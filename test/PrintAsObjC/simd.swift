@@ -12,7 +12,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -parse-as-library %t/simd_test.swiftmodule -parse -emit-objc-header-path %t/simd.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: FileCheck %s < %t/simd.h
 // RUN: %check-in-clang %t/simd.h
-// RUN: %check-in-clang -fno-modules %t/simd.h -include Foundation.h
+// RUN: %check-in-clang -fno-modules -Qunused-arguments %t/simd.h -include Foundation.h
 
 // REQUIRES: objc_interop
 
@@ -30,12 +30,12 @@ import simd
 // CHECK-LABEL: @interface Foo : NSObject
 @objc class Foo: NSObject {
   // CHECK-LABEL: - (swift_float4)doStuffWithFloat4:(swift_float4)x;
-  @objc func doStuffWithFloat4(x: float4) -> float4 { return x }
+  @objc func doStuffWithFloat4(_ x: float4) -> float4 { return x }
   // CHECK-LABEL: - (swift_double2)doStuffWithDouble2:(swift_double2)x;
-  @objc func doStuffWithDouble2(x: double2) -> double2 { return x }
+  @objc func doStuffWithDouble2(_ x: double2) -> double2 { return x }
   // CHECK-LABEL: - (swift_int3)doStuffWithInt3:(swift_int3)x;
-  @objc func doStuffWithInt3(x: int3) -> int3 { return x }
+  @objc func doStuffWithInt3(_ x: int3) -> int3 { return x }
   // CHECK-LABEL: - (swift_uint4)doStuffWithUInt4:(swift_uint4)x;
-  @objc func doStuffWithUInt4(x: uint4) -> uint4 { return x }
+  @objc func doStuffWithUInt4(_ x: uint4) -> uint4 { return x }
 }
 

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// An iterator over the elements of `Range<Element>`.
+@_fixed_layout
 public struct RangeIterator<
   Element : ForwardIndex
 > : IteratorProtocol, Sequence {
@@ -67,11 +68,12 @@ public struct RangeIterator<
 ///
 /// However, subscripting that range still works in a generic context:
 ///
-///     func brackets<Element : ForwardIndex>(x: Range<Element>, i: Element) -> Element {
+///     func brackets<Element : ForwardIndex>(_ x: Range<Element>, i: Element) -> Element {
 ///       return x[i] // Just forward to subscript
 ///     }
 ///     print(brackets(Range<Int>(start: -99, end: 100), 0))
 ///     // Prints "0"
+@_fixed_layout
 public struct Range<
   Element : ForwardIndex
 > : Equatable, Collection,
@@ -87,6 +89,7 @@ public struct Range<
 
   /// Construct a range with `startIndex == start` and `endIndex ==
   /// end`.
+  @_versioned
   @_transparent
   internal init(_start: Element, end: Element) {
     self.startIndex = _start
@@ -156,14 +159,14 @@ extension Range : CustomReflectable {
 /// O(1) implementation of `contains()` for ranges of comparable elements.
 extension Range where Element : Comparable {
   @warn_unused_result
-  public func _customContainsEquatableElement(element: Element) -> Bool? {
+  public func _customContainsEquatableElement(_ element: Element) -> Bool? {
     return element >= self.startIndex && element < self.endIndex
   }
 
   // FIXME: copied from SequenceAlgorithms as a workaround for
   // https://bugs.swift.org/browse/SR-435
   @warn_unused_result
-  public func contains(element: Element) -> Bool {
+  public func contains(_ element: Element) -> Bool {
     if let result = _customContainsEquatableElement(element) {
       return result
     }

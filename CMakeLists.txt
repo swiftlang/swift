@@ -137,6 +137,20 @@ option(SWIFT_ENABLE_LTO
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
   "Define the maximum number of linker jobs for swift.")
+set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
+  "Path to the directory that contains the Android NDK tools that are executable on the build machine")
+set(SWIFT_ANDROID_NDK_TOOLCHAIN_VERSION "" CACHE STRING
+  "A version of the toolchain to use when building for Android. Use 4.8 for 32-bit builds, 4.9 for 64-bit builds")
+set(SWIFT_ANDROID_SDK_PATH "" CACHE STRING
+  "Path to the directory that contains the Android SDK tools that will be passed to the swiftc frontend")
+set(SWIFT_ANDROID_ICU_UC "" CACHE STRING
+  "Path to a directory containing libicuuc.so")
+set(SWIFT_ANDROID_ICU_UC_INCLUDE "" CACHE STRING
+  "Path to a directory containing headers for libicuuc")
+set(SWIFT_ANDROID_ICU_I18N "" CACHE STRING
+  "Path to a directory containing libicui18n.so")
+set(SWIFT_ANDROID_ICU_I18N_INCLUDE "" CACHE STRING
+  "Path to a directory containing headers libicui18n")
 
 #
 # User-configurable Darwin-specific options.
@@ -213,6 +227,10 @@ option(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 
 option(SWIFT_STDLIB_ENABLE_RESILIENCE
     "Build the standard libraries and overlays with resilience enabled; see docs/LibraryEvolution.rst"
+    FALSE)
+
+option(SWIFT_STDLIB_ENABLE_REFLECTION_METADATA
+    "Build the standard libraries and overlays with remote reflection metadata; see docs/proposals/RemoteMirrors.rst"
     FALSE)
 
 option(SWIFT_STDLIB_SIL_SERIALIZE_ALL
@@ -347,7 +365,7 @@ set(SWIFT_GYB_FLAGS
 
 # Directory to use as the Clang module cache when building Swift source files.
 set(SWIFT_MODULE_CACHE_PATH
-    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/clang-module-cache")
+    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/module-cache")
 
 # Xcode: use libc++ and c++11 using proper build settings.
 if(XCODE)
@@ -421,9 +439,33 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
 
   # FIXME: This will not work while trying to cross-compile.
   if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
-    configure_sdk_unix(LINUX "Linux" "linux" "linux" "x86_64" "x86_64-unknown-linux-gnu")
     set(SWIFT_HOST_VARIANT_ARCH "x86_64")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+
+    if("${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+      set(swift_can_crosscompile_stdlib FALSE)
+    else()
+      set(swift_can_crosscompile_stdlib TRUE)
+    endif()
+
+    is_sdk_requested(LINUX swift_build_linux)
+    if(swift_build_linux)
+      configure_sdk_unix(LINUX "Linux" "linux" "linux" "x86_64" "x86_64-unknown-linux-gnu")
+      set(SWIFT_PRIMARY_VARIANT_SDK_default "LINUX")
+      set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+    endif()
+
+    is_sdk_requested(ANDROID swift_build_android)
+    if(swift_build_android AND ${swift_can_crosscompile_stdlib})
+      configure_sdk_unix(ANDROID "Android" "android" "android" "armv7" "armv7-none-linux-androideabi")
+      # This must be set, as variables such as "${SWIFT_SDK_${sdk}_PATH}" are
+      # referenced in several other locations.
+      set(SWIFT_SDK_ANDROID_PATH "${SWIFT_ANDROID_SDK_PATH}")
+
+      set(SWIFT_PRIMARY_VARIANT_SDK_default "ANDROID")
+      set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")
+    endif()
+
   # FIXME: This only matches ARMv6l (by far the most common variant).
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv6l")
     configure_sdk_unix(LINUX "Linux" "linux" "linux" "armv6" "armv6-unknown-linux-gnueabihf")
@@ -683,7 +725,11 @@ endif()
 #
 # Set up global CMake variables for API notes.
 #
-
+# API notes version 1.0.0
+#
+# Change the above comment to 'touch' this file and keep incremental builds
+# working when adding a new apinotes file.
+#
 set(SWIFT_API_NOTES_PATH "${SWIFT_SOURCE_DIR}/apinotes")
 if(NOT EXISTS "${SWIFT_API_NOTES_PATH}/Foundation.apinotes")
   message(FATAL_ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
@@ -700,13 +746,13 @@ if(SWIFT_BUILD_TOOLS)
   add_subdirectory(include)
   add_subdirectory(lib)
   add_subdirectory(tools)
+  add_subdirectory(tools/swift-reflection-dump)
 endif()
 add_subdirectory(utils)
 add_subdirectory(stdlib)
 
-if(SWIFT_BUILD_TOOLS)
+if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
   add_subdirectory(tools/swift-reflection-test)
-  add_subdirectory(tools/swift-reflection-dump)
 endif()
 
 if(SWIFT_BUILD_PERF_TESTSUITE AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")

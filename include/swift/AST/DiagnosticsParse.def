@@ -148,8 +148,8 @@ WARNING(lex_editor_placeholder_in_playground,none,
 
 NOTE(note_in_decl_extension,none,
      "in %select{declaration|extension}0 of %1", (bool, Identifier))
-WARNING(line_directive_style_deprecated,none,
-        "#line directive is deprecated, please use #sourceLocation instead",
+ERROR(line_directive_style_deprecated,none,
+        "#line directive was renamed to #sourceLocation",
         ())
 
 ERROR(declaration_same_line_without_semi,none,
@@ -180,6 +180,9 @@ ERROR(disallowed_init,none,
       "initial value is not allowed here", ())
 ERROR(var_init_self_referential,none,
       "variable used within its own initial value", ())
+ERROR(expected_self_before_reference,none,
+      "expected self. before member name", ())
+
 ERROR(disallowed_enum_element,none,
       "enum 'case' is not allowed outside of an enum", ())
 ERROR(decl_inner_scope,none,
@@ -284,8 +287,6 @@ ERROR(expected_type_in_associatedtype,PointsToFirstBadToken,
       "expected type in associatedtype declaration", ())
 ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
       "associated types may not have a generic parameter list", ())
-ERROR(typealias_generic_list_constraint,PointsToFirstBadToken,
-      "type parameters may not be constrained in typealias argument list", ())
 
 
 // Func
@@ -738,9 +739,9 @@ ERROR(invalid_label_on_stmt,none,
 NOTE(discard_result_of_closure,none,
      "explicitly discard the result of the closure by assigning to '_'", ())
 
-WARNING(snake_case_deprecated,none,
-        "%0 is deprecated and will be removed in Swift 3, please use %1",
-        (StringRef, StringRef))
+ERROR(snake_case_deprecated,none,
+      "%0 has been replaced with %1 in Swift 3",
+      (StringRef, StringRef))
 
 
 // Assignment statement
@@ -1078,8 +1079,8 @@ ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
 // Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
 
-WARNING(replace_equal_with_colon_for_value,none,
-        "'=' is deprecated in favor of ':' before an attribute argument", ())
+ERROR(replace_equal_with_colon_for_value,none,
+      "'=' has been replaced with ':' in attribute arguments", ())
 ERROR(expected_attribute_name,none,
       "expected an attribute name", ())
 ERROR(unknown_attribute,none,
@@ -1164,6 +1165,11 @@ ERROR(attr_availability_renamed, none,
 // autoclosure
 ERROR(attr_autoclosure_expected_r_paren,PointsToFirstBadToken,
       "expected ')' in @autoclosure", ())
+ERROR(attr_noescape_conflicts_escaping_autoclosure,none,
+      "@noescape conflicts with @autoclosure(escaping)", ())
+ERROR(attr_noescape_implied_by_autoclosure,none,
+      "@noescape is implied by @autoclosure and should not be "
+      "redundantly specified", ())
 
 // convention
 ERROR(convention_attribute_expected_lparen,none,
@@ -1284,11 +1290,11 @@ ERROR(unsupported_conditional_compilation_integer,none,
 ERROR(version_component_not_number,none,
       "version component contains non-numeric characters", ())
 ERROR(compiler_version_too_many_components,none,
-			"compiler version must not have more than five components", ())
+      "compiler version must not have more than five components", ())
 WARNING(unused_compiler_version_component,none,
-			"the second version component is not used for comparison", ())
+      "the second version component is not used for comparison", ())
 ERROR(empty_version_component,none,
-			"found empty version component", ())
+      "found empty version component", ())
 ERROR(compiler_version_component_out_of_range,none,
       "compiler version component out of range: must be in [0, %0]",
       (unsigned))

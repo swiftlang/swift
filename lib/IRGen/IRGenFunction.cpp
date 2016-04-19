@@ -36,7 +36,7 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM,
                              const SILDebugScope *DbgScope,
                              Optional<SILLocation> DbgLoc)
   : IGM(IGM), Builder(IGM.getLLVMContext()),
-    CurFn(Fn),  DbgScope(DbgScope)
+    CurFn(Fn), DbgScope(DbgScope)
   {
 
   // Make sure the instructions in this function are attached its debug scope.
@@ -53,6 +53,8 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM,
   // file or via annotations.
   if (IGM.Opts.Sanitize == SanitizerKind::Address)
     Fn->addFnAttr(llvm::Attribute::SanitizeAddress);
+  if (IGM.Opts.Sanitize == SanitizerKind::Thread)
+    Fn->addFnAttr(llvm::Attribute::SanitizeThread);
 
   emitPrologue();
 }

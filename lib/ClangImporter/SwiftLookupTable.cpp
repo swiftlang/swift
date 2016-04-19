@@ -84,7 +84,7 @@ translateDeclToContext(clang::NamedDecl *decl) {
     // If this typedef is merely a restatement of a tag declaration's type,
     // return the result for that tag.
     if (auto tag = typedefName->getUnderlyingType()->getAsTagDecl())
-      return translateDeclToContext(tag);
+      return translateDeclToContext(const_cast<clang::TagDecl *>(tag));
 
     // Otherwise, this must be a typedef mapped to a strong type.
     return std::make_pair(SwiftLookupTable::ContextKind::Typedef,
@@ -105,13 +105,8 @@ SwiftLookupTable::translateContext(EffectiveClangContext context) {
       return std::make_pair(ContextKind::TranslationUnit, StringRef());
     
     // Tag declaration context.
-    if (auto tag = dyn_cast<clang::TagDecl>(dc)) {
-      if (tag->getIdentifier())
-        return std::make_pair(ContextKind::Tag, tag->getName());
-      if (auto typedefDecl = tag->getTypedefNameForAnonDecl())
-        return std::make_pair(ContextKind::Tag, typedefDecl->getName());
-      return None;
-    }
+    if (auto tag = dyn_cast<clang::TagDecl>(dc))
+      return translateDeclToContext(const_cast<clang::TagDecl *>(tag));
 
     // Objective-C class context.
     if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(dc))
@@ -130,10 +125,8 @@ SwiftLookupTable::translateContext(EffectiveClangContext context) {
 
   case EffectiveClangContext::UnresolvedContext:
     // Resolve the context.
-    if (auto decl = resolveContext(context.getUnresolvedName())) {
-      if (auto context = translateDeclToContext(decl))
-        return context;
-    }
+    if (auto decl = resolveContext(context.getUnresolvedName()))
+      return translateDeclToContext(decl);
 
     return None;
   }
@@ -165,6 +158,66 @@ void SwiftLookupTable::addCategory(clang::ObjCCategoryDecl *category) {
 
   // Add the category.
   Categories.push_back(category);
+}
+
+bool SwiftLookupTable::resolveUnresolvedEntries(
+    SmallVectorImpl<SingleEntry> &unresolved) {
+  // Common case: nothing left to resolve.
+  unresolved.clear();
+  if (UnresolvedEntries.empty()) return false;
+
+  // Reprocess each of the unresolved entries to see if it can be
+  // resolved now that we're done. This occurs when a swift_name'd
+  // entity becomes a member of an entity that follows it in the
+  // translation unit, e.g., given:
+  //
+  // \code
+  //   typedef enum FooSomeEnumeration __attribute__((Foo.SomeEnum)) {
+  //     ...
+  //   } FooSomeEnumeration;
+  //
+  //   typedef struct Foo {
+  //     
+  //   } Foo;
+  // \endcode
+  //
+  // FooSomeEnumeration belongs inside "Foo", but we haven't actually
+  // seen "Foo" yet. Therefore, we will reprocess FooSomeEnumeration
+  // at the end, once "Foo" is available. There are several reasons
+  // this loop can execute:
+  //
+  // * Import-as-member places an entity inside of an another entity
+  // that comes later in the translation unit. The number of
+  // iterations that can be caused by this is bounded by the nesting
+  // depth. (At present, that depth is limited to 2).
+  //
+  // * An erroneous import-as-member will cause an extra iteration at
+  // the end, so that the loop can detect that nothing changed and
+  // return a failure.
+  while (true) {
+    // Take the list of unresolved entries to process.
+    auto prevNumUnresolvedEntries = UnresolvedEntries.size();
+    auto currentUnresolved = std::move(UnresolvedEntries);
+    UnresolvedEntries.clear();
+
+    // Process each of the currently-unresolved entries.
+    for (const auto &entry : currentUnresolved)
+      addEntry(std::get<0>(entry), std::get<1>(entry), std::get<2>(entry));
+
+    // Are we done?
+    if (UnresolvedEntries.empty()) return false;
+
+    // If nothing changed, fail: something is unresolvable, and the
+    // caller should complain.
+    if (UnresolvedEntries.size() == prevNumUnresolvedEntries) {
+      for (const auto &entry : UnresolvedEntries)
+        unresolved.push_back(std::get<1>(entry));
+      return true;
+    }
+
+    // Something got resolved, so loop again.
+    assert(UnresolvedEntries.size() < prevNumUnresolvedEntries);
+  }
 }
 
 /// Determine whether the entry is a global declaration that is being
@@ -237,7 +290,19 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
 
   // Translate the context.
   auto contextOpt = translateContext(effectiveContext);
-  if (!contextOpt) return;
+  if (!contextOpt) {
+    // If it is a declaration with a swift_name attribute, we might be
+    // able to resolve this later.
+    if (auto decl = newEntry.dyn_cast<clang::NamedDecl *>()) {
+      if (decl->hasAttr<clang::SwiftNameAttr>()) {
+        UnresolvedEntries.push_back(
+          std::make_tuple(name, newEntry, effectiveContext));
+      }
+    }
+
+    return;
+  }
+
   auto context = *contextOpt;
 
   // If this is a global imported as a member, record is as such.

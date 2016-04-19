@@ -7,7 +7,7 @@
 // CHECK: , !dbg ![[DBG:.*]]
 // CHECK: ret void
 
-func get_truth(input: Int64) -> Int64 {
+func get_truth(_ input: Int64) -> Int64 {
     return input % 2
 }
 
@@ -17,11 +17,11 @@ infix operator &&&&& {
   precedence 120
 }
 
-func &&&&&(lhs: Boolean, @autoclosure rhs: () -> Boolean) -> Bool {
+func &&&&&(lhs: Boolean, rhs: @autoclosure () -> Boolean) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
 
-func call_me(input: Int64) -> Void {
+func call_me(_ input: Int64) -> Void {
 // rdar://problem/14627460
 // An autoclosure should have a line number in the debug info and a scope line of 0.
 // CHECK-DAG: !DISubprogram({{.*}}linkageName: "_TFF11autoclosure7call_meFVs5Int64T_u_KT_Ps7Boolean_",{{.*}} line: [[@LINE+3]],{{.*}} isLocal: false, isDefinition: true

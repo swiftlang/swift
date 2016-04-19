@@ -55,6 +55,7 @@ namespace swift {
   class DeclContext;
   class DefaultArgumentInitializer;
   class ExtensionDecl;
+  class ForeignRepresentationInfo;
   class FuncDecl;
   class LazyResolver;
   class PatternBindingDecl;
@@ -517,9 +518,10 @@ public:
 
   /// Determine whether the given Swift type is representable in a
   /// given foreign language.
-  std::pair<ForeignRepresentableKind, ProtocolConformance *>
-  getForeignRepresentable(NominalTypeDecl *nominal, ForeignLanguage language,
-                          DeclContext *dc);
+  ForeignRepresentationInfo
+  getForeignRepresentationInfo(NominalTypeDecl *nominal,
+                               ForeignLanguage language,
+                               DeclContext *dc);
 
   /// Add a declaration to a list of declarations that need to be emitted
   /// as part of the current module or source file, but are otherwise not

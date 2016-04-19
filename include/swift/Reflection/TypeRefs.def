@@ -30,5 +30,8 @@ TYPEREF(DependentMember, TypeRef)
 TYPEREF(ForeignClass, TypeRef)
 TYPEREF(ObjCClass, TypeRef)
 TYPEREF(Opaque, TypeRef)
+TYPEREF(UnownedStorage, TypeRef)
+TYPEREF(UnmanagedStorage, TypeRef)
+TYPEREF(WeakStorage, TypeRef)
 
 #undef TYPEREF

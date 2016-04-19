@@ -5,7 +5,7 @@ import simd
 
 // Work around rdar://problem/20577079 with a Swift function that touches all
 // the fields of float4, forcing it to be validated.
-func forceStuff(x: float4, y: float3) -> (Float,Float,Float,Float) {
+func forceStuff(x: float4, y: float3) -> (Float, Float, Float, Float) {
   if true {
     return (y.x, y.y, y.z, y.x)
   } else {

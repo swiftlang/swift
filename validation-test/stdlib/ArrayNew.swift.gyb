@@ -46,11 +46,11 @@ var ArrayTestSuite = TestSuite("Array")
 // FIXME: incomplete.
 //===----------------------------------------------------------------------===//
 
-func withInoutInt(x: inout Int, body: (x: inout Int) -> Void) {
+func withInoutInt(_ x: inout Int, body: (x: inout Int) -> Void) {
   body(x: &x)
 }
 
-func withInoutT<T>(x: inout T, body: (x: inout T) -> Void) {
+func withInoutT<T>(_ x: inout T, body: (x: inout T) -> Void) {
   body(x: &x)
 }
 
@@ -58,15 +58,15 @@ func withInoutT<T>(x: inout T, body: (x: inout T) -> Void) {
 %   for array_type in all_array_types:
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
-  var a: ${array_type}<${array_type}<${element_type}>> = [ [
+  var a: ${array_type}<${array_type}<${element_type}>> = [[
     ${element_type}(10), ${element_type}(20), ${element_type}(30),
     ${element_type}(40), ${element_type}(50), ${element_type}(60),
     ${element_type}(70)
-  ] ]
+  ]]
   let identityOuter = a.identity
   var identityInner = a[0].identity
 
-  func checkIdentity(stackTrace: SourceLocStack) {
+  func checkIdentity(_ stackTrace: SourceLocStack) {
 %     if element_type == 'TestValueTy':
     // Does not reallocate storage because we changed a property based on a
     // reference; array storage was not changed.  Writeback of the inner array
@@ -128,15 +128,15 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
 }
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW") {
-  var a: ${array_type}<${array_type}<${element_type}>> = [ [
+  var a: ${array_type}<${array_type}<${element_type}>> = [[
     ${element_type}(10), ${element_type}(20), ${element_type}(30),
     ${element_type}(40), ${element_type}(50), ${element_type}(60),
     ${element_type}(70), ${element_type}(80), ${element_type}(90),
-  ] ]
+  ]]
   let identityOuter = a.identity
   var identityInner = a[0].identity
 
-  func checkIdentity(stackTrace: SourceLocStack) {
+  func checkIdentity(_ stackTrace: SourceLocStack) {
 %     if element_type == 'TestValueTy':
     // Does not reallocate storage because we changed a property based on a
     // reference; array storage was not changed.
@@ -235,26 +235,26 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
 // FIXME: incomplete.
 //===----------------------------------------------------------------------===//
 
-func isNativeArray<Element>(a: Array<Element>) -> Bool {
+func isNativeArray<Element>(_ a: Array<Element>) -> Bool {
   return a._hoistableIsNativeTypeChecked()
 }
 
-func isCocoaArray<Element>(a: Array<Element>) -> Bool {
+func isCocoaArray<Element>(_ a: Array<Element>) -> Bool {
   return !isNativeArray(a)
 }
 
-func getAsImmutableNSArray(a: Array<Int>) -> NSArray {
-  var elements = a.map { TestObjCValueTy($0) as AnyObject? }
+func getAsImmutableNSArray(_ a: Array<Int>) -> NSArray {
+  var elements = a.map { TestObjCValueTy($0) as AnyObject }
   return NSArray(objects: &elements, count: elements.count)
 }
 
-func getAsNSArray(a: Array<Int>) -> NSArray {
+func getAsNSArray(_ a: Array<Int>) -> NSArray {
   // Return an `NSMutableArray` to make sure that it has a unique
   // pointer identity.
   return getAsNSMutableArray(a)
 }
 
-func getAsNSMutableArray(a: Array<Int>) -> NSMutableArray {
+func getAsNSMutableArray(_ a: Array<Int>) -> NSMutableArray {
   let result = NSMutableArray()
   for element in a {
     result.add(TestObjCValueTy(element))
@@ -273,7 +273,7 @@ class CustomImmutableNSArray : NSArray {
     super.init()
   }
 
-  override init(objects: UnsafePointer<AnyObject?>, count: Int) {
+  override init(objects: UnsafePointer<AnyObject>, count: Int) {
     super.init(objects: objects, count: count)
   }
 
@@ -282,7 +282,7 @@ class CustomImmutableNSArray : NSArray {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone) -> AnyObject {
+  override func copy(with zone: NSZone?) -> AnyObject {
     CustomImmutableNSArray.timesCopyWithZoneWasCalled += 1
     return self
   }
@@ -302,7 +302,7 @@ class CustomImmutableNSArray : NSArray {
   @objc
   override func countByEnumerating(
     with state: UnsafeMutablePointer<NSFastEnumerationState>,
-    objects: AutoreleasingUnsafeMutablePointer<AnyObject?>,
+    objects: AutoreleasingUnsafeMutablePointer<AnyObject>,
     count: Int
   ) -> Int {
     var theState = state.pointee

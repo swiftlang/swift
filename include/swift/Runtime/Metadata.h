@@ -907,6 +907,9 @@ extern "C" const ValueWitnessTable _TWVXwGSqBo_; // weak Builtin.NativeObject?
 SWIFT_RUNTIME_EXPORT
 extern "C" const ExtraInhabitantsValueWitnessTable _TWVBb; // Builtin.BridgeObject
 
+SWIFT_RUNTIME_EXPORT
+extern "C" const ExtraInhabitantsValueWitnessTable _TWVBp; // Builtin.RawPointer
+
 #if SWIFT_OBJC_INTEROP
 // The ObjC-pointer table can be used for arbitrary ObjC pointer types.
 SWIFT_RUNTIME_EXPORT
@@ -1287,6 +1290,8 @@ SWIFT_RUNTIME_EXPORT
 extern "C" const FullOpaqueMetadata _TMBo;        // Builtin.NativeObject
 SWIFT_RUNTIME_EXPORT
 extern "C" const FullOpaqueMetadata _TMBb;        // Builtin.BridgeObject
+SWIFT_RUNTIME_EXPORT
+extern "C" const FullOpaqueMetadata _TMBp;        // Builtin.RawPointer
 SWIFT_RUNTIME_EXPORT
 extern "C" const FullOpaqueMetadata _TMBB;        // Builtin.UnsafeValueBuffer
 #if SWIFT_OBJC_INTEROP

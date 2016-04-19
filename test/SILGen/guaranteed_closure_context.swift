@@ -2,7 +2,7 @@
 
 func use<T>(_: T) {}
 
-func escape(f: () -> ()) {}
+func escape(_ f: () -> ()) {}
 
 protocol P {}
 class C: P {}

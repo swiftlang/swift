@@ -32,6 +32,7 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
   add_subdirectory(Reflection)
+  add_subdirectory(SwiftRemoteMirror)
 endif()
 
 if(SWIFT_BUILD_SDK_OVERLAY)

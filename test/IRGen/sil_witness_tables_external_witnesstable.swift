@@ -8,7 +8,7 @@ import Swift
 // CHECK: @_TMVs1X = external global %swift.type
 // CHECK: @_TWPVs1Xs1Ps = external global i8*
 
-func doSomething<T : P>(t : T) -> Y {
+func doSomething<T : P>(_ t : T) -> Y {
   return t.doSomething()
 }
 

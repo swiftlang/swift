@@ -1576,6 +1576,8 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
          "variable not validated yet");
   assert(!VD->isStatic() && "Static vars are already lazy on their own");
 
+  maybeAddMaterializeForSet(VD, *this);
+
   // Create the storage property as an optional of VD's type.
   SmallString<64> NameBuf = VD->getName().str();
   NameBuf += ".storage";
@@ -2062,9 +2064,6 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   configureConstructorType(ctor, selfType, bodyParams->getType(ctx),
                            superclassCtor->isBodyThrowing());
   if (superclassCtor->isObjC()) {
-    auto errorConvention = superclassCtor->getForeignErrorConvention();
-    markAsObjC(tc, ctor, ObjCReason::ImplicitlyObjC, errorConvention);
-
     // Inherit the @objc name from the superclass initializer, if it
     // has one.
     if (auto objcAttr = superclassCtor->getAttrs().getAttribute<ObjCAttr>()) {
@@ -2075,6 +2074,9 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
         ctor->getAttrs().add(clonedAttr);
       }
     }
+
+    auto errorConvention = superclassCtor->getForeignErrorConvention();
+    markAsObjC(tc, ctor, ObjCReason::ImplicitlyObjC, errorConvention);
   }
   if (superclassCtor->isRequired())
     ctor->getAttrs().add(new (tc.Context) RequiredAttr(/*implicit=*/true));
@@ -2142,7 +2144,7 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   typeCheckDecl(DD, /*isFirstPass=*/true);
 
   // Create an empty body for the destructor.
-  DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc(),true));
+  DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc(), true));
   CD->addMember(DD);
   CD->setHasDestructor();
 }

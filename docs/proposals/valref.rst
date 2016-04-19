@@ -245,7 +245,7 @@ Function Parameters
 Function parameters can be explicitly declared ``val``, or ``ref``::
 
   func baz(
-      x: Int      // x is passed by-value
+      _ x: Int      // x is passed by-value
     , val y: Int  // just like "y: Int"
     , ref z: Int  // allocate z on the heap
 
@@ -290,7 +290,7 @@ type parameter, as follows::
 parameters::
 
   // Fill an array with independent copies of x
-  func fill<T:val>(array:[T], x:T) {
+  func fill<T:val>(_ array:[T], x:T) {
     for i in 0...array.length {
       array[i] = x
     }
@@ -432,16 +432,16 @@ How This Design Beats Rust/C++/C#/etc.
 
 * Simple programs stay simple.  Rust has a great low-level memory safety
   story, but it comes at the expense of ease-of-use.  You can't learn
-  to use that system effectively without confronting three `kinds`__
+  to use that system effectively without confronting two `kinds`__
   of pointer, `named lifetimes`__, `borrowing managed boxes and
   rooting`__, etc.  By contrast, there's a path to learning swift that
   postpones the ``val``\ /``ref`` distinction, and that's pretty much
   *all* one must learn to have a complete understanding of the object
   model in the "easy" and "safe" zones.
 
-__ http://static.rust-lang.org/doc/tutorial.html#boxes-and-pointers
-__ http://static.rust-lang.org/doc/tutorial-borrowed-ptr.html#named-lifetimes
-__ http://static.rust-lang.org/doc/tutorial-borrowed-ptr.html#borrowing-managed-boxes-and-rooting
+__ https://doc.rust-lang.org/reference.html#pointer-types
+__ https://doc.rust-lang.org/book/lifetimes.html
+__ https://doc.rust-lang.org/book/box-syntax-and-patterns.html
 
 * Simple programs stay safe.  C++ offers great control over
   everything, but the sharp edges are always exposed.  This design

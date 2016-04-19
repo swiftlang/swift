@@ -4,6 +4,8 @@ add_swift_library(swiftIRGen
   ExtraInhabitants.cpp
   Fulfillment.cpp
   GenArchetype.cpp
+  GenBuiltin.cpp
+  GenCall.cpp
   GenCast.cpp
   GenClangDecl.cpp
   GenClangType.cpp

@@ -19,10 +19,12 @@
 
 // APPKIT-LABEL: {{^}}class NSView : NSObject, NSCoding, NSAccessibility {{{$}}
 // APPKIT-NEXT: init?(coder aDecoder: NSCoder)
+// APPKIT-NEXT: @discardableResult
 // APPKIT-NEXT: func isDescendant(of aView: NSView) -> Bool
+// APPKIT-NEXT: @discardableResult
 // APPKIT-NEXT: func ancestorShared(with aView: NSView) -> NSView?
-// APPKIT-NEXT: func addSubview(aView: NSView)
-// APPKIT-NEXT: func addSubview(aView: NSView, positioned place: UInt32, relativeTo otherView: NSView?)
+// APPKIT-NEXT: func addSubview(_ aView: NSView)
+// APPKIT-NEXT: func addSubview(_ aView: NSView, positioned place: UInt32, relativeTo otherView: NSView?)
 // APPKIT-NEXT: unowned(unsafe) var superview: @sil_unmanaged NSView? { get }
 // APPKIT-NEXT: var layer: CALayer?
 // APPKIT-NEXT: var trackingAreas: [AnyObject] { get }

@@ -46,7 +46,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   ///   unnecessary reallocation.
   @warn_unused_result
   mutating func requestUniqueMutableBackingBuffer(
-    minimumCapacity minimumCapacity: Int
+    minimumCapacity: Int
   ) -> _ContiguousArrayBuffer<Element>?
 
   /// Returns `true` iff this buffer is backed by a uniquely-referenced mutable
@@ -70,7 +70,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   /// - Precondition: This buffer is backed by a uniquely-referenced
   /// `_ContiguousArrayBuffer`.
   mutating func replace<C : Collection where C.Iterator.Element == Element>(
-    subRange subRange: Range<Int>,
+    subRange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
   )
@@ -82,7 +82,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
   func withUnsafeBufferPointer<R>(
-    @noescape body: (UnsafeBufferPointer<Element>) throws -> R
+    _ body: @noescape (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
@@ -90,7 +90,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   ///
   /// - Precondition: Such contiguous storage exists or the buffer is empty.
   mutating func withUnsafeMutableBufferPointer<R>(
-    @noescape body: (UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @noescape (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R
 
   /// The number of elements the buffer stores.
@@ -102,19 +102,18 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   /// An object that keeps the elements stored in this buffer alive.
   var owner: AnyObject { get }
 
+  /// A pointer to the first element.
+  ///
+  /// - Precondition: The elements are known to be stored contiguously.
+  var firstElementAddress: UnsafeMutablePointer<Element> { get }
+
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.
-  var firstElementAddress: UnsafeMutablePointer<Element> { get }
+  var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? { get }
 
   /// Returns a base address to which you can add an index `i` to get the
   /// address of the corresponding element at `i`.
   var subscriptBaseAddress: UnsafeMutablePointer<Element> { get }
-
-  /// Like `subscriptBaseAddress`, but can assume that `self` is a mutable,
-  /// uniquely referenced native representation.
-  /// - Precondition: `_isNative` is `true`.
-  var _unconditionalMutableSubscriptBaseAddress:
-    UnsafeMutablePointer<Element> { get }
 
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
@@ -129,15 +128,10 @@ extension _ArrayBufferProtocol {
     return firstElementAddress
   }
 
-  public var _unconditionalMutableSubscriptBaseAddress:
-    UnsafeMutablePointer<Element> {
-    return subscriptBaseAddress
-  }
-
   public mutating func replace<
     C : Collection where C.Iterator.Element == Element
   >(
-    subRange subRange: Range<Int>,
+    subRange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
   ) {
@@ -149,8 +143,6 @@ extension _ArrayBufferProtocol {
     self.count = oldCount + growth
 
     let elements = self.subscriptBaseAddress
-    _sanityCheck(elements != nil)
-
     let oldTailIndex = subRange.endIndex
     let oldTailStart = elements + oldTailIndex
     let newTailIndex = oldTailIndex + growth

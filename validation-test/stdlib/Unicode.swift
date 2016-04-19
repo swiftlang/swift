@@ -112,7 +112,7 @@ class EOFCountingIterator<T> : IteratorProtocol {
 }
 
 func checkDecodeUTF<Codec : UnicodeCodec>(
-    codec: Codec.Type, _ expectedHead: [UInt32],
+    _ codec: Codec.Type, _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utfStr: [Codec.CodeUnit]
 ) -> AssertionResult {
   do {
@@ -160,14 +160,14 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
 }
 
 func checkDecodeUTF8(
-    expectedHead: [UInt32],
+    _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utf8Str: [UInt8]
 ) -> AssertionResult {
   return checkDecodeUTF(UTF8.self, expectedHead, expectedRepairedTail, utf8Str)
 }
 
 func checkDecodeUTF16(
-    expectedHead: [UInt32],
+    _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utf16Str: [UInt16]
 ) -> AssertionResult {
   return checkDecodeUTF(UTF16.self, expectedHead, expectedRepairedTail,
@@ -175,14 +175,14 @@ func checkDecodeUTF16(
 }
 
 func checkDecodeUTF32(
-    expectedHead: [UInt32],
+    _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utf32Str: [UInt32]
 ) -> AssertionResult {
   return checkDecodeUTF(UTF32.self, expectedHead, expectedRepairedTail,
       utf32Str)
 }
 
-func checkEncodeUTF8(expected: [UInt8],
+func checkEncodeUTF8(_ expected: [UInt8],
                      _ scalars: [UInt32]) -> AssertionResult {
   var encoded = [UInt8]()
   let output: (UInt8) -> Void = { encoded.append($0) }
@@ -797,7 +797,7 @@ var UTF8Decoder = TestSuite("UTF8Decoder")
 UTF8Decoder.test("Internal/_decodeOne") {
 
   // Ensure we accept all valid scalars
-  func ensureValid(scalar: UnicodeScalar) {
+  func ensureValid(_ scalar: UnicodeScalar) {
     var data: UInt32 = 0
     var i: UInt32 = 0
     Swift.UTF8.encode(scalar) { cp in
@@ -2200,7 +2200,7 @@ class NonContiguousNSString : NSString {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone) -> AnyObject {
+  override func copy(with zone: NSZone?) -> AnyObject {
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self
@@ -2217,17 +2217,17 @@ class NonContiguousNSString : NSString {
   var _value: [UInt16]
 }
 
-func checkUTF8View(expected: [UInt8], _ subject: String,
+func checkUTF8View(_ expected: [UInt8], _ subject: String,
     _ stackTrace: SourceLocStack) {
   checkForwardCollection(expected, subject.utf8)
 }
 
-func checkUTF16View(expected: [UInt16], _ subject: String,
+func checkUTF16View(_ expected: [UInt16], _ subject: String,
     _ stackTrace: SourceLocStack) {
   checkSliceableWithBidirectionalIndex(expected, subject.utf16)
 }
 
-func forStringsWithUnpairedSurrogates(checkClosure: (UTF16Test, String) -> Void) {
+func forStringsWithUnpairedSurrogates(_ checkClosure: (UTF16Test, String) -> Void) {
   for (name, batch) in UTF16Tests {
     print("Batch: \(name)")
     for test in batch {
@@ -2287,7 +2287,7 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
   }
 }
 
-func verifyThatStringIsOpaqueForCoreFoundation(nss: NSString) {
+func verifyThatStringIsOpaqueForCoreFoundation(_ nss: NSString) {
   // Sanity checks to make sure we are testing the code path that does UTF-8
   // encoding itself, instead of dispatching to CF.  Both the original string
   // itself and its copies should be resilient to CF's fast path functions,

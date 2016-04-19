@@ -23,7 +23,7 @@ public prefix func !<T : Boolean>(a: T) -> Bool {
 @inline(__always)
 @warn_unused_result
 public func && <T : Boolean, U : Boolean>(
-  lhs: T, @autoclosure rhs: () throws -> U
+  lhs: T, rhs: @autoclosure () throws -> U
 ) rethrows -> Bool {
   return lhs.boolValue ? try rhs().boolValue : false
 }
@@ -33,7 +33,7 @@ public func && <T : Boolean, U : Boolean>(
 @inline(__always)
 @warn_unused_result
 public func || <T : Boolean, U : Boolean>(
-  lhs: T, @autoclosure rhs: () throws -> U
+  lhs: T, rhs: @autoclosure () throws -> U
 ) rethrows -> Bool {
   return lhs.boolValue ? true : try rhs().boolValue
 }
@@ -44,7 +44,7 @@ public func || <T : Boolean, U : Boolean>(
 @_transparent
 @warn_unused_result
 public func && <T : Boolean>(
-  lhs: T, @autoclosure rhs: () throws -> Bool
+  lhs: T, rhs: @autoclosure () throws -> Bool
 ) rethrows -> Bool {
   return lhs.boolValue ? try rhs().boolValue : false
 }
@@ -52,7 +52,7 @@ public func && <T : Boolean>(
 @_transparent
 @warn_unused_result
 public func || <T : Boolean>(
-  lhs: T, @autoclosure rhs: () throws -> Bool
+  lhs: T, rhs: @autoclosure () throws -> Bool
 ) rethrows -> Bool {
   return lhs.boolValue ? true : try rhs().boolValue
 }

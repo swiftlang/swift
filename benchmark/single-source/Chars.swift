@@ -14,7 +14,7 @@
 import TestsUtils
 
 @inline(never)
-public func run_Chars(N: Int) {
+public func run_Chars(_ N: Int) {
   // Permute some characters.
   let alphabet: [Character] = [
     "A", "B", "C", "D", "E", "F", "G",

@@ -48,9 +48,9 @@ extension BenchResults : CustomStringConvertible {
 struct Test {
   let name: String
   let index: Int
-  let f: (Int)->()
+  let f: (Int) -> ()
   var run: Bool
-  init(name: String, n: Int, f: (Int)->()) {
+  init(name: String, n: Int, f: (Int) -> ()) {
     self.name = name
     self.index = n
     self.f = f
@@ -58,8 +58,8 @@ struct Test {
   }
 }
 
-public var precommitTests: [String : (Int)->()] = [:]
-public var otherTests: [String : (Int)->()] = [:]
+public var precommitTests: [String : (Int) -> ()] = [:]
+public var otherTests: [String : (Int) -> ()] = [:]
 
 enum TestAction {
   case Run
@@ -182,7 +182,7 @@ struct TestConfig {
   }
 }
 
-func internalMeanSD(inputs: [UInt64]) -> (UInt64, UInt64) {
+func internalMeanSD(_ inputs: [UInt64]) -> (UInt64, UInt64) {
   // If we are empty, return 0, 0.
   if inputs.isEmpty {
     return (0, 0)
@@ -211,7 +211,7 @@ func internalMeanSD(inputs: [UInt64]) -> (UInt64, UInt64) {
   return (mean, UInt64(sqrt(Double(sum2)/(Double(inputs.count) - 1))))
 }
 
-func internalMedian(inputs: [UInt64]) -> UInt64 {
+func internalMedian(_ inputs: [UInt64]) -> UInt64 {
   return inputs.sorted()[inputs.count / 2]
 }
 
@@ -229,7 +229,7 @@ class SampleRunner {
   init() {
     mach_timebase_info(&info)
   }
-  func run(name: String, fn: (Int) -> Void, num_iters: UInt) -> UInt64 {
+  func run(_ name: String, fn: (Int) -> Void, num_iters: UInt) -> UInt64 {
     // Start the timer.
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     var str = name
@@ -250,7 +250,7 @@ class SampleRunner {
 }
 
 /// Invoke the benchmark entry point and return the run time in milliseconds.
-func runBench(name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResults {
+func runBench(_ name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResults {
 
   var samples = [UInt64](repeating: 0, count: c.numSamples)
 
@@ -296,7 +296,7 @@ func runBench(name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResult
                       mean: mean, sd: sd, median: internalMedian(samples))
 }
 
-func printRunInfo(c: TestConfig) {
+func printRunInfo(_ c: TestConfig) {
   if c.verbose {
     print("--- CONFIG ---")
     print("NumSamples: \(c.numSamples)")
@@ -318,7 +318,7 @@ func printRunInfo(c: TestConfig) {
   }
 }
 
-func runBenchmarks(c: TestConfig) {
+func runBenchmarks(_ c: TestConfig) {
   let units = "us"
   print("#\(c.delim)TEST\(c.delim)SAMPLES\(c.delim)MIN(\(units))\(c.delim)MAX(\(units))\(c.delim)MEAN(\(units))\(c.delim)SD(\(units))\(c.delim)MEDIAN(\(units))")
   var SumBenchResults = BenchResults()

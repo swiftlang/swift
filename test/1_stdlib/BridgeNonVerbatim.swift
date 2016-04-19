@@ -19,7 +19,6 @@
 // RUN: %target-run-stdlib-swift %s | FileCheck %s
 // REQUIRES: executable_test
 //
-// XFAIL: interpret
 // REQUIRES: objc_interop
 
 import Swift
@@ -28,7 +27,7 @@ import ObjectiveC
 
 // FIXME: Should go into the standard library.
 public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(source: _ObjectiveCType?)
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self {
     var result: Self? = nil
     _forceBridgeFromObjectiveC(source!, result: &result)
@@ -88,14 +87,14 @@ struct X : _ObjectiveCBridgeable {
   }
 
   static func _forceBridgeFromObjectiveC(
-    x: Tracked,
+    _ x: Tracked,
     result: inout X?
   ) {
     result = X(x.value)
   }
 
   static func _conditionallyBridgeFromObjectiveC(
-    x: Tracked,
+    _ x: Tracked,
     result: inout X?
   ) -> Bool {
     result = X(x.value)
@@ -134,7 +133,7 @@ func testScope() {
     // FIXME: Can't elide signature and use $0 here <rdar://problem/17770732> 
     (buf: inout UnsafeMutableBufferPointer<Int>) -> () in
     nsx.getObjects(
-      UnsafeMutablePointer<AnyObject>(buf.baseAddress),
+      UnsafeMutablePointer<AnyObject>(buf.baseAddress!),
       range: _SwiftNSRange(location: 1, length: 2))
   }
 

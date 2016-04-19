@@ -300,9 +300,10 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
       Type PointerInt8Ty = BoundGenericType::get(PointerDecl,
                                                  nullptr,
                                                  Int8Decl->getDeclaredType());
+      Type OptPointerInt8Ty = OptionalType::get(PointerInt8Ty);
       PtrPtrInt8Ty = BoundGenericType::get(PointerDecl,
                                            nullptr,
-                                           PointerInt8Ty)
+                                           OptPointerInt8Ty)
         ->getCanonicalType();
     }
   }
@@ -600,6 +601,8 @@ void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
   assert(!thunk.isForeign && "foreign-to-native thunks only");
   SILFunction *f = getFunction(thunk, ForDefinition);
   f->setThunk(IsThunk);
+  if (thunk.asForeign().isClangGenerated())
+    f->setFragile(IsFragile);
   preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
   PrettyStackTraceSILFunction X("silgen emitForeignToNativeThunk", f);
   SILGenFunction(*this, *f).emitForeignToNativeThunk(thunk);
@@ -854,9 +857,14 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
   auto *f =
-      M.getOrCreateFunction(SILLinkage::Private, funcName, initSILType, nullptr,
+      M.getOrCreateFunction(makeModuleFragile
+                                ? SILLinkage::Public
+                                : SILLinkage::Private,
+                            funcName, initSILType, nullptr,
                             SILLocation(binding), IsNotBare, IsNotTransparent,
-                            makeModuleFragile ? IsFragile : IsNotFragile);
+                            makeModuleFragile
+                                ? IsFragile
+                                : IsNotFragile);
   f->setDebugScope(
       new (M) SILDebugScope(RegularLocation(binding->getInit(pbdEntry)), f));
   f->setLocation(binding);

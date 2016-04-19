@@ -7,7 +7,7 @@ indirect enum TreeA<T> {
 }
 
 // CHECK-LABEL: sil hidden @_TF13indirect_enum11TreeA_casesurFTx1lGOS_5TreeAx_1rGS0_x__T_
-func TreeA_cases<T>(t: T, l: TreeA<T>, r: TreeA<T>) {
+func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
 
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<T>.Type
 // CHECK-NEXT:    [[NIL:%.*]] = enum $TreeA<T>, #TreeA.Nil!enumelt
@@ -43,7 +43,7 @@ func TreeA_cases<T>(t: T, l: TreeA<T>, r: TreeA<T>) {
 }
 
 // CHECK-LABEL: sil hidden @_TF13indirect_enum16TreeA_reabstractFFSiSiT_
-func TreeA_reabstract(f: Int -> Int) {
+func TreeA_reabstract(_ f: Int -> Int) {
 
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<Int -> Int>.Type
 // CHECK-NEXT:    [[BOX:%.*]] = alloc_box $@callee_owned (@in Int) -> @out Int
@@ -66,7 +66,7 @@ enum TreeB<T> {
 }
 
 // CHECK-LABEL: sil hidden @_TF13indirect_enum11TreeB_casesurFTx1lGOS_5TreeBx_1rGS0_x__T_
-func TreeB_cases<T>(t: T, l: TreeB<T>, r: TreeB<T>) {
+func TreeB_cases<T>(_ t: T, l: TreeB<T>, r: TreeB<T>) {
 
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeB<T>.Type
 // CHECK:         [[NIL:%.*]] = alloc_stack $TreeB<T>
@@ -107,7 +107,7 @@ func TreeB_cases<T>(t: T, l: TreeB<T>, r: TreeB<T>) {
 }
 
 // CHECK-LABEL: sil hidden @_TF13indirect_enum13TreeInt_casesFTSi1lOS_7TreeInt1rS0__T_ : $@convention(thin) (Int, @owned TreeInt, @owned TreeInt) -> ()
-func TreeInt_cases(t: Int, l: TreeInt, r: TreeInt) {
+func TreeInt_cases(_ t: Int, l: TreeInt, r: TreeInt) {
 
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeInt.Type
 // CHECK-NEXT:    [[NIL:%.*]] = enum $TreeInt, #TreeInt.Nil!enumelt
@@ -151,12 +151,12 @@ enum TrivialButIndirect {
 }
 
 func a() {}
-func b<T>(x: T) {}
-func c<T>(x: T, _ y: T) {}
+func b<T>(_ x: T) {}
+func c<T>(_ x: T, _ y: T) {}
 func d() {}
 
 // CHECK-LABEL: sil hidden @_TF13indirect_enum11switchTreeA
-func switchTreeA<T>(x: TreeA<T>) {
+func switchTreeA<T>(_ x: TreeA<T>) {
   // --           x +2
   // CHECK:       retain_value %0
   // CHECK:       switch_enum %0 : $TreeA<T>
@@ -218,7 +218,7 @@ func switchTreeA<T>(x: TreeA<T>) {
 }
 
 // CHECK-LABEL: sil hidden @_TF13indirect_enum11switchTreeB
-func switchTreeB<T>(x: TreeB<T>) {
+func switchTreeB<T>(_ x: TreeB<T>) {
   // CHECK:       copy_addr %0 to [initialization] [[SCRATCH:%.*]] :
   // CHECK:       switch_enum_addr [[SCRATCH]]
   switch x {
@@ -312,7 +312,7 @@ func switchTreeB<T>(x: TreeB<T>) {
 }
 
 // CHECK-LABEL: sil hidden @_TF13indirect_enum10guardTreeA
-func guardTreeA<T>(tree: TreeA<T>) {
+func guardTreeA<T>(_ tree: TreeA<T>) {
   do {
     // CHECK:   retain_value %0
     // CHECK:   switch_enum %0 : $TreeA<T>, case #TreeA.Nil!enumelt: [[YES:bb[0-9]+]], default [[NO:bb[0-9]+]]
@@ -395,7 +395,7 @@ func guardTreeA<T>(tree: TreeA<T>) {
 }
 
 // CHECK-LABEL: sil hidden @_TF13indirect_enum10guardTreeB
-func guardTreeB<T>(tree: TreeB<T>) {
+func guardTreeB<T>(_ tree: TreeB<T>) {
   do {
     // CHECK:   copy_addr %0 to [initialization] [[TMP:%.*]] :
     // CHECK:   switch_enum_addr [[TMP]] : $*TreeB<T>, case #TreeB.Nil!enumelt: [[YES:bb[0-9]+]], default [[NO:bb[0-9]+]]
@@ -482,7 +482,7 @@ func guardTreeB<T>(tree: TreeB<T>) {
   }
 }
 
-func dontDisableCleanupOfIndirectPayload(x: TrivialButIndirect) {
+func dontDisableCleanupOfIndirectPayload(_ x: TrivialButIndirect) {
   // CHECK:   switch_enum %0 : $TrivialButIndirect, case #TrivialButIndirect.Direct!enumelt.1:  [[YES:bb[0-9]+]], default [[NO:bb[0-9]+]]
   // CHECK: [[NO]]:
   // CHECK:   release_value %0

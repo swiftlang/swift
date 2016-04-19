@@ -93,6 +93,9 @@ ERROR(could_not_use_type_member,none,
 ERROR(could_not_use_type_member_on_instance,none,
       "static member %1 cannot be used on instance of type %0",
       (Type, DeclName))
+ERROR(could_not_use_type_member_on_existential,none,
+      "static member %1 cannot be used on protocol metatype %0",
+      (Type, DeclName))
 ERROR(could_not_use_instance_member_on_type,none,
       "instance member %1 cannot be used on type %0",
       (Type, DeclName))
@@ -763,6 +766,10 @@ ERROR(missing_initializer_def,PointsToFirstBadToken,
       "initializer requires a body", ())
 
 // Attributes
+WARNING(attr_decl_attr_now_on_type,none,
+      "%0 is now an attribute on a parameter type, "
+      "instead of on the parameter itself", (StringRef))
+
 ERROR(operator_not_func,none,
       "operators must be declared with 'func'", ())
 ERROR(redefining_builtin_operator,none,
@@ -1054,8 +1061,10 @@ ERROR(extension_protocol_via_typealias,none,
 ERROR(extension_anyobject,none,
       "'AnyObject' protocol cannot be extended", ())
 ERROR(objc_generic_extension_using_type_parameter,none,
-      "Extension of a generic Objective-C class cannot access the class's "
-      "generic parameters", ())
+      "extension of a generic Objective-C class cannot access the class's "
+      "generic parameters at runtime", ())
+NOTE(objc_generic_extension_using_type_parameter_here,none,
+     "generic parameter used here", ())
 
 // Protocols
 ERROR(type_does_not_conform,none,
@@ -1322,8 +1331,8 @@ ERROR(override_multiple_decls_arg_mismatch,none,
       "declaration %0 has different argument names from any potential "
       "overrides", (DeclName))
 NOTE(overridden_near_match_here,none,
-     "potential overridden %select{method|initializer}0 %1 here",
-      (bool, DeclName))
+     "potential overridden %0 %1 here",
+      (DescriptiveDeclKind, DeclName))
 ERROR(override_decl_extension,none,
       "declarations %select{in extensions|from extensions}0 cannot "
       "%select{override|be overridden}0 yet", (bool))
@@ -1409,6 +1418,14 @@ ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
       "a non-throwing %select{method|initializer}0 is not supported", (bool))
 
+ERROR(override_optional_mismatch,none,
+      "cannot override %0 %select{parameter|index}1 of type %2 with "
+      "non-optional type %3",
+      (DescriptiveDeclKind, bool, Type, Type))
+ERROR(override_optional_result_mismatch,none,
+      "cannot override %0 %select{result|element}1 type %2 with "
+      "optional type %3",
+      (DescriptiveDeclKind, bool, Type, Type))
 WARNING(override_unnecessary_IUO,none,
       "overriding %0 parameter of type %1 with implicitly unwrapped optional "
       "type %2",
@@ -1457,8 +1474,9 @@ NOTE(class_here,none,
      "class %0 declared here", (Identifier))
 ERROR(inheritance_from_final_class,none,
       "inheritance from a final class %0", (Identifier))
-ERROR(inheritance_from_objc_generic_class,none,
-      "inheritance from a generic Objective-C class %0", (Identifier))
+ERROR(inheritance_from_unspecialized_objc_generic_class,none,
+      "inheritance from a generic Objective-C class %0 must bind "
+      "type parameters of %0 to specific concrete types", (Identifier))
 ERROR(inheritance_from_objc_runtime_visible_class,none,
       "inheritance from an Objective-C class %0 only visible via the runtime", (Identifier))
 
@@ -1612,6 +1630,8 @@ ERROR(property_behavior_invalid_parameter,none,
 
 ERROR(attr_only_only_one_decl_kind,none,
       "%0 may only be used on '%1' declarations", (DeclAttribute,StringRef))
+ERROR(attr_only_only_on_parameters,none,
+      "%0 may only be used on parameters", (StringRef))
 
 
 ERROR(override_final,none,
@@ -2039,8 +2059,8 @@ WARNING(store_in_willset,none,
         "attempting to store to property %0 within its own willSet, which is "
         "about to be overwritten by the new value", (Identifier))
 
-WARNING(tuple_splat_use,none,
-        "passing %0 arguments to a callee as a single tuple value is deprecated",
+ERROR(tuple_splat_use,none,
+      "passing %0 arguments to a callee as a single tuple value has been removed in Swift 3",
         (unsigned))
 
 
@@ -2151,10 +2171,8 @@ NOTE(change_to_mutating,none,
      (bool))
 
 // For Stmt
-WARNING(deprecated_c_style_for_stmt,none,
-"C-style for statement is deprecated and will be removed in a future version of Swift", ())
-NOTE(cant_fix_c_style_for_stmt,none,
-"C-style for statement can't be automatically fixed to for-in, because the loop variable is modified inside the loop", ())
+ERROR(deprecated_c_style_for_stmt,none,
+      "C-style for statement has been removed in Swift 3", ())
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,none,
@@ -2423,21 +2441,13 @@ NOTE(overridden_required_initializer_here,none,
 
 // Functions
 ERROR(attribute_requires_function_type,none,
-      "attribute only applies to syntactic function types", ())
-ERROR(objc_block_cannot_be_thin,none,
-      "@objc_block function type cannot be @thin", ())
+      "@%0 attribute only applies to function types", (StringRef))
 ERROR(attribute_not_supported,none,
       "this attribute is not supported", ())
-ERROR(convention_with_deprecated_representation_attribute,none,
-      "@convention attribute cannot be used with deprecated @%0 attribute",
-      (StringRef))
 ERROR(unsupported_convention,none,
       "convention '%0' not supported", (StringRef))
 ERROR(unreferenced_generic_parameter,none,
       "generic parameter '%0' is not used in function signature", (StringRef))
-WARNING(deprecated_convention_attribute,none,
-        "'@%0' attribute is deprecated; '@convention(%1)' should be used "
-        "instead", (StringRef, StringRef))
 
 // SIL
 ERROR(opened_non_protocol,none,
@@ -2455,9 +2465,6 @@ ERROR(sil_function_multiple_error_results,PointsToFirstBadToken,
       "SIL function types cannot have multiple @error results", ())
 ERROR(unsupported_sil_convention,none,
       "convention '%0' not supported in SIL", (StringRef))
-ERROR(sil_deprecated_convention_attribute,none,
-      "'@%0' attribute is deprecated; '@convention(%1)' must be used instead",
-      (StringRef, StringRef))
 
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,none,

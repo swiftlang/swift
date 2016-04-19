@@ -12,7 +12,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 //
-// XFAIL: interpret
 // REQUIRES: objc_interop
 
 import StdlibUnittest

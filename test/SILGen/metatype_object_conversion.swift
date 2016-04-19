@@ -11,7 +11,7 @@ protocol CP : class {}
 @objc protocol OP {}
 
 // CHECK-LABEL: sil hidden @_TF26metatype_object_conversion16metatypeToObjectFMCS_1CPs9AnyObject_ 
-func metatypeToObject(x: C.Type) -> AnyObject {
+func metatypeToObject(_ x: C.Type) -> AnyObject {
   // CHECK: bb0([[THICK:%.*]] : $@thick C.Type):
   // CHECK:   [[OBJC:%.*]] = thick_to_objc_metatype [[THICK]]
   // CHECK:   [[OBJECT:%.*]] = objc_metatype_to_object [[OBJC]]
@@ -20,7 +20,7 @@ func metatypeToObject(x: C.Type) -> AnyObject {
 }
 
 // CHECK-LABEL: sil hidden @_TF26metatype_object_conversion27existentialMetatypeToObjectFPMPS_2CP_Ps9AnyObject_
-func existentialMetatypeToObject(x: CP.Type) -> AnyObject {
+func existentialMetatypeToObject(_ x: CP.Type) -> AnyObject {
   // CHECK: bb0([[THICK:%.*]] : $@thick CP.Type):
   // CHECK:   [[OBJC:%.*]] = thick_to_objc_metatype [[THICK]]
   // CHECK:   [[OBJECT:%.*]] = objc_existential_metatype_to_object [[OBJC]]

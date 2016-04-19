@@ -92,7 +92,7 @@ struct MinimalForwardCollectionWith${Implementation}Filter<Element>
   }
 
   func filter(
-    @noescape transform: (Element) throws -> Bool
+    @noescape _ transform: (Element) throws -> Bool
   ) rethrows -> [Element] {
     MinimalForwardCollectionWithCustomFilter.timesFilterWasCalled += 1
     return try _data.filter(transform)
@@ -105,7 +105,7 @@ struct MinimalForwardCollectionWith${Implementation}Filter<Element>
 % end
 
 func callStaticCollectionFilter(
-  sequence: MinimalForwardCollectionWithDefaultFilter<OpaqueValue<Int>>,
+  _ sequence: MinimalForwardCollectionWithDefaultFilter<OpaqueValue<Int>>,
   @noescape includeElement: (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
   var result = sequence.filter(includeElement)
@@ -114,7 +114,7 @@ func callStaticCollectionFilter(
 }
 
 func callStaticCollectionFilter(
-  sequence: MinimalForwardCollectionWithCustomFilter<OpaqueValue<Int>>,
+  _ sequence: MinimalForwardCollectionWithCustomFilter<OpaqueValue<Int>>,
   @noescape includeElement: (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
   var result = sequence.filter(includeElement)
@@ -123,7 +123,7 @@ func callStaticCollectionFilter(
 }
 
 func callGenericCollectionFilter<S : Collection>(
-  sequence: S,
+  _ sequence: S,
   @noescape includeElement: (S.Iterator.Element) -> Bool
 ) -> [S.Iterator.Element] {
   var result = sequence.filter(includeElement)
@@ -224,7 +224,7 @@ struct MinimalForwardCollectionWith${Implementation}Map<Element>
   }
 
   func map<T>(
-    @noescape transform: (Element) throws -> T
+    @noescape _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     MinimalForwardCollectionWithCustomMap.timesMapWasCalled += 1
     return try _data.map(transform)
@@ -237,7 +237,7 @@ struct MinimalForwardCollectionWith${Implementation}Map<Element>
 % end
 
 func callStaticCollectionMap<T>(
-  collection: MinimalForwardCollectionWithDefaultMap<OpaqueValue<Int>>,
+  _ collection: MinimalForwardCollectionWithDefaultMap<OpaqueValue<Int>>,
   @noescape transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = collection.map(transform)
@@ -246,7 +246,7 @@ func callStaticCollectionMap<T>(
 }
 
 func callStaticCollectionMap<T>(
-  collection: MinimalForwardCollectionWithCustomMap<OpaqueValue<Int>>,
+  _ collection: MinimalForwardCollectionWithCustomMap<OpaqueValue<Int>>,
   @noescape transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = collection.map(transform)
@@ -255,7 +255,7 @@ func callStaticCollectionMap<T>(
 }
 
 func callGenericCollectionMap<C : Collection, T>(
-  collection: C,
+  _ collection: C,
   @noescape transform: (C.Iterator.Element) -> T
 ) -> [T] {
   var result = collection.map(transform)
@@ -408,7 +408,7 @@ struct MinimalForwardCollectionWithDefaultIterator : Collection {
   var _count: Int
 }
 
-func callGenericIterator<S : Sequence>(sequence: S) -> S.Iterator {
+func callGenericIterator<S : Sequence>(_ sequence: S) -> S.Iterator {
   return sequence.makeIterator()
 }
 
@@ -569,12 +569,12 @@ CollectionTypeTests.test("index(of:)/WhereElementIsEquatable/dispatch") {
 // completely different line type-checks
 func callGenericFind_<
   C : Collection where C.Iterator.Element : Equatable
->(collection: C, _ element: C.Iterator.Element) -> C.Index? {
+>(_ collection: C, _ element: C.Iterator.Element) -> C.Index? {
   return collection.index(of: element)
 }
 
 func callStaticFind_(
-  set: Set<MinimalHashableValue>,
+  _ set: Set<MinimalHashableValue>,
   _ element: MinimalHashableValue
 ) -> Set<MinimalHashableValue>.Index? {
   return set.index(of: element)
@@ -629,7 +629,7 @@ extension Collection where
   SubSequence.Iterator.Element == Iterator.Element,
   SubSequence.Index == Index {
 
-  func _test_indicesOf(element: Iterator.Element) -> [Index] {
+  func _test_indicesOf(_ element: Iterator.Element) -> [Index] {
     var result: [Index] = []
     var tail = self[indices]
     while let foundIndex = tail.index(of: element) {

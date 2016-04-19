@@ -4,7 +4,7 @@
 
 import Foundation
 
-func variadicFunc2(A : Int32, _: Any...) -> Int { return 0 }
+func variadicFunc2(_ A : Int32, _: Any...) -> Int { return 0 }
 
 class C1 {}
 

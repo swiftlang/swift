@@ -6,14 +6,11 @@
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test
-// XFAIL: interpret
 // REQUIRES: objc_interop
 
 import Foundation
 import StdlibUnittest
 import ObjCClasses
-
-let wut = Container<NSString>.self
 
 var ImportedObjCGenerics = TestSuite("ImportedObjCGenerics")
 
@@ -55,13 +52,13 @@ ImportedObjCGenerics.test("Subclasses") {
 }
 
 ImportedObjCGenerics.test("SwiftGenerics") {
-  func openContainer<T: AnyObject>(x: Container<T>) -> T {
+  func openContainer<T: AnyObject>(_ x: Container<T>) -> T {
     return x.object
   }
-  func openStringContainer<T: Container<NSString>>(x: T) -> NSString {
+  func openStringContainer<T: Container<NSString>>(_ x: T) -> NSString {
     return x.object
   }
-  func openArbitraryContainer<S: AnyObject, T: Container<S>>(x: T) -> S {
+  func openArbitraryContainer<S: AnyObject, T: Container<S>>(_ x: T) -> S {
     return x.object
   }
 
@@ -80,26 +77,26 @@ ImportedObjCGenerics.test("SwiftGenerics") {
   expectEqual("i-missed-you-so-so-bad", openStringContainer(strContainer))
   expectEqual("i-missed-you-so-so-bad", openArbitraryContainer(strContainer))
 
-  let numContainer = Container<NSNumber>(object: NSNumber(integer: 21))
-  expectEqual(NSNumber(integer: 21), openContainer(numContainer))
-  expectEqual(NSNumber(integer: 21), openArbitraryContainer(numContainer))
+  let numContainer = Container<NSNumber>(object: NSNumber(value: 21))
+  expectEqual(NSNumber(value: 21), openContainer(numContainer))
+  expectEqual(NSNumber(value: 21), openArbitraryContainer(numContainer))
 
-  let subNumContainer = SubContainer<NSNumber>(object: NSNumber(integer: 22))
-  expectEqual(NSNumber(integer: 22), openContainer(subNumContainer))
-  expectEqual(NSNumber(integer: 22), openArbitraryContainer(subNumContainer))
+  let subNumContainer = SubContainer<NSNumber>(object: NSNumber(value: 22))
+  expectEqual(NSNumber(value: 22), openContainer(subNumContainer))
+  expectEqual(NSNumber(value: 22), openArbitraryContainer(subNumContainer))
 }
 
 ImportedObjCGenerics.test("SwiftGenerics/Creation") {
-  func makeContainer<T: AnyObject>(x: T) -> Container<T> {
+  func makeContainer<T: AnyObject>(_ x: T) -> Container<T> {
     return Container(object: x)
   }
 
-  let c = makeContainer(NSNumber(integer: 22))
-  expectEqual(NSNumber(integer: 22), c.object)
+  let c = makeContainer(NSNumber(value: 22))
+  expectEqual(NSNumber(value: 22), c.object)
 }
 
 ImportedObjCGenerics.test("ProtocolConstraints") {
-  func copyContainerContents<T: NSCopying>(x: CopyingContainer<T>) -> T {
+  func copyContainerContents<T: NSCopying>(_ x: CopyingContainer<T>) -> T {
     return x.object.copy(with: nil) as! T
   }
 
@@ -112,7 +109,7 @@ ImportedObjCGenerics.test("ClassConstraints") {
     return x.object.noise as NSString
   }
   let petCarrier = AnimalContainer(object: Dog())
-  expectEqual("woof", makeContainedAnimalMakeNoise(petCarrier))
+  expectEqual("woof", makeContainedAnimalMakeNoise(x: petCarrier))
 }
 
 class ClassWithMethodsUsingObjCGenerics: NSObject {
@@ -146,6 +143,49 @@ ImportedObjCGenerics.test("InheritanceFromNongeneric") {
   expectTrue(Container<NSString>.superclass() == NSObject.self)
   expectTrue(Container<NSObject>.superclass() == NSObject.self)
   expectTrue(Container<NSObject>.self == Container<NSString>.self)
+}
+
+public class InheritInSwift: Container<NSString> {
+  public override init(object: NSString) {
+    super.init(object: object.lowercased as NSString)
+  }
+  public override var object: NSString {
+    get {
+      return super.object.uppercased as NSString
+    }
+    set {
+      super.object = newValue.lowercased as NSString
+    }
+  }
+
+  public var superObject: NSString {
+    get {
+      return super.object as NSString
+    }
+  }
+}
+
+ImportedObjCGenerics.test("InheritInSwift") {
+  let s = InheritInSwift(object: "HEllo")
+  let sup: Container = s
+
+  expectEqual(s.superObject, "hello")
+  expectEqual(s.object, "HELLO")
+  expectEqual(sup.object, "HELLO")
+
+  s.object = "GOodbye"
+  expectEqual(s.superObject, "goodbye")
+  expectEqual(s.object, "GOODBYE")
+  expectEqual(sup.object, "GOODBYE")
+
+  s.processObject { o in
+    expectEqual(o, "GOODBYE")
+  }
+
+  s.updateObject { "Aloha" }
+  expectEqual(s.superObject, "aloha")
+  expectEqual(s.object, "ALOHA")
+  expectEqual(sup.object, "ALOHA")
 }
 
 runAllTests()

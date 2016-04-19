@@ -69,7 +69,7 @@ extension FinalGizmo {
 }
 
 // CHECK-LABEL: sil hidden @_TF19objc_attr_NSManaged9testFinalFCS_10FinalGizmoSS : $@convention(thin) (@owned FinalGizmo) -> @owned String {
-func testFinal(obj: FinalGizmo) -> String {
+func testFinal(_ obj: FinalGizmo) -> String {
   // CHECK: class_method [volatile] %0 : $FinalGizmo, #FinalGizmo.kvc2!1.foreign : (FinalGizmo) -> () -> () , $@convention(objc_method) (FinalGizmo) -> ()
   // CHECK-NOT: return
   // CHECK: class_method [volatile] %0 : $FinalGizmo, #FinalGizmo.y!getter.1.foreign : (FinalGizmo) -> () -> String , $@convention(objc_method) (FinalGizmo) -> @autoreleased NSString

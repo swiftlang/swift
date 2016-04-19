@@ -75,6 +75,9 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     if (!ReferencedF)
       continue;
 
+    DEBUG(llvm::dbgs() << "Trying to use specialized function for:\n";
+          AI.getInstruction()->dumpInContext());
+
     // Check if it is a call of a generic function.
     // If this is the case, check if there is a specialization
     // available for it already and use this specialization
@@ -104,7 +107,8 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     std::string ClonedName;
     {
       Mangle::Mangler Mangler;
-      GenericSpecializationMangler GenericMangler(Mangler, ReferencedF, Subs);
+      GenericSpecializationMangler GenericMangler(Mangler, ReferencedF, Subs,
+                                                  ReferencedF->isFragile());
       GenericMangler.mangle();
       ClonedName = Mangler.finalize();
     }
@@ -113,12 +117,22 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     // If we already have this specialization, reuse it.
     auto PrevF = M.lookUpFunction(ClonedName);
     if (PrevF) {
+      DEBUG(llvm::dbgs() << "Found a specialization: " << ClonedName << "\n");
       if (PrevF->getLinkage() != SILLinkage::SharedExternal)
         NewF = PrevF;
-    } else {
+      else {
+        DEBUG(llvm::dbgs() << "Wrong linkage: " << (int)PrevF->getLinkage()
+                           << "\n");
+      }
+    }
+
+    if (!PrevF || !NewF) {
       // Check for the existence of this function in another module without
       // loading the function body.
       PrevF = lookupPrespecializedSymbol(M, ClonedName);
+      DEBUG(llvm::dbgs()
+            << "Checked if there is a specialization in a different module: "
+            << PrevF << "\n");
       if (!PrevF)
         continue;
       NewF = PrevF;
@@ -127,10 +141,12 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     if (!NewF)
       continue;
 
+    assert(NewF->isExternalDeclaration() &&
+           "Prespecialized function should be an external declaration");
+
     // An existing specialization was found.
-    DEBUG(
-        llvm::dbgs() << "Found a specialization of " << ReferencedF->getName()
-        << " : " << NewF->getName() << "\n");
+    DEBUG(llvm::dbgs() << "Found a specialization of " << ReferencedF->getName()
+                       << " : " << NewF->getName() << "\n");
 
     auto NewAI = replaceWithSpecializedFunction(AI, NewF, ReInfo);
     AI.getInstruction()->replaceAllUsesWith(NewAI.getInstruction());

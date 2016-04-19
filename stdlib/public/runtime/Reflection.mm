@@ -17,6 +17,7 @@
 #include "swift/Runtime/Enum.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Portability.h"
 #include "Private.h"
 #include <cassert>
 #include <cstdio>
@@ -112,86 +113,7 @@ struct String {
   {}
 #endif
 };
-  
-struct Array {
-  // Keep the details of Array's implementation opaque to the runtime.
-  const void *x;
-};
-  
-struct PlaygroundQuickLook {
-  struct RawData {
-    Array Data;
-    String Type;
-  };
-  struct Rectangle {
-    double x, y, w, h;
-  };
-  struct Point {
-    double x, y;
-  };
-  struct Interval {
-    int64_t loc,len;
-  };
-  
-  union {
-    String TextOrURL;
-    int64_t Int;
-    uint64_t UInt;
-    float Float;
-    double Double;
-    Any Any;
-    RawData Raw;
-    Rectangle Rect;
-    Point PointOrSize;
-    bool Logical;
-    Interval Range;
-  };
-  enum class Tag : uint8_t {
-    Text,
-    Int,
-    UInt,
-    Float,
-    Double,
-    Image,
-    Sound,
-    Color,
-    BezierPath,
-    AttributedString,
-    Rectangle,
-    Point,
-    Size,
-    Logical,
-    Range,
-    View,
-    Sprite,
-    URL,
-    Raw,
-  } Kind;
-};
-  
-struct OptionalPlaygroundQuickLook {
-  union {
-    struct {
-      union {
-        String TextOrURL;
-        int64_t Int;
-        uint64_t UInt;
-        float Float;
-        double Double;
-        Any Any;
-        PlaygroundQuickLook::RawData Raw;
-        PlaygroundQuickLook::Rectangle Rect;
-        PlaygroundQuickLook::Point PointOrSize;
-        bool Logical;
-        PlaygroundQuickLook::Interval Range;
-      };
-      PlaygroundQuickLook::Tag Kind;
-      bool isNone;
-    } optional;
-    PlaygroundQuickLook payload;
-  };
-};
-  
+
 /// A Mirror witness table for use by MagicMirror.
 struct MirrorWitnessTable;
   
@@ -980,99 +902,30 @@ void swift_ObjCMirror_subscript(String *outString,
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" void
-swift_ClassMirror_quickLookObject(OptionalPlaygroundQuickLook &result,
-                                  HeapObject *owner, const OpaqueValue *value,
+extern "C" id
+swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
                                   const Metadata *type) {
-  memset(&result, 0, sizeof(result));
-  
   id object = [*reinterpret_cast<const id *>(value) retain];
   swift_release(owner);
   if ([object respondsToSelector:@selector(debugQuickLookObject)]) {
     id quickLookObject = [object debugQuickLookObject];
     [quickLookObject retain];
     [object release];
-    object = quickLookObject;
+    return quickLookObject;
   }
-  
-  // NSNumbers quick-look as integers or doubles, depending on type.
-  if ([object isKindOfClass:[NSNumber class]]) {
-    NSNumber *n = object;
-    
-    switch ([n objCType][0]) {
-    case 'd': // double
-      result.payload.Double = [n doubleValue];
-      result.payload.Kind = PlaygroundQuickLook::Tag::Double;
-      break;
-    case 'f': // float
-      result.payload.Float = [n floatValue];
-      result.payload.Kind = PlaygroundQuickLook::Tag::Float;
-      break;
-        
-    case 'Q': // unsigned long long
-      result.payload.UInt = [n unsignedLongLongValue];
-      result.payload.Kind = PlaygroundQuickLook::Tag::UInt;
-      break;
 
-    // FIXME: decimals?
-    default:
-      result.payload.Int = [n longLongValue];
-      result.payload.Kind = PlaygroundQuickLook::Tag::Int;
-      break;
-    }
-    
-    [object release];
-    result.optional.isNone = false;
-    return;
-  }
-  
-  // Various other framework types are used for rich representations.
-  
-  /// Store an ObjC reference into an Any.
-  auto initializeAnyWithTakeOfObject = [](Any &any, id obj) {
-    any.Type = swift_getObjCClassMetadata(_swift_getClass((const void*) obj));
-    *reinterpret_cast<id *>(&any.Buffer) = obj;
-  };
-  
-  if ([object isKindOfClass:NSClassFromString(@"NSAttributedString")]) {
-    initializeAnyWithTakeOfObject(result.payload.Any, object);
-    result.payload.Kind = PlaygroundQuickLook::Tag::AttributedString;
-    result.optional.isNone = false;
-    return;
-  } else if ([object isKindOfClass:NSClassFromString(@"NSImage")]
-      || [object isKindOfClass:NSClassFromString(@"UIImage")]
-      || [object isKindOfClass:NSClassFromString(@"NSImageView")]
-      || [object isKindOfClass:NSClassFromString(@"UIImageView")]
-      || [object isKindOfClass:NSClassFromString(@"CIImage")]
-      || [object isKindOfClass:NSClassFromString(@"NSBitmapImageRep")]) {
-    initializeAnyWithTakeOfObject(result.payload.Any, object);
-    result.payload.Kind = PlaygroundQuickLook::Tag::Image;
-    result.optional.isNone = false;
-    return;
-  } else if ([object isKindOfClass:NSClassFromString(@"NSColor")]
-             || [object isKindOfClass:NSClassFromString(@"UIColor")]) {
-    initializeAnyWithTakeOfObject(result.payload.Any, object);
-    result.payload.Kind = PlaygroundQuickLook::Tag::Color;
-    result.optional.isNone = false;
-    return;
-  } else if ([object isKindOfClass:NSClassFromString(@"NSBezierPath")]
-             || [object isKindOfClass:NSClassFromString(@"UIBezierPath")]) {
-    initializeAnyWithTakeOfObject(result.payload.Any, object);
-    result.payload.Kind = PlaygroundQuickLook::Tag::BezierPath;
-    result.optional.isNone = false;
-    return;
-  } else if ([object isKindOfClass:[NSString class]]) {
-    result.payload.TextOrURL = String((NSString*)object);
-    [object release];
-    result.payload.Kind = PlaygroundQuickLook::Tag::Text;
-    result.optional.isNone = false;
-    return;
-  }
-  
-  // Return none if we didn't get a suitable object.
-  [object release];
-  result.optional.isNone = true;
+  return object;
 }
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" bool swift_isKind(id object, NSString *className) {
+  bool result = [object isKindOfClass:NSClassFromString(className)];
+  [object release];
+  [className release];
+
+  return result;
+}
+
 #endif
   
 // -- MagicMirror implementation.
@@ -1081,9 +934,9 @@ swift_ClassMirror_quickLookObject(OptionalPlaygroundQuickLook &result,
 #error __USER_LABEL_PREFIX__ is undefined
 #endif
 
-#define GLUE_EXPANDED(a,b) a##b
-#define GLUE(a,b) GLUE_EXPANDED(a,b)
-#define SYMBOL_NAME(name) GLUE(__USER_LABEL_PREFIX__,name)
+#define GLUE_EXPANDED(a, b) a##b
+#define GLUE(a, b) GLUE_EXPANDED(a, b)
+#define SYMBOL_NAME(name) GLUE(__USER_LABEL_PREFIX__, name)
 
 #define QUOTE_EXPANDED(literal) #literal
 #define QUOTE(literal) QUOTE_EXPANDED(literal)
@@ -1338,16 +1191,63 @@ MirrorReturn swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
 }
 
 // NB: This function is not used directly in the Swift codebase, but is
-// exported for Xcode support. Please coordinate before changing.
+// exported for Xcode support and is used by the sanitizers. Please coordinate
+// before changing.
+//
+/// Demangles a Swift symbol name.
+///
+/// \param mangledName is the symbol name that needs to be demangled.
+/// \param mangledNameLength is the length of the string that should be
+/// demangled.
+/// \param outputBuffer is the user provided buffer where the demangled name
+/// will be placed. If nullptr, a new buffer will be malloced. In that case,
+/// the user of this API is responsible for freeing the returned buffer.
+/// \param outputBufferSize is the size of the output buffer. If the demangled
+/// name does not fit into the outputBuffer, the output will be truncated and
+/// the size will be updated, indicating how large the buffer should be.
+/// \param flags can be used to select the demangling style. TODO: We should
+//// define what these will be.
+/// \returns the demangled name. Returns nullptr if the input String is not a
+/// Swift mangled name.
 SWIFT_RUNTIME_EXPORT
-extern "C" void swift_stdlib_demangleName(const char *mangledName,
-                                          size_t mangledNameLength,
-                                          String *demangledName) {
+extern "C" char *swift_demangle(const char *mangledName,
+                                size_t mangledNameLength,
+                                char *outputBuffer,
+                                size_t *outputBufferSize,
+                                uint32_t flags) {
+  if (flags != 0) {
+    swift::fatalError(0, "Only 'flags' value of '0' is currently supported.");
+  }
+  if (outputBuffer != nullptr && outputBufferSize == nullptr) {
+    swift::fatalError(0, "'outputBuffer' is passed but the size is 'nullptr'.");
+  }
+
+  // Check if we are dealing with Swift mangled name, otherwise, don't try
+  // to demangle and send indication to the user.
+  if (mangledName[0] != '_' || mangledName[1] != 'T') {
+    return nullptr;
+  }
+
+  // Demangle the name.
   auto options = Demangle::DemangleOptions();
   options.DisplayDebuggerGeneratedModule = false;
   auto result =
       Demangle::demangleSymbolAsString(mangledName,
                                        mangledNameLength,
                                        options);
-  new (demangledName) String(result.data(), result.size());
+
+  // If the output buffer is not provided, malloc memory ourselves.
+  if (outputBuffer == nullptr || *outputBufferSize == 0) {
+    return strdup(result.c_str());
+  }
+
+  // Indicate a failure if the result does not fit and will be truncated
+  // and set the required outputBufferSize.
+  if (*outputBufferSize < result.length() + 1) {
+    *outputBufferSize = result.length() + 1;
+  }
+
+  // Copy into the provided buffer.
+  _swift_strlcpy(outputBuffer, result.c_str(), *outputBufferSize);
+  return outputBuffer;
 }

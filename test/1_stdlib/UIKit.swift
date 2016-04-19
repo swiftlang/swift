@@ -7,7 +7,7 @@ import StdlibUnittest
 
 let UIKitTests = TestSuite("UIKit")
 
-private func printDevice(o: UIDeviceOrientation) -> String {
+private func printDevice(_ o: UIDeviceOrientation) -> String {
   var s = "\(o.isPortrait) \(UIDeviceOrientationIsPortrait(o)), "
   s += "\(o.isLandscape) \(UIDeviceOrientationIsLandscape(o)), "
   s += "\(o.isFlat), \(o.isValidInterfaceOrientation) "
@@ -15,7 +15,7 @@ private func printDevice(o: UIDeviceOrientation) -> String {
   return s
 }
 
-private func printInterface(o: UIInterfaceOrientation) -> String {
+private func printInterface(_ o: UIInterfaceOrientation) -> String {
   return "\(o.isPortrait) \(UIInterfaceOrientationIsPortrait(o)), " +
     "\(o.isLandscape) \(UIInterfaceOrientationIsLandscape(o))"
 }

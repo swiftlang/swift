@@ -54,7 +54,7 @@ definition. These kinds are:
    compiler rejects) immutable data that is pointing to mutable data. For
    example::
 
-     struct [immutable,inout] IList { data : int, next : List }
+     struct [immutable, inout] IList { data : int, next : List }
      ...
      var a = IList(1, IList(2, IList(3, nil)))
      ...
@@ -94,7 +94,7 @@ definition. These kinds are:
    Not having mutable shared state also prevents race conditions from turning
    into safety violations. Here's a description of the go issue which causes
    them to be unsafe when running multiple threads:
-   `http://research.swtch.com/2010/02/off-to-races.html`_
+   <http://research.swtch.com/gorace>
 
    Note that a highly desirable feature of the language is the ability to take
    an instance of a mutable type and *make it immutable* somehow, allowing it to
@@ -115,12 +115,12 @@ definition. These kinds are:
    multithreaded mandelbrot example, that does each pixel in "parallel", to
    illustrate some ideas::
 
-     func do_mandelbrot(x : float, y : float) -> int {
+     func do_mandelbrot(_ x : float, y : float) -> int {
        // details elided
      }
      
      actor MandelbrotCalculator {
-       func compute(x : float, y : float, Driver D) {
+       func compute(_ x : float, y : float, Driver D) {
          var num_iters = do_mandelbrot(x, y)
          D.collect_point(x, y, num_iters)
        }
@@ -141,7 +141,7 @@ definition. These kinds are:
          }
        }
      
-       func collect_point(x : float, y : float, num_iters : int) {
+       func collect_point(_ x : float, y : float, num_iters : int) {
          result.setPoint(x, y, Color(num_iters, num_iters, num_iters))
          if (--numpoints == 0)
          draw(result)

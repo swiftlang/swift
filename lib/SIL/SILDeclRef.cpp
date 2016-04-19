@@ -35,6 +35,10 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
   if (method->hasForcedStaticDispatch())
     return MethodDispatch::Static;
 
+  // Import-as-member declarations are always statically referenced.
+  if (method->isImportAsMember())
+    return MethodDispatch::Static;
+
   // If this declaration is in a class but not marked final, then it is
   // always dynamically dispatched.
   auto dc = method->getDeclContext();
@@ -324,8 +328,15 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       if (isa<ClangModuleUnit>(derivedFor->getModuleScopeContext()))
         return ClangLinkage;
   }
-  
-  // Otherwise, we have external linkage.
+
+  // If the module is being built with -sil-serialize-all, everything has
+  // to have public linkage.
+  if (moduleContext->getParentModule()->getResilienceStrategy()
+      == ResilienceStrategy::Fragile) {
+    return (forDefinition ? SILLinkage::Public : SILLinkage::PublicExternal);
+  }
+
+  // Otherwise, linkage is determined by accessibility at the AST level.
   switch (d->getEffectiveAccess()) {
     case Accessibility::Private:
       return (forDefinition ? SILLinkage::Private : SILLinkage::PrivateExternal);

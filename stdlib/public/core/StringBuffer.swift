@@ -31,7 +31,7 @@ struct _StringBufferIVars {
 
   // This stored property should be stored at offset zero.  We perform atomic
   // operations on it using _HeapBuffer's pointer.
-  var usedEnd: UnsafeMutablePointer<_RawByte>
+  var usedEnd: UnsafeMutablePointer<_RawByte>?
 
   var capacityAndElementShift: Int
   var byteCapacity: Int {
@@ -43,7 +43,7 @@ struct _StringBufferIVars {
 }
 
 // FIXME: Wanted this to be a subclass of
-// _HeapBuffer<_StringBufferIVars,UTF16.CodeUnit>, but
+// _HeapBuffer<_StringBufferIVars, UTF16.CodeUnit>, but
 // <rdar://problem/15520519> (Can't call static method of derived
 // class of generic class with dependent argument type) prevents it.
 public struct _StringBuffer {
@@ -89,7 +89,7 @@ public struct _StringBuffer {
     Encoding : UnicodeCodec
     where Input.Iterator.Element == Encoding.CodeUnit
   >(
-    input: Input, encoding: Encoding.Type, repairIllFormedSequences: Bool,
+    _ input: Input, encoding: Encoding.Type, repairIllFormedSequences: Bool,
     minimumCapacity: Int = 0
   ) -> (_StringBuffer?, hadError: Bool) {
     // Determine how many UTF-16 code units we'll need
@@ -145,7 +145,7 @@ public struct _StringBuffer {
   /// A past-the-end pointer for this buffer's stored data.
   var usedEnd: UnsafeMutablePointer<_RawByte> {
     get {
-      return _storage.value.usedEnd
+      return _storage.value.usedEnd!
     }
     set(newValue) {
       _storage.value.usedEnd = newValue
@@ -183,7 +183,7 @@ public struct _StringBuffer {
   // "grow()," below.
   @warn_unused_result
   func hasCapacity(
-    cap: Int, forSubRange r: Range<UnsafePointer<_RawByte>>
+    _ cap: Int, forSubRange r: Range<UnsafePointer<_RawByte>>
   ) -> Bool {
     // The substring to be grown could be pointing in the middle of this
     // _StringBuffer.
@@ -202,6 +202,7 @@ public struct _StringBuffer {
   ///   to extend.
   /// - parameter newUsedCount: The desired size of the substring.
   @inline(__always)
+  @discardableResult
   mutating func grow(
     oldBounds bounds: Range<UnsafePointer<_RawByte>>, newUsedCount: Int
   ) -> Bool {

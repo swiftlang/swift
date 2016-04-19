@@ -40,18 +40,18 @@
 // CHECK-FOUNDATION: func mutableCopy() -> NSMutableArray
 
 // Note: id -> "Object".
-// CHECK-FOUNDATION: func index(of _: AnyObject) -> Int
+// CHECK-FOUNDATION: func index(of: AnyObject) -> Int
 
 // Note: Class -> "Class"
 // CHECK-OBJECTIVEC: func isKind(of aClass: AnyClass) -> Bool
 
 // Note: Pointer-to-struct name matching; preposition splitting.
 //
-// CHECK-FOUNDATION: func copy(with _: Zone = nil) -> AnyObject!
+// CHECK-FOUNDATION: func copy(with: Zone? = nil) -> AnyObject!
 
 // Note: Objective-C type parameter names.
-// CHECK-FOUNDATION: func object(forKey _: Copying) -> AnyObject?
-// CHECK-FOUNDATION: func removeObject(forKey _: Copying)
+// CHECK-FOUNDATION: func object(forKey: Copying) -> AnyObject?
+// CHECK-FOUNDATION: func removeObject(forKey: Copying)
 
 // Note: Don't drop the name of the first parameter in an initializer entirely.
 // CHECK-FOUNDATION: init(array: [AnyObject])
@@ -94,10 +94,10 @@
 // CHECK-FOUNDATION: open(_: URL!, completionHandler: ((Bool) -> Void)!)
 
 // Note: property name stripping property type.
-// CHECK-FOUNDATION: var uppercase: String
+// CHECK-FOUNDATION: var uppercased: String
 
 // Note: don't map base name down to a keyword.
-// CHECK-FOUNDATION: func doSelector(_: Selector)
+// CHECK-FOUNDATION: func doSelector(_: Selector!)
 
 // Note: Strip names preceded by a gerund.
 // CHECK-FOUNDATION: func startSquashing(_: Bee)
@@ -108,7 +108,7 @@
 // CHECK-FOUNDATION: func add(_: [AnyObject])
 
 // Note: Int and Index match.
-// CHECK-FOUNDATION: func slice(from _: Int, to: Int) -> String
+// CHECK-FOUNDATION: func slice(from: Int, to: Int) -> String
 
 // Note: <context type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: func appending(_: String) -> String
@@ -117,7 +117,7 @@
 // CHECK-FOUNDATION: func withString(_: String) -> String
 
 // Note: Noun phrase puts preposition inside.
-// CHECK-FOUNDATION: func url(withAddedString _: String) -> URL?
+// CHECK-FOUNDATION: func url(withAddedString: String) -> URL?
 
 // Note: CalendarUnits is not a set of "Options".
 // CHECK-FOUNDATION: class func forCalendarUnits(_: CalendarUnit) -> String!
@@ -134,17 +134,17 @@
 // CHECK-FOUNDATION: static var reverse: EnumerationOptions
 
 // Note: usingBlock -> body
-// CHECK-FOUNDATION: func enumerateObjects(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
-// CHECK-FOUNDATION: func enumerateObjects(_: EnumerationOptions = [], using: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>!) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(_: EnumerationOptions = [], using: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>!) -> Void)!)
 
 // Note: WithBlock -> body, nullable closures default to nil.
-// CHECK-FOUNDATION: func enumerateObjectsRandomly(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
+// CHECK-FOUNDATION: func enumerateObjectsRandomly(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>!) -> Void)? = nil)
 
 // Note: id<Proto> treated as "Proto".
-// CHECK-FOUNDATION: func doSomething(with _: Copying)
+// CHECK-FOUNDATION: func doSomething(with: Copying)
 
 // Note: NSObject<Proto> treated as "Proto".
-// CHECK-FOUNDATION: func doSomethingElse(with _: protocol<Copying, ObjectProtocol>)
+// CHECK-FOUNDATION: func doSomethingElse(with: protocol<Copying, ObjectProtocol>)
 
 // Note: Function type -> "Function".
 // CHECK-FOUNDATION: func sort(_: @convention(c) (AnyObject, AnyObject) -> Int)
@@ -153,7 +153,7 @@
 // CHECK-FOUNDATION: func remove(_: [AnyObject])
 
 // Note: Skipping "Type" suffix.
-// CHECK-FOUNDATION: func doSomething(with _: UnderlyingType)
+// CHECK-FOUNDATION: func doSomething(with: UnderlyingType)
 
 // Don't introduce default arguments for lone parameters to setters.
 // CHECK-FOUNDATION: func setDefaultEnumerationOptions(_: EnumerationOptions)
@@ -173,7 +173,7 @@
 // CHECK-FOUNDATION: var setShouldBeInfinite: Bool { get }
 
 // "UTF8" initialisms.
-// CHECK-FOUNDATION: init?(utf8String: UnsafePointer<Int8>)
+// CHECK-FOUNDATION: init?(utf8String: UnsafePointer<Int8>!)
 
 // Don't strip prefixes from globals.
 // CHECK-FOUNDATION: let NSGlobalConstant: String
@@ -201,23 +201,23 @@
 // CHECK-APPKIT: func same() -> Self
 
 // Note: Unsafe(Mutable)Pointers don't get defaulted to 'nil'
-// CHECK-APPKIT: func getRGBAComponents(_: UnsafeMutablePointer<Int8>)
+// CHECK-APPKIT: func getRGBAComponents(_: UnsafeMutablePointer<Int8>?)
 
 // Note: Skipping over "3D"
-// CHECK-APPKIT: func drawInAir(at _: Point3D)
+// CHECK-APPKIT: func drawInAir(at: Point3D)
 
 // Note: with<something> -> <something>
-// CHECK-APPKIT: func draw(at _: Point3D, withAttributes: [String : AnyObject]? = [:])
+// CHECK-APPKIT: func draw(at: Point3D, withAttributes: [String : AnyObject]? = [:])
 
 // Note: Don't strip names that aren't preceded by a verb or preposition.
 // CHECK-APPKIT: func setTextColor(_: NSColor?)
 
 // Note: Splitting with default arguments.
-// CHECK-APPKIT: func draw(in _: NSView?)
+// CHECK-APPKIT: func draw(in: NSView?)
 
 // Note: NSDictionary default arguments for "options"
-// CHECK-APPKIT: func drawAnywhere(in _: NSView?, options: [Object : AnyObject] = [:])
-// CHECK-APPKIT: func drawAnywhere(options _: [Object : AnyObject] = [:])
+// CHECK-APPKIT: func drawAnywhere(in: NSView?, options: [Object : AnyObject] = [:])
+// CHECK-APPKIT: func drawAnywhere(options: [Object : AnyObject] = [:])
 
 // Note: no lowercasing of initialisms when there might be a prefix.
 // CHECK-CORECOOLING: func CFBottom() ->
@@ -240,12 +240,12 @@
 // beginning and the end of a property.
 // CHECK-APPKIT: var flattening: NSBezierPath { get }
 
-// CHECK-APPKIT: func dismiss(animated _: Bool)
+// CHECK-APPKIT: func dismiss(animated: Bool)
 
-// CHECK-APPKIT: func shouldCollapseAutoExpandedItems(forDeposited _: Bool) -> Bool
+// CHECK-APPKIT: func shouldCollapseAutoExpandedItems(forDeposited: Bool) -> Bool
 
 // Introducing argument labels and pruning the base name.
-// CHECK-APPKIT: func rectForCancelButton(whenCentered _: Bool)
+// CHECK-APPKIT: func rectForCancelButton(whenCentered: Bool)
 
 // CHECK-APPKIT: func openUntitledDocumentAndDisplay(_: Bool)
 
@@ -253,40 +253,40 @@
 // CHECK-APPKIT: func setContentHuggingPriority(_: NSLayoutPriority)
 
 // Look through typedefs of pointers.
-// CHECK-APPKIT: func layout(at _: NSPointPointer)
+// CHECK-APPKIT: func layout(at: NSPointPointer!)
 
 // The presence of a property prevents us from stripping redundant
 // type information from the base name.
 // CHECK-APPKIT: func addGestureRecognizer(_: NSGestureRecognizer)
 // CHECK-APPKIT: func removeGestureRecognizer(_: NSGestureRecognizer)
-// CHECK-APPKIT: func favoriteView(for _: NSGestureRecognizer) -> NSView?
+// CHECK-APPKIT: func favoriteView(for: NSGestureRecognizer) -> NSView?
 // CHECK-APPKIT: func addLayoutConstraints(_: Set<NSLayoutConstraint>)
 // CHECK-APPKIT: func add(_: Rect)
 // CHECK-APPKIT: class func conjureRect(_: Rect)
 
-// CHECK-OMIT-NEEDLESS-WORDS: func jump(to _: URL)
-// CHECK-OMIT-NEEDLESS-WORDS: func objectIs(compatibleWith _: AnyObject) -> Bool
-// CHECK-OMIT-NEEDLESS-WORDS: func insetBy(x _: Int, y: Int)
+// CHECK-OMIT-NEEDLESS-WORDS: func jump(to: URL)
+// CHECK-OMIT-NEEDLESS-WORDS: func objectIs(compatibleWith: AnyObject) -> Bool
+// CHECK-OMIT-NEEDLESS-WORDS: func insetBy(x: Int, y: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func setIndirectlyToValue(_: AnyObject)
 // CHECK-OMIT-NEEDLESS-WORDS: func jumpToTop(_: AnyObject)
 // CHECK-OMIT-NEEDLESS-WORDS: func removeWithNoRemorse(_: AnyObject)
-// CHECK-OMIT-NEEDLESS-WORDS: func bookmark(with _: [URL])
-// CHECK-OMIT-NEEDLESS-WORDS: func save(to _: URL, forSaveOperation: Int)
-// CHECK-OMIT-NEEDLESS-WORDS: func index(withItemNamed _: String)
-// CHECK-OMIT-NEEDLESS-WORDS: func methodAndReturnError(_: AutoreleasingUnsafeMutablePointer<Error?>)
+// CHECK-OMIT-NEEDLESS-WORDS: func bookmark(with: [URL])
+// CHECK-OMIT-NEEDLESS-WORDS: func save(to: URL, forSaveOperation: Int)
+// CHECK-OMIT-NEEDLESS-WORDS: func index(withItemNamed: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func methodAndReturnError(_: AutoreleasingUnsafeMutablePointer<Error?>!)
 
-// CHECK-OMIT-NEEDLESS-WORDS: func type(of _: String)
-// CHECK-OMIT-NEEDLESS-WORDS: func type(ofNamedString _: String)
-// CHECK-OMIT-NEEDLESS-WORDS: func type(ofTypeNamed _: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func type(of: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func type(ofNamedString: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func type(ofTypeNamed: String)
 
 // Look for preposition prior to "of".
-// CHECK-OMIT-NEEDLESS-WORDS: func append(withContentsOf _: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func append(withContentsOf: String)
 
 // Leave subscripts alone
 // CHECK-OMIT-NEEDLESS-WORDS: subscript(_: UInt) -> AnyObject { get }
 // CHECK-OMIT-NEEDLESS-WORDS: func objectAtIndexedSubscript(_: UInt) -> AnyObject
 
-// CHECK-OMIT-NEEDLESS-WORDS: func exportPresets(bestMatching _: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func exportPresets(bestMatching: String)
 // CHECK-OMIT-NEEDLESS-WORDS: func isCompatibleWith(_: String)
 
 // CHECK-OMIT-NEEDLESS-WORDS: func add(_: AnyObject)
@@ -294,10 +294,10 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func slobbering(_: String) -> OmitNeedlessWords
 
 // Elements of C array types
-// CHECK-OMIT-NEEDLESS-WORDS: func drawPolygon(with _: UnsafePointer<Point>, count: Int)
+// CHECK-OMIT-NEEDLESS-WORDS: func drawPolygon(with: UnsafePointer<Point>!, count: Int)
 
 // Typedef ending in "Array".
-// CHECK-OMIT-NEEDLESS-WORDS: func drawFilledPolygon(with _: PointArray, count: Int)
+// CHECK-OMIT-NEEDLESS-WORDS: func drawFilledPolygon(with: PointArray!, count: Int)
 
 // Non-parameterized Objective-C class ending in "Array".
 // CHECK-OMIT-NEEDLESS-WORDS: func draw(_: SEGreebieArray)

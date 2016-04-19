@@ -5,7 +5,7 @@
 import CoreCooling
 
 // CHECK: sil hidden @_TF2cf8useEmAllFCSo16CCMagnetismModelT_ :
-func useEmAll(model: CCMagnetismModel) {
+func useEmAll(_ model: CCMagnetismModel) {
 // CHECK: function_ref @CCPowerSupplyGetDefault : $@convention(c) () -> @autoreleased ImplicitlyUnwrappedOptional<CCPowerSupply>
   let power = CCPowerSupplyGetDefault()
 

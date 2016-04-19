@@ -89,6 +89,6 @@ public struct ChangeSize {
   return versionedGlobal
 }
 
-@_transparent public func setVersionedGlobal(c: Int) {
+@_transparent public func setVersionedGlobal(_ c: Int) {
   versionedGlobal.count = c
 }

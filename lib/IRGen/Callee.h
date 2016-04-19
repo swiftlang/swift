@@ -21,18 +21,12 @@
 #include <type_traits>
 #include "llvm/IR/DerivedTypes.h"
 #include "swift/SIL/SILType.h"
-#include "CallingConvention.h"
 #include "Explosion.h"
 #include "IRGen.h"
+#include "Signature.h"
 
 namespace llvm {
   class PointerType;
-}
-
-namespace clang {
-  namespace CodeGen {
-    class CGFunctionInfo;    
-  }
 }
 
 namespace swift {
@@ -41,11 +35,6 @@ namespace swift {
 namespace irgen {
   class Callee;
   class IRGenFunction;
-
-  class ForeignFunctionInfo {
-  public:
-    const clang::CodeGen::CGFunctionInfo *ClangInfo = nullptr;
-  };
 
   class Callee {
     /// The unsubstituted function type being called.

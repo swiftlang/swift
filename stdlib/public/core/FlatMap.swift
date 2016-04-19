@@ -19,7 +19,7 @@ extension LazySequenceProtocol {
   /// - Complexity: O(1)
   @warn_unused_result
   public func flatMap<SegmentOfResult : Sequence>(
-    transform: (Elements.Iterator.Element) -> SegmentOfResult
+    _ transform: (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazySequence<
     FlattenSequence<LazyMapSequence<Elements, SegmentOfResult>>> {
     return self.map(transform).flatten()
@@ -35,7 +35,7 @@ extension LazyCollectionProtocol {
   /// - Complexity: O(1)
   @warn_unused_result
   public func flatMap<SegmentOfResult : Collection>(
-    transform: (Elements.Iterator.Element) -> SegmentOfResult
+    _ transform: (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazyCollection<
     FlattenCollection<
       LazyMapCollection<Elements, SegmentOfResult>>
@@ -57,7 +57,7 @@ extension LazyCollectionProtocol where Elements.Index : BidirectionalIndex
     SegmentOfResult : Collection
     where SegmentOfResult.Index : BidirectionalIndex
   >(
-    transform: (Elements.Iterator.Element) -> SegmentOfResult
+    _ transform: (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazyCollection<
     FlattenBidirectionalCollection<
       LazyMapCollection<Elements, SegmentOfResult>

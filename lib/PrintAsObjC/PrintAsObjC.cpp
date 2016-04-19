@@ -175,7 +175,7 @@ private:
   }
 
   void printDocumentationComment(Decl *D) {
-    llvm::markup::MarkupContext MC;
+    swift::markup::MarkupContext MC;
     auto DC = getDocComment(MC, D);
     if (DC.hasValue())
       ide::getDocumentationCommentAsDoxygen(DC.getValue(), os);
@@ -430,7 +430,7 @@ private:
       // parameter, print it.
       if (errorConvention && i == errorConvention->getErrorParameterIndex()) {
         os << piece << ":(";
-        print(errorConvention->getErrorParameterType(), OTK_None);
+        print(errorConvention->getErrorParameterType(), None);
         os << ")error";
         continue;
       }
@@ -918,10 +918,8 @@ private:
       return false;
 
     os << iter->second.first;
-    if (iter->second.second) {
-      // FIXME: Selectors and pointers should be nullable.
-      printNullability(OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional);
-    }
+    if (iter->second.second)
+      printNullability(optionalKind);
     return true;
   }
   
@@ -930,13 +928,6 @@ private:
     os << "/* ";
     Ty->print(os);
     os << " */";
-  }
-
-  bool isClangObjectPointerType(const clang::TypeDecl *clangTypeDecl) const {
-    ASTContext &ctx = M.getASTContext();
-    auto &clangASTContext = ctx.getClangModuleLoader()->getClangASTContext();
-    clang::QualType clangTy = clangASTContext.getTypeDeclType(clangTypeDecl);
-    return clangTy->isObjCRetainableType();
   }
 
   bool isClangPointerType(const clang::TypeDecl *clangTypeDecl) const {
@@ -958,13 +949,9 @@ private:
       auto *clangTypeDecl = cast<clang::TypeDecl>(alias->getClangDecl());
       os << clangTypeDecl->getName();
 
-      // Print proper nullability for CF types, but _Null_unspecified for
-      // all other non-object Clang pointer types.
       if (aliasTy->hasReferenceSemantics() ||
-          isClangObjectPointerType(clangTypeDecl)) {
+          isClangPointerType(clangTypeDecl)) {
         printNullability(optionalKind);
-      } else if (isClangPointerType(clangTypeDecl)) {
-        printNullability(OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional);
       }
       return;
     }
@@ -1069,8 +1056,7 @@ private:
     if (isConst)
       os << " const";
     os << " *";
-    // FIXME: Pointer types should be nullable.
-    printNullability(OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional);
+    printNullability(optionalKind);
     return true;
   }
 

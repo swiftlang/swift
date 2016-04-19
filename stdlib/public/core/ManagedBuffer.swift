@@ -20,7 +20,7 @@ public class NonObjectiveCBase {
   public init() {}
 }
 
-/// A base class of `ManagedBuffer<Value,Element>`, used during
+/// A base class of `ManagedBuffer<Value, Element>`, used during
 /// instance creation.
 ///
 /// During instance creation, in particular during
@@ -35,7 +35,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// idea to store this information in the "value" area when
   /// an instance is created.
   public final var capacity: Int {
-    let p = ManagedBufferPointer<Value,Element>(self)
+    let p = ManagedBufferPointer<Value, Element>(self)
     return p.capacity
   }
 
@@ -45,7 +45,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointerToValue<R>(
-    body: (UnsafeMutablePointer<Value>) -> R
+    _ body: (UnsafeMutablePointer<Value>) -> R
   ) -> R {
     return withUnsafeMutablePointers { (v, e) in return body(v) }
   }
@@ -56,7 +56,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointerToElements<R>(
-    body: (UnsafeMutablePointer<Element>) -> R
+    _ body: (UnsafeMutablePointer<Element>) -> R
   ) -> R {
     return withUnsafeMutablePointers { return body($0.1) }
   }
@@ -67,7 +67,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// - Note: These pointers are only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointers<R>(
-    body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>) -> R
+    _ body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>) -> R
   ) -> R {
     return ManagedBufferPointer(self).withUnsafeMutablePointers(body)
   }
@@ -98,11 +98,11 @@ public class ManagedBuffer<Value, Element>
   /// `initializeValue` on the partially-constructed object to
   /// generate an initial `Value`.
   public final class func create(
-    minimumCapacity minimumCapacity: Int,
+    minimumCapacity: Int,
     initialValue: (ManagedProtoBuffer<Value, Element>) -> Value
   ) -> ManagedBuffer<Value, Element> {
 
-    let p = ManagedBufferPointer<Value,Element>(
+    let p = ManagedBufferPointer<Value, Element>(
       bufferClass: self,
       minimumCapacity: minimumCapacity,
       initialValue: { buffer, _ in
@@ -146,7 +146,7 @@ public class ManagedBuffer<Value, Element>
 /// --------------------
 ///
 ///      class MyBuffer<Element> { // non-@objc
-///        typealias Manager = ManagedBufferPointer<(Int,String), Element>
+///        typealias Manager = ManagedBufferPointer<(Int, String), Element>
 ///        deinit {
 ///          Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
 ///            (pointerToValue, pointerToElements) -> Void in
@@ -257,7 +257,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Note: This pointer is only valid
   ///   for the duration of the call to `body`.
   public func withUnsafeMutablePointerToValue<R>(
-    body: @noescape (UnsafeMutablePointer<Value>) -> R
+    _ body: @noescape (UnsafeMutablePointer<Value>) -> R
   ) -> R {
     return withUnsafeMutablePointers { (v, e) in return body(v) }
   }
@@ -268,7 +268,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public func withUnsafeMutablePointerToElements<R>(
-    body: (UnsafeMutablePointer<Element>) -> R
+    _ body: (UnsafeMutablePointer<Element>) -> R
   ) -> R {
     return withUnsafeMutablePointers { return body($0.1) }
   }
@@ -279,7 +279,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Note: These pointers are only valid for the duration of the
   ///   call to `body`.
   public func withUnsafeMutablePointers<R>(
-    body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>) -> R
+    _ body: @noescape (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>) -> R
   ) -> R {
     let result = body(_valuePointer, _elementPointer)
     _fixLifetime(_nativeBuffer)
@@ -361,7 +361,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   internal typealias _My = ManagedBufferPointer
 
   internal static func _checkValidBufferClass(
-    bufferClass: AnyClass, creating: Bool = false
+    _ bufferClass: AnyClass, creating: Bool = false
   ) {
     _debugPrecondition(
       _class_getInstancePositiveExtentSize(bufferClass) == sizeof(_HeapObject.self)
@@ -378,7 +378,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   }
 
   internal static func _sanityCheckValidBufferClass(
-    bufferClass: AnyClass, creating: Bool = false
+    _ bufferClass: AnyClass, creating: Bool = false
   ) {
     _sanityCheck(
       _class_getInstancePositiveExtentSize(bufferClass) == sizeof(_HeapObject.self)
@@ -467,7 +467,7 @@ public func == <Value, Element>(
 /// Useful for implementing the copy-on-write optimization for the
 /// deep storage of value types:
 ///
-///     mutating func modifyMe(arg: X) {
+///     mutating func modifyMe(_ arg: X) {
 ///       if isUniquelyReferencedNonObjC(&myStorage) {
 ///         myStorage.modifyInPlace(arg)
 ///       }
@@ -479,12 +479,12 @@ public func == <Value, Element>(
 /// This function is safe to use for `mutating` functions in
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
-public func isUniquelyReferencedNonObjC<T : AnyObject>(object: inout T) -> Bool
+public func isUniquelyReferencedNonObjC<T : AnyObject>(_ object: inout T) -> Bool
 {
   return _isUnique(&object)
 }
 
-internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(object: inout T) -> Bool {
+internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(_ object: inout T) -> Bool {
   return _isUniqueOrPinned(&object)
 }
 
@@ -498,7 +498,7 @@ internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(object: inout T
 /// Useful for implementing the copy-on-write optimization for the
 /// deep storage of value types:
 ///
-///     mutating func modifyMe(arg: X) {
+///     mutating func modifyMe(_ arg: X) {
 ///       if isUniquelyReferenced(&myStorage) {
 ///         myStorage.modifyInPlace(arg)
 ///       }
@@ -511,7 +511,7 @@ internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(object: inout T
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
 public func isUniquelyReferenced<T : NonObjectiveCBase>(
-  object: inout T
+  _ object: inout T
 ) -> Bool {
   return _isUnique(&object)
 }
@@ -527,7 +527,7 @@ public func isUniquelyReferenced<T : NonObjectiveCBase>(
 /// Useful for implementing the copy-on-write optimization for the
 /// deep storage of value types:
 ///
-///     mutating func modifyMe(arg: X) {
+///     mutating func modifyMe(_ arg: X) {
 ///       if isUniquelyReferencedNonObjC(&myStorage) {
 ///         myStorage.modifyInPlace(arg)
 ///       }
@@ -540,7 +540,7 @@ public func isUniquelyReferenced<T : NonObjectiveCBase>(
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
 public func isUniquelyReferencedNonObjC<T : AnyObject>(
-  object: inout T?
+  _ object: inout T?
 ) -> Bool {
   return _isUnique(&object)
 }

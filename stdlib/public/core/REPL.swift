@@ -12,7 +12,7 @@
 
 /// Print a string as is to stdout.
 public // COMPILER_INTRINSIC
-func _replPrintLiteralString(text: String) {
+func _replPrintLiteralString(_ text: String) {
   print(text, terminator: "")
 }
 
@@ -20,6 +20,6 @@ func _replPrintLiteralString(text: String) {
 @inline(never)
 @_semantics("stdlib_binary_only")
 public // COMPILER_INTRINSIC
-func _replDebugPrintln<T>(value: T) {
+func _replDebugPrintln<T>(_ value: T) {
   debugPrint(value)
 }

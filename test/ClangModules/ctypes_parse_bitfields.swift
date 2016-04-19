@@ -2,7 +2,7 @@
 
 import ctypes
 
-func useStructWithBitfields(mrm: ModRM) -> ModRM {
+func useStructWithBitfields(_ mrm: ModRM) -> ModRM {
   let rm: CUnsignedInt = mrm.rm
   let reg: CUnsignedInt = mrm.reg
   let mod: CUnsignedInt = mrm.mod
@@ -17,7 +17,7 @@ func useStructWithBitfields(mrm: ModRM) -> ModRM {
   return mrm
 }
 
-func constructStructWithBitfields(x: CUnsignedInt) {
+func constructStructWithBitfields(_ x: CUnsignedInt) {
   _ = StructWithBitfields()
   _ = StructWithBitfields(First: x, Second: x, Third: x)
 }

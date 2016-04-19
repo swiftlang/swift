@@ -120,7 +120,7 @@ struct FixedSizedRefArrayOfOptional<T>
   init(capacity: Int)
   {
     buffer = Storage.Buffer(Storage.self, capacity, capacity)
-    for var i = 0; i < capacity; ++i {
+    for i in 0 ..< capacity {
       (buffer.baseAddress + i).initialize(with: .none)
     }
 
@@ -182,7 +182,8 @@ struct DictionaryIndex<Element> : BidirectionalIndex {
 
   func predecessor() -> Index {
     var j = self.offset
-    while --j > 0 {
+    while j > 1 {
+      j -= 1
       if buffer[j] != nil {
         return Index(buffer: buffer, offset: j)
       }
@@ -275,7 +276,7 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
       _buffer[i.offset] = Element(key: key, value: value)
 
       if !found {
-        ++_count
+        _count += 1
       }
     }
   }
@@ -291,7 +292,7 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
   /// \brief Ensure this Dictionary holds a unique reference to its
   /// buffer having at least minimumCapacity elements.  Return true
   /// iff this results in a change of capacity.
-  mutating func _ensureUniqueBuffer(minimumCapacity: Int) -> Bool {
+  mutating func _ensureUniqueBuffer(_ minimumCapacity: Int) -> Bool {
     var isUnique: Bool = isUniquelyReferencedNonObjC(&_owner)
 
     if !isUnique || capacity < minimumCapacity {
@@ -317,19 +318,19 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
     return false
   }
 
-  func _bucket(k: Key) -> Int {
+  func _bucket(_ k: Key) -> Int {
     return k.hashValue & _bucketMask
   }
 
-  func _next(bucket: Int) -> Int {
+  func _next(_ bucket: Int) -> Int {
     return (bucket + 1) & _bucketMask
   }
 
-  func _prev(bucket: Int) -> Int {
+  func _prev(_ bucket: Int) -> Int {
     return (bucket - 1) & _bucketMask
   }
 
-  func _find(k: Key, startBucket: Int) -> (Index,Bool) {
+  func _find(_ k: Key, startBucket: Int) -> (Index,Bool) {
     var bucket = startBucket
     
 
@@ -345,12 +346,12 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
     }
   }
 
-  func find(k: Key) -> (Index,Bool) {
+  func find(_ k: Key) -> (Index,Bool) {
     return _find(k, startBucket: _bucket(k))
   }
 
   mutating
-  func deleteKey(k: Key) -> Bool {
+  func deleteKey(_ k: Key) -> Bool {
     var start = _bucket(k)
     var (pos, found) = _find(k, startBucket: start)
 
@@ -360,7 +361,7 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
 
     // remove the element
     _buffer[pos.offset] = .none
-    --_count
+    _count -= 1
 
     // If we've put a hole in a chain of contiguous elements, some
     // element after the hole may belong where the new hole is.
@@ -368,8 +369,10 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
 
     // Find the last bucket in the contiguous chain
     var lastInChain = hole
-    for var b = _next(lastInChain); _buffer[b] != nil; b = _next(b) {
+    var b = _next(lastInChain)
+    while _buffer[b] != nil {
       lastInChain = b
+      b = _next(b)
     }
 
     // Relocate out-of-place elements in the chain, repeating until
@@ -377,8 +380,8 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
     while hole != lastInChain {
       // Walk backwards from the end of the chain looking for
       // something out-of-place.
-      var b: Int
-      for b = lastInChain; b != hole; b = _prev(b) {
+      var b = lastInChain
+      while b != hole {
 
         var idealBucket = _bucket(_buffer[b]!.key)
 
@@ -400,6 +403,7 @@ struct Dictionary<Key: Hashable, Value> : Collection, Sequence {
       _buffer[hole] = _buffer[b]
       _buffer[b] = .none
       hole = b
+      b = _prev(b)
     }
 
     return true
@@ -503,7 +507,7 @@ extension String {
   }
 }
 
-func display(v : Dictionary<Int, X>) {
+func display(_ v : Dictionary<Int, X>) {
   print("[ ", terminator: "")
   var separator = ""
   for p in v {

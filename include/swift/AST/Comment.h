@@ -22,54 +22,40 @@ class DocComment;
 struct RawComment;
 
 class DocComment {
-public:
-  struct CommentParts {
-    Optional<const llvm::markup::Paragraph *>Brief;
-    ArrayRef<const llvm::markup::MarkupASTNode *> BodyNodes;
-    ArrayRef<const llvm::markup::ParamField *> ParamFields;
-    Optional<const llvm::markup::ReturnsField *> ReturnsField;
-    Optional<const llvm::markup::ThrowsField *> ThrowsField;
-
-    bool isEmpty() const {
-      return !Brief.hasValue() && !ReturnsField.hasValue() && !ThrowsField.hasValue() && BodyNodes.empty() && ParamFields.empty();
-    }
-  };
-
-private:
   const Decl *D;
-  const llvm::markup::Document *Doc = nullptr;
-  const CommentParts Parts;
+  const swift::markup::Document *Doc = nullptr;
+  const swift::markup::CommentParts Parts;
 
 public:
-  DocComment(const Decl *D, llvm::markup::Document *Doc,
-             CommentParts Parts)
+  DocComment(const Decl *D, swift::markup::Document *Doc,
+             swift::markup::CommentParts Parts)
       : D(D), Doc(Doc), Parts(Parts) {}
 
   const Decl *getDecl() const { return D; }
 
-  const llvm::markup::Document *getDocument() const { return Doc; }
+  const swift::markup::Document *getDocument() const { return Doc; }
 
-  CommentParts getParts() const {
+  swift::markup::CommentParts getParts() const {
     return Parts;
   }
 
-  Optional<const llvm::markup::Paragraph *> getBrief() const {
+  Optional<const swift::markup::Paragraph *> getBrief() const {
     return Parts.Brief;
   }
 
-  Optional<const llvm::markup::ReturnsField * >getReturnsField() const {
+  Optional<const swift::markup::ReturnsField * >getReturnsField() const {
     return Parts.ReturnsField;
   }
 
-  Optional<const llvm::markup::ThrowsField*> getThrowsField() const {
+  Optional<const swift::markup::ThrowsField*> getThrowsField() const {
     return Parts.ThrowsField;
   }
 
-  ArrayRef<const llvm::markup::ParamField *> getParamFields() const {
+  ArrayRef<const swift::markup::ParamField *> getParamFields() const {
     return Parts.ParamFields;
   }
 
-  ArrayRef<const llvm::markup::MarkupASTNode *> getBodyNodes() const {
+  ArrayRef<const swift::markup::MarkupASTNode *> getBodyNodes() const {
     return Parts.BodyNodes;
   }
 
@@ -79,7 +65,7 @@ public:
 
   // Only allow allocation using the allocator in MarkupContext or by
   // placement new.
-  void *operator new(size_t Bytes, llvm::markup::MarkupContext &MC,
+  void *operator new(size_t Bytes, swift::markup::MarkupContext &MC,
                      unsigned Alignment = alignof(DocComment));
   void *operator new(size_t Bytes, void *Mem) {
     assert(Mem);
@@ -91,7 +77,7 @@ public:
   void operator delete(void *Data) = delete;
 };
 
-Optional<DocComment *>getDocComment(llvm::markup::MarkupContext &Context,
+Optional<DocComment *>getDocComment(swift::markup::MarkupContext &Context,
                                     const Decl *D);
 
 } // namespace swift

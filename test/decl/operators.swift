@@ -18,13 +18,13 @@ infix operator ++++ {
   associativity left
 }
 
-infix func fn_binary(lhs: Int, rhs: Int) {}  // expected-error {{'infix' requires a function with an operator identifier}}
+infix func fn_binary(_ lhs: Int, rhs: Int) {}  // expected-error {{'infix' requires a function with an operator identifier}}
 
 
 func ++++(lhs: X, rhs: X) -> X {}
 func ++++(lhs: Y, rhs: Y) -> Y {} // okay
 
-func useInt(x: Int) {}
+func useInt(_ x: Int) {}
 func test() {
   var x : Int  
   let y : Int = 42
@@ -38,11 +38,11 @@ prefix operator ~~ {}
 postfix operator ~~ {}
 infix operator ~~ {}
 
-postfix func foo(x: Int) {} // expected-error {{'postfix' requires a function with an operator identifier}}
+postfix func foo(_ x: Int) {} // expected-error {{'postfix' requires a function with an operator identifier}}
 postfix func ~~(x: Int) -> Float { return Float(x) }
 postfix func ~~(x: Int, y: Int) {} // expected-error {{'postfix' requires a function with one argument}}
 prefix func ~~(x: Float) {}
-func test_postfix(x: Int) {
+func test_postfix(_ x: Int) {
   ~~x~~
 }
 

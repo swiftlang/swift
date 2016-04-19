@@ -696,6 +696,11 @@ public:
   void addMacrosToLookupTable(clang::ASTContext &clangCtx,
                               clang::Preprocessor &pp, SwiftLookupTable &table);
 
+  /// Finalize a lookup table, handling any as-yet-unresolved entries
+  /// and emitting diagnostics if necessary.
+  void finalizeLookupTable(clang::ASTContext &clangCtx,
+                           clang::Preprocessor &pp, SwiftLookupTable &table);
+
 public:
   void registerExternalDecl(Decl *D) {
     RegisteredExternalDecls.push_back(D);

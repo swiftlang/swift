@@ -22,7 +22,7 @@ func f0() {
 }
 
 import func Swift.print
-func f1(a: Swift.Int) -> Swift.Void { print(a) }
+func f1(_ a: Swift.Int) -> Swift.Void { print(a) }
 
 import func Swift.print
 

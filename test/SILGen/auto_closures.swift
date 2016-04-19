@@ -4,14 +4,14 @@ struct Bool {}
 var false_ = Bool()
 
 // CHECK-LABEL: sil hidden @_TF13auto_closures17call_auto_closure
-func call_auto_closure(@autoclosure x: () -> Bool) -> Bool {
+func call_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
   // CHECK: [[RET:%.*]] = apply %0()
   // CHECK: return [[RET]]
   return x()
 }
 
 // CHECK-LABEL sil @_TF13auto_closures30test_auto_closure_with_capture
-func test_auto_closure_with_capture(x: Bool) -> Bool {
+func test_auto_closure_with_capture(_ x: Bool) -> Bool {
   // CHECK: [[CLOSURE:%.*]] = function_ref @_TFF13auto_closures30test_auto_closure_with_capture
   // CHECK: [[WITHCAPTURE:%.*]] = partial_apply [[CLOSURE]](
   // CHECK: [[RET:%.*]] = apply {{%.*}}([[WITHCAPTURE]])
@@ -52,13 +52,13 @@ public class Sub : Base {
 // CHECK: }
 // CHECK-LABEL: sil shared @_TFFF13auto_closures20closureInAutoclosureFTVS_4BoolS0__S0_u_KT_S0_U_FS0_S0_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
-func compareBool(lhs: Bool, _ rhs: Bool) -> Bool { return false_ }
-func testBool(x: Bool, _ pred: (Bool) -> Bool) -> Bool {
+func compareBool(_ lhs: Bool, _ rhs: Bool) -> Bool { return false_ }
+func testBool(_ x: Bool, _ pred: (Bool) -> Bool) -> Bool {
   return pred(x)
 }
-func delayBool(@autoclosure fn: () -> Bool) -> Bool {
+func delayBool(_ fn: @autoclosure () -> Bool) -> Bool {
   return fn()
 }
-func closureInAutoclosure(lhs: Bool, _ rhs: Bool) -> Bool {
+func closureInAutoclosure(_ lhs: Bool, _ rhs: Bool) -> Bool {
   return delayBool(testBool(lhs, { compareBool($0, rhs) }))
 }

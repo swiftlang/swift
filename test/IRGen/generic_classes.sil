@@ -163,7 +163,7 @@ class GenericInheritsGeneric<A, B> : RootGeneric<A> {
 
   override init()
 }
-sil @_TFC15generic_classes22GenericInheritsGenericD : $@convention(method) <T,U> (GenericInheritsGeneric<T,U>) -> ()
+sil @_TFC15generic_classes22GenericInheritsGenericD : $@convention(method) <T, U> (GenericInheritsGeneric<T, U>) -> ()
 
 sil @_TFC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_ : $@convention(method) <A, B> (@guaranteed GenericInheritsGeneric<A, B>) -> ()
 
@@ -200,7 +200,7 @@ class RecursiveGenericInheritsGeneric<A, B> : RootGeneric<A> {
   override init()
 }
 sil_vtable RecursiveGenericInheritsGeneric {}
-sil @_TFC15generic_classes31RecursiveGenericInheritsGenericD : $@convention(method) <T,U> (RecursiveGenericInheritsGeneric<T,U>) -> ()
+sil @_TFC15generic_classes31RecursiveGenericInheritsGenericD : $@convention(method) <T, U> (RecursiveGenericInheritsGeneric<T, U>) -> ()
 
 
 // CHECK: define{{( protected)?}} [[ROOTGENERIC]]* @RootGeneric_fragile_dependent_alloc

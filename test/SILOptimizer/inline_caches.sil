@@ -41,14 +41,14 @@ class C {
 }
 
 // CHECK-LABEL: sil @_TZFC4spec1C3foofMS0_FT_T_
-sil @_TZFC4spec1C3foofMS0_FT_T_ : $@convention(thin) (@thick C.Type) -> () {
+sil @_TZFC4spec1C3foofMS0_FT_T_ : $@convention(method) (@thick C.Type) -> () {
 bb0(%0 : $@thick C.Type):
   %2 = tuple ()
   return %2 : $()
 }
 
 // CHECK-LABEL: sil @_TZFC4spec1C3barfMS0_FT_T_
-sil @_TZFC4spec1C3barfMS0_FT_T_ : $@convention(thin) (@thick C.Type) -> () {
+sil @_TZFC4spec1C3barfMS0_FT_T_ : $@convention(method) (@thick C.Type) -> () {
   // CHECK: bb0
 bb0(%0 : $@thick C.Type):
   // CHECK-NOT: class_method
@@ -60,10 +60,10 @@ bb0(%0 : $@thick C.Type):
   // CHECK: apply [[REF]]
   // CHECK: br bb1
   // CHECK: bb3
-  // CHECK: [[METHOD:%.*]] = class_method %0 : $@thick C.Type, #C.foo!1 : (C.Type) -> () -> () , $@convention(thin) (@thick C.Type) -> ()
+  // CHECK: [[METHOD:%.*]] = class_method %0 : $@thick C.Type, #C.foo!1 : (C.Type) -> () -> () , $@convention(method) (@thick C.Type) -> ()
   // CHECK: apply [[METHOD]]
-  %2 = class_method %0 : $@thick C.Type, #C.foo!1 : C.Type -> () -> () , $@convention(thin) (@thick C.Type) -> ()
-  %3 = apply %2(%0) : $@convention(thin) (@thick C.Type) -> ()
+  %2 = class_method %0 : $@thick C.Type, #C.foo!1 : C.Type -> () -> () , $@convention(method) (@thick C.Type) -> ()
+  %3 = apply %2(%0) : $@convention(method) (@thick C.Type) -> ()
   %4 = tuple ()
   return %4 : $()
 }

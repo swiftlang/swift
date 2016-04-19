@@ -44,7 +44,7 @@ Swift compiler itself need not be recompiled except in rare cases
 where the changes affect how the SDK overlays are built. To recompile
 API notes for a given module `$MODULE` and place them into their 
 
-### OSX
+### OS X
 ```
 xcrun swift -apinotes -yaml-to-binary -target x86_64-apple-macosx10.10 -o $SWIFT_EXEC/lib/swift/macosx/$MODULE.apinotesc $MODULE.apinotes
 ```

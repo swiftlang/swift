@@ -14,12 +14,12 @@ import has_generic_witness
 var cfoo : Fooable = FooClass()
 var sfoo : Fooable = FooStruct()
 
-func bar<B: Barrable>(b: B) {}
+func bar<B: Barrable>(_ b: B) {}
 bar(BarClass())
 bar(BarStruct())
 
 var cbas : Bassable = BasClass()
 var sbas : Bassable = BasStruct()
 
-func cyc<C: CyclicAssociated>(c: C) {}
+func cyc<C: CyclicAssociated>(_ c: C) {}
 cyc(CyclicImpl())

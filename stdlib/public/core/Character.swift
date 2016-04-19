@@ -107,7 +107,7 @@ public struct Character :
     }
     else {
       if let native = s._core.nativeBuffer
-              where native.start == UnsafeMutablePointer(s._core._baseAddress) {
+              where native.start == UnsafeMutablePointer(s._core._baseAddress!){
         _representation = .large(native._storage)
         return
       }
@@ -120,7 +120,7 @@ public struct Character :
   /// Returns the index of the lowest byte that is 0xFF, or 8 if
   /// there is none.
   @warn_unused_result
-  static func _smallSize(value: UInt64) -> Int {
+  static func _smallSize(_ value: UInt64) -> Int {
     var mask: UInt64 = 0xFF
     for i in 0..<8 {
       if (value & mask) == mask {
@@ -132,7 +132,7 @@ public struct Character :
   }
 
   @warn_unused_result
-  static func _smallValue(value: Builtin.Int63) -> UInt64 {
+  static func _smallValue(_ value: Builtin.Int63) -> UInt64 {
     return UInt64(Builtin.zext_Int63_Int64(value)) | (1<<63)
   }
 

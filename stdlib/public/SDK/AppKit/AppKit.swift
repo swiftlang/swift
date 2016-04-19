@@ -64,7 +64,7 @@ public extension NSGradient {
 // argv as a const char**.
 @_silgen_name("NSApplicationMain")
 public func NSApplicationMain(
-  argc: Int32, _ argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>>
+  _ argc: Int32, _ argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
 ) -> Int32
 
 extension NSColor : _ColorLiteralConvertible {

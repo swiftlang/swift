@@ -25,7 +25,7 @@ func testObjectiveCBridgeStubFromNSString() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeStubFromNSString(N: Int) {
+public func run_ObjectiveCBridgeStubFromNSString(_ N: Int) {
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubFromNSString()
@@ -44,7 +44,7 @@ func testObjectiveCBridgeStubToNSString() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeStubToNSString(N: Int) {
+public func run_ObjectiveCBridgeStubToNSString(_ N: Int) {
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubToNSString()
@@ -64,7 +64,7 @@ func testObjectiveCBridgeStubFromArrayOfNSString() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeStubFromArrayOfNSString(N: Int) {
+public func run_ObjectiveCBridgeStubFromArrayOfNSString(_ N: Int) {
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubFromArrayOfNSString()
@@ -75,15 +75,14 @@ public func run_ObjectiveCBridgeStubFromArrayOfNSString(N: Int) {
 func testObjectiveCBridgeStubToArrayOfNSString() {
    let b = BridgeTester()
    let str = "hello world"
-   let arr = [ str, str, str, str, str,
-               str, str, str, str, str ]
+   let arr = [str, str, str, str, str, str, str, str, str, str]
    for _ in 0 ..< 10_000 {
      b.test(fromArrayOf: arr)
    }
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeStubToArrayOfNSString(N: Int) {
+public func run_ObjectiveCBridgeStubToArrayOfNSString(_ N: Int) {
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubToArrayOfNSString()

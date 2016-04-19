@@ -388,14 +388,13 @@ namespace {
     void initialize(IRGenFunction &IGF, Explosion &e,
                     Address addr) const override {}
     void copy(IRGenFunction &IGF, Explosion &src,
-              Explosion &dest) const override {}
-    void consume(IRGenFunction &IGF, Explosion &src) const override {}
+              Explosion &dest, Atomicity atomicity) const override {}
+    void consume(IRGenFunction &IGF, Explosion &src,
+                 Atomicity atomicity) const override {}
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {}
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {}
-    void packIntoEnumPayload(IRGenFunction &IGF,
-                             EnumPayload &payload,
-                             Explosion &src,
-                             unsigned offset) const override {}
+    void packIntoEnumPayload(IRGenFunction &IGF, EnumPayload &payload,
+                             Explosion &src, unsigned offset) const override {}
     void unpackFromEnumPayload(IRGenFunction &IGF,
                                const EnumPayload &payload,
                                Explosion &dest,
@@ -412,7 +411,53 @@ namespace {
                       Alignment align)
       : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align) {}
   };
-  
+
+  /// A TypeInfo implementation for bare non-null pointers (like `void *`).
+  class RawPointerTypeInfo final :
+    public PODSingleScalarTypeInfo<RawPointerTypeInfo, LoadableTypeInfo> {
+  public:
+    RawPointerTypeInfo(llvm::Type *storage, Size size, Alignment align)
+      : PODSingleScalarTypeInfo(
+          storage, size,
+          SpareBitVector::getConstant(size.getValueInBits(), false),
+          align) {}
+
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+      return true;
+    }
+
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+      return 1;
+    }
+
+    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,
+                                       unsigned index) const override {
+      assert(index == 0);
+      return APInt(bits, 0);
+    }
+
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                         Address src,
+                                         SILType T) const override {
+      // Copied from BridgeObjectTypeInfo.
+      src = IGF.Builder.CreateBitCast(src, IGF.IGM.IntPtrTy->getPointerTo());
+      auto val = IGF.Builder.CreateLoad(src);
+      auto zero = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0);
+      auto isNonzero = IGF.Builder.CreateICmpNE(val, zero);
+      // We either have extra inhabitant 0 or no extra inhabitant (-1).
+      // Conveniently, this is just a sext i1 -> i32 away.
+      return IGF.Builder.CreateSExt(isNonzero, IGF.IGM.Int32Ty);
+    }
+
+    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                              Address dest, SILType T) const override {
+      // Copied from BridgeObjectTypeInfo.
+      // There's only one extra inhabitant, 0.
+      dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.IntPtrTy->getPointerTo());
+      IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0),dest);
+    }
+  };
+
   /// A TypeInfo implementation for opaque storage. Swift will preserve any
   /// data stored into this arbitrarily sized and aligned field, but doesn't
   /// know anything about the data.
@@ -467,19 +512,20 @@ namespace {
     }
     
     void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
-              Explosion &targetExplosion) const override {
+              Explosion &targetExplosion, Atomicity atomicity) const override {
       reexplode(IGF, sourceExplosion, targetExplosion);
     }
-    
-    void consume(IRGenFunction &IGF, Explosion &explosion) const override {
+
+    void consume(IRGenFunction &IGF, Explosion &explosion,
+                 Atomicity atomicity) const override {
       explosion.claimNext();
     }
     
     void fixLifetime(IRGenFunction &IGF, Explosion &explosion) const override {
       explosion.claimNext();
     }
-    
-    void destroy(IRGenFunction &IGF, Address address, SILType T) const override{
+
+    void destroy(IRGenFunction &IGF, Address address, SILType T) const override {
       /* nop */
     }
     
@@ -718,6 +764,20 @@ const LoadableTypeInfo &TypeConverter::getBridgeObjectTypeInfo() {
   BridgeObjectTI->NextConverted = FirstType;
   FirstType = BridgeObjectTI;
   return *BridgeObjectTI;
+}
+
+const LoadableTypeInfo &IRGenModule::getRawPointerTypeInfo() {
+  return Types.getRawPointerTypeInfo();
+}
+
+const LoadableTypeInfo &TypeConverter::getRawPointerTypeInfo() {
+  if (RawPointerTI) return *RawPointerTI;
+  RawPointerTI = new RawPointerTypeInfo(IGM.Int8PtrTy,
+                                        IGM.getPointerSize(),
+                                        IGM.getPointerAlignment());
+  RawPointerTI->NextConverted = FirstType;
+  FirstType = RawPointerTI;
+  return *RawPointerTI;
 }
 
 const LoadableTypeInfo &TypeConverter::getEmptyTypeInfo() {
@@ -1263,6 +1323,7 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
                            getFixedBufferSize(IGM),
                            getFixedBufferAlignment(IGM));
   case TypeKind::BuiltinRawPointer:
+    return &getRawPointerTypeInfo();
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinVector: {

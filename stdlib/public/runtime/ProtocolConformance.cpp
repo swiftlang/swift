@@ -24,7 +24,7 @@
 #if defined(__APPLE__) && defined(__MACH__)
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
-#elif defined(__ELF__)
+#elif defined(__ELF__) || defined(__ANDROID__)
 #include <elf.h>
 #include <link.h>
 #endif
@@ -349,7 +349,7 @@ static void _initializeCallbacksToInspectDylib() {
   _dyld_register_func_for_add_image(_addImageProtocolConformances);
 }
 
-#elif defined(__ELF__)
+#elif defined(__ELF__) || defined(__ANDROID__)
 static int _addImageProtocolConformances(struct dl_phdr_info *info,
                                           size_t size, void *data) {
   // inspectArgs contains addImage*Block function and the section name
@@ -360,6 +360,12 @@ static int _addImageProtocolConformances(struct dl_phdr_info *info,
     handle = dlopen(nullptr, RTLD_LAZY);
   } else
     handle = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
+
+  if (!handle) {
+    // Not a shared library.
+    return 0;
+  }
+
   auto conformances = reinterpret_cast<const uint8_t*>(
       dlsym(handle, inspectArgs->sectionName));
 
@@ -560,10 +566,9 @@ recur:
       return FoundConformance.first;
   }
 
-  unsigned failedGeneration = ConformanceCacheGeneration;
-
   // If we didn't have an up-to-date cache entry, scan the conformance records.
   C.SectionsToScanLock.lock();
+  unsigned failedGeneration = ConformanceCacheGeneration;
 
   // If we have no new information to pull in (and nobody else pulled in
   // new information while we waited on the lock), we're done.

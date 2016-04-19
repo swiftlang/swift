@@ -6,8 +6,16 @@ import ImportAsMember
 
 func makeMetatype() -> Struct1.Type { return Struct1.self }
 
+// CHECK-LABEL: sil @_TF10cf_members17importAsUnaryInitFT_T_
+public func importAsUnaryInit() {
+  // CHECK: function_ref @CCPowerSupplyCreateDangerous : $@convention(c) () -> @owned CCPowerSupply
+  var a = CCPowerSupply(dangerous: ())
+  let f: () -> CCPowerSupply = CCPowerSupply.init(dangerous:)
+  a = f()
+}
+
 // CHECK-LABEL: sil @_TF10cf_members3foo
-public func foo(x: Double) {
+public func foo(_ x: Double) {
 // CHECK: bb0([[X:%.*]] : $Double):
   // CHECK: [[GLOBALVAR:%.*]] = global_addr @IAMStruct1GlobalVar
   // CHECK: [[ZZ:%.*]] = load [[GLOBALVAR]]
@@ -217,7 +225,7 @@ public func foo(x: Double) {
 // CHECK:         apply [[CFUNC]]([[X]], [[Y]], [[SELF]], [[Z]])
 
 // CHECK-LABEL: sil @_TF10cf_members3bar
-public func bar(x: Double) {
+public func bar(_ x: Double) {
   // CHECK: function_ref @CCPowerSupplyCreate : $@convention(c) (Double) -> @owned CCPowerSupply
   let ps = CCPowerSupply(watts: x)
   // CHECK: function_ref @CCRefrigeratorCreate : $@convention(c) (CCPowerSupply) -> @owned CCRefrigerator
@@ -238,7 +246,7 @@ public func bar(x: Double) {
 }
 
 // CHECK-LABEL: sil @_TF10cf_members16importAsProtocolFPSo8IAMProto_T_
-public func importAsProtocol(x: IAMProto_t) {
+public func importAsProtocol(_ x: IAMProto_t) {
   // CHECK: function_ref @mutateSomeState : $@convention(c) <τ_0_0 where τ_0_0 : IAMProto> (τ_0_0) -> ()
   x.mutateSomeState()
   // CHECK: function_ref @mutateSomeStateWithParameter : $@convention(c) <τ_0_0 where τ_0_0 : IAMProto> (τ_0_0, Int) -> ()
@@ -250,4 +258,13 @@ public func importAsProtocol(x: IAMProto_t) {
   let y = x.someValue
   // CHECK: function_ref @setSomeValue : $@convention(c) <τ_0_0 where τ_0_0 : IAMProto> (τ_0_0, Int32) -> Int32
   x.someValue = y
+}
+
+// CHECK-LABEL: sil @_TF10cf_members28importGlobalVarsAsProperties
+public func importGlobalVarsAsProperties()
+    -> (Double, CCPowerSupply, CCPowerSupply?) {
+  // CHECK: global_addr @kCCPowerSupplyDC
+  // CHECK: global_addr @kCCPowerSupplyAC
+  // CHECK: global_addr @kCCPowerSupplyDefaultPower
+  return (CCPowerSupply.defaultPower, CCPowerSupply.AC, CCPowerSupply.DC)
 }

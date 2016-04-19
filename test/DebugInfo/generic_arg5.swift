@@ -4,7 +4,7 @@ public struct S<Type>
   let value : Type
 }
 
-public func foo<Type>(values : [S<Type>])
+public func foo<Type>(_ values : [S<Type>])
 {
   // CHECK: define {{.*}}_TFF12generic_arg53foourFGSaGVS_1Sx__T_U_FGS0_Q__GSqGS0_Q___
   // CHECK: store %[[TY:.*]]* %1, %[[TY]]** %[[ALLOCA:.*]], align

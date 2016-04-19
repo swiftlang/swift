@@ -19,9 +19,9 @@ struct _Prespecialize {
   // Create specializations for the arrays of most
   // popular builtin integer and floating point types.
   static internal func _specializeArrays() {
-    func _createArrayUser<Element : Comparable>(sampleValue: Element) {
+    func _createArrayUser<Element : Comparable>(_ sampleValue: Element) {
       // Initializers.
-      let _: [Element] = [ sampleValue ]
+      let _: [Element] = [sampleValue]
       var a = [Element](repeating: sampleValue, count: 1)
 
       // Read array element
@@ -68,9 +68,9 @@ struct _Prespecialize {
       print("Element:\(sampleValue)")
     }
 
-    func _createArrayUserWithoutSorting<Element>(sampleValue: Element) {
+    func _createArrayUserWithoutSorting<Element>(_ sampleValue: Element) {
       // Initializers.
-      let _: [Element] = [ sampleValue ]
+      let _: [Element] = [sampleValue]
       var a = [Element](repeating: sampleValue, count: 1)
 
       // Read array element
@@ -151,6 +151,10 @@ struct _Prespecialize {
     // Specialize Range for integers
     for i in 0..<a.count {
       count += a[i]
+    }
+    // Specialize Range for integers
+    for j in 0...a.count - 1{
+      count += a[j]
     }
     return count
   }

@@ -37,7 +37,7 @@ class PriorityQueue {
   }
 
   // Insert element N to heap, maintaining the heap property.
-  func insert(n : EdgeCost) {
+  func insert(_ n: EdgeCost) {
     let ind: Int = heap.count
     heap.append(n)
     graphIndexToHeapIndexMap[n.to] = heap.count - 1
@@ -46,7 +46,7 @@ class PriorityQueue {
 
   // Insert element N if in's not in the heap, or update its cost if the new
   // value is less than the existing one.
-  func insertOrUpdate(n : EdgeCost) {
+  func insertOrUpdate(_ n: EdgeCost) {
     let id = n.to
     let c  = n.cost
     if let ind = graphIndexToHeapIndexMap[id] {
@@ -64,7 +64,7 @@ class PriorityQueue {
 
   // Restore heap property by moving element at index IND up.
   // This is needed after insertion, and after decreasing an element's cost.
-  func bubbleUp(ind: Int) {
+  func bubbleUp(_ ind: Int) {
     var ind = ind
     let c = heap[ind].cost
     while (ind != 0) {
@@ -93,7 +93,7 @@ class PriorityQueue {
   // Restore heap property by moving element at index IND down.
   // This is needed after removing an element, and after increasing an
   // element's cost.
-  func bubbleDown(ind: Int) {
+  func bubbleDown(_ ind: Int) {
     var ind = ind
     let n = heap.count
     while (ind < n) {
@@ -118,7 +118,7 @@ class PriorityQueue {
 
   // Swaps elements I and J in the heap and correspondingly updates
   // graphIndexToHeapIndexMap.
-  func Swap(i: Int, with j : Int) {
+  func Swap(_ i: Int, with j : Int) {
     if (i == j) {
       return
     }
@@ -139,13 +139,13 @@ class PriorityQueue {
     }
   }
 
-  func getLeftChildIndex(index : Int) -> Int {
+  func getLeftChildIndex(_ index : Int) -> Int {
     return index*2 + 1
   }
-  func getRightChildIndex(index : Int) -> Int {
+  func getRightChildIndex(_ index : Int) -> Int {
     return (index + 1)*2
   }
-  func getParentIndex(childIndex : Int) -> Int {
+  func getParentIndex(_ childIndex : Int) -> Int {
     return (childIndex - 1)/2
   }
 }
@@ -183,7 +183,7 @@ extension Edge : Hashable {
   }
 }
 
-func Prims(graph : Array<GraphNode>, _ fun : (Int,Int)->Double) -> Array<Int?> {
+func Prims(_ graph : Array<GraphNode>, _ fun : (Int, Int) -> Double) -> Array<Int?> {
   var treeEdges = Array<Int?>(repeating:nil, count:graph.count)
 
   let queue = PriorityQueue(Num:graph.count)
@@ -214,7 +214,7 @@ func Prims(graph : Array<GraphNode>, _ fun : (Int,Int)->Double) -> Array<Int?> {
 }
 
 @inline(never)
-public func run_Prims(N: Int) {
+public func run_Prims(_ N: Int) {
   for _ in 1...5*N {
     let nodes : [Int] = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
       13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
@@ -226,7 +226,7 @@ public func run_Prims(N: Int) {
 
     // Prim's algorithm is designed for undirected graphs.
     // Due to that, in our set all the edges are paired, i.e. for any
-    // edge (start,end,C) there is also an edge (end,start,C).
+    // edge (start, end, C) there is also an edge (end, start, C).
     let edges : [(Int, Int, Double)] = [
       (26, 47, 921),
       (20, 25, 971),

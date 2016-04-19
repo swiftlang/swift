@@ -87,7 +87,8 @@ import Swift
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
 // CHECK-native: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* null)
-// CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @rt_swift_getInitializedObjCClass(%objc_class* @"OBJC_CLASS_$_SwiftObject")
+// CHECK-objc:   [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_SwiftObject"
+// CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @rt_swift_getInitializedObjCClass(%objc_class* [[T0]])
 // CHECK-objc:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]])
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 10
@@ -100,7 +101,8 @@ import Swift
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
 // CHECK-native: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* null)
-// CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @rt_swift_getInitializedObjCClass(%objc_class* @"OBJC_CLASS_$_SwiftObject")
+// CHECK-objc:   [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_SwiftObject"
+// CHECK-objc:   [[SUPER:%.*]] = call %objc_class* @rt_swift_getInitializedObjCClass(%objc_class* [[T0]])
 // CHECK-objc:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]])
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 10
@@ -112,12 +114,15 @@ import Swift
 class A<T> {
   var x = 0
 
-  func run(t: T) {}
+  func run(_ t: T) {}
   init(y : Int) {}
 }
 
 class B<T> {
-  var ptr : UnsafeMutablePointer<T> = nil
+  var ptr : UnsafeMutablePointer<T>
+  init(ptr: UnsafeMutablePointer<T>) {
+    self.ptr = ptr
+  }
   deinit {
     ptr.deinitialize()
   }
@@ -126,7 +131,7 @@ class B<T> {
 class C<T> : A<Int> {}
 
 class D<T> : A<Int> {
-  override func run(t: Int) {}
+  override func run(_ t: Int) {}
 }
 
 struct E<T> {

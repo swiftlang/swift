@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func testCall(f: (() -> ())?) {
+func testCall(_ f: (() -> ())?) {
   f?()
 }
 // CHECK:    sil hidden @{{.*}}testCall{{.*}}
@@ -23,7 +23,7 @@ func testCall(f: (() -> ())?) {
 // CHECK-NEXT: enum $Optional<()>, #Optional.none!enumelt
 // CHECK-NEXT: br bb2
 
-func testAddrOnlyCallResult<T>(f: (()->T)?) {
+func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
   var f = f
   var x = f?()
 }
@@ -67,17 +67,17 @@ func testAddrOnlyCallResult<T>(f: (()->T)?) {
 
 // <rdar://problem/15180622>
 
-func wrap<T>(x: T) -> T? { return x }
+func wrap<T>(_ x: T) -> T? { return x }
 
 // CHECK-LABEL: sil hidden @_TF8optional16wrap_then_unwrap
-func wrap_then_unwrap<T>(x: T) -> T {
+func wrap_then_unwrap<T>(_ x: T) -> T {
   // CHECK: [[FORCE:%.*]] = function_ref @_TFs26_stdlib_Optional_unwrappedurFGSqx_x
   // CHECK: apply [[FORCE]]<{{.*}}>(%0, {{%.*}})
   return wrap(x)!
 }
 
 // CHECK-LABEL: sil hidden @_TF8optional10tuple_bind
-func tuple_bind(x: (Int, String)?) -> String? {
+func tuple_bind(_ x: (Int, String)?) -> String? {
   return x?.1
   // CHECK:   cond_br {{%.*}}, [[NONNULL:bb[0-9]+]], [[NULL:bb[0-9]+]]
   // CHECK: [[NONNULL]]:
@@ -88,7 +88,7 @@ func tuple_bind(x: (Int, String)?) -> String? {
 // rdar://21883752 - We were crashing on this function because the deallocation happened
 // out of scope.
 // CHECK-LABEL: sil hidden @_TF8optional16crash_on_deallocFTGVs10DictionarySiGSaSi___T_
-func crash_on_dealloc(dict : [Int : [Int]] = [:]) {
+func crash_on_dealloc(_ dict : [Int : [Int]] = [:]) {
   var dict = dict
   dict[1]?.append(2)
 }

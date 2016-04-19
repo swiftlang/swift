@@ -54,8 +54,8 @@ public class TypeIndexed<Value> : Resettable {
 
 extension TypeIndexed where Value : ForwardIndex {
   public func expectIncrement<R>(
-    t: Any.Type,
-    @autoclosure _ message: () -> String = "",
+    _ t: Any.Type,
+    _ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
     file: String = #file, line: UInt = #line,
@@ -72,8 +72,8 @@ extension TypeIndexed where Value : ForwardIndex {
 
 extension TypeIndexed where Value : Equatable {
   public func expectUnchanged<R>(
-    t: Any.Type,
-    @autoclosure _ message: () -> String = "",
+    _ t: Any.Type,
+    _ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
     file: String = #file, line: UInt = #line,
@@ -98,8 +98,8 @@ public func <=> <T: Comparable>(
 }
 
 public func expectEqual<V: Comparable>(
-  expected: DictionaryLiteral<Any.Type, V>, _ actual: TypeIndexed<V>,
-  @autoclosure _ message: () -> String = "",
+  _ expected: DictionaryLiteral<Any.Type, V>, _ actual: TypeIndexed<V>,
+  _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = #file, line: UInt = #line

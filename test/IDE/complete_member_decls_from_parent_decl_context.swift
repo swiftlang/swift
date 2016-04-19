@@ -48,7 +48,7 @@ class CodeCompletionInClassMethods1 {
   var instanceVar: Int
 
   func instanceFunc0() {}
-  func instanceFunc1(a: Int) {}
+  func instanceFunc1(_ a: Int) {}
 
   subscript(i: Int) -> Double {
     get {
@@ -70,7 +70,7 @@ class CodeCompletionInClassMethods1 {
   class var staticVar: Int
 
   class func staticFunc0() {}
-  class func staticFunc1(a: Int) {}
+  class func staticFunc1(_ a: Int) {}
 
   /// @} Members.
 
@@ -151,7 +151,7 @@ struct CodeCompletionInStructMethods1 {
   mutating
   func instanceFunc0() {}
   mutating
-  func instanceFunc1(a: Int) {}
+  func instanceFunc1(_ a: Int) {}
 
   subscript(i: Int) -> Double {
     get {
@@ -173,7 +173,7 @@ struct CodeCompletionInStructMethods1 {
   static var staticVar: Int
 
   static func staticFunc0() {}
-  static func staticFunc1(a: Int) {}
+  static func staticFunc1(_ a: Int) {}
 
   /// @} Members.
 
@@ -589,7 +589,7 @@ func testOuterE() {
 // NESTED_NOMINAL_DECL_E_1: End completions
 
 class SR627_BaseClass<T> {
-  func myFunction(x: T) -> T? {
+  func myFunction(_ x: T) -> T? {
     return nil
   }
 }
@@ -597,13 +597,13 @@ class SR627_BaseClass<T> {
 class SR627_Subclass: SR627_BaseClass<String> {
   #^SR627_SUBCLASS^#
 // SR627_SUBCLASS: Begin completions
-// SR627_SUBCLASS-DAG: Decl[InstanceMethod]/Super:         override func myFunction(x: String) -> String? {|}; name=myFunction(x: String) -> String?
+// SR627_SUBCLASS-DAG: Decl[InstanceMethod]/Super:         override func myFunction(_ x: String) -> String? {|}; name=myFunction(_ x: String) -> String?
 // SR627_SUBCLASS: End completions
 }
 
 class SR627_SubSubclass: SR627_Subclass {
   #^SR627_SUB_SUBCLASS^#
   // SR627_SUB_SUBCLASS: Begin completions
-  // SR627_SUB_SUBCLASS-DAG: Decl[InstanceMethod]/Super:         override func myFunction(x: String) -> String? {|}; name=myFunction(x: String) -> String?
+  // SR627_SUB_SUBCLASS-DAG: Decl[InstanceMethod]/Super:         override func myFunction(_ x: String) -> String? {|}; name=myFunction(_ x: String) -> String?
   // SR627_SUB_SUBCLASS: End completions
 }

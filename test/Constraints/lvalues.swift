@@ -1,9 +1,9 @@
 // RUN: %target-parse-verify-swift
 
-func f0(x: inout Int) {}
-func f1<T>(x: inout T) {}
-func f2(x: inout X) {}
-func f2(x: inout Double) {}
+func f0(_ x: inout Int) {}
+func f1<T>(_ x: inout T) {}
+func f2(_ x: inout X) {}
+func f2(_ x: inout Double) {}
 
 class Reftype {
   var property: Double { get {} set {} }
@@ -49,7 +49,6 @@ x += x
 var yi = y[i]
 
 // Non-settable lvalues
-// FIXME: better diagnostic!
 
 var non_settable_x : X {
   return x
@@ -78,28 +77,28 @@ f2(&non_settable_x) // expected-error{{cannot pass immutable value as inout argu
 f1(&non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 // - inout assignment
 non_settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'non_settable_x' is a get-only property}}
-++non_settable_x // expected-error{{cannot pass immutable value to mutating operator: 'non_settable_x' is a get-only property}}
+++non_settable_x // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 
 // non-settable property is non-settable:
 z.non_settable_x = x // expected-error{{cannot assign to property: 'non_settable_x' is a get-only property}}
 f2(&z.non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 f1(&z.non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 z.non_settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'non_settable_x' is a get-only property}}
-++z.non_settable_x // expected-error{{cannot pass immutable value to mutating operator: 'non_settable_x' is a get-only property}}
+++z.non_settable_x // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 
 // non-settable subscript is non-settable:
 z[0] = 0.0 // expected-error{{cannot assign through subscript: subscript is get-only}}
 f2(&z[0]) // expected-error{{cannot pass immutable value as inout argument: subscript is get-only}}
 f1(&z[0]) // expected-error{{cannot pass immutable value as inout argument: subscript is get-only}}
 z[0] += 0.0 // expected-error{{left side of mutating operator isn't mutable: subscript is get-only}}
-++z[0] // expected-error{{cannot pass immutable value to mutating operator: subscript is get-only}}
+++z[0] // expected-error{{cannot pass immutable value as inout argument: subscript is get-only}}
 
 // settable property of an rvalue value type is non-settable:
 fz().settable_x = x // expected-error{{cannot assign to property: 'fz' returns immutable value}}
 f2(&fz().settable_x) // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
 f1(&fz().settable_x) // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
 fz().settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'fz' returns immutable value}}
-++fz().settable_x // expected-error{{cannot pass immutable value to mutating operator: 'fz' returns immutable value}}
+++fz().settable_x // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
 
 // settable property of an rvalue reference type IS SETTABLE:
 fref().property = 0.0
@@ -113,7 +112,7 @@ z.non_settable_x.property = 1.0 // expected-error{{cannot assign to property: 'n
 f2(&z.non_settable_x.property) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 f1(&z.non_settable_x.property) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 z.non_settable_x.property += 1.0 // expected-error{{left side of mutating operator isn't mutable: 'non_settable_x' is a get-only property}}
-++z.non_settable_x.property // expected-error{{cannot pass immutable value to mutating operator: 'non_settable_x' is a get-only property}}
+++z.non_settable_x.property // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 
 // settable property of a non-settable reference type IS SETTABLE:
 z.non_settable_reftype.property = 1.0
@@ -153,8 +152,8 @@ func testFooStruct() {
 }
 
 // Don't load from explicit lvalues.
-func takesInt(x: Int) {}
-func testInOut(arg: inout Int) {
+func takesInt(_ x: Int) {}
+func testInOut(_ arg: inout Int) {
   var x : Int
   takesInt(&x) // expected-error{{'&' used with non-inout argument of type 'Int'}}
 }
@@ -166,15 +165,15 @@ var ir2 = ((&i)) // expected-error{{type 'inout Int' of variable is not material
                  // expected-error{{'&' can only appear immediately in a call argument list}}
 
 // <rdar://problem/17133089>
-func takeArrayRef(x: inout Array<String>) { }
+func takeArrayRef(_ x: inout Array<String>) { }
 
 // rdar://22308291
 takeArrayRef(["asdf", "1234"]) // expected-error{{contextual type 'inout Array<String>' cannot be used with array literal}}
 
 // <rdar://problem/19835413> Reference to value from array changed
 func rdar19835413() {
-  func f1(p: UnsafeMutablePointer<Void>) {}
-  func f2(a: [Int], i: Int, pi: UnsafeMutablePointer<Int>) {
+  func f1(_ p: UnsafeMutablePointer<Void>) {}
+  func f2(_ a: [Int], i: Int, pi: UnsafeMutablePointer<Int>) {
     var a = a
     f1(&a)
     f1(&a[i])
@@ -198,7 +197,7 @@ public struct Kale : Radish {
   }
 }
 
-func testImmutableUnsafePointer(p: UnsafePointer<Int>) {
+func testImmutableUnsafePointer(_ p: UnsafePointer<Int>) {
   p.pointee = 1 // expected-error {{cannot assign to property: 'pointee' is a get-only property}}
   p[0] = 1 // expected-error {{cannot assign through subscript: subscript is get-only}}
 }
@@ -217,18 +216,18 @@ func rdar17245353() {
 
 // <rdar://problem/23131768> Bugs related to closures with inout parameters
 func rdar23131768() {
-  func f(g: (inout Int) -> Void) { var a = 1; g(&a); print(a) }
+  func f(_ g: (inout Int) -> Void) { var a = 1; g(&a); print(a) }
   f { $0 += 1 } // Crashes compiler
 
-  func f2(g: (inout Int) -> Void) { var a = 1; g(&a); print(a) }
+  func f2(_ g: (inout Int) -> Void) { var a = 1; g(&a); print(a) }
   f2 { $0 = $0 + 1 } // previously error: Cannot convert value of type '_ -> ()' to expected type '(inout Int) -> Void'
 
-  func f3(g: (inout Int) -> Void) { var a = 1; g(&a); print(a) }
+  func f3(_ g: (inout Int) -> Void) { var a = 1; g(&a); print(a) }
   f3 { (v: inout Int) -> Void in v += 1 }
 }
 
 // <rdar://problem/23331567> Swift: Compiler crash related to closures with inout parameter.
-func r23331567(fn: (x: inout Int) -> Void) {
+func r23331567(_ fn: (x: inout Int) -> Void) {
   var a = 0
   fn(x: &a)
 }

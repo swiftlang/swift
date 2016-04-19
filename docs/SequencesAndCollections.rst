@@ -54,7 +54,7 @@ represented by the `SequenceType` protocol::
 
   .. |AnyIterator| replace:: `AnyIterator<T>`
 
-  __ http://swiftdoc.org/type/AnyIterator/
+  __ http://swiftdoc.org/v3.0/type/AnyIterator/
 
 As you can see, sequence does nothing more than deliver an iterator.
 To understand the need for iterators, it's important to distinguish
@@ -156,7 +156,7 @@ end.  For example::
   // Return an array containing the elements of `source`, with
   // `separator` interposed between each consecutive pair.
   func array<S: SequenceType>(
-    source: S, 
+    _ source: S, 
     withSeparator separator: S.Iterator.Element
   ) -> [S.Iterator.Element] {
     var result: [S.Iterator.Element] = []
@@ -309,7 +309,7 @@ range of elements, denoted by two indices, by elements from a collection with a
     mutating func replaceSubrange<
       C: CollectionType where C.Iterator.Element == Self.Iterator.Element
     >(
-      subRange: Range<Index>, with newElements: C
+      _ subRange: Range<Index>, with newElements: C
     )
   }
 
@@ -356,7 +356,7 @@ features such as `Comparable` conformance, index subtraction, and
 addition/subtraction of integers to/from indices.
 
 The indices of a `deque
-<http://en.wikipedia.org/wiki/Double-ended_queue>`_ can provide random
+<https://en.wikipedia.org/wiki/Double-ended_queue>`_ can provide random
 access, as do the indices into `String.UTF16View` (when Foundation is
 loaded) and, of course, array indices.  Many common sorting and
 selection algorithms, among others, depend on these capabilities.

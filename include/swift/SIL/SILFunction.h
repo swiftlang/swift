@@ -330,6 +330,12 @@ public:
   /// Set the function's linkage attribute.
   void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
 
+  /// Returns true if this function can be inlined into a fragile function
+  /// body.
+  bool hasValidLinkageForFragileInline() const {
+    return isFragile() || isThunk() == IsReabstractionThunk;
+  }
+
   /// Returns true if this function can be referenced from a fragile function
   /// body.
   bool hasValidLinkageForFragileRef() const;
@@ -662,7 +668,7 @@ public:
 
   /// verify - Run the IR verifier to make sure that the SILFunction follows
   /// invariants.
-  void verify() const;
+  void verify(bool SingleFunction=true) const;
 
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;

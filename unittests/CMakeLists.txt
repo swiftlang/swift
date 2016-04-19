@@ -40,7 +40,7 @@ endfunction()
 if(SWIFT_BUILD_TOOLS)
   # We can't link C++ unit tests unless we build the tools.
 
-  add_subdirectory(Availability)
+  add_subdirectory(AST)
   add_subdirectory(Basic)
   add_subdirectory(Driver)
   add_subdirectory(IDE)

@@ -2267,7 +2267,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
             for (auto cmv : argArray) {
               if (cmv.getValue() == value) {
                 if (cmv.hasCleanup())
-                  B.createRetainValue(CurrentSILLoc, value);
+                  B.createRetainValue(CurrentSILLoc, value, Atomicity::Atomic);
                 break;
               }
             }

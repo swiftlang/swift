@@ -79,7 +79,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   public mutating func replace<
     C : Collection where C.Iterator.Element == Element
   >(
-    subRange subRange: Range<Int>,
+    subRange: Range<Int>,
     with insertCount: Int,
     elementsOf newValues: C
   ) {
@@ -124,6 +124,10 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     return subscriptBaseAddress + startIndex
   }
 
+  public var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
+    return firstElementAddress
+  }
+
   /// [63:1: 63-bit index][0: has a native buffer]
   var endIndexAndFlags: UInt
 
@@ -131,7 +135,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
 
   @warn_unused_result
   public mutating func requestUniqueMutableBackingBuffer(
-    minimumCapacity minimumCapacity: Int
+    minimumCapacity: Int
   ) -> NativeBuffer? {
     _invariantCheck()
     if _fastPath(_hasNativeBuffer && isUniquelyReferenced()) {
@@ -216,7 +220,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
 
   /// Traps unless the given `index` is valid for subscripting, i.e.
   /// `startIndex ≤ index < endIndex`
-  internal func _checkValidSubscript(index : Int) {
+  internal func _checkValidSubscript(_ index : Int) {
     _precondition(
       index >= startIndex && index < endIndex, "Index out of bounds")
   }
@@ -246,7 +250,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
 
   @_versioned
   @warn_unused_result
-  func getElement(i: Int) -> Element {
+  func getElement(_ i: Int) -> Element {
     _sanityCheck(i >= startIndex, "negative slice index is out of range")
     _sanityCheck(i < endIndex, "slice index out of range")
     return subscriptBaseAddress[i]
@@ -310,7 +314,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   /// underlying contiguous storage.
   public
   func withUnsafeBufferPointer<R>(
-    @noescape body: (UnsafeBufferPointer<Element>) throws -> R
+    _ body: @noescape (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
     return try body(UnsafeBufferPointer(start: firstElementAddress,
@@ -321,7 +325,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   /// over the underlying contiguous storage.
   public
   mutating func withUnsafeMutableBufferPointer<R>(
-    @noescape body: (UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @noescape (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
     return try body(
@@ -341,7 +345,8 @@ extension _SliceBuffer {
     let result = _ContiguousArrayBuffer<Element>(
       uninitializedCount: count,
       minimumCapacity: 0)
-    result.firstElementAddress.initializeFrom(firstElementAddress, count: count)
+    result.firstElementAddress.initializeFrom(
+      firstElementAddress, count: count)
     return result
   }
 }

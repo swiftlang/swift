@@ -2797,6 +2797,11 @@ namespace {
                        Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
 
+      // If imported as member, the member should be final.
+      if (dc->getAsClassOrClassExtensionContext())
+        result->getAttrs().add(new (Impl.SwiftContext)
+                                 FinalAttr(/*IsImplicit=*/true));
+
       if (!decl->hasExternalStorage())
         Impl.registerExternalDecl(result);
 
@@ -4704,6 +4709,9 @@ namespace {
     }
 
     Decl *VisitObjCCategoryDecl(const clang::ObjCCategoryDecl *decl) {
+      // If the declaration is invalid, fail.
+      if (decl->isInvalidDecl()) return nullptr;
+
       // Objective-C categories and extensions map to Swift extensions.
       clang::SourceLocation categoryNameLoc = decl->getCategoryNameLoc();
       if (categoryNameLoc.isMacroID()) {
@@ -5596,6 +5604,12 @@ void ClangImporter::Implementation::importAttributes(
     MappedDecl->getAttrs().add(new (C) WarnUnusedResultAttr(SourceLoc(),
                                                             SourceLoc(),
                                                             false));
+  } else {
+    if (auto MD = dyn_cast<FuncDecl>(MappedDecl)) {
+      if (!MD->getResultType()->isVoid()) {
+        MD->getAttrs().add(new (C) DiscardableResultAttr(/*implicit*/false));
+      }
+    }
   }
   // Map __attribute__((const)).
   if (ClangDecl->hasAttr<clang::ConstAttr>()) {

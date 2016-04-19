@@ -59,9 +59,9 @@ This mode can be enabled using the Xcode build setting 'Whole Module Optimizatio
 Reducing Dynamic Dispatch
 =========================
 
-Swift by default is a very dynamic language like Objective-C. Unlike Objective
-C, Swift gives the programmer the ability to improve runtime performance when
-necessary by removing or reducing this dynamicism. This section goes through
+Swift by default is a very dynamic language like Objective-C. Unlike Objective-C,
+Swift gives the programmer the ability to improve runtime performance when
+necessary by removing or reducing this dynamism. This section goes through
 several examples of language constructs that can be used to perform such an
 operation.
 
@@ -89,7 +89,7 @@ in the following code snippet, ``a.aProperty``, ``a.doSomething()`` and
     override func doSomething() { ... }
   }
 
-  func usingAnA(a: A) {
+  func usingAnA(_ a: A) {
     a.doSomething()
     a.aProperty = ...
   }
@@ -124,12 +124,12 @@ in the following ``C.array1`` and ``D.array1`` will be accessed directly
     var array2: [Int]      // 'array2' *can* be overridden by a computed property.
   }
 
-  func usingC(c: C) {
+  func usingC(_ c: C) {
      c.array1[i] = ... // Can directly access C.array without going through dynamic dispatch.
      c.doSomething() = ... // Can directly call C.doSomething without going through virtual dispatch.
   }
 
-  func usingD(d: D) {
+  func usingD(_ d: D) {
      d.array1[i] = ... // Can directly access D.array1 without going through dynamic dispatch.
      d.array2[i] = ... // Will access D.array2 through dynamic dispatch.
   }
@@ -156,13 +156,13 @@ do not have any overriding declarations in the same file:
     private var myPrivateVar : Int
   }
 
-  func usingE(e: E) {
+  func usingE(_ e: E) {
     e.doSomething() // There is no sub class in the file that declares this class.
                     // The compiler can remove virtual calls to doSomething()
                     // and directly call A's doSomething method.
   }
 
-  func usingF(f: F) -> Int {
+  func usingF(_ f: F) -> Int {
     return f.myPrivateVar
   }
 
@@ -239,7 +239,7 @@ end of the callee. This means that if one writes a function like the following:
 
 ::
 
-  func append_one(a: [Int]) -> [Int] {
+  func append_one(_ a: [Int]) -> [Int] {
     a.append(1)
     return a
   }
@@ -313,11 +313,11 @@ generics. Some more examples of generics:
 ::
 
   class MyStack<T> {
-    func push(element: T) { ... }
+    func push(_ element: T) { ... }
     func pop() -> T { ... }
   }
 
-  func myAlgorithm(a: [T], length: Int) { ... }
+  func myAlgorithm(_ a: [T], length: Int) { ... }
 
   // The compiler can specialize code of MyStack[Int]
   var stackOfInts: MyStack[Int]
@@ -347,9 +347,16 @@ Advice: Use @_specialize to direct the compiler to specialize generics
 ----------------------------------------------------------------------
 
 The compiler only automatically specializes generic code if the call
-site and the callee function are located in the same module. However, the programmer can provide hints to the compiler in the form of @_specialize attributes. See :ref:`generics-specialization` for details.
+site and the callee function are located in the same module. However,
+the programmer can provide hints to the compiler in the form of
+@_specialize attributes. For details see
+:ref:`generics-specialization`.
 
-This attribute instructs the compiler to specialize on the specified concrete type list. The compiler inserts type checks and dispatches from the generic function to the specialized variant. In the following example, injecting the @_specialize attribute speeds up the code by about 10 times.
+This attribute instructs the compiler to specialize on the specified
+concrete type list. The compiler inserts type checks and dispatches
+from the generic function to the specialized variant. In the following
+example, injecting the @_specialize attribute speeds up the code by
+about 10 times.
 
 ::
 
@@ -379,7 +386,7 @@ This attribute instructs the compiler to specialize on the specified concrete ty
 
   Game(10).play
 
-The cost of large swift values
+The cost of large Swift values
 ==============================
 
 In Swift, values keep a unique copy of their data. There are several advantages
@@ -439,7 +446,7 @@ argument drops from being O(n), depending on the size of the tree to O(1).
   struct Tree : P {
     var node : [P?]
     init() {
-      node = [ thing ]
+      node = [thing]
     }
   }
 
@@ -494,12 +501,12 @@ The type ``Box`` can replace the array in the code sample above.
 Unsafe code
 ===========
 
-Swift classes are always reference counted. The swift compiler inserts code
+Swift classes are always reference counted. The Swift compiler inserts code
 that increments the reference count every time the object is accessed.
 For example, consider the problem of scanning a linked list that's
 implemented using classes. Scanning the list is done by moving a
 reference from one node to the next: ``elem = elem.next``. Every time we move
-the reference swift will increment the reference count of the ``next`` object
+the reference Swift will increment the reference count of the ``next`` object
 and decrement the reference count of the previous object. These reference
 count operations are expensive and unavoidable when using Swift classes.
 
@@ -532,7 +539,7 @@ alive.
 
     // The call to ``withExtendedLifetime(Head)`` makes sure that the lifetime of
     // Head is guaranteed to extend over the region of code that uses Unmanaged
-    // refererences. Because there exists a reference to Head for the duration
+    // references. Because there exists a reference to Head for the duration
     // of the scope and we don't modify the list of ``Node``s there also exist a
     // reference through the chain of ``Head.next``, ``Head.next.next``, ...
     // instances.
@@ -544,7 +551,7 @@ alive.
 
       // Use the unmanaged reference in a call/variable access. The use of
       // _withUnsafeGuaranteedRef allows the compiler to remove the ultimate
-      // retain/release accross the call/access.
+      // retain/release across the call/access.
 
       while let Next = Ref._withUnsafeGuaranteedRef { $0.next } {
         ...

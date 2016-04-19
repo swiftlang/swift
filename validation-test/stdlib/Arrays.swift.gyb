@@ -140,7 +140,7 @@ extension ${array_type} where Element : TestProtocol1 {
 }
 
 /// Returns an ${array_type} that does not share its buffer with other arrays.
-func getFresh${array_type}<S : Sequence>(sequence: S)
+func getFresh${array_type}<S : Sequence>(_ sequence: S)
   -> ${array_type}<S.Iterator.Element> {
   var result: ${array_type}<S.Iterator.Element> = []
   result.reserveCapacity(sequence.underestimatedCount)
@@ -207,7 +207,7 @@ ArrayTestSuite.test("${array_type}/Sliceable/Enums") {
   typealias E = EnumWithoutPayloads
 
   do {
-    let expected = [ E.A, E.B, E.C, E.D ]
+    let expected = [E.A, E.B, E.C, E.D]
     let sliceable = ${array_type}(expected)
     checkSliceableWithBidirectionalIndex(expected, sliceable)
   }
@@ -215,7 +215,7 @@ ArrayTestSuite.test("${array_type}/Sliceable/Enums") {
   /*
   FIXME: add this test when Array<T> can be conditionally Equatable.
   do {
-    let expected = [ [ E.A, E.B ], [ E.B, E.C ], [ E.D ], [ E.A, E.B, E.D ] ]
+    let expected = [[E.A, E.B], [E.B, E.C], [E.D], [E.A, E.B, E.D]]
     let sliceable = ${array_type}(expected)
     checkSliceableWithBidirectionalIndex(
       expected, sliceable, SourceLocStack().withCurrentLoc())
@@ -241,9 +241,6 @@ ArrayTestSuite.test("${array_type}/emptyAllocation") {
   let arr1 = ${array_type}<LifetimeTracked>(repeating: LifetimeTracked(0), count: 0)
   // Empty arrays all use the same buffer
   expectEqual(arr0._buffer.identity, arr1._buffer.identity)
-
-  let hasNilBuffer = arr1.identity == nil
-  expectFalse(hasNilBuffer)
 
   let arr2: ${array_type}<LifetimeTracked> = []
   let emptyLiteralsShareBuffer = arr0._buffer.identity == arr2._buffer.identity

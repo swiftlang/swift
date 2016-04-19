@@ -3,7 +3,7 @@
 // Content is in separate file in ./Inputs due to the "requires" keyword getting
 // recognized by lit.
 
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>attention()</Name><USR>s:F14swift_ide_test9attentionFT_T_</USR><Declaration>func attention()</Declaration><Discussion><Attention><Para>This function is so hip and exciting, it can&apos;t be trusted.</Para></Attention></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}} line="{{.*}}" column="{{.*}}"><Name>attention()</Name><USR>s:F14swift_ide_test9attentionFT_T_</USR><Declaration>func attention()</Declaration><Discussion><Attention><Para>This function is so hip and exciting, it can’t be trusted.</Para></Attention></Discussion></Function>]
 
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>author()</Name><USR>s:F14swift_ide_test6authorFT_T_</USR><Declaration>func author()</Declaration><Discussion><Author><Para>Stephen</Para></Author></Discussion></Function>]
 
@@ -25,11 +25,11 @@
 
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>note()</Name><USR>s:F14swift_ide_test4noteFT_T_</USR><Declaration>func note()</Declaration><Discussion><Note><Para>This function is very hip and exciting.</Para></Note></Discussion></Function>]
 
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>postcondition(_:)</Name><USR>s:F14swift_ide_test13postconditionFRSiT_</USR><Declaration>func postcondition(x: inout Int)</Declaration><Discussion><Postcondition><Para>x is unchanged</Para></Postcondition></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>postcondition(_:)</Name><USR>s:F14swift_ide_test13postconditionFRSiT_</USR><Declaration>func postcondition(_ x: inout Int)</Declaration><Discussion><Postcondition><Para>x is unchanged</Para></Postcondition></Discussion></Function>]
 
 // CHECK: {{.*}}DocCommentAsXML=none
 
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>precondition(_:)</Name><USR>s:F14swift_ide_test12preconditionFSiT_</USR><Declaration>func precondition(x: Int)</Declaration><Discussion><Precondition><Para><codeVoice>x &lt; 100</codeVoice></Para></Precondition></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>precondition(_:)</Name><USR>s:F14swift_ide_test12preconditionFSiT_</USR><Declaration>func precondition(_ x: Int)</Declaration><Discussion><Precondition><Para><codeVoice>x &lt; 100</codeVoice></Para></Precondition></Discussion></Function>]
 // CHECK: {{.*}}DocCommentAsXML=none
 
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>remark()</Name><USR>s:F14swift_ide_test6remarkFT_T_</USR><Declaration>func remark()</Declaration><Discussion><Remark><Para>Always, no, never forget to check your references.</Para></Remark></Discussion></Function>]
@@ -38,7 +38,7 @@
 
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>requires()</Name><USR>s:F14swift_ide_test8requiresFT_T_</USR><Declaration>func requires()</Declaration><Discussion><Requires><Para></Para><List-Bullet><Item><Para>explicit package name. Just kidding!</Para></Item></List-Bullet></Requires></Discussion></Function>]
 
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>see()</Name><USR>s:F14swift_ide_test3seeFT_T_</USR><Declaration>func see()</Declaration><Discussion><See><Para>the pie (it&apos;s very good).</Para></See></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>see()</Name><USR>s:F14swift_ide_test3seeFT_T_</USR><Declaration>func see()</Declaration><Discussion><See><Para>the pie (it’s very good).</Para></See></Discussion></Function>] CommentXMLValid
 
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>since()</Name><USR>s:F14swift_ide_test5sinceFT_T_</USR><Declaration>func since()</Declaration><Discussion><Since><Para>1809</Para></Since></Discussion></Function>]
 

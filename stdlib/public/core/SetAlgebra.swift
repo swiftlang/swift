@@ -58,70 +58,71 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///
   /// - Equivalent to `self.intersect([member]) == [member]`
   @warn_unused_result
-  func contains(member: Element) -> Bool
+  func contains(_ member: Element) -> Bool
 
   /// Returns the set of elements contained in `self`, in `other`, or in
   /// both `self` and `other`.
   @warn_unused_result
-  func union(other: Self) -> Self
+  func union(_ other: Self) -> Self
   
   /// Returns the set of elements contained in both `self` and `other`.
   @warn_unused_result
-  func intersect(other: Self) -> Self
+  func intersect(_ other: Self) -> Self
 
   /// Returns the set of elements contained in `self` or in `other`,
   /// but not in both `self` and `other`.
   @warn_unused_result
-  func exclusiveOr(other: Self) -> Self
+  func exclusiveOr(_ other: Self) -> Self
 
   /// If `member` is not already contained in `self`, inserts it.
   ///
   /// - Equivalent to `self.unionInPlace([member])`
   /// - Postcondition: `self.contains(member)`
-  mutating func insert(member: Element)
+  mutating func insert(_ member: Element)
   
   /// If `member` is contained in `self`, removes and returns it.
   /// Otherwise, removes all elements subsumed by `member` and returns
   /// `nil`.
   ///
   /// - Postcondition: `self.intersect([member]).isEmpty`
-  mutating func remove(member: Element) -> Element?
+  @discardableResult
+  mutating func remove(_ member: Element) -> Element?
 
   /// Insert all elements of `other` into `self`.
   ///
   /// - Equivalent to replacing `self` with `self.union(other)`.
   /// - Postcondition: `self.isSupersetOf(other)`
-  mutating func unionInPlace(other: Self)
+  mutating func unionInPlace(_ other: Self)
 
   /// Removes all elements of `self` that are not also present in
   /// `other`.
   ///
   /// - Equivalent to replacing `self` with `self.intersect(other)`
   /// - Postcondition: `self.isSubsetOf(other)`
-  mutating func intersectInPlace(other: Self)
+  mutating func intersectInPlace(_ other: Self)
 
   /// Replaces `self` with a set containing all elements contained in
   /// either `self` or `other`, but not both.
   ///
   /// - Equivalent to replacing `self` with `self.exclusiveOr(other)`
-  mutating func exclusiveOrInPlace(other: Self)  
+  mutating func exclusiveOrInPlace(_ other: Self)  
 
   //===--- Requirements with default implementations ----------------------===//
   /// Returns the set of elements contained in `self` but not in `other`.
   @warn_unused_result
-  func subtract(other: Self) -> Self
+  func subtract(_ other: Self) -> Self
 
   /// Returns `true` iff every element of `self` is contained in `other`.
   @warn_unused_result
-  func isSubsetOf(other: Self) -> Bool
+  func isSubsetOf(_ other: Self) -> Bool
 
   /// Returns `true` iff `self.intersect(other).isEmpty`.
   @warn_unused_result
-  func isDisjointWith(other: Self) -> Bool
+  func isDisjointWith(_ other: Self) -> Bool
 
   /// Returns `true` iff every element of `other` is contained in `self`.
   @warn_unused_result
-  func isSupersetOf(other: Self) -> Bool
+  func isSupersetOf(_ other: Self) -> Bool
 
   /// Returns `true` iff `self.contains(e)` is `false` for all `e`.
   var isEmpty: Bool { get }
@@ -132,13 +133,13 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// Removes all elements of `other` from `self`.
   ///
   /// - Equivalent to replacing `self` with `self.subtract(other)`.
-  mutating func subtractInPlace(other: Self)
+  mutating func subtractInPlace(_ other: Self)
 
   /// Returns `true` iff `a` subsumes `b`.
   ///
   /// - Equivalent to `([a] as Self).isSupersetOf([b])`
   @warn_unused_result
-  static func element(a: Element, subsumes b: Element) -> Bool
+  static func element(_ a: Element, subsumes b: Element) -> Bool
 
   /// Returns `true` iff `a` is disjoint with `b`.
   ///
@@ -146,7 +147,7 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///
   /// - SeeAlso: `Self.element(_, subsumes:_)`
   @warn_unused_result
-  static func element(a: Element, isDisjointWith b: Element) -> Bool
+  static func element(_ a: Element, isDisjointWith b: Element) -> Bool
 }
 
 /// `SetAlgebra` requirements for which default implementations
@@ -176,31 +177,31 @@ extension SetAlgebra {
   /// Removes all elements of `other` from `self`.
   ///
   /// - Equivalent to replacing `self` with `self.subtract(other)`.
-  public mutating func subtractInPlace(other: Self) {
+  public mutating func subtractInPlace(_ other: Self) {
     self.intersectInPlace(self.exclusiveOr(other))
   }
 
   /// Returns `true` iff every element of `self` is contained in `other`.
   @warn_unused_result
-  public func isSubsetOf(other: Self) -> Bool {
+  public func isSubsetOf(_ other: Self) -> Bool {
     return self.intersect(other) == self
   }
 
   /// Returns `true` iff every element of `other` is contained in `self`.
   @warn_unused_result
-  public func isSupersetOf(other: Self) -> Bool {
+  public func isSupersetOf(_ other: Self) -> Bool {
     return other.isSubsetOf(self)
   }
 
   /// Returns `true` iff `self.intersect(other).isEmpty`.
   @warn_unused_result
-  public func isDisjointWith(other: Self) -> Bool {
+  public func isDisjointWith(_ other: Self) -> Bool {
     return self.intersect(other).isEmpty
   }
 
   /// Returns the set of elements contained in `self` but not in `other`.
   @warn_unused_result
-  public func subtract(other: Self) -> Self {
+  public func subtract(_ other: Self) -> Self {
     return self.intersect(self.exclusiveOr(other))
   }
 
@@ -212,14 +213,14 @@ extension SetAlgebra {
   /// Returns `true` iff every element of `other` is contained in `self`
   /// and `self` contains an element that is not contained in `other`.
   @warn_unused_result
-  public func isStrictSupersetOf(other: Self) -> Bool {
+  public func isStrictSupersetOf(_ other: Self) -> Bool {
     return self.isSupersetOf(other) && self != other
   }
 
   /// Returns `true` iff every element of `self` is contained in `other`
   /// and `other` contains an element that is not contained in `self`.
   @warn_unused_result
-  public func isStrictSubsetOf(other: Self) -> Bool {
+  public func isStrictSubsetOf(_ other: Self) -> Bool {
     return other.isStrictSupersetOf(self)
   }
 
@@ -227,7 +228,7 @@ extension SetAlgebra {
   ///
   /// - Equivalent to `([a] as Self).isSupersetOf([b])`
   @warn_unused_result
-  public static func element(a: Element, subsumes b: Element) -> Bool {
+  public static func element(_ a: Element, subsumes b: Element) -> Bool {
     return ([a] as Self).isSupersetOf([b])
   }
 
@@ -237,7 +238,7 @@ extension SetAlgebra {
   ///
   /// - SeeAlso: `Self.element(_, subsumes:_)`
   @warn_unused_result
-  public static func element(a: Element, isDisjointWith b: Element) -> Bool {
+  public static func element(_ a: Element, isDisjointWith b: Element) -> Bool {
     return ([a] as Self).isDisjointWith([b])
   }
 }

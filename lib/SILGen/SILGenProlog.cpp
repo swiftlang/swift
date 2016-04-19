@@ -275,7 +275,8 @@ struct ArgumentInitHelper {
 
       // Set up a cleanup to write back to the inout.
       gen.Cleanups.pushCleanup<CleanupWriteBackToInOut>(vd, address);
-    } else if (vd->isLet()) {
+    } else {
+      assert(vd->isLet() && "expected parameter to be immutable!");
       // If the variable is immutable, we can bind the value as is.
       // Leave the cleanup on the argument, if any, in place to consume the
       // argument if we're responsible for it.
@@ -284,20 +285,6 @@ struct ArgumentInitHelper {
         gen.B.createDebugValueAddr(loc, argrv.getValue(), {vd->isLet(), ArgNo});
       else
         gen.B.createDebugValue(loc, argrv.getValue(), {vd->isLet(), ArgNo});
-    } else {
-      // If the variable is mutable, we need to copy or move the argument
-      // value to local mutable memory.
-
-      auto initVar = gen.emitLocalVariableWithCleanup(vd, false, ArgNo);
-
-      // If we have a cleanup on the value, we can move it into the variable.
-      if (argrv.hasCleanup())
-        argrv.forwardInto(gen, loc, initVar->getAddress());
-      // Otherwise, we need an independently-owned copy.
-      else
-        argrv.copyInto(gen, initVar->getAddress(), loc);
-
-      initVar->finishInitialization(gen);
     }
   }
 

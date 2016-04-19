@@ -21,7 +21,8 @@
 
 #include "LibcShims.h"
 
-__swift_ssize_t swift_stdlib_readLine_stdin(char **LinePtr);
+__swift_ssize_t
+swift_stdlib_readLine_stdin(char * _Nullable * _Nonnull LinePtr);
 
 #endif // SWIFT_STDLIB_SHIMS_RUNTIMESTUBS_H_
 

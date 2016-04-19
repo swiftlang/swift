@@ -259,6 +259,7 @@ void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
   // anything, stop.
   FulfillmentMap fulfillments;
   if (!fulfillments.searchTypeMetadata(IGF.IGM, type, isExact,
+                                       /*isSelf*/ false,
                                        /*source*/ 0, MetadataPath(),
                                        FulfillmentMap::Everything())) {
     return;

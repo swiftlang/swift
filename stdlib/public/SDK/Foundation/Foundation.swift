@@ -71,7 +71,7 @@ public class NSConstantString {}
 @warn_unused_result
 @_silgen_name("swift_convertStringToNSString")
 public // COMPILER_INTRINSIC
-func _convertStringToNSString(string: String) -> NSString {
+func _convertStringToNSString(_ string: String) -> NSString {
   return string._bridgeToObjectiveC()
 }
 
@@ -135,14 +135,14 @@ extension String : _ObjectiveCBridgeable {
   }
 
   public static func _forceBridgeFromObjectiveC(
-    x: NSString,
+    _ x: NSString,
     result: inout String?
   ) {
     result = String(x)
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSString,
+    _ x: NSString,
     result: inout String?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
@@ -150,7 +150,7 @@ extension String : _ObjectiveCBridgeable {
   }
 
   public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSString?
+    _ source: NSString?
   ) -> String {
     // `nil` has historically been used as a stand-in for an empty
     // string; map it to an empty string.
@@ -173,23 +173,23 @@ extension Int : _ObjectiveCBridgeable {
   }
 
   public init(_ number: NSNumber) {
-    self = number.integerValue
+    self = number.intValue
   }
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(integer: self)
+    return NSNumber(value: self)
   }
 
   public static func _forceBridgeFromObjectiveC(
-    x: NSNumber,
+    _ x: NSNumber,
     result: inout Int?
   ) {
-    result = x.integerValue
+    result = x.intValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSNumber,
+    _ x: NSNumber,
     result: inout Int?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
@@ -197,9 +197,9 @@ extension Int : _ObjectiveCBridgeable {
   }
 
   public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
+    _ source: NSNumber?
   ) -> Int {
-    return source!.integerValue
+    return source!.intValue
   }
 }
 
@@ -209,23 +209,23 @@ extension UInt : _ObjectiveCBridgeable {
   }
 
   public init(_ number: NSNumber) {
-    self = number.unsignedIntegerValue
+    self = number.uintValue
   }
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(unsignedInteger: self)
+    return NSNumber(value: self)
   }
 
   public static func _forceBridgeFromObjectiveC(
-    x: NSNumber,
+    _ x: NSNumber,
     result: inout UInt?
   ) {
-    result = x.unsignedIntegerValue
+    result = x.uintValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSNumber,
+    _ x: NSNumber,
     result: inout UInt?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
@@ -233,9 +233,9 @@ extension UInt : _ObjectiveCBridgeable {
   }
 
   public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
+    _ source: NSNumber?
   ) -> UInt {
-    return source!.unsignedIntegerValue
+    return source!.uintValue
   }
 }
 
@@ -250,18 +250,18 @@ extension Float : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(float: self)
+    return NSNumber(value: self)
   }
 
   public static func _forceBridgeFromObjectiveC(
-    x: NSNumber,
+    _ x: NSNumber,
     result: inout Float?
   ) {
     result = x.floatValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSNumber,
+    _ x: NSNumber,
     result: inout Float?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
@@ -269,7 +269,7 @@ extension Float : _ObjectiveCBridgeable {
   }
 
   public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
+    _ source: NSNumber?
   ) -> Float {
     return source!.floatValue
   }
@@ -286,18 +286,18 @@ extension Double : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(double: self)
+    return NSNumber(value: self)
   }
 
   public static func _forceBridgeFromObjectiveC(
-    x: NSNumber,
+    _ x: NSNumber,
     result: inout Double?
   ) {
     result = x.doubleValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSNumber,
+    _ x: NSNumber,
     result: inout Double?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
@@ -305,7 +305,7 @@ extension Double : _ObjectiveCBridgeable {
   }
 
   public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
+    _ source: NSNumber?
   ) -> Double {
     return source!.doubleValue
   }
@@ -322,18 +322,18 @@ extension Bool: _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return NSNumber(bool: self)
+    return NSNumber(value: self)
   }
 
   public static func _forceBridgeFromObjectiveC(
-    x: NSNumber,
+    _ x: NSNumber,
     result: inout Bool?
   ) {
     result = x.boolValue
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSNumber,
+    _ x: NSNumber,
     result: inout Bool?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
@@ -341,7 +341,7 @@ extension Bool: _ObjectiveCBridgeable {
   }
 
   public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
+    _ source: NSNumber?
   ) -> Bool {
     return source!.boolValue
   }
@@ -363,7 +363,7 @@ extension CGFloat : _ObjectiveCBridgeable {
   }
 
   public static func _forceBridgeFromObjectiveC(
-    x: NSNumber,
+    _ x: NSNumber,
     result: inout CGFloat?
   ) {
     var nativeResult: CGFloat.NativeType? = 0.0
@@ -372,7 +372,7 @@ extension CGFloat : _ObjectiveCBridgeable {
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSNumber,
+    _ x: NSNumber,
     result: inout CGFloat?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
@@ -380,7 +380,7 @@ extension CGFloat : _ObjectiveCBridgeable {
   }
 
   public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSNumber?
+    _ source: NSNumber?
   ) -> CGFloat {
     return CGFloat(
              CGFloat.NativeType._unconditionallyBridgeFromObjectiveC(source))
@@ -392,17 +392,17 @@ extension NSNumber : FloatLiteralConvertible, IntegerLiteralConvertible,
                      BooleanLiteralConvertible {
   /// Create an instance initialized to `value`.
   public required convenience init(integerLiteral value: Int) {
-    self.init(integer: value)
+    self.init(value: value)
   }
 
   /// Create an instance initialized to `value`.
   public required convenience init(floatLiteral value: Double) {
-    self.init(double: value)
+    self.init(value: value)
   }
 
   /// Create an instance initialized to `value`.
   public required convenience init(booleanLiteral value: Bool) {
-    self.init(bool: value)
+    self.init(value: value)
   }
 }
 
@@ -415,11 +415,8 @@ public let NSNotFound: Int = .max
 extension NSArray : ArrayLiteralConvertible {
   /// Create an instance initialized with `elements`.
   public required convenience init(arrayLiteral elements: AnyObject...) {
-    // + (instancetype)arrayWithObjects:(const id [])objects count:(NSUInteger)cnt;
-    let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
-    self.init(
-      objects: UnsafeMutablePointer(x.firstElementAddress), count: x.count)
-    _fixLifetime(x)
+    // Let bridging take care of it.
+    self.init(array: elements)
   }
 }
 
@@ -457,7 +454,7 @@ extension Array : _ObjectiveCBridgeable {
   }
 
   public static func _forceBridgeFromObjectiveC(
-    source: NSArray,
+    _ source: NSArray,
     result: inout Array?
   ) {
     _precondition(
@@ -481,7 +478,7 @@ extension Array : _ObjectiveCBridgeable {
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
-    source: NSArray,
+    _ source: NSArray,
     result: inout Array?
   ) -> Bool {
     // Construct the result array by conditionally bridging each element.
@@ -492,7 +489,7 @@ extension Array : _ObjectiveCBridgeable {
   }
 
   public static func _unconditionallyBridgeFromObjectiveC(
-    source: NSArray?
+    _ source: NSArray?
   ) -> Array {
     _precondition(
       Swift._isBridgedToObjectiveC(Element.self),
@@ -526,8 +523,8 @@ extension NSDictionary : DictionaryLiteralConvertible {
     dictionaryLiteral elements: (NSCopying, AnyObject)...
   ) {
     self.init(
-      objects: elements.map { (AnyObject?)($0.1) },
-      forKeys: elements.map { (NSCopying?)($0.0) },
+      objects: elements.map { $0.1 },
+      forKeys: elements.map { $0.0 },
       count: elements.count)
   }
 }
@@ -565,7 +562,7 @@ extension Dictionary : _ObjectiveCBridgeable {
   }
 
   public static func _forceBridgeFromObjectiveC(
-    d: NSDictionary,
+    _ d: NSDictionary,
     result: inout Dictionary?
   ) {
     if let native = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorageOf(
@@ -595,7 +592,7 @@ extension Dictionary : _ObjectiveCBridgeable {
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSDictionary,
+    _ x: NSDictionary,
     result: inout Dictionary?
   ) -> Bool {
     let anyDict = x as [NSObject : AnyObject]
@@ -615,7 +612,7 @@ extension Dictionary : _ObjectiveCBridgeable {
   }
 
   public static func _unconditionallyBridgeFromObjectiveC(
-    d: NSDictionary?
+    _ d: NSDictionary?
   ) -> Dictionary {
     // `nil` has historically been used as a stand-in for an empty
     // dictionary; map it to an empty dictionary.
@@ -661,15 +658,9 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
   var count: Int
 
   /// Size of ObjectsBuffer, in ids.
-  var STACK_BUF_SIZE: Int { return 4 }
+  static var STACK_BUF_SIZE: Int { return 4 }
 
-  // FIXME: Replace with _CocoaFastEnumerationStackBuf.
-  /// Must have enough space for STACK_BUF_SIZE object references.
-  struct ObjectsBuffer {
-    var buf: (OpaquePointer, OpaquePointer, OpaquePointer, OpaquePointer) =
-      (nil, nil, nil, nil)
-  }
-  var objects: [ObjectsBuffer]
+  var objects: [Unmanaged<AnyObject>?]
 
   public func next() -> AnyObject? {
     if n == count {
@@ -678,18 +669,20 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
       refresh()
       if count == 0 { return nil }
     }
-    let next: AnyObject = state[0].itemsPtr[n]!
+    let next: AnyObject = state[0].itemsPtr![n]!
     n += 1
     return next
   }
 
   func refresh() {
+    _sanityCheck(objects.count > 0)
     n = 0
-    count = enumerable.countByEnumerating(
-      with: state._baseAddressIfContiguous,
-      objects: AutoreleasingUnsafeMutablePointer(
-        objects._baseAddressIfContiguous),
-      count: STACK_BUF_SIZE)
+    objects.withUnsafeMutableBufferPointer {
+      count = enumerable.countByEnumerating(
+        with: &state,
+        objects: AutoreleasingUnsafeMutablePointer($0.baseAddress!),
+        count: $0.count)
+    }
   }
 
   public init(_ enumerable: NSFastEnumeration) {
@@ -698,7 +691,8 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
       state: 0, itemsPtr: nil,
       mutationsPtr: _fastEnumerationStorageMutationsPtr,
       extra: (0, 0, 0, 0, 0)) ]
-    self.objects = [ ObjectsBuffer() ]
+    self.objects = Array(
+      repeating: nil, count: NSFastEnumerationIterator.STACK_BUF_SIZE)
     self.n = -1
     self.count = -1
   }
@@ -811,7 +805,7 @@ extension Set : _ObjectiveCBridgeable {
     return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSSet.self)
   }
 
-  public static func _forceBridgeFromObjectiveC(s: NSSet, result: inout Set?) {
+  public static func _forceBridgeFromObjectiveC(_ s: NSSet, result: inout Set?) {
     if let native =
       Set<Element>._bridgeFromObjectiveCAdoptingNativeStorageOf(s as AnyObject) {
 
@@ -836,7 +830,7 @@ extension Set : _ObjectiveCBridgeable {
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSSet, result: inout Set?
+    _ x: NSSet, result: inout Set?
   ) -> Bool {
     let anySet = x as Set<NSObject>
     if _isBridgedVerbatimToObjectiveC(Element.self) {
@@ -848,7 +842,7 @@ extension Set : _ObjectiveCBridgeable {
     return result != nil
   }
 
-  public static func _unconditionallyBridgeFromObjectiveC(s: NSSet?) -> Set {
+  public static func _unconditionallyBridgeFromObjectiveC(_ s: NSSet?) -> Set {
     // `nil` has historically been used as a stand-in for an empty
     // set; map it to an empty set.
     if _slowPath(s == nil) { return Set() }
@@ -944,7 +938,7 @@ extension NSRange {
 /// Returns a localized string, using the main bundle if one is not specified.
 @warn_unused_result
 public
-func NSLocalizedString(key: String,
+func NSLocalizedString(_ key: String,
                        tableName: String? = nil,
                        bundle: NSBundle = NSBundle.main(),
                        value: String = "",
@@ -956,7 +950,7 @@ func NSLocalizedString(key: String,
 // NSLog
 //===----------------------------------------------------------------------===//
 
-public func NSLog(format: String, _ args: CVarArg...) {
+public func NSLog(_ format: String, _ args: CVarArg...) {
   withVaList(args) { NSLogv(format, $0) }
 }
 
@@ -1006,7 +1000,7 @@ extension CGRectEdge {
 // NSError (as an out parameter).
 //===----------------------------------------------------------------------===//
 
-public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>
+public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>?
 
 // Note: NSErrorPointer becomes ErrorPointer in Swift 3.
 public typealias ErrorPointer = NSErrorPointer
@@ -1017,7 +1011,7 @@ let _nilObjCError: ErrorProtocol = _GenericObjCError.nilError
 @warn_unused_result
 @_silgen_name("swift_convertNSErrorToErrorProtocol")
 public // COMPILER_INTRINSIC
-func _convertNSErrorToErrorProtocol(error: NSError?) -> ErrorProtocol {
+func _convertNSErrorToErrorProtocol(_ error: NSError?) -> ErrorProtocol {
   if let error = error {
     return error
   }
@@ -1027,7 +1021,7 @@ func _convertNSErrorToErrorProtocol(error: NSError?) -> ErrorProtocol {
 @warn_unused_result
 @_silgen_name("swift_convertErrorProtocolToNSError")
 public // COMPILER_INTRINSIC
-func _convertErrorProtocolToNSError(error: ErrorProtocol) -> NSError {
+func _convertErrorProtocolToNSError(_ error: ErrorProtocol) -> NSError {
   return unsafeDowncast(_bridgeErrorProtocolToNSError(error), to: NSError.self)
 }
 
@@ -1072,7 +1066,7 @@ extension NSString {
 
   @warn_unused_result
   public class func localizedStringWithFormat(
-    format: NSString, _ args: CVarArg...
+    _ format: NSString, _ args: CVarArg...
   ) -> Self {
     return withVaList(args) {
       self.init(format: format as String, locale: NSLocale.current(), arguments: $0)
@@ -1080,7 +1074,7 @@ extension NSString {
   }
 
   @warn_unused_result
-  public func appendingFormat(format: NSString, _ args: CVarArg...)
+  public func appendingFormat(_ format: NSString, _ args: CVarArg...)
   -> NSString {
     return withVaList(args) {
       self.appending(NSString(format: format as String, arguments: $0) as String) as NSString
@@ -1089,7 +1083,7 @@ extension NSString {
 }
 
 extension NSMutableString {
-  public func appendFormat(format: NSString, _ args: CVarArg...) {
+  public func appendFormat(_ format: NSString, _ args: CVarArg...) {
     return withVaList(args) {
       self.append(NSString(format: format as String, arguments: $0) as String)
     }
@@ -1099,14 +1093,7 @@ extension NSMutableString {
 extension NSArray {
   // Overlay: - (instancetype)initWithObjects:(id)firstObj, ...
   public convenience init(objects elements: AnyObject...) {
-    // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
-    let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
-    // Use Imported:
-    // @objc(initWithObjects:count:)
-    //    init(withObjects objects: UnsafePointer<AnyObject?>,
-    //    count cnt: Int)
-    self.init(objects: UnsafeMutablePointer(x.firstElementAddress), count: x.count)
-    _fixLifetime(x)
+    self.init(array: elements)
   }
 }
 
@@ -1202,14 +1189,14 @@ extension NSDictionary {
 
 @_silgen_name("NS_Swift_NSUndoManager_registerUndoWithTargetHandler")
 internal func NS_Swift_NSUndoManager_registerUndoWithTargetHandler(
-  self_: AnyObject,
+  _ self_: AnyObject,
   _ target: AnyObject,
   _ handler: @convention(block) (AnyObject) -> Void)
 
 extension NSUndoManager {
   @available(OSX 10.11, iOS 9.0, *)
   public func registerUndoWithTarget<TargetType : AnyObject>(
-    target: TargetType, handler: (TargetType) -> Void
+    _ target: TargetType, handler: (TargetType) -> Void
   ) {
     // The generic blocks use a different ABI, so we need to wrap the provided
     // handler in something ObjC compatible.
@@ -1228,20 +1215,20 @@ extension NSUndoManager {
 @warn_unused_result
 @_silgen_name("NS_Swift_NSCoder_decodeObject")
 internal func NS_Swift_NSCoder_decodeObject(
-  self_: AnyObject,
+  _ self_: AnyObject,
   _ error: NSErrorPointer) -> AnyObject?
 
 @warn_unused_result
 @_silgen_name("NS_Swift_NSCoder_decodeObjectForKey")
 internal func NS_Swift_NSCoder_decodeObjectForKey(
-  self_: AnyObject,
+  _ self_: AnyObject,
   _ key: AnyObject,
   _ error: NSErrorPointer) -> AnyObject?
 
 @warn_unused_result
 @_silgen_name("NS_Swift_NSCoder_decodeObjectOfClassForKey")
 internal func NS_Swift_NSCoder_decodeObjectOfClassForKey(
-  self_: AnyObject,
+  _ self_: AnyObject,
   _ cls: AnyObject,
   _ key: AnyObject,
   _ error: NSErrorPointer) -> AnyObject?
@@ -1249,14 +1236,14 @@ internal func NS_Swift_NSCoder_decodeObjectOfClassForKey(
 @warn_unused_result
 @_silgen_name("NS_Swift_NSCoder_decodeObjectOfClassesForKey")
 internal func NS_Swift_NSCoder_decodeObjectOfClassesForKey(
-  self_: AnyObject,
+  _ self_: AnyObject,
   _ classes: NSSet?,
   _ key: AnyObject,
   _ error: NSErrorPointer) -> AnyObject?
 
 
 @available(OSX 10.11, iOS 9.0, *)
-internal func resolveError(error: NSError?) throws {
+internal func resolveError(_ error: NSError?) throws {
   if let error = error where error.code != NSCoderValueNotFoundError {
     throw error
   }
@@ -1264,14 +1251,14 @@ internal func resolveError(error: NSError?) throws {
 
 extension NSCoder {
   @warn_unused_result
-  public func decodeObjectOfClass<DecodedObjectType: NSCoding where DecodedObjectType: NSObject>(cls: DecodedObjectType.Type, forKey key: String) -> DecodedObjectType? {
+  public func decodeObjectOfClass<DecodedObjectType: NSCoding where DecodedObjectType: NSObject>(_ cls: DecodedObjectType.Type, forKey key: String) -> DecodedObjectType? {
     let result = NS_Swift_NSCoder_decodeObjectOfClassForKey(self as AnyObject, cls as AnyObject, key as AnyObject, nil)
     return result as! DecodedObjectType?
   }
 
   @warn_unused_result
   @nonobjc
-  public func decodeObjectOfClasses(classes: NSSet?, forKey key: String) -> AnyObject? {
+  public func decodeObjectOfClasses(_ classes: NSSet?, forKey key: String) -> AnyObject? {
     var classesAsNSObjects: Set<NSObject>? = nil
     if let theClasses = classes {
       classesAsNSObjects =
@@ -1293,7 +1280,7 @@ extension NSCoder {
 
   @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
-  public func decodeTopLevelObjectForKey(key: String) throws -> AnyObject? {
+  public func decodeTopLevelObjectForKey(_ key: String) throws -> AnyObject? {
     var error: NSError?
     let result = NS_Swift_NSCoder_decodeObjectForKey(self as AnyObject, key as AnyObject, &error)
     try resolveError(error)
@@ -1302,7 +1289,7 @@ extension NSCoder {
 
   @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
-  public func decodeTopLevelObjectOfClass<DecodedObjectType: NSCoding where DecodedObjectType: NSObject>(cls: DecodedObjectType.Type, forKey key: String) throws -> DecodedObjectType? {
+  public func decodeTopLevelObjectOfClass<DecodedObjectType: NSCoding where DecodedObjectType: NSObject>(_ cls: DecodedObjectType.Type, forKey key: String) throws -> DecodedObjectType? {
     var error: NSError?
     let result = NS_Swift_NSCoder_decodeObjectOfClassForKey(self as AnyObject, cls as AnyObject, key as AnyObject, &error)
     try resolveError(error)
@@ -1311,7 +1298,7 @@ extension NSCoder {
 
   @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
-  public func decodeTopLevelObjectOfClasses(classes: NSSet?, forKey key: String) throws -> AnyObject? {
+  public func decodeTopLevelObjectOfClasses(_ classes: NSSet?, forKey key: String) throws -> AnyObject? {
     var error: NSError?
     let result = NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classes, key as AnyObject, &error)
     try resolveError(error)
@@ -1326,14 +1313,14 @@ extension NSCoder {
 @warn_unused_result
 @_silgen_name("NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData")
 internal func NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(
-  self_: AnyObject,
+  _ self_: AnyObject,
   _ data: AnyObject,
   _ error: NSErrorPointer) -> AnyObject?
 
 extension NSKeyedUnarchiver {
   @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
-  public class func unarchiveTopLevelObjectWithData(data: NSData) throws -> AnyObject? {
+  public class func unarchiveTopLevelObjectWithData(_ data: NSData) throws -> AnyObject? {
     var error: NSError?
     let result = NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(self, data as AnyObject, &error)
     try resolveError(error)
@@ -1347,7 +1334,7 @@ extension NSKeyedUnarchiver {
 
 extension NSURL : _FileReferenceLiteralConvertible {
   private convenience init(failableFileReferenceLiteral path: String) {
-    let fullPath = NSBundle.main().path(forResource: path, ofType: nil)!
+    let fullPath = NSBundle.main().pathForResource(path, ofType: nil)!
     self.init(fileURLWithPath: fullPath)
   }
 

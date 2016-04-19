@@ -78,19 +78,19 @@ protocol SuperREPLPrintable : REPLPrintable {
 }
 
 protocol FooProtocol {
-  func format(kind: UnicodeScalar, layout: String) -> String
+  func format(_ kind: UnicodeScalar, layout: String) -> String
 }
 
 struct SuperPrint : REPLPrintable, FooProtocol, SuperREPLPrintable {
   func replPrint() {}
   func superReplPrint() {}
-  func format(kind: UnicodeScalar, layout: String) -> String {}
+  func format(_ kind: UnicodeScalar, layout: String) -> String {}
 }
 
 struct Struct1 {}
 extension Struct1 : REPLPrintable, FooProtocol {
   func replPrint() {}
-  func format(kind: UnicodeScalar, layout: String) -> String {}
+  func format(_ kind: UnicodeScalar, layout: String) -> String {}
 }
 
 func accept_manyPrintable(_: protocol<REPLPrintable, FooProtocol>) {}

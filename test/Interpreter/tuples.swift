@@ -20,7 +20,7 @@ func <+>=(a: inout Interval, b: Interval) {
   a.hi += b.hi
 }
 
-func print(x: Interval) {
+func print(_ x: Interval) {
   print("(lo=\(x.lo), hi=\(x.hi))")
 }
 
@@ -39,7 +39,7 @@ func mutate() {
 }
 mutate()
 
-func printInts(ints: Int...) {
+func printInts(_ ints: Int...) {
   print("\(ints.count) ints: ", terminator: "")
   for int in ints {
     print("\(int) ", terminator: "")

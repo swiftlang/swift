@@ -30,13 +30,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @_transparent
   @warn_unused_result
-  public static func fromOpaque(value: OpaquePointer) -> Unmanaged {
-    // Null pointer check is a debug check, because it guards only against one
-    // specific bad pointer value.
-    _debugPrecondition(
-      value != nil,
-      "attempt to create an Unmanaged instance from a null pointer")
-
+  public static func fromOpaque(_ value: OpaquePointer) -> Unmanaged {
     return Unmanaged(_private: unsafeBitCast(value, to: Instance.self))
   }
 
@@ -48,7 +42,7 @@ public struct Unmanaged<Instance : AnyObject> {
   /// API expects you to pass the object at +1.
   @_transparent
   @warn_unused_result
-  public static func passRetained(value: Instance) -> Unmanaged {
+  public static func passRetained(_ value: Instance) -> Unmanaged {
     return Unmanaged(_private: value).retain()
   }
 
@@ -63,7 +57,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///                            .passUnretained(object))
   @_transparent
   @warn_unused_result
-  public static func passUnretained(value: Instance) -> Unmanaged {
+  public static func passUnretained(_ value: Instance) -> Unmanaged {
     return Unmanaged(_private: value)
   }
 
@@ -175,14 +169,14 @@ public struct Unmanaged<Instance : AnyObject> {
   ///        }
   ///    }
   ///
-  ///    func doSomething(u : Unmanaged<Owned>) {
+  ///    func doSomething(_ u : Unmanaged<Owned>) {
   ///      u._withUnsafeGuaranteedRef {
   ///        $0.doSomething()
   ///      }
   ///    }
   ///  }
   public func _withUnsafeGuaranteedRef<Result>(
-    @noescape closure: (Instance) throws -> Result
+    _ closure: @noescape (Instance) throws -> Result
   ) rethrows -> Result {
     let instance = _value
     let (guaranteedInstance, token) = Builtin.unsafeGuaranteed(instance)

@@ -12,5 +12,5 @@ public struct Q<T> {
   // CHECK: ![[ARG]] = !DILocalVariable(name: "arg", arg: 1,
   // CHECK-SAME:                        line: [[@LINE+2]],
   // CHECK-SAME:   type: !"_TtGSaGV12generic_arg41QQq_FS_3foourFGSaGS0_x__T___")
-public func foo<T>(arg: [Q<T>]) {
+public func foo<T>(_ arg: [Q<T>]) {
 }

@@ -1197,12 +1197,23 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.create##ID(Loc, getLocalValue(ValID,  \
                     getSILType(MF->getType(TyID),                        \
                                (SILValueCategory)TyCategory)));          \
+   break;
+
+#define REFCOUNTING_INSTRUCTION(ID) \
+  case ValueKind::ID##Inst:                   \
+    assert(RecordKind == SIL_ONE_OPERAND &&            \
+           "Layout should be OneOperand.");            \
+    ResultVal = Builder.create##ID(Loc, getLocalValue(ValID,  \
+                    getSILType(MF->getType(TyID),                        \
+                               (SILValueCategory)TyCategory)),  \
+                                   (Atomicity)Attr);          \
     break;
+
   UNARY_INSTRUCTION(CondFail)
-  UNARY_INSTRUCTION(RetainValue)
-  UNARY_INSTRUCTION(ReleaseValue)
-  UNARY_INSTRUCTION(AutoreleaseValue)
-  UNARY_INSTRUCTION(SetDeallocating)
+  REFCOUNTING_INSTRUCTION(RetainValue)
+  REFCOUNTING_INSTRUCTION(ReleaseValue)
+  REFCOUNTING_INSTRUCTION(AutoreleaseValue)
+  REFCOUNTING_INSTRUCTION(SetDeallocating)
   UNARY_INSTRUCTION(DeinitExistentialAddr)
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(IsNonnull)
@@ -1211,18 +1222,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(Throw)
   UNARY_INSTRUCTION(FixLifetime)
   UNARY_INSTRUCTION(CopyBlock)
-  UNARY_INSTRUCTION(StrongPin)
-  UNARY_INSTRUCTION(StrongUnpin)
-  UNARY_INSTRUCTION(StrongRetain)
-  UNARY_INSTRUCTION(StrongRelease)
-  UNARY_INSTRUCTION(StrongRetainUnowned)
-  UNARY_INSTRUCTION(UnownedRetain)
-  UNARY_INSTRUCTION(UnownedRelease)
+  REFCOUNTING_INSTRUCTION(StrongPin)
+  REFCOUNTING_INSTRUCTION(StrongUnpin)
+  REFCOUNTING_INSTRUCTION(StrongRetain)
+  REFCOUNTING_INSTRUCTION(StrongRelease)
+  REFCOUNTING_INSTRUCTION(StrongRetainUnowned)
+  REFCOUNTING_INSTRUCTION(UnownedRetain)
+  REFCOUNTING_INSTRUCTION(UnownedRelease)
   UNARY_INSTRUCTION(IsUnique)
   UNARY_INSTRUCTION(IsUniqueOrPinned)
   UNARY_INSTRUCTION(DebugValue)
   UNARY_INSTRUCTION(DebugValueAddr)
 #undef UNARY_INSTRUCTION
+#undef REFCOUNTING_INSTRUCTION
 
   case ValueKind::LoadUnownedInst: {
     auto Ty = MF->getType(TyID);
@@ -1785,6 +1797,68 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
 
   return Func;
 }
+
+/// Check for existence of a function with a given name and required linkage.
+/// This function is modeled after readSILFunction. But it does not
+/// create a SILFunction object.
+bool SILDeserializer::hasSILFunction(StringRef Name,
+                                     SILLinkage Linkage) {
+  if (!FuncTable)
+    return false;
+  auto iter = FuncTable->find(Name);
+  if (iter == FuncTable->end())
+    return false;
+
+  // There is a function with the required name.
+  // Find out which linkage it has.
+  auto FID = *iter;
+  auto &cacheEntry = Funcs[FID-1];
+  if (cacheEntry.isFullyDeserialized() ||
+      (cacheEntry.isDeserialized()))
+    return cacheEntry.get()->getLinkage() == Linkage ||
+           Linkage == SILLinkage::Private;
+
+  BCOffsetRAII restoreOffset(SILCursor);
+  SILCursor.JumpToBit(cacheEntry.getOffset());
+
+  auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (entry.Kind == llvm::BitstreamEntry::Error) {
+    DEBUG(llvm::dbgs() << "Cursor advance error in hasSILFunction.\n");
+    MF->error();
+    return false;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+  unsigned kind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  assert(kind == SIL_FUNCTION && "expect a sil function");
+  (void)kind;
+
+  // Read function properties only, e.g. its linkage and other attributes.
+  // TODO: If this results in any noticeable performance problems, Cache the
+  // linkage to avoid re-reading it from the bitcode each time?
+  TypeID funcTyID;
+  unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
+    inlineStrategy, effect, numSpecAttrs;
+  ArrayRef<uint64_t> SemanticsIDs;
+  SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isFragile,
+                                isThunk, isGlobal, inlineStrategy, effect,
+                                numSpecAttrs, funcTyID, SemanticsIDs);
+  auto linkage = fromStableSILLinkage(rawLinkage);
+  if (!linkage) {
+    DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
+                       << " for SIL function " << Name << "\n");
+    return false;
+  }
+
+  // Bail if it is not a required linkage.
+  if (linkage.getValue() != Linkage && Linkage != SILLinkage::Private)
+    return false;
+
+  DEBUG(llvm::dbgs() << "Found SIL Function: " << Name << "\n");
+  return true;
+}
+
 
 SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
                                                 bool declarationOnly) {

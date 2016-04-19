@@ -137,7 +137,7 @@ public protocol _Mirror {
 @warn_unused_result
 @_silgen_name("swift_getSummary")
 public // COMPILER_INTRINSIC
-func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
+func _getSummary<T>(_ out: UnsafeMutablePointer<String>, x: T) {
   out.initialize(with: String(reflecting: x))
 }
 
@@ -147,11 +147,11 @@ func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
 /// of any type.
 @warn_unused_result
 @_silgen_name("swift_reflectAny")
-public func _reflect<T>(x: T) -> _Mirror
+public func _reflect<T>(_ x: T) -> _Mirror
 
 /// Dump an object's contents using its mirror to the specified output stream.
 public func dump<T, TargetStream : OutputStream>(
-  value: T,
+  _ value: T,
   to target: inout TargetStream,
   name: String? = nil,
   indent: Int = 0,
@@ -175,7 +175,7 @@ public func dump<T, TargetStream : OutputStream>(
 
 /// Dump an object's contents using its mirror to standard output.
 public func dump<T>(
-  value: T,
+  _ value: T,
   name: String? = nil,
   indent: Int = 0,
   maxDepth: Int = .max,
@@ -193,7 +193,7 @@ public func dump<T>(
 
 /// Dump an object's contents. User code should use dump().
 internal func _dump_unlocked<TargetStream : OutputStream>(
-  value: Any,
+  _ value: Any,
   to target: inout TargetStream,
   name: String?,
   indent: Int,
@@ -291,7 +291,7 @@ internal func _dump_unlocked<TargetStream : OutputStream>(
 /// Dump information about an object's superclass, given a mirror reflecting
 /// that superclass.
 internal func _dumpSuperclass_unlocked<TargetStream : OutputStream>(
-  mirror mirror: Mirror,
+  mirror: Mirror,
   to target: inout TargetStream,
   indent: Int,
   maxDepth: Int,
@@ -358,7 +358,7 @@ internal func _dumpSuperclass_unlocked<TargetStream : OutputStream>(
 
 @_silgen_name("swift_MagicMirrorData_summary")
 func _swift_MagicMirrorData_summaryImpl(
-  metadata: Any.Type, _ result: UnsafeMutablePointer<String>
+  _ metadata: Any.Type, _ result: UnsafeMutablePointer<String>
 )
 
 @_fixed_layout
@@ -480,7 +480,7 @@ func _getEnumChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 @warn_unused_result
 @_silgen_name("swift_EnumMirror_caseName")
 func _swift_EnumMirror_caseName(
-    data: _MagicMirrorData) -> UnsafePointer<CChar>
+    _ data: _MagicMirrorData) -> UnsafePointer<CChar>
 
 struct _EnumMirror : _Mirror {
   let data: _MagicMirrorData
@@ -520,10 +520,50 @@ func _getClassChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
 #if _runtime(_ObjC)
 @_silgen_name("swift_ClassMirror_quickLookObject")
-public func _getClassPlaygroundQuickLook(
-  _: inout PlaygroundQuickLook?,
-  _: _MagicMirrorData
-)
+public func _swift_ClassMirror_quickLookObject(_: _MagicMirrorData) -> AnyObject
+
+@_silgen_name("swift_isKind")
+func _swift_isKind(_ object: AnyObject, of: AnyObject) -> Bool
+
+func _isKind(_ object: AnyObject, of: String) -> Bool {
+  return _swift_isKind(object, of: _bridgeToObjectiveC(of)!)
+}
+
+func _getClassPlaygroundQuickLook(_ object: AnyObject) -> PlaygroundQuickLook? {
+  if _isKind(object, of: "NSNumber") {
+    let number: _NSNumber = unsafeBitCast(object, to: _NSNumber.self)
+    switch UInt8(number.objCType[0]) {
+    case UInt8(ascii: "d"):
+      return .double(number.doubleValue)
+    case UInt8(ascii: "f"):
+      return .float(number.floatValue)
+    case UInt8(ascii: "Q"):
+      return .uInt(number.unsignedLongLongValue)
+    default:
+      return .int(number.longLongValue)
+    }
+  } else if _isKind(object, of: "NSAttributedString") {
+    return .attributedString(object)
+  } else if _isKind(object, of: "NSImage") ||
+            _isKind(object, of: "UIImage") ||
+            _isKind(object, of: "NSImageView") ||
+            _isKind(object, of: "UIImageView") ||
+            _isKind(object, of: "CIImage") ||
+            _isKind(object, of: "NSBitmapImageRep") {
+    return .image(object)
+  } else if _isKind(object, of: "NSColor") ||
+            _isKind(object, of: "UIColor") {
+    return .color(object)
+  } else if _isKind(object, of: "NSBezierPath") ||
+            _isKind(object, of: "UIBezierPath") {
+    return .bezierPath(object)
+  } else if _isKind(object, of: "NSString") {
+    return .text(_forceBridgeFromObjectiveC(object, String.self))
+  }
+
+  return .none
+}
+
 #endif
 
 struct _ClassMirror : _Mirror {
@@ -545,9 +585,8 @@ struct _ClassMirror : _Mirror {
   }
   var quickLookObject: PlaygroundQuickLook? {
 #if _runtime(_ObjC)
-    var result: PlaygroundQuickLook? = nil
-    _getClassPlaygroundQuickLook(&result, data)
-    return result
+    let object = _swift_ClassMirror_quickLookObject(data)
+    return _getClassPlaygroundQuickLook(object)
 #else
     return nil
 #endif

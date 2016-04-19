@@ -379,6 +379,10 @@ enum class ConventionsKind : uint8_t {
       // (An ObjC class type wouldn't be const-qualified.)
       if (clangTy->isPointerType()
           && clangTy->getPointeeType().isConstQualified()) {
+        // Peek through optionals.
+        if (auto substObjTy = substTy.getAnyOptionalObjectType())
+          substTy = substObjTy;
+
         // Void pointers aren't usefully indirectable.
         if (clangTy->isVoidPointerType())
           return false;
@@ -394,10 +398,6 @@ enum class ConventionsKind : uint8_t {
           // since we only ever indirect the 'self' parameter of functions
           // imported as methods.
           return false;
-        
-        // Peek through optionals.
-        if (auto substObjTy = substTy.getAnyOptionalObjectType())
-          substTy = substObjTy;
         
         if (clangTy->getPointeeType()->getAs<clang::RecordType>()) {
           // CF type as foreign class
@@ -1564,21 +1564,21 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     return getProtocolWitnessRepresentation(proto);
 
   switch (c.kind) {
-    case SILDeclRef::Kind::Func:
-    case SILDeclRef::Kind::Allocator:
-    case SILDeclRef::Kind::EnumElement:
-    case SILDeclRef::Kind::Destroyer:
-    case SILDeclRef::Kind::Deallocator:
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::GlobalGetter:
-      if (c.getDecl()->isInstanceMember())
-        return SILFunctionTypeRepresentation::Method;
-      return SILFunctionTypeRepresentation::Thin;
-
     case SILDeclRef::Kind::DefaultArgGenerator:
       return SILFunctionTypeRepresentation::Thin;
 
+    case SILDeclRef::Kind::Func:
+      if (c.getDecl()->getDeclContext()->isTypeContext())
+        return SILFunctionTypeRepresentation::Method;
+      return SILFunctionTypeRepresentation::Thin;
+
+    case SILDeclRef::Kind::Destroyer:
+    case SILDeclRef::Kind::Deallocator:
+    case SILDeclRef::Kind::Allocator:
     case SILDeclRef::Kind::Initializer:
+    case SILDeclRef::Kind::EnumElement:
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer:
       return SILFunctionTypeRepresentation::Method;

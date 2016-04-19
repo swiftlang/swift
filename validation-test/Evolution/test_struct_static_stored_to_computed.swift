@@ -9,7 +9,7 @@ var StructStaticChangeStoredToComputedTest = TestSuite("StructStaticChangeStored
 
 StructStaticChangeStoredToComputedTest.test("ChangeStoredToComputed") {
   do {
-    @inline(never) func twice(x: inout Int) {
+    @inline(never) func twice(_ x: inout Int) {
       x *= 2
     }
 

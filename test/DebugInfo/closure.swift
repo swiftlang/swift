@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
-func foldl1<T>(list: [T], _ function: (a: T, b: T) -> T) -> T {
+func foldl1<T>(_ list: [T], _ function: (a: T, b: T) -> T) -> T {
      assert(list.count > 1)
      var accumulator = list[0]
-     for var i = 1; i < list.count; i += 1 {
+     for i in 1 ..< list.count {
          accumulator = function(a: accumulator, b: list[i])
      }
      return accumulator

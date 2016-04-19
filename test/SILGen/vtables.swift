@@ -151,11 +151,11 @@ class Observed {
 
 // rdar://problem/21298214
 class BaseWithDefaults {
-   func a(object: AnyObject? = nil) {}
+   func a(_ object: AnyObject? = nil) {}
 }
 
 class DerivedWithoutDefaults : BaseWithDefaults {
-   override func a(object: AnyObject?) { 
+   override func a(_ object: AnyObject?) { 
      super.a(object)   
    }
 }

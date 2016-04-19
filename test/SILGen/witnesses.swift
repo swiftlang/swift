@@ -82,7 +82,7 @@ protocol X {
   func generic<A>(x x: A) -> A
   mutating
   func classes<A2: Classes>(x x: A2) -> A2
-  func <~>(x: Self, y: Self) -> Self
+  func <~>(_ x: Self, y: Self) -> Self
 }
 protocol Y {}
 
@@ -150,7 +150,7 @@ struct ConformingStruct : X {
   // CHECK-NEXT:    return %3 : $A2
   // CHECK-NEXT:  }
 }
-func <~>(x: ConformingStruct, y: ConformingStruct) -> ConformingStruct { return x }
+func <~>(_ x: ConformingStruct, y: ConformingStruct) -> ConformingStruct { return x }
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_ZFS1_oi3ltg{{.*}} : $@convention(witness_method) (@in ConformingStruct, @in ConformingStruct, @thick ConformingStruct.Type) -> @out ConformingStruct {
 // CHECK:       bb0(%0 : $*ConformingStruct, %1 : $*ConformingStruct, %2 : $*ConformingStruct, %3 : $@thick ConformingStruct.Type):
 // CHECK-NEXT:    %4 = load %1 : $*ConformingStruct
@@ -183,7 +183,7 @@ final class ConformingClass : X {
   func generic<D>(x x: D) -> D { return x }
   func classes<D2: Classes>(x x: D2) -> D2 { return x }
 }
-func <~>(x: ConformingClass, y: ConformingClass) -> ConformingClass { return x }
+func <~>(_ x: ConformingClass, y: ConformingClass) -> ConformingClass { return x }
 
 extension ConformingClass : ClassBounded { }
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses15ConformingClassS_12ClassBoundedS_FS1_9selfTypes{{.*}} : $@convention(witness_method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass {
@@ -214,7 +214,7 @@ struct ConformingAOStruct : X {
   func generic<D>(x x: D) -> D { return x }
   func classes<D2: Classes>(x x: D2) -> D2 { return x }
 }
-func <~>(x: ConformingAOStruct, y: ConformingAOStruct) -> ConformingAOStruct { return x }
+func <~>(_ x: ConformingAOStruct, y: ConformingAOStruct) -> ConformingAOStruct { return x }
 
 struct ConformsWithMoreGeneric : X, Y {
   mutating
@@ -266,7 +266,7 @@ struct ConformsWithMoreGeneric : X, Y {
   // CHECK-NEXT:    return [[RESULT]] : $A2
   // CHECK-NEXT:  }
 }
-func <~> <J: Y, K: Y>(x: J, y: K) -> K { return y }
+func <~> <J: Y, K: Y>(_ x: J, y: K) -> K { return y }
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_ZFS1_oi3ltg{{.*}} : $@convention(witness_method) (@in ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @thick ConformsWithMoreGeneric.Type) -> @out ConformsWithMoreGeneric {
 // CHECK:       bb0(%0 : $*ConformsWithMoreGeneric, %1 : $*ConformsWithMoreGeneric, %2 : $*ConformsWithMoreGeneric, %3 : $@thick ConformsWithMoreGeneric.Type):
 // CHECK-NEXT:    // function_ref
@@ -309,7 +309,7 @@ protocol UnlabeledSelfRequirement {
 
 struct LabeledSelfWitness : UnlabeledSelfRequirement {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses18LabeledSelfWitnessS_24UnlabeledSelfRequirementS_FS1_6method{{.*}} : $@convention(witness_method) (@in LabeledSelfWitness, @in_guaranteed LabeledSelfWitness) -> ()
-  func method(x: LabeledSelfWitness) {}
+  func method(_ x: LabeledSelfWitness) {}
 }
 
 protocol ReadOnlyRequirement {
@@ -360,8 +360,8 @@ struct IUOFailableModel : NonFailableRefinement, IUOFailableRequirement {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16IUOFailableModelS_21NonFailableRefinementS_FS1_C{{.*}}
   // CHECK: bb0([[SELF:%[0-9]+]] : $*IUOFailableModel, [[FOO:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick IUOFailableModel.Type):
   // CHECK:   [[META:%[0-9]+]] = metatype $@thin IUOFailableModel.Type
-  // CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFV9witnesses16IUOFailableModelC{{.*}} : $@convention(thin) (Int, @thin IUOFailableModel.Type) -> ImplicitlyUnwrappedOptional<IUOFailableModel>
-  // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[FOO]], [[META]]) : $@convention(thin) (Int, @thin IUOFailableModel.Type) -> ImplicitlyUnwrappedOptional<IUOFailableModel>
+  // CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFV9witnesses16IUOFailableModelC{{.*}} : $@convention(method) (Int, @thin IUOFailableModel.Type) -> ImplicitlyUnwrappedOptional<IUOFailableModel>
+  // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[FOO]], [[META]]) : $@convention(method) (Int, @thin IUOFailableModel.Type) -> ImplicitlyUnwrappedOptional<IUOFailableModel>
   // CHECK:   [[IUO_RESULT_TEMP:%[0-9]+]] = alloc_stack $ImplicitlyUnwrappedOptional<IUOFailableModel>
   // CHECK:   store [[IUO_RESULT]] to [[IUO_RESULT_TEMP]] : $*ImplicitlyUnwrappedOptional<IUOFailableModel>
   
@@ -426,9 +426,9 @@ protocol HasAssoc {
 }
 
 protocol GenericParameterNameCollisionProtocol {
-  func foo<T>(x: T)
+  func foo<T>(_ x: T)
   associatedtype Assoc2
-  func bar<T>(x: T -> Assoc2)
+  func bar<T>(_ x: T -> Assoc2)
 }
 
 struct GenericParameterNameCollision<T: HasAssoc> :
@@ -437,12 +437,12 @@ struct GenericParameterNameCollision<T: HasAssoc> :
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}foo{{.*}} : $@convention(witness_method) <T1 where T1 : HasAssoc><T> (@in T, @in_guaranteed GenericParameterNameCollision<T1>) -> () {
   // CHECK:       bb0(%0 : $*T, %1 : $*GenericParameterNameCollision<T1>):
   // CHECK:         apply {{%.*}}<T1, T1.Assoc, T>
-  func foo<U>(x: U) {}
+  func foo<U>(_ x: U) {}
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}bar{{.*}} : $@convention(witness_method) <T1 where T1 : HasAssoc><T> (@owned @callee_owned (@in T) -> @out T1.Assoc, @in_guaranteed GenericParameterNameCollision<T1>) -> () {
   // CHECK:       bb0(%0 : $@callee_owned (@in T) -> @out T1.Assoc, %1 : $*GenericParameterNameCollision<T1>):
   // CHECK:         apply {{%.*}}<T1, T1.Assoc, T>
-  func bar<V>(x: V -> T.Assoc) {}
+  func bar<V>(_ x: V -> T.Assoc) {}
 }
 
 protocol PropertyRequirement {

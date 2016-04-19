@@ -26,7 +26,7 @@ struct RaceTest1 : RaceTestWithPerTrialData {
   }
 
   func thread1(
-    raceData: RaceData, _ threadLocalData: inout ThreadLocalData
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     switch RaceTest1.iterationCountdown.fetchAndAdd(-1) {
     case 0:
@@ -47,7 +47,7 @@ struct RaceTest1 : RaceTestWithPerTrialData {
   }
 
   func evaluateObservations(
-    observations: [Observation],
+    _ observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     for observation in observations {

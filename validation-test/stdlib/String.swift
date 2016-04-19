@@ -28,7 +28,7 @@ StringTests.test("sizeof") {
 }
 
 func checkUnicodeScalarViewIteration(
-    expectedScalars: [UInt32], _ str: String
+    _ expectedScalars: [UInt32], _ str: String
 ) {
   do {
     let us = str.unicodeScalars
@@ -317,8 +317,8 @@ StringTests.test("literalConcatenation") {
 
 StringTests.test("appendToSubstring") {
   for initialSize in 1..<16 {
-    for sliceStart in [ 0, 2, 8, initialSize ] {
-      for sliceEnd in [ 0, 2, 8, sliceStart + 1 ] {
+    for sliceStart in [0, 2, 8, initialSize] {
+      for sliceEnd in [0, 2, 8, sliceStart + 1] {
         if sliceStart > initialSize || sliceEnd > initialSize ||
           sliceEnd < sliceStart {
           continue
@@ -601,7 +601,7 @@ StringTests.test("COW/replaceSubrange/end") {
 
 func asciiString<
   S: Sequence where S.Iterator.Element == Character
->(content: S) -> String {
+>(_ content: S) -> String {
   var s = String()
   s.append(contentsOf: content)
   expectEqual(1, s._core.elementWidth)
@@ -712,7 +712,7 @@ StringTests.test("stringCoreReserve")
 #endif
 }
 
-func makeStringCore(base: String) -> _StringCore {
+func makeStringCore(_ base: String) -> _StringCore {
   var x = _StringCore()
   // make sure some - but not all - replacements will have to grow the buffer
   x.reserveCapacity(base._core.count * 3 / 2)
@@ -815,7 +815,7 @@ StringTests.test("toInt") {
   // Make a String from an Int, mangle the String's characters,
   // then print if the new String is or is not still an Int.
   func testConvertabilityOfStringWithModification(
-    initialValue: Int,
+    _ initialValue: Int,
     modification: (chars: inout [UTF8.CodeUnit]) -> Void
   ) {
     var chars = Array(String(initialValue).utf8)
@@ -881,7 +881,7 @@ StringTests.test("growth") {
 }
 
 StringTests.test("Construction") {
-  expectEqual("abc", String([ "a", "b", "c" ] as [Character]))
+  expectEqual("abc", String(["a", "b", "c"] as [Character]))
 }
 
 StringTests.test("Conversions") {
@@ -1097,26 +1097,26 @@ StringTests.test("String.append(_: UnicodeScalar)") {
     // U+0061 LATIN SMALL LETTER A
     let input: UnicodeScalar = "\u{61}"
     s.append(input)
-    expectEqual([ "\u{61}" ], Array(s.unicodeScalars))
+    expectEqual(["\u{61}"], Array(s.unicodeScalars))
   }
   do {
     // U+304B HIRAGANA LETTER KA
     let input: UnicodeScalar = "\u{304b}"
     s.append(input)
-    expectEqual([ "\u{61}", "\u{304b}" ], Array(s.unicodeScalars))
+    expectEqual(["\u{61}", "\u{304b}"], Array(s.unicodeScalars))
   }
   do {
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
     let input: UnicodeScalar = "\u{3099}"
     s.append(input)
-    expectEqual([ "\u{61}", "\u{304b}", "\u{3099}" ], Array(s.unicodeScalars))
+    expectEqual(["\u{61}", "\u{304b}", "\u{3099}"], Array(s.unicodeScalars))
   }
   do {
     // U+1F425 FRONT-FACING BABY CHICK
     let input: UnicodeScalar = "\u{1f425}"
     s.append(input)
     expectEqual(
-      [ "\u{61}", "\u{304b}", "\u{3099}", "\u{1f425}" ],
+      ["\u{61}", "\u{304b}", "\u{3099}", "\u{1f425}"],
       Array(s.unicodeScalars))
   }
 }
@@ -1155,7 +1155,7 @@ StringTests.test("String.append(_: Character)") {
     // U+0303 COMBINING TILDE
     "\u{61}\u{0300}\u{0301}\u{0302}\u{0303}",
   ]
-  let baseStrings = [ "" ] + baseCharacters.map { String($0) }
+  let baseStrings = [""] + baseCharacters.map { String($0) }
 
   for baseIdx in baseStrings.indices {
     for prefix in ["", " "] {
@@ -1165,7 +1165,7 @@ StringTests.test("String.append(_: Character)") {
         var s = base
         s.append(input)
         expectEqualSequence(
-          Array(base.characters) + [ input ],
+          Array(base.characters) + [input],
           Array(s.characters),
           "baseIdx=\(baseIdx) inputIdx=\(inputIdx)")
       }

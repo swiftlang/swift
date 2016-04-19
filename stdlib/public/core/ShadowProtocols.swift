@@ -30,9 +30,9 @@ public protocol _ShadowProtocol {}
 @objc
 public protocol _NSFastEnumeration : _ShadowProtocol {
   @objc(countByEnumeratingWithState:objects:count:)
-  func countByEnumeratingWith(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int
+  func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int
 }
 
@@ -50,7 +50,7 @@ public typealias _SwiftNSZone = OpaquePointer
 @objc
 public protocol _NSCopying : _ShadowProtocol {
   @objc(copyWithZone:)
-  func copy(with zone: _SwiftNSZone) -> AnyObject
+  func copy(with zone: _SwiftNSZone?) -> AnyObject
 }
 
 /// A shadow for the "core operations" of NSArray.
@@ -62,14 +62,14 @@ public protocol _NSArrayCore :
     _NSCopying, _NSFastEnumeration {
 
   @objc(objectAtIndex:)
-  func objectAt(index: Int) -> AnyObject
+  func objectAt(_ index: Int) -> AnyObject
 
   func getObjects(_: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange)
 
   @objc(countByEnumeratingWithState:objects:count:)
-  func countByEnumeratingWith(
-         state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-         objects: UnsafeMutablePointer<AnyObject>, count: Int
+  func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int
 
   var count: Int { get }
@@ -94,22 +94,22 @@ public protocol _NSDictionaryCore :
   var count: Int { get }
 
   @objc(objectForKey:)
-  func objectFor(aKey: AnyObject) -> AnyObject?
+  func objectFor(_ aKey: AnyObject) -> AnyObject?
 
   func keyEnumerator() -> _NSEnumerator
 
   // We also override the following methods for efficiency.
 
   @objc(copyWithZone:)
-  func copy(with zone: _SwiftNSZone) -> AnyObject
+  func copy(with zone: _SwiftNSZone?) -> AnyObject
 
-  func getObjects(objects: UnsafeMutablePointer<AnyObject>,
-    andKeys keys: UnsafeMutablePointer<AnyObject>)
+  func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?)
 
   @objc(countByEnumeratingWithState:objects:count:)
-  func countByEnumeratingWith(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int
+  func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int
 }
 
@@ -125,9 +125,9 @@ public protocol _NSDictionaryCore :
 public protocol _NSDictionary : _NSDictionaryCore {
   // Note! This API's type is different from what is imported by the clang
   // importer.
-  func getObjects(objects: UnsafeMutablePointer<AnyObject>,
-      andKeys keys: UnsafeMutablePointer<AnyObject>)
-}
+  func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
+      andKeys keys: UnsafeMutablePointer<AnyObject>?)
+    }
 
 /// A shadow for the "core operations" of NSSet.
 ///
@@ -144,18 +144,18 @@ public protocol _NSSetCore :
   init(objects: UnsafePointer<AnyObject?>, count: Int)
 
   var count: Int { get }
-  func member(object: AnyObject) -> AnyObject?
+  func member(_ object: AnyObject) -> AnyObject?
   func objectEnumerator() -> _NSEnumerator
 
   // We also override the following methods for efficiency.
 
   @objc(copyWithZone:)
-  func copy(with zone: _SwiftNSZone) -> AnyObject
+  func copy(with zone: _SwiftNSZone?) -> AnyObject
 
   @objc(countByEnumeratingWithState:objects:count:)
-  func countByEnumeratingWith(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int
+  func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int
 }
 
@@ -169,6 +169,17 @@ public protocol _NSSetCore :
 /// supplies.
 @unsafe_no_objc_tagged_pointer @objc
 public protocol _NSSet : _NSSetCore {
+}
+
+/// A shadow for the API of NSNumber we will use in the core
+/// stdlib.
+@objc
+public protocol _NSNumber {
+  var doubleValue: Double { get }
+  var floatValue: Float { get }
+  var unsignedLongLongValue: UInt64 { get }
+  var longLongValue: Int64 { get }
+  var objCType: UnsafePointer<Int8> { get }
 }
 
 #else

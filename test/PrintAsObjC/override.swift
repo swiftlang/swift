@@ -7,8 +7,8 @@
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
 // FIXME: END -enable-source-import hackaround
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -emit-module -I %t -I %S/Inputs/custom-modules -o %t %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -parse-as-library %t/override.swiftmodule -I %t -parse -emit-objc-header-path %t/override.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -I %S/Inputs/custom-modules -o %t %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -parse-as-library %t/override.swiftmodule -parse -emit-objc-header-path %t/override.h
 // RUN: FileCheck %s < %t/override.h
 // RUN: %check-in-clang %t/override.h -I %S/Inputs/custom-modules -Wno-super-class-method-mismatch -Wno-overriding-method-mismatch
 // RUN: not %check-in-clang %t/override.h -Wno-super-class-method-mismatch -I %S/Inputs/custom-modules 2>&1 | FileCheck -check-prefix=CLANG %s
@@ -31,7 +31,7 @@ class A_Child : Base {
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)_;
   override func foo(_: Int) -> Int { return 0 }
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y;
-  override func foo(x: Int, y: Int) -> Int { return x + y }
+  override func foo(_ x: Int, y: Int) -> Int { return x + y }
   
   
   // CHECK-NEXT: - (BOOL)doThingAndReturnError:(NSError * _Nullable * _Null_unspecified)error;
@@ -55,7 +55,7 @@ class A_Grandchild : A_Child {
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)_;
   override func foo(_: Int) -> Int { return 0 }
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y;
-  override func foo(x: Int, y: Int) -> Int { return x + y }
+  override func foo(_ x: Int, y: Int) -> Int { return x + y }
 
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 } // CHECK-NEXT: @end
@@ -85,7 +85,7 @@ class B_GrandchildViaEmpty : B_EmptyChild {
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)_;
   override func foo(_: Int) -> Int { return 0 }
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y;
-  override func foo(x: Int, y: Int) -> Int { return x + y }
+  override func foo(_ x: Int, y: Int) -> Int { return x + y }
 
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 } // CHECK-NEXT: @end
@@ -95,7 +95,7 @@ class B_GrandchildViaEmpty : B_EmptyChild {
 class FixMe : Base {
   // CHECK-NEXT: - (void)callback:(NSInteger (^ _Nullable)(void))fn;
   // CLANG: error: conflicting parameter types in declaration of 'callback:'
-  override func callback(fn: (() -> Int)?) {}
+  override func callback(_ fn: (() -> Int)?) {}
 
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 } // CHECK-NEXT: @end

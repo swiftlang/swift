@@ -33,7 +33,7 @@ builtinIntLiteralBits = 2048
 def allInts():
     for bits in allIntBits:
         for signed in False, True:
-            yield bits,signed
+            yield bits, signed
 
 def baseIntName(name):
     return 'Int' if name == 'Int' else 'Int' + str(name)
@@ -205,7 +205,7 @@ extension ${Self} : CustomDebugStringConvertible {
 extension ${Self} : FloatingPoint {
   public typealias _BitsType = UInt${bits}
 
-  public static func _fromBitPattern(bits: _BitsType) -> ${Self} {
+  public static func _fromBitPattern(_ bits: _BitsType) -> ${Self} {
     return ${Self}(_bits: Builtin.bitcast_Int${bits}_FPIEEE${bits}(bits._value))
   }
 
@@ -497,7 +497,7 @@ extension ${Self} : AbsoluteValuable {
   /// Returns the absolute value of `x`.
   @_transparent
   @warn_unused_result
-  public static func abs(x: ${Self}) -> ${Self} {
+  public static func abs(_ x: ${Self}) -> ${Self} {
     return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(x._value))
   }
 }
@@ -564,16 +564,16 @@ extension ${Self} {
 //===----------------------------------------------------------------------===//
 
 @_transparent
-@available(*, deprecated, message: "it will be removed in Swift 3")
+@available(*, unavailable, message: "it has been removed in Swift 3")
 public prefix func ++ (rhs: inout ${Self}) -> ${Self} { rhs += 1.0; return rhs }
 @_transparent
-@available(*, deprecated, message: "it will be removed in Swift 3")
+@available(*, unavailable, message: "it has been removed in Swift 3")
 public prefix func -- (rhs: inout ${Self}) -> ${Self} { rhs -= 1.0; return rhs }
 @_transparent
-@available(*, deprecated, message: "it will be removed in Swift 3")
+@available(*, unavailable, message: "it has been removed in Swift 3")
 public postfix func ++ (lhs: inout ${Self}) -> ${Self} { let tmp = lhs; lhs += 1.0; return tmp }
 @_transparent
-@available(*, deprecated, message: "it will be removed in Swift 3")
+@available(*, unavailable, message: "it has been removed in Swift 3")
 public postfix func -- (lhs: inout ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp }
 
 

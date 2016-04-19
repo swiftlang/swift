@@ -45,7 +45,7 @@ protocol CustomStringConvertible { func print() } // expected-note{{protocol req
 
 struct TestFormat { }
 protocol FormattedPrintable : CustomStringConvertible {
-  func print(format format: TestFormat)
+  func print(format: TestFormat)
 }
 
 struct X0 : Any, CustomStringConvertible {
@@ -71,7 +71,7 @@ class NotPrintableC : CustomStringConvertible, Any {} // expected-error{{type 'N
 enum NotPrintableO : Any, CustomStringConvertible {} // expected-error{{type 'NotPrintableO' does not conform to protocol 'CustomStringConvertible'}}
 
 struct NotFormattedPrintable : FormattedPrintable { // expected-error{{type 'NotFormattedPrintable' does not conform to protocol 'CustomStringConvertible'}}
-  func print(format format: TestFormat) {} // expected-note{{candidate has non-matching type '(format: TestFormat) -> ()'}}
+  func print(format: TestFormat) {} // expected-note{{candidate has non-matching type '(format: TestFormat) -> ()'}}
 }
 
 // Circular protocols
@@ -90,7 +90,7 @@ struct Circle {
   func circle_end() {}
 }
 
-func testCircular(circle: Circle) {
+func testCircular(_ circle: Circle) {
   // FIXME: It would be nice if this failure were suppressed because the protocols
   // have circular definitions.
   _ = circle as CircleStart // expected-error{{'Circle' is not convertible to 'CircleStart'; did you mean to use 'as!' to force downcast?}} {{14-16=as!}}
@@ -197,7 +197,7 @@ struct IntStringGetter : GetATuple {
 //===----------------------------------------------------------------------===//
 // FIXME: Actually make use of default arguments, check substitutions, etc.
 protocol ProtoWithDefaultArg {
-  func increment(value: Int = 1) // expected-error{{default argument not permitted in a protocol method}}
+  func increment(_ value: Int = 1) // expected-error{{default argument not permitted in a protocol method}}
 }
 
 struct HasNoDefaultArg : ProtoWithDefaultArg {
@@ -208,42 +208,42 @@ struct HasNoDefaultArg : ProtoWithDefaultArg {
 // Variadic function requirements
 //===----------------------------------------------------------------------===//
 protocol IntMaxable {
-  func intmax(first first: Int, rest: Int...) -> Int // expected-note 2{{protocol requires function 'intmax(first:rest:)' with type '(first: Int, rest: Int...) -> Int'}}
+  func intmax(first: Int, rest: Int...) -> Int // expected-note 2{{protocol requires function 'intmax(first:rest:)' with type '(first: Int, rest: Int...) -> Int'}}
 }
 
 struct HasIntMax : IntMaxable {
-  func intmax(first first: Int, rest: Int...) -> Int {}
+  func intmax(first: Int, rest: Int...) -> Int {}
 }
 
 struct NotIntMax1 : IntMaxable  { // expected-error{{type 'NotIntMax1' does not conform to protocol 'IntMaxable'}}
-  func intmax(first first: Int, rest: [Int]) -> Int {} // expected-note{{candidate has non-matching type '(first: Int, rest: [Int]) -> Int'}}
+  func intmax(first: Int, rest: [Int]) -> Int {} // expected-note{{candidate has non-matching type '(first: Int, rest: [Int]) -> Int'}}
 }
 
 struct NotIntMax2 : IntMaxable { // expected-error{{type 'NotIntMax2' does not conform to protocol 'IntMaxable'}}
-  func intmax(first first: Int, rest: Int) -> Int {} // expected-note{{candidate has non-matching type '(first: Int, rest: Int) -> Int'}}
+  func intmax(first: Int, rest: Int) -> Int {} // expected-note{{candidate has non-matching type '(first: Int, rest: Int) -> Int'}}
 }
 
 //===----------------------------------------------------------------------===//
 // 'Self' type
 //===----------------------------------------------------------------------===//
 protocol IsEqualComparable {
-  func isEqual(other other: Self) -> Bool // expected-note{{protocol requires function 'isEqual(other:)' with type '(other: WrongIsEqual) -> Bool'}}
+  func isEqual(other: Self) -> Bool // expected-note{{protocol requires function 'isEqual(other:)' with type '(other: WrongIsEqual) -> Bool'}}
 }
 
 struct HasIsEqual : IsEqualComparable {
-  func isEqual(other other: HasIsEqual) -> Bool {}
+  func isEqual(other: HasIsEqual) -> Bool {}
 }
 
 struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual' does not conform to protocol 'IsEqualComparable'}}
-  func isEqual(other other: Int) -> Bool {}  // expected-note{{candidate has non-matching type '(other: Int) -> Bool'}}
+  func isEqual(other: Int) -> Bool {}  // expected-note{{candidate has non-matching type '(other: Int) -> Bool'}}
 }
 
 //===----------------------------------------------------------------------===//
 // Using values of existential type.
 //===----------------------------------------------------------------------===//
 
-func existentialSequence(e: Sequence) { // expected-error{{has Self or associated type requirements}}
-  var x = e.makeIterator() // expected-error{{type 'Sequence' does not conform to protocol 'IteratorProtocol'}}
+func existentialSequence(_ e: Sequence) { // expected-error{{has Self or associated type requirements}}
+  var x = e.makeIterator() // expected-error{{'Sequence' is not convertible to '<<error type>>'}}
   x.next()
   x.nonexistent()
 }
@@ -253,7 +253,7 @@ protocol HasSequenceAndStream {
   func getR() -> R
 }
 
-func existentialSequenceAndStreamType(h: HasSequenceAndStream) { // expected-error{{has Self or associated type requirements}}
+func existentialSequenceAndStreamType(_ h: HasSequenceAndStream) { // expected-error{{has Self or associated type requirements}}
   // FIXME: Crummy diagnostics.
   var x = h.getR() // expected-error{{member 'getR' cannot be used on value of protocol type 'HasSequenceAndStream'; use a generic constraint instead}}
   x.makeIterator()
@@ -282,7 +282,7 @@ struct DictionaryIntInt {
   }
 }
 
-func testSubscripting(iis: IntIntSubscriptable, i_s: IntSubscriptable) { // expected-error{{has Self or associated type requirements}}
+func testSubscripting(_ iis: IntIntSubscriptable, i_s: IntSubscriptable) { // expected-error{{has Self or associated type requirements}}
   var i: Int = iis[17] 
   var i2 = i_s[17] // expected-error{{member 'subscript' cannot be used on value of protocol type 'IntSubscriptable'; use a generic constraint instead}}
 }
@@ -328,7 +328,7 @@ prefix operator <> {}
 postfix operator <> {}
 
 protocol IndexValue {
-  prefix func <> (max: Self) -> Int
+  prefix func <> (_ max: Self) -> Int
   postfix func <> (min: Self) -> Int
 }
 
@@ -447,22 +447,22 @@ protocol FirstProtocol {
 }
 
 protocol SecondProtocol {
-    func aMethod(object : FirstProtocol)
+    func aMethod(_ object : FirstProtocol)
 }
 
 // <rdar://problem/19495341> Can't upcast to parent types of type constraints without forcing
 class C1 : P2 {}
-func f<T : C1>(x : T) {
+func f<T : C1>(_ x : T) {
   x as P2
 }
 
 class C2 {}
-func g<T : C2>(x : T) {
+func g<T : C2>(_ x : T) {
   x as P2 // expected-error{{'T' is not convertible to 'P2'; did you mean to use 'as!' to force downcast?}} {{5-7=as!}}
 }
 
 class C3 : P1 {} // expected-error{{type 'C3' does not conform to protocol 'P1'}}
-func h<T : C3>(x : T) {
+func h<T : C3>(_ x : T) {
   x as P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
 

@@ -52,6 +52,6 @@ func foo(x: FooStruct1) -> S1 {}
 
 // RUN: %sourcekitd-test -req=cursor -usr "s:F10cursor_usr3fooFVSC10FooStruct1VS_2S1" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | FileCheck %s -check-prefix=CHECK3
 // CHECK3: source.lang.swift.decl.function.free (9:6-9:24)
-// CHECK3: foo(_:)
-// CHECK3: (FooStruct1) -> S1
-// CHECK3: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>(<decl.var.parameter><decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="c:@S@FooStruct1">FooStruct1</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr="s:V10cursor_usr2S1">S1</ref.struct></decl.function.returntype></decl.function.free>
+// CHECK3: foo(x:)
+// CHECK3: (x: FooStruct1) -> S1
+// CHECK3: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="c:@S@FooStruct1">FooStruct1</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr="s:V10cursor_usr2S1">S1</ref.struct></decl.function.returntype></decl.function.free>

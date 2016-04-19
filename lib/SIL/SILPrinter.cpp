@@ -427,7 +427,7 @@ class SILPrinter : public SILVisitor<SILPrinter> {
 public:
   SILPrinter(
       SILPrintContext &PrintCtx,
-      llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr )
+      llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr)
       : Ctx(PrintCtx),
         PrintState{{PrintCtx.OS()}, PrintOptions::printSIL()},
         LastBufferID(0) {
@@ -669,7 +669,8 @@ public:
     // Print inlined-at location, if any.
     if (DS) {
       SILFunction *InlinedF = DS->getInlinedFunction();
-      for (auto *CS : reversed(DS->flattenedInlineTree())) {
+      auto InlineScopes = DS->flattenedInlineTree();
+      for (auto *CS : reversed(InlineScopes)) {
         *this << ": ";
         if (InlinedF) {
           *this << demangleSymbol(InlinedF->getName());
@@ -678,7 +679,7 @@ public:
         }
         *this << " perf_inlined_at ";
         auto CallSite = CS->Loc;
-        if (!CallSite.isNull())
+        if (!CallSite.isNull() && CallSite.isASTNode())
           CallSite.getSourceLoc().print(
             PrintState.OS, M.getASTContext().SourceMgr, LastBufferID);
         else
@@ -1156,19 +1157,19 @@ public:
   }
   
   void visitRetainValueInst(RetainValueInst *I) {
-    *this << "retain_value " << getIDAndType(I->getOperand());
+    visitRefCountingInst(I, "retain_value");
   }
 
   void visitReleaseValueInst(ReleaseValueInst *I) {
-    *this << "release_value " << getIDAndType(I->getOperand());
+    visitRefCountingInst(I, "release_value");
   }
 
   void visitAutoreleaseValueInst(AutoreleaseValueInst *I) {
-    *this << "autorelease_value " << getIDAndType(I->getOperand());
+    visitRefCountingInst(I, "autorelease_value");
   }
 
   void visitSetDeallocatingInst(SetDeallocatingInst *I) {
-    *this << "set_deallocating " << getIDAndType(I->getOperand());
+    visitRefCountingInst(I, "set_deallocating");
   }
 
   void visitStructInst(StructInst *SI) {
@@ -1372,26 +1373,32 @@ public:
   void visitCopyBlockInst(CopyBlockInst *RI) {
     *this << "copy_block " << getIDAndType(RI->getOperand());
   }
+  void visitRefCountingInst(RefCountingInst *I, StringRef InstName) {
+    *this << InstName << " ";
+    if (I->isNonAtomic())
+      *this << "[nonatomic] ";
+    *this << getIDAndType(I->getOperand(0));
+  }
   void visitStrongRetainInst(StrongRetainInst *RI) {
-    *this << "strong_retain " << getIDAndType(RI->getOperand());
+    visitRefCountingInst(RI, "strong_retain");
   }
   void visitStrongReleaseInst(StrongReleaseInst *RI) {
-    *this << "strong_release " << getIDAndType(RI->getOperand());
+    visitRefCountingInst(RI, "strong_release");
   }
   void visitStrongPinInst(StrongPinInst *PI) {
-    *this << "strong_pin " << getIDAndType(PI->getOperand());
+    visitRefCountingInst(PI, "strong_pin");
   }
   void visitStrongUnpinInst(StrongUnpinInst *UI) {
-    *this << "strong_unpin " << getIDAndType(UI->getOperand());
+    visitRefCountingInst(UI, "strong_unpin");
   }
   void visitStrongRetainUnownedInst(StrongRetainUnownedInst *RI) {
-    *this << "strong_retain_unowned " << getIDAndType(RI->getOperand());
+    visitRefCountingInst(RI, "strong_retain_unowned");
   }
   void visitUnownedRetainInst(UnownedRetainInst *RI) {
-    *this << "unowned_retain " << getIDAndType(RI->getOperand());
+    visitRefCountingInst(RI, "unowned_retain");
   }
   void visitUnownedReleaseInst(UnownedReleaseInst *RI) {
-    *this << "unowned_release " << getIDAndType(RI->getOperand());
+    visitRefCountingInst(RI, "unowned_release");
   }
   void visitIsUniqueInst(IsUniqueInst *CUI) {
     *this << "is_unique " << getIDAndType(CUI->getOperand());
@@ -2178,7 +2185,8 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
                          unsigned Indent) const {
   OS << "{\n";
   OS.indent(Indent);
-  Loc.getSourceLoc().print(OS, SM);
+  if (Loc.isASTNode())
+    Loc.getSourceLoc().print(OS, SM);
   OS << "\n";
   OS.indent(Indent + 2);
   OS << " parent: ";

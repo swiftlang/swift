@@ -940,6 +940,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
       assert(SizeInBits && "zero-sized piece");
       assert(SizeInBits < VarSizeInBits && "piece covers entire var");
       assert(OffsetInBits+SizeInBits <= VarSizeInBits && "pars > totum");
+      (void) VarSizeInBits;
 
       // Add the piece DWARF expression.
       Operands.push_back(llvm::dwarf::DW_OP_bit_piece);

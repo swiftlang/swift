@@ -65,7 +65,7 @@ func testError() {
 #elseif GENERICONLY
 // FIXME: THE BELOW IS WRONG! This alone doesn't pull in the conformance, but it should.
 // GENERICONLY-NOT: TestError: _BridgedNSError
-  func dyncast<T, U>(x: T) -> U {
+  func dyncast<T, U>(_ x: T) -> U {
     return x as! U
   }
   let _ : TestError = dyncast(testErrorNSError)

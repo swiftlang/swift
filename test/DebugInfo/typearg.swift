@@ -9,13 +9,13 @@ class AClass : AProtocol {
 
 // CHECK: define hidden void @{{.*}}aFunction
 // CHECK:  call void @llvm.dbg.declare(metadata %swift.type** %{{.*}}, metadata ![[TYPEARG:.*]], metadata !{{[0-9]+}}),
-// CHECK: ![[VOIDPTR:[0-9]+]] = !DIDerivedType(tag: DW_TAG_pointer_type, name: "_TtBp", baseType: null
 // CHECK: ![[TYPEARG]] = !DILocalVariable(name: "$swift.type.T"
 // CHECK-SAME:                            type: ![[SWIFTMETATYPE:[^,)]+]]
 // CHECK-SAME:                            flags: DIFlagArtificial
 // CHECK: ![[SWIFTMETATYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$swift.type",
-// CHECK-SAME:                                baseType: ![[VOIDPTR]]
-func aFunction<T : AProtocol>(x: T) {
+// CHECK-SAME:                                baseType: ![[VOIDPTR:[0-9]+]]
+// CHECK: ![[VOIDPTR]] = !DIDerivedType(tag: DW_TAG_pointer_type, name: "_TtBp", baseType: null
+func aFunction<T : AProtocol>(_ x: T) {
     print("I am in aFunction: \(x.f())")
 }
 
@@ -26,7 +26,7 @@ class Foo<Bar> {
       func one() {
       }
 
-      func two<Baz>(x: Baz) {
+      func two<Baz>(_ x: Baz) {
     // TODO: leave breadcrumbs for how to dynamically derive T in the debugger
     // CHECK- FIXME: !DILocalVariable(name: "$swift.type.Bar"
     // CHECK: !DILocalVariable(name: "$swift.type.Baz"

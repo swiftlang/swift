@@ -26,7 +26,7 @@ Reflection.test("Dictionary/Empty") {
 }
 
 Reflection.test("Dictionary") {
-  let dict = [ "One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5 ]
+  let dict = ["One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5]
 
   var output = ""
   dump(dict, to: &output)

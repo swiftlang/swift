@@ -17,11 +17,13 @@
 #include "swift/Reflection/TypeRef.h"
 #include "llvm/ADT/Optional.h"
 #include "messages.h"
+#include "overrides.h"
 
 #include <unistd.h>
 
 using namespace swift;
-using namespace reflection;
+using namespace swift::reflection;
+using namespace swift::remote;
 using namespace Demangle;
 
 static void errorAndExit(const std::string &message) {
@@ -48,36 +50,36 @@ struct RemoteReflectionInfo {
   const std::string ImageName;
   const Section<Runtime> fieldmd;
   const Section<Runtime> assocty;
-  const llvm::Optional<Section<Runtime>> reflstr;
+  const Section<Runtime> builtin;
   const Section<Runtime> typeref;
+  const Section<Runtime> reflstr;
   const StoredPointer StartAddress;
   const StoredSize TotalSize;
 
   RemoteReflectionInfo(std::string ImageName,
                        Section<Runtime> fieldmd,
                        Section<Runtime> assocty,
-                       llvm::Optional<Section<Runtime>> reflstr,
-                       Section<Runtime> typeref)
+                       Section<Runtime> builtin,
+                       Section<Runtime> typeref,
+                       Section<Runtime> reflstr)
     : ImageName(ImageName),
       fieldmd(fieldmd),
       assocty(assocty),
-      reflstr(reflstr),
+      builtin(builtin),
       typeref(typeref),
+      reflstr(reflstr),
       StartAddress(std::min({
         fieldmd.StartAddress,
-        typeref.StartAddress,
-        reflstr.hasValue()
-          ? reflstr.getValue().StartAddress
-          : fieldmd.StartAddress,
-        assocty.StartAddress})),
+  assocty.StartAddress,
+  builtin.StartAddress,
+  typeref.StartAddress,
+  reflstr.StartAddress})),
       TotalSize(std::max({
         fieldmd.getEndAddress(),
         assocty.getEndAddress(),
-        reflstr.hasValue()
-          ? reflstr.getValue().getEndAddress()
-          : fieldmd.getEndAddress(),
-        typeref.getEndAddress()
-      }) - StartAddress) {}
+  builtin.getEndAddress(),
+  typeref.getEndAddress(),
+  reflstr.getEndAddress()}) - StartAddress) {}
 };
 }
 
@@ -141,9 +143,9 @@ public:
     }
   }
 
-  bool readBytes(addr_t Address, uint8_t *Dest, uint64_t Size) override {
+  bool readBytes(RemoteAddress Address, uint8_t *Dest, uint64_t Size) override {
 
-    StoredPointer TargetAddress = (StoredPointer)Address;
+    StoredPointer TargetAddress = (StoredPointer)Address.getAddressData();
     write(getParentWriteFD(), REQUEST_READ_BYTES, 2);
     write(getParentWriteFD(), &TargetAddress, sizeof(TargetAddress));
     write(getParentWriteFD(), &Size, sizeof(StoredSize));
@@ -159,13 +161,13 @@ public:
     return static_cast<uint64_t>(Length);
   }
 
-  addr_t getSymbolAddress(const std::string &SymbolName) override {
+  RemoteAddress getSymbolAddress(const std::string &SymbolName) override {
     StoredPointer Address = 0;
     write(getParentWriteFD(), REQUEST_SYMBOL_ADDRESS, 2);
     write(getParentWriteFD(), SymbolName.c_str(), SymbolName.size());
     write(getParentWriteFD(), "\n", 1);
     collectBytesFromPipe(&Address, sizeof(Address));
-    return static_cast<StoredPointer>(Address);
+    return RemoteAddress(static_cast<StoredPointer>(Address));
   }
 
   StoredPointer receiveInstanceAddress() {
@@ -204,30 +206,33 @@ public:
 
       StoredPointer fieldmd_start;
       StoredPointer fieldmd_size;
+      StoredPointer assocty_start;
+      StoredPointer assocty_size;
+      StoredPointer builtin_start;
+      StoredPointer builtin_size;
       StoredPointer typeref_start;
       StoredPointer typeref_size;
       StoredPointer reflstr_start;
       StoredPointer reflstr_size;
-      StoredPointer assocty_start;
-      StoredPointer assocty_size;
 
       collectBytesFromPipe(&fieldmd_start, sizeof(fieldmd_start));
       collectBytesFromPipe(&fieldmd_size, sizeof(fieldmd_size));
+      collectBytesFromPipe(&assocty_start, sizeof(assocty_start));
+      collectBytesFromPipe(&assocty_size, sizeof(assocty_size));
+      collectBytesFromPipe(&builtin_start, sizeof(builtin_start));
+      collectBytesFromPipe(&builtin_size, sizeof(builtin_size));
       collectBytesFromPipe(&typeref_start, sizeof(typeref_start));
       collectBytesFromPipe(&typeref_size, sizeof(typeref_size));
       collectBytesFromPipe(&reflstr_start, sizeof(reflstr_start));
       collectBytesFromPipe(&reflstr_size, sizeof(reflstr_size));
-      collectBytesFromPipe(&assocty_start, sizeof(assocty_start));
-      collectBytesFromPipe(&assocty_size, sizeof(assocty_size));
 
       RemoteInfos.push_back({
         ImageName,
         {fieldmd_start, fieldmd_size},
-        {typeref_start, typeref_size},
-        reflstr_size > 0
-          ? llvm::Optional<Section<Runtime>>({reflstr_start, reflstr_size})
-          : llvm::None,
         {assocty_start, assocty_size},
+        {builtin_start, builtin_size},
+        {typeref_start, typeref_size},
+        {reflstr_start, reflstr_size},
       });
     }
 
@@ -236,51 +241,53 @@ public:
 
       auto buffer = (uint8_t *)malloc(RemoteInfo.TotalSize);
 
-      if (!readBytes(RemoteInfo.StartAddress, buffer, RemoteInfo.TotalSize))
+      if (!readBytes(RemoteAddress(RemoteInfo.StartAddress), buffer,
+                     RemoteInfo.TotalSize))
         errorAndExit("Couldn't read reflection information");
 
       auto fieldmd_base
         = buffer + RemoteInfo.fieldmd.StartAddress - RemoteInfo.StartAddress;
+      auto assocty_base
+        = buffer + RemoteInfo.assocty.StartAddress - RemoteInfo.StartAddress;
+      auto builtin_base
+        = buffer + RemoteInfo.builtin.StartAddress - RemoteInfo.StartAddress;
       auto typeref_base
         = buffer + RemoteInfo.typeref.StartAddress - RemoteInfo.StartAddress;
       auto reflstr_base
-        = RemoteInfo.reflstr.hasValue()
-          ? buffer + RemoteInfo.reflstr.getValue().StartAddress
-             - RemoteInfo.StartAddress
-          : 0;
-      auto assocty_base
-        = buffer + RemoteInfo.assocty.StartAddress - RemoteInfo.StartAddress;
+        = buffer + RemoteInfo.reflstr.StartAddress - RemoteInfo.StartAddress;
       ReflectionInfo Info {
         RemoteInfo.ImageName,
         {fieldmd_base, fieldmd_base + RemoteInfo.fieldmd.Size},
-        {typeref_base, typeref_base + RemoteInfo.typeref.Size},
-        {reflstr_base, reflstr_base + (RemoteInfo.reflstr.hasValue()
-          ? RemoteInfo.reflstr.getValue().Size
-          : 0)},
         {assocty_base, assocty_base + RemoteInfo.assocty.Size},
+        {builtin_base, builtin_base + RemoteInfo.builtin.Size},
+        {typeref_base, typeref_base + RemoteInfo.typeref.Size},
+        {reflstr_base, reflstr_base + RemoteInfo.reflstr.Size},
       };
       Infos.push_back(Info);
     }
     return Infos;
   }
 
-  uint64_t getStringLength(StoredPointer Address) {
+  uint64_t getStringLength(RemoteAddress addr) {
     write(getParentWriteFD(), REQUEST_STRING_LENGTH, 2);
-    StoredPointer Length;
+    StoredPointer Address = addr.getAddressData();
     write(getParentWriteFD(), &Address, sizeof(Address));
+    StoredPointer Length;
     collectBytesFromPipe(&Length, sizeof(Length));
     return static_cast<uint64_t>(Length);
   }
 
-  std::string readString(addr_t Address) override {
+  bool readString(RemoteAddress Address, std::string &Dest) override {
     auto NameSize = getStringLength(Address);
     if (!NameSize)
-      return "";
+      return false;
 
     auto NameBuffer = std::unique_ptr<uint8_t>(new uint8_t[NameSize + 1]);
     if (!readBytes(Address, NameBuffer.get(), NameSize + 1))
-      return "";
-    return std::string(reinterpret_cast<const char *>(NameBuffer.get()));
+      return false;
+
+    Dest = reinterpret_cast<const char *>(NameBuffer.get());
+    return true;
   }
 };
 
@@ -289,48 +296,48 @@ template <typename Runtime>
 static int doDumpHeapInstance(std::string BinaryFilename) {
   using StoredPointer = typename Runtime::StoredPointer;
 
-  PipeMemoryReader<Runtime> Pipe;
+  auto Pipe = std::make_shared<PipeMemoryReader<Runtime>>();
 
-  pid_t pid = fork();
+  pid_t pid = _fork();
   switch (pid) {
     case -1:
       errorAndExit("Couldn't fork child process");
       exit(EXIT_FAILURE);
     case 0: { // Child:
-      close(Pipe.getParentWriteFD());
-      close(Pipe.getParentReadFD());
-      dup2(Pipe.getChildReadFD(), STDIN_FILENO);
-      dup2(Pipe.getChildWriteFD(), STDOUT_FILENO);
-      execv(BinaryFilename.c_str(), NULL);
+      close(Pipe->getParentWriteFD());
+      close(Pipe->getParentReadFD());
+      dup2(Pipe->getChildReadFD(), STDIN_FILENO);
+      dup2(Pipe->getChildWriteFD(), STDOUT_FILENO);
+      _execv(BinaryFilename.c_str(), NULL);
       exit(EXIT_SUCCESS);
     }
     default: { // Parent
-      close(Pipe.getChildReadFD());
-      close(Pipe.getChildWriteFD());
+      close(Pipe->getChildReadFD());
+      close(Pipe->getChildWriteFD());
 
       ReflectionContext<External<Runtime>> RC(Pipe);
 
-      uint8_t PointerSize = Pipe.receivePointerSize();
+      uint8_t PointerSize = Pipe->receivePointerSize();
       if (PointerSize != Runtime::PointerSize)
         errorAndExit("Child process had unexpected architecture");
 
-      StoredPointer instance = Pipe.receiveInstanceAddress();
+      StoredPointer instance = Pipe->receiveInstanceAddress();
       assert(instance);
       std::cout << "Parent: instance pointer in child address space: 0x";
       std::cout << std::hex << instance << std::endl;
 
       StoredPointer isa;
-      if (!Pipe.readInteger(instance, &isa))
+      if (!Pipe->readInteger(RemoteAddress(instance), &isa))
         errorAndExit("Couldn't get heap object's metadata address");
 
-      for (auto &Info : Pipe.receiveReflectionInfo())
+      for (auto &Info : Pipe->receiveReflectionInfo())
         RC.addReflectionInfo(Info);
 
       std::cout << "Parent: metadata pointer in child address space: 0x";
       std::cout << std::hex << isa << std::endl;
 
       std::cout << "Decoding type reference ..." << std::endl;
-      auto TR = RC.getTypeRef(isa);
+      auto TR = RC.readTypeFromMetadata(isa);
       TR->dump(std::cout, 0);
 
       auto Fields = RC.getFieldTypeRefs(isa);
@@ -343,8 +350,7 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
     }
   }
 
-  Pipe.sendExitMessage();
-
+  Pipe->sendExitMessage();
   return EXIT_SUCCESS;
 }
 
@@ -361,6 +367,7 @@ int main(int argc, char *argv[]) {
   std::string arch(argv[1]);
   std::string BinaryFilename(argv[2]);
 
+  // FIXME: get this from LLVM
   unsigned PointerSize = 0;
   if (arch == "x86_64")
     PointerSize = 8;

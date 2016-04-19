@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func f0<T>(x: T) {}
+func f0<T>(_ x: T) {}
 
 // FIXME: Lookup breaks if these come after f1!
 class A { 
@@ -10,7 +10,7 @@ class B : A {
   override init() { super.init() } 
 }
 
-func f1(a: A) -> A { return a }
-func f1(b: B) -> B { return b }
+func f1(_ a: A) -> A { return a }
+func f1(_ b: B) -> B { return b }
 
 f0(f1(B()))

@@ -1372,7 +1372,7 @@ public:
     auto nominal = ctorRef->getDecl()->getDeclContext()
                      ->getAsNominalTypeOrNominalTypeExtensionContext();
     bool useAllocatingCtor;
-    
+
     // Value types only have allocating initializers.
     if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
       useAllocatingCtor = true;
@@ -1406,7 +1406,11 @@ public:
       selfFormalType = CanMetatypeType::get(
           selfFormalType->getInOutObjectType()->getCanonicalType());
 
-      if (SGF.AllocatorMetatype)
+      // If the initializer is a C function imported as a member,
+      // there is no 'self' parameter. Mark it undef.
+      if (ctorRef->getDecl()->isImportAsMember())
+        self = SGF.emitUndef(expr, selfFormalType);
+      else if (SGF.AllocatorMetatype)
         self = emitCorrespondingSelfValue(
                  ManagedValue::forUnmanaged(SGF.AllocatorMetatype),
                  arg);
@@ -1440,7 +1444,8 @@ public:
     // that's the only thing that's witnessed. For classes,
     // this is the initializing constructor, to which we will dynamically
     // dispatch.
-    if (SelfParam.getSubstRValueType()->getRValueInstanceType()->is<ArchetypeType>()
+    if (SelfParam.getSubstRValueType()->getRValueInstanceType()
+          ->is<ArchetypeType>()
         && isa<ProtocolDecl>(ctorRef->getDecl()->getDeclContext())) {
       // Look up the witness for the constructor.
       auto constant = SILDeclRef(ctorRef->getDecl(),
@@ -1470,13 +1475,17 @@ public:
                   getSubstFnType(), fn));
     } else {
       // Directly call the peer constructor.
-      setCallee(Callee::forDirect(SGF,
-                                  SILDeclRef(ctorRef->getDecl(),
-                                             useAllocatingCtor
-                                               ? SILDeclRef::Kind::Allocator
-                                               : SILDeclRef::Kind::Initializer,
-                               SILDeclRef::ConstructAtBestResilienceExpansion),
-                                  getSubstFnType(useAllocatingCtor), fn));
+      setCallee(
+        Callee::forDirect(
+          SGF,
+          SILDeclRef(ctorRef->getDecl(),
+                     useAllocatingCtor
+                       ? SILDeclRef::Kind::Allocator
+                       : SILDeclRef::Kind::Initializer,
+                     SILDeclRef::ConstructAtBestResilienceExpansion,
+                     SILDeclRef::ConstructAtNaturalUncurryLevel,
+                     requiresForeignEntryPoint(ctorRef->getDecl())),
+            getSubstFnType(useAllocatingCtor), fn));
     }
 
     // Set up the substitutions, if we have any.
@@ -1785,11 +1794,16 @@ static std::pair<ManagedValue, ManagedValue>
 emitForeignErrorArgument(SILGenFunction &gen,
                          SILLocation loc,
                          SILParameterInfo errorParameter) {
-  // We assume that there's no interesting reabstraction here.
-  auto errorPtrType = errorParameter.getType();
+  // We assume that there's no interesting reabstraction here beyond a layer of
+  // optional.
+  OptionalTypeKind optKind;
+  CanType errorPtrType = errorParameter.getType();
+  CanType unwrappedPtrType = errorPtrType;
+  if (Type unwrapped = errorPtrType->getAnyOptionalObjectType(optKind))
+    unwrappedPtrType = unwrapped->getCanonicalType();
 
   PointerTypeKind ptrKind;
-  auto errorType = CanType(errorPtrType->getAnyPointerElementType(ptrKind));
+  auto errorType = CanType(unwrappedPtrType->getAnyPointerElementType(ptrKind));
   auto &errorTL = gen.getTypeLowering(errorType);
 
   // Allocate a temporary.
@@ -1807,8 +1821,14 @@ emitForeignErrorArgument(SILGenFunction &gen,
                                      AbstractionPattern(errorType),
                                      errorType);
   auto pointerValue = gen.emitLValueToPointer(loc, std::move(lvalue),
-                                              errorPtrType, ptrKind,
+                                              unwrappedPtrType, ptrKind,
                                               AccessKind::ReadWrite);
+
+  // Wrap up in an Optional if called for.
+  if (optKind != OTK_None) {
+    auto &optTL = gen.getTypeLowering(errorPtrType);
+    pointerValue = gen.getOptionalSomeValue(loc, pointerValue, optTL);
+  }
 
   return {managedErrorTemp, pointerValue};
 }
@@ -2317,7 +2337,7 @@ RValue SILGenFunction::emitApply(
       assert(lifetimeExtendedSelf
              && "did not save lifetime-extended self param");
       if (!hasAlreadyLifetimeExtendedSelf) {
-        B.createAutoreleaseValue(loc, lifetimeExtendedSelf);
+        B.createAutoreleaseValue(loc, lifetimeExtendedSelf, Atomicity::Atomic);
         hasAlreadyLifetimeExtendedSelf = true;
       }
       SWIFT_FALLTHROUGH;

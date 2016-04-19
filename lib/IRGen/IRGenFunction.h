@@ -230,8 +230,10 @@ public:
 
   // Routines that are generic over the reference-counting style:
   //   - strong references
-  void emitStrongRetain(llvm::Value *value, ReferenceCounting refcounting);
-  void emitStrongRelease(llvm::Value *value, ReferenceCounting refcounting);
+  void emitStrongRetain(llvm::Value *value, ReferenceCounting refcounting,
+                        Atomicity atomicity);
+  void emitStrongRelease(llvm::Value *value, ReferenceCounting refcounting,
+                         Atomicity atomicity);
   llvm::Value *emitLoadRefcountedPtr(Address addr, ReferenceCounting style);
 
   //   - unowned references
@@ -282,8 +284,10 @@ public:
   //   - strong references
   void emitNativeStrongAssign(llvm::Value *value, Address addr);
   void emitNativeStrongInit(llvm::Value *value, Address addr);
-  void emitNativeStrongRetain(llvm::Value *value);
-  void emitNativeStrongRelease(llvm::Value *value);
+  void emitNativeStrongRetain(llvm::Value *value,
+                              Atomicity atomicity = Atomicity::Atomic);
+  void emitNativeStrongRelease(llvm::Value *value,
+                               Atomicity atomicity = Atomicity::Atomic);
   void emitNativeSetDeallocating(llvm::Value *value);
   //   - unowned references
   void emitNativeUnownedRetain(llvm::Value *value);
@@ -311,8 +315,8 @@ public:
   void emitNativeWeakCopyAssign(Address destAddr, Address srcAddr);
   void emitNativeWeakTakeAssign(Address destAddr, Address srcAddr);
   //   - other operations
-  llvm::Value *emitNativeTryPin(llvm::Value *object);
-  void emitNativeUnpin(llvm::Value *handle);
+  llvm::Value *emitNativeTryPin(llvm::Value *object, Atomicity atomicity);
+  void emitNativeUnpin(llvm::Value *handle, Atomicity atomicity);
 
   // Routines for the ObjC reference-counting style.
   void emitObjCStrongRetain(llvm::Value *value);
@@ -326,8 +330,10 @@ public:
   // Routines for an unknown reference-counting style (meaning,
   // dynamically something compatible with either the ObjC or Swift styles).
   //   - strong references
-  void emitUnknownStrongRetain(llvm::Value *value);
-  void emitUnknownStrongRelease(llvm::Value *value);
+  void emitUnknownStrongRetain(llvm::Value *value,
+                               Atomicity atomicity = Atomicity::Atomic);
+  void emitUnknownStrongRelease(llvm::Value *valuei,
+                                Atomicity atomicity = Atomicity::Atomic);
   //   - unowned references
   void emitUnknownUnownedInit(llvm::Value *val, Address dest);
   void emitUnknownUnownedAssign(llvm::Value *value, Address dest);
@@ -350,8 +356,8 @@ public:
   llvm::Value *emitUnknownWeakTakeStrong(Address src, llvm::Type *type);
 
   // Routines for the Builtin.NativeObject reference-counting style.
-  void emitBridgeStrongRetain(llvm::Value *value);
-  void emitBridgeStrongRelease(llvm::Value *value);
+  void emitBridgeStrongRetain(llvm::Value *value, Atomicity atomicity);
+  void emitBridgeStrongRelease(llvm::Value *value, Atomicity atomicity);
 
   // Routines for the ErrorType reference-counting style.
   void emitErrorStrongRetain(llvm::Value *value);

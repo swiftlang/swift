@@ -16,7 +16,7 @@ class Evaluator
         map[2] = { Problem2().run() }
     }
 
-    func evaluate(n: Int)
+    func evaluate(_ n: Int)
     {
         if let problemBlock = map[n]
         {

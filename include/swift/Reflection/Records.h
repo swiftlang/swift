@@ -22,6 +22,8 @@
 namespace swift {
 namespace reflection {
 
+// Field records describe the type of a single stored property or case member
+// of a class, struct or enum.
 class FieldRecordFlags {
   using int_type = uint32_t;
   enum : int_type {
@@ -52,6 +54,11 @@ class FieldRecord {
 
 public:
   FieldRecord() = delete;
+
+  bool hasMangledTypeName() const {
+    return MangledTypeName;
+  }
+
   std::string getMangledTypeName() const {
     return MangledTypeName.get();
   }
@@ -92,6 +99,8 @@ struct FieldRecordIterator {
   }
 };
 
+// Field descriptors contain a collection of field records for a single
+// class, struct or enum declaration.
 struct FieldDescriptor {
   const FieldRecord *getFieldRecordBuffer() const {
     return reinterpret_cast<const FieldRecord *>(this + 1);
@@ -122,6 +131,37 @@ public:
   }
 };
 
+class FieldDescriptorIterator
+  : public std::iterator<std::forward_iterator_tag, FieldDescriptor> {
+public:
+  const void *Cur;
+  const void * const End;
+  FieldDescriptorIterator(const void *Cur, const void * const End)
+    : Cur(Cur), End(End) {}
+
+  const FieldDescriptor &operator*() const {
+    return *reinterpret_cast<const FieldDescriptor *>(Cur);
+  }
+
+  FieldDescriptorIterator &operator++() {
+    const auto &FR = this->operator*();
+    const void *Next = reinterpret_cast<const char *>(Cur)
+      + sizeof(FieldDescriptor) + FR.NumFields * FR.FieldRecordSize;
+    Cur = Next;
+    return *this;
+  }
+
+  bool operator==(FieldDescriptorIterator const &other) const {
+    return Cur == other.Cur && End == other.End;
+  }
+
+  bool operator!=(FieldDescriptorIterator const &other) const {
+    return !(*this == other);
+  }
+};
+
+// Associated type records describe the mapping from an associated
+// type to the type witness of a conformance.
 class AssociatedTypeRecord {
   const RelativeDirectPointer<const char> Name;
   const RelativeDirectPointer<const char> SubstitutedTypeName;
@@ -174,6 +214,8 @@ struct AssociatedTypeRecordIterator {
   }
 };
 
+// An associated type descriptor contains a collection of associated
+// type records for a conformance.
 struct AssociatedTypeDescriptor {
   const RelativeDirectPointer<const char> ConformingTypeName;
   const RelativeDirectPointer<const char> ProtocolTypeName;
@@ -238,35 +280,49 @@ public:
   }
 };
 
-class FieldDescriptorIterator
-  : public std::iterator<std::forward_iterator_tag, FieldDescriptor> {
+// Builtin type records describe basic layout information about
+// any builtin types referenced from the other sections.
+class BuiltinTypeDescriptor {
+  const RelativeDirectPointer<const char> TypeName;
+
+public:
+  uint32_t Size;
+  uint32_t Alignment;
+  uint32_t Stride;
+  uint32_t NumExtraInhabitants;
+
+  std::string getMangledTypeName() const {
+    return TypeName.get();
+  }
+};
+
+class BuiltinTypeDescriptorIterator
+  : public std::iterator<std::forward_iterator_tag, BuiltinTypeDescriptor> {
 public:
   const void *Cur;
   const void * const End;
-  FieldDescriptorIterator(const void *Cur, const void * const End)
+  BuiltinTypeDescriptorIterator(const void *Cur, const void * const End)
     : Cur(Cur), End(End) {}
 
-  const FieldDescriptor &operator*() const {
-    return *reinterpret_cast<const FieldDescriptor *>(Cur);
+  const BuiltinTypeDescriptor &operator*() const {
+    return *reinterpret_cast<const BuiltinTypeDescriptor *>(Cur);
   }
 
-  FieldDescriptorIterator &operator++() {
-    const auto &FR = this->operator*();
+  BuiltinTypeDescriptorIterator &operator++() {
     const void *Next = reinterpret_cast<const char *>(Cur)
-      + sizeof(FieldDescriptor) + FR.NumFields * FR.FieldRecordSize;
+      + sizeof(BuiltinTypeDescriptor);
     Cur = Next;
     return *this;
   }
 
-  bool operator==(FieldDescriptorIterator const &other) const {
+  bool operator==(BuiltinTypeDescriptorIterator const &other) const {
     return Cur == other.Cur && End == other.End;
   }
 
-  bool operator!=(FieldDescriptorIterator const &other) const {
+  bool operator!=(BuiltinTypeDescriptorIterator const &other) const {
     return !(*this == other);
   }
 };
-
 
 } // end namespace reflection
 } // end namespace swift

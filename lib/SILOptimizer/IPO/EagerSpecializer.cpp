@@ -273,6 +273,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
     ++SubIt;
   }
   assert(SubIt == SubEnd && "Too many substitutions.");
+  (void) SubEnd;
 
   // 2. Convert call arguments, casting and adjusting for calling convention.
 
@@ -441,7 +442,8 @@ static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
   
   // Create a specialized function.
   GenericFuncSpecializer
-        FuncSpecializer(GenericFunc, SA.getSubstitutions(), ReInfo);
+        FuncSpecializer(GenericFunc, SA.getSubstitutions(),
+                        GenericFunc->isFragile(), ReInfo);
 
   SILFunction *NewFunc = FuncSpecializer.trySpecialization();
   if (!NewFunc)

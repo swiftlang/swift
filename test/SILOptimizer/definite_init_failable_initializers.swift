@@ -306,7 +306,7 @@ extension FailableAddrOnlyStruct {
 // Structs with throwing initializers
 ////
 
-func unwrap(x: Int) throws -> Int { return x }
+func unwrap(_ x: Int) throws -> Int { return x }
 
 struct ThrowStruct {
   var x: Canary
@@ -1507,7 +1507,7 @@ extension P2 {
 // self.dynamicType with uninitialized self
 ////
 
-func use(a : Any) {}
+func use(_ a : Any) {}
 
 class DynamicTypeBase {
   var x: Int

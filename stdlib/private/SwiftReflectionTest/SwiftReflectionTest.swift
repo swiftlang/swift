@@ -29,7 +29,7 @@ let RequestStringLength = "l"
 let RequestExit = "e"
 let RequestPointerSize = "p"
 
-internal func debugLog(message: String) {
+internal func debugLog(_ message: String) {
 #if DEBUG_LOG
   fputs("Child: \(message)\n", stderr)
   fflush(stderr)
@@ -68,11 +68,11 @@ internal struct ReflectionInfo : Sequence {
   /// type requirements.
   internal let assocty: Section
 
-  internal func makeIterator() -> AnyIterator<Section> {
+  internal func makeIterator() -> AnyIterator<Section?> {
     return AnyIterator([
       fieldmd,
       typeref,
-      reflstr ?? Section(startAddress: nil, size: 0),
+      reflstr,
       assocty
     ].makeIterator())
   }
@@ -91,18 +91,14 @@ typealias MachHeader = mach_header
 ///   image.
 /// - Returns: A `Section` containing the address and size, or `nil` if there
 ///   is no section by the given name.
-internal func getSectionInfo(name: String,
+internal func getSectionInfo(_ name: String,
   _ imageHeader: UnsafePointer<MachHeader>) -> Section? {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
-  var section: Section? = nil
-  name.withCString {
-    var size: UInt = 0
-    let address = getsectiondata(imageHeader, "__DATA", $0, &size)
-    guard address != nil else { return }
-    guard size != 0 else { return }
-    section = Section(startAddress: address, size: size)
-  }
-  return section
+  var size: UInt = 0
+  let address = getsectiondata(imageHeader, "__DATA", name, &size)
+  guard let nonNullAddress = address else { return nil }
+  guard size != 0 else { return nil }
+  return Section(startAddress: nonNullAddress, size: size)
 }
 
 /// Get the Swift Reflection section locations for a loaded image.
@@ -160,7 +156,7 @@ internal func sendAddress(of instance: AnyObject) {
 }
 
 /// Send the `value`'s bits to the parent.
-internal func sendValue<T>(value: T) {
+internal func sendValue<T>(_ value: T) {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   var value = value
   sendBytes(from: &value, count: sizeof(T.self))
@@ -193,8 +189,8 @@ internal func sendReflectionInfos() {
     fwrite(imageNameBytes, 1, imageNameBytes.count, stdout)
     fflush(stdout)
     for section in info {
-      sendValue(section.startAddress)
-      sendValue(section.size)
+      sendValue(section?.startAddress)
+      sendValue(section?.size ?? 0)
     }
   }
 }
@@ -267,7 +263,7 @@ internal func sendPointerSize() {
 /// - Get the pointer size of this process, which affects assumptions about the
 ///   the layout of runtime structures with pointer-sized fields.
 /// - Read raw bytes out of this process's address space.
-public func reflect(instance: AnyObject) {
+public func reflect(_ instance: AnyObject) {
   while let command = readLine(strippingNewline: true) {
     switch command {
     case String(validatingUTF8: RequestInstanceAddress)!:
