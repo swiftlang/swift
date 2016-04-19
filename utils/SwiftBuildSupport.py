@@ -67,6 +67,7 @@ SWIFT_BUILD_ROOT = os.environ.get(
 
 def print_with_argv0(message):
     print(sys.argv[0] + ": " + message)
+    sys.stdout.flush()
 
 
 def quote_shell_command(args):
@@ -82,6 +83,7 @@ def check_call(args, print_command=False, verbose=False, disable_sleep=False):
 
     if print_command:
         print(os.getcwd() + "$ " + quote_shell_command(args))
+        sys.stdout.flush()
     try:
         return subprocess.check_call(args)
     except subprocess.CalledProcessError as e:
@@ -101,6 +103,7 @@ def check_call(args, print_command=False, verbose=False, disable_sleep=False):
 def check_output(args, print_command=False, verbose=False):
     if print_command:
         print(os.getcwd() + "$ " + quote_shell_command(args))
+        sys.stdout.flush()
     try:
         return subprocess.check_output(args)
     except subprocess.CalledProcessError as e:

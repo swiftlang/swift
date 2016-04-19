@@ -41,10 +41,11 @@ def _print_command(dry_run, command, env=None, prompt="+ "):
     if env is not None:
         output += ['env'] + [_quote("%s=%s" % (k, v)) for k, v in env]
     output += [_quote(arg) for arg in command]
-    file = None
-    if not dry_run:
-        file = sys.stderr
+    file = sys.stderr
+    if dry_run:
+        file = sys.stdout
     print(prompt + ' '.join(output), file=file)
+    file.flush()
 
 
 def call(command, stderr=None, env=None, dry_run=None):
