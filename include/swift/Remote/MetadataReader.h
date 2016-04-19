@@ -328,13 +328,20 @@ public:
   using StoredSize = typename Runtime::StoredSize;
 
 private:
+  /// A cache of built types, keyed by the address of the type.
   std::unordered_map<StoredPointer, BuiltType> TypeCache;
-  std::unordered_map<StoredPointer, SharedTargetMetadataRef<Runtime>>
-  MetadataCache;
 
-  std::unordered_map<StoredPointer,
-                     std::pair<SharedTargetNominalTypeDescriptorRef<Runtime>,
-                               StoredPointer>>
+  using SharedMetadataRef = SharedTargetMetadataRef<Runtime>;
+
+  /// A cache of read type metadata, keyed by the address of the metadata.
+  std::unordered_map<StoredPointer, SharedMetadataRef> MetadataCache;
+
+  using SharedNominalTypeDescriptorRef =
+    SharedTargetNominalTypeDescriptorRef<Runtime>;
+
+  /// A cache of read nominal type descriptors, keyed by the address of the
+  /// nominal type descriptor.
+  std::unordered_map<StoredPointer, SharedNominalTypeDescriptorRef>
     NominalTypeDescriptorCache;
 
 public:
@@ -488,6 +495,25 @@ public:
     }
   }
 
+  /// Given the address of a nominal type descriptor, attempt to resolve
+  /// its nominal type declaration.
+  BuiltNominalTypeDecl readNominalTypeFromDescriptor(StoredPointer address) {
+    auto descriptor = readNominalTypeDescriptor(address);
+    if (!descriptor)
+      return BuiltNominalTypeDecl();
+
+    auto nameAddress
+      = resolveRelativeOffset<int32_t>(address +
+                                       descriptor->offsetToNameOffset());
+    std::string mangledName;
+    if (!Reader->readString(RemoteAddress(nameAddress), mangledName))
+      return BuiltNominalTypeDecl();
+
+    BuiltNominalTypeDecl decl =
+      Builder.createNominalTypeDecl(std::move(mangledName));
+    return decl;
+  }
+
 protected:
   template<typename Offset>
   StoredPointer resolveRelativeOffset(StoredPointer targetAddress) {
@@ -590,11 +616,7 @@ private:
   }
 
   std::pair<SharedTargetNominalTypeDescriptorRef<Runtime>, StoredPointer>
-  readNominalTypeDescriptor(StoredPointer MetadataAddress) {
-    auto Cached = NominalTypeDescriptorCache.find(MetadataAddress);
-    if (Cached != NominalTypeDescriptorCache.end())
-      return Cached->second;
-
+  readNominalTypeDescriptorFromMetadata(StoredPointer MetadataAddress) {
     auto Meta = readMetadata(MetadataAddress);
     StoredPointer DescriptorAddress;
 
@@ -625,26 +647,30 @@ private:
         return {nullptr, 0};
     }
 
-    auto Size = sizeof(TargetNominalTypeDescriptor<Runtime>);
-    auto Buffer = (uint8_t *)malloc(Size);
-    if (!Reader->readBytes(RemoteAddress(DescriptorAddress), Buffer, Size)) {
-      free(Buffer);
-      return {nullptr, 0};
+    return { readNominalTypeDescriptor(DescriptorAddress), DescriptorAddress };
+  }
+
+  /// Given the address of a nominal type descriptor, attempt to read it.
+  SharedTargetNominalTypeDescriptorRef<Runtime>
+  readNominalTypeDescriptor(StoredPointer descriptorAddress) {
+    auto cached = NominalTypeDescriptorCache.find(descriptorAddress);
+    if (cached != NominalTypeDescriptorCache.end())
+      return cached->second;
+
+    auto size = sizeof(TargetNominalTypeDescriptor<Runtime>);
+    auto buffer = (uint8_t *)malloc(size);
+    if (!Reader->readBytes(RemoteAddress(descriptorAddress), buffer, size)) {
+      free(buffer);
+      return nullptr;
     }
 
-    auto Casted
-      = reinterpret_cast<TargetNominalTypeDescriptor<Runtime> *>(Buffer);
+    auto casted
+      = reinterpret_cast<TargetNominalTypeDescriptor<Runtime> *>(buffer);
+    auto descriptor
+      = SharedTargetNominalTypeDescriptorRef<Runtime>(casted, free);
 
-    auto Descriptor
-      = SharedTargetNominalTypeDescriptorRef<Runtime>(Casted, free);
-
-    std::pair<SharedTargetNominalTypeDescriptorRef<Runtime>, StoredPointer>
-    Result = {
-      Descriptor,
-      DescriptorAddress
-    };
-    NominalTypeDescriptorCache.insert({MetadataAddress, Result});
-    return Result;
+    NominalTypeDescriptorCache.insert({descriptorAddress, descriptor});
+    return descriptor;
   }
 
   SharedProtocolDescriptorRef<Runtime>
@@ -674,7 +700,7 @@ private:
       StoredPointer DescriptorAddress;
       SharedTargetNominalTypeDescriptorRef<Runtime> Descriptor;
       std::tie(Descriptor, DescriptorAddress)
-        = readNominalTypeDescriptor(MetadataAddress);
+        = readNominalTypeDescriptorFromMetadata(MetadataAddress);
       std::vector<BuiltType> Substitutions;
       auto OffsetToParent
         = sizeof(StoredPointer) * (Descriptor->GenericParams.Offset - 1);
@@ -695,7 +721,7 @@ private:
     StoredPointer DescriptorAddress;
     SharedTargetNominalTypeDescriptorRef<Runtime> Descriptor;
     std::tie(Descriptor, DescriptorAddress)
-      = readNominalTypeDescriptor(MetadataAddress);
+      = readNominalTypeDescriptorFromMetadata(MetadataAddress);
     std::vector<BuiltType> Substitutions;
     auto NumGenericParams = Descriptor->GenericParams.NumPrimaryParams;
     auto OffsetToGenericArgs
@@ -723,7 +749,7 @@ private:
     StoredPointer DescriptorAddress;
     SharedTargetNominalTypeDescriptorRef<Runtime> Descriptor;
     std::tie(Descriptor, DescriptorAddress)
-      = readNominalTypeDescriptor(MetadataAddress);
+      = readNominalTypeDescriptorFromMetadata(MetadataAddress);
     if (!Descriptor)
       return BuiltType();
 
