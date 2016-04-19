@@ -12,6 +12,8 @@
 
 #include "swift/Reflection/MetadataSource.h"
 
+#include <sstream>
+
 using namespace swift;
 using namespace reflection;
 
@@ -79,11 +81,50 @@ public:
   }
 };
 
+class MetadataSourceEncoder
+  : public MetadataSourceVisitor<MetadataSourceEncoder> {
+  std::stringstream OS;
+  bool Finalized  = false;
+public:
+  void
+  visitClosureBindingMetadataSource(const ClosureBindingMetadataSource *CB) {
+    OS << 'M';
+    OS << CB->getIndex();
+  }
+
+  void
+  visitReferenceCaptureMetadataSource(const ReferenceCaptureMetadataSource *RC){
+    OS << 'R';
+    OS << RC->getIndex();
+  }
+
+  void
+  visitGenericArgumentMetadataSource(const GenericArgumentMetadataSource *GA) {
+    OS << 'G';
+    OS << GA->getIndex();
+    visit(GA->getSource());
+    OS << '_';
+  }
+
+  std::string finalize() {
+    assert(!Finalized && "Attempted to reuse finalized MetadataSourceEncoder");
+    Finalized = true;
+    return OS.str();
+  }
+};
+
 void MetadataSource::dump() const {
   dump(std::cerr, 0);
 }
 
 void MetadataSource::dump(std::ostream &OS, unsigned Indent) const {
   PrintMetadataSource(OS, Indent).visit(this);
+  OS << std::endl;
+}
+
+std::string MetadataSource::encode() const {
+  MetadataSourceEncoder Encoder;
+  Encoder.visit(this);
+  return Encoder.finalize();
 }
 
