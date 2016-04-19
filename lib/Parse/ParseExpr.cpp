@@ -1132,6 +1132,12 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   break;
 #include "swift/Parse/Tokens.def"
 
+#define POUND_OLD_OBJECT_LITERAL(Name, NewName, NewArg, OldArg)\
+  case tok::pound_##Name:\
+  Result = parseExprObjectLiteral(ObjectLiteralExpr::NewName, "#" #NewName);\
+  break;
+#include "swift/Parse/Tokens.def"
+
   case tok::code_complete:
     Result = makeParserResult(new (Context) CodeCompletionExpr(Tok.getRange()));
     Result.setHasCodeCompletion();
@@ -2322,7 +2328,9 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
 /// expr-literal:
 ///   '#' identifier expr-paren
 ParserResult<Expr>
-Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind) {
+Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
+                               StringRef NewName) {
+  auto PoundTok = Tok;
   SourceLoc PoundLoc = consumeToken();
   // Parse a tuple of args
   if (!Tok.is(tok::l_paren)) {
@@ -2337,6 +2345,43 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind) {
   if (Arg.isParseError()) {
     return makeParserError();
   }
+  // If the legacy name was used (e.g., #Image instead of #imageLiteral)
+  // prompt an error and a fixit.
+  if (!NewName.empty()) {
+    auto diag =
+      diagnose(PoundTok, diag::object_literal_legacy_name, 
+               PoundTok.getText(), NewName);
+    auto Range = PoundTok.getRange();
+    
+    // Create a FixIt for the keyword.
+    diag.fixItReplaceChars(Range.getStart(), Range.getEnd(), NewName);
+
+    // Try and construct a FixIt for the argument label.
+    if (TupleExpr *TE = dyn_cast_or_null<TupleExpr>(Arg.get())) {
+      auto ArgLoc = TE->getElementNameLoc(0);
+      auto FirstElementName = TE->getElementName(0);
+            
+      if (ArgLoc.isValid() && !FirstElementName.empty()) { 
+        auto OldArg = FirstElementName.str();
+        auto NewArg =
+          llvm::StringSwitch<StringRef>(OldArg)
+#define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)\
+            .Case(#old_arg, #new_arg)
+#include "swift/Parse/Tokens.def"
+            .Default("");
+       
+        if (!NewArg.empty()) {    
+          auto Loc = TE->getElementNameLoc(0);
+          diag.fixItReplaceChars(Loc,
+                                 Loc.getAdvancedLocOrInvalid(OldArg.size()),
+                                 NewArg);
+        }
+      }
+    }
+    
+    return makeParserError();
+  }
+
   return makeParserResult(
     new (Context) ObjectLiteralExpr(PoundLoc, LitKind, Arg.get(),
                                     /*implicit=*/false));

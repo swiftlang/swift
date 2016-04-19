@@ -50,6 +50,12 @@
 #define POUND_OBJECT_LITERAL(kw, desc, proto) POUND_KEYWORD(kw)
 #endif
 
+/// POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)
+///   Every keyword in the #foo namespace representing an object literal.
+#ifndef POUND_OLD_OBJECT_LITERAL
+#define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg) POUND_KEYWORD(kw)
+#endif
+
 /// POUND_CONFIG(kw)
 ///   Every keyword in the #foo namespace representing a configuration.
 #ifndef POUND_CONFIG
@@ -192,13 +198,16 @@ POUND_KEYWORD(selector)
 // Keywords in the # namespace that are build configurations.
 POUND_CONFIG(available)
 
-// FIXME: It feels like a layering violation to mention the protocol
-// kind and description here, but essentially there is a single
-// delcarative way to specify the shape of object literals, their
-// descriptive text, and their protocols.
+
+// Declaratively define object literals, including their
+// corresponding protocols.
 POUND_OBJECT_LITERAL(fileLiteral, "file reference", FileReferenceLiteralConvertible)
 POUND_OBJECT_LITERAL(imageLiteral, "image", ImageLiteralConvertible)
 POUND_OBJECT_LITERAL(colorLiteral, "color", ColorLiteralConvertible)
+
+POUND_OLD_OBJECT_LITERAL(FileReference, fileLiteral, fileReferenceLiteral, resourceName)
+POUND_OLD_OBJECT_LITERAL(Image, imageLiteral, imageLiteral, resourceName)
+POUND_OLD_OBJECT_LITERAL(Color, colorLiteral, colorLiteralRed, red)
 
 POUND_KEYWORD(file)
 POUND_KEYWORD(column)
@@ -214,4 +223,5 @@ POUND_KEYWORD(dsohandle)
 #undef POUND_KEYWORD
 #undef POUND_NORMAL_KEYWORD
 #undef POUND_OBJECT_LITERAL
+#undef POUND_OLD_OBJECT_LITERAL
 #undef POUND_CONFIG

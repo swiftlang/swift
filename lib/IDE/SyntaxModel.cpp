@@ -102,6 +102,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 
 #define POUND_NORMAL_KEYWORD(Name) case tok::pound_##Name:
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:
+#define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) case tok::pound_##Name:
 #include "swift/Parse/Tokens.def"    
         Kind = SyntaxNodeKind::Keyword;
         break;

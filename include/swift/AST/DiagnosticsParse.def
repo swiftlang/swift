@@ -1043,6 +1043,8 @@ ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
 // Object literal expressions
 ERROR(expected_arg_list_in_object_literal,none,
       "expected argument list in object literal", ())
+ERROR(object_literal_legacy_name,none,
+      "'%0' has been renamed to '%1", (StringRef, StringRef))
 
 // If expressions
 ERROR(expected_expr_after_if_question,none,
