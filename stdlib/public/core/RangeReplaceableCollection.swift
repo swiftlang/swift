@@ -23,28 +23,60 @@ public protocol RangeReplaceableIndexable : Indexable {
   // This protocol is almost an implementation detail of the standard
   // library.
 
+  /// Creates an empty instance.
   init()
 
+  /// Construct a Collection of `count` elements, each initialized to
+  /// `repeatedValue`.
   init(repeating repeatedValue: _Element, count: Int)
 
+  /// Creates an instance containing `elements`.
   init<
     S : Sequence where S.Iterator.Element == _Element
   >(_ elements: S)
 
+  /// Replace the given `subRange` of elements with `newElements`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`subRange.count`) if
+  ///   `subRange.upperBound == self.endIndex` and `newElements.isEmpty`,
+  ///   O(`self.count` + `newElements.count`) otherwise.
   mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == _Element
   >(
     _ subRange: Range<Index>, with newElements: C
   )
 
+  /// Insert `newElement` at index `i`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`self.count`).
   mutating func insert(_ newElement: _Element, at i: Index)
 
+  /// Insert `newElements` at index `i`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`self.count + newElements.count`).
   mutating func insert<
     S : Collection where S.Iterator.Element == _Element
   >(contentsOf newElements: S, at i: Index)
 
+  /// Remove the element at index `i`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`self.count`).
+  @discardableResult
   mutating func remove(at i: Index) -> _Element
 
+  /// Remove all elements within `bounds`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`self.count`).
   mutating func removeSubrange(_ bounds: Range<Index>)
 }
 
@@ -55,7 +87,7 @@ public protocol RangeReplaceableCollection
 {
   //===--- Fundamental Requirements ---------------------------------------===//
 
-  /// Create an empty instance.
+  /// Creates an empty instance.
   init()
 
   /// Replace the given `subRange` of elements with `newElements`.
@@ -113,7 +145,7 @@ public protocol RangeReplaceableCollection
   /// `repeatedValue`.
   init(repeating repeatedValue: Iterator.Element, count: Int)
 
-  /// Creates a collection instance that contains `elements`.
+  /// Creates an instance containing `elements`.
   init<
     S : Sequence where S.Iterator.Element == Iterator.Element
   >(_ elements: S)
