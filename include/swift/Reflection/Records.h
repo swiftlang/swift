@@ -99,6 +99,12 @@ struct FieldRecordIterator {
   }
 };
 
+enum class FieldDescriptorKind : uint16_t {
+  Struct,
+  Class,
+  Enum
+};
+
 // Field descriptors contain a collection of field records for a single
 // class, struct or enum declaration.
 class FieldDescriptor {
@@ -111,8 +117,9 @@ class FieldDescriptor {
 public:
   FieldDescriptor() = delete;
 
+  const FieldDescriptorKind Kind;
+  const uint16_t FieldRecordSize;
   const uint32_t NumFields;
-  const uint32_t FieldRecordSize;
 
   using const_iterator = FieldRecordIterator;
 
