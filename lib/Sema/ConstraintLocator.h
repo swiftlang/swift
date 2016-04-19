@@ -606,7 +606,7 @@ public:
   /// Attempt to simplify this locator to a single expression.
   Expr *trySimplifyToExpr() const;
 
-  /// Retrive the last element in the path, if there is one.
+  /// Retrieve the last element in the path, if there is one.
   Optional<LocatorPathElt> last() const {
     // If we stored a path element here, grab it.
     if (element) return *element;
