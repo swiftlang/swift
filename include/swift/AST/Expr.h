@@ -868,6 +868,9 @@ public:
     return SourceRange(PoundLoc, Arg->getEndLoc());
   }
 
+  /// Return the string form of the literal name.
+  StringRef getLiteralKindRawName() const;
+
   StringRef getLiteralKindPlainName() const;
 
   static bool classof(const Expr *E) {

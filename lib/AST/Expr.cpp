@@ -844,6 +844,14 @@ StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
       unicode::isSingleExtendedGraphemeCluster(Val);
 }
 
+StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
+  switch (LitKind) {
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return #Name;
+#include "swift/Parse/Tokens.def"    
+  }
+  llvm_unreachable("unspecified literal");
+}
+
 StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
   switch (LitKind) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return Desc;

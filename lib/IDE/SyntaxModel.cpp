@@ -489,7 +489,12 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::ObjectLiteralExpression;
     SN.Range = charSourceRangeFromSourceRange(SM, ObjectE->getSourceRange());
-    SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, ObjectE->getSourceRange());
+    SourceLoc NRStart = ObjectE->getSourceLoc().getAdvancedLoc(1);    
+    SourceLoc NREnd =
+      NRStart.getAdvancedLoc(ObjectE->getLiteralKindRawName().size());
+    SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
+    SN.BodyRange =
+      innerCharSourceRangeFromSourceRange(SM, ObjectE->getSourceRange());
     pushStructureNode(SN, E);
 
   } else if (auto *ArrayE = dyn_cast<ArrayExpr>(E)) {
