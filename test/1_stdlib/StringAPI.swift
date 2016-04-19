@@ -268,7 +268,6 @@ StringTests.test("hasPrefix,hasSuffix")
 }
 
 StringTests.test("Failures{hasPrefix,hasSuffix}-CF")
-  .xfail(.custom({ true }, reason: "rdar://problem/19034601"))
   .skip(.nativeRuntime(
     "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
   .code {

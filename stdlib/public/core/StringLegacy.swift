@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
 
 extension String {
   /// Construct an instance that is the concatenation of `count` copies
@@ -74,9 +75,20 @@ func _stdlib_NSStringHasSuffixNFDPointer(_ theString: OpaquePointer, _ suffix: O
 extension String {
   /// Returns `true` iff `self` begins with `prefix`.
   public func hasPrefix(_ prefix: String) -> Bool {
-    if self._core.hasContiguousStorage && prefix._core.hasContiguousStorage {
-      let lhsStr = _NSContiguousString(self._core)
-      let rhsStr = _NSContiguousString(prefix._core)
+    let selfCore = self._core
+    let prefixCore = prefix._core
+    if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
+      if selfCore.isASCII && prefixCore.isASCII {
+        // Prefix longer than self.
+        let prefixCount = prefixCore.count
+        if prefixCount > selfCore.count || prefixCount == 0 {
+          return false
+        }
+        return Int(_swift_stdlib_memcmp(
+          selfCore.startASCII, prefixCore.startASCII, prefixCount)) == 0
+      }
+      let lhsStr = _NSContiguousString(selfCore)
+      let rhsStr = _NSContiguousString(prefixCore)
       return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
         return _stdlib_NSStringHasPrefixNFDPointer($0, $1)
       }
