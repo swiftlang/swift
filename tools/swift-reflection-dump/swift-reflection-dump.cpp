@@ -98,7 +98,7 @@ static int doDumpReflectionSections(std::string binaryFilename,
   OwningBinary<Binary> binaryOwner;
   std::unique_ptr<llvm::object::ObjectFile> objectOwner;
 
-  auto Expected = std::move(llvm::object::createBinary(binaryFilename));
+  auto Expected = llvm::object::createBinary(binaryFilename);
   if (!Expected) {
     std::cerr << "Could not create binary for " << binaryFilename;
     return EXIT_FAILURE;
