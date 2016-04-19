@@ -19,14 +19,11 @@
 
 #include "swift/Basic/Demangle.h"
 #include "swift/Reflection/Records.h"
-#include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Remote/MetadataReader.h"
 
 using namespace swift;
 using namespace reflection;
-
-TypeRefBuilder::TypeRefBuilder() : TC(*this) {}
 
 const AssociatedTypeDescriptor * TypeRefBuilder::
 lookupAssociatedTypes(const std::string &MangledTypeName,
