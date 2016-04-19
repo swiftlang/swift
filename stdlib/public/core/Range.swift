@@ -367,8 +367,8 @@ extension RangeProtocol where Bound : Strideable, Bound.Stride : Integer {
   ///
   /// - Precondition: an equivalent range is representable as an
   ///   instance of `Self`.  For example, `Range(0...Int.max)`
-  ///   violates this precondition because `Range<Int>` is half-open
-  ///   and would need an `upperBound` equal to `Int.max + 1`, which
+  ///   violates this precondition because an equivalent `Range<Int>`
+  ///   would need an `upperBound` equal to `Int.max + 1`, which
   ///   is unrepresentable as an `Int`.
   @inline(__always)
   public init<
