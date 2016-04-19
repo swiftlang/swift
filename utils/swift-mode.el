@@ -219,6 +219,16 @@ otherwise."
 present, returning t if so and nil otherwise."
   (swift-skip-re swift-identifier-re))
 
+(defun swift-skip-simple-type-name ()
+  "Hop over a chain of the form identifier
+generic-parameter-list? ( `.' identifier generic-parameter-list?
+)*, returning t if the initial identifier was found and nil otherwise."
+  (when (swift-skip-identifier)
+    (swift-skip-generic-parameter-list)
+    (when (swift-skip-re "\\.")
+      (swift-skip-simple-type-name))
+    t))
+
 (defun swift-skip-type-name ()
     "Hop over any comments, whitespace, and the name of a type if
 one is present, returning t if so and nil otherwise"
@@ -233,8 +243,7 @@ one is present, returning t if so and nil otherwise"
            (forward-sexp)
            (setq found t))
           
-          ((swift-skip-identifier)
-           (swift-skip-generic-parameter-list)
+          ((swift-skip-simple-type-name)
            (setq found t)))
 
           ;; followed by "->"
