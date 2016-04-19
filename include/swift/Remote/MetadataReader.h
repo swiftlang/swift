@@ -43,7 +43,8 @@ using SharedProtocolDescriptorRef
 /// a textual mangling.
 template <typename BuilderType>
 class TypeDecoder {
-  using Type = typename BuilderType::Type;
+  using BuiltType = typename BuilderType::BuiltType;
+  using BuiltNominalTypeDecl = typename BuilderType::BuiltNominalTypeDecl;
   using NodeKind = Demangle::Node::Kind;
 
   BuilderType &Builder;
@@ -53,8 +54,8 @@ class TypeDecoder {
     : Builder(Builder) {}
 
   /// Given a demangle tree, attempt to turn it into a type.
-  Type decodeMangledType(const Demangle::NodePointer &Node) {
-    if (!Node) return Type();
+  BuiltType decodeMangledType(const Demangle::NodePointer &Node) {
+    if (!Node) return BuiltType();
 
     using NodeKind = Demangle::Node::Kind;
     switch (Node->getKind()) {
@@ -67,23 +68,23 @@ class TypeDecoder {
       case NodeKind::Class:
       case NodeKind::Enum:
       case NodeKind::Structure: {
-        std::string mangledName;
-        Type parent = Type();
-        if (!decodeMangledNominalType(Node, mangledName, parent))
-          return Type();
+        BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
+        BuiltType parent = BuiltType();
+        if (!decodeMangledNominalType(Node, typeDecl, parent))
+          return BuiltType();
 
-        return Builder.createNominalType(mangledName, parent);
+        return Builder.createNominalType(typeDecl, parent);
       }
       case NodeKind::BoundGenericClass:
       case NodeKind::BoundGenericEnum:
       case NodeKind::BoundGenericStructure: {
         assert(Node->getNumChildren() == 2);
-        std::string mangledName;
-        Type parent = Type();
-        if (!decodeMangledNominalType(Node->getChild(0), mangledName, parent))
-          return Type();
+        BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
+        BuiltType parent = BuiltType();
+        if (!decodeMangledNominalType(Node->getChild(0), typeDecl, parent))
+          return BuiltType();
 
-        std::vector<Type> args;
+        std::vector<BuiltType> args;
 
         const auto &genericArgs = Node->getChild(1);
         assert(genericArgs->getKind() == NodeKind::TypeList);
@@ -91,11 +92,11 @@ class TypeDecoder {
         for (auto genericArg : *genericArgs) {
           auto paramType = decodeMangledType(genericArg);
           if (!paramType)
-            return Type();
+            return BuiltType();
           args.push_back(paramType);
         }
 
-        return Builder.createBoundGenericType(mangledName, args, parent);
+        return Builder.createBoundGenericType(typeDecl, args, parent);
       }
       case NodeKind::BuiltinTypeName: {
         auto mangledName = Demangle::mangleNode(Node);
@@ -104,23 +105,23 @@ class TypeDecoder {
       case NodeKind::ExistentialMetatype: {
         auto instance = decodeMangledType(Node->getChild(0));
         if (!instance)
-          return Type();
+          return BuiltType();
         return Builder.createExistentialMetatypeType(instance);
       }
       case NodeKind::Metatype: {
         auto instance = decodeMangledType(Node->getChild(0));
         if (!instance)
-          return Type();
+          return BuiltType();
         return Builder.createMetatypeType(instance);
       }
       case NodeKind::ProtocolList: {
-        std::vector<Type> protocols;
+        std::vector<BuiltType> protocols;
         auto TypeList = Node->getChild(0);
         for (auto componentType : *TypeList) {
           if (auto protocol = decodeMangledType(componentType))
             protocols.push_back(protocol);
           else
-            return Type();
+            return BuiltType();
         }
         if (protocols.size() == 1)
           return protocols.front();
@@ -155,14 +156,14 @@ class TypeDecoder {
           Node->getChild(0)->getKind() == NodeKind::ThrowsAnnotation;
         flags = flags.withThrows(true);
 
-        std::vector<Type> arguments;
+        std::vector<BuiltType> arguments;
         std::vector<bool> argsAreInOut;
         if (!decodeMangledFunctionInputType(Node->getChild(isThrow ? 1 : 0),
                                             arguments, argsAreInOut, flags))
-          return Type();
+          return BuiltType();
 
         auto result = decodeMangledType(Node->getChild(isThrow ? 2 : 1));
-        if (!result) return Type();
+        if (!result) return BuiltType();
         return Builder.createFunctionType(arguments, argsAreInOut,
                                           result, flags);
       }
@@ -172,11 +173,11 @@ class TypeDecoder {
         return decodeMangledType(Node->getChild(0));
       case NodeKind::NonVariadicTuple:
       case NodeKind::VariadicTuple: {
-        std::vector<Type> Elements;
+        std::vector<BuiltType> Elements;
         for (auto element : *Node) {
           auto elementType = decodeMangledType(element);
           if (!elementType)
-            return Type();
+            return BuiltType();
           Elements.push_back(elementType);
         }
         bool Variadic = (Node->getKind() == NodeKind::VariadicTuple);
@@ -192,11 +193,11 @@ class TypeDecoder {
       case NodeKind::DependentMemberType: {
         auto base = decodeMangledType(Node->getChild(0));
         if (!base)
-          return Type();
+          return BuiltType();
         auto member = Node->getChild(1)->getText();
         auto protocol = decodeMangledType(Node->getChild(1));
         if (!protocol)
-          return Type();
+          return BuiltType();
         return Builder.createDependentMemberType(member, base, protocol);
       }
       case NodeKind::DependentAssociatedTypeRef:
@@ -204,32 +205,32 @@ class TypeDecoder {
       case NodeKind::Unowned: {
         auto base = decodeMangledType(Node->getChild(0));
         if (!base)
-          return Type();
+          return BuiltType();
         return Builder.createUnownedStorageType(base);
       }
       case NodeKind::Unmanaged: {
         auto base = decodeMangledType(Node->getChild(0));
         if (!base)
-          return Type();
+          return BuiltType();
         return Builder.createUnmanagedStorageType(base);
       }
       case NodeKind::Weak: {
         auto base = decodeMangledType(Node->getChild(0));
         if (!base)
-          return Type();
+          return BuiltType();
         return Builder.createWeakStorageType(base);
       }
       default:
-        return Type();
+        return BuiltType();
     }
   }
 
 private:
   bool decodeMangledNominalType(const Demangle::NodePointer &node,
-                                std::string &mangledName,
-                                Type &parent) {
+                                BuiltNominalTypeDecl &typeDecl,
+                                BuiltType &parent) {
     if (node->getKind() == NodeKind::Type)
-      return decodeMangledNominalType(node->getChild(0), mangledName, parent);
+      return decodeMangledNominalType(node->getChild(0), typeDecl, parent);
 
     assert(node->getNumChildren() == 2);
     auto moduleOrParentType = node->getChild(0);
@@ -244,12 +245,14 @@ private:
       if (!parent) return false;
     }
 
-    mangledName = Demangle::mangleNode(node);
+    typeDecl = Builder.createNominalTypeDecl(node);
+    if (!typeDecl) return false;
+
     return true;
   }
 
   bool decodeMangledFunctionInputType(const Demangle::NodePointer &node,
-                                      std::vector<Type> &args,
+                                      std::vector<BuiltType> &args,
                                       std::vector<bool> &argsAreInOut,
                                       FunctionTypeFlags &flags) {
     // Look through a couple of sugar nodes.
@@ -261,7 +264,7 @@ private:
 
     auto decodeSingleHelper =
     [&](const Demangle::NodePointer &typeNode, bool argIsInOut) -> bool {
-      Type argType = decodeMangledType(typeNode);
+      BuiltType argType = decodeMangledType(typeNode);
       if (!argType) return false;
 
       args.push_back(argType);
@@ -302,7 +305,7 @@ private:
 };
 
 template<typename BuilderType>
-static inline typename BuilderType::Type
+static inline typename BuilderType::BuiltType
 decodeMangledType(BuilderType &Builder,
                   const Demangle::NodePointer &Node) {
   return TypeDecoder<BuilderType>(Builder).decodeMangledType(Node);
@@ -319,12 +322,13 @@ decodeMangledType(BuilderType &Builder,
 template <typename Runtime, typename BuilderType>
 class MetadataReader {
 public:
-  using Type = typename BuilderType::Type;
+  using BuiltType = typename BuilderType::BuiltType;
+  using BuiltNominalTypeDecl = typename BuilderType::BuiltNominalTypeDecl;
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
 
 private:
-  std::unordered_map<StoredPointer, Type> TypeCache;
+  std::unordered_map<StoredPointer, BuiltType> TypeCache;
   std::unordered_map<StoredPointer, SharedTargetMetadataRef<Runtime>>
   MetadataCache;
 
@@ -360,18 +364,18 @@ public:
   }
 
   /// Given a demangle tree, attempt to turn it into a type.
-  Type decodeMangledType(const Demangle::NodePointer &Node) {
+  BuiltType decodeMangledType(const Demangle::NodePointer &Node) {
     return swift::remote::decodeMangledType(Builder, Node);
   }
 
   /// Given a remote pointer to metadata, attempt to turn it into a type.
-  Type readTypeFromMetadata(StoredPointer MetadataAddress) {
+  BuiltType readTypeFromMetadata(StoredPointer MetadataAddress) {
     auto Cached = TypeCache.find(MetadataAddress);
     if (Cached != TypeCache.end())
       return Cached->second;
 
     auto Meta = readMetadata(MetadataAddress);
-    if (!Meta) return Type();
+    if (!Meta) return BuiltType();
 
     switch (Meta->getKind()) {
     case MetadataKind::Class:
@@ -383,7 +387,7 @@ public:
       return readNominalTypeFromMetadata(MetadataAddress);
     case MetadataKind::Tuple: {
       auto TupleMeta = cast<TargetTupleTypeMetadata<Runtime>>(Meta.get());
-      std::vector<Type> Elements;
+      std::vector<BuiltType> Elements;
       StoredPointer ElementAddress = MetadataAddress +
         sizeof(TargetTupleTypeMetadata<Runtime>);
       using Element = typename TargetTupleTypeMetadata<Runtime>::Element;
@@ -392,19 +396,19 @@ public:
         Element E;
         if (!Reader->readBytes(RemoteAddress(ElementAddress),
                                (uint8_t*)&E, sizeof(Element)))
-          return Type();
+          return BuiltType();
 
         if (auto ElementTypeRef = readTypeFromMetadata(E.Type))
           Elements.push_back(ElementTypeRef);
         else
-          return Type();
+          return BuiltType();
       }
       return Builder.createTupleType(Elements, /*variadic*/ false);
     }
     case MetadataKind::Function: {
       auto Function = cast<TargetFunctionTypeMetadata<Runtime>>(Meta.get());
 
-      std::vector<Type> Arguments;
+      std::vector<BuiltType> Arguments;
       std::vector<bool> ArgumentIsInOut;
       StoredPointer ArgumentAddress = MetadataAddress +
         sizeof(TargetFunctionTypeMetadata<Runtime>);
@@ -413,7 +417,7 @@ public:
         StoredPointer FlaggedArgumentAddress;
         if (!Reader->readInteger(RemoteAddress(ArgumentAddress),
                                  &FlaggedArgumentAddress))
-          return Type();
+          return BuiltType();
 
         // TODO: Use target-agnostic FlaggedPointer to mask this!
         const auto InOutMask = (StoredPointer) 1;
@@ -423,12 +427,12 @@ public:
         if (auto ArgumentTypeRef = readTypeFromMetadata(FlaggedArgumentAddress))
           Arguments.push_back(ArgumentTypeRef);
         else
-          return Type();
+          return BuiltType();
       }
 
       auto Result = readTypeFromMetadata(Function->ResultType);
       if (!Result)
-        return Type();
+        return BuiltType();
 
       auto flags = FunctionTypeFlags().withConvention(Function->getConvention())
                                       .withThrows(Function->throws());
@@ -437,21 +441,21 @@ public:
     }
     case MetadataKind::Existential: {
       auto Exist = cast<TargetExistentialTypeMetadata<Runtime>>(Meta.get());
-      std::vector<Type> Protocols;
+      std::vector<BuiltType> Protocols;
       for (size_t i = 0; i < Exist->Protocols.NumProtocols; ++i) {
         auto ProtocolAddress = Exist->Protocols[i];
         auto ProtocolDescriptor = readProtocolDescriptor(ProtocolAddress);
         if (!ProtocolDescriptor)
-          return Type();
+          return BuiltType();
         
         std::string MangledName;
         if (!Reader->readString(RemoteAddress(ProtocolDescriptor->Name),
                                 MangledName))
-          return Type();
+          return BuiltType();
         auto Demangled = Demangle::demangleSymbolAsNode(MangledName);
         auto Protocol = decodeMangledType(Demangled);
         if (!Protocol)
-          return Type();
+          return BuiltType();
 
         Protocols.push_back(Protocol);
       }
@@ -460,7 +464,7 @@ public:
     case MetadataKind::Metatype: {
       auto Metatype = cast<TargetMetatypeMetadata<Runtime>>(Meta.get());
       auto Instance = readTypeFromMetadata(Metatype->InstanceType);
-      if (!Instance) return Type();
+      if (!Instance) return BuiltType();
       return Builder.createMetatypeType(Instance);
     }
     case MetadataKind::ObjCClassWrapper:
@@ -468,7 +472,7 @@ public:
     case MetadataKind::ExistentialMetatype: {
       auto Exist = cast<TargetExistentialMetatypeMetadata<Runtime>>(Meta.get());
       auto Instance = readTypeFromMetadata(Exist->InstanceType);
-      if (!Instance) return Type();
+      if (!Instance) return BuiltType();
       return Builder.createExistentialMetatypeType(Instance);
     }
     case MetadataKind::ForeignClass:
@@ -671,7 +675,7 @@ private:
       SharedTargetNominalTypeDescriptorRef<Runtime> Descriptor;
       std::tie(Descriptor, DescriptorAddress)
         = readNominalTypeDescriptor(MetadataAddress);
-      std::vector<Type> Substitutions;
+      std::vector<BuiltType> Substitutions;
       auto OffsetToParent
         = sizeof(StoredPointer) * (Descriptor->GenericParams.Offset - 1);
       if (!Reader->readInteger(RemoteAddress(MetadataAddress + OffsetToParent),
@@ -687,12 +691,12 @@ private:
     return 0;
   }
 
-  std::vector<Type> getGenericSubst(StoredPointer MetadataAddress) {
+  std::vector<BuiltType> getGenericSubst(StoredPointer MetadataAddress) {
     StoredPointer DescriptorAddress;
     SharedTargetNominalTypeDescriptorRef<Runtime> Descriptor;
     std::tie(Descriptor, DescriptorAddress)
       = readNominalTypeDescriptor(MetadataAddress);
-    std::vector<Type> Substitutions;
+    std::vector<BuiltType> Substitutions;
     auto NumGenericParams = Descriptor->GenericParams.NumPrimaryParams;
     auto OffsetToGenericArgs
       = sizeof(StoredPointer) * (Descriptor->GenericParams.Offset);
@@ -713,7 +717,7 @@ private:
     return Substitutions;
   }
 
-  Type readNominalTypeFromMetadata(StoredPointer MetadataAddress) {
+  BuiltType readNominalTypeFromMetadata(StoredPointer MetadataAddress) {
     auto Meta = readMetadata(MetadataAddress);
 
     StoredPointer DescriptorAddress;
@@ -721,30 +725,35 @@ private:
     std::tie(Descriptor, DescriptorAddress)
       = readNominalTypeDescriptor(MetadataAddress);
     if (!Descriptor)
-      return Type();
+      return BuiltType();
 
     auto NameAddress
       = resolveRelativeOffset<int32_t>(DescriptorAddress +
                                        Descriptor->offsetToNameOffset());
     std::string MangledName;
     if (!Reader->readString(RemoteAddress(NameAddress), MangledName))
-      return Type();
+      return BuiltType();
 
-    Type Parent;
+    BuiltNominalTypeDecl TypeDecl =
+      Builder.createNominalTypeDecl(std::move(MangledName));
+    if (!TypeDecl)
+      return BuiltType();
+
+    BuiltType Parent;
     if (auto ParentAddress = getParentAddress(MetadataAddress)) {
       Parent = readTypeFromMetadata(ParentAddress);
-      if (!Parent) return Type();
+      if (!Parent) return BuiltType();
     }
 
-    Type Nominal;
+    BuiltType Nominal;
     if (Descriptor->GenericParams.NumPrimaryParams) {
       auto Args = getGenericSubst(MetadataAddress);
-      if (Args.empty()) return Type();
-      Nominal = Builder.createBoundGenericType(MangledName, Args, Parent);
+      if (Args.empty()) return BuiltType();
+      Nominal = Builder.createBoundGenericType(TypeDecl, Args, Parent);
     } else {
-      Nominal = Builder.createNominalType(MangledName, Parent);
+      Nominal = Builder.createNominalType(TypeDecl, Parent);
     }
-    if (!Nominal) return Type();
+    if (!Nominal) return BuiltType();
 
     TypeCache.insert({MetadataAddress, Nominal});
     return Nominal;

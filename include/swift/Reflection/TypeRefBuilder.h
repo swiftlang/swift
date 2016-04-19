@@ -21,6 +21,7 @@
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
 #include "swift/Reflection/TypeRef.h"
+#include "llvm/ADT/Optional.h"
 
 #include <iostream>
 #include <vector>
@@ -85,7 +86,8 @@ struct ReflectionInfo {
 /// it vends.
 class TypeRefBuilder {
 public:
-  using Type = const TypeRef *;
+  using BuiltType = const TypeRef *;
+  using BuiltNominalTypeDecl = Optional<std::string>;
 
   TypeRefBuilder() {}
 
@@ -111,16 +113,25 @@ public:
     return BuiltinTypeRef::create(*this, mangledName);
   }
 
-  const NominalTypeRef *createNominalType(const std::string &mangledName,
+  Optional<std::string> createNominalTypeDecl(const Demangle::NodePointer &node) {
+    return Demangle::mangleNode(node);
+  }
+
+  Optional<std::string> createNominalTypeDecl(std::string &&mangledName) {
+    return std::move(mangledName);
+  }
+
+  const NominalTypeRef *createNominalType(
+                                    const Optional<std::string> &mangledName,
                                     const TypeRef *parent) {
-    return NominalTypeRef::create(*this, mangledName, parent);
+    return NominalTypeRef::create(*this, *mangledName, parent);
   }
 
   const BoundGenericTypeRef *
-  createBoundGenericType(const std::string &mangledName,
+  createBoundGenericType(const Optional<std::string> &mangledName,
                          const std::vector<const TypeRef *> &args,
                          const TypeRef *parent) {
-    return BoundGenericTypeRef::create(*this, mangledName, args, parent);
+    return BoundGenericTypeRef::create(*this, *mangledName, args, parent);
   }
 
   const TupleTypeRef *
