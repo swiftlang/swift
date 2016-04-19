@@ -199,6 +199,7 @@ precommitTests = [
   "Sim2DArray": run_Sim2DArray,
   "SortLettersInPlace": run_SortLettersInPlace,
   "SortStrings": run_SortStrings,
+  "SortStringsUnicode": run_SortStringsUnicode,
   "StackPromo": run_StackPromo,
   "StaticArray": run_StaticArray,
   "StrComplexWalk": run_StrComplexWalk,
