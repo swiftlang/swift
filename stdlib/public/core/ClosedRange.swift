@@ -51,6 +51,12 @@ extension ClosedRangeProtocol {
   public var description: String {
     return "\(lowerBound)...\(upperBound)"
   }
+
+  public var customMirror: Mirror {
+    return Mirror(
+      self,
+      children: ["lowerBound": lowerBound, "upperBound": upperBound])
+  }
 }
 
 // WORKAROUND rdar://25214598 - should be Bound : Strideable
@@ -202,8 +208,7 @@ public struct ClosedRangeIterator<
 public struct CountableClosedRange<
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
-> : ClosedRangeProtocol, RandomAccessCollection,
-  CustomStringConvertible, CustomDebugStringConvertible {
+> : ClosedRangeProtocol, RandomAccessCollection {
 
   /// A type that represents a position in the range.
   public typealias Index = ClosedRangeIndex<Bound>
@@ -266,11 +271,6 @@ public struct CountableClosedRange<
     return element >= self.lowerBound && element < self.upperBound
   }
 
-  /// A textual representation of `self`, suitable for debugging.
-  public var debugDescription: String {
-    return "CountableClosedRange(\(String(reflecting: lowerBound))"
-      + "...\(String(reflecting: upperBound)))"
-  }
 
   /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
   public var isEmpty: Bool {
@@ -284,11 +284,14 @@ public struct CountableClosedRange<
   }
 }
 
-extension CountableClosedRange : CustomReflectable {
-  public var customMirror: Mirror {
-    return Mirror(
-      self,
-      children: ["lowerBound": lowerBound, "upperBound": upperBound])
+extension CountableClosedRange
+  : CustomStringConvertible, CustomDebugStringConvertible,
+  CustomReflectable {
+
+  /// A textual representation of `self`, suitable for debugging.
+  public var debugDescription: String {
+    return "CountableClosedRange(\(String(reflecting: lowerBound))"
+      + "...\(String(reflecting: upperBound)))"
   }
 }
 
@@ -304,8 +307,7 @@ extension CountableClosedRange : CustomReflectable {
 ///     lowercase.contains("z")    // true
 public struct ClosedRange<
   Bound : Comparable
-> : ClosedRangeProtocol,
-  CustomStringConvertible, CustomDebugStringConvertible {
+> : ClosedRangeProtocol {
 
   /// Creates a range with `lowerBound == lower` and `upperBound ==
   /// upper`.
@@ -338,18 +340,16 @@ public struct ClosedRange<
   public var isEmpty: Bool {
     return false
   }
+}
+
+extension ClosedRange
+  : CustomStringConvertible, CustomDebugStringConvertible,
+  CustomReflectable {
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return "ClosedRange(\(String(reflecting: lowerBound))"
       + "...\(String(reflecting: upperBound)))"
-  }
-}
-
-extension ClosedRange : CustomReflectable {
-  public var customMirror: Mirror {
-    return Mirror(
-      self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
   }
 }
 

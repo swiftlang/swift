@@ -176,6 +176,12 @@ extension HalfOpenRangeProtocol {
   public var description: String {
     return "\(lowerBound)..<\(upperBound)"
   }
+
+  public var customMirror: Mirror {
+    return Mirror(
+      self,
+      children: ["lowerBound": lowerBound, "upperBound": upperBound])
+  }
 }
 
 /// Half-open ranges whose `Bound` is `Strideable` with `Integer`
@@ -259,8 +265,7 @@ extension HalfOpenRangeProtocol
 public struct CountableRange<
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
-> : HalfOpenRangeProtocol, RandomAccessCollection,
-  CustomStringConvertible, CustomDebugStringConvertible {
+> : HalfOpenRangeProtocol, RandomAccessCollection {
 
   public typealias Element = Bound
   public typealias Index = Element
@@ -334,6 +339,11 @@ public struct CountableRange<
   public var isEmpty: Bool {
     return lowerBound == upperBound
   }
+}
+
+extension CountableRange
+  : CustomStringConvertible, CustomDebugStringConvertible,
+  CustomReflectable {
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
@@ -460,14 +470,6 @@ Bound._DisabledRangeIndex.Stride : Integer {
 
 //===--- End 0-based indexing protection ----------------------------------===//
 
-extension CountableRange : CustomReflectable {
-  public var customMirror: Mirror {
-    return Mirror(
-      self,
-      children: ["lowerBound": lowerBound, "upperBound": upperBound])
-  }
-}
-
 /// An interval over a `Comparable` type, from a lower bound up to, but not
 /// including, an upper bound. Can represent an empty interval.
 ///
@@ -480,9 +482,7 @@ extension CountableRange : CustomReflectable {
 ///     underFive.contains(5.0)     // false
 public struct Range<
   Bound : Comparable
-> : HalfOpenRangeProtocol,
-    CustomStringConvertible, CustomDebugStringConvertible {
-
+> : HalfOpenRangeProtocol {
   /// Creates a range with `lowerBound == lower` and `upperBound == upper`.
   ///
   /// - Note: As this initializer does not check its precondition, it should be
@@ -519,6 +519,10 @@ public struct Range<
   public var isEmpty: Bool {
     return lowerBound == upperBound
   }
+}
+
+extension Range
+  : CustomStringConvertible, CustomDebugStringConvertible {
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
