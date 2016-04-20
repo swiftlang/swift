@@ -47,10 +47,11 @@ import swift_build_support.ninja      # noqa (E402)
 import swift_build_support.tar        # noqa (E402)
 import swift_build_support.targets    # noqa (E402)
 
+
 # A strict parser for bools (unlike Python's `bool()`, where
 # `bool('False')` is `True`).
 #
-# This function can be pased as `type=` argument to argparse to parse values
+# This function can be passed as `type=` argument to argparse to parse values
 # passed to command line arguments.
 def argparse_bool(string):
     if string in ['0', 'false', 'False']:

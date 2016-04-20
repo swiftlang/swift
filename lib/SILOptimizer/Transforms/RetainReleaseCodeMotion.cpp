@@ -22,7 +22,7 @@
 ///
 /// This pass is more sophisticated than SILCodeMotion, as arc optimizations
 /// can be very beneficial, use an optimistic global data flow to achieve
-/// optimiality.
+/// optimality.
 ///
 /// Proof of Correctness:
 /// -------------------
@@ -180,7 +180,7 @@ struct BlockState {
 
 /// CodeMotionContext - This is the base class which retain code motion and
 /// release code motion inherits from. It defines an interface as to how the
-/// code motion precedure should be.
+/// code motion procedure should be.
 class CodeMotionContext {
 protected:
   /// Dataflow needs multiple iteration to converge. If this is false, then we
@@ -206,8 +206,8 @@ protected:
   /// All the unique refcount roots retained or released in the function.
   llvm::SetVector<SILValue> RCRootVault;
 
-  /// Contains a map between rc roots to their index in the RCRootVault.
-  /// used to facilitate fast rc roots to index lookup.
+  /// Contains a map between RC roots to their index in the RCRootVault.
+  /// used to facilitate fast RC roots to index lookup.
   llvm::DenseMap<SILValue, unsigned> RCRootIndex;
 
   /// All the retains or releases originally in the function. Eventually
@@ -218,7 +218,7 @@ protected:
   using InsertPointList = llvm::SmallVector<SILInstruction *, 2>;
   llvm::SmallDenseMap<SILValue, InsertPointList> InsertPoints;
 
-  /// These are the blocks that have a RC instruction to process or it blocks
+  /// These are the blocks that have an RC instruction to process or it blocks
   /// some RC instructions. If the basic block has neither, we do not need to
   /// process the block again in the last iteration. We populate this set when
   /// we compute the genset and killset.
@@ -236,7 +236,7 @@ protected:
      return RCCache[R] = RCFI->getRCIdentityRoot(R);
   }
 
-  /// Return the rc-identity root of the rc instruction, i.e.
+  /// Return the rc-identity root of the RC instruction, i.e.
   /// retain or release.
   SILValue getRCRoot(SILInstruction *I) {
     assert(isRetainInstruction(I) || isReleaseInstruction(I) &&
@@ -257,7 +257,7 @@ public:
   /// Run the data flow to move retains and releases.
   bool run();
 
-  /// Check whether we need to run an optimitic iteration data flow.
+  /// Check whether we need to run an optimistic iteration data flow.
   /// or a pessimistic would suffice.
   virtual bool requireIteration() = 0;
 
@@ -349,7 +349,7 @@ class RetainCodeMotionContext : public CodeMotionContext {
     // These terminator instructions block.
     if (isa<ReturnInst>(II) || isa<ThrowInst>(II) || isa<UnreachableInst>(II))
       return true;
-    // Identical rc root blocks code motion, we will be able to move this retain
+    // Identical RC root blocks code motion, we will be able to move this retain
     // further once we move the blocking retain.
     if (isRetainInstruction(II) && getRCRoot(II) == Ptr)
       return true;
@@ -457,7 +457,7 @@ void RetainCodeMotionContext::initializeCodeMotionBBMaxSet() {
    }
 
    // Process the instructions in the basic block to find what refcounted
-   // roots are retained. If we know that a rc root cant be retained at a
+   // roots are retained. If we know that an RC root cant be retained at a
    // basic block, then we know we do not need to consider it for the killset.
    // NOTE: this is a conservative approximation, because some retains may be
    // blocked before it reaches this block.
@@ -493,7 +493,8 @@ void RetainCodeMotionContext::computeCodeMotionGenKillSet() {
       }
     }
 
-    // Is this a block thats interesting to the last iteration of the data flow.
+    // Is this a block that is interesting to the last iteration of the data
+    // flow.
     if (!InterestBlock)
       continue;
     InterestBlocks.insert(BB);
@@ -657,7 +658,7 @@ public:
   }
 };
 
-/// ReleaseCodeMotionContext - Context to peroform release code motion.
+/// ReleaseCodeMotionContext - Context to perform release code motion.
 class ReleaseCodeMotionContext : public CodeMotionContext {
   /// All the release block state for all the basic blocks in the function. 
   llvm::SmallDenseMap<SILBasicBlock *, ReleaseBlockState *> BlockStates;
@@ -677,7 +678,7 @@ class ReleaseCodeMotionContext : public CodeMotionContext {
     // released value.
     if (II == Ptr)
       return true;
-    // Identical rc root blocks code motion, we will be able to move this release
+    // Identical RC root blocks code motion, we will be able to move this release
     // further once we move the blocking release.
     if (isReleaseInstruction(II) && getRCRoot(II) == Ptr)
       return true;
@@ -795,7 +796,7 @@ void ReleaseCodeMotionContext::initializeCodeMotionBBMaxSet() {
    }
 
    // Process the instructions in the basic block to find what refcounted
-   // roots are released. If we know that a rc root cant be released at a
+   // roots are released. If we know that an RC root cant be released at a
    // basic block, then we know we do not need to consider it for the killset.
    // NOTE: this is a conservative approximation, because some releases may be
    // blocked before it reaches this block.
@@ -816,7 +817,7 @@ void ReleaseCodeMotionContext::computeCodeMotionGenKillSet() {
       for (unsigned i = 0; i < RCRootVault.size(); ++i) {
         if (!State->BBMaxSet.test(i) || !mayBlockCodeMotion(&*I, RCRootVault[i]))
           continue;
-        // This instruction blocks this rc root.
+        // This instruction blocks this RC root.
         InterestBlock = true;
         State->BBKillSet.set(i);
         State->BBGenSet.reset(i);
@@ -932,7 +933,7 @@ void ReleaseCodeMotionContext::convergeCodeMotionDataFlow() {
 
 void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
   // The BBSetIns have converged, run last iteration and figure out insertion
-  // point for each rc root.
+  // point for each RC root.
   for (SILBasicBlock *BB : PO->getPostOrder()) {
     // Intersect in the successor BBSetIns.
     mergeBBDataFlowStates(BB);
@@ -958,7 +959,7 @@ void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
       continue;
 
     // Compute insertion point generated by MayUse terminator inst.
-    // If terminator instruction can block the rc root. We will have no
+    // If terminator instruction can block the RC root. We will have no
     // choice but to anchor the release instructions in the successor blocks.
     for (unsigned i = 0; i < RCRootVault.size(); ++i) {
       SILInstruction *Term = BB->getTerminator();

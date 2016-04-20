@@ -1040,7 +1040,7 @@ Type ConstraintSystem::replaceSelfTypeInArchetype(ArchetypeType *archetype) {
 }
 
 /// Determine whether the given locator is for a witness or requirement.
-static bool isRequirementOrWitnesss(const ConstraintLocatorBuilder &locator) {
+static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
   if (auto last = locator.last()) {
     return last->getKind() == ConstraintLocator::Requirement ||
     last->getKind() == ConstraintLocator::Witness;
@@ -1247,7 +1247,7 @@ ConstraintSystem::getTypeOfMemberReference(
     // optional/dynamic, is settable, or is not.
     auto fnType = openedFnType->getResult()->castTo<FunctionType>();
     auto elementTy = fnType->getResult();
-    if (!isRequirementOrWitnesss(locator)) {
+    if (!isRequirementOrWitness(locator)) {
       if (subscript->getAttrs().hasAttribute<OptionalAttr>())
         elementTy = OptionalType::get(elementTy->getRValueType());
       else if (isDynamicResult) {
@@ -1387,7 +1387,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                              choice.isSpecialized(), locator);
     }
 
-    if (!isRequirementOrWitnesss(locator) &&
+    if (!isRequirementOrWitness(locator) &&
         choice.getDecl()->getAttrs().hasAttribute<OptionalAttr>() &&
         !isa<SubscriptDecl>(choice.getDecl())) {
       // For a non-subscript declaration that is an optional
