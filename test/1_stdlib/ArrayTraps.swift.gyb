@@ -9,7 +9,7 @@
 // REQUIRES: executable_test
 
 // FIXME: Assertion failiure in StrongRefCount::decrementFromOneAndDeallocateNonAtomic
-// XFAIL: linux
+// UNSUPPORTED: linux
 
 import StdlibUnittest
 
