@@ -35,7 +35,7 @@ STATISTIC(NumSunk, "Number of instructions sunk");
 STATISTIC(NumRefCountOpsSimplified, "Number of enum ref count ops simplified");
 STATISTIC(NumHoisted, "Number of instructions hoisted");
 
-llvm::cl::opt<bool> DisableSILRRCodeMotion("disable-sil-cm-rr-cm", llvm::cl::init(true));
+llvm::cl::opt<bool> DisableSILRRCodeMotion("disable-sil-cm-rr-cm", llvm::cl::init(false));
 
 using namespace swift;
 
