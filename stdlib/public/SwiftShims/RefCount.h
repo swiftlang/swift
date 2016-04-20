@@ -34,6 +34,7 @@ typedef struct {
 #include <type_traits>
 #include <stdint.h>
 #include <assert.h>
+#include <stdio.h>
 
 #include "swift/Basic/type_traits.h"
 
