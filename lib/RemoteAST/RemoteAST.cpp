@@ -16,6 +16,7 @@
 
 #include "swift/RemoteAST/RemoteAST.h"
 #include "swift/Remote/MetadataReader.h"
+#include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -31,6 +32,10 @@ namespace {
 /// just finds and builds things in the AST.
 class RemoteASTTypeBuilder {
   ASTContext &Ctx;
+
+  /// The notional module in which we're writing and type-checking code.
+  /// Created lazily.
+  ModuleDecl *NotionalModule = nullptr;
 
 public:
   using BuiltType = swift::Type;
@@ -315,8 +320,21 @@ private:
                                        Demangle::Node::Kind kind);
 
   Type checkTypeRepr(TypeRepr *repr) {
-    // TODO: invoke the type-checker here
-    return Type();
+    ModuleDecl *module = getNotionalModule();
+
+    TypeLoc loc(repr);
+    if (performTypeLocChecking(Ctx, loc, /*SILType*/ false, module,
+                               /*diagnose*/ false))
+      return Type();
+
+    return loc.getType();
+  }
+
+  ModuleDecl *getNotionalModule() {
+    if (!NotionalModule) {
+      NotionalModule = ModuleDecl::create(Ctx.getIdentifier(".RemoteAST"), Ctx);
+    }
+    return NotionalModule;
   }
 
   class TypeReprList {
