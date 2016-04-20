@@ -339,11 +339,6 @@ public struct ClosedRange<
     return false
   }
 
-  /// A textual representation of `self`.
-  public var description: String {
-    return "\(lowerBound)...\(upperBound)"
-  }
-
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return "ClosedRange(\(String(reflecting: lowerBound))"

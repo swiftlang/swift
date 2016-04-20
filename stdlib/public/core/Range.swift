@@ -520,11 +520,6 @@ public struct Range<
     return lowerBound == upperBound
   }
 
-  /// A textual representation of `self`.
-  public var description: String {
-    return "\(lowerBound)..<\(upperBound)"
-  }
-
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return "Range(\(String(reflecting: lowerBound))"
