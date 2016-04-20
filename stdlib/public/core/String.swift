@@ -726,8 +726,10 @@ extension String {
   ///
   /// - Complexity: O(`bounds.count`) if `bounds.upperBound
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
-  public mutating func replaceSubrange(
-    _ bounds: Range<Index>, with newElements: String
+  public mutating func replaceSubrange<
+    Bounds : RangeProtocol where Bounds.Bound == Index
+  >(
+    _ bounds: Bounds, with newElements: String
   ) {
     replaceSubrange(bounds, with: newElements.characters)
   }
@@ -773,7 +775,9 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  public mutating func removeSubrange(_ bounds: Range<Index>) {
+  public mutating func removeSubrange<
+    Bounds : RangeProtocol where Bounds.Bound == Index
+  >(_ bounds: Bounds) {
     withMutableCharacters {
       (v: inout CharacterView) in v.removeSubrange(bounds)
     }
