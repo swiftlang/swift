@@ -47,8 +47,10 @@ bool mayDecrementRefCount(SILInstruction *User, SILValue Ptr,
 bool mayCheckRefCount(SILInstruction *User);
 
 /// \returns True if the \p User might use the pointer \p Ptr in a manner that
-/// requires \p Ptr to be alive before Inst.
-bool mayUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA);
+/// requires \p Ptr to be alive before Inst or the release of Ptr may use memory
+/// accessed by \p User.
+bool mayHaveSymmetricInteference(SILInstruction *User, SILValue Ptr,
+                                 AliasAnalysis *AA);
 
 /// \returns True if the \p User must use the pointer \p Ptr in a manner that
 /// requires \p Ptr to be alive before Inst.

@@ -676,9 +676,8 @@ class ReleaseCodeMotionContext : public CodeMotionContext {
     // further once we move the blocking release.
     if (isReleaseInstruction(II) && getRCRoot(II) == Ptr)
       return true;
-    // TODO: we now consider deinit. Rename mayUseValue, maybe call it may interfere.
-    // Stop at may use.
-    if (mayUseValue(II, Ptr, AA))
+    // Stop at may interfere.
+    if (mayHaveSymmetricInteference(II, Ptr, AA))
       return true;
     // This instruction does not block the release.
     return false;
