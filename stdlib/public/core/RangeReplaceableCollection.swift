@@ -35,7 +35,7 @@ public protocol RangeReplaceableIndexable : Indexable {
     S : Sequence where S.Iterator.Element == _Element
   >(_ elements: S)
 
-  /// Replace the given `subRange` of elements with `newElements`.
+  /// Replaces the given `subrange` of elements with `newElements`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -45,7 +45,7 @@ public protocol RangeReplaceableIndexable : Indexable {
   mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == _Element
   >(
-    _ subRange: Range<Index>, with newElements: C
+    _ subrange: Range<Index>, with newElements: C
   )
 
   /// Insert `newElement` at index `i`.
@@ -90,7 +90,7 @@ public protocol RangeReplaceableCollection
   /// Creates an empty instance.
   init()
 
-  /// Replace the given `subRange` of elements with `newElements`.
+  /// Replaces the given `subrange` of elements with `newElements`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -100,7 +100,7 @@ public protocol RangeReplaceableCollection
   mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(
-    _ subRange: Range<Index>, with newElements: C
+    _ subrange: Range<Index>, with newElements: C
   )
 
   /*
@@ -388,9 +388,9 @@ Index : Strideable, Index.Stride : Integer {
   public mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(
-    _ subRange: CountableRange<Index>, with newElements: C
+    _ subrange: CountableRange<Index>, with newElements: C
   ) {
-    self.replaceSubrange(Range(subRange), with: newElements)
+    self.replaceSubrange(Range(subrange), with: newElements)
   }
 }
 
@@ -400,9 +400,9 @@ extension RangeReplaceableCollection {
     where
     R.Bound == Self.Index, C.Iterator.Element == Iterator.Element
   >(
-    _ subRange: R, with newElements: C
+    _ subrange: R, with newElements: C
   ) {
-    self.replaceSubrange(_makeHalfOpen(subRange), with: newElements)
+    self.replaceSubrange(_makeHalfOpen(subrange), with: newElements)
   }
   
   @warn_unused_result
@@ -549,7 +549,7 @@ extension RangeReplaceableCollection {
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(
-    _ subRange: Range<Index>, with newElements: C
+    _ subrange: Range<Index>, with newElements: C
   ) {
     fatalError("unavailable function can't be called")
   }
@@ -560,7 +560,7 @@ extension RangeReplaceableCollection {
   }
 
   @available(*, unavailable, renamed: "removeSubrange")
-  public mutating func removeRange(_ subRange: Range<Index>) {
+  public mutating func removeRange(_ subrange: Range<Index>) {
   }
 
   @available(*, unavailable, renamed: "append(contentsOf:)")
