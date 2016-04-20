@@ -112,14 +112,7 @@ extension RangeProtocol {
     return (!other.isEmpty && self.contains(other.lowerBound))
         || (!self.isEmpty && other.contains(lowerBound))
   }
-  
-  /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
-  public var isEmpty: Bool {
-    // Note: this default implementation is not suitable for a range
-    // that has an open lower bound.
-    return !self.contains(self.lowerBound)
-  }
-  
+
   /// Returns `self` clamped to `limits`.
   ///
   /// The bounds of the result, even if it is empty, are always
@@ -337,15 +330,15 @@ public struct CountableRange<
     return element >= self.lowerBound && element < self.upperBound
   }
 
+  /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
+  public var isEmpty: Bool {
+    return lowerBound == upperBound
+  }
+
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return "CountableRange(\(String(reflecting: lowerBound))"
     + "..<\(String(reflecting: upperBound)))"
-  }
-
-  public // ambiguity resolution between RangeProtocol and Collection defaults
-  var isEmpty: Bool {
-    return lowerBound == upperBound
   }
 }
 
@@ -520,6 +513,11 @@ public struct Range<
   @warn_unused_result
   public func contains(_ element: Bound) -> Bool {
     return element >= self.lowerBound && element < self.upperBound
+  }
+
+  /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
+  public var isEmpty: Bool {
+    return lowerBound == upperBound
   }
 
   /// A textual representation of `self`.

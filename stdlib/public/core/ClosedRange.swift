@@ -272,8 +272,8 @@ public struct CountableClosedRange<
       + "...\(String(reflecting: upperBound)))"
   }
 
-  public // ambiguity resolution between RangeProtocol and Collection defaults
-  var isEmpty: Bool {
+  /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
+  public var isEmpty: Bool {
     return false
   }
 
@@ -332,6 +332,11 @@ public struct ClosedRange<
   @warn_unused_result
   public func contains(_ element: Bound) -> Bool {
     return element >= self.lowerBound && element <= self.upperBound
+  }
+
+  /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
+  public var isEmpty: Bool {
+    return false
   }
 
   /// A textual representation of `self`.
