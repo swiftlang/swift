@@ -301,10 +301,13 @@ extension RangeReplaceableCollection {
   internal func _makeHalfOpen<
     R : RangeProtocol where R.Bound == Index
   >(_ r: R) -> Range<Index> {
-    return Range(
-      uncheckedBounds: (
-        lower: r.lowerBound,
-        upper: r.contains(r.upperBound) ? successor(of: r.upperBound) : r.upperBound))
+
+    // The upperBound of the result depends on whether `r` is a closed
+    // range.
+    let u = r.contains(r.upperBound) 
+	    ? successor(of: r.upperBound) : r.upperBound
+    
+    return Range(uncheckedBounds: (lower: r.lowerBound, upper: u))
   }
   
   public mutating func removeSubrange<
