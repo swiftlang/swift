@@ -1616,13 +1616,18 @@ DeclName Parser::parseUnqualifiedDeclName(bool allowInit,
   return DeclName(Context, baseName, argumentLabels);
 }
 
-static bool shouldAddSelfFixit(DeclContext* Current, DeclName Name) {
+static bool shouldAddSelfFixit(DeclContext* Current, DeclName Name,
+                               DescriptiveDeclKind &Kind) {
   if (Current->isTypeContext() || !Current->getInnermostTypeContext())
     return false;
   if (auto *Nominal = Current->getInnermostTypeContext()->
       getAsNominalTypeOrNominalTypeExtensionContext()){
     // FIXME: we cannot resolve members appear later in the body of the nominal.
-    return !Nominal->lookupDirect(Name).empty();
+    auto LookupResults = Nominal->lookupDirect(Name);
+    if (!LookupResults.empty()) {
+      Kind = LookupResults.front()->getDescriptiveKind();
+      return true;
+    }
   }
   return false;
 }
@@ -1673,10 +1678,11 @@ Expr *Parser::parseExprIdentifier() {
   } else {
     for (auto activeVar : DisabledVars) {
       if (activeVar->getFullName() == name) {
+        DescriptiveDeclKind Kind;
         if (DisabledVarReason.ID == diag::var_init_self_referential.ID &&
-            shouldAddSelfFixit(CurDeclContext, name)) {
-          diagnose(loc.getBaseNameLoc(), diag::expected_self_before_reference).
-            fixItInsert(loc.getBaseNameLoc(), "self.");
+            shouldAddSelfFixit(CurDeclContext, name, Kind)) {
+          diagnose(loc.getBaseNameLoc(), diag::expected_self_before_reference,
+                   Kind).fixItInsert(loc.getBaseNameLoc(), "self.");
         } else {
           diagnose(loc.getBaseNameLoc(), DisabledVarReason);
         }

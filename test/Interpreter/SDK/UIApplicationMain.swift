@@ -11,7 +11,7 @@ import UIKit
 
 @UIApplicationMain
 class MyDelegate : NSObject, UIApplicationDelegate {
-  func application(application: UIApplication, didFinishLaunchingWithOptions launchOptions: [NSObject: AnyObject]?) -> Bool {
+  func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [NSObject: AnyObject]?) -> Bool {
     // CHECK: launched
     print("launched")
     exit(EXIT_SUCCESS)

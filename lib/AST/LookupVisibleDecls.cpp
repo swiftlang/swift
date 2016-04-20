@@ -378,10 +378,13 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
       if (auto *VD = dyn_cast<ValueDecl>(Member)) {
         if (TypeResolver)
           TypeResolver->resolveDeclSignature(VD);
+
         // Skip value requirements that have corresponding witnesses. This cuts
         // down on duplicates.
         if (!NormalConformance->hasWitness(VD) ||
-            NormalConformance->getWitness(VD, nullptr) == nullptr) {
+            NormalConformance->getWitness(VD, nullptr) == nullptr ||
+            NormalConformance->getWitness(VD, nullptr).getDecl()->getFullName()
+              != VD->getFullName()) {
           Consumer.foundDecl(VD, ReasonForThisProtocol);
         }
       }

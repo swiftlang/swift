@@ -181,7 +181,7 @@ ERROR(disallowed_init,none,
 ERROR(var_init_self_referential,none,
       "variable used within its own initial value", ())
 ERROR(expected_self_before_reference,none,
-      "expected self. before member name", ())
+      "variable used within its own initial value; use 'self.' to refer to the %0", (DescriptiveDeclKind))
 
 ERROR(disallowed_enum_element,none,
       "enum 'case' is not allowed outside of an enum", ())

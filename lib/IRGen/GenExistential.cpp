@@ -1267,7 +1267,7 @@ public:
       Refcounting(refcounting) {}
 
   ReferenceCounting getReferenceCounting() const {
-    // ErrorProtocol uses its own rc entry points.
+    // ErrorProtocol uses its own RC entry points.
     return Refcounting;
   }
   

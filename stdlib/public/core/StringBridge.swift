@@ -226,6 +226,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     return _core[index]
   }
 
+  @inline(__always) // Performance: To save on reference count operations.
   func getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange) {
