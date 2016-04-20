@@ -93,6 +93,8 @@ using namespace swift;
 STATISTIC(NumRetainsSunk, "Number of retains sunk");
 STATISTIC(NumReleasesHoisted, "Number of releases hoisted");
 
+llvm::cl::opt<bool> DisableRRCodeMotion("disable-rr-cm", llvm::cl::init(true));
+
 //===----------------------------------------------------------------------===//
 //                             Utility 
 //===----------------------------------------------------------------------===//
@@ -1030,6 +1032,9 @@ public:
 
   /// The entry point to the transformation.
   void run() override {
+    if (DisableRRCodeMotion)
+      return;
+
     // Respect function no.optimize.
     SILFunction *F = getFunction();
     if (!F->shouldOptimize())
