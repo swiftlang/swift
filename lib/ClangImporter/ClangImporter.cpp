@@ -2085,6 +2085,11 @@ auto ClangImporter::Implementation::importFullName(
   if (isa<clang::ObjCCategoryDecl>(D))
     return result;
 
+  // Swift 2.2 does not import Objective-C class properties as properties.
+  if (auto objcPropertyDecl = dyn_cast<clang::ObjCPropertyDecl>(D)) {
+    if (objcPropertyDecl->isClassProperty()) return result;
+  }
+
   // Compute the effective context, if requested.
   if (effectiveContext) {
     auto dc = const_cast<clang::DeclContext *>(D->getDeclContext());
@@ -2737,11 +2742,13 @@ ClangImporter::Implementation::getAPINotesForContext(
 void ClangImporter::Implementation::mergePropInfoIntoAccessor(
     const clang::ObjCMethodDecl *method, api_notes::ObjCMethodInfo &methodInfo){
 
-  if (!method->isPropertyAccessor())
+  // Swift 2.2 does not import class properties as properties.
+  if (!method->isPropertyAccessor() || method->isClassMethod())
     return;
 
+  // Swift 2.2 does not import Objective-C class properties as properties.
   const clang::ObjCPropertyDecl *pDecl = method->findPropertyDecl();
-  if (!pDecl)
+  if (!pDecl || pDecl->isClassProperty())
     return;
 
   if (auto pInfo = getKnownObjCProperty(pDecl)) {
@@ -2890,6 +2897,9 @@ ClangImporter::Implementation::getKnownObjCContext(
 Optional<api_notes::ObjCPropertyInfo>
 ClangImporter::Implementation::getKnownObjCProperty(
     const clang::ObjCPropertyDecl *property) {
+  // Swift 2.2 does not import Objective-C class properties as properties.
+  if (property->isClassProperty()) return None;
+
   auto *container = cast<clang::ObjCContainerDecl>(property->getDeclContext());
 
   // Figure out where to look for context information.
@@ -3070,7 +3080,9 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
     //
     // Note that this is suppressed for certain accessibility declarations,
     // which are imported as getter/setter pairs and not properties.
-    if (objcMethod->isPropertyAccessor()) {
+    //
+    // Swift 2.2 does not import class properties as properties.
+    if (objcMethod->isPropertyAccessor() && objcMethod->isInstanceMethod()) {
       // Suppress the import of this method when the corresponding
       // property is not suppressed.
       return !shouldSuppressDeclImport(
@@ -3090,6 +3102,9 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
     // getter/setter pairs instead.
     if (isAccessibilityDecl(objcProperty))
       return true;
+
+    // Swift 2.2 does not import Objective-C class properties as properties.
+    if (objcProperty->isClassProperty()) return true;
 
     // Check whether there is a superclass method for the getter that
     // is *not* suppressed, in which case we will need to suppress
@@ -3896,7 +3911,8 @@ void ClangModuleUnit::lookupObjCMethods(
     if (owningClangModule != clangModule) continue;
 
     // If we found a property accessor, import the property.
-    if (objcMethod->isPropertyAccessor())
+    // Swift 2.2 does not import class properties as properties.
+    if (objcMethod->isPropertyAccessor() && objcMethod->isInstanceMethod())
       (void)owner.Impl.importDecl(objcMethod->findPropertyDecl(true));
 
     // Import it.

@@ -99,6 +99,11 @@ module ObjCSubscripts {
   export *
 }
 
+module ObjCClassPropertiesIgnored {
+  header "ObjCClassPropertiesIgnored.h"
+  export *
+}
+
 module ProtoWithInitializer {
   header "ProtoWithInitializer.h"
   export *
