@@ -230,17 +230,6 @@ public protocol RangeReplaceableCollection
   /// - Precondition: `n >= 0 && self.count >= n`.
   mutating func removeFirst(_ n: Int)
 
-  // FIXME: swift-3-indexing-model: why is this convenience function a protocol
-  // requirement?
-  /// Remove all elements within `bounds`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`self.count`).
-  mutating func removeSubrange<
-    Bounds : RangeProtocol where Bounds.Bound == Index
-  >(_ bounds: Range<Index>)
-
   /// Remove all elements.
   ///
   /// Invalidates all indices with respect to `self`.
@@ -321,7 +310,25 @@ extension RangeReplaceableCollection {
   public mutating func removeSubrange<
     R : RangeProtocol where R.Bound == Index
   >(_ bounds: R) {
-    replaceSubrange(_makeHalfOpen(bounds), with: EmptyCollection())
+    removeSubrange(_makeHalfOpen(bounds))
+  /// Removes all elements within `bounds`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`self.count`).
+  public mutating func removeSubrange(_ bounds: Range<Index>) {
+    replaceSubrange(bounds, with: EmptyCollection())
+  }
+
+  /// Removes all elements within `bounds`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`self.count`).
+  public mutating func removeSubrange<
+    R : RangeProtocol where R.Bound == Index
+  >(_ bounds: R) {
+    removeSubrange(_makeHalfOpen(bounds))
   }
 
   public mutating func removeFirst(_ n: Int) {
@@ -396,7 +403,7 @@ Index : Strideable, Index.Stride : Integer {
 
 extension RangeReplaceableCollection {
   public mutating func replaceSubrange<
-    R : RangeProtocol, C : Collection
+    R : ClosedRangeProtocol, C : Collection
     where
     R.Bound == Self.Index, C.Iterator.Element == Iterator.Element
   >(

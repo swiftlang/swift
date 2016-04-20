@@ -715,7 +715,8 @@ extension String {
     _ bounds: Bounds, with newElements: C
   ) {
     withMutableCharacters {
-      (v: inout CharacterView) in v.replaceSubrange(bounds, with: newElements)
+      (v: inout CharacterView) 
+      in v.replaceSubrange(v._makeHalfOpen(bounds), with: newElements)
     }
   }
 
