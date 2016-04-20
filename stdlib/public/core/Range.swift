@@ -63,14 +63,6 @@ public protocol RangeProtocol : Equatable {
   /// upper bound.
   @warn_unused_result
   func contains(_ value: Bound) -> Bool
-  
-  /// Returns `true` iff `self` and `other` contain a value in common.
-  /// 
-  /// Any type of range contains every value `x` where
-  /// `lowerBound < x < upperBound`. `RangeProtocol` makes no requirement as
-  /// to whether individual range types must contain either their lower or
-  /// upper bound.
-  func overlaps(_ other: Self) -> Bool
 
   /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
   var isEmpty: Bool { get }
@@ -90,12 +82,6 @@ public protocol RangeProtocol : Equatable {
   /// Depending on the concrete type of the range, `upperBound` may or may not
   /// be contained in the range.
   var upperBound: Bound { get }
-  
-  /// Returns `self` clamped to `limits`.
-  ///
-  /// The bounds of the result, even if it is empty, are always
-  /// limited to the bounds of `limits`.
-  func clamped(to limits: Self) -> Self
 }
 
 extension RangeProtocol {
