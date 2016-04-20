@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -retain-sinking -late-release-hoisting %s
+// RUN: %target-sil-opt -enable-sil-verify-all -retain-sinking -late-release-hoisting %s | FileCheck %s
 
 import Builtin
 import Swift
@@ -212,6 +212,25 @@ bb0(%0 : $*Builtin.NativeObject):
   strong_retain %1 : $Builtin.NativeObject
   is_unique %0 : $*Builtin.NativeObject
   %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that is_unique stops code motion.
+// CHECK-LABEL: sil @retain_inserted_deterministically : $@convention(thin)
+// CHECK: bb0([[IN0:%[0-9]+]] : $Builtin.NativeObject, [[IN1:%[0-9]+]] : $Builtin.NativeObject, [[IN2:%[0-9]+]] : $Builtin.NativeObject, [[IN3:%[0-9]+]] : $Builtin.NativeObject):
+// CHECK: strong_retain [[IN1]] : $Builtin.NativeObject
+// CHECK: strong_retain [[IN3]] : $Builtin.NativeObject
+// CHECK: strong_retain [[IN2]] : $Builtin.NativeObject
+// CHECK: strong_retain [[IN0]] : $Builtin.NativeObject
+sil @retain_inserted_deterministically : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject, %2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject):
+  strong_retain %1 : $Builtin.NativeObject
+  strong_retain %3 : $Builtin.NativeObject
+  strong_retain %2 : $Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  %9998 = function_ref @blocker : $@convention(thin) () -> ()
+  apply %9998() : $@convention(thin) () -> ()
   return %9999 : $()
 }
 

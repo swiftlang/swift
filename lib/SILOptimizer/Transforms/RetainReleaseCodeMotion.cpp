@@ -93,7 +93,7 @@ using namespace swift;
 STATISTIC(NumRetainsSunk, "Number of retains sunk");
 STATISTIC(NumReleasesHoisted, "Number of releases hoisted");
 
-llvm::cl::opt<bool> DisableRRCodeMotion("disable-rr-cm", llvm::cl::init(true));
+llvm::cl::opt<bool> DisableRRCodeMotion("disable-rr-cm", llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//
 //                             Utility 
@@ -503,9 +503,12 @@ void RetainCodeMotionContext::computeCodeMotionGenKillSet() {
 bool RetainCodeMotionContext::performCodeMotion() {
   bool Changed = false;
   // Create the new retain instructions.
-  for (auto RC : InsertPoints) {
-    for (auto IP : RC.second) {
-      createIncrementBefore(RC.first, IP);
+  for (auto RC : RCRootVault) {
+    auto Iter = InsertPoints.find(RC);
+    if (Iter == InsertPoints.end())
+      continue;
+    for (auto IP : Iter->second) {
+      createIncrementBefore(Iter->first, IP);
       Changed = true;
     }
   }
@@ -870,9 +873,12 @@ void ReleaseCodeMotionContext::mergeBBDataFlowStates(SILBasicBlock *BB) {
 bool ReleaseCodeMotionContext::performCodeMotion() {
   bool Changed = false;
   // Create the new releases at each anchor point.
-  for (auto RC : InsertPoints) {
-    for (auto IP : RC.second) {
-      createDecrementBefore(RC.first, IP);
+  for (auto RC : RCRootVault) {
+    auto Iter = InsertPoints.find(RC);
+    if (Iter == InsertPoints.end())
+      continue;
+    for (auto IP : Iter->second) {
+      createDecrementBefore(Iter->first, IP);
       Changed = true;
     }
   }
