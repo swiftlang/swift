@@ -1,3 +1,4 @@
-add_swift_library(swiftRemoteAST SHARED
+add_swift_library(swiftRemoteAST
   RemoteAST.cpp
-  LINK_LIBRARIES swiftSema)
+  LINK_LIBRARIES
+    swiftSema)
