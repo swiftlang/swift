@@ -1863,7 +1863,8 @@ function(_add_swift_executable_single name)
       PROPERTIES FOLDER "Swift executables")
 endfunction()
 
-# Add an executable for the target machine.
+# Add an executable for each target variant. Executables are given suffixes
+# with the variant SDK and ARCH.
 #
 # See add_swift_executable for detailed documentation.
 #
@@ -1977,6 +1978,10 @@ endfunction()
 #
 #   source1 ...
 #     Sources to add into this executable.
+#
+# Note:
+#   Host executables are not given a variant suffix. To build a executable for
+#   each SDK and ARCH variant, use add_swift_target_executable.
 function(add_swift_executable name)
   # Parse the arguments we were given.
   cmake_parse_arguments(SWIFTEXE
@@ -1997,7 +2002,6 @@ function(add_swift_executable name)
 
   set(SWIFTEXE_SOURCES ${SWIFTEXE_UNPARSED_ARGUMENTS})
 
-  # Note: host tools don't get a variant suffix.
   _add_swift_executable_single(
       ${name}
       ${SWIFTEXE_SOURCES}
