@@ -23,6 +23,7 @@
 #include "llvm/Support/Compiler.h"
 #include <string>
 #include <cstring>
+#include <cassert>
 #include <type_traits>
 
 namespace swift {
