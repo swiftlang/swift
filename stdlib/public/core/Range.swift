@@ -61,6 +61,7 @@ public protocol RangeProtocol : Equatable {
   /// `lowerBound < x < upperBound`. `RangeProtocol` makes no requirement as
   /// to whether individual range types must contain either their lower or
   /// upper bound.
+  @warn_unused_result
   func contains(_ value: Bound) -> Bool
   
   /// Returns `true` iff `self` and `other` contain a value in common.
@@ -105,6 +106,12 @@ extension RangeProtocol {
   }
   
   /// Returns `true` iff `self` and `other` contain a value in common.
+  ///
+  /// Any type of range contains every value `x` where
+  /// `lowerBound < x < upperBound`. `RangeProtocol` makes no requirement as
+  /// to whether individual range types must contain either their lower or
+  /// upper bound.
+  @warn_unused_result
   @inline(__always)
   public func overlaps<
     Other : RangeProtocol where Other.Bound == Bound
@@ -117,6 +124,7 @@ extension RangeProtocol {
   ///
   /// The bounds of the result, even if it is empty, are always
   /// limited to the bounds of `limits`.
+  @warn_unused_result
   @inline(__always)
   public func clamped(to limits: Self) -> Self {
     return Self(
@@ -359,6 +367,7 @@ extension RangeProtocol {
   /// Return true if this is not a closed range type.
   ///
   /// - parameter x: any arbitrary value of type `Bound`.
+  @warn_unused_result
   internal static func _isNotClosed(_ x: Bound) -> Bool {
     return Self(uncheckedBounds: (lower: x, upper: x)).isEmpty
   }
@@ -640,7 +649,7 @@ public func ..< <
 }
 
 @warn_unused_result
-public func ~= <R: RangeProtocol> (
+public func ~= <R : RangeProtocol> (
   pattern: R, value: R.Bound
 ) -> Bool {
   return pattern.contains(value)
