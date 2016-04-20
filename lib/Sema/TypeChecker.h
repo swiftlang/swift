@@ -1467,6 +1467,13 @@ public:
                           ProtocolConformance **Conformance = nullptr,
                           SourceLoc ComplainLoc = SourceLoc());
 
+  /// Completely check the given conformance.
+  void checkConformance(NormalProtocolConformance *conformance);
+
+  /// Check all of the conformances in the given context.
+  void checkConformancesInContext(DeclContext *dc,
+                                  IterableDeclContext *idc);
+
   /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
   void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);
 
@@ -1618,7 +1625,6 @@ public:
   ///
   /// Routines that perform lazy resolution as required for AST operations.
   /// @{
-  void checkConformance(NormalProtocolConformance *conformance) override;
   void resolveTypeWitness(const NormalProtocolConformance *conformance,
                           AssociatedTypeDecl *assocType) override;
   void resolveWitness(const NormalProtocolConformance *conformance,

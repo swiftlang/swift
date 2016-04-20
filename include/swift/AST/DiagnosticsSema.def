@@ -1267,6 +1267,8 @@ ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
 NOTE(protocol_conformance_implied_here,none,
      "implied protocol conformance %0 here can be made explicit", (Identifier))
+
+// "Near matches"
 WARNING(optional_req_nonobjc_near_match,none,
         "non-@objc %select{initializer %1|method %1|property %1|subscript}0 "
         "does not satisfy optional requirement of @objc protocol %2",
@@ -1275,6 +1277,22 @@ NOTE(optional_req_nonobjc_near_match_add_objc,none,
      "add '@objc' to provide an Objective-C entrypoint", ())
 NOTE(optional_req_nonobjc_near_match_silence,none,
      "add '@nonobjc' to silence this warning", ())
+
+WARNING(optional_req_near_match,none,
+        "%0 %1 nearly matches optional requirement %2 of protocol %3",
+        (DescriptiveDeclKind, DeclName, DeclName, DeclName))
+NOTE(optional_req_near_match_rename,none,
+     "rename to %0 to satisfy this requirement",
+     (DeclName))
+NOTE(optional_req_near_match_move,none,
+     "move %0 to %select{an|another}1 extension to silence this warning",
+     (DeclName, unsigned))
+NOTE(optional_req_near_match_nonobjc,none,
+     "move %0 to %select{an|another}1 extension or add '@nonobjc' to "
+     "silence this warning", (DeclName))
+NOTE(optional_req_near_match_accessibility,none,
+     "make %0 %select{ERROR|private|private or internal}1 to silence this "
+     "warning", (DeclName, Accessibility))
 
 // Protocols and existentials
 ERROR(assoc_type_outside_of_protocol,none,

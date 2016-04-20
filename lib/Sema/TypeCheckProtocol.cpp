@@ -1879,16 +1879,6 @@ void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
     // match.
     if (!SuppressDiagnostics)
       checkOptionalWitnessNonObjCMatch(requirement);
-
-    if (auto funcReq = dyn_cast<AbstractFunctionDecl>(requirement)) {
-      TC.Context.recordObjCUnsatisfiedOptReq(DC, funcReq);
-    } else {
-      auto storageReq = cast<AbstractStorageDecl>(requirement);
-      if (auto getter = storageReq->getGetter())
-        TC.Context.recordObjCUnsatisfiedOptReq(DC, getter);
-      if (auto setter = storageReq->getSetter())
-        TC.Context.recordObjCUnsatisfiedOptReq(DC, setter);
-    }
   }
 }
 
@@ -4173,6 +4163,430 @@ void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
   checkConformsToProtocol(*this, conformance);
+}
+
+/// Determine the score when trying to match two identifiers together.
+static unsigned scoreIdentifiers(Identifier lhs, Identifier rhs,
+                                 unsigned limit, bool isFirstParamOfFunc) {
+  // Simple case: we have the same identifier.
+  if (lhs == rhs) return 0;
+
+  // One of the identifiers is empty.
+  if (lhs.empty() != rhs.empty()) {
+    // Attribute a score of "1" when the first argument of a function is
+    // present in one case but absent in the other, because this was a change
+    // from Swift 2 to Swift 3.
+    if (isFirstParamOfFunc) return 1;
+
+    // Otherwise, use the length of the non-empty identifier.
+    return lhs.empty() ? rhs.str().size() : lhs.str().size();
+  }
+
+  // Compute the edit distance between the two names.
+  return lhs.str().edit_distance(rhs.str(), true, limit);
+}
+
+/// Compute the scope between two potentially-matching names, which is
+/// effectively the sum of the edit distances between the corresponding
+/// argument labels.
+static unsigned scorePotentiallyMatchingNames(DeclName lhs, DeclName rhs,
+                                              bool isFunc,
+                                              unsigned limit) {
+  // If there are a different number of argument labels, we're done.
+  if (lhs.getArgumentNames().size() != rhs.getArgumentNames().size())
+    return limit;
+
+  // Score the base name match.
+  unsigned score = scoreIdentifiers(lhs.getBaseName(), rhs.getBaseName(),
+                                    limit, false);
+  if (score >= limit) return limit;
+
+  // Compute the edit distance between matching argument names.
+  for (unsigned i = 0; i != lhs.getArgumentNames().size(); ++i) {
+    score += scoreIdentifiers(lhs.getArgumentNames()[i],
+                              rhs.getArgumentNames()[i],
+                              limit - score,
+                              isFunc && i == 0);
+    if (score >= limit) return limit;
+  }
+
+  return score;
+}
+
+namespace {
+  /// Describes actions one could take to suppress a warning about a
+  /// nearly-matching witness for an optional requirement.
+  enum class PotentialWitnessWarningSuppression {
+    MoveToExtension,
+    MoveToAnotherExtension
+  };
+}
+
+/// Determine we can suppress the warning about a potential witness nearly
+/// matching an optional requirement by moving the declaration.
+Optional<PotentialWitnessWarningSuppression>
+canSuppressPotentialWitnessWarningWithMovement(ValueDecl *requirement,
+                                               ValueDecl *witness) {
+  // If the witness is within an extension, it can be moved to another
+  // extension.
+  if (isa<ExtensionDecl>(witness->getDeclContext()))
+    return PotentialWitnessWarningSuppression::MoveToAnotherExtension;
+
+  // A stored property cannot be moved to an extension.
+  if (auto var = dyn_cast<VarDecl>(witness)) {
+    if (var->hasStorage()) return None;
+  }
+
+  // If the witness is within a struct or enum, it can be freely moved to
+  // another extension.
+  if (isa<StructDecl>(witness->getDeclContext()) ||
+      isa<EnumDecl>(witness->getDeclContext()))
+    return PotentialWitnessWarningSuppression::MoveToExtension;
+
+  // From here on, we only handle members of classes.
+  auto classDecl = dyn_cast<ClassDecl>(witness->getDeclContext());
+  if (!classDecl) return None;
+
+  // If the witness is a designated or required initializer, we can't move it
+  // to an extension.
+  if (auto ctor = dyn_cast<ConstructorDecl>(witness)) {
+    switch (ctor->getInitKind()) {
+    case CtorInitializerKind::Designated:
+      return None;
+
+    case CtorInitializerKind::Convenience:
+    case CtorInitializerKind::ConvenienceFactory:
+    case CtorInitializerKind::Factory:
+      break;
+    }
+
+    if (ctor->isRequired()) return None;
+  }
+
+  // We can move this entity to an extension.
+  return PotentialWitnessWarningSuppression::MoveToExtension;
+}
+
+/// Determine we can suppress the warning about a potential witness nearly
+/// matching an optional requirement by adding @nonobjc.
+static bool
+canSuppressPotentialWitnessWarningWithNonObjC(ValueDecl *requirement,
+                                              ValueDecl *witness) {
+  // The requirement must be @objc.
+  if (!requirement->isObjC()) return false;
+
+  // The witness must not have @nonobjc.
+  if (witness->getAttrs().hasAttribute<NonObjCAttr>()) return false;
+
+  // The witness must be @objc.
+  if (!witness->isObjC()) return false;
+
+  // ... but not explicitly.
+  if (auto attr = witness->getAttrs().getAttribute<ObjCAttr>()) {
+    if (!attr->isImplicit()) return false;
+  }
+
+  // And not because it has to be for overriding.
+  if (auto overridden = witness->getOverriddenDecl())
+    if (overridden->isObjC()) return false;
+
+  // @nonobjc can be used to silence this warning.
+  return true;
+}
+
+/// Get the length of the given full name, counting up the base name and all
+/// argument labels.
+static unsigned getNameLength(DeclName name) {
+  unsigned length = 0;
+  if (!name.getBaseName().empty()) length += name.getBaseName().str().size();
+  for (auto arg : name.getArgumentNames()) {
+    if (!arg.empty())
+      length += arg.str().size();
+  }
+  return length;
+}
+
+/// Determine whether we should warn about the given witness being a close
+/// match for the given optional requirement.
+static bool shouldWarnAboutPotentialWitness(ValueDecl *req,
+                                            ValueDecl *witness,
+                                            Accessibility accessibility,
+                                            unsigned score) {
+  // If the warning couldn't be suppressed, don't warn.
+  if (!canSuppressPotentialWitnessWarningWithMovement(req, witness) &&
+      !canSuppressPotentialWitnessWarningWithNonObjC(req, witness))
+    return false;
+
+  // If the potential witness is already marked @nonobjc, don't warn.
+  if (witness->getAttrs().hasAttribute<NonObjCAttr>())
+    return false;
+
+  // Don't warn if the potential witness has been explicitly given less
+  // visibility than the conformance.
+  if (witness->getFormalAccess() < accessibility) {
+    if (auto attr = witness->getAttrs().getAttribute<AccessibilityAttr>())
+      if (!attr->isImplicit()) return false;
+  }
+
+  // If the score is relatively high, don't warn: this is probably unrelated.
+  // The heuristic we use here is to ignore outright omissions and determine
+  // whether there was more than one typo for every two characters. If so,
+  // consider it "different".
+  unsigned reqNameLen = getNameLength(req->getFullName());
+  unsigned witnessNameLen = getNameLength(witness->getFullName());
+  unsigned lengthDiff =
+    std::max(reqNameLen, witnessNameLen) - std::min(reqNameLen, witnessNameLen);
+  if ((score - lengthDiff) > (witnessNameLen + 1) / 3) return false;
+
+  return true;
+}
+
+/// Diagnose a potential witness.
+static void diagnosePotentialWitness(TypeChecker &tc, ValueDecl *req,
+                                     ValueDecl *witness,
+                                     Accessibility accessibility) {
+  auto proto = cast<ProtocolDecl>(req->getDeclContext());
+
+  // Primary warning.
+  tc.diagnose(witness, diag::optional_req_near_match,
+              witness->getDescriptiveKind(),
+              witness->getFullName(),
+              req->getFullName(),
+              proto->getFullName());
+
+  // Warning to fix the names.
+  if (req->getFullName() != witness->getFullName()) {
+    auto diag = tc.diagnose(witness, diag::optional_req_near_match_rename,
+                            req->getFullName());
+    fixDeclarationName(diag, witness, req->getFullName());
+
+    // Also fix the Objective-C name, if needed.
+    if (req->isObjC())
+      fixDeclarationObjCName(diag, witness, req->getObjCRuntimeName());
+  }
+
+  // If moving the declaration can help, suggest that.
+  if (auto move
+        = canSuppressPotentialWitnessWarningWithMovement(req, witness)) {
+    tc.diagnose(witness, diag::optional_req_near_match_move,
+                witness->getFullName(), static_cast<unsigned>(*move));
+  }
+
+  // If adding 'private' or 'internal' can help, suggest that.
+  if (accessibility != Accessibility::Private &&
+      !witness->getAttrs().hasAttribute<AccessibilityAttr>()) {
+    tc.diagnose(witness, diag::optional_req_near_match_accessibility,
+                witness->getFullName(),
+                accessibility)
+      .fixItInsert(witness->getAttributeInsertionLoc(true), "private ");
+  }
+
+  // If adding @nonobjc can help, suggest that.
+  if (canSuppressPotentialWitnessWarningWithNonObjC(req, witness)) {
+    tc.diagnose(witness, diag::optional_req_nonobjc_near_match_silence)
+      .fixItInsert(witness->getAttributeInsertionLoc(false), "@nonobjc ");
+  }
+
+  tc.diagnose(req, diag::protocol_requirement_here, req->getFullName());
+}
+
+void TypeChecker::checkConformancesInContext(DeclContext *dc,
+                                             IterableDeclContext *idc) {
+  // Determine the accessibility of this conformance.
+  Accessibility defaultAccessibility;
+  if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+    // For anything with a Clang node, lazily check conformances.
+    if (ext->hasClangNode()) return;
+
+    defaultAccessibility = ext->getDefaultAccessibility();
+  } else {
+    // For anything with a Clang node, lazily check conformances.
+    auto nominal = cast<NominalTypeDecl>(dc);
+    if (nominal->hasClangNode()) return;
+
+    defaultAccessibility = nominal->getFormalAccess();
+  }
+
+  ReferencedNameTracker *tracker = nullptr;
+  if (SourceFile *SF = dc->getParentSourceFile())
+    tracker = SF->getReferencedNameTracker();
+
+
+  // Check each of the conformances associated with this context.
+  SmallVector<ConformanceDiagnostic, 4> diagnostics;
+  auto conformances = dc->getLocalConformances(ConformanceLookupKind::All,
+                                               &diagnostics,
+                                               /*sorted=*/true);
+  bool hasAnyUnsatisfiedOptionalReqs = false;
+  for (auto conformance : conformances) {
+    // Check and record normal conformances.
+    if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
+      checkConformance(normal);
+
+      // Check whether there are any unsatisfied optional requirements.
+      if (!normal->isInvalid() && !hasAnyUnsatisfiedOptionalReqs) {
+        auto proto = conformance->getProtocol();
+        for (auto member : proto->getMembers()) {
+          if (isa<TypeDecl>(member)) continue;
+
+          auto value = dyn_cast<ValueDecl>(member);
+          if (!value) continue;
+
+          // If there is an empty witness, record it.
+          if (normal->hasWitness(value) &&
+              !normal->getWitness(value, nullptr).getDecl()) {
+            hasAnyUnsatisfiedOptionalReqs = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (tracker)
+      tracker->addUsedMember({conformance->getProtocol(), Identifier()},
+                             defaultAccessibility != Accessibility::Private);
+  }
+
+  // Diagnose any conflicts attributed to this declaration context.
+  for (const auto &diag : diagnostics) {
+    // Figure out the declaration of the existing conformance.
+    Decl *existingDecl = dyn_cast<NominalTypeDecl>(diag.ExistingDC);
+    if (!existingDecl)
+      existingDecl = cast<ExtensionDecl>(diag.ExistingDC);
+
+    // Complain about redundant conformances.
+    diagnose(diag.Loc, diag::redundant_conformance,
+             dc->getDeclaredTypeInContext(),
+             diag.Protocol->getName());
+
+    diagnose(existingDecl, diag::declared_protocol_conformance_here,
+             dc->getDeclaredTypeInContext(),
+             static_cast<unsigned>(diag.ExistingKind),
+             diag.Protocol->getName(),
+             diag.ExistingExplicitProtocol->getName());
+  }
+
+  // If there were any unsatisfied optional requirements, check whether
+  // there are any near-matches we should diagnose.
+  if (hasAnyUnsatisfiedOptionalReqs) {
+    // Catalog all of members of this declaration context that satisfy
+    // requirements of conformances in this context.
+    llvm::MapVector<DeclName, llvm::TinyPtrVector<ValueDecl *>>
+      unsatisfiedOptionalReqs;
+    llvm::SmallPtrSet<ValueDecl *, 16> knownWitnesses;
+    for (auto conformance : conformances) {
+      conformance->forEachValueWitness(
+        nullptr,
+        [&](ValueDecl *req, ConcreteDeclRef witness) {
+          // If there is a witness, record it if it's within this context.
+          if (witness.getDecl()) {
+            if (witness.getDecl()->getDeclContext() == dc)
+              knownWitnesses.insert(witness.getDecl());
+            return;
+          }
+
+          // There is no witness. If this was an optional requirement,
+          // record it as such.
+          if (req->getAttrs().hasAttribute<OptionalAttr>())
+            unsatisfiedOptionalReqs[req->getBaseName()].push_back(req);
+         });
+    }
+
+    // Find all of the members that aren't used to satisfy requirements,
+    // and check whether they are close to an unsatisfied requirement.
+    for (auto member : idc->getMembers()) {
+      // Filter out anything that couldn't satisfy an optional requirement.
+      auto value = dyn_cast<ValueDecl>(member);
+      if (!value) continue;
+      if (isa<TypeDecl>(value)) continue;
+      if (knownWitnesses.count(value) > 0) continue;
+      if (!value->getFullName()) continue;
+
+      // Consider any optional requirements with the same base name.
+      auto optionalReqs = unsatisfiedOptionalReqs.find(value->getBaseName());
+      if (optionalReqs == unsatisfiedOptionalReqs.end()) continue;
+
+      // Find the optional requirements with the nearest-matching names.
+      SmallVector<ValueDecl *, 4> bestOptionalReqs;
+      unsigned bestScore = UINT_MAX;
+      for (auto req : optionalReqs->second) {
+        // Score this particular optional requirement.
+        auto score = scorePotentiallyMatchingNames(value->getFullName(),
+                                                   req->getFullName(),
+                                                   isa<FuncDecl>(req),
+                                                   bestScore);
+        // If the score is better than the best we've seen, update the best
+        // and clear out the list.
+        if (score < bestScore) {
+          bestOptionalReqs.clear();
+          bestScore = score;
+        }
+
+        // If this score matches the (possible new) best score, record it.
+        if (score == bestScore && bestScore < UINT_MAX)
+          bestOptionalReqs.push_back(req);
+      }
+
+      // If we found an exactly-matching name, don't diagnose anything here.
+      // FIXME: We want to diagnose here with specific detail.
+      if (bestScore == 0)
+        bestOptionalReqs.clear();
+
+      // If we found some requirements with nearly-matching names, diagnose
+      // the first one.
+      if (bestScore < UINT_MAX) {
+        bestOptionalReqs.erase(
+          std::remove_if(
+            bestOptionalReqs.begin(),
+            bestOptionalReqs.end(),
+            [&](ValueDecl *req) {
+              return !shouldWarnAboutPotentialWitness(req, value,
+                                                      defaultAccessibility,
+                                                      bestScore);
+            }),
+          bestOptionalReqs.end());
+      }
+
+      // If we have something to complain about, do so.
+      if (!bestOptionalReqs.empty()) {
+        auto req = bestOptionalReqs[0];
+        diagnosePotentialWitness(*this, req, value, defaultAccessibility);
+
+        // Remove this optional requirement from the list. We don't want to
+        // complain about it twice.
+        if (optionalReqs->second.size() == 1) {
+          unsatisfiedOptionalReqs.erase(optionalReqs);
+        } else {
+          optionalReqs->second.erase(std::find(optionalReqs->second.begin(),
+                                               optionalReqs->second.end(),
+                                               req));
+        }
+      }
+    }
+
+    // For any unsatified optional @objc requirements that remain,
+    // note them in the AST for @objc selector collision checking.
+    for (const auto &unsatisfied : unsatisfiedOptionalReqs) {
+      for (auto req : unsatisfied.second) {
+        // Skip non-@objc requirements.
+        if (!req->isObjC()) continue;
+
+        // Skip unavailable requirements.
+        if (req->getAttrs().isUnavailable(Context)) continue;
+
+        // Record this requirement.
+        if (auto funcReq = dyn_cast<AbstractFunctionDecl>(req)) {
+          Context.recordObjCUnsatisfiedOptReq(dc, funcReq);
+        } else {
+          auto storageReq = cast<AbstractStorageDecl>(req);
+          if (auto getter = storageReq->getGetter())
+            Context.recordObjCUnsatisfiedOptReq(dc, getter);
+          if (auto setter = storageReq->getSetter())
+            Context.recordObjCUnsatisfiedOptReq(dc, setter);
+        }
+      }
+    }
+  }
 }
 
 void TypeChecker::resolveTypeWitness(
