@@ -26,7 +26,7 @@ public protocol RangeReplaceableIndexable : Indexable {
   /// Creates an empty instance.
   init()
 
-  /// Construct a Collection of `count` elements, each initialized to
+  /// Creates an instance of `count` elements, each initialized to
   /// `repeatedValue`.
   init(repeating repeatedValue: _Element, count: Int)
 
@@ -48,14 +48,14 @@ public protocol RangeReplaceableIndexable : Indexable {
     _ subrange: Range<Index>, with newElements: C
   )
 
-  /// Insert `newElement` at index `i`.
+  /// Inserts `newElement` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
   mutating func insert(_ newElement: _Element, at i: Index)
 
-  /// Insert `newElements` at index `i`.
+  /// Inserts `newElements` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -64,7 +64,7 @@ public protocol RangeReplaceableIndexable : Indexable {
     S : Collection where S.Iterator.Element == _Element
   >(contentsOf newElements: S, at i: Index)
 
-  /// Remove the element at index `i`.
+  /// Removes the element at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -72,7 +72,7 @@ public protocol RangeReplaceableIndexable : Indexable {
   @discardableResult
   mutating func remove(at i: Index) -> _Element
 
-  /// Remove all elements within `bounds`.
+  /// Removes all elements within `bounds`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -141,7 +141,7 @@ public protocol RangeReplaceableCollection
 
   //===--- Derivable Requirements -----------------------------------------===//
 
-  /// Construct a Collection of `count` elements, each initialized to
+  /// Constructs a Collection of `count` elements, each initialized to
   /// `repeatedValue`.
   init(repeating repeatedValue: Iterator.Element, count: Int)
 
@@ -150,7 +150,7 @@ public protocol RangeReplaceableCollection
     S : Sequence where S.Iterator.Element == Iterator.Element
   >(_ elements: S)
 
-  /// Append `x` to `self`.
+  /// Appends `x` to `self`.
   ///
   /// Applying `successor(of:)` to the index of the new element yields
   /// `self.endIndex`.
@@ -170,7 +170,7 @@ public protocol RangeReplaceableCollection
   >(inout _: Self, _: S)
   */
 
-  /// Append the elements of `newElements` to `self`.
+  /// Appends the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
   mutating func append<
@@ -179,14 +179,14 @@ public protocol RangeReplaceableCollection
     S.Iterator.Element == Iterator.Element
   >(contentsOf newElements: S)
 
-  /// Insert `newElement` at index `i`.
+  /// Inserts `newElement` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
   mutating func insert(_ newElement: Iterator.Element, at i: Index)
 
-  /// Insert `newElements` at index `i`.
+  /// Inserts `newElements` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -195,7 +195,7 @@ public protocol RangeReplaceableCollection
     S : Collection where S.Iterator.Element == Iterator.Element
   >(contentsOf newElements: S, at i: Index)
 
-  /// Remove the element at index `i`.
+  /// Removes the element at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -217,20 +217,20 @@ public protocol RangeReplaceableCollection
   @warn_unused_result
   mutating func _customRemoveLast(_ n: Int) -> Bool
 
-  /// Remove the element at `startIndex` and return it.
+  /// Removes the element at `startIndex` and return it.
   ///
   /// - Complexity: O(`self.count`)
   /// - Precondition: `!self.isEmpty`.
   @discardableResult
   mutating func removeFirst() -> Iterator.Element
 
-  /// Remove the first `n` elements.
+  /// Removes the first `n` elements.
   ///
   /// - Complexity: O(`self.count`)
   /// - Precondition: `n >= 0 && self.count >= n`.
   mutating func removeFirst(_ n: Int)
 
-  /// Remove all elements.
+  /// Removes all elements.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -298,6 +298,7 @@ extension RangeReplaceableCollection {
     return result
   }
 
+  /// Returns a half-open range denoting the same positions as `r`.
   internal func _makeHalfOpen<
     R : RangeProtocol where R.Bound == Index
   >(_ r: R) -> Range<Index> {
@@ -310,10 +311,6 @@ extension RangeReplaceableCollection {
     return Range(uncheckedBounds: (lower: r.lowerBound, upper: u))
   }
   
-  public mutating func removeSubrange<
-    R : RangeProtocol where R.Bound == Index
-  >(_ bounds: R) {
-    removeSubrange(_makeHalfOpen(bounds))
   /// Removes all elements within `bounds`.
   ///
   /// Invalidates all indices with respect to `self`.
@@ -377,7 +374,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
     return element
   }
 
-  /// Remove the first `n` elements.
+  /// Removes the first `n` elements.
   ///
   /// - Complexity: O(1)
   /// - Precondition: `self.count >= n`.
@@ -393,8 +390,13 @@ extension RangeReplaceableCollection where SubSequence == Self {
 extension RangeReplaceableCollection
   where
 Index : Strideable, Index.Stride : Integer {
-  // FIXME: swift-3-indexing-model: why do we need this overload?  There's
-  // another one generic on RangeProtocol.
+  /// Replace the given `subrange` of elements with `newElements`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`subRange.count`) if
+  ///   `subRange.upperBound == self.endIndex` and `newElements.isEmpty`,
+  ///   O(`self.count` + `newElements.count`) otherwise.
   public mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(
@@ -405,6 +407,13 @@ Index : Strideable, Index.Stride : Integer {
 }
 
 extension RangeReplaceableCollection {
+  /// Replace the given `subrange` of elements with `newElements`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`subRange.count`) if
+  ///   `subRange.upperBound == self.endIndex` and `newElements.isEmpty`,
+  ///   O(`self.count` + `newElements.count`) otherwise.
   public mutating func replaceSubrange<
     R : ClosedRangeProtocol, C : Collection
     where
@@ -446,7 +455,7 @@ extension RangeReplaceableCollection
 }
 
 extension RangeReplaceableCollection where Self : BidirectionalCollection {
-  /// Remove an element from the end.
+  /// Removes an element from the end.
   ///
   /// - Complexity: O(1)
   /// - Precondition: `!self.isEmpty`
@@ -458,7 +467,7 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
     return remove(at: predecessor(of: endIndex))
   }
 
-  /// Remove the last `n` elements.
+  /// Removes the last `n` elements.
   ///
   /// - Complexity: O(`self.count`)
   /// - Precondition: `n >= 0 && self.count >= n`.
@@ -495,7 +504,7 @@ extension RangeReplaceableCollection
     return remove(at: predecessor(of: endIndex))
   }
 
-  /// Remove the last `n` elements.
+  /// Removes the last `n` elements.
   ///
   /// - Complexity: O(`self.count`)
   /// - Precondition: `n >= 0 && self.count >= n`.
