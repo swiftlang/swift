@@ -135,14 +135,13 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
             << PrevF << "\n");
       if (!PrevF)
         continue;
+      assert(PrevF->isExternalDeclaration() &&
+             "Prespecialized function should be an external declaration");
       NewF = PrevF;
     }
 
     if (!NewF)
       continue;
-
-    assert(NewF->isExternalDeclaration() &&
-           "Prespecialized function should be an external declaration");
 
     // An existing specialization was found.
     DEBUG(llvm::dbgs() << "Found a specialization of " << ReferencedF->getName()
