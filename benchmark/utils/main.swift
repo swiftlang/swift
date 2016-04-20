@@ -205,6 +205,7 @@ precommitTests = [
   "StrComplexWalk": run_StrComplexWalk,
   "StrToInt": run_StrToInt,
   "StringBuilder": run_StringBuilder,
+  "StringEqualPointerComparison": run_StringEqualPointerComparison,
   "StringInterpolation": run_StringInterpolation,
   "StringHasPrefix": run_StringHasPrefix,
   "StringHasPrefixUnicode": run_StringHasPrefixUnicode,
