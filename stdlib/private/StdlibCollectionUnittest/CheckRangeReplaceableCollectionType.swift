@@ -62,7 +62,7 @@ internal enum IndexSelection {
   }
 }
 
-internal struct ReplaceRangeTest {
+internal struct ReplaceSubrangeTest {
   let collection: [OpaqueValue<Int>]
   let newElements: [OpaqueValue<Int>]
   let rangeSelection: RangeSelection
@@ -191,7 +191,7 @@ internal struct RemoveLastNTest {
   }
 }
 
-internal struct RemoveRangeTest {
+internal struct RemoveSubrangeTest {
   let collection: [OpaqueValue<Int>]
   let rangeSelection: RangeSelection
   let expected: [Int]
@@ -335,74 +335,74 @@ let appendContentsOfTests: [AppendContentsOfTest] = [
     expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080]),
 ]
 
-let replaceRangeTests: [ReplaceRangeTest] = [
-  ReplaceRangeTest(
+let replaceRangeTests: [ReplaceSubrangeTest] = [
+  ReplaceSubrangeTest(
     collection: [],
     newElements: [],
     rangeSelection: .emptyRange,
     expected: []),
 
-  ReplaceRangeTest(
+  ReplaceSubrangeTest(
     collection: [],
     newElements: [1010],
     rangeSelection: .emptyRange,
     expected: [1010]),
 
-  ReplaceRangeTest(
+  ReplaceSubrangeTest(
     collection: [],
     newElements: [1010, 2020, 3030],
     rangeSelection: .emptyRange,
     expected: [1010, 2020, 3030]),
 
-  ReplaceRangeTest(
+  ReplaceSubrangeTest(
     collection: [4040],
     newElements: [1010, 2020, 3030],
     rangeSelection: .leftEdge,
     expected: [1010, 2020, 3030, 4040]),
 
-  ReplaceRangeTest(
+  ReplaceSubrangeTest(
     collection: [1010],
     newElements: [2020, 3030, 4040],
     rangeSelection: .rightEdge,
     expected: [1010, 2020, 3030, 4040]),
 
-  ReplaceRangeTest(
+  ReplaceSubrangeTest(
     collection: [1010, 2020, 3030],
     newElements: [4040],
     rangeSelection: .rightEdge,
     expected: [1010, 2020, 3030, 4040]),
 
-  ReplaceRangeTest(
+  ReplaceSubrangeTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     newElements: [9090],
     rangeSelection: .offsets(1..<1),
     expected: [1010, 9090, 2020, 3030, 4040, 5050]),
 
-  ReplaceRangeTest(
+  ReplaceSubrangeTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     newElements: [9090],
     rangeSelection: .offsets(1..<2),
     expected: [1010, 9090, 3030, 4040, 5050]),
 
-  ReplaceRangeTest(
+  ReplaceSubrangeTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     newElements: [9090],
     rangeSelection: .offsets(1..<3),
     expected: [1010, 9090, 4040, 5050]),
 
-  ReplaceRangeTest(
+  ReplaceSubrangeTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     newElements: [9090],
     rangeSelection: .offsets(1..<4),
     expected: [1010, 9090, 5050]),
 
-  ReplaceRangeTest(
+  ReplaceSubrangeTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     newElements: [9090],
     rangeSelection: .offsets(1..<5),
     expected: [1010, 9090]),
 
-  ReplaceRangeTest(
+  ReplaceSubrangeTest(
     collection: [1010, 2020, 3030],
     newElements: [8080, 9090],
     rangeSelection: .offsets(1..<2),
@@ -809,43 +809,43 @@ self.test("\(testNamePrefix).removeFirst(n: Int)/removeTooMany/semantics") {
 //===----------------------------------------------------------------------===//
 
 self.test("\(testNamePrefix).removeSubrange()/semantics") {
-  let tests: [RemoveRangeTest] = [
-    RemoveRangeTest(
+  let tests: [RemoveSubrangeTest] = [
+    RemoveSubrangeTest(
       collection: [],
       rangeSelection: .emptyRange,
       expected: []),
 
-    RemoveRangeTest(
+    RemoveSubrangeTest(
       collection: [1010],
       rangeSelection: .middle,
       expected: []),
 
-    RemoveRangeTest(
+    RemoveSubrangeTest(
       collection: [1010, 2020, 3030, 4040],
       rangeSelection: .leftHalf,
       expected: [3030, 4040]),
 
-    RemoveRangeTest(
+    RemoveSubrangeTest(
       collection: [1010, 2020, 3030, 4040],
       rangeSelection: .rightHalf,
       expected: [1010, 2020]),
 
-    RemoveRangeTest(
+    RemoveSubrangeTest(
       collection: [1010, 2020, 3030, 4040, 5050],
       rangeSelection: .middle,
       expected: [1010, 5050]),
 
-    RemoveRangeTest(
+    RemoveSubrangeTest(
       collection: [1010, 2020, 3030, 4040, 5050, 6060],
       rangeSelection: .leftHalf,
       expected: [4040, 5050, 6060]),
 
-    RemoveRangeTest(
+    RemoveSubrangeTest(
       collection: [1010, 2020, 3030, 4040, 5050, 6060],
       rangeSelection: .rightHalf,
       expected: [1010, 2020, 3030]),
 
-    RemoveRangeTest(
+    RemoveSubrangeTest(
       collection: [1010, 2020, 3030, 4040, 5050, 6060],
       rangeSelection: .middle,
       expected: [1010, 6060]),
