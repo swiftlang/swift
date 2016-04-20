@@ -19,6 +19,7 @@
 #ifndef SWIFT_REMOTEAST_REMOTEAST_H
 #define SWIFT_REMOTEAST_REMOTEAST_H
 
+#include "swift/Remote/Failure.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/Optional.h"
@@ -32,6 +33,107 @@ class NominalTypeDecl;
 class Type;
 
 namespace remoteAST {
+
+template <class T>
+class Result {
+  union Storage {
+    remote::Failure Failure;
+    T Success;
+
+    Storage() {}
+    Storage(const Storage &) = delete;
+    Storage &operator=(const Storage &) = delete;
+    ~Storage() {}
+  };
+
+  Storage S;
+  bool IsSuccess;
+
+  Result(bool isSuccess) {}
+
+public:
+  /*implicit*/ Result(const T &value) : IsSuccess(true) {
+    new (&S.Success) T(value);
+  }
+
+  /*implicit*/ Result(T &&value) : IsSuccess(true) {
+    new (&S.Success) T(std::move(value));
+  }
+
+  /*implicit*/ Result(remote::Failure &&failure) : IsSuccess(false) {
+    new (&S.Failure) remote::Failure(std::move(failure));
+  }
+
+  Result(const Result &other) : IsSuccess(other.IsSuccess) {
+    if (IsSuccess) {
+      ::new (&S.Success) T(other.S.Success);
+    } else {
+      ::new (&S.Failure) remote::Failure(other.S.Failure);      
+    }
+  }
+
+  Result(Result &&other) : IsSuccess(other.IsSuccess) {
+    if (IsSuccess) {
+      ::new (&S.Success) T(std::move(other.S.Success));
+    } else {
+      ::new (&S.Failure) remote::Failure(std::move(other.S.Failure));
+    }
+  }
+
+  Result &operator=(const Result &other) {
+    this->~Result();
+    ::new (this) Result(other);
+    return *this;
+  }
+
+  Result &operator=(Result &&other) {
+    this->~Result();
+    ::new (this) Result(std::move(other));
+    return *this;
+  }
+
+  ~Result() {
+    if (IsSuccess) {
+      S.Success.~T();
+    } else {
+      S.Failure.~Failure();
+    }
+  }
+
+  template <class... ArgTys>
+  static Result emplaceSuccess(ArgTys &&...args) {
+    Result result(true);
+    ::new (&result.S.Success) T(std::forward<ArgTys>(args)...);
+    return result;
+  }
+
+  template <class KindTy, class... ArgTys>
+  static Result emplaceFailure(KindTy kind, ArgTys &&...args) {
+    Result result(false);
+    ::new (&result.S.Failure)
+      remote::Failure(kind, std::forward<ArgTys>(args)...);
+    return result;
+  }
+
+  explicit operator bool() const { return isSuccess(); }
+  bool isSuccess() const { return IsSuccess; }
+  bool isFailure() const { return !IsSuccess; }
+
+  const remote::Failure &getFailure() const {
+    assert(isFailure());
+    return S.Failure;
+  }
+
+  const T &getValue() const & {
+    assert(isSuccess());
+    return S.Success;
+  }
+
+  T &&getValue() && {
+    assert(isSuccess());
+    return std::move(S.Success);
+  }
+};
 
 /// A context for performing an operation relating the remote process with
 /// the AST.  This may be discarded and recreated at any time without danger,
@@ -65,16 +167,12 @@ public:
 
   /// Given an address which is supposedly of type metadata, try to
   /// resolve it to a specific type in the local AST.
-  ///
-  /// This may fail by returning a null type.
-  Type getTypeForRemoteTypeMetadata(remote::RemoteAddress address);
+  Result<Type> getTypeForRemoteTypeMetadata(remote::RemoteAddress address);
 
   /// Given an address which is supposedly of a nominal type descriptor,
   /// try to resolve it to a specific nominal type declaration in the
   /// local AST.
-  ///
-  /// This may fail by returning null.
-  NominalTypeDecl *
+  Result<NominalTypeDecl *>
   getDeclForRemoteNominalTypeDescriptor(remote::RemoteAddress address);
 
   /// Given a type in the local AST, try to resolve the offset of its
@@ -83,7 +181,7 @@ public:
   /// This may fail by returning an empty optional.  Failure may indicate
   /// that an offset for the property could not be resolved, or it may
   /// simply indicate that the property has a non-zero offset.
-  Optional<uint64_t> getOffsetForProperty(Type type, StringRef propertyName);
+  Result<uint64_t> getOffsetForProperty(Type type, StringRef propertyName);
 };
 
 } // end namespace remoteAST

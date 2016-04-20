@@ -506,26 +506,33 @@ public:
     }
   }
 
-  Type getTypeForRemoteTypeMetadata(RemoteAddress address) {
+  Result<Type> getTypeForRemoteTypeMetadata(RemoteAddress address) {
+    Type result;
     if (Is32) {
-      return Reader32->readTypeFromMetadata(address.getAddressData());
+      result = Reader32->readTypeFromMetadata(address.getAddressData());
     } else {
-      return Reader64->readTypeFromMetadata(address.getAddressData());
+      result = Reader64->readTypeFromMetadata(address.getAddressData());
     }
+    if (result) return result;
+    return Result<Type>::emplaceFailure(Failure::Unknown);
   }
 
-  NominalTypeDecl *getDeclForRemoteNominalTypeDescriptor(RemoteAddress address){
-
+  Result<NominalTypeDecl *>
+  getDeclForRemoteNominalTypeDescriptor(RemoteAddress address) {
+    NominalTypeDecl *result;
     if (Is32) {
-      return Reader32->readNominalTypeFromDescriptor(address.getAddressData());
+      result =Reader32->readNominalTypeFromDescriptor(address.getAddressData());
     } else {
-      return Reader64->readNominalTypeFromDescriptor(address.getAddressData());
+      result =Reader64->readNominalTypeFromDescriptor(address.getAddressData());
     }
+
+    if (result) return result;
+    return Result<NominalTypeDecl *>::emplaceFailure(Failure::Unknown);
   }
 
-  Optional<uint64_t> getOffsetForProperty(Type type, StringRef propertyName) {
+  Result<uint64_t> getOffsetForProperty(Type type, StringRef propertyName) {
     // TODO
-    return None;    
+    return Result<uint64_t>::emplaceFailure(Failure::Unknown);
   }
 };
 
@@ -544,16 +551,17 @@ RemoteASTContext::~RemoteASTContext() {
   delete asImpl(Impl);
 }
 
-Type RemoteASTContext::getTypeForRemoteTypeMetadata(RemoteAddress address) {
+Result<Type>
+RemoteASTContext::getTypeForRemoteTypeMetadata(RemoteAddress address) {
   return asImpl(Impl)->getTypeForRemoteTypeMetadata(address);
 }
 
-NominalTypeDecl *
+Result<NominalTypeDecl *>
 RemoteASTContext::getDeclForRemoteNominalTypeDescriptor(RemoteAddress address) {
   return asImpl(Impl)->getDeclForRemoteNominalTypeDescriptor(address);
 }
 
-Optional<uint64_t>
+Result<uint64_t>
 RemoteASTContext::getOffsetForProperty(Type type, StringRef propertyName) {
   return asImpl(Impl)->getOffsetForProperty(type, propertyName);
 }
