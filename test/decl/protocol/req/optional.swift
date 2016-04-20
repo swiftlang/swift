@@ -45,19 +45,16 @@ class C2 : P1 {
 
 class C3 : P1 {
   func method(_ x: Int) { } 
-  // expected-warning@-1{{non-@objc method 'method' does not satisfy optional requirement of @objc protocol 'P1'}}
-  // expected-note@-2{{add '@objc' to provide an Objective-C entrypoint}}{{3-3=@objc }}
-  // expected-note@-3{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
+  // expected-warning@-1{{non-'@objc' method 'method' does not satisfy optional requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
+  // expected-note@-2{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
 
   var prop: Int = 0
-  // expected-warning@-1{{non-@objc property 'prop' does not satisfy optional requirement of @objc protocol 'P1'}}
-  // expected-note@-2{{add '@objc' to provide an Objective-C entrypoint}}{{3-3=@objc }}
-  // expected-note@-3{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
+  // expected-warning@-1{{non-'@objc' property 'prop' does not satisfy optional requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
+  // expected-note@-2{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
 
   subscript (i: Int) -> ObjCClass? {
-  // expected-warning@-1{{non-@objc subscript does not satisfy optional requirement of @objc protocol 'P1'}}
+  // expected-warning@-1{{non-'@objc' subscript does not satisfy optional requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
   // expected-note@-2{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
-  // expected-note@-3{{add '@objc' to provide an Objective-C entrypoint}}{{3-3=@objc }}
     get {
       return nil
     }
@@ -69,19 +66,16 @@ class C4 { }
 
 extension C4 : P1 {
   func method(_ x: Int) { } 
-  // expected-warning@-1{{non-@objc method 'method' does not satisfy optional requirement of @objc protocol 'P1'}}
-  // expected-note@-2{{add '@objc' to provide an Objective-C entrypoint}}{{3-3=@objc }}
-  // expected-note@-3{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
+  // expected-warning@-1{{non-'@objc' method 'method' does not satisfy optional requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
+  // expected-note@-2{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
 
   var prop: Int { return 5 }
-  // expected-warning@-1{{non-@objc property 'prop' does not satisfy optional requirement of @objc protocol 'P1'}}
-  // expected-note@-2{{add '@objc' to provide an Objective-C entrypoint}}{{3-3=@objc }}
-  // expected-note@-3{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
+  // expected-warning@-1{{non-'@objc' property 'prop' does not satisfy optional requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
+  // expected-note@-2{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
 
   subscript (i: Int) -> ObjCClass? {
-  // expected-warning@-1{{non-@objc subscript does not satisfy optional requirement of @objc protocol 'P1'}}
+  // expected-warning@-1{{non-'@objc' subscript does not satisfy optional requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
   // expected-note@-2{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
-  // expected-note@-3{{add '@objc' to provide an Objective-C entrypoint}}{{3-3=@objc }}
     get {
       return nil
     }
@@ -93,19 +87,16 @@ class C5 : P1 { }
 
 extension C5 {
   func method(_ x: Int) { } 
-  // expected-warning@-1{{non-@objc method 'method' does not satisfy optional requirement of @objc protocol 'P1'}}
-  // expected-note@-2{{add '@objc' to provide an Objective-C entrypoint}}{{3-3=@objc }}
-  // expected-note@-3{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
+  // expected-warning@-1{{non-'@objc' method 'method' does not satisfy optional requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
+  // expected-note@-2{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
 
   var prop: Int { return 5 }
-  // expected-warning@-1{{non-@objc property 'prop' does not satisfy optional requirement of @objc protocol 'P1'}}
-  // expected-note@-2{{add '@objc' to provide an Objective-C entrypoint}}{{3-3=@objc }}
-  // expected-note@-3{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
+  // expected-warning@-1{{non-'@objc' property 'prop' does not satisfy optional requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
+  // expected-note@-2{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
 
   subscript (i: Int) -> ObjCClass? {
-    // expected-warning@-1{{non-@objc subscript does not satisfy optional requirement of @objc protocol 'P1'}}
-    // expected-note@-2{{add '@objc' to provide an Objective-C entrypoint}}{{3-3=@objc }}
-    // expected-note@-3{{add '@nonobjc' to silence this warning}}
+    // expected-warning@-1{{non-'@objc' subscript does not satisfy optional requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
+    // expected-note@-2{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
     get {
       return nil
     }
@@ -137,7 +128,7 @@ extension C6 : P1 {
 
 @objc class C8 : P2 { // expected-note{{class 'C8' declares conformance to protocol 'P2' here}}
   func objcMethod(int x: Int) { } // expected-error{{Objective-C method 'objcMethodWithInt:' provided by method 'objcMethod(int:)' conflicts with optional requirement method 'method(y:)' in protocol 'P2'}}
-  // expected-note@-1{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
+  // expected-note@-1{{add '@nonobjc' to silence this error}}{{3-3=@nonobjc }}
   // expected-note@-2{{rename method to match requirement 'method(y:)'}}{{3-3=@objc(objcMethodWithInt:) }}{{8-18=method}}{{19-22=y}}
 }
 

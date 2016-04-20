@@ -29,9 +29,9 @@
 }
 
 class C1b : P1 {
-  func method1() { } // expected-error{{non-'@objc' method 'method1()' does not satisfy '@objc' requirement in protocol 'P1'}}{{3-3=@objc }}
-  var property1: ObjCClass = ObjCClass() // expected-error{{non-'@objc' property 'property1' does not satisfy '@objc' requirement in protocol 'P1'}}{{3-3=@objc }}
-  var property2: ObjCClass = ObjCClass() // expected-error{{non-'@objc' property 'property2' does not satisfy '@objc' requirement in protocol 'P1'}}{{3-3=@objc }}
+  func method1() { } // expected-error{{non-'@objc' method 'method1()' does not satisfy requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
+  var property1: ObjCClass = ObjCClass() // expected-error{{non-'@objc' property 'property1' does not satisfy requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
+  var property2: ObjCClass = ObjCClass() // expected-error{{non-'@objc' property 'property2' does not satisfy requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
 }
 
 @objc protocol P2 {
@@ -42,9 +42,9 @@ class C1b : P1 {
 }
 
 class C2a : P2 {
-  func method(_: Int, class: ObjCClass) { } // expected-error{{non-'@objc' method 'method(_:class:)' does not satisfy '@objc' requirement in protocol 'P2'}}{{3-3=@objc(methodWithInt:withClass:) }}
+  func method(_: Int, class: ObjCClass) { } // expected-error{{non-'@objc' method 'method(_:class:)' does not satisfy requirement of '@objc' protocol 'P2'}}{{3-3=@objc(methodWithInt:withClass:) }}
 
-  var empty: Bool { // expected-error{{non-'@objc' property 'empty' does not satisfy '@objc' requirement in protocol 'P2'}}{{3-3=@objc }}
+  var empty: Bool { // expected-error{{non-'@objc' property 'empty' does not satisfy requirement of '@objc' protocol 'P2'}}{{3-3=@objc }}
     get { }
   }
 }
@@ -103,5 +103,5 @@ class C3a : P3 {
 }
 
 class Bar: Foo {
-  required init() {} // expected-error{{non-'@objc' initializer 'init()' does not satisfy '@objc' requirement in protocol 'Foo'}}{{3-3=@objc }}
+  required init() {} // expected-error{{non-'@objc' initializer 'init()' does not satisfy requirement of '@objc' protocol 'Foo'}}{{3-3=@objc }}
 }

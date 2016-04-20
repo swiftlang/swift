@@ -1395,15 +1395,6 @@ namespace {
     /// Record that the given optional requirement has no witness.
     void recordOptionalWitness(ValueDecl *requirement);
 
-    /// Check whether there is a potential non-@objc witness for an
-    /// @objc optional requirement.
-    void checkOptionalWitnessNonObjCMatch(ValueDecl *requirement);
-
-    /// Check whether there is a potential non-@objc witness for an
-    /// @objc optional requirement.
-    bool diagnoseOptionalWitnessNonObjCMatch(ValueDecl *requirement,
-                                             ValueDecl *witness);
-
     /// Record a type witness.
     ///
     /// \param assocType The associated type whose witness is being recorded.
@@ -1870,62 +1861,6 @@ void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
 
   // Record that there is no witness.
   Conformance->setWitness(requirement, ConcreteDeclRef());
-
-  // If the requirement is @objc, note that we have an unsatisfied
-  // optional @objc requirement.
-  if (requirement->isObjC() &&
-      !requirement->getAttrs().isUnavailable(TC.Context)) {
-    // If we're not suppressing diagnostics, look for a non-@objc near
-    // match.
-    if (!SuppressDiagnostics)
-      checkOptionalWitnessNonObjCMatch(requirement);
-  }
-}
-
-void ConformanceChecker::checkOptionalWitnessNonObjCMatch(
-       ValueDecl *requirement) {
-  for (auto witness : lookupValueWitnesses(requirement, nullptr)) {
-    // If the witness is in a different DeclContext, ignore it.
-    if (witness->getDeclContext() != DC)
-      continue;
-
-    // If the witness is @objc, selector-collision diagnostics will
-    // handle this if there actually is a collision.
-    if (witness->isObjC())
-      continue;
-
-    // Diagnose if needed.
-    if (diagnoseOptionalWitnessNonObjCMatch(requirement, witness))
-      break;
-  }
-}
-
-bool ConformanceChecker::diagnoseOptionalWitnessNonObjCMatch(
-       ValueDecl *requirement, ValueDecl *witness) {
-  // This is silenced by writing @nonobjc.
-  if (witness->getAttrs().hasAttribute<NonObjCAttr>())
-    return false;;
-
-  // Diagnose the non-@objc declaration.
-  TC.diagnose(witness, diag::optional_req_nonobjc_near_match,
-              getRequirementKind(requirement), requirement->getFullName(),
-              Proto->getFullName());
-
-  // Add the appropriate "@objc" attribute to make the witness match.
-  {
-    auto diag = TC.diagnose(witness,
-                            diag::optional_req_nonobjc_near_match_add_objc);
-    fixDeclarationObjCName(diag, witness, requirement->getObjCRuntimeName());
-  }
-
-  // Add the "@nonobjc" attribute to suppress the warning.
-  TC.diagnose(witness, diag::optional_req_nonobjc_near_match_silence)
-    .fixItInsert(witness->getAttributeInsertionLoc(/*forModifier=*/false),
-                 "@nonobjc ");
-
-  TC.diagnose(requirement, diag::protocol_requirement_here,
-              requirement->getFullName());
-  return true;
 }
 
 void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
@@ -3695,35 +3630,29 @@ void ConformanceChecker::checkConformance() {
     auto finalizeWitness = [&] {
       // Find the witness.
       auto witness = Conformance->getWitness(requirement, nullptr).getDecl();
-      if (!witness) {
-        // If this is an unsatisfied @objc optional requirement,
-        // diagnose it.
-        if (requirement->isObjC())
-          checkOptionalWitnessNonObjCMatch(requirement);
-
-        return;
-      }
+      if (!witness) return;
 
       // Objective-C checking for @objc requirements.
       if (requirement->isObjC()) {
         // The witness must also be @objc.
         if (!witness->isObjC()) {
-          // If the requirement is optional, warn.
-          if (requirement->getAttrs().hasAttribute<OptionalAttr>()) {
-            diagnoseOptionalWitnessNonObjCMatch(requirement, witness);
-            return;
-          }
-
+          bool isOptional =
+            requirement->getAttrs().hasAttribute<OptionalAttr>();
           if (auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness)) {
             auto diagInfo = getObjCMethodDiagInfo(witnessFunc);
-            auto diag = TC.diagnose(witness, diag::witness_non_objc,
+            auto diag = TC.diagnose(witness,
+                                    isOptional ? diag::witness_non_objc_optional
+                                               : diag::witness_non_objc,
                                     diagInfo.first, diagInfo.second,
                                     Proto->getFullName());
             fixDeclarationObjCName(
               diag, witness,
               cast<AbstractFunctionDecl>(requirement)->getObjCSelector());
           } else if (isa<VarDecl>(witness)) {
-            auto diag = TC.diagnose(witness, diag::witness_non_objc_storage,
+            auto diag = TC.diagnose(witness,
+                                    isOptional
+                                      ? diag::witness_non_objc_storage_optional
+                                      : diag::witness_non_objc_storage,
                                     /*isSubscript=*/false,
                                     witness->getFullName(),
                                     Proto->getFullName());
@@ -3732,10 +3661,23 @@ void ConformanceChecker::checkConformance() {
                ObjCSelector(requirement->getASTContext(), 0,
                             cast<VarDecl>(requirement)->getObjCPropertyName()));
           } else if (isa<SubscriptDecl>(witness)) {
-            TC.diagnose(witness, diag::witness_non_objc_storage,
+            TC.diagnose(witness,
+                        isOptional
+                          ? diag::witness_non_objc_storage_optional
+                          : diag::witness_non_objc_storage,
                         /*isSubscript=*/true,
                         witness->getFullName(),
-                        Proto->getFullName());
+                        Proto->getFullName())
+              .fixItInsert(witness->getAttributeInsertionLoc(false),
+                           "@objc ");
+          }
+
+          // If the requirement is optional, @nonobjc suppresses the
+          // diagnostic.
+          if (isOptional) {
+            TC.diagnose(witness, diag::optional_req_near_match_nonobjc, false)
+              .fixItInsert(witness->getAttributeInsertionLoc(false),
+                           "@nonobjc ");
           }
 
           TC.diagnose(requirement, diag::protocol_requirement_here,
@@ -4354,8 +4296,8 @@ static void diagnosePotentialWitness(TypeChecker &tc, ValueDecl *req,
               req->getFullName(),
               proto->getFullName());
 
-  // Warning to fix the names.
   if (req->getFullName() != witness->getFullName()) {
+    // Note to fix the names.
     auto diag = tc.diagnose(witness, diag::optional_req_near_match_rename,
                             req->getFullName());
     fixDeclarationName(diag, witness, req->getFullName());
@@ -4363,6 +4305,11 @@ static void diagnosePotentialWitness(TypeChecker &tc, ValueDecl *req,
     // Also fix the Objective-C name, if needed.
     if (req->isObjC())
       fixDeclarationObjCName(diag, witness, req->getObjCRuntimeName());
+  } else if (req->isObjC() && !witness->isObjC()) {
+    // Note to add @objc.
+    auto diag = tc.diagnose(witness,
+                            diag::optional_req_nonobjc_near_match_add_objc);
+    fixDeclarationObjCName(diag, witness, req->getObjCRuntimeName());    
   }
 
   // If moving the declaration can help, suggest that.
@@ -4383,7 +4330,7 @@ static void diagnosePotentialWitness(TypeChecker &tc, ValueDecl *req,
 
   // If adding @nonobjc can help, suggest that.
   if (canSuppressPotentialWitnessWarningWithNonObjC(req, witness)) {
-    tc.diagnose(witness, diag::optional_req_nonobjc_near_match_silence)
+    tc.diagnose(witness, diag::optional_req_near_match_nonobjc, false)
       .fixItInsert(witness->getAttributeInsertionLoc(false), "@nonobjc ");
   }
 
@@ -4526,11 +4473,6 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         if (score == bestScore && bestScore < UINT_MAX)
           bestOptionalReqs.push_back(req);
       }
-
-      // If we found an exactly-matching name, don't diagnose anything here.
-      // FIXME: We want to diagnose here with specific detail.
-      if (bestScore == 0)
-        bestOptionalReqs.clear();
 
       // If we found some requirements with nearly-matching names, diagnose
       // the first one.
