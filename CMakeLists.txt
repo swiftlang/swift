@@ -139,8 +139,8 @@ set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
   "Define the maximum number of linker jobs for swift.")
 set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android NDK tools that are executable on the build machine")
-set(SWIFT_ANDROID_NDK_TOOLCHAIN_VERSION "" CACHE STRING
-  "A version of the toolchain to use when building for Android. Use 4.8 for 32-bit builds, 4.9 for 64-bit builds")
+set(SWIFT_ANDROID_NDK_GCC_VERSION "" CACHE STRING
+  "The GCC version to use when building for Android. Currently only 4.9 is supported.")
 set(SWIFT_ANDROID_SDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android SDK tools that will be passed to the swiftc frontend")
 set(SWIFT_ANDROID_ICU_UC "" CACHE STRING
