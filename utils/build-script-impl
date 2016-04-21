@@ -204,6 +204,7 @@ KNOWN_SETTINGS=(
     use-gold-linker             ""               "Enable using the gold linker"
     darwin-toolchain-bundle-identifier ""        "CFBundleIdentifier for xctoolchain info plist"
     darwin-toolchain-display-name      ""        "Display Name for xctoolcain info plist"
+    darwin-toolchain-display-name-short ""       "Display Name with out date for xctoolchain info plist"
     darwin-toolchain-name              ""        "Directory name for xctoolchain"
     darwin-toolchain-version           ""        "Version for xctoolchain info plist and installer pkg"
     darwin-toolchain-application-cert  ""        "Application Cert name to codesign xctoolchain"
@@ -2564,11 +2565,14 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
       DARWIN_TOOLCHAIN_INFO_PLIST="${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist"
       DARWIN_TOOLCHAIN_REPORT_URL="https://bugs.swift.org/"
       COMPATIBILITY_VERSION=2
+      DARWIN_TOOLCHAIN_CREATED_DATE="$(date -u +'%a %b %d %T GMT %Y')"
 
       echo "-- Removing: ${DARWIN_TOOLCHAIN_INFO_PLIST}"
       rm -f ${DARWIN_TOOLCHAIN_INFO_PLIST}
 
       ${PLISTBUDDY_BIN} -c "Add DisplayName string '${DARWIN_TOOLCHAIN_DISPLAY_NAME}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+      ${PLISTBUDDY_BIN} -c "Add ShortDisplayName string '${DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+      ${PLISTBUDDY_BIN} -c "Add CreatedDate date '${DARWIN_TOOLCHAIN_CREATED_DATE}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
       ${PLISTBUDDY_BIN} -c "Add CompatibilityVersion integer ${COMPATIBILITY_VERSION}" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
       ${PLISTBUDDY_BIN} -c "Add Version string '${DARWIN_TOOLCHAIN_VERSION}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
       ${PLISTBUDDY_BIN} -c "Add CFBundleIdentifier string '${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
