@@ -393,6 +393,7 @@ DeclContext *
 RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
   switch (node->getKind()) {
   case Demangle::Node::Kind::DeclContext:
+  case Demangle::Node::Kind::Type:
     return findDeclContext(node->getFirstChild());
 
   case Demangle::Node::Kind::Module:
