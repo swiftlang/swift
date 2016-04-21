@@ -10,4 +10,5 @@ add_swift_library(swiftFrontendTool
     swiftClangImporter
     swiftOption
     clangAPINotes
+    clangBasic
 )
