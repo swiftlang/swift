@@ -389,5 +389,26 @@ UnsafeMutablePointerTestSuite.test("customPlaygroundQuickLook") {
   }
 }
 
-runAllTests()
+% for (SelfName, SelfType) in [
+%         ('UnsafePointer', 'UnsafePointer<Int>'),
+%         ('UnsafeMutablePointer', 'UnsafeMutablePointer<Int>')]:
 
+${SelfName}TestSuite.test("Comparable") {
+  let instances = [
+    0x00000001,
+    0xFF00FF00,
+    0x00001111,
+    0x00000002,
+    0xFFFFFFFF,
+    0x00001111
+  ].map { ($0, ${SelfType}(bitPattern: $0)!) }
+
+  func comparisonOracle(i: Int, j: Int) -> ExpectedComparisonResult {
+    return instances[i].0 <=> instances[j].0
+  }
+  checkComparable(instances.map { $0.1 }, oracle: comparisonOracle)
+}
+
+% end
+
+runAllTests()
