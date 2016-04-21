@@ -10,23 +10,48 @@
 
 import unittest
 import os
+import argparse
 
 from swift_build_support import migration
 
 
 class MigrateImplArgsTestCase(unittest.TestCase):
-    def test_args_moved_before_separator(self):
-        # Tests that '-RT --foo=bar -- --foo=baz --flim' is parsed as
-        # '-RT --foo=bar --foo=baz -- --flim'
-        args = migration.migrate_impl_args(
-            ['-RT', '--darwin-xcrun-toolchain=foo', '--',
-             '--darwin-xcrun-toolchain=bar', '--other'],
-            ['--darwin-xcrun-toolchain'])
+    def test_report_unknown_args(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-R', '--release', action='store_true')
+        parser.add_argument('-T', '--validation-test', action='store_true')
+        parser.add_argument('--darwin-xcrun-toolchain')
+
+        args = migration.parse_args(
+            parser,
+            ['-RT', '--unknown', 'true', '--darwin-xcrun-toolchain=foo', '--',
+             '--darwin-xcrun-toolchain=bar', '--other'])
 
         self.assertEqual(
             args,
-            ['-RT', '--darwin-xcrun-toolchain=foo',
-             '--darwin-xcrun-toolchain=bar', '--', '--other'])
+            argparse.Namespace(
+                release=True,
+                validation_test=True,
+                darwin_xcrun_toolchain='bar',
+                build_script_impl_args=['--unknown', 'true', '--other']))
+
+    def test_no_unknown_args(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-R', '--release', action='store_true')
+        parser.add_argument('-T', '--validation-test', action='store_true')
+        parser.add_argument('--darwin-xcrun-toolchain')
+
+        args = migration.parse_args(
+            parser,
+            ['-RT', '--darwin-xcrun-toolchain=bar'])
+
+        self.assertEqual(
+            args,
+            argparse.Namespace(
+                release=True,
+                validation_test=True,
+                darwin_xcrun_toolchain='bar',
+                build_script_impl_args=[]))
 
     def test_check_impl_args(self):
         # Assuming file locations:

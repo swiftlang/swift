@@ -162,7 +162,7 @@ Using option presets:
   using the name=value syntax on the command line.
 
 
-Any arguments passed after "--" are forwarded directly to Swift's
+Any arguments not listed are forwarded directly to Swift's
 'build-script-impl'.  See that script's help for details.
 
 Environment variables
@@ -795,31 +795,7 @@ details of the setups of other systems or automated environments.""")
              "called multiple times to add multiple such options.",
         action="append", dest="extra_cmake_options", default=[])
 
-    parser.add_argument(
-        "build_script_impl_args",
-        help="",
-        nargs="*")
-
-    args = parser.parse_args(migration.migrate_impl_args(sys.argv[1:], [
-        '--darwin-xcrun-toolchain',
-        '--cmake',
-        '--host-target',
-        '--stdlib-deployment-targets',
-        '--skip-build',
-        '--show-sdks',
-        '--install-prefix',
-        '--install-symroot',
-        '--symbols-package',
-        '--skip-test-ios',
-        '--skip-test-ios-simulator',
-        '--skip-test-ios-host',
-        '--skip-test-tvos',
-        '--skip-test-tvos-simulator',
-        '--skip-test-tvos-host',
-        '--skip-test-watchos',
-        '--skip-test-watchos-simulator',
-        '--skip-test-watchos-host',
-    ]))
+    args = migration.parse_args(parser, sys.argv[1:])
 
     build_script_impl = os.path.join(
         SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl")
