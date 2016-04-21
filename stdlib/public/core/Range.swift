@@ -159,12 +159,6 @@ extension HalfOpenRangeProtocol {
       uncheckedBounds: (lower: other.lowerBound, upper: other.upperBound)
     )
   }
-  
-  /// Returns `true` iff `lowerBound <= value && upperBound > value`.
-  @inline(__always)
-  public func contains(_ value: Bound) -> Bool {
-    return lowerBound <= value && upperBound > value
-  }
 
   /// A textual representation of `self`.
   public var description: String {
@@ -326,7 +320,7 @@ public struct CountableRange<
 
   @warn_unused_result
   public func _customContainsEquatableElement(_ element: Element) -> Bool? {
-    return element >= self.lowerBound && element < self.upperBound
+    return lowerBound <= element && element < upperBound
   }
 
   /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
@@ -507,7 +501,7 @@ public struct Range<
   /// `upperBound`.
   @warn_unused_result
   public func contains(_ element: Bound) -> Bool {
-    return element >= self.lowerBound && element < self.upperBound
+    return lowerBound <= element && element < upperBound
   }
 
   /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.

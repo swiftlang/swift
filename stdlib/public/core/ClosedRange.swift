@@ -268,9 +268,8 @@ public struct CountableClosedRange<
   
   @warn_unused_result
   public func _customContainsEquatableElement(_ element: Bound) -> Bool? {
-    return element >= self.lowerBound && element < self.upperBound
+    return element >= self.lowerBound && element <= self.upperBound
   }
-
 
   /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
   public var isEmpty: Bool {

@@ -602,39 +602,6 @@ SequenceTypeTests.test("Set<T>.contains/CustomImplementation/${dispatch}") {
 
 % end
 
-SequenceTypeTests.test("Range<Element>.contains/WhereElementIsComparable/staticDispatch") {
-  let start = 10
-  let end = 20
-  let range: Range<MinimalComparableValue> =
-    MinimalComparableValue(start)..<MinimalComparableValue(end)
-  expectEqual(
-    1, MinimalComparableValue.timesLessWasCalled.value)
-  let count = 30
-  for test in 0..<count {
-    expectEqual(
-      test >= start && test < end,
-      range.contains(MinimalComparableValue(test)))
-  }
-  expectEqual(
-    51, MinimalComparableValue.timesLessWasCalled.value)
-}
-
-SequenceTypeTests.test("Range<Element>.contains/WhereElementIsStrideable/dispatch") {
-  let start = 10
-  let end = 20
-  let range: CountableRange<MinimalStrideableValue> =
-    MinimalStrideableValue(start)..<MinimalStrideableValue(end)
-  expectEqual(
-    1, MinimalStrideableValue.timesLessWasCalled.value)
-  let count = 30
-  for test in 0..<count {
-    expectEqual(
-      test >= start && test < end,
-      LoggingCollection(wrapping: range).contains(MinimalStrideableValue(test)))
-  }
-  expectEqual(51, MinimalStrideableValue.timesLessWasCalled.value)
-}
-
 SequenceTypeTests.test("contains/Predicate") {
   for test in findTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
