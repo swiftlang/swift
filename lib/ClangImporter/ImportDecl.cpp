@@ -1275,6 +1275,44 @@ namespace {
       if (!DC)
         return nullptr;
 
+      // Check for swift_newtype
+      if (!SwiftType) {
+        if (auto newtypeAttr =
+                Decl->template getAttr<clang::SwiftNewtypeAttr>()) {
+          switch (newtypeAttr->getNewtypeKind()) {
+          case clang::SwiftNewtypeAttr::NK_Struct: {
+
+            auto underlyingType = Impl.importType(
+                Decl->getUnderlyingType(), ImportTypeKind::Typedef,
+                isInSystemModule(DC),
+                Decl->getUnderlyingType()->isBlockPointerType());
+
+            auto &cxt = Impl.SwiftContext;
+            auto Loc = Impl.importSourceLoc(Decl->getLocation());
+
+            auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
+                Decl, Loc, Name, Loc, None, nullptr, DC);
+            structDecl->computeType();
+
+            ProtocolDecl *protocols[] = {
+                cxt.getProtocol(KnownProtocolKind::RawRepresentable),
+            };
+            makeStructRawValued(structDecl, underlyingType,
+                                {KnownProtocolKind::RawRepresentable},
+                                protocols);
+
+            Impl.ImportedDecls[Decl->getCanonicalDecl()] = structDecl;
+            Impl.registerExternalDecl(structDecl);
+            return structDecl;
+          }
+
+          case clang::SwiftNewtypeAttr::NK_Enum:
+            // TODO: support enum
+            break;
+          }
+        }
+      }
+
       if (!SwiftType) {
         // Import typedefs of blocks as their fully-bridged equivalent Swift
         // type. That matches how we want to use them in most cases. All other
