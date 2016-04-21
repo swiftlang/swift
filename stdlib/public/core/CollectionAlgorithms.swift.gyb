@@ -24,7 +24,7 @@ IElement = "Iterator.Element"
 
 extension BidirectionalCollection {
   public var last: Iterator.Element? {
-    return isEmpty ? nil : self[predecessor(of: endIndex)]
+    return isEmpty ? nil : self[location(before: endIndex)]
   }
 }
 
@@ -48,7 +48,7 @@ extension Collection where ${IElement} : Equatable {
       if self[i] == element {
         return i
       }
-      self.formSuccessor(&i)
+      self.formLocation(after: &i)
     }
     return nil
   }
@@ -68,7 +68,7 @@ extension Collection {
       if try predicate(self[i]) {
         return i
       }
-      self.formSuccessor(&i)
+      self.formLocation(after: &i)
     }
     return nil
   }
@@ -153,7 +153,7 @@ ${orderingRequirementForComparable}
       return unsafeBufferPivot - bufferPointer.startIndex
     }
     if let offset = maybeOffset {
-      return index(numericCast(offset), stepsFrom: startIndex)
+      return location(startIndex, offsetBy: numericCast(offset))
     }
 
 %   if preds:
@@ -303,7 +303,7 @@ extension ${Self} {
         Range(
           uncheckedBounds: (
             lower: bounds.lowerBound,
-            upper: successor(of: bounds.upperBound)))
+            upper: location(after: bounds.upperBound)))
       ]
     }
 %   if 'Mutable' in Self:
@@ -312,7 +312,7 @@ extension ${Self} {
         Range(
           uncheckedBounds: (
             lower: bounds.lowerBound,
-            upper: successor(of: bounds.upperBound)))
+            upper: location(after: bounds.upperBound)))
       ] = newValue
     }
 %   end

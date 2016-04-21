@@ -48,7 +48,7 @@ public struct CollectionOfOne<Element> : RandomAccessCollection {
   }
 
   /// The "past the end" position; always identical to
-  /// `successor(of: startIndex)`.
+  /// `location(after: startIndex)`.
   ///
   /// - Note: `endIndex` is not a valid argument to `subscript`.
   public var endIndex: Int {
@@ -57,7 +57,7 @@ public struct CollectionOfOne<Element> : RandomAccessCollection {
   
   /// Always returns `endIndex`.
   @warn_unused_result
-  public func successor(of i: Int) -> Int {
+  public func location(after i: Int) -> Int {
     _precondition(i == startIndex)
     return endIndex
   }

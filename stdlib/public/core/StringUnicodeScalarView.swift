@@ -116,21 +116,21 @@ extension String {
     ///
     /// `endIndex` is not a valid argument to `subscript`, and is always
     /// reachable from `startIndex` by zero or more applications of
-    /// `successor(of:)`.
+    /// `location(after:)`.
     public var endIndex: Index {
       return Index(_core.endIndex, _core)
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func successor(of i: Index) -> Index {
+    public func location(after i: Index) -> Index {
       // FIXME: swift-3-indexing-model: move `successor()` implementation here.
       return i.successor()
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func predecessor(of i: Index) -> Index {
+    public func location(before i: Index) -> Index {
       // FIXME: swift-3-indexing-model: move `predecessor()` implementation here.
       return i.predecessor()
     }
@@ -335,7 +335,7 @@ extension String.UnicodeScalarIndex {
       // surrogate will be decoded as a single replacement character,
       // thus making the corresponding position valid.
       if UTF16.isTrailSurrogate(utf16[utf16Index])
-        && UTF16.isLeadSurrogate(utf16[utf16.predecessor(of: utf16Index)]) {
+        && UTF16.isLeadSurrogate(utf16[utf16.location(before: utf16Index)]) {
         return nil
       }
     }

@@ -19,10 +19,10 @@ StringTraps.test("startIndex/predecessor")
   .code {
   var s = "abc"
   var i = s.startIndex
-  i = s.successor(of: i)
-  i = s.predecessor(of: i)
+  i = s.location(after: i)
+  i = s.location(before: i)
   expectCrashLater()
-  i = s.predecessor(of: i)
+  i = s.location(before: i)
 }
 
 StringTraps.test("endIndex/successor")
@@ -32,11 +32,11 @@ StringTraps.test("endIndex/successor")
   .code {
   var s = "abc"
   var i = s.startIndex
-  i = s.successor(of: i)
-  i = s.successor(of: i)
-  i = s.successor(of: i)
+  i = s.location(after: i)
+  i = s.location(after: i)
+  i = s.location(after: i)
   expectCrashLater()
-  i = s.successor(of: i)
+  i = s.location(after: i)
 }
 
 StringTraps.test("subscript(_:)/endIndex")
@@ -46,9 +46,9 @@ StringTraps.test("subscript(_:)/endIndex")
   .code {
   var s = "abc"
   var i = s.startIndex
-  i = s.successor(of: i)
-  i = s.successor(of: i)
-  i = s.successor(of: i)
+  i = s.location(after: i)
+  i = s.location(after: i)
+  i = s.location(after: i)
   expectCrashLater()
   s[i]
 }
@@ -60,11 +60,11 @@ StringTraps.test("UTF8ViewEndIndexSuccessor")
   .code {
   var s = "abc"
   var i = s.utf8.startIndex
-  i = s.utf8.successor(of: i)
-  i = s.utf8.successor(of: i)
-  i = s.utf8.successor(of: i)
+  i = s.utf8.location(after: i)
+  i = s.utf8.location(after: i)
+  i = s.utf8.location(after: i)
   expectCrashLater()
-  i = s.utf8.successor(of: i)
+  i = s.utf8.location(after: i)
 }
 
 StringTraps.test("UTF8ViewSubscript/endIndex")
@@ -74,9 +74,9 @@ StringTraps.test("UTF8ViewSubscript/endIndex")
   .code {
   var s = "abc"
   var i = s.utf8.startIndex
-  i = s.utf8.successor(of: i)
-  i = s.utf8.successor(of: i)
-  i = s.utf8.successor(of: i)
+  i = s.utf8.location(after: i)
+  i = s.utf8.location(after: i)
+  i = s.utf8.location(after: i)
   expectCrashLater()
   s.utf8[i]
 }
@@ -88,7 +88,7 @@ StringTraps.test("UTF16ViewSubscript/DecrementedStartIndex")
   .code {
   var s = "abc"
   var i = s.utf16.startIndex
-  i = s.utf16.predecessor(of: i)
+  i = s.utf16.location(before: i)
   expectCrashLater()
   s.utf16[i]
 }
@@ -100,9 +100,9 @@ StringTraps.test("UTF16ViewSubscript/endIndex")
   .code {
   var s = "abc"
   var i = s.utf16.startIndex
-  i = s.utf16.successor(of: i)
-  i = s.utf16.successor(of: i)
-  i = s.utf16.successor(of: i)
+  i = s.utf16.location(after: i)
+  i = s.utf16.location(after: i)
+  i = s.utf16.location(after: i)
   expectCrashLater()
   s.utf16[i]
 }

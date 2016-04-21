@@ -225,13 +225,13 @@ public struct CountableClosedRange<
 
   /// Returns the position immediately after `i`.
   @warn_unused_result
-  public func successor(of i: Index) -> Index {
+  public func location(after i: Index) -> Index {
     return i._successor(upperBound: upperBound)
   }
 
   /// Returns the position immediately preceding `i`.
   @warn_unused_result
-  public func predecessor(of i: Index) -> Index {
+  public func location(before i: Index) -> Index {
     return i._predecessor(upperBound: upperBound)
   }
 
@@ -263,7 +263,7 @@ public struct CountableClosedRange<
   /// The range's upper bound.
   ///
   /// `upperBound` is always reachable from `lowerBound` by zero or
-  /// more applications of `successor(of:)`.
+  /// more applications of `location(after:)`.
   public let upperBound: Bound
   
   @warn_unused_result

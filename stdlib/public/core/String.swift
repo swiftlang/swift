@@ -565,29 +565,29 @@ extension String {
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor(of:)`.
+  /// `location(after:)`.
   public var endIndex: Index { return characters.endIndex }
 
     // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func successor(of i: Index) -> Index { return characters.successor(of: i) }
+  public func location(after i: Index) -> Index { return characters.location(after: i) }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func predecessor(of i: Index) -> Index { return characters.predecessor(of: i) }
+  public func location(before i: Index) -> Index { return characters.location(before: i) }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
-    return characters.index(n, stepsFrom: i)
+  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    return characters.location(i, offsetBy: n)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func index(
-    _ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+  public func location(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
-    return characters.index(n, stepsFrom: i, limitedBy: limit)
+    return characters.location(i, offsetBy: n, limitedBy: limit)
   }
 
   // TODO: swift-3-indexing-model - add docs

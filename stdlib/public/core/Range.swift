@@ -260,7 +260,7 @@ public struct CountableRange<
   
   // WORKAROUND - default should be picked up from Collection
   @warn_unused_result
-  public func successor(of i: Index) -> Index {
+  public func location(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests.
     _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
 
@@ -269,7 +269,7 @@ public struct CountableRange<
 
   // WORKAROUND - default should be picked up from Collection
   @warn_unused_result
-  public func predecessor(of i: Index) -> Index {
+  public func location(before i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i: should allow `endIndex`.
     //_failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
 
@@ -310,7 +310,7 @@ public struct CountableRange<
   ///
   /// `upperBound` is not a valid argument to `subscript`, and is always
   /// reachable from `lowerBound` by zero or more applications of
-  /// `successor(of:)`.
+  /// `location(after:)`.
   /// 
   /// Identical to `lowerBound` in an empty range.
   public let upperBound: Bound

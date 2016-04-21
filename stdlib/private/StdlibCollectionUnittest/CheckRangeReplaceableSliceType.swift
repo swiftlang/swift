@@ -75,7 +75,7 @@ extension TestSuite {
         var c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         let survivingIndices = _allIndices(
           into: c,
-          in: c.successor(of: c.startIndex)..<c.endIndex)
+          in: c.location(after: c.startIndex)..<c.endIndex)
         let removedElement = c.removeFirst()
         expectEqual(test.collection.first, extractValue(removedElement).value)
         expectEqualSequence(
@@ -108,7 +108,7 @@ extension TestSuite {
         var c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         let survivingIndices = _allIndices(
           into: c,
-          in: c.index(numericCast(test.numberToRemove), stepsFrom: c.startIndex) ..<
+          in: c.location(c.startIndex, offsetBy: numericCast(test.numberToRemove)) ..<
             c.endIndex
         )
         c.removeFirst(test.numberToRemove)
@@ -221,7 +221,7 @@ extension TestSuite {
         var c = makeWrappedCollection(test.collection)
         let survivingIndices = _allIndices(
           into: c,
-          in: c.startIndex..<c.predecessor(of: c.endIndex))
+          in: c.startIndex..<c.location(before: c.endIndex))
         let removedElement = c.removeLast()
         expectEqual(
           test.collection.last!.value,
@@ -257,7 +257,7 @@ extension TestSuite {
         let survivingIndices = _allIndices(
           into: c,
           in: c.startIndex ..<
-            c.index(numericCast(-test.numberToRemove), stepsFrom: c.endIndex)
+            c.location(c.endIndex, offsetBy: numericCast(-test.numberToRemove))
         )
         c.removeLast(test.numberToRemove)
         expectEqualSequence(

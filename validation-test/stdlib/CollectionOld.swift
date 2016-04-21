@@ -141,14 +141,14 @@ func isPalindrome2<
   var b = seq.startIndex, e = seq.endIndex
 
   while (b != e) {
-    e = seq.predecessor(of: e)
+    e = seq.location(before: e)
     if (b == e) {
       break
     }
     if seq[b] != seq[e] {
       return false
     }
-    b = seq.successor(of: b)
+    b = seq.location(after: b)
   }
   return true
 }
@@ -250,7 +250,7 @@ struct CollectionOnly<T: Collection> : Collection {
   subscript(position: T.Index) -> T.Iterator.Element {
     return base[position]
   }
-  func successor(of i: T.Index) -> T.Index { return base.successor(of: i) }
+  func location(after i: T.Index) -> T.Index { return base.location(after: i) }
 }
 
 // CHECK: all done.

@@ -23,8 +23,8 @@ public struct SubscriptRangeTest {
 
   public func bounds<C : Collection>(in c: C) -> Range<C.Index> {
     let i = c.startIndex
-    return c.index(numericCast(bounds.lowerBound), stepsFrom: i) ..<
-           c.index(numericCast(bounds.upperBound), stepsFrom: i)
+    return c.location(i, offsetBy: numericCast(bounds.lowerBound)) ..<
+           c.location(i, offsetBy: numericCast(bounds.upperBound))
   }
 
   public init(
@@ -310,7 +310,7 @@ internal func _allIndices<C : Collection>(
   var i = bounds.lowerBound
   while i != bounds.upperBound {
     result.append(i)
-    i = c.successor(of: i)
+    i = c.location(after: i)
   }
   return result
 }
@@ -454,14 +454,14 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .none {
     let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     let index = c.endIndex
     expectCrashLater()
-    _blackHole(c.index(numericCast(outOfBoundsIndexOffset), stepsFrom: index))
+    _blackHole(c.location(index, offsetBy: numericCast(outOfBoundsIndexOffset)))
   }
 
   self.test("\(testNamePrefix).Index/OutOfBounds/Right/Empty") {
     let c = makeWrappedCollection([])
     let index = c.endIndex
     expectCrashLater()
-    _blackHole(c.index(numericCast(outOfBoundsIndexOffset), stepsFrom: index))
+    _blackHole(c.location(index, offsetBy: numericCast(outOfBoundsIndexOffset)))
   }
 }
 
@@ -474,7 +474,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.endIndex
     expectCrashLater()
-    index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
+    index = c.location(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
     _blackHole(c[index])
   }
 
@@ -482,7 +482,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     let c = makeWrappedCollection([])
     var index = c.endIndex
     expectCrashLater()
-    index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
+    index = c.location(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
     _blackHole(c[index])
   }
 
@@ -499,10 +499,10 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     print("\(elements)/sliceFromLeft=\(sliceFromLeft)/sliceFromRight=\(sliceFromRight)")
     let base = makeWrappedCollection(elements)
     let sliceStartIndex =
-      base.index(numericCast(sliceFromLeft), stepsFrom: base.startIndex)
-    let sliceEndIndex = base.index(
-      numericCast(elements.count - sliceFromRight),
-      stepsFrom: base.startIndex)
+      base.location(base.startIndex, offsetBy: numericCast(sliceFromLeft))
+    let sliceEndIndex = base.location(
+      base.startIndex,
+      offsetBy: numericCast(elements.count - sliceFromRight))
     var slice = base[sliceStartIndex..<sliceEndIndex]
     expectType(C.SubSequence.self, &slice)
 
@@ -524,14 +524,14 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
       return
     case .outOfRangeToTheLeft:
       if sliceFromLeft == 0 { return }
-      index = base.index(
-        numericCast(sliceFromLeft - 1),
-        stepsFrom: base.startIndex)
+      index = base.location(
+        base.startIndex,
+        offsetBy: numericCast(sliceFromLeft - 1))
     case .outOfRangeToTheRight:
       if sliceFromRight == 0 { return }
-      index = base.index(
-        numericCast(elements.count - sliceFromRight),
-        stepsFrom: base.startIndex)
+      index = base.location(
+        base.startIndex,
+        offsetBy: numericCast(elements.count - sliceFromRight))
     case .baseEndIndex:
       index = base.endIndex
     case .sliceEndIndex:
@@ -573,7 +573,7 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
     let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.endIndex
     expectCrashLater()
-    index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
+    index = c.location(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
     _blackHole(c[index..<index])
   }
 
@@ -581,7 +581,7 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
     let c = makeWrappedCollection([])
     var index = c.endIndex
     expectCrashLater()
-    index = c.index(numericCast(outOfBoundsSubscriptOffset), stepsFrom: index)
+    index = c.location(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
     _blackHole(c[index..<index])
   }
 
@@ -598,10 +598,10 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
     print("\(elements)/sliceFromLeft=\(sliceFromLeft)/sliceFromRight=\(sliceFromRight)")
     let base = makeWrappedCollection(elements)
     let sliceStartIndex =
-      base.index(numericCast(sliceFromLeft), stepsFrom: base.startIndex)
-    let sliceEndIndex = base.index(
-      numericCast(elements.count - sliceFromRight),
-      stepsFrom: base.startIndex)
+      base.location(base.startIndex, offsetBy: numericCast(sliceFromLeft))
+    let sliceEndIndex = base.location(
+      base.startIndex,
+      offsetBy: numericCast(elements.count - sliceFromRight))
     var slice = base[sliceStartIndex..<sliceEndIndex]
     expectType(C.SubSequence.self, &slice)
 
@@ -633,43 +633,43 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
       return
     case .outOfRangeToTheLeftEmpty:
       if sliceFromLeft == 0 { return }
-      let index = base.index(
-        numericCast(sliceFromLeft - 1),
-        stepsFrom: base.startIndex)
+      let index = base.location(
+        base.startIndex,
+        offsetBy: numericCast(sliceFromLeft - 1))
       bounds = index..<index
       break
     case .outOfRangeToTheLeftNonEmpty:
       if sliceFromLeft == 0 { return }
-      let index = base.index(
-        numericCast(sliceFromLeft - 1),
-        stepsFrom: base.startIndex)
+      let index = base.location(
+        base.startIndex,
+        offsetBy: numericCast(sliceFromLeft - 1))
       bounds = index..<sliceStartIndex
       break
     case .outOfRangeToTheRightEmpty:
       if sliceFromRight == 0 { return }
-      let index = base.index(
-        numericCast(elements.count - sliceFromRight + 1),
-        stepsFrom: base.startIndex)
+      let index = base.location(
+        base.startIndex,
+        offsetBy: numericCast(elements.count - sliceFromRight + 1))
       bounds = index..<index
       break
     case .outOfRangeToTheRightNonEmpty:
       if sliceFromRight == 0 { return }
-      let index = base.index(
-        numericCast(elements.count - sliceFromRight + 1),
-        stepsFrom: base.startIndex)
+      let index = base.location(
+        base.startIndex,
+        offsetBy: numericCast(elements.count - sliceFromRight + 1))
       bounds = sliceEndIndex..<index
       break
     case .outOfRangeBothSides:
       if sliceFromLeft == 0 { return }
       if sliceFromRight == 0 { return }
       bounds =
-        base.index(
-          numericCast(sliceFromLeft - 1),
-          stepsFrom: base.startIndex)
+        base.location(
+          base.startIndex,
+          offsetBy: numericCast(sliceFromLeft - 1))
         ..<
-        base.index(
-          numericCast(elements.count - sliceFromRight + 1),
-          stepsFrom: base.startIndex)
+        base.location(
+          base.startIndex,
+          offsetBy: numericCast(elements.count - sliceFromRight + 1))
       break
     case .baseEndIndex:
       if sliceFromRight == 0 { return }
@@ -683,8 +683,8 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
 }
 
 // FIXME: swift-3-indexing-model - add tests for the following?
-//          successor(of: i: Index) -> Index
-//          formSuccessor(i: inout Index)
+//          location(after: i: Index) -> Index
+//          formLocation(after: i: inout Index)
 //          advance(i: Index, by n: IndexDistance) -> Index
 //          advance(i: Index, by n: IndexDistance, limitedBy: Index) -> Index
 //          distance(from start: Index, to end: Index) -> IndexDistance
@@ -870,7 +870,7 @@ self.test("\(testNamePrefix).split/semantics") {
 self.test("\(testNamePrefix).prefix(through:)/semantics") {
   for test in prefixThroughTests {
     let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-    let index = c.index(numericCast(test.position), stepsFrom: c.startIndex)
+    let index = c.location(c.startIndex, offsetBy: numericCast(test.position))
     let result = c.prefix(through: index)
     expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
@@ -884,7 +884,7 @@ self.test("\(testNamePrefix).prefix(through:)/semantics") {
 self.test("\(testNamePrefix).prefix(upTo:)/semantics") {
   for test in prefixUpToTests {
     let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-    let index = c.index(numericCast(test.end), stepsFrom: c.startIndex)
+    let index = c.location(c.startIndex, offsetBy: numericCast(test.end))
     let result = c.prefix(upTo: index)
     expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
@@ -898,7 +898,7 @@ self.test("\(testNamePrefix).prefix(upTo:)/semantics") {
 self.test("\(testNamePrefix).suffix(from:)/semantics") {
   for test in suffixFromTests {
     let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-    let index = c.index(numericCast(test.start), stepsFrom: c.startIndex)
+    let index = c.location(c.startIndex, offsetBy: numericCast(test.start))
     let result = c.suffix(from: index)
     expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
@@ -915,7 +915,7 @@ self.test("\(testNamePrefix).removeFirst()/slice/semantics") {
     var slice = c[c.startIndex..<c.endIndex]
     let survivingIndices = _allIndices(
       into: slice,
-      in: slice.successor(of: slice.startIndex)..<slice.endIndex)
+      in: slice.location(after: slice.startIndex)..<slice.endIndex)
     let removedElement = slice.removeFirst()
     expectEqual(test.collection.first, extractValue(removedElement).value)
     expectEqualSequence(
@@ -955,7 +955,7 @@ self.test("\(testNamePrefix).removeFirst(n: Int)/slice/semantics") {
     var slice = c[c.startIndex..<c.endIndex]
     let survivingIndices = _allIndices(
       into: slice,
-      in: slice.index(numericCast(test.numberToRemove), stepsFrom: slice.startIndex) ..<
+      in: slice.location(slice.startIndex, offsetBy: numericCast(test.numberToRemove)) ..<
         slice.endIndex
     )
     slice.removeFirst(test.numberToRemove)
@@ -1011,7 +1011,7 @@ self.test("\(testNamePrefix).popFirst()/slice/semantics") {
     var slice = c[c.startIndex..<c.endIndex]
     let survivingIndices = _allIndices(
       into: slice,
-      in: slice.successor(of: slice.startIndex)..<slice.endIndex)
+      in: slice.location(after: slice.startIndex)..<slice.endIndex)
     let removedElement = slice.popFirst()!
     expectEqual(test.collection.first, extractValue(removedElement).value)
     expectEqualSequence(
@@ -1099,8 +1099,8 @@ self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
     testNamePrefix += String(C.Type)
 
 // FIXME: swift-3-indexing-model - add tests for the follow?
-//          predecessor(of i: Index) -> Index
-//          formPredecessor(i: inout Index)
+//          location(before: of i: Index) -> Index
+//          formLocation(before: i: inout Index)
 
 // FIXME: swift-3-indexing-model - enhance the following for negative direction?
 //          advance(i: Index, by n: IndexDistance) -> Index
@@ -1137,7 +1137,7 @@ self.test("\(testNamePrefix).removeLast()/slice/semantics") {
     let survivingIndices = _allIndices(
       into: slice,
       in: slice.startIndex ..<
-        slice.index(numericCast(-test.numberToRemove), stepsFrom: slice.endIndex)
+        slice.location(slice.endIndex, offsetBy: numericCast(-test.numberToRemove))
     )
     let removedElement = slice.removeLast()
     expectEqual(
@@ -1181,7 +1181,7 @@ self.test("\(testNamePrefix).removeLast(n: Int)/slice/semantics") {
     let survivingIndices = _allIndices(
       into: slice,
       in: slice.startIndex ..<
-        slice.index(numericCast(-test.numberToRemove), stepsFrom: slice.endIndex)
+        slice.location(slice.endIndex, offsetBy: numericCast(-test.numberToRemove))
     )
     slice.removeLast(test.numberToRemove)
     expectEqualSequence(
@@ -1237,7 +1237,7 @@ self.test("\(testNamePrefix).popLast()/slice/semantics") {
     let survivingIndices = _allIndices(
       into: slice,
       in: slice.startIndex ..<
-        slice.index(numericCast(-test.numberToRemove), stepsFrom: slice.endIndex)
+        slice.location(slice.endIndex, offsetBy: numericCast(-test.numberToRemove))
     )
     let removedElement = slice.popLast()!
     expectEqual(
@@ -1279,14 +1279,14 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .none {
     let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     let index = c.startIndex
     expectCrashLater()
-    _blackHole(c.index(numericCast(-outOfBoundsIndexOffset), stepsFrom: index))
+    _blackHole(c.location(index, offsetBy: numericCast(-outOfBoundsIndexOffset)))
   }
 
   self.test("\(testNamePrefix).Index/OutOfBounds/Left/Empty") {
     let c = makeWrappedCollection([])
     let index = c.startIndex
     expectCrashLater()
-    _blackHole(c.index(numericCast(-outOfBoundsIndexOffset), stepsFrom: index))
+    _blackHole(c.location(index, offsetBy: numericCast(-outOfBoundsIndexOffset)))
   }
 }
 
@@ -1299,7 +1299,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.startIndex
     expectCrashLater()
-    index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
+    index = c.location(index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
     _blackHole(c[index])
   }
 
@@ -1307,7 +1307,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     let c = makeWrappedCollection([])
     var index = c.startIndex
     expectCrashLater()
-    index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
+    index = c.location(index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
     _blackHole(c[index])
   }
 }
@@ -1321,7 +1321,7 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
     let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.startIndex
     expectCrashLater()
-    index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
+    index = c.location(index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
     _blackHole(c[index..<index])
   }
 
@@ -1329,7 +1329,7 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
     let c = makeWrappedCollection([])
     var index = c.startIndex
     expectCrashLater()
-    index = c.index(numericCast(-outOfBoundsSubscriptOffset), stepsFrom: index)
+    index = c.location(index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
     _blackHole(c[index..<index])
   }
 }

@@ -107,12 +107,12 @@ func makeCollection(elements: [OpaqueValue<Int>])
   baseElements.append(contentsOf: elements)
   baseElements.append(contentsOf: suffix.map(OpaqueValue.init))
   let base = ${test.base}(elements: baseElements)
-  let startIndex = base.index(
-    numericCast(prefix.count),
-    stepsFrom: base.startIndex)
-  let endIndex = base.index(
-    numericCast(prefix.count + elements.count),
-    stepsFrom: base.startIndex)
+  let startIndex = base.location(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count))
+  let endIndex = base.location(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count + elements.count))
   return ${test.base_slice}(
     base: base,
     bounds: startIndex..<endIndex)
@@ -124,12 +124,12 @@ func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
   baseElements.append(contentsOf: elements)
   baseElements.append(contentsOf: suffix.map(MinimalEquatableValue.init))
   let base = ${test.base}(elements: baseElements)
-  let startIndex = base.index(
-    numericCast(prefix.count),
-    stepsFrom: base.startIndex)
-  let endIndex = base.index(
-    numericCast(prefix.count + elements.count),
-    stepsFrom: base.startIndex)
+  let startIndex = base.location(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count))
+  let endIndex = base.location(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count + elements.count))
   return ${test.base_slice}(
     base: base,
     bounds: startIndex..<endIndex)
@@ -141,12 +141,12 @@ func makeCollectionOfComparable(elements: [MinimalComparableValue])
   baseElements.append(contentsOf: elements)
   baseElements.append(contentsOf: suffix.map(MinimalComparableValue.init))
   let base = ${test.base}(elements: baseElements)
-  let startIndex = base.index(
-    numericCast(prefix.count),
-    stepsFrom: base.startIndex)
-  let endIndex = base.index(
-    numericCast(prefix.count + elements.count),
-    stepsFrom: base.startIndex)
+  let startIndex = base.location(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count))
+  let endIndex = base.location(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count + elements.count))
   return ${test.base_slice}(
     base: base,
     bounds: startIndex..<endIndex)

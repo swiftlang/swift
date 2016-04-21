@@ -452,8 +452,8 @@ extension Mirror {
         position = children.index { $0.label == label } ?? children.endIndex
       }
       else if let offset = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
-        position = children.index(offset,
-          stepsFrom: children.startIndex,
+        position = children.location(children.startIndex,
+          offsetBy: offset,
           limitedBy: children.endIndex) ?? children.endIndex
       }
       else {
@@ -762,7 +762,7 @@ extension DictionaryLiteral : Collection {
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor(of:)`.
+  /// `location(after:)`.
   ///
   /// - Complexity: O(1).
   public var endIndex: Int { return _elements.endIndex }

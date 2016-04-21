@@ -49,7 +49,7 @@
 // For the API this implies that indices can't be moved forward or
 // backward by themselves (`i.successor()` is not allowed).  Only the
 // corresponding collection instance can move indices (e.g.,
-// `c.successor(of: i)`).  This API change reduces the requirements on the
+// `c.location(after: i)`).  This API change reduces the requirements on the
 // amount of information indices need to store or reference.
 //
 // In this model indices can store the minimal amount of information
@@ -119,7 +119,7 @@
 // * Advancing an index forward or backward becomes harder -- the
 //   statement now includes two entities (collection and index):
 //
-//     j = c.successor(of: i)    vs.    j = i.successor()
+//     j = c.location(after: i)    vs.    j = i.successor()
 //
 //   In practice though, we found that when the code is doing such
 //   index manipulations, the collection is typically still around
@@ -157,7 +157,7 @@
 //
 //     // After:
 //     var i = c.index { $0 % 2 == 0 } // No change in algorithm API.
-//     i = c.successor(of: i)                   // Advancing an index requires a collection instance.
+//     i = c.location(after: i)                   // Advancing an index requires a collection instance.
 //     print(c[i])                     // No change in subscripting.
 //
 
@@ -442,9 +442,9 @@ public protocol MyIndexableType {
   var unownedHandle: UnownedHandle { get }
 
   @warn_unused_result
-  func successor(of i: Index) -> Index
+  func location(after i: Index) -> Index
 
-  func formSuccessor(_ i: inout Index)
+  func formLocation(after i: inout Index)
 
   func _failEarlyRangeCheck(_ index: Index, bounds: MyRange<Index>)
 
@@ -456,8 +456,8 @@ public protocol MyIndexableType {
 }
 extension MyIndexableType {
   @inline(__always)
-  public func formSuccessor(_ i: inout Index) {
-    i = successor(of: i)
+  public func formLocation(after i: inout Index) {
+    i = location(after: i)
   }
 }
 
@@ -482,7 +482,7 @@ public protocol MyForwardCollectionType : MySequenceType, MyIndexableType {
   var unownedHandle: UnownedHandle { get }
 
   @warn_unused_result
-  func successor(of i: Index) -> Index
+  func location(after i: Index) -> Index
 
   @warn_unused_result
   func advance(_ i: Index, by: IndexDistance) -> Index
@@ -523,7 +523,7 @@ extension MyForwardCollectionType {
 
     var i = i
     for var offset: IndexDistance = 0; offset != n; offset = offset + 1 {
-      formSuccessor(&i)
+      formLocation(after: &i)
     }
     return i
   }
@@ -539,18 +539,18 @@ extension MyForwardCollectionType {
 
     var i = i
     for var offset: IndexDistance = 0; offset != n && i != limit; offset = offset + 1 {
-      formSuccessor(&i)
+      formLocation(after: &i)
     }
     return i
   }
 
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
     return self._advanceForward(i, by: n)
   }
 
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func location(_ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index) -> Index {
     return self._advanceForward(i, by: n, limitedBy: limit)
   }
 
@@ -560,7 +560,7 @@ extension MyForwardCollectionType {
     var count: IndexDistance = 0
     while start != end {
       count = count + 1
-      formSuccessor(&start)
+      formLocation(after: &start)
     }
     return count
   }
@@ -601,7 +601,7 @@ extension MyForwardCollectionType {
   @warn_unused_result
   public func dropFirst(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
-    let start = index(numericCast(n), stepsFrom: startIndex, limitedBy: endIndex)
+    let start = location(startIndex, offsetBy: numericCast(n), limitedBy: endIndex)
     return self[start..<*endIndex]
   }
 
@@ -609,14 +609,14 @@ extension MyForwardCollectionType {
   public func dropLast(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = max(0, numericCast(count) - n)
-    let end = index(numericCast(amount), stepsFrom: startIndex, limitedBy: endIndex)
+    let end = location(startIndex, offsetBy: numericCast(amount), limitedBy: endIndex)
     return self[startIndex..<*end]
   }
 
   @warn_unused_result
   public func prefix(_ maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a prefix of negative length from a collection")
-    let end = index(numericCast(maxLength), stepsFrom: startIndex, limitedBy: endIndex)
+    let end = location(startIndex, offsetBy: numericCast(maxLength), limitedBy: endIndex)
     return self[startIndex..<*end]
   }
 
@@ -624,7 +624,7 @@ extension MyForwardCollectionType {
   public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a collection")
     let amount = max(0, numericCast(count) - maxLength)
-    let start = index(numericCast(amount), stepsFrom: startIndex, limitedBy: endIndex)
+    let start = location(startIndex, offsetBy: numericCast(amount), limitedBy: endIndex)
     return self[start..<*endIndex]
   }
 }
@@ -669,19 +669,19 @@ extension MyForwardCollectionType
   Index.Distance == IndexDistance {
 
   @warn_unused_result
-  public func successor(of i: Index) -> Index {
-    return index(1, stepsFrom: i)
+  public func location(after i: Index) -> Index {
+    return location(i, offsetBy: 1)
   }
 
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
     _precondition(n >= 0,
       "Can't advance an Index of MyForwardCollectionType by a negative amount")
     return i.advancedBy(n)
   }
 
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func location(_ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index) -> Index {
     _precondition(n >= 0,
       "Can't advance an Index of MyForwardCollectionType by a negative amount")
     let d = i.distanceTo(limit)
@@ -719,7 +719,7 @@ extension MyForwardCollectionType
       if self[i] == element {
         return i
       }
-      formSuccessor(&i)
+      formLocation(after: &i)
     }
     return nil
   }
@@ -731,45 +731,45 @@ extension MyForwardCollectionType
   public mutating func popFirst() -> Generator.Element? {
     guard !isEmpty else { return nil }
     let element = first!
-    self = self[MyRange(start: self.successor(of: startIndex), end: endIndex)]
+    self = self[MyRange(start: self.location(after: startIndex), end: endIndex)]
     return element
   }
 }
 
 public protocol MyBidirectionalCollectionType : MyForwardCollectionType {
   @warn_unused_result
-  func predecessor(of i: Index) -> Index
+  func location(before i: Index) -> Index
 
-  func formPredecessor(_ i: inout Index)
+  func formLocation(before i: inout Index)
 }
 
 extension MyBidirectionalCollectionType {
   @inline(__always)
-  public func formPredecessor(_ i: inout Index) {
-    i = predecessor(of: i)
+  public func formLocation(before i: inout Index) {
+    i = location(before: i)
   }
 
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n)
     }
     var i = i
     for var offset: IndexDistance = n; offset != 0; offset = offset + 1 {
-      formPredecessor(&i)
+      formLocation(before: &i)
     }
     return i
   }
 
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func location(_ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n, limitedBy: limit)
     }
     var i = i
     for var offset: IndexDistance = n; offset != 0 && i != limit;
         offset = offset + 1 {
-      formPredecessor(&i)
+      formLocation(before: &i)
     }
     return i
   }
@@ -780,17 +780,17 @@ extension MyBidirectionalCollectionType
   Index.Distance == IndexDistance {
 
   @warn_unused_result
-  public func predecessor(of i: Index) -> Index {
-    return index(-1, stepsFrom: i)
+  public func location(before i: Index) -> Index {
+    return location(i, offsetBy: -1)
   }
 
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
     return i.advancedBy(n)
   }
 
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index {
+  public func location(_ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index) -> Index {
     let d = i.distanceTo(limit)
     if d == 0 || (d > 0 ? d <= n : d >= n) {
       return limit
@@ -870,8 +870,8 @@ public struct DefaultForwardIndexRange<Collection : MyIndexableType /* MyForward
   }
 
   @warn_unused_result
-  public func successor(of i: Index) -> Index {
-    return Collection(from: _unownedCollection).successor(of: i)
+  public func location(after i: Index) -> Index {
+    return Collection(from: _unownedCollection).location(after: i)
   }
 }
 
@@ -898,7 +898,7 @@ public struct DefaultForwardIndexRangeGenerator<Collection : MyIndexableType /* 
       return nil
     }
     let result = _i
-    _i = _collection.successor(of: _i)
+    _i = _collection.location(after: _i)
     return result
   }
 }
@@ -937,14 +937,14 @@ public struct MyIterableRange<Index : MyStrideable> :
   }
 
   @warn_unused_result
-  public func successor(of i: Index) -> Index {
+  public func location(after i: Index) -> Index {
     let result = i.advancedBy(1)
     _precondition(startIndex <= result, "can't advance past endIndex")
     return i.advancedBy(1)
   }
 
   @warn_unused_result
-  public func predecessor(of i: Index) -> Index {
+  public func location(before i: Index) -> Index {
     let result = i.advancedBy(-1)
     _precondition(result <= endIndex, "can't advance before startIndex")
     return result
@@ -1004,8 +1004,8 @@ public struct MySlice<Collection : MyIndexableType /* : MyForwardCollectionType 
   }
 
   @warn_unused_result
-  public func successor(of i: Index) -> Index {
-    return _base.successor(of: i)
+  public func location(after i: Index) -> Index {
+    return _base.location(after: i)
   }
 
   public func _failEarlyRangeCheck(_ index: Index, bounds: MyRange<Index>) {
@@ -1094,8 +1094,8 @@ public struct MySliceIndexRange<Collection : MyIndexableType /* MyForwardCollect
   }
 
   @warn_unused_result
-  public func successor(of i: Index) -> Index {
-    return Collection(from: _unownedCollection).successor(of: i)
+  public func location(after i: Index) -> Index {
+    return Collection(from: _unownedCollection).location(after: i)
   }
 
   public func _failEarlyRangeCheck(_ index: Index, bounds: MyRange<Index>) {
@@ -1148,7 +1148,7 @@ public struct DefaultGenerator<Collection : MyIndexableType>
       return nil
     }
     let result = _collection[_i]
-    _i = _collection.successor(of: _i)
+    _i = _collection.location(after: _i)
     return result
   }
 }
@@ -1240,13 +1240,13 @@ extension MyMutableCollectionType
     @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) {
     if isEmpty { return }
-    if successor(of: startIndex) == endIndex { return }
+    if location(after: startIndex) == endIndex { return }
 
     while true {
       var swapped = false
       for i in OldSequence(indices) {
         if i == endIndex { break }
-        let ni = successor(of: i)
+        let ni = location(after: i)
         if ni == endIndex { break }
         if isOrderedBefore(self[ni], self[i]) {
           swap(&self[i], &self[ni])
@@ -1287,9 +1287,9 @@ extension MyRandomAccessCollectionType
     var subrangeCount = count
     while subrangeCount != 0 {
       let midOffset = subrangeCount / 2
-      let mid = index(midOffset, stepsFrom: low)
+      let mid = location(low, offsetBy: midOffset)
       if isOrderedBefore(self[mid], element) {
-        low = successor(of: mid)
+        low = location(after: mid)
         subrangeCount -= midOffset + 1
       } else {
         subrangeCount = midOffset
@@ -1374,7 +1374,7 @@ public struct MySimplestForwardCollection<Element> : MyForwardCollectionType {
   }
 
   @warn_unused_result
-  public func successor(of i: MySimplestForwardCollectionIndex) -> MySimplestForwardCollectionIndex {
+  public func location(after i: MySimplestForwardCollectionIndex) -> MySimplestForwardCollectionIndex {
     return MySimplestForwardCollectionIndex(i._index + 1)
   }
 
@@ -1423,12 +1423,12 @@ public struct MySimplestBidirectionalCollection<Element> : MyBidirectionalCollec
   }
 
   @warn_unused_result
-  public func successor(of i: MySimplestBidirectionalCollectionIndex) -> MySimplestBidirectionalCollectionIndex {
+  public func location(after i: MySimplestBidirectionalCollectionIndex) -> MySimplestBidirectionalCollectionIndex {
     return MySimplestBidirectionalCollectionIndex(i._index + 1)
   }
 
   @warn_unused_result
-  public func predecessor(of i: MySimplestBidirectionalCollectionIndex) -> MySimplestBidirectionalCollectionIndex {
+  public func location(before i: MySimplestBidirectionalCollectionIndex) -> MySimplestBidirectionalCollectionIndex {
     return MySimplestBidirectionalCollectionIndex(i._index - 1)
   }
 
@@ -1833,7 +1833,7 @@ extension MyBinaryTree : MyBidirectionalCollectionType {
   }
 
   @warn_unused_result
-  public func successor(of i: Index) -> Index {
+  public func location(after i: Index) -> Index {
     _precondition(
       i._treeID == _treeID,
       "can't use index from another tree")
@@ -1871,7 +1871,7 @@ extension MyBinaryTree : MyBidirectionalCollectionType {
   }
 
   @warn_unused_result
-  public func predecessor(of i: Index) -> Index {
+  public func location(before i: Index) -> Index {
     _precondition(
       i._treeID == _treeID,
       "can't use index from another tree")
@@ -2076,26 +2076,26 @@ NewCollection.test("MyBinaryTree.insert(_:)") {
     var i = t.startIndex
     expectEqual(10, t[i])
 
-    i = t.successor(of: i)
+    i = t.location(after: i)
     expectEqual(20, t[i])
 
-    i = t.successor(of: i)
+    i = t.location(after: i)
     expectEqual(30, t[i])
 
-    i = t.successor(of: i)
+    i = t.location(after: i)
     expectEqual(t.endIndex, i)
   }
   do {
     var i = t.endIndex
-    i = t.predecessor(of: i)
+    i = t.location(before: i)
     dump(i, name: "30")
     expectEqual(30, t[i])
 
-    i = t.predecessor(of: i)
+    i = t.location(before: i)
     dump(i, name: "20")
     expectEqual(20, t[i])
 
-    i = t.predecessor(of: i)
+    i = t.location(before: i)
     dump(i, name: "10")
     expectEqual(10, t[i])
     expectEqual(t.startIndex, i)

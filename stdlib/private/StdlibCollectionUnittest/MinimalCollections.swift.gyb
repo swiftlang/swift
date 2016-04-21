@@ -650,14 +650,14 @@ public struct ${Self}<T> : ${SelfProtocols} {
   }
 
   @warn_unused_result
-  public func successor(of i: MinimalIndex) -> MinimalIndex {
+  public func location(after i: MinimalIndex) -> MinimalIndex {
     _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
     return _uncheckedIndex(forPosition: i.position + 1)
   }
 
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
   @warn_unused_result
-  public func predecessor(of i: MinimalIndex) -> MinimalIndex {
+  public func location(before i: MinimalIndex) -> MinimalIndex {
     // FIXME: swift-3-indexing-model: perform a range check and use
     // return _uncheckedIndex(forPosition: i.position - 1)
     return _index(forPosition: i.position - 1)
@@ -682,7 +682,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
   }
 
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
 %     if Traversal == 'Forward':
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
@@ -892,18 +892,18 @@ public struct ${Self}<Element> : ${SelfProtocols} {
 
   public let timesSuccessorCalled = ResettableValue(0)
   @warn_unused_result
-  public func successor(of i: MinimalIndex) -> MinimalIndex {
+  public func location(after i: MinimalIndex) -> MinimalIndex {
     timesSuccessorCalled.value += 1
-    return base.successor(of: i)
+    return base.location(after: i)
   }
 
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
   public let timesPredecessorCalled = ResettableValue(0)
 
   @warn_unused_result
-  public func predecessor(of i: MinimalIndex) -> MinimalIndex {
+  public func location(before i: MinimalIndex) -> MinimalIndex {
     timesPredecessorCalled.value += 1
-    return base.predecessor(of: i)
+    return base.location(before: i)
   }
 %     end
 
@@ -915,8 +915,8 @@ public struct ${Self}<Element> : ${SelfProtocols} {
   }
 
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
-    return base.index(n, stepsFrom: i)
+  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    return base.location(i, offsetBy: n)
   }
 %     end
 

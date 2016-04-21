@@ -41,9 +41,9 @@ public struct CollectionMisuseResiliencyChecks {
   }
 }
 
-% for inc, protocol, successor, end in (
-%  ('inc', 'Indexable', 'successor', 'end'),
-%  ('dec', 'BidirectionalIndexable', 'predecessor', 'start')):
+% for inc, protocol, direction, end in (
+%  ('inc', 'Indexable', 'after', 'end'),
+%  ('dec', 'BidirectionalIndexable', 'before', 'start')):
 
 /// Test that the elements of `instances` satisfy
 /// ${'some of ' if inc == 'dec' else ''}the semantic
@@ -71,13 +71,13 @@ public func check${inc.capitalize()}rementable<
   checkEquatable(instances, oracle: equalityOracle, ${trace})
   for i in instances {
     if i != ${end}Index {
-      let next = baseCollection.${successor}(of: i)
-      // ${successor} gets us a new index value
+      let next = baseCollection.location(${direction}: i)
+      // location(${direction}:) gets us a new index value
       expectNotEqual(i, next, ${trace})
 
-      // Which is the same as if we apply form${successor}
+      // Which is the same as if we apply formLocation(${direction}:)
       var j = i
-      baseCollection.form${successor.capitalize()}(&j)
+      baseCollection.formLocation(${direction}: &j)
       expectEqual(j, next, ${trace})
     }
   }
@@ -108,8 +108,8 @@ internal func _checkIncrementalAdvance<
 
     var offset: BaseCollection.IndexDistance = 0
     for _ in 0...(d * sign).toIntMax() {
-      let j = baseCollection.index(offset, stepsFrom: i)
-      let k = baseCollection.index(offset + sign, stepsFrom: i, limitedBy: limit) ?? limit
+      let j = baseCollection.location(i, offsetBy: offset)
+      let k = baseCollection.location(i, offsetBy: offset + sign, limitedBy: limit) ?? limit
       let jAtLimit = offset == d
       if jAtLimit {
         expectEqual(limit, j, ${trace})
@@ -148,7 +148,7 @@ public func checkForwardIndex<
 
   _checkIncrementalAdvance(instances, of: baseCollection,
     equalityOracle: equalityOracle, limit: endIndex,
-    sign: 1, next: { baseCollection.successor(of: $0) }, ${trace})
+    sign: 1, next: { baseCollection.location(after: $0) }, ${trace})
 }
 
 // FIXME: [swift-3-indexing-model] rephrase the comment, as it
@@ -185,7 +185,7 @@ public func checkBidirectionalIndex<
 
   _checkIncrementalAdvance(instances, of: baseCollection,
     equalityOracle: equalityOracle, limit: startIndex,
-    sign: -1, next: { baseCollection.predecessor(of: $0) }, ${trace})
+    sign: -1, next: { baseCollection.location(before: $0) }, ${trace})
 }
 
 // FIXME: [swift-3-indexing-model] rephrase the comment, as it
@@ -265,11 +265,11 @@ public func checkAdvancesAndDistances<
 
   for i in instances.indices {
     let x = instances[i]
-    expectEqual(x, baseCollection.index(0, stepsFrom: x))
+    expectEqual(x, baseCollection.location(x, offsetBy: 0))
 
     for j in distances.indices {
       let y = distances[j]
-      expectEqual(advanceOracle(i, j), baseCollection.index(y, stepsFrom: x))
+      expectEqual(advanceOracle(i, j), baseCollection.location(x, offsetBy: y))
     }
 
     for j in instances.indices {
@@ -307,9 +307,9 @@ public func check${Traversal}Collection<
       resiliencyChecks: resiliencyChecks, sameValue: sameValue)
   }
 
-  let succ = { collection.successor(of: $0) }
+  let succ = { collection.location(after: $0) }
 %     if Traversal != 'Forward':
-  let pred = { collection.predecessor(of: $0) }
+  let pred = { collection.location(before: $0) }
 %     end
   // Advances up to 1 positions without passing endIndex.  Don't use
   // advanced(by: n) to do this because it's under test here.
@@ -355,7 +355,7 @@ public func check${Traversal}Collection<
   }
 
   func nextN(_ n: Distance, _ i: C.Index) -> C.Index {
-    return collection.index(n, stepsFrom: i)
+    return collection.location(i, offsetBy: n)
   }
 
   let instances = _allIndices(into: collection, in: partWay0..<partWay1)
@@ -497,8 +497,8 @@ public func checkSliceableWithBidirectionalIndex<
 
   let expectedArray = Array(expected)
 
-  let succ = { sliceable.successor(of: $0) }
-  let pred = { sliceable.predecessor(of: $0) }
+  let succ = { sliceable.location(after: $0) }
+  let pred = { sliceable.location(before: $0) }
 
   var start = sliceable.startIndex
   for startNumericIndex in 0...expectedArray.count {

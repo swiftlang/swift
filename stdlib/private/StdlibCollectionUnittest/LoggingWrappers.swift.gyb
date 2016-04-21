@@ -361,14 +361,14 @@ public struct ${Self}<
   }
 
   @warn_unused_result
-  public func successor(of i: Index) -> Index {
+  public func location(after i: Index) -> Index {
     Log.successor[selfType] += 1
-    return base.successor(of: i)
+    return base.location(after: i)
   }
 
-  public func formSuccessor(_ i: inout Index) {
+  public func formLocation(after i: inout Index) {
     Log.formSuccessor[selfType] += 1
-    base.formSuccessor(&i)
+    base.formLocation(after: &i)
   }
 
   public typealias Indices = Base.Indices
@@ -418,17 +418,17 @@ public struct ${Self}<
   }
 
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
+  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
     Log.advance[selfType] += 1
-    return base.index(n, stepsFrom: i)
+    return base.location(i, offsetBy: n)
   }
 
   @warn_unused_result
-  public func index(
-    _ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+  public func location(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     Log.advanceLimit[selfType] += 1
-    return base.index(n, stepsFrom: i, limitedBy: limit)
+    return base.location(i, offsetBy: n, limitedBy: limit)
   }
 
   @warn_unused_result
@@ -549,14 +549,14 @@ public struct ${Self}<
 %     end
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
   @warn_unused_result
-  public func predecessor(of i: Index) -> Index {
+  public func location(before i: Index) -> Index {
     BidirectionalCollectionLog.predecessor[selfType] += 1
-    return base.predecessor(of: i)
+    return base.location(before: i)
   }
 
-  public func formPredecessor(_ i: inout Index) {
+  public func formLocation(before i: inout Index) {
     BidirectionalCollectionLog.formPredecessor[selfType] += 1
-    base.formPredecessor(&i)
+    base.formLocation(before: &i)
   }
 
   public var last: Iterator.Element? {

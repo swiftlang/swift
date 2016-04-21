@@ -41,7 +41,7 @@ public protocol MutableIndexable : Indexable {
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor(of:)`.
+  /// `location(after:)`.
   ///
   /// - Complexity: O(1)
   var endIndex: Index { get }
@@ -110,9 +110,9 @@ public protocol MutableIndexable : Indexable {
   ///
   /// - Precondition: `i` has a well-defined successor.
   @warn_unused_result
-  func successor(of i: Index) -> Index
+  func location(after i: Index) -> Index
 
-  func formSuccessor(_ i: inout Index)
+  func formLocation(after i: inout Index)
 }
 
 // TODO: swift-3-indexing-model - review the following

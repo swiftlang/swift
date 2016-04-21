@@ -2089,7 +2089,7 @@ public func checkStrideable<
 }
 
 public func nthIndex<C: Collection>(_ x: C, _ n: Int) -> C.Index {
-  return x.index(numericCast(n), stepsFrom: x.startIndex)
+  return x.location(x.startIndex, offsetBy: numericCast(n))
 }
 
 public func nth<C: Collection>(_ x: C, _ n: Int) -> C.Iterator.Element {

@@ -220,35 +220,39 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
 %   if Kind == 'Collection':
   internal subscript(i: _AnyIndexBox) -> Element { _abstract() }
+  
   @warn_unused_result
-  internal func _successor(of i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
-  internal func _formSuccessor(_ i: _AnyIndexBox) { _abstract() }
+  internal func _location(after i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
+  
+  internal func _formLocation(after i: _AnyIndexBox) { _abstract() }
+  
   @warn_unused_result
-  internal func _index(_ n: IntMax, stepsFrom i: _AnyIndexBox) -> _AnyIndexBox {
+  internal func _location(
+    _ i: _AnyIndexBox, offsetBy n: IntMax
+  ) -> _AnyIndexBox {
     _abstract()
   }
+  
   @warn_unused_result
-  internal func _index(
-    _ n: IntMax,
-    stepsFrom i: _AnyIndexBox,
-    limitedBy limit: _AnyIndexBox
+  internal func _location(
+    _ i: _AnyIndexBox, offsetBy n: IntMax, limitedBy limit: _AnyIndexBox
   ) -> _AnyIndexBox? {
     _abstract()
   }
-  internal func _formIndex(_ n: IntMax, stepsFrom i: inout _AnyIndexBox) {
+  
+  internal func _formLocation(_ i: inout _AnyIndexBox, offsetBy n: IntMax) {
     _abstract()
   }
-  internal func _formIndex(
-    _ n: IntMax,
-    stepsFrom i: inout _AnyIndexBox,
-    limitedBy limit: _AnyIndexBox
+  
+  internal func _formLocation(
+    _ i: inout _AnyIndexBox, offsetBy n: IntMax, limitedBy limit: _AnyIndexBox
   ) -> Bool {
     _abstract()
   }
+  
   @warn_unused_result
   internal func _distance(
-    from start: _AnyIndexBox,
-    to end: _AnyIndexBox
+    from start: _AnyIndexBox, to end: _AnyIndexBox
   ) -> IntMax {
     _abstract()
   }
@@ -300,8 +304,8 @@ internal class _AnyRandomAccessCollectionBox<Element>
 %   end
 
 %   if Kind == 'BidirectionalCollection':
-  internal func _predecessor(of i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
-  internal func _formPredecessor(_ i: _AnyIndexBox) { _abstract() }
+  internal func _location(before i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
+  internal func _formLocation(before i: _AnyIndexBox) { _abstract() }
   internal var _last: Element? { _abstract() }
 
   internal override init(
@@ -469,57 +473,53 @@ internal final class _${Kind}Box<
   }
 
   @warn_unused_result
-  internal override func _successor(of position: _AnyIndexBox) -> _AnyIndexBox {
-    return _IndexBox(_base: _base.successor(of: _unbox(position)))
+  internal override func _location(after position: _AnyIndexBox) -> _AnyIndexBox {
+    return _IndexBox(_base: _base.location(after: _unbox(position)))
   }
 
-  internal override func _formSuccessor(_ position: _AnyIndexBox) {
+  internal override func _formLocation(after position: _AnyIndexBox) {
     if let p = position as? _IndexBox<S.Index> {
-      return _base.formSuccessor(&p._base)
+      return _base.formLocation(after: &p._base)
     }
     fatalError("Index type mismatch!")
   }
 
   @warn_unused_result
-  internal override func _index(
-    _ n: IntMax,
-    stepsFrom i: _AnyIndexBox
+  internal override func _location(
+    _ i: _AnyIndexBox, offsetBy n: IntMax
   ) -> _AnyIndexBox {
-    return _IndexBox(_base: _base.index(numericCast(n), stepsFrom: _unbox(i)))
+    return _IndexBox(_base: _base.location(_unbox(i), offsetBy: numericCast(n)))
   }
 
   @warn_unused_result
-  internal override func _index(
-    _ n: IntMax,
-    stepsFrom i: _AnyIndexBox,
+  internal override func _location(
+    _ i: _AnyIndexBox,
+    offsetBy n: IntMax,
     limitedBy limit: _AnyIndexBox
   ) -> _AnyIndexBox? {
-    return _base.index(
-        numericCast(n),
-        stepsFrom: _unbox(i),
+    return _base.location(
+        _unbox(i),
+        offsetBy: numericCast(n),
         limitedBy: _unbox(limit))
       .map { _IndexBox(_base: $0) }
   }
 
-  internal override func _formIndex(
-    _ n: IntMax,
-    stepsFrom i: inout _AnyIndexBox
+  internal override func _formLocation(
+    _ i: inout _AnyIndexBox, offsetBy n: IntMax
   ) {
     if let box = i as? _IndexBox<S.Index> {
-      return _base.formIndex(numericCast(n), stepsFrom: &box._base)
+      return _base.formLocation(&box._base, offsetBy: numericCast(n))
     }
     fatalError("Index type mismatch!")
   }
 
-  internal override func _formIndex(
-    _ n: IntMax,
-    stepsFrom i: inout _AnyIndexBox,
-    limitedBy limit: _AnyIndexBox
+  internal override func _formLocation(
+    _ i: inout _AnyIndexBox, offsetBy n: IntMax, limitedBy limit: _AnyIndexBox
   ) -> Bool {
     if let box = i as? _IndexBox<S.Index> {
-      return _base.formIndex(
-        numericCast(n),
-        stepsFrom: &box._base,
+      return _base.formLocation(
+        &box._base,
+        offsetBy: numericCast(n),
         limitedBy: _unbox(limit))
     }
     fatalError("Index type mismatch!")
@@ -543,13 +543,13 @@ internal final class _${Kind}Box<
 
 %     if Kind in ['BidirectionalCollection', 'RandomAccessCollection']:
   @warn_unused_result
-  internal override func _predecessor(of position: _AnyIndexBox) -> _AnyIndexBox {
-    return _IndexBox(_base: _base.predecessor(of: _unbox(position)))
+  internal override func _location(before position: _AnyIndexBox) -> _AnyIndexBox {
+    return _IndexBox(_base: _base.location(before: _unbox(position)))
   }
 
-  internal override func _formPredecessor(_ position: _AnyIndexBox) {
+  internal override func _formLocation(before position: _AnyIndexBox) {
     if let p = position as? _IndexBox<S.Index> {
-      return _base.formPredecessor(&p._base)
+      return _base.formLocation(before: &p._base)
     }
     fatalError("Index type mismatch!")
   }
@@ -972,7 +972,7 @@ public struct ${Self}<Element>
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor(of:)`.
+  /// `location(after:)`.
   public var endIndex: AnyIndex {
     return AnyIndex(_box: _box._endIndex)
   }
@@ -1003,54 +1003,51 @@ public struct ${Self}<Element>
   }
 
   @warn_unused_result
-  public func successor(of i: AnyIndex) -> AnyIndex {
-    return AnyIndex(_box: _box._successor(of: i._box))
+  public func location(after i: AnyIndex) -> AnyIndex {
+    return AnyIndex(_box: _box._location(after: i._box))
   }
 
-  public func formSuccessor(_ i: inout AnyIndex) {
+  public func formLocation(after i: inout AnyIndex) {
     if _isUnique(&i._box) {
-      _box._formSuccessor(i._box)
+      _box._formLocation(after: i._box)
     }
     else {
-      i = successor(of: i)
+      i = location(after: i)
     }
   }
 
   @warn_unused_result
-  public func index(
-    _ n: IntMax,
-    stepsFrom i: AnyIndex
-  ) -> AnyIndex {
-    return AnyIndex(_box: _box._index(n, stepsFrom: i._box))
+  public func location(_ i: AnyIndex, offsetBy n: IntMax) -> AnyIndex {
+    return AnyIndex(_box: _box._location(i._box, offsetBy: n))
   }
 
   @warn_unused_result
-  public func index(
-    _ n: IntMax,
-    stepsFrom i: AnyIndex,
+  public func location(
+    _ i: AnyIndex,
+    offsetBy n: IntMax,
     limitedBy limit: AnyIndex
   ) -> AnyIndex? {
-    return _box._index(n, stepsFrom: i._box, limitedBy: limit._box)
+    return _box._location(i._box, offsetBy: n, limitedBy: limit._box)
       .map { AnyIndex(_box:$0) }
   }
 
-  public func formIndex(_ n: IntMax, stepsFrom i: inout AnyIndex) {
+  public func formLocation(_ i: inout AnyIndex, offsetBy n: IntMax) {
     if _isUnique(&i._box) {
-      return _box._formIndex(n, stepsFrom: &i._box)
+      return _box._formLocation(&i._box, offsetBy: n)
     } else {
-      i = index(n, stepsFrom: i)
+      i = location(i, offsetBy: n)
     }
   }
 
-  public func formIndex(
-    _ n: IntMax,
-    stepsFrom i: inout AnyIndex,
+  public func formLocation(
+    _ i: inout AnyIndex,
+    offsetBy n: IntMax,
     limitedBy limit: AnyIndex
   ) -> Bool {
     if _isUnique(&i._box) {
-      return _box._formIndex(n, stepsFrom: &i._box, limitedBy: limit._box)
+      return _box._formLocation(&i._box, offsetBy: n, limitedBy: limit._box)
     }
-    if let advanced = index(n, stepsFrom: i, limitedBy: limit) {
+    if let advanced = location(i, offsetBy: n, limitedBy: limit) {
       i = advanced
       return true
     }
@@ -1075,16 +1072,16 @@ public struct ${Self}<Element>
   }
 
 %   if Traversal == 'Bidirectional' or Traversal == 'RandomAccess':
-  public func predecessor(of i: AnyIndex) -> AnyIndex {
-    return AnyIndex(_box: _box._predecessor(of: i._box))
+  public func location(before i: AnyIndex) -> AnyIndex {
+    return AnyIndex(_box: _box._location(before: i._box))
   }
 
-  public func formPredecessor(_ i: inout AnyIndex) {
+  public func formLocation(before i: inout AnyIndex) {
     if _isUnique(&i._box) {
-      _box._formPredecessor(i._box)
+      _box._formLocation(before: i._box)
     }
     else {
-      i = predecessor(of: i)
+      i = location(before: i)
     }
   }
 

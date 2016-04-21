@@ -100,18 +100,18 @@ public struct ${Self}<
   public var endIndex: Base.Index { return _base.endIndex }
 
   @warn_unused_result
-  public func successor(of i: Index) -> Index { return _base.successor(of: i) }
+  public func location(after i: Index) -> Index { return _base.location(after: i) }
 
-  public func formSuccessor(_ i: inout Index) {
-    _base.formSuccessor(&i)
+  public func formLocation(after i: inout Index) {
+    _base.formLocation(after: &i)
   }
 
 %   if Traversal in ['Bidirectional', 'RandomAccess']:
   @warn_unused_result
-  public func predecessor(of i: Index) -> Index { return _base.predecessor(of: i) }
+  public func location(before i: Index) -> Index { return _base.location(before: i) }
 
-  public func formPredecessor(_ i: inout Index) {
-    _base.formPredecessor(&i)
+  public func formLocation(before i: inout Index) {
+    _base.formLocation(before: &i)
   }
 %   end
 
@@ -163,15 +163,15 @@ public struct ${Self}<
 %   end
 
   @warn_unused_result
-  public func index(_ n: Base.IndexDistance, stepsFrom i: Index) -> Index {
-    return _base.index(n, stepsFrom: i)
+  public func location(_ i: Index, offsetBy n: Base.IndexDistance) -> Index {
+    return _base.location(i, offsetBy: n)
   }
 
   @warn_unused_result
-  public func index(
-    _ n: Base.IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+  public func location(
+    _ i: Index, offsetBy n: Base.IndexDistance, limitedBy limit: Index
   ) -> Index? {
-    return _base.index(n, stepsFrom: i, limitedBy: limit)
+    return _base.location(i, offsetBy: n, limitedBy: limit)
   }
 
   @warn_unused_result

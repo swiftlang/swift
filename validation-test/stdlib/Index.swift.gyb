@@ -22,7 +22,7 @@ import StdlibCollectionUnittest
 
 extension Collection {
   func indexAt(offset offset: Int) -> Index {
-    return self.index(numericCast(offset), stepsFrom: self.startIndex)
+    return self.location(self.startIndex, offsetBy: numericCast(offset))
   }
 }
 
@@ -58,7 +58,7 @@ struct IndexStepsFromTest {
     self.distance = distance
     self.expectedIndex = expectedIndex
     self.limit = limit
-    self.loc = SourceLoc(file, line, comment: "index(_:stepsFrom:) test data")
+    self.loc = SourceLoc(file, line, comment: "location(_:offsetBy:) test data")
   }
 }
 
@@ -155,15 +155,15 @@ Index.test("${TraversalCollection}/distance(to:)/dispatch") {
   expectCustomizable(c, c.log.distance)
 }
 
-Index.test("${TraversalCollection}/index(_:stepsFrom:)/dispatch") {
+Index.test("${TraversalCollection}/location(_:offsetBy:)/dispatch") {
   let c = ${TraversalCollection}Log.dispatchTester(Array(0..<10))
-  _ = c.index(10, stepsFrom: c.startIndex)
+  _ = c.location(c.startIndex, offsetBy: 10)
   expectCustomizable(c, c.log.advance)
 }
 
-Index.test("${TraversalCollection}/index(_:stepsFrom:limitedBy:)/dispatch") {
+Index.test("${TraversalCollection}/location(_:offsetBy:limitedBy:)/dispatch") {
   let c = ${TraversalCollection}Log.dispatchTester(Array(0..<10))
-  _ = c.index(10, stepsFrom: c.startIndex, limitedBy: 5)
+  _ = c.location(c.startIndex, offsetBy: 10, limitedBy: 5)
   expectCustomizable(c, c.log.advanceLimit)
 }
 
@@ -189,7 +189,7 @@ Index.test("${Kind}Collection/index(_:stepsFrom: n)/semantics") {
   for test in indexStepsFromTests.filter({$0.limit == nil && $0.distance >= 0}) {
     let c = ${Kind}Collection(elements: Array(0..<10))
 
-    let new = c.index(test.distance, stepsFrom: c.indexAt(offset: test.startIndex))
+    let new = c.location(c.indexAt(offset: test.startIndex), offsetBy: test.distance)
     // Since the `indexAt(offset:)` method performs the same operation
     // (i.e. adavances `c.startIndex` by `test.distance`, it would be
     // silly to compare index values. Luckily the underlying collection
@@ -204,7 +204,7 @@ Index.test("${Kind}Collection/index(_:stepsFrom: -n)/semantics") {
   for test in indexStepsFromTests.filter({$0.limit == nil && $0.distance < 0}) {
     let c = ${Kind}Collection(elements: Array(0..<10))
     expectCrashLater()
-    _ = c.index(test.distance, stepsFrom: c.indexAt(offset: test.startIndex))
+    _ = c.location(c.indexAt(offset: test.startIndex), offsetBy: test.distance)
   }
 }
 %     end
@@ -216,9 +216,9 @@ Index.test("${Kind}Collection/advance(by: -n, limitedBy:)/semantics") {
     let limit = c.indexAt(offset: test.limit.unsafelyUnwrapped)
 
     expectCrashLater()
-    _ = c.index(
-      test.distance,
-      stepsFrom: c.indexAt(offset: test.startIndex),
+    _ = c.location(
+      c.indexAt(offset: test.startIndex),
+      offsetBy: test.distance,
       limitedBy: limit)
   }
 }
@@ -237,9 +237,9 @@ Index.test("${Kind}Collection/advance(by: n, limitedBy:)/semantics") {
 
 %     end
 
-    let new = c.index(
-      test.distance,
-      stepsFrom: c.indexAt(offset: test.startIndex),
+    let new = c.location(
+      c.indexAt(offset: test.startIndex),
+      offsetBy: test.distance,
       limitedBy: limit)
     if test.expectedIndex == nil {
       expectEmpty(new)
@@ -256,13 +256,13 @@ Index.test("${Kind}Collection/advance(by: n, limitedBy:)/semantics") {
 %     if Traversal == 'RandomAccess' and Base == 'Defaulted':
 
 Index.test(
-  "${Kind}Collection/index(_:stepsFrom:)/avoidsSuccessorAndPredecessor/dispatch"
+  "${Kind}Collection/location(_:offsetBy:)/avoidsSuccessorAndPredecessor/dispatch"
 ) {
   for test in indexStepsFromTests.filter({$0.limit == nil && $0.distance >= 0}) {
     let c = ${Kind}Collection(Array(0..<10))
 
     let i = c.indexAt(offset: test.startIndex)
-    let result  = c.index(test.distance, stepsFrom: i)
+    let result  = c.location(i, offsetBy: test.distance)
     expectEqual(0, c.timesSuccessorCalled.value)
     expectEqual(0, c.timesPredecessorCalled.value)
   }
@@ -270,14 +270,14 @@ Index.test(
 
 #if false // FIXME: swift-3-indexing-model. implementation missing
 Index.test(
-  "${Kind}Index/index(_:stepsFrom:limitedBy:)/avoidsSuccessorAndPredecessor/dispatch"
+  "${Kind}Index/location(_:offsetBy:limitedBy:)/avoidsSuccessorAndPredecessor/dispatch"
 ) {
   for test in indexStepsFromTests.filter({$0.limit != nil && $0.distance >= 0}) {
     let c = ${Kind}Collection(Array(0..<10))
 
     let i = c.indexAt(offset: test.startIndex)
     let limit = c.indexAt(offset: test.limit.unsafelyUnwrapped)
-    _ = c.index(test.distance, stepsFrom: i, limitedBy: limit)
+    _ = c.location(i, offsetBy: test.distance, limitedBy: limit)
     expectEqual(0, c.timesSuccessorCalled.value)
     expectEqual(0, c.timesPredecessorCalled.value)
   }

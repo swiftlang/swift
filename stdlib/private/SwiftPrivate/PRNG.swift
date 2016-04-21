@@ -56,5 +56,5 @@ public func pickRandom<
   C : RandomAccessCollection
 >(_ c: C) -> C.Iterator.Element {
   let i = Int(rand32(exclusiveUpperBound: numericCast(c.count)))
-  return c[c.index(numericCast(i), stepsFrom: c.startIndex)]
+  return c[c.location(c.startIndex, offsetBy: numericCast(i))]
 }

@@ -158,12 +158,12 @@ extension _ArrayBufferProtocol where Index == Int {
       var i = newValues.startIndex
       for j in CountableRange(subRange) {
         elements[j] = newValues[i]
-        newValues.formSuccessor(&i)
+        newValues.formLocation(after: &i)
       }
       // Initialize the hole left by sliding the tail forward
       for j in oldTailIndex..<newTailIndex {
         (elements + j).initialize(with: newValues[i])
-        newValues.formSuccessor(&i)
+        newValues.formLocation(after: &i)
       }
       _expectEnd(i, newValues)
     }
@@ -173,8 +173,8 @@ extension _ArrayBufferProtocol where Index == Int {
       var j = newValues.startIndex
       for _ in 0..<newCount {
         elements[i] = newValues[j]
-        formSuccessor(&i)
-        newValues.formSuccessor(&j)
+        formLocation(after: &i)
+        newValues.formLocation(after: &j)
       }
       _expectEnd(j, newValues)
 

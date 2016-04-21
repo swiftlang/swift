@@ -30,8 +30,8 @@ public protocol RandomAccessIndexable : BidirectionalIndexable {
 ///   `RandomAccessCollection`:
 ///
 ///   - `c.count`
-///   - `c.index(n, stepsFrom: i)`
-///   - `c.index(n, stepsFrom: i, limitedBy: l)`
+///   - `c.location(i, offsetBy: n)`
+///   - `c.location(i, offsetBy: n, limitedBy: l)`
 ///   - `c.distance(from: i, to: j)`
 public protocol RandomAccessCollection :
   RandomAccessIndexable, BidirectionalCollection
@@ -62,10 +62,10 @@ extension RandomAccessCollection where SubSequence == RandomAccessSlice<Self> {
 extension RandomAccessCollection {
 // TODO: swift-3-indexing-model - implement optimized version of the following
 // (also un-xfail corresponding test in validation-test/stdlib/Index.swift.gyb)
-  //func index(n: IndexDistance, stepsFrom i: Index) -> Index
+  //func location(i: Index, offsetBy n: IndexDistance) -> Index
   //@warn_unused_result
-  //func index(
-    //n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+  //func location(
+  //  i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   //) -> Index?
   //distance(from start: Index, to end: Index) -> IndexDistance
 }
