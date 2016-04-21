@@ -21,7 +21,7 @@
 #include "swift/Remote/RemoteAddress.h"
 
 #include "llvm/Support/Compiler.h"
-#include <assert.h>
+#include <cassert>
 #include <string>
 #include <cstring>
 #include <type_traits>
