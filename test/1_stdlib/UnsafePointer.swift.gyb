@@ -394,14 +394,23 @@ UnsafeMutablePointerTestSuite.test("customPlaygroundQuickLook") {
 %         ('UnsafeMutablePointer', 'UnsafeMutablePointer<Int>')]:
 
 ${SelfName}TestSuite.test("Comparable") {
-  let instances = [
+  var addresses: [UInt] = [
     0x00000001,
     0xFF00FF00,
     0x00001111,
     0x00000002,
     0xFFFFFFFF,
     0x00001111
-  ].map { ($0, ${SelfType}(bitPattern: $0)!) }
+  ]
+
+  #if arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+  addresses += [
+    0xFFFFFFFF80000000,
+    0x8000000000000000
+  ]
+  #endif
+
+  let instances = addresses.map { ($0, ${SelfType}(bitPattern: $0)!) }
 
   func comparisonOracle(i: Int, j: Int) -> ExpectedComparisonResult {
     return instances[i].0 <=> instances[j].0
