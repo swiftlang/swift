@@ -1379,6 +1379,73 @@ namespace {
       return constructor;
     }
 
+    /// Make a struct declaration into a raw-value-backed struct
+    ///
+    /// \param structDecl the struct to make a raw value for
+    /// \param underlyingType the type of the raw value
+    /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
+    /// \param protocols the protocols to make this struct conform to
+    /// \param setterAccessibility the accessiblity of the raw value's setter
+    /// \param isLet whether the raw value should be a let
+    /// \param makeUnlabeledValueInit whether to also create an unlabeled init
+    /// \param isImplicit whether to mark the rawValue as implicit
+    ///
+    /// This will perform most of the work involved in making a new Swift struct
+    /// be backed by a raw value. This will populated derived protocols and
+    /// synthesized protocols, add the new variable and pattern bindings, and
+    /// create the inits parameterized over a raw value
+    ///
+    template <unsigned N>
+    void makeStructRawValued(
+        StructDecl *structDecl,
+        Type underlyingType,
+        ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
+        ProtocolDecl *const(&protocols)[N],
+        Accessibility setterAccessibility = Accessibility::Private,
+        bool isLet = true,
+        bool makeUnlabeledValueInit = false,
+        bool isImplicit = true) {
+      auto &cxt = Impl.SwiftContext;
+      populateInheritedTypes(structDecl, protocols);
+
+      // Note synthesized protocols
+      for (auto kind : synthesizedProtocolAttrs)
+        structDecl->getAttrs().add(new (cxt) SynthesizedProtocolAttr(kind));
+
+      // Create a variable to store the underlying value.
+      auto varName = cxt.Id_rawValue;
+      auto var = new (cxt) VarDecl(
+          /*static*/ false,
+          /*IsLet*/ isLet, SourceLoc(), varName, underlyingType, structDecl);
+      if (isImplicit)
+        var->setImplicit();
+      var->setAccessibility(Accessibility::Public);
+      var->setSetterAccessibility(setterAccessibility);
+
+      // Create a pattern binding to describe the variable.
+      Pattern *varPattern = createTypedNamedPattern(var);
+
+      auto patternBinding = PatternBindingDecl::create(
+          cxt, SourceLoc(), StaticSpellingKind::None, SourceLoc(), varPattern,
+          nullptr, structDecl);
+      structDecl->setHasDelayedMembers();
+
+      // Create constructors to initialize that value from a value of the
+      // underlying type.
+      if (makeUnlabeledValueInit)
+        structDecl->addMember(createValueConstructor(
+            structDecl, var,
+            /*wantCtorParamNames=*/false,
+            /*wantBody=*/!Impl.hasFinishedTypeChecking()));
+      structDecl->addMember(
+          createValueConstructor(structDecl, var,
+                                 /*wantCtorParamNames=*/true,
+                                 /*wantBody=*/!Impl.hasFinishedTypeChecking()));
+
+      structDecl->addMember(patternBinding);
+      structDecl->addMember(var);
+    }
+
     /// \brief Create a constructor that initializes a struct from its members.
     ConstructorDecl *createValueConstructor(StructDecl *structDecl,
                                             ArrayRef<VarDecl *> members,
@@ -1625,45 +1692,10 @@ namespace {
         Loc, name, Loc, None, nullptr, dc);
       structDecl->computeType();
 
-      // Note that this is a raw option set type.
-      structDecl->getAttrs().add(
-        new (Impl.SwiftContext) SynthesizedProtocolAttr(
-                                  KnownProtocolKind::OptionSet));
-
-      
-      // Create a field to store the underlying value.
-      auto varName = Impl.SwiftContext.Id_rawValue;
-      auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
-                                                 /*IsLet*/ true,
-                                                 SourceLoc(), varName,
-                                                 underlyingType,
-                                                 structDecl);
-      var->setImplicit();
-      var->setAccessibility(Accessibility::Public);
-      var->setSetterAccessibility(Accessibility::Private);
-
-      // Create a pattern binding to describe the variable.
-      Pattern *varPattern = createTypedNamedPattern(var);
-
-      auto patternBinding =
-          PatternBindingDecl::create(Impl.SwiftContext, SourceLoc(),
-                                     StaticSpellingKind::None, SourceLoc(),
-                                     varPattern, nullptr, structDecl);
-      
-      // Create the init(rawValue:) constructor.
-      auto labeledValueConstructor = createValueConstructor(
-                                structDecl, var,
-                                /*wantCtorParamNames=*/true,
-                                /*wantBody=*/!Impl.hasFinishedTypeChecking());
-
-      // Build an OptionSet conformance for the type.
       ProtocolDecl *protocols[]
         = {cxt.getProtocol(KnownProtocolKind::OptionSet)};
-      populateInheritedTypes(structDecl, protocols);
-
-      structDecl->addMember(labeledValueConstructor);
-      structDecl->addMember(patternBinding);
-      structDecl->addMember(var);
+      makeStructRawValued(structDecl, underlyingType,
+                          {KnownProtocolKind::OptionSet}, protocols);
       return structDecl;
     }
     
@@ -1714,49 +1746,12 @@ namespace {
         ProtocolDecl *protocols[]
           = {cxt.getProtocol(KnownProtocolKind::RawRepresentable),
              cxt.getProtocol(KnownProtocolKind::Equatable)};
-        populateInheritedTypes(structDecl, protocols);
-
-        // Note that this is a raw representable type.
-        structDecl->getAttrs().add(
-          new (Impl.SwiftContext) SynthesizedProtocolAttr(
-                                    KnownProtocolKind::RawRepresentable));
-
-        // Create a variable to store the underlying value.
-        auto varName = Impl.SwiftContext.Id_rawValue;
-        auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
-                                                   /*IsLet*/ false,
-                                                   SourceLoc(), varName,
-                                                   underlyingType,
-                                                   structDecl);
-        var->setAccessibility(Accessibility::Public);
-        var->setSetterAccessibility(Accessibility::Public);
-
-        // Create a pattern binding to describe the variable.
-        Pattern *varPattern = createTypedNamedPattern(var);
-
-        auto patternBinding =
-            PatternBindingDecl::create(Impl.SwiftContext, SourceLoc(),
-                                       StaticSpellingKind::None, SourceLoc(),
-                                       varPattern, nullptr, structDecl);
-
-        // Create a constructor to initialize that value from a value of the
-        // underlying type.
-        auto valueConstructor =
-            createValueConstructor(structDecl, var,
-                                   /*wantCtorParamNames=*/false,
-                                   /*wantBody=*/!Impl.hasFinishedTypeChecking());
-        auto labeledValueConstructor =
-            createValueConstructor(structDecl, var,
-                                   /*wantCtorParamNames=*/true,
-                                   /*wantBody=*/!Impl.hasFinishedTypeChecking());
-
-        structDecl->setHasDelayedMembers();
-
-        // Set the members of the struct.
-        structDecl->addMember(valueConstructor);
-        structDecl->addMember(labeledValueConstructor);
-        structDecl->addMember(patternBinding);
-        structDecl->addMember(var);
+        makeStructRawValued(structDecl, underlyingType,
+                            {KnownProtocolKind::RawRepresentable}, protocols,
+                            /*setterAccessibility=*/Accessibility::Public,
+                            /*isLet=*/false,
+                            /*makeUnlabeledValueInit=*/true,
+                            /*isImplicit=*/false);
 
         result = structDecl;
         break;
