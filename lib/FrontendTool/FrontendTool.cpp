@@ -20,6 +20,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/FrontendTool/FrontendTool.h"
+
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -614,7 +616,8 @@ static void debugFailWithCrash() {
 static bool performCompile(CompilerInstance &Instance,
                            CompilerInvocation &Invocation,
                            ArrayRef<const char *> Args,
-                           int &ReturnValue) {
+                           int &ReturnValue,
+                           FrontendObserver *observer) {
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
 
@@ -668,6 +671,10 @@ static bool performCompile(CompilerInstance &Instance,
     Instance.performParseOnly();
   else
     Instance.performSema();
+
+  if (observer) {
+    observer->performedSemanticAnalysis(Instance);
+  }
 
   FrontendOptions::DebugCrashMode CrashMode = opts.CrashMode;
   if (CrashMode == FrontendOptions::DebugCrashMode::AssertAfterParse)
@@ -759,6 +766,10 @@ static bool performCompile(CompilerInstance &Instance,
     }
   }
 
+  if (observer) {
+    observer->performedSILGeneration(*SM);
+  }
+
   // We've been told to emit SIL after SILGen, so write it now.
   if (Action == FrontendOptions::EmitSILGen) {
     // If we are asked to link all, link all.
@@ -787,9 +798,14 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   // Perform "stable" optimizations that are invariant across compiler versions.
-  if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses &&
-      runSILDiagnosticPasses(*SM))
-    return true;
+  if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses) {
+    if (runSILDiagnosticPasses(*SM))
+      return true;
+
+    if (observer) {
+      observer->performedSILDiagnostics(*SM);
+    }
+  }
 
   // Now if we are asked to link all, link all.
   if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
@@ -816,6 +832,10 @@ static bool performCompile(CompilerInstance &Instance,
     } else {
       runSILPassesForOnone(*SM);
     }
+  }
+
+  if (observer) {
+    observer->performedSILOptimization(*SM);
   }
 
   {
@@ -915,6 +935,11 @@ static bool performCompile(CompilerInstance &Instance,
     const ProcessCmdLine &CmdLine = ProcessCmdLine(opts.ImmediateArgv.begin(),
                                                    opts.ImmediateArgv.end());
     Instance.setSILModule(std::move(SM));
+
+    if (observer) {
+      observer->aboutToRunImmediately(Instance);
+    }
+
     ReturnValue =
       RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
     return false;
@@ -997,7 +1022,8 @@ static bool dumpAPI(Module *Mod, StringRef OutDir) {
 }
 
 int swift::performFrontend(ArrayRef<const char *> Args,
-                           const char *Argv0, void *MainAddr) {
+                           const char *Argv0, void *MainAddr,
+                           FrontendObserver *observer) {
   llvm::InitializeAllTargets();
   llvm::InitializeAllTargetMCs();
   llvm::InitializeAllAsmPrinters();
@@ -1030,6 +1056,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   IRGenOpts.DWARFVersion = swift::GenericDWARFVersion;
   if (Invocation.getLangOptions().Target.isWindowsCygwinEnvironment())
     IRGenOpts.DWARFVersion = swift::CygwinDWARFVersion;
+
+  // The compiler invocation is now fully configured; notify our observer.
+  if (observer) {
+    observer->parsedArgs(Invocation);
+  }
 
   if (Invocation.getFrontendOptions().PrintHelp ||
       Invocation.getFrontendOptions().PrintHelpHidden) {
@@ -1125,9 +1156,15 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return 1;
   }
 
+  // The compiler instance has been configured; notify our observer.
+  if (observer) {
+    observer->configuredCompiler(Instance);
+  }
+
   int ReturnValue = 0;
-  bool HadError = performCompile(Instance, Invocation, Args, ReturnValue) ||
-                  Instance.getASTContext().hadError();
+  bool HadError =
+    performCompile(Instance, Invocation, Args, ReturnValue, observer) ||
+    Instance.getASTContext().hadError();
 
   if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {
     HadError = dumpAPI(Instance.getMainModule(),
@@ -1148,3 +1185,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   return (HadError ? 1 : ReturnValue);
 }
+
+void FrontendObserver::parsedArgs(CompilerInvocation &invocation) {}
+void FrontendObserver::configuredCompiler(CompilerInstance &instance) {}
+void FrontendObserver::performedSemanticAnalysis(CompilerInstance &instance) {}
+void FrontendObserver::performedSILGeneration(SILModule &module) {}
+void FrontendObserver::performedSILDiagnostics(SILModule &module) {}
+void FrontendObserver::performedSILOptimization(SILModule &module) {}
+void FrontendObserver::aboutToRunImmediately(CompilerInstance &instance) {}
