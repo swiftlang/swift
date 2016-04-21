@@ -4,22 +4,17 @@
 // RUN: %target-swift-frontend -parse -primary-file %t/main.swift -emit-reference-dependencies-path - > %t.swiftdeps
 
 // SR-1267, SR-1270
-import Foundation
+class TypeType<T> { }
+protocol ProtocolType {}
 
-class TypeType<T where T: NSString> {
-    func call(notification: NSNotification?) {
-        let set = NSOrderedSet()
-        if let objects = set.array as? [T] {
-            let _ = (notification?.userInfo?["great_key"] as? NSSet).flatMap { updatedObjects in
-                return updatedObjects.filter({ element in
-                    guard let element = element as? T
-                        where objects.index(of: element) != nil
-                    else {
-                        return false
-                    }
-                    return true
-                })
-            } ?? []
-        }
+struct StructType<T> { }
+extension StructType where T : ProtocolType {
+    func testCase<T>() -> TypeType<T> {
+        return TypeType<T>()
     }
+}
+
+class TestView : ProtocolType {}
+extension StructType where T : TestView {
+    var typeType : TypeType<T> { return testCase() }
 }
