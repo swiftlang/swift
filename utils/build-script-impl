@@ -533,7 +533,7 @@ function set_deployment_target_based_options() {
                     )
                 fi
 
-                lvm_cmake_options=(
+                llvm_cmake_options=(
                     "${llvm_cmake_options[@]}"
                     "-DCMAKE_C_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
                     "-DCMAKE_CXX_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
