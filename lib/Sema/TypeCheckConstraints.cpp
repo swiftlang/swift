@@ -1625,6 +1625,13 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     // If we already had an error, don't repeat the problem.
     if (contextualType.getType()->is<ErrorType>())
       return true;
+
+    // Only provide a TypeLoc if it makes sense to allow diagnostics.
+    if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
+      const Pattern *inner = typedPattern->getSemanticsProvidingPattern();
+      if (isa<NamedPattern>(inner) || isa<AnyPattern>(inner))
+        contextualType = typedPattern->getTypeLoc();
+    }
   }
     
   // Type-check the initializer.
