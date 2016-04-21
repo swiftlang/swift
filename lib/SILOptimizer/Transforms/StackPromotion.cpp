@@ -220,8 +220,35 @@ static bool isPromotableAllocInst(SILInstruction *I) {
 }
 
 StackPromoter::ChangeState StackPromoter::promote() {
+
+  llvm::SetVector<SILBasicBlock *> ReachableBlocks;
+
+  // First step: find blocks which end up in a no-return block (terminated by
+  // an unreachable instruction).
+  // Search for function-exiting blocks, i.e. return and throw.
+  for (SILBasicBlock &BB : *F) {
+    TermInst *TI = BB.getTerminator();
+    if (TI->isFunctionExiting())
+      ReachableBlocks.insert(&BB);
+  }
+  // Propagate the reachability up the control flow graph.
+  unsigned Idx = 0;
+  while (Idx < ReachableBlocks.size()) {
+    SILBasicBlock *BB = ReachableBlocks[Idx++];
+    for (SILBasicBlock *Pred : BB->getPreds())
+      ReachableBlocks.insert(Pred);
+  }
+
   // Search the whole function for stack promotable allocations.
   for (SILBasicBlock &BB : *F) {
+
+    // Don't stack promote any allocation inside a code region which ends up in
+    // a no-return block. Such allocations may missing their final release.
+    // We would insert the deallocation too early, which may result in a
+    // use-after-free problem.
+    if (ReachableBlocks.count(&BB) == 0)
+      continue;
+
     for (auto Iter = BB.begin(); Iter != BB.end();) {
       // The allocation instruction may be moved, so increment Iter prior to
       // doing the optimization.
