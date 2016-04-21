@@ -224,6 +224,21 @@ function toupper() {
     echo "$@" | tr '[:lower:]' '[:upper:]'
 }
 
+function true_false() {
+    case "$1" in
+        false | FALSE | 0 | "")
+            echo "FALSE"
+            ;;
+        true | TRUE | 1)
+            echo "TRUE"
+            ;;
+        *)
+            echo "true_false: unknown value: $1" >&2
+            exit 1
+            ;;
+    esac
+}
+
 function to_varname() {
     toupper "${1//-/_}"
 }
@@ -813,21 +828,6 @@ function not() {
     if [[ ! "$1" ]] ; then
         echo 1
     fi
-}
-
-function true_false() {
-    case "$1" in
-        false | FALSE | 0 | "")
-            echo "FALSE"
-            ;;
-        true | TRUE | 1)
-            echo "TRUE"
-            ;;
-        *)
-            echo "true_false: unknown value: $1" >&2
-            exit 1
-            ;;
-    esac
 }
 
 function false_true() {
