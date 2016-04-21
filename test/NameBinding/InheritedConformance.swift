@@ -13,7 +13,7 @@ class TypeType<T where T: NSString> {
             let _ = (notification?.userInfo?["great_key"] as? NSSet).flatMap { updatedObjects in
                 return updatedObjects.filter({ element in
                     guard let element = element as? T
-                        where objects.index(of: element) != nil
+                        where objects.indexOf(element) != nil
                     else {
                         return false
                     }
