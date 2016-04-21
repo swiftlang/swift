@@ -48,7 +48,7 @@ public:
   }
 
   NominalTypeDecl *createNominalTypeDecl(std::string &&mangledName) {
-    auto node = Demangle::demangleSymbolAsNode(mangledName);
+    auto node = Demangle::demangleTypeAsNode(mangledName);
     if (!node) return nullptr;
 
     return createNominalTypeDecl(node);
