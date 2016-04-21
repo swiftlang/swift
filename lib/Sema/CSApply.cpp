@@ -3274,7 +3274,8 @@ namespace {
       argExpr = new (ctx) ParenExpr(E->getLoc(), argExpr, E->getLoc(),
                                     /*hasTrailingClosure*/false);
       Expr *callExpr = new (ctx) CallExpr(fnRef, argExpr, /*implicit*/true);
-      bool invalid = tc.typeCheckExpression(callExpr, cs.DC, valueType,
+      bool invalid = tc.typeCheckExpression(callExpr, cs.DC,
+                                            TypeLoc::withoutLoc(valueType),
                                             CTP_CannotFail);
       (void) invalid;
       assert(!invalid && "conversion cannot fail");
@@ -3798,7 +3799,9 @@ getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
   }
 
   // Convert the literal to the appropriate type.
-  bool invalid = tc.typeCheckExpression(init, dc, defArg.second,CTP_CannotFail);
+  bool invalid = tc.typeCheckExpression(init, dc, 
+                                        TypeLoc::withoutLoc(defArg.second),
+                                        CTP_CannotFail);
   assert(!invalid && "conversion cannot fail");
   (void)invalid;
   return {init, defArg.first};

@@ -1269,7 +1269,7 @@ namespace {
 
 #pragma mark High-level entry points
 bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
-                                      Type convertType,
+                                      TypeLoc convertType,
                                       ContextualTypePurpose convertTypePurpose,
                                       TypeCheckExprOptions options,
                                       ExprTypeCheckListener *listener) {
@@ -1286,28 +1286,29 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // Verify that a purpose was specified if a convertType was.  Note that it is
   // ok to have a purpose without a convertType (which is used for call
   // return types).
-  assert((!convertType || convertTypePurpose != CTP_Unused) &&
+  assert((!convertType.getType() || convertTypePurpose != CTP_Unused) &&
          "Purpose for conversion type was not specified");
 
   // Take a look at the conversion type to check to make sure it is sensible.
-  if (convertType) {
+  if (convertType.getType()) {
     // If we're asked to convert to an UnresolvedType, then ignore the request.
     // This happens when CSDiags nukes a type.
-    if (convertType->is<UnresolvedType>() ||
-        (convertType->is<MetatypeType>() && convertType->hasUnresolvedType())) {
-      convertType = Type();
+    if (convertType.getType()->is<UnresolvedType>() ||
+        (convertType.getType()->is<MetatypeType>() &&
+         convertType.getType()->hasUnresolvedType())) {
+      convertType = TypeLoc();
       convertTypePurpose = CTP_Unused;
     }
   }
 
   // Tell the constraint system what the contextual type is.  This informs
   // diagnostics and is a hint for various performance optimizations.
-  cs.setContextualType(expr, convertType.getPointer(), convertTypePurpose);
+  cs.setContextualType(expr, convertType, convertTypePurpose);
 
   // If the convertType is *only* provided for that hint, then null it out so
   // that we don't later treat it as an actual conversion constraint.
   if (options.contains(TypeCheckExprFlags::ConvertTypeIsOnlyAHint))
-    convertType = Type();
+    convertType = TypeLoc();
   
   bool suppressDiagnostics =
     options.contains(TypeCheckExprFlags::SuppressDiagnostics);
@@ -1320,15 +1321,16 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (solveForExpression(expr, dc, convertType, allowFreeTypeVariables,
-                         listener, cs, viable, options))
+  if (solveForExpression(expr, dc, convertType.getType(),
+                         allowFreeTypeVariables, listener, cs, viable, options))
     return true;
 
   // If the client allows the solution to have unresolved type expressions,
   // check for them now.  We cannot apply the solution with unresolved TypeVars,
   // because they will leak out into arbitrary places in the resultant AST.
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables) &&
-      (viable.size() != 1 || (convertType && convertType->hasUnresolvedType()))) {
+      (viable.size() != 1 ||
+       (convertType.getType() && convertType.getType()->hasUnresolvedType()))) {
     expr->setType(ErrorType::get(Context));
     return false;
   }
@@ -1337,8 +1339,9 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   auto &solution = viable[0];
   bool isDiscarded = options.contains(TypeCheckExprFlags::IsDiscarded);
   bool skipClosures = options.contains(TypeCheckExprFlags::SkipMultiStmtClosures);
-  auto result = cs.applySolution(solution, expr, convertType, isDiscarded,
-                                 suppressDiagnostics, skipClosures);
+  auto result = cs.applySolution(solution, expr, convertType.getType(),
+                                 isDiscarded, suppressDiagnostics,
+                                 skipClosures);
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
     return true;
@@ -1485,8 +1488,7 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
   return false;
 }
 
-bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
-                                             Type convertType) {
+bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc) {
   PrettyStackTraceExpr stackTrace(Context, "shallow type-checking", expr);
 
   // Construct a constraint system from this expression.
@@ -1496,13 +1498,6 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
     expr = generatedExpr;
   else
     return true;
-
-  // If there is a type that we're expected to convert to, add the conversion
-  // constraint.
-  if (convertType) {
-    cs.addConstraint(ConstraintKind::Conversion, expr->getType(), convertType,
-                     cs.getConstraintLocator(expr));
-  }
 
   if (getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
@@ -1532,16 +1527,6 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
     return true;
-  }
-
-  // If we're supposed to convert the expression to some particular type,
-  // do so now.
-  if (convertType) {
-    result = solution.coerceToType(result, convertType,
-                                   cs.getConstraintLocator(expr));
-    if (!result) {
-      return true;
-    }
   }
 
   if (getLangOpts().DebugConstraintSolver) {
@@ -1631,14 +1616,14 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   assert(initializer && "type-checking an uninitialized binding?");
   BindingListener listener(pattern, initializer, DC);
 
-  Type contextualType;
+  TypeLoc contextualType;
   auto contextualPurpose = CTP_Unused;
   if (pattern->hasType()) {
-    contextualType = pattern->getType();
+    contextualType = TypeLoc::withoutLoc(pattern->getType());
     contextualPurpose = CTP_Initialization;
 
     // If we already had an error, don't repeat the problem.
-    if (contextualType->is<ErrorType>())
+    if (contextualType.getType()->is<ErrorType>())
       return true;
   }
     
@@ -2422,8 +2407,14 @@ void ConstraintSystem::print(raw_ostream &out) {
   
   out << "Score: " << CurrentScore << "\n";
 
-  if (contextualType)
-    out << "Contextual Type: " << contextualType << "\n";
+  if (contextualType.getType()) {
+    out << "Contextual Type: " << contextualType.getType();
+    if (TypeRepr *TR = contextualType.getTypeRepr()) {
+      out << " at ";
+      TR->getSourceRange().print(out, getASTContext().SourceMgr, /*text*/false);
+    }
+    out << "\n";
+  }
 
   out << "Type Variables:\n";
   for (auto tv : TypeVariables) {
