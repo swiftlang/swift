@@ -1,4 +1,4 @@
-//===--- frontend_main.cpp - Swift Compiler Frontend ----------------------===//
+//===--- FrontendTool.cpp - Swift Compiler Frontend ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,6 +14,9 @@
 /// \brief This is the entry point to the swift -frontend functionality, which
 /// implements the core compiler functionality along with a number of additional
 /// tools for demonstration and testing purposes.
+///
+/// This is separate from the rest of libFrontend to reduce the dependencies
+/// required by that library.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -993,8 +996,8 @@ static bool dumpAPI(Module *Mod, StringRef OutDir) {
   return false;
 }
 
-int frontend_main(ArrayRef<const char *>Args,
-                  const char *Argv0, void *MainAddr) {
+int swift::performFrontend(ArrayRef<const char *> Args,
+                           const char *Argv0, void *MainAddr) {
   llvm::InitializeAllTargets();
   llvm::InitializeAllTargetMCs();
   llvm::InitializeAllAsmPrinters();

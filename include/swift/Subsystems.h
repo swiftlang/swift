@@ -88,6 +88,20 @@ namespace swift {
 
   /// @}
 
+  /// Perform all the operations of the frontend, exactly as if invoked
+  /// with -frontend.
+  ///
+  /// \param args the arguments to use as the arguments to the frontend
+  /// \param argv0 the name used as the frontend executable
+  /// \param mainAddr an address from the main executable
+  ///
+  /// \return the exit value of the frontend: 0 or 1 on success unless
+  ///   the frontend executes in immediate mode, in which case this will be
+  ///   the exit value of the script, assuming it exits normally
+  int performFrontend(ArrayRef<const char *> args,
+                      const char *argv0,
+                      void *mainAddr);
+
   /// \brief Parse a single buffer into the given source file.
   ///
   /// If the source file is the main file, stop parsing after the next
