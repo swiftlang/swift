@@ -6,6 +6,19 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
+extension Range {
+  static var _isHalfOpen: Bool { return true }
+}
+extension CountableRange {
+  static var _isHalfOpen: Bool { return true }
+}
+extension ClosedRange {
+  static var _isHalfOpen: Bool { return false }
+}
+extension CountableClosedRange {
+  static var _isHalfOpen: Bool { return false }
+}
+
 protocol TestProtocol1 {}
 
 struct ContainsTest {
@@ -61,12 +74,12 @@ enum VariantRange {
   case halfOpen(lowerBound: Int, upperBound: Int)
   case closed(lowerBound: Int, upperBound: Int)
 
-  var isClosed: Bool {
+  var isHalfOpen: Bool {
     switch self {
     case .halfOpen:
-      return false
-    case .closed:
       return true
+    case .closed:
+      return false
     }
   }
 
@@ -195,13 +208,48 @@ extension ${Self} where Bound : TestProtocol1 {
 
 var ${TestSuite} = TestSuite("${Self}")
 
-${TestSuite}.test("init(uncheckedBounds:)") {
-  let _1 = ${Bound}(1)
-  let _2 = ${Bound}(2)
-  let r = ${Self}(uncheckedBounds: (lower: _2, upper: _1))
-  expectEqual(_2, r.lowerBound)
-  expectEqual(_1, r.upperBound)
+${TestSuite}.test("init(uncheckedBounds:)")
+  .forEach(in: [(1, 2), (1, 1), (2, 1)]) {
+  (lowerInt, upperInt) in
+
+  // Check that 'init(uncheckedBounds:)' does not perform precondition checks,
+  // allowing to create ranges that break invariants.
+  let r = ${Self}(
+    uncheckedBounds: (lower: ${Bound}(lowerInt), upper: ${Bound}(upperInt)))
+  expectEqual(lowerInt, r.lowerBound.value)
+  expectEqual(upperInt, r.upperBound.value)
 }
+
+%   for (DestinationSelf, _, _) in all_range_types:
+${TestSuite}.test("init(${DestinationSelf})/whereBoundIsStrideable")
+  .forEach(in: [(0, 0), (1, 2), (10, 20), (Int.min, Int.max)]) {
+  (lowerInt, upperInt) in
+
+  let lower = MinimalStrideableValue(lowerInt)
+  let upper = MinimalStrideableValue(upperInt)
+  let source: ${Self}<MinimalStrideableValue> = lower${op}upper
+
+  let isSourceHalfOpen = ${Self}<MinimalStrideableValue>._isHalfOpen
+  let isDestinationHalfOpen =
+    ${DestinationSelf}<MinimalStrideableValue>._isHalfOpen
+
+  let shouldTrap =
+    (source.isEmpty && !isDestinationHalfOpen) ||
+    (upperInt == Int.max && !isSourceHalfOpen && isDestinationHalfOpen)
+  if shouldTrap {
+    expectCrashLater()
+  }
+
+  let converted = ${DestinationSelf}(source)
+
+  if !shouldTrap {
+    expectEqual(lower.value, converted.lowerBound.value)
+    expectEqual(
+      upper.value + ((isSourceHalfOpen ? 0 : 1) - (isDestinationHalfOpen ? 0 : 1)),
+      converted.upperBound.value)
+  }
+}
+%   end
 
 ${TestSuite}.test("lowerBound, upperBound") {
   let _1 = ${Bound}(1, identity: 1010)
@@ -305,16 +353,13 @@ ${TestSuite}.test("contains(_:)/semantics, ~=/semantics")
 %   end
 
   let value = ${Bound}(test.value)
-
-%   if 'Closed' in Self:
-  expectEqual(test.containedInClosed, range.contains(value))
-  expectEqual(test.containedInClosed, loggingRange.contains(value))
-  expectEqual(test.containedInClosed, range ~= value)
-%   else:
-  expectEqual(test.containedInHalfOpen, range.contains(value))
-  expectEqual(test.containedInHalfOpen, loggingRange.contains(value))
-  expectEqual(test.containedInHalfOpen, range ~= value)
-%   end
+  let expected =
+    ${Self}<${Bound}>._isHalfOpen
+    ? test.containedInHalfOpen
+    : test.containedInClosed
+  expectEqual(expected, range.contains(value))
+  expectEqual(expected, loggingRange.contains(value))
+  expectEqual(expected, range ~= value)
 }
 
 %   for (OtherSelf, other_op, OtherBound) in all_range_types:
@@ -322,8 +367,8 @@ ${TestSuite}.test("overlaps(${OtherSelf})/semantics")
   .forEach(in: overlapsTests) {
   (test) in
 
-  if test.lhs.isClosed != ${str('Closed' in Self).lower()} ||
-     test.rhs.isClosed != ${str('Closed' in OtherSelf).lower()} {
+  if test.lhs.isHalfOpen != ${Self}<${Bound}>._isHalfOpen ||
+     test.rhs.isHalfOpen != ${OtherSelf}<${OtherBound}>._isHalfOpen {
     return
   }
 
@@ -354,20 +399,50 @@ ${TestSuite}.test("clamped(to:)/semantics")
     subject.clamped(to: limits))
 }
 
+${TestSuite}.test("count/whereBoundIsStrideable") {
+  typealias Bound = MinimalStrideableValue
+  let start = Bound(10)
+  let end = Bound(20)
+  let range1: ${Self}<Bound> = start${op}start
+  let range2: ${Self}<Bound> = start${op}end
+  expectEqual(0, Bound.timesEqualEqualWasCalled.value)
+  expectEqual(2, Bound.timesLessWasCalled.value)
+  expectEqual(0, Bound.timesDistanceWasCalled.value)
+  expectEqual(0, Bound.timesAdvancedWasCalled.value)
+  expectEqual( 0 + (${Self}<Bound>._isHalfOpen ? 0 : 1), range1.count)
+  expectEqual(10 + (${Self}<Bound>._isHalfOpen ? 0 : 1), range2.count)
+%   if Self == 'CountableClosedRange':
+  // FIXME: swift-3-indexing-model: implement an O(1) `distance()` on
+  // CountableClosedRange.
+  expectEqual(12, Bound.timesEqualEqualWasCalled.value)
+  expectEqual(2, Bound.timesLessWasCalled.value)
+  expectEqual(0, Bound.timesDistanceWasCalled.value)
+  expectEqual(10, Bound.timesAdvancedWasCalled.value)
+%   else:
+  expectEqual(0, Bound.timesEqualEqualWasCalled.value)
+  expectEqual(2, Bound.timesLessWasCalled.value)
+  expectEqual(2, Bound.timesDistanceWasCalled.value)
+  expectEqual(0, Bound.timesAdvancedWasCalled.value)
+%   end
+}
+
 ${TestSuite}.test("isEmpty") {
   let start = ${Bound}(10)
   let end = ${Bound}(20)
   let range1: ${Self}<${Bound}> = start${op}start
   let range2: ${Self}<${Bound}> = start${op}end
+  expectEqual(0, ${Bound}.timesEqualEqualWasCalled.value)
   expectEqual(2, ${Bound}.timesLessWasCalled.value)
-%   if 'Closed' in Self:
-  expectFalse(range1.isEmpty)
+  expectEqual(${Self}<${Bound}>._isHalfOpen, range1.isEmpty)
   expectFalse(range2.isEmpty)
-%   else:
-  expectTrue(range1.isEmpty)
-  expectFalse(range2.isEmpty)
+  expectEqual(
+    ${Self}<${Bound}>._isHalfOpen ? 2 : 0,
+    ${Bound}.timesEqualEqualWasCalled.value)
+  expectEqual(2, ${Bound}.timesLessWasCalled.value)
+%   if Bound == 'MinimalStrideableValue':
+  expectEqual(0, ${Bound}.timesDistanceWasCalled.value)
+  expectEqual(0, ${Bound}.timesAdvancedWasCalled.value)
 %   end
-  expectEqual(2, ${Bound}.timesLessWasCalled.value)
 }
 
 ${TestSuite}.test("CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable") {
@@ -392,6 +467,28 @@ ${TestSuite}.test("CustomStringConvertible, CustomDebugStringConvertible, Custom
 
 % end
 
+CountableRangeTestSuite.test("AssociatedTypes") {
+  typealias Collection = CountableRange<MinimalStrideableValue>
+  expectCollectionAssociatedTypes(
+    collectionType: Collection.self,
+    iteratorType: IndexingIterator<Collection>.self,
+    subSequenceType: Collection.self,
+    indexType: MinimalStrideableValue.self,
+    indexDistanceType: MinimalStrideableValue.Stride.self,
+    indicesType: Collection.self)
+}
+
+CountableClosedRangeTestSuite.test("AssociatedTypes") {
+  typealias Collection = CountableClosedRange<MinimalStrideableValue>
+  expectCollectionAssociatedTypes(
+    collectionType: Collection.self,
+    iteratorType: ClosedRangeIterator<MinimalStrideableValue>.self,
+    subSequenceType: RandomAccessSlice<Collection>.self,
+    indexType: ClosedRangeIndex<MinimalStrideableValue>.self,
+    indexDistanceType: MinimalStrideableValue.Stride.self,
+    indicesType: DefaultRandomAccessIndices<Collection>.self)
+}
+
 var MiscTestSuite = TestSuite("Misc")
 
 MiscTestSuite.test("map()") {
@@ -410,12 +507,6 @@ MiscTestSuite.test("reversed()") {
     [ 9, 8, 7, 6, 5, 4, 3, 2, 1, 0 ],
     result)
 }
-
-// FIXME: swift-3-indexing-model: check that CountableRange is a collection.
-/*
-func assertCollection<C: Collection>(_: C) {}
-assertCollection(0..<10)
-*/
 
 // FIXME: swift-3-indexing-model: this test does not belong in this file.
 MiscTestSuite.test("stride") {

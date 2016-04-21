@@ -262,8 +262,28 @@ public func expectGE(_ lhs: Int, _ rhs: Int, ${TRACE}) {
   }
 }
 
-public func expectTrapping<R : RangeProtocol>(
-  _ point: R.Bound, in range: R, ${TRACE}
+% for OtherRange in ['Range', 'CountableRange', 'ClosedRange', 'CountableClosedRange']:
+extension Range
+%   if 'Countable' in OtherRange:
+  where
+  Bound : protocol<Comparable, _Strideable>, Bound.Stride : SignedInteger
+%   end
+{
+  internal func _contains(_ other: ${OtherRange}<Bound>) -> Bool {
+    if other.lowerBound < lowerBound { return false }
+%   if 'Closed' in OtherRange:
+    if upperBound <= other.upperBound { return false }
+%   else:
+    if upperBound < other.upperBound { return false }
+%   end
+    return true
+  }
+}
+% end
+
+% for Range in ['Range', 'CountableRange', 'ClosedRange', 'CountableClosedRange']:
+public func expectTrapping<Bound>(
+  _ point: Bound, in range: ${Range}<Bound>, ${TRACE}
 ) {
   if !range.contains(point) {
     expectationFailure("\(point) in \(range)", trace: ${trace})
@@ -271,59 +291,26 @@ public func expectTrapping<R : RangeProtocol>(
   }
 }
 
-extension RangeProtocol {
-  internal var _isHalfOpen: Bool {
-    return !self.contains(self.upperBound)
-  }
-}
-
-extension HalfOpenRangeProtocol {
-  internal func _contains<
-    Other : RangeProtocol
-    where
-    Other.Bound == Bound
-  >(_ other: Other) -> Bool {
-    if other.lowerBound < lowerBound { return false }
-    if other._isHalfOpen {
-      if upperBound < other.upperBound { return false }
-    } else {
-      if upperBound <= other.upperBound { return false }
-    }
-    return true
-  }
-}
-
-extension ClosedRangeProtocol {
-  internal func _contains<
-    Other : ClosedRangeProtocol
-    where
-    Other.Bound == Bound
-  >(_ other: Other) -> Bool {
-    if other.lowerBound < lowerBound { return false }
-    if upperBound < other.upperBound { return false }
-    return true
-  }
-}
-
-public func expectTrapping<
-  R1 : RangeProtocol, R2 : HalfOpenRangeProtocol
-  where
-  R1.Bound == R2.Bound
->(
-  _ subRange: R1, in range: R2, ${TRACE}
+public func expectTrapping<Bound>(
+  _ subRange: ${Range}<Bound>, in range: Range<Bound>, ${TRACE}
 ) {
   if !range._contains(subRange) {
     expectationFailure("\(subRange) in \(range)", trace: ${trace})
     _trappingExpectationFailedCallback()
   }
 }
+% end
 
-public func expectTrapping<
-  R1 : ClosedRangeProtocol, R2 : ClosedRangeProtocol
-  where
-  R1.Bound == R2.Bound
->(
-  _ subRange: R1, in range: R2, ${TRACE}
+extension ClosedRange {
+  internal func _contains(_ other: ClosedRange<Bound>) -> Bool {
+    if other.lowerBound < lowerBound { return false }
+    if upperBound < other.upperBound { return false }
+    return true
+  }
+}
+
+public func expectTrapping<Bound>(
+  _ subRange: ClosedRange<Bound>, in range: ClosedRange<Bound>, ${TRACE}
 ) {
   if !range._contains(subRange) {
     expectationFailure("\(subRange) in \(range)", trace: ${trace})
@@ -2178,7 +2165,7 @@ public func expectEqualsUnordered<T : Comparable>(
 }
 
 public func expectEqualsUnordered<
-  T : Strideable where T.Stride : Integer
+  T : Strideable where T.Stride : SignedInteger
 >(
   _ expected: Range<T>, _ actual: [T], ${TRACE}
 ) {
@@ -2193,7 +2180,7 @@ public func expectEqualsUnordered<
 public func expectEqualsUnordered<T : Strideable>(
   _ expected: CountableRange<T>, _ actual: [T], ${TRACE}
 ) {
-  if expected.count != actual.count {
+  if numericCast(expected.count) != actual.count {
     expectationFailure("expected elements: \"\(expected)\"\n"
       + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace})

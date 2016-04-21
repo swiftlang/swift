@@ -150,6 +150,8 @@ public func == (
 public struct MinimalStrideableValue : Equatable, Comparable, Strideable {
   public static var timesEqualEqualWasCalled = ResettableValue(0)
   public static var timesLessWasCalled = ResettableValue(0)
+  public static var timesDistanceWasCalled = ResettableValue(0)
+  public static var timesAdvancedWasCalled = ResettableValue(0)
 
   public static var equalImpl =
     ResettableValue<(Int, Int) -> Bool>({ $0 == $1 })
@@ -173,11 +175,13 @@ public struct MinimalStrideableValue : Equatable, Comparable, Strideable {
 
   @warn_unused_result
   public func distance(to other: MinimalStrideableValue) -> Stride {
+    MinimalStrideableValue.timesDistanceWasCalled.value += 1
     return other.value - self.value
   }
 
   @warn_unused_result
   public func advanced(by n: Stride) -> MinimalStrideableValue {
+    MinimalStrideableValue.timesAdvancedWasCalled.value += 1
     return MinimalStrideableValue(self.value + n, identity: self.identity)
   }
 }

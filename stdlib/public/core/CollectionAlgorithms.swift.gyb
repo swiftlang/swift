@@ -320,7 +320,7 @@ extension ${Self} {
 }
 
 // WORKAROUND rdar://25214066 - should be on Collection
-extension ${Self} where Index : Strideable, Index.Stride : Integer {
+extension ${Self} where Index : Strideable, Index.Stride : SignedInteger {
   public subscript(bounds: CountableRange<Index>) -> SubSequence {
     get {
       return self[Range(bounds)]

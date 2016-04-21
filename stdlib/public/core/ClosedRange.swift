@@ -13,52 +13,6 @@
 // FIXME: swift-3-indexing-model: Generalize all tests to check both
 // [Closed]Range and [Closed]CountableRange.
 
-// FIXME(ABI)(compiler limitation): remove `ClosedRangeProtocol` and make
-// `ClosedRange` conditionally conform to `RandomAccessCollection`.
-//
-/// A type that represents a contiguous range of any comparable value,
-/// containing both its lower and upper bounds.
-///
-/// A closed range cannot represent an empty range.
-public protocol ClosedRangeProtocol : RangeProtocol {}
-
-@warn_unused_result
-public func == <
-  LHS : ClosedRangeProtocol, RHS : ClosedRangeProtocol 
-  where LHS.Bound == RHS.Bound
->(lhs: LHS, rhs: RHS) -> Bool {
-  return
-    lhs.lowerBound == rhs.lowerBound &&
-    lhs.upperBound == rhs.upperBound
-}
-
-extension ClosedRangeProtocol {
-  @inline(__always)
-  public init<
-    Other: ClosedRangeProtocol where Other.Bound == Bound
-  >(_ other: Other) {
-    self.init(
-      uncheckedBounds: (lower: other.lowerBound, upper: other.upperBound)
-    )
-  }
-  
-  @inline(__always)
-  public func contains(_ value: Bound) -> Bool {
-    return lowerBound <= value && upperBound >= value
-  }
-
-  /// A textual representation of `self`.
-  public var description: String {
-    return "\(lowerBound)...\(upperBound)"
-  }
-
-  public var customMirror: Mirror {
-    return Mirror(
-      self,
-      children: ["lowerBound": lowerBound, "upperBound": upperBound])
-  }
-}
-
 // WORKAROUND rdar://25214598 - should be Bound : Strideable
 internal enum _ClosedRangeIndexRepresentation<
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
@@ -79,7 +33,7 @@ public struct ClosedRangeIndex<
 
   /// Creates a position `p` for which `r[p] == x`.
   internal init(_ x: Bound) { _value = .inRange(x) }
-  
+
   internal func _successor(upperBound limit: Bound) -> ClosedRangeIndex {
     switch _value {
     case .inRange(let x): return x == limit
@@ -142,46 +96,19 @@ public func < <B>(lhs: ClosedRangeIndex<B>, rhs: ClosedRangeIndex<B>) -> Bool {
   }
 }
 
-/// Closed ranges whose `Bound` is `Strideable` with `Integer` `Stride`
-/// have all the capabilities of `RandomAccessCollection`s, where
-/// elements of the collection are the values contained in the range.
-extension ClosedRangeProtocol 
-// WORKAROUND rdar://25214598 - should be Bound : Strideable
-  where Bound : _Strideable, Bound.Stride : Integer {
-
-  /// The number of values contained in `self`. 
-  public var count: Bound.Stride {
-    return lowerBound.distance(to: upperBound)
-  }
-  
-  /// Access the element at `position`.
-  ///
-  /// - Precondition: `position` is a valid position in `self` and
-  ///   `position != upperBound`.
-  public subscript(position: ClosedRangeIndex<Bound>) -> Bound {
-    return position._dereferenced
-  }
-
-  public var startIndex: ClosedRangeIndex<Bound> {
-    return ClosedRangeIndex(lowerBound)
-  }
-  
-  public var endIndex: ClosedRangeIndex<Bound> {
-    return ClosedRangeIndex()
-  }
-}
-
 // WORKAROUND: needed because of rdar://25584401
 /// An iterator over the elements of a `CountableClosedRange` instance.
 public struct ClosedRangeIterator<
-  Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
+  Bound : protocol<_Strideable, Comparable>
+  where
+  Bound.Stride : SignedInteger
 > : IteratorProtocol, Sequence {
 
-  init(_ r: CountableClosedRange<Bound>) {
+  internal init(_range r: CountableClosedRange<Bound>) {
     _nextResult = r.lowerBound
     _upperBound = r.upperBound
   }
-  
+
   public func makeIterator() -> ClosedRangeIterator {
     return self
   }
@@ -207,32 +134,74 @@ public struct ClosedRangeIterator<
 /// - SeeAlso: `CountableRange`, `ClosedRange`, `Range`
 public struct CountableClosedRange<
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
-> : ClosedRangeProtocol, RandomAccessCollection {
+  Bound : protocol<_Strideable, Comparable>
+  where
+  Bound.Stride : SignedInteger
+> : RandomAccessCollection {
+
+  /// The range's lower bound.
+  ///
+  /// Identical to `upperBound` in an empty range.
+  public let lowerBound: Bound
+
+  /// The range's upper bound.
+  ///
+  /// `upperBound` is always reachable from `lowerBound` by zero or
+  /// more applications of `location(after:)`.
+  public let upperBound: Bound
+
+  public typealias Element = Bound
 
   /// A type that represents a position in the range.
   public typealias Index = ClosedRangeIndex<Bound>
-  
+
+  public typealias IndexDistance = Bound.Stride
+
   // WORKAROUND: needed because of rdar://25584401
   public typealias Iterator = ClosedRangeIterator<Bound>
-  //public typealias IndexDistance = Int
-  // FIXME: swift-3-indexing-model: IndexDistance = Bound.Stride
-  
+
   // WORKAROUND: needed because of rdar://25584401
   public func makeIterator() -> ClosedRangeIterator<Bound> {
-    return ClosedRangeIterator(self)
+    return ClosedRangeIterator(_range: self)
+  }
+
+  public var startIndex: ClosedRangeIndex<Bound> {
+    return ClosedRangeIndex(lowerBound)
+  }
+
+  public var endIndex: ClosedRangeIndex<Bound> {
+    return ClosedRangeIndex()
   }
 
   /// Returns the position immediately after `i`.
   @warn_unused_result
   public func location(after i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range checks and tests.
     return i._successor(upperBound: upperBound)
   }
 
   /// Returns the position immediately preceding `i`.
   @warn_unused_result
   public func location(before i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range checks and tests.
     return i._predecessor(upperBound: upperBound)
+  }
+
+  // FIXME: swift-3-indexing-model: implement O(1) `location(_:offsetBy:)`
+  // and `distance(from:to:)`, and write tests for them.
+
+  /// Access the element at `position`.
+  ///
+  /// - Precondition: `position` is a valid position in `self` and
+  ///   `position != upperBound`.
+  public subscript(position: ClosedRangeIndex<Bound>) -> Bound {
+    // FIXME: swift-3-indexing-model: range checks and tests.
+    return position._dereferenced
+  }
+
+  public subscript(bounds: Range<Index>)
+    -> RandomAccessSlice<CountableClosedRange<Bound>> {
+    return RandomAccessSlice(base: self, bounds: bounds)
   }
 
   public // WORKAROUND: needed because of rdar://25584401
@@ -255,17 +224,6 @@ public struct CountableClosedRange<
     self.upperBound = bounds.upper
   }
 
-  /// The range's lower bound.
-  ///
-  /// Identical to `upperBound` in an empty range.
-  public let lowerBound: Bound
-
-  /// The range's upper bound.
-  ///
-  /// `upperBound` is always reachable from `lowerBound` by zero or
-  /// more applications of `location(after:)`.
-  public let upperBound: Bound
-  
   @warn_unused_result
   public func _customContainsEquatableElement(_ element: Bound) -> Bool? {
     return element >= self.lowerBound && element <= self.upperBound
@@ -274,23 +232,6 @@ public struct CountableClosedRange<
   /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
   public var isEmpty: Bool {
     return false
-  }
-
-  public subscript(
-    bounds: Range<Index>
-  ) -> RandomAccessSlice<CountableClosedRange> {
-    return RandomAccessSlice(base: self, bounds: bounds)
-  }
-}
-
-extension CountableClosedRange
-  : CustomStringConvertible, CustomDebugStringConvertible,
-  CustomReflectable {
-
-  /// A textual representation of `self`, suitable for debugging.
-  public var debugDescription: String {
-    return "CountableClosedRange(\(String(reflecting: lowerBound))"
-      + "...\(String(reflecting: upperBound)))"
   }
 }
 
@@ -306,7 +247,7 @@ extension CountableClosedRange
 ///     lowercase.contains("z")    // true
 public struct ClosedRange<
   Bound : Comparable
-> : ClosedRangeProtocol {
+> {
 
   /// Creates a range with `lowerBound == lower` and `upperBound ==
   /// upper`.
@@ -341,17 +282,6 @@ public struct ClosedRange<
   }
 }
 
-extension ClosedRange
-  : CustomStringConvertible, CustomDebugStringConvertible,
-  CustomReflectable {
-
-  /// A textual representation of `self`, suitable for debugging.
-  public var debugDescription: String {
-    return "ClosedRange(\(String(reflecting: lowerBound))"
-      + "...\(String(reflecting: upperBound)))"
-  }
-}
-
 /// Returns a closed range that contains `minimum` and `maximum`.
 ///
 /// - Precondition: `minimum <= maximum`.
@@ -371,7 +301,9 @@ public func ... <Bound : Comparable> (minimum: Bound, maximum: Bound)
 @warn_unused_result
 public func ... <
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
+  Bound : protocol<_Strideable, Comparable>
+  where
+  Bound.Stride : SignedInteger
 > (
   minimum: Bound, maximum: Bound
 ) -> CountableClosedRange<Bound> {
