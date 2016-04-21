@@ -1280,6 +1280,10 @@ namespace {
         if (auto newtypeAttr =
                 Decl->template getAttr<clang::SwiftNewtypeAttr>()) {
           switch (newtypeAttr->getNewtypeKind()) {
+          case clang::SwiftNewtypeAttr::NK_Enum:
+            // TODO: import as closed enum instead
+
+            // For now, fall through and treat as a struct
           case clang::SwiftNewtypeAttr::NK_Struct: {
 
             auto underlyingType = Impl.importType(
@@ -1305,11 +1309,8 @@ namespace {
             Impl.registerExternalDecl(structDecl);
             return structDecl;
           }
+        }
 
-          case clang::SwiftNewtypeAttr::NK_Enum:
-            // TODO: support enum
-            break;
-          }
         }
       }
 

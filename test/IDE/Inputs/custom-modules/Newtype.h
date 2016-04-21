@@ -17,3 +17,10 @@ extern const SNTErrorDomain SNTFive
     __attribute((swift_name("stillAMember")));
 extern const SNTErrorDomain SNTElsewhere
     __attribute((swift_name("Foo.err")));
+
+typedef NSString *SNTClosedEnum __attribute((swift_newtype(enum)))
+__attribute((swift_name("ClosedEnum")));
+
+extern const SNTClosedEnum SNTFirstClosedEntryEnum;
+extern const SNTClosedEnum SNTSecondEntry;
+extern const SNTClosedEnum SNTClosedEnumThirdEntry;
