@@ -17,6 +17,8 @@
 #
 # ----------------------------------------------------------------------------
 
+import subprocess
+
 
 def migrate_impl_args(argv, migrate_args):
     """
@@ -54,3 +56,22 @@ def migrate_impl_args(argv, migrate_args):
         impl_args.remove(impl_arg_to_remove)
 
     return args + impl_args
+
+
+def check_impl_args(build_script_impl, argv):
+    """
+    Check whether given argv are all known argument for `build-script-impl`.
+
+    Raise ValueError with message if any invalid argument is found.
+    Return nothing if success.
+    """
+    pipe = subprocess.Popen(
+        [build_script_impl, '--check-args-only=1'] + argv,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+
+    (_, err) = pipe.communicate()
+
+    if pipe.returncode != 0:
+        msg = str(err.splitlines()[0].decode())
+        raise ValueError(msg)
