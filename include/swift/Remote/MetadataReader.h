@@ -744,8 +744,6 @@ private:
   }
 
   BuiltType readNominalTypeFromMetadata(StoredPointer MetadataAddress) {
-    auto Meta = readMetadata(MetadataAddress);
-
     StoredPointer DescriptorAddress;
     SharedTargetNominalTypeDescriptorRef<Runtime> Descriptor;
     std::tie(Descriptor, DescriptorAddress)
