@@ -350,7 +350,7 @@ createEmptyFunctionWithOptimizedSig(const std::string &NewFName) {
   CanSILFunctionType NewFTy = createOptimizedSILFunctionType();
 
   // Create the new function.
-  auto *NewF = M.getOrCreateFunction(
+  auto *NewF = M.createFunction(
       F->getLinkage(), NewFName, NewFTy, nullptr, F->getLocation(), F->isBare(),
       F->isTransparent(), F->isFragile(), F->isThunk(), F->getClassVisibility(),
       F->getInlineStrategy(), F->getEffectsKind(), 0, F->getDebugScope(),
