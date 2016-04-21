@@ -1158,9 +1158,16 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
       // The value is not live in any of the successor blocks. This means the
       // block contains a last use of the value. The next instruction after
       // the last use is part of the frontier.
-      SILBasicBlock::iterator Iter(findLastUserInBlock(BB));
-      Fr.push_back(&*next(Iter));
-    } else if (DeadInSucc && mode != IgnoreExitEdges) {
+      SILInstruction *LastUser = findLastUserInBlock(BB);
+      if (!isa<TermInst>(LastUser)) {
+        Fr.push_back(&*next(LastUser->getIterator()));
+        continue;
+      }
+      // In case the last user is a TermInst we add all successor blocks to the
+      // frontier (see below).
+      assert(DeadInSucc && "The final using TermInst must have successors");
+    }
+    if (DeadInSucc && mode != IgnoreExitEdges) {
       // The value is not live in some of the successor blocks.
       LiveOutBlocks.insert(BB);
       for (const SILSuccessor &Succ : BB->getSuccessors()) {
