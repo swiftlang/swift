@@ -746,8 +746,13 @@ if(SWIFT_BUILD_TOOLS)
   add_subdirectory(include)
   add_subdirectory(lib)
   add_subdirectory(tools)
+endif()
+
+is_sdk_requested("${SWIFT_HOST_VARIANT_SDK}" SWIFT_HOST_SDK_REQUESTED)
+if(SWIFT_BUILD_TOOLS AND SWIFT_BUILD_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
   add_subdirectory(tools/swift-reflection-dump)
 endif()
+
 add_subdirectory(utils)
 add_subdirectory(stdlib)
 
