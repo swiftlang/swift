@@ -225,6 +225,7 @@ generic-parameter-list? ( `.' identifier generic-parameter-list?
 )*, returning t if the initial identifier was found and nil otherwise."
   (when (swift-skip-identifier)
     (swift-skip-generic-parameter-list)
+    (swift-skip-re "\\?+")
     (when (swift-skip-re "\\.")
       (swift-skip-simple-type-name))
     t))
@@ -239,15 +240,16 @@ one is present, returning t if so and nil otherwise"
         (and
          ;; match a tuple or an identifier + optional generic param list
          (cond
-          ((looking-at "(")
+          ((looking-at "[[(]")
            (forward-sexp)
            (setq found t))
           
           ((swift-skip-simple-type-name)
            (setq found t)))
-
+         
           ;; followed by "->"
-          (prog1 (swift-skip-re "->")
+          (prog1 (swift-skip-re "throws\\|rethrows\\|->")
+            (swift-skip-re "->") ;; accounts for the throws/rethrows cases on the previous line
             (swift-skip-comments-and-space))))
     found))
 
