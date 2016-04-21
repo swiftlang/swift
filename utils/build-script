@@ -538,6 +538,9 @@ details of the setups of other systems or automated environments.""")
 
     run_tests_group = parser.add_argument_group(
         title="Run tests")
+
+    # NOTE: We can't merge -t and --test, because nargs='?' makes
+    #       `-ti` to be treated as `-t=i`.
     run_tests_group.add_argument(
         "-t",
         help="test Swift after building",
@@ -561,6 +564,20 @@ details of the setups of other systems or automated environments.""")
     run_tests_group.add_argument(
         "--validation-test",
         help="run the validation test suite (implies --test)",
+        metavar="BOOL",
+        nargs='?',
+        type=argparse_bool,
+        default=False,
+        const=True)
+    run_tests_group.add_argument(
+        "-o",
+        help="run the test suite in optimized mode too (implies --test)",
+        action="store_const",
+        const=True,
+        dest="test_optimized")
+    run_tests_group.add_argument(
+        "--test-optimized",
+        help="run the test suite in optimized mode too (implies --test)",
         metavar="BOOL",
         nargs='?',
         type=argparse_bool,
@@ -598,14 +615,6 @@ details of the setups of other systems or automated environments.""")
         help="Use the host compiler, not the self-built one to compile the "
              "Swift runtime",
         action="store_true")
-
-    parser.add_argument(
-        "-o", "--test-optimized",
-        help="run the test suite in optimized mode too (implies --test)",
-        nargs='?',
-        type=argparse_bool,
-        default=False,
-        const=True)
 
     run_build_group = parser.add_argument_group(
         title="Run build")
