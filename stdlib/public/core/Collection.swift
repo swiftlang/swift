@@ -556,7 +556,12 @@ extension Indexable {
 
 /// Supply optimized defaults for `Collection` models that use some model
 /// of `Strideable` as their `Index`.
-extension Indexable where Index : Strideable {
+extension Indexable
+  where
+  Index : Strideable,
+  Index.Stride == IndexDistance,
+  Index.Stride : SignedInteger {
+
   @warn_unused_result
   public func successor(of i: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests.
@@ -565,14 +570,11 @@ extension Indexable where Index : Strideable {
     return i.advanced(by: 1)
   }
 
-  /*
   @warn_unused_result
   public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // FIXME: swift-3-indexing-model: range check i
-
-    // FIXME: swift-3-indexing-model - error: cannot invoke 'advanced' with an argument list of type '(by: Self.IndexDistance)'
     return i.advanced(by: n)
   }
 
@@ -583,10 +585,8 @@ extension Indexable where Index : Strideable {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // FIXME: swift-3-indexing-model: range check i
-
-    // FIXME: swift-3-indexing-model - error: cannot invoke 'advanced' with an argument list of type '(by: Self.IndexDistance)'
     let i = i.advanced(by: n)
-    if (i >= limit) {
+    if (i > limit) {
       return nil
     }
     return i
@@ -597,11 +597,8 @@ extension Indexable where Index : Strideable {
     _precondition(start <= end,
       "Only BidirectionalCollections can have end come before start")
     // FIXME: swift-3-indexing-model: range check supplied start and end?
-
-    // FIXME: swift-3-indexing-model - error: cannot invoke 'distance' with an argument list of type '(to: Self.Index)'
     return start.distance(to: end)
   }
-  */
 }
 
 /// Supply the default `makeIterator()` method for `Collection` models

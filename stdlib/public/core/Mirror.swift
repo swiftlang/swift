@@ -453,8 +453,7 @@ extension Mirror {
       }
       else if let offset = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
         position = children.index(offset,
-          stepsFrom: 
-          children.startIndex,
+          stepsFrom: children.startIndex,
           limitedBy: children.endIndex) ?? children.endIndex
       }
       else {

@@ -138,7 +138,12 @@ extension BidirectionalIndexable {
 
 /// Supply optimized defaults for `BidirectionalCollection` models that use
 /// some model of `Strideable` as their `Index`.
-extension BidirectionalIndexable where Index : Strideable {
+extension BidirectionalIndexable
+  where
+  Index : Strideable,
+  Index.Stride == IndexDistance,
+  Index.Stride : SignedInteger {
+
   @warn_unused_result
   public func predecessor(of i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i: should allow `endIndex`.
@@ -147,22 +152,22 @@ extension BidirectionalIndexable where Index : Strideable {
     return i.advanced(by: -1)
   }
 
-  /*
   @warn_unused_result
   public func index(_ n: IndexDistance, stepsFrom i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i
-
-    // FIXME: swift-3-indexing-model - error: cannot invoke 'advanced' with an argument list of type '(by: Self.IndexDistance)'
     return i.advanced(by: n)
   }
 
   @warn_unused_result
-  public func index(_ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index) -> Index? {
+  public func index(
+    _ n: IndexDistance, stepsFrom i: Index, limitedBy limit: Index
+  ) -> Index? {
     // FIXME: swift-3-indexing-model: range check i
-
-    // FIXME: swift-3-indexing-model - error: cannot invoke 'advanced' with an argument list of type '(by: Self.IndexDistance)'
+    if n == 0 {
+      return i
+    }
     let i = i.advanced(by: n)
-    if (i > limit) {
+    if (n > 0) ? (i > limit) : (i < limit) {
       return nil
     }
     return i
@@ -171,11 +176,8 @@ extension BidirectionalIndexable where Index : Strideable {
   @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     // FIXME: swift-3-indexing-model: range check supplies start and end?
-
-    // FIXME: swift-3-indexing-model - error: cannot invoke 'distance' with an argument list of type '(to: Self.Index)'
     return start.distance(to: end)
   }
-  */
 }
 
 /// Supply the default "slicing" `subscript` for `BidirectionalCollection`
