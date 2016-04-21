@@ -175,11 +175,11 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
       addBuiltinTypeRefs(type);
     }
 
-    if (IGM.Opts.StripReflectionNames) {
-      addConstantInt32(0);
-    } else {
+    if (IGM.Opts.EnableReflectionNames) {
       auto fieldName = IGM.getAddrOfFieldName(value->getNameStr());
       addRelativeAddress(fieldName);
+    } else {
+      addConstantInt32(0);
     }
   }
 
@@ -380,8 +380,8 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef Str) {
 }
 
 void IRGenModule::emitReflectionMetadataRecords() {
-  auto DontHaveDecls = NominalTypeDecls.empty() && ExtensionDecls.empty();
-  if (Opts.StripReflectionMetadata || DontHaveDecls)
+  auto DoNotHaveDecls = NominalTypeDecls.empty() && ExtensionDecls.empty();
+  if (!Opts.EnableReflectionMetadata || DoNotHaveDecls)
     return;
 
   // We collect all referenced builtin types and emit records for them.

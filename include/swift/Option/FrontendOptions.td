@@ -193,11 +193,8 @@ def enable_llvm_value_names : Flag<["-"], "enable-llvm-value-names">,
 def enable_reflection_metadata : Flag<["-"], "enable-reflection-metadata">,
   HelpText<"Enable emission of reflection metadata for nominal types">;
 
-def strip_reflection_metadata : Flag<["-"], "strip-reflection-metadata">,
-  HelpText<"Strip all reflection metadata for nominal types">;
-
-def strip_reflection_names : Flag<["-"], "strip-reflection-names">,
-  HelpText<"Strip names of stored properties and enum cases from"
+def enable_reflection_names : Flag<["-"], "enable-reflection-names">,
+  HelpText<"Enable emission of names of stored properties and enum cases in"
            "reflection metadata">;
 
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
