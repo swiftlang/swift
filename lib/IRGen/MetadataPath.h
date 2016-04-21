@@ -20,6 +20,8 @@
 
 #include "swift/Basic/EncodedSequence.h"
 
+#include "MetadataSource.h"
+
 namespace llvm {
   class Value;
 }
@@ -162,6 +164,18 @@ public:
     return cost;
   }
 
+  template <typename Allocator>
+  const MetadataSource *getMetadataSource(Allocator &A,
+                                          const MetadataSource *Root) const {
+    for (auto C : Path) {
+      switch (C.getKind()) {
+      case
+      case Impossible:
+        Return A.template createImpossible();
+      }
+    }
+  }
+
   /// Given a pointer to type metadata, follow a path from it.
   llvm::Value *followFromTypeMetadata(IRGenFunction &IGF,
                                       CanType sourceType,
@@ -174,6 +188,25 @@ public:
                                       ProtocolConformanceRef conformance,
                                       llvm::Value *source,
                                       Map<llvm::Value*> *cache) const;
+
+  template <typename Allocator>
+  const MetadataSource *
+  getMetadataSource(Allocator &A, const MetadataSource *Root) const {
+    for (auto C : Path) {
+      switch (C.getKind()) {
+      case NominalParent:
+        Root = A.template createParent(Root);
+        continue;
+      case NominalTypeArgument:
+        Root = A.template createGenericArgument(C.getPrimaryIndex(), Root);
+        continue;
+      default:
+        return A.template createImpossible();
+      }
+    }
+
+    return Root;
+  }
 
   void dump() const;
   void print(llvm::raw_ostream &out) const;
