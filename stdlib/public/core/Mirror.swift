@@ -111,7 +111,6 @@ public struct Mirror {
   /// method.
   public typealias Child = (label: String?, value: Any)
 
-  // FIXME: swift-3-indexing-model: update code in comment to reflect reality
   /// The type used to represent sub-structure.
   ///
   /// Depending on your needs, you may find it useful to "upgrade"
@@ -121,8 +120,11 @@ public struct Mirror {
   /// might write:
   ///
   ///     if let b = AnyBidirectionalCollection(someMirror.children) {
-  ///       for i in b.endIndex.advanced(by: -20, limitedBy: b.startIndex)..<b.endIndex {
+  ///       var i = xs.location(b.endIndex, offsetBy: -20,
+  ///         limitedBy: b.startIndex) ?? b.startIndex
+  ///       while i != xs.endIndex {
   ///          print(b[i])
+  ///          b.formLocation(after: &i)
   ///       }
   ///     }
   public typealias Children = AnyCollection<Child>
@@ -405,7 +407,6 @@ extension Mirror {
     var customMirror: Mirror { return mirror }
   }
 
-  // FIXME: swift-3-indexing-model: update code in comment to reflect reality
   /// Return a specific descendant of the reflected subject, or `nil`
   /// Returns a specific descendant of the reflected subject, or `nil`
   /// if no such descendant exists.
@@ -419,19 +420,21 @@ extension Mirror {
   ///
   ///     var d = nil
   ///     let children = Mirror(reflecting: x).children
-  ///     let p0 = children.startIndex.advanced(by: 1, limitedBy: children.endIndex)
-  ///     if p0 != children.endIndex {
+  ///     if let p0 = children.location(children.startIndex,
+  ///       offsetBy: 1, limitedBy: children.endIndex) {
   ///       let grandChildren = Mirror(reflecting: children[p0].value).children
   ///       SeekTwo: for g in grandChildren {
   ///         if g.label == "two" {
   ///           let greatGrandChildren = Mirror(reflecting: g.value).children
-  ///           let p1 = greatGrandChildren.startIndex.advanced(
-  ///             by: 3,
-  ///             limitedBy: greatGrandChildren.endIndex)
-  ///           if p1 != endIndex { d = greatGrandChildren[p1].value }
+  ///           if let p1 = greatGrandChildren.location(
+  ///             greatGrandChildren.startIndex,
+  ///             offsetBy: 3, limitedBy: greatGrandChildren.endIndex) {
+  ///             d = greatGrandChildren[p1].value
+  ///           }
   ///           break SeekTwo
   ///         }
   ///       }
+  ///     }
   ///
   /// As you can see, complexity for each element of the argument list
   /// depends on the argument type and capabilities of the collection
