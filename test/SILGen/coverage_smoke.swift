@@ -8,7 +8,6 @@
 
 // REQUIRES: profile_runtime
 // REQUIRES: OS=macosx
-// REQUIRES: rdar://problem/25493310
 // XFAIL: asan
 
 func main() {
