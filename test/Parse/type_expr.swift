@@ -170,3 +170,20 @@ func meta_metatypes() {
   _ = P.Protocol.Type.self
   _ = B.Type.self
 }
+
+// https://bugs.swift.org/browse/SR-502
+func testFunctionCollectionTypes() {
+  _ = [Int -> Int]()
+  _ = [(Int) -> Int]()
+  _ = [(Int, Int) -> Int]()
+  _ = [(x: Int, y: Int) -> Int]()
+  // Make sure associativity is correct
+  let a = [Int -> Int -> Int]()
+  let b: Int = a[0](5)(4)
+
+  _ = [String: Int -> Int]()
+  _ = [String: (Int, Int) -> Int]()
+
+  _ = [1 -> Int]() // expected-error{{expected type before '->'}}
+  _ = [Int -> 1]() // expected-error{{expected type after '->'}}
+}

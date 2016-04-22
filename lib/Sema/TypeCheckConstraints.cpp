@@ -21,6 +21,7 @@
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
@@ -676,8 +677,13 @@ namespace {
       ExprStack.pop_back();
 
       // Fold sequence expressions.
-      if (auto seqExpr = dyn_cast<SequenceExpr>(expr))
-        return TC.foldSequence(seqExpr, DC);
+      if (auto seqExpr = dyn_cast<SequenceExpr>(expr)) {
+        auto result = TC.foldSequence(seqExpr, DC);
+        if (auto typeResult = simplifyTypeExpr(result)) {
+          return typeResult;
+        }
+        return result;
+      }
 
       // Type check the type parameters in an UnresolvedSpecializeExpr.
       if (auto us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
@@ -1029,6 +1035,40 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
                                           /*FIXME:colonLoc=*/SourceLoc(),
                                           SourceRange(DE->getLBracketLoc(),
                                                       DE->getRBracketLoc()));
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+  }
+
+  // Reinterpret arrow expr T1 -> T2 as function type.
+  // FIXME: support 'throws', 'inout', etc.
+  if (auto *AE = dyn_cast<ArrowExpr>(E)) {
+    if (!AE->isFolded()) {
+      return nullptr;
+    }
+    TypeExpr *ArgsTypeExpr = dyn_cast<TypeExpr>(AE->getArgsExpr());
+    bool HadError = false;
+    if (!ArgsTypeExpr) {
+      TC.diagnose(AE->getArgsExpr()->getLoc(),
+                  diag::expected_type_before_arrow);
+      HadError = true;
+    }
+    TypeExpr *ResultTypeExpr = dyn_cast<TypeExpr>(AE->getResultExpr());
+    if (!ResultTypeExpr && isa<ArrowExpr>(AE->getResultExpr())) {
+      // When simplifying a type expr like "Int -> Int -> Int" the RHS may have
+      // been folded at the same time; recursively simplify it first if
+      // necessary.
+      ResultTypeExpr = simplifyTypeExpr(AE->getResultExpr());
+    }
+    if (!ResultTypeExpr) {
+      TC.diagnose(AE->getResultExpr()->getLoc(),
+                  diag::expected_type_after_arrow);
+      HadError = true;
+    }
+    if (HadError) return nullptr;
+    TypeRepr *ArgsTypeRepr = ArgsTypeExpr->getTypeRepr();
+    TypeRepr *ResultTypeRepr = ResultTypeExpr->getTypeRepr();
+    auto NewTypeRepr =
+      new (TC.Context) FunctionTypeRepr(nullptr, ArgsTypeRepr, SourceLoc(),
+                                        AE->getArrowLoc(), ResultTypeRepr);
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
 

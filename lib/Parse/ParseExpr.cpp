@@ -349,6 +349,13 @@ parse_operator:
       // Jump directly to parsing another operator.
       goto parse_operator;
     }
+
+    case tok::arrow: {
+      SourceLoc ArrowLoc = consumeToken(tok::arrow);
+      Expr *arrowExpr = new (Context) ArrowExpr(ArrowLoc);
+      SequencedExprs.push_back(arrowExpr);
+      break;
+    }
         
     default:
       // If the next token is not a binary operator, we're done.

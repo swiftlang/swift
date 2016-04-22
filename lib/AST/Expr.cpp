@@ -608,6 +608,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::Coerce:
     return false;
 
+  case ExprKind::Arrow:
   case ExprKind::If:
   case ExprKind::Assign:
   case ExprKind::DefaultValue:

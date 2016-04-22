@@ -182,6 +182,12 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
       return op->getInfixData();
   }
 
+  if (isa<ArrowExpr>(E)) {
+    return InfixData(IntrinsicPrecedences::ArrowExpr,
+                     Associativity::Right,
+                     /*assignment*/ false);
+  }
+
   // If E is already an ErrorExpr, then we've diagnosed it as invalid already,
   // otherwise emit an error.
   if (!isa<ErrorExpr>(E))
@@ -304,6 +310,14 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     assert(RHS == as && "'as' with non-type RHS?!");
     as->setSubExpr(LHS);    
     return makeResultExpr(as);
+  }
+
+  if (auto *arrow = dyn_cast<ArrowExpr>(Op)) {
+    // Resolve the '->' expression.
+    assert(!arrow->isFolded() && "already folded '->' expr in sequence?!");
+    arrow->setArgsExpr(LHS);
+    arrow->setResultExpr(RHS);
+    return makeResultExpr(arrow);
   }
   
   // Build the argument to the operation.

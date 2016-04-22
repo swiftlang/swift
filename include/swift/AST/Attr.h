@@ -94,6 +94,7 @@ public:
 namespace IntrinsicPrecedences {
   enum : unsigned char {
     MinPrecedence = 0,
+    ArrowExpr = 0, // ->
     IfExpr = 100, // ?:
     AssignExpr = 90, // =
     ExplicitCastExpr = 132, // 'is' and 'as'
