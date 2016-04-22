@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -disable-incremental-llvm-codegen -primary-file %s | FileCheck %s
 
 func use_metadata<F>(_ f: F) {}
 

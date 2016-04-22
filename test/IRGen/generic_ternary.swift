@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-incremental-llvm-codegen | FileCheck %s
 
 // REQUIRES: CPU=i386_or_x86_64
 

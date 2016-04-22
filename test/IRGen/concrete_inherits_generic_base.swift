@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name foo -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -module-name foo -emit-ir -disable-incremental-llvm-codegen %s | FileCheck %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 

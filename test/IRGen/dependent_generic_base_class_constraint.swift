@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -verify %s
+// RUN: %target-swift-frontend -emit-ir -disable-incremental-llvm-codegen -verify %s
 class GenericClass<T> { }
 
 protocol MyProtocol { }

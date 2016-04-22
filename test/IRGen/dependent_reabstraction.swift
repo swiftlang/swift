@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -disable-incremental-llvm-codegen %s | FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s
+// RUN: %target-swift-frontend -emit-ir -disable-incremental-llvm-codegen %s
 
 enum Singleton {
   case F(Singleton -> ())

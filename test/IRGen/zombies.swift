@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -O -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -O -emit-ir -disable-incremental-llvm-codegen | FileCheck %s
 
 // rdar://24121475
 //   Ideally, these wouldn't be in the v-table at all; but as long as they
