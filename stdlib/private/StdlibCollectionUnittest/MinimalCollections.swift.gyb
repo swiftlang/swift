@@ -165,7 +165,11 @@ public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
     }
   }
 
+  public let timesMakeIteratorCalled = ResettableValue(0)
+
+  @warn_unused_result
   public func makeIterator() -> MinimalIterator<T> {
+    timesMakeIteratorCalled.value += 1
     return MinimalIterator(_sharedState)
   }
 
@@ -577,7 +581,10 @@ public struct ${Self}<T> : ${SelfProtocols} {
   }
 %     end
 
+  public let timesMakeIteratorCalled = ResettableValue(0)
+
   public func makeIterator() -> MinimalIterator<T> {
+    timesMakeIteratorCalled.value += 1
     return MinimalIterator(_elements)
   }
 
@@ -598,11 +605,17 @@ public struct ${Self}<T> : ${SelfProtocols} {
       uncheckedPosition: i)
   }
 
+  public let timesStartIndexCalled = ResettableValue(0)
+
   public var startIndex: MinimalIndex {
+    timesStartIndexCalled.value += 1
     return _uncheckedIndex(forPosition: _elements.startIndex)
   }
 
+  public let timesEndIndexCalled = ResettableValue(0)
+
   public var endIndex: MinimalIndex {
+    timesEndIndexCalled.value += 1
     return _uncheckedIndex(forPosition: _elements.endIndex)
   }
 
@@ -885,12 +898,16 @@ public struct ${Self}<Element> : ${SelfProtocols} {
     return base.underestimatedCount
   }
 
+  public let timesMakeIteratorCalled = ResettableValue(0)
+
   @warn_unused_result
   public func makeIterator() -> MinimalIterator<Element> {
+    timesMakeIteratorCalled.value += 1
     return base.makeIterator()
   }
 
   public let timesSuccessorCalled = ResettableValue(0)
+
   @warn_unused_result
   public func location(after i: MinimalIndex) -> MinimalIndex {
     timesSuccessorCalled.value += 1
@@ -920,11 +937,17 @@ public struct ${Self}<Element> : ${SelfProtocols} {
   }
 %     end
 
+  public let timesStartIndexCalled = ResettableValue(0)
+
   public var startIndex: MinimalIndex {
+    timesStartIndexCalled.value += 1
     return base.startIndex
   }
 
+  public let timesEndIndexCalled = ResettableValue(0)
+
   public var endIndex: MinimalIndex {
+    timesEndIndexCalled.value += 1
     return base.endIndex
   }
 

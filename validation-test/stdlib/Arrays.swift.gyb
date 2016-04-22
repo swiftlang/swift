@@ -9,58 +9,69 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-
-//===--- struct MrMcRange -------------------------------------------------===//
-// A wrapper around Range<Tracked> that allows us to detect when it is
-// being treated as a Collection rather than merely a Sequence, which
-// helps us to prove that an optimization is being used.  In
-// particular, when constructing a _ContiguousArrayBuffer from a
-// Collection, the necessary storage should be pre-allocated.
-struct MrMcRange : Collection {
-  static var timesStartIndexWasCalled = ResettableValue(0)
-
-  typealias Base = Range<Int>
-
-  init(_ base: Base) {
-    self.base = base
-  }
-
-  var startIndex: Int {
-    MrMcRange.timesStartIndexWasCalled.value += 1
-    return base.startIndex
-  }
-
-  var endIndex: Int {
-    return base.endIndex
-  }
-
-  subscript(i: Int) -> LifetimeTracked {
-    return LifetimeTracked(i)
-  }
-
-  var base: Base
-}
-
 let CopyToNativeArrayBufferTests = TestSuite("CopyToNativeArrayBufferTests")
 
 CopyToNativeArrayBufferTests.test("Sequence._copyToNativeArrayBuffer()") {
-  let sequence: MinimalSequence<LifetimeTracked> =
-    MinimalSequence(elements: LifetimeTracked(10)..<LifetimeTracked(27))
-  let buffer = sequence._copyToNativeArrayBuffer()
-  expectEqualSequence(
-    Array(10..<27),
-    buffer.map { $0.value })
+  do {
+    // Call from a static context.
+    let s =
+      MinimalSequence(elements: LifetimeTracked(10)..<LifetimeTracked(27))
+
+    expectEqual(0, s.timesMakeIteratorCalled.value)
+    let buffer = s._copyToNativeArrayBuffer()
+    expectEqual(1, s.timesMakeIteratorCalled.value)
+    expectEqualSequence(
+      Array(10..<27),
+      buffer.map { $0.value })
+  }
+  do {
+    // Call from a generic context.
+    let wrapped = MinimalSequence(elements: LifetimeTracked(10)..<LifetimeTracked(27))
+    let s = LoggingSequence(wrapping: wrapped)
+
+    expectEqual(0, wrapped.timesMakeIteratorCalled.value)
+    let buffer = s._copyToNativeArrayBuffer()
+    expectEqual(1, wrapped.timesMakeIteratorCalled.value)
+    expectEqualSequence(
+      Array(10..<27),
+      buffer.map { $0.value })
+  }
 }
 
 CopyToNativeArrayBufferTests.test("Collection._copyToNativeArrayBuffer()") {
-  let buffer = MrMcRange(3..<23)._copyToNativeArrayBuffer()
   // Check that collections are handled with the collection-specific API.  This
   // means that we are calling the right default implementation (one for
   // collections, not the one for sequences).
-  expectNotEqual(0, MrMcRange.timesStartIndexWasCalled.value)
-  expectEqualSequence(
-    Array(3..<23),
-    buffer.map { $0.value })
+
+  do {
+    // Call from a static context.
+    let c =
+      DefaultedCollection(elements: LifetimeTracked(10)..<LifetimeTracked(27))
+
+    expectEqual(0, c.timesMakeIteratorCalled.value)
+    expectEqual(0, c.timesStartIndexCalled.value)
+    let buffer = c._copyToNativeArrayBuffer()
+    expectEqual(0, c.timesMakeIteratorCalled.value)
+    expectNotEqual(0, c.timesStartIndexCalled.value)
+    expectEqualSequence(
+      Array(10..<27),
+      buffer.map { $0.value })
+  }
+  do {
+    // Call from a generic context.
+    let wrapped =
+      DefaultedCollection(elements: LifetimeTracked(10)..<LifetimeTracked(27))
+    let s = LoggingSequence(wrapping: wrapped)
+    expectEqual(0, wrapped.timesMakeIteratorCalled.value)
+    expectEqual(0, wrapped.timesStartIndexCalled.value)
+    let buffer = s._copyToNativeArrayBuffer()
+    expectEqual(0, wrapped.timesMakeIteratorCalled.value)
+    expectNotEqual(0, wrapped.timesStartIndexCalled.value)
+
+    expectEqualSequence(
+      Array(10..<27),
+      buffer.map { $0.value })
+  }
 }
 
 %{
