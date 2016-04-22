@@ -391,11 +391,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     // and is not included in the resource directory with the other implicit
     // module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
     SmallString<128> GlibcModuleMapPath;
-    if (!importerOpts.OverrideResourceDir.empty()) {
-      GlibcModuleMapPath = importerOpts.OverrideResourceDir;
-    } else if (!searchPathOpts.RuntimeResourcePath.empty()) {
-      GlibcModuleMapPath = searchPathOpts.RuntimeResourcePath;
-    }
+    GlibcModuleMapPath = searchPathOpts.RuntimeResourcePath;
 
     // Running without a resource directory is not a supported configuration.
     assert(!GlibcModuleMapPath.empty());
