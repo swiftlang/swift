@@ -1,3 +1,4 @@
+
 //===--- Index.swift.gyb - tests for Index types and operations -----------===//
 //
 // This source file is part of the Swift.org open source project
@@ -21,123 +22,67 @@ import StdlibCollectionUnittest
 
 
 extension Collection {
-  func indexAt(offset offset: Int) -> Index {
+  func nthIndex(_ offset: Int) -> Index {
     return self.location(self.startIndex, offsetBy: numericCast(offset))
   }
 }
 
 struct DistanceFromToTest {
-  let startIndex: Int
-  let endIndex: Int
-  let expectedDistance: Int
+  let startOffset: Int
+  let endOffset: Int
+  var expectedDistance : Int { return endOffset - startOffset }
   let loc: SourceLoc
 
   init(
-    startIndex: Int, endIndex: Int, expectedDistance: Int,
+    _ offsets: Range<Int>,
     file: String = #file, line: UInt = #line
   ) {
-    self.startIndex = startIndex
-    self.endIndex = endIndex
-    self.expectedDistance = expectedDistance
+    self.startOffset = offsets.lowerBound
+    self.endOffset = offsets.upperBound
     self.loc = SourceLoc(file, line, comment: "distance(from:to:) test data")
   }
 }
 
 struct IndexStepsFromTest {
-  let startIndex: Int
+  let startOffset: Int
   let distance: Int
   let limit: Int?
-  let expectedIndex: Int?
+  
+  var expectedOffset: Int? {
+    let fullOffset = startOffset + distance
+    return limit != nil && fullOffset > limit! ? nil : fullOffset
+  }
+  
   let loc: SourceLoc
   init(
-    startIndex: Int, distance: Int, expectedIndex: Int?,
+    startOffset: Int, distance: Int,
     limitedBy limit: Int? = nil,
     file: String = #file, line: UInt = #line
   ) {
-    self.startIndex = startIndex
+    self.startOffset = startOffset
     self.distance = distance
-    self.expectedIndex = expectedIndex
     self.limit = limit
     self.loc = SourceLoc(file, line, comment: "location(_:offsetBy:) test data")
   }
 }
 
 let distanceFromToTests = [
-  DistanceFromToTest(
-    startIndex: 0,
-    endIndex: 0,
-    expectedDistance: 0
-  ),
-  DistanceFromToTest(
-    startIndex: 10,
-    endIndex: 10,
-    expectedDistance: 0
-  ),
-  DistanceFromToTest(
-    startIndex: 10,
-    endIndex: 13,
-    expectedDistance: 3
-  ),
-  DistanceFromToTest(
-    startIndex: 7,
-    endIndex: 10,
-    expectedDistance: 3
-  ),
+  DistanceFromToTest(0..<0),
+  DistanceFromToTest(10..<10),
+  DistanceFromToTest(10..<13),
+  DistanceFromToTest(7..<10),
 ]
 
 let indexStepsFromTests = [
-  IndexStepsFromTest(
-    startIndex: 0,
-    distance: 0,
-    expectedIndex: 0
-  ),
-  IndexStepsFromTest(
-    startIndex: 0,
-    distance: -1,
-    expectedIndex: -1
-  ),
-  IndexStepsFromTest(
-    startIndex: 0,
-    distance: 0,
-    expectedIndex: 0,
-    limitedBy: 0
-  ),
-  IndexStepsFromTest(
-    startIndex: 0,
-    distance: 0,
-    expectedIndex: 0,
-    limitedBy: 10
-  ),
-  IndexStepsFromTest(
-    startIndex: 0,
-    distance: 10,
-    expectedIndex: nil,
-    limitedBy: 0
-  ),
-  IndexStepsFromTest(
-    startIndex: 0,
-    distance: -10,
-    expectedIndex: nil,
-    limitedBy: 0
-  ),
-  IndexStepsFromTest(
-    startIndex: 0,
-    distance: 10,
-    expectedIndex: 10,
-    limitedBy: 10
-  ),
-  IndexStepsFromTest(
-    startIndex: 0,
-    distance: 20,
-    expectedIndex: nil,
-    limitedBy: 10
-  ),
-  IndexStepsFromTest(
-    startIndex: 10,
-    distance: -20,
-    expectedIndex: nil,
-    limitedBy: 0
-  ),
+  IndexStepsFromTest(startOffset: 0, distance: 0),
+  IndexStepsFromTest(startOffset: 0, distance: -1),
+  IndexStepsFromTest(startOffset: 0, distance: 0, limitedBy: 0),
+  IndexStepsFromTest(startOffset: 0, distance: 0, limitedBy: 10),
+  IndexStepsFromTest(startOffset: 0, distance: 10, limitedBy: 0),
+  IndexStepsFromTest(startOffset: 0, distance: -10, limitedBy: 0),
+  IndexStepsFromTest(startOffset: 0, distance: 10, limitedBy: 10),
+  IndexStepsFromTest(startOffset: 0, distance: 20, limitedBy: 10),
+  IndexStepsFromTest(startOffset: 10, distance: -20, limitedBy: 0),
 ]
 
 var Index = TestSuite("Index")
@@ -178,8 +123,8 @@ Index.test("${Kind}Collection/distance(from:to:)/semantics") {
   let c = ${Kind}Collection(elements: Array(0..<20))
   for test in distanceFromToTests {
     let d = c.distance(
-      from: c.indexAt(offset: test.startIndex),
-      to: c.indexAt(offset: test.endIndex))
+      from: c.nthIndex(test.startOffset),
+      to: c.nthIndex(test.endOffset))
     expectEqual(test.expectedDistance, d,
       stackTrace: SourceLocStack().with(test.loc))
   }
@@ -189,12 +134,12 @@ Index.test("${Kind}Collection/index(_:stepsFrom: n)/semantics") {
   for test in indexStepsFromTests.filter({$0.limit == nil && $0.distance >= 0}) {
     let c = ${Kind}Collection(elements: Array(0..<10))
 
-    let new = c.location(c.indexAt(offset: test.startIndex), offsetBy: test.distance)
-    // Since the `indexAt(offset:)` method performs the same operation
+    let new = c.location(c.nthIndex(test.startOffset), offsetBy: test.distance)
+    // Since the `nthIndex(offset:)` method performs the same operation
     // (i.e. adavances `c.startIndex` by `test.distance`, it would be
     // silly to compare index values. Luckily the underlying collection
     // contains exactly index offsets.
-    expectEqual(test.expectedIndex!, c[new],
+    expectEqual(test.expectedOffset!, c[new],
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
@@ -204,7 +149,7 @@ Index.test("${Kind}Collection/index(_:stepsFrom: -n)/semantics") {
   for test in indexStepsFromTests.filter({$0.limit == nil && $0.distance < 0}) {
     let c = ${Kind}Collection(elements: Array(0..<10))
     expectCrashLater()
-    _ = c.location(c.indexAt(offset: test.startIndex), offsetBy: test.distance)
+    _ = c.location(c.nthIndex(test.startOffset), offsetBy: test.distance)
   }
 }
 %     end
@@ -213,11 +158,11 @@ Index.test("${Kind}Collection/index(_:stepsFrom: -n)/semantics") {
 Index.test("${Kind}Collection/advance(by: -n, limitedBy:)/semantics") {
   for test in indexStepsFromTests.filter({$0.limit != nil && $0.distance < 0}) {
     let c = ${Kind}Collection(elements: Array(0..<10))
-    let limit = c.indexAt(offset: test.limit.unsafelyUnwrapped)
+    let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
 
     expectCrashLater()
     _ = c.location(
-      c.indexAt(offset: test.startIndex),
+      c.nthIndex(test.startOffset),
       offsetBy: test.distance,
       limitedBy: limit)
   }
@@ -227,7 +172,7 @@ Index.test("${Kind}Collection/advance(by: -n, limitedBy:)/semantics") {
 Index.test("${Kind}Collection/advance(by: n, limitedBy:)/semantics") {
   for test in indexStepsFromTests.filter({$0.limit != nil && $0.distance >= 0}) {
     let c = ${Kind}Collection(elements: Array(0..<20))
-    let limit = c.indexAt(offset: test.limit.unsafelyUnwrapped)
+    let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
 
 %     if Traversal == 'Forward':
 
@@ -238,13 +183,13 @@ Index.test("${Kind}Collection/advance(by: n, limitedBy:)/semantics") {
 %     end
 
     let new = c.location(
-      c.indexAt(offset: test.startIndex),
+      c.nthIndex(test.startOffset),
       offsetBy: test.distance,
       limitedBy: limit)
-    if test.expectedIndex == nil {
+    if test.expectedOffset == nil {
       expectEmpty(new)
     } else {
-      expectEqual(c.indexAt(offset: test.expectedIndex!), new!,
+      expectEqual(c.nthIndex(test.expectedOffset!), new!,
         stackTrace: SourceLocStack().with(test.loc))
     }
   }
@@ -261,7 +206,7 @@ Index.test(
   for test in indexStepsFromTests.filter({$0.limit == nil && $0.distance >= 0}) {
     let c = ${Kind}Collection(Array(0..<10))
 
-    let i = c.indexAt(offset: test.startIndex)
+    let i = c.nthIndex(test.startOffset)
     let result  = c.location(i, offsetBy: test.distance)
     expectEqual(0, c.timesSuccessorCalled.value)
     expectEqual(0, c.timesPredecessorCalled.value)
@@ -275,8 +220,8 @@ Index.test(
   for test in indexStepsFromTests.filter({$0.limit != nil && $0.distance >= 0}) {
     let c = ${Kind}Collection(Array(0..<10))
 
-    let i = c.indexAt(offset: test.startIndex)
-    let limit = c.indexAt(offset: test.limit.unsafelyUnwrapped)
+    let i = c.nthIndex(test.startOffset)
+    let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
     _ = c.location(i, offsetBy: test.distance, limitedBy: limit)
     expectEqual(0, c.timesSuccessorCalled.value)
     expectEqual(0, c.timesPredecessorCalled.value)
