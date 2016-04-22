@@ -544,16 +544,7 @@ public:
     if (!descriptor)
       return BuiltNominalTypeDecl();
 
-    auto nameAddress
-      = resolveRelativeOffset<int32_t>(address +
-                                       descriptor->offsetToNameOffset());
-    std::string mangledName;
-    if (!Reader->readString(RemoteAddress(nameAddress), mangledName))
-      return BuiltNominalTypeDecl();
-
-    BuiltNominalTypeDecl decl =
-      Builder.createNominalTypeDecl(std::move(mangledName));
-    return decl;
+    return buildNominalTypeDecl(descriptor);
   }
 
 protected:
@@ -655,38 +646,25 @@ private:
     }
   }
 
-  NominalTypeDescriptorRef
-  readNominalTypeDescriptorFromMetadata(MetadataRef metadata) {
-    StoredPointer descriptorAddress;
-
+  StoredPointer readAddressOfNominalTypeDescriptor(MetadataRef metadata) {
     switch (metadata->getKind()) {
     case MetadataKind::Class: {
-      auto ClassMeta = cast<TargetClassMetadata<Runtime>>(metadata);
-      descriptorAddress
-        = resolveRelativeOffset<StoredPointer>(metadata.getAddress() +
-                                       ClassMeta->offsetToDescriptorOffset());
-      break;
-    }
-    case MetadataKind::Struct: {
-      auto StructMeta = cast<TargetStructMetadata<Runtime>>(metadata);
-      descriptorAddress
-        = resolveRelativeOffset<StoredPointer>(metadata.getAddress() +
-                                      StructMeta->offsetToDescriptorOffset());
-      break;
-    }
-    case MetadataKind::Optional:
-    case MetadataKind::Enum: {
-      auto EnumMeta = cast<TargetEnumMetadata<Runtime>>(metadata);
-      descriptorAddress
-        = resolveRelativeOffset<StoredPointer>(metadata.getAddress() +
-                                        EnumMeta->offsetToDescriptorOffset());
-      break;
-    }
-    default:
-      return nullptr;
+      auto classMeta = cast<TargetClassMetadata<Runtime>>(metadata);
+      return resolveRelativeOffset<StoredPointer>(metadata.getAddress() +
+                                       classMeta->offsetToDescriptorOffset());
     }
 
-    return readNominalTypeDescriptor(descriptorAddress);
+    case MetadataKind::Struct:
+    case MetadataKind::Optional:
+    case MetadataKind::Enum: {
+      auto valueMeta = cast<TargetValueMetadata<Runtime>>(metadata);
+      return resolveRelativeOffset<StoredPointer>(metadata.getAddress() +
+                                       valueMeta->offsetToDescriptorOffset());
+    }
+
+    default:
+      return 0;
+    }
   }
 
   /// Given the address of a nominal type descriptor, attempt to read it.
@@ -711,6 +689,22 @@ private:
     return NominalTypeDescriptorRef(address, descriptor);
   }
 
+  /// Given a read nominal type descriptor, attempt to build a
+  /// nominal type decl from it.
+  BuiltNominalTypeDecl
+  buildNominalTypeDecl(NominalTypeDescriptorRef descriptor) {
+    auto nameAddress
+      = resolveRelativeOffset<int32_t>(descriptor.getAddress() +
+                                       descriptor->offsetToNameOffset());
+    std::string mangledName;
+    if (!Reader->readString(RemoteAddress(nameAddress), mangledName))
+      return BuiltNominalTypeDecl();
+
+    BuiltNominalTypeDecl decl =
+      Builder.createNominalTypeDecl(std::move(mangledName));
+    return decl;
+  }
+
   SharedProtocolDescriptorRef<Runtime>
   readProtocolDescriptor(StoredPointer Address) {
     auto Size = sizeof(TargetProtocolDescriptor<Runtime>);
@@ -724,42 +718,36 @@ private:
     return SharedProtocolDescriptorRef<Runtime>(Casted, free);
   }
 
-  bool getParentAddress(MetadataRef metadata,
-                        NominalTypeDescriptorRef descriptor,
-                        StoredPointer &parentAddress) {
+  StoredPointer getNominalParent(MetadataRef metadata,
+                                 NominalTypeDescriptorRef descriptor) {
     // If this is metadata for some sort of value type, the parent type
     // is at a fixed offset.
     if (auto valueMetadata = dyn_cast<TargetValueMetadata<Runtime>>(metadata)) {
-      parentAddress = valueMetadata->Parent;
-      return true;
+      return valueMetadata->Parent;
     }
 
     // If this is metadata for a class type, the parent type for the
     // most-derived class is at a offset stored in the most-derived
     // nominal type descriptor.
     if (auto classMetadata = dyn_cast<TargetClassMetadata<Runtime>>(metadata)) {
-      // The class might not have a parent.
-      if (!descriptor->GenericParams.Flags.hasParent()) {
-        parentAddress = StoredPointer();
-        return true;
-      }
-
       // If it does, it's immediately before the generic parameters.
       auto offsetToParent
         = sizeof(StoredPointer) * (descriptor->GenericParams.Offset - 1);
       RemoteAddress addressOfParent(metadata.getAddress() + offsetToParent);
-      return Reader->readInteger(addressOfParent, &parentAddress);
+      StoredPointer parentAddress;
+      if (!Reader->readInteger(addressOfParent, &parentAddress))
+        return StoredPointer();
+      return parentAddress;
     }
 
-    // Otherwise, assume it just doesn't have a parent.
-    // This is still a success.
-    parentAddress = StoredPointer();
-    return true;
+    // Otherwise, we don't know how to access its parent.  This is a failure.
+    return StoredPointer();
   }
 
-  std::vector<BuiltType> getGenericSubst(MetadataRef metadata) {
-    auto descriptor = readNominalTypeDescriptorFromMetadata(metadata);
+  std::vector<BuiltType>
+  getGenericSubst(MetadataRef metadata, NominalTypeDescriptorRef descriptor) {
     std::vector<BuiltType> substitutions;
+
     auto numGenericParams = descriptor->GenericParams.NumPrimaryParams;
     auto offsetToGenericArgs =
       sizeof(StoredPointer) * (descriptor->GenericParams.Offset);
@@ -782,34 +770,33 @@ private:
   }
 
   BuiltType readNominalTypeFromMetadata(MetadataRef metadata) {
-    auto descriptor = readNominalTypeDescriptorFromMetadata(metadata);
+    auto descriptorAddress = readAddressOfNominalTypeDescriptor(metadata);
+    if (!descriptorAddress)
+      return BuiltType();
+
+    // Read the nominal type descriptor.
+    auto descriptor = readNominalTypeDescriptor(descriptorAddress);
     if (!descriptor)
       return BuiltType();
 
-    auto nameAddress
-      = resolveRelativeOffset<int32_t>(descriptor.getAddress() +
-                                       descriptor->offsetToNameOffset());
-    std::string MangledName;
-    if (!Reader->readString(RemoteAddress(nameAddress), MangledName))
-      return BuiltType();
-
-    BuiltNominalTypeDecl typeDecl =
-      Builder.createNominalTypeDecl(std::move(MangledName));
+    // From that, attempt to resolve a nominal type.
+    BuiltNominalTypeDecl typeDecl = buildNominalTypeDecl(descriptor);
     if (!typeDecl)
       return BuiltType();
 
-    StoredPointer parentAddress;
-    if (!getParentAddress(metadata, descriptor, parentAddress))
-      return BuiltType();
+    // Read the parent type if the type has one.
     BuiltType parent = BuiltType();
-    if (parentAddress) {
+    if (descriptor->GenericParams.Flags.hasParent()) {
+      StoredPointer parentAddress = getNominalParent(metadata, descriptor);
+      if (!parentAddress)
+        return BuiltType();
       parent = readTypeFromMetadata(parentAddress);
       if (!parent) return BuiltType();
     }
 
     BuiltType nominal;
     if (descriptor->GenericParams.NumPrimaryParams) {
-      auto args = getGenericSubst(metadata);
+      auto args = getGenericSubst(metadata, descriptor);
       if (args.empty()) return BuiltType();
       nominal = Builder.createBoundGenericType(typeDecl, args, parent);
     } else {
