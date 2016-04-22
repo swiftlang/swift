@@ -806,7 +806,7 @@ matchWitness(TypeChecker &tc,
   }
 
   SmallVector<OptionalAdjustment, 2> optionalAdjustments;
-  bool anyRenaming = false;
+  bool anyRenaming = req->getFullName() != witness->getFullName();
   if (decomposeFunctionType) {
     // Decompose function types into parameters and result type.
     auto reqFnType = reqType->castTo<AnyFunctionType>();
@@ -852,12 +852,6 @@ matchWitness(TypeChecker &tc,
       // FIXME: Specialize the match failure kind
       if (reqParams[i].isVararg() != witnessParams[i].isVararg())
         return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
-
-      // Check the parameter names.
-      if (reqParams[i].getName() != witnessParams[i].getName()) {
-        // A parameter has been renamed.
-        anyRenaming = true;
-      }
 
       // Gross hack: strip a level of unchecked-optionality off both
       // sides when matching against a protocol imported from Objective-C.

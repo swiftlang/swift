@@ -2033,6 +2033,7 @@ class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName {
   // expected-warning@-1{{instance method 'doThing' nearly matches optional requirement 'doThing' of protocol 'ProtocolThrowsObjCName'}}
   // expected-note@-2{{move 'doThing' to an extension to silence this warning}}
   // expected-note@-3{{make 'doThing' private to silence this warning}}{{9-9=private }}
+  // expected-note@-4{{candidate has non-matching type '(Int) throws -> String'}}
 }
 
 @objc class DictionaryTest {
