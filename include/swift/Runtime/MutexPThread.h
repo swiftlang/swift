@@ -26,12 +26,31 @@ typedef pthread_cond_t ConditionHandle;
 typedef pthread_mutex_t MutexHandle;
 typedef pthread_rwlock_t ReadWriteLockHandle;
 
+#if defined(__CYGWIN__)
+// At the moment CYGWIN pthreads implementation doesn't support the use of
+// constexpr for static allocation versions. The way they define things
+// results in a reinterpret_cast which violates constexpr.
+#define CONDITION_SUPPORTS_CONSTEXPR 0
+#define MUTEX_SUPPORTS_CONSTEXPR 0
+#define READWRITELOCK_SUPPORTS_CONSTEXPR 0
+#else
+#define CONDITION_SUPPORTS_CONSTEXPR 1
+#define MUTEX_SUPPORTS_CONSTEXPR 1
+#define READWRITELOCK_SUPPORTS_CONSTEXPR 1
+#endif
+
 /// PThread low-level implementation that supports ConditionVariable
 /// found in Mutex.h
 ///
 /// See ConditionVariable
 struct ConditionPlatformHelper {
-  static constexpr ConditionHandle staticInit() {
+#if CONDITION_SUPPORTS_CONSTEXPR
+  static constexpr
+#else
+  static
+#endif
+      ConditionHandle
+      staticInit() {
     return PTHREAD_COND_INITIALIZER;
   };
   static void init(ConditionHandle &condition);
@@ -46,7 +65,13 @@ struct ConditionPlatformHelper {
 ///
 /// See Mutex
 struct MutexPlatformHelper {
-  static constexpr MutexHandle staticInit() {
+#if MUTEX_SUPPORTS_CONSTEXPR
+  static constexpr
+#else
+  static
+#endif
+      MutexHandle
+      staticInit() {
     return PTHREAD_MUTEX_INITIALIZER;
   };
   static void init(MutexHandle &mutex, bool checked = false);
@@ -69,9 +94,16 @@ struct MutexPlatformHelper {
 ///
 /// See ReadWriteLock
 struct ReadWriteLockPlatformHelper {
-  static constexpr ReadWriteLockHandle staticInit() {
+#if READWRITELOCK_SUPPORTS_CONSTEXPR
+  static constexpr
+#else
+  static
+#endif
+      ReadWriteLockHandle
+      staticInit() {
     return PTHREAD_RWLOCK_INITIALIZER;
   };
+
   static void init(ReadWriteLockHandle &rwlock);
   static void destroy(ReadWriteLockHandle &rwlock);
   static void readLock(ReadWriteLockHandle &rwlock);
