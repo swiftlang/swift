@@ -636,6 +636,11 @@ public:
     addConstantInt32(MetadataSources.size());
     addConstantInt32(Layout.getBindings().size());
 
+    // Now add typerefs of all of the captures.
+    for (auto CaptureType : CaptureTypes) {
+      addTypeRef(Callee.getModule().getSwiftModule(), CaptureType);
+    }
+
     // Add the pairs that make up the generic param -> metadata source map
     // to the struct.
     for (auto GenericAndSource : MetadataSources) {
@@ -643,11 +648,6 @@ public:
       auto Source = GenericAndSource.second;
       addTypeRef(nullptr, GenericParam);
       addMetadataSource(Source);
-    }
-
-    // Now add typerefs of all of the captures.
-    for (auto CaptureType : CaptureTypes) {
-      addTypeRef(Callee.getModule().getSwiftModule(), CaptureType);
     }
   }
 
