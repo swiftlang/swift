@@ -4337,6 +4337,20 @@ static void diagnosePotentialWitness(TypeChecker &tc, ValueDecl *req,
   tc.diagnose(req, diag::protocol_requirement_here, req->getFullName());
 }
 
+/// Determine whether the given requirement was left unsatisfied.
+static bool isUnsatisfiedReq(NormalProtocolConformance *conformance,
+                             ValueDecl *req) {
+  if (conformance->isInvalid()) return false;
+  if (isa<TypeDecl>(req)) return false;
+
+  // An optional requirement might not have a witness...
+  if (!conformance->hasWitness(req) ||
+      !conformance->getWitness(req, nullptr).getDecl())
+    return req->getAttrs().hasAttribute<OptionalAttr>();
+
+  return false;
+}
+
 void TypeChecker::checkConformancesInContext(DeclContext *dc,
                                              IterableDeclContext *idc) {
   // Determine the accessibility of this conformance.
@@ -4364,27 +4378,35 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   auto conformances = dc->getLocalConformances(ConformanceLookupKind::All,
                                                &diagnostics,
                                                /*sorted=*/true);
-  bool hasAnyUnsatisfiedOptionalReqs = false;
+  // Catalog all of members of this declaration context that satisfy
+  // requirements of conformances in this context.
+  llvm::MapVector<DeclName, llvm::TinyPtrVector<ValueDecl *>>
+    unsatisfiedReqs;
+
+  bool anyInvalid = false;
   for (auto conformance : conformances) {
     // Check and record normal conformances.
     if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
       checkConformance(normal);
 
-      // Check whether there are any unsatisfied optional requirements.
-      if (!normal->isInvalid() && !hasAnyUnsatisfiedOptionalReqs) {
-        auto proto = conformance->getProtocol();
-        for (auto member : proto->getMembers()) {
-          if (isa<TypeDecl>(member)) continue;
+      if (anyInvalid) continue;
 
-          auto value = dyn_cast<ValueDecl>(member);
-          if (!value) continue;
+      if (normal->isInvalid()) {
+        anyInvalid = true;
+        continue;
+      }
 
-          // If there is an empty witness, record it.
-          if (normal->hasWitness(value) &&
-              !normal->getWitness(value, nullptr).getDecl()) {
-            hasAnyUnsatisfiedOptionalReqs = true;
-            break;
-          }
+      // Check whether there are any unsatisfied requirements.
+      auto proto = conformance->getProtocol();
+      for (auto member : proto->getMembers()) {
+        auto req = dyn_cast<ValueDecl>(member);
+        if (!req) continue;
+
+        // If the requirement is unsatisfied, we might want to warn
+        // about near misses; record it.
+        if (isUnsatisfiedReq(normal, req)) {
+          unsatisfiedReqs[req->getBaseName()].push_back(req);
+          continue;
         }
       }
     }
@@ -4413,50 +4435,43 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
              diag.ExistingExplicitProtocol->getName());
   }
 
-  // If there were any unsatisfied optional requirements, check whether
-  // there are any near-matches we should diagnose.
-  if (hasAnyUnsatisfiedOptionalReqs) {
-    // Catalog all of members of this declaration context that satisfy
-    // requirements of conformances in this context.
-    llvm::MapVector<DeclName, llvm::TinyPtrVector<ValueDecl *>>
-      unsatisfiedOptionalReqs;
+  // If there were any unsatisfied requirements, check whether there
+  // are any near-matches we should diagnose.
+  if (!unsatisfiedReqs.empty() && !anyInvalid) {
+    // Collect the set of witnesses that came from this context.
     llvm::SmallPtrSet<ValueDecl *, 16> knownWitnesses;
     for (auto conformance : conformances) {
       conformance->forEachValueWitness(
         nullptr,
         [&](ValueDecl *req, ConcreteDeclRef witness) {
           // If there is a witness, record it if it's within this context.
-          if (witness.getDecl()) {
-            if (witness.getDecl()->getDeclContext() == dc)
-              knownWitnesses.insert(witness.getDecl());
-            return;
-          }
-
-          // There is no witness. If this was an optional requirement,
-          // record it as such.
-          if (req->getAttrs().hasAttribute<OptionalAttr>())
-            unsatisfiedOptionalReqs[req->getBaseName()].push_back(req);
+          if (witness.getDecl() && witness.getDecl()->getDeclContext() == dc)
+            knownWitnesses.insert(witness.getDecl());
          });
     }
 
-    // Find all of the members that aren't used to satisfy requirements,
-    // and check whether they are close to an unsatisfied requirement.
+    // Find all of the members that aren't used to satisfy
+    // requirements, and check whether they are close to an
+    // unsatisfied or defaulted requirement.
     for (auto member : idc->getMembers()) {
-      // Filter out anything that couldn't satisfy an optional requirement.
+      // Filter out anything that couldn't satisfy one of the
+      // requirements or was used to satisfy a different requirement.
       auto value = dyn_cast<ValueDecl>(member);
       if (!value) continue;
       if (isa<TypeDecl>(value)) continue;
       if (knownWitnesses.count(value) > 0) continue;
       if (!value->getFullName()) continue;
 
-      // Consider any optional requirements with the same base name.
-      auto optionalReqs = unsatisfiedOptionalReqs.find(value->getBaseName());
-      if (optionalReqs == unsatisfiedOptionalReqs.end()) continue;
+      // Consider any unsatisfied requirements with the same base
+      // name.
+      auto reqs = unsatisfiedReqs.find(value->getBaseName());
+      if (reqs == unsatisfiedReqs.end()) continue;
 
-      // Find the optional requirements with the nearest-matching names.
+      // Find the unsatisfied requirements with the nearest-matching
+      // names.
       SmallVector<ValueDecl *, 4> bestOptionalReqs;
       unsigned bestScore = UINT_MAX;
-      for (auto req : optionalReqs->second) {
+      for (auto req : reqs->second) {
         // Score this particular optional requirement.
         auto score = scorePotentiallyMatchingNames(value->getFullName(),
                                                    req->getFullName(),
@@ -4496,19 +4511,20 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
         // Remove this optional requirement from the list. We don't want to
         // complain about it twice.
-        if (optionalReqs->second.size() == 1) {
-          unsatisfiedOptionalReqs.erase(optionalReqs);
+        if (reqs->second.size() == 1) {
+          unsatisfiedReqs.erase(reqs);
         } else {
-          optionalReqs->second.erase(std::find(optionalReqs->second.begin(),
-                                               optionalReqs->second.end(),
-                                               req));
+          reqs->second.erase(std::find(reqs->second.begin(),
+                                       reqs->second.end(),
+                                       req));
         }
       }
     }
 
-    // For any unsatified optional @objc requirements that remain,
-    // note them in the AST for @objc selector collision checking.
-    for (const auto &unsatisfied : unsatisfiedOptionalReqs) {
+    // For any unsatified optional @objc requirements that remain
+    // unsatisfied, note them in the AST for @objc selector collision
+    // checking.
+    for (const auto &unsatisfied : unsatisfiedReqs) {
       for (auto req : unsatisfied.second) {
         // Skip non-@objc requirements.
         if (!req->isObjC()) continue;
