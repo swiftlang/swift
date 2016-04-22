@@ -120,12 +120,9 @@ internal func _checkIncrementalAdvance<
   }
 }
 
-// FIXME: [swift-3-indexing-model] rephrase the comment, as it
-// refers to `ForwardIndex` that does not exist any more.
-/// Test that the elements of `instances` satisfy the semantic
-/// requirements of `ForwardIndex`, using `equalityOracle` to
-/// generate equality expectations from pairs of positions in
-/// `instances`.
+/// Test that the elements of `instances` satisfy the semantic requirements of
+/// index for `Collection`, using `equalityOracle` to generate equality
+/// expectations from pairs of positions in `instances`.
 ///
 /// - Precondition: `endIndex` is reachable from all elements of
 ///   `instances`
@@ -151,12 +148,9 @@ public func checkForwardIndex<
     sign: 1, next: { baseCollection.location(after: $0) }, ${trace})
 }
 
-// FIXME: [swift-3-indexing-model] rephrase the comment, as it
-// refers to `BidirectionalIndex` that does not exist any more.
-/// Test that the elements of `instances` satisfy the semantic
-/// requirements of `BidirectionalIndex`, using `equalityOracle`
-/// to generate equality expectations from pairs of positions in
-/// `instances`.
+/// Test that the elements of `instances` satisfy the semantic requirements of
+/// index for `BidirectionalCollection`, using `equalityOracle` to generate
+/// equality expectations from pairs of positions in `instances`.
 ///
 /// - Precondition:
 ///   - all elements of `instances` are reachable from `startIndex`.
@@ -188,13 +182,11 @@ public func checkBidirectionalIndex<
     sign: -1, next: { baseCollection.location(before: $0) }, ${trace})
 }
 
-// FIXME: [swift-3-indexing-model] rephrase the comment, as it
-// refers to `BidirectionalIndex` that does not exist any more.
-/// Test that the elements of `instances` satisfy the semantic
-/// requirements of `RandomAccessIndex`, using
-/// `advanceOracle` and 'distanceOracle' to generate expectations
-/// about the results of `advanced(by:)` and `distance(to:)` from pairs of
-/// positions in `instances` and `distances`.
+/// Test that the elements of `instances` satisfy the semantic requirements of
+/// index for `RandomAccessCollection`, using `advanceOracle` and
+/// 'distanceOracle' to generate expectations about the results of
+/// `advanced(by:)` and `distance(to:)` from pairs of positions in `instances`
+/// and `distances`.
 ///
 /// - Precondition:
 ///   - all elements of `instances` are reachable from `startIndex`.
