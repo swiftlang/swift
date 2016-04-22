@@ -115,23 +115,24 @@ Index.test("${TraversalCollection}/location(_:offsetBy:limitedBy:)/dispatch") {
 % end
 
 % for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
-%   CollectionPrefix = collectionForTraversal(Traversal).replace('Collection', '')
+%   Collection = collectionForTraversal(Traversal).replace('Collection', '')
 %   for Base in ['Minimal', 'Defaulted']:
-%     Kind = '{}{}'.format(Base, CollectionPrefix)
+%     Kind = '{}{}'.format(Base, Collection)
 
 Index.test("${Kind}Collection/distance(from:to:)/semantics") {
   let c = ${Kind}Collection(elements: Array(0..<20))
   for test in distanceFromToTests {
     let d = c.distance(
-      from: c.nthIndex(test.startOffset),
-      to: c.nthIndex(test.endOffset))
-    expectEqual(test.expectedDistance, d,
-      stackTrace: SourceLocStack().with(test.loc))
+      from: c.nthIndex(test.startOffset), to: c.nthIndex(test.endOffset))
+    expectEqual(
+      test.expectedDistance, d, stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
 Index.test("${Kind}Collection/index(_:stepsFrom: n)/semantics") {
-  for test in indexStepsFromTests.filter({$0.limit == nil && $0.distance >= 0}) {
+  for test in indexStepsFromTests.filter(
+    {$0.limit == nil && $0.distance >= 0}
+  ) {
     let c = ${Kind}Collection(elements: Array(0..<10))
 
     let new = c.location(c.nthIndex(test.startOffset), offsetBy: test.distance)
@@ -170,7 +171,9 @@ Index.test("${Kind}Collection/advance(by: -n, limitedBy:)/semantics") {
 %     end
 
 Index.test("${Kind}Collection/advance(by: n, limitedBy:)/semantics") {
-  for test in indexStepsFromTests.filter({$0.limit != nil && $0.distance >= 0}) {
+  for test in indexStepsFromTests.filter(
+    {$0.limit != nil && $0.distance >= 0}
+  ) {
     let c = ${Kind}Collection(elements: Array(0..<20))
     let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
 
@@ -201,9 +204,12 @@ Index.test("${Kind}Collection/advance(by: n, limitedBy:)/semantics") {
 %     if Traversal == 'RandomAccess' and Base == 'Defaulted':
 
 Index.test(
-  "${Kind}Collection/location(_:offsetBy:)/avoidsSuccessorAndPredecessor/dispatch"
+  "${Kind}Collection/location(_:offsetBy:)/"
+  + "avoidsSuccessorAndPredecessor/dispatch"
 ) {
-  for test in indexStepsFromTests.filter({$0.limit == nil && $0.distance >= 0}) {
+  for test in indexStepsFromTests.filter(
+    {$0.limit == nil && $0.distance >= 0}
+  ) {
     let c = ${Kind}Collection(Array(0..<10))
 
     let i = c.nthIndex(test.startOffset)
@@ -215,9 +221,12 @@ Index.test(
 
 #if false // FIXME: swift-3-indexing-model. implementation missing
 Index.test(
-  "${Kind}Index/location(_:offsetBy:limitedBy:)/avoidsSuccessorAndPredecessor/dispatch"
+  "${Kind}Index/location(_:offsetBy:limitedBy:)/"
+  + "avoidsSuccessorAndPredecessor/dispatch"
 ) {
-  for test in indexStepsFromTests.filter({$0.limit != nil && $0.distance >= 0}) {
+  for test in indexStepsFromTests.filter(
+    {$0.limit != nil && $0.distance >= 0}
+  ) {
     let c = ${Kind}Collection(Array(0..<10))
 
     let i = c.nthIndex(test.startOffset)
