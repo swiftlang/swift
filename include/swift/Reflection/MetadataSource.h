@@ -182,6 +182,9 @@ class MetadataSource {
         return decodeGenericArgument(A, it, end);
       case 'P':
         return decodeParent(A, it, end);
+      case 'S':
+        ++it;
+        return A.template createSelf();
       default:
         return nullptr;
     }
@@ -315,6 +318,7 @@ public:
   }
 };
 
+/// Metadata gotten through the parent of a nominal type's metadata.
 class ParentMetadataSource final : public MetadataSource {
   const MetadataSource *Child;
 public:
@@ -334,6 +338,41 @@ public:
 
   static bool classof(const MetadataSource *MS) {
     return MS->getKind() == MetadataSourceKind::Parent;
+  }
+};
+
+/// A source of metadata from the Self metadata parameter passed via
+/// a witness_method convention function.
+class SelfMetadataSource final : public MetadataSource {
+public:
+  SelfMetadataSource() : MetadataSource(MetadataSourceKind::Self) {}
+
+  template <typename Allocator>
+  static const SelfMetadataSource*
+  create(Allocator &A) {
+    return A.template make_source<SelfMetadataSource>();
+  }
+
+  static bool classof(const MetadataSource *MS) {
+    return MS->getKind() == MetadataSourceKind::Self;
+  }
+};
+
+/// A source of metadata from the Self witness table parameter passed via
+/// a witness_method convention function.
+class SelfWitnessTableMetadataSource final : public MetadataSource {
+public:
+  SelfWitnessTableMetadataSource()
+    : MetadataSource(MetadataSourceKind::SelfWitnessTable) {}
+
+  template <typename Allocator>
+  static const SelfWitnessTableMetadataSource*
+  create(Allocator &A) {
+    return A.template make_source<SelfWitnessTableMetadataSource>();
+  }
+
+  static bool classof(const MetadataSource *MS) {
+    return MS->getKind() == MetadataSourceKind::SelfWitnessTable;
   }
 };
 

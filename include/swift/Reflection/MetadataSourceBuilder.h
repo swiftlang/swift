@@ -62,6 +62,16 @@ public:
   createParent(const MetadataSource *Child) {
     return ParentMetadataSource::create(*this, Child);
   }
+
+  const SelfMetadataSource *
+  createSelf() {
+    return SelfMetadataSource::create(*this);
+  }
+
+  const SelfWitnessTableMetadataSource *
+  createSelfWitnessTable() {
+    return SelfWitnessTableMetadataSource::create(*this);
+  }
 };
 
 } // end namespace reflection

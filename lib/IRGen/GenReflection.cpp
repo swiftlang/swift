@@ -70,6 +70,15 @@ public:
     visit(P->getChild());
     OS << '_';
   }
+
+  void visitSelfMetadataSource(const SelfMetadataSource *S) {
+    OS << 'S';
+  }
+
+  void
+  visitSelfWitnessTableMetadataSource(const SelfWitnessTableMetadataSource *S) {
+    OS << 'W';
+  }
 };
 
 class PrintMetadataSource
@@ -146,6 +155,18 @@ public:
   visitParentMetadataSource(const ParentMetadataSource *P) {
     printHeader("parent-of");
     printRec(P->getChild());
+    closeForm();
+  }
+
+  void
+  visitSelfMetadataSource(const SelfMetadataSource *S) {
+    printHeader("self");
+    closeForm();
+  }
+
+  void
+  visitSelfWitnessTableMetadataSource(const SelfWitnessTableMetadataSource *S) {
+    printHeader("self-witness-table");
     closeForm();
   }
 };
@@ -511,6 +532,8 @@ public:
 
     PolymorphicConvention Convention(IGM, CalleeType);
 
+    using SourceKind = PolymorphicConvention::SourceKind;
+
     auto Generics = Callee.getContextGenericParams()->getNestedGenericParams();
     for (auto GenericParam : Generics) {
       // The generic type parameter (depth, index) serves as the key to the
@@ -527,11 +550,22 @@ public:
         // The convention fulfills the requirement, so record how to get
         // to the metadata.
 
+        auto ConventionSource = Convention.getSource(Fulfillment->SourceIndex);
+        if (ConventionSource.getKind() == SourceKind::SelfMetadata) {
+          SourceMap.insert({GenericParamType, SourceBuilder.createSelf()});
+          continue;
+        } else if (ConventionSource.getKind() == SourceKind::SelfWitnessTable) {
+          SourceMap.insert({
+            GenericParamType,
+            SourceBuilder.createSelfWitnessTable()
+          });
+          continue;
+        }
+
         // Since captures are created via partial_apply instructions, we need
         // to see which function parameter fulfilled this metadata need and
         // grab its type.
-        auto FnParameterIndex
-          = Convention.getSource(Fulfillment->SourceIndex).getParamIndex();
+        auto FnParameterIndex = ConventionSource.getParamIndex();
         auto FnParameter = CalleeType->getParameters()[FnParameterIndex];
         auto ParameterType = FnParameter.getType()->getCanonicalType();
 

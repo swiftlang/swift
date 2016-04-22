@@ -93,6 +93,17 @@ public:
     printRec(P->getChild());
     closeForm();
   }
+
+  void visitSelfMetadataSource(const SelfMetadataSource *S) {
+    printHeader("self");
+    closeForm();
+  }
+
+  void
+  visitSelfWitnessTableMetadataSource(const SelfWitnessTableMetadataSource *W) {
+    printHeader("self-witness-table");
+    closeForm();
+  }
 };
 
 void MetadataSource::dump() const {
