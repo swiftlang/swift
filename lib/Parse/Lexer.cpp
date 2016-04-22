@@ -1066,12 +1066,12 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     }
     // Move the pointer back to EOF.
     --CurPtr;
-    SWIFT_FALLTHROUGH;
-  case '\n':  // String literals cannot have \n or \r in them.
-  case '\r':
     if (EmitDiagnostics)
       diagnose(CurPtr-1, diag::lex_unterminated_string);
     return ~1U;
+  case '\n':  // String """ literals can now have \n or \r in them.
+  case '\r':  // These are checked for in calling functions anyway.
+    return CurPtr[-1];
   case '\\':  // Escapes.
     break;
   }
@@ -1227,6 +1227,13 @@ void Lexer::lexStringLiteral() {
   // NOTE: We only allow single-quote string literals so we can emit useful
   // diagnostics about changing them to double quotes.
 
+  bool isMultiLine = false;
+  if (*TokStart == '"' && *CurPtr == '"' && *(CurPtr + 1) == '"') {
+    isMultiLine = true;
+    TokStart += 2;
+    CurPtr += 2;
+  }
+
   bool wasErroneous = false;
   
   while (true) {
@@ -1247,7 +1254,7 @@ void Lexer::lexStringLiteral() {
     }
 
     // String literals cannot have \n or \r in them.
-    if (*CurPtr == '\r' || *CurPtr == '\n' || CurPtr == BufferEnd) {
+    if (((*CurPtr == '\r' || *CurPtr == '\n') && !isMultiLine) || CurPtr == BufferEnd) {
       diagnose(TokStart, diag::lex_unterminated_string);
       return formToken(tok::unknown, TokStart);
     }
@@ -1295,6 +1302,17 @@ void Lexer::lexStringLiteral() {
           .fixItReplaceChars(getSourceLoc(TokStart), getSourceLoc(CurPtr),
                              replacement);
       }
+
+      if (isMultiLine) {
+        if (*CurPtr == '"' && *(CurPtr + 1) == '"') {
+          formToken(tok::string_literal, TokStart);
+          CurPtr += 2;
+          return;
+        }
+        else
+          continue;
+      }
+
       return formToken(tok::string_literal, TokStart);
     }
   }
