@@ -1067,8 +1067,9 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     TypeRepr *ArgsTypeRepr = ArgsTypeExpr->getTypeRepr();
     TypeRepr *ResultTypeRepr = ResultTypeExpr->getTypeRepr();
     auto NewTypeRepr =
-      new (TC.Context) FunctionTypeRepr(nullptr, ArgsTypeRepr, SourceLoc(),
-                                        AE->getArrowLoc(), ResultTypeRepr);
+      new (TC.Context) FunctionTypeRepr(nullptr, ArgsTypeRepr,
+                                        AE->getThrowsLoc(), AE->getArrowLoc(),
+                                        ResultTypeRepr);
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
 

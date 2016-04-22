@@ -3490,28 +3490,30 @@ public:
   }
 };
 
-/// \brief Represents two expressions joined by the arrow operator '->'.
-/// Currently this only exists to be transformed into a FunctionTypeRepr by
-/// simplifyTypeExpr() in Sema.
+/// \brief Represents two expressions joined by the arrow operator '->', which
+/// may be preceded by the 'throws' keyword. Currently this only exists to be
+/// transformed into a FunctionTypeRepr by simplifyTypeExpr() in Sema.
 class ArrowExpr : public Expr {
+  SourceLoc ThrowsLoc;
   SourceLoc ArrowLoc;
   Expr *Args;
   Expr *Result;
 public:
-  ArrowExpr(Expr *Args, SourceLoc ArrowLoc, Expr *Result)
+  ArrowExpr(Expr *Args, SourceLoc ThrowsLoc, SourceLoc ArrowLoc, Expr *Result)
     : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      ArrowLoc(ArrowLoc), Args(Args), Result(Result)
+      ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(Args), Result(Result)
   { }
 
-  ArrowExpr(SourceLoc ArrowLoc)
+  ArrowExpr(SourceLoc ThrowsLoc, SourceLoc ArrowLoc)
     : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      ArrowLoc(ArrowLoc), Args(nullptr), Result(nullptr)
+      ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(nullptr), Result(nullptr)
   { }
 
   Expr *getArgsExpr() const { return Args; }
   void setArgsExpr(Expr *E) { Args = E; }
   Expr *getResultExpr() const { return Result; }
   void setResultExpr(Expr *E) { Result = E; }
+  SourceLoc getThrowsLoc() const { return ThrowsLoc; }
   SourceLoc getArrowLoc() const { return ArrowLoc; }
   bool isFolded() const { return Args != nullptr && Result != nullptr; }
 
