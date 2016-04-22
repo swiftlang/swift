@@ -551,9 +551,11 @@ function set_deployment_target_based_options() {
                         "${swift_cmake_options[@]}"
                         "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
                         "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
-                        "-DSWIFT_PARALLEL_LINK_JOBS=$(num_swift_parallel_lto_link_jobs)"
                     )
                 fi
+                swift_cmake_options+=(
+                    "-DSWIFT_PARALLEL_LINK_JOBS=$(num_swift_parallel_lto_link_jobs)"
+                )
             fi
 
             swift_cmake_options=(
