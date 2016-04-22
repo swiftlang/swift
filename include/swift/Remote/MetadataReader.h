@@ -582,68 +582,66 @@ private:
     if (!Reader->readInteger(RemoteAddress(address), &KindValue))
       return nullptr;
 
-    auto Kind = static_cast<MetadataKind>(KindValue);
-
-    if (metadataKindIsClass(Kind)) {
+    switch (getEnumeratedMetadataKind(KindValue)) {
+    case MetadataKind::Class:
       return _readMetadata<TargetClassMetadata<Runtime>>(address);
-    } else {
-      switch (Kind) {
-      case MetadataKind::Enum:
-        return _readMetadata<TargetEnumMetadata<Runtime>>(address);
-      case MetadataKind::ErrorObject:
-        return _readMetadata<TargetEnumMetadata<Runtime>>(address);
-      case MetadataKind::Existential: {
-        StoredPointer NumProtocolsAddress = address +
-          TargetExistentialTypeMetadata<Runtime>::OffsetToNumProtocols;
-        StoredPointer NumProtocols;
-        if (!Reader->readInteger(RemoteAddress(NumProtocolsAddress),
-                                 &NumProtocols))
-          return nullptr;
-
-        auto TotalSize = sizeof(TargetExistentialTypeMetadata<Runtime>) +
-          NumProtocols *
-            sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
-        
-        return _readMetadata<TargetExistentialTypeMetadata<Runtime>>(address,
-                                                                     TotalSize);
-      }
-      case MetadataKind::ExistentialMetatype:
-        return _readMetadata<
-          TargetExistentialMetatypeMetadata<Runtime>>(address);
-      case MetadataKind::ForeignClass:
-        return _readMetadata<TargetForeignClassMetadata<Runtime>>(address);
-      case MetadataKind::Function:
-        return _readMetadata<TargetFunctionTypeMetadata<Runtime>>(address);
-      case MetadataKind::HeapGenericLocalVariable:
-        return _readMetadata<TargetHeapLocalVariableMetadata<Runtime>>(address);
-      case MetadataKind::HeapLocalVariable:
-        return _readMetadata<TargetHeapLocalVariableMetadata<Runtime>>(address);
-      case MetadataKind::Metatype:
-        return _readMetadata<TargetMetatypeMetadata<Runtime>>(address);
-      case MetadataKind::ObjCClassWrapper:
-        return _readMetadata<TargetObjCClassWrapperMetadata<Runtime>>(address);
-      case MetadataKind::Opaque:
-        return _readMetadata<TargetOpaqueMetadata<Runtime>>(address);
-      case MetadataKind::Optional:
-        return _readMetadata<TargetEnumMetadata<Runtime>>(address);
-      case MetadataKind::Struct:
-        return _readMetadata<TargetStructMetadata<Runtime>>(address);
-      case MetadataKind::Tuple: {
-        auto NumElementsAddress = address +
-          TargetTupleTypeMetadata<Runtime>::OffsetToNumElements;
-        StoredSize NumElements;
-        if (!Reader->readInteger(RemoteAddress(NumElementsAddress),
-                                 &NumElements))
-          return nullptr;
-        auto TotalSize = sizeof(TargetTupleTypeMetadata<Runtime>) +
-          NumElements * sizeof(StoredPointer);
-        return _readMetadata<TargetTupleTypeMetadata<Runtime>>(address,
-                                                               TotalSize);
-      }
-      default:
+    case MetadataKind::Enum:
+      return _readMetadata<TargetEnumMetadata<Runtime>>(address);
+    case MetadataKind::ErrorObject:
+      return _readMetadata<TargetEnumMetadata<Runtime>>(address);
+    case MetadataKind::Existential: {
+      StoredPointer NumProtocolsAddress = address +
+        TargetExistentialTypeMetadata<Runtime>::OffsetToNumProtocols;
+      StoredPointer NumProtocols;
+      if (!Reader->readInteger(RemoteAddress(NumProtocolsAddress),
+                               &NumProtocols))
         return nullptr;
-      }
+
+      auto TotalSize = sizeof(TargetExistentialTypeMetadata<Runtime>) +
+        NumProtocols *
+          sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
+
+      return _readMetadata<TargetExistentialTypeMetadata<Runtime>>(address,
+                                                                   TotalSize);
     }
+    case MetadataKind::ExistentialMetatype:
+      return _readMetadata<
+        TargetExistentialMetatypeMetadata<Runtime>>(address);
+    case MetadataKind::ForeignClass:
+      return _readMetadata<TargetForeignClassMetadata<Runtime>>(address);
+    case MetadataKind::Function:
+      return _readMetadata<TargetFunctionTypeMetadata<Runtime>>(address);
+    case MetadataKind::HeapGenericLocalVariable:
+      return _readMetadata<TargetHeapLocalVariableMetadata<Runtime>>(address);
+    case MetadataKind::HeapLocalVariable:
+      return _readMetadata<TargetHeapLocalVariableMetadata<Runtime>>(address);
+    case MetadataKind::Metatype:
+      return _readMetadata<TargetMetatypeMetadata<Runtime>>(address);
+    case MetadataKind::ObjCClassWrapper:
+      return _readMetadata<TargetObjCClassWrapperMetadata<Runtime>>(address);
+    case MetadataKind::Opaque:
+      return _readMetadata<TargetOpaqueMetadata<Runtime>>(address);
+    case MetadataKind::Optional:
+      return _readMetadata<TargetEnumMetadata<Runtime>>(address);
+    case MetadataKind::Struct:
+      return _readMetadata<TargetStructMetadata<Runtime>>(address);
+    case MetadataKind::Tuple: {
+      auto NumElementsAddress = address +
+        TargetTupleTypeMetadata<Runtime>::OffsetToNumElements;
+      StoredSize NumElements;
+      if (!Reader->readInteger(RemoteAddress(NumElementsAddress),
+                               &NumElements))
+        return nullptr;
+      auto TotalSize = sizeof(TargetTupleTypeMetadata<Runtime>) +
+        NumElements * sizeof(StoredPointer);
+      return _readMetadata<TargetTupleTypeMetadata<Runtime>>(address,
+                                                             TotalSize);
+    }
+    }
+
+    // We can fall out here if the value wasn't actually a valid
+    // MetadataKind.
+    return nullptr;
   }
 
   StoredPointer readAddressOfNominalTypeDescriptor(MetadataRef metadata) {

@@ -39,10 +39,14 @@ enum class MetadataKind : uint32_t {
 #include "MetadataKind.def"
 };
 
+/// Try to translate the 'isa' value of a type/heap metadata into a value
+/// of the MetadataKind enum.
 template <typename StoredPointer>
-bool metadataKindIsClass(StoredPointer Kind) {
-  return Kind > static_cast<StoredPointer>(MetadataKind::NonIsaMetadata_End) ||
-      Kind < static_cast<StoredPointer>(MetadataKind::NonIsaMetadata_Start);
+MetadataKind getEnumeratedMetadataKind(StoredPointer kind) {
+  if (kind > static_cast<StoredPointer>(MetadataKind::NonIsaMetadata_End) ||
+      kind < static_cast<StoredPointer>(MetadataKind::NonIsaMetadata_Start))
+    return MetadataKind::Class;
+  return MetadataKind(kind);
 }
 
 /// Kinds of Swift nominal type descriptor records.
