@@ -3519,7 +3519,8 @@ public:
 
   SourceLoc getSourceLoc() const { return ArrowLoc; }
   SourceLoc getStartLoc() const {
-    return isFolded() ? Args->getStartLoc() : ArrowLoc;
+    return isFolded() ? Args->getStartLoc() :
+           ThrowsLoc.isValid() ? ThrowsLoc : ArrowLoc;
   }
   SourceLoc getEndLoc() const {
     return isFolded() ? Result->getEndLoc() : ArrowLoc;
