@@ -48,10 +48,6 @@ StringTests.test("sizeof") {
   expectEqual(3 * sizeof(Int.self), sizeof(String.self))
 }
 
-StringTests.test("AssociatedTypes") {
-  
-}
-
 StringTests.test("AssociatedTypes-UTF8View") {
   typealias View = String.UTF8View
   expectCollectionAssociatedTypes(
