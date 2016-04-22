@@ -93,60 +93,6 @@ public:
     printRec(P->getChild());
     closeForm();
   }
-
-  void
-  visitImpossibleMetadataSource(const ImpossibleMetadataSource *I) {
-    printHeader("impossible");
-    closeForm();
-  }
-};
-
-class MetadataSourceEncoder
-  : public MetadataSourceVisitor<MetadataSourceEncoder> {
-  std::stringstream OS;
-  bool Finalized  = false;
-public:
-  void
-  visitClosureBindingMetadataSource(const ClosureBindingMetadataSource *CB) {
-    OS << 'B';
-    OS << CB->getIndex();
-  }
-
-  void
-  visitReferenceCaptureMetadataSource(const ReferenceCaptureMetadataSource *RC){
-    OS << 'R';
-    OS << RC->getIndex();
-  }
-
-  void
-  visitMetadataCaptureMetadataSource(const MetadataCaptureMetadataSource *MC) {
-    OS << 'M';
-    OS << MC->getIndex();
-  }
-
-  void
-  visitGenericArgumentMetadataSource(const GenericArgumentMetadataSource *GA) {
-    OS << 'G';
-    OS << GA->getIndex();
-    visit(GA->getSource());
-    OS << '_';
-  }
-
-  void visitParentMetadataSource(const ParentMetadataSource *P) {
-    OS << 'P';
-    visit(P->getChild());
-    OS << '_';
-  }
-
-  void visitImpossibleMetadataSource(const ImpossibleMetadataSource *I) {
-    OS << 'I';
-  }
-
-  std::string finalize() {
-    assert(!Finalized && "Attempted to reuse finalized MetadataSourceEncoder");
-    Finalized = true;
-    return OS.str();
-  }
 };
 
 void MetadataSource::dump() const {
@@ -157,13 +103,3 @@ void MetadataSource::dump(std::ostream &OS, unsigned Indent) const {
   PrintMetadataSource(OS, Indent).visit(this);
   OS << std::endl;
 }
-
-std::string MetadataSource::encode() const {
-  MetadataSourceEncoder Encoder;
-  Encoder.visit(this);
-  return Encoder.finalize();
-}
-
-const ImpossibleMetadataSource *
-ImpossibleMetadataSource::Singleton = new ImpossibleMetadataSource();
-

@@ -19,8 +19,7 @@
 #define SWIFT_IRGEN_METADATAPATH_H
 
 #include "swift/Basic/EncodedSequence.h"
-
-#include "MetadataSource.h"
+#include "swift/Reflection/MetadataSource.h"
 
 namespace llvm {
   class Value;
@@ -164,18 +163,6 @@ public:
     return cost;
   }
 
-  template <typename Allocator>
-  const MetadataSource *getMetadataSource(Allocator &A,
-                                          const MetadataSource *Root) const {
-    for (auto C : Path) {
-      switch (C.getKind()) {
-      case
-      case Impossible:
-        Return A.template createImpossible();
-      }
-    }
-  }
-
   /// Given a pointer to type metadata, follow a path from it.
   llvm::Value *followFromTypeMetadata(IRGenFunction &IGF,
                                       CanType sourceType,
@@ -190,21 +177,24 @@ public:
                                       Map<llvm::Value*> *cache) const;
 
   template <typename Allocator>
-  const MetadataSource *
-  getMetadataSource(Allocator &A, const MetadataSource *Root) const {
+  const reflection::MetadataSource *
+  getMetadataSource(Allocator &A,
+                    const reflection::MetadataSource *Root) const {
+    if (Root == nullptr)
+      return nullptr;
+
     for (auto C : Path) {
       switch (C.getKind()) {
-      case NominalParent:
+      case Component::Kind::NominalParent:
         Root = A.template createParent(Root);
         continue;
-      case NominalTypeArgument:
+      case Component::Kind::NominalTypeArgument:
         Root = A.template createGenericArgument(C.getPrimaryIndex(), Root);
         continue;
       default:
-        return A.template createImpossible();
+        return nullptr;
       }
     }
-
     return Root;
   }
 

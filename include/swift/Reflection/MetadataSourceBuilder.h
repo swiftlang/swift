@@ -62,11 +62,6 @@ public:
   createParent(const MetadataSource *Child) {
     return ParentMetadataSource::create(*this, Child);
   }
-
-  const ImpossibleMetadataSource *
-  createImpossible() {
-    return ImpossibleMetadataSource::get();
-  }
 };
 
 } // end namespace reflection

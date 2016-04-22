@@ -166,19 +166,6 @@ class MetadataSource {
   }
 
   template <typename Allocator>
-  static const MetadataSource*
-  decodeImpossible(Allocator &A,
-                   std::string::const_iterator &it,
-                   const std::string::const_iterator &end) {
-    // Decode the impossible. Create the impossible.
-    if (it == end || *it != 'I')
-      return nullptr;
-
-    ++it;
-    return A.template createImpossible();
-  }
-
-  template <typename Allocator>
   static const MetadataSource *decode(Allocator &A,
                                       std::string::const_iterator &it,
                                       const std::string::const_iterator &end) {
@@ -195,8 +182,6 @@ class MetadataSource {
         return decodeGenericArgument(A, it, end);
       case 'P':
         return decodeParent(A, it, end);
-      case 'I':
-        return decodeImpossible(A, it, end);
       default:
         return nullptr;
     }
@@ -211,7 +196,6 @@ public:
 
   void dump() const;
   void dump(std::ostream &OS, unsigned Indent = 0) const;
-  std::string encode() const;
   template <typename Allocator>
   static const MetadataSource *decode(Allocator &A, const std::string &str) {
     auto begin = str.begin();
@@ -347,18 +331,9 @@ public:
   const MetadataSource *getChild() const {
     return Child;
   }
-};
-
-class ImpossibleMetadataSource final : public MetadataSource {
-  static const ImpossibleMetadataSource *Singleton;
-public:
-  ImpossibleMetadataSource()
-    : MetadataSource(MetadataSourceKind::Impossible) {}
-
-  static const ImpossibleMetadataSource *get();
 
   static bool classof(const MetadataSource *MS) {
-    return MS->getKind() == MetadataSourceKind::Impossible;
+    return MS->getKind() == MetadataSourceKind::Parent;
   }
 };
 

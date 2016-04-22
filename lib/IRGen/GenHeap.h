@@ -67,7 +67,8 @@ public:
 
   /// As a convenience, build a metadata object with internal linkage
   /// consisting solely of the standard heap metadata.
-  llvm::Constant *getPrivateMetadata(IRGenModule &IGM) const;
+  llvm::Constant *getPrivateMetadata(IRGenModule &IGM,
+                                     llvm::Constant *captureDescriptor) const;
 };
 
 class HeapNonFixedOffsets : public NonFixedOffsetsImpl {

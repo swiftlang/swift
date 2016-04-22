@@ -27,6 +27,7 @@ namespace swift {
   class CanType;
   class FuncDecl;
   struct SILDeclRef;
+  class SILFunction;
   class SILType;
   class Substitution;
 
