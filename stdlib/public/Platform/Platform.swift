@@ -278,6 +278,48 @@ public var S_IEXEC: mode_t  { return S_IXUSR }
 #endif
 
 //===----------------------------------------------------------------------===//
+// ioctl.h
+//===----------------------------------------------------------------------===//
+
+@_silgen_name("_swift_Platform_ioctl")
+internal func _swift_Platform_ioctl(
+  _ fd: CInt,
+  _ request: UInt,
+  _ value: CInt
+) -> CInt
+
+@_silgen_name("_swift_Platform_ioctlPtr")
+internal func _swift_Platform_ioctlPtr(
+  _ fd: CInt,
+  _ request: UInt,
+  _ ptr: UnsafeMutablePointer<Void>
+) -> CInt
+
+public func ioctl(
+  _ fd: CInt,
+  _ request: UInt,
+  _ value: CInt
+) -> CInt {
+  return _swift_Platform_ioctl(fd, request, value)
+}
+
+public func ioctl(
+  _ fd: CInt,
+  _ request: UInt,
+  _ ptr: UnsafeMutablePointer<Void>
+) -> CInt {
+  return _swift_Platform_ioctlPtr(fd, request, ptr)
+}
+
+public func ioctl(
+  _ fd: CInt,
+  _ request: UInt
+) -> CInt {
+  return _swift_Platform_ioctl(fd, request, 0)
+}
+ 
+ 
+//===----------------------------------------------------------------------===//
 // unistd.h
 //===----------------------------------------------------------------------===//
 
