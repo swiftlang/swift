@@ -149,8 +149,9 @@ Index.test("${Kind}Collection/index(_:stepsFrom: n)/semantics") {
 Index.test("${Kind}Collection/index(_:stepsFrom: -n)/semantics") {
   for test in indexStepsFromTests.filter({$0.limit == nil && $0.distance < 0}) {
     let c = ${Kind}Collection(elements: Array(0..<10))
+    let start = c.nthIndex(test.startOffset)
     expectCrashLater()
-    _ = c.location(c.nthIndex(test.startOffset), offsetBy: test.distance)
+    _ = c.location(start, offsetBy: test.distance)
   }
 }
 %     end
@@ -160,12 +161,9 @@ Index.test("${Kind}Collection/advance(by: -n, limitedBy:)/semantics") {
   for test in indexStepsFromTests.filter({$0.limit != nil && $0.distance < 0}) {
     let c = ${Kind}Collection(elements: Array(0..<10))
     let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
-
+    let start = c.nthIndex(test.startOffset)
     expectCrashLater()
-    _ = c.location(
-      c.nthIndex(test.startOffset),
-      offsetBy: test.distance,
-      limitedBy: limit)
+    _ = c.location(start, offsetBy: test.distance, limitedBy: limit)
   }
 }
 %     end
