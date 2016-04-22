@@ -1045,6 +1045,8 @@ ERROR(expected_arg_list_in_object_literal,none,
       "expected argument list in object literal", ())
 ERROR(object_literal_legacy_name,none,
       "'%0' has been renamed to '%1", (StringRef, StringRef))
+ERROR(legacy_object_literal_syntax,none,
+       "object literal syntax no longer uses '[# ... #]''", ())
 
 // If expressions
 ERROR(expected_expr_after_if_question,none,

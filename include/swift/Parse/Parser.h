@@ -1177,6 +1177,10 @@ public:
   Expr *parseExprAnonClosureArg();
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
 
+  // NOTE: used only for legacy support for old object literal syntax.
+  // Will be removed in the future.
+  bool isCollectionLiteralStartingWithLSquareLit();
+
   /// Parse an object literal.
   ///
   /// \param LK The literal kind as determined by the first token.
