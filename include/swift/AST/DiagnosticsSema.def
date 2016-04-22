@@ -1204,7 +1204,7 @@ NOTE(ambiguous_witnesses_type,none,
 NOTE(protocol_witness_exact_match,none,
      "candidate exactly matches%0", (StringRef))
 NOTE(protocol_witness_renamed,none,
-     "candidate matches (with renaming)%0", (StringRef))
+     "rename to %0 to satisfy this requirement%1", (DeclName, StringRef))
 NOTE(protocol_witness_kind_conflict,none,
      "candidate is not %select{an initializer|a function|a variable|"
      "a subscript}0", (RequirementKind))
@@ -1272,9 +1272,6 @@ NOTE(protocol_conformance_implied_here,none,
 WARNING(optional_req_near_match,none,
         "%0 %1 nearly matches optional requirement %2 of protocol %3",
         (DescriptiveDeclKind, DeclName, DeclName, DeclName))
-NOTE(optional_req_near_match_rename,none,
-     "rename to %0 to satisfy this requirement",
-     (DeclName))
 NOTE(optional_req_nonobjc_near_match_add_objc,none,
      "add '@objc' to provide an Objective-C entrypoint", ())
 NOTE(optional_req_nonobjc_to_objc,none,

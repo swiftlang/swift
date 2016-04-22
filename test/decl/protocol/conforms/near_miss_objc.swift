@@ -104,3 +104,18 @@ class C6a : P6 {
   // expected-note@-3{{move 'methodWithInt(_:forSomeClass:dividingDouble:)' to an extension to silence this warning}}
   // expected-note@-4{{make 'methodWithInt(_:forSomeClass:dividingDouble:)' private to silence this warning}}{{3-3=private }}
 }
+
+// Use the first note to always describe why it didn't match.
+@objc protocol P7 {
+  optional func method(foo: Float)
+  // expected-note@-1{{requirement 'method(foo:)' declared here}}
+}
+
+class C7a : P7 {
+  @objc func method(foo: Double) { }
+  // expected-warning@-1{{instance method 'method(foo:)' nearly matches optional requirement 'method(foo:)' of protocol 'P7'}}
+  // expected-note@-2{{candidate has non-matching type '(foo: Double) -> ()'}}
+  // expected-note@-3{{move 'method(foo:)' to an extension to silence this warning}}
+  // expected-note@-4{{make 'method(foo:)' private to silence this warning}}
+}
+

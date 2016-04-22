@@ -1708,9 +1708,18 @@ diagnoseMatch(TypeChecker &tc, Module *module,
                 withAssocTypes);
     break;
 
-  case MatchKind::RenamedMatch:
-    tc.diagnose(match.Witness, diag::protocol_witness_renamed, withAssocTypes);
+  case MatchKind::RenamedMatch: {
+    auto diag = tc.diagnose(match.Witness, diag::protocol_witness_renamed,
+                            req->getFullName(), withAssocTypes);
+
+    // Fix the name.
+    fixDeclarationName(diag, match.Witness, req->getFullName());
+
+    // Also fix the Objective-C name, if needed.
+    if (req->isObjC())
+      fixDeclarationObjCName(diag, match.Witness, req->getObjCRuntimeName());
     break;
+  }
 
   case MatchKind::KindConflict:
     tc.diagnose(match.Witness, diag::protocol_witness_kind_conflict,
@@ -4344,7 +4353,9 @@ static bool shouldWarnAboutPotentialWitness(ValueDecl *req,
 }
 
 /// Diagnose a potential witness.
-static void diagnosePotentialWitness(TypeChecker &tc, ValueDecl *req,
+static void diagnosePotentialWitness(TypeChecker &tc,
+                                     NormalProtocolConformance *conformance,
+                                     ValueDecl *req,
                                      ValueDecl *witness,
                                      Accessibility accessibility) {
   auto proto = cast<ProtocolDecl>(req->getDeclContext());
@@ -4356,20 +4367,18 @@ static void diagnosePotentialWitness(TypeChecker &tc, ValueDecl *req,
               req->getFullName(),
               proto->getFullName());
 
-  if (req->getFullName() != witness->getFullName()) {
-    // Note to fix the names.
-    auto diag = tc.diagnose(witness, diag::optional_req_near_match_rename,
-                            req->getFullName());
-    fixDeclarationName(diag, witness, req->getFullName());
-
-    // Also fix the Objective-C name, if needed.
-    if (req->isObjC())
-      fixDeclarationObjCName(diag, witness, req->getObjCRuntimeName());
-  } else if (req->isObjC() && !witness->isObjC()) {
-    // Note to add @objc.
+  // Describe why the witness didn't satisfy the requirement.
+  auto match = matchWitness(tc, conformance->getProtocol(), conformance,
+                            conformance->getDeclContext(), req, witness);
+  if (match.Kind == MatchKind::ExactMatch &&
+      req->isObjC() && !witness->isObjC()) {
+    // Special case: note to add @objc.
     auto diag = tc.diagnose(witness,
                             diag::optional_req_nonobjc_near_match_add_objc);
-    fixDeclarationObjCName(diag, witness, req->getObjCRuntimeName());    
+    fixDeclarationObjCName(diag, witness, req->getObjCRuntimeName());
+  } else {
+    diagnoseMatch(tc, conformance->getDeclContext()->getParentModule(),
+                  conformance, req, match);
   }
 
   // If moving the declaration can help, suggest that.
@@ -4559,7 +4568,18 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       // If we have something to complain about, do so.
       if (!bestOptionalReqs.empty()) {
         auto req = bestOptionalReqs[0];
-        diagnosePotentialWitness(*this, req, value, defaultAccessibility);
+        bool diagnosed = false;
+        for (auto conformance : conformances) {
+          if (conformance->getProtocol() == req->getDeclContext()) {
+            diagnosePotentialWitness(*this,
+                                     conformance->getRootNormalConformance(),
+                                     req, value, defaultAccessibility);
+            diagnosed = true;
+            break;
+          }
+        }
+        assert(diagnosed && "Failed to find conformance to diagnose?");
+        (void)diagnosed;
 
         // Remove this optional requirement from the list. We don't want to
         // complain about it twice.
