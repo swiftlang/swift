@@ -1039,33 +1039,52 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   }
 
   // Reinterpret arrow expr T1 -> T2 as function type.
-  // FIXME: support 'throws', 'inout', etc.
+  // FIXME: support 'inout', etc.
   if (auto *AE = dyn_cast<ArrowExpr>(E)) {
-    if (!AE->isFolded()) {
-      return nullptr;
-    }
-    TypeExpr *ArgsTypeExpr = dyn_cast<TypeExpr>(AE->getArgsExpr());
+    if (!AE->isFolded()) return nullptr;
     bool HadError = false;
-    if (!ArgsTypeExpr) {
+
+    TypeRepr *ArgsTypeRepr = nullptr;
+    if (auto TyE = dyn_cast<TypeExpr>(AE->getArgsExpr())) {
+      ArgsTypeRepr = TyE->getTypeRepr();
+    } else if (auto TE = dyn_cast<TupleExpr>(AE->getArgsExpr())) {
+      if (TE->getNumElements() == 0) {
+        ArgsTypeRepr = new (TC.Context) TupleTypeRepr({}, TE->getSourceRange(),
+            /*EllipsisLoc*/ SourceLoc(), /*EllipsisIdx*/ 0);
+      }
+    }
+    if (!ArgsTypeRepr) {
       TC.diagnose(AE->getArgsExpr()->getLoc(),
                   diag::expected_type_before_arrow);
       HadError = true;
     }
-    TypeExpr *ResultTypeExpr = dyn_cast<TypeExpr>(AE->getResultExpr());
-    if (!ResultTypeExpr && isa<ArrowExpr>(AE->getResultExpr())) {
+
+    TypeRepr *ResultTypeRepr = nullptr;
+    if (auto TyE = dyn_cast<TypeExpr>(AE->getResultExpr())) {
+      ResultTypeRepr = TyE->getTypeRepr();
+    } else if (auto TE = dyn_cast<TupleExpr>(AE->getResultExpr())) {
+      if (TE->getNumElements() == 0) {
+        ResultTypeRepr = new (TC.Context) TupleTypeRepr({},
+            TE->getSourceRange(), /*EllipsisLoc*/ SourceLoc(),
+            /*EllipsisIdx*/ 0);
+      }
+    } else if (isa<ArrowExpr>(AE->getResultExpr())) {
       // When simplifying a type expr like "Int -> Int -> Int" the RHS may have
       // been folded at the same time; recursively simplify it first if
       // necessary.
-      ResultTypeExpr = simplifyTypeExpr(AE->getResultExpr());
+      auto ResultTypeExpr = simplifyTypeExpr(AE->getResultExpr());
+      if (ResultTypeExpr) {
+        ResultTypeRepr = ResultTypeExpr->getTypeRepr();
+      }
     }
-    if (!ResultTypeExpr) {
+    if (!ResultTypeRepr) {
       TC.diagnose(AE->getResultExpr()->getLoc(),
                   diag::expected_type_after_arrow);
       HadError = true;
     }
+
     if (HadError) return nullptr;
-    TypeRepr *ArgsTypeRepr = ArgsTypeExpr->getTypeRepr();
-    TypeRepr *ResultTypeRepr = ResultTypeExpr->getTypeRepr();
+
     auto NewTypeRepr =
       new (TC.Context) FunctionTypeRepr(nullptr, ArgsTypeRepr,
                                         AE->getThrowsLoc(), AE->getArrowLoc(),

@@ -186,4 +186,12 @@ func testFunctionCollectionTypes() {
 
   _ = [1 -> Int]() // expected-error{{expected type before '->'}}
   _ = [Int -> 1]() // expected-error{{expected type after '->'}}
+
+  // Should parse () as void type when before or after arrow
+  _ = [() -> Int]()
+  _ = [Int -> ()]()
+
+  _ = [Int throws -> Int]()
+  _ = [Int -> throws Int]() // expected-error{{'throws' may only occur before '->'}}
+  _ = [Int throws Int]() // expected-error{{'throws' may only occur before '->'}}
 }
