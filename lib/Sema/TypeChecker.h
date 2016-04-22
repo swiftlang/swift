@@ -1848,6 +1848,12 @@ public:
   const StringRef Message;
 };
 
+/// Attempt to omit needless words from the name of the given declaration.
+Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
+
+/// Attempt to omit needless words from the name of the given declaration.
+Optional<Identifier> omitNeedlessWords(VarDecl *var);
+
 } // end namespace swift
 
 #endif

@@ -76,3 +76,31 @@ class C4a : P4 {
   // expected-note@-3{{move 'doSomethingWithPriority(_:d:)' to an extension to silence this warning}}
   // expected-note@-4{{make 'doSomethingWithPriority(_:d:)' private to silence this warning}}{{3-3=private }}
 }
+
+@objc class SomeClass { }
+
+@objc protocol P5 {
+  optional func methodWithInt(_: Int, forSomeClass: SomeClass, dividingDouble: Double)
+  // expected-note@-1{{requirement 'methodWithInt(_:forSomeClass:dividingDouble:)' declared here}}
+}
+
+class C5a : P5 {
+  func method(_: Int, for someClass: SomeClass, dividing double: Double) { }
+  // expected-warning@-1{{instance method 'method(_:for:dividing:)' nearly matches optional requirement 'methodWithInt(_:forSomeClass:dividingDouble:)' of protocol 'P5'}}
+  // expected-note@-2{{rename to 'methodWithInt(_:forSomeClass:dividingDouble:)' to satisfy this requirement}}{{3-3=@objc(methodWithInt:forSomeClass:dividingDouble:) }}{{8-14=methodWithInt}}{{23-26=forSomeClass}}{{49-57=dividingDouble}}
+  // expected-note@-3{{move 'method(_:for:dividing:)' to an extension to silence this warning}}
+  // expected-note@-4{{make 'method(_:for:dividing:)' private to silence this warning}}{{3-3=private }}
+}
+
+@objc protocol P6 {
+  optional func method(_: Int, for someClass: SomeClass, dividing double: Double)
+  // expected-note@-1{{requirement 'method(_:for:dividing:)' declared here}}
+}
+
+class C6a : P6 {
+  func methodWithInt(_: Int, forSomeClass: SomeClass, dividingDouble: Double) { }
+  // expected-warning@-1{{instance method 'methodWithInt(_:forSomeClass:dividingDouble:)' nearly matches optional requirement 'method(_:for:dividing:)' of protocol 'P6'}}
+  // expected-note@-2{{rename to 'method(_:for:dividing:)' to satisfy this requirement}}{{3-3=@objc(method:for:dividing:) }}{{8-21=method}}{{30-30=for }}{{55-55=dividing }}
+  // expected-note@-3{{move 'methodWithInt(_:forSomeClass:dividingDouble:)' to an extension to silence this warning}}
+  // expected-note@-4{{make 'methodWithInt(_:forSomeClass:dividingDouble:)' private to silence this warning}}{{3-3=private }}
+}

@@ -4188,6 +4188,34 @@ static unsigned scorePotentiallyMatchingNames(DeclName lhs, DeclName rhs,
   return score;
 }
 
+/// Apply omit-needless-words to the given declaration, if possible.
+static Optional<DeclName> omitNeedlessWords(ValueDecl *value) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
+    return swift::omitNeedlessWords(func);
+  if (auto var = dyn_cast<VarDecl>(value)) {
+    if (auto newName = swift::omitNeedlessWords(var))
+      return DeclName(*newName);
+    return None;
+  }
+  return None;
+}
+
+/// Determine the score between two potentially-matching declarations.
+static unsigned scorePotentiallyMatching(ValueDecl *req, ValueDecl *witness,
+                                         unsigned limit) {
+  DeclName reqName = req->getFullName();
+  DeclName witnessName = witness->getFullName();
+
+  // Apply the omit-needless-words heuristics to both names.
+  if (auto adjustedReqName = ::omitNeedlessWords(req))
+    reqName = *adjustedReqName;
+  if (auto adjustedWitnessName = ::omitNeedlessWords(witness))
+    witnessName = *adjustedWitnessName;
+
+  return scorePotentiallyMatchingNames(reqName, witnessName, isa<FuncDecl>(req),
+                                       limit);
+}
+
 namespace {
   /// Describes actions one could take to suppress a warning about a
   /// nearly-matching witness for an optional requirement.
@@ -4499,10 +4527,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       unsigned bestScore = UINT_MAX;
       for (auto req : unsatisfiedReqs) {
         // Score this particular optional requirement.
-        auto score = scorePotentiallyMatchingNames(value->getFullName(),
-                                                   req->getFullName(),
-                                                   isa<FuncDecl>(req),
-                                                   bestScore);
+        auto score = scorePotentiallyMatching(req, value, bestScore);
+
         // If the score is better than the best we've seen, update the best
         // and clear out the list.
         if (score < bestScore) {
