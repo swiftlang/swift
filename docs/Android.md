@@ -70,7 +70,8 @@ Alternatively, you may choose to build libiconv and libicu for Android yourself:
 ### 2. Building the Swift stdlib for Android
 
 Enter your Swift directory, then run the build script, passing paths to the
-Android NDK and libicu/libiconv directories:
+Android NDK, as well as the directories that contain the `libicuuc.so` and
+`libicui18n.so` you downloaded or built in step one:
 
 ```
 $ utils/build-script \
@@ -78,9 +79,9 @@ $ utils/build-script \
     --android \                         # Build for Android.
     --android-ndk ~/android-ndk-r11c \  # Path to an Android NDK.
     --android-api-level 21 \            # The Android API level to target. Swift only supports 21 or greater.
-    --android-icu-uc ~/libicu-android/armeabi-v7a/libicuuc.so \
+    --android-icu-uc ~/libicu-android/armeabi-v7a \
     --android-icu-uc-include ~/libicu-android/armeabi-v7a/icu/source/common \
-    --android-icu-i18n ~/libicu-android/armeabi-v7a/libicui18n.so \
+    --android-icu-i18n ~/libicu-android/armeabi-v7a \
     --android-icu-i18n-include ~/libicu-android/armeabi-v7a/icu/source/i18n/
 ```
 
