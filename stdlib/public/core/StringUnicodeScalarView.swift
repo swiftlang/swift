@@ -63,35 +63,6 @@ extension String {
         self._core = _core
       }
 
-      /// Returns the next consecutive value after `self`.
-      ///
-      /// - Precondition: The next value is representable.
-      @warn_unused_result
-      @inline(__always)
-      internal func successor() -> Index {
-        // FIXME: swift-3-indexing-model: remove `successor()`.
-        var scratch = _ScratchIterator(_core, _position)
-        var decoder = UTF16()
-        let (_, length) = decoder._decodeOne(&scratch)
-        return Index(_position + length, _core)
-      }
-
-      /// Returns the previous consecutive value before `self`.
-      ///
-      /// - Precondition: The previous value is representable.
-      @warn_unused_result
-      internal func predecessor() -> Index {
-        // FIXME: swift-3-indexing-model: remove `predecessor()`.
-        var i = _position-1
-        let codeUnit = _core[i]
-        if _slowPath((codeUnit >> 10) == 0b1101_11) {
-          if i != 0 && (_core[i - 1] >> 10) == 0b1101_10 {
-            i -= 1
-          }
-        }
-        return Index(i, _core)
-      }
-
       /// The end index that for this view.
       internal var _viewStartIndex: Index {
         return Index(_core.startIndex, _core)
@@ -121,18 +92,30 @@ extension String {
       return Index(_core.endIndex, _core)
     }
 
-    // TODO: swift-3-indexing-model - add docs
+    /// Returns the next consecutive location after `i`.
+    ///
+    /// - Precondition: The next location exists.
     @warn_unused_result
     public func location(after i: Index) -> Index {
-      // FIXME: swift-3-indexing-model: move `successor()` implementation here.
-      return i.successor()
+      var scratch = _ScratchIterator(_core, i._position)
+      var decoder = UTF16()
+      let (_, length) = decoder._decodeOne(&scratch)
+      return Index(i._position + length, _core)
     }
 
-    // TODO: swift-3-indexing-model - add docs
+    /// Returns the previous consecutive location before `i`.
+    ///
+    /// - Precondition: The previous location exists.
     @warn_unused_result
     public func location(before i: Index) -> Index {
-      // FIXME: swift-3-indexing-model: move `predecessor()` implementation here.
-      return i.predecessor()
+      var i = i._position-1
+      let codeUnit = _core[i]
+      if _slowPath((codeUnit >> 10) == 0b1101_11) {
+        if i != 0 && (_core[i - 1] >> 10) == 0b1101_10 {
+          i -= 1
+        }
+      }
+      return Index(i, _core)
     }
 
     /// Access the element at `position`.
@@ -411,7 +394,7 @@ extension String.UnicodeScalarIndex {
     if self == scalars.startIndex || self == scalars.endIndex {
       return true
     }
-    let precedingScalar = scalars[self.predecessor()]
+    let precedingScalar = scalars[scalars.location(before: self)]
 
     let graphemeClusterBreakProperty =
       _UnicodeGraphemeClusterBreakPropertyTrie()
