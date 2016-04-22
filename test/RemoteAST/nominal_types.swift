@@ -1,5 +1,7 @@
 // RUN: %target-swift-remoteast-test %s | FileCheck %s
 
+// XFAIL: linux
+
 @_silgen_name("printMetadataType")
 func printType(_: Any.Type)
 
