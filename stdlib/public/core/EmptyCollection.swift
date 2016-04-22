@@ -32,8 +32,7 @@ public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
 
 /// A collection whose element type is `Element` but that is always empty.
 public struct EmptyCollection<Element> :
-  RandomAccessCollection
-  // FIXME: swift-3-indexing-model - conform to MutableCollection as well
+  RandomAccessCollection, MutableCollection
 {
   /// A type that represents a valid position in the collection.
   ///
@@ -41,6 +40,7 @@ public struct EmptyCollection<Element> :
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Int
   public typealias IndexDistance = Int
+  public typealias SubSequence = EmptyCollection<Element>
 
   /// Construct an instance.
   public init() {}
@@ -87,7 +87,21 @@ public struct EmptyCollection<Element> :
   /// Should never be called, since this collection is always empty.
   public subscript(position: Index) -> Element {
     // TODO: swift-3-indexing-model: tests for traps.
-    _preconditionFailure("Index out of range")
+    get {
+      _preconditionFailure("Index out of range")
+    }
+    set {
+      _preconditionFailure("Index out of range")
+    }
+  }
+
+  public subscript(bounds: Range<Index>) -> EmptyCollection<Element> {
+    get {
+      _preconditionFailure("Index out of range")
+    }
+    set {
+      _preconditionFailure("Index out of range")
+    }
   }
 
   /// The number of elements (always zero).
@@ -124,6 +138,19 @@ public struct EmptyCollection<Element> :
     _precondition(start == 0, "From must be startIndex (or endIndex)")
     _precondition(end == 0, "To must be endIndex (or startIndex)")
     return 0
+  }
+
+  public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
+    _precondition(index == 0, "out of bounds")
+    _precondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
+      "invalid bounds for an empty collection")
+  }
+
+  public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
+    _precondition(range.lowerBound == 0 && range.upperBound == 0,
+      "invalid range for an empty collection")
+    _precondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
+      "invalid bounds for an empty collection")
   }
 
   // TODO: swift-3-indexing-model - fast fail any others from RandomAccessCollection (and up inheritance)?
