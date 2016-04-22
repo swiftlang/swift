@@ -528,15 +528,13 @@ function set_deployment_target_based_options() {
             )
             if [[ $(true_false "${LLVM_ENABLE_LTO}") = "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
-                    llvm_cmake_options=(
-                        "${llvm_cmake_options[@]}"
+                    llvm_cmake_options+=(
                         "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
                         "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
                     )
                 fi
 
-                llvm_cmake_options=(
-                    "${llvm_cmake_options[@]}"
+                llvm_cmake_options+=(
                     "-DCMAKE_C_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
                     "-DCMAKE_CXX_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
                     "-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
@@ -547,8 +545,7 @@ function set_deployment_target_based_options() {
 
             if [[ $(true_false "${SWIFT_ENABLE_LTO}") = "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
-                    swift_cmake_options=(
-                        "${swift_cmake_options[@]}"
+                    swift_cmake_options+=(
                         "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
                         "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
                     )
@@ -558,8 +555,7 @@ function set_deployment_target_based_options() {
                 )
             fi
 
-            swift_cmake_options=(
-                "${swift_cmake_options[@]}"
+            swift_cmake_options+=(
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_OSX="${DARWIN_DEPLOYMENT_VERSION_OSX}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS="${DARWIN_DEPLOYMENT_VERSION_IOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS="${DARWIN_DEPLOYMENT_VERSION_TVOS}"
