@@ -3,26 +3,53 @@
 @_silgen_name("printMetadataType")
 func printType(_: Any.Type)
 
-struct A {
-  struct Foo {}
-}
-printType(A.Foo.self)
-
 printType(Int.self)
 // CHECK: Int
 
-struct Foo {}
-printType(Foo.self)
-// CHECK: Foo
+struct A {}
+printType(A.self)
+// CHECK: A
 
-struct Bar {
+struct B {
   struct Foo {}
 }
-printType(Bar.Foo.self)
-// CHECK: Bar.Foo
+printType(B.Foo.self)
+// CHECK: B.Foo
 
-extension Bar {
-  struct Baz {}
+extension B {
+  struct Bar {}
 }
-printType(Bar.Baz.self)
-// CHECK: Bar.Baz
+printType(B.Bar.self)
+// CHECK: B.Bar
+
+class C {
+}
+printType(C.self)
+// CHECK: C
+
+class D : C {
+}
+printType(D.self)
+// CHECK: D
+
+class E {
+  struct Foo {}
+}
+printType(E.Foo.self)
+// CHECK: E.Foo
+
+struct F {
+  class Foo {}
+}
+printType(F.Foo.self)
+// CHECK: F.Foo
+
+enum G {
+  case Gwhatever
+
+  struct Foo {}
+}
+printType(G.self)
+// CHECK: G
+printType(G.Foo.self)
+// CHECK: G.Foo
