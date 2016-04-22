@@ -2556,23 +2556,16 @@ auto ClangImporter::Implementation::importFullName(
   // swift_newtype-ed declarations may have common words with the type name
   // stripped.
   if (auto newtypeDecl = findSwiftNewtype(D)) {
-    SmallString<32> newNameBuffer;
-    auto newtypeNameWords = camel_case::getWords(newtypeDecl->getName());
-    auto declNameWords = camel_case::getWords(baseName);
+    // Skip a leading 'k' in a 'kConstant' pattern
+    if (baseName.size() >= 2 && baseName[0] == 'k' &&
+        clang::isUppercase(baseName[1]))
+      baseName.drop_front(1);
 
-    // Scan the decl name, and drop any words that appear in order in the type
-    // name
-    for (auto wI = declNameWords.begin(), skipWI = newtypeNameWords.begin();
-         wI != declNameWords.end(); ++wI) {
-      if (skipWI != newtypeNameWords.end() && *wI == *skipWI) {
-        ++skipWI;
-        continue;
-      }
-      newNameBuffer.append(*wI);
-    }
-
-    if (newNameBuffer.str() != baseName) {
-      baseName = omitNeedlessWordsScratch.copyString(newNameBuffer);
+    bool nonIdentifier = false;
+    auto pre =
+        getCommonWordPrefix(newtypeDecl->getName(), baseName, nonIdentifier);
+    if (pre.size()) {
+      baseName = baseName.drop_front(pre.size());
       strippedPrefix = true;
     }
   }

@@ -11,7 +11,7 @@
 // PRINT-NEXT:    static let one: ErrorDomain
 // PRINT-NEXT:    static let errTwo: ErrorDomain
 // PRINT-NEXT:    static let three: ErrorDomain
-// PRINT-NEXT:    static let four: ErrorDomain
+// PRINT-NEXT:    static let fourErrorDomain: ErrorDomain
 // PRINT-NEXT:    static let stillAMember: ErrorDomain
 // PRINT-NEXT:  }
 // PRINT-NEXT:  struct Foo {
@@ -27,7 +27,7 @@
 // PRINT-NEXT:    let rawValue: NSString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension ClosedEnum {
-// PRINT-NEXT:    static let firstEntry: ClosedEnum
+// PRINT-NEXT:    static let firstClosedEntryEnum: ClosedEnum
 // PRINT-NEXT:    static let secondEntry: ClosedEnum
 // PRINT-NEXT:    static let thirdEntry: ClosedEnum
 // PRINT-NEXT:  }
