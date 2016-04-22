@@ -41,10 +41,6 @@ static StringRef getCoverageSection(IRGenModule &IGM) {
   return llvm::getInstrProfCoverageSectionName(isMachO(IGM));
 }
 
-static StringRef getProfNamesSection(IRGenModule &IGM) {
-  return llvm::getInstrProfNameSectionName(isMachO(IGM));
-}
-
 void IRGenModule::emitCoverageMapping() {
   const auto &Mappings = SILMod->getCoverageMapList();
   // If there aren't any coverage maps, there's nothing to emit.
@@ -78,6 +74,7 @@ void IRGenModule::emitCoverageMapping() {
   // Now we need to build up the list of function records.
   llvm::LLVMContext &Ctx = LLVMContext;
   auto *Int32Ty = llvm::Type::getInt32Ty(Ctx);
+  auto *Int8PtrTy = llvm::Type::getInt8PtrTy(Ctx);
 
   llvm::Type *FunctionRecordTypes[] = {
 #define COVMAP_FUNC_RECORD(Type, LLVMType, Name, Init) LLVMType,
@@ -89,6 +86,7 @@ void IRGenModule::emitCoverageMapping() {
       llvm::StructType::get(Ctx, llvm::makeArrayRef(FunctionRecordTypes),
                             /*isPacked=*/true);
 
+  std::vector<llvm::Constant *> FunctionNames;
   std::vector<llvm::Constant *> FunctionRecords;
   std::vector<CounterMappingRegion> Regions;
   for (const auto &M : Mappings) {
@@ -111,13 +109,7 @@ void IRGenModule::emitCoverageMapping() {
         M.getFile());
     llvm::GlobalVariable *NamePtr = llvm::createPGOFuncNameVar(
         *getModule(), llvm::GlobalValue::LinkOnceAnyLinkage, NameValue);
-
-    // The instr-profiling pass in llvm typically sets the function name ptr's
-    // section. We do it here because (1) SIL's int_instrprof_increment does not
-    // use this exact GlobalVariable, so llvm misses it and (2) we shouldn't
-    // expose all name ptrs to llvm via the getCoverageUnusedNamesVarName() API.
-    NamePtr->setSection(getProfNamesSection(*this));
-    NamePtr->setAlignment(1);
+    FunctionNames.push_back(llvm::ConstantExpr::getBitCast(NamePtr, Int8PtrTy));
 
     CurrentSize = OS.str().size();
     unsigned MappingLen = CurrentSize - PrevSize;
@@ -182,6 +174,13 @@ void IRGenModule::emitCoverageMapping() {
       CovDataVal, llvm::getCoverageMappingVarName());
   CovData->setSection(getCoverageSection(*this));
   CovData->setAlignment(8);
-
   addUsedGlobal(CovData);
+
+  if (!FunctionNames.empty()) {
+    auto *NamesArrTy = llvm::ArrayType::get(Int8PtrTy, FunctionNames.size());
+    auto *NamesArrVal = llvm::ConstantArray::get(NamesArrTy, FunctionNames);
+    new llvm::GlobalVariable(*getModule(), NamesArrTy, true,
+                             llvm::GlobalValue::InternalLinkage, NamesArrVal,
+                             llvm::getCoverageUnusedNamesVarName());
+  }
 }
