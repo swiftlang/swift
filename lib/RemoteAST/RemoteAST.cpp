@@ -301,7 +301,7 @@ private:
     }
 
     // We do have a parent type.  If the nominal type doesn't, it's an error.
-    if (parentDecl) {
+    if (!parentDecl) {
       return false;
     }
 
