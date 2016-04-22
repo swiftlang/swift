@@ -15,6 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+// FIXME(ABI): The character string view should have a custom iterator type to
+// allow performance optimizations of linear traversals.
+
 extension String {
   /// A `String`'s collection of `Character`s ([extended grapheme
   /// clusters](http://www.unicode.org/glossary/#extended_grapheme_cluster))
