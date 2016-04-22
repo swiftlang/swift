@@ -19,6 +19,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -4109,23 +4110,39 @@ void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
 
 /// Determine the score when trying to match two identifiers together.
 static unsigned scoreIdentifiers(Identifier lhs, Identifier rhs,
-                                 unsigned limit, bool isFirstParamOfFunc) {
+                                 unsigned limit) {
   // Simple case: we have the same identifier.
   if (lhs == rhs) return 0;
 
-  // One of the identifiers is empty.
-  if (lhs.empty() != rhs.empty()) {
-    // Attribute a score of "1" when the first argument of a function is
-    // present in one case but absent in the other, because this was a change
-    // from Swift 2 to Swift 3.
-    if (isFirstParamOfFunc) return 1;
-
-    // Otherwise, use the length of the non-empty identifier.
+  // One of the identifiers is empty. Use the length of the non-empty
+  // identifier.
+  if (lhs.empty() != rhs.empty())
     return lhs.empty() ? rhs.str().size() : lhs.str().size();
-  }
 
   // Compute the edit distance between the two names.
   return lhs.str().edit_distance(rhs.str(), true, limit);
+}
+
+/// Combine the given base name and first argument label into a single
+/// name.
+static StringRef
+combineBaseNameAndFirstArgument(Identifier baseName,
+                                Identifier firstArgName,
+                                SmallVectorImpl<char> &scratch) {
+  // Handle cases where one or the other name is empty.
+  if (baseName.empty()) {
+    if (firstArgName.empty()) return "";
+    return firstArgName.str();
+  }
+
+  if (firstArgName.empty())
+    return baseName.str();
+
+  // Append the first argument name to the base name.
+  scratch.clear();
+  scratch.append(baseName.str().begin(), baseName.str().end());
+  camel_case::appendSentenceCase(scratch, firstArgName.str());
+  return StringRef(scratch.data(), scratch.size());
 }
 
 /// Compute the scope between two potentially-matching names, which is
@@ -4138,17 +4155,33 @@ static unsigned scorePotentiallyMatchingNames(DeclName lhs, DeclName rhs,
   if (lhs.getArgumentNames().size() != rhs.getArgumentNames().size())
     return limit;
 
-  // Score the base name match.
-  unsigned score = scoreIdentifiers(lhs.getBaseName(), rhs.getBaseName(),
-                                    limit, false);
+  // Score the base name match. If there is a first argument for a
+  // function, include its text along with the base name's text.
+  unsigned score;
+  if (lhs.getArgumentNames().empty() || !isFunc) {
+    score = scoreIdentifiers(lhs.getBaseName(), rhs.getBaseName(), limit);
+  } else {
+    llvm::SmallString<16> lhsScratch;
+    StringRef lhsFirstName =
+      combineBaseNameAndFirstArgument(lhs.getBaseName(),
+                                      lhs.getArgumentNames()[0],
+                                      lhsScratch);
+
+    llvm::SmallString<16> rhsScratch;
+    StringRef rhsFirstName =
+      combineBaseNameAndFirstArgument(rhs.getBaseName(),
+                                      rhs.getArgumentNames()[0],
+                                      rhsScratch);
+
+    score = lhsFirstName.edit_distance(rhsFirstName.str(), true, limit);
+  }
   if (score >= limit) return limit;
 
   // Compute the edit distance between matching argument names.
-  for (unsigned i = 0; i != lhs.getArgumentNames().size(); ++i) {
+  for (unsigned i = isFunc ? 1 : 0; i < lhs.getArgumentNames().size(); ++i) {
     score += scoreIdentifiers(lhs.getArgumentNames()[i],
                               rhs.getArgumentNames()[i],
-                              limit - score,
-                              isFunc && i == 0);
+                              limit - score);
     if (score >= limit) return limit;
   }
 
@@ -4270,15 +4303,14 @@ static bool shouldWarnAboutPotentialWitness(ValueDecl *req,
       if (!attr->isImplicit()) return false;
   }
 
-  // If the score is relatively high, don't warn: this is probably unrelated.
-  // The heuristic we use here is to ignore outright omissions and determine
-  // whether there was more than one typo for every two characters. If so,
-  // consider it "different".
+  // If the score is relatively high, don't warn: this is probably
+  // unrelated.  Allow about one typo for every two properly-typed
+  // characters, which prevents completely-wacky suggestions in many
+  // cases.
   unsigned reqNameLen = getNameLength(req->getFullName());
   unsigned witnessNameLen = getNameLength(witness->getFullName());
-  unsigned lengthDiff =
-    std::max(reqNameLen, witnessNameLen) - std::min(reqNameLen, witnessNameLen);
-  if ((score - lengthDiff) > (witnessNameLen + 1) / 3) return false;
+  if (score > (std::min(reqNameLen, witnessNameLen) + 1) / 3)
+    return false;
 
   return true;
 }
@@ -4380,8 +4412,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
                                                /*sorted=*/true);
   // Catalog all of members of this declaration context that satisfy
   // requirements of conformances in this context.
-  llvm::MapVector<DeclName, llvm::TinyPtrVector<ValueDecl *>>
-    unsatisfiedReqs;
+  SmallVector<ValueDecl *, 16> unsatisfiedReqs;
 
   bool anyInvalid = false;
   for (auto conformance : conformances) {
@@ -4405,7 +4436,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         // If the requirement is unsatisfied, we might want to warn
         // about near misses; record it.
         if (isUnsatisfiedReq(normal, req)) {
-          unsatisfiedReqs[req->getBaseName()].push_back(req);
+          unsatisfiedReqs.push_back(req);
           continue;
         }
       }
@@ -4462,16 +4493,11 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       if (knownWitnesses.count(value) > 0) continue;
       if (!value->getFullName()) continue;
 
-      // Consider any unsatisfied requirements with the same base
-      // name.
-      auto reqs = unsatisfiedReqs.find(value->getBaseName());
-      if (reqs == unsatisfiedReqs.end()) continue;
-
       // Find the unsatisfied requirements with the nearest-matching
       // names.
       SmallVector<ValueDecl *, 4> bestOptionalReqs;
       unsigned bestScore = UINT_MAX;
-      for (auto req : reqs->second) {
+      for (auto req : unsatisfiedReqs) {
         // Score this particular optional requirement.
         auto score = scorePotentiallyMatchingNames(value->getFullName(),
                                                    req->getFullName(),
@@ -4511,37 +4537,31 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
         // Remove this optional requirement from the list. We don't want to
         // complain about it twice.
-        if (reqs->second.size() == 1) {
-          unsatisfiedReqs.erase(reqs);
-        } else {
-          reqs->second.erase(std::find(reqs->second.begin(),
-                                       reqs->second.end(),
-                                       req));
-        }
+        unsatisfiedReqs.erase(std::find(unsatisfiedReqs.begin(),
+                                        unsatisfiedReqs.end(),
+                                        req));
       }
     }
 
     // For any unsatified optional @objc requirements that remain
     // unsatisfied, note them in the AST for @objc selector collision
     // checking.
-    for (const auto &unsatisfied : unsatisfiedReqs) {
-      for (auto req : unsatisfied.second) {
-        // Skip non-@objc requirements.
-        if (!req->isObjC()) continue;
+    for (auto req : unsatisfiedReqs) {
+      // Skip non-@objc requirements.
+      if (!req->isObjC()) continue;
 
-        // Skip unavailable requirements.
-        if (req->getAttrs().isUnavailable(Context)) continue;
+      // Skip unavailable requirements.
+      if (req->getAttrs().isUnavailable(Context)) continue;
 
-        // Record this requirement.
-        if (auto funcReq = dyn_cast<AbstractFunctionDecl>(req)) {
-          Context.recordObjCUnsatisfiedOptReq(dc, funcReq);
-        } else {
-          auto storageReq = cast<AbstractStorageDecl>(req);
-          if (auto getter = storageReq->getGetter())
-            Context.recordObjCUnsatisfiedOptReq(dc, getter);
-          if (auto setter = storageReq->getSetter())
-            Context.recordObjCUnsatisfiedOptReq(dc, setter);
-        }
+      // Record this requirement.
+      if (auto funcReq = dyn_cast<AbstractFunctionDecl>(req)) {
+        Context.recordObjCUnsatisfiedOptReq(dc, funcReq);
+      } else {
+        auto storageReq = cast<AbstractStorageDecl>(req);
+        if (auto getter = storageReq->getGetter())
+          Context.recordObjCUnsatisfiedOptReq(dc, getter);
+        if (auto setter = storageReq->getSetter())
+          Context.recordObjCUnsatisfiedOptReq(dc, setter);
       }
     }
   }

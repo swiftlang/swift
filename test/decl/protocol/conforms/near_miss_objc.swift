@@ -41,8 +41,8 @@ class C1e : P1 {
   @nonobjc func doSomething(a: Int, c: Double) { } // don't warn
 }
 
-// Don't try to match an
-
+// Don't try to match an optional requirement against a declaration
+// that already satisfies one witness.
 @objc protocol P2 {
   optional func doSomething(a: Int, b: Double)
   optional func doSomething(a: Int, d: Double)
@@ -52,3 +52,27 @@ class C2a : P2 {
   @objc func doSomething(a: Int, b: Double) { } // don't warn: this matches something
 }
 
+// Cope with base names that change.
+@objc protocol P3 {
+  optional func doSomethingWithPriority(_ a: Int, d: Double) // expected-note{{requirement 'doSomethingWithPriority(_:d:)' declared here}}
+}
+
+class C3a : P3 {
+  func doSomething(priority: Int, d: Double) { }
+  // expected-warning@-1{{instance method 'doSomething(priority:d:)' nearly matches optional requirement 'doSomethingWithPriority(_:d:)' of protocol 'P3'}}
+  // expected-note@-2{{rename to 'doSomethingWithPriority(_:d:)' to satisfy this requirement}}{{20-20=_ }}
+  // expected-note@-3{{move 'doSomething(priority:d:)' to an extension to silence this warning}}
+  // expected-note@-4{{make 'doSomething(priority:d:)' private to silence this warning}}{{3-3=private }}
+}
+
+@objc protocol P4 {
+  optional func doSomething(priority: Int, d: Double) // expected-note{{requirement 'doSomething(priority:d:)' declared here}}
+}
+
+class C4a : P4 {
+  func doSomethingWithPriority(_ a: Int, d: Double) { }
+  // expected-warning@-1{{instance method 'doSomethingWithPriority(_:d:)' nearly matches optional requirement 'doSomething(priority:d:)' of protocol 'P4'}}
+  // expected-note@-2{{rename to 'doSomething(priority:d:)' to satisfy this requirement}}{{32-33=priority}}
+  // expected-note@-3{{move 'doSomethingWithPriority(_:d:)' to an extension to silence this warning}}
+  // expected-note@-4{{make 'doSomethingWithPriority(_:d:)' private to silence this warning}}{{3-3=private }}
+}
