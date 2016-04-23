@@ -43,24 +43,22 @@ struct DistanceFromToTest {
   }
 }
 
-struct IndexStepsFromTest {
+public struct IndexStepsFromTest {
   let startOffset: Int
   let distance: Int
   let limit: Int?
-  
-  var expectedOffset: Int? {
-    let fullOffset = startOffset + distance
-    return limit != nil && fullOffset > limit! ? nil : fullOffset
-  }
+  let expectedOffset: Int?
   
   let loc: SourceLoc
+
   init(
-    startOffset: Int, distance: Int,
+    startOffset: Int, distance: Int, expectedOffset: Int?,
     limitedBy limit: Int? = nil,
     file: String = #file, line: UInt = #line
   ) {
     self.startOffset = startOffset
     self.distance = distance
+    self.expectedOffset = expectedOffset
     self.limit = limit
     self.loc = SourceLoc(file, line, comment: "location(_:offsetBy:) test data")
   }
@@ -74,15 +72,30 @@ let distanceFromToTests = [
 ]
 
 let indexStepsFromTests = [
-  IndexStepsFromTest(startOffset: 0, distance: 0),
-  IndexStepsFromTest(startOffset: 0, distance: -1),
-  IndexStepsFromTest(startOffset: 0, distance: 0, limitedBy: 0),
-  IndexStepsFromTest(startOffset: 0, distance: 0, limitedBy: 10),
-  IndexStepsFromTest(startOffset: 0, distance: 10, limitedBy: 0),
-  IndexStepsFromTest(startOffset: 0, distance: -10, limitedBy: 0),
-  IndexStepsFromTest(startOffset: 0, distance: 10, limitedBy: 10),
-  IndexStepsFromTest(startOffset: 0, distance: 20, limitedBy: 10),
-  IndexStepsFromTest(startOffset: 10, distance: -20, limitedBy: 0),
+  IndexStepsFromTest(startOffset: 0, distance: 0, expectedOffset: 0),
+  IndexStepsFromTest(startOffset: 0, distance: -1, expectedOffset: -1),
+  IndexStepsFromTest(
+    startOffset: 0, distance: 0, expectedOffset: 0, limitedBy: 0),
+  IndexStepsFromTest(
+    startOffset: 0, distance: 0, expectedOffset: 0, limitedBy: 10),
+  IndexStepsFromTest(
+    startOffset: 0, distance: 10, expectedOffset: nil, limitedBy: 0),
+  IndexStepsFromTest(
+    startOffset: 0, distance: -10, expectedOffset: nil, limitedBy: 0),
+  IndexStepsFromTest(
+    startOffset: 0, distance: 10, expectedOffset: 10, limitedBy: 10),
+  IndexStepsFromTest(
+    startOffset: 0, distance: 20, expectedOffset: nil, limitedBy: 10),
+  IndexStepsFromTest(
+    startOffset: 10, distance: -20, expectedOffset: nil, limitedBy: 0),
+  IndexStepsFromTest(
+    startOffset: 5, distance: 5, expectedOffset: 10, limitedBy: 2),
+  IndexStepsFromTest(
+    startOffset: 5, distance: 5, expectedOffset: nil, limitedBy: 5),
+  IndexStepsFromTest(
+    startOffset: 5, distance: -5, expectedOffset: 0, limitedBy: 7),
+  IndexStepsFromTest(
+    startOffset: 5, distance: -5, expectedOffset: nil, limitedBy: 5)
 ]
 
 var Index = TestSuite("Index")
