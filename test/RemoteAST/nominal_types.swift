@@ -59,3 +59,12 @@ printType(H<A,A>.self)
 // CHECK: H<A, A>
 printType(H<B.Foo, H<B, A>>.self)
 // CHECK: H<B.Foo, H<B, A>>
+
+class I<T> {}
+printType(I<Int>.self)
+// CHECK: I<Int>
+
+// None of these are currently permitted by Sema.
+// TODO: non-generic types nested in generic types
+// TODO: generic types nested in generic types
+// TODO: generic types nested in non-generic types
