@@ -31,3 +31,23 @@
 // PRINT-NEXT:    static let secondEntry: ClosedEnum
 // PRINT-NEXT:    static let thirdEntry: ClosedEnum
 // PRINT-NEXT:  }
+
+// RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules
+import Newtype
+
+func tests() {
+	let errOne = ErrorDomain.one
+	errOne.process()
+
+	let fooErr = Foo.err
+	fooErr.process()
+	Foo().process() // expected-error{{value of type 'Foo' has no member 'process'}}
+
+	let thirdEnum = ClosedEnum.thirdEntry
+	thirdEnum.process()
+	  // expected-error@-1{{value of type 'ClosedEnum' has no member 'process'}}
+
+	let _ = ErrorDomain(rawValue: thirdEnum.rawValue)
+	let _ = ClosedEnum(rawValue: errOne.rawValue)
+
+}
