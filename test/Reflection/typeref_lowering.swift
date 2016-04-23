@@ -2,10 +2,11 @@
 // RUN: %target-build-swift %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -Xfrontend -enable-reflection-metadata -Xfrontend -enable-reflection-names -o %t/libTypesToReflect
 // RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect -binary-filename %platform-module-dir/libswiftCore.dylib -dump-type-lowering < %s | FileCheck %s
 
-// REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
 
 V12TypeLowering11BasicStruct
 // CHECK:      (struct TypeLowering.BasicStruct)
+
 // CHECK-NEXT: (struct size=16 alignment=4 stride=16 num_extra_inhabitants=0
 // CHECK-NEXT:   (field name=i1 offset=0
 // CHECK-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
@@ -37,6 +38,7 @@ V12TypeLowering11BasicStruct
 // CHECK-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // CHECK-NEXT:           (field offset=0
 // CHECK-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0)))))))
+
 
 V12TypeLowering15AssocTypeStruct
 // CHECK:      (struct TypeLowering.AssocTypeStruct)
@@ -87,3 +89,33 @@ TGV12TypeLowering3BoxVs5Int16_Vs5Int32_
 // CHECK-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // CHECK-NEXT:       (field offset=0
 // CHECK-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0)))))
+
+V12TypeLowering15ReferenceStruct
+// CHECK:      (struct TypeLowering.ReferenceStruct)
+
+// CHECK-NEXT: (struct size=40 alignment=8 stride=40 num_extra_inhabitants=0
+// CHECK-NEXT:   (field name=strongRef offset=0
+// CHECK-NEXT:     (reference kind=strong refcounting=native))
+// CHECK-NEXT:   (field name=strongOptionalRef offset=8
+// CHECK-NEXT:     (reference kind=strong refcounting=native))
+// CHECK-NEXT:   (field name=unownedRef offset=16
+// CHECK-NEXT:     (reference kind=unowned refcounting=native))
+// CHECK-NEXT:   (field name=weakRef offset=24
+// CHECK-NEXT:     (reference kind=weak refcounting=native))
+// CHECK-NEXT:   (field name=unmanagedRef offset=32
+// CHECK-NEXT:     (reference kind=unmanaged refcounting=native)))
+
+V12TypeLowering14FunctionStruct
+// CHECK:      (struct TypeLowering.FunctionStruct)
+
+// CHECK-NEXT: (struct size=32 alignment=8 stride=32 num_extra_inhabitants=0
+// CHECK-NEXT:   (field name=thickFunction offset=0
+// CHECK-NEXT:     (thick_function size=16 alignment=8 stride=16 num_extra_inhabitants=0
+// CHECK-NEXT:       (field name=function offset=0
+// CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
+// CHECK-NEXT:       (field name=context offset=8
+// CHECK-NEXT:         (reference kind=strong refcounting=native))))
+// CHECK-NEXT:   (field name=thinFunction offset=16
+// CHECK-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
+// CHECK-NEXT:   (field name=cFunction offset=24
+// CHECK-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1)))
