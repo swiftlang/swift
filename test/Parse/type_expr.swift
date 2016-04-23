@@ -194,4 +194,8 @@ func testFunctionCollectionTypes() {
   _ = [Int throws -> Int]()
   _ = [Int -> throws Int]() // expected-error{{'throws' may only occur before '->'}}
   _ = [Int throws Int]() // expected-error{{'throws' may only occur before '->'}}
+
+  let _ = Int -> Int // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments after the type to construct a value of the type}} expected-note{{use '.self' to reference the type object}}
+  let _ = 2 + () -> Int // expected-error{{expected type before '->'}}
+  let _ = () -> (Int, Int).2 // expected-error{{expected type after '->'}}
 }
