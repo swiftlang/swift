@@ -87,6 +87,14 @@ aFunction: (TypesToReflect.C, TypesToReflect.S, TypesToReflect.E, Swift.Int) -> 
   (struct Swift.Int)
   (struct Swift.Int))
 
+aFunctionWithThinRepresentation: @convention(thin) () -> ()
+(function convention=thin
+  (tuple))
+
+aFunctionWithCRepresentation: @convention(c) () -> ()
+(function convention=c
+  (tuple))
+
 TypesToReflect.E
 ----------------
 Class: TypesToReflect.C

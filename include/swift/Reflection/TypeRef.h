@@ -20,6 +20,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Casting.h"
+#include "swift/ABI/MetadataValues.h"
 
 #include <iostream>
 
@@ -187,16 +188,20 @@ public:
 class FunctionTypeRef final : public TypeRef {
   std::vector<const TypeRef *> Arguments;
   const TypeRef *Result;
+  FunctionTypeFlags Flags;
 
 public:
-  FunctionTypeRef(std::vector<const TypeRef *> Arguments, const TypeRef *Result)
-    : TypeRef(TypeRefKind::Function), Arguments(Arguments), Result(Result) {}
+  FunctionTypeRef(std::vector<const TypeRef *> Arguments, const TypeRef *Result,
+                  FunctionTypeFlags Flags)
+    : TypeRef(TypeRefKind::Function), Arguments(Arguments), Result(Result),
+      Flags(Flags) {}
 
   template <typename Allocator>
   static FunctionTypeRef *create(Allocator &A,
                                  std::vector<const TypeRef *> Arguments,
-                                 const TypeRef *Result) {
-    return A.template makeTypeRef<FunctionTypeRef>(Arguments, Result);
+                                 const TypeRef *Result,
+                                 FunctionTypeFlags Flags) {
+    return A.template makeTypeRef<FunctionTypeRef>(Arguments, Result, Flags);
   }
 
   const std::vector<const TypeRef *> &getArguments() const {
@@ -205,6 +210,10 @@ public:
 
   const TypeRef *getResult() const {
     return Result;
+  }
+
+  FunctionTypeFlags getFlags() const {
+    return Flags;
   }
 
   static bool classof(const TypeRef *TR) {

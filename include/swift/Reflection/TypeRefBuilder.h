@@ -148,8 +148,7 @@ public:
                      const TypeRef *result,
                      FunctionTypeFlags flags) {
     // FIXME: don't ignore inOutArgs
-    // FIXME: don't ignore flags
-    return FunctionTypeRef::create(*this, args, result);
+    return FunctionTypeRef::create(*this, args, result, flags);
   }
 
   const ProtocolTypeRef *createProtocolType(const std::string &moduleName,
