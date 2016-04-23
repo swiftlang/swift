@@ -452,9 +452,8 @@ enum class FunctionMetadataConvention: uint8_t {
 };
 
 /// Flags in a function type metadata record.
-template <typename Runtime>
+template <typename int_type>
 class TargetFunctionTypeFlags {
-  using int_type = typename Runtime::StoredSize;
   enum : int_type {
     NumArgumentsMask = 0x00FFFFFFU,
     ConventionMask   = 0x0F000000U,
@@ -471,16 +470,16 @@ public:
     return TargetFunctionTypeFlags((Data & ~NumArgumentsMask) | numArguments);
   }
   
-  constexpr TargetFunctionTypeFlags<Runtime>
+  constexpr TargetFunctionTypeFlags<int_type>
   withConvention(FunctionMetadataConvention c) const {
     return TargetFunctionTypeFlags((Data & ~ConventionMask)
                              | (int_type(c) << ConventionShift));
   }
   
-  constexpr TargetFunctionTypeFlags<Runtime>
+  constexpr TargetFunctionTypeFlags<int_type>
   withThrows(bool throws) const {
-    return TargetFunctionTypeFlags<Runtime>((Data & ~ThrowsMask) |
-                                            (throws ? ThrowsMask : 0));
+    return TargetFunctionTypeFlags<int_type>((Data & ~ThrowsMask) |
+                                             (throws ? ThrowsMask : 0));
   }
   
   unsigned getNumArguments() const {
@@ -499,18 +498,18 @@ public:
     return Data;
   }
   
-  static TargetFunctionTypeFlags<Runtime> fromIntValue(int_type Data) {
+  static TargetFunctionTypeFlags<int_type> fromIntValue(int_type Data) {
     return TargetFunctionTypeFlags(Data);
   }
   
-  bool operator==(TargetFunctionTypeFlags<Runtime> other) const {
+  bool operator==(TargetFunctionTypeFlags<int_type> other) const {
     return Data == other.Data;
   }
-  bool operator!=(TargetFunctionTypeFlags<Runtime> other) const {
+  bool operator!=(TargetFunctionTypeFlags<int_type> other) const {
     return Data != other.Data;
   }
 };
-using FunctionTypeFlags = TargetFunctionTypeFlags<InProcess>;
+using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 
 /// Field types and flags as represented in a nominal type's field/case type
 /// vector.

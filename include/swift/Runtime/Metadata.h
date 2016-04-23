@@ -2046,7 +2046,7 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   // TODO: Make this target agnostic
   using Argument = FlaggedPointer<const TargetMetadata<Runtime> *, 0>;
 
-  TargetFunctionTypeFlags<Runtime> Flags;
+  TargetFunctionTypeFlags<StoredSize> Flags;
 
   /// The type metadata for the result type.
   ConstTargetMetadataPointer<Runtime, TargetMetadata> ResultType;
