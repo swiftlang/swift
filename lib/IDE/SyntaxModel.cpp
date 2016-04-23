@@ -84,10 +84,6 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       Length = Tok.getLength();
 
       if (LiteralStartLoc.hasValue() && Length.hasValue()) {
-        // We are still inside an object literal until we hit a r_square.
-        if (Tok.getKind() != tok::r_square) {
-          continue;
-        }
         Kind = SyntaxNodeKind::ObjectLiteral;
         Nodes.emplace_back(Kind, CharSourceRange(SM, LiteralStartLoc.getValue(),
           Tok.getRange().getEnd()));
