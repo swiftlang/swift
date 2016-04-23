@@ -223,6 +223,7 @@ private:
 public:
   llvm::Value *emitUnmanagedAlloc(const HeapLayout &layout,
                                   const llvm::Twine &name,
+                                  llvm::Constant *captureDescriptor,
                                   const HeapNonFixedOffsets *offsets = 0);
 
   // Functions that don't care about the reference-counting style.

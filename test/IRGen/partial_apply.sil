@@ -496,7 +496,7 @@ sil public_external @receive_closure : $@convention(thin) <C where C : Base> (@o
 // CHECK-LABEL: define{{( protected)?}} void @test_partial_apply(%C13partial_apply4Base*)
 // CHECK:  [[CTX:%.*]] = bitcast %C13partial_apply4Base* %0 to %swift.refcounted*
 // CHECK:  [[TYPE:%.*]] = call %swift.type* @_TMaC13partial_apply3Sub()
-// CHECK:  call void @receive_closure(i8* bitcast (%C13partial_apply3Sub* (%swift.refcounted*)* @_TPA_parametric_casting_closure.28 to i8*), %swift.refcounted* [[CTX]], %swift.type* [[TYPE]])
+// CHECK:  call void @receive_closure(i8* bitcast (%C13partial_apply3Sub* (%swift.refcounted*)* @_TPA_parametric_casting_closure.{{[0-9]+}} to i8*), %swift.refcounted* [[CTX]], %swift.type* [[TYPE]])
 
 // CHECK-LABEL: define internal %C13partial_apply3Sub* @_TPA_parametric_casting_closure(%C13partial_apply4Base*, %swift.refcounted*)
 // CHECK: [[RES:%.*]] = tail call %C13partial_apply4Base* @parametric_casting_closure
@@ -504,7 +504,7 @@ sil public_external @receive_closure : $@convention(thin) <C where C : Base> (@o
 // CHECK: ret %C13partial_apply3Sub* [[CASTED]]
 
 
-// CHECK-LABEL: define internal %C13partial_apply3Sub* @_TPA_parametric_casting_closure.28(%swift.refcounted*)
+// CHECK-LABEL: define internal %C13partial_apply3Sub* @_TPA_parametric_casting_closure.{{[0-9]+}}(%swift.refcounted*)
 // CHECK:  [[TYPE:%.*]] = call %swift.type* @_TMaC13partial_apply3Sub()
 // CHECK:  [[CTX:%.*]] = bitcast %swift.refcounted* %0 to %C13partial_apply4Base*
 // CHECK:  [[CALL:%.*]] = tail call %C13partial_apply4Base* @parametric_casting_closure(%C13partial_apply4Base* [[CTX]], %swift.type* [[TYPE]])

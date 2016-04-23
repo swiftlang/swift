@@ -12,6 +12,8 @@
 
 #include "swift/Reflection/MetadataSource.h"
 
+#include <sstream>
+
 using namespace swift;
 using namespace reflection;
 
@@ -71,10 +73,35 @@ public:
   }
 
   void
+  visitMetadataCaptureMetadataSource(const MetadataCaptureMetadataSource *MC){
+    printHeader("metadata-capture");
+    printField("index", MC->getIndex());
+    closeForm();
+  }
+
+  void
   visitGenericArgumentMetadataSource(const GenericArgumentMetadataSource *GA) {
     printHeader("generic-argument");
     printField("index", GA->getIndex());
     printRec(GA->getSource());
+    closeForm();
+  }
+
+  void
+  visitParentMetadataSource(const ParentMetadataSource *P) {
+    printHeader("parent-of");
+    printRec(P->getChild());
+    closeForm();
+  }
+
+  void visitSelfMetadataSource(const SelfMetadataSource *S) {
+    printHeader("self");
+    closeForm();
+  }
+
+  void
+  visitSelfWitnessTableMetadataSource(const SelfWitnessTableMetadataSource *W) {
+    printHeader("self-witness-table");
     closeForm();
   }
 };
@@ -85,5 +112,5 @@ void MetadataSource::dump() const {
 
 void MetadataSource::dump(std::ostream &OS, unsigned Indent) const {
   PrintMetadataSource(OS, Indent).visit(this);
+  OS << std::endl;
 }
-
