@@ -15,7 +15,7 @@ add_swift_library(swiftStdlibCollectionUnittest SHARED IS_STDLIB
   StdlibCollectionUnittest.swift
 
   CheckCollectionInstance.swift.gyb
-  CheckCollectionType.swift
+  CheckCollectionType.swift.gyb
   CheckMutableCollectionType.swift.gyb
   CheckRangeReplaceableCollectionType.swift
   CheckRangeReplaceableSliceType.swift

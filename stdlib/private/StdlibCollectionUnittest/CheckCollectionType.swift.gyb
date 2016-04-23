@@ -444,22 +444,26 @@ internal func _product<C1 : Collection, C2 : Collection>(
   return result
 }
 
-extension TestSuite {
-  public func addCollectionTests<
-    C : Collection,
-    CollectionWithEquatableElement : Collection
-    where
-    C.SubSequence : Collection,
+%{
+  from gyb_stdlib_support import collectionForTraversal
+  def testConstraints(protocol):
+    return '''    
+    C : %(protocol)s,
+    CollectionWithEquatableElement : %(protocol)s
+  where
+    C.SubSequence : %(protocol)s,
     C.SubSequence.Iterator.Element == C.Iterator.Element,
     C.SubSequence.Index == C.Index,
     C.SubSequence.Indices.Iterator.Element == C.Index,
     C.SubSequence.SubSequence == C.SubSequence,
-    C.Indices : Collection,
+    C.Indices : %(protocol)s,
     C.Indices.Iterator.Element == C.Index,
     C.Indices.Index == C.Index,
     C.Indices.SubSequence == C.Indices,
     CollectionWithEquatableElement.Iterator.Element : Equatable
-  >(
+  ''' % locals()
+
+  testParams = '''
     _ testNamePrefix: String = "",
     makeCollection: ([C.Iterator.Element]) -> C,
     wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
@@ -479,7 +483,12 @@ extension TestSuite {
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
     outOfBoundsSubscriptOffset: Int = 1
-  ) {
+  '''
+}% 
+extension TestSuite {
+  public func addCollectionTests<
+    ${testConstraints('Collection')}
+  >(${testParams}) {
     var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(#function) {
@@ -1145,40 +1154,8 @@ extension TestSuite {
   } // addCollectionTests
 
   public func addBidirectionalCollectionTests<
-    C : BidirectionalCollection,
-    CollectionWithEquatableElement : BidirectionalCollection
-    where
-    C.SubSequence : BidirectionalCollection,
-    C.SubSequence.Iterator.Element == C.Iterator.Element,
-    C.SubSequence.Index == C.Index,
-    C.SubSequence.Indices.Iterator.Element == C.Index,
-    C.SubSequence.SubSequence == C.SubSequence,
-    C.Indices : BidirectionalCollection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices,
-    CollectionWithEquatableElement.Iterator.Element : Equatable
-  >(
-    _ testNamePrefix: String = "",
-    makeCollection: ([C.Iterator.Element]) -> C,
-    wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
-    extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
-
-    makeCollectionOfEquatable: (
-      [CollectionWithEquatableElement.Iterator.Element]
-    ) -> CollectionWithEquatableElement,
-    
-    wrapValueIntoEquatable: (
-      MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
-    
-    extractValueFromEquatable: (
-      CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue,
-
-    checksAdded: Box<Set<String>> = Box([]),
-    resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-    outOfBoundsIndexOffset: Int = 1,
-    outOfBoundsSubscriptOffset: Int = 1
-  ) {
+    ${testConstraints('BidirectionalCollection')}
+  >(${testParams}) {
     var testNamePrefix = testNamePrefix
     if checksAdded.value.contains(#function) {
       return
@@ -1499,40 +1476,8 @@ extension TestSuite {
   } // addBidirectionalCollectionTests
 
   public func addRandomAccessCollectionTests<
-    C : RandomAccessCollection,
-    CollectionWithEquatableElement : RandomAccessCollection
-    where
-    C.SubSequence : RandomAccessCollection,
-    C.SubSequence.Iterator.Element == C.Iterator.Element,
-    C.SubSequence.Index == C.Index,
-    C.SubSequence.Indices.Iterator.Element == C.Index,
-    C.SubSequence.SubSequence == C.SubSequence,
-    C.Indices : RandomAccessCollection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices,
-    CollectionWithEquatableElement.Iterator.Element : Equatable
-  >(
-    _ testNamePrefix: String = "",
-    makeCollection: ([C.Iterator.Element]) -> C,
-    wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
-    extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
-
-    makeCollectionOfEquatable: (
-      [CollectionWithEquatableElement.Iterator.Element]
-    ) -> CollectionWithEquatableElement,
-
-    wrapValueIntoEquatable: (
-      MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
-
-    extractValueFromEquatable: (
-      CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue,
-
-    checksAdded: Box<Set<String>> = Box([]),
-    resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-    outOfBoundsIndexOffset: Int = 1,
-    outOfBoundsSubscriptOffset: Int = 1
-  ) {
+    ${testConstraints('RandomAccessCollection')}
+  >(${testParams}) {
     var testNamePrefix = testNamePrefix
 
     if checksAdded.value.contains(#function) {
