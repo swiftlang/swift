@@ -1177,13 +1177,13 @@ public:
   }
   
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
+    // Emit the closure body.
+    SGF.SGM.emitClosure(e);
+
     // A directly-called closure can be emitted as a direct call instead of
     // really producing a closure object.
     SILDeclRef constant(e);
-    // Emit the closure function if we haven't yet.
-    if (!SGF.SGM.hasFunction(constant))
-      SGF.SGM.emitClosure(e);
-    
+
     ArrayRef<Substitution> subs;
     CanFunctionType substFnType = getSubstFnType();
     
