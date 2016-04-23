@@ -101,7 +101,7 @@ private:
 
 public:
   template <typename TypeRefTy, typename... Args>
-  TypeRefTy *make_typeref(Args... args) {
+  TypeRefTy *makeTypeRef(Args... args) {
     auto TR = new TypeRefTy(::std::forward<Args>(args)...);
     TypeRefPool.push_back(std::unique_ptr<const TypeRef>(TR));
     return TR;

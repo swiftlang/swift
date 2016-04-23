@@ -72,7 +72,7 @@ public:
 
   template <typename Allocator>
   static const BuiltinTypeRef *create(Allocator &A, std::string MangledName) {
-    return A.template make_typeref<BuiltinTypeRef>(MangledName);
+    return A.template makeTypeRef<BuiltinTypeRef>(MangledName);
   }
 
   const std::string &getMangledName() const {
@@ -118,7 +118,7 @@ public:
   static const NominalTypeRef *create(Allocator &A,
                                       const std::string &MangledName,
                                       const TypeRef *Parent = nullptr) {
-    return A.template make_typeref<NominalTypeRef>(MangledName, Parent);
+    return A.template makeTypeRef<NominalTypeRef>(MangledName, Parent);
   }
 
   static bool classof(const TypeRef *TR) {
@@ -142,9 +142,9 @@ public:
   create(Allocator &A, const std::string &MangledName,
          std::vector<const TypeRef *> GenericParams,
          const TypeRef *Parent = nullptr) {
-    return A.template make_typeref<BoundGenericTypeRef>(MangledName,
-                                                        GenericParams,
-                                                        Parent);
+    return A.template makeTypeRef<BoundGenericTypeRef>(MangledName,
+                                                       GenericParams,
+                                                       Parent);
   }
 
   const std::vector<const TypeRef *> &getGenericParams() const {
@@ -168,7 +168,7 @@ public:
   static TupleTypeRef *create(Allocator &A,
                               std::vector<const TypeRef *> Elements,
                               bool Variadic = false) {
-    return A.template make_typeref<TupleTypeRef>(Elements, Variadic);
+    return A.template makeTypeRef<TupleTypeRef>(Elements, Variadic);
   }
 
   const std::vector<const TypeRef *> &getElements() const {
@@ -196,7 +196,7 @@ public:
   static FunctionTypeRef *create(Allocator &A,
                                  std::vector<const TypeRef *> Arguments,
                                  const TypeRef *Result) {
-    return A.template make_typeref<FunctionTypeRef>(Arguments, Result);
+    return A.template makeTypeRef<FunctionTypeRef>(Arguments, Result);
   }
 
   const std::vector<const TypeRef *> &getArguments() const {
@@ -225,7 +225,7 @@ public:
   static const ProtocolTypeRef *
   create(Allocator &A, const std::string &ModuleName,
          const std::string &Name) {
-    return A.template make_typeref<ProtocolTypeRef>(ModuleName, Name);
+    return A.template makeTypeRef<ProtocolTypeRef>(ModuleName, Name);
   }
 
   const std::string &getName() const {
@@ -259,7 +259,7 @@ public:
   template <typename Allocator>
   static const ProtocolCompositionTypeRef *
   create(Allocator &A, std::vector<const TypeRef *> Protocols) {
-    return A.template make_typeref<ProtocolCompositionTypeRef>(Protocols);
+    return A.template makeTypeRef<ProtocolCompositionTypeRef>(Protocols);
   }
 
   const std::vector<const TypeRef *> &getProtocols() const {
@@ -281,7 +281,7 @@ public:
   template <typename Allocator>
   static const MetatypeTypeRef *create(Allocator &A,
                                  const TypeRef *InstanceType) {
-    return A.template make_typeref<MetatypeTypeRef>(InstanceType);
+    return A.template makeTypeRef<MetatypeTypeRef>(InstanceType);
   }
 
   const TypeRef *getInstanceType() const {
@@ -303,7 +303,7 @@ public:
   template <typename Allocator>
   static const ExistentialMetatypeTypeRef *
   create(Allocator &A, const TypeRef *InstanceType) {
-    return A.template make_typeref<ExistentialMetatypeTypeRef>(InstanceType);
+    return A.template makeTypeRef<ExistentialMetatypeTypeRef>(InstanceType);
   }
 
   const TypeRef *getInstanceType() const {
@@ -326,7 +326,7 @@ public:
   template <typename Allocator>
   static const GenericTypeParameterTypeRef *
   create(Allocator &A, uint32_t Depth, uint32_t Index) {
-    return A.template make_typeref<GenericTypeParameterTypeRef>(Depth, Index);
+    return A.template makeTypeRef<GenericTypeParameterTypeRef>(Depth, Index);
   }
 
   uint32_t getDepth() const {
@@ -357,8 +357,8 @@ public:
   static const DependentMemberTypeRef *
   create(Allocator &A, const std::string &Member,
          const TypeRef *Base, const TypeRef *Protocol) {
-    return A.template make_typeref<DependentMemberTypeRef>(Member, Base,
-                                                           Protocol);
+    return A.template makeTypeRef<DependentMemberTypeRef>(Member, Base,
+                                                          Protocol);
   }
 
   const std::string &getMember() const {
@@ -391,7 +391,7 @@ public:
   template <typename Allocator>
   static ForeignClassTypeRef *create(Allocator &A,
                                      const std::string &Name) {
-    return A.template make_typeref<ForeignClassTypeRef>(Name);
+    return A.template makeTypeRef<ForeignClassTypeRef>(Name);
   }
 
   const std::string &getName() const {
@@ -414,7 +414,7 @@ public:
 
   template <typename Allocator>
   static const ObjCClassTypeRef *create(Allocator &A, const std::string &Name) {
-    return A.template make_typeref<ObjCClassTypeRef>(Name);
+    return A.template makeTypeRef<ObjCClassTypeRef>(Name);
   }
 
   const std::string &getName() const {
@@ -459,7 +459,7 @@ public:
   template <typename Allocator>
   static const UnownedStorageTypeRef *create(Allocator &A,
                                        const TypeRef *Type) {
-    return A.template make_typeref<UnownedStorageTypeRef>(Type);
+    return A.template makeTypeRef<UnownedStorageTypeRef>(Type);
   }
 
   static bool classof(const TypeRef *TR) {
@@ -475,7 +475,7 @@ public:
   template <typename Allocator>
   static const WeakStorageTypeRef *create(Allocator &A,
                                     const TypeRef *Type) {
-    return A.template make_typeref<WeakStorageTypeRef>(Type);
+    return A.template makeTypeRef<WeakStorageTypeRef>(Type);
   }
 
   static bool classof(const TypeRef *TR) {
@@ -491,7 +491,7 @@ public:
   template <typename Allocator>
   static const UnmanagedStorageTypeRef *create(Allocator &A,
                                                const TypeRef *Type) {
-    return A.template make_typeref<UnmanagedStorageTypeRef>(Type);
+    return A.template makeTypeRef<UnmanagedStorageTypeRef>(Type);
   }
 
   static bool classof(const TypeRef *TR) {
