@@ -3212,7 +3212,6 @@ public:
 
     auto floatType = context.getFloatDecl()->getDeclaredType();
     addFromProto(LK::ColorLiteral, "", [&](Builder &builder) {
-      builder.addLeftBracket();
       builder.addTextChunk("#colorLiteral");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("red"),
@@ -3227,18 +3226,15 @@ public:
       builder.addCallParameter(context.getIdentifier("alpha"), floatType,
                                false, true);
       builder.addRightParen();
-      builder.addRightBracket();
     });
 
     auto stringType = context.getStringDecl()->getDeclaredType();
     addFromProto(LK::ImageLiteral, "", [&](Builder &builder) {
-      builder.addLeftBracket();
       builder.addTextChunk("#imageLiteral");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("resourceName"),
                                stringType, false, true);
       builder.addRightParen();
-      builder.addRightBracket();
     });
 
     // Add tuple completion (item, item).
