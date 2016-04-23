@@ -183,14 +183,19 @@ protected:
     });
   }
 
-  void addTypeRef(Module *ModuleContext, CanType type) {
+  /// Add a 32-bit relative offset to a mangled typeref string
+  /// in the typeref reflection section, or globally if 'global' is 'true'.
+  void addTypeRef(Module *ModuleContext, CanType type, bool global = false) {
     assert(type);
     Mangle::Mangler mangler(/*DWARFMangling*/false,
                             /*usePunyCode*/ true,
                             /*OptimizeProtocolNames*/ false);
     mangler.setModuleContext(ModuleContext);
     mangler.mangleType(type, 0);
-    auto mangledName = IGM.getAddrOfStringForTypeRef(mangler.finalize());
+    auto mangledName = global
+     ? IGM.getAddrOfGlobalString(mangler.finalize(),
+                                 /*willBeRelativelyAddressed*/ true)
+     : IGM.getAddrOfStringForTypeRef(mangler.finalize());
     addRelativeAddress(mangledName);
   }
 
@@ -488,7 +493,8 @@ public:
       MetadataSourceEncoder Encoder(OS);
       Encoder.visit(Source);
 
-      auto EncodedSource = IGM.getAddrOfStringForTypeRef(OS.str());
+      auto EncodedSource = IGM.getAddrOfGlobalString(OS.str(),
+        /*willBeRelativelyAddressed*/ true);
       addRelativeAddress(EncodedSource);
     }
   }
@@ -638,7 +644,8 @@ public:
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
-      addTypeRef(Callee.getModule().getSwiftModule(), CaptureType);
+      addTypeRef(Callee.getModule().getSwiftModule(), CaptureType,
+                 /*global*/ true);
     }
 
     // Add the pairs that make up the generic param -> metadata source map
@@ -646,7 +653,7 @@ public:
     for (auto GenericAndSource : MetadataSources) {
       auto GenericParam = GenericAndSource.first->getCanonicalType();
       auto Source = GenericAndSource.second;
-      addTypeRef(nullptr, GenericParam);
+      addTypeRef(nullptr, GenericParam, /*global*/ true);
       addMetadataSource(Source);
     }
   }
