@@ -21,9 +21,9 @@
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
+#include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
-#include "swift/SwiftRemoteMirror/SwiftRemoteMirrorTypes.h"
 
 #include <iostream>
 #include <vector>
@@ -80,24 +80,8 @@ public:
     getBuilder().addReflectionInfo(I);
   }
 
-  swift_typeinfo_t getInfoForTypeRef(const TypeRef *TR) {
-    // TODO
-    return {
-      SWIFT_UNKNOWN,
-      NULL,
-      0,
-      0,
-      0
-    };
-  }
-
-  swift_childinfo_t getInfoForChild(const TypeRef *TR, unsigned Index) {
-    // TODO
-    return {
-      0,
-      NULL,
-      0,
-    };
+  const TypeInfo *getTypeInfo(const TypeRef *TR) {
+    return getBuilder().getTypeConverter().getTypeInfo(TR);
   }
 };
 
