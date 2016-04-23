@@ -21,6 +21,7 @@
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
@@ -676,8 +677,13 @@ namespace {
       ExprStack.pop_back();
 
       // Fold sequence expressions.
-      if (auto seqExpr = dyn_cast<SequenceExpr>(expr))
-        return TC.foldSequence(seqExpr, DC);
+      if (auto seqExpr = dyn_cast<SequenceExpr>(expr)) {
+        auto result = TC.foldSequence(seqExpr, DC);
+        if (auto typeResult = simplifyTypeExpr(result)) {
+          return typeResult;
+        }
+        return result;
+      }
 
       // Type check the type parameters in an UnresolvedSpecializeExpr.
       if (auto us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
@@ -1029,6 +1035,60 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
                                           /*FIXME:colonLoc=*/SourceLoc(),
                                           SourceRange(DE->getLBracketLoc(),
                                                       DE->getRBracketLoc()));
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+  }
+
+  // Reinterpret arrow expr T1 -> T2 as function type.
+  // FIXME: support 'inout', etc.
+  if (auto *AE = dyn_cast<ArrowExpr>(E)) {
+    if (!AE->isFolded()) return nullptr;
+    bool HadError = false;
+
+    TypeRepr *ArgsTypeRepr = nullptr;
+    if (auto TyE = dyn_cast<TypeExpr>(AE->getArgsExpr())) {
+      ArgsTypeRepr = TyE->getTypeRepr();
+    } else if (auto TE = dyn_cast<TupleExpr>(AE->getArgsExpr())) {
+      if (TE->getNumElements() == 0) {
+        ArgsTypeRepr = new (TC.Context) TupleTypeRepr({}, TE->getSourceRange(),
+            /*EllipsisLoc*/ SourceLoc(), /*EllipsisIdx*/ 0);
+      }
+    }
+    if (!ArgsTypeRepr) {
+      TC.diagnose(AE->getArgsExpr()->getLoc(),
+                  diag::expected_type_before_arrow);
+      HadError = true;
+    }
+
+    TypeRepr *ResultTypeRepr = nullptr;
+    if (auto TyE = dyn_cast<TypeExpr>(AE->getResultExpr())) {
+      ResultTypeRepr = TyE->getTypeRepr();
+    } else if (auto TE = dyn_cast<TupleExpr>(AE->getResultExpr())) {
+      if (TE->getNumElements() == 0) {
+        ResultTypeRepr = new (TC.Context) TupleTypeRepr({},
+            TE->getSourceRange(), /*EllipsisLoc*/ SourceLoc(),
+            /*EllipsisIdx*/ 0);
+      }
+    } else if (isa<ArrowExpr>(AE->getResultExpr())) {
+      // When simplifying a type expr like "Int -> Int -> Int" the RHS may have
+      // been folded at the same time; recursively simplify it first if
+      // necessary.
+      auto ResultTypeExpr = simplifyTypeExpr(AE->getResultExpr());
+      if (ResultTypeExpr) {
+        ResultTypeRepr = ResultTypeExpr->getTypeRepr();
+      }
+    }
+    if (!ResultTypeRepr) {
+      TC.diagnose(AE->getResultExpr()->getLoc(),
+                  diag::expected_type_after_arrow);
+      HadError = true;
+    }
+
+    if (HadError) return nullptr;
+
+    auto NewTypeRepr =
+      new (TC.Context) FunctionTypeRepr(nullptr, ArgsTypeRepr,
+                                        AE->getThrowsLoc(), AE->getArrowLoc(),
+                                        ResultTypeRepr);
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
 
