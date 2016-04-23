@@ -18,34 +18,12 @@
 #ifndef SWIFT_REMOTE_MEMORYREADER_H
 #define SWIFT_REMOTE_MEMORYREADER_H
 
-#include <cstdint>
+#include "swift/Remote/RemoteAddress.h"
+
 #include <string>
 
 namespace swift {
 namespace remote {
-
-/// An abstract address in the remote process's address space.
-class RemoteAddress {
-  uint64_t Data;
-public:
-  explicit RemoteAddress(const void *localPtr)
-    : Data(reinterpret_cast<uintptr_t>(localPtr)) {}
-
-  explicit RemoteAddress(uint64_t addressData) : Data(addressData) {}
-
-  explicit operator bool() const {
-    return Data != 0;
-  }
-
-  template <class T>
-  const T *getLocalPointer() const {
-    return reinterpret_cast<const T*>(static_cast<uintptr_t>(Data));
-  }
-
-  uint64_t getAddressData() const {
-    return Data;
-  }
-};
 
 /// An abstract interface for reading memory.
 ///

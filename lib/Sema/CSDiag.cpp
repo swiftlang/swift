@@ -2899,7 +2899,8 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
       TCEOptions |= TypeCheckExprFlags::PreferForceUnwrapToOptional;
   }
 
-  bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, convertType,
+  bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC,
+                                             TypeLoc::withoutLoc(convertType),
                                              convertTypePurpose, TCEOptions,
                                              listener);
 
@@ -3106,6 +3107,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   Diag<Type, Type> diagID;
   Diag<Type, Type> diagIDProtocol;
   Diag<Type> nilDiag;
+  std::function<void(void)> nilFollowup;
 
   // If this is conversion failure due to a return statement with an argument
   // that cannot be coerced to the result type of the function, emit a
@@ -3122,6 +3124,19 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
     diagID = diag::cannot_convert_initializer_value;
     diagIDProtocol = diag::cannot_convert_initializer_value_protocol;
     nilDiag = diag::cannot_convert_initializer_value_nil;
+    nilFollowup = [this]{
+      TypeRepr *patternTR = CS->getContextualTypeLoc().getTypeRepr();
+      if (!patternTR)
+        return;
+      auto diag = diagnose(patternTR->getLoc(), diag::note_make_optional,
+                           OptionalType::get(CS->getContextualType()));
+      if (patternTR->isSimple()) {
+        diag.fixItInsertAfter(patternTR->getEndLoc(), "?");
+      } else {
+        diag.fixItInsert(patternTR->getStartLoc(), "(");
+        diag.fixItInsertAfter(patternTR->getEndLoc(), ")?");
+      }
+    };
     break;
   case CTP_ReturnStmt:
     // Special case the "conversion to void" case.
@@ -3204,6 +3219,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   // instead of uttering NilLiteralConvertible.
   if (isa<NilLiteralExpr>(expr->getValueProvidingExpr())) {
     diagnose(expr->getLoc(), nilDiag, contextualType);
+    if (nilFollowup)
+      nilFollowup();
     return true;
   }
   

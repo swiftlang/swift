@@ -2532,13 +2532,10 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   return "";
 }
 
-/// Attempt to omit needless words from the name of the given declaration.
-static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
+Optional<DeclName> swift::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
-  if (!Context.LangOpts.WarnOmitNeedlessWords)
-    return None;
 
-  if (afd->isInvalid())
+  if (afd->isInvalid() || isa<DestructorDecl>(afd))
     return None;
 
   DeclName name = afd->getFullName();
@@ -2624,14 +2621,10 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
   return DeclName(Context, newBaseName, newArgNames);
 }
 
-/// Attempt to omit needless words from the name of the given declaration.
-static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
+Optional<Identifier> swift::omitNeedlessWords(VarDecl *var) {
   auto &Context = var->getASTContext();
 
   if (var->isInvalid())
-    return None;
-
-  if (!Context.LangOpts.WarnOmitNeedlessWords)
     return None;
 
   if (var->getName().empty())
@@ -2646,7 +2639,7 @@ static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
 
   // Dig out the type of the variable.
   Type type = var->getInterfaceType()->getReferenceStorageReferent()
-  ->getLValueOrInOutObjectType();
+                ->getLValueOrInOutObjectType();
   while (auto optObjectTy = type->getAnyOptionalObjectType())
     type = optObjectTy;
 
@@ -2674,18 +2667,24 @@ static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
 }
 
 void TypeChecker::checkOmitNeedlessWords(AbstractFunctionDecl *afd) {
-  auto newName = ::omitNeedlessWords(afd);
+  if (!Context.LangOpts.WarnOmitNeedlessWords)
+    return;
+
+  auto newName = omitNeedlessWords(afd);
   if (!newName)
     return;
 
   auto name = afd->getFullName();
   InFlightDiagnostic diag = diagnose(afd->getLoc(), diag::omit_needless_words,
                                      name, *newName);
-  fixAbstractFunctionNames(diag, afd, *newName);
+  fixDeclarationName(diag, afd, *newName);
 }
 
 void TypeChecker::checkOmitNeedlessWords(VarDecl *var) {
-  auto newName = ::omitNeedlessWords(var);
+  if (!Context.LangOpts.WarnOmitNeedlessWords)
+    return;
+
+  auto newName = omitNeedlessWords(var);
   if (!newName)
     return;
 
@@ -2859,7 +2858,7 @@ void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
     return;
 
   // Determine whether the callee has any needless words in it.
-  auto newName = ::omitNeedlessWords(afd);
+  auto newName = omitNeedlessWords(afd);
 
   bool renamed;
   if (!newName) {
@@ -2961,7 +2960,7 @@ void TypeChecker::checkOmitNeedlessWords(MemberRefExpr *memberRef) {
     return;
 
   // Check whether any needless words were omitted.
-  auto newName = ::omitNeedlessWords(var);
+  auto newName = omitNeedlessWords(var);
   if (!newName)
     return;
 

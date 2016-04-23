@@ -455,7 +455,7 @@ public:
                                          IsThunk_t isThunk);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
-  /// exist..
+  /// exist.
   SILFunction *getOrCreateFunction(SILLocation loc,
                                    StringRef name,
                                    SILLinkage linkage,
@@ -468,18 +468,17 @@ public:
                                            SILFunction::NotRelevant);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
-  /// exist..
+  /// exist.
   SILFunction *getOrCreateFunction(SILLocation loc,
                                    SILDeclRef constant,
                                    ForDefinition_t forDefinition);
 
-  /// \brief Return the declaration of a function, or create it if it does not
-  /// exist.
+  /// \brief Create a function declaration.
   ///
   /// This signature is a direct copy of the signature of SILFunction::create()
   /// in order to simplify refactoring all SILFunction creation use-sites to use
   /// SILModule. Eventually the uses should probably be refactored.
-  SILFunction *getOrCreateFunction(
+  SILFunction *createFunction(
       SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
       GenericParamList *contextGenericParams, Optional<SILLocation> loc,
       IsBare_t isBareSILFunction, IsTransparent_t isTrans,

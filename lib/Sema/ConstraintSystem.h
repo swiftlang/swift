@@ -938,7 +938,7 @@ private:
   /// There can only be a single contextual type on the root of the expression
   /// being checked.  If specified, this holds its type along with the base
   /// expression, and the purpose of it.
-  Type contextualType;
+  TypeLoc contextualType;
   Expr *contextualTypeNode = nullptr;
   ContextualTypePurpose contextualTypePurpose = CTP_Unused;
   
@@ -1223,16 +1223,20 @@ public:
     this->FavoredTypes[E] = T;
   }
  
-  void setContextualType(Expr *E, Type T, ContextualTypePurpose purpose) {
+  void setContextualType(Expr *E, TypeLoc T, ContextualTypePurpose purpose) {
     contextualTypeNode = E;
     contextualType = T;
     contextualTypePurpose = purpose;
   }
 
   Type getContextualType(Expr *E) const {
-    return E == contextualTypeNode ? contextualType : Type();
+    return E == contextualTypeNode ? contextualType.getType() : Type();
   }
   Type getContextualType() const {
+    return contextualType.getType();
+  }
+
+  TypeLoc getContextualTypeLoc() const {
     return contextualType;
   }
 

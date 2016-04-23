@@ -175,15 +175,17 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
       addBuiltinTypeRefs(type);
     }
 
-    if (IGM.Opts.StripReflectionNames) {
-      addConstantInt32(0);
-    } else {
+    if (IGM.Opts.EnableReflectionNames) {
       auto fieldName = IGM.getAddrOfFieldName(value->getNameStr());
       addRelativeAddress(fieldName);
+    } else {
+      addConstantInt32(0);
     }
   }
 
   void addDecl(const NominalTypeDecl *decl) {
+    using swift::reflection::FieldDescriptorKind;
+
     PrettyStackTraceDecl DebugStack("emitting field type metadata", decl);
     auto type = decl->getDeclaredType()->getCanonicalType();
     addTypeRef(decl->getModuleContext(), type);
@@ -192,8 +194,11 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     case DeclKind::Class:
     case DeclKind::Struct: {
       auto properties = decl->getStoredProperties();
+      addConstantInt16(uint16_t(isa<StructDecl>(decl)
+                                ? FieldDescriptorKind::Struct
+                                : FieldDescriptorKind::Class));
+      addConstantInt16(fieldRecordSize);
       addConstantInt32(std::distance(properties.begin(), properties.end()));
-      addConstantInt32(fieldRecordSize);
       for (auto property : properties)
         addFieldDecl(property,
                      property->getInterfaceType()
@@ -203,8 +208,9 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     case DeclKind::Enum: {
       auto enumDecl = cast<EnumDecl>(decl);
       auto cases = enumDecl->getAllElements();
+      addConstantInt16(uint16_t(FieldDescriptorKind::Enum));
+      addConstantInt16(fieldRecordSize);
       addConstantInt32(std::distance(cases.begin(), cases.end()));
-      addConstantInt32(fieldRecordSize);
       for (auto enumCase : cases) {
         if (enumCase->hasArgumentType()) {
           addFieldDecl(enumCase,
@@ -374,8 +380,8 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef Str) {
 }
 
 void IRGenModule::emitReflectionMetadataRecords() {
-  auto DontHaveDecls = NominalTypeDecls.empty() && ExtensionDecls.empty();
-  if (Opts.StripReflectionMetadata || DontHaveDecls)
+  auto DoNotHaveDecls = NominalTypeDecls.empty() && ExtensionDecls.empty();
+  if (!Opts.EnableReflectionMetadata || DoNotHaveDecls)
     return;
 
   // We collect all referenced builtin types and emit records for them.

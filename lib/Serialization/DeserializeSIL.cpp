@@ -289,7 +289,7 @@ static SILFunction *createBogusSILFunction(SILModule &M,
                                            StringRef name,
                                            SILType type) {
   SourceLoc loc;
-  return M.getOrCreateFunction(
+  return M.createFunction(
       SILLinkage::Private, name, type.castTo<SILFunctionType>(), nullptr,
       RegularLocation(loc), IsNotBare, IsNotTransparent, IsNotFragile,
       IsNotThunk, SILFunction::NotRelevant);
@@ -429,7 +429,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
   // Otherwise, create a new function.
   } else {
-    fn = SILMod.getOrCreateFunction(
+    fn = SILMod.createFunction(
         linkage.getValue(), name, ty.castTo<SILFunctionType>(), nullptr, loc,
         IsNotBare, IsTransparent_t(isTransparent == 1),
         IsFragile_t(isFragile == 1), IsThunk_t(isThunk),

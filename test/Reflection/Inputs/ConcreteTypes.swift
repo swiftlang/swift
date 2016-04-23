@@ -55,4 +55,5 @@ public struct References {
   public let strongRef: C
   public weak var weakRef: C?
   public unowned var unownedRef: C
+  public unowned(unsafe) var unownedUnsafeRef: C
 }

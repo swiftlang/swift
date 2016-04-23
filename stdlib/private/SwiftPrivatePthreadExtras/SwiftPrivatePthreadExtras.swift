@@ -49,7 +49,7 @@ internal class PthreadBlockContextImpl<Argument, Result>: PthreadBlockContext {
 
 /// Entry point for `pthread_create` that invokes a block context.
 internal func invokeBlockContext(
-  _ contextAsVoidPointer: UnsafeMutablePointer<Void>!
+  _ contextAsVoidPointer: UnsafeMutablePointer<Void>?
 ) -> UnsafeMutablePointer<Void>! {
   // The context is passed in +1; we're responsible for releasing it.
   let contextAsOpaque = OpaquePointer(contextAsVoidPointer!)
@@ -73,7 +73,7 @@ public func _stdlib_pthread_create_block<Argument, Result>(
 
   var threadID = _make_pthread_t()
   let result = pthread_create(&threadID, attr,
-    invokeBlockContext, contextAsVoidPointer)
+    { invokeBlockContext($0) }, contextAsVoidPointer)
   if result == 0 {
     return (result, threadID)
   } else {

@@ -179,6 +179,12 @@ PASS(PredictableMemoryOptimizations, "predictable-memopt",
      "Predictable early memory optimizations")
 PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "Devirtualize release-instructions")
+PASS(RetainSinking, "retain-sinking",
+     "Sink retains")
+PASS(ReleaseHoisting, "release-hoisting",
+     "Hoist releases")
+PASS(LateReleaseHoisting, "late-release-hoisting",
+     "Hoist releases")
 PASS(RemovePins, "remove-pins",
      "Remove pin/unpin pairs")
 PASS(SideEffectsDumper, "side-effects-dump",

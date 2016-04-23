@@ -47,6 +47,15 @@ namespace swift {
 
 class SerializedModuleLoader;
 
+/// The abstract configuration of the compiler, including:
+///   - options for all stages of translation,
+///   - information about the build environment,
+///   - information about the job being performed, and
+///   - lists of inputs.
+///
+/// A CompilerInvocation can be built from a frontend command line
+/// using parseArgs.  It can then be used to build a CompilerInstance,
+/// which manages the actual compiler execution.
 class CompilerInvocation {
   LangOptions LangOpts;
   FrontendOptions FrontendOpts;
@@ -282,6 +291,14 @@ public:
   }
 };
 
+/// A class which manages the state and execution of the compiler.
+/// This owns the primary compiler singletons, such as the ASTContext,
+/// as well as various build products such as the SILModule.
+///
+/// Before a CompilerInstance can be used, it must be configured by
+/// calling \a setup.  If successful, this will create an ASTContext
+/// and set up the basic compiler invariants.  Calling \a setup multiple
+/// times on a single CompilerInstance is not permitted.
 class CompilerInstance {
   CompilerInvocation Invocation;
   SourceManager SourceMgr;

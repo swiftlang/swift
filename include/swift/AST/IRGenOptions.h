@@ -140,11 +140,11 @@ public:
   unsigned HasValueNamesSetting : 1;
   unsigned ValueNames : 1;
 
-  /// Only strip the field names section from nominal type field metadata.
-  unsigned StripReflectionNames : 1;
+  /// Emit nominal type field metadata.
+  unsigned EnableReflectionMetadata : 1;
 
-  /// Strip all nominal type field metadata.
-  unsigned StripReflectionMetadata : 1;
+  /// Emit names of struct stored properties and enum cases.
+  unsigned EnableReflectionNames : 1;
 
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
@@ -165,7 +165,7 @@ public:
                    EmitStackPromotionChecks(false), GenerateProfile(false),
                    PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
                    HasValueNamesSetting(false), ValueNames(false),
-                   StripReflectionNames(true), StripReflectionMetadata(true),
+                   EnableReflectionMetadata(false), EnableReflectionNames(false),
                    CmdArgs(), UseIncrementalLLVMCodeGen(true)
                    {}
 

@@ -358,7 +358,7 @@ public:
       return nullptr;
 
     if (!RS->hasResult()) {
-      if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context)))
+      if (!ResultTy->isVoid())
         TC.diagnose(RS->getReturnLoc(), diag::return_expr_missing);
       return RS;
     }
@@ -395,7 +395,9 @@ public:
                                        RS->isImplicit());
     }
 
-    auto hadTypeError = TC.typeCheckExpression(E, DC, ResultTy, CTP_ReturnStmt);
+    auto hadTypeError = TC.typeCheckExpression(E, DC,
+                                               TypeLoc::withoutLoc(ResultTy),
+                                               CTP_ReturnStmt);
     RS->setResult(E);
     
     if (hadTypeError) {
@@ -413,7 +415,7 @@ public:
     Type exnType = TC.getExceptionType(DC, TS->getThrowLoc());
     if (!exnType) return TS;
     
-    TC.typeCheckExpression(E, DC, exnType, CTP_ThrowStmt);
+    TC.typeCheckExpression(E, DC, TypeLoc::withoutLoc(exnType), CTP_ThrowStmt);
     TS->setSubExpr(E);
     
     return TS;
@@ -508,7 +510,7 @@ public:
       TC.typeCheckDecl(D, /*isFirstPass*/false);
 
     if (auto *Initializer = FS->getInitializer().getPtrOrNull()) {
-      TC.typeCheckExpression(Initializer, DC, Type(), CTP_Unused,
+      TC.typeCheckExpression(Initializer, DC, TypeLoc(), CTP_Unused,
                              TypeCheckExprFlags::IsDiscarded);
       FS->setInitializer(Initializer);
       TC.checkIgnoredExpr(Initializer);
@@ -520,7 +522,7 @@ public:
     }
 
     if (auto *Increment = FS->getIncrement().getPtrOrNull()) {
-      TC.typeCheckExpression(Increment, DC, Type(), CTP_Unused,
+      TC.typeCheckExpression(Increment, DC, TypeLoc(), CTP_Unused,
                              TypeCheckExprFlags::IsDiscarded);
       FS->setIncrement(Increment);
       TC.checkIgnoredExpr(Increment);
@@ -1082,7 +1084,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       if (isDiscarded)
         options |= TypeCheckExprFlags::IsDiscarded;
 
-      bool hadTypeError = TC.typeCheckExpression(SubExpr, DC, Type(),
+      bool hadTypeError = TC.typeCheckExpression(SubExpr, DC, TypeLoc(),
                                                  CTP_Unused, options);
       if (isDiscarded && !hadTypeError)
         TC.checkIgnoredExpr(SubExpr);
@@ -1142,7 +1144,8 @@ static void checkDefaultArguments(TypeChecker &tc, ParameterList *params,
     }
 
     // Type-check the initializer, then flag that we did so.
-    if (tc.typeCheckExpression(e, initContext, param->getType(),
+    if (tc.typeCheckExpression(e, initContext,
+                               TypeLoc::withoutLoc(param->getType()),
                                CTP_DefaultParameter))
       defaultValueHandle->setExpr(defaultValueHandle->getExpr(), true);
     else
@@ -1227,7 +1230,7 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
   if (ctor->isBodyThrowing())
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*Implicit=*/true);
 
-  if (typeCheckExpression(r, ctor, Type(), CTP_Unused,
+  if (typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
                           TypeCheckExprFlags::IsDiscarded | 
                           TypeCheckExprFlags::SuppressDiagnostics))
     return nullptr;

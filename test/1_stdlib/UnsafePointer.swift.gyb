@@ -151,7 +151,6 @@ ${SelfName}TestSuite.test("Hashable") {
   }
 }
 
-% if SelfName != 'OpaquePointer':
 ${SelfName}TestSuite.test("toInteger") {
   do {
     let word: Int = 0x12345678
@@ -172,7 +171,6 @@ ${SelfName}TestSuite.test("toInteger") {
     expectEqual(UInt(0), UInt(bitPattern: ptr))
   }
 }
-% end
 
 % end
 
@@ -389,5 +387,35 @@ UnsafeMutablePointerTestSuite.test("customPlaygroundQuickLook") {
   }
 }
 
-runAllTests()
+% for (SelfName, SelfType) in [
+%         ('UnsafePointer', 'UnsafePointer<Int>'),
+%         ('UnsafeMutablePointer', 'UnsafeMutablePointer<Int>')]:
 
+${SelfName}TestSuite.test("Comparable") {
+  var addresses: [UInt] = [
+    0x00000001,
+    0xFF00FF00,
+    0x00001111,
+    0x00000002,
+    0xFFFFFFFF,
+    0x00001111
+  ]
+
+  #if arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+  addresses += [
+    0xFFFFFFFF80000000,
+    0x8000000000000000
+  ]
+  #endif
+
+  let instances = addresses.map { ($0, ${SelfType}(bitPattern: $0)!) }
+
+  func comparisonOracle(i: Int, j: Int) -> ExpectedComparisonResult {
+    return instances[i].0 <=> instances[j].0
+  }
+  checkComparable(instances.map { $0.1 }, oracle: comparisonOracle)
+}
+
+% end
+
+runAllTests()

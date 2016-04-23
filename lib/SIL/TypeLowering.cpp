@@ -1673,9 +1673,9 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
 
 /// Get the type of a destructor function.
 static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
-                                            bool isDeallocating,
-                                            ASTContext &C,
-                                            bool isForeign) {
+                                                     bool isDeallocating,
+                                                     ASTContext &C,
+                                                     bool isForeign) {
   auto classType = dd->getDeclContext()->getDeclaredInterfaceType()
                      ->getCanonicalType();
 
@@ -1706,9 +1706,9 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
 /// Retrieve the type of the ivar initializer or destroyer method for
 /// a class.
 static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
-                                                   bool isObjC,
-                                                   ASTContext &ctx,
-                                                   bool isDestroyer) {
+                                                            bool isObjC,
+                                                            ASTContext &ctx,
+                                                            bool isDestroyer) {
   auto classType = cd->getDeclaredInterfaceType()->getCanonicalType();
 
   auto emptyTupleTy = TupleType::getEmpty(ctx)->getCanonicalType();

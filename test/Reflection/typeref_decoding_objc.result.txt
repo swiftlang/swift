@@ -14,11 +14,11 @@ cfString: __ObjC.CFString
 TypesToReflect.GenericOC
 ------------------------
 ocnss: TypesToReflect.GenericOC<__ObjC.NSString>
-(bound-generic class TypesToReflect.GenericOC
+(bound_generic_class TypesToReflect.GenericOC
   (class __ObjC.NSString))
 
 occfs: TypesToReflect.GenericOC<__ObjC.CFString>
-(bound-generic class TypesToReflect.GenericOC
+(bound_generic_class TypesToReflect.GenericOC
   (class __ObjC.CFString))
 
 
