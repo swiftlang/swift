@@ -45,6 +45,7 @@ if(SWIFT_BUILD_TOOLS)
   add_subdirectory(Driver)
   add_subdirectory(IDE)
   add_subdirectory(Parse)
+  add_subdirectory(Reflection)
   add_subdirectory(SwiftDemangle)
 
   if(SWIFT_BUILD_SDK_OVERLAY)
