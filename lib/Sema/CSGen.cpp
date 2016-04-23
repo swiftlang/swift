@@ -2904,6 +2904,12 @@ namespace {
     ConstraintWalker(ConstraintGenerator &CG) : CG(CG) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // Note that the subexpression of a #selector expression is
+      // unevaluated.
+      if (auto sel = dyn_cast<ObjCSelectorExpr>(expr)) {
+        CG.getConstraintSystem().UnevaluatedRootExprs.insert(sel->getSubExpr());
+      }
+
       // For closures containing only a single expression, the body participates
       // in type checking.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {

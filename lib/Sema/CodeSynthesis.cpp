@@ -812,31 +812,35 @@ synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
   TC.typeCheckDecl(setter, false);
 }
 
-/// The specified AbstractStorageDecl was just found to satisfy a
-/// protocol property requirement.  Ensure that it has the full
-/// complement of accessors.
-void TypeChecker::synthesizeWitnessAccessorsForStorage(
-                                             AbstractStorageDecl *requirement,
-                                             AbstractStorageDecl *storage) {
+void TypeChecker::synthesizeAccessorsForStorage(AbstractStorageDecl *storage,
+                                                bool wantMaterializeForSet) {
   // If the decl is stored, convert it to StoredWithTrivialAccessors
   // by synthesizing the full set of accessors.
   if (!storage->hasAccessorFunctions()) {
     addTrivialAccessorsToStorage(storage, *this);
     return;
   }
-  
-  // Otherwise, if the requirement is settable, ensure that there's a
-  // materializeForSet function.
-  //
-  // @objc protocols don't need a materializeForSet since ObjC doesn't have
-  // that concept.
-  if (!requirement->isObjC() &&
-      requirement->getSetter() && !storage->getMaterializeForSetFunc()) {
+
+  // If we want wantMaterializeForSet, create it now.
+  if (wantMaterializeForSet && !storage->getMaterializeForSetFunc()) {
     FuncDecl *materializeForSet = addMaterializeForSet(storage, *this);
     synthesizeMaterializeForSet(materializeForSet, storage, *this);
     typeCheckDecl(materializeForSet, false);
   }
-  return;
+}
+
+/// The specified AbstractStorageDecl was just found to satisfy a
+/// protocol property requirement.  Ensure that it has the full
+/// complement of accessors.
+void TypeChecker::synthesizeWitnessAccessorsForStorage(
+                                             AbstractStorageDecl *requirement,
+                                             AbstractStorageDecl *storage) {
+  // @objc protocols don't need a materializeForSet since ObjC doesn't
+  // have that concept.
+  bool wantMaterializeForSet =
+    !requirement->isObjC() && requirement->getSetter();
+
+  synthesizeAccessorsForStorage(storage, wantMaterializeForSet);
 }
 
 void swift::synthesizeMaterializeForSet(FuncDecl *materializeForSet,

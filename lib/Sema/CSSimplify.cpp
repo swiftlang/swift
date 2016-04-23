@@ -2662,6 +2662,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       hasInstanceMethods = true;
       hasStaticMembers = true;
     }
+
+    // If we're at the root of an unevaluated context, we can
+    // reference instance members on the metatype.
+    if (memberLocator &&
+        UnevaluatedRootExprs.count(memberLocator->getAnchor())) {
+      hasInstanceMembers = true;
+    }
   } else {
     // Otherwise, we can access all instance members.
     hasInstanceMembers = true;

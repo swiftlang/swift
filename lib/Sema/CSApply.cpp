@@ -920,7 +920,15 @@ namespace {
       // For types and properties, build member references.
       if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
         assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
-        assert(baseIsInstance || !member->isInstanceMember());
+        if (!baseIsInstance && member->isInstanceMember()) {
+          assert(memberLocator.getBaseLocator() && 
+                 cs.UnevaluatedRootExprs.count(
+                   memberLocator.getBaseLocator()->getAnchor()) &&
+                 "Attempt to reference an instance member of a metatype");
+          auto baseInstanceTy = base->getType()->getRValueInstanceType();
+          base = new (context) UnevaluatedInstanceExpr(base, baseInstanceTy);
+          base->setImplicit();
+        }
 
         auto memberRefExpr
           = new (context) MemberRefExpr(base, dotLoc, memberRef,
@@ -3392,48 +3400,150 @@ namespace {
         return E;
       }
 
-      // If the declaration we found was not a method or initializer,
-      // complain.
-      auto func = dyn_cast<AbstractFunctionDecl>(foundDecl);
-      if (!func) {
-        Optional<InFlightDiagnostic> diag;
-        if (auto VD = dyn_cast<VarDecl>(foundDecl)) {
-          diag.emplace(tc.diagnose(E->getLoc(), diag::expr_selector_var,
-                                   isa<ParamDecl>(VD)
-                                   ? 1
-                                   : VD->getDeclContext()->isTypeContext()
-                                     ? 0
-                                     : 2));
-        } else {
-          diag.emplace(tc.diagnose(E->getLoc(),
-                                   diag::expr_selector_not_method_or_init));
+      // Check whether we found an entity that #selector could refer to.
+      // If we found a method or initializer, check it.
+      AbstractFunctionDecl *method = nullptr;
+      if (auto func = dyn_cast<AbstractFunctionDecl>(foundDecl)) {
+        // Methods and initializers.
+
+        // If this isn't a method, complain.
+        if (!func->getDeclContext()->isTypeContext()) {
+          tc.diagnose(E->getLoc(), diag::expr_selector_not_method,
+                      func->getDeclContext()->isModuleScopeContext(),
+                      func->getFullName())
+            .highlight(subExpr->getSourceRange());
+          tc.diagnose(func, diag::decl_declared_here, func->getFullName());
+          return E;
         }
-        diag->highlight(subExpr->getSourceRange());
-        diag.reset();
+
+        // Check that we requested a method.
+        switch (E->getSelectorKind()) {
+        case ObjCSelectorExpr::Method:
+          break;
+
+        case ObjCSelectorExpr::Getter:
+        case ObjCSelectorExpr::Setter:
+          // Complain that we cannot ask for the getter or setter of a
+          // method.
+          tc.diagnose(E->getModifierLoc(),
+                      diag::expr_selector_expected_property,
+                      E->getSelectorKind() == ObjCSelectorExpr::Setter,
+                      foundDecl->getDescriptiveKind(),
+                      foundDecl->getFullName())
+            .fixItRemoveChars(E->getModifierLoc(),
+                              E->getSubExpr()->getStartLoc());
+
+          // Update the AST to reflect the fix.
+          E->overrideObjCSelectorKind(ObjCSelectorExpr::Method, SourceLoc());
+          break;
+        }
+
+        // Note the method we're referring to.
+        method = func;
+      } else if (auto var = dyn_cast<VarDecl>(foundDecl)) {
+        // Properties.
+
+        // If this isn't a property on a type, complain.
+        if (!var->getDeclContext()->isTypeContext()) {
+          tc.diagnose(E->getLoc(), diag::expr_selector_not_property,
+                      isa<ParamDecl>(var), var->getFullName())
+            .highlight(subExpr->getSourceRange());
+          tc.diagnose(var, diag::decl_declared_here, var->getFullName());
+          return E;
+        }
+
+        // Check that we requested a property getter or setter.
+        switch (E->getSelectorKind()) {
+        case ObjCSelectorExpr::Method: {
+          bool isSettable = var->isSettable(cs.DC) &&
+            var->isSetterAccessibleFrom(cs.DC);
+          auto primaryDiag =
+            tc.diagnose(E->getLoc(), diag::expr_selector_expected_method,
+                        isSettable, var->getFullName());
+          primaryDiag.highlight(subExpr->getSourceRange());
+
+          // The point at which we will insert the modifier.
+          SourceLoc modifierLoc = E->getSubExpr()->getStartLoc();
+
+          // Make sure we have the accessors.
+          tc.synthesizeAccessorsForStorage(var,
+                                           /*wantMaterializeForSet=*/false);
+
+          // If the property is settable, we don't know whether the
+          // user wanted the getter or setter. Provide notes for each.
+          if (isSettable) {
+            // Flush the primary diagnostic. We have notes to add.
+            primaryDiag.flush();
+
+            // Add notes for the getter and setter, respectively.
+            tc.diagnose(modifierLoc, diag::expr_selector_add_modifier,
+                        false, var->getFullName())
+              .fixItInsert(modifierLoc, "getter: ");
+            tc.diagnose(modifierLoc, diag::expr_selector_add_modifier,
+                        true, var->getFullName())
+              .fixItInsert(modifierLoc, "setter: ");
+
+            // Bail out now. We don't know what the user wanted, so
+            // don't fill in the details.
+            return E;
+          }
+
+          // The property is non-settable, so add "getter:".
+          primaryDiag.fixItInsert(modifierLoc, "getter: ");
+          E->overrideObjCSelectorKind(ObjCSelectorExpr::Getter, modifierLoc);
+          method = var->getGetter();
+          break;
+        }
+
+        case ObjCSelectorExpr::Getter:
+          method = var->getGetter();
+          break;
+
+        case ObjCSelectorExpr::Setter:
+          // Make sure we actually have a setter.
+          if (!var->isSettable(cs.DC)) {
+            tc.diagnose(E->getLoc(), diag::expr_selector_property_not_settable,
+                        var->getDescriptiveKind(), var->getFullName());
+            tc.diagnose(var, diag::decl_declared_here, var->getFullName());
+            return E;
+          }
+
+          // Make sure the setter is accessible.
+          if (!var->isSetterAccessibleFrom(cs.DC)) {
+            tc.diagnose(E->getLoc(),
+                        diag::expr_selector_property_setter_inaccessible,
+                        var->getDescriptiveKind(), var->getFullName());
+            tc.diagnose(var, diag::decl_declared_here, var->getFullName());
+            return E;
+          }
+
+          method = var->getSetter();
+          break;
+        }
+      } else {
+        // Cannot reference with #selector.
+        tc.diagnose(E->getLoc(), diag::expr_selector_no_declaration)
+          .highlight(subExpr->getSourceRange());
         tc.diagnose(foundDecl, diag::decl_declared_here,
                     foundDecl->getFullName());
         return E;
       }
+      assert(method && "Didn't find a method?");
 
       // The declaration we found must be exposed to Objective-C.
-      if (!func->isObjC()) {
+      if (!method->isObjC()) {
         tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
-                    isa<ConstructorDecl>(func))
+                    foundDecl->getDescriptiveKind(), foundDecl->getFullName())
           .highlight(subExpr->getSourceRange());
-        if (foundDecl->getLoc().isValid()) {
-          tc.diagnose(foundDecl,
-                      diag::expr_selector_make_objc,
-                      isa<ConstructorDecl>(func))
-            .fixItInsert(foundDecl->getAttributeInsertionLoc(false),
-                         "@objc ");
-        } else {
-          tc.diagnose(foundDecl, diag::decl_declared_here,
-                      foundDecl->getFullName());
-        }
+        tc.diagnose(foundDecl, diag::expr_selector_make_objc,
+                    foundDecl->getDescriptiveKind())
+          .fixItInsert(foundDecl->getAttributeInsertionLoc(false),
+                       "@objc ");
         return E;
       }
 
-      E->setMethod(func);
+      // Note which method we're referencing.
+      E->setMethod(method);
       return E;
     }
 

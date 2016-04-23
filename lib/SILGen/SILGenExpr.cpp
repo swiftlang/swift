@@ -233,6 +233,8 @@ namespace {
     RValue visitPointerToPointerExpr(PointerToPointerExpr *E, SGFContext C);
     RValue visitForeignObjectConversionExpr(ForeignObjectConversionExpr *E,
                                             SGFContext C);
+    RValue visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
+                                        SGFContext C);
   };
 }
 
@@ -3433,6 +3435,11 @@ RValue RValueEmitter::visitForeignObjectConversionExpr(
                         SGF.getLoweredType(E->getType())),
                       orig.getCleanup());
   return RValue(SGF, E, E->getType()->getCanonicalType(), result);
+}
+
+RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
+                                                   SGFContext C) {
+  llvm_unreachable("unevaluated_instance expression can never be evaluated");
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

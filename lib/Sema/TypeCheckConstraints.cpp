@@ -1325,8 +1325,6 @@ namespace {
   };
 }
 
-
-
 #pragma mark High-level entry points
 bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeLoc convertType,

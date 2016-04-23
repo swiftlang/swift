@@ -15,8 +15,6 @@ class C1 {
   @objc class func method3(_ a: A, b: B) { } // expected-note{{found this candidate}}
   @objc class func method3(a: A, b: B) { } // expected-note{{found this candidate}}
 
-  @objc var a: A = A() // expected-note{{'a' declared here}}
-
   @objc func getC1() -> AnyObject { return self }
 
   @objc func testUnqualifiedSelector(_ a: A, b: B) {
@@ -27,12 +25,12 @@ class C1 {
   }
 
   @objc func testParam(_ testParam: A) { // expected-note{{'testParam' declared here}}
-    _ = #selector(testParam) // expected-error{{argument of '#selector' cannot refer to a parameter}}
+    _ = #selector(testParam) // expected-error{{argument of '#selector' cannot refer to parameter 'testParam'}}
   }
 
   @objc func testVariable() {
     let testVariable = 1 // expected-note{{'testVariable' declared here}}
-    _ = #selector(testVariable) // expected-error{{argument of '#selector' cannot refer to a variable}}
+    _ = #selector(testVariable) // expected-error{{argument of '#selector' cannot refer to variable 'testVariable'}}
   }
 }
 
@@ -42,7 +40,7 @@ class C1 {
 }
 
 extension C1 {
-  final func method6() { } // expected-note{{add '@objc' to expose this method to Objective-C}}{{3-3=@objc }}
+  final func method6() { } // expected-note{{add '@objc' to expose this instance method to Objective-C}}{{3-3=@objc }}
 }
 
 func testSelector(_ c1: C1, p1: P1, obj: AnyObject) {
@@ -92,13 +90,8 @@ func testUnusedSelector() {
     #selector(C1.getC1) // expected-warning{{result of '#selector' is unused}}
 }
 
-func testProperties(_ c1: C1) {
-  _ = #selector(c1.a) // expected-error{{argument of '#selector' cannot refer to a property}}
-  _ = #selector(C1.a) // FIXME poor diagnostic: expected-error{{instance member 'a' cannot be used on type 'C1'}}
-}
-
 func testNonObjC(_ c1: C1) {
-  _ = #selector(c1.method6) // expected-error{{argument of '#selector' refers to a method that is not exposed to Objective-C}}
+  _ = #selector(c1.method6) // expected-error{{argument of '#selector' refers to instance method 'method6()' that is not exposed to Objective-C}}
 }
 
 func testParseErrors1() {

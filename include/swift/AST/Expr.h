@@ -301,6 +301,16 @@ class alignas(8) Expr {
   enum { NumCollectionUpcastConversionExprBits = NumExprBits + 1 };
   static_assert(NumCollectionUpcastConversionExprBits <= 32, "fits in an unsigned");
 
+  class ObjCSelectorExprBitfields {
+    friend class ObjCSelectorExpr;
+    unsigned : NumExprBits;
+
+    /// The selector kind.
+    unsigned SelectorKind : 2;
+  };
+  enum { NumObjCSelectorExprBits = NumExprBits + 2 };
+  static_assert(NumObjCSelectorExprBits <= 32, "fits in an unsigned");
+
 protected:
   union {
     ExprBitfields ExprBits;
@@ -322,6 +332,7 @@ protected:
     CheckedCastExprBitfields CheckedCastExprBits;
     CollectionUpcastConversionExprBitfields CollectionUpcastConversionExprBits;
     TupleShuffleExprBitfields TupleShuffleExprBits;
+    ObjCSelectorExprBitfields ObjCSelectorExprBits;
   };
 
 private:
@@ -2269,6 +2280,17 @@ public:
   }
 };
 
+/// Construct an unevaluated instance of the underlying metatype.
+class UnevaluatedInstanceExpr : public ImplicitConversionExpr {
+public:
+  UnevaluatedInstanceExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::UnevaluatedInstance, subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnevaluatedInstance;
+  }
+};
+
 /// TupleShuffleExpr - This represents a permutation of a tuple value to a new
 /// tuple type.  The expression's type is known to be a tuple type.
 ///
@@ -3753,29 +3775,84 @@ public:
 class ObjCSelectorExpr : public Expr {
   SourceLoc KeywordLoc;
   SourceLoc LParenLoc;
+  SourceLoc ModifierLoc;
   Expr *SubExpr;
   SourceLoc RParenLoc;
-  AbstractFunctionDecl *Method = nullptr;
+  AbstractFunctionDecl *ResolvedMethod = nullptr;
 
 public:
-  ObjCSelectorExpr(SourceLoc keywordLoc, SourceLoc lParenLoc,
-                   Expr *subExpr, SourceLoc rParenLoc)
+  /// The kind of #selector expression this is.
+  enum ObjCSelectorKind {
+    Method, Getter, Setter
+  };
+
+  ObjCSelectorExpr(ObjCSelectorKind kind, SourceLoc keywordLoc,
+                   SourceLoc lParenLoc, SourceLoc modifierLoc, Expr *subExpr,
+                   SourceLoc rParenLoc)
     : Expr(ExprKind::ObjCSelector, /*Implicit=*/false),
-      KeywordLoc(keywordLoc), LParenLoc(lParenLoc), SubExpr(subExpr),
-      RParenLoc(rParenLoc) { }
+      KeywordLoc(keywordLoc), LParenLoc(lParenLoc),
+      ModifierLoc(modifierLoc), SubExpr(subExpr), RParenLoc(rParenLoc) {
+    ObjCSelectorExprBits.SelectorKind = static_cast<unsigned>(kind);
+  }
 
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *expr) { SubExpr = expr; }
 
+  /// Whether this selector references a property getter or setter.
+  bool isPropertySelector() const {
+    switch (getSelectorKind()) {
+    case ObjCSelectorKind::Method:
+      return false;
+
+    case ObjCSelectorKind::Getter:
+    case ObjCSelectorKind::Setter:
+      return true;
+    }
+  }
+
+  /// Whether this selector references a method.
+  bool isMethodSelector() const {
+    switch (getSelectorKind()) {
+    case ObjCSelectorKind::Method:
+      return true;
+
+    case ObjCSelectorKind::Getter:
+    case ObjCSelectorKind::Setter:
+      return false;
+    }
+  }
+
   /// Retrieve the Objective-C method to which this expression refers.
-  AbstractFunctionDecl *getMethod() const { return Method; }
+  AbstractFunctionDecl *getMethod() const { return ResolvedMethod; }
 
   /// Set the Objective-C method to which this expression refers.
-  void setMethod(AbstractFunctionDecl *method) { Method = method; }
+  void setMethod(AbstractFunctionDecl *method) { ResolvedMethod = method; }
 
   SourceLoc getLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const {
     return SourceRange(KeywordLoc, RParenLoc);
+  }
+
+  /// The location at which the getter: or setter: starts. Requires the selector
+  /// to be a getter or setter.
+  SourceLoc getModifierLoc() const {
+    assert(isPropertySelector() && "Modifiers only set on property selectors");
+    return ModifierLoc;
+  }
+
+  /// Retrieve the kind of the selector (method, getter, setter)
+  ObjCSelectorKind getSelectorKind() const {
+    return static_cast<ObjCSelectorKind>(ObjCSelectorExprBits.SelectorKind);
+  }
+
+  /// Override the selector kind.
+  ///
+  /// Used by the type checker to recover from ill-formed #selector
+  /// expressions.
+  void overrideObjCSelectorKind(ObjCSelectorKind newKind,
+                                SourceLoc modifierLoc) {
+    ObjCSelectorExprBits.SelectorKind = static_cast<unsigned>(newKind);
+    ModifierLoc = modifierLoc;
   }
 
   static bool classof(const Expr *E) {

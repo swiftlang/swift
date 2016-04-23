@@ -553,6 +553,8 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 ///
 ///   expr-selector:
 ///     '#selector' '(' expr ')'
+///     '#selector' '(' 'getter' ':' expr ')'
+///     '#selector' '(' 'setter' ':' expr ')'
 ///
 ParserResult<Expr> Parser::parseExprSelector() {
   // Consume '#selector'.
@@ -564,6 +566,26 @@ ParserResult<Expr> Parser::parseExprSelector() {
     return makeParserError();
   }
   SourceLoc lParenLoc = consumeToken(tok::l_paren);
+  SourceLoc modifierLoc;
+
+
+  // Parse possible 'getter:' or 'setter:' modifiers, and determine
+  // the kind of selector we're working with.
+  ObjCSelectorExpr::ObjCSelectorKind selectorKind;
+  if (peekToken().is(tok::colon) &&
+      (Tok.isContextualKeyword("getter") ||
+       Tok.isContextualKeyword("setter"))) {
+    // Parse the modifier.
+    if (Tok.isContextualKeyword("getter"))
+      selectorKind = ObjCSelectorExpr::Getter;
+    else
+      selectorKind = ObjCSelectorExpr::Setter;
+
+    modifierLoc = consumeToken(tok::identifier);
+    (void)consumeToken(tok::colon);
+  } else {
+    selectorKind = ObjCSelectorExpr::Method;
+  }
 
   // Parse the subexpression.
   CodeCompletionCallbacks::InObjCSelectorExprRAII
@@ -591,8 +613,8 @@ ParserResult<Expr> Parser::parseExprSelector() {
              new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
 
   return makeParserResult<Expr>(
-    new (Context) ObjCSelectorExpr(keywordLoc, lParenLoc, subExpr.get(),
-                                   rParenLoc));
+    new (Context) ObjCSelectorExpr(selectorKind, keywordLoc, lParenLoc,
+                                   modifierLoc, subExpr.get(), rParenLoc));
 }
 
 static DeclRefKind getDeclRefKindForOperator(tok kind) {

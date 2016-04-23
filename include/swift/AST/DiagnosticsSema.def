@@ -374,18 +374,36 @@ ERROR(expr_selector_no_objc_runtime,none,
 ERROR(expr_selector_module_missing,none,
       "import the 'ObjectiveC' module to use '#selector'", ())
 ERROR(expr_selector_no_declaration,none,
-      "argument of '#selector' does not refer to an initializer or method", ())
-ERROR(expr_selector_var,none,
-      "argument of '#selector' cannot refer to a %select{property|parameter|variable}0", (int))
-ERROR(expr_selector_not_method_or_init,none,
-      "argument of '#selector' does not refer to a method or initializer", ())
+      "argument of '#selector' does not refer to an '@objc' method, property, "
+      "or initializer", ())
+ERROR(expr_selector_not_method,none,
+      "argument of '#selector' cannot refer to %select{local|global}0 "
+      "function %1", (bool, DeclName))
+ERROR(expr_selector_expected_property,none,
+      "cannot reference %1 %2 as a property; remove '%select{getter|setter}0:'",
+      (bool, DescriptiveDeclKind, DeclName))
+ERROR(expr_selector_not_property,none,
+      "argument of '#selector' cannot refer to %select{variable|parameter}0 %1",
+      (bool, DeclName))
+ERROR(expr_selector_expected_method,none,
+      "use 'getter:'%select{| or 'setter:'}0 to refer to the Objective-C getter"
+      "%select{| or setter}0 of property %1%select{|, respectively}0",
+      (bool, DeclName))
+NOTE(expr_selector_add_modifier,none,
+     "add '%select{getter|setter}0:' to reference the Objective-C "
+     "%select{getter|setter}0 for %1", (bool, DeclName))
+ERROR(expr_selector_property_not_settable,none,
+      "argument of '#selector(setter:)' refers to non-settable %0 %1",
+      (DescriptiveDeclKind, DeclName))
+ERROR(expr_selector_property_setter_inaccessible,none,
+      "setter of %0 %1 is inaccessible", (DescriptiveDeclKind, DeclName))
 ERROR(expr_selector_not_objc,none,
-      "argument of '#selector' refers to %select{a method|an initializer}0 "
-      "that is not exposed to Objective-C",
-      (bool))
+      "argument of '#selector' refers to %0 %1 that is not exposed to "
+      "Objective-C",
+      (DescriptiveDeclKind, DeclName))
 NOTE(expr_selector_make_objc,none,
-     "add '@objc' to expose this %select{method|initializer}0 to Objective-C",
-     (bool))
+     "add '@objc' to expose this %0 to Objective-C",
+     (DescriptiveDeclKind))
 
 // Selectors-as-string-literals.
 WARNING(selector_literal_invalid,none,
