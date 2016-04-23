@@ -111,3 +111,33 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
 
   return undef : $()
 }
+
+typealias Any = protocol<>
+
+struct Foo<T> {
+  private let x : T -> ()
+  private let y : T
+  private let z : Any
+}
+
+// rdar://25870973
+//   swift-2.2 specific test that field projections of concrete but
+//   non-fixed-size types don't crash south of an init_existential_addr.
+sil @bar : $@convention(thin) <T> (@out Foo<T>) -> ()
+sil @foo : $@convention(thin) <T> (@out Any, @in Foo<T>) -> () {
+bb0(%0 : $*Any, %1 : $*Foo<T>):
+  %2 = alloc_stack $Any
+
+  %3 = init_existential_addr %2 : $*Any, $Foo<T>
+  %fn = function_ref @bar : $@convention(thin) <T> (@out Foo<T>) -> ()
+  %result = apply %fn<T>(%3) : $@convention(thin) <T> (@out Foo<T>) -> ()
+
+  %4 = init_existential_addr %0 : $*Any, $Foo<T>
+  copy_addr %3 to [initialization] %4 : $*Foo<T>
+
+  destroy_addr %2 : $*Any
+
+  dealloc_stack %2 : $*Any
+  %ret = tuple ()
+  return %ret : $()
+}
