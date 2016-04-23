@@ -586,6 +586,7 @@ details of the setups of other systems or automated environments.""")
     run_tests_group.add_argument(
         "--long-test",
         help="run the long test suite",
+        metavar="BOOL",
         nargs='?',
         type=argparse_bool,
         default=False,
