@@ -1144,8 +1144,17 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     auto LSquareTokRange = Tok.getRange();
     (void)consumeToken(tok::l_square_lit);
     
-    Result = parseExprPostfix(ID, isExprBasic);
-    
+    if (Tok.is(tok::pound)) {
+      consumeToken();
+      if (!Tok.is(tok::identifier))
+        diagnose(LSquareLoc, diag::expected_object_literal_identifier);
+      skipUntil(tok::r_square_lit);
+      Result = makeParserError();
+    }
+    else {
+      Result = parseExprPostfix(ID, isExprBasic);
+    }
+
     // This should be an invariant based on the check in
     // isCollectionLiteralStartingWithLSquareLit().
     auto RSquareTokRange = Tok.getRange();
@@ -2362,6 +2371,11 @@ bool Parser::isCollectionLiteralStartingWithLSquareLit() {
    BacktrackingScope backtracking(*this);
    (void)consumeToken(tok::l_square_lit);
    switch (Tok.getKind()) {
+     // Handle both dengerate '#' and '# identifier'.
+     case tok::pound:
+      (void) consumeToken();
+      if (Tok.is(tok::identifier)) skipSingle();
+      break;
 #define POUND_OBJECT_LITERAL(kw, desc, proto)\
      case tok::pound_##kw: (void)consumeToken(); break;
 #define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)\
