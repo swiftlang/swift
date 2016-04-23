@@ -2034,6 +2034,17 @@ static bool moduleIsInferImportAsMember(const clang::NamedDecl *decl,
   return false;
 }
 
+// If this decl is associated with a swift_newtype typedef, return it, otherwise
+// null
+static clang::TypedefNameDecl *findSwiftNewtype(const clang::Decl *decl) {
+  if (auto varDecl = dyn_cast<clang::VarDecl>(decl))
+    if (auto typedefTy = varDecl->getType()->getAs<clang::TypedefType>())
+      if (typedefTy->getDecl()->hasAttr<clang::SwiftNewtypeAttr>())
+        return typedefTy->getDecl();
+
+  return nullptr;
+}
+
 auto ClangImporter::Implementation::importFullName(
        const clang::NamedDecl *D,
        ImportNameOptions options,
@@ -2068,8 +2079,11 @@ auto ClangImporter::Implementation::importFullName(
       result.EffectiveContext = enumDecl->getRedeclContext();
       break;
     }
+  // Import onto a swift_newtype if present
+  } else if (auto newtypeDecl = findSwiftNewtype(D)) {
+    result.EffectiveContext = newtypeDecl;
+  // Everything else goes into its redeclaration context.
   } else {
-    // Everything else goes into its redeclaration context.
     result.EffectiveContext = dc->getRedeclContext();
   }
 
@@ -2538,6 +2552,24 @@ auto ClangImporter::Implementation::importFullName(
 
   // Omit needless words.
   StringScratchSpace omitNeedlessWordsScratch;
+
+  // swift_newtype-ed declarations may have common words with the type name
+  // stripped.
+  if (auto newtypeDecl = findSwiftNewtype(D)) {
+    // Skip a leading 'k' in a 'kConstant' pattern
+    if (baseName.size() >= 2 && baseName[0] == 'k' &&
+        clang::isUppercase(baseName[1]))
+      baseName.drop_front(1);
+
+    bool nonIdentifier = false;
+    auto pre =
+        getCommonWordPrefix(newtypeDecl->getName(), baseName, nonIdentifier);
+    if (pre.size()) {
+      baseName = baseName.drop_front(pre.size());
+      strippedPrefix = true;
+    }
+  }
+
   if (!result.isSubscriptAccessor()) {
     // Check whether the module in which the declaration resides has a
     // module prefix and will map into Swift as a type. If so, strip
