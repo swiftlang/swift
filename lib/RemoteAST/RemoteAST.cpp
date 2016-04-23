@@ -33,9 +33,9 @@ namespace {
 class RemoteASTTypeBuilder {
   ASTContext &Ctx;
 
-  /// The notional module in which we're writing and type-checking code.
+  /// The notional context in which we're writing and type-checking code.
   /// Created lazily.
-  ModuleDecl *NotionalModule = nullptr;
+  DeclContext *NotionalDC = nullptr;
 
 public:
   using BuiltType = swift::Type;
@@ -320,21 +320,22 @@ private:
                                        Demangle::Node::Kind kind);
 
   Type checkTypeRepr(TypeRepr *repr) {
-    ModuleDecl *module = getNotionalModule();
+    DeclContext *dc = getNotionalDC();
 
     TypeLoc loc(repr);
-    if (performTypeLocChecking(Ctx, loc, /*SILType*/ false, module,
+    if (performTypeLocChecking(Ctx, loc, /*SILType*/ false, dc,
                                /*diagnose*/ false))
       return Type();
 
     return loc.getType();
   }
 
-  ModuleDecl *getNotionalModule() {
-    if (!NotionalModule) {
-      NotionalModule = ModuleDecl::create(Ctx.getIdentifier(".RemoteAST"), Ctx);
+  DeclContext *getNotionalDC() {
+    if (!NotionalDC) {
+      NotionalDC = ModuleDecl::create(Ctx.getIdentifier(".RemoteAST"), Ctx);
+      NotionalDC = new (Ctx) TopLevelCodeDecl(NotionalDC);
     }
-    return NotionalModule;
+    return NotionalDC;
   }
 
   class TypeReprList {

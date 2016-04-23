@@ -53,3 +53,9 @@ printType(G.self)
 // CHECK: G
 printType(G.Foo.self)
 // CHECK: G.Foo
+
+struct H<T, U> {}
+printType(H<A,A>.self)
+// CHECK: H<A, A>
+printType(H<B.Foo, H<B, A>>.self)
+// CHECK: H<B.Foo, H<B, A>>
