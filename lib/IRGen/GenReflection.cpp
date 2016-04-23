@@ -475,7 +475,7 @@ class CaptureDescriptorBuilder : public ReflectionMetadataBuilder {
   HeapLayout &Layout;
 public:
   CaptureDescriptorBuilder(IRGenModule &IGM,
-                           SmallPtrSetImpl<CanType> &BuiltinTypes,
+                           llvm::SetVector<CanType> &BuiltinTypes,
                            SILFunction &Callee,
                            HeapLayout &Layout)
     : ReflectionMetadataBuilder(IGM, BuiltinTypes),
@@ -746,7 +746,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef Str) {
 
 llvm::Constant *IRGenModule::getAddrOfCaptureDescriptor(SILFunction &SILFn,
                                                         HeapLayout &Layout) {
-  SmallPtrSet<CanType, 1> BuiltinTypes;
+  llvm::SetVector<CanType> BuiltinTypes;
   CaptureDescriptorBuilder builder(*this, BuiltinTypes, SILFn, Layout);
 
   auto var = builder.emit();
