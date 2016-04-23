@@ -1282,6 +1282,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     if (Args.hasArg(OPT_enable_reflection_names)) {
       Opts.EnableReflectionNames = true;
     }
+    if (Args.hasArg(OPT_enable_reflection_builtins)) {
+      Opts.EnableReflectionBuiltins = true;
+    }
   }
 
   return false;
