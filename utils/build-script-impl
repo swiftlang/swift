@@ -1552,6 +1552,8 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
 
     for product in "${PRODUCTS[@]}"; do
         unset skip_build
+        source_dir_var="$(toupper ${product})_SOURCE_DIR"
+        source_dir=${!source_dir_var}
         build_dir=$(build_directory ${deployment_target} ${product})
         build_targets=(all)
         cmake_options=("${COMMON_CMAKE_OPTIONS[@]}")
@@ -1581,7 +1583,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                   "${cmake_options[@]}"
                   -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
                   "${cmark_cmake_options[@]}"
-                  "${CMARK_SOURCE_DIR}"
                 )
                 skip_build=${SKIP_BUILD_CMARK}
                 build_targets=(all)
@@ -1616,7 +1617,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DLLVM_INCLUDE_TESTS:BOOL=$(true_false "${SOURCE_TREE_INCLUDES_TESTS}")
                     -LLVM_INCLUDE_DOCS:BOOL=TRUE
                     "${llvm_cmake_options[@]}"
-                    "${LLVM_SOURCE_DIR}"
                 )
                 if [[ $(is_cross_tools_deployment_target ${deployment_target}) ]] ; then
                     cmake_options=(
@@ -1783,11 +1783,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                                    "${SWIFT_BENCHMARK_TARGETS[@]}")
                 fi
 
-                cmake_options=(
-                    "${cmake_options[@]}"
-                    "${SWIFT_SOURCE_DIR}"
-                )
-
                 skip_build=${SKIP_BUILD_SWIFT}
                 ;;
             lldb)
@@ -1838,7 +1833,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                             -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
                             -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
                             -DLLDB_ALLOW_STATIC_BINDINGS=1
-                            "${LLDB_SOURCE_DIR}"
                         )
                         ;;
                     FreeBSD)
@@ -1856,7 +1850,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                             -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
                             -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
                             -DLLDB_ALLOW_STATIC_BINDINGS=1
-                            "${LLDB_SOURCE_DIR}"
                         )
                         ;;
                     CYGWIN_NT-10.0)
@@ -1874,7 +1867,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                             -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
                             -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
                             -DLLDB_ALLOW_STATIC_BINDINGS=1
-                            "${LLDB_SOURCE_DIR}"
                         )
                         ;;
                     Darwin)
@@ -1907,7 +1899,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                             )
                         fi
                         set_lldb_build_mode
-                        pushd ${LLDB_SOURCE_DIR}
+                        pushd ${source_dir}
                         xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
                         popd
                         continue
@@ -1922,7 +1914,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DFILECHECK_EXECUTABLE:PATH="$(build_directory_bin ${deployment_target} llvm)/FileCheck"
                     -DCMAKE_BUILD_TYPE:STRING="${LLBUILD_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
-                    "${LLBUILD_SOURCE_DIR}"
                 )
                 ;;
             swiftpm)
@@ -2058,7 +2049,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             set -x
             mkdir -p "${build_dir}"
             rm -f "${cmake_cache_path}"
-            (cd "${build_dir}" && "${CMAKE}" "${cmake_options[@]}" ${USER_CONFIG_ARGS})
+            (cd "${build_dir}" && "${CMAKE}" "${cmake_options[@]}" ${USER_CONFIG_ARGS} "${source_dir}")
             { set +x; } 2>/dev/null
         fi
 
