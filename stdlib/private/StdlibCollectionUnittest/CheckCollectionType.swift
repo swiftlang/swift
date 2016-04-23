@@ -303,6 +303,83 @@ let removeFirstTests: [RemoveFirstNTest] = [
   ),
 ]
 
+extension Collection {
+  public func nthIndex(_ offset: Int) -> Index {
+    return self.location(self.startIndex, offsetBy: numericCast(offset))
+  }
+}
+
+public struct DistanceFromToTest {
+  public let startOffset: Int
+  public let endOffset: Int
+  public var expectedDistance : Int { return endOffset - startOffset }
+  public let loc: SourceLoc
+
+  public init(
+    _ offsets: Range<Int>,
+    file: String = #file, line: UInt = #line
+  ) {
+    self.startOffset = offsets.lowerBound
+    self.endOffset = offsets.upperBound
+    self.loc = SourceLoc(file, line, comment: "distance(from:to:) test data")
+  }
+}
+
+public struct IndexStepsFromTest {
+  public let startOffset: Int
+  public let distance: Int
+  public let limit: Int?
+  public let expectedOffset: Int?
+  
+  public let loc: SourceLoc
+
+  public init(
+    startOffset: Int, distance: Int, expectedOffset: Int?,
+    limitedBy limit: Int? = nil,
+    file: String = #file, line: UInt = #line
+  ) {
+    self.startOffset = startOffset
+    self.distance = distance
+    self.expectedOffset = expectedOffset
+    self.limit = limit
+    self.loc = SourceLoc(file, line, comment: "location(_:offsetBy:) test data")
+  }
+}
+
+public let distanceFromToTests = [
+  DistanceFromToTest(0..<0),
+  DistanceFromToTest(10..<10),
+  DistanceFromToTest(10..<13),
+  DistanceFromToTest(7..<10),
+]
+
+public let indexStepsFromTests = [
+  IndexStepsFromTest(startOffset: 0, distance: 0, expectedOffset: 0),
+  IndexStepsFromTest(startOffset: 0, distance: -1, expectedOffset: -1),
+  IndexStepsFromTest(
+    startOffset: 0, distance: 0, expectedOffset: 0, limitedBy: 0),
+  IndexStepsFromTest(
+    startOffset: 0, distance: 0, expectedOffset: 0, limitedBy: 10),
+  IndexStepsFromTest(
+    startOffset: 0, distance: 10, expectedOffset: nil, limitedBy: 0),
+  IndexStepsFromTest(
+    startOffset: 0, distance: -10, expectedOffset: nil, limitedBy: 0),
+  IndexStepsFromTest(
+    startOffset: 0, distance: 10, expectedOffset: 10, limitedBy: 10),
+  IndexStepsFromTest(
+    startOffset: 0, distance: 20, expectedOffset: nil, limitedBy: 10),
+  IndexStepsFromTest(
+    startOffset: 10, distance: -20, expectedOffset: nil, limitedBy: 0),
+  IndexStepsFromTest(
+    startOffset: 5, distance: 5, expectedOffset: 10, limitedBy: 2),
+  IndexStepsFromTest(
+    startOffset: 5, distance: 5, expectedOffset: nil, limitedBy: 5),
+  IndexStepsFromTest(
+    startOffset: 5, distance: -5, expectedOffset: 0, limitedBy: 7),
+  IndexStepsFromTest(
+    startOffset: 5, distance: -5, expectedOffset: nil, limitedBy: 5)
+]
+
 internal func _allIndices<C : Collection>(
   into c: C, in bounds: Range<C.Index>
 ) -> [C.Index] {
