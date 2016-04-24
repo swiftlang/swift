@@ -8,9 +8,9 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-import unittest
-import os
 import argparse
+import os
+import unittest
 
 from swift_build_support import migration
 
