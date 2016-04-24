@@ -42,7 +42,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 import swift_build_support.toolchain  # noqa (E402)
 import swift_build_support.cmake      # noqa (E402)
 import swift_build_support.debug      # noqa (E402)
-from swift_build_support.migration import migrate_impl_args  # noqa (E402)
+from swift_build_support import migration  # noqa (E402)
 import swift_build_support.ninja      # noqa (E402)
 import swift_build_support.tar        # noqa (E402)
 import swift_build_support.targets    # noqa (E402)
@@ -162,7 +162,7 @@ Using option presets:
   using the name=value syntax on the command line.
 
 
-Any arguments passed after "--" are forwarded directly to Swift's
+Any arguments not listed are forwarded directly to Swift's
 'build-script-impl'.  See that script's help for details.
 
 Environment variables
@@ -805,31 +805,24 @@ details of the setups of other systems or automated environments.""")
              "called multiple times to add multiple such options.",
         action="append", dest="extra_cmake_options", default=[])
 
-    parser.add_argument(
-        "build_script_impl_args",
-        help="",
-        nargs="*")
+    args = migration.parse_args(parser, sys.argv[1:])
 
-    args = parser.parse_args(migrate_impl_args(sys.argv[1:], [
-        '--darwin-xcrun-toolchain',
-        '--cmake',
-        '--host-target',
-        '--stdlib-deployment-targets',
-        '--skip-build',
-        '--show-sdks',
-        '--install-prefix',
-        '--install-symroot',
-        '--symbols-package',
-        '--skip-test-ios',
-        '--skip-test-ios-simulator',
-        '--skip-test-ios-host',
-        '--skip-test-tvos',
-        '--skip-test-tvos-simulator',
-        '--skip-test-tvos-host',
-        '--skip-test-watchos',
-        '--skip-test-watchos-simulator',
-        '--skip-test-watchos-host',
-    ]))
+    build_script_impl = os.path.join(
+        SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl")
+
+    if args.build_script_impl_args:
+        # If we received any impl args, check if `build-script-impl` would
+        # accept them or not before any further processing.
+        try:
+            migration.check_impl_args(build_script_impl,
+                                      args.build_script_impl_args)
+        except ValueError as e:
+            parser.print_usage(sys.stderr)
+            print(e, file=sys.stderr)
+            sys.exit(2)  # 2 is the same as `argparse` error exit code.
+
+        if '--check-args-only' in args.build_script_impl_args:
+            return 0
 
     if args.host_target is None or args.stdlib_deployment_targets is None:
         print_with_argv0("Unknown operating system.")
@@ -1170,7 +1163,6 @@ details of the setups of other systems or automated environments.""")
         print_with_argv0("Can't find CMake. Please install CMake.")
         return 1
     build_script_impl_args = [
-        os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl"),
         "--build-dir", build_dir,
         "--install-prefix", os.path.abspath(args.install_prefix),
         "--host-target", args.host_target,
@@ -1277,7 +1269,8 @@ details of the setups of other systems or automated environments.""")
     if args.show_sdks:
         swift_build_support.debug.print_xcodebuild_versions()
 
-    check_call(build_script_impl_args, disable_sleep=True)
+    check_call([build_script_impl] + build_script_impl_args,
+               disable_sleep=True)
 
     if args.symbols_package:
         print('--- Creating symbols package ---')
