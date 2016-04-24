@@ -24,23 +24,9 @@
 
 #include <vector>
 #include <unordered_map>
-#include <utility>
 
 namespace swift {
 namespace remote {
-
-template <typename Runtime>
-using SharedTargetMetadataRef = std::shared_ptr<TargetMetadata<Runtime>>;
-
-using SharedCaptureDescriptor = std::shared_ptr<const CaptureDescriptor>;
-
-template <typename Runtime>
-using SharedTargetNominalTypeDescriptorRef
-  = std::shared_ptr<TargetNominalTypeDescriptor<Runtime>>;
-
-template <typename Runtime>
-using SharedProtocolDescriptorRef
-  = std::shared_ptr<TargetProtocolDescriptor<Runtime>>;
 
 /// A utility class for constructing abstract types from
 /// a textual mangling.
@@ -351,6 +337,14 @@ public:
   }
 };
 
+/// A structure, designed for use with std::unique_ptr, which destroys
+/// a pointer by calling free on it (and not trying to call a destructor).
+struct delete_with_free {
+  void operator()(const void *memory) {
+    free(const_cast<void*>(memory));
+  }
+};
+
 /// A generic reader of metadata.
 ///
 /// BuilderType must implement a particular interface which is currently
@@ -373,21 +367,29 @@ private:
 
   using MetadataRef =
     RemoteRef<Runtime, TargetMetadata<Runtime>>;
-  using SharedMetadataRef =
-    SharedTargetMetadataRef<Runtime>;
+  using OwnedMetadataRef =
+    std::unique_ptr<const TargetMetadata<Runtime>, delete_with_free>;
 
   /// A cache of read type metadata, keyed by the address of the metadata.
-  std::unordered_map<StoredPointer, SharedMetadataRef> MetadataCache;
+  std::unordered_map<StoredPointer, OwnedMetadataRef>
+    MetadataCache;
 
   using NominalTypeDescriptorRef =
     RemoteRef<Runtime, TargetNominalTypeDescriptor<Runtime>>;
-  using SharedNominalTypeDescriptorRef =
-    SharedTargetNominalTypeDescriptorRef<Runtime>;
+  using OwnedNominalTypeDescriptorRef =
+    std::unique_ptr<const TargetNominalTypeDescriptor<Runtime>,
+                    delete_with_free>;
 
   /// A cache of read nominal type descriptors, keyed by the address of the
   /// nominal type descriptor.
-  std::unordered_map<StoredPointer, SharedNominalTypeDescriptorRef>
+  std::unordered_map<StoredPointer, OwnedNominalTypeDescriptorRef>
     NominalTypeDescriptorCache;
+
+  using OwnedProtocolDescriptorRef =
+    std::unique_ptr<const TargetProtocolDescriptor<Runtime>, delete_with_free>;
+
+  using OwnedCaptureDescriptor =
+    std::unique_ptr<const CaptureDescriptor, delete_with_free>;
 
 public:
   BuilderType Builder;
@@ -421,21 +423,12 @@ public:
   }
 
   /// Given a remote pointer to metadata, attempt to discover its MetadataKind.
-  std::pair<bool,MetadataKind>
+  std::pair<bool, MetadataKind>
   readKindFromMetadata(StoredPointer MetadataAddress) {
-    auto Cached = MetadataCache.find(MetadataAddress);
-    if (Cached != MetadataCache.end()) {
-      if (auto Meta = Cached->second) {
-        return {true,Cached->second->getKind()};
-      } else {
-        return {false,MetadataKind::Opaque};
-      }
-    }
+    auto meta = readMetadata(MetadataAddress);
+    if (!meta) return {false, MetadataKind::Opaque};
 
-    auto Meta = readMetadata(MetadataAddress);
-    if (!Meta) return {false,MetadataKind::Opaque};
-
-    return {true,Meta->getKind()};
+    return {true, meta->getKind()};
   }
 
   /// Given a remote pointer to metadata, attempt to turn it into a type.
@@ -590,7 +583,7 @@ private:
     }
 
     auto metadata = reinterpret_cast<TargetMetadata<Runtime>*>(buffer);
-    MetadataCache.insert({address, SharedMetadataRef(metadata, free)});
+    MetadataCache.insert(std::make_pair(address, OwnedMetadataRef(metadata)));
     return MetadataRef(address, metadata);
   }
 
@@ -703,8 +696,8 @@ private:
     auto descriptor
       = reinterpret_cast<TargetNominalTypeDescriptor<Runtime> *>(buffer);
 
-    NominalTypeDescriptorCache.insert({address,
-                            SharedNominalTypeDescriptorRef(descriptor, free)});
+    NominalTypeDescriptorCache.insert(
+      std::make_pair(address, OwnedNominalTypeDescriptorRef(descriptor)));
     return NominalTypeDescriptorRef(address, descriptor);
   }
 
@@ -724,7 +717,7 @@ private:
     return decl;
   }
 
-  SharedProtocolDescriptorRef<Runtime>
+  OwnedProtocolDescriptorRef
   readProtocolDescriptor(StoredPointer Address) {
     auto Size = sizeof(TargetProtocolDescriptor<Runtime>);
     auto Buffer = (uint8_t *)malloc(Size);
@@ -734,7 +727,7 @@ private:
     }
     auto Casted
       = reinterpret_cast<TargetProtocolDescriptor<Runtime> *>(Buffer);
-    return SharedProtocolDescriptorRef<Runtime>(Casted, free);
+    return OwnedProtocolDescriptorRef(Casted);
   }
 
   StoredPointer getNominalParent(MetadataRef metadata,
@@ -830,7 +823,7 @@ private:
   /// Read the entire CaptureDescriptor in this address space, including
   /// trailing capture typeref relative offsets, and GenericMetadataSource
   /// pairs.
-  SharedCaptureDescriptor readCaptureDescriptor(StoredPointer Address) {
+  OwnedCaptureDescriptor readCaptureDescriptor(StoredPointer Address) {
 
     uint32_t NumCaptures = 0;
     uint32_t NumMetadataSources = 0;
@@ -857,7 +850,7 @@ private:
     }
 
     auto RawDescriptor = reinterpret_cast<const CaptureDescriptor *>(Buffer);
-    return SharedCaptureDescriptor(RawDescriptor, /*deleter*/ free);
+    return OwnedCaptureDescriptor(RawDescriptor);
   }
 };
 
