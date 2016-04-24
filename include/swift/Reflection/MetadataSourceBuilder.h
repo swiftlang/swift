@@ -1,4 +1,4 @@
-//===--- MetadataSourceBuilder.h - Swift Metadata Source Builder --------*- C++ -*-===//
+//===--- MetadataSourceBuilder.h - Metadata Source Builder ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // Implements utilities for constructing MetadataSources.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_REFLECTION_METADATASOURCEBUILDER_H
