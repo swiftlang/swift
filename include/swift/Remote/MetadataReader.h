@@ -725,7 +725,7 @@ private:
     }
 
     // If this is metadata for a class type, the parent type for the
-    // most-derived class is at a offset stored in the most-derived
+    // most-derived class is at an offset stored in the most-derived
     // nominal type descriptor.
     if (auto classMetadata = dyn_cast<TargetClassMetadata<Runtime>>(metadata)) {
       // If it does, it's immediately before the generic parameters.

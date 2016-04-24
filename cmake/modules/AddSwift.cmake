@@ -1986,7 +1986,7 @@ endfunction()
 #     Sources to add into this executable.
 #
 # Note:
-#   Host executables are not given a variant suffix. To build a executable for
+#   Host executables are not given a variant suffix. To build an executable for
 #   each SDK and ARCH variant, use add_swift_target_executable.
 function(add_swift_executable name)
   # Parse the arguments we were given.

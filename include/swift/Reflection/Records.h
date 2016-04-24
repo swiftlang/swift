@@ -390,7 +390,7 @@ private:
   const GenericMetadataSource *getGenericMetadataSourceBuffer() const {
     auto BeginTR = reinterpret_cast<const char *>(getCaptureTypeRefBuffer());
     auto EndTR = BeginTR + NumCaptures * sizeof(GenericMetadataSource);
-    return reinterpret_cast<const GenericMetadataSource *>(EndTR );
+    return reinterpret_cast<const GenericMetadataSource *>(EndTR);
   }
 
   const RelativeDirectPointer<const char> *getCaptureTypeRefBuffer() const {
