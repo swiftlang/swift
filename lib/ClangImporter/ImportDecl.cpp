@@ -1424,7 +1424,7 @@ namespace {
     /// \param underlyingType the type of the raw value
     /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
     /// \param protocols the protocols to make this struct conform to
-    /// \param setterAccessibility the accessiblity of the raw value's setter
+    /// \param setterAccessibility the accessibility of the raw value's setter
     /// \param isLet whether the raw value should be a let
     /// \param makeUnlabeledValueInit whether to also create an unlabeled init
     /// \param isImplicit whether to mark the rawValue as implicit

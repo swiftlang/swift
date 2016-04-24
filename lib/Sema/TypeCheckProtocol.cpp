@@ -4583,7 +4583,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       }
     }
 
-    // For any unsatified optional @objc requirements that remain
+    // For any unsatisfied optional @objc requirements that remain
     // unsatisfied, note them in the AST for @objc selector collision
     // checking.
     for (auto req : unsatisfiedReqs) {
