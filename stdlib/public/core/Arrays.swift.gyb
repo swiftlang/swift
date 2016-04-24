@@ -1010,6 +1010,8 @@ extension ${Self} {
   }
 }
 
+// FIXME(ABI): remove this entrypoint.  The functionality should be provided by
+// a `+=` operator on `RangeReplaceableCollection`.
 /// Append the contents of `rhs` to `lhs`.
 public func += <
   Element, S : Sequence
@@ -1027,6 +1029,8 @@ public func += <
   _arrayAppendSequence(&lhs._buffer, rhs)
 }
 
+// FIXME(ABI): remove this entrypoint.  The functionality should be provided by
+// a `+=` operator on `RangeReplaceableCollection`.
 /// Append the contents of `rhs` to `lhs`.
 public func += <
   Element, C : Collection
