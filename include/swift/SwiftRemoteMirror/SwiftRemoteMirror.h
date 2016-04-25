@@ -75,6 +75,10 @@ swift_reflection_infoForField(SwiftReflectionContextRef ContextRef,
                               unsigned Index);
 
 /// Returns a fully instantiated typeref for a generic argument by index.
+unsigned
+swift_reflection_genericArgumentCountOfTypeRef(swift_typeref_t OpaqueTypeRef);
+
+/// Returns a fully instantiated typeref for a generic argument by index.
 swift_typeref_t
 swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
                                           unsigned Index);

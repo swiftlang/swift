@@ -82,9 +82,19 @@ swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
 
   if (auto BG = dyn_cast<BoundGenericTypeRef>(TR)) {
     auto &Params = BG->getGenericParams();
-    if (Index < Params.size()) {
-      return reinterpret_cast<swift_typeref_t>(Params[Index]);
-    }
+    assert(Index < Params.size());
+    return reinterpret_cast<swift_typeref_t>(Params[Index]);
+  }
+  return 0;
+}
+
+unsigned
+swift_reflection_genericArgumentCountOfTypeRef(swift_typeref_t OpaqueTypeRef) {
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+
+  if (auto BG = dyn_cast<BoundGenericTypeRef>(TR)) {
+    auto &Params = BG->getGenericParams();
+    return Params.size();
   }
   return 0;
 }
@@ -96,15 +106,64 @@ swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   auto TI = Context->getTypeInfo(TR);
 
-  // TODO
-  (void) TI;
+  if (TI == nullptr) {
+    return {
+      SWIFT_UNKNOWN,
+      0,
+      0,
+      0,
+      0
+    };
+  }
+
+  swift_layout_kind_t Kind;
+  unsigned NumFields = 0;
+
+  switch (TI->getKind()) {
+  case TypeInfoKind::Builtin:
+    Kind = SWIFT_BUILTIN;
+    break;
+  case TypeInfoKind::Record: {
+    auto *RecordTI = cast<RecordTypeInfo>(TI);
+    switch (RecordTI->getRecordKind()) {
+    case RecordKind::Tuple:
+      Kind = SWIFT_TUPLE;
+      break;
+    case RecordKind::Struct:
+      Kind = SWIFT_STRUCT;
+      break;
+    case RecordKind::ThickFunction:
+      Kind = SWIFT_THICK_FUNCTION;
+      break;
+    }
+    NumFields = RecordTI->getNumFields();
+    break;
+  }
+  case TypeInfoKind::Reference: {
+    auto *ReferenceTI = cast<ReferenceTypeInfo>(TI);
+    switch (ReferenceTI->getReferenceKind()) {
+    case ReferenceKind::Strong:
+      Kind = SWIFT_STRONG_REFERENCE;
+      break;
+    case ReferenceKind::Unowned:
+      Kind = SWIFT_UNOWNED_REFERENCE;
+      break;
+    case ReferenceKind::Weak:
+      Kind = SWIFT_WEAK_REFERENCE;
+      break;
+    case ReferenceKind::Unmanaged:
+      Kind = SWIFT_UNMANAGED_REFERENCE;
+      break;
+    }
+  }
+  }
 
   return {
-    SWIFT_UNKNOWN,
-    NULL,
-    0,
-    0,
-    0
+    Kind,
+    TI->getSize(),
+    TI->getAlignment(),
+    TI->getStride(),
+    NumFields
   };
 }
 
@@ -114,15 +173,13 @@ swift_reflection_infoForChild(SwiftReflectionContextRef ContextRef,
                               unsigned Index) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
-  auto TI = Context->getTypeInfo(TR);
 
-  // TODO
-  (void) TI;
+  auto *RecordTI = cast<RecordTypeInfo>(Context->getTypeInfo(TR));
+  auto FieldInfo = RecordTI->getFields()[Index];
 
   return {
-    0,
-    NULL,
-    0,
+    FieldInfo.Name.c_str(),
+    FieldInfo.Offset,
+    reinterpret_cast<swift_typeref_t>(FieldInfo.TR),
   };
 }
-
