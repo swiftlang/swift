@@ -31,6 +31,8 @@ namespace remote {
 template <typename Runtime>
 using SharedTargetMetadataRef = std::shared_ptr<TargetMetadata<Runtime>>;
 
+using SharedCaptureDescriptor = std::shared_ptr<const CaptureDescriptor>;
+
 template <typename Runtime>
 using SharedTargetNominalTypeDescriptorRef
   = std::shared_ptr<TargetNominalTypeDescriptor<Runtime>>;
@@ -527,7 +529,7 @@ public:
     case MetadataKind::ForeignClass:
       return Builder.getUnnamedForeignClassType();
     case MetadataKind::HeapLocalVariable:
-      return Builder.getUnnamedForeignClassType(); // FIXME?
+        return Builder.getUnnamedForeignClassType(); // FIXME?
     case MetadataKind::HeapGenericLocalVariable:
       return Builder.getUnnamedForeignClassType(); // FIXME?
     case MetadataKind::ErrorObject:
@@ -804,6 +806,39 @@ private:
 
     TypeCache.insert({metadata.getAddress(), nominal});
     return nominal;
+  }
+
+  /// Read the entire CaptureDescriptor in this address space, including
+  /// trailing capture typeref relative offsets, and GenericMetadataSource
+  /// pairs.
+  SharedCaptureDescriptor readCaptureDescriptor(StoredPointer Address) {
+
+    uint32_t NumCaptures = 0;
+    uint32_t NumMetadataSources = 0;
+
+    StoredSize Offset = 0;
+
+    if (!Reader->readInteger(Address + Offset, &NumCaptures))
+      return nullptr;
+
+    Offset += sizeof(NumCaptures);
+
+    if (!Reader->readInteger(Address + Offset, &NumMetadataSources))
+      return nullptr;
+
+    StoredSize Size = sizeof(CaptureDescriptor) +
+      NumCaptures * sizeof(RelativeDirectPointer<const char>) +
+      NumMetadataSources * sizeof(GenericMetadataSource);
+
+    auto Buffer = (uint8_t *)malloc(Size);
+
+    if (!Reader->readBytes(Address, Buffer, Size)) {
+      free(Buffer);
+      return nullptr;
+    }
+
+    auto RawDescriptor = reinterpret_cast<const CaptureDescriptor *>(Buffer);
+    return SharedCaptureDescriptor(RawDescriptor, /*deleter*/ free);
   }
 };
 
