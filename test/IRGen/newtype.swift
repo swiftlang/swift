@@ -1,4 +1,4 @@
-// RUN// RUN: %target-swift-frontend -I %S/../IDE/Inputs/custom-modules %s -emit-ir | FileCheck %s
+// RUN// RUN: %target-swift-frontend -I %S/../IDE/Inputs/custom-modules %s -emit-ir -enable-swift-newtype | FileCheck %s
 import Newtype
 
 // REQUIRES: objc_interop

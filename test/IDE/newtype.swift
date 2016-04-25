@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=Newtype > %t.printed.A.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -enable-swift-newtype -print-module -source-filename %s -module-to-print=Newtype > %t.printed.A.txt
 // RUN: FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
 // REQUIRES: objc_interop
 
@@ -32,7 +32,7 @@
 // PRINT-NEXT:    static let thirdEntry: ClosedEnum
 // PRINT-NEXT:  }
 
-// RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules
+// RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules -enable-swift-newtype
 import Newtype
 
 func tests() {

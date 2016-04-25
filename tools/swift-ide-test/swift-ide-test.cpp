@@ -301,6 +301,11 @@ InferImportAsMember("enable-infer-import-as-member",
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+HonorSwiftNewtypeAttr("enable-swift-newtype",
+                      llvm::cl::desc("Enable swift_newtype import"),
+                      llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 StripNSPrefix("enable-strip-ns-prefix",
               llvm::cl::desc("Strip the NS prefix from Foundation et al"),
               llvm::cl::init(false));
@@ -2680,11 +2685,14 @@ int main(int argc, char *argv[]) {
       options::CodeCompleteInitsInPostfixExpr;
   InitInvok.getLangOptions().Swift3Migration |= options::Swift3Migration;
   InitInvok.getLangOptions().InferImportAsMember |=
-    options::InferImportAsMember;  InitInvok.getLangOptions().StripNSPrefix |= options::StripNSPrefix;
+    options::InferImportAsMember;
+  InitInvok.getLangOptions().StripNSPrefix |= options::StripNSPrefix;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().InferImportAsMember |=
     options::InferImportAsMember;
+  InitInvok.getClangImporterOptions().HonorSwiftNewtypeAttr |=
+    options::HonorSwiftNewtypeAttr;
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }
