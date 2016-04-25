@@ -16,11 +16,20 @@
 #include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/Support/FileSystem.h"
 
 using namespace swift;
 using namespace swift::index;
+
+static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
+  if (!D->hasName())
+    return true;
+
+  OS << D->getFullName();
+  return false;
+}
 
 namespace {
 // Adapter providing a common interface for a SourceFile/Module.
@@ -82,6 +91,53 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   SmallVector<Entity, 6> EntitiesStack;
   SmallVector<Expr *, 8> ExprStack;
   bool Cancelled = false;
+
+  struct NameAndUSR {
+    StringRef USR;
+    StringRef name;
+  };
+  typedef llvm::PointerIntPair<Decl *, 3> DeclAccessorPair;
+  llvm::DenseMap<Decl *, NameAndUSR> nameAndUSRCache;
+  llvm::DenseMap<DeclAccessorPair, StringRef> accessorUSRCache;
+  StringScratchSpace stringStorage;
+
+  bool getNameAndUSR(ValueDecl *D, StringRef &name, StringRef &USR) {
+    auto &result = nameAndUSRCache[D];
+    if (result.USR.empty()) {
+      SmallString<128> storage;
+      {
+        llvm::raw_svector_ostream OS(storage);
+        if (ide::printDeclUSR(D, OS))
+          return true;
+        result.USR = stringStorage.copyString(OS.str());
+      }
+
+      storage.clear();
+      {
+        llvm::raw_svector_ostream OS(storage);
+        printDisplayName(D, OS);
+        result.name = stringStorage.copyString(OS.str());
+      }
+    }
+
+    name = result.name;
+    USR = result.USR;
+    return false;
+  }
+
+  StringRef getAccessorUSR(AbstractStorageDecl *D, AccessorKind AK) {
+    assert(AK != AccessorKind::NotAccessor);
+    assert(static_cast<int>(AK) < 0x111 && "AccessorKind too big for pair");
+    DeclAccessorPair key(D, static_cast<int>(AK));
+    auto &result = accessorUSRCache[key];
+    if (result.empty()) {
+      SmallString<128> storage;
+      llvm::raw_svector_ostream OS(storage);
+      ide::printAccessorUSR(D, AK, OS);
+      result = stringStorage.copyString(OS.str());
+    }
+    return result;
+  }
 
 public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
@@ -522,11 +578,9 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
   auto handleInfo = [this, D, AccKind](IndexSymbol &Info) {
     Info.kind = SymbolKind::Accessor;
     Info.subKind = getSubKindForAccessor(AccKind);
-    Info.name.clear();
-    Info.USR.clear();
-    Info.group.clear();
-    llvm::raw_svector_ostream OS(Info.USR);
-    ide::printAccessorUSR(D, AccKind, OS);
+    Info.name = "";
+    Info.USR = getAccessorUSR(D, AccKind);
+    Info.group = "";
 
     if (!IdxConsumer.startSourceEntity(Info)) {
       Cancelled = true;
@@ -708,14 +762,6 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc) {
   return !Cancelled;
 }
 
-static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
-  if (!D->hasName())
-    return true;
-
-  OS << D->getFullName();
-  return false;
-}
-
 bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
                                           bool IsRef, IndexSymbol &Info) {
   assert(D);
@@ -729,18 +775,12 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
 
   Info.isRef = IsRef;
 
-  Info.name.clear();
-  llvm::raw_svector_ostream NameOS(Info.name);
-  printDisplayName(D, NameOS);
-
-  llvm::raw_svector_ostream OS(Info.USR);
-  if (ide::printDeclUSR(D, OS))
+  if (getNameAndUSR(D, Info.name, Info.USR))
     return true;
+
   std::tie(Info.line, Info.column) = getLineCol(Loc);
-  if (auto Group = D->getGroupName()) {
-    Info.group.clear();
-    Info.group.append(Group.getValue());
-  }
+  if (auto Group = D->getGroupName())
+    Info.group = Group.getValue();
   return false;
 }
 
@@ -784,10 +824,8 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(ValueDecl *D,
     return true;
 
   Info.IsTestCandidate = isTestCandidate(D);
-  if (auto Group = D->getGroupName()) {
-    Info.group.clear();
-    Info.group.append(Group.getValue());
-  }
+  if (auto Group = D->getGroupName())
+    Info.group = Group.getValue();
   return false;
 }
 
@@ -848,9 +886,9 @@ bool IndexSwiftASTWalker::initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
       ReceiverTy = MetaT->getInstanceType();
 
     if (auto TyD = ReceiverTy->getAnyNominal()) {
-      llvm::raw_svector_ostream OS(Info.ReceiverUSR);
-      ide::printDeclUSR(TyD, OS);
-
+      StringRef unused;
+      if (getNameAndUSR(TyD, unused, Info.ReceiverUSR))
+        return true;
       Info.IsDynamic = isDynamicCall(BaseE, D);
     }
   }

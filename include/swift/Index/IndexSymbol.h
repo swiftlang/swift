@@ -86,9 +86,11 @@ struct IndexSymbol {
   SymbolKind kind;
   SymbolSubKind subKind = SymbolSubKind::None;
   bool isRef;
-  SmallString<32> name;
-  SmallString<64> USR;
-  SmallString<16> group;
+  // The following strings are guaranteed to live at least as long as the
+  // current indexing action.
+  StringRef name;
+  StringRef USR; // USR may be safely compared by pointer.
+  StringRef group;
   unsigned line = 0;
   unsigned column = 0;
 
@@ -105,7 +107,7 @@ struct FuncDeclIndexSymbol : public IndexSymbol {
 };
 
 struct CallRefIndexSymbol : public IndexSymbol {
-  llvm::SmallString<64> ReceiverUSR;
+  StringRef ReceiverUSR;
   bool IsDynamic = false;
 
   CallRefIndexSymbol() : IndexSymbol(CallReference) {}
