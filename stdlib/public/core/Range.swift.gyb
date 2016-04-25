@@ -283,18 +283,17 @@ public struct Range<
   }
 }
 
-% for (Self, op) in [
-%   ('Range', '..<'),
-%   ('CountableRange', '..<'),
-%   ('ClosedRange', '...'),
-%   ('CountableClosedRange', '...')
-% ]:
-%   for (OtherSelf, other_op) in [
-%     ('Range', '..<'),
-%     ('CountableRange', '..<'),
-%     ('ClosedRange', '...'),
-%     ('CountableClosedRange', '...')
-%   ]:
+%{
+all_range_types = [
+  ('Range', '..<'),
+  ('CountableRange', '..<'),
+  ('ClosedRange', '...'),
+  ('CountableClosedRange', '...')
+]
+}%
+
+% for (Self, op) in all_range_types:
+%   for (OtherSelf, other_op) in all_range_types:
 extension ${Self}
 %   if 'Countable' in Self or 'Countable' in OtherSelf or 'Closed' in Self or 'Closed' in OtherSelf:
   where
