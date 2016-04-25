@@ -5673,6 +5673,8 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
                                                    init->getType()));
   var->setConstant(true);
   var->setInitializer(init);
+
+  addNominalTypeDecl(protocol);
 }
 
 /// \brief Load a reference to the protocol descriptor for the given protocol.

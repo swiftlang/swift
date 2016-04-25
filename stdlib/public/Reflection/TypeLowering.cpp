@@ -362,6 +362,10 @@ public:
 
       return nullptr;
     }
+    case FieldDescriptorKind::ObjCProtocol:
+    case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::Protocol:
+      return nullptr;
     }
   }
 
