@@ -90,7 +90,6 @@ KNOWN_SETTINGS=(
     cmake                       ""               "path to the cmake binary"
     distcc                      ""               "use distcc in pump mode"
     build-runtime-with-host-compiler   "1"       "use the host c++ compiler to build everything"
-    user-config-args            ""               "User-supplied arguments to cmake when used to do configuration"
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of 'cmake --help' for choices"
     verbose-build               ""               "print the commands executed during the build"
     install-prefix              ""               "installation prefix"
@@ -221,6 +220,8 @@ KNOWN_SETTINGS=(
     android-icu-i18n-include           ""        "Path to a directory containing headers libicui18n"
     export-compile-commands            ""        "set to generate JSON compilation databases for each build product"
     check-args-only                    ""        "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
+    # TODO: Remove this some time later.
+    user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
 )
 
 function toupper() {
@@ -694,6 +695,12 @@ while [[ "$1" ]] ; do
     shift
 done
 
+# TODO: Remove this some time later.
+if [[ "${USER_CONFIG_ARGS}" ]]; then
+    echo "Error: --user-config-args is renamed to --extra-cmake-options." 1>&2
+    exit 1
+fi
+
 if [[ "${CHECK_ARGS_ONLY}" ]]; then
     exit 0
 fi
@@ -1160,15 +1167,8 @@ if [[ "${EXPORT_COMPILE_COMMANDS}" ]] ; then
     )
 fi
 
-if [[ "${EXTRA_CMAKE_OPTIONS}" ]] ; then
-    for cmake_opt in $(echo "${EXTRA_CMAKE_OPTIONS}" | tr "," "\n")
-    do
-        COMMON_CMAKE_OPTIONS=(
-            "${COMMON_CMAKE_OPTIONS[@]}"
-            "${cmake_opt}"
-        )
-    done
-fi
+# Convert to an array.
+eval EXTRA_CMAKE_OPTIONS=(${EXTRA_CMAKE_OPTIONS})
 
 if [[ "${DISTCC}" ]] ; then
     # On some platforms, 'pump' may be unrelated to distcc, in which case it's
@@ -2055,7 +2055,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             set -x
             mkdir -p "${build_dir}"
             rm -f "${cmake_cache_path}"
-            (cd "${build_dir}" && "${CMAKE}" "${cmake_options[@]}" ${USER_CONFIG_ARGS} "${source_dir}")
+            (cd "${build_dir}" && "${CMAKE}" "${cmake_options[@]}" "${EXTRA_CMAKE_OPTIONS[@]}" "${source_dir}")
             { set +x; } 2>/dev/null
         fi
 
