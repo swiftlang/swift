@@ -258,3 +258,126 @@ _ = C21311590()
 _ = B21311590()
 
 
+class MismatchOptionalBase {
+  func param(_: Int?) {}
+  func paramIUO(_: Int!) {}
+  func result() -> Int { return 0 }
+
+  func fixSeveralTypes(a: Int?, b: Int!) -> Int { return 0 }
+
+  func functionParam(x: ((Int) -> Int)?) {}
+  func tupleParam(x: (Int, Int)?) {}
+
+  func nameAndTypeMismatch(label: Int?) {}
+
+  func ambiguousOverride(a: Int, b: Int?) {} // expected-note 2 {{overridden declaration is here}} expected-note {{potential overridden instance method 'ambiguousOverride(a:b:)' here}}
+  func ambiguousOverride(a: Int?, b: Int) {} // expected-note 2 {{overridden declaration is here}} expected-note {{potential overridden instance method 'ambiguousOverride(a:b:)' here}}
+
+  var prop: Int = 0 // expected-note {{attempt to override property here}}
+  var optProp: Int? // expected-note {{attempt to override property here}}
+
+  var getProp: Int { return 0 } // expected-note {{attempt to override property here}}
+  var getOptProp: Int? { return nil }
+
+  init(param: Int?) {}
+  init() {} // expected-note {{non-failable initializer 'init()' overridden here}}
+
+  subscript(a: Int?) -> Void { // expected-note {{attempt to override subscript here}}
+    get { return () }
+    set {}
+  }
+  subscript(b: Void) -> Int { // expected-note {{attempt to override subscript here}}
+    get { return 0 }
+    set {}
+  }
+
+  subscript(get a: Int?) -> Void {
+    return ()
+  }
+  subscript(get b: Void) -> Int {
+    return 0
+  }
+
+  subscript(ambiguous a: Int, b: Int?) -> Void { // expected-note {{overridden declaration is here}} expected-note {{potential overridden subscript 'subscript(ambiguous:_:)' here}}
+    return ()
+  }
+  subscript(ambiguous a: Int?, b: Int) -> Void { // expected-note {{overridden declaration is here}} expected-note {{potential overridden subscript 'subscript(ambiguous:_:)' here}}
+    return ()
+  }
+}
+
+class MismatchOptional : MismatchOptionalBase {
+  override func param(_: Int) {} // expected-error {{cannot override instance method parameter of type 'Int?' with non-optional type 'Int'}} {{29-29=?}}
+  override func paramIUO(_: Int) {} // expected-error {{cannot override instance method parameter of type 'Int!' with non-optional type 'Int'}} {{32-32=?}}
+  override func result() -> Int? { return nil } // expected-error {{cannot override instance method result type 'Int' with optional type 'Int?'}} {{32-33=}}
+
+  override func fixSeveralTypes(a: Int, b: Int) -> Int! { return nil }
+  // expected-error@-1 {{cannot override instance method parameter of type 'Int?' with non-optional type 'Int'}} {{39-39=?}}
+  // expected-error@-2 {{cannot override instance method parameter of type 'Int!' with non-optional type 'Int'}} {{47-47=?}}
+  // expected-error@-3 {{cannot override instance method result type 'Int' with optional type 'Int!'}} {{55-56=}}
+
+  override func functionParam(x: (Int) -> Int) {} // expected-error {{cannot override instance method parameter of type '((Int) -> Int)?' with non-optional type '(Int) -> Int'}} {{34-34=(}} {{46-46=)?}}
+  override func tupleParam(x: (Int, Int)) {} // expected-error {{cannot override instance method parameter of type '(Int, Int)?' with non-optional type '(Int, Int)'}} {{41-41=?}}
+
+  override func nameAndTypeMismatch(_: Int) {}
+  // expected-error@-1 {{argument names for method 'nameAndTypeMismatch' do not match those of overridden method 'nameAndTypeMismatch(label:)'}} {{37-37=label }}
+  // expected-error@-2 {{cannot override instance method parameter of type 'Int?' with non-optional type 'Int'}} {{43-43=?}}
+
+  override func ambiguousOverride(a: Int?, b: Int?) {} // expected-error {{declaration 'ambiguousOverride(a:b:)' cannot override more than one superclass declaration}} {{none}}
+  override func ambiguousOverride(a: Int, b: Int) {} // expected-error {{method does not override any method from its superclass}} {{none}}
+
+  override var prop: Int? { // expected-error {{property 'prop' with type 'Int?' cannot override a property with type 'Int'}} {{none}}
+    get { return nil }
+    set {}
+  }
+  override var optProp: Int { // expected-error {{cannot override mutable property 'optProp' of type 'Int?' with covariant type 'Int'}} {{none}}
+    get { return 0 }
+    set {}
+  }
+  override var getProp: Int? { return nil } // expected-error {{property 'getProp' with type 'Int?' cannot override a property with type 'Int'}} {{none}}
+  override var getOptProp: Int { return 0 } // okay
+
+  override init(param: Int) {} // expected-error {{cannot override initializer parameter of type 'Int?' with non-optional type 'Int'}}
+  override init?() {} // expected-error {{failable initializer 'init()' cannot override a non-failable initializer}} {{none}}
+
+  override subscript(a: Int) -> Void { // expected-error {{cannot override mutable subscript of type '(Int) -> Void' with covariant type '(Int?) -> Void'}}
+    get { return () }
+    set {}
+  }
+  override subscript(b: Void) -> Int? { // expected-error {{cannot override mutable subscript of type '(Void) -> Int?' with covariant type '(Void) -> Int'}}
+    get { return nil }
+    set {}
+  }
+
+  override subscript(get a: Int) -> Void { // expected-error {{cannot override subscript index of type 'Int?' with non-optional type 'Int'}} {{32-32=?}}
+    return ()
+  }
+  override subscript(get b: Void) -> Int? { // expected-error {{cannot override subscript element type 'Int' with optional type 'Int?'}} {{41-42=}}
+    return nil
+  }
+
+  override subscript(ambiguous a: Int?, b: Int?) -> Void { // expected-error {{declaration 'subscript(ambiguous:_:)' cannot override more than one superclass declaration}}
+    return ()
+  }
+  override subscript(ambiguous a: Int, b: Int) -> Void { // expected-error {{subscript does not override any subscript from its superclass}}
+    return ()
+  }
+}
+
+class MismatchOptional2 : MismatchOptionalBase {
+  override func result() -> Int! { return nil } // expected-error {{cannot override instance method result type 'Int' with optional type 'Int!'}} {{32-33=}}
+
+  // None of these are overrides because we didn't say 'override'. Since they're
+  // not exact matches, they shouldn't result in errors.
+  func param(_: Int) {}
+  func ambiguousOverride(a: Int, b: Int) {}
+
+  // This is covariant, so we still assume it's meant to override.
+  func ambiguousOverride(a: Int?, b: Int?) {} // expected-error {{declaration 'ambiguousOverride(a:b:)' cannot override more than one superclass declaration}}
+}
+
+class MismatchOptional3 : MismatchOptionalBase {
+  override func result() -> Optional<Int> { return nil } // expected-error {{cannot override instance method result type 'Int' with optional type 'Optional<Int>'}} {{none}}
+}
+
+

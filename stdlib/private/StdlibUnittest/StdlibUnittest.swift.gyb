@@ -50,7 +50,7 @@ public struct SourceLocStack {
   }
 
   public init(_ loc: SourceLoc) {
-    locs = [ loc ]
+    locs = [loc]
   }
 
   init(_locs: [SourceLoc]) {
@@ -416,6 +416,8 @@ extension ProcessTerminationStatus {
       return false
     case .signal(let signal):
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
+    default:
+      return false
     }
   }
 }
@@ -526,7 +528,7 @@ struct _ParentProcess {
   }
 
   mutating func _spawnChild() {
-    let params = [ "--stdlib-unittest-run-child" ] + _args
+    let params = ["--stdlib-unittest-run-child"] + _args
     let (pid, childStdinFD, childStdoutFD, childStderrFD) = spawnChild(params)
     _pid = pid
     _childStdin = _FDOutputStream(fd: childStdinFD)
@@ -2611,8 +2613,8 @@ func == <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
 }
 
 func < <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
-  return [ lhs.first, lhs.second ].lexicographicallyPrecedes(
-    [ rhs.first, rhs.second ])
+  return [lhs.first, lhs.second].lexicographicallyPrecedes(
+    [rhs.first, rhs.second])
 }
 
 public func expectEqualsUnordered<
@@ -2626,7 +2628,7 @@ public func expectEqualsUnordered<
     _ expected: Expected, _ actual: Actual, ${TRACE}
 ) {
   func comparePairLess(_ lhs: (T, T), rhs: (T, T)) -> Bool {
-    return [ lhs.0, lhs.1 ].lexicographicallyPrecedes([ rhs.0, rhs.1 ])
+    return [lhs.0, lhs.1].lexicographicallyPrecedes([rhs.0, rhs.1])
   }
 
   let x: [(T, T)] =

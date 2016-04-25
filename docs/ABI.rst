@@ -907,8 +907,8 @@ Types
   type ::= 'BB'                              // Builtin.UnsafeValueBuffer
   type ::= 'Bf' natural '_'                  // Builtin.Float<n>
   type ::= 'Bi' natural '_'                  // Builtin.Int<n>
-  type ::= 'BO'                              // Builtin.ObjCPointer
-  type ::= 'Bo'                              // Builtin.ObjectPointer
+  type ::= 'BO'                              // Builtin.UnknownObject
+  type ::= 'Bo'                              // Builtin.NativeObject
   type ::= 'Bp'                              // Builtin.RawPointer
   type ::= 'Bv' natural type                 // Builtin.Vec<n>x<type>
   type ::= 'Bw'                              // Builtin.Word

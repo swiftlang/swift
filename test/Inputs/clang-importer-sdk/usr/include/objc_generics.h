@@ -22,9 +22,36 @@ void takeGenericClass(__nullable GenericClass<NSString *> *thing);
 @end
 
 @protocol Pettable
+- (nonnull instancetype)initWithFur:(nonnull id)fur;
+- (nonnull instancetype)other;
++ (nonnull instancetype)adopt;
+- (void)pet;
+- (void)petWith:(nonnull id <Pettable>)other;
+
+@property (nonatomic, class) _Nonnull id<Pettable> needingMostPets;
+
 @end
 
 @interface Animal : NSObject
+- (nonnull instancetype)initWithNoise:(nonnull id)noise;
+- (nonnull instancetype)another;
++ (nonnull instancetype)create;
+
+- (void)eat:(Animal*)prey;
+
+@property (nonatomic, readonly) Animal *_Nonnull buddy;
+
+@property (nonatomic, class) Animal *_Nonnull apexPredator;
+
+- (Animal *_Nonnull)objectAtIndexedSubscript:(NSInteger)i;
+- (void)setObject:(Animal *_Nonnull)x atIndexedSubscript:(NSInteger)i;
+
+@end
+
+@protocol Fungible
+@end
+
+@interface FungibleContainer<T: id<Fungible>> : NSObject
 @end
 
 @interface PettableContainer<T: id<Pettable>> : NSObject

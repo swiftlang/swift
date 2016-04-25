@@ -330,7 +330,7 @@
 // current collections model), then an additional design is possible
 // -- let's call it (2)(c) for the purpose of discussion.  This design
 // would be like (2)(b), but won't require extra storage that is used
-// only for safety checks.  Instead, every index would pay a RC
+// only for safety checks.  Instead, every index would pay an RC
 // penalty and carry a strong reference to the tree node.
 //
 // Note that (2)(c) is still technically possible to implement in the
@@ -1578,15 +1578,15 @@ internal final class _NodePayload<Element : Comparable> {
 extension _NodePayload : CustomReflectable {
   internal func customMirror() -> Mirror {
     if let lc = _leftChild, rc = _rightChild {
-      return Mirror(self, children: [ "left": lc, "data": _data, "right": rc ])
+      return Mirror(self, children: ["left": lc, "data": _data, "right": rc])
     }
     if let lc = _leftChild {
-      return Mirror(self, children: [ "left": lc, "data": _data ])
+      return Mirror(self, children: ["left": lc, "data": _data])
     }
     if let rc = _rightChild {
-      return Mirror(self, children: [ "data": _data, "right": rc ])
+      return Mirror(self, children: ["data": _data, "right": rc])
     }
-    return Mirror(self, children: [ "data": _data ])
+    return Mirror(self, children: ["data": _data])
   }
 }
 

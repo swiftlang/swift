@@ -1315,7 +1315,9 @@ TypeBase *NameAliasType::getSinglyDesugaredType() {
 
   // The type for a generic TypeAliasDecl is an UnboundGenericType.
   if (TAD->getGenericParams())
-    return UnboundGenericType::get(TAD, Type(), TAD->getASTContext());
+    return UnboundGenericType::get(TAD,
+                           TAD->getDeclContext()->getDeclaredTypeInContext(),
+                                   TAD->getASTContext());
 
   return getDecl()->getUnderlyingType().getPointer();
 }
@@ -1919,13 +1921,14 @@ bool TypeBase::isPotentiallyBridgedValueType() {
 }
 
 /// Determine whether this is a representable Objective-C object type.
-static ForeignRepresentableKind getObjCObjectRepresentable(Type type) {
+static ForeignRepresentableKind getObjCObjectRepresentable(Type type,
+                                                           DeclContext *dc) {
   // @objc metatypes are representable when their instance type is.
   if (auto metatype = type->getAs<AnyMetatypeType>()) {
     // If the instance type is not representable, the metatype is not
     // representable.
     auto instanceType = metatype->getInstanceType();
-    if (getObjCObjectRepresentable(instanceType)
+    if (getObjCObjectRepresentable(instanceType, dc)
           == ForeignRepresentableKind::None)
       return ForeignRepresentableKind::None;
 
@@ -1955,6 +1958,14 @@ static ForeignRepresentableKind getObjCObjectRepresentable(Type type) {
   // Objective-C existential types.
   if (type->isObjCExistentialType())
     return ForeignRepresentableKind::Object;
+  
+  // Class-constrained generic parameters, from ObjC generic classes.
+  if (auto tyContext = dc->getInnermostTypeContext())
+    if (auto clas = tyContext->getAsClassOrClassExtensionContext())
+      if (clas->hasClangNode())
+        if (auto archetype = type->getAs<ArchetypeType>())
+          if (archetype->requiresClass())
+            return ForeignRepresentableKind::Object;
 
   return ForeignRepresentableKind::None;
 }
@@ -1976,7 +1987,7 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
 
   // Objective-C object types, including metatypes.
   if (language == ForeignLanguage::ObjectiveC) {
-    auto representable = getObjCObjectRepresentable(type);
+    auto representable = getObjCObjectRepresentable(type, dc);
     if (representable != ForeignRepresentableKind::None)
       return { representable, nullptr };
   }
@@ -2137,7 +2148,7 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
         pointerElt = objectType;
 
       if (language == ForeignLanguage::ObjectiveC &&
-          getObjCObjectRepresentable(pointerElt)
+          getObjCObjectRepresentable(pointerElt, dc)
             != ForeignRepresentableKind::None)
         return { ForeignRepresentableKind::Trivial, nullptr };
 
@@ -2238,6 +2249,37 @@ static bool canOverride(CanType t1, CanType t2,
                         LazyResolver *resolver) {
   if (t1 == t2) return true;
 
+  // First try unwrapping optionals.
+  // Make sure we only unwrap at most one layer of optional.
+  if (!insideOptional) {
+    // Value-to-optional and optional-to-optional.
+    if (auto obj2 = t2.getAnyOptionalObjectType()) {
+      // Optional-to-optional.
+      if (auto obj1 = t1.getAnyOptionalObjectType()) {
+        // Allow T? and T! to freely override one another.
+        return canOverride(obj1, obj2, matchMode,
+                           /*isParameter=*/false,
+                           /*insideOptional=*/true,
+                           resolver);
+      }
+
+      // Value-to-optional.
+      return canOverride(t1, obj2, matchMode,
+                         /*isParameter=*/false,
+                         /*insideOptional=*/true,
+                         resolver);
+
+    } else if (matchMode == OverrideMatchMode::AllowTopLevelOptionalMismatch) {
+      // Optional-to-value, normally disallowed.
+      if (auto obj1 = t1.getAnyOptionalObjectType()) {
+        return canOverride(obj1, t2, matchMode,
+                           /*isParameter=*/false,
+                           /*insideOptional=*/true,
+                           resolver);
+      }
+    }
+  }
+
   // Scalar-to-tuple and tuple-to-tuple.
   if (auto tuple2 = dyn_cast<TupleType>(t2)) {
     // We only ever look into singleton tuples on the RHS if we're
@@ -2294,30 +2336,9 @@ static bool canOverride(CanType t1, CanType t2,
                         resolver));
   }
 
-  // Don't unwrap optionals directly inside other optionals.
-  if (!insideOptional) {
-    // Value-to-optional and optional-to-optional.
-    if (auto obj2 = t2.getAnyOptionalObjectType()) {
-      // Optional-to-optional.
-      if (auto obj1 = t1.getAnyOptionalObjectType()) {
-        // Allow T? and T! to freely override one another.
-        return canOverride(obj1, obj2, matchMode,
-                           /*isParameter=*/false,
-                           /*insideOptional=*/true,
-                           resolver);
-      }
-
-      // Value-to-optional.
-      return canOverride(t1, obj2, matchMode,
-                         /*isParameter=*/false,
-                         /*insideOptional=*/true,
-                         resolver);
-    }
-  }
-
-  // Allow T to override T! in certain cases.
   if (matchMode == OverrideMatchMode::AllowNonOptionalForIUOParam &&
       isParameter && !insideOptional) {
+    // Allow T to override T! in certain cases.
     if (auto obj1 = t1->getImplicitlyUnwrappedOptionalObjectType()) {
       t1 = obj1->getCanonicalType();
       if (t1 == t2) return true;

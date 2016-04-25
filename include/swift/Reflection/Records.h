@@ -99,9 +99,15 @@ struct FieldRecordIterator {
   }
 };
 
+enum class FieldDescriptorKind : uint16_t {
+  Struct,
+  Class,
+  Enum
+};
+
 // Field descriptors contain a collection of field records for a single
 // class, struct or enum declaration.
-struct FieldDescriptor {
+class FieldDescriptor {
   const FieldRecord *getFieldRecordBuffer() const {
     return reinterpret_cast<const FieldRecord *>(this + 1);
   }
@@ -109,8 +115,11 @@ struct FieldDescriptor {
   const RelativeDirectPointer<const char> MangledTypeName;
 
 public:
+  FieldDescriptor() = delete;
+
+  const FieldDescriptorKind Kind;
+  const uint16_t FieldRecordSize;
   const uint32_t NumFields;
-  const uint32_t FieldRecordSize;
 
   using const_iterator = FieldRecordIterator;
 
@@ -124,6 +133,10 @@ public:
     auto Begin = getFieldRecordBuffer();
     auto End = Begin + NumFields;
     return const_iterator { End, End };
+  }
+
+  bool hasMangledTypeName() const {
+    return MangledTypeName;
   }
 
   std::string getMangledTypeName() const {
@@ -291,6 +304,10 @@ public:
   uint32_t Stride;
   uint32_t NumExtraInhabitants;
 
+  bool hasMangledTypeName() const {
+    return TypeName;
+  }
+
   std::string getMangledTypeName() const {
     return TypeName.get();
   }
@@ -321,6 +338,63 @@ public:
 
   bool operator!=(BuiltinTypeDescriptorIterator const &other) const {
     return !(*this == other);
+  }
+};
+
+/// A key-value pair in a TypeRef -> MetadataSource map.
+struct GenericMetadataSource {
+  using Key = RelativeDirectPointer<const char>;
+  using Value = Key;
+
+  const Key MangledTypeName;
+  const Value EncodedMetadataSource;
+};
+
+/// Describes the layout of a heap closure.
+///
+/// For simplicity's sake and other reasons, this shouldn't contain
+/// architecture-specifically sized things like direct pointers, uintptr_t, etc.
+struct CaptureDescriptor {
+public:
+
+  /// The number of captures in the closure and the number of typerefs that
+  /// immediately follow this struct.
+  const uint32_t NumCaptures;
+
+  /// The number of sources of metadata available in the MetadataSourceMap
+  /// directly following the list of capture's typerefs.
+  const uint32_t NumMetadataSources;
+
+  /// The number of items in the NecessaryBindings structure at the head of
+  /// the closure.
+  const uint32_t NumBindings;
+
+  /// Get the key-value pair for the ith generic metadata source.
+  const GenericMetadataSource &getGenericMetadataSource(size_t i) const {
+    assert(i <= NumMetadataSources &&
+           "Generic metadata source index out of range");
+    auto Begin = getGenericMetadataSourceBuffer();
+    return Begin[i];
+  }
+
+  /// Get the typeref (encoded as a mangled type name) of the ith
+  /// closure capture.
+  const RelativeDirectPointer<const char> &
+  getCaptureMangledTypeName(size_t i) const {
+    assert(i <= NumCaptures && "Capture index out of range");
+    auto Begin = getCaptureTypeRefBuffer();
+    return Begin[i];
+  }
+
+private:
+  const GenericMetadataSource *getGenericMetadataSourceBuffer() const {
+    auto BeginTR = reinterpret_cast<const char *>(getCaptureTypeRefBuffer());
+    auto EndTR = BeginTR + NumCaptures * sizeof(GenericMetadataSource);
+    return reinterpret_cast<const GenericMetadataSource *>(EndTR);
+  }
+
+  const RelativeDirectPointer<const char> *getCaptureTypeRefBuffer() const {
+    return reinterpret_cast<const RelativeDirectPointer<const char> *>(this+1);
   }
 };
 

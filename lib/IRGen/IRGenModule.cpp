@@ -258,6 +258,7 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
     WitnessTablePtrTy,
     TypeMetadataStructTy,
     Int32Ty,
+    CaptureDescriptorPtrTy,
   });
   FullBoxMetadataPtrTy = FullBoxMetadataStructTy->getPointerTo(DefaultAS);
 

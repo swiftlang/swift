@@ -56,7 +56,7 @@ internal func _splitRandomAccessIndexRange<Index : RandomAccessIndex>(
   let endIndex = range.endIndex
   let length = startIndex.distance(to: endIndex).toIntMax()
   if length < 2 {
-    return [ range ]
+    return [range]
   }
   let middle = startIndex.advanced(by: Index.Distance(length / 2))
   return [startIndex ..< middle, middle ..< endIndex]

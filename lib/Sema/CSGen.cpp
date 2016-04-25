@@ -1713,6 +1713,12 @@ namespace {
       return Type();
     }
 
+    Type visitArrowExpr(ArrowExpr *expr) {
+      // If an ArrowExpr survived until CSGen, then there was an upstream
+      // error that was already reported.
+      return Type();
+    }
+
     Type visitIdentityExpr(IdentityExpr *expr) {
       expr->setType(expr->getSubExpr()->getType());
       return expr->getType();

@@ -732,7 +732,7 @@ internal func _writeBackMutableSlice<
     "Cannot replace a slice of a MutableCollection with a slice of a larger size")
 }
 
-@available(*, unavailable, message: "Bit enum has been deprecated. Please use Int instead.")
+@available(*, unavailable, message: "Bit enum has been removed. Please use Int instead.")
 public enum Bit {}
 
 @available(*, unavailable, renamed: "IndexingIterator")

@@ -11,14 +11,18 @@ nsString: __ObjC.NSString
 cfString: __ObjC.CFString
 (class __ObjC.CFString)
 
+aBlock: @convention(block) () -> ()
+(function convention=block
+  (tuple))
+
 TypesToReflect.GenericOC
 ------------------------
 ocnss: TypesToReflect.GenericOC<__ObjC.NSString>
-(bound-generic class TypesToReflect.GenericOC
+(bound_generic_class TypesToReflect.GenericOC
   (class __ObjC.NSString))
 
 occfs: TypesToReflect.GenericOC<__ObjC.CFString>
-(bound-generic class TypesToReflect.GenericOC
+(bound_generic_class TypesToReflect.GenericOC
   (class __ObjC.CFString))
 
 

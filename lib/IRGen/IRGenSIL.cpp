@@ -2162,10 +2162,11 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   std::tie(calleeFn, innerContext, origCalleeTy)
     = getPartialApplicationFunction(*this, i->getCallee(),
                                     i->getSubstitutions());
-  
+
   // Create the thunk and function value.
   Explosion function;
-  emitFunctionPartialApplication(*this, calleeFn, innerContext, llArgs,
+  emitFunctionPartialApplication(*this, *CurSILFn,
+                                 calleeFn, innerContext, llArgs,
                                  params, i->getSubstitutions(),
                                  origCalleeTy, i->getSubstCalleeType(),
                                  i->getType().castTo<SILFunctionType>(),

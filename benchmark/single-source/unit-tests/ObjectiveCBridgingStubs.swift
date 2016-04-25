@@ -75,8 +75,7 @@ public func run_ObjectiveCBridgeStubFromArrayOfNSString(_ N: Int) {
 func testObjectiveCBridgeStubToArrayOfNSString() {
    let b = BridgeTester()
    let str = "hello world"
-   let arr = [ str, str, str, str, str,
-               str, str, str, str, str ]
+   let arr = [str, str, str, str, str, str, str, str, str, str]
    for _ in 0 ..< 10_000 {
      b.test(fromArrayOf: arr)
    }

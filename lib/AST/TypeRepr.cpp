@@ -265,7 +265,6 @@ void ErrorTypeRepr::printImpl(ASTPrinter &Printer,
 void AttributedTypeRepr::printImpl(ASTPrinter &Printer,
                                    const PrintOptions &Opts) const {
   printAttrs(Printer);
-  Printer << " ";
   printTypeRepr(Ty, Printer, Opts);
 }
 
@@ -277,12 +276,17 @@ void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
 void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
   const TypeAttributes &Attrs = getAttrs();
   if (Attrs.has(TAK_noreturn))     Printer << "@noreturn ";
-  if (Attrs.has(TAK_noescape))     Printer << "@noescape ";
-  if (Attrs.has(TAK_autoclosure))  Printer << "@autoclosure ";
+
+  switch (Attrs.has(TAK_autoclosure)*2 + Attrs.has(TAK_noescape)) {
+  case 0: break;  // Nothing specified.
+  case 1: Printer << "@noescape "; break;
+  case 2: Printer << "@autoclosure(escaping) "; break;
+  case 3: Printer << "@autoclosure "; break;
+  }
   if (Attrs.has(TAK_thin))         Printer << "@thin ";
   if (Attrs.has(TAK_thick))        Printer << "@thick ";
   if (Attrs.convention.hasValue()) {
-    Printer << "@convention(" << Attrs.convention.getValue() << ")";
+    Printer << "@convention(" << Attrs.convention.getValue() << ") ";
   }
 }
 

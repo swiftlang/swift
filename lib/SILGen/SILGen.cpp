@@ -321,10 +321,10 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    None,
                                    C);
 
-  return M.getOrCreateFunction(SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION,
-                               topLevelType, nullptr, Loc, IsBare,
-                               IsNotTransparent, IsNotFragile, IsNotThunk,
-                               SILFunction::NotRelevant);
+  return M.createFunction(SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION,
+                          topLevelType, nullptr, Loc, IsBare,
+                          IsNotTransparent, IsNotFragile, IsNotThunk,
+                          SILFunction::NotRelevant);
 }
 
 SILType SILGenModule::getConstantType(SILDeclRef constant) {
@@ -696,9 +696,18 @@ void SILGenModule::emitEnumConstructor(EnumElementDecl *decl) {
 }
 
 SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
-  // Closures are emitted by need, so don't required delayed emission.
   SILDeclRef constant(ce);
   SILFunction *f = getFunction(constant, ForDefinition);
+
+  // Generate the closure function, if we haven't already.
+  //
+  // We may visit the same closure expr multiple times in some cases.
+  // For instance, when closures appear as in-line initializers of stored
+  // properties, in which case the closure will be emitted into every
+  // initializer of the containing type.
+  if (!f->isExternalDeclaration())
+    return f;
+
   preEmitFunction(constant, ce, f, ce);
   PrettyStackTraceSILFunction X("silgen closureexpr", f);
   SILGenFunction(*this, *f).emitClosure(ce);
@@ -857,14 +866,14 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
   auto *f =
-      M.getOrCreateFunction(makeModuleFragile
-                                ? SILLinkage::Public
-                                : SILLinkage::Private,
-                            funcName, initSILType, nullptr,
-                            SILLocation(binding), IsNotBare, IsNotTransparent,
-                            makeModuleFragile
-                                ? IsFragile
-                                : IsNotFragile);
+      M.createFunction(makeModuleFragile
+                           ? SILLinkage::Public
+                           : SILLinkage::Private,
+                       funcName, initSILType, nullptr,
+                       SILLocation(binding), IsNotBare, IsNotTransparent,
+                       makeModuleFragile
+                           ? IsFragile
+                           : IsNotFragile);
   f->setDebugScope(
       new (M) SILDebugScope(RegularLocation(binding->getInit(pbdEntry)), f));
   f->setLocation(binding);

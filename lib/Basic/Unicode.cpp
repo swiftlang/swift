@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Unicode.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ConvertUTF.h"
 
 using namespace swift;

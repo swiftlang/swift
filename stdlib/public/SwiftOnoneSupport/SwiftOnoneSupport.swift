@@ -21,7 +21,7 @@ struct _Prespecialize {
   static internal func _specializeArrays() {
     func _createArrayUser<Element : Comparable>(_ sampleValue: Element) {
       // Initializers.
-      let _: [Element] = [ sampleValue ]
+      let _: [Element] = [sampleValue]
       var a = [Element](repeating: sampleValue, count: 1)
 
       // Read array element
@@ -70,7 +70,7 @@ struct _Prespecialize {
 
     func _createArrayUserWithoutSorting<Element>(_ sampleValue: Element) {
       // Initializers.
-      let _: [Element] = [ sampleValue ]
+      let _: [Element] = [sampleValue]
       var a = [Element](repeating: sampleValue, count: 1)
 
       // Read array element

@@ -55,9 +55,30 @@ func j(_ x: GenericClass<NSString>?) {
 }
 
 class Desk {}
-class Rock: Pettable {}
-class Porcupine: Animal {}
-class Cat: Animal, Pettable {}
+class Rock: NSObject, Pettable {
+  required init(fur: AnyObject) {}
+  func other() -> Self { return self }
+  class func adopt() -> Self { fatalError("") }
+  func pet() {}
+  func pet(with other: Pettable) {}
+  class var needingMostPets: Pettable {
+    get { fatalError("") }
+    set { }
+  }
+}
+class Porcupine: Animal {
+}
+class Cat: Animal, Pettable {
+  required init(fur: AnyObject) {}
+  func other() -> Self { return self }
+  class func adopt() -> Self { fatalError("") }
+  func pet() {}
+  func pet(with other: Pettable) {}
+  class var needingMostPets: Pettable {
+    get { fatalError("") }
+    set { }
+  }
+}
 
 func testImportedTypeParamRequirements() {
   let _ = PettableContainer<Desk>() // expected-error{{type 'Desk' does not conform to protocol 'Pettable'}}
@@ -77,56 +98,176 @@ func testImportedTypeParamRequirements() {
 extension GenericClass {
   func doesntUseGenericParam() {}
   @objc func doesntUseGenericParam2() -> Self {}
-  // Doesn't technically use 'T', since it's type-erased at runtime
+  // Doesn't use 'T', since ObjC class type params are type-erased
   func doesntUseGenericParam3() -> GenericClass<T> {}
+  // Doesn't use 'T', since its metadata isn't necessary to pass around instance
+  @objc func doesntUseGenericParam4(_ x: T, _ y: T.Type) -> T {
+    _ = x
+    _ = y
+    return x
+  }
+  // Doesn't use 'T', since its metadata isn't necessary to erase to AnyObject
+  // or to existential metatype
+  func doesntUseGenericParam5(_ x: T, _ y: T.Type) -> T {
+    _ = y as AnyObject.Type
+    _ = y as Any.Type
+    _ = y as AnyObject
+    _ = x as AnyObject
+  }
 
-  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
-  func usesGenericParamA(_ x: T) {}
-  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
-  func usesGenericParamB(_ x: Int) -> T {}
-  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
-  func usesGenericParamC(_ x: [(T, T)]?) {}
-  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamC(_ x: [(T, T)]?) {} // expected-note{{used here}}
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   func usesGenericParamD(_ x: Int) {
-    _ = T.self
+    _ = T.self // expected-note{{used here}}
   }
-  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   func usesGenericParamE(_ x: Int) {
-    _ = x as? T
+    _ = x as? T // expected-note{{used here}}
   }
-  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   func usesGenericParamF(_ x: Int) {
-    _ = x is T
+    _ = x is T // expected-note{{used here}}
   }
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamG(_ x: T) {
+    _ = T.self // expected-note{{used here}}
+  }
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamH(_ x: T) {
+    _ = x as Any // expected-note{{used here}}
+  }
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamI(_ y: T.Type) {
+    _ = y as Any // expected-note{{used here}}
+  }
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamJ() -> [(T, T)]? {} // expected-note{{used here}}
 
   static func doesntUseGenericParam() {}
   static func doesntUseGenericParam2() -> Self {}
   // Doesn't technically use 'T', since it's type-erased at runtime
   static func doesntUseGenericParam3() -> GenericClass<T> {}
 
-  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
-  static func usesGenericParamA(_ x: T) {}
-  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
-  static func usesGenericParamB(_ x: Int) -> T {}
-  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
-  static func usesGenericParamC(_ x: [(T, T)]?) {}
-  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  static func usesGenericParamC(_ x: [(T, T)]?) {} // expected-note{{used here}}
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   static func usesGenericParamD(_ x: Int) {
-    _ = T.self
+    _ = T.self // expected-note{{used here}}
   }
-  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   static func usesGenericParamE(_ x: Int) {
-    _ = x as? T
+    _ = x as? T // expected-note{{used here}}
   }
-  // expected-error@+1{{Extension of a generic Objective-C class cannot access the class's generic parameters}}
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   static func usesGenericParamF(_ x: Int) {
-    _ = x is T
+    _ = x is T // expected-note{{used here}}
   }
 
   func checkThatMethodsAreObjC() {
     _ = #selector(GenericClass.doesntUseGenericParam)
     _ = #selector(GenericClass.doesntUseGenericParam2)
     _ = #selector(GenericClass.doesntUseGenericParam3)
+    _ = #selector(GenericClass.doesntUseGenericParam4)
+    _ = #selector(GenericClass.doesntUseGenericParam5)
+  }
+}
+
+func swiftFunction<T: Animal>(x: T) {}
+
+extension AnimalContainer {
+  func doesntUseGenericParam1(_ x: T, _ y: T.Type) {
+    _ = #selector(x.another)
+    _ = #selector(y.create)
+  }
+
+  func doesntUseGenericParam2(_ x: T, _ y: T.Type) {
+    let a = x.another()
+    _ = a.another()
+    _ = x.another().another()
+
+    _ = x.dynamicType.create().another()
+    _ = x.dynamicType.init(noise: x).another()
+    _ = y.create().another()
+    _ = y.init(noise: x).another()
+    _ = y.init(noise: x.another()).another()
+    x.eat(a)
+  }
+
+  func doesntUseGenericParam3(_ x: T, _ y: T.Type) {
+    let sup: Animal = x
+    sup.eat(x)
+    _ = x.buddy
+    _ = x[0]
+    x[0] = x
+  }
+
+  func doesntUseGenericParam4(_ x: T, _ y: T.Type) {
+    _ = x.dynamicType.apexPredator.another()
+    x.dynamicType.apexPredator = x
+
+    _ = y.apexPredator.another()
+
+    y.apexPredator = x
+  }
+
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamA(_ x: T) {
+    _ = T(noise: x) // expected-note{{used here}}
+  }
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamB() {
+    _ = T.create() // expected-note{{used here}}
+  }
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamC() {
+    _ = T.apexPredator // expected-note{{used here}}
+  }
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamD(_ x: T) {
+    T.apexPredator = x // expected-note{{used here}}
+  }
+
+  func checkThatMethodsAreObjC() {
+    _ = #selector(AnimalContainer.doesntUseGenericParam1)
+    _ = #selector(AnimalContainer.doesntUseGenericParam2)
+    _ = #selector(AnimalContainer.doesntUseGenericParam3)
+    _ = #selector(AnimalContainer.doesntUseGenericParam4)
+  }
+}
+
+extension PettableContainer {
+  func doesntUseGenericParam(_ x: T, _ y: T.Type) {
+    _ = x.dynamicType.init(fur: x).other()
+    _ = x.dynamicType.adopt().other()
+    _ = y.init(fur: x).other()
+    _ = y.adopt().other()
+    x.pet()
+    x.pet(with: x)
+  }
+
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamA(_ x: T) {
+    _ = T(fur: x) // expected-note{{used here}}
+  }
+
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamB(_ x: T) {
+    _ = T.adopt() // expected-note{{used here}}
+  }
+
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamC(_ x: T) {
+    _ = T.needingMostPets // expected-note{{used here}}
+  }
+
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamD(_ x: T) {
+    T.needingMostPets = x // expected-note{{used here}}
+  }
+
+  func checkThatMethodsAreObjC() {
+    _ = #selector(PettableContainer.doesntUseGenericParam)
   }
 }
 

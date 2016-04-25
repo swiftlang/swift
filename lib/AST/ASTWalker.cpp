@@ -709,6 +709,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitArrowExpr(ArrowExpr *E) {
+    if (Expr *Args = E->getArgsExpr()) {
+      Args = doIt(Args);
+      if (!Args) return nullptr;
+      E->setArgsExpr(Args);
+    }
+    if (Expr *Result = E->getResultExpr()) {
+      Result = doIt(Result);
+      if (!Result) return nullptr;
+      E->setResultExpr(Result);
+    }
+    return E;
+  }
+
   Expr *visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
     Expr *Sub = doIt(E->getSubExpr());
     if (!Sub) return nullptr;

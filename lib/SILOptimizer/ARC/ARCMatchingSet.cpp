@@ -33,7 +33,7 @@
 
 using namespace swift;
 
-llvm::cl::opt<bool> DisableARCRRMotion("disable-code-motion-arc", llvm::cl::init(false));
+llvm::cl::opt<bool> DisableARCRRMotion("disable-code-motion-arc", llvm::cl::init(true));
 
 //===----------------------------------------------------------------------===//
 //                          ARC Matching Set Builder

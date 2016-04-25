@@ -52,6 +52,8 @@ enum CodeCompletionCommandKind {
   keyword,
   recommended,
   recommendedover,
+  mutatingvariant,
+  nonmutatingvariant,
 };
 
 CodeCompletionCommandKind getCommandKind(StringRef Command) {
@@ -61,6 +63,8 @@ CodeCompletionCommandKind getCommandKind(StringRef Command) {
   CHECK_CASE(keyword);
   CHECK_CASE(recommended);
   CHECK_CASE(recommendedover);
+  CHECK_CASE(mutatingvariant);
+  CHECK_CASE(nonmutatingvariant);
 #undef CHECK_CASE
   return CodeCompletionCommandKind::none;
 }
@@ -74,6 +78,8 @@ StringRef getCommandName(CodeCompletionCommandKind Kind) {
   CHECK_CASE(keyword)
   CHECK_CASE(recommended)
   CHECK_CASE(recommendedover)
+  CHECK_CASE(mutatingvariant);
+  CHECK_CASE(nonmutatingvariant);
 #undef CHECK_CASE
   llvm_unreachable("Cannot handle this Kind.");
 }
@@ -89,6 +95,8 @@ return true;
     CHECK_CASE(keyword)
     CHECK_CASE(recommended)
     CHECK_CASE(recommendedover)
+    CHECK_CASE(mutatingvariant);
+    CHECK_CASE(nonmutatingvariant);
 #undef CHECK_CASE
   } while (!Content.empty());
   return false;
@@ -221,6 +229,12 @@ public:
   void visitRecommendedoverField(const RecommendedoverField *Field) override {
     Kind = CodeCompletionCommandKind::recommendedover;
   }
+  void visitMutatingvariantField(const MutatingvariantField *Field) override {
+    Kind = CodeCompletionCommandKind::mutatingvariant;
+  }
+  void visitNonmutatingvariantField(const NonmutatingvariantField *Field) override {
+    Kind = CodeCompletionCommandKind::nonmutatingvariant;
+  }
   void visitText(const Text *Text) override {
     if (Kind == CodeCompletionCommandKind::none)
       return;
@@ -252,6 +266,8 @@ void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
       case ASTNodeKind::KeywordField:
       case ASTNodeKind::RecommendedField:
       case ASTNodeKind::RecommendedoverField:
+      case ASTNodeKind::MutatingvariantField:
+      case ASTNodeKind::NonmutatingvariantField:
         Extractor.walk(Part);
         break;
       default:

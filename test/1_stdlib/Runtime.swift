@@ -144,7 +144,7 @@ class ClassConformsToP1 : Boolean, Q1 {
 
 class Class2ConformsToP1<T : Boolean> : Boolean, Q1 {
   init(_ value: T) {
-    self.value = [ value ]
+    self.value = [value]
   }
   var boolValue: Bool {
     return value[0].boolValue
@@ -549,7 +549,7 @@ Reflection.test("Struct/Generic/DefaultMirror") {
   do {
     var value = GenericStructWithDefaultMirror<Int, [Any?]>(
       first: 123,
-      second: [ "abc", 456, 789.25 ])
+      second: ["abc", 456, 789.25])
     var output = ""
     dump(value, to: &output)
 

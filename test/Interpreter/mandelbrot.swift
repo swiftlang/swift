@@ -39,8 +39,8 @@ func mandelbrot(_ xMin: Double, _ xMax: Double,
   var dY = (yMax - yMin) / Double(cols)
   // Iterate over the points an determine if they are in the
   // Mandelbrot set.
-  for var row = xMin; row < xMax ; row += dX {
-    for var col = yMin; col < yMax; col += dY {
+  for row in stride(from: xMin, to: xMax, by: dX) {
+    for col in stride(from: yMin, to: yMax, by: dY) {
       var c = Complex(real: col, imag: row)
       printDensity(getMandelbrotIterations(c, 200))
     }

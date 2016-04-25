@@ -1061,8 +1061,10 @@ ERROR(extension_protocol_via_typealias,none,
 ERROR(extension_anyobject,none,
       "'AnyObject' protocol cannot be extended", ())
 ERROR(objc_generic_extension_using_type_parameter,none,
-      "Extension of a generic Objective-C class cannot access the class's "
-      "generic parameters", ())
+      "extension of a generic Objective-C class cannot access the class's "
+      "generic parameters at runtime", ())
+NOTE(objc_generic_extension_using_type_parameter_here,none,
+     "generic parameter used here", ())
 
 // Protocols
 ERROR(type_does_not_conform,none,
@@ -1202,7 +1204,7 @@ NOTE(ambiguous_witnesses_type,none,
 NOTE(protocol_witness_exact_match,none,
      "candidate exactly matches%0", (StringRef))
 NOTE(protocol_witness_renamed,none,
-     "candidate matches (with renaming)%0", (StringRef))
+     "rename to %0 to satisfy this requirement%1", (DeclName, StringRef))
 NOTE(protocol_witness_kind_conflict,none,
      "candidate is not %select{an initializer|a function|a variable|"
      "a subscript}0", (RequirementKind))
@@ -1242,7 +1244,7 @@ NOTE(protocol_witness_rethrows_conflict,none,
 NOTE(protocol_witness_throws_conflict,none,
      "candidate throws, but protocol does not allow it", ())
 NOTE(protocol_witness_not_objc,none,
-     "candidate is not '@objc', but protocol requires it", ())
+     "candidate is explicitly '@nonobjc'", ())
 
 NOTE(protocol_witness_type,none,
      "possibly intended match", ())
@@ -1265,10 +1267,24 @@ ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
 NOTE(protocol_conformance_implied_here,none,
      "implied protocol conformance %0 here can be made explicit", (Identifier))
-WARNING(optional_req_nonobjc_near_match,none,
-        "non-@objc %select{initializer %1|method %1|property %1|subscript}0 "
-        "cannot satisfy optional requirement of @objc protocol %2",
-        (RequirementKind, DeclName, DeclName))
+
+// "Near matches"
+WARNING(optional_req_near_match,none,
+        "%0 %1 nearly matches optional requirement %2 of protocol %3",
+        (DescriptiveDeclKind, DeclName, DeclName, DeclName))
+NOTE(optional_req_nonobjc_near_match_add_objc,none,
+     "add '@objc' to provide an Objective-C entrypoint", ())
+NOTE(optional_req_nonobjc_to_objc,none,
+     "rename to %0 to satisfy this requirement",
+     (DeclName))
+NOTE(optional_req_near_match_move,none,
+     "move %0 to %select{an|another}1 extension to silence this warning",
+     (DeclName, unsigned))
+NOTE(optional_req_near_match_nonobjc,none,
+     "add '@nonobjc' to silence this %select{warning|error}0", (bool))
+NOTE(optional_req_near_match_accessibility,none,
+     "make %0 %select{ERROR|private|private or internal}1 to silence this "
+     "warning", (DeclName, Accessibility))
 
 // Protocols and existentials
 ERROR(assoc_type_outside_of_protocol,none,
@@ -1329,8 +1345,8 @@ ERROR(override_multiple_decls_arg_mismatch,none,
       "declaration %0 has different argument names from any potential "
       "overrides", (DeclName))
 NOTE(overridden_near_match_here,none,
-     "potential overridden %select{method|initializer}0 %1 here",
-      (bool, DeclName))
+     "potential overridden %0 %1 here",
+      (DescriptiveDeclKind, DeclName))
 ERROR(override_decl_extension,none,
       "declarations %select{in extensions|from extensions}0 cannot "
       "%select{override|be overridden}0 yet", (bool))
@@ -1416,6 +1432,14 @@ ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
       "a non-throwing %select{method|initializer}0 is not supported", (bool))
 
+ERROR(override_optional_mismatch,none,
+      "cannot override %0 %select{parameter|index}1 of type %2 with "
+      "non-optional type %3",
+      (DescriptiveDeclKind, bool, Type, Type))
+ERROR(override_optional_result_mismatch,none,
+      "cannot override %0 %select{result|element}1 type %2 with "
+      "optional type %3",
+      (DescriptiveDeclKind, bool, Type, Type))
 WARNING(override_unnecessary_IUO,none,
       "overriding %0 parameter of type %1 with implicitly unwrapped optional "
       "type %2",
@@ -2049,8 +2073,8 @@ WARNING(store_in_willset,none,
         "attempting to store to property %0 within its own willSet, which is "
         "about to be overwritten by the new value", (Identifier))
 
-WARNING(tuple_splat_use,none,
-        "passing %0 arguments to a callee as a single tuple value is deprecated",
+ERROR(tuple_splat_use,none,
+      "passing %0 arguments to a callee as a single tuple value has been removed in Swift 3",
         (unsigned))
 
 
@@ -2161,10 +2185,8 @@ NOTE(change_to_mutating,none,
      (bool))
 
 // For Stmt
-WARNING(deprecated_c_style_for_stmt,none,
-"C-style for statement is deprecated and will be removed in a future version of Swift", ())
-NOTE(cant_fix_c_style_for_stmt,none,
-"C-style for statement can't be automatically fixed to for-in, because the loop variable is modified inside the loop", ())
+ERROR(deprecated_c_style_for_stmt,none,
+      "C-style for statement has been removed in Swift 3", ())
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,none,
@@ -2654,7 +2676,7 @@ ERROR(objc_class_method_not_permitted,none,
       OBJC_DIAG_SELECT " defines Objective-C class method %2, which is "
       "not permitted by Swift", (unsigned, DeclName, ObjCSelector))
 
-NOTE(objc_witness_selector_mismatch,none,
+ERROR(objc_witness_selector_mismatch,none,
       "Objective-C method %2 provided by " OBJC_DIAG_SELECT
       " does not match the requirement's selector (%3)",
       (unsigned, DeclName, ObjCSelector, ObjCSelector))
@@ -2664,6 +2686,30 @@ ERROR(objc_optional_requirement_conflict,none,
       " conflicts with optional requirement " OBJC_DIAG_SELECT_2
       " in protocol %5",
       (unsigned, DeclName, unsigned, DeclName, ObjCSelector, DeclName))
+
+NOTE(objc_optional_requirement_swift_rename,none,
+     "rename %select{method|initializer|property|subscript}0 to match "
+     "requirement %1", (bool, DeclName))
+
+ERROR(witness_non_objc,none,
+      "non-'@objc' " OBJC_DIAG_SELECT " does not satisfy requirement "
+      "of '@objc' protocol %2",
+      (unsigned, DeclName, DeclName))
+
+WARNING(witness_non_objc_optional,none,
+        "non-'@objc' " OBJC_DIAG_SELECT " does not satisfy optional "
+        "requirement of '@objc' protocol %2",
+        (unsigned, DeclName, DeclName))
+
+ERROR(witness_non_objc_storage,none,
+      "non-'@objc' %select{property %1|subscript}0 does not satisfy "
+      "requirement of '@objc' protocol %2",
+      (bool, DeclName, DeclName))
+
+WARNING(witness_non_objc_storage_optional,none,
+      "non-'@objc' %select{property %1|subscript}0 does not satisfy "
+      "optional requirement of '@objc' protocol %2",
+      (bool, DeclName, DeclName))
 
 ERROR(nonobjc_not_allowed,none,
       "declaration is %" OBJC_ATTR_SELECT "0, and cannot be marked @nonobjc",

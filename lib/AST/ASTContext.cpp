@@ -33,6 +33,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Parse/Lexer.h" // bad dependency
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Lex/HeaderSearch.h"
@@ -1827,6 +1828,148 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
   }
 }
 
+bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
+                               DeclName targetName) {
+  if (decl->isImplicit()) return false;
+  if (decl->getFullName() == targetName) return false;
+
+  // Handle properties directly.
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    // Replace the name.
+    SmallString<64> scratch;
+    diag.fixItReplace(var->getNameLoc(), targetName.getString(scratch));
+    return false;
+  }
+
+  // We only handle functions from here on.
+  auto func = dyn_cast<AbstractFunctionDecl>(decl);
+  if (!func) return true;
+
+  auto name = func->getFullName();
+
+  // Fix the name of the function itself.
+  if (name.getBaseName() != targetName.getBaseName()) {
+    diag.fixItReplace(func->getLoc(), targetName.getBaseName().str());
+  }
+
+  // Fix the argument names that need fixing.
+  assert(name.getArgumentNames().size()
+          == targetName.getArgumentNames().size());
+  auto params = func->getParameterList(func->getDeclContext()->isTypeContext());
+  for (unsigned i = 0, n = name.getArgumentNames().size(); i != n; ++i) {
+    auto origArg = name.getArgumentNames()[i];
+    auto targetArg = targetName.getArgumentNames()[i];
+
+    if (origArg == targetArg)
+      continue;
+
+    auto *param = params->get(i);
+
+    // The parameter has an explicitly-specified API name, and it's wrong.
+    if (param->getArgumentNameLoc() != param->getLoc() &&
+        param->getArgumentNameLoc().isValid()) {
+      // ... but the internal parameter name was right. Just zap the
+      // incorrect explicit specialization.
+      if (param->getName() == targetArg) {
+        diag.fixItRemoveChars(param->getArgumentNameLoc(),
+                              param->getLoc());
+        continue;
+      }
+
+      // Fix the API name.
+      StringRef targetArgStr = targetArg.empty()? "_" : targetArg.str();
+      diag.fixItReplace(param->getArgumentNameLoc(), targetArgStr);
+      continue;
+    }
+
+    // The parameter did not specify a separate API name. Insert one.
+    if (targetArg.empty())
+      diag.fixItInsert(param->getLoc(), "_ ");
+    else {
+      llvm::SmallString<8> targetArgStr;
+      targetArgStr += targetArg.str();
+      targetArgStr += ' ';
+      diag.fixItInsert(param->getLoc(), targetArgStr);
+    }
+  }
+
+  return false;
+}
+
+bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
+                                   Optional<ObjCSelector> targetNameOpt,
+                                   bool ignoreImpliedName) {
+  // Subscripts cannot be renamed, so handle them directly.
+  if (isa<SubscriptDecl>(decl)) {
+    diag.fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/false),
+                     "@objc ");
+    return false;
+  }
+
+  // Determine the Objective-C name of the declaration.
+  ObjCSelector name = *decl->getObjCRuntimeName();
+  auto targetName = *targetNameOpt;
+
+  // Dig out the existing '@objc' attribute on the witness. We don't care
+  // about implicit ones because they don't have useful source location
+  // information.
+  auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
+  if (attr && attr->isImplicit())
+    attr = nullptr;
+
+  // If there is an @objc attribute with an explicit, incorrect witness
+  // name, go fix the witness name.
+  if (attr && name != targetName &&
+      attr->hasName() && !attr->isNameImplicit()) {
+    // Find the source range covering the full name.
+    SourceLoc startLoc;
+    if (attr->getNameLocs().empty())
+      startLoc = attr->getRParenLoc();
+    else
+      startLoc = attr->getNameLocs().front();
+
+    // Replace the name with the name of the requirement.
+    SmallString<64> scratch;
+    diag.fixItReplaceChars(startLoc, attr->getRParenLoc(),
+                           targetName.getString(scratch));
+    return false;
+  }
+
+  // We need to create or amend an @objc attribute with the appropriate name.
+
+  // Form the Fix-It text.
+  SourceLoc startLoc;
+  SmallString<64> fixItText;
+  {
+    assert((!attr || !attr->hasName() || attr->isNameImplicit() ||
+            name == targetName) && "Nothing to diagnose!");
+    llvm::raw_svector_ostream out(fixItText);
+
+    // If there is no @objc attribute, we need to add our own '@objc'.
+    if (!attr) {
+      startLoc = decl->getAttributeInsertionLoc(/*forModifier=*/false);
+      out << "@objc";
+    } else {
+      startLoc = Lexer::getLocForEndOfToken(decl->getASTContext().SourceMgr,
+                                            attr->getRange().End);
+    }
+
+    // If the names of the witness and requirement differ, we need to
+    // specify the name.
+    if (name != targetName || ignoreImpliedName) {
+      out << "(";
+      out << targetName;
+      out << ")";
+    }
+
+    if (!attr)
+      out << " ";
+  }
+
+  diag.fixItInsert(startLoc, fixItText);
+  return false;
+}
+
 void ASTContext::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
   bool ImportsFoundationModule = false;
 
@@ -2301,6 +2444,54 @@ bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
                    reqDiagInfo.second,
                    selector,
                    protocolName);
+
+    /// Local function to determine if the given declaration is an accessor.
+    auto isAccessor = [](ValueDecl *decl) -> bool {
+      if (auto func = dyn_cast<FuncDecl>(decl))
+        return func->isAccessor();
+
+      return false;
+    };
+
+    // Fix the name of the witness, if we can.
+    if (req->getFullName() != conflicts[0]->getFullName() &&
+        req->getKind() == conflicts[0]->getKind() &&
+        isAccessor(req) == isAccessor(conflicts[0])) {
+      // They're of the same kind: fix the name.
+      unsigned kind;
+      if (isa<ConstructorDecl>(req))
+        kind = 1;
+      else if (auto func = dyn_cast<FuncDecl>(req)) {
+        if (func->isAccessor())
+          kind = isa<SubscriptDecl>(func->getAccessorStorageDecl()) ? 3 : 2;
+        else
+          kind = 0;
+      } else {
+        llvm_unreachable("unhandled @objc declaration kind");
+      }
+
+      auto diag = Diags.diagnose(conflicts[0],
+                                 diag::objc_optional_requirement_swift_rename,
+                                 kind, req->getFullName());
+
+      // Fix the Swift name.
+      fixDeclarationName(diag, conflicts[0], req->getFullName());
+
+      // Fix the '@objc' attribute, if needed.
+      fixDeclarationObjCName(diag, conflicts[0], req->getObjCRuntimeName(),
+                             /*ignoreImpliedName=*/true);
+    }
+
+    // @nonobjc will silence this warning.
+    bool hasExplicitObjCAttribute = false;
+    if (auto objcAttr = conflicts[0]->getAttrs().getAttribute<ObjCAttr>())
+      hasExplicitObjCAttribute = !objcAttr->isImplicit();
+    if (!hasExplicitObjCAttribute)
+      Diags.diagnose(conflicts[0], diag::optional_req_near_match_nonobjc, true)
+        .fixItInsert(
+          conflicts[0]->getAttributeInsertionLoc(/*forModifier=*/false),
+          "@nonobjc ");
+
     Diags.diagnose(getDeclContextLoc(unsatisfied.first),
                    diag::protocol_conformance_here,
                    true,

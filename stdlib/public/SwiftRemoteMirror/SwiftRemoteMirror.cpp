@@ -1,4 +1,17 @@
+//===--- SwiftRemoteMirror.cpp - C wrapper for Reflection API -------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 #include "swift/Reflection/ReflectionContext.h"
+#include "swift/Reflection/TypeLowering.h"
 #include "swift/Remote/CMemoryReader.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
 
@@ -81,7 +94,18 @@ swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
-  return Context->getInfoForTypeRef(TR);
+  auto TI = Context->getTypeInfo(TR);
+
+  // TODO
+  (void) TI;
+
+  return {
+    SWIFT_UNKNOWN,
+    NULL,
+    0,
+    0,
+    0
+  };
 }
 
 swift_childinfo_t
@@ -90,6 +114,15 @@ swift_reflection_infoForChild(SwiftReflectionContextRef ContextRef,
                               unsigned Index) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
-  return Context->getInfoForChild(TR, Index);
+  auto TI = Context->getTypeInfo(TR);
+
+  // TODO
+  (void) TI;
+
+  return {
+    0,
+    NULL,
+    0,
+  };
 }
 

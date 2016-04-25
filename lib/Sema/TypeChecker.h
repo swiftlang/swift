@@ -1097,7 +1097,9 @@ public:
   /// \param convertType The type that the expression is being converted to,
   /// or null if the expression is standalone.  If the 'ConvertTypeIsOnlyAHint'
   /// option is specified, then this is only a hint, it doesn't produce a full
-  /// conversion constraint.
+  /// conversion constraint. The location information is only used for
+  /// diagnostics should the conversion fail; it is safe to pass a TypeLoc
+  /// without location information.
   ///
   /// \param options Options that control how type checking is performed.
   ///
@@ -1107,14 +1109,14 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
-                           Type convertType = Type(),
+                           TypeLoc convertType = TypeLoc(),
                            ContextualTypePurpose convertTypePurpose =CTP_Unused,
                            TypeCheckExprOptions options =TypeCheckExprOptions(),
                            ExprTypeCheckListener *listener = nullptr);
 
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            ExprTypeCheckListener *listener) {
-    return typeCheckExpression(expr, dc, Type(), CTP_Unused,
+    return typeCheckExpression(expr, dc, TypeLoc(), CTP_Unused,
                                TypeCheckExprOptions(), listener);
   }
 
@@ -1147,12 +1149,8 @@ public:
   /// \param expr The expression to type-check, which will be modified in
   /// place.
   ///
-  /// \param convertType The type that the expression is being converted to,
-  /// or null if the expression is standalone.
-  ///
   /// \returns true if an error occurred, false otherwise.
-  bool typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
-                                  Type convertType = Type());
+  bool typeCheckExpressionShallow(Expr *&expr, DeclContext *dc);
 
   /// \brief Type check whether the given type declaration includes members of
   /// unsupported recursive value types.
@@ -1467,6 +1465,13 @@ public:
                           ProtocolConformance **Conformance = nullptr,
                           SourceLoc ComplainLoc = SourceLoc());
 
+  /// Completely check the given conformance.
+  void checkConformance(NormalProtocolConformance *conformance);
+
+  /// Check all of the conformances in the given context.
+  void checkConformancesInContext(DeclContext *dc,
+                                  IterableDeclContext *idc);
+
   /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
   void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);
 
@@ -1558,12 +1563,6 @@ public:
 
   /// @}
 
-  /// Fix the name of the given function to the target name, attaching
-  /// Fix-Its to the provided in-flight diagnostic.
-  void fixAbstractFunctionNames(InFlightDiagnostic &diag,
-                                AbstractFunctionDecl *func,
-                                DeclName targetName);
-
   /// \name Overload resolution
   ///
   /// Routines that perform overload resolution or provide diagnostics related
@@ -1624,7 +1623,6 @@ public:
   ///
   /// Routines that perform lazy resolution as required for AST operations.
   /// @{
-  void checkConformance(NormalProtocolConformance *conformance) override;
   void resolveTypeWitness(const NormalProtocolConformance *conformance,
                           AssociatedTypeDecl *assocType) override;
   void resolveWitness(const NormalProtocolConformance *conformance,
@@ -1757,9 +1755,7 @@ public:
   void diagnoseDeprecated(SourceRange SourceRange,
                           const DeclContext *ReferenceDC,
                           const AvailableAttr *Attr,
-                          DeclName Name,
-              std::function<void(InFlightDiagnostic&)> extraInfoHandler =
-                          [](InFlightDiagnostic&){});
+                          DeclName Name);
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
@@ -1851,6 +1847,12 @@ public:
   /// The unescaped message to display to the user.
   const StringRef Message;
 };
+
+/// Attempt to omit needless words from the name of the given declaration.
+Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
+
+/// Attempt to omit needless words from the name of the given declaration.
+Optional<Identifier> omitNeedlessWords(VarDecl *var);
 
 } // end namespace swift
 

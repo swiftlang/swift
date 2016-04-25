@@ -38,7 +38,7 @@ typealias basicTypealias = Int
 typealias DSI = MyType<String, Int>
 typealias DS<T> = MyType<String, T>
 
-typealias BadA<T : Int> = MyType<String, T>  // expected-error {{type parameters may not be constrained in typealias argument list}}
+typealias BadA<T : Int> = MyType<String, T>  // expected-error {{inheritance from non-protocol, non-class type 'Int'}}
 
 typealias BadB<T where T == Int> = MyType<String, T>  // expected-error {{associated types may not have a generic parameter list}}
 // expected-error @-1 {{same-type requirement makes generic parameter 'T' non-generic}}
@@ -58,7 +58,6 @@ func f() {
   let _ : Tuple2b = (1, "foo")
   
 }
-
 
 
 typealias A<T1, T2> = MyType<T2, T1>  // expected-note {{generic type 'A' declared here}}
@@ -91,8 +90,6 @@ let _ : D = D<Int, Int, Float>(a: 1, b: 2)
 // expected-error @+1 {{generic parameter 'T3' could not be inferred}}
 let _ : D<Int, Int, Float> = D(a: 1, b: 2)
 
-
-
 let _ : F = { (a : Int) -> Int in a }  // Infer the types of F
 
 // TODO QoI: Cannot infer T1/T2.
@@ -112,6 +109,34 @@ _ = C(a: 42,        // expected-error {{'Int' is not convertible to 'String'}}
 
 _ = G(a: "foo", b: 42)
 _ = G<Int, String>(a: "foo", b: 42)
+
+
+struct MyTypeWithHashable<TyA, TyB : Hashable> {
+}
+
+typealias MTWHInt<HT : Hashable> = MyTypeWithHashable<Int, HT>
+typealias MTWHInt2<HT> = MyTypeWithHashable<Int, HT> // expected-error {{type 'HT' does not conform to protocol 'Hashable'}}
+
+func f(a : MyTypeWithHashable<Int, Int>) {
+  f(a: MyTypeWithHashable<Int, Int>())
+  f(a: MTWHInt<Int>())
+}
+
+
+
+
+// FIXME: Nested generic typealiases aren't working yet.
+struct GenericStruct<T> {
+  typealias TA<U> = MyType<T, U>
+  
+  func testCapture<S>(s : S, t : T) -> TA<S> {  // expected-error {{cannot specialize non-generic type 'MyType<T, U>'}}
+    return TA<S>(a: t, b : s)
+  }
+}
+
+let _ = GenericStruct<Int>.TA<Float>(a: 4.0, b: 1)  // expected-error {{'Int' is not convertible to 'Float'}}
+
+let _ : GenericStruct<Int>.TA<Float>  // expected-error {{cannot specialize non-generic type 'MyType<Int, U>'}}
 
 
 

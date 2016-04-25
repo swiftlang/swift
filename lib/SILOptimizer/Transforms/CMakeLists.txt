@@ -15,6 +15,7 @@ set(TRANSFORMS_SOURCES
   Transforms/RedundantLoadElimination.cpp
   Transforms/RedundantOverflowCheckRemoval.cpp
   Transforms/ReleaseDevirtualizer.cpp
+  Transforms/RetainReleaseCodeMotion.cpp
   Transforms/RemovePin.cpp
   Transforms/SILCleanup.cpp
   Transforms/SILCodeMotion.cpp

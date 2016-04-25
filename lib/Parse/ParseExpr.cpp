@@ -176,6 +176,29 @@ ParserResult<Expr> Parser::parseExprAs() {
   return makeParserResult(parsed);
 }
 
+/// parseExprArrow
+///
+///   expr-arrow:
+///     '->'
+///     'throws' '->'
+ParserResult<Expr> Parser::parseExprArrow() {
+  SourceLoc throwsLoc, arrowLoc;
+  if (Tok.is(tok::kw_throws)) {
+    throwsLoc = consumeToken(tok::kw_throws);
+    if (!Tok.is(tok::arrow)) {
+      diagnose(throwsLoc, diag::throws_after_function_result);
+      return nullptr;
+    }
+  }
+  arrowLoc = consumeToken(tok::arrow);
+  if (Tok.is(tok::kw_throws)) {
+    diagnose(Tok.getLoc(), diag::throws_after_function_result);
+    throwsLoc = consumeToken(tok::kw_throws);
+  }
+  auto arrow = new (Context) ArrowExpr(throwsLoc, arrowLoc);
+  return makeParserResult(arrow);
+}
+
 /// parseExprSequence
 ///
 ///   expr-sequence(Mode):
@@ -348,6 +371,15 @@ parse_operator:
       // We already parsed the right operand as part of the 'is' production.
       // Jump directly to parsing another operator.
       goto parse_operator;
+    }
+
+    case tok::arrow:
+    case tok::kw_throws: {
+      ParserResult<Expr> arrow = parseExprArrow();
+      if (arrow.isNull() || arrow.hasCodeCompletion())
+        return arrow;
+      SequencedExprs.push_back(arrow.get());
+      break;
     }
         
     default:
@@ -1654,13 +1686,18 @@ DeclName Parser::parseUnqualifiedDeclName(bool allowInit,
   return DeclName(Context, baseName, argumentLabels);
 }
 
-static bool shouldAddSelfFixit(DeclContext* Current, DeclName Name) {
+static bool shouldAddSelfFixit(DeclContext* Current, DeclName Name,
+                               DescriptiveDeclKind &Kind) {
   if (Current->isTypeContext() || !Current->getInnermostTypeContext())
     return false;
   if (auto *Nominal = Current->getInnermostTypeContext()->
       getAsNominalTypeOrNominalTypeExtensionContext()){
     // FIXME: we cannot resolve members appear later in the body of the nominal.
-    return !Nominal->lookupDirect(Name).empty();
+    auto LookupResults = Nominal->lookupDirect(Name);
+    if (!LookupResults.empty()) {
+      Kind = LookupResults.front()->getDescriptiveKind();
+      return true;
+    }
   }
   return false;
 }
@@ -1711,10 +1748,13 @@ Expr *Parser::parseExprIdentifier() {
   } else {
     for (auto activeVar : DisabledVars) {
       if (activeVar->getFullName() == name) {
-        auto diag = diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-        if (DisabledVarReason.ID == diag::var_init_self_referential.ID
-            && shouldAddSelfFixit(CurDeclContext, name)) {
-          diag.fixItInsert(loc.getBaseNameLoc(), "self.");
+        DescriptiveDeclKind Kind;
+        if (DisabledVarReason.ID == diag::var_init_self_referential.ID &&
+            shouldAddSelfFixit(CurDeclContext, name, Kind)) {
+          diagnose(loc.getBaseNameLoc(), diag::expected_self_before_reference,
+                   Kind).fixItInsert(loc.getBaseNameLoc(), "self.");
+        } else {
+          diagnose(loc.getBaseNameLoc(), DisabledVarReason);
         }
         return new (Context) ErrorExpr(loc.getSourceRange());
       }

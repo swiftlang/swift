@@ -1101,6 +1101,7 @@ public:
   ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic = false);
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprAs();
+  ParserResult<Expr> parseExprArrow();
   ParserResult<Expr> parseExprSequence(Diag<> ID,
                                        bool isExprBasic,
                                        bool isForConditionalDirective = false);

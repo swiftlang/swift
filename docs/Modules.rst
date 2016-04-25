@@ -415,7 +415,7 @@ Glossary
     A module whose contents are generated from a C-family header or set of 
     headers. See Clang's Modules__ documentation for more information.
 
-    __ http://goto.apple.com/?http://clang.llvm.org/docs/Modules.html
+    __ http://clang.llvm.org/docs/Modules.html
 
   framework
     A mechanism for library distribution on OS X. Traditionally contains header
@@ -440,7 +440,7 @@ Glossary
     in C++; see Wikipedia__ for some examples. Swift's name mangling scheme is
     not the same as C++'s but serves a similar purpose.
 
-    __ http://goto.apple.com/?http://en.wikipedia.org/wiki/Name_mangling#Name_mangling_in_C.2B.2B
+    __ https://en.wikipedia.org/wiki/Name_mangling#C.2B.2B
 
   module
     An entity containing the API for a library, to be `imported <import>` into

@@ -80,7 +80,7 @@ public struct LoggingIterator<Base: IteratorProtocol>
   }
   
   public mutating func next() -> Base.Element? {
-    ++Log.next[selfType]
+    Log.next[selfType] += 1
     return base.next()
   }
   
@@ -111,7 +111,7 @@ public protocol LoggingSequenceType  : Sequence, LoggingType {
 
 extension LoggingSequenceType {
   public var underestimatedCount: Int {
-    ++SequenceLog.underestimatedCount[selfType]
+    SequenceLog.underestimatedCount[selfType] += 1
     return base.underestimatedCount
   }
 }
@@ -119,28 +119,28 @@ extension LoggingSequenceType {
 extension LoggingSequenceType
   where Log == SequenceLog, Iterator == LoggingIterator<Base.Iterator> {
   public func makeIterator() -> LoggingIterator<Base.Iterator> {
-    ++Log.iterator[selfType]
+    Log.iterator[selfType] += 1
     return LoggingIterator(base.makeIterator())
   }
 
   public func map<T>(
     @noescape transform: (Base.Iterator.Element) -> T
   ) -> [T] {
-    ++Log.map[selfType]
+    Log.map[selfType] += 1
     return base.map(transform)
   }
 
   public func filter(
     @noescape includeElement: (Base.Iterator.Element) -> Bool
   ) -> [Base.Iterator.Element] {
-    ++Log.filter[selfType]
+    Log.filter[selfType] += 1
     return base.filter(includeElement)
   }
   
   public func _customContainsEquatableElement(
     element: Base.Iterator.Element
   ) -> Bool? {
-    ++Log._customContainsEquatableElement[selfType]
+    Log._customContainsEquatableElement[selfType] += 1
     return base._customContainsEquatableElement(element)
   }
   
@@ -150,7 +150,7 @@ extension LoggingSequenceType
   public func _preprocessingPass<R>(
     @noescape preprocess: (Self) -> R
   ) -> R? {
-    ++Log._preprocessingPass[selfType]
+    Log._preprocessingPass[selfType] += 1
     return base._preprocessingPass { _ in preprocess(self) }
   }
 
@@ -158,7 +158,7 @@ extension LoggingSequenceType
   /// in the same order.
   public func _copyToNativeArrayBuffer()
     -> _ContiguousArrayBuffer<Base.Iterator.Element> {
-    ++Log._copyToNativeArrayBuffer[selfType]
+    Log._copyToNativeArrayBuffer[selfType] += 1
     return base._copyToNativeArrayBuffer()
   }
 
@@ -166,7 +166,7 @@ extension LoggingSequenceType
   public func _copyContents(
     initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
   ) -> UnsafeMutablePointer<Base.Iterator.Element> {
-    ++Log._copyContents[selfType]
+    Log._copyContents[selfType] += 1
     return base._copyContents(initializing: ptr)
   }
 }
@@ -208,41 +208,41 @@ public protocol LoggingCollectionType : LoggingSequenceType, Collection {
 extension LoggingCollectionType
 where Index == Base.Index {
   public var startIndex: Base.Index {
-    ++CollectionLog.startIndex[selfType]
+    CollectionLog.startIndex[selfType] += 1
     return base.startIndex
   }
   
   public var endIndex: Base.Index {
-    ++CollectionLog.endIndex[selfType]
+    CollectionLog.endIndex[selfType] += 1
     return base.endIndex
   }
   public subscript(position: Base.Index) -> Base.Iterator.Element {
-    ++CollectionLog.subscriptIndex[selfType]
+    CollectionLog.subscriptIndex[selfType] += 1
     return base[position]
   }
   
   public subscript(_prext_bounds: Range<Base.Index>) -> Base.SubSequence {
-    ++CollectionLog.subscriptRange[selfType]
+    CollectionLog.subscriptRange[selfType] += 1
     return base[_prext_bounds]
   }    
 
   public var isEmpty: Bool {
-    ++CollectionLog.isEmpty[selfType]
+    CollectionLog.isEmpty[selfType] += 1
     return base.isEmpty
   }
 
   public var count: Base.Index.Distance {
-    ++CollectionLog.count[selfType]
+    CollectionLog.count[selfType] += 1
     return base.count
   }
   
   public func _customIndexOfEquatableElement(element: Base.Iterator.Element) -> Base.Index?? {
-    ++CollectionLog._customIndexOfEquatableElement[selfType]
+    CollectionLog._customIndexOfEquatableElement[selfType] += 1
     return base._customIndexOfEquatableElement(element)
   }
 
   public var first: Base.Iterator.Element? {
-    ++CollectionLog.first[selfType]
+    CollectionLog.first[selfType] += 1
     return base.first
   }
 }

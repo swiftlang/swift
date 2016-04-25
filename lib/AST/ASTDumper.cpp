@@ -2122,6 +2122,13 @@ public:
   void visitCoerceExpr(CoerceExpr *E) {
     printExplicitCastExpr(E, "coerce_expr");
   }
+  void visitArrowExpr(ArrowExpr *E) {
+    printCommon(E, "arrow") << '\n';
+    printRec(E->getArgsExpr());
+    OS << '\n';
+    printRec(E->getResultExpr());
+    OS << ')';
+  }
   void visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
     printCommon(E, "rebind_self_in_constructor_expr") << '\n';
     printRec(E->getSubExpr());

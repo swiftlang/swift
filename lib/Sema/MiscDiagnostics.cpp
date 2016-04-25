@@ -973,8 +973,8 @@ public:
 
 private:
   bool diagAvailability(const ValueDecl *D, SourceRange R);
-  bool diagnoseIncDecDeprecation(const ValueDecl *D, SourceRange R,
-                                 const AvailableAttr *Attr);
+  bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
+                             const AvailableAttr *Attr);
 
   /// Walk an assignment expression, checking for availability.
   void walkAssignExpr(AssignExpr *E) {
@@ -1090,13 +1090,16 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R) {
   if (!D)
     return false;
 
+  if (auto *attr = AvailableAttr::isUnavailable(D))
+    if (diagnoseIncDecRemoval(D, R, attr))
+      return true;
+
   if (TC.diagnoseExplicitUnavailability(D, R, DC))
     return true;
 
   // Diagnose for deprecation
   if (const AvailableAttr *Attr = TypeChecker::getDeprecated(D)) {
-    if (!diagnoseIncDecDeprecation(D, R, Attr))
-      TC.diagnoseDeprecated(R, DC, Attr, D->getFullName());
+    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName());
   }
 
   if (TC.getLangOpts().DisableAvailabilityChecking)
@@ -1132,11 +1135,11 @@ static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
 }
 
 
-/// If this is a call to a deprecated ++ / -- operator, try to diagnose it with
-/// a fixit hint and return true.  If not, or if we fail, return false.
-bool AvailabilityWalker::diagnoseIncDecDeprecation(const ValueDecl *D,
-                                                   SourceRange R,
-                                                   const AvailableAttr *Attr) {
+/// If this is a call to an unavailable ++ / -- operator, try to diagnose it
+/// with a fixit hint and return true.  If not, or if we fail, return false.
+bool AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D,
+                                               SourceRange R,
+                                               const AvailableAttr *Attr) {
   // We can only produce a fixit if we're talking about ++ or --.
   bool isInc = D->getNameStr() == "++";
   if (!isInc && D->getNameStr() != "--")
@@ -1171,17 +1174,16 @@ bool AvailabilityWalker::diagnoseIncDecDeprecation(const ValueDecl *D,
   
   if (!replacement.empty()) {
     // If we emit a deprecation diagnostic, produce a fixit hint as well.
-    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName(),
-                          [&](InFlightDiagnostic &diag) {
-      if (isa<PrefixUnaryExpr>(call)) {
-        // Prefix: remove the ++ or --.
-        diag.fixItRemove(call->getFn()->getSourceRange());
-        diag.fixItInsertAfter(call->getArg()->getEndLoc(), replacement);
-      } else {
-        // Postfix: replace the ++ or --.
-        diag.fixItReplace(call->getFn()->getSourceRange(), replacement);
-      }
-    });
+    auto diag = TC.diagnose(R.Start, diag::availability_decl_unavailable_msg,
+                            D->getFullName(), "it has been removed in Swift 3");
+    if (isa<PrefixUnaryExpr>(call)) {
+      // Prefix: remove the ++ or --.
+      diag.fixItRemove(call->getFn()->getSourceRange());
+      diag.fixItInsertAfter(call->getArg()->getEndLoc(), replacement);
+    } else {
+      // Postfix: replace the ++ or --.
+      diag.fixItReplace(call->getFn()->getSourceRange(), replacement);
+    }
 
     return true;
   }
@@ -1860,7 +1862,6 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
     
   if (checker.isVarDeclEverWritten(loopVar)) {
     diagnostic.flush();
-    TC.diagnose(FS->getStartLoc(), diag::cant_fix_c_style_for_stmt);
     return;
   }
     
@@ -2531,13 +2532,10 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   return "";
 }
 
-/// Attempt to omit needless words from the name of the given declaration.
-static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
+Optional<DeclName> swift::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
-  if (!Context.LangOpts.WarnOmitNeedlessWords)
-    return None;
 
-  if (afd->isInvalid())
+  if (afd->isInvalid() || isa<DestructorDecl>(afd))
     return None;
 
   DeclName name = afd->getFullName();
@@ -2623,14 +2621,10 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
   return DeclName(Context, newBaseName, newArgNames);
 }
 
-/// Attempt to omit needless words from the name of the given declaration.
-static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
+Optional<Identifier> swift::omitNeedlessWords(VarDecl *var) {
   auto &Context = var->getASTContext();
 
   if (var->isInvalid())
-    return None;
-
-  if (!Context.LangOpts.WarnOmitNeedlessWords)
     return None;
 
   if (var->getName().empty())
@@ -2645,7 +2639,7 @@ static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
 
   // Dig out the type of the variable.
   Type type = var->getInterfaceType()->getReferenceStorageReferent()
-  ->getLValueOrInOutObjectType();
+                ->getLValueOrInOutObjectType();
   while (auto optObjectTy = type->getAnyOptionalObjectType())
     type = optObjectTy;
 
@@ -2673,18 +2667,24 @@ static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
 }
 
 void TypeChecker::checkOmitNeedlessWords(AbstractFunctionDecl *afd) {
-  auto newName = ::omitNeedlessWords(afd);
+  if (!Context.LangOpts.WarnOmitNeedlessWords)
+    return;
+
+  auto newName = omitNeedlessWords(afd);
   if (!newName)
     return;
 
   auto name = afd->getFullName();
   InFlightDiagnostic diag = diagnose(afd->getLoc(), diag::omit_needless_words,
                                      name, *newName);
-  fixAbstractFunctionNames(diag, afd, *newName);
+  fixDeclarationName(diag, afd, *newName);
 }
 
 void TypeChecker::checkOmitNeedlessWords(VarDecl *var) {
-  auto newName = ::omitNeedlessWords(var);
+  if (!Context.LangOpts.WarnOmitNeedlessWords)
+    return;
+
+  auto newName = omitNeedlessWords(var);
   if (!newName)
     return;
 
@@ -2858,7 +2858,7 @@ void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
     return;
 
   // Determine whether the callee has any needless words in it.
-  auto newName = ::omitNeedlessWords(afd);
+  auto newName = omitNeedlessWords(afd);
 
   bool renamed;
   if (!newName) {
@@ -2960,7 +2960,7 @@ void TypeChecker::checkOmitNeedlessWords(MemberRefExpr *memberRef) {
     return;
 
   // Check whether any needless words were omitted.
-  auto newName = ::omitNeedlessWords(var);
+  auto newName = omitNeedlessWords(var);
   if (!newName)
     return;
 

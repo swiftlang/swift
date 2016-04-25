@@ -1097,9 +1097,7 @@ private:
 public:
   /// Get the metadata kind.
   MetadataKind getKind() const {
-    if (metadataKindIsClass(Kind))
-      return MetadataKind::Class;
-    return MetadataKind(Kind);
+    return getEnumeratedMetadataKind(Kind);
   }
   
   /// Set the metadata kind.
@@ -2048,7 +2046,7 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   // TODO: Make this target agnostic
   using Argument = FlaggedPointer<const TargetMetadata<Runtime> *, 0>;
 
-  TargetFunctionTypeFlags<Runtime> Flags;
+  TargetFunctionTypeFlags<StoredSize> Flags;
 
   /// The type metadata for the result type.
   ConstTargetMetadataPointer<Runtime, TargetMetadata> ResultType;

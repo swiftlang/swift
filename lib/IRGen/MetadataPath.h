@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_METADATAPATH_H
 
 #include "swift/Basic/EncodedSequence.h"
+#include "swift/Reflection/MetadataSource.h"
 
 namespace llvm {
   class Value;
@@ -174,6 +175,28 @@ public:
                                       ProtocolConformanceRef conformance,
                                       llvm::Value *source,
                                       Map<llvm::Value*> *cache) const;
+
+  template <typename Allocator>
+  const reflection::MetadataSource *
+  getMetadataSource(Allocator &A,
+                    const reflection::MetadataSource *Root) const {
+    if (Root == nullptr)
+      return nullptr;
+
+    for (auto C : Path) {
+      switch (C.getKind()) {
+      case Component::Kind::NominalParent:
+        Root = A.template createParent(Root);
+        continue;
+      case Component::Kind::NominalTypeArgument:
+        Root = A.template createGenericArgument(C.getPrimaryIndex(), Root);
+        continue;
+      default:
+        return nullptr;
+      }
+    }
+    return Root;
+  }
 
   void dump() const;
   void print(llvm::raw_ostream &out) const;

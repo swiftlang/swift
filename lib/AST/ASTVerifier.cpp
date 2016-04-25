@@ -836,6 +836,19 @@ struct ASTNodeBase {};
       verifyCheckedBase(S);
     }
 
+    void verifyChecked(TupleExpr *E) {
+      const TupleType *exprTy = E->getType()->castTo<TupleType>();
+      for_each(exprTy->getElements().begin(), exprTy->getElements().end(),
+               E->getElements().begin(),
+               [this](const TupleTypeElt &field, const Expr *elt) {
+        checkTrivialSubtype(field.getType()->getUnlabeledType(Ctx),
+                            elt->getType()->getUnlabeledType(Ctx),
+                            "tuple and element");
+      });
+      // FIXME: Check all the variadic elements.
+      verifyCheckedBase(E);
+    }
+
     void verifyChecked(InOutExpr *E) {
       Type srcObj = checkLValue(E->getSubExpr()->getType(),
                                 "result of InOutExpr");

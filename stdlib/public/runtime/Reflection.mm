@@ -590,9 +590,7 @@ const char *swift_EnumCaseName(OpaqueValue *value, const Metadata *type) {
 
   MagicMirror *theMirror = reinterpret_cast<MagicMirror *>(&mirror);
   MagicMirrorData data = theMirror->Data;
-  swift_retain(data.Owner);
   const char *result = swift_EnumMirror_caseName(data.Owner, data.Value, data.Type);
-  type->vw_destroy(value);
   return result;
 }
 
@@ -932,6 +930,13 @@ extern "C" bool swift_isKind(id object, NSString *className) {
 
 #if !defined(__USER_LABEL_PREFIX__)
 #error __USER_LABEL_PREFIX__ is undefined
+#endif
+
+// Workaround the bug of clang in Cygwin 64bit
+// https://llvm.org/bugs/show_bug.cgi?id=26744
+#if defined(__CYGWIN__) && defined(__x86_64__)
+#undef __USER_LABEL_PREFIX__
+#define __USER_LABEL_PREFIX__
 #endif
 
 #define GLUE_EXPANDED(a, b) a##b
