@@ -82,6 +82,7 @@ public:
 struct FieldInfo {
   std::string Name;
   unsigned Offset;
+  const TypeRef *TR;
   const TypeInfo &TI;
 };
 
@@ -141,7 +142,9 @@ class TypeConverter {
   llvm::DenseMap<const TypeRef *, const TypeInfo *> Cache;
   llvm::DenseMap<std::pair<unsigned, unsigned>,
                  const ReferenceTypeInfo *> ReferenceCache;
-  const TypeInfo *RawPointerTI = nullptr;
+  const TypeRef *RawPointerTR = nullptr;
+  const TypeRef *NativeObjectTR = nullptr;
+  const TypeRef *UnknownObjectTR = nullptr;
   const TypeInfo *ThickFunctionTI = nullptr;
 
 public:
@@ -156,7 +159,9 @@ public:
   getReferenceTypeInfo(ReferenceKind Kind,
                        ReferenceCounting Refcounting);
 
-  const TypeInfo *getRawPointerTypeInfo();
+  const TypeRef *getRawPointerTypeRef();
+  const TypeRef *getNativeObjectTypeRef();
+  const TypeRef *getUnknownObjectTypeRef();
   const TypeInfo *getThickFunctionTypeInfo();
 
   template <typename TypeInfoTy, typename... Args>

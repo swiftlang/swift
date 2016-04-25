@@ -119,3 +119,11 @@ V12TypeLowering14FunctionStruct
 // CHECK-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
 // CHECK-NEXT:   (field name=cFunction offset=24
 // CHECK-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1)))
+
+Bo
+// CHECK:      (builtin Builtin.NativeObject)
+// CHECK-NEXT: (reference kind=strong refcounting=native)
+
+BO
+// CHECK:      (builtin Builtin.UnknownObject)
+// CHECK-NEXT: (reference kind=strong refcounting=unknown)

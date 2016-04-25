@@ -175,27 +175,34 @@ class RecordTypeInfoBuilder {
   unsigned Size, Alignment, Stride, NumExtraInhabitants;
   RecordKind Kind;
   std::vector<FieldInfo> Fields;
+  bool Invalid;
 
 public:
   RecordTypeInfoBuilder(TypeConverter &TC, RecordKind Kind)
     : TC(TC), Size(0), Alignment(1), Stride(0), NumExtraInhabitants(0),
-      Kind(Kind) {}
+      Kind(Kind), Invalid(false) {}
 
-  void addField(const std::string &Name, const TypeInfo &TI) {
+  void addField(const std::string &Name, const TypeRef *TR) {
+    const TypeInfo *TI = TC.getTypeInfo(TR);
+    if (TI == nullptr) {
+      Invalid = true;
+      return;
+    }
+
     // FIXME: I just made this up
     if (Size == 0)
-      NumExtraInhabitants = TI.getNumExtraInhabitants();
+      NumExtraInhabitants = TI->getNumExtraInhabitants();
     else
       NumExtraInhabitants = 0;
 
-    unsigned fieldSize = TI.getSize();
-    unsigned fieldAlignment = TI.getAlignment();
+    unsigned fieldSize = TI->getSize();
+    unsigned fieldAlignment = TI->getAlignment();
 
     // Align the current size appropriately
     Size = ((Size + fieldAlignment - 1) & ~(fieldAlignment - 1));
 
     // Add the field at the aligned offset
-    Fields.push_back({Name, Size, TI});
+    Fields.push_back({Name, Size, TR, *TI});
 
     // Update the aggregate size
     Size += fieldSize;
@@ -208,6 +215,9 @@ public:
   }
 
   const RecordTypeInfo *build() {
+    if (Invalid)
+      return nullptr;
+
     return TC.makeTypeInfo<RecordTypeInfo>(
         Size, Alignment, Stride,
         NumExtraInhabitants, Kind, Fields);
@@ -227,10 +237,10 @@ TypeConverter::getReferenceTypeInfo(ReferenceKind Kind,
   const TypeRef *TR;
   switch (Refcounting) {
   case ReferenceCounting::Native:
-    TR = BuiltinTypeRef::create(Builder, "Bo");
+    TR = getNativeObjectTypeRef();
     break;
   case ReferenceCounting::Unknown:
-    TR = BuiltinTypeRef::create(Builder, "BO");
+    TR = getUnknownObjectTypeRef();
     break;
   }
 
@@ -254,26 +264,35 @@ TypeConverter::getThickFunctionTypeInfo() {
     return ThickFunctionTI;
 
   RecordTypeInfoBuilder builder(*this, RecordKind::ThickFunction);
-  auto *TI = getRawPointerTypeInfo();
-  if (TI == nullptr)
-    return nullptr;
-  builder.addField("function", *TI);
-  TI = getReferenceTypeInfo(ReferenceKind::Strong,
-                            ReferenceCounting::Native);
-  if (TI == nullptr)
-    return nullptr;
-  builder.addField("context", *TI);
+  builder.addField("function", getRawPointerTypeRef());
+  builder.addField("context", getNativeObjectTypeRef());
   ThickFunctionTI = builder.build();
 
   return ThickFunctionTI;
 }
 
-const TypeInfo *TypeConverter::getRawPointerTypeInfo() {
-  if (RawPointerTI != nullptr)
-    return RawPointerTI;
+const TypeRef *TypeConverter::getRawPointerTypeRef() {
+  if (RawPointerTR != nullptr)
+    return RawPointerTR;
 
-  RawPointerTI = getTypeInfo(BuiltinTypeRef::create(Builder, "Bp"));
-  return RawPointerTI;
+  RawPointerTR = BuiltinTypeRef::create(Builder, "Bp");
+  return RawPointerTR;
+}
+
+const TypeRef *TypeConverter::getNativeObjectTypeRef() {
+  if (NativeObjectTR != nullptr)
+    return NativeObjectTR;
+
+  NativeObjectTR = BuiltinTypeRef::create(Builder, "Bo");
+  return NativeObjectTR;
+}
+
+const TypeRef *TypeConverter::getUnknownObjectTypeRef() {
+  if (UnknownObjectTR != nullptr)
+    return UnknownObjectTR;
+
+  UnknownObjectTR = BuiltinTypeRef::create(Builder, "BO");
+  return UnknownObjectTR;
 }
 
 class LowerType
@@ -286,6 +305,14 @@ public:
   LowerType(TypeConverter &TC) : TC(TC) {}
 
   const TypeInfo *visitBuiltinTypeRef(const BuiltinTypeRef *B) {
+    if (B->getMangledName() == "Bo") {
+      return TC.getReferenceTypeInfo(ReferenceKind::Strong,
+                                     ReferenceCounting::Native);
+    } else if (B->getMangledName() == "BO") {
+      return TC.getReferenceTypeInfo(ReferenceKind::Strong,
+                                     ReferenceCounting::Unknown);
+    }
+
     auto *descriptor = TC.getBuilder().getBuiltinTypeInfo(B);
     assert(descriptor != nullptr);
     return TC.makeTypeInfo<BuiltinTypeInfo>(descriptor);
@@ -303,12 +330,8 @@ public:
                                      ReferenceCounting::Native);
     case FieldDescriptorKind::Struct: {
       RecordTypeInfoBuilder builder(TC, RecordKind::Struct);
-      for (auto Field : TC.getBuilder().getFieldTypeRefs(TR, FD)) {
-        auto *FieldTI = TC.getTypeInfo(Field.second);
-        if (FieldTI == nullptr)
-          return nullptr;
-        builder.addField(Field.first, *FieldTI);
-      }
+      for (auto Field : TC.getBuilder().getFieldTypeRefs(TR, FD))
+        builder.addField(Field.first, Field.second);
       return builder.build();
     }
     case FieldDescriptorKind::Enum: {
@@ -352,35 +375,22 @@ public:
 
   const TypeInfo *visitTupleTypeRef(const TupleTypeRef *T) {
     RecordTypeInfoBuilder builder(TC, RecordKind::Tuple);
-    for (auto Element : T->getElements()) {
-      auto *FieldTI = TC.getTypeInfo(Element);
-      if (FieldTI == nullptr)
-        return nullptr;
-      builder.addField("", *FieldTI);
-    }
+    for (auto Element : T->getElements())
+      builder.addField("", Element);
     return builder.build();
   }
 
   const TypeInfo *visitFunctionTypeRef(const FunctionTypeRef *F) {
     switch (F->getFlags().getConvention()) {
-    case FunctionMetadataConvention::Swift: {
-      RecordTypeInfoBuilder builder(TC, RecordKind::ThickFunction);
-      auto *TI = TC.getRawPointerTypeInfo();
-      if (TI == nullptr)
-        return nullptr;
-      builder.addField("function", *TI);
-      TI = TC.getReferenceTypeInfo(ReferenceKind::Strong,
-                                   ReferenceCounting::Native);
-      builder.addField("context", *TI);
-      return builder.build();
-    }
+    case FunctionMetadataConvention::Swift:
+      return TC.getThickFunctionTypeInfo();
     case FunctionMetadataConvention::Block:
       // FIXME: Native convention if blocks are ever supported on Linux?
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                      ReferenceCounting::Unknown);
     case FunctionMetadataConvention::Thin:
     case FunctionMetadataConvention::CFunctionPointer:
-      return TC.getRawPointerTypeInfo();
+      return TC.getTypeInfo(TC.getRawPointerTypeRef());
     }
   }
 
