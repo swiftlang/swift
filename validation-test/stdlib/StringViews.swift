@@ -691,7 +691,7 @@ tests.test("UTF16->String") {
   let s = summer + winter + winter + summer
   let v = s.utf16
   for i in v.indices {
-    for j in i..<v.endIndex {      
+    for j in v.indices[i..<v.endIndex] {
       if let si = i.samePosition(in: s) {
         if let sj = j.samePosition(in: s) {
           expectEqual(s[si..<sj], String(v[i..<j])!)
