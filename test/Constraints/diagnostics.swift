@@ -583,7 +583,7 @@ func r21684487() {
   var closures = Array<MyClosure>()
   let testClosure = {(list: [Int]) -> Bool in return true}
   
-  let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot convert value of type '([Int]) -> Bool' to expected argument type 'AnyObject?'}}
+  let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot convert value of type 'MyClosure' (aka 'Array<Int> -> Bool') to expected argument type 'AnyObject?'}}
 }
 
 // <rdar://problem/18397777> QoI: special case comparisons with nil
@@ -720,7 +720,7 @@ func r23272739(_ contentType: String) {
 // <rdar://problem/23641896> QoI: Strings in Swift cannot be indexed directly with integer offsets
 func r23641896() {
   var g = "Hello World"
-  g.replaceSubrange(0...2, with: "ce")  // expected-error {{argument type 'String' does not conform to expected type 'Collection'}}
+  g.replaceSubrange(0...2, with: "ce")  // expected-error {{cannot invoke 'replaceSubrange' with an argument list of type '(CountableClosedRange<Int>, with: String)'}} expected-note {{overloads for 'replaceSubrange' exist}}
 
   _ = g[12]  // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
 
