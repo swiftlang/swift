@@ -176,6 +176,29 @@ ParserResult<Expr> Parser::parseExprAs() {
   return makeParserResult(parsed);
 }
 
+/// parseExprArrow
+///
+///   expr-arrow:
+///     '->'
+///     'throws' '->'
+ParserResult<Expr> Parser::parseExprArrow() {
+  SourceLoc throwsLoc, arrowLoc;
+  if (Tok.is(tok::kw_throws)) {
+    throwsLoc = consumeToken(tok::kw_throws);
+    if (!Tok.is(tok::arrow)) {
+      diagnose(throwsLoc, diag::throws_after_function_result);
+      return nullptr;
+    }
+  }
+  arrowLoc = consumeToken(tok::arrow);
+  if (Tok.is(tok::kw_throws)) {
+    diagnose(Tok.getLoc(), diag::throws_after_function_result);
+    throwsLoc = consumeToken(tok::kw_throws);
+  }
+  auto arrow = new (Context) ArrowExpr(throwsLoc, arrowLoc);
+  return makeParserResult(arrow);
+}
+
 /// parseExprSequence
 ///
 ///   expr-sequence(Mode):
@@ -348,6 +371,15 @@ parse_operator:
       // We already parsed the right operand as part of the 'is' production.
       // Jump directly to parsing another operator.
       goto parse_operator;
+    }
+
+    case tok::arrow:
+    case tok::kw_throws: {
+      ParserResult<Expr> arrow = parseExprArrow();
+      if (arrow.isNull() || arrow.hasCodeCompletion())
+        return arrow;
+      SequencedExprs.push_back(arrow.get());
+      break;
     }
         
     default:

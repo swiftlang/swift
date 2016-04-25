@@ -146,6 +146,10 @@ public:
   /// Emit names of struct stored properties and enum cases.
   unsigned EnableReflectionNames : 1;
 
+  /// Emit metadata for certain builtin types. Only for use by
+  /// standard library.
+  unsigned EnableReflectionBuiltins : 1;
+
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
 
@@ -166,7 +170,8 @@ public:
                    PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
                    HasValueNamesSetting(false), ValueNames(false),
                    EnableReflectionMetadata(false), EnableReflectionNames(false),
-                   CmdArgs(), UseIncrementalLLVMCodeGen(true)
+                   EnableReflectionBuiltins(false), CmdArgs(),
+                   UseIncrementalLLVMCodeGen(true)
                    {}
 
   /// Gets the name of the specified output filename.

@@ -173,7 +173,7 @@ public:
 
 class ReflectionMetadataBuilder : public ConstantBuilder<> {
 protected:
-  SmallPtrSetImpl<CanType> &BuiltinTypes;
+  llvm::SetVector<CanType> &BuiltinTypes;
 
   // Collect any builtin types referenced from this type.
   void addBuiltinTypeRefs(CanType type) {
@@ -201,7 +201,7 @@ protected:
 
 public:
   ReflectionMetadataBuilder(IRGenModule &IGM,
-                            SmallPtrSetImpl<CanType> &BuiltinTypes)
+                            llvm::SetVector<CanType> &BuiltinTypes)
     : ConstantBuilder(IGM), BuiltinTypes(BuiltinTypes) {}
 };
 
@@ -274,7 +274,7 @@ public:
   AssociatedTypeMetadataBuilder(IRGenModule &IGM,
     ArrayRef<const NominalTypeDecl *> NominalTypeDecls,
     ArrayRef<const ExtensionDecl *> ExtensionDecls,
-    SmallPtrSetImpl<CanType> &BuiltinTypes)
+    llvm::SetVector<CanType> &BuiltinTypes)
     : ReflectionMetadataBuilder(IGM, BuiltinTypes),
       NominalTypeDecls(NominalTypeDecls),
       ExtensionDecls(ExtensionDecls) {}
@@ -384,7 +384,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
 public:
   FieldTypeMetadataBuilder(IRGenModule &IGM,
                            ArrayRef<const NominalTypeDecl *> NominalTypeDecls,
-                           SmallPtrSetImpl<CanType> &BuiltinTypes)
+                           llvm::SetVector<CanType> &BuiltinTypes)
     : ReflectionMetadataBuilder(IGM, BuiltinTypes),
       NominalTypeDecls(NominalTypeDecls) {}
 
@@ -420,7 +420,7 @@ class BuiltinTypeMetadataBuilder : public ReflectionMetadataBuilder {
   void addBuiltinType(CanType builtinType) {
     addTypeRef(builtinType->getASTContext().TheBuiltinModule, builtinType);
 
-    auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfoForUnlowered(builtinType));
+    auto &ti = cast<FixedTypeInfo>(IGM.getTypeInfoForUnlowered(builtinType));
     addConstantInt32(ti.getFixedSize().getValue());
     addConstantInt32(ti.getFixedAlignment().getValue());
     addConstantInt32(ti.getFixedStride().getValue());
@@ -435,7 +435,7 @@ class BuiltinTypeMetadataBuilder : public ReflectionMetadataBuilder {
 
 public:
   BuiltinTypeMetadataBuilder(IRGenModule &IGM,
-                             SmallPtrSetImpl<CanType> &BuiltinTypes)
+                             llvm::SetVector<CanType> &BuiltinTypes)
     : ReflectionMetadataBuilder(IGM, BuiltinTypes) {}
 
   llvm::GlobalVariable *emit() {
@@ -475,7 +475,7 @@ class CaptureDescriptorBuilder : public ReflectionMetadataBuilder {
   HeapLayout &Layout;
 public:
   CaptureDescriptorBuilder(IRGenModule &IGM,
-                           SmallPtrSetImpl<CanType> &BuiltinTypes,
+                           llvm::SetVector<CanType> &BuiltinTypes,
                            SILFunction &Callee,
                            HeapLayout &Layout)
     : ReflectionMetadataBuilder(IGM, BuiltinTypes),
@@ -746,7 +746,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef Str) {
 
 llvm::Constant *IRGenModule::getAddrOfCaptureDescriptor(SILFunction &SILFn,
                                                         HeapLayout &Layout) {
-  SmallPtrSet<CanType, 1> BuiltinTypes;
+  llvm::SetVector<CanType> BuiltinTypes;
   CaptureDescriptorBuilder builder(*this, BuiltinTypes, SILFn, Layout);
 
   auto var = builder.emit();
@@ -758,7 +758,8 @@ llvm::Constant *IRGenModule::getAddrOfCaptureDescriptor(SILFunction &SILFn,
 
 void IRGenModule::emitReflectionMetadataRecords() {
   auto DoNotHaveDecls = NominalTypeDecls.empty() && ExtensionDecls.empty();
-  if (!Opts.EnableReflectionMetadata || DoNotHaveDecls)
+  if (!Opts.EnableReflectionMetadata ||
+      (!Opts.EnableReflectionBuiltins && DoNotHaveDecls))
     return;
 
   // We collect all referenced builtin types and emit records for them.
@@ -766,7 +767,7 @@ void IRGenModule::emitReflectionMetadataRecords() {
   // builtin types.
   //
   // FIXME: This metadata should be in the runtime instead.
-  SmallPtrSet<CanType, 4> BuiltinTypes;
+  llvm::SetVector<CanType> BuiltinTypes;
 
   {
     FieldTypeMetadataBuilder builder(*this, NominalTypeDecls, BuiltinTypes);
@@ -785,7 +786,13 @@ void IRGenModule::emitReflectionMetadataRecords() {
       addUsedGlobal(var);
   }
 
-  {
+  if (Opts.EnableReflectionBuiltins) {
+    BuiltinTypes.insert(Context.TheNativeObjectType);
+    BuiltinTypes.insert(Context.TheUnknownObjectType);
+    BuiltinTypes.insert(Context.TheBridgeObjectType);
+    BuiltinTypes.insert(Context.TheRawPointerType);
+    BuiltinTypes.insert(Context.TheUnsafeValueBufferType);
+
     BuiltinTypeMetadataBuilder builder(*this, BuiltinTypes);
     auto var = builder.emit();
     if (var)

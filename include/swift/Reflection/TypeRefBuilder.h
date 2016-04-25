@@ -101,7 +101,7 @@ private:
 
 public:
   template <typename TypeRefTy, typename... Args>
-  TypeRefTy *make_typeref(Args... args) {
+  TypeRefTy *makeTypeRef(Args... args) {
     auto TR = new TypeRefTy(::std::forward<Args>(args)...);
     TypeRefPool.push_back(std::unique_ptr<const TypeRef>(TR));
     return TR;
@@ -148,8 +148,7 @@ public:
                      const TypeRef *result,
                      FunctionTypeFlags flags) {
     // FIXME: don't ignore inOutArgs
-    // FIXME: don't ignore flags
-    return FunctionTypeRef::create(*this, args, result);
+    return FunctionTypeRef::create(*this, args, result, flags);
   }
 
   const ProtocolTypeRef *createProtocolType(const std::string &moduleName,

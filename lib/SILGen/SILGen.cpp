@@ -696,9 +696,18 @@ void SILGenModule::emitEnumConstructor(EnumElementDecl *decl) {
 }
 
 SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
-  // Closures are emitted by need, so don't required delayed emission.
   SILDeclRef constant(ce);
   SILFunction *f = getFunction(constant, ForDefinition);
+
+  // Generate the closure function, if we haven't already.
+  //
+  // We may visit the same closure expr multiple times in some cases.
+  // For instance, when closures appear as in-line initializers of stored
+  // properties, in which case the closure will be emitted into every
+  // initializer of the containing type.
+  if (!f->isExternalDeclaration())
+    return f;
+
   preEmitFunction(constant, ce, f, ce);
   PrettyStackTraceSILFunction X("silgen closureexpr", f);
   SILGenFunction(*this, *f).emitClosure(ce);

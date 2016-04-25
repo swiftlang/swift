@@ -90,7 +90,6 @@ KNOWN_SETTINGS=(
     cmake                       ""               "path to the cmake binary"
     distcc                      ""               "use distcc in pump mode"
     build-runtime-with-host-compiler   "1"       "use the host c++ compiler to build everything"
-    user-config-args            ""               "User-supplied arguments to cmake when used to do configuration"
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of 'cmake --help' for choices"
     verbose-build               ""               "print the commands executed during the build"
     install-prefix              ""               "installation prefix"
@@ -220,6 +219,9 @@ KNOWN_SETTINGS=(
     android-icu-i18n                   ""        "Path to a directory containing libicui18n.so"
     android-icu-i18n-include           ""        "Path to a directory containing headers libicui18n"
     export-compile-commands            ""        "set to generate JSON compilation databases for each build product"
+    check-args-only                    ""        "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
+    # TODO: Remove this some time later.
+    user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
 )
 
 function toupper() {
@@ -686,11 +688,22 @@ while [[ "$1" ]] ; do
             ;;
 
         *)
-            usage
+            echo "Error: Invalid argument: $1" 1>&2
+            usage 1>&2
             exit 1
     esac
     shift
 done
+
+# TODO: Remove this some time later.
+if [[ "${USER_CONFIG_ARGS}" ]]; then
+    echo "Error: --user-config-args is renamed to --extra-cmake-options." 1>&2
+    exit 1
+fi
+
+if [[ "${CHECK_ARGS_ONLY}" ]]; then
+    exit 0
+fi
 
 if [[ "${SKIP_IOS}" ]] ; then
     SKIP_BUILD_IOS=1
@@ -1154,15 +1167,8 @@ if [[ "${EXPORT_COMPILE_COMMANDS}" ]] ; then
     )
 fi
 
-if [[ "${EXTRA_CMAKE_OPTIONS}" ]] ; then
-    for cmake_opt in $(echo "${EXTRA_CMAKE_OPTIONS}" | tr "," "\n")
-    do
-        COMMON_CMAKE_OPTIONS=(
-            "${COMMON_CMAKE_OPTIONS[@]}"
-            "${cmake_opt}"
-        )
-    done
-fi
+# Convert to an array.
+eval EXTRA_CMAKE_OPTIONS=(${EXTRA_CMAKE_OPTIONS})
 
 if [[ "${DISTCC}" ]] ; then
     # On some platforms, 'pump' may be unrelated to distcc, in which case it's
@@ -1552,6 +1558,8 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
 
     for product in "${PRODUCTS[@]}"; do
         unset skip_build
+        source_dir_var="$(toupper ${product})_SOURCE_DIR"
+        source_dir=${!source_dir_var}
         build_dir=$(build_directory ${deployment_target} ${product})
         build_targets=(all)
         cmake_options=("${COMMON_CMAKE_OPTIONS[@]}")
@@ -1581,7 +1589,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                   "${cmake_options[@]}"
                   -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
                   "${cmark_cmake_options[@]}"
-                  "${CMARK_SOURCE_DIR}"
                 )
                 skip_build=${SKIP_BUILD_CMARK}
                 build_targets=(all)
@@ -1614,9 +1621,8 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
                     -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}"
                     -DLLVM_INCLUDE_TESTS:BOOL=$(true_false "${SOURCE_TREE_INCLUDES_TESTS}")
-                    -LLVM_INCLUDE_DOCS:BOOL=TRUE
+                    -DLLVM_INCLUDE_DOCS:BOOL=TRUE
                     "${llvm_cmake_options[@]}"
-                    "${LLVM_SOURCE_DIR}"
                 )
                 if [[ $(is_cross_tools_deployment_target ${deployment_target}) ]] ; then
                     cmake_options=(
@@ -1783,11 +1789,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                                    "${SWIFT_BENCHMARK_TARGETS[@]}")
                 fi
 
-                cmake_options=(
-                    "${cmake_options[@]}"
-                    "${SWIFT_SOURCE_DIR}"
-                )
-
                 skip_build=${SKIP_BUILD_SWIFT}
                 ;;
             lldb)
@@ -1838,7 +1839,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                             -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
                             -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
                             -DLLDB_ALLOW_STATIC_BINDINGS=1
-                            "${LLDB_SOURCE_DIR}"
                         )
                         ;;
                     FreeBSD)
@@ -1856,7 +1856,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                             -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
                             -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
                             -DLLDB_ALLOW_STATIC_BINDINGS=1
-                            "${LLDB_SOURCE_DIR}"
                         )
                         ;;
                     CYGWIN_NT-10.0)
@@ -1874,7 +1873,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                             -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
                             -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
                             -DLLDB_ALLOW_STATIC_BINDINGS=1
-                            "${LLDB_SOURCE_DIR}"
                         )
                         ;;
                     Darwin)
@@ -1907,7 +1905,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                             )
                         fi
                         set_lldb_build_mode
-                        pushd ${LLDB_SOURCE_DIR}
+                        pushd ${source_dir}
                         xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
                         popd
                         continue
@@ -1922,7 +1920,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DFILECHECK_EXECUTABLE:PATH="$(build_directory_bin ${deployment_target} llvm)/FileCheck"
                     -DCMAKE_BUILD_TYPE:STRING="${LLBUILD_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
-                    "${LLBUILD_SOURCE_DIR}"
                 )
                 ;;
             swiftpm)
@@ -2058,7 +2055,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             set -x
             mkdir -p "${build_dir}"
             rm -f "${cmake_cache_path}"
-            (cd "${build_dir}" && "${CMAKE}" "${cmake_options[@]}" ${USER_CONFIG_ARGS})
+            (cd "${build_dir}" && "${CMAKE}" "${cmake_options[@]}" "${EXTRA_CMAKE_OPTIONS[@]}" "${source_dir}")
             { set +x; } 2>/dev/null
         fi
 

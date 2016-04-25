@@ -2456,6 +2456,10 @@ namespace {
       llvm_unreachable("Expression wasn't parsed?");
     }
 
+    Expr *visitArrowExpr(ArrowExpr *expr) {
+      llvm_unreachable("Arrow expr wasn't converted to type?");
+    }
+
     Expr *visitIdentityExpr(IdentityExpr *expr) {
       expr->setType(expr->getSubExpr()->getType());
       return expr;

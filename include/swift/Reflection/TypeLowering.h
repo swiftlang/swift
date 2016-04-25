@@ -19,6 +19,7 @@
 #define SWIFT_REFLECTION_TYPELOWERING_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/Casting.h"
 
 #include <iostream>
 #include <memory>
@@ -26,13 +27,34 @@
 namespace swift {
 namespace reflection {
 
+using llvm::cast;
+using llvm::dyn_cast;
+
 class TypeRef;
 class TypeRefBuilder;
 
+enum class RecordKind : unsigned {
+  Tuple,
+  Struct,
+  ThickFunction,
+};
+
+enum class ReferenceCounting : unsigned {
+  Native,
+  Unknown
+};
+
+enum class ReferenceKind : unsigned {
+  Strong,
+  Unowned,
+  Weak,
+  Unmanaged
+};
+
 enum class TypeInfoKind : unsigned {
   Builtin,
-  Struct,
-  Tuple,
+  Record,
+  Reference,
 };
 
 class TypeInfo {
@@ -60,23 +82,57 @@ public:
 struct FieldInfo {
   std::string Name;
   unsigned Offset;
+  const TypeRef *TR;
   const TypeInfo &TI;
 };
 
 /// Class instances, structs, tuples
 class RecordTypeInfo : public TypeInfo {
+  RecordKind SubKind;
   std::vector<FieldInfo> Fields;
 
 public:
-  RecordTypeInfo(TypeInfoKind Kind,
-                 unsigned Size, unsigned Alignment,
+  RecordTypeInfo(unsigned Size, unsigned Alignment,
                  unsigned Stride, unsigned NumExtraInhabitants,
-                 const std::vector<FieldInfo> &Fields)
-    : TypeInfo(Kind, Size, Alignment, Stride, NumExtraInhabitants),
-      Fields(Fields) {}
+                 RecordKind SubKind, const std::vector<FieldInfo> &Fields)
+    : TypeInfo(TypeInfoKind::Record, Size, Alignment, Stride,
+               NumExtraInhabitants),
+      SubKind(SubKind), Fields(Fields) {}
 
+  RecordKind getRecordKind() const { return SubKind; }
   unsigned getNumFields() const { return Fields.size(); }
   const std::vector<FieldInfo> &getFields() const { return Fields; }
+
+  static bool classof(const TypeInfo *TI) {
+    return TI->getKind() == TypeInfoKind::Record;
+  }
+};
+
+/// References to classes, closure contexts and anything else with an
+/// 'isa' pointer
+class ReferenceTypeInfo : public TypeInfo {
+  ReferenceKind SubKind;
+  ReferenceCounting Refcounting;
+
+public:
+  ReferenceTypeInfo(unsigned Size, unsigned Alignment,
+                    unsigned Stride, unsigned NumExtraInhabitants,
+                    ReferenceKind SubKind, ReferenceCounting Refcounting)
+    : TypeInfo(TypeInfoKind::Reference, Size, Alignment, Stride,
+               NumExtraInhabitants),
+      SubKind(SubKind), Refcounting(Refcounting) {}
+
+  ReferenceKind getReferenceKind() const {
+    return SubKind;
+  }
+
+  ReferenceCounting getReferenceCounting() const {
+    return Refcounting;
+  }
+
+  static bool classof(const TypeInfo *TI) {
+    return TI->getKind() == TypeInfoKind::Reference;
+  }
 };
 
 /// This class owns the memory for all TypeInfo instances that it vends.
@@ -84,6 +140,12 @@ class TypeConverter {
   TypeRefBuilder &Builder;
   std::vector<std::unique_ptr<const TypeInfo>> Pool;
   llvm::DenseMap<const TypeRef *, const TypeInfo *> Cache;
+  llvm::DenseMap<std::pair<unsigned, unsigned>,
+                 const ReferenceTypeInfo *> ReferenceCache;
+  const TypeRef *RawPointerTR = nullptr;
+  const TypeRef *NativeObjectTR = nullptr;
+  const TypeRef *UnknownObjectTR = nullptr;
+  const TypeInfo *ThickFunctionTI = nullptr;
 
 public:
   explicit TypeConverter(TypeRefBuilder &Builder) : Builder(Builder) {}
@@ -91,6 +153,23 @@ public:
   TypeRefBuilder &getBuilder() { return Builder; }
 
   const TypeInfo *getTypeInfo(const TypeRef *TR);
+
+  /* Not really public */
+  const ReferenceTypeInfo *
+  getReferenceTypeInfo(ReferenceKind Kind,
+                       ReferenceCounting Refcounting);
+
+  const TypeRef *getRawPointerTypeRef();
+  const TypeRef *getNativeObjectTypeRef();
+  const TypeRef *getUnknownObjectTypeRef();
+  const TypeInfo *getThickFunctionTypeInfo();
+
+  template <typename TypeInfoTy, typename... Args>
+  const TypeInfoTy *makeTypeInfo(Args... args) {
+    auto TI = new TypeInfoTy(::std::forward<Args>(args)...);
+    Pool.push_back(std::unique_ptr<const TypeInfo>(TI));
+    return TI;
+  }
 };
 
 }
