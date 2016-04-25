@@ -43,7 +43,7 @@
     {
       key.line: 4,
       key.column: 8,
-      key.filepath: "/Volumes/Data/Users/kremenek/Desktop/sources/swift-tkremenek/test/SourceKit/SyntaxMapData/syntaxmap-object-literals.swift",
+      key.filepath: syntaxmap-object-literals.swift,
       key.severity: source.diagnostic.severity.error,
       key.description: "consecutive statements on a line must be separated by ';'",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse,
@@ -58,7 +58,7 @@
     {
       key.line: 4,
       key.column: 9,
-      key.filepath: "/Volumes/Data/Users/kremenek/Desktop/sources/swift-tkremenek/test/SourceKit/SyntaxMapData/syntaxmap-object-literals.swift",
+      key.filepath: syntaxmap-object-literals.swift,
       key.severity: source.diagnostic.severity.error,
       key.description: "expected initial value after '='",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
@@ -66,7 +66,7 @@
     {
       key.line: 4,
       key.column: 9,
-      key.filepath: "/Volumes/Data/Users/kremenek/Desktop/sources/swift-tkremenek/test/SourceKit/SyntaxMapData/syntaxmap-object-literals.swift",
+      key.filepath: syntaxmap-object-literals.swift,
       key.severity: source.diagnostic.severity.error,
       key.description: "expected expression",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
