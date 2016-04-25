@@ -222,27 +222,20 @@ public:
 };
 
 class ProtocolTypeRef final : public TypeRef {
-  std::string ModuleName;
-  std::string Name;
+  std::string MangledName;
 
 public:
-  ProtocolTypeRef(const std::string &ModuleName,
-                  const std::string &Name)
-    : TypeRef(TypeRefKind::Protocol), ModuleName(ModuleName), Name(Name) {}
+  ProtocolTypeRef(const std::string &MangledName)
+    : TypeRef(TypeRefKind::Protocol), MangledName(MangledName) {}
 
   template <typename Allocator>
   static const ProtocolTypeRef *
-  create(Allocator &A, const std::string &ModuleName,
-         const std::string &Name) {
-    return A.template makeTypeRef<ProtocolTypeRef>(ModuleName, Name);
+  create(Allocator &A, const std::string &MangledName) {
+    return A.template makeTypeRef<ProtocolTypeRef>(MangledName);
   }
 
-  const std::string &getName() const {
-    return Name;
-  }
-
-  const std::string &getModuleName() const {
-    return ModuleName;
+  const std::string &getMangledName() const {
+    return MangledName;
   }
 
   static bool classof(const TypeRef *TR) {
@@ -250,8 +243,7 @@ public:
   }
 
   bool operator==(const ProtocolTypeRef &Other) const {
-    return ModuleName.compare(Other.ModuleName) == 0 &&
-           Name.compare(Other.Name) == 0;
+    return MangledName == Other.MangledName;
   }
   bool operator!=(const ProtocolTypeRef &Other) const {
     return !(*this == Other);

@@ -120,7 +120,17 @@ class TypeDecoder {
     case NodeKind::Protocol: {
       auto moduleName = Node->getChild(0)->getText();
       auto name = Node->getChild(1)->getText();
-      return Builder.createProtocolType(moduleName, name);
+
+      // Consistent handling of protocols and protocol compositions
+      auto protocolList = Demangle::NodeFactory::create(NodeKind::ProtocolList);
+      auto typeList = Demangle::NodeFactory::create(NodeKind::TypeList);
+      auto type = Demangle::NodeFactory::create(NodeKind::Type);
+      type->addChild(Node);
+      typeList->addChild(type);
+      protocolList->addChild(typeList);
+
+      auto mangledName = Demangle::mangleNode(protocolList);
+      return Builder.createProtocolType(mangledName, moduleName, name);
     }
     case NodeKind::DependentGenericParamType: {
       auto depth = Node->getChild(0)->getIndex();

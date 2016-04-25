@@ -246,7 +246,9 @@ public:
     return FunctionType::get(input, output, einfo);
   }
 
-  Type createProtocolType(StringRef moduleName, StringRef protocolName) {
+  Type createProtocolType(StringRef mangledName,
+                          StringRef moduleName,
+                          StringRef protocolName) {
     auto module = Ctx.getModuleByName(moduleName);
     if (!module) return Type();
 

@@ -151,9 +151,10 @@ public:
     return FunctionTypeRef::create(*this, args, result, flags);
   }
 
-  const ProtocolTypeRef *createProtocolType(const std::string &moduleName,
-                                      const std::string &protocolName) {
-    return ProtocolTypeRef::create(*this, moduleName, protocolName);
+  const ProtocolTypeRef *createProtocolType(const std::string &mangledName,
+                                            const std::string &moduleName,
+                                            const std::string &name) {
+    return ProtocolTypeRef::create(*this, mangledName);
   }
 
   const ProtocolCompositionTypeRef *

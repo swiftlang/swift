@@ -133,8 +133,8 @@ public:
 
   void visitProtocolTypeRef(const ProtocolTypeRef *P) {
     printHeader("protocol");
-    printField("module", P->getModuleName());
-    printField("name", P->getName());
+    auto demangled = Demangle::demangleTypeAsString(P->getMangledName());
+    printField("", demangled);
     OS << ')';
   }
 
