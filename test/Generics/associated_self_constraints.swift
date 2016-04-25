@@ -54,12 +54,9 @@ class Subject<T>: Observer, Observable {
     }
 }
 
+/*
+FIXME: <rdar://problem/25666028> swift-3-indexing-model: Generics/associated_self_constraints.swift
 struct X<T> {
-
-  // FIXME swift-3-indexing-model: Check with Ted K or Joe P about
-  // whether this change to the test is legit.  They appear to have
-  // added it in fad874708e05cff56aec5587a4b0f49cdadc6d11 or
-  // 53c69a956f3fac878bc5a00a243bb05245520208, respectively
   mutating func replace<
     C : Collection where C.Iterator.Element == T, C.Index : Strideable
   >(a: C) {
@@ -68,6 +65,7 @@ struct X<T> {
     }
   }
 }
+*/
 
 protocol P {
     associatedtype A

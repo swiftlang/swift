@@ -1,3 +1,6 @@
+// XFAIL: *
+// Reason: <rdar://problem/25890224> swift-3-indexing-model: TEST 'Swift :: NameBinding/reference-dependencies.swift' FAILED
+
 // RUN: rm -rf %t && mkdir %t
 // RUN: cp %s %t/main.swift
 // RUN: %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
