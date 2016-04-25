@@ -919,7 +919,7 @@ StringTests.test(
 #endif
 }
 
-#if os(Linux)
+#if os(Linux) || os(FreeBSD) || os(Android)
 import Glibc
 #endif
 
