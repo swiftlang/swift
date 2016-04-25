@@ -708,6 +708,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
   // An overload of `append(contentsOf:)` that uses the += that is optimized for
   // collections.
+  // FIXME(ABI): remove this entrypoint.  The overload for `Sequence` should be
+  // made optimal for this case, too.
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
