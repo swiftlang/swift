@@ -197,21 +197,21 @@ public protocol StringInterpolationConvertible {
 }
 
 /// Conforming types can be initialized with color literals (e.g.
-/// `[#Color(colorLiteralRed: 1, green: 0, blue: 0, alpha: 1)#]`).
+/// `#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)`).
 public protocol _ColorLiteralConvertible {
-  init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)
+  init(red: Float, green: Float, blue: Float, alpha: Float)
 }
 
 /// Conforming types can be initialized with image literals (e.g.
-/// `[#Image(imageLiteral: "hi.png")#]`).
+/// `#imageLiteral(resourceName: "hi.png")`).
 public protocol _ImageLiteralConvertible {
-  init(imageLiteral: String)
+  init(resourceName: String)
 }
 
 /// Conforming types can be initialized with strings (e.g.
-/// `[#FileReference(fileReferenceLiteral: "resource.txt")#]`).
+/// `#fileLiteral(resourceName: "resource.txt")`).
 public protocol _FileReferenceLiteralConvertible {
-  init(fileReferenceLiteral: String)
+  init(resourceName: String)
 }
 
 /// A container is destructor safe if whether it may store to memory on
