@@ -1,6 +1,3 @@
-// XFAIL: *
-// Reason: <rdar://problem/25890224> swift-3-indexing-model: TEST 'Swift :: NameBinding/reference-dependencies.swift' FAILED
-
 // RUN: rm -rf %t && mkdir %t
 // RUN: cp %s %t/main.swift
 // RUN: %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
@@ -361,7 +358,6 @@ struct Sentinel2 {}
 // CHECK-DAG: - ["V4main10IntWrapper", "deinit"]
 // CHECK-DAG: - ["Ps10Comparable", ""]
 // CHECK-DAG: - ["C4main18ClassFromOtherFile", ""]
-// CHECK-DAG: - !private ["Si", "deinit"]
 // CHECK-DAG: - !private ["Si", "max"]
 // CHECK-DAG: - ["Ps23FloatLiteralConvertible", ""]
 // CHECK-DAG: - !private ["Ps31UnicodeScalarLiteralConvertible", ""]
