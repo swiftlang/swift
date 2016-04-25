@@ -1014,10 +1014,8 @@ extension ${Self} {
 // a `+=` operator on `RangeReplaceableCollection`.
 /// Append the contents of `rhs` to `lhs`.
 public func += <
-  Element, S : Sequence
-  where
-  S.Iterator.Element == Element
->(lhs: inout ${Self}<Element>, rhs: S) {
+  S : Sequence
+>(lhs: inout ${Self}<S.Iterator.Element>, rhs: S) {
   let oldCount = lhs.count
   let capacity = lhs.capacity
   let newCount = oldCount + rhs.underestimatedCount
@@ -1033,10 +1031,8 @@ public func += <
 // a `+=` operator on `RangeReplaceableCollection`.
 /// Append the contents of `rhs` to `lhs`.
 public func += <
-  Element, C : Collection
-  where
-  C.Iterator.Element == Element
->(lhs: inout ${Self}<Element>, rhs: C) {
+  C : Collection
+>(lhs: inout ${Self}<C.Iterator.Element>, rhs: C) {
   let rhsCount = numericCast(rhs.count) as Int
 
   let oldCount = lhs.count
