@@ -81,7 +81,7 @@ FunctionSignatureSpecializationMangler(SpecializationPass P, Mangler &M,
 void
 FunctionSignatureSpecializationMangler::
 setArgumentDead(unsigned ArgNo) {
-  Args[ArgNo].first |= ArgumentModifierIntBase(ArgumentModifier::Dead);
+  Args[ArgNo].first = ArgumentModifierIntBase(ArgumentModifier::Dead);
 }
 
 void

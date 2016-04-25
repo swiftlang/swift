@@ -730,6 +730,11 @@ class ProjectionTreeNode {
       Initialized(false), IsLive(false) {}
 
 public:
+  enum LivenessKind : unsigned {
+    NormalUseLiveness = 0,
+    IgnoreEpilogueReleases = 1,
+  };
+
   class NewAggregateBuilder;
 
   ~ProjectionTreeNode() = default;
@@ -794,7 +799,8 @@ private:
 
   void processUsersOfValue(ProjectionTree &Tree,
                            llvm::SmallVectorImpl<ValueNodePair> &Worklist,
-                           SILValue Value);
+                           SILValue Value, ProjectionTreeNode::LivenessKind Kind,
+                           llvm::DenseSet<SILInstruction *> &Releases);
 
   void createNextLevelChildren(ProjectionTree &Tree);
 
@@ -810,6 +816,11 @@ class ProjectionTree {
 
   llvm::BumpPtrAllocator &Allocator;
 
+  /// The way we compute what is live and what is dead.
+  ProjectionTreeNode::LivenessKind Kind;
+
+  llvm::DenseSet<SILInstruction *> EpilogueReleases;
+
   // A common pattern is a 3 field struct.
   llvm::SmallVector<ProjectionTreeNode *, 4> ProjectionTreeNodes;
   llvm::SmallVector<unsigned, 3> LiveLeafIndices;
@@ -820,6 +831,9 @@ public:
   /// Construct a projection tree from BaseTy.
   ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator,
                  SILType BaseTy);
+  ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator,
+                 SILType BaseTy, ProjectionTreeNode::LivenessKind Kind, 
+                 llvm::DenseSet<SILInstruction*> Insts);
   /// Construct an uninitialized projection tree, which can then be
   /// initialized by initializeWithExistingTree.
   ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator) 
