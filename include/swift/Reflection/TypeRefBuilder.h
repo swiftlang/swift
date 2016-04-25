@@ -96,6 +96,8 @@ public:
   TypeRefBuilder &operator=(const TypeRefBuilder &other) = delete;
 
 private:
+  /// Makes sure dynamically allocated TypeRefs stick around for the life of
+  /// this TypeRefBuilder and are automatically released.
   std::vector<std::unique_ptr<const TypeRef>> TypeRefPool;
   TypeConverter TC;
 
@@ -115,7 +117,8 @@ public:
     return BuiltinTypeRef::create(*this, mangledName);
   }
 
-  Optional<std::string> createNominalTypeDecl(const Demangle::NodePointer &node) {
+  Optional<std::string>
+  createNominalTypeDecl(const Demangle::NodePointer &node) {
     return Demangle::mangleNode(node);
   }
 
