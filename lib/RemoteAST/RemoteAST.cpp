@@ -587,6 +587,11 @@ RemoteASTContext::getTypeForRemoteTypeMetadata(RemoteAddress address) {
   return asImpl(Impl)->getTypeForRemoteTypeMetadata(address);
 }
 
+Result<MetadataKind>
+RemoteASTContext::getKindForRemoteTypeMetadata(remote::RemoteAddress address) {
+  return asImpl(Impl)->getKindForRemoteTypeMetadata(address);
+}
+
 Result<NominalTypeDecl *>
 RemoteASTContext::getDeclForRemoteNominalTypeDescriptor(RemoteAddress address) {
   return asImpl(Impl)->getDeclForRemoteNominalTypeDescriptor(address);
