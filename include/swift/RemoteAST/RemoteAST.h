@@ -22,6 +22,7 @@
 #include "swift/Remote/Failure.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ABI/MetadataValues.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -168,6 +169,11 @@ public:
   /// Given an address which is supposedly of type metadata, try to
   /// resolve it to a specific type in the local AST.
   Result<Type> getTypeForRemoteTypeMetadata(remote::RemoteAddress address);
+
+  /// Given an address which is supposedly of type metadata, try to
+  /// resolve it to a specific MetadataKind value for its backing type.
+  Result<MetadataKind>
+  getKindForRemoteTypeMetadata(remote::RemoteAddress address);
 
   /// Given an address which is supposedly of a nominal type descriptor,
   /// try to resolve it to a specific nominal type declaration in the

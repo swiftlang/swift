@@ -537,6 +537,17 @@ public:
     return Result<Type>::emplaceFailure(Failure::Unknown);
   }
 
+  Result<MetadataKind> getKindForRemoteTypeMetadata(RemoteAddress address) {
+    std::pair<bool,MetadataKind> result;
+    if (Is32) {
+      result = Reader32->readKindFromMetadata(address.getAddressData());
+    } else {
+      result = Reader64->readKindFromMetadata(address.getAddressData());
+    }
+    if (result.first) return Result<MetadataKind>(result.second);
+    return Result<MetadataKind>::emplaceFailure(Failure::Unknown);
+  }
+
   Result<NominalTypeDecl *>
   getDeclForRemoteNominalTypeDescriptor(RemoteAddress address) {
     NominalTypeDecl *result;

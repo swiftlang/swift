@@ -24,6 +24,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <utility>
 
 namespace swift {
 namespace remote {
@@ -417,6 +418,24 @@ public:
   /// Given a demangle tree, attempt to turn it into a type.
   BuiltType decodeMangledType(const Demangle::NodePointer &Node) {
     return swift::remote::decodeMangledType(Builder, Node);
+  }
+
+  /// Given a remote pointer to metadata, attempt to discover its MetadataKind.
+  std::pair<bool,MetadataKind>
+  readKindFromMetadata(StoredPointer MetadataAddress) {
+    auto Cached = MetadataCache.find(MetadataAddress);
+    if (Cached != MetadataCache.end()) {
+      if (auto Meta = Cached->second) {
+        return {true,Cached->second->getKind()};
+      } else {
+        return {false,MetadataKind::Opaque};
+      }
+    }
+
+    auto Meta = readMetadata(MetadataAddress);
+    if (!Meta) return {false,MetadataKind::Opaque};
+
+    return {true,Meta->getKind()};
   }
 
   /// Given a remote pointer to metadata, attempt to turn it into a type.
