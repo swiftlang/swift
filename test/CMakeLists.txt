@@ -244,6 +244,9 @@ if(PYTHONINTERP_FOUND)
 
             list(APPEND LIT_ARGS "--param" "run_only_tests=long_tests")
           endif()
+          if(test_subset STREQUAL "all")
+            list(APPEND LIT_ARGS "--param" "run_only_tests=all")
+          endif()
 
           set(directories)
           set(dependencies ${test_dependencies})
