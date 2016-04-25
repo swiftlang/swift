@@ -164,7 +164,7 @@ func testExprPostfixBeginIgnored3(fooParam: FooStruct) {
 
 //===--- Test that we include function parameters in completion results.
 
-func testFindFuncParam1(fooParam: FooStruct, a: Int, b: Float, c: inout Double)(d: inout Double) {
+func testFindFuncParam1(fooParam: FooStruct, a: Int, b: Float, c: inout Double, d: inout Double) {
   #^FIND_FUNC_PARAM_1^#
 // FIND_FUNC_PARAM_1: Begin completions
 // FIND_FUNC_PARAM_1-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
@@ -183,7 +183,7 @@ func testFindFuncParam2<Foo : FooProtocol>(fooParam: FooStruct, foo: Foo) {
 }
 
 struct TestFindFuncParam3_4 {
-  func testFindFuncParam3(a: Int, b: Float)(c: Double) {
+  func testFindFuncParam3(a: Int, b: Float, c: Double) {
     #^FIND_FUNC_PARAM_3^#
 // FIND_FUNC_PARAM_3: Begin completions
 // FIND_FUNC_PARAM_3-DAG: Decl[LocalVar]/Local: self[#TestFindFuncParam3_4#]{{; name=.+$}}
@@ -229,7 +229,7 @@ struct TestFindFuncParam5_6<T> {
 }
 
 class TestFindFuncParam7 {
-  func testFindFuncParam7(a: Int, b: Float)(c: Double) {
+  func testFindFuncParam7(a: Int, b: Float, c: Double) {
     #^FIND_FUNC_PARAM_7^#
 // FIND_FUNC_PARAM_7: Begin completions
 // FIND_FUNC_PARAM_7-DAG: Decl[LocalVar]/Local: self[#TestFindFuncParam7#]{{; name=.+$}}
