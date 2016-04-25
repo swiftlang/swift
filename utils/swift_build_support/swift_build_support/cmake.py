@@ -14,9 +14,10 @@
 #
 # ----------------------------------------------------------------------------
 
-import re
-import platform
 from numbers import Number
+import platform
+import re
+import subprocess
 
 from . import xcrun
 from .which import which
@@ -136,3 +137,30 @@ class CMake(object):
                 define("LLVM_VERSION_PATCH:STRING", m.group(3))
 
         return options
+
+    def build_args(self):
+        """Return arguments to the build tool used for all products
+        """
+        args = self.args
+        jobs = args.build_jobs
+        if args.distcc:
+            jobs = str(
+                subprocess.check_output([self.host_distcc, '-j'])).rstrip()
+
+        build_args = list(args.build_args)
+
+        if args.cmake_generator == 'Ninja':
+            build_args += ['-j%s' % jobs]
+            if args.verbose_build:
+                build_args += ['-v']
+
+        elif args.cmake_generator == 'Unix Makefiles':
+            build_args += ['-j%s' % jobs]
+            if args.verbose_build:
+                build_args += ['VERBOSE=1']
+
+        elif args.cmake_generator == 'Xcode':
+            build_args += ['-parallelizeTargets',
+                           '-jobs', str(jobs)]
+
+        return build_args

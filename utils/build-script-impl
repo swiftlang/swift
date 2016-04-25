@@ -774,6 +774,12 @@ if [[ "${SKIP_BUILD_WATCHOS_SIMULATOR}" ]] ; then
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
 
+# FIXME: We currently do not support building compiler-rt with the
+# Xcode generator.
+if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
+    SKIP_COMPILER_RT=1
+fi
+
 # FIXME: We currently do not support cross-compiling swift with compiler-rt.
 if [[ "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS}" ]]; then
     SKIP_COMPILER_RT=1
@@ -1131,38 +1137,11 @@ COMMON_C_FLAGS=""
 # Convert to an array.
 eval COMMON_CMAKE_OPTIONS=(${COMMON_CMAKE_OPTIONS})
 eval EXTRA_CMAKE_OPTIONS=(${EXTRA_CMAKE_OPTIONS})
+eval BUILD_ARGS=(${BUILD_ARGS})
 
-CMAKE_JOBS="${BUILD_JOBS}"
-if [[ "${DISTCC}" ]] ; then
-    CMAKE_JOBS="$(distcc -j)"
+if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
+    BUILD_TARGET_FLAG="-target"
 fi
-
-case "${CMAKE_GENERATOR}" in
-    Ninja)
-        BUILD_ARGS="${BUILD_ARGS} -j${CMAKE_JOBS}"
-        if [[ "${VERBOSE_BUILD}" ]] ; then
-            BUILD_ARGS="${BUILD_ARGS} -v"
-        fi
-        ;;
-    'Unix Makefiles')
-        BUILD_ARGS="${BUILD_ARGS} -j${CMAKE_JOBS}"
-        if [[ "${VERBOSE_BUILD}" ]] ; then
-            BUILD_ARGS="${BUILD_ARGS} VERBOSE=1"
-        fi
-        ;;
-    Xcode)
-        # -parallelizeTargets is an unsupported flag from the Xcode 3 days,
-        # but since we're not using proper Xcode 4 schemes, this is the
-        # only way to get target-level parallelism.
-        BUILD_ARGS="${BUILD_ARGS} -parallelizeTargets"
-        BUILD_ARGS="${BUILD_ARGS} -jobs ${CMAKE_JOBS}"
-        BUILD_TARGET_FLAG="-target"
-
-        # FIXME: We currently do not support building compiler-rt with the
-        # Xcode generator.
-        SKIP_COMPILER_RT=1
-        ;;
-esac
 
 function build_directory() {
     deployment_target=$1
@@ -2001,7 +1980,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             fi
 
             set -x
-            ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- ${BUILD_ARGS} ${build_targets[@]}
+            ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
             { set +x; } 2>/dev/null
         fi
 

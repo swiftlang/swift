@@ -849,6 +849,19 @@ details of the setups of other systems or automated environments.""")
         type=argparse_shell_split,
         default=[])
 
+    parser.add_argument(
+        "--build-args",
+        help="arguments to the build tool. This would be prepended to the "
+             "default argument that is '-j8' when CMake generator is "
+             "\"Ninja\".",
+        type=argparse_shell_split,
+        default=[])
+
+    parser.add_argument(
+        "--verbose-build",
+        help="print the commands executed during the build",
+        action="store_true")
+
     args = migration.parse_args(parser, sys.argv[1:])
 
     build_script_impl = os.path.join(
@@ -1258,6 +1271,8 @@ details of the setups of other systems or automated environments.""")
         "--workspace", SWIFT_SOURCE_ROOT,
         "--common-cmake-options=%s" % ' '.join(
             pipes.quote(opt) for opt in cmake.common_options()),
+        "--build-args=%s" % ' '.join(
+            pipes.quote(arg) for arg in cmake.build_args()),
     ]
 
     if args.distcc:
@@ -1273,6 +1288,8 @@ details of the setups of other systems or automated environments.""")
         build_script_impl_args += [
             "--clang-compiler-version", args.clang_compiler_version
         ]
+    if args.verbose_build:
+        build_script_impl_args += ["--verbose-build"]
     if args.install_symroot:
         build_script_impl_args += [
             "--install-symroot", os.path.abspath(args.install_symroot)

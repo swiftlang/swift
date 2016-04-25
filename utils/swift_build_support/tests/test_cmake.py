@@ -29,8 +29,15 @@ class HostCMakeTestCase(unittest.TestCase):
 
 class CMakeTestCase(unittest.TestCase):
 
+    def mock_distcc_path(self):
+        """Return a path string of mock distcc executable
+        """
+        return os.path.join(os.path.dirname(__file__),
+                            'mock-distcc')
+
     def default_args(self):
-        "Return new args object with default values"
+        """Return new args object with default values
+        """
         return Namespace(host_cc="/path/to/clang",
                          host_cxx="/path/to/clang++",
                          enable_asan=False,
@@ -38,14 +45,21 @@ class CMakeTestCase(unittest.TestCase):
                          export_compile_commands=False,
                          distcc=False,
                          cmake_generator="Ninja",
-                         clang_compiler_version=None)
+                         clang_compiler_version=None,
+                         build_jobs=8,
+                         build_args=[],
+                         verbose_build=False)
 
     def cmake(self, args):
-        "Return new CMake object initialized with given args"
+        """Return new CMake object initialized with given args
+        """
+        host_distcc = None
+        if args.distcc:
+            host_distcc = self.mock_distcc_path()
         return CMake(args=args,
                      host_cc=args.host_cc,
                      host_cxx=args.host_cxx,
-                     host_distcc="/path/to/distcc")
+                     host_distcc=host_distcc)
 
     def test_common_options_defaults(self):
         args = self.default_args()
@@ -108,9 +122,9 @@ class CMakeTestCase(unittest.TestCase):
         self.assertEqual(
             list(cmake.common_options()),
             ["-G", "Ninja",
-             "-DCMAKE_C_COMPILER:PATH=/path/to/distcc",
+             "-DCMAKE_C_COMPILER:PATH=" + self.mock_distcc_path(),
              "-DCMAKE_C_COMPILER_ARG1=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=/path/to/distcc",
+             "-DCMAKE_CXX_COMPILER:PATH=" + self.mock_distcc_path(),
              "-DCMAKE_CXX_COMPILER_ARG1=/path/to/clang++"])
 
     def test_common_options_xcode(self):
@@ -152,15 +166,83 @@ class CMakeTestCase(unittest.TestCase):
             ["-G", "Xcode",
              "-DLLVM_USE_SANITIZER=Address;Undefined",
              "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-             "-DCMAKE_C_COMPILER:PATH=/path/to/distcc",
+             "-DCMAKE_C_COMPILER:PATH=" + self.mock_distcc_path(),
              "-DCMAKE_C_COMPILER_ARG1=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=/path/to/distcc",
+             "-DCMAKE_CXX_COMPILER:PATH=" + self.mock_distcc_path(),
              "-DCMAKE_CXX_COMPILER_ARG1=/path/to/clang++",
              "-DCMAKE_CONFIGURATION_TYPES=" +
              "Debug;Release;MinSizeRel;RelWithDebInfo",
              "-DLLVM_VERSION_MAJOR:STRING=3",
              "-DLLVM_VERSION_MINOR:STRING=8",
              "-DLLVM_VERSION_PATCH:STRING=0"])
+
+    def test_build_args_ninja(self):
+        args = self.default_args()
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.build_args()),
+            ["-j8"])
+
+        args.verbose_build = True
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.build_args()),
+            ["-j8", "-v"])
+
+    def test_build_args_makefile(self):
+        args = self.default_args()
+        args.cmake_generator = "Unix Makefiles"
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.build_args()),
+            ["-j8"])
+
+        args.verbose_build = True
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.build_args()),
+            ["-j8", "VERBOSE=1"])
+
+    def test_build_args_xcode(self):
+        args = self.default_args()
+        args.cmake_generator = "Xcode"
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.build_args()),
+            ["-parallelizeTargets", "-jobs", "8"])
+
+        # NOTE: Xcode generator DOES NOT take 'verbose-build' into account.
+        args.verbose_build = True
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.build_args()),
+            ["-parallelizeTargets", "-jobs", "8"])
+
+    def test_build_args_eclipse_ninja(self):
+        # NOTE: Eclipse generator DOES NOT take 'build-jobs' into account,
+        #       nor 'verbose-build'.
+        args = self.default_args()
+        args.cmake_generator = "Eclipse CDT4 - Ninja"
+        args.verbose_build = True
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.build_args()), [])
+
+    def test_build_args_custom_build_args(self):
+        args = self.default_args()
+        args.build_args = ["-foo", "bar baz"]
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.build_args()),
+            ["-foo", "bar baz", "-j8"])
+
+    def test_build_args_distcc(self):
+        args = self.default_args()
+        args.distcc = True
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.build_args()),
+            ["-j6"])
 
 
 class CMakeOptionsTestCase(unittest.TestCase):
