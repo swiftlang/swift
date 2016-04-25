@@ -101,6 +101,41 @@ swift_reflection_genericArgumentCountOfTypeRef(swift_typeref_t OpaqueTypeRef) {
   return 0;
 }
 
+swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
+  switch (TI.getKind()) {
+  case TypeInfoKind::Builtin:
+    return SWIFT_BUILTIN;
+  case TypeInfoKind::Record: {
+    auto &RecordTI = cast<RecordTypeInfo>(TI);
+    switch (RecordTI.getRecordKind()) {
+    case RecordKind::Tuple:
+      return SWIFT_TUPLE;
+    case RecordKind::Struct:
+      return SWIFT_STRUCT;
+    case RecordKind::ThickFunction:
+      return SWIFT_THICK_FUNCTION;
+    case RecordKind::Existential:
+      return SWIFT_EXISTENTIAL;
+    case RecordKind::ClassExistential:
+      return SWIFT_CLASS_EXISTENTIAL;
+    }
+  }
+  case TypeInfoKind::Reference: {
+    auto &ReferenceTI = cast<ReferenceTypeInfo>(TI);
+    switch (ReferenceTI.getReferenceKind()) {
+    case ReferenceKind::Strong:
+      return SWIFT_STRONG_REFERENCE;
+    case ReferenceKind::Unowned:
+      return SWIFT_UNOWNED_REFERENCE;
+    case ReferenceKind::Weak:
+      return SWIFT_WEAK_REFERENCE;
+    case ReferenceKind::Unmanaged:
+      return SWIFT_UNMANAGED_REFERENCE;
+    }
+  }
+  }
+}
+
 swift_typeinfo_t
 swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef) {
@@ -118,50 +153,12 @@ swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
     };
   }
 
-  swift_layout_kind_t Kind;
   unsigned NumFields = 0;
-
-  switch (TI->getKind()) {
-  case TypeInfoKind::Builtin:
-    Kind = SWIFT_BUILTIN;
-    break;
-  case TypeInfoKind::Record: {
-    auto *RecordTI = cast<RecordTypeInfo>(TI);
-    switch (RecordTI->getRecordKind()) {
-    case RecordKind::Tuple:
-      Kind = SWIFT_TUPLE;
-      break;
-    case RecordKind::Struct:
-      Kind = SWIFT_STRUCT;
-      break;
-    case RecordKind::ThickFunction:
-      Kind = SWIFT_THICK_FUNCTION;
-      break;
-    }
+  if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI))
     NumFields = RecordTI->getNumFields();
-    break;
-  }
-  case TypeInfoKind::Reference: {
-    auto *ReferenceTI = cast<ReferenceTypeInfo>(TI);
-    switch (ReferenceTI->getReferenceKind()) {
-    case ReferenceKind::Strong:
-      Kind = SWIFT_STRONG_REFERENCE;
-      break;
-    case ReferenceKind::Unowned:
-      Kind = SWIFT_UNOWNED_REFERENCE;
-      break;
-    case ReferenceKind::Weak:
-      Kind = SWIFT_WEAK_REFERENCE;
-      break;
-    case ReferenceKind::Unmanaged:
-      Kind = SWIFT_UNMANAGED_REFERENCE;
-      break;
-    }
-  }
-  }
 
   return {
-    Kind,
+    getTypeInfoKind(*TI),
     TI->getSize(),
     TI->getAlignment(),
     TI->getStride(),
@@ -182,6 +179,7 @@ swift_reflection_infoForChild(SwiftReflectionContextRef ContextRef,
   return {
     FieldInfo.Name.c_str(),
     FieldInfo.Offset,
+    getTypeInfoKind(FieldInfo.TI),
     reinterpret_cast<swift_typeref_t>(FieldInfo.TR),
   };
 }

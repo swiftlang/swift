@@ -36,7 +36,18 @@ class TypeRefBuilder;
 enum class RecordKind : unsigned {
   Tuple,
   Struct,
+
+  // A Swift-native function is always a function pointer followed by a
+  // retainable, nullable context pointer.
   ThickFunction,
+
+  // An existential is a three-word buffer followed by value metadata and
+  // witness tables.
+  Existential,
+
+  // A class existential is a retainable pointer followed by witness
+  // tables.
+  ClassExistential,
 };
 
 enum class ReferenceCounting : unsigned {

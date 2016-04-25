@@ -47,3 +47,24 @@ public struct FunctionStruct {
   public let thinFunction: @convention(thin) () -> ()
   public let cFunction: @convention(c) () -> ()
 }
+
+public protocol P1 {}
+public protocol P2 : P1 {}
+public protocol P3 {}
+
+public protocol CP1 : class {}
+public protocol CP2 : CP1 {}
+
+public struct ExistentialStruct {
+  public let any: Any
+  public let anyObject: AnyObject
+  public let anyProto: P1
+  public let anyProtoComposition: protocol<P1, P2, P3>
+  public let anyClassBoundProto1: CP1
+  public let anyClassBoundProto2: CP2
+  public let anyClassBoundProtoComposition1: protocol<CP1, CP2>
+  public let anyClassBoundProtoComposition2: protocol<P1, CP2>
+
+  public weak var weakAnyObject: AnyObject?
+  public weak var weakAnyClassBoundProto: CP1?
+}

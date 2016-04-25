@@ -107,6 +107,12 @@ public:
       case RecordKind::ThickFunction:
         printHeader("thick_function");
         break;
+      case RecordKind::Existential:
+        printHeader("existential");
+        break;
+      case RecordKind::ClassExistential:
+        printHeader("class_existential");
+        break;
       }
       printBasic(TI);
       printFields(RecordTI);
@@ -221,6 +227,89 @@ public:
     return TC.makeTypeInfo<RecordTypeInfo>(
         Size, Alignment, Stride,
         NumExtraInhabitants, Kind, Fields);
+  }
+};
+
+class ExistentialTypeInfoBuilder {
+  TypeConverter &TC;
+  bool ObjC;
+  bool Class;
+  unsigned WitnessTableCount;
+  bool Invalid;
+
+public:
+  ExistentialTypeInfoBuilder(TypeConverter &TC)
+    : TC(TC), ObjC(false), Class(false), WitnessTableCount(0),
+      Invalid(false) {}
+
+  void addProtocol(const TypeRef *TR) {
+    auto *P = dyn_cast<ProtocolTypeRef>(TR);
+    if (P == nullptr) {
+      Invalid = true;
+      return;
+    }
+
+    // FIXME: AnyObject should go away
+    if (P->getMangledName() == "Ps9AnyObject_") {
+      Class = true;
+      return;
+    }
+
+    const FieldDescriptor *FD = TC.getBuilder().getFieldTypeInfo(TR);
+    if (FD == nullptr) {
+      Invalid = true;
+      return;
+    }
+
+    switch (FD->Kind) {
+    case FieldDescriptorKind::ObjCProtocol:
+      ObjC = true;
+      break;
+    case FieldDescriptorKind::ClassProtocol:
+      Class = true;
+      WitnessTableCount++;
+      break;
+    case FieldDescriptorKind::Protocol:
+      WitnessTableCount++;
+      break;
+    case FieldDescriptorKind::Struct:
+    case FieldDescriptorKind::Enum:
+    case FieldDescriptorKind::Class:
+      Invalid = true;
+      break;
+    }
+  }
+
+  const TypeInfo *build() {
+    if (Invalid)
+      return nullptr;
+
+    if (ObjC) {
+      if (WitnessTableCount > 0)
+        return nullptr;
+
+      return TC.getReferenceTypeInfo(ReferenceKind::Strong,
+                                     ReferenceCounting::Unknown);
+    }
+
+    RecordTypeInfoBuilder builder(TC,
+                                  Class
+                                    ? RecordKind::ClassExistential
+                                    : RecordKind::Existential);
+
+    if (Class) {
+      builder.addField("object", TC.getUnknownObjectTypeRef());
+    } else {
+      builder.addField("value", TC.getRawPointerTypeRef());
+      builder.addField("value", TC.getRawPointerTypeRef());
+      builder.addField("value", TC.getRawPointerTypeRef());
+      builder.addField("metadata", TC.getRawPointerTypeRef());
+    }
+
+    for (unsigned i = 0; i < WitnessTableCount; i++)
+      builder.addField("wtable", TC.getRawPointerTypeRef());
+
+    return builder.build();
   }
 };
 
@@ -355,10 +444,16 @@ public:
       //
       // Also this is wrong if we wrap a reference in multiple levels of
       // optionality
-      if (NoPayloadCases == 1 &&
-          PayloadCases == 1 &&
-          isa<ReferenceTypeInfo>(PayloadTI))
-        return PayloadTI;
+      if (NoPayloadCases == 1 && PayloadCases == 1) {
+        if (isa<ReferenceTypeInfo>(PayloadTI))
+          return PayloadTI;
+
+        if (auto *RecordTI = dyn_cast<RecordTypeInfo>(PayloadTI)) {
+          auto SubKind = RecordTI->getRecordKind();
+          if (SubKind == RecordKind::ClassExistential)
+            return PayloadTI;
+        }
+      }
 
       return nullptr;
     }
@@ -399,14 +494,17 @@ public:
   }
 
   const TypeInfo *visitProtocolTypeRef(const ProtocolTypeRef *P) {
-    // FIXME
-    return nullptr;
+    ExistentialTypeInfoBuilder builder(TC);
+    builder.addProtocol(P);
+    return builder.build();
   }
 
   const TypeInfo *
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
-    // FIXME
-    return nullptr;
+    ExistentialTypeInfoBuilder builder(TC);
+    for (auto *P : PC->getProtocols())
+      builder.addProtocol(P);
+    return builder.build();
   }
 
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
@@ -442,6 +540,36 @@ public:
                                    ReferenceCounting::Unknown);
   }
 
+  const TypeInfo *
+  rebuildStorageTypeInfo(const TypeInfo *TI, ReferenceKind Kind) {
+    if (auto *ReferenceTI = dyn_cast<ReferenceTypeInfo>(TI))
+      return TC.getReferenceTypeInfo(Kind, ReferenceTI->getReferenceCounting());
+
+    if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI)) {
+      auto SubKind = RecordTI->getRecordKind();
+      if (SubKind == RecordKind::ClassExistential) {
+        std::vector<FieldInfo> Fields;
+        for (auto &Field : RecordTI->getFields()) {
+          if (Field.Name == "object") {
+            auto *FieldTI = rebuildStorageTypeInfo(&Field.TI, Kind);
+            Fields.push_back({Field.Name, Field.Offset, Field.TR, *FieldTI});
+            continue;
+          }
+          Fields.push_back(Field);
+        }
+
+        return TC.makeTypeInfo<RecordTypeInfo>(
+            RecordTI->getSize(),
+            RecordTI->getAlignment(),
+            RecordTI->getStride(),
+            RecordTI->getNumExtraInhabitants(),
+            SubKind, Fields);
+      }
+    }
+
+    return nullptr;
+  }
+
   template<typename StorageTypeRef>
   const TypeInfo *
   visitAnyStorageTypeRef(const StorageTypeRef *S, ReferenceKind Kind) {
@@ -449,9 +577,7 @@ public:
     if (TI == nullptr)
       return nullptr;
 
-    // FIXME: This might also be a class existential
-    return TC.getReferenceTypeInfo(Kind,
-        cast<ReferenceTypeInfo>(TI)->getReferenceCounting());
+    return rebuildStorageTypeInfo(TI, Kind);
   }
 
   const TypeInfo *
