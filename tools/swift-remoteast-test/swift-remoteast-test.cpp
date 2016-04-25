@@ -44,6 +44,7 @@ extern "C" void printMetadataType(const Metadata *typeMetadata) {
   auto result =
     remoteAST.getTypeForRemoteTypeMetadata(RemoteAddress(typeMetadata));
   if (result) {
+    out << "found type: ";
     result.getValue().print(out);
     out << '\n';
   } else {

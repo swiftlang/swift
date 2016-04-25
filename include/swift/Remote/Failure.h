@@ -256,6 +256,8 @@ public:
 
       // Do something based on the character after '%'.
       char c = *next++;
+      text = next;
+
       if (c == '%') {
         result += c;
         continue;

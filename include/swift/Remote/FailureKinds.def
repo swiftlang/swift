@@ -16,4 +16,7 @@ FAILURE(Unknown, "an unknown failure occurred", ())
 FAILURE(Memory, "an unknown failure occurred while reading %0 at address %1",
         (String, Address))
 
+FAILURE(CouldNotResolveTypeDecl,
+        "could not resolve a type with mangled name '%0'", (String))
+
 #undef FAILURE

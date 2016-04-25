@@ -205,6 +205,10 @@ public:
     return ObjCClassTypeRef::getUnnamed();
   }
 
+  const ForeignClassTypeRef *createForeignClassType(std::string &&mangledName) {
+    return ForeignClassTypeRef::getUnnamed(); // FIXME
+  }
+
   const ForeignClassTypeRef *getUnnamedForeignClassType() {
     return ForeignClassTypeRef::getUnnamed();
   }
