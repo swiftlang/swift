@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -module-name test_v7k | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -disable-incremental-llvm-codegen -primary-file %s -module-name test_v7k | FileCheck %s
 // RUN: %target-swift-frontend -S -primary-file %s -module-name test_v7k | FileCheck -check-prefix=V7K %s
 
 // REQUIRES: CPU=armv7k

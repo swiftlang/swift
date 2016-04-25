@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-incremental-llvm-codegen
 
 struct A<T1, T2>
 {

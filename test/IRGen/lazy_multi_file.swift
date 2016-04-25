@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s %S/Inputs/lazy_multi_file_helper.swift -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s %S/Inputs/lazy_multi_file_helper.swift -emit-ir -disable-incremental-llvm-codegen | FileCheck %s
 
 // REQUIRES: CPU=i386_or_x86_64
 

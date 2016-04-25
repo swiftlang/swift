@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-ir -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-ir -disable-incremental-llvm-codegen -primary-file %s | FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
