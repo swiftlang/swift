@@ -24,20 +24,6 @@ def cmp(a, b, p):
 // need such a predicate.
 % preds = [True, False]
 % for p in preds:
-%{
-if p:
-  orderingRequirement = """\
-/// - Precondition: `isOrderedBefore` is a
-///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
-///   over `elements`."""
-  according = " according to `isOrderedBefore`"
-else:
-  orderingRequirement = """\
-/// - Precondition: The less-than operator (`func <`) defined in the `Comparable`
-///   conformance is a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
-///   over `elements`."""
-  according = ""
-}%
 
 func _insertionSort<
   C : protocol<MutableCollection, BidirectionalCollection>

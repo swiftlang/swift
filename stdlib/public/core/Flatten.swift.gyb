@@ -99,7 +99,31 @@ public struct FlattenSequence<
 }
 
 extension Sequence where Iterator.Element : Sequence {
-  /// A concatenation of the elements of `self`.
+  /// Returns the elements of this sequence of sequences, concatenated.
+  ///
+  /// In this example, an array of three ranges is flattened so that the
+  /// elements of each range can be iterated in turn.
+  ///
+  ///     let ranges = [0..<3, 8..<10, 15..<17]
+  ///
+  ///     // A for-in loop over 'ranges' accesses each range:
+  ///     for range in ranges {
+  ///       print(range)
+  ///     }
+  ///     // Prints "0..<3"
+  ///     // Prints "8..<10"
+  ///     // Prints "15..<17"
+  ///
+  ///     // Use 'flatten()' to access each element of each range:
+  ///     for index in ranges.flatten() {
+  ///         print(index, terminator: " ")
+  ///     }
+  ///     // Prints: "0 1 2 8 9 15 16"
+  ///
+  /// - Returns: A flattened view of the elements of this
+  ///   sequence of sequences.
+  ///
+  /// - SeeAlso: `flatMap(_:)`, `joinWithSeparator(_:)`
   @warn_unused_result
   public func flatten() -> FlattenSequence<Self> {
     return FlattenSequence(_base: self)
@@ -184,7 +208,7 @@ public func < <BaseElements> (
   return false
 }
 
-/// A flattened view of a base collection-of-collections.
+/// A flattened view of a base collection of collections.
 ///
 /// The elements of this view are a concatenation of the elements of
 /// each collection in the base.
@@ -349,7 +373,31 @@ public struct ${Collection}<
 
 extension ${collectionForTraversal(traversal)}
   where ${constraints % {'Base': ''}} {
-  /// A concatenation of the elements of `self`.
+  /// Returns the elements of this collection of collections, concatenated.
+  ///
+  /// In this example, an array of three ranges is flattened so that the
+  /// elements of each range can be iterated in turn.
+  ///
+  ///     let ranges = [0..<3, 8..<10, 15..<17]
+  ///
+  ///     // A for-in loop over 'ranges' accesses each range:
+  ///     for range in ranges {
+  ///       print(range)
+  ///     }
+  ///     // Prints "0..<3"
+  ///     // Prints "8..<10"
+  ///     // Prints "15..<17"
+  ///
+  ///     // Use 'flatten()' to access each element of each range:
+  ///     for index in ranges.flatten() {
+  ///         print(index, terminator: " ")
+  ///     }
+  ///     // Prints: "0 1 2 8 9 15 16"
+  ///
+  /// - Returns: A flattened view of the elements of this
+  ///   collection of collections.
+  ///
+  /// - SeeAlso: `flatMap(_:)`, `joinWithSeparator(_:)`
   @warn_unused_result
   public func flatten() -> ${Collection}<Self> {
     return ${Collection}(self)

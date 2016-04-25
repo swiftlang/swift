@@ -887,7 +887,7 @@ public func !== <
 /// same `Element` type, hiding the specifics of the underlying
 /// `Collection`.
 ///
-/// - SeeAlso: ${', '.join('`Any%s`' % collectionForTraversal(t) for t in (2 * TRAVERSALS)[ti + 1 : ti + 3]) }
+/// - SeeAlso: ${', '.join('`Any%sCollection`' % t for t in (2 * TRAVERSALS)[ti + 1 : ti + 3]) }
 public struct ${Self}<Element>
   : AnyCollectionProtocol, ${SelfProtocol} {
 

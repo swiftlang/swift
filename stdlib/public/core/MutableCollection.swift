@@ -10,10 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that supports subscript assignment to a mutable collection.
+/// A type that provides subscript access to its elements.
 ///
-/// - Important: In most cases, it's best to ignore this protocol and use
-///   `MutableCollection` instead, as it has a more complete interface.
+/// In most cases, it's best to ignore this protocol and use the
+/// `MutableCollection` protocol instead, because it has a more complete
+/// interface.
 public protocol MutableIndexable : Indexable {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
@@ -30,20 +31,26 @@ public protocol MutableIndexable : Indexable {
   // TODO: swift-3-indexing-model - Index only needs to be comparable or must be comparable..?
   associatedtype Index : Comparable
 
-  /// The position of the first element in a non-empty collection.
+  /// The position of the first element in a nonempty collection.
   ///
-  /// In an empty collection, `startIndex == endIndex`.
-  ///
-  /// - Complexity: O(1)
+  /// If the collection is empty, `startIndex` is equal to `endIndex`.
   var startIndex: Index { get }
 
-  /// The collection's "past the end" position.
+  /// The collection's "past the end" position, or one greater than the last
+  /// valid subscript argument.
   ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
-  /// `location(after:)`.
+  /// When you need a range that includes the last element of a collection, use
+  /// the half-open range operator (`..<`) with `endIndex`. The `..<` operator
+  /// creates a range that doesn't include the upper bound, so it's always
+  /// safe to use with `endIndex`. For example:
   ///
-  /// - Complexity: O(1)
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     if let index = numbers.index(of: 30) {
+  ///         print(numbers[index ..< numbers.endIndex])
+  ///     }
+  ///     // Prints "[30, 40, 50]"
+  ///
+  /// If the collection is empty, `endIndex` is equal to `startIndex`.
   var endIndex: Index { get }
 
   // The declaration of _Element and subscript here is a trick used to
@@ -56,12 +63,50 @@ public protocol MutableIndexable : Indexable {
   // expressing it today.
   associatedtype _Element
 
-  /// Returns the element at the given `position`.
+  /// Accesses the element at the specified position.
   ///
-  /// - Complexity: O(1)
+  /// For example, you can replace an element of an array by using its
+  /// subscript.
+  ///
+  ///     var streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     streets[1] = "Butler"
+  ///     print(streets[1])
+  ///     // Prints "Butler"
+  ///
+  /// You can subscript a collection with any valid index other than the
+  /// collection's end index. The end index refers to the position one
+  /// past the last element of a collection, so it doesn't correspond with an
+  /// element.
+  ///
+  /// - Parameter position: The position of the element to access. `position`
+  ///   must be a valid index of the collection that is not equal to the
+  ///   `endIndex` property.
   subscript(position: Index) -> _Element { get set }
 
   associatedtype SubSequence
+  
+  /// Accesses a contiguous subrange of the collection's elements.
+  ///
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original collection. Always use the slice's `startIndex` property
+  /// instead of assuming that its indices start at a particular value.
+  ///
+  /// This example demonstrates getting a slice of an array of strings, finding
+  /// the index of one of the strings in the slice, and then using that index
+  /// in the original array.
+  ///
+  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     let streetsSlice = streets[2 ..< streets.endIndex]
+  ///     print(streetsSlice)
+  ///     // Prints "["Channing", "Douglas", "Evarts"]"
+  ///
+  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     streets[index!] = "Eustace"
+  ///     print(streets[index!])
+  ///     // Prints "Eustace"
+  ///
+  /// - Parameter bounds: A range of the collection's indices. The bounds of
+  ///   the range must be valid indices of the collection.
   subscript(bounds: Range<Index>) -> SubSequence { get set }
   
   /// Performs a range check in O(1), or a no-op when a range check is not
@@ -116,38 +161,104 @@ public protocol MutableIndexable : Indexable {
 }
 
 // TODO: swift-3-indexing-model - review the following
-/// A *collection* that supports subscript assignment.
+/// A collection that supports subscript assignment.
 ///
-/// For any instance `a` of a type conforming to
-/// `MutableCollection`, :
+/// Collections that conform to `MutableCollection` gain the ability to
+/// change the value of their elements. This example shows how you can
+/// modify one of the names in an array of students.
+///
+///     var students = ["Ben", "Ivy", "Jordell", "Maxime"]
+///     if let i = students.index(of: "Maxime") {
+///         students[i] = "Max"
+///     }
+///     print(students)
+///     // Prints "["Ben", "Ivy", "Jordell", "Max"]"
+///
+/// In addition to changing the value of an individual element, you can also
+/// change the values of a slice of elements in a mutable collection. For
+/// example, you can sort *part* of a mutable collection by calling the
+/// mutable `sort()` method on a subscripted subsequence. Here's an
+/// example that sorts the first half of an array of integers:
+///
+///     var numbers = [15, 40, 10, 30, 60, 25, 5, 100]
+///     numbers[0..<4].sort()
+///     print(numbers)
+///     // Prints "[10, 15, 30, 40, 60, 25, 5, 100]"
+///
+/// The `MutableCollection` protocol allows changing the values of a
+/// collection's elements but not the length of the collection itself. For
+/// operations that require adding or removing elements, see the
+/// `RangeReplaceableCollection` protocol instead.
+///
+/// Conforming to the MutableCollection Protocol
+/// ============================================
+///
+/// To add conformance to the `MutableCollection` protocol to your own
+/// custom collection, upgrade your type's subscript to support both read
+/// and write access.
+/// 
+/// A value stored into a subscript of a `MutableCollection` instance must
+/// subsequently be accessible at that same position. That is, for a mutable
+/// collection instance `a`, index `i`, and value `x`, the two sets of
+/// assignments in the following code sample must be equivalent:
 ///
 ///     a[i] = x
 ///     let y = a[i]
-///
-/// is equivalent to:
-///
+///     
+///     // Must be equivalent to:
 ///     a[i] = x
 ///     let y = x
-///
 public protocol MutableCollection : MutableIndexable, Collection {
   // FIXME: should be constrained to MutableCollection
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
+  /// A collection that represents a contiguous subrange of the collection's
+  /// elements.
   associatedtype SubSequence : Collection /*: MutableCollection*/
     = MutableSlice<Self>
 
-  /// Access the element at `position`.
+  /// Accesses the element at the specified position.
   ///
-  /// - Precondition: `position` indicates a valid position in `self` and
-  ///   `position != endIndex`.
+  /// For example, you can replace an element of an array by using its
+  /// subscript.
   ///
-  /// - Complexity: O(1)
+  ///     var streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     streets[1] = "Butler"
+  ///     print(streets[1])
+  ///     // Prints "Butler"
+  ///
+  /// You can subscript a collection with any valid index other than the
+  /// collection's end index. The end index refers to the position one
+  /// past the last element of a collection, so it doesn't correspond with an
+  /// element.
+  ///
+  /// - Parameter position: The position of the element to access. `position`
+  ///   must be a valid index of the collection that is not equal to the
+  ///   `endIndex` property.
   subscript(position: Index) -> Iterator.Element {get set}
 
-  /// Returns a collection representing a contiguous sub-range of
-  /// `self`'s elements.
+  /// Accesses a contiguous subrange of the collection's elements.
   ///
-  /// - Complexity: O(1) for the getter, O(`bounds.count`) for the setter.
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original collection. Always use the slice's `startIndex` property
+  /// instead of assuming that its indices start at a particular value.
+  ///
+  /// This example demonstrates getting a slice of an array of strings, finding
+  /// the index of one of the strings in the slice, and then using that index
+  /// in the original array.
+  ///
+  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     let streetsSlice = streets[2 ..< streets.endIndex]
+  ///     print(streetsSlice)
+  ///     // Prints "["Channing", "Douglas", "Evarts"]"
+  ///
+  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     streets[index!] = "Eustace"
+  ///     print(streets[index!])
+  ///     // Prints "Eustace"
+  ///
+  /// - Parameter bounds: A range of the collection's indices. The bounds of
+  ///   the range must be valid indices of the collection.
   subscript(bounds: Range<Index>) -> SubSequence {get set}
 
   /// Call `body(p)`, where `p` is a pointer to the collection's
@@ -179,6 +290,28 @@ extension MutableCollection {
     return nil
   }
 
+  /// Accesses a contiguous subrange of the collection's elements.
+  ///
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original collection. Always use the slice's `startIndex` property
+  /// instead of assuming that its indices start at a particular value.
+  ///
+  /// This example demonstrates getting a slice of an array of strings, finding
+  /// the index of one of the strings in the slice, and then using that index
+  /// in the original array.
+  ///
+  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     let streetsSlice = streets[2 ..< streets.endIndex]
+  ///     print(streetsSlice)
+  ///     // Prints "["Channing", "Douglas", "Evarts"]"
+  ///
+  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     streets[index!] = "Eustace"
+  ///     print(streets[index!])
+  ///     // Prints "Eustace"
+  ///
+  /// - Parameter bounds: A range of the collection's indices. The bounds of
+  ///   the range must be valid indices of the collection.
   public subscript(bounds: Range<Index>) -> MutableSlice<Self> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)

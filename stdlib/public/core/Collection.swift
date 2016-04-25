@@ -13,8 +13,8 @@
 /// A type that provides subscript access to its elements, with forward
 /// index traversal.
 ///
-/// - Important: In most cases, it's best to ignore this protocol and use
-///   `Collection` instead, as it has a more complete interface.
+/// In most cases, it's best to ignore this protocol and use the `Collection`
+/// protocol instead, because it has a more complete interface.
 public protocol IndexableBase {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
@@ -33,20 +33,26 @@ public protocol IndexableBase {
   /// - SeeAlso: endIndex
   associatedtype Index : Comparable
 
-  /// The position of the first element in a non-empty collection.
+  /// The position of the first element in a nonempty collection.
   ///
-  /// In an empty collection, `startIndex == endIndex`.
-  ///
-  /// - Complexity: O(1)
+  /// If the collection is empty, `startIndex` is equal to `endIndex`.
   var startIndex: Index { get }
 
-  /// The collection's "past the end" position.
+  /// The collection's "past the end" position, or one greater than the last
+  /// valid subscript argument.
   ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
-  /// `location(after:)`.
+  /// When you need a range that includes the last element of a collection, use
+  /// the half-open range operator (`..<`) with `endIndex`. The `..<` operator
+  /// creates a range that doesn't include the upper bound, so it's always
+  /// safe to use with `endIndex`. For example:
   ///
-  /// - Complexity: O(1)
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     if let index = numbers.index(of: 30) {
+  ///         print(numbers[index ..< numbers.endIndex])
+  ///     }
+  ///     // Prints "[30, 40, 50]"
+  ///
+  /// If the collection is empty, `endIndex` is equal to `startIndex`.
   var endIndex: Index { get }
 
   // The declaration of _Element and subscript here is a trick used to
@@ -59,13 +65,23 @@ public protocol IndexableBase {
   // expressing it today.
   associatedtype _Element
 
-  /// Accesses the element at the given `position`.
+  /// Accesses the element at the specified position.
   ///
-  /// - Complexity: O(1)
+  /// For example, access an element of an array through its subscript to
+  /// print its value:
   ///
-  /// - Requires: `position` is valid for subscripting `self`.  That
-  ///   is, it is reachable from `startIndex` by zero or more
-  ///   applications of `location(after:)` and is not equal to `endIndex`.
+  ///     var streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     print(streets[1])
+  ///     // Prints "Bryant"
+  ///
+  /// You can subscript a collection with any valid index other than the
+  /// collection's end index. The end index refers to the position one
+  /// past the last element of a collection, so it doesn't correspond with an
+  /// element.
+  ///
+  /// - Parameter position: The position of the element to access. `position`
+  ///   must be a valid index of the collection that is not equal to the
+  ///   `endIndex` property.
   subscript(position: Index) -> _Element { get }
 
   // WORKAROUND: rdar://25214066
@@ -219,24 +235,95 @@ public protocol Indexable : IndexableBase {
   func distance(from start: Index, to end: Index) -> IndexDistance
 }
 
-/// The iterator used for collections that don't specify one.
+/// A type that iterates over a collection using its indices.
+///
+/// The `IndexingIterator` type is the default iterator for any collection that
+/// doesn't declare its own. It acts as an iterator by using a collection's
+/// indices to step over each value in the collection. Most collections in the
+/// standard library use `IndexingIterator` as their iterator.
+///
+/// By default, any custom collection type you create will inherit a
+/// `makeIterator()` method that returns an `IndexingIterator` instance,
+/// making it unnecessary to declare your own. When creating a custom
+/// collection type, add the minimal requirements of the `Collection`
+/// protocol: starting and ending indices and a subscript for accessing
+/// elements. With those elements defined, the inherited `makeIterator()`
+/// method satisfies the requirements of the `Sequence` protocol.
+///
+/// Here's an example of a type that declares the minimal requirements for a
+/// collection. The `CollectionOfTwo` structure is a fixed-size collection
+/// that always holds two elements of a specific type.
+///
+///     struct CollectionOfTwo<Element>: Collection {
+///         let elements: (Element, Element)
+///
+///         init(_ first: Element, _ second: Element) {
+///             self.elements = (first, second)
+///         }
+///
+///         var startIndex: Int { return 0 }
+///         var endIndex: Int   { return 2 }
+///
+///         subscript(index: Int) -> Element {
+///             switch index {
+///             case 0: return elements.0
+///             case 1: return elements.1
+///             default: fatalError("Index out of bounds.")
+///             }
+///         }
+///     }
+///
+/// The `CollectionOfTwo` type uses the default iterator type,
+/// `IndexingIterator`, because it doesn't define its own `makeIterator()`
+/// method or `Iterator` associated type. This example shows how a
+/// `CollectionOfTwo` instance can be created holding the values of a point,
+/// and then iterated over using a `for`-`in` loop.
+///
+///     let point = CollectionOfTwo(15.0, 20.0)
+///     for element in point {
+///         print(element)
+///     }
+///     // Prints "15.0"
+///     // Prints "20.0"
 public struct IndexingIterator<
   Elements : IndexableBase
   // FIXME(compiler limitation):
   // Elements : Collection
 > : IteratorProtocol, Sequence {
 
-  /// Create an *iterator* over the given collection.
+  /// Creates an iterator over the given collection.
   public /// @testable
   init(_elements: Elements) {
     self._elements = _elements
     self._position = _elements.startIndex
   }
 
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
   ///
-  /// - Precondition: No preceding call to `self.next()` has returned `nil`.
+  /// Repeatedly calling this method returns all the elements of the underlying
+  /// sequence in order. As soon as the sequence has run out of elements, the
+  /// `next()` method returns `nil`.
+  ///
+  /// You must not call this method if it has previously returned `nil`.
+  ///
+  /// This example shows how an iterator can be used explicitly to emulate a
+  /// `for`-`in` loop. First, retrieve a sequence's iterator, and then call
+  /// the iterator's `next()` method until it returns `nil`.
+  ///
+  ///     let numbers = [2, 3, 5, 7]
+  ///     var numbersIterator = numbers.makeIterator()
+  ///
+  ///     while let num = numbersIterator.next() {
+  ///         print(num)
+  ///     }
+  ///     // Prints "2"
+  ///     // Prints "3"
+  ///     // Prints "5"
+  ///     // Prints "7"
+  ///
+  /// - Returns: The next element in the underlying sequence if a next element
+  ///   exists; otherwise, `nil`.
   public mutating func next() -> Elements._Element? {
     if _position == _elements.endIndex { return nil }
     let element = _elements[_position]
@@ -248,20 +335,132 @@ public struct IndexingIterator<
   internal var _position: Elements.Index
 }
 
-/// A multi-pass sequence with addressable positions.
+/// A sequence whose elements can be traversed multiple times,
+/// nondestructively, and accessed by indexed subscript.
 ///
-/// Positions are represented by an associated `Index` type.  Whereas
-/// an arbitrary sequence may be consumed as it is traversed, a
-/// collection is multi-pass: any element may be revisited merely by
-/// saving its index.
+/// Collections are used extensively throughout the standard library. When
+/// you use arrays, dictionaries, views of a string's contents and other
+/// types, you benefit from the operations that the `Collection` protocol
+/// declares and implements.
 ///
-/// The sequence view of the elements is identical to the collection
-/// view.  In other words, the following code binds the same series of
-/// values to `x` as does `for x in self {}`:
+/// In addition to the methods that collections inherit from the `Sequence`
+/// protocol, you gain access to methods that depend on accessing an element
+/// at a specific position when using a collection.
 ///
-///     for i in self.indices {
-///         let x = self[i]
+/// For example, if you want to print only the first word in a string,
+/// search for the index of the first space, and then create a subsequence up
+/// to that position.
+///
+///     let text = "Buffalo buffalo buffalo buffalo."
+///     if let firstSpace = text.characters.index(of: " ") {
+///         print(String(text.characters.prefix(upTo: firstSpace)))
 ///     }
+///     // Prints "Buffalo"
+///
+/// The `firstSpace` constant is an index into the `text.characters`
+/// collection. `firstSpace` is the position of the first space in the
+/// collection. You can store indices in variables, and pass them to
+/// collection algorithms or use them later to access the corresponding
+/// element. In the example above, `firstSpace` is used to extract the prefix
+/// that contains elements up to that index.
+///
+/// You can pass only valid indices to collection operations. You can find a
+/// complete set of a collection's valid indices by starting with the
+/// collection's `startIndex` property and finding every successor up to, and
+/// including, the `endIndex` property. All other values of the `Index` type,
+/// such as the `startIndex` property of a different collection, are invalid
+/// indices for this collection.
+///
+/// Saved indices may become invalid as a result of mutating operations; for
+/// more information about index invalidation in mutable collections, see the
+/// reference for the `MutableCollection` and `RangeReplaceableCollection`
+/// protocols, as well as for the specific type you're using.
+///
+/// Accessing Individual Elements
+/// =============================
+///
+/// You can access an element of a collection through its subscript with any
+/// valid index except the collection's `endIndex` property, a "past-the-end"
+/// index that does not correspond with any element of the collection.
+///
+/// Here's an example of accessing the first character in a string through its
+/// subscript:
+///
+///     let firstChar = text.characters[text.characters.startIndex]
+///     print(firstChar)
+///     // Prints "B"
+///
+/// The `Collection` protocol declares and provides default implementations
+/// for many operations that depend on elements being accessible by their
+/// subscript. For example, you can also access the first character of
+/// `text` using the `first` property, which has the value of the first
+/// element of the collection, or `nil` if the collection is empty.
+///
+///     print(text.characters.first)
+///     // Prints "Optional("B")"
+///
+/// Traversing a Collection 
+/// =======================
+///
+/// While a sequence may be consumed as it is traversed, a collection is
+/// guaranteed to be multi-pass: Any element may be repeatedly accessed by
+/// saving its index. Moreover, a collection's indices form a finite range
+/// of the positions of the collection's elements. This guarantees the
+/// safety of operations that depend on a sequence being finite, such as
+/// checking to see whether a collection contains an element.
+///
+/// Iterating over the elements of a collection by their positions yields the
+/// same elements in the same order as iterating over that collection using
+/// its iterator. This example demonstrates that the `characters` view of a
+/// string returns the same characters in the same order whether the view's
+/// indices or the view itself is being iterated.
+///
+///     let word = "Swift"
+///     for character in word.characters {
+///         print(character)
+///     }
+///     // Prints "S"
+///     // Prints "w"
+///     // Prints "i"
+///     // Prints "f"
+///     // Prints "t"
+/// 
+///     for i in word.characters.indices {
+///         print(word.characters[i])
+///     }
+///     // Prints "S"
+///     // Prints "w"
+///     // Prints "i"
+///     // Prints "f"
+///     // Prints "t"
+///
+/// Conforming to the Collection Protocol 
+/// =====================================
+///
+/// If you create a custom type that can provide repeated access to its
+/// elements, conformance to the `Collection` protocol gives your
+/// custom type a more useful and more efficient interface for sequence and
+/// collection operations. To add conformance to your type, declare
+/// `startIndex` and `endIndex` properties and a subscript that provides at
+/// least read-only access to your type's elements.
+///
+/// Expected Performance
+/// ====================
+///
+/// Types that conform to `Collection` are expected to provide the
+/// `startIndex` and `endIndex` properties and subscript access to elements
+/// as O(1) operations. Types that are not able to guarantee that expected
+/// performance must document the departure, because many collection operations
+/// depend on O(1) subscripting performance for their own performance
+/// guarantees.
+///
+/// The performance of some collection operations depends on the type of index
+/// that the collection provides. For example, a random-access collection,
+/// which can measure the distance between two indices in O(1) time, will be
+/// able to calculate its `count` property in O(1) time. Conversely, because a
+/// forward or bidirectional collection must traverse the entire collection to
+/// count the number of contained elements, accessing its `count` property is
+/// an O(N) operation.
 public protocol Collection : Indexable, Sequence {
   /// A type that can represent the number of steps between pairs of
   /// `Index` values where one value is reachable from the other.
@@ -281,16 +480,15 @@ public protocol Collection : Indexable, Sequence {
   // FIXME: Needed here so that the `Iterator` is properly deduced from
   // a custom `makeIterator()` function.  Otherwise we get an
   // `IndexingIterator`. <rdar://problem/21539115>
-  /// Returns an iterator over the elements of `self`.
+  /// Returns an iterator over the elements of the collection.
   func makeIterator() -> Iterator
 
-  /// A `Sequence` that can represent a contiguous subrange of `self`'s
+  /// A sequence that represents a contiguous subrange of the collection's
   /// elements.
   ///
-  /// - Note: This associated type appears as a requirement in
-  ///   `Sequence`, but is restated here with stricter
-  ///   constraints: in a `Collection`, the `SubSequence` should
-  ///   also be a `Collection`.
+  /// This associated type appears as a requirement in the `Sequence`
+  /// protocol, but it is restated here with stricter constraints. In a
+  /// collection, the subsequence should also conform to `Collection`.
   associatedtype SubSequence : IndexableBase, Sequence = Slice<Self>
   // FIXME(compiler limitation):
   // associatedtype SubSequence : Collection
@@ -306,13 +504,46 @@ public protocol Collection : Indexable, Sequence {
   // These constraints allow processing collections in generic code by
   // repeatedly slicing them in a loop.
 
-  /// Returns the element at the given `position`.
+  /// Accesses the element at the specified position.
+  ///
+  /// For example, access an element of an array through its subscript to
+  /// print its value:
+  ///
+  ///     var streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     print(streets[1])
+  ///     // Prints "Bryant"
+  ///
+  /// You can subscript a collection with any valid index other than the
+  /// collection's end index. The end index refers to the position one
+  /// past the last element of a collection, so it doesn't correspond with an
+  /// element.
+  ///
+  /// - Parameter position: The position of the element to access. `position`
+  ///   must be a valid index of the collection that is not equal to the
+  ///   `endIndex` property.
   subscript(position: Index) -> Iterator.Element { get }
 
-  /// Returns a collection representing a contiguous sub-range of
-  /// `self`'s elements.
+  /// Accesses a contiguous subrange of the collection's elements.
   ///
-  /// - Complexity: O(1)
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original collection. Always use the slice's `startIndex` property
+  /// instead of assuming that its indices start at a particular value.
+  ///
+  /// This example demonstrates getting a slice of an array of strings, finding
+  /// the index of one of the strings in the slice, and then using that index
+  /// in the original array.
+  ///
+  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     let streetsSlice = streets[2 ..< streets.endIndex]
+  ///     print(streetsSlice)
+  ///     // Prints "["Channing", "Douglas", "Evarts"]"
+  ///
+  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     print(streets[index!])
+  ///     // Prints "Evarts"
+  ///
+  /// - Parameter bounds: A range of the collection's indices. The bounds of
+  ///   the range must be valid indices of the collection.
   subscript(bounds: Range<Index>) -> SubSequence { get }
 
   /// A collection type whose elements are the indices of `self` that
@@ -346,37 +577,107 @@ public protocol Collection : Indexable, Sequence {
   ///   ```
   var indices: Indices { get }
 
-  /// Returns `self[startIndex..<end]`
+  /// Returns a subsequence from the start of the collection up to, but not
+  /// including, the specified position.
   ///
-  /// - Precondition: `end >= self.startIndex && end <= self.endIndex`
+  /// The resulting subsequence *does not include* the element at the
+  /// position `end`.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50, 60]
+  ///     if let i = numbers.index(of: 40) {
+  ///         print(numbers.prefix(upTo: i))
+  ///     }
+  ///     // Prints "[10, 20, 30]"
+  ///
+  /// Passing the collection's starting index as the `end` parameter results in
+  /// an empty subsequence.
+  ///
+  ///     print(numbers.prefix(upTo: numbers.startIndex))
+  ///     // Prints "[]"
+  ///
+  /// - Parameter end: The "past-the-end" index of the resulting subsequence.
+  ///   `end` must be a valid index of the collection.
+  /// - Returns: A subsequence up to, but not including, the `end` position.
+  ///
   /// - Complexity: O(1)
+  /// - SeeAlso: `prefix(through:)`
   @warn_unused_result
   func prefix(upTo end: Index) -> SubSequence
 
-  /// Returns `self[start..<endIndex]`
+  /// Returns a subsequence from the specified position to the end of the
+  /// collection.
+  ///
+  /// For example:
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50, 60]
+  ///     if let i = numbers.index(of: 40) {
+  ///         print(numbers.suffix(from: i))
+  ///     }
+  ///     // Prints "[40, 50, 60]"
+  ///
+  /// Passing the collection's `endIndex` as the `start` parameter results in
+  /// an empty subsequence.
+  ///
+  ///     print(numbers.suffix(from: numbers.endIndex))
+  ///     // Prints "[]"
+  ///
+  /// - Parameter start: The index at which to start the resulting subsequence.
+  ///   `start` must be a valid index of the collection.
+  /// - Returns: A subsequence starting at the `start` position.
   ///
   /// - Precondition: `start >= self.startIndex && start <= self.endIndex`
   /// - Complexity: O(1)
   @warn_unused_result
   func suffix(from start: Index) -> SubSequence
 
-  /// Returns `prefix(upTo: location(after: position)`
+  /// Returns a subsequence from the start of the collection through the
+  /// specified position.
   ///
-  /// - Precondition: `position >= self.startIndex && position < self.endIndex`
+  /// The resulting subsequence *includes* the element at the position `end`.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50, 60]
+  ///     if let i = numbers.index(of: 40) {
+  ///         print(numbers.prefix(through: i))
+  ///     }
+  ///     // Prints "[10, 20, 30, 40]"
+  ///
+  /// - Parameter end: The index of the last element to include in the
+  ///   resulting subsequence. `end` must be a valid index of the collection
+  ///   that is not equal to the `endIndex` property.
+  /// - Returns: A subsequence up to, and including, the `end` position.
+  ///
   /// - Complexity: O(1)
+  /// - SeeAlso: `prefix(upTo:)`
   @warn_unused_result
   func prefix(through position: Index) -> SubSequence
 
-  /// Returns `true` iff `self` is empty.
+  /// A Boolean value indicating whether the collection is empty.
+  ///
+  /// When you need to check whether your collection is empty, use the
+  /// `isEmpty` property instead of checking that the `count` property is
+  /// equal to zero. For collections that don't conform to
+  /// `RandomAccessCollection`, accessing the `count` property iterates
+  /// through the elements of the collection.
+  ///
+  ///     let horseName = "Silver"
+  ///     if horseName.characters.isEmpty {
+  ///         print("I've been through the desert on a horse with no name.")
+  ///     } else {
+  ///         print("Hi ho, \(horseName)!")
+  ///     }
+  ///     // Prints "Hi ho, Silver!")
+  ///
+  /// - Complexity: O(1)
   var isEmpty: Bool { get }
 
-  /// Returns the number of elements.
+  /// The number of elements in the collection.
   ///
-  /// - Complexity: O(1) if `Self` conforms to
-  ///   `RandomAccessCollection`; O(N) otherwise.
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
+  ///   of the collection.
   var count: IndexDistance { get }
-
-  // The following requirement enables dispatching for indexOf when
+  
+  // The following requirement enables dispatching for index(of:) when
   // the element type is Equatable.
   /// Returns `Optional(Optional(index))` if an element was found
   /// or `Optional(nil)` if an element was determined to be missing;
@@ -386,7 +687,15 @@ public protocol Collection : Indexable, Sequence {
   @warn_unused_result
   func _customIndexOfEquatableElement(_ element: Iterator.Element) -> Index??
 
-  /// The first element of `self`, or `nil` if `self` is empty.
+  /// The first element of the collection.
+  ///
+  /// If the collection is empty, the value of this property is `nil`.
+  /// 
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     if let firstNumber = numbers.first {
+  ///         print(firstNumber)
+  ///     }
+  ///     // Prints "10"
   var first: Iterator.Element? { get }
 
   /// Returns the result of advancing `i` by `n` positions.
@@ -605,6 +914,7 @@ extension Indexable
 /// that accept the default associated `Iterator`,
 /// `IndexingIterator<Self>`.
 extension Collection where Iterator == IndexingIterator<Self> {
+  /// Returns an iterator over the elements of the collection.
   public func makeIterator() -> IndexingIterator<Self> {
     return IndexingIterator(_elements: self)
   }
@@ -613,6 +923,27 @@ extension Collection where Iterator == IndexingIterator<Self> {
 /// Supply the default "slicing" `subscript` for `Collection` models
 /// that accept the default associated `SubSequence`, `Slice<Self>`.
 extension Collection where SubSequence == Slice<Self> {
+  /// Accesses a contiguous subrange of the collection's elements.
+  ///
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original collection. Always use the slice's `startIndex` property
+  /// instead of assuming that its indices start at a particular value.
+  ///
+  /// This example demonstrates getting a slice of an array of strings, finding
+  /// the index of one of the strings in the slice, and then using that index
+  /// in the original array.
+  ///
+  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     let streetsSlice = streets[2 ..< streets.endIndex]
+  ///     print(streetsSlice)
+  ///     // Prints "["Channing", "Douglas", "Evarts"]"
+  ///
+  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     print(streets[index!])
+  ///     // Prints "Evarts"
+  ///
+  /// - Parameter bounds: A range of the collection's indices. The bounds of
+  ///   the range must be valid indices of the collection.
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
     return Slice(base: self, bounds: bounds)
@@ -621,8 +952,10 @@ extension Collection where SubSequence == Slice<Self> {
 
 // TODO: swift-3-indexing-model - review the following
 extension Collection where SubSequence == Self {
-  /// If `!self.isEmpty`, remove the first element and return it, otherwise
-  /// return `nil`.
+  /// Removes and returns the first element of the collection.
+  ///
+  /// - Returns: The first element of the collection if the collection is
+  ///   not empty; otherwise, `nil`.
   ///
   /// - Complexity: O(1)
   @warn_unused_result
@@ -636,16 +969,36 @@ extension Collection where SubSequence == Self {
 
 /// Default implementations of core requirements
 extension Collection {
-  /// Returns `true` iff `self` is empty.
+  /// A Boolean value indicating whether the collection is empty.
+  ///
+  /// When you need to check whether your collection is empty, use the
+  /// `isEmpty` property instead of checking that the `count` property is
+  /// equal to zero. For collections that don't conform to
+  /// `RandomAccessCollection`, accessing the `count` property iterates
+  /// through the elements of the collection.
+  ///
+  ///     let horseName = "Silver"
+  ///     if horseName.characters.isEmpty {
+  ///         print("I've been through the desert on a horse with no name.")
+  ///     } else {
+  ///         print("Hi ho, \(horseName)!")
+  ///     }
+  ///     // Prints "Hi ho, Silver!")
   ///
   /// - Complexity: O(1)
   public var isEmpty: Bool {
     return startIndex == endIndex
   }
 
-  /// Returns the first element of `self`, or `nil` if `self` is empty.
+  /// The first element of the collection.
   ///
-  /// - Complexity: O(1)
+  /// If the collection is empty, the value of this property is `nil`.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     if let firstNumber = numbers.first {
+  ///         print(firstNumber)
+  ///     }
+  ///     // Prints "10"
   public var first: Iterator.Element? {
     // NB: Accessing `startIndex` may not be O(1) for some lazy collections,
     // so instead of testing `isEmpty` and then returning the first element,
@@ -663,18 +1016,20 @@ extension Collection {
   //  }
 
 // TODO: swift-3-indexing-model - review the following
-  /// Returns a value less than or equal to the number of elements in
-  /// `self`, *nondestructively*.
+  /// A value less than or equal to the number of elements in the collection.
   ///
-  /// - Complexity: O(`count`).
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
+  ///   of the collection.
   public var underestimatedCount: Int {
     return numericCast(count)
   }
 
-  /// Returns the number of elements.
+  /// The number of elements in the collection.
   ///
-  /// - Complexity: O(1) if `Self` conforms to `RandomAccessCollection`;
-  ///   O(N) otherwise.
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
+  ///   of the collection.
   public var count: IndexDistance {
     return distance(from: startIndex, to: endIndex)
   }
@@ -703,10 +1058,23 @@ extension Collection {
 
 extension Collection {
 // TODO: swift-3-indexing-model - review the following
-  /// Returns an `Array` containing the results of mapping `transform`
-  /// over `self`.
+  /// Returns an array containing the results of mapping the given closure
+  /// over the sequence's elements.
   ///
-  /// - Complexity: O(N).
+  /// In this example, `map` is used first to convert the names in the array
+  /// to lowercase strings and then to count their characters.
+  ///
+  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
+  ///     let lowercaseNames = cast.map { $0.lowercaseString }
+  ///     // 'lowercaseNames' == ["vivien", "marlon", "kim", "karl"]
+  ///     let letterCounts = cast.map { $0.characters.count }
+  ///     // 'letterCounts' == [6, 6, 3, 4]
+  ///
+  /// - Parameter transform: A mapping closure. `transform` accepts an
+  ///   element of this sequence as its parameter and returns a transformed
+  ///   value of the same or of a different type.
+  /// - Returns: An array containing the transformed elements of this
+  ///   sequence.
   @warn_unused_result
   public func map<T>(
     _ transform: @noescape (Iterator.Element) throws -> T
@@ -730,10 +1098,25 @@ extension Collection {
     return Array(result)
   }
 
-  /// Returns a subsequence containing all but the first `n` elements.
+  /// Returns a subsequence containing all but the given number of initial
+  /// elements.
   ///
-  /// - Precondition: `n >= 0`
-  /// - Complexity: O(`n`)
+  /// If the number of elements to drop exceeds the number of elements in
+  /// the sequence, the result is an empty subsequence.
+  ///
+  ///     let numbers = [1, 2, 3, 4, 5]
+  ///     print(numbers.dropFirst(2))
+  ///     // Prints "[3, 4, 5]"
+  ///     print(numbers.dropFirst(10))
+  ///     // Prints "[]"
+  ///
+  /// - Parameter n: The number of elements to drop from the beginning of
+  ///   the sequence. `n` must be greater than or equal to zero.
+  /// - Returns: A subsquence starting after the specified number of
+  ///   elements.
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of elements to drop from
+  ///   the beginning of the sequence.
   @warn_unused_result
   public func dropFirst(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
@@ -742,10 +1125,23 @@ extension Collection {
     return self[start..<endIndex]
   }
 
-  /// Returns a subsequence containing all but the last `n` elements.
+  /// Returns a subsequence containing all but the specified number of final
+  /// elements.
   ///
-  /// - Precondition: `n >= 0`
-  /// - Complexity: O(`self.count`)
+  /// The sequence must be finite. If the number of elements to drop exceeds
+  /// the number of elements in the sequence, the result is an empty
+  /// subsequence.
+  ///
+  ///     let numbers = [1, 2, 3, 4, 5]
+  ///     print(numbers.dropLast(2))
+  ///     // Prints "[1, 2, 3]"
+  ///     print(numbers.dropLast(10))
+  ///     // Prints "[]"
+  ///
+  /// - Parameter n: The number of elements to drop off the end of the
+  ///   sequence. `n` must be greater than or equal to zero.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @warn_unused_result
   public func dropLast(_ n: Int) -> SubSequence {
     _precondition(
@@ -756,14 +1152,22 @@ extension Collection {
     return self[startIndex..<end]
   }
 
-  /// Returns a subsequence, up to `maxLength` in length, containing the
-  /// initial elements.
+  /// Returns a subsequence, up to the specified maximum length, containing
+  /// the initial elements of the sequence.
   ///
-  /// If `maxLength` exceeds `self.count`, the result contains all
-  /// the elements of `self`.
+  /// If the maximum length exceeds the number of elements in the sequence,
+  /// the result contains all the elements in the sequence.
   ///
-  /// - Precondition: `maxLength >= 0`
-  /// - Complexity: O(`maxLength`)
+  ///     let numbers = [1, 2, 3, 4, 5]
+  ///     print(numbers.prefix(2))
+  ///     // Prints "[1, 2]"
+  ///     print(numbers.prefix(10))
+  ///     // Prints "[1, 2, 3, 4, 5]"
+  ///
+  /// - Parameter maxLength: The maximum number of elements to return.
+  ///   `maxLength` must be greater than or equal to zero.
+  /// - Returns: A subsequence starting at the beginning of this sequence
+  ///   with at most `maxLength` elements.
   @warn_unused_result
   public func prefix(_ maxLength: Int) -> SubSequence {
     _precondition(
@@ -774,14 +1178,25 @@ extension Collection {
     return self[startIndex..<end]
   }
 
-  /// Returns a slice, up to `maxLength` in length, containing the
-  /// final elements of `self`.
+  /// Returns a subsequence, up to the given maximum length, containing the
+  /// final elements of the sequence.
   ///
-  /// If `maxLength` exceeds `s.count`, the result contains all
-  /// the elements of `self`.
+  /// The sequence must be finite. If the maximum length exceeds the number
+  /// of elements in the sequence, the result contains all the elements in
+  /// the sequence.
   ///
-  /// - Precondition: `maxLength >= 0`
-  /// - Complexity: O(`self.count`)
+  ///     let numbers = [1, 2, 3, 4, 5]
+  ///     print(numbers.suffix(2))
+  ///     // Prints "[4, 5]"
+  ///     print(numbers.suffix(10))
+  ///     // Prints "[1, 2, 3, 4, 5]"
+  ///
+  /// - Parameter maxLength: The maximum number of elements to return. Must
+  ///   be greater than or equal to zero.
+  /// - Returns: A subsequence terminating at the end of this sequence with
+  ///   at most `maxLength` elements.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @warn_unused_result
   public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
@@ -793,16 +1208,56 @@ extension Collection {
     return self[start..<endIndex]
   }
 
-  /// Returns `self[startIndex..<end]`
+  /// Returns a subsequence from the start of the collection up to, but not
+  /// including, the specified position.
+  ///
+  /// The resulting subsequence *does not include* the element at the
+  /// position `end`.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50, 60]
+  ///     if let i = numbers.index(of: 40) {
+  ///         print(numbers.prefix(upTo: i))
+  ///     }
+  ///     // Prints "[10, 20, 30]"
+  ///
+  /// Passing the collection's starting index as the `end` parameter results in
+  /// an empty subsequence.
+  ///
+  ///     print(numbers.prefix(upTo: numbers.startIndex))
+  ///     // Prints "[]"
+  ///
+  /// - Parameter end: The "past-the-end" index of the resulting subsequence.
+  ///   `end` must be a valid index of the collection.
+  /// - Returns: A subsequence up to, but not including, the `end` position.
   ///
   /// - Precondition: `end >= self.startIndex && end <= self.endIndex`
   /// - Complexity: O(1)
+  /// - SeeAlso: `prefix(through:)`
   @warn_unused_result
   public func prefix(upTo end: Index) -> SubSequence {
     return self[startIndex..<end]
   }
 
-  /// Returns `self[start..<endIndex]`
+  /// Returns a subsequence from the specified position to the end of the
+  /// collection.
+  ///
+  /// For example:
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50, 60]
+  ///     if let i = numbers.index(of: 40) {
+  ///         print(numbers.suffix(from: i))
+  ///     }
+  ///     // Prints "[40, 50, 60]"
+  ///
+  /// Passing the collection's `endIndex` as the `start` parameter results in
+  /// an empty subsequence.
+  ///
+  ///     print(numbers.suffix(from: numbers.endIndex))
+  ///     // Prints "[]"
+  ///
+  /// - Parameter start: The index at which to start the resulting
+  ///   subsequence. `start` must be a valid index of the collection.
+  /// - Returns: A subsequence starting at the `start` position.
   ///
   /// - Precondition: `start >= self.startIndex && start <= self.endIndex`
   /// - Complexity: O(1)
@@ -811,32 +1266,74 @@ extension Collection {
     return self[start..<endIndex]
   }
 
-  /// Returns `prefix(upTo: location(after: position))`
+  /// Returns a subsequence from the start of the collection through the
+  /// specified position.
   ///
-  /// - Precondition: `position >= self.startIndex && position < self.endIndex`
+  /// The resulting subsequence *includes* the element at the position
+  /// `end`.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50, 60]
+  ///     if let i = numbers.index(of: 40) {
+  ///         print(numbers.prefix(through: i))
+  ///     }
+  ///     // Prints "[10, 20, 30, 40]"
+  ///
+  /// - Parameter end: The index of the last element to include in the
+  ///   resulting subsequence. `end` must be a valid index of the collection
+  ///   that is not equal to the `endIndex` property.
+  /// - Returns: A subsequence up to, and including, the `end` position.
+  ///
   /// - Complexity: O(1)
+  /// - SeeAlso: `prefix(upTo:)`
   @warn_unused_result
   public func prefix(through position: Index) -> SubSequence {
     return prefix(upTo: location(after: position))
   }
 
   // TODO: swift-3-indexing-model - review the following
-  /// Returns the maximal `SubSequence`s of `self`, in order, that
-  /// don't contain elements satisfying the predicate `isSeparator`.
+  /// Returns the longest possible subsequences of the sequence, in order, that
+  /// don't contain elements satisfying the given predicate. Elements that are
+  /// used to split the sequence are not returned as part of any subsequence.
   ///
-  /// - Parameter maxSplits: The maximum number of `SubSequence`s to
-  ///   return, minus 1.
-  ///   If `maxSplits + 1` `SubSequence`s are returned, the last one is
-  ///   a suffix of `self` containing *all* the elements of `self` following the
-  ///   last split point.
-  ///   The default value is `Int.max`.
+  /// The following examples show the effects of the `maxSplits` and
+  /// `omittingEmptySubsequences` parameters when splitting a string using a
+  /// closure that matches spaces. The first use of `split` returns each word
+  /// that was originally separated by one or more spaces.
   ///
-  /// - Parameter omittingEmptySubsequences: If `false`, an empty `SubSequence`
-  ///   is produced in the result for each pair of consecutive elements
-  ///   satisfying `isSeparator`.
-  ///   The default value is `true`.
+  ///     let line = "BLANCHE:   I don't want realism. I want magic!"
+  ///     print(line.characters.split(isSeparator: { $0 == " " })
+  ///                          .map(String.init))
+  ///     // Prints "["BLANCHE:", "I", "don't", "want", "realism.", "I", "want", "magic!"]"
   ///
-  /// - Precondition: `maxSplits >= 0`
+  /// The second example passes `1` for the `maxSplits` parameter, so the
+  /// original string is split just once, into two new strings.
+  ///
+  ///     print(line.characters.split(maxSplits: 1, isSeparator: { $0 == " " })
+  ///                           .map(String.init))
+  ///     // Prints "["BLANCHE:", "  I don\'t want realism. I want magic!"]"
+  ///
+  /// The final example passes `false` for the `omittingEmptySubsequences`
+  /// parameter, so the returned array contains empty strings where spaces
+  /// were repeated.
+  ///
+  ///     print(line.characters.split(omittingEmptySubsequences: false, isSeparator: { $0 == " " })
+  ///                           .map(String.init))
+  ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
+  ///
+  /// - Parameters:
+  ///   - maxSplits: The maximum number of times to split the sequence, or one
+  ///     less than the number of subsequences to return. If `maxSplits + 1`
+  ///     subsequences are returned, the last one is a suffix of the original
+  ///     sequence containing the remaining elements. `maxSplits` must be
+  ///     greater than or equal to zero.
+  ///   - omittingEmptySubsequences: If `false`, an empty subsequence is
+  ///     returned in the result for each pair of consecutive elements
+  ///     satisfying the `isSeparator` predicate and for each element at the
+  ///     start or end of the sequence satisfying the `isSeparator` predicate.
+  ///   - isSeparator: A closure that takes an element as an argument and
+  ///     returns a Boolean value indicating whether the sequence should be
+  ///     split at that element.
+  /// - Returns: An array of subsequences, split from this sequence's elements.
   @warn_unused_result
   public func split(
     maxSplits: Int = Int.max,
@@ -886,22 +1383,49 @@ extension Collection {
 
 // TODO: swift-3-indexing-model - review the following
 extension Collection where Iterator.Element : Equatable {
-  /// Returns the maximal `SubSequence`s of `self`, in order, around a
-  /// `separator` element.
+  /// Returns the longest possible subsequences of the sequence, in order, that
+  /// don't contain elements satisfying the given predicate. Elements that are
+  /// used to split the sequence are not returned as part of any subsequence.
   ///
-  /// - Parameter maxSplits: The maximum number of `SubSequence`s to
-  ///   return, minus 1.
-  ///   If `maxSplits + 1` `SubSequence`s are returned, the last one is
-  ///   a suffix of `self` containing *all* the elements of `self` following the
-  ///   last split point.
-  ///   The default value is `Int.max`.
+  /// The following examples show the effects of the `maxSplits` and
+  /// `omittingEmptySubsequences` parameters when splitting a string using a
+  /// closure that matches spaces. The first use of `split` returns each word
+  /// that was originally separated by one or more spaces.
   ///
-  /// - Parameter omittingEmptySubsequences: If `false`, an empty `SubSequence`
-  ///   is produced in the result for each pair of consecutive elements
-  ///   equal to `separator`.
-  ///   The default value is `true`.
+  ///     let line = "BLANCHE:   I don't want realism. I want magic!"
+  ///     print(line.characters.split(isSeparator: { $0 == " " })
+  ///                          .map(String.init))
+  ///     // Prints "["BLANCHE:", "I", "don't", "want", "realism.", "I", "want", "magic!"]"
   ///
-  /// - Precondition: `maxSplits >= 0`
+  /// The second example passes `1` for the `maxSplits` parameter, so the
+  /// original string is split just once, into two new strings.
+  ///
+  ///     print(line.characters.split(maxSplits: 1, isSeparator: { $0 == " " })
+  ///                           .map(String.init))
+  ///     // Prints "["BLANCHE:", "  I don\'t want realism. I want magic!"]"
+  ///
+  /// The final example passes `false` for the `omittingEmptySubsequences`
+  /// parameter, so the returned array contains empty strings where spaces
+  /// were repeated.
+  ///
+  ///     print(line.characters.split(omittingEmptySubsequences: false, isSeparator: { $0 == " " })
+  ///                           .map(String.init))
+  ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
+  ///
+  /// - Parameters:
+  ///   - maxSplits: The maximum number of times to split the sequence, or one
+  ///     less than the number of subsequences to return. If `maxSplits + 1`
+  ///     subsequences are returned, the last one is a suffix of the original
+  ///     sequence containing the remaining elements. `maxSplits` must be
+  ///     greater than or equal to zero.
+  ///   - omittingEmptySubsequences: If `false`, an empty subsequence is
+  ///     returned in the result for each pair of consecutive elements
+  ///     satisfying the `isSeparator` predicate and for each element at the
+  ///     start or end of the sequence satisfying the `isSeparator` predicate.
+  ///   - isSeparator: A closure that takes an element as an argument and
+  ///     returns a Boolean value indicating whether the sequence should be
+  ///     split at that element.
+  /// - Returns: An array of subsequences, split from this sequence's elements.
   @warn_unused_result
   public func split(
     separator: Iterator.Element,
@@ -917,10 +1441,14 @@ extension Collection where Iterator.Element : Equatable {
 
 // TODO: swift-3-indexing-model - review the following
 extension Collection where SubSequence == Self {
-  /// Remove the element at `startIndex` and return it.
+  /// Removes and returns the first element of the collection.
+  ///
+  /// The collection must not be empty.
+  ///
+  /// - Returns: The first element of the collection.
   ///
   /// - Complexity: O(1)
-  /// - Precondition: `!self.isEmpty`.
+  /// - SeeAlso: `popFirst()`
   @discardableResult
   public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
@@ -929,12 +1457,15 @@ extension Collection where SubSequence == Self {
     return element
   }
 
-  /// Remove the first `n` elements.
+  /// Removes the specified number of elements from the beginning of the
+  /// collection.
   ///
-  /// - Complexity:
-  ///   - O(1) if `Self` conforms to `RandomAccessCollection`
-  ///   - O(n) otherwise
-  /// - Precondition: `n >= 0 && self.count >= n`.
+  /// - Parameter n: The number of elements to remove. `n` must be greater than
+  ///   or equal to zero and less than or equal to the number of elements in
+  ///   the collection.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*).
   public mutating func removeFirst(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "number of elements to remove should be non-negative")

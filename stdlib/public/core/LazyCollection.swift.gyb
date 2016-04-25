@@ -216,9 +216,12 @@ extension ${Self} : ${TraversalCollection} {
 
 /// Augment `self` with lazy methods such as `map`, `filter`, etc.
 extension ${TraversalCollection} {
-  /// A collection with contents identical to `self`, but on which
-  /// normally-eager operations such as `map` and `filter` are
-  /// implemented lazily.
+  /// A view onto this collection that provides lazy implementations of
+  /// normally eager operations, such as `map` and `filter`.
+  ///
+  /// Use the `lazy` property when chaining operations to prevent
+  /// intermediate operations from allocating storage, or when you only
+  /// need a part of the final collection to avoid unnecessary computation.
   ///
   /// - See Also: `LazySequenceProtocol`, `LazyCollectionProtocol`.
   public var lazy: ${Self}<Self> {

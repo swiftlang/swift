@@ -555,10 +555,20 @@ extension String {
 
 extension Sequence where Iterator.Element == String {
 
-  /// Interpose the `separator` between elements of `self`, then concatenate
-  /// the result.  For example:
+  /// Returns a new string by concatenating the elements of the sequence,
+  /// adding the given separator between each element.
   ///
-  ///     ["foo", "bar", "baz"].joined(separator: "-|-") // "foo-|-bar-|-baz"
+  /// The following example shows how an array of strings can be joined to a
+  /// single, comma-separated string:
+  ///
+  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
+  ///     let list = cast.joined(separator: ", ")
+  ///     print(list)
+  ///     // Prints "Vivien, Marlon, Kim, Karl"
+  ///
+  /// - Parameter separator: A string to insert between each of the elements
+  ///   in this sequence.
+  /// - Returns: A single, concatenated string.
   @warn_unused_result
   public func joined(separator: String) -> String {
     var result = ""

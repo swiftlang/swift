@@ -250,7 +250,29 @@ public struct ReversedRandomAccessCollection<
 }
 
 extension BidirectionalCollection {
-  /// Returns the elements of `self` in reverse order.
+  /// Returns a view presenting the elements of the collection in reverse
+  /// order.
+  ///
+  /// You can reverse a collection without allocating new space for its
+  /// elements by calling this `reversed()` method. A `ReverseCollection`
+  /// instance wraps an underlying collection and provides access to its
+  /// elements in reverse order. This example prints the characters of a
+  /// string in reverse order:
+  ///
+  ///     let word = "Backwards"
+  ///     for char in word.characters.reversed() {
+  ///         print(char, terminator="")
+  ///     }
+  ///     // Prints "sdrawkcaB"
+  ///
+  /// If you need a reversed collection of the same type, you may be able to
+  /// use the collection's sequence-based or collection-based initializer. For
+  /// example, to get the reversed version of a string, reverse its
+  /// characters and initialize a new `String` instance from the result.
+  ///
+  ///     let reversedWord = String(word.characters.reversed())
+  ///     print(reversedWord)
+  ///     // Prints "sdrawkcaB"
   ///
   /// - Complexity: O(1)
   @warn_unused_result
@@ -260,7 +282,31 @@ extension BidirectionalCollection {
 }
 
 extension RandomAccessCollection {
-  /// Returns the elements of `self` in reverse order.
+  /// Returns a view presenting the elements of the collection in reverse
+  /// order.
+  ///
+  /// You can reverse a collection without allocating new space for its
+  /// elements by calling this `reversed()` method. A
+  /// `ReverseRandomAccessCollection` instance wraps an underlying collection
+  /// and provides access to its elements in reverse order. This example
+  /// prints the elements of an array in reverse order:
+  ///
+  ///     let numbers = [3, 5, 7]
+  ///     for number in numbers.reversed() {
+  ///         print(number)
+  ///     }
+  ///     // Prints "7"
+  ///     // Prints "5"
+  ///     // Prints "3"
+  ///
+  /// If you need a reversed collection of the same type, you may be able to
+  /// use the collection's sequence-based or collection-based initializer. For
+  /// example, to get the reversed version of an array, initialize a new
+  /// `Array` instance from the result of this `reversed()` method.
+  ///
+  ///     let reversedNumbers = Array(numbers.reversed())
+  ///     print(reversedNumbers)
+  ///     // Prints "[7, 5, 3]"
   ///
   /// - Complexity: O(1)
   @warn_unused_result

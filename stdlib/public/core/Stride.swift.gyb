@@ -151,7 +151,7 @@ public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
 
 /// A `Sequence` of values formed by striding over a half-open interval.
 public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
-  // FIXME: should really be a CollectionType, as it is multipass
+  // FIXME: should really be a Collection, as it is multipass
 
   /// Returns an iterator over the elements of this sequence.
   ///
