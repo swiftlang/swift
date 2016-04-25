@@ -703,7 +703,15 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     where
     S.Iterator.Element == Element
   >(contentsOf newElements: S) {
-    self += newElements
+    let oldCount = self.count
+    let capacity = self.capacity
+    let newCount = oldCount + newElements.underestimatedCount
+
+    if newCount > capacity {
+      self.reserveCapacity(
+        Swift.max(newCount, _growArrayCapacity(capacity)))
+      }
+    _arrayAppendSequence(&self._buffer, newElements)
   }
 
   // An overload of `append(contentsOf:)` that uses the += that is optimized for
@@ -718,7 +726,21 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     where
     C.Iterator.Element == Element
   >(contentsOf newElements: C) {
-    self += newElements
+    let newElementsCount = numericCast(newElements.count) as Int
+
+    let oldCount = self.count
+    let capacity = self.capacity
+    let newCount = oldCount + newElementsCount
+
+    // Ensure uniqueness, mutability, and sufficient storage.  Note that
+    // for consistency, we need unique self even if newElements is empty.
+    self.reserveCapacity(
+      newCount > capacity ?
+      Swift.max(newCount, _growArrayCapacity(capacity))
+      : newCount)
+
+    (self._buffer.firstElementAddress + oldCount).initializeFrom(newElements)
+    self._buffer.count = newCount
   }
 
   /// Remove and return the last element in O(1).
@@ -1018,15 +1040,7 @@ extension ${Self} {
 public func += <
   S : Sequence
 >(lhs: inout ${Self}<S.Iterator.Element>, rhs: S) {
-  let oldCount = lhs.count
-  let capacity = lhs.capacity
-  let newCount = oldCount + rhs.underestimatedCount
-
-  if newCount > capacity {
-    lhs.reserveCapacity(
-      max(newCount, _growArrayCapacity(capacity)))
-  }
-  _arrayAppendSequence(&lhs._buffer, rhs)
+  lhs.append(contentsOf: rhs)
 }
 
 // FIXME(ABI): remove this entrypoint.  The functionality should be provided by
@@ -1035,21 +1049,7 @@ public func += <
 public func += <
   C : Collection
 >(lhs: inout ${Self}<C.Iterator.Element>, rhs: C) {
-  let rhsCount = numericCast(rhs.count) as Int
-
-  let oldCount = lhs.count
-  let capacity = lhs.capacity
-  let newCount = oldCount + rhsCount
-
-  // Ensure uniqueness, mutability, and sufficient storage.  Note that
-  // for consistency, we need unique lhs even if rhs is empty.
-  lhs.reserveCapacity(
-    newCount > capacity ?
-    max(newCount, _growArrayCapacity(capacity))
-    : newCount)
-
-  (lhs._buffer.firstElementAddress + oldCount).initializeFrom(rhs)
-  lhs._buffer.count = newCount
+  lhs.append(contentsOf: rhs)
 }
 % end
 
