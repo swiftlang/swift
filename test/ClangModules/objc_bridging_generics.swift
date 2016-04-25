@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/../Inputs/clang-importer-sdk -I %S/../Inputs/clang-importer-sdk/swift-modules -enable-source-import -enable-import-objc-generics -parse -parse-as-library -verify %s
+// RUN: %target-swift-frontend -sdk %S/../Inputs/clang-importer-sdk -I %S/../Inputs/clang-importer-sdk/swift-modules -enable-source-import -parse -parse-as-library -verify %s
 
 // REQUIRES: objc_interop
 
