@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -enable-reflection-metadata -emit-ir %S/Inputs/reflection_metadata.swift | FileCheck %s
-// RUN: %target-swift-frontend -enable-reflection-metadata -strip-reflection-names -emit-ir %S/Inputs/reflection_metadata.swift | FileCheck %s --check-prefix=STRIP_REFLECTION_NAMES
-// RUN: %target-swift-frontend -enable-reflection-metadata -strip-reflection-metadata -emit-ir %S/Inputs/reflection_metadata.swift | FileCheck %s --check-prefix=STRIP_REFLECTION_METADATA
+// RUN: %target-swift-frontend -enable-reflection-metadata -enable-reflection-names -emit-ir %S/Inputs/reflection_metadata.swift | FileCheck %s
+// RUN: %target-swift-frontend -enable-reflection-metadata -emit-ir %S/Inputs/reflection_metadata.swift | FileCheck %s --check-prefix=STRIP_REFLECTION_NAMES
+// RUN: %target-swift-frontend -emit-ir %S/Inputs/reflection_metadata.swift | FileCheck %s --check-prefix=STRIP_REFLECTION_METADATA
 
 // STRIP_REFLECTION_NAMES-NOT: {{.*}}swift3_reflstr
 // STRIP_REFLECTION_NAMES_DAG: {{.*}}swift3_reflect

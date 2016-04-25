@@ -330,7 +330,7 @@
 // current collections model), then an additional design is possible
 // -- let's call it (2)(c) for the purpose of discussion.  This design
 // would be like (2)(b), but won't require extra storage that is used
-// only for safety checks.  Instead, every index would pay a RC
+// only for safety checks.  Instead, every index would pay an RC
 // penalty and carry a strong reference to the tree node.
 //
 // Note that (2)(c) is still technically possible to implement in the

@@ -1,5 +1,5 @@
 set(swift_reflection_test_compile_flags
-  "-Xfrontend" "-enable-reflection-metadata")
+  "-Xfrontend" "-enable-reflection-names")
 
 add_swift_library(swiftSwiftReflectionTest SHARED IS_STDLIB
   SwiftReflectionTest.swift

@@ -78,8 +78,8 @@ set(SWIFTLIB_ESSENTIAL
   Policy.swift
   Print.swift
   RandomAccessCollection.swift
-  Range.swift
-  RangeReplaceableCollection.swift
+  Range.swift.gyb
+  RangeReplaceableCollection.swift.gyb
   Reflection.swift
   Repeat.swift
   REPL.swift
@@ -102,6 +102,8 @@ set(SWIFTLIB_ESSENTIAL
   StringCore.swift
   StringInterpolation.swift.gyb
   StringLegacy.swift
+  StringRangeReplaceableCollection.swift.gyb
+  StringIndexConversions.swift
   StringUnicodeScalarView.swift
   StringUTF16.swift
   StringUTF8.swift

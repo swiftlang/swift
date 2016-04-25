@@ -77,7 +77,8 @@ KNOWN_SETTINGS=(
     llvm-enable-lto             "0"              "enable LTO compilation of LLVM/Clang."
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
-    swift-stdlib-enable-reflection-metadata "0"  "build the Swift stdlib and overlays with remote reflection metadata"
+    swift-stdlib-enable-reflection-metadata "1"  "build the Swift stdlib and overlays with remote reflection metadata"
+    swift-stdlib-enable-reflection-names "0"     "build the Swift stdlib and overlays with names of struct stored properties and enum cases"
     swift-stdlib-enable-resilience "0"           "build the Swift stdlib and overlays with resilience enabled"
     swift-stdlib-sil-serialize-all "1"           "build the Swift stdlib and overlays with all method bodies serialized"
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
@@ -203,6 +204,7 @@ KNOWN_SETTINGS=(
     use-gold-linker             ""               "Enable using the gold linker"
     darwin-toolchain-bundle-identifier ""        "CFBundleIdentifier for xctoolchain info plist"
     darwin-toolchain-display-name      ""        "Display Name for xctoolcain info plist"
+    darwin-toolchain-display-name-short ""       "Display Name with out date for xctoolchain info plist"
     darwin-toolchain-name              ""        "Directory name for xctoolchain"
     darwin-toolchain-version           ""        "Version for xctoolchain info plist and installer pkg"
     darwin-toolchain-application-cert  ""        "Application Cert name to codesign xctoolchain"
@@ -211,8 +213,8 @@ KNOWN_SETTINGS=(
     build-jobs                         ""        "The number of parallel build jobs to use"
     darwin-toolchain-alias             ""        "Swift alias for toolchain"
     android-ndk                        ""        "An absolute path to the NDK that will be used as a libc implementation for Android builds"
-    android-ndk-version                ""        "A version of the NDK to use when building for Android. Currently only 21 or above is supported"
-    android-ndk-toolchain-version      ""        "A version of the toolchain to use when building for Android. Use 4.8 for 32-bit builds, 4.9 for 64-bit builds"
+    android-api-level                  ""        "The Android API level to target when building for Android. Currently only 21 or above is supported"
+    android-ndk-gcc-version            ""        "The GCC version to use when building for Android. Currently only 4.9 is supported"
     android-icu-uc                     ""        "Path to a directory containing libicuuc.so"
     android-icu-uc-include             ""        "Path to a directory containing headers for libicuuc"
     android-icu-i18n                   ""        "Path to a directory containing libicui18n.so"
@@ -222,6 +224,21 @@ KNOWN_SETTINGS=(
 
 function toupper() {
     echo "$@" | tr '[:lower:]' '[:upper:]'
+}
+
+function true_false() {
+    case "$1" in
+        false | FALSE | 0 | "")
+            echo "FALSE"
+            ;;
+        true | TRUE | 1)
+            echo "TRUE"
+            ;;
+        *)
+            echo "true_false: unknown value: $1" >&2
+            exit 1
+            ;;
+    esac
 }
 
 function to_varname() {
@@ -511,15 +528,13 @@ function set_deployment_target_based_options() {
             )
             if [[ $(true_false "${LLVM_ENABLE_LTO}") = "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
-                    llvm_cmake_options=(
-                        "${llvm_cmake_options[@]}"
+                    llvm_cmake_options+=(
                         "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
                         "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
                     )
                 fi
 
-                lvm_cmake_options=(
-                    "${llvm_cmake_options[@]}"
+                llvm_cmake_options+=(
                     "-DCMAKE_C_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
                     "-DCMAKE_CXX_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
                     "-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
@@ -530,17 +545,17 @@ function set_deployment_target_based_options() {
 
             if [[ $(true_false "${SWIFT_ENABLE_LTO}") = "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
-                    swift_cmake_options=(
-                        "${swift_cmake_options[@]}"
+                    swift_cmake_options+=(
                         "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
                         "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
-                        "-DSWIFT_PARALLEL_LINK_JOBS=$(num_swift_parallel_lto_link_jobs)"
                     )
                 fi
+                swift_cmake_options+=(
+                    "-DSWIFT_PARALLEL_LINK_JOBS=$(num_swift_parallel_lto_link_jobs)"
+                )
             fi
 
-            swift_cmake_options=(
-                "${swift_cmake_options[@]}"
+            swift_cmake_options+=(
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_OSX="${DARWIN_DEPLOYMENT_VERSION_OSX}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS="${DARWIN_DEPLOYMENT_VERSION_IOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS="${DARWIN_DEPLOYMENT_VERSION_TVOS}"
@@ -813,21 +828,6 @@ function not() {
     if [[ ! "$1" ]] ; then
         echo 1
     fi
-}
-
-function true_false() {
-    case "$1" in
-        false | FALSE | 0 | "")
-            echo "FALSE"
-            ;;
-        true | TRUE | 1)
-            echo "TRUE"
-            ;;
-        *)
-            echo "true_false: unknown value: $1" >&2
-            exit 1
-            ;;
-    esac
 }
 
 function false_true() {
@@ -1645,8 +1645,8 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
-                        -DSWIFT_ANDROID_NDK_TOOLCHAIN_VERSION:STRING="${ANDROID_NDK_TOOLCHAIN_VERSION}"
-                        -DSWIFT_ANDROID_SDK_PATH:STRING="${ANDROID_NDK}/platforms/android-${ANDROID_NDK_VERSION}/arch-arm"
+                        -DSWIFT_ANDROID_NDK_GCC_VERSION:STRING="${ANDROID_NDK_GCC_VERSION}"
+                        -DSWIFT_ANDROID_SDK_PATH:STRING="${ANDROID_NDK}/platforms/android-${ANDROID_API_LEVEL}/arch-arm"
                         -DSWIFT_ANDROID_ICU_UC:STRING="${ANDROID_ICU_UC}"
                         -DSWIFT_ANDROID_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
                         -DSWIFT_ANDROID_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
@@ -1712,6 +1712,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
                     -DSWIFT_STDLIB_ENABLE_REFLECTION_METADATA:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_REFLECTION_METADATA}")
+                    -DSWIFT_STDLIB_ENABLE_REFLECTION_NAMES:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_REFLECTION_NAMES}")
                     -DSWIFT_STDLIB_ENABLE_RESILIENCE:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_RESILIENCE}")
                     -DSWIFT_STDLIB_SIL_SERIALIZE_ALL:BOOL=$(true_false "${SWIFT_STDLIB_SIL_SERIALIZE_ALL}")
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
@@ -2561,16 +2562,26 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
       DARWIN_TOOLCHAIN_INSTALL_LOCATION="/Library/Developer/Toolchains/${DARWIN_TOOLCHAIN_NAME}.xctoolchain"
       DARWIN_TOOLCHAIN_INFO_PLIST="${INSTALL_DESTDIR}/${TOOLCHAIN_PREFIX}/Info.plist"
       DARWIN_TOOLCHAIN_REPORT_URL="https://bugs.swift.org/"
+      COMPATIBILITY_VERSION=1
+      DARWIN_TOOLCHAIN_CREATED_DATE="$(date -u +'%a %b %d %T GMT %Y')"
 
       echo "-- Removing: ${DARWIN_TOOLCHAIN_INFO_PLIST}"
       rm -f ${DARWIN_TOOLCHAIN_INFO_PLIST}
 
       ${PLISTBUDDY_BIN} -c "Add DisplayName string '${DARWIN_TOOLCHAIN_DISPLAY_NAME}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+      ${PLISTBUDDY_BIN} -c "Add ShortDisplayName string '${DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+      ${PLISTBUDDY_BIN} -c "Add CreatedDate date '${DARWIN_TOOLCHAIN_CREATED_DATE}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+      ${PLISTBUDDY_BIN} -c "Add CompatibilityVersion integer ${COMPATIBILITY_VERSION}" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
       ${PLISTBUDDY_BIN} -c "Add Version string '${DARWIN_TOOLCHAIN_VERSION}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
       ${PLISTBUDDY_BIN} -c "Add CFBundleIdentifier string '${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
       ${PLISTBUDDY_BIN} -c "Add ReportProblemURL string '${DARWIN_TOOLCHAIN_REPORT_URL}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
       ${PLISTBUDDY_BIN} -c "Add Aliases array" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
       ${PLISTBUDDY_BIN} -c "Add Aliases:0 string '${DARWIN_TOOLCHAIN_ALIAS}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+      ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings dict" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+      ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:ENABLE_BITCODE bool NO" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+      ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_DISABLE_REQUIRED_ARCLITE bool YES" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+      ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_LINK_OBJC_RUNTIME bool YES" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+
       chmod a+r "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 
       if [[ "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" ]] ; then

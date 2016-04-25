@@ -400,7 +400,7 @@ SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
                              isThunk, SILFunction::NotRelevant);
 }
 
-SILFunction *SILModule::getOrCreateFunction(
+SILFunction *SILModule::createFunction(
     SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
     GenericParamList *contextGenericParams, Optional<SILLocation> loc,
     IsBare_t isBareSILFunction, IsTransparent_t isTrans, IsFragile_t isFragile,

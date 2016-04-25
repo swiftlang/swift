@@ -1039,6 +1039,16 @@ Type ConstraintSystem::replaceSelfTypeInArchetype(ArchetypeType *archetype) {
   return archetype;
 }
 
+/// Determine whether the given locator is for a witness or requirement.
+static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
+  if (auto last = locator.last()) {
+    return last->getKind() == ConstraintLocator::Requirement ||
+    last->getKind() == ConstraintLocator::Witness;
+  }
+
+  return false;
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(
   Type baseTy, ValueDecl *value,
@@ -1237,10 +1247,14 @@ ConstraintSystem::getTypeOfMemberReference(
     // optional/dynamic, is settable, or is not.
     auto fnType = openedFnType->getResult()->castTo<FunctionType>();
     auto elementTy = fnType->getResult();
-    if (subscript->getAttrs().hasAttribute<OptionalAttr>())
-      elementTy = OptionalType::get(elementTy->getRValueType());
-    else if (isDynamicResult)
-      elementTy = ImplicitlyUnwrappedOptionalType::get(elementTy->getRValueType());
+    if (!isRequirementOrWitness(locator)) {
+      if (subscript->getAttrs().hasAttribute<OptionalAttr>())
+        elementTy = OptionalType::get(elementTy->getRValueType());
+      else if (isDynamicResult) {
+        elementTy = ImplicitlyUnwrappedOptionalType::get(
+                      elementTy->getRValueType());
+      }
+    }
 
     type = FunctionType::get(fnType->getInput(), elementTy);
   } else if (isa<ProtocolDecl>(value->getDeclContext()) &&
@@ -1372,8 +1386,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         = getTypeOfReference(choice.getDecl(), isTypeReference,
                              choice.isSpecialized(), locator);
     }
-    
-    if (choice.getDecl()->getAttrs().hasAttribute<OptionalAttr>() &&
+
+    if (!isRequirementOrWitness(locator) &&
+        choice.getDecl()->getAttrs().hasAttribute<OptionalAttr>() &&
         !isa<SubscriptDecl>(choice.getDecl())) {
       // For a non-subscript declaration that is an optional
       // requirement in a protocol, strip off the lvalue-ness (FIXME:

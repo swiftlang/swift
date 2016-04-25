@@ -565,7 +565,7 @@ PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
-  auto *Fn = M.getOrCreateFunction(
+  auto *Fn = M.createFunction(
       SILLinkage::Shared, ClonedName, ClonedTy, Orig->getContextGenericParams(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Fragile,
       Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),

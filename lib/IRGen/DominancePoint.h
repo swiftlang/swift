@@ -23,8 +23,8 @@
 #ifndef SWIFT_IRGEN_DOMINANCEPOINT_H
 #define SWIFT_IRGEN_DOMINANCEPOINT_H
 
-#include <assert.h>
-#include <stdint.h>
+#include <cassert>
+#include <cstdint>
 
 namespace swift {
 namespace irgen {

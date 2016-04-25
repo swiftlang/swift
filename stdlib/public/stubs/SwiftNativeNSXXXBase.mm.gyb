@@ -162,6 +162,17 @@ extern "C" bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" bool swift_stdlib_NSStringHasPrefixNFDPointer(void *theString,
+                                                         void *prefix) {
+  auto Length = CFStringGetLength((__bridge CFStringRef)theString);
+  int Result = CFStringFindWithOptions(
+      (__bridge CFStringRef)theString, (__bridge CFStringRef)prefix,
+      CFRangeMake(0, Length), kCFCompareAnchored | kCFCompareNonliteral,
+      nullptr);
+  return Result;
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" bool
 swift_stdlib_NSStringHasSuffixNFD(NSString *NS_RELEASES_ARGUMENT theString,
                                   NSString *NS_RELEASES_ARGUMENT suffix) {
@@ -172,6 +183,17 @@ swift_stdlib_NSStringHasSuffixNFD(NSString *NS_RELEASES_ARGUMENT theString,
       kCFCompareAnchored | kCFCompareBackwards | kCFCompareNonliteral, nullptr);
   swift_unknownRelease(theString);
   swift_unknownRelease(suffix);
+  return Result;
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" bool swift_stdlib_NSStringHasSuffixNFDPointer(void *theString,
+                                                         void *suffix) {
+  auto Length = CFStringGetLength((__bridge CFStringRef)theString);
+  int Result = CFStringFindWithOptions(
+      (__bridge CFStringRef)theString, (__bridge CFStringRef)suffix,
+      CFRangeMake(0, Length),
+      kCFCompareAnchored | kCFCompareBackwards | kCFCompareNonliteral, nullptr);
   return Result;
 }
 

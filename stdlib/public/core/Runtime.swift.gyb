@@ -28,12 +28,11 @@ func _stdlib_atomicCompareExchangeStrongPtrImpl(
   expected: UnsafeMutablePointer<OpaquePointer?>,
   desired: OpaquePointer?) -> Bool {
 
-  // Bit-cast directly from 'OpaquePointer?' to 'Builtin.Word' because
-  // Builtin.RawPointer can't be nil.
+  // We use Builtin.Word here because Builtin.RawPointer can't be nil.
   let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
     target._rawValue,
-    unsafeBitCast(expected.pointee, to: Builtin.Word.self),
-    unsafeBitCast(desired, to: Builtin.Word.self))
+    UInt(bitPattern: expected.pointee)._builtinWordValue,
+    UInt(bitPattern: desired)._builtinWordValue)
   expected.pointee = OpaquePointer(bitPattern: Int(oldValue))
   return Bool(won)
 }

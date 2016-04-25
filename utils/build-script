@@ -47,10 +47,11 @@ import swift_build_support.ninja      # noqa (E402)
 import swift_build_support.tar        # noqa (E402)
 import swift_build_support.targets    # noqa (E402)
 
+
 # A strict parser for bools (unlike Python's `bool()`, where
 # `bool('False')` is `True`).
 #
-# This function can be pased as `type=` argument to argparse to parse values
+# This function can be passed as `type=` argument to argparse to parse values
 # passed to command line arguments.
 def argparse_bool(string):
     if string in ['0', 'false', 'False']:
@@ -537,16 +538,47 @@ details of the setups of other systems or automated environments.""")
 
     run_tests_group = parser.add_argument_group(
         title="Run tests")
+
+    # NOTE: We can't merge -t and --test, because nargs='?' makes
+    #       `-ti` to be treated as `-t=i`.
     run_tests_group.add_argument(
-        "-t", "--test",
+        "-t",
         help="test Swift after building",
+        action="store_const",
+        const=True,
+        dest="test")
+    run_tests_group.add_argument(
+        "--test",
+        help="test Swift after building",
+        metavar="BOOL",
         nargs='?',
         type=argparse_bool,
         default=False,
         const=True)
     run_tests_group.add_argument(
-        "-T", "--validation-test",
+        "-T",
         help="run the validation test suite (implies --test)",
+        action="store_const",
+        const=True,
+        dest="validation_test")
+    run_tests_group.add_argument(
+        "--validation-test",
+        help="run the validation test suite (implies --test)",
+        metavar="BOOL",
+        nargs='?',
+        type=argparse_bool,
+        default=False,
+        const=True)
+    run_tests_group.add_argument(
+        "-o",
+        help="run the test suite in optimized mode too (implies --test)",
+        action="store_const",
+        const=True,
+        dest="test_optimized")
+    run_tests_group.add_argument(
+        "--test-optimized",
+        help="run the test suite in optimized mode too (implies --test)",
+        metavar="BOOL",
         nargs='?',
         type=argparse_bool,
         default=False,
@@ -554,6 +586,7 @@ details of the setups of other systems or automated environments.""")
     run_tests_group.add_argument(
         "--long-test",
         help="run the long test suite",
+        metavar="BOOL",
         nargs='?',
         type=argparse_bool,
         default=False,
@@ -583,14 +616,6 @@ details of the setups of other systems or automated environments.""")
         help="Use the host compiler, not the self-built one to compile the "
              "Swift runtime",
         action="store_true")
-
-    parser.add_argument(
-        "-o", "--test-optimized",
-        help="run the test suite in optimized mode too (implies --test)",
-        nargs='?',
-        type=argparse_bool,
-        default=False,
-        const=True)
 
     run_build_group = parser.add_argument_group(
         title="Run build")
@@ -744,16 +769,18 @@ details of the setups of other systems or automated environments.""")
              "implementation for Android builds",
         metavar="PATH")
     android_group.add_argument(
-        "--android-ndk-version",
-        help="A version of the NDK to use when building for Android. "
+        "--android-api-level",
+        help="The Android API level to target when building for Android. "
              "Currently only 21 or above is supported",
         default="21")
     android_group.add_argument(
-        "--android-ndk-toolchain-version",
-        help="A version of the toolchain to use when building for Android. "
-             "Use 4.8 for 32-bit builds, 4.9 for 64-bit builds",
+        "--android-ndk-gcc-version",
+        help="The GCC version to use when building for Android. Currently "
+             "only 4.9 is supported. %(default)s is also the default value. "
+             "This option may be used when experimenting with versions "
+             "of the Android NDK not officially supported by Swift",
         choices=["4.8", "4.9"],
-        default="4.8")
+        default="4.9")
     android_group.add_argument(
         "--android-icu-uc",
         help="Path to a directory containing libicuuc.so",
@@ -822,7 +849,7 @@ details of the setups of other systems or automated environments.""")
 
     if args.android:
         if args.android_ndk is None or \
-                args.android_ndk_version is None or \
+                args.android_api_level is None or \
                 args.android_icu_uc is None or \
                 args.android_icu_uc_include is None or \
                 args.android_icu_i18n is None or \
@@ -1210,9 +1237,9 @@ details of the setups of other systems or automated environments.""")
     if args.android:
         build_script_impl_args += [
             "--android-ndk", args.android_ndk,
-            "--android-ndk-version", args.android_ndk_version,
-            "--android-ndk-toolchain-version",
-            args.android_ndk_toolchain_version,
+            "--android-api-level", args.android_api_level,
+            "--android-ndk-gcc-version",
+            args.android_ndk_gcc_version,
             "--android-icu-uc", args.android_icu_uc,
             "--android-icu-uc-include", args.android_icu_uc_include,
             "--android-icu-i18n", args.android_icu_i18n,

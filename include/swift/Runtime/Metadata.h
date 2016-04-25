@@ -1097,9 +1097,7 @@ private:
 public:
   /// Get the metadata kind.
   MetadataKind getKind() const {
-    if (metadataKindIsClass(Kind))
-      return MetadataKind::Class;
-    return MetadataKind(Kind);
+    return getEnumeratedMetadataKind(Kind);
   }
   
   /// Set the metadata kind.

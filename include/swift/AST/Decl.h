@@ -2132,6 +2132,15 @@ public:
   /// names.
   DeclName getBaseName() const { return Name.getBaseName(); }
 
+  /// Retrieve the name to use for this declaration when interoperating
+  /// with the Objective-C runtime.
+  ///
+  /// \returns A "selector" containing the runtime name. For non-method
+  /// entities (classes, protocols, properties), this operation will
+  /// return a zero-parameter selector with the appropriate name in its
+  /// first slot.
+  Optional<ObjCSelector> getObjCRuntimeName() const;
+
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 

@@ -298,19 +298,6 @@ extension RangeReplaceableCollection {
     return result
   }
 
-  /// Returns a half-open range denoting the same positions as `r`.
-  internal func _makeHalfOpen<
-    R : RangeProtocol where R.Bound == Index
-  >(_ r: R) -> Range<Index> {
-
-    // The upperBound of the result depends on whether `r` is a closed
-    // range.
-    let u = r.contains(r.upperBound) 
-	    ? location(after: r.upperBound) : r.upperBound
-    
-    return Range(uncheckedBounds: (lower: r.lowerBound, upper: u))
-  }
-  
   /// Removes all elements within `bounds`.
   ///
   /// Invalidates all indices with respect to `self`.
@@ -318,17 +305,6 @@ extension RangeReplaceableCollection {
   /// - Complexity: O(`self.count`).
   public mutating func removeSubrange(_ bounds: Range<Index>) {
     replaceSubrange(bounds, with: EmptyCollection())
-  }
-
-  /// Removes all elements within `bounds`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`self.count`).
-  public mutating func removeSubrange<
-    R : RangeProtocol where R.Bound == Index
-  >(_ bounds: R) {
-    removeSubrange(_makeHalfOpen(bounds))
   }
 
   public mutating func removeFirst(_ n: Int) {
@@ -387,9 +363,26 @@ extension RangeReplaceableCollection where SubSequence == Self {
   }
 }
 
+% for Range in ['CountableRange', 'ClosedRange', 'CountableClosedRange']:
 extension RangeReplaceableCollection
+%   if 'Countable' in Range:
   where
-Index : Strideable, Index.Stride : Integer {
+  Index : Strideable, Index.Stride : SignedInteger
+%   end
+{
+  /// Returns a half-open range denoting the same positions as `r`.
+  internal func _makeHalfOpen(_ r: ${Range}<Index>) -> Range<Index> {
+    // The upperBound of the result depends on whether `r` is a closed
+    // range.
+%   if 'Closed' in Range:
+    return Range(uncheckedBounds: (
+      lower: r.lowerBound,
+      upper: location(after: r.upperBound)))
+%   else:
+    return Range(r)
+%   end
+  }
+
   /// Replace the given `subrange` of elements with `newElements`.
   ///
   /// Invalidates all indices with respect to `self`.
@@ -400,30 +393,25 @@ Index : Strideable, Index.Stride : Integer {
   public mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(
-    _ subrange: CountableRange<Index>, with newElements: C
+    _ subrange: ${Range}<Index>, with newElements: C
   ) {
-    self.replaceSubrange(Range(subrange), with: newElements)
+    // FIXME: swift-3-indexing-model: tests.
+    self.replaceSubrange(_makeHalfOpen(subrange), with: newElements)
   }
-}
 
-extension RangeReplaceableCollection {
-  /// Replace the given `subrange` of elements with `newElements`.
+  /// Removes all elements within `bounds`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`subRange.count`) if
-  ///   `subRange.upperBound == self.endIndex` and `newElements.isEmpty`,
-  ///   O(`self.count` + `newElements.count`) otherwise.
-  public mutating func replaceSubrange<
-    R : ClosedRangeProtocol, C : Collection
-    where
-    R.Bound == Self.Index, C.Iterator.Element == Iterator.Element
-  >(
-    _ subrange: R, with newElements: C
-  ) {
-    self.replaceSubrange(_makeHalfOpen(subrange), with: newElements)
+  /// - Complexity: O(`self.count`).
+  public mutating func removeSubrange(_ bounds: ${Range}<Index>) {
+    // FIXME: swift-3-indexing-model: tests.
+    removeSubrange(_makeHalfOpen(bounds))
   }
-  
+}
+% end
+
+extension RangeReplaceableCollection {
   @warn_unused_result
   public mutating func _customRemoveLast() -> Iterator.Element? {
     return nil

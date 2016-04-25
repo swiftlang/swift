@@ -91,31 +91,18 @@ class C2 : A2 {}
 class D2: B2 {}
 class E2 :C2 {}
 
-
-public func testfoo1() -> Int {
-  return foo(E2())
-}
-
 class A3 { @inline(never) func f() -> Int { return 0 } }
 class B3 : A3 { @inline(never) override func f() -> Int { return 1 }}
 class C3 : A3 {}
 class D3: C3 {}
 class E3 :C3 {}
 
-// A, C,D,E all use the same implementation. 
-// B has its own implementation.
-@inline(never)
-func foo(_ a: A3) -> Int {
-// Check that call to A3.f() can be devirtualized.
-//
-// CHECK-NORMAL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case3fooFCS_2A3Si
 // CHECK-TESTABLE: sil{{( hidden)?}} [thunk] [always_inline] @_TF19devirt_default_case3fooFCS_2A3Si
-// CHECK-NORMAL: function_ref @{{.*}}TFC19devirt_default_case2B31f
-// CHECK-NORMAL: function_ref @{{.*}}TFC19devirt_default_case2A31f
-// CHECK-NORMAL-NOT: class_method
-// CHECK: }
-  return a.f()
+
+public func testfoo1() -> Int {
+  return foo(E2())
 }
+
 
 public func testfoo3() -> Int {
   return foo(E3())
@@ -136,6 +123,21 @@ class Base4 {
   }
   
   @inline(never) func foo() { }
+}
+
+
+// A, C,D,E all use the same implementation. 
+// B has its own implementation.
+@inline(never)
+func foo(_ a: A3) -> Int {
+// Check that call to A3.f() can be devirtualized.
+//
+// CHECK-NORMAL: sil{{( hidden)?}} [noinline] @_TTSf4g___TF19devirt_default_case3fooFCS_2A3Si
+// CHECK-NORMAL: function_ref @{{.*}}TFC19devirt_default_case2B31f
+// CHECK-NORMAL: function_ref @{{.*}}TFC19devirt_default_case2A31f
+// CHECK-NORMAL-NOT: class_method
+// CHECK: }
+  return a.f()
 }
 
 class Derived4 : Base4 {

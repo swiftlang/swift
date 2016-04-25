@@ -245,7 +245,7 @@ extension _ArrayBuffer {
       if boundsCount == 0 {
         return _SliceBuffer(
           _ContiguousArrayBuffer<Element>(),
-          shiftedToStartIndex: bounds.startIndex)
+          shiftedToStartIndex: bounds.lowerBound)
       }
 
       // Look for contiguous storage in the NSArray

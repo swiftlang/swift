@@ -44,15 +44,15 @@ func typeInference_Strideable<S : Strideable>(v: S) {
   do {
     let r1: Range<S>       = v...v // expected-error {{no '...' candidates produce the expected contextual result type 'Range<S>'}} expected-note {{}}
     let r2: ClosedRange<S> = v..<v // expected-error {{no '..<' candidates produce the expected contextual result type 'ClosedRange<S>'}} expected-note {{}}
-    let r3: CountableRange<S>       = v..<v // expected-error {{type 'S.Stride' does not conform to protocol 'Integer'}}
-    let r4: CountableClosedRange<S> = v...v // expected-error {{type 'S.Stride' does not conform to protocol 'Integer'}}
-    let r5: CountableRange<S>       = v...v // expected-error {{type 'S.Stride' does not conform to protocol 'Integer'}}
-    let r6: CountableClosedRange<S> = v..<v // expected-error {{type 'S.Stride' does not conform to protocol 'Integer'}}
+    let r3: CountableRange<S>       = v..<v // expected-error {{type 'S.Stride' does not conform to protocol 'SignedInteger'}}
+    let r4: CountableClosedRange<S> = v...v // expected-error {{type 'S.Stride' does not conform to protocol 'SignedInteger'}}
+    let r5: CountableRange<S>       = v...v // expected-error {{type 'S.Stride' does not conform to protocol 'SignedInteger'}}
+    let r6: CountableClosedRange<S> = v..<v // expected-error {{type 'S.Stride' does not conform to protocol 'SignedInteger'}}
   }
 }
 
-func typeInference_StrideableWithIntegerStride<
-  S : Strideable where S.Stride : Integer
+func typeInference_StrideableWithSignedIntegerStride<
+  S : Strideable where S.Stride : SignedInteger
 >(v: S) {
   do {
     var range = v..<v
@@ -196,7 +196,7 @@ func disallowSubscriptingOnIntegers() {
     r2[0]       // expected-error {{cannot convert value of type 'Int' to expected argument type 'Range<ClosedRangeIndex<_>>'}}
     r3[0]       // expected-error {{cannot convert value of type 'Int' to expected argument type 'Range<ClosedRangeIndex<_>>'}}
 
-    r0[UInt(0)] // expected-error {{ambiguous reference to member 'subscript'}}
+    r0[UInt(0)] // expected-error {{cannot subscript a value of type 'CountableRange<Int>' with an index of type 'UInt'}} expected-note {{overloads for 'subscript' exist}}
     r1[UInt(0)] // expected-error {{ambiguous use of 'subscript'}}
     r2[UInt(0)] // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Range<ClosedRangeIndex<_>>'}}
     r3[UInt(0)] // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Range<ClosedRangeIndex<_>>'}}
@@ -216,11 +216,11 @@ func disallowSubscriptingOnIntegers() {
     (UInt(10)...100)[0...4] // expected-error {{cannot convert call result type 'CountableClosedRange<_>' to expected type 'Range<ClosedRangeIndex<_>>'}}
 
     r0[r0]      // expected-error {{ambiguous use of 'subscript'}}
-    r0[r1]      // expected-error {{ambiguous subscript}}
+    r0[r1]      // expected-error {{ambiguous reference to member 'subscript'}}
     r0[r2]      // expected-error {{ambiguous use of 'subscript'}}
     r0[r3]      // expected-error {{ambiguous reference to member 'subscript'}}
 
-    r1[r0]      // expected-error {{ambiguous subscript}}
+    r1[r0]      // expected-error {{ambiguous reference to member 'subscript'}}
     r1[r1]      // expected-error {{ambiguous use of 'subscript'}}
     r1[r2]      // expected-error {{ambiguous reference to member 'subscript'}}
     r1[r3]      // expected-error {{ambiguous use of 'subscript'}}
@@ -241,48 +241,48 @@ func disallowSubscriptingOnIntegers() {
     let r1: Range = UInt(10)..<100
     let r2: ClosedRange = 10...100
     let r3: ClosedRange = UInt(10)...100
-    r0[0]       // expected-error {{ambiguous use of 'subscript'}}
-    r1[0]       // expected-error {{ambiguous use of 'subscript'}}
-    r2[0]       // expected-error {{cannot convert value of type 'Int' to expected argument type 'ClosedRangeIndex<_>'}}
-    r3[0]       // expected-error {{cannot convert value of type 'Int' to expected argument type 'ClosedRangeIndex<_>'}}
+    r0[0]       // expected-error {{type 'Range<Int>' has no subscript members}}
+    r1[0]       // expected-error {{type 'Range<UInt>' has no subscript members}}
+    r2[0]       // expected-error {{type 'ClosedRange<Int>' has no subscript members}}
+    r3[0]       // expected-error {{type 'ClosedRange<UInt>' has no subscript members}}
 
-    r0[UInt(0)] // expected-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'UInt'}} expected-note {{overloads for 'subscript' exist}}
-    r1[UInt(0)] // expected-error {{ambiguous use of 'subscript'}}
-    r2[UInt(0)] // expected-error {{cannot convert value}}
-    r3[UInt(0)] // expected-error {{cannot convert value}}
+    r0[UInt(0)] // expected-error {{type 'Range<Int>' has no subscript members}}
+    r1[UInt(0)] // expected-error {{type 'Range<UInt>' has no subscript members}}
+    r2[UInt(0)] // expected-error {{type 'ClosedRange<Int>' has no subscript members}}
+    r3[UInt(0)] // expected-error {{type 'ClosedRange<UInt>' has no subscript members}}
 
-    r0[0..<4]   // expected-error {{ambiguous use of 'subscript'}}
-    r1[0..<4]   // expected-error {{ambiguous use of 'subscript'}}
-    r2[0..<4]   // expected-error {{no '..<' candidates produce the expected contextual result type 'ClosedRangeIndex<_>'}} expected-note {{overloads for '..<' exist}}
-    r3[0..<4]   // expected-error {{no '..<' candidates produce the expected contextual result type 'ClosedRangeIndex<_>'}} expected-note {{overloads for '..<' exist}}
+    r0[0..<4]   // expected-error {{type 'Range<Int>' has no subscript members}}
+    r1[0..<4]   // expected-error {{type 'Range<UInt>' has no subscript members}}
+    r2[0..<4]   // expected-error {{type 'ClosedRange<Int>' has no subscript members}}
+    r3[0..<4]   // expected-error {{type 'ClosedRange<UInt>' has no subscript members}}
     (10..<100)[0]           // expected-error {{ambiguous use of 'subscript'}}
     (UInt(10)...100)[0..<4] // expected-error {{cannot convert call result type}}
 
-    r0[0...4]   // expected-error {{ambiguous use of 'subscript'}}
-    r1[0...4]   // expected-error {{ambiguous use of 'subscript'}}
-    r2[0...4]   // expected-error {{no '...' candidates produce the expected contextual result type 'ClosedRangeIndex<_>'}} expected-note {{overloads for '...' exist}}
-    r3[0...4]   // expected-error {{no '...' candidates produce the expected contextual result type 'ClosedRangeIndex<_>'}} expected-note {{overloads for '...' exist}}
+    r0[0...4]   // expected-error {{type 'Range<Int>' has no subscript members}}
+    r1[0...4]   // expected-error {{type 'Range<UInt>' has no subscript members}}
+    r2[0...4]   // expected-error {{type 'ClosedRange<Int>' has no subscript members}}
+    r3[0...4]   // expected-error {{type 'ClosedRange<UInt>' has no subscript members}}
     (10...100)[0...4] // expected-error {{cannot convert call result type 'CountableClosedRange<_>' to expected type 'Range<ClosedRangeIndex<_>>'}}
     (UInt(10)...100)[0...4] // expected-error {{cannot convert call result type}}
 
-    r0[r0]      // expected-error {{ambiguous use of 'subscript'}}
-    r0[r1]      // expected-error {{ambiguous reference to member 'subscript'}}
-    r0[r2]      // expected-error {{ambiguous use of 'subscript'}}
-    r0[r3]      // expected-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'ClosedRange<UInt>'}} expected-note {{overloads for 'subscript' exist}}
+    r0[r0]      // expected-error {{type 'Range<Int>' has no subscript members}}
+    r0[r1]      // expected-error {{type 'Range<Int>' has no subscript members}}
+    r0[r2]      // expected-error {{type 'Range<Int>' has no subscript members}}
+    r0[r3]      // expected-error {{type 'Range<Int>' has no subscript members}}
 
-    r1[r0]      // expected-error {{ambiguous reference to member 'subscript'}}
-    r1[r1]      // expected-error {{ambiguous use of 'subscript'}}
-    r1[r2]      // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'ClosedRange<Int>'}} expected-note {{overloads for 'subscript' exist}}
-    r1[r3]      // expected-error {{ambiguous use of 'subscript'}}
+    r1[r0]      // expected-error {{type 'Range<UInt>' has no subscript members}}
+    r1[r1]      // expected-error {{type 'Range<UInt>' has no subscript members}}
+    r1[r2]      // expected-error {{type 'Range<UInt>' has no subscript members}}
+    r1[r3]      // expected-error {{type 'Range<UInt>' has no subscript members}}
 
-    r2[r0]      // expected-error {{cannot convert value}}
-    r2[r1]      // expected-error {{cannot convert value}}
-    r2[r2]      // expected-error {{cannot convert value}}
-    r2[r3]      // expected-error {{cannot convert value}}
+    r2[r0]      // expected-error {{type 'ClosedRange<Int>' has no subscript members}}
+    r2[r1]      // expected-error {{type 'ClosedRange<Int>' has no subscript members}}
+    r2[r2]      // expected-error {{type 'ClosedRange<Int>' has no subscript members}}
+    r2[r3]      // expected-error {{type 'ClosedRange<Int>' has no subscript members}}
 
-    r3[r0]      // expected-error {{cannot convert value}}
-    r3[r1]      // expected-error {{cannot convert value}}
-    r3[r2]      // expected-error {{cannot convert value}}
-    r3[r3]      // expected-error {{cannot convert value}}
+    r3[r0]      // expected-error {{type 'ClosedRange<UInt>' has no subscript members}}
+    r3[r1]      // expected-error {{type 'ClosedRange<UInt>' has no subscript members}}
+    r3[r2]      // expected-error {{type 'ClosedRange<UInt>' has no subscript members}}
+    r3[r3]      // expected-error {{type 'ClosedRange<UInt>' has no subscript members}}
   }
 }

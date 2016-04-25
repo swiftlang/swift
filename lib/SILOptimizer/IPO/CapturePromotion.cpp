@@ -430,7 +430,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
-  auto *Fn = M.getOrCreateFunction(
+  auto *Fn = M.createFunction(
       Orig->getLinkage(), ClonedName, SubstTy, Orig->getContextGenericParams(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Fragile,
       Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
