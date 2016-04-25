@@ -11,6 +11,11 @@ module ImportedProtocols {
   }
 }
 
+module Newtype {
+  export *
+  header "Newtype.h"
+}
+
 module ImportAsMember {
   export *
 

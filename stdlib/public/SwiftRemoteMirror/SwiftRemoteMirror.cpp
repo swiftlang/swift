@@ -1,4 +1,17 @@
+//===--- SwiftRemoteMirror.cpp - C wrapper for Reflection API -------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 #include "swift/Reflection/ReflectionContext.h"
+#include "swift/Reflection/TypeLowering.h"
 #include "swift/Remote/CMemoryReader.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
 
@@ -10,12 +23,14 @@ using NativeReflectionContext
   = ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
 
 SwiftReflectionContextRef
-swift_reflection_createReflectionContext(PointerSizeFunction getPointerSize,
+swift_reflection_createReflectionContext(void *reader_context,
+                                         PointerSizeFunction getPointerSize,
                                          SizeSizeFunction getSizeSize,
                                          ReadBytesFunction readBytes,
                                          GetStringLengthFunction getStringLength,
                                          GetSymbolAddressFunction getSymbolAddress) {
   MemoryReaderImpl ReaderImpl {
+    reader_context,
     getPointerSize,
     getSizeSize,
     readBytes,
@@ -69,9 +84,19 @@ swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
 
   if (auto BG = dyn_cast<BoundGenericTypeRef>(TR)) {
     auto &Params = BG->getGenericParams();
-    if (Index < Params.size()) {
-      return reinterpret_cast<swift_typeref_t>(Params[Index]);
-    }
+    assert(Index < Params.size());
+    return reinterpret_cast<swift_typeref_t>(Params[Index]);
+  }
+  return 0;
+}
+
+unsigned
+swift_reflection_genericArgumentCountOfTypeRef(swift_typeref_t OpaqueTypeRef) {
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+
+  if (auto BG = dyn_cast<BoundGenericTypeRef>(TR)) {
+    auto &Params = BG->getGenericParams();
+    return Params.size();
   }
   return 0;
 }
@@ -81,7 +106,67 @@ swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
-  return Context->getInfoForTypeRef(TR);
+  auto TI = Context->getTypeInfo(TR);
+
+  if (TI == nullptr) {
+    return {
+      SWIFT_UNKNOWN,
+      0,
+      0,
+      0,
+      0
+    };
+  }
+
+  swift_layout_kind_t Kind;
+  unsigned NumFields = 0;
+
+  switch (TI->getKind()) {
+  case TypeInfoKind::Builtin:
+    Kind = SWIFT_BUILTIN;
+    break;
+  case TypeInfoKind::Record: {
+    auto *RecordTI = cast<RecordTypeInfo>(TI);
+    switch (RecordTI->getRecordKind()) {
+    case RecordKind::Tuple:
+      Kind = SWIFT_TUPLE;
+      break;
+    case RecordKind::Struct:
+      Kind = SWIFT_STRUCT;
+      break;
+    case RecordKind::ThickFunction:
+      Kind = SWIFT_THICK_FUNCTION;
+      break;
+    }
+    NumFields = RecordTI->getNumFields();
+    break;
+  }
+  case TypeInfoKind::Reference: {
+    auto *ReferenceTI = cast<ReferenceTypeInfo>(TI);
+    switch (ReferenceTI->getReferenceKind()) {
+    case ReferenceKind::Strong:
+      Kind = SWIFT_STRONG_REFERENCE;
+      break;
+    case ReferenceKind::Unowned:
+      Kind = SWIFT_UNOWNED_REFERENCE;
+      break;
+    case ReferenceKind::Weak:
+      Kind = SWIFT_WEAK_REFERENCE;
+      break;
+    case ReferenceKind::Unmanaged:
+      Kind = SWIFT_UNMANAGED_REFERENCE;
+      break;
+    }
+  }
+  }
+
+  return {
+    Kind,
+    TI->getSize(),
+    TI->getAlignment(),
+    TI->getStride(),
+    NumFields
+  };
 }
 
 swift_childinfo_t
@@ -90,6 +175,13 @@ swift_reflection_infoForChild(SwiftReflectionContextRef ContextRef,
                               unsigned Index) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
-  return Context->getInfoForChild(TR, Index);
-}
 
+  auto *RecordTI = cast<RecordTypeInfo>(Context->getTypeInfo(TR));
+  auto FieldInfo = RecordTI->getFields()[Index];
+
+  return {
+    FieldInfo.Name.c_str(),
+    FieldInfo.Offset,
+    reinterpret_cast<swift_typeref_t>(FieldInfo.TR),
+  };
+}

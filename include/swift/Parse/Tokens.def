@@ -38,6 +38,29 @@
 #define POUND_KEYWORD(kw)
 #endif
 
+/// POUND_NORMAL_KEYWORD(kw)
+///   Keywords except object and config keywords in the #foo namespace.
+#ifndef POUND_NORMAL_KEYWORD
+#define POUND_NORMAL_KEYWORD(kw) POUND_KEYWORD(kw)
+#endif
+
+/// POUND_OBJECT_LITERAL(kw, desc, proto)
+///   Every keyword in the #foo namespace representing an object literal.
+#ifndef POUND_OBJECT_LITERAL
+#define POUND_OBJECT_LITERAL(kw, desc, proto) POUND_KEYWORD(kw)
+#endif
+
+/// POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)
+///   Every keyword in the #foo namespace representing an object literal.
+#ifndef POUND_OLD_OBJECT_LITERAL
+#define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg) POUND_KEYWORD(kw)
+#endif
+
+/// POUND_CONFIG(kw)
+///   Every keyword in the #foo namespace representing a configuration.
+#ifndef POUND_CONFIG
+#define POUND_CONFIG(kw) POUND_KEYWORD(kw)
+#endif
 
 /// SIL_KEYWORD(kw)
 ///   Expands for every SIL keyword. These are only keywords when parsing SIL.
@@ -140,9 +163,6 @@ PUNCTUATOR(r_brace,       "}")
 PUNCTUATOR(l_square,      "[")
 PUNCTUATOR(r_square,      "]")
 
-PUNCTUATOR(l_square_lit,  "[#")
-PUNCTUATOR(r_square_lit,  "#]")
-
 PUNCTUATOR(period,        ".")
 PUNCTUATOR(period_prefix, ".")
 PUNCTUATOR(comma,         ",")
@@ -165,6 +185,11 @@ PUNCTUATOR(question_infix,"?")    // if not left-bound
 PUNCTUATOR(sil_dollar,    "$")    // Only in SIL mode.
 PUNCTUATOR(sil_exclamation, "!")    // Only in SIL mode.
 
+// Legacy punctuators used for migrating old object literal syntax.
+// NOTE: Remove in the future.
+PUNCTUATOR(l_square_lit,  "[#")
+PUNCTUATOR(r_square_lit,  "#]")
+
 // Keywords in the # namespace.  "if" becomes "tok::pound_if".
 POUND_KEYWORD(if)
 POUND_KEYWORD(else)
@@ -173,8 +198,21 @@ POUND_KEYWORD(endif)
 POUND_KEYWORD(line)
 POUND_KEYWORD(setline)
 POUND_KEYWORD(sourceLocation)
-POUND_KEYWORD(available)
 POUND_KEYWORD(selector)
+
+// Keywords in the # namespace that are build configurations.
+POUND_CONFIG(available)
+
+
+// Declaratively define object literals, including their
+// corresponding protocols.
+POUND_OBJECT_LITERAL(fileLiteral, "file reference", FileReferenceLiteralConvertible)
+POUND_OBJECT_LITERAL(imageLiteral, "image", ImageLiteralConvertible)
+POUND_OBJECT_LITERAL(colorLiteral, "color", ColorLiteralConvertible)
+
+POUND_OLD_OBJECT_LITERAL(FileReference, fileLiteral, fileReferenceLiteral, resourceName)
+POUND_OLD_OBJECT_LITERAL(Image, imageLiteral, imageLiteral, resourceName)
+POUND_OLD_OBJECT_LITERAL(Color, colorLiteral, colorLiteralRed, red)
 
 POUND_KEYWORD(file)
 POUND_KEYWORD(column)
@@ -188,3 +226,7 @@ POUND_KEYWORD(dsohandle)
 #undef SIL_KEYWORD
 #undef PUNCTUATOR
 #undef POUND_KEYWORD
+#undef POUND_NORMAL_KEYWORD
+#undef POUND_OBJECT_LITERAL
+#undef POUND_OLD_OBJECT_LITERAL
+#undef POUND_CONFIG

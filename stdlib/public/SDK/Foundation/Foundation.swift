@@ -1338,7 +1338,7 @@ extension NSURL : _FileReferenceLiteralConvertible {
     self.init(fileURLWithPath: fullPath)
   }
 
-  public required convenience init(fileReferenceLiteral path: String) {
+  public required convenience init(resourceName path: String) {
     self.init(failableFileReferenceLiteral: path)
   }
 }

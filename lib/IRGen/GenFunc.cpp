@@ -1077,6 +1077,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 /// Emit a partial application thunk for a function pointer applied to a partial
 /// set of argument values.
 void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
+                                           SILFunction &SILFn,
                                            llvm::Value *fnPtr,
                                            llvm::Value *fnContext,
                                            Explosion &args,
@@ -1287,6 +1288,9 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, argValTypes, argTypeInfos,
                     /*typeToFill*/ nullptr,
                     std::move(bindings));
+
+  auto Descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, layout);
+
   llvm::Value *data;
   if (layout.isKnownEmpty()) {
     data = IGF.IGM.RefCountedNull;
@@ -1294,7 +1298,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     // Allocate a new object.
     HeapNonFixedOffsets offsets(IGF, layout);
 
-    data = IGF.emitUnmanagedAlloc(layout, "closure", &offsets);
+    data = IGF.emitUnmanagedAlloc(layout, "closure", Descriptor, &offsets);
     Address dataAddr = layout.emitCastTo(IGF, data);
 
     

@@ -77,8 +77,8 @@ struct SwiftToSourceKitCompletionAdapter {
 
 struct SwiftCodeCompletionConsumer
     : public ide::SimpleCachingCodeCompletionConsumer {
-  using HandlerFunc = std::function<void(ArrayRef<CodeCompletionResult *>,
-                                         SwiftCompletionInfo &)>;
+  using HandlerFunc = std::function<void(
+      MutableArrayRef<CodeCompletionResult *>, SwiftCompletionInfo &)>;
   HandlerFunc handleResultsImpl;
   SwiftCompletionInfo swiftContext;
 
@@ -218,7 +218,8 @@ void SwiftLangSupport::codeComplete(llvm::MemoryBuffer *UnresolvedInputFile,
                                     SourceKit::CodeCompletionConsumer &SKConsumer,
                                     ArrayRef<const char *> Args) {
   SwiftCodeCompletionConsumer SwiftConsumer([&](
-      ArrayRef<CodeCompletionResult *> Results, SwiftCompletionInfo &) {
+      MutableArrayRef<CodeCompletionResult *> Results, SwiftCompletionInfo &) {
+    CodeCompletionContext::sortCompletionResults(Results);
     for (auto *Result : Results) {
       if (!SwiftToSourceKitCompletionAdapter::handleResult(SKConsumer, Result))
         break;
@@ -987,7 +988,8 @@ static void transformAndForwardResults(
     bool hasQDot = false;
     bool hasInit = false;
     SwiftCodeCompletionConsumer swiftConsumer([&](
-        ArrayRef<CodeCompletionResult *> results, SwiftCompletionInfo &info) {
+        MutableArrayRef<CodeCompletionResult *> results,
+        SwiftCompletionInfo &info) {
       auto topResults = filterInnerResults(results, options.addInnerResults,
                                            options.addInnerOperators, hasDot,
                                            hasQDot, hasInit);
@@ -1080,7 +1082,8 @@ void SwiftLangSupport::codeCompleteOpen(
   bool hasExpectedTypes = false;
 
   SwiftCodeCompletionConsumer swiftConsumer(
-      [&](ArrayRef<CodeCompletionResult *> results, SwiftCompletionInfo &info) {
+      [&](MutableArrayRef<CodeCompletionResult *> results,
+          SwiftCompletionInfo &info) {
         completionKind = info.completionContext->CodeCompletionKind;
         hasExpectedTypes = info.completionContext->HasExpectedTypeRelation;
         completions =

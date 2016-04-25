@@ -938,7 +938,13 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
   auto *selfTypeInfo = &IGF.getTypeInfo(selfType);
   HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal,
                     selfType, selfTypeInfo);
-  llvm::Value *data = IGF.emitUnmanagedAlloc(layout, "closure");
+
+  // FIXME: Either emit a descriptor for this or create a metadata kind
+  // that indicates its trivial layout.
+  auto Descriptor
+    = llvm::ConstantPointerNull::get(IGF.IGM.CaptureDescriptorPtrTy);
+  llvm::Value *data = IGF.emitUnmanagedAlloc(layout, "closure",
+                                             Descriptor);
   // FIXME: non-fixed offsets
   NonFixedOffsets offsets = None;
   Address dataAddr = layout.emitCastTo(IGF, data);

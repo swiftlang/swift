@@ -55,6 +55,15 @@ public:
   /// for the given type.
   void addTypeMetadata(CanType type);
 
+  /// Get the requirement from the bindings at index i.
+  const GenericRequirement &operator[](size_t i) const {
+    return Requirements[i];
+  }
+
+  size_t size() const {
+    return Requirements.size();
+  }
+
   /// Add whatever information is necessary to reconstruct a witness table
   /// reference for the given type.
   void addProtocolConformance(CanType type, ProtocolConformanceRef conf);
@@ -71,6 +80,10 @@ public:
 
   /// Restore the necessary bindings from the given buffer.
   void restore(IRGenFunction &IGF, Address buffer) const;
+
+  const llvm::SetVector<GenericRequirement> &getRequirements() const {
+    return Requirements;
+  }
 };
 
 } // end namespace irgen

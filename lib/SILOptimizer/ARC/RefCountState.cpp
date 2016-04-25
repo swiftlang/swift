@@ -434,7 +434,7 @@ bool BottomUpRefCountState::handlePotentialUser(
   if (!valueCanBeUsedGivenLatticeState())
     return false;
 
-  if (!mayHaveSymmetricInteference(PotentialUser, getRCRoot(), AA))
+  if (!mayHaveSymmetricInterference(PotentialUser, getRCRoot(), AA))
     return false;
 
   // Instructions that we do not recognize (and thus will not move) and that
@@ -533,7 +533,7 @@ void BottomUpRefCountState::updateForPredTerminators(
   if (!valueCanBeUsedGivenLatticeState() ||
       std::none_of(Terms.begin(), Terms.end(),
                    [this, &AA](SILInstruction *I)
-       -> bool { return mayHaveSymmetricInteference(I, getRCRoot(), AA); }))
+       -> bool { return mayHaveSymmetricInterference(I, getRCRoot(), AA); }))
     return;
 
   handleUser(InputInsertPt, getRCRoot(), SetFactory, AA);
@@ -877,7 +877,7 @@ bool TopDownRefCountState::handlePotentialUser(SILInstruction *PotentialUser,
   if (!valueCanBeUsedGivenLatticeState())
     return false;
 
-  if (!mayHaveSymmetricInteference(PotentialUser, getRCRoot(), AA))
+  if (!mayHaveSymmetricInterference(PotentialUser, getRCRoot(), AA))
     return false;
 
   return handleUser(PotentialUser, getRCRoot(), AA);

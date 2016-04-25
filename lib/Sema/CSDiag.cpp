@@ -4996,11 +4996,9 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
   // Figure out what import to suggest.
   auto &Ctx = CS->getASTContext();
   const auto &target = Ctx.LangOpts.Target;
-  StringRef plainName = E->getName().str();
   StringRef importModule;
   StringRef importDefaultTypeName;
   if (protocol == Ctx.getProtocol(KnownProtocolKind::ColorLiteralConvertible)) {
-    plainName = "color";
     if (target.isMacOSX()) {
       importModule = "AppKit";
       importDefaultTypeName = "NSColor";
@@ -5010,7 +5008,6 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     }
   } else if (protocol == Ctx.getProtocol(
                KnownProtocolKind::ImageLiteralConvertible)) {
-    plainName = "image";
     if (target.isMacOSX()) {
       importModule = "AppKit";
       importDefaultTypeName = "NSImage";
@@ -5020,12 +5017,12 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     }
   } else if (protocol == Ctx.getProtocol( 
                KnownProtocolKind::FileReferenceLiteralConvertible)) {
-    plainName = "file reference";
     importModule = "Foundation";
     importDefaultTypeName = Ctx.getSwiftName(KnownFoundationEntity::NSURL);
   }
 
   // Emit the diagnostic.
+  const auto plainName = E->getLiteralKindPlainName();
   TC.diagnose(E->getLoc(), diag::object_literal_default_type_missing,
               plainName);
   if (!importModule.empty()) {

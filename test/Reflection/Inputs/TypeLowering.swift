@@ -31,3 +31,19 @@ public struct Bar<T : P> {
 public struct AssocTypeStruct {
   public let t: Bar<Foo<Int8, Int16>>
 }
+
+public class C {}
+
+public struct ReferenceStruct {
+  public let strongRef: C
+  public let strongOptionalRef: C
+  public unowned let unownedRef: C
+  public weak var weakRef: C?
+  public unowned(unsafe) let unmanagedRef: C
+}
+
+public struct FunctionStruct {
+  public let thickFunction: () -> ()
+  public let thinFunction: @convention(thin) () -> ()
+  public let cFunction: @convention(c) () -> ()
+}

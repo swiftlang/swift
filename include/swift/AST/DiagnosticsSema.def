@@ -514,8 +514,8 @@ ERROR(pattern_used_in_type,none,
 NOTE(note_module_as_type,none,
      "cannot use module %0 as a type", (Identifier))
 
-ERROR(use_unknown_object_literal,none,
-     "use of unknown object literal name %0", (Identifier))
+ERROR(use_unknown_object_literal_protocol,none,
+     "cannot deduce protocol for %0 literal", (StringRef))
 ERROR(object_literal_default_type_missing,none,
      "could not infer type of %0 literal", (StringRef))
 NOTE(object_literal_resolve_import,none,

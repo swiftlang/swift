@@ -1101,6 +1101,7 @@ public:
   ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic = false);
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprAs();
+  ParserResult<Expr> parseExprArrow();
   ParserResult<Expr> parseExprSequence(Diag<> ID,
                                        bool isExprBasic,
                                        bool isForConditionalDirective = false);
@@ -1176,8 +1177,17 @@ public:
 
   Expr *parseExprAnonClosureArg();
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
+
+  // NOTE: used only for legacy support for old object literal syntax.
+  // Will be removed in the future.
   bool isCollectionLiteralStartingWithLSquareLit();
-  ParserResult<Expr> parseExprObjectLiteral();
+
+  /// Parse an object literal.
+  ///
+  /// \param LK The literal kind as determined by the first token.
+  /// \param NewName New name for a legacy literal.
+  ParserResult<Expr> parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LK,
+                                            StringRef NewName = StringRef());
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          Identifier firstSelectorPiece
                                            = Identifier(),

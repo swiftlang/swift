@@ -1363,8 +1363,8 @@ namespace {
       auto &tc = CS.getTypeChecker();
       auto protocol = tc.getLiteralProtocol(expr);
       if (!protocol) {
-        tc.diagnose(expr->getLoc(), diag::use_unknown_object_literal,
-                    expr->getName());
+        tc.diagnose(expr->getLoc(), diag::use_unknown_object_literal_protocol,
+                    expr->getLiteralKindPlainName());
         return nullptr;
       }
 
@@ -1709,6 +1709,12 @@ namespace {
     
     Type visitSequenceExpr(SequenceExpr *expr) {
       // If a SequenceExpr survived until CSGen, then there was an upstream
+      // error that was already reported.
+      return Type();
+    }
+
+    Type visitArrowExpr(ArrowExpr *expr) {
+      // If an ArrowExpr survived until CSGen, then there was an upstream
       // error that was already reported.
       return Type();
     }

@@ -17,6 +17,12 @@
 #ifndef SWIFT_IRGEN_GENPROTO_H
 #define SWIFT_IRGEN_GENPROTO_H
 
+#include "swift/SIL/SILFunction.h"
+
+#include "Fulfillment.h"
+#include "GenericRequirement.h"
+#include "MetadataPath.h"
+
 namespace llvm {
   class Type;
 }
@@ -170,6 +176,165 @@ namespace irgen {
                                           ArrayRef<ProtocolEntry> protos,
                                           ProtocolDecl *target,
                                     const GetWitnessTableFn &getWitnessTable);
+
+  /// A class for computing how to pass arguments to a polymorphic
+  /// function.  The subclasses of this are the places which need to
+  /// be updated if the convention changes.
+  class PolymorphicConvention {
+  public:
+    enum class SourceKind {
+      /// Metadata is derived from a source class pointer.
+      ClassPointer,
+
+      /// Metadata is derived from a type metadata pointer.
+      Metadata,
+
+      /// Metadata is derived from the origin type parameter.
+      GenericLValueMetadata,
+
+      /// Metadata is obtained directly from the from a Self metadata
+      /// parameter passed via the WitnessMethod convention.
+      SelfMetadata,
+
+      /// Metadata is derived from the Self witness table parameter
+      /// passed via the WitnessMethod convention.
+      SelfWitnessTable,
+    };
+
+    static bool requiresSourceIndex(SourceKind kind) {
+      return (kind == SourceKind::ClassPointer ||
+              kind == SourceKind::Metadata ||
+              kind == SourceKind::GenericLValueMetadata);
+    }
+
+    enum : unsigned { InvalidSourceIndex = ~0U };
+
+    class Source {
+      /// The kind of source this is.
+      SourceKind Kind;
+
+      /// The parameter index, for ClassPointer and Metadata sources.
+      unsigned Index;
+
+    public:
+      CanType Type;
+
+      Source(SourceKind kind, unsigned index, CanType type)
+        : Kind(kind), Index(index), Type(type) {
+        assert(index != InvalidSourceIndex || !requiresSourceIndex(kind));
+      }
+
+      SourceKind getKind() const { return Kind; }
+      unsigned getParamIndex() const {
+        assert(requiresSourceIndex(getKind()));
+        return Index;
+      }
+
+      template <typename Allocator>
+      const reflection::MetadataSource *getMetadataSource(Allocator &A) const {
+        switch (Kind) {
+        case SourceKind::ClassPointer:
+          return A.template createReferenceCapture(Index);
+        case SourceKind::Metadata:
+          return A.template createMetadataCapture(Index);
+        default:
+          return nullptr;
+        }
+      }
+    };
+
+  protected:
+    IRGenModule &IGM;
+    ModuleDecl &M;
+    CanSILFunctionType FnType;
+
+    CanGenericSignature Generics;
+
+    std::vector<Source> Sources;
+
+    FulfillmentMap Fulfillments;
+
+    GenericSignature::ConformsToArray getConformsTo(Type t) {
+      return Generics->getConformsTo(t, M);
+    }
+
+  public:
+    PolymorphicConvention(IRGenModule &IGM, CanSILFunctionType fnType);
+
+    ArrayRef<Source> getSources() const { return Sources; }
+
+    using RequirementCallback =
+      llvm::function_ref<void(GenericRequirement requirement)>;
+
+    void enumerateRequirements(const RequirementCallback &callback);
+
+    void enumerateUnfulfilledRequirements(const RequirementCallback &callback);
+
+    /// Returns a Fulfillment for a type parameter requirement, or
+    /// nullptr if it's unfulfilled.
+    const Fulfillment *getFulfillmentForTypeMetadata(CanType type) const;
+
+    /// Return the source of type metadata at a particular source index.
+    Source getSource(size_t SourceIndex) const {
+      return Sources[SourceIndex];
+    }
+
+  private:
+    void initGenerics();
+    void considerNewTypeSource(SourceKind kind, unsigned paramIndex,
+                               CanType type, IsExact_t isExact,
+                               bool isSelfParameter);
+    bool considerType(CanType type, IsExact_t isExact, bool isSelfParameter,
+                      unsigned sourceIndex, MetadataPath &&path);
+
+    /// Testify to generic parameters in the Self type of a protocol
+    /// witness method.
+    void considerWitnessSelf(CanSILFunctionType fnType);
+
+    /// Testify to generic parameters in the Self type of an @objc
+    /// generic or protocol method.
+    void considerObjCGenericSelf(CanSILFunctionType fnType);
+
+    void considerParameter(SILParameterInfo param, unsigned paramIndex,
+                           bool isSelfParameter);
+
+    void addSelfMetadataFulfillment(CanType arg);
+    void addSelfWitnessTableFulfillment(CanType arg, ProtocolDecl *proto);
+  };
+
+  /// A class for binding type parameters of a generic function.
+  class EmitPolymorphicParameters : public PolymorphicConvention {
+    IRGenFunction &IGF;
+    SILFunction &Fn;
+
+  public:
+    EmitPolymorphicParameters(IRGenFunction &IGF, SILFunction &Fn);
+
+    void emit(Explosion &in, WitnessMetadata *witnessMetadata,
+              const GetParameterFn &getParameter);
+
+  private:
+    CanType getTypeInContext(CanType type) const;
+
+    CanType getArgTypeInContext(unsigned paramIndex) const;
+
+    /// Fulfill local type data from any extra information associated with
+    /// the given source.
+    void bindExtraSource(const Source &source, Explosion &in,
+                         WitnessMetadata *witnessMetadata);
+
+    void bindParameterSources(const GetParameterFn &getParameter);
+
+    void bindParameterSource(SILParameterInfo param, unsigned paramIndex,
+                             const GetParameterFn &getParameter) ;
+    // Did the convention decide that the parameter at the given index
+    // was a class-pointer source?
+    bool isClassPointerSource(unsigned paramIndex);
+    
+    void bindArchetypeAccessPaths();
+    void addPotentialArchetypeAccessPath(CanType targetDepType,
+                                         CanType sourceDepType);
+  };
 
 } // end namespace irgen
 } // end namespace swift

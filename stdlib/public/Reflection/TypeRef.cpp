@@ -109,9 +109,25 @@ public:
 
   void visitFunctionTypeRef(const FunctionTypeRef *F) {
     printHeader("function");
+
+    switch (F->getFlags().getConvention()) {
+    case FunctionMetadataConvention::Swift:
+      break;
+    case FunctionMetadataConvention::Block:
+      printField("convention", "block");
+      break;
+    case FunctionMetadataConvention::Thin:
+      printField("convention", "thin");
+      break;
+    case FunctionMetadataConvention::CFunctionPointer:
+      printField("convention", "c");
+      break;
+    }
+
     for (auto Arg : F->getArguments())
       printRec(Arg);
     printRec(F->getResult());
+
     OS << ')';
   }
 
@@ -455,7 +471,7 @@ public:
     auto SubstitutedResult = visit(F->getResult());
 
     return FunctionTypeRef::create(Builder, SubstitutedArguments,
-                                   SubstitutedResult);
+                                   SubstitutedResult, F->getFlags());
   }
 
   const TypeRef *visitProtocolTypeRef(const ProtocolTypeRef *P) {

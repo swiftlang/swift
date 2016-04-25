@@ -176,6 +176,29 @@ ParserResult<Expr> Parser::parseExprAs() {
   return makeParserResult(parsed);
 }
 
+/// parseExprArrow
+///
+///   expr-arrow:
+///     '->'
+///     'throws' '->'
+ParserResult<Expr> Parser::parseExprArrow() {
+  SourceLoc throwsLoc, arrowLoc;
+  if (Tok.is(tok::kw_throws)) {
+    throwsLoc = consumeToken(tok::kw_throws);
+    if (!Tok.is(tok::arrow)) {
+      diagnose(throwsLoc, diag::throws_after_function_result);
+      return nullptr;
+    }
+  }
+  arrowLoc = consumeToken(tok::arrow);
+  if (Tok.is(tok::kw_throws)) {
+    diagnose(Tok.getLoc(), diag::throws_after_function_result);
+    throwsLoc = consumeToken(tok::kw_throws);
+  }
+  auto arrow = new (Context) ArrowExpr(throwsLoc, arrowLoc);
+  return makeParserResult(arrow);
+}
+
 /// parseExprSequence
 ///
 ///   expr-sequence(Mode):
@@ -348,6 +371,15 @@ parse_operator:
       // We already parsed the right operand as part of the 'is' production.
       // Jump directly to parsing another operator.
       goto parse_operator;
+    }
+
+    case tok::arrow:
+    case tok::kw_throws: {
+      ParserResult<Expr> arrow = parseExprArrow();
+      if (arrow.isNull() || arrow.hasCodeCompletion())
+        return arrow;
+      SequencedExprs.push_back(arrow.get());
+      break;
     }
         
     default:
@@ -1113,21 +1145,6 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     Result = parseExprCollection();
     break;
 
-  case tok::l_square_lit: // [#Color(...)#], [#Image(...)#]
-    // If this is actually a collection literal starting with '[#', handle it
-    // as such.
-    if (isCollectionLiteralStartingWithLSquareLit()) {
-      // Split the token into two.
-      SourceLoc LSquareLoc = consumeStartingCharacterOfCurrentToken();
-
-      // Consume the '[' token.
-      Result = parseExprCollection(LSquareLoc);
-      break;
-    }
-
-    Result = parseExprObjectLiteral();
-    break;
-
   case tok::pound_available: {
     // For better error recovery, parse but reject #available in an expr
     // context.
@@ -1141,6 +1158,59 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
                   new (Context) ErrorExpr(res.get()->getSourceRange()));
     break;
   }
+
+  // NOTE: This is for migrating the old object literal syntax.
+  // Eventually this block can be removed.
+  case tok::l_square_lit: {// [#Color(...)#], [#Image(...)#]
+    // If this is actually a collection literal starting with '[#', handle it
+    // as such.
+    if (isCollectionLiteralStartingWithLSquareLit()) {
+      // Split the token into two.
+      SourceLoc LSquareLoc = consumeStartingCharacterOfCurrentToken();
+      // Consume the '[' token.
+      Result = parseExprCollection(LSquareLoc);
+      break;
+    }     
+
+    auto LSquareLoc = Tok.getLoc();
+    auto LSquareTokRange = Tok.getRange();
+    (void)consumeToken(tok::l_square_lit);
+    
+    if (Tok.is(tok::pound)) {
+      consumeToken();
+      if (!Tok.is(tok::identifier))
+        diagnose(LSquareLoc, diag::expected_object_literal_identifier);
+      skipUntil(tok::r_square_lit);
+      Result = makeParserError();
+    }
+    else {
+      Result = parseExprPostfix(ID, isExprBasic);
+    }
+
+    // This should be an invariant based on the check in
+    // isCollectionLiteralStartingWithLSquareLit().
+    auto RSquareTokRange = Tok.getRange();
+    (void)consumeToken(tok::r_square_lit);
+
+    // Issue a diagnostic for the legacy syntax and provide a fixit
+    // to strip away the '[#' and '#]'
+    diagnose(LSquareLoc, diag::legacy_object_literal_syntax)
+      .fixItRemoveChars(LSquareTokRange.getStart(), LSquareTokRange.getEnd())
+      .fixItRemoveChars(RSquareTokRange.getStart(), RSquareTokRange.getEnd());
+    
+    break;
+  }
+
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:\
+  Result = parseExprObjectLiteral(ObjectLiteralExpr::Name);\
+  break;
+#include "swift/Parse/Tokens.def"
+
+#define POUND_OLD_OBJECT_LITERAL(Name, NewName, NewArg, OldArg)\
+  case tok::pound_##Name:\
+  Result = parseExprObjectLiteral(ObjectLiteralExpr::NewName, "#" #NewName);\
+  break;
+#include "swift/Parse/Tokens.def"
 
   case tok::code_complete:
     Result = makeParserResult(new (Context) CodeCompletionExpr(Tok.getRange()));
@@ -2335,30 +2405,41 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
                         /*Implicit=*/false));
 }
 
+// NOTE: this is to detect the old object literal syntax.
+// This will be removed in the future.
 bool Parser::isCollectionLiteralStartingWithLSquareLit() {
-  BacktrackingScope backtracking(*this);
-  (void)consumeToken(tok::l_square_lit);
-  if (!consumeIf(tok::identifier)) return false;
+   BacktrackingScope backtracking(*this);
+   (void)consumeToken(tok::l_square_lit);
+   switch (Tok.getKind()) {
+     // Handle both dengerate '#' and '# identifier'.
+     case tok::pound:
+      (void) consumeToken();
+      if (Tok.is(tok::identifier)) skipSingle();
+      break;
+#define POUND_OBJECT_LITERAL(kw, desc, proto)\
+     case tok::pound_##kw: (void)consumeToken(); break;
+#define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)\
+     case tok::pound_##kw: (void)consumeToken(); break;
+#include "swift/Parse/Tokens.def"
+     default:
+       return true;
+   }
 
-  // Skip over a parenthesized argument, if present.
-  if (Tok.is(tok::l_paren)) skipSingle();
-
-  return Tok.isNot(tok::r_square_lit);
-}
-
+   // Skip over a parenthesized argument, if present.
+   if (Tok.is(tok::l_paren)) skipSingle();
+ 
+   return Tok.isNot(tok::r_square_lit);
+ }
+ 
 /// \brief Parse an object literal expression.
 ///
 /// expr-literal:
-///   '[#' identifier expr-paren '#]'
+///   '#' identifier expr-paren
 ParserResult<Expr>
-Parser::parseExprObjectLiteral() {
-  SourceLoc LLitLoc = consumeToken(tok::l_square_lit);
-  Identifier Name;
-  SourceLoc NameLoc;
-  if (parseIdentifier(Name, NameLoc,
-                      diag::expected_identifier_after_l_square_lit)) {
-    return makeParserError();
-  }
+Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
+                               StringRef NewName) {
+  auto PoundTok = Tok;
+  SourceLoc PoundLoc = consumeToken();
   // Parse a tuple of args
   if (!Tok.is(tok::l_paren)) {
     diagnose(Tok, diag::expected_arg_list_in_object_literal);
@@ -2372,13 +2453,45 @@ Parser::parseExprObjectLiteral() {
   if (Arg.isParseError()) {
     return makeParserError();
   }
-  if (!Tok.is(tok::r_square_lit)) {
-    diagnose(Tok, diag::expected_r_square_lit_after_object_literal);
+  // If the legacy name was used (e.g., #Image instead of #imageLiteral)
+  // prompt an error and a fixit.
+  if (!NewName.empty()) {
+    auto diag =
+      diagnose(PoundTok, diag::object_literal_legacy_name, 
+               PoundTok.getText(), NewName);
+    auto Range = PoundTok.getRange();
+    
+    // Create a FixIt for the keyword.
+    diag.fixItReplaceChars(Range.getStart(), Range.getEnd(), NewName);
+
+    // Try and construct a FixIt for the argument label.
+    if (TupleExpr *TE = dyn_cast_or_null<TupleExpr>(Arg.get())) {
+      auto ArgLoc = TE->getElementNameLoc(0);
+      auto FirstElementName = TE->getElementName(0);
+            
+      if (ArgLoc.isValid() && !FirstElementName.empty()) { 
+        auto OldArg = FirstElementName.str();
+        auto NewArg =
+          llvm::StringSwitch<StringRef>(OldArg)
+#define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)\
+            .Case(#old_arg, #new_arg)
+#include "swift/Parse/Tokens.def"
+            .Default("");
+       
+        if (!NewArg.empty()) {    
+          auto Loc = TE->getElementNameLoc(0);
+          diag.fixItReplaceChars(Loc,
+                                 Loc.getAdvancedLocOrInvalid(OldArg.size()),
+                                 NewArg);
+        }
+      }
+    }
+    
     return makeParserError();
   }
-  SourceLoc RLitLoc = consumeToken(tok::r_square_lit);
+
   return makeParserResult(
-    new (Context) ObjectLiteralExpr(LLitLoc, Name, NameLoc, Arg.get(), RLitLoc,
+    new (Context) ObjectLiteralExpr(PoundLoc, LitKind, Arg.get(),
                                     /*implicit=*/false));
 }
 

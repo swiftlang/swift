@@ -24,12 +24,15 @@
 
 #include <vector>
 #include <unordered_map>
+#include <utility>
 
 namespace swift {
 namespace remote {
 
 template <typename Runtime>
 using SharedTargetMetadataRef = std::shared_ptr<TargetMetadata<Runtime>>;
+
+using SharedCaptureDescriptor = std::shared_ptr<const CaptureDescriptor>;
 
 template <typename Runtime>
 using SharedTargetNominalTypeDescriptorRef
@@ -59,169 +62,169 @@ class TypeDecoder {
 
     using NodeKind = Demangle::Node::Kind;
     switch (Node->getKind()) {
-      case NodeKind::Global:
-        return decodeMangledType(Node->getChild(0));
-      case NodeKind::TypeMangling:
-        return decodeMangledType(Node->getChild(0));
-      case NodeKind::Type:
-        return decodeMangledType(Node->getChild(0));
-      case NodeKind::Class:
-      case NodeKind::Enum:
-      case NodeKind::Structure: {
-        BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
-        BuiltType parent = BuiltType();
-        if (!decodeMangledNominalType(Node, typeDecl, parent))
-          return BuiltType();
-
-        return Builder.createNominalType(typeDecl, parent);
-      }
-      case NodeKind::BoundGenericClass:
-      case NodeKind::BoundGenericEnum:
-      case NodeKind::BoundGenericStructure: {
-        assert(Node->getNumChildren() == 2);
-        BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
-        BuiltType parent = BuiltType();
-        if (!decodeMangledNominalType(Node->getChild(0), typeDecl, parent))
-          return BuiltType();
-
-        std::vector<BuiltType> args;
-
-        const auto &genericArgs = Node->getChild(1);
-        assert(genericArgs->getKind() == NodeKind::TypeList);
-
-        for (auto genericArg : *genericArgs) {
-          auto paramType = decodeMangledType(genericArg);
-          if (!paramType)
-            return BuiltType();
-          args.push_back(paramType);
-        }
-
-        return Builder.createBoundGenericType(typeDecl, args, parent);
-      }
-      case NodeKind::BuiltinTypeName: {
-        auto mangledName = Demangle::mangleNode(Node);
-        return Builder.createBuiltinType(mangledName);
-      }
-      case NodeKind::ExistentialMetatype: {
-        auto instance = decodeMangledType(Node->getChild(0));
-        if (!instance)
-          return BuiltType();
-        return Builder.createExistentialMetatypeType(instance);
-      }
-      case NodeKind::Metatype: {
-        auto instance = decodeMangledType(Node->getChild(0));
-        if (!instance)
-          return BuiltType();
-        return Builder.createMetatypeType(instance);
-      }
-      case NodeKind::ProtocolList: {
-        std::vector<BuiltType> protocols;
-        auto TypeList = Node->getChild(0);
-        for (auto componentType : *TypeList) {
-          if (auto protocol = decodeMangledType(componentType))
-            protocols.push_back(protocol);
-          else
-            return BuiltType();
-        }
-        if (protocols.size() == 1)
-          return protocols.front();
-        else
-          return Builder.createProtocolCompositionType(protocols);
-      }
-      case NodeKind::Protocol: {
-        auto moduleName = Node->getChild(0)->getText();
-        auto name = Node->getChild(1)->getText();
-        return Builder.createProtocolType(moduleName, name);
-      }
-      case NodeKind::DependentGenericParamType: {
-        auto depth = Node->getChild(0)->getIndex();
-        auto index = Node->getChild(1)->getIndex();
-        return Builder.createGenericTypeParameterType(depth, index);
-      }
-      case NodeKind::ObjCBlock:
-      case NodeKind::CFunctionPointer:
-      case NodeKind::ThinFunctionType:
-      case NodeKind::FunctionType: {
-        FunctionTypeFlags flags;
-        if (Node->getKind() == NodeKind::ObjCBlock) {
-          flags = flags.withConvention(FunctionMetadataConvention::Block);
-        } else if (Node->getKind() == NodeKind::CFunctionPointer) {
-          flags =
-            flags.withConvention(FunctionMetadataConvention::CFunctionPointer);
-        } else if (Node->getKind() == NodeKind::ThinFunctionType) {
-          flags = flags.withConvention(FunctionMetadataConvention::Thin);
-        }
-
-        bool isThrow =
-          Node->getChild(0)->getKind() == NodeKind::ThrowsAnnotation;
-        flags = flags.withThrows(true);
-
-        std::vector<BuiltType> arguments;
-        std::vector<bool> argsAreInOut;
-        if (!decodeMangledFunctionInputType(Node->getChild(isThrow ? 1 : 0),
-                                            arguments, argsAreInOut, flags))
-          return BuiltType();
-
-        auto result = decodeMangledType(Node->getChild(isThrow ? 2 : 1));
-        if (!result) return BuiltType();
-        return Builder.createFunctionType(arguments, argsAreInOut,
-                                          result, flags);
-      }
-      case NodeKind::ArgumentTuple:
-        return decodeMangledType(Node->getChild(0));
-      case NodeKind::ReturnType:
-        return decodeMangledType(Node->getChild(0));
-      case NodeKind::NonVariadicTuple:
-      case NodeKind::VariadicTuple: {
-        std::vector<BuiltType> Elements;
-        for (auto element : *Node) {
-          auto elementType = decodeMangledType(element);
-          if (!elementType)
-            return BuiltType();
-          Elements.push_back(elementType);
-        }
-        bool Variadic = (Node->getKind() == NodeKind::VariadicTuple);
-        return Builder.createTupleType(Elements, Variadic);
-      }
-      case NodeKind::TupleElement:
-        if (Node->getChild(0)->getKind() == NodeKind::TupleElementName)
-          return decodeMangledType(Node->getChild(1));
-        return decodeMangledType(Node->getChild(0));
-      case NodeKind::DependentGenericType: {
-        return decodeMangledType(Node->getChild(1));
-      }
-      case NodeKind::DependentMemberType: {
-        auto base = decodeMangledType(Node->getChild(0));
-        if (!base)
-          return BuiltType();
-        auto member = Node->getChild(1)->getText();
-        auto protocol = decodeMangledType(Node->getChild(1));
-        if (!protocol)
-          return BuiltType();
-        return Builder.createDependentMemberType(member, base, protocol);
-      }
-      case NodeKind::DependentAssociatedTypeRef:
-        return decodeMangledType(Node->getChild(0));
-      case NodeKind::Unowned: {
-        auto base = decodeMangledType(Node->getChild(0));
-        if (!base)
-          return BuiltType();
-        return Builder.createUnownedStorageType(base);
-      }
-      case NodeKind::Unmanaged: {
-        auto base = decodeMangledType(Node->getChild(0));
-        if (!base)
-          return BuiltType();
-        return Builder.createUnmanagedStorageType(base);
-      }
-      case NodeKind::Weak: {
-        auto base = decodeMangledType(Node->getChild(0));
-        if (!base)
-          return BuiltType();
-        return Builder.createWeakStorageType(base);
-      }
-      default:
+    case NodeKind::Global:
+      return decodeMangledType(Node->getChild(0));
+    case NodeKind::TypeMangling:
+      return decodeMangledType(Node->getChild(0));
+    case NodeKind::Type:
+      return decodeMangledType(Node->getChild(0));
+    case NodeKind::Class:
+    case NodeKind::Enum:
+    case NodeKind::Structure: {
+      BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
+      BuiltType parent = BuiltType();
+      if (!decodeMangledNominalType(Node, typeDecl, parent))
         return BuiltType();
+
+      return Builder.createNominalType(typeDecl, parent);
+    }
+    case NodeKind::BoundGenericClass:
+    case NodeKind::BoundGenericEnum:
+    case NodeKind::BoundGenericStructure: {
+      assert(Node->getNumChildren() == 2);
+      BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
+      BuiltType parent = BuiltType();
+      if (!decodeMangledNominalType(Node->getChild(0), typeDecl, parent))
+        return BuiltType();
+
+      std::vector<BuiltType> args;
+
+      const auto &genericArgs = Node->getChild(1);
+      assert(genericArgs->getKind() == NodeKind::TypeList);
+
+      for (auto genericArg : *genericArgs) {
+        auto paramType = decodeMangledType(genericArg);
+        if (!paramType)
+          return BuiltType();
+        args.push_back(paramType);
+      }
+
+      return Builder.createBoundGenericType(typeDecl, args, parent);
+    }
+    case NodeKind::BuiltinTypeName: {
+      auto mangledName = Demangle::mangleNode(Node);
+      return Builder.createBuiltinType(mangledName);
+    }
+    case NodeKind::ExistentialMetatype: {
+      auto instance = decodeMangledType(Node->getChild(0));
+      if (!instance)
+        return BuiltType();
+      return Builder.createExistentialMetatypeType(instance);
+    }
+    case NodeKind::Metatype: {
+      auto instance = decodeMangledType(Node->getChild(0));
+      if (!instance)
+        return BuiltType();
+      return Builder.createMetatypeType(instance);
+    }
+    case NodeKind::ProtocolList: {
+      std::vector<BuiltType> protocols;
+      auto TypeList = Node->getChild(0);
+      for (auto componentType : *TypeList) {
+        if (auto protocol = decodeMangledType(componentType))
+          protocols.push_back(protocol);
+        else
+          return BuiltType();
+      }
+      if (protocols.size() == 1)
+        return protocols.front();
+      else
+        return Builder.createProtocolCompositionType(protocols);
+    }
+    case NodeKind::Protocol: {
+      auto moduleName = Node->getChild(0)->getText();
+      auto name = Node->getChild(1)->getText();
+      return Builder.createProtocolType(moduleName, name);
+    }
+    case NodeKind::DependentGenericParamType: {
+      auto depth = Node->getChild(0)->getIndex();
+      auto index = Node->getChild(1)->getIndex();
+      return Builder.createGenericTypeParameterType(depth, index);
+    }
+    case NodeKind::ObjCBlock:
+    case NodeKind::CFunctionPointer:
+    case NodeKind::ThinFunctionType:
+    case NodeKind::FunctionType: {
+      FunctionTypeFlags flags;
+      if (Node->getKind() == NodeKind::ObjCBlock) {
+        flags = flags.withConvention(FunctionMetadataConvention::Block);
+      } else if (Node->getKind() == NodeKind::CFunctionPointer) {
+        flags =
+          flags.withConvention(FunctionMetadataConvention::CFunctionPointer);
+      } else if (Node->getKind() == NodeKind::ThinFunctionType) {
+        flags = flags.withConvention(FunctionMetadataConvention::Thin);
+      }
+
+      bool isThrow =
+        Node->getChild(0)->getKind() == NodeKind::ThrowsAnnotation;
+      flags = flags.withThrows(true);
+
+      std::vector<BuiltType> arguments;
+      std::vector<bool> argsAreInOut;
+      if (!decodeMangledFunctionInputType(Node->getChild(isThrow ? 1 : 0),
+                                          arguments, argsAreInOut, flags))
+        return BuiltType();
+
+      auto result = decodeMangledType(Node->getChild(isThrow ? 2 : 1));
+      if (!result) return BuiltType();
+      return Builder.createFunctionType(arguments, argsAreInOut,
+                                        result, flags);
+    }
+    case NodeKind::ArgumentTuple:
+      return decodeMangledType(Node->getChild(0));
+    case NodeKind::ReturnType:
+      return decodeMangledType(Node->getChild(0));
+    case NodeKind::NonVariadicTuple:
+    case NodeKind::VariadicTuple: {
+      std::vector<BuiltType> Elements;
+      for (auto element : *Node) {
+        auto elementType = decodeMangledType(element);
+        if (!elementType)
+          return BuiltType();
+        Elements.push_back(elementType);
+      }
+      bool Variadic = (Node->getKind() == NodeKind::VariadicTuple);
+      return Builder.createTupleType(Elements, Variadic);
+    }
+    case NodeKind::TupleElement:
+      if (Node->getChild(0)->getKind() == NodeKind::TupleElementName)
+        return decodeMangledType(Node->getChild(1));
+      return decodeMangledType(Node->getChild(0));
+    case NodeKind::DependentGenericType: {
+      return decodeMangledType(Node->getChild(1));
+    }
+    case NodeKind::DependentMemberType: {
+      auto base = decodeMangledType(Node->getChild(0));
+      if (!base)
+        return BuiltType();
+      auto member = Node->getChild(1)->getText();
+      auto protocol = decodeMangledType(Node->getChild(1));
+      if (!protocol)
+        return BuiltType();
+      return Builder.createDependentMemberType(member, base, protocol);
+    }
+    case NodeKind::DependentAssociatedTypeRef:
+      return decodeMangledType(Node->getChild(0));
+    case NodeKind::Unowned: {
+      auto base = decodeMangledType(Node->getChild(0));
+      if (!base)
+        return BuiltType();
+      return Builder.createUnownedStorageType(base);
+    }
+    case NodeKind::Unmanaged: {
+      auto base = decodeMangledType(Node->getChild(0));
+      if (!base)
+        return BuiltType();
+      return Builder.createUnmanagedStorageType(base);
+    }
+    case NodeKind::Weak: {
+      auto base = decodeMangledType(Node->getChild(0));
+      if (!base)
+        return BuiltType();
+      return Builder.createWeakStorageType(base);
+    }
+    default:
+      return BuiltType();
     }
   }
 
@@ -417,6 +420,24 @@ public:
     return swift::remote::decodeMangledType(Builder, Node);
   }
 
+  /// Given a remote pointer to metadata, attempt to discover its MetadataKind.
+  std::pair<bool,MetadataKind>
+  readKindFromMetadata(StoredPointer MetadataAddress) {
+    auto Cached = MetadataCache.find(MetadataAddress);
+    if (Cached != MetadataCache.end()) {
+      if (auto Meta = Cached->second) {
+        return {true,Cached->second->getKind()};
+      } else {
+        return {false,MetadataKind::Opaque};
+      }
+    }
+
+    auto Meta = readMetadata(MetadataAddress);
+    if (!Meta) return {false,MetadataKind::Opaque};
+
+    return {true,Meta->getKind()};
+  }
+
   /// Given a remote pointer to metadata, attempt to turn it into a type.
   BuiltType readTypeFromMetadata(StoredPointer MetadataAddress) {
     auto Cached = TypeCache.find(MetadataAddress);
@@ -527,7 +548,7 @@ public:
     case MetadataKind::ForeignClass:
       return Builder.getUnnamedForeignClassType();
     case MetadataKind::HeapLocalVariable:
-      return Builder.getUnnamedForeignClassType(); // FIXME?
+        return Builder.getUnnamedForeignClassType(); // FIXME?
     case MetadataKind::HeapGenericLocalVariable:
       return Builder.getUnnamedForeignClassType(); // FIXME?
     case MetadataKind::ErrorObject:
@@ -725,7 +746,7 @@ private:
     }
 
     // If this is metadata for a class type, the parent type for the
-    // most-derived class is at a offset stored in the most-derived
+    // most-derived class is at an offset stored in the most-derived
     // nominal type descriptor.
     if (auto classMetadata = dyn_cast<TargetClassMetadata<Runtime>>(metadata)) {
       // If it does, it's immediately before the generic parameters.
@@ -804,6 +825,39 @@ private:
 
     TypeCache.insert({metadata.getAddress(), nominal});
     return nominal;
+  }
+
+  /// Read the entire CaptureDescriptor in this address space, including
+  /// trailing capture typeref relative offsets, and GenericMetadataSource
+  /// pairs.
+  SharedCaptureDescriptor readCaptureDescriptor(StoredPointer Address) {
+
+    uint32_t NumCaptures = 0;
+    uint32_t NumMetadataSources = 0;
+
+    StoredSize Offset = 0;
+
+    if (!Reader->readInteger(Address + Offset, &NumCaptures))
+      return nullptr;
+
+    Offset += sizeof(NumCaptures);
+
+    if (!Reader->readInteger(Address + Offset, &NumMetadataSources))
+      return nullptr;
+
+    StoredSize Size = sizeof(CaptureDescriptor) +
+      NumCaptures * sizeof(RelativeDirectPointer<const char>) +
+      NumMetadataSources * sizeof(GenericMetadataSource);
+
+    auto Buffer = (uint8_t *)malloc(Size);
+
+    if (!Reader->readBytes(Address, Buffer, Size)) {
+      free(Buffer);
+      return nullptr;
+    }
+
+    auto RawDescriptor = reinterpret_cast<const CaptureDescriptor *>(Buffer);
+    return SharedCaptureDescriptor(RawDescriptor, /*deleter*/ free);
   }
 };
 

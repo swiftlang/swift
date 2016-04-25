@@ -578,9 +578,11 @@ void Lexer::lexIdentifier() {
 /// lexHash - Handle #], #! for shebangs, and the family of #identifiers.
 void Lexer::lexHash() {
   const char *TokStart = CurPtr-1;
+
+  // NOTE: legacy punctuator.  Remove in the future.
   if (*CurPtr == ']') { // #]
-    CurPtr++;
-    return formToken(tok::r_square_lit, TokStart);
+     CurPtr++;
+     return formToken(tok::r_square_lit, TokStart);
   }
   
   // Allow a hashbang #! line at the beginning of the file.
@@ -1620,11 +1622,16 @@ Restart:
   case '@': return formToken(tok::at_sign, TokStart);
   case '{': return formToken(tok::l_brace, TokStart);
   case '[': {
-    if (*CurPtr == '#') { // [#
-      CurPtr++;
-      return formToken(tok::l_square_lit, TokStart);
-    }
-    return formToken(tok::l_square, TokStart);
+     // NOTE: Legacy punctuator for old object literal syntax.
+     // Remove in the future.
+     if (*CurPtr == '#') { // [#
+       // NOTE: Do NOT include the '#' in the token, unlike in earlier
+       // versions of Swift that supported the old object literal syntax
+       // directly.  The '#' will be lexed as part of the object literal
+       // keyword token itself.
+       return formToken(tok::l_square_lit, TokStart);
+     }
+     return formToken(tok::l_square, TokStart);
   }
   case '(': return formToken(tok::l_paren, TokStart);
   case '}': return formToken(tok::r_brace, TokStart);

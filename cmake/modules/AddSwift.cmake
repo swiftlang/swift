@@ -406,6 +406,8 @@ function(_compile_swift_files dependency_target_out_var_name)
   if(SWIFTFILE_IS_STDLIB_CORE)
     list(APPEND swift_flags
         "-nostdimport" "-parse-stdlib" "-module-name" "Swift")
+    list(APPEND swift_flags
+        "-Xfrontend" "-enable-reflection-builtins")
     list(APPEND swift_flags "-Xfrontend" "-group-info-path"
                             "-Xfrontend" "${GROUP_INFO_JSON_FILE}")
     if (NOT SWIFT_STDLIB_ENABLE_RESILIENCE)
@@ -1984,7 +1986,7 @@ endfunction()
 #     Sources to add into this executable.
 #
 # Note:
-#   Host executables are not given a variant suffix. To build a executable for
+#   Host executables are not given a variant suffix. To build an executable for
 #   each SDK and ARCH variant, use add_swift_target_executable.
 function(add_swift_executable name)
   # Parse the arguments we were given.
