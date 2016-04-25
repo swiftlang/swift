@@ -1,15 +1,15 @@
-// RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-build-swift %S/Inputs/report_dead_method_call/main.swift %s -O -Xfrontend -disable-access-control -o %t/a.out
-// RUN: %target-run %t/a.out 2> %t/err1.log; FileCheck %s < %t/err1.log
-// RUN: %target-run %t/a.out p1 2> %t/err2.log; FileCheck %s < %t/err2.log
-// RUN: %target-run %t/a.out p1 p2 2> %t/err3.log; FileCheck %s < %t/err3.log
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+
+// We compile with -O (optimizations) and -disable-access-control (which
+// allows use to "call" methods that are removed by dead code elimination).
+// RUN: %target-build-swift %S/Inputs/report_dead_method_call/main.swift %s -O -Xfrontend -disable-access-control -o %t/report_dead_method_call
+
+// The private, unused methods are optimized away. The test calls these
+// methods anyway (since it has overridden the access control), so we
+// expect them to produce "fatal error: call of deleted method" when run.
+// RUN: %target-run %t/report_dead_method_call
 // REQUIRES: executable_test
-
-
-// The -disable-access-control option let us "call" methods, which are removed
-// by dead method elimination.
-
-// CHECK: fatal error: call of deleted method
 
 private protocol PrivateProto {
 	func abc()

@@ -1,4 +1,8 @@
+// The StdlibUnittest test suite is placed here because it contains
+// expressions that are only allowed at the top level in files named
+// "main.swift".
 
+import StdlibUnittest
 
 @inline(never)
 func testProto(_ c: Container) {
@@ -27,16 +31,22 @@ func testPublicClass(_ c: PublicBase) {
 	c.ghi()
 }
 
-switch Process.argc {
-case 1:
-	callClass()
+let ReportDeadMethodCallTestSuite = TestSuite("ReportDeadMethodCall")
 
-case 2:
-	callProto()
-
-case 3:
-	callPublicClass()
-
-default:
-	break
+ReportDeadMethodCallTestSuite.test("Call class") {
+  expectCrashLater()
+  callClass()
 }
+
+ReportDeadMethodCallTestSuite.test("Call proto") {
+  expectCrashLater()
+  callProto()
+}
+
+ReportDeadMethodCallTestSuite.test("Call public class") {
+  expectCrashLater()
+  callPublicClass()
+}
+
+runAllTests()
+
