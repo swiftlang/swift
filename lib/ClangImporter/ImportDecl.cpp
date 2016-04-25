@@ -4366,9 +4366,6 @@ namespace {
     Optional<GenericParamList *> importObjCGenericParams(
        const clang::ObjCInterfaceDecl *decl, DeclContext *dc)
     {
-      if (!Impl.SwiftContext.LangOpts.ImportObjCGenerics) {
-        return nullptr;
-      }
       auto typeParamList = decl->getTypeParamList();
       if (!typeParamList) {
         return nullptr;
