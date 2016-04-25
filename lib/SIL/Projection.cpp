@@ -892,7 +892,8 @@ void
 ProjectionTreeNode::
 processUsersOfValue(ProjectionTree &Tree,
                     llvm::SmallVectorImpl<ValueNodePair> &Worklist,
-                    SILValue Value) {
+                    SILValue Value, LivenessKind Kind,
+                    llvm::DenseSet<SILInstruction *> &Releases) {
   DEBUG(llvm::dbgs() << "    Looking at Users:\n");
 
   // For all uses of V...
@@ -910,6 +911,13 @@ processUsersOfValue(ProjectionTree &Tree,
     if (!P.isValid()) {
       DEBUG(llvm::dbgs() << "            Failed to create projection. Adding "
             "to non projection user!\n");
+      // Is the user an epilogue release ?
+      if (Kind == IgnoreEpilogueReleases) {
+        bool EpilogueReleaseUser = !Releases.empty();
+        EpilogueReleaseUser &= Releases.find(User) != Releases.end();
+        if (EpilogueReleaseUser)
+          continue;
+      }
       addNonProjectionUser(Op);
       continue;
     }
@@ -941,6 +949,12 @@ processUsersOfValue(ProjectionTree &Tree,
       // The only projection which we do not currently handle are enums since we
       // may not know the correct case. This can be extended in the future.
       // Is the user an epilogue release ?
+      if (Kind == IgnoreEpilogueReleases) {
+        bool EpilogueReleaseUser = !Releases.empty();
+        EpilogueReleaseUser &= Releases.find(User) != Releases.end();
+        if (EpilogueReleaseUser)
+          continue;
+      }
       addNonProjectionUser(Op);
     }
   }
@@ -1143,7 +1157,21 @@ public:
 
 ProjectionTree::
 ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &BPA, SILType BaseTy) 
-  : Mod(Mod), Allocator(BPA) {
+  : Mod(Mod), Allocator(BPA),
+    Kind(ProjectionTreeNode::LivenessKind::NormalUseLiveness) {
+  DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy);
+
+  // Create the root node of the tree with our base type.
+  createRoot(BaseTy);
+
+  // Create the rest of the type tree lazily based on uses.
+}
+
+ProjectionTree::
+ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &BPA, SILType BaseTy,
+               ProjectionTreeNode::LivenessKind Kind,
+               llvm::DenseSet<SILInstruction *> Insts)
+  : Mod(Mod), Allocator(BPA), Kind(Kind), EpilogueReleases(Insts) {
   DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy);
 
   // Create the root node of the tree with our base type.
@@ -1159,6 +1187,8 @@ ProjectionTree::~ProjectionTree() {
 
 void
 ProjectionTree::initializeWithExistingTree(const ProjectionTree &PT) {
+  Kind = PT.Kind;
+  EpilogueReleases = PT.EpilogueReleases;
   LiveLeafIndices = PT.LiveLeafIndices;
   for (const auto &N : PT.ProjectionTreeNodes) {
     ProjectionTreeNodes.push_back(new (Allocator) ProjectionTreeNode(*N));
@@ -1255,7 +1285,7 @@ computeUsesAndLiveness(SILValue Base) {
     // If Value is not null, collate all users of Value the appropriate child
     // nodes and add such items to the worklist.
     if (Value) {
-      Node->processUsersOfValue(*this, UseWorklist, Value);
+      Node->processUsersOfValue(*this, UseWorklist, Value, Kind, EpilogueReleases);
     }
 
     // If this node is live due to a non projection user, propagate down its

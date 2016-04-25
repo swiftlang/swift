@@ -441,7 +441,7 @@ bb0(%0 : $S2):
 // This test checks if we can handle @owned structs correctly
 // CHECK-LABEL: sil [fragile] [thunk] [always_inline] @owned_struct_1_callee : $@convention(thin) (@owned S5, @owned S5) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32) {
 // CHECK: bb0([[IN1:%.*]] : $S5, [[IN2:%.*]] : $S5):
-// CHECK: [[FN:%.*]] = function_ref @_TTSfq4dgs_g__owned_struct_1_callee : $@convention(thin) (@guaranteed S4, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4dg_gs__owned_struct_1_callee : $@convention(thin) (@guaranteed S4, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN2]] : $S5, #S5.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN2]] : $S5, #S5.f1
 // CHECK: [[EXT4:%.*]] = struct_extract [[EXT1]] : $S1, #S1.f2
@@ -489,7 +489,7 @@ bb0(%0 : $S5, %1 : $S5):
 
 // CHECK-LABEL: sil [fragile] @owned_struct_1_caller : $@convention(thin) (S5) -> () {
 // CHECK: bb0([[IN:%.*]] : $S5):
-// CHECK: [[FN:%.*]] = function_ref @_TTSfq4dgs_g__owned_struct_1_callee : $@convention(thin) (@guaranteed S4, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4dg_gs__owned_struct_1_callee : $@convention(thin) (@guaranteed S4, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S5, #S5.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S5, #S5.f1
 // CHECK: [[EXT4:%.*]] = struct_extract [[EXT1]] : $S1, #S1.f2
@@ -507,7 +507,7 @@ bb0(%0 : $S5):
 // This test checks if we can properly insert arguments in between dead arguments.
 // CHECK-LABEL: sil [fragile] [thunk] [always_inline] @owned_struct_2_callee : $@convention(thin) (Builtin.Int256, Builtin.Int256, @owned S5, Builtin.Int128, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int256, [[IN2:%.*]] : $Builtin.Int256, [[IN3:%.*]] : $S5, [[IN4:%.*]] : $Builtin.Int128, [[IN5:%.*]] : $Builtin.Int128):
-// CHECK: [[FN:%.*]] = function_ref @_TTSfq4n_ds_g_d_n__owned_struct_2_callee : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4n_d_gs_d_n__owned_struct_2_callee : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN3]] : $S5, #S5.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN3]] : $S5, #S5.f1
 // CHECK: [[EXT4:%.*]] = struct_extract [[EXT1]] : $S1, #S1.f2
@@ -552,7 +552,7 @@ bb0(%0 : $Builtin.Int256, %1 : $Builtin.Int256, %2 : $S5, %3 : $Builtin.Int128, 
 
 // CHECK-LABEL: sil [fragile] @owned_struct_2_caller : $@convention(thin) (Builtin.Int256, S5, Builtin.Int128) -> () {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int256, [[IN2:%.*]] : $S5, [[IN3:%.*]] : $Builtin.Int128):
-// CHECK: [[FN:%.*]] = function_ref @_TTSfq4n_ds_g_d_n__owned_struct_2_callee : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4n_d_gs_d_n__owned_struct_2_callee : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN2]] : $S5, #S5.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN2]] : $S5, #S5.f1
 // CHECK: [[EXT4:%.*]] = struct_extract [[EXT1]] : $S1, #S1.f2
@@ -960,7 +960,7 @@ bb0(%0 : $SingleFieldLvl1):
 
 
 
-// CHECK-LABEL: sil [fragile] @_TTSfq4dgs_g__owned_struct_1_callee : $@convention(thin) (@guaranteed S4, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32) {
+// CHECK-LABEL: sil [fragile] @_TTSfq4dg_gs__owned_struct_1_callee : $@convention(thin) (@guaranteed S4, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32) {
 // CHECK: bb0([[IN1:%.*]] : $S4, [[IN2:%.*]] : $Builtin.Int16, [[IN3:%.*]] : $Builtin.Int32):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN2]] : $Builtin.Int16, [[IN3]] : $Builtin.Int32)
 // CHECK: [[STRUCT3:%.*]] = struct $S5 ([[IN1]] : $S4, [[STRUCT1]] : $S1)
@@ -970,7 +970,7 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: [[OUT:%.*]] = tuple ([[IN2]] : $Builtin.Int16, [[IN3]] : $Builtin.Int32, [[IN2]] : $Builtin.Int16, [[IN3]] : $Builtin.Int32)
 // CHECK: return [[OUT]] : $(Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32)
 
-// CHECK-LABEL: sil [fragile] @_TTSfq4n_ds_g_d_n__owned_struct_2_callee : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128) {
+// CHECK-LABEL: sil [fragile] @_TTSfq4n_d_gs_d_n__owned_struct_2_callee : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int256, [[IN2:%.*]] : $S4, [[IN3:%.*]] : $Builtin.Int16, [[IN4:%.*]] : $Builtin.Int32, [[IN5:%.*]] : $Builtin.Int128):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN3]] : $Builtin.Int16, [[IN4]] : $Builtin.Int32)
 // CHECK: [[STRUCT3:%.*]] = struct $S5 ([[IN2]] : $S4, [[STRUCT1]] : $S1)

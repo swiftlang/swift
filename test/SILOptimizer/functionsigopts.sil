@@ -221,7 +221,7 @@ bb3:
 //
 // CHECK-LABEL: sil [thunk] [always_inline] @exploded_release_to_dead_argument
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
-// CHECK: [[IN1:%.*]] = function_ref @_TTSf4dg__exploded_release_to_dead_argument
+// CHECK: [[IN1:%.*]] = function_ref @_TTSf4dg__exploded_release_to_dead_argument 
 // CHECK: apply [[IN1]]()
 // CHECK: release_value [[INPUT_ARG0]] 
 sil @exploded_release_to_dead_argument : $@convention(thin) (@owned boo) -> () {
@@ -1096,8 +1096,8 @@ bb3:
 
 // CHECK-LABEL: sil [fragile] [thunk] [always_inline] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[INPUT_PTR1:%.*]] : $Builtin.NativeObject, [[INPUT_PTR2:%.*]] : $Builtin.NativeObject):
-// CHECK: release_value [[INPUT_PTR2]] : $Builtin.NativeObject
 // CHECK: release_value [[INPUT_PTR1]] : $Builtin.NativeObject
+// CHECK: release_value [[INPUT_PTR2]] : $Builtin.NativeObject
 sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   // make it a non-trivial function
@@ -1141,8 +1141,8 @@ bb2:
 
 // CHECK-LABEL: sil [fragile] [thunk] [always_inline] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[INPUT_PTR1:%.*]] : $Builtin.NativeObject, [[INPUT_PTR2:%.*]] : $Builtin.NativeObject):
-// CHECK: release_value [[INPUT_PTR2]] : $Builtin.NativeObject
 // CHECK: release_value [[INPUT_PTR1]] : $Builtin.NativeObject
+// CHECK: release_value [[INPUT_PTR2]] : $Builtin.NativeObject
 sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   // make it a non-trivial function
@@ -1199,21 +1199,21 @@ bb2(%5 : $Builtin.NativeObject):
 // CHECK-NEXT: release_value [[INPUT_PTR_1]] : $Builtin.NativeObject
 // CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS1:%.*]] = function_ref @_TTSfq4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS1]]([[INPUT_PTR_1]], [[INPUT_PTR_2]])
-// CHECK: release_value [[INPUT_PTR_2]]
 // CHECK: release_value [[INPUT_PTR_1]]
+// CHECK: release_value [[INPUT_PTR_2]]
 // CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS1:%.*]] = function_ref @_TTSfq4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS1]]([[INPUT_PTR_2]], [[INPUT_PTR_1]])
-// CHECK: release_value [[INPUT_PTR_1]]
 // CHECK: release_value [[INPUT_PTR_2]]
+// CHECK: release_value [[INPUT_PTR_1]]
 
 // CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS2:%.*]] = function_ref @_TTSfq4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS2]]([[INPUT_PTR_2]], [[INPUT_PTR_1]])
-// CHECK: release_value [[INPUT_PTR_1]]
 // CHECK: release_value [[INPUT_PTR_2]]
+// CHECK: release_value [[INPUT_PTR_1]]
 // CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS2:%.*]] = function_ref @_TTSfq4g_g__owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS2]]([[INPUT_PTR_1]], [[INPUT_PTR_2]])
-// CHECK: release_value [[INPUT_PTR_2]]
 // CHECK: release_value [[INPUT_PTR_1]]
+// CHECK: release_value [[INPUT_PTR_2]]
 
 sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_caller : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
@@ -1368,6 +1368,8 @@ bb0(%0 : $Builtin.Int32):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil @_TTSf4dg__exploded_release_to_dead_argument
 
 // CHECK-LABEL: sil @_TTSf4gs__exploded_release_to_guaranteed_param
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $Int):

@@ -104,7 +104,6 @@ template <typename SubType>
 class SpecializationMangler : public SpecializationManglerBase {
   SubType *asImpl() { return static_cast<SubType *>(this); }
 public:
-  Mangle::Mangler &getMangler() const { return M; }
 
   ~SpecializationMangler() = default;
 
