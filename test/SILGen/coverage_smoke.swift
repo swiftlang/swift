@@ -11,7 +11,6 @@
 
 // REQUIRES: profile_runtime
 // REQUIRES: OS=macosx
-// XFAIL: asan
 
 // CHECK-INTERNAL: Functions shown: 1
 // CHECK-COV: 1|{{.*}}[[@LINE+1]]|{{.*}}func f_internal
