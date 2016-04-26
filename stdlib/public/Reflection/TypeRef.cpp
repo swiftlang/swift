@@ -133,8 +133,8 @@ public:
 
   void visitProtocolTypeRef(const ProtocolTypeRef *P) {
     printHeader("protocol");
-    printField("module", P->getModuleName());
-    printField("name", P->getName());
+    auto demangled = Demangle::demangleTypeAsString(P->getMangledName());
+    printField("", demangled);
     OS << ')';
   }
 
@@ -283,7 +283,7 @@ struct TypeRefIsConcrete
     return true;
   }
   
-  bool visitOpaqueTypeRef(const OpaqueTypeRef *Op) {
+  bool visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return true;
   }
 
@@ -299,20 +299,6 @@ struct TypeRefIsConcrete
     return visit(US->getType());
   }
 };
-
-const ForeignClassTypeRef *
-ForeignClassTypeRef::UnnamedSingleton = new ForeignClassTypeRef("");
-
-const ForeignClassTypeRef *ForeignClassTypeRef::getUnnamed() {
-  return UnnamedSingleton;
-}
-
-const ObjCClassTypeRef *
-ObjCClassTypeRef::UnnamedSingleton = new ObjCClassTypeRef("");
-
-const ObjCClassTypeRef *ObjCClassTypeRef::getUnnamed() {
-  return UnnamedSingleton;
-}
 
 const OpaqueTypeRef *
 OpaqueTypeRef::Singleton = new OpaqueTypeRef();
@@ -429,6 +415,109 @@ bool NominalTypeTrait::isClass() const {
   return ::isClass(Demangled);
 }
 
+/// Visitor class to set the WasAbstract flag of any MetatypeTypeRefs
+/// contained in the given type.
+class ThickenMetatype
+  : public TypeRefVisitor<ThickenMetatype, const TypeRef *> {
+  TypeRefBuilder &Builder;
+public:
+  using TypeRefVisitor<ThickenMetatype, const TypeRef *>::visit;
+
+  ThickenMetatype(TypeRefBuilder &Builder) : Builder(Builder) {}
+
+  const TypeRef *visitBuiltinTypeRef(const BuiltinTypeRef *B) {
+    return B;
+  }
+
+  const TypeRef *visitNominalTypeRef(const NominalTypeRef *N) {
+    return N;
+  }
+
+  const TypeRef *visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
+    std::vector<const TypeRef *> GenericParams;
+    for (auto Param : BG->getGenericParams())
+      GenericParams.push_back(visit(Param));
+    return BoundGenericTypeRef::create(Builder, BG->getMangledName(),
+                                       GenericParams);
+  }
+
+  const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
+    std::vector<const TypeRef *> Elements;
+    for (auto Element : T->getElements())
+      Elements.push_back(visit(Element));
+    return TupleTypeRef::create(Builder, Elements);
+  }
+
+  const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
+    std::vector<const TypeRef *> SubstitutedArguments;
+    for (auto Argument : F->getArguments())
+      SubstitutedArguments.push_back(visit(Argument));
+
+    auto SubstitutedResult = visit(F->getResult());
+
+    return FunctionTypeRef::create(Builder, SubstitutedArguments,
+                                   SubstitutedResult, F->getFlags());
+  }
+
+  const TypeRef *visitProtocolTypeRef(const ProtocolTypeRef *P) {
+    return P;
+  }
+
+  const TypeRef *
+  visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    return PC;
+  }
+
+  const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
+    return MetatypeTypeRef::create(Builder, visit(M->getInstanceType()),
+                                   /*WasAbstract=*/true);
+  }
+
+  const TypeRef *
+  visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
+    return EM;
+  }
+
+  const TypeRef *
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
+    return GTP;
+  }
+
+  const TypeRef *visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
+    return DM;
+  }
+
+  const TypeRef *visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
+    return F;
+  }
+
+  const TypeRef *visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
+    return OC;
+  }
+
+  const TypeRef *visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
+    return US;
+  }
+
+  const TypeRef *visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
+    return WS;
+  }
+
+  const TypeRef *
+  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
+    return US;
+  }
+
+  const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
+    return O;
+  }
+};
+
+static const TypeRef *
+thickenMetatypes(TypeRefBuilder &Builder, const TypeRef *TR) {
+  return ThickenMetatype(Builder).visit(TR);
+}
+
 class TypeRefSubstitution
   : public TypeRefVisitor<TypeRefSubstitution, const TypeRef *> {
   TypeRefBuilder &Builder;
@@ -457,9 +546,8 @@ public:
 
   const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
     std::vector<const TypeRef *> Elements;
-    for (auto Element : T->getElements()) {
+    for (auto Element : T->getElements())
       Elements.push_back(visit(Element));
-    }
     return TupleTypeRef::create(Builder, Elements);
   }
 
@@ -475,6 +563,8 @@ public:
   }
 
   const TypeRef *visitProtocolTypeRef(const ProtocolTypeRef *P) {
+    // Protocol compositions do not contain type parameters.
+    assert(P->isConcrete());
     return P;
   }
 
@@ -484,11 +574,23 @@ public:
   }
 
   const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
-    return MetatypeTypeRef::create(Builder, visit(M->getInstanceType()));
+    // If the metatype's instance type does not contain any type parameters,
+    // substitution does not alter anything, and the empty representation
+    // can still be used.
+    if (M->isConcrete())
+      return M;
+
+    // When substituting a concrete type into a type parameter inside
+    // of a metatype's instance type, (eg; T.Type, T := C), we must
+    // represent the metatype at runtime as a value, even if the
+    // metatype naturally has an empty representation.
+    return MetatypeTypeRef::create(Builder, visit(M->getInstanceType()),
+                                   /*WasAbstract=*/true);
   }
 
   const TypeRef *
   visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
+    // Existential metatypes do not contain type parameters.
     assert(EM->getInstanceType()->isConcrete());
     return EM;
   }
@@ -498,14 +600,21 @@ public:
     auto found = Substitutions.find({GTP->getDepth(), GTP->getIndex()});
     assert(found != Substitutions.end());
     assert(found->second->isConcrete());
-    return found->second;
+
+    // When substituting a concrete type containing a metatype into a
+    // type parameter, (eg: T, T := C.Type), we must also represent
+    // the metatype as a value.
+    return thickenMetatypes(Builder, found->second);
   }
 
   const TypeRef *visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
+    // Substitute type parameters in the base type to get a fully concrete
+    // type.
     auto SubstBase = visit(DM->getBase());
 
     const TypeRef *TypeWitness = nullptr;
 
+    // Get the original type of the witness from the conformance.
     switch (SubstBase->getKind()) {
     case TypeRefKind::Nominal: {
       auto Nominal = cast<NominalTypeRef>(SubstBase);
@@ -522,7 +631,12 @@ public:
     }
 
     assert(TypeWitness);
-    return TypeWitness->subst(Builder, SubstBase->getSubstMap());
+
+    // Apply base type substitutions to get the fully-substituted nested type.
+    auto *Subst = TypeWitness->subst(Builder, SubstBase->getSubstMap());
+
+    // Same as above.
+    return thickenMetatypes(Builder, Subst);
   }
 
   const TypeRef *visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
@@ -546,8 +660,8 @@ public:
     return UnmanagedStorageTypeRef::create(Builder, visit(US->getType()));
   }
 
-  const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *Op) {
-    return Op;
+  const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
+    return O;
   }
 };
 

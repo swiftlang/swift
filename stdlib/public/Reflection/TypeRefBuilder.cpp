@@ -77,6 +77,8 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
     MangledName = N->getMangledName();
   else if (auto BG = dyn_cast<BoundGenericTypeRef>(TR))
     MangledName = BG->getMangledName();
+  else if (auto P = dyn_cast<ProtocolTypeRef>(TR))
+    MangledName = P->getMangledName();
   else
     return {};
 

@@ -154,10 +154,6 @@ namespace swift {
     /// Whether we are stripping the "NS" prefix from Foundation et al.
     bool StripNSPrefix = false;
 
-    /// Whether classes with Objective-C lightweight generic type parameters
-    /// should be imported into Swift as generic classes.
-    bool ImportObjCGenerics = false;
-
     /// Enable the Swift 3 migration via Fix-Its.
     bool Swift3Migration = false;
 

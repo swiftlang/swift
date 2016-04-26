@@ -235,7 +235,7 @@ primaryArchetype: A
 
 dependentMember1: A.Inner
 (dependent_member
-  (protocol module=TypesToReflect name=P1)
+  (protocol TypesToReflect.P1)
   (generic_type_parameter depth=0 index=0) member=Inner)
 
 TypesToReflect.C3
@@ -279,14 +279,14 @@ primaryArchetype: A
 
 dependentMember1: A.Outer
 (dependent_member
-  (protocol module=TypesToReflect name=P2)
+  (protocol TypesToReflect.P2)
   (generic_type_parameter depth=0 index=0) member=Outer)
 
 dependentMember2: A.Outer.Inner
 (dependent_member
-  (protocol module=TypesToReflect name=P1)
+  (protocol TypesToReflect.P1)
   (dependent_member
-    (protocol module=TypesToReflect name=P2)
+    (protocol TypesToReflect.P2)
     (generic_type_parameter depth=0 index=0) member=Outer) member=Inner)
 
 TypesToReflect.C4
@@ -379,7 +379,7 @@ primaryArchetype: A
 
 dependentMember1: A.Inner
 (dependent_member
-  (protocol module=TypesToReflect name=P1)
+  (protocol TypesToReflect.P1)
   (generic_type_parameter depth=0 index=0) member=Inner)
 
 TypesToReflect.S3
@@ -427,14 +427,14 @@ primaryArchetype: A
 
 dependentMember1: A.Outer
 (dependent_member
-  (protocol module=TypesToReflect name=P2)
+  (protocol TypesToReflect.P2)
   (generic_type_parameter depth=0 index=0) member=Outer)
 
 dependentMember2: A.Outer.Inner
 (dependent_member
-  (protocol module=TypesToReflect name=P1)
+  (protocol TypesToReflect.P1)
   (dependent_member
-    (protocol module=TypesToReflect name=P2)
+    (protocol TypesToReflect.P2)
     (generic_type_parameter depth=0 index=0) member=Outer) member=Inner)
 
 TypesToReflect.S4
@@ -511,7 +511,7 @@ Primary: A
 
 DependentMemberInner: A.Inner
 (dependent_member
-  (protocol module=TypesToReflect name=P1)
+  (protocol TypesToReflect.P1)
   (generic_type_parameter depth=0 index=0) member=Inner)
 
 ExistentialMetatype: A.Type
@@ -553,18 +553,28 @@ Primary: A
 
 DependentMemberOuter: A.Outer
 (dependent_member
-  (protocol module=TypesToReflect name=P2)
+  (protocol TypesToReflect.P2)
   (generic_type_parameter depth=0 index=0) member=Outer)
 
 DependentMemberInner: A.Outer.Inner
 (dependent_member
-  (protocol module=TypesToReflect name=P1)
+  (protocol TypesToReflect.P1)
   (dependent_member
-    (protocol module=TypesToReflect name=P2)
+    (protocol TypesToReflect.P2)
     (generic_type_parameter depth=0 index=0) member=Outer) member=Inner)
 
 TypesToReflect.E4
 -----------------
+TypesToReflect.P1
+-----------------
+TypesToReflect.P2
+-----------------
+TypesToReflect.P3
+-----------------
+TypesToReflect.P4
+-----------------
+TypesToReflect.ClassBoundP
+--------------------------
 
 ASSOCIATED TYPES:
 =================

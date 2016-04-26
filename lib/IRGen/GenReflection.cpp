@@ -369,6 +369,20 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
       }
       break;
     }
+    case DeclKind::Protocol: {
+      auto protocolDecl = cast<ProtocolDecl>(decl);
+      FieldDescriptorKind Kind;
+      if (protocolDecl->isObjC())
+        Kind = FieldDescriptorKind::ObjCProtocol;
+      else if (protocolDecl->requiresClass())
+        Kind = FieldDescriptorKind::ClassProtocol;
+      else
+        Kind = FieldDescriptorKind::Protocol;
+      addConstantInt16(uint16_t(Kind));
+      addConstantInt16(fieldRecordSize);
+      addConstantInt32(0);
+      break;
+    }
     default:
       llvm_unreachable("Not a nominal type");
       break;

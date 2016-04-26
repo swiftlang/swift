@@ -102,7 +102,10 @@ struct FieldRecordIterator {
 enum class FieldDescriptorKind : uint16_t {
   Struct,
   Class,
-  Enum
+  Enum,
+  Protocol,
+  ClassProtocol,
+  ObjCProtocol,
 };
 
 // Field descriptors contain a collection of field records for a single

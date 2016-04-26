@@ -24,23 +24,9 @@
 
 #include <vector>
 #include <unordered_map>
-#include <utility>
 
 namespace swift {
 namespace remote {
-
-template <typename Runtime>
-using SharedTargetMetadataRef = std::shared_ptr<TargetMetadata<Runtime>>;
-
-using SharedCaptureDescriptor = std::shared_ptr<const CaptureDescriptor>;
-
-template <typename Runtime>
-using SharedTargetNominalTypeDescriptorRef
-  = std::shared_ptr<TargetNominalTypeDescriptor<Runtime>>;
-
-template <typename Runtime>
-using SharedProtocolDescriptorRef
-  = std::shared_ptr<TargetProtocolDescriptor<Runtime>>;
 
 /// A utility class for constructing abstract types from
 /// a textual mangling.
@@ -134,7 +120,17 @@ class TypeDecoder {
     case NodeKind::Protocol: {
       auto moduleName = Node->getChild(0)->getText();
       auto name = Node->getChild(1)->getText();
-      return Builder.createProtocolType(moduleName, name);
+
+      // Consistent handling of protocols and protocol compositions
+      auto protocolList = Demangle::NodeFactory::create(NodeKind::ProtocolList);
+      auto typeList = Demangle::NodeFactory::create(NodeKind::TypeList);
+      auto type = Demangle::NodeFactory::create(NodeKind::Type);
+      type->addChild(Node);
+      typeList->addChild(type);
+      protocolList->addChild(typeList);
+
+      auto mangledName = Demangle::mangleNode(protocolList);
+      return Builder.createProtocolType(mangledName, moduleName, name);
     }
     case NodeKind::DependentGenericParamType: {
       auto depth = Node->getChild(0)->getIndex();
@@ -176,15 +172,39 @@ class TypeDecoder {
       return decodeMangledType(Node->getChild(0));
     case NodeKind::NonVariadicTuple:
     case NodeKind::VariadicTuple: {
-      std::vector<BuiltType> Elements;
-      for (auto element : *Node) {
-        auto elementType = decodeMangledType(element);
+      std::vector<BuiltType> elements;
+      std::string labels;
+      for (auto &element : *Node) {
+        if (element->getKind() != NodeKind::TupleElement)
+          return BuiltType();
+
+        // If the tuple element is labelled, add its label to 'labels'.
+        unsigned typeChildIndex = 0;
+        if (element->getChild(0)->getKind() == NodeKind::TupleElementName) {
+          // Add spaces to terminate all the previous labels if this
+          // is the first we've seen.
+          if (labels.empty()) labels.append(elements.size(), ' ');
+
+          // Add the label and its terminator.
+          labels += element->getChild(0)->getText();
+          labels += ' ';
+          typeChildIndex = 1;
+
+        // Otherwise, add a space if a previous element had a label.
+        } else if (!labels.empty()) {
+          labels += ' ';
+        }
+
+        // Decode the element type.
+        BuiltType elementType =
+          decodeMangledType(element->getChild(typeChildIndex));
         if (!elementType)
           return BuiltType();
-        Elements.push_back(elementType);
+
+        elements.push_back(elementType);
       }
-      bool Variadic = (Node->getKind() == NodeKind::VariadicTuple);
-      return Builder.createTupleType(Elements, Variadic);
+      bool variadic = (Node->getKind() == NodeKind::VariadicTuple);
+      return Builder.createTupleType(elements, std::move(labels), variadic);
     }
     case NodeKind::TupleElement:
       if (Node->getChild(0)->getKind() == NodeKind::TupleElementName)
@@ -351,6 +371,14 @@ public:
   }
 };
 
+/// A structure, designed for use with std::unique_ptr, which destroys
+/// a pointer by calling free on it (and not trying to call a destructor).
+struct delete_with_free {
+  void operator()(const void *memory) {
+    free(const_cast<void*>(memory));
+  }
+};
+
 /// A generic reader of metadata.
 ///
 /// BuilderType must implement a particular interface which is currently
@@ -373,21 +401,29 @@ private:
 
   using MetadataRef =
     RemoteRef<Runtime, TargetMetadata<Runtime>>;
-  using SharedMetadataRef =
-    SharedTargetMetadataRef<Runtime>;
+  using OwnedMetadataRef =
+    std::unique_ptr<const TargetMetadata<Runtime>, delete_with_free>;
 
   /// A cache of read type metadata, keyed by the address of the metadata.
-  std::unordered_map<StoredPointer, SharedMetadataRef> MetadataCache;
+  std::unordered_map<StoredPointer, OwnedMetadataRef>
+    MetadataCache;
 
   using NominalTypeDescriptorRef =
     RemoteRef<Runtime, TargetNominalTypeDescriptor<Runtime>>;
-  using SharedNominalTypeDescriptorRef =
-    SharedTargetNominalTypeDescriptorRef<Runtime>;
+  using OwnedNominalTypeDescriptorRef =
+    std::unique_ptr<const TargetNominalTypeDescriptor<Runtime>,
+                    delete_with_free>;
 
   /// A cache of read nominal type descriptors, keyed by the address of the
   /// nominal type descriptor.
-  std::unordered_map<StoredPointer, SharedNominalTypeDescriptorRef>
+  std::unordered_map<StoredPointer, OwnedNominalTypeDescriptorRef>
     NominalTypeDescriptorCache;
+
+  using OwnedProtocolDescriptorRef =
+    std::unique_ptr<const TargetProtocolDescriptor<Runtime>, delete_with_free>;
+
+  using OwnedCaptureDescriptor =
+    std::unique_ptr<const CaptureDescriptor, delete_with_free>;
 
 public:
   BuilderType Builder;
@@ -421,21 +457,12 @@ public:
   }
 
   /// Given a remote pointer to metadata, attempt to discover its MetadataKind.
-  std::pair<bool,MetadataKind>
+  std::pair<bool, MetadataKind>
   readKindFromMetadata(StoredPointer MetadataAddress) {
-    auto Cached = MetadataCache.find(MetadataAddress);
-    if (Cached != MetadataCache.end()) {
-      if (auto Meta = Cached->second) {
-        return {true,Cached->second->getKind()};
-      } else {
-        return {false,MetadataKind::Opaque};
-      }
-    }
+    auto meta = readMetadata(MetadataAddress);
+    if (!meta) return {false, MetadataKind::Opaque};
 
-    auto Meta = readMetadata(MetadataAddress);
-    if (!Meta) return {false,MetadataKind::Opaque};
-
-    return {true,Meta->getKind()};
+    return {true, meta->getKind()};
   }
 
   /// Given a remote pointer to metadata, attempt to turn it into a type.
@@ -456,24 +483,35 @@ public:
     case MetadataKind::Optional:
       return readNominalTypeFromMetadata(Meta);
     case MetadataKind::Tuple: {
-      auto TupleMeta = cast<TargetTupleTypeMetadata<Runtime>>(Meta);
-      std::vector<BuiltType> Elements;
-      StoredPointer ElementAddress = MetadataAddress +
+      auto tupleMeta = cast<TargetTupleTypeMetadata<Runtime>>(Meta);
+
+      std::vector<BuiltType> elementTypes;
+      elementTypes.reserve(tupleMeta->NumElements);
+
+      StoredPointer elementAddress = MetadataAddress +
         sizeof(TargetTupleTypeMetadata<Runtime>);
       using Element = typename TargetTupleTypeMetadata<Runtime>::Element;
-      for (StoredPointer i = 0; i < TupleMeta->NumElements; ++i,
-           ElementAddress += sizeof(Element)) {
-        Element E;
-        if (!Reader->readBytes(RemoteAddress(ElementAddress),
-                               (uint8_t*)&E, sizeof(Element)))
+      for (StoredPointer i = 0; i < tupleMeta->NumElements; ++i,
+           elementAddress += sizeof(Element)) {
+        Element element;
+        if (!Reader->readBytes(RemoteAddress(elementAddress),
+                               (uint8_t*)&element, sizeof(Element)))
           return BuiltType();
 
-        if (auto ElementTypeRef = readTypeFromMetadata(E.Type))
-          Elements.push_back(ElementTypeRef);
+        if (auto elementType = readTypeFromMetadata(element.Type))
+          elementTypes.push_back(elementType);
         else
           return BuiltType();
       }
-      return Builder.createTupleType(Elements, /*variadic*/ false);
+
+      // Read the labels string.
+      std::string labels;
+      if (tupleMeta->Labels &&
+          !Reader->readString(RemoteAddress(tupleMeta->Labels), labels))
+        return BuiltType();
+
+      return Builder.createTupleType(elementTypes, std::move(labels),
+                                     /*variadic*/ false);
     }
     case MetadataKind::Function: {
       auto Function = cast<TargetFunctionTypeMetadata<Runtime>>(Meta);
@@ -545,8 +583,18 @@ public:
       if (!Instance) return BuiltType();
       return Builder.createExistentialMetatypeType(Instance);
     }
-    case MetadataKind::ForeignClass:
-      return Builder.getUnnamedForeignClassType();
+    case MetadataKind::ForeignClass: {
+      auto namePtrAddress =
+        Meta.getAddress() + TargetForeignClassMetadata<Runtime>::OffsetToName;
+      StoredPointer namePtr;
+      if (!Reader->readInteger(RemoteAddress(namePtrAddress), &namePtr) ||
+          namePtr == 0)
+        return BuiltType();
+      std::string name;
+      if (!Reader->readString(RemoteAddress(namePtr), name))
+        return BuiltType();
+      return Builder.createForeignClassType(std::move(name));
+    }
     case MetadataKind::HeapLocalVariable:
         return Builder.getUnnamedForeignClassType(); // FIXME?
     case MetadataKind::HeapGenericLocalVariable:
@@ -581,16 +629,21 @@ protected:
   }
 
 private:
-  template <typename M>
-  MetadataRef _readMetadata(StoredPointer address, size_t size = sizeof(M)) {
-    uint8_t *buffer = (uint8_t *)malloc(size);
+  template <template <class R> class M>
+  MetadataRef _readMetadata(StoredPointer address) {
+    return _readMetadata(address, sizeof(M<Runtime>));
+  }
+
+  MetadataRef _readMetadata(StoredPointer address, size_t sizeAfter) {
+    auto size = sizeAfter;
+    uint8_t *buffer = (uint8_t *) malloc(size);
     if (!Reader->readBytes(RemoteAddress(address), buffer, size)) {
       free(buffer);
       return nullptr;
     }
 
     auto metadata = reinterpret_cast<TargetMetadata<Runtime>*>(buffer);
-    MetadataCache.insert({address, SharedMetadataRef(metadata, free)});
+    MetadataCache.insert(std::make_pair(address, OwnedMetadataRef(metadata)));
     return MetadataRef(address, metadata);
   }
 
@@ -605,58 +658,55 @@ private:
 
     switch (getEnumeratedMetadataKind(KindValue)) {
     case MetadataKind::Class:
-      return _readMetadata<TargetClassMetadata<Runtime>>(address);
+      return _readMetadata<TargetClassMetadata>(address);
     case MetadataKind::Enum:
-      return _readMetadata<TargetEnumMetadata<Runtime>>(address);
+      return _readMetadata<TargetEnumMetadata>(address);
     case MetadataKind::ErrorObject:
-      return _readMetadata<TargetEnumMetadata<Runtime>>(address);
+      return _readMetadata<TargetEnumMetadata>(address);
     case MetadataKind::Existential: {
-      StoredPointer NumProtocolsAddress = address +
+      StoredPointer numProtocolsAddress = address +
         TargetExistentialTypeMetadata<Runtime>::OffsetToNumProtocols;
-      StoredPointer NumProtocols;
-      if (!Reader->readInteger(RemoteAddress(NumProtocolsAddress),
-                               &NumProtocols))
+      StoredPointer numProtocols;
+      if (!Reader->readInteger(RemoteAddress(numProtocolsAddress),
+                               &numProtocols))
         return nullptr;
 
-      auto TotalSize = sizeof(TargetExistentialTypeMetadata<Runtime>) +
-        NumProtocols *
+      auto totalSize = sizeof(TargetExistentialTypeMetadata<Runtime>)
+                     + numProtocols *
           sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
 
-      return _readMetadata<TargetExistentialTypeMetadata<Runtime>>(address,
-                                                                   TotalSize);
+      return _readMetadata(address, totalSize);
     }
     case MetadataKind::ExistentialMetatype:
-      return _readMetadata<
-        TargetExistentialMetatypeMetadata<Runtime>>(address);
+      return _readMetadata<TargetExistentialMetatypeMetadata>(address);
     case MetadataKind::ForeignClass:
-      return _readMetadata<TargetForeignClassMetadata<Runtime>>(address);
+      return _readMetadata<TargetForeignClassMetadata>(address);
     case MetadataKind::Function:
-      return _readMetadata<TargetFunctionTypeMetadata<Runtime>>(address);
+      return _readMetadata<TargetFunctionTypeMetadata>(address);
     case MetadataKind::HeapGenericLocalVariable:
-      return _readMetadata<TargetHeapLocalVariableMetadata<Runtime>>(address);
+      return _readMetadata<TargetHeapLocalVariableMetadata>(address);
     case MetadataKind::HeapLocalVariable:
-      return _readMetadata<TargetHeapLocalVariableMetadata<Runtime>>(address);
+      return _readMetadata<TargetHeapLocalVariableMetadata>(address);
     case MetadataKind::Metatype:
-      return _readMetadata<TargetMetatypeMetadata<Runtime>>(address);
+      return _readMetadata<TargetMetatypeMetadata>(address);
     case MetadataKind::ObjCClassWrapper:
-      return _readMetadata<TargetObjCClassWrapperMetadata<Runtime>>(address);
+      return _readMetadata<TargetObjCClassWrapperMetadata>(address);
     case MetadataKind::Opaque:
-      return _readMetadata<TargetOpaqueMetadata<Runtime>>(address);
+      return _readMetadata<TargetOpaqueMetadata>(address);
     case MetadataKind::Optional:
-      return _readMetadata<TargetEnumMetadata<Runtime>>(address);
+      return _readMetadata<TargetEnumMetadata>(address);
     case MetadataKind::Struct:
-      return _readMetadata<TargetStructMetadata<Runtime>>(address);
+      return _readMetadata<TargetStructMetadata>(address);
     case MetadataKind::Tuple: {
-      auto NumElementsAddress = address +
+      auto numElementsAddress = address +
         TargetTupleTypeMetadata<Runtime>::OffsetToNumElements;
-      StoredSize NumElements;
-      if (!Reader->readInteger(RemoteAddress(NumElementsAddress),
-                               &NumElements))
+      StoredSize numElements;
+      if (!Reader->readInteger(RemoteAddress(numElementsAddress),
+                               &numElements))
         return nullptr;
-      auto TotalSize = sizeof(TargetTupleTypeMetadata<Runtime>) +
-        NumElements * sizeof(StoredPointer);
-      return _readMetadata<TargetTupleTypeMetadata<Runtime>>(address,
-                                                             TotalSize);
+      auto totalSize = sizeof(TargetTupleTypeMetadata<Runtime>)
+                     + numElements * sizeof(StoredPointer);
+      return _readMetadata(address, totalSize);
     }
     }
 
@@ -703,8 +753,8 @@ private:
     auto descriptor
       = reinterpret_cast<TargetNominalTypeDescriptor<Runtime> *>(buffer);
 
-    NominalTypeDescriptorCache.insert({address,
-                            SharedNominalTypeDescriptorRef(descriptor, free)});
+    NominalTypeDescriptorCache.insert(
+      std::make_pair(address, OwnedNominalTypeDescriptorRef(descriptor)));
     return NominalTypeDescriptorRef(address, descriptor);
   }
 
@@ -724,7 +774,7 @@ private:
     return decl;
   }
 
-  SharedProtocolDescriptorRef<Runtime>
+  OwnedProtocolDescriptorRef
   readProtocolDescriptor(StoredPointer Address) {
     auto Size = sizeof(TargetProtocolDescriptor<Runtime>);
     auto Buffer = (uint8_t *)malloc(Size);
@@ -734,7 +784,7 @@ private:
     }
     auto Casted
       = reinterpret_cast<TargetProtocolDescriptor<Runtime> *>(Buffer);
-    return SharedProtocolDescriptorRef<Runtime>(Casted, free);
+    return OwnedProtocolDescriptorRef(Casted);
   }
 
   StoredPointer getNominalParent(MetadataRef metadata,
@@ -830,7 +880,7 @@ private:
   /// Read the entire CaptureDescriptor in this address space, including
   /// trailing capture typeref relative offsets, and GenericMetadataSource
   /// pairs.
-  SharedCaptureDescriptor readCaptureDescriptor(StoredPointer Address) {
+  OwnedCaptureDescriptor readCaptureDescriptor(StoredPointer Address) {
 
     uint32_t NumCaptures = 0;
     uint32_t NumMetadataSources = 0;
@@ -857,7 +907,7 @@ private:
     }
 
     auto RawDescriptor = reinterpret_cast<const CaptureDescriptor *>(Buffer);
-    return SharedCaptureDescriptor(RawDescriptor, /*deleter*/ free);
+    return OwnedCaptureDescriptor(RawDescriptor);
   }
 };
 

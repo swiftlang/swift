@@ -147,7 +147,7 @@ func _getSummary<T>(_ out: UnsafeMutablePointer<String>, x: T) {
 /// of any type.
 @warn_unused_result
 @_silgen_name("swift_reflectAny")
-public func _reflect<T>(_ x: T) -> _Mirror
+internal func _reflect<T>(_ x: T) -> _Mirror
 
 /// Dump an object's contents using its mirror to the specified output stream.
 public func dump<T, TargetStream : OutputStream>(

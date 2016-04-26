@@ -38,16 +38,24 @@ typedef struct swift_reflection_section_t {
   void *End;
 } swift_reflection_section_t;
 
-/// The kind of a Swift type.
+/// The layout kind of a Swift type.
 typedef enum swift_layout_kind_t {
+  // Nothing is known about the size or contents of this value.
   SWIFT_UNKNOWN,
 
+  // An opaque value with known size and alignment but no specific
+  // interpretation.
   SWIFT_BUILTIN,
 
+  // Record types consisting of zero or more fields.
   SWIFT_TUPLE,
   SWIFT_STRUCT,
   SWIFT_THICK_FUNCTION,
+  SWIFT_EXISTENTIAL,
+  SWIFT_CLASS_EXISTENTIAL,
+  SWIFT_EXISTENTIAL_METATYPE,
 
+  // References to other objects in the heap.
   SWIFT_STRONG_REFERENCE,
   SWIFT_UNOWNED_REFERENCE,
   SWIFT_WEAK_REFERENCE,
@@ -58,7 +66,7 @@ struct swift_childinfo;
 
 /// A description of the memory layout of a type or field of a type.
 typedef struct swift_typeinfo {
-  swift_layout_kind_t LayoutKind;
+  swift_layout_kind_t Kind;
 
   unsigned Size;
   unsigned Alignment;
@@ -71,6 +79,7 @@ typedef struct swift_childinfo {
   /// The memory for Name is owned by the reflection context.
   const char *Name;
   unsigned Offset;
+  swift_layout_kind_t Kind;
   swift_typeref_t TR;
 } swift_childinfo_t;
 

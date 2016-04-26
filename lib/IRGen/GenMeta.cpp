@@ -5391,13 +5391,13 @@ namespace {
 
 llvm::Constant *
 IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
-  // Create a temporary base for relative references.
-  auto tempBase = createTemporaryRelativeAddressBase(*this);
-
   // What we save in GlobalVars is actually the offsetted value.
   auto entity = LinkEntity::forForeignTypeMetadataCandidate(type);
   if (auto entry = GlobalVars[entity])
     return entry;
+
+  // Create a temporary base for relative references.
+  auto tempBase = createTemporaryRelativeAddressBase(*this);
   
   // Compute the constant initializer and the offset of the type
   // metadata candidate within it.
@@ -5673,6 +5673,8 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
                                                    init->getType()));
   var->setConstant(true);
   var->setInitializer(init);
+
+  addNominalTypeDecl(protocol);
 }
 
 /// \brief Load a reference to the protocol descriptor for the given protocol.

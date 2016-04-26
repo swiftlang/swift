@@ -1894,6 +1894,9 @@ struct TargetForeignTypeMetadata : public TargetMetadata<Runtime> {
 
   struct HeaderType : HeaderPrefix, TypeMetadataHeader {};
 
+  static constexpr int OffsetToName =
+    (int) offsetof(HeaderType, Name) - (int) sizeof(HeaderType);
+
   TargetPointer<Runtime, const char> getName() const {
     return reinterpret_cast<TargetPointer<Runtime, const char>>(
       asFullMetadata(this)->Name);

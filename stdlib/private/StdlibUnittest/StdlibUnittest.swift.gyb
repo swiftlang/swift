@@ -551,6 +551,8 @@ extension ProcessTerminationStatus {
     case .signal(let signal):
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
     default:
+      // This default case is needed for standard library builds where
+      // resilience is enabled
       return false
     }
   }

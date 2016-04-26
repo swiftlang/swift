@@ -1276,7 +1276,7 @@ namespace {
         return nullptr;
 
       // Check for swift_newtype
-      if (!SwiftType) {
+      if (!SwiftType && Impl.HonorSwiftNewtypeAttr) {
         if (auto newtypeAttr =
                 Decl->template getAttr<clang::SwiftNewtypeAttr>()) {
           switch (newtypeAttr->getNewtypeKind()) {
@@ -4366,9 +4366,6 @@ namespace {
     Optional<GenericParamList *> importObjCGenericParams(
        const clang::ObjCInterfaceDecl *decl, DeclContext *dc)
     {
-      if (!Impl.SwiftContext.LangOpts.ImportObjCGenerics) {
-        return nullptr;
-      }
       auto typeParamList = decl->getTypeParamList();
       if (!typeParamList) {
         return nullptr;

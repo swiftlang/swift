@@ -1949,8 +1949,6 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
   ParserResult<BraceStmt> body =
       parseBraceItemList(diag::expected_lbrace_after_repeat);
   status |= body;
-  if (status.hasCodeCompletion())
-    return makeParserResult<Stmt>(status, nullptr);
   if (body.isNull())
     body = makeParserResult(
         body, BraceStmt::create(Context, repeatLoc, {}, PreviousLoc, true));
@@ -1972,7 +1970,7 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
     condition = parseExpr(diag::expected_expr_repeat_while);
     status |= condition;
     if (condition.isNull()) {
-      return makeParserResult<Stmt>(status, nullptr); // FIXME: better recovery
+      condition = makeParserErrorResult(new (Context) ErrorExpr(whileLoc));
     }
   }
 

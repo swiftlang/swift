@@ -805,7 +805,12 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
       assert(std::distance(D->getStoredProperties().begin(),
                            D->getStoredProperties().end()) == 1 &&
              "Struct representation of a Clang enum should wrap one value");
-
+    } else if (clangDecl->hasAttr<clang::SwiftNewtypeAttr>()) {
+      // Fall back to Swift lowering for the underlying type's
+      // representation as a struct member.
+      assert(std::distance(D->getStoredProperties().begin(),
+                           D->getStoredProperties().end()) == 1 &&
+             "Struct representation of a swift_newtype should wrap one value");
     } else {
       llvm_unreachable("Swift struct represents unexpected imported type");
     }

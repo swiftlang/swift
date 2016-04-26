@@ -549,6 +549,7 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
   for (auto *Store : Stores)
     SSAUp.AddAvailableValue(Store->getParent(), Store->getSrc());
 
+  SILLocation Loc = Stores[0]->getLoc();
   for (auto *RelPoint : ReleasePoints) {
     SILBuilder B(RelPoint);
     // This does not use the SSAUpdater::RewriteUse API because it does not do
@@ -557,9 +558,9 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
     // can simply ask SSAUpdater for the reaching store.
     SILValue RelVal = SSAUp.GetValueAtEndOfBlock(RelPoint->getParent());
     if (StVal->getType().isReferenceCounted(RelPoint->getModule()))
-      B.createStrongRelease(RelPoint->getLoc(), RelVal, Atomicity::Atomic);
+      B.createStrongRelease(Loc, RelVal, Atomicity::Atomic);
     else
-      B.createReleaseValue(RelPoint->getLoc(), RelVal, Atomicity::Atomic);
+      B.createReleaseValue(Loc, RelVal, Atomicity::Atomic);
   }
 }
 

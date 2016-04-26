@@ -36,7 +36,21 @@ class TypeRefBuilder;
 enum class RecordKind : unsigned {
   Tuple,
   Struct,
+
+  // A Swift-native function is always a function pointer followed by a
+  // retainable, nullable context pointer.
   ThickFunction,
+
+  // An existential is a three-word buffer followed by value metadata and
+  // witness tables.
+  Existential,
+
+  // A class existential is a retainable pointer followed by witness
+  // tables.
+  ClassExistential,
+
+  // An existential metatype.
+  ExistentialMetatype,
 };
 
 enum class ReferenceCounting : unsigned {
@@ -146,6 +160,7 @@ class TypeConverter {
   const TypeRef *NativeObjectTR = nullptr;
   const TypeRef *UnknownObjectTR = nullptr;
   const TypeInfo *ThickFunctionTI = nullptr;
+  const TypeInfo *EmptyTI = nullptr;
 
 public:
   explicit TypeConverter(TypeRefBuilder &Builder) : Builder(Builder) {}
@@ -163,6 +178,7 @@ public:
   const TypeRef *getNativeObjectTypeRef();
   const TypeRef *getUnknownObjectTypeRef();
   const TypeInfo *getThickFunctionTypeInfo();
+  const TypeInfo *getEmptyTypeInfo();
 
   template <typename TypeInfoTy, typename... Args>
   const TypeInfoTy *makeTypeInfo(Args... args) {

@@ -20,7 +20,9 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangImporter.h"
 
 using namespace swift;
 using namespace swift::remote;
@@ -37,17 +39,42 @@ class RemoteASTTypeBuilder {
   /// Created lazily.
   DeclContext *NotionalDC = nullptr;
 
+  Optional<Failure> CurFailure;
+
 public:
   using BuiltType = swift::Type;
   using BuiltNominalTypeDecl = swift::NominalTypeDecl*;
   explicit RemoteASTTypeBuilder(ASTContext &ctx) : Ctx(ctx) {}
+
+  template <class Result, class FailureKindTy, class... FailureArgTys>
+  Result fail(FailureKindTy kind, FailureArgTys &&...failureArgs) {
+    if (!CurFailure) {
+      CurFailure.emplace(kind, std::forward<FailureArgTys>(failureArgs)...);
+    }
+    return Result();
+  }
+
+  template <class T, class DefaultFailureKindTy, class... DefaultFailureArgTys>
+  Result<T> getFailureAsResult(DefaultFailureKindTy defaultFailureKind,
+                               DefaultFailureArgTys &&...defaultFailureArgs) {
+    // If we already have a failure, use that.
+    if (CurFailure) {
+      Result<T> result = std::move(*CurFailure);
+      CurFailure.reset();
+      return result;
+    }
+
+    // Otherwise, use the default failure.
+    return Result<T>::emplaceFailure(defaultFailureKind,
+               std::forward<DefaultFailureArgTys>(defaultFailureArgs)...);
+  }
 
   Type createBuiltinType(const std::string &mangledName) {
     // TODO
     return Type();
   }
 
-  NominalTypeDecl *createNominalTypeDecl(std::string &&mangledName) {
+  NominalTypeDecl *createNominalTypeDecl(StringRef mangledName) {
     auto node = Demangle::demangleTypeAsNode(mangledName);
     if (!node) return nullptr;
 
@@ -157,14 +184,22 @@ public:
     return genericType;
   }
 
-  Type createTupleType(ArrayRef<Type> eltTypes, bool isVariadic) {
+  Type createTupleType(ArrayRef<Type> eltTypes, StringRef labels,
+                       bool isVariadic) {
     // Just bail out on variadic tuples for now.
     if (isVariadic) return Type();
 
     SmallVector<TupleTypeElt, 4> elements;
     elements.reserve(eltTypes.size());
     for (auto eltType : eltTypes) {
-      elements.push_back(eltType);
+      Identifier label;
+      if (!labels.empty()) {
+        auto split = labels.split(' ');
+        if (!split.first.empty())
+          label = Ctx.getIdentifier(split.first);
+        labels = split.second;
+      }
+      elements.emplace_back(eltType, label);
     }
 
     return TupleType::get(elements, Ctx);
@@ -219,7 +254,9 @@ public:
     return FunctionType::get(input, output, einfo);
   }
 
-  Type createProtocolType(StringRef moduleName, StringRef protocolName) {
+  Type createProtocolType(StringRef mangledName,
+                          StringRef moduleName,
+                          StringRef protocolName) {
     auto module = Ctx.getModuleByName(moduleName);
     if (!module) return Type();
 
@@ -282,6 +319,13 @@ public:
     return Type();
   }
 
+  Type createForeignClassType(StringRef mangledName) {
+    auto typeDecl = createNominalTypeDecl(mangledName);
+    if (!typeDecl) return Type();
+
+    return createNominalType(typeDecl, /*parent*/ Type());
+  }
+
   Type getUnnamedForeignClassType() {
     return Type();
   }
@@ -313,11 +357,14 @@ private:
   DeclContext *findDeclContext(const Demangle::NodePointer &node);
   ModuleDecl *findModule(const Demangle::NodePointer &node);
   Demangle::NodePointer findModuleNode(const Demangle::NodePointer &node);
+  bool isForeignModule(const Demangle::NodePointer &node);
 
   NominalTypeDecl *findNominalTypeDecl(DeclContext *dc,
                                        Identifier name,
                                        Identifier privateDiscriminator,
                                        Demangle::Node::Kind kind);
+  NominalTypeDecl *findForeignNominalTypeDecl(Identifier name,
+                                              Demangle::Node::Kind kind);
 
   Type checkTypeRepr(TypeRepr *repr) {
     DeclContext *dc = getNotionalDC();
@@ -328,6 +375,20 @@ private:
       return Type();
 
     return loc.getType();
+  }
+
+  static NominalTypeDecl *getAcceptableNominalTypeCandidate(ValueDecl *decl, 
+                                                  Demangle::Node::Kind kind) {
+    if (kind == Demangle::Node::Kind::Class) {
+      return dyn_cast<ClassDecl>(decl);
+    } else if (kind == Demangle::Node::Kind::Enum) {
+      return dyn_cast<EnumDecl>(decl);
+    } else if (kind == Demangle::Node::Kind::Protocol) {
+      return dyn_cast<ProtocolDecl>(decl);
+    } else {
+      assert(kind == Demangle::Node::Kind::Structure);
+      return dyn_cast<StructDecl>(decl);
+    }
   }
 
   DeclContext *getNotionalDC() {
@@ -363,7 +424,10 @@ private:
 NominalTypeDecl *
 RemoteASTTypeBuilder::createNominalTypeDecl(const Demangle::NodePointer &node) {
   auto DC = findDeclContext(node);
-  if (!DC) return nullptr;
+  if (!DC) {
+    return fail<NominalTypeDecl*>(Failure::CouldNotResolveTypeDecl,
+                                  Demangle::mangleNode(node));
+  }
 
   auto decl = dyn_cast<NominalTypeDecl>(DC);
   if (!decl) return nullptr;
@@ -388,6 +452,16 @@ RemoteASTTypeBuilder::findModuleNode(const Demangle::NodePointer &node) {
     return nullptr;
 
   return findModuleNode(child->getFirstChild());
+}
+
+bool RemoteASTTypeBuilder::isForeignModule(const Demangle::NodePointer &node) {
+  if (node->getKind() == Demangle::Node::Kind::DeclContext)
+    return isForeignModule(node->getFirstChild());
+
+  if (node->getKind() != Demangle::Node::Kind::Module)
+    return false;
+
+  return (node->getText() == "__ObjC");
 }
 
 DeclContext *
@@ -423,9 +497,6 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
       return dyn_cast<DeclContext>(decl);
     }
 
-    DeclContext *dc = findDeclContext(node->getChild(0));
-    if (!dc) return nullptr;
-
     Identifier name;
     Identifier privateDiscriminator;
     if (declNameNode->getKind() == Demangle::Node::Kind::Identifier) {
@@ -439,6 +510,17 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
     // Ignore any other decl-name productions for now.
     } else {
       return nullptr;
+    }
+
+    DeclContext *dc = findDeclContext(node->getChild(0));
+    if (!dc) {
+      // Do some backup logic for foreign type declarations.
+      if (privateDiscriminator.empty() &&
+          isForeignModule(node->getChild(0))) {
+        return findForeignNominalTypeDecl(name, node->getKind());
+      } else {
+        return nullptr;
+      }
     }
 
     return findNominalTypeDecl(dc, name, privateDiscriminator, node->getKind());
@@ -465,18 +547,9 @@ RemoteASTTypeBuilder::findNominalTypeDecl(DeclContext *dc,
   NominalTypeDecl *result = nullptr;
   for (auto decl : lookupResults) {
     // Ignore results that are not the right kind of nominal type declaration.
-    NominalTypeDecl *candidate;
-    if (kind == Demangle::Node::Kind::Class) {
-      candidate = dyn_cast<ClassDecl>(decl);
-    } else if (kind == Demangle::Node::Kind::Enum) {
-      candidate = dyn_cast<EnumDecl>(decl);
-    } else if (kind == Demangle::Node::Kind::Protocol) {
-      candidate = dyn_cast<ProtocolDecl>(decl);
-    } else {
-      assert(kind == Demangle::Node::Kind::Structure);
-      candidate = dyn_cast<StructDecl>(decl);
-    }
-    if (!candidate) return nullptr;
+    NominalTypeDecl *candidate = getAcceptableNominalTypeCandidate(decl, kind);
+    if (!candidate)
+      continue;
 
     // Ignore results that aren't actually from the defining module.
     if (candidate->getParentModule() != module)
@@ -492,76 +565,99 @@ RemoteASTTypeBuilder::findNominalTypeDecl(DeclContext *dc,
   return result;
 }
 
+NominalTypeDecl *
+RemoteASTTypeBuilder::findForeignNominalTypeDecl(Identifier name,
+                                                 Demangle::Node::Kind kind) {
+  // Check to see if we have an importer loaded.
+  auto importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+  if (!importer) return nullptr;
+
+  // Find the unique declaration that has the right kind.
+  struct Consumer : VisibleDeclConsumer {
+    Demangle::Node::Kind ExpectedKind;
+    NominalTypeDecl *Result = nullptr;
+    bool HadError = false;
+
+    explicit Consumer(Demangle::Node::Kind kind) : ExpectedKind(kind) {}
+
+    void foundDecl(ValueDecl *decl, DeclVisibilityKind reason) override {
+      if (HadError) return;
+      auto typeDecl = getAcceptableNominalTypeCandidate(decl, ExpectedKind);
+      if (!typeDecl) return;
+      if (!Result) {
+        Result = typeDecl;
+      } else {
+        HadError = true;
+        Result = nullptr;
+      }
+    }
+  } consumer(kind);
+
+  importer->lookupValue(name, consumer);
+
+  return consumer.Result;
+}
+
 namespace {
+
+/// An interface for implementations of the RemoteASTContext interface.
 class RemoteASTContextImpl {
-  using Reader32Ty = MetadataReader<External<RuntimeTarget<4>>,
-                                    RemoteASTTypeBuilder>;
-  using Reader64Ty = MetadataReader<External<RuntimeTarget<8>>,
-                                    RemoteASTTypeBuilder>;
-  union {
-    Reader32Ty *Reader32;
-    Reader64Ty *Reader64;
-  };
-  bool Is32;
+public:
+  RemoteASTContextImpl() = default;
+  virtual ~RemoteASTContextImpl() = default;
+
+  virtual Result<Type>
+  getTypeForRemoteTypeMetadata(RemoteAddress metadata) = 0;
+  virtual Result<MetadataKind>
+  getKindForRemoteTypeMetadata(RemoteAddress metadata) = 0;
+  virtual Result<NominalTypeDecl*>
+  getDeclForRemoteNominalTypeDescriptor(RemoteAddress descriptor) = 0;
+  virtual Result<uint64_t>
+  getOffsetForProperty(Type type, StringRef propertyName) = 0;
+};
+
+/// A template for generating concrete implementations of the
+/// RemoteASTContext interface.
+template <class Runtime>
+class RemoteASTContextConcreteImpl final : public RemoteASTContextImpl {
+  MetadataReader<Runtime, RemoteASTTypeBuilder> Reader;
+
+  RemoteASTTypeBuilder &getBuilder() {
+    return Reader.Builder;
+  }
 
 public:
-  RemoteASTContextImpl(ASTContext &ctx,
-                       std::shared_ptr<MemoryReader> &&reader) {
-    auto &target = ctx.LangOpts.Target;
-    assert(target.isArch32Bit() || target.isArch64Bit());
+  RemoteASTContextConcreteImpl(std::shared_ptr<MemoryReader> &&reader,
+                               ASTContext &ctx)
+    : Reader(std::move(reader), ctx) {}
 
-    Is32 = target.isArch32Bit();
-    if (Is32) {
-      Reader32 = new Reader32Ty(std::move(reader), ctx);
-    } else {
-      Reader64 = new Reader64Ty(std::move(reader), ctx);
-    }
+  Result<Type> getTypeForRemoteTypeMetadata(RemoteAddress metadata) override {
+    if (auto result = Reader.readTypeFromMetadata(metadata.getAddressData()))
+      return result;
+    return getBuilder().template getFailureAsResult<Type>(
+             Failure::Unknown);
   }
 
-  ~RemoteASTContextImpl() {
-    if (Is32) {
-      delete Reader32;
-    } else {
-      delete Reader64;
-    }
+  Result<MetadataKind>
+  getKindForRemoteTypeMetadata(RemoteAddress metadata) override {
+    auto result = Reader.readKindFromMetadata(metadata.getAddressData());
+    if (result.first)
+      return result.second;
+    return getBuilder().template getFailureAsResult<MetadataKind>(
+             Failure::Unknown);
   }
 
-  Result<Type> getTypeForRemoteTypeMetadata(RemoteAddress address) {
-    Type result;
-    if (Is32) {
-      result = Reader32->readTypeFromMetadata(address.getAddressData());
-    } else {
-      result = Reader64->readTypeFromMetadata(address.getAddressData());
-    }
-    if (result) return result;
-    return Result<Type>::emplaceFailure(Failure::Unknown);
+  Result<NominalTypeDecl*>
+  getDeclForRemoteNominalTypeDescriptor(RemoteAddress descriptor) override {
+    if (auto result =
+          Reader.readNominalTypeFromDescriptor(descriptor.getAddressData()))
+      return result;
+    return getBuilder().template getFailureAsResult<NominalTypeDecl*>(
+             Failure::Unknown);
   }
 
-  Result<MetadataKind> getKindForRemoteTypeMetadata(RemoteAddress address) {
-    std::pair<bool,MetadataKind> result;
-    if (Is32) {
-      result = Reader32->readKindFromMetadata(address.getAddressData());
-    } else {
-      result = Reader64->readKindFromMetadata(address.getAddressData());
-    }
-    if (result.first) return Result<MetadataKind>(result.second);
-    return Result<MetadataKind>::emplaceFailure(Failure::Unknown);
-  }
-
-  Result<NominalTypeDecl *>
-  getDeclForRemoteNominalTypeDescriptor(RemoteAddress address) {
-    NominalTypeDecl *result;
-    if (Is32) {
-      result =Reader32->readNominalTypeFromDescriptor(address.getAddressData());
-    } else {
-      result =Reader64->readNominalTypeFromDescriptor(address.getAddressData());
-    }
-
-    if (result) return result;
-    return Result<NominalTypeDecl *>::emplaceFailure(Failure::Unknown);
-  }
-
-  Result<uint64_t> getOffsetForProperty(Type type, StringRef propertyName) {
+  Result<uint64_t>
+  getOffsetForProperty(Type type, StringRef propertyName) override {
     // TODO
     return Result<uint64_t>::emplaceFailure(Failure::Unknown);
   }
@@ -569,13 +665,27 @@ public:
 
 } // end anonymous namespace
 
-static RemoteASTContextImpl* asImpl(void *impl) {
+static RemoteASTContextImpl *createImpl(ASTContext &ctx,
+                                      std::shared_ptr<MemoryReader> &&reader) {
+  auto &target = ctx.LangOpts.Target;
+  assert(target.isArch32Bit() || target.isArch64Bit());
+
+  if (target.isArch32Bit()) {
+    using Target = External<RuntimeTarget<4>>;
+    return new RemoteASTContextConcreteImpl<Target>(std::move(reader), ctx);
+  } else {
+    using Target = External<RuntimeTarget<8>>;
+    return new RemoteASTContextConcreteImpl<Target>(std::move(reader), ctx);
+  }
+}
+
+static RemoteASTContextImpl *asImpl(void *impl) {
   return static_cast<RemoteASTContextImpl*>(impl);
 }
 
 RemoteASTContext::RemoteASTContext(ASTContext &ctx,
                                    std::shared_ptr<MemoryReader> reader)
-  : Impl(new RemoteASTContextImpl(ctx, std::move(reader))) {
+  : Impl(createImpl(ctx, std::move(reader))) {
 }
 
 RemoteASTContext::~RemoteASTContext() {
@@ -585,6 +695,11 @@ RemoteASTContext::~RemoteASTContext() {
 Result<Type>
 RemoteASTContext::getTypeForRemoteTypeMetadata(RemoteAddress address) {
   return asImpl(Impl)->getTypeForRemoteTypeMetadata(address);
+}
+
+Result<MetadataKind>
+RemoteASTContext::getKindForRemoteTypeMetadata(remote::RemoteAddress address) {
+  return asImpl(Impl)->getKindForRemoteTypeMetadata(address);
 }
 
 Result<NominalTypeDecl *>
