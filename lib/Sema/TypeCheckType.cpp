@@ -1338,6 +1338,64 @@ Type TypeChecker::resolveIdentifierType(
   return result;
 }
 
+// Returns true if any illegal IUOs were found. If inference of IUO type is disabled, IUOs may only be specified in the following positions:
+//  * outermost type
+//  * function param
+//  * function return type
+static bool checkForIllegalIUOs(TypeChecker &TC, TypeRepr *Repr,
+                                TypeResolutionOptions Options) {
+  class IllegalIUOWalker : public ASTWalker {
+    TypeChecker &TC;
+    SmallVector<bool, 4> IUOsAllowed;
+    bool FoundIllegalIUO = false;
+
+  public:
+    IllegalIUOWalker(TypeChecker &TC, bool IsGenericParameter)
+      : TC(TC)
+      , IUOsAllowed{!IsGenericParameter} {}
+
+    bool walkToTypeReprPre(TypeRepr *T) {
+      bool iuoAllowedHere = IUOsAllowed.back();
+
+      // Raise a diagnostic if we run into a prohibited IUO.
+      if (!iuoAllowedHere) {
+        if (auto *iuoTypeRepr =
+            dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(T)) {
+          TC.diagnose(iuoTypeRepr->getStartLoc(), diag::iuo_in_illegal_position)
+            .fixItReplace(iuoTypeRepr->getExclamationLoc(), "?");
+          FoundIllegalIUO = true;
+        }
+      }
+
+      bool childIUOsAllowed = false;
+      if (iuoAllowedHere) {
+        if (auto *tupleTypeRepr = dyn_cast<TupleTypeRepr>(T)) {
+          if (tupleTypeRepr->isParenType()) {
+            childIUOsAllowed = true;
+          }
+        } else if (isa<FunctionTypeRepr>(T)) {
+          childIUOsAllowed = true;
+        } else if (isa<AttributedTypeRepr>(T) || isa<InOutTypeRepr>(T)) {
+          childIUOsAllowed = true;
+        }
+      }
+      IUOsAllowed.push_back(childIUOsAllowed);
+      return true;
+    }
+
+    bool walkToTypeReprPost(TypeRepr *T) {
+      IUOsAllowed.pop_back();
+      return true;
+    }
+
+    bool getFoundIllegalIUO() const { return FoundIllegalIUO; }
+  };
+
+  IllegalIUOWalker Walker(TC, Options.contains(TR_GenericSignature));
+  Repr->walk(Walker);
+  return Walker.getFoundIllegalIUO();
+}
+
 bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
                                TypeResolutionOptions options,
                                GenericTypeResolver *resolver,
@@ -1349,6 +1407,9 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
     return Loc.isError();
 
   if (Loc.getType().isNull()) {
+    // Raise error if we parse an IUO type in an illegal position.
+    checkForIllegalIUOs(*this, Loc.getTypeRepr(), options);
+
     auto type = resolveType(Loc.getTypeRepr(), DC, options, resolver,
                             unsatisfiedDependency);
     if (!type) {

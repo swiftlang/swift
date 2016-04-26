@@ -1376,22 +1376,10 @@ class infer_instanceVar1 {
   @objc var var_ArrayType11_: [Any]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
-  var var_ArrayType12: [Any!]
-  // CHECK-LABEL: {{^}}  var var_ArrayType12: [Any!]
-
-  @objc var var_ArrayType12_: [Any!]
-  // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-
   var var_ArrayType13: [Any?]
   // CHECK-LABEL: {{^}}  var var_ArrayType13: [Any?]
 
   @objc var var_ArrayType13_: [Any?]
-  // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-
-  var var_ArrayType14: [AnyObject!]
-  // CHECK-LABEL: {{^}}  var var_ArrayType14: [AnyObject!]
-
-  @objc var var_ArrayType14_: [AnyObject!]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType15: [AnyObject?]
