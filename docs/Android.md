@@ -49,7 +49,7 @@ the Swift stdlib for Android requires the libiconv and libicu libraries.
 However, you'll need versions of these libraries that work on Android devices.
 
 You may download prebuilt copies of these dependencies, built for Ubuntu 15.10
-and Android NDK r11c. Click [here](https://github.com/SwiftAndroid/libiconv-libicu-android/releases/download/android-ndk-r11c/libiconv-libicu-armeabi-v7a-ubuntu-15.10-ndk-r11c.zip)
+and Android NDK r11c. Click [here](https://github.com/SwiftAndroid/libiconv-libicu-android/releases/download/android-ndk-r11c/libiconv-libicu-armeabi-v7a-ubuntu-15.10-ndk-r11c.tar.gz)
 to download, then unzip the archive file.
 
 Alternatively, you may choose to build libiconv and libicu for Android yourself:
