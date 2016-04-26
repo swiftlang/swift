@@ -23,7 +23,7 @@ func testNoEscape(f: @noescape @convention(block) () -> Void, nsStr: NSString,
   // rdar://problem/19818617
   nsStr.enumerateLines(fStr) // okay due to @noescape
 
-  _ = nsStr.enumerateLines as Int // expected-error{{cannot convert value of type '(@noescape (String!) -> Void) -> Void' to type 'Int' in coercion}}
+  _ = nsStr.enumerateLines as Int // expected-error{{cannot convert value of type '(@noescape (String) -> Void) -> Void' to type 'Int' in coercion}}
 }
 
 func checkTypeImpl<T>(_ a: inout T, _: T.Type) {}

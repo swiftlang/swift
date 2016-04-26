@@ -396,14 +396,14 @@ class DesignatedOverrides : Gizmo {
 // Make sure we copy blocks passed in as IUOs - <rdar://problem/22471309>
 
 func registerAnsible() {
-  // CHECK: function_ref @_TFF11objc_thunks15registerAnsibleFT_T_U_FGSQFT_T__T_
-  // CHECK: function_ref @_TTRXFo_oGSQFT_T____XFdCb_dGSQbT_T____
-  Ansible.anseAsync({ completion in completion() })
+  // CHECK: function_ref @_TFF11objc_thunks15registerAnsibleFT_T_U_FGSqFT_T__T_
+  // CHECK: function_ref @_TTRXFo_oGSqFT_T____XFdCb_dGSqbT_T____
+  Ansible.anseAsync({ completion in completion!() })
 }
 
 // FIXME: would be nice if we didn't need to re-abstract as much here.
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oGSQFT_T____XFdCb_dGSQbT_T____ : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@owned ImplicitlyUnwrappedOptional<() -> ()>) -> (), ImplicitlyUnwrappedOptional<@convention(block) () -> ()>) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oGSqFT_T____XFdCb_dGSqbT_T____ : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@owned Optional<() -> ()>) -> (), Optional<@convention(block) () -> ()>) -> ()
 // CHECK: [[HEAP_BLOCK_IUO:%.*]] = copy_block %1
 // CHECK: select_enum [[HEAP_BLOCK_IUO]]
 // CHECK: bb1:
@@ -412,4 +412,4 @@ func registerAnsible() {
 // CHECK: [[BRIDGED_BLOCK:%.*]] = partial_apply [[BLOCK_THUNK]]([[HEAP_BLOCK]])
 // CHECK: [[REABS_THUNK:%.*]] = function_ref @_TTRXFo___XFo_iT__iT__
 // CHECK: [[REABS_BLOCK:%.*]] = partial_apply [[REABS_THUNK]]([[BRIDGED_BLOCK]])
-// CHECK: [[REABS_BLOCK_IUO:%.*]] = enum $ImplicitlyUnwrappedOptional<() -> ()>, {{.*}} [[REABS_BLOCK]]
+// CHECK: [[REABS_BLOCK_IUO:%.*]] = enum $Optional<() -> ()>, {{.*}} [[REABS_BLOCK]]

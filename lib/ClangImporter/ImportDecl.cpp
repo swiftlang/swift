@@ -1289,7 +1289,8 @@ namespace {
             auto underlyingType = Impl.importType(
                 Decl->getUnderlyingType(), ImportTypeKind::Typedef,
                 isInSystemModule(DC),
-                Decl->getUnderlyingType()->isBlockPointerType());
+                Decl->getUnderlyingType()->isBlockPointerType(),
+                OTK_Optional);
 
             auto &cxt = Impl.SwiftContext;
             auto Loc = Impl.importSourceLoc(Decl->getLocation());
@@ -1322,7 +1323,8 @@ namespace {
         SwiftType = Impl.importType(ClangType,
                                     ImportTypeKind::Typedef,
                                     isInSystemModule(DC),
-                                    ClangType->isBlockPointerType());
+                                    ClangType->isBlockPointerType(),
+                                    OTK_Optional);
       }
 
       if (!SwiftType)
