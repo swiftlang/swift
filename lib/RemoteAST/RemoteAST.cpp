@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangImporter.h"
 
 using namespace swift;
 using namespace swift::remote;
@@ -366,8 +367,8 @@ private:
     return loc.getType();
   }
 
-  NominalTypeDecl *getAcceptableNominalTypeCandidate(ValueDecl *decl, 
-                                                    Demangle::Node::Kind kind) {
+  static NominalTypeDecl *getAcceptableNominalTypeCandidate(ValueDecl *decl, 
+                                                  Demangle::Node::Kind kind) {
     if (kind == Demangle::Node::Kind::Class) {
       return dyn_cast<ClassDecl>(decl);
     } else if (kind == Demangle::Node::Kind::Enum) {
@@ -557,44 +558,34 @@ RemoteASTTypeBuilder::findNominalTypeDecl(DeclContext *dc,
 NominalTypeDecl *
 RemoteASTTypeBuilder::findForeignNominalTypeDecl(Identifier name,
                                                  Demangle::Node::Kind kind) {
-  SimpleIdentTypeRepr repr(SourceLoc(), name);
-  auto type = checkTypeRepr(&repr);
-  if (!type) return nullptr;
+  // Check to see if we have an importer loaded.
+  auto importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+  if (!importer) return nullptr;
 
-  if (auto nomTy = type->getAs<NominalType>()) {
-    if (auto typeDecl = getAcceptableNominalTypeCandidate(nomTy->getDecl(), kind)) {
-      if (typeDecl->hasClangNode())
-        return typeDecl;
+  // Find the unique declaration that has the right kind.
+  struct Consumer : VisibleDeclConsumer {
+    Demangle::Node::Kind ExpectedKind;
+    NominalTypeDecl *Result = nullptr;
+    bool HadError = false;
+
+    explicit Consumer(Demangle::Node::Kind kind) : ExpectedKind(kind) {}
+
+    void foundDecl(ValueDecl *decl, DeclVisibilityKind reason) override {
+      if (HadError) return;
+      auto typeDecl = getAcceptableNominalTypeCandidate(decl, ExpectedKind);
+      if (!typeDecl) return;
+      if (!Result) {
+        Result = typeDecl;
+      } else {
+        HadError = true;
+        Result = nullptr;
+      }
     }
-  }
-  return nullptr;
+  } consumer(kind);
 
-  UnqualifiedLookup lookup(name, getNotionalDC(), /*resolver*/ nullptr,
-                           /*known private*/ false, SourceLoc(),
-                           /*type lookup*/ true);
+  importer->lookupValue(name, consumer);
 
-  NominalTypeDecl *result = nullptr;
-  for (auto lookupResult : lookup.Results) {
-    // We can ignore the base declaration here.
-    auto decl = lookupResult.getValueDecl();
-
-    // Ignore results that are not the right kind of nominal type declaration.
-    NominalTypeDecl *candidate = getAcceptableNominalTypeCandidate(decl, kind);
-    if (!candidate)
-      continue;
-
-    // Ignore results that aren't foreign.
-    if (!candidate->hasClangNode())
-      continue;
-
-    // This is a viable result.
-
-    // If we already have a viable result, it's ambiguous, so give up.
-    if (result) return nullptr;
-    result = candidate;
-  }
-
-  return result;
+  return consumer.Result;
 }
 
 namespace {
