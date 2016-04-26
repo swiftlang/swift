@@ -138,7 +138,7 @@ LazyTestSuite.test("EmptyIterator") {
 // FIXME: trap tests.
 
 //===----------------------------------------------------------------------===//
-// lazy()
+// lazy
 //===----------------------------------------------------------------------===//
 
 LazyTestSuite.test("isEmpty") {
@@ -608,6 +608,50 @@ tests.test("LazyMapCollection/Passthrough") {
   }
 }
 
+tests.test("lazy.mapped/TypeInference") {
+  let baseArray: [OpaqueValue<Int>] = (0..<10).map(OpaqueValue.init)
+  do {
+    var mapped = MinimalSequence(elements: baseArray)
+      .lazy.map { _ in OpaqueValue<Int8>(0) }
+    expectType(
+      LazyMapSequence<
+        MinimalSequence<OpaqueValue<Int>>,
+        OpaqueValue<Int8>
+      >.self,
+      &mapped)
+  }
+  do {
+    var mapped = MinimalCollection(elements: baseArray)
+      .lazy.map { _ in OpaqueValue<Int8>(0) }
+    expectType(
+      LazyMapCollection<
+        MinimalCollection<OpaqueValue<Int>>,
+        OpaqueValue<Int8>
+      >.self,
+      &mapped)
+  }
+  do {
+    var mapped = MinimalBidirectionalCollection(elements: baseArray)
+      .lazy.map { _ in OpaqueValue<Int8>(0) }
+    expectType(
+      LazyMapBidirectionalCollection<
+        MinimalBidirectionalCollection<OpaqueValue<Int>>,
+        OpaqueValue<Int8>
+      >.self,
+      &mapped)
+  }
+  do {
+    var mapped = MinimalRandomAccessCollection(elements: baseArray)
+      .lazy.map { _ in OpaqueValue<Int8>(0) }
+    expectType(
+      LazyMapRandomAccessCollection<
+        MinimalRandomAccessCollection<OpaqueValue<Int>>,
+        OpaqueValue<Int8>
+      >.self,
+      &mapped)
+  }
+}
+
 //===--- Reverse ----------------------------------------------------------===//
 tests.test("ReversedCollection") {
   let expected = Array(stride(from: 11, through: 0, by: -1))
@@ -812,6 +856,42 @@ tests.test("LazyFilterCollection") {
   checkFilterIteratorBase(
     base.lazy.filter { $0.value % 2 == 0 },
     base.lazy.filter { $0.value % 2 != 0 })
+}
+
+tests.test("lazy.filter/TypeInference") {
+  let baseArray: [OpaqueValue<Int>] = (0..<10).map(OpaqueValue.init)
+  do {
+    var filtered = MinimalSequence(elements: baseArray)
+      .lazy.filter { _ in true }
+    expectType(
+      LazyFilterSequence<MinimalSequence<OpaqueValue<Int>>>.self,
+      &filtered)
+  }
+  do {
+    var filtered = MinimalCollection(elements: baseArray)
+      .lazy.filter { _ in true }
+    expectType(
+      LazyFilterCollection<MinimalCollection<OpaqueValue<Int>>>.self,
+      &filtered)
+  }
+  do {
+    var filtered = MinimalBidirectionalCollection(elements: baseArray)
+      .lazy.filter { _ in true }
+    expectType(
+      LazyFilterBidirectionalCollection<
+        MinimalBidirectionalCollection<OpaqueValue<Int>>
+      >.self,
+      &filtered)
+  }
+  do {
+    var filtered = MinimalRandomAccessCollection(elements: baseArray)
+      .lazy.filter { _ in true }
+    expectType(
+      LazyFilterBidirectionalCollection<
+        MinimalRandomAccessCollection<OpaqueValue<Int>>
+      >.self,
+      &filtered)
+  }
 }
 
 do {

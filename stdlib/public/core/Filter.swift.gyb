@@ -10,6 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+%{
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal,
+    sliceTypeName
+)
+}%
+
 /// An iterator over the elements traversed by some base iterator that also
 /// satisfy a given predicate.
 ///
@@ -153,6 +161,14 @@ public func > <Base : Collection>(
   return lhs.base > rhs.base
 }
 
+// FIXME(ABI)(compiler limitation): `LazyFilter*Collection` types should be
+// collapsed into one `LazyFilterCollection` using conditional conformances.
+// Maybe even combined with `LazyFilterSequence`.
+
+% for Traversal in ['Forward', 'Bidirectional']:
+%   Self = "LazyFilter" + collectionForTraversal(Traversal)
+%   Slice = sliceTypeName(traversal=Traversal, mutable=False, rangeReplaceable=False)
+
 /// A lazy `Collection` wrapper that includes the elements of an
 /// underlying collection that satisfy a predicate.
 ///
@@ -162,9 +178,9 @@ public func > <Base : Collection>(
 ///   the usual performance given by `Collection`. Be aware, therefore, that 
 ///   general operations on `LazyFilterCollection` instances may not have the
 ///   documented complexity.
-public struct LazyFilterCollection<
+public struct ${Self}<
   Base : Collection
-> : LazyCollectionProtocol {
+> : LazyCollectionProtocol, ${collectionForTraversal(Traversal)} {
 
   /// A type that represents a valid position in the collection.
   ///
@@ -216,6 +232,13 @@ public struct LazyFilterCollection<
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
     return LazyFilterIndex(base: _nextFiltered(i.base))
   }
+
+%   if Traversal == 'Bidirectional':
+  @warn_unused_result
+  public func location(before i: Index) -> Index {
+    fatalError("FIXME: swift-3-indexing-model: implement")
+  }
+%   end
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
@@ -280,6 +303,20 @@ public struct LazyFilterCollection<
     return _base[position.base]
   }
 
+  public subscript(bounds: Range<Index>) -> ${Slice}<${Self}<Base>> {
+    return ${Slice}(base: self, bounds: bounds)
+  }
+
+  // FIXME(ABI)(compiler limitation): we actually want to add:
+  //
+  //   typealias SubSequence = ${Self}<Base.SubSequence>
+  //
+  // so that all slicing optimizations of the base collection can kick in.
+  //
+  // We can't do that right now though, because that would force a lot of
+  // constraints on `Base.SubSequence`, limiting the possible contexts where
+  // the `.lazy.filter` API can be used.
+
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
@@ -291,6 +328,8 @@ public struct LazyFilterCollection<
   var _base: Base
   let _predicate: (Base.Iterator.Element) -> Bool
 }
+
+% end
 
 extension LazySequenceProtocol {
   /// Returns the elements of `self` that satisfy `predicate`.
@@ -308,7 +347,13 @@ extension LazySequenceProtocol {
   }
 }
 
-extension LazyCollectionProtocol {
+% for Traversal in ['Forward', 'Bidirectional']:
+
+extension LazyCollectionProtocol
+  where
+  Self : ${collectionForTraversal(Traversal)},
+  Elements : ${collectionForTraversal(Traversal)}
+{
   /// Returns the elements of `self` that satisfy `predicate`.
   ///
   /// - Note: The elements of the result are computed on-demand, as
@@ -318,11 +363,13 @@ extension LazyCollectionProtocol {
   @warn_unused_result
   public func filter(
     _ predicate: (Elements.Iterator.Element) -> Bool
-  ) -> LazyFilterCollection<Self.Elements> {
-    return LazyFilterCollection(
+  ) -> LazyFilter${collectionForTraversal(Traversal)}<Self.Elements> {
+    return LazyFilter${collectionForTraversal(Traversal)}(
       _base: self.elements, whereElementsSatisfy: predicate)
   }
 }
+
+% end
 
 @available(*, unavailable, renamed: "LazyFilterIterator")
 public struct LazyFilterGenerator<Base : IteratorProtocol> {}

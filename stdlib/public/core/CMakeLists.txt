@@ -45,7 +45,7 @@ set(SWIFTLIB_ESSENTIAL
   EmptyCollection.swift
   ErrorType.swift
   Existential.swift
-  Filter.swift
+  Filter.swift.gyb
   FixedPoint.swift.gyb
   FlatMap.swift
   Flatten.swift.gyb
