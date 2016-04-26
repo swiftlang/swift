@@ -575,8 +575,16 @@ public:
       if (!Instance) return BuiltType();
       return Builder.createMetatypeType(Instance);
     }
-    case MetadataKind::ObjCClassWrapper:
-      return Builder.getUnnamedObjCClassType();
+    case MetadataKind::ObjCClassWrapper: {
+      auto objcWrapper = cast<TargetObjCClassWrapperMetadata<Runtime>>(Meta);
+      auto classAddress = objcWrapper->Class;
+
+      std::string className;
+      if (!readObjCClassName(classAddress, className))
+        return BuiltType();
+
+      return Builder.createObjCClassType(std::move(className));
+    }
     case MetadataKind::ExistentialMetatype: {
       auto Exist = cast<TargetExistentialMetatypeMetadata<Runtime>>(Meta);
       auto Instance = readTypeFromMetadata(Exist->InstanceType);
@@ -596,7 +604,7 @@ public:
       return Builder.createForeignClassType(std::move(name));
     }
     case MetadataKind::HeapLocalVariable:
-        return Builder.getUnnamedForeignClassType(); // FIXME?
+      return Builder.getUnnamedForeignClassType(); // FIXME?
     case MetadataKind::HeapGenericLocalVariable:
       return Builder.getUnnamedForeignClassType(); // FIXME?
     case MetadataKind::ErrorObject:
@@ -908,6 +916,75 @@ private:
 
     auto RawDescriptor = reinterpret_cast<const CaptureDescriptor *>(Buffer);
     return OwnedCaptureDescriptor(RawDescriptor);
+  }
+
+  /// Given a pointer to an Objective-C class, try to read its class name.
+  bool readObjCClassName(StoredPointer classAddress, std::string &className) {
+    // The following algorithm only works on the non-fragile Apple runtime.
+
+    // Grab the RO-data pointer.  This part is not ABI.
+    StoredPointer roDataPtr = readObjCRODataPtr(classAddress);
+    if (!roDataPtr) return false;
+
+    // This is ABI.
+    static constexpr auto OffsetToName =
+      roundUpToAlignment(size_t(12), sizeof(StoredPointer))
+        + sizeof(StoredPointer);;
+
+    // Read the name pointer.
+    StoredPointer namePtr;
+    if (!Reader->readInteger(RemoteAddress(roDataPtr + OffsetToName), &namePtr))
+      return false;
+
+    // If the name pointer is null, treat that as an error.
+    if (!namePtr)
+      return false;
+
+    return Reader->readString(RemoteAddress(namePtr), className);
+  }
+
+  /// Given that the remote process is running the non-fragile Apple runtime,
+  /// grab the ro-data from a class pointer.
+  StoredPointer readObjCRODataPtr(StoredPointer classAddress) {
+    // WARNING: the following algorithm works on current modern Apple
+    // runtimes but is not actually ABI.  But it is pretty reliable.
+
+    StoredPointer dataPtr;
+    if (!Reader->readInteger(RemoteAddress(classAddress +
+                               TargetClassMetadata<Runtime>::offsetToData()),
+                             &dataPtr))
+      return StoredPointer();
+
+    // Apply the data-pointer mask.
+    // These values have been stolen from the runtime source.
+    static constexpr uint64_t DataPtrMask =
+      (Runtime::PointerSize == 8 ? 0x00007ffffffffff8ULL : 0xfffffffcULL);
+    dataPtr &= StoredPointer(DataPtrMask);
+    if (!dataPtr)
+      return StoredPointer();
+
+    // Read the flags, which is a 32-bit header on both formats.
+    uint32_t flags;
+    if (!Reader->readInteger(RemoteAddress(dataPtr), &flags))
+      return StoredPointer();
+
+    // If the type is not realized, this is the RO-data.
+    static constexpr uint32_t RO_REALIZED = 0x80000000U;
+    if (!(flags & RO_REALIZED))
+      return dataPtr;
+
+    // Otherwise, it's the RW-data; read the RO-data pointer from a
+    // well-known position within the RW-data.
+    static constexpr uint32_t OffsetToROPtr = 8;
+    if (!Reader->readInteger(RemoteAddress(dataPtr + OffsetToROPtr), &dataPtr))
+      return StoredPointer();
+
+    return dataPtr;
+  }
+
+  template <class T>
+  static constexpr T roundUpToAlignment(T offset, T alignment) {
+    return (offset + alignment - 1) & ~(alignment - 1);
   }
 };
 

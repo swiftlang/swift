@@ -50,7 +50,7 @@ class Result {
   Storage S;
   bool IsSuccess;
 
-  Result(bool isSuccess) {}
+  Result(bool isSuccess) : IsSuccess(isSuccess) {}
 
 public:
   /*implicit*/ Result(const T &value) : IsSuccess(true) {
