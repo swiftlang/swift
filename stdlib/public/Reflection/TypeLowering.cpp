@@ -13,6 +13,9 @@
 // Implements logic for computing in-memory layouts from TypeRefs loaded from
 // reflection metadata.
 //
+// This has to match up with layout algorithms used in IRGen and the runtime,
+// and a bit of SIL type lowering to boot.
+//
 //===----------------------------------------------------------------------===//
 
 #include "swift/Reflection/TypeLowering.h"
@@ -179,6 +182,8 @@ public:
   }
 };
 
+/// Utility class for performing universal layout for types such as
+/// tuples, structs, thick functions, etc.
 class RecordTypeInfoBuilder {
   TypeConverter &TC;
   unsigned Size, Alignment, Stride, NumExtraInhabitants;
@@ -233,6 +238,7 @@ public:
   }
 };
 
+/// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {
   TypeConverter &TC;
   bool ObjC;
@@ -254,6 +260,7 @@ public:
 
     // FIXME: AnyObject should go away
     if (P->getMangledName() == "Ps9AnyObject_") {
+      // No witness table for AnyObject
       Class = true;
       return;
     }
@@ -266,9 +273,11 @@ public:
 
     switch (FD->Kind) {
     case FieldDescriptorKind::ObjCProtocol:
+      // Objective-C protocols do not have any witness tables.
       ObjC = true;
       break;
     case FieldDescriptorKind::ClassProtocol:
+      ObjC = true;
       Class = true;
       WitnessTableCount++;
       break;
@@ -301,8 +310,12 @@ public:
                                     : RecordKind::Existential);
 
     if (Class) {
+      // Class existentials consist of a single retainable pointer
+      // followed by witness tables.
       builder.addField("object", TC.getUnknownObjectTypeRef());
     } else {
+      // Non-class existentials consist of a three-word buffer and
+      // value metadata, followed by witness tables.
       builder.addField("value", TC.getRawPointerTypeRef());
       builder.addField("value", TC.getRawPointerTypeRef());
       builder.addField("value", TC.getRawPointerTypeRef());
@@ -370,6 +383,9 @@ TypeConverter::getReferenceTypeInfo(ReferenceKind Kind,
   return TI;
 }
 
+/// Thick functions consist of a function pointer and nullable retainable
+/// context pointer. The context is modeled exactly like a native Swift
+/// class reference.
 const TypeInfo *
 TypeConverter::getThickFunctionTypeInfo() {
   if (ThickFunctionTI != nullptr)
@@ -416,8 +432,15 @@ const TypeRef *TypeConverter::getUnknownObjectTypeRef() {
 }
 
 enum class MetatypeRepresentation : unsigned {
+  /// Singleton metatype values are empty.
   Thin,
+
+  /// Metatypes containing classes, or where the original unsubstituted
+  /// type contains a type parameter, must be represented as pointers
+  /// to metadata structures.
   Thick,
+
+  /// Insufficient information to determine which.
   Unknown
 };
 
@@ -437,6 +460,11 @@ MetatypeRepresentation combineRepresentations(MetatypeRepresentation rep1,
   return MetatypeRepresentation::Thin;
 }
 
+/// Visitor class to determine if a metatype should use the empty
+/// representation.
+///
+/// This relies on substitution correctly setting wasAbstract() on
+/// MetatypeTypeRefs.
 class HasSingletonMetatype
   : public TypeRefVisitor<HasSingletonMetatype, MetatypeRepresentation> {
   TypeRefBuilder &Builder;
@@ -457,6 +485,7 @@ public:
 
     switch (FD->Kind) {
     case FieldDescriptorKind::Class:
+      // Classes can have subclasses, so the metatype is always thick.
       return MetatypeRepresentation::Thick;
 
     case FieldDescriptorKind::Struct:
@@ -466,6 +495,7 @@ public:
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
     case FieldDescriptorKind::Protocol:
+      // Invalid field descriptor.
       return MetatypeRepresentation::Unknown;
     }
   }
@@ -562,6 +592,9 @@ public:
   LowerType(TypeConverter &TC) : TC(TC) {}
 
   const TypeInfo *visitBuiltinTypeRef(const BuiltinTypeRef *B) {
+    /// The context field of a thick function is a Builtin.NativeObject.
+    /// Since we want this to round-trip, lower these as reference
+    /// types.
     if (B->getMangledName() == "Bo") {
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                      ReferenceCounting::Native);
@@ -570,8 +603,11 @@ public:
                                      ReferenceCounting::Unknown);
     }
 
+    /// Otherwise, get the fixed layout information from reflection
+    /// metadata.
     auto *descriptor = TC.getBuilder().getBuiltinTypeInfo(B);
-    assert(descriptor != nullptr);
+    if (descriptor == nullptr)
+      return nullptr;
     return TC.makeTypeInfo<BuiltinTypeInfo>(descriptor);
   }
 
@@ -582,16 +618,21 @@ public:
 
     switch (FD->Kind) {
     case FieldDescriptorKind::Class:
+      // A value of class type is a single retainable pointer.
+      //
       // FIXME: need to know if this is a NativeObject or UnknownObject
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                      ReferenceCounting::Native);
     case FieldDescriptorKind::Struct: {
+      // Lower the struct's fields using substitutions from the
+      // TypeRef to make field types concrete.
       RecordTypeInfoBuilder builder(TC, RecordKind::Struct);
       for (auto Field : TC.getBuilder().getFieldTypeRefs(TR, FD))
         builder.addField(Field.first, Field.second);
       return builder.build();
     }
     case FieldDescriptorKind::Enum: {
+      // Sort enum into payload and no-payload cases.
       unsigned NoPayloadCases = 0;
       unsigned PayloadCases = 0;
       const TypeInfo *PayloadTI = nullptr;
@@ -602,13 +643,18 @@ public:
           continue;
         }
 
+        // FIXME: If the unsubstituted payload type is empty, but not
+        // resilient, we treat the case as an no-payload case.
+        //
+        // This should be handled by IRGen emitting the enum strategy
+        // explicitly.
         PayloadCases++;
         PayloadTI = TC.getTypeInfo(Field.second);
         if (PayloadTI == nullptr)
           return nullptr;
       }
 
-      // FIXME: Implement remaining cases
+      // FIXME: Implement remaining enum layout strategies
       //
       // Also this is wrong if we wrap a reference in multiple levels of
       // optionality
@@ -628,6 +674,7 @@ public:
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
     case FieldDescriptorKind::Protocol:
+      // Invalid field descriptor
       return nullptr;
     }
   }
@@ -697,6 +744,7 @@ public:
       for (auto *P : PC->getProtocols())
         builder.addProtocol(P);
     } else {
+      // Invalid TypeRef
       return nullptr;
     }
 
@@ -725,11 +773,22 @@ public:
                                    ReferenceCounting::Unknown);
   }
 
+  // Apply a storage qualifier, like 'weak', 'unowned' or 'unowned(unsafe)'
+  // to a type with reference semantics, such as a class reference or
+  // class-bound existential.
   const TypeInfo *
   rebuildStorageTypeInfo(const TypeInfo *TI, ReferenceKind Kind) {
+    // If we can't lower the original storage type, give up.
+    if (TI == nullptr)
+      return nullptr;
+
+    // Simple case: Just change the reference kind
     if (auto *ReferenceTI = dyn_cast<ReferenceTypeInfo>(TI))
       return TC.getReferenceTypeInfo(Kind, ReferenceTI->getReferenceCounting());
 
+    // Class existentials are represented as record types.
+    // Destructure the existential and replace the "object"
+    // field with the right reference kind.
     if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI)) {
       auto SubKind = RecordTI->getRecordKind();
       if (SubKind == RecordKind::ClassExistential) {
@@ -752,31 +811,27 @@ public:
       }
     }
 
+    // Anything else -- give up
     return nullptr;
   }
 
-  template<typename StorageTypeRef>
   const TypeInfo *
-  visitAnyStorageTypeRef(const StorageTypeRef *S, ReferenceKind Kind) {
-    auto *TI = TC.getTypeInfo(S->getType());
-    if (TI == nullptr)
-      return nullptr;
-
-    return rebuildStorageTypeInfo(TI, Kind);
+  visitAnyStorageTypeRef(const TypeRef *TR, ReferenceKind Kind) {
+    return rebuildStorageTypeInfo(TC.getTypeInfo(TR), Kind);
   }
 
   const TypeInfo *
   visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
-    return visitAnyStorageTypeRef(US, ReferenceKind::Unowned);
+    return visitAnyStorageTypeRef(US->getType(), ReferenceKind::Unowned);
   }
 
   const TypeInfo *visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
-    return visitAnyStorageTypeRef(WS, ReferenceKind::Weak);
+    return visitAnyStorageTypeRef(WS->getType(), ReferenceKind::Weak);
   }
 
   const TypeInfo *
   visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
-    return visitAnyStorageTypeRef(US, ReferenceKind::Unmanaged);
+    return visitAnyStorageTypeRef(US->getType(), ReferenceKind::Unmanaged);
   }
 
   const TypeInfo *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
