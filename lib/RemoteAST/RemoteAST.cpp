@@ -315,8 +315,12 @@ public:
     return WeakStorageType::get(base, Ctx);
   }
 
-  Type getUnnamedObjCClassType() {
-    return Type();
+  Type createObjCClassType(StringRef name) {
+    Identifier ident = Ctx.getIdentifier(name);
+    auto typeDecl =
+      findForeignNominalTypeDecl(ident, Demangle::Node::Kind::Class);
+    if (!typeDecl) return Type();
+    return createNominalType(typeDecl, /*parent*/ Type());
   }
 
   Type createForeignClassType(StringRef mangledName) {
@@ -584,6 +588,7 @@ RemoteASTTypeBuilder::findForeignNominalTypeDecl(Identifier name,
       if (HadError) return;
       auto typeDecl = getAcceptableNominalTypeCandidate(decl, ExpectedKind);
       if (!typeDecl) return;
+      if (typeDecl == Result) return;
       if (!Result) {
         Result = typeDecl;
       } else {
