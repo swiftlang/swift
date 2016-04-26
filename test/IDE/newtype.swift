@@ -36,6 +36,13 @@
 // PRINT-NEXT:    var _rawValue: NSString!
 // PRINT-NEXT:    var rawValue: String! { get }
 // PRINT-NEXT:  }
+// PRINT-NEXT:  struct MyFloat : RawRepresentable {
+// PRINT-NEXT:    init(rawValue: Float)
+// PRINT-NEXT:    let rawValue: Float
+// PRINT-NEXT:  }
+// PRINT-NEXT:  extension MyFloat {
+// PRINT-NEXT:    static let globalFloat: MyFloat
+// PRINT-NEXT:  }
 
 // RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules
 import Newtype

@@ -26,3 +26,7 @@ extern const SNTClosedEnum SNTSecondEntry;
 extern const SNTClosedEnum SNTClosedEnumThirdEntry;
 
 typedef NSString * IUONewtype __attribute((swift_newtype(struct)));
+
+typedef float MyFloat __attribute((swift_newtype(struct)));
+extern const MyFloat globalFloat;
+

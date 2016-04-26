@@ -86,6 +86,30 @@ static Pattern *createTypedNamedPattern(VarDecl *decl) {
   return P;
 }
 
+/// Create a var member for this struct, along with its pattern binding, and add
+/// it as a member
+static std::pair<VarDecl *, PatternBindingDecl *>
+createVarWithPattern(ASTContext &cxt, DeclContext *dc, Identifier name, Type ty,
+                     bool isLet, bool isImplicit,
+                     Accessibility setterAccessibility) {
+  // Create a variable to store the underlying value.
+  auto var = new (cxt) VarDecl(
+      /*static*/ false,
+      /*IsLet*/ isLet, SourceLoc(), name, ty, dc);
+  if (isImplicit)
+    var->setImplicit();
+  var->setAccessibility(Accessibility::Public);
+  var->setSetterAccessibility(setterAccessibility);
+
+  // Create a pattern binding to describe the variable.
+  Pattern *varPattern = createTypedNamedPattern(var);
+  auto patternBinding =
+      PatternBindingDecl::create(cxt, SourceLoc(), StaticSpellingKind::None,
+                                 SourceLoc(), varPattern, nullptr, dc);
+
+  return {var, patternBinding};
+}
+
 #ifndef NDEBUG
 static bool verifyNameMapping(MappedTypeNameKind NameMapping,
                               StringRef left, StringRef right) {
@@ -1464,28 +1488,15 @@ namespace {
         bool makeUnlabeledValueInit = false,
         bool isImplicit = true) {
       auto &cxt = Impl.SwiftContext;
-      populateInheritedTypes(structDecl, protocols);
-
-      // Note synthesized protocols
-      for (auto kind : synthesizedProtocolAttrs)
-        structDecl->getAttrs().add(new (cxt) SynthesizedProtocolAttr(kind));
+      addProtocolsToStruct(structDecl, synthesizedProtocolAttrs, protocols);
 
       // Create a variable to store the underlying value.
-      auto varName = cxt.Id_rawValue;
-      auto var = new (cxt) VarDecl(
-          /*static*/ false,
-          /*IsLet*/ isLet, SourceLoc(), varName, underlyingType, structDecl);
-      if (isImplicit)
-        var->setImplicit();
-      var->setAccessibility(Accessibility::Public);
-      var->setSetterAccessibility(setterAccessibility);
+      VarDecl *var;
+      PatternBindingDecl *patternBinding;
+      std::tie(var, patternBinding) =
+          createVarWithPattern(cxt, structDecl, cxt.Id_rawValue, underlyingType,
+                               isLet, isImplicit, setterAccessibility);
 
-      // Create a pattern binding to describe the variable.
-      Pattern *varPattern = createTypedNamedPattern(var);
-
-      auto patternBinding = PatternBindingDecl::create(
-          cxt, SourceLoc(), StaticSpellingKind::None, SourceLoc(), varPattern,
-          nullptr, structDecl);
       structDecl->setHasDelayedMembers();
 
       // Create constructors to initialize that value from a value of the
@@ -1499,7 +1510,6 @@ namespace {
           createValueConstructor(structDecl, var,
                                  /*wantCtorParamNames=*/true,
                                  /*wantBody=*/!Impl.hasFinishedTypeChecking()));
-
       structDecl->addMember(patternBinding);
       structDecl->addMember(var);
     }
@@ -1526,30 +1536,18 @@ namespace {
         ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
         ProtocolDecl *const(&protocols)[N]) {
       auto &cxt = Impl.SwiftContext;
-      populateInheritedTypes(structDecl, protocols);
-
-      // Note synthesized protocols
-      for (auto kind : synthesizedProtocolAttrs)
-        structDecl->getAttrs().add(new (cxt) SynthesizedProtocolAttr(kind));
+      addProtocolsToStruct(structDecl, synthesizedProtocolAttrs,
+                           protocols);
 
       auto storedVarName = cxt.getIdentifier("_rawValue");
       auto computedVarName = cxt.Id_rawValue;
 
-      //
       // Create a variable to store the underlying value.
-      auto storedVar = new (cxt) VarDecl(
-          /*static*/ false,
-          /*IsLet*/ false, SourceLoc(), storedVarName, storedUnderlyingType,
-          structDecl);
-      storedVar->setImplicit();
-      storedVar->setAccessibility(Accessibility::Public);
-      storedVar->setSetterAccessibility(Accessibility::Private);
-
-      // Create a pattern binding to describe the variable.
-      Pattern *storedVarPattern = createTypedNamedPattern(storedVar);
-      auto storedPatternBinding = PatternBindingDecl::create(
-          cxt, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-          storedVarPattern, nullptr, structDecl);
+      VarDecl *storedVar;
+      PatternBindingDecl *storedPatternBinding;
+      std::tie(storedVar, storedPatternBinding) = createVarWithPattern(
+          cxt, structDecl, storedVarName, storedUnderlyingType, /*isLet=*/false,
+          /*isImplicit=*/true, Accessibility::Private);
 
       //
       // Create a computed value variable
@@ -1599,15 +1597,12 @@ namespace {
         init->getAttrs().add(new (cxt) TransparentAttr(/*implicit*/ true));
       }
 
-      // Create constructor for computed value
       structDecl->setHasDelayedMembers();
-
       structDecl->addMember(init);
-
       structDecl->addMember(storedPatternBinding);
       structDecl->addMember(storedVar);
-      structDecl->addMember(computedVar);
       structDecl->addMember(computedPatternBinding);
+      structDecl->addMember(computedVar);
     }
 
     /// \brief Create a constructor that initializes a struct from its members.
@@ -1834,6 +1829,20 @@ namespace {
                });
       nominal->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
       nominal->setCheckedInheritanceClause();
+    }
+
+    /// Add protocol conformances and synthesized protocol attributes
+    template <unsigned N>
+    void
+    addProtocolsToStruct(StructDecl *structDecl,
+                         ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
+                         ProtocolDecl *const(&protocols)[N]) {
+      populateInheritedTypes(structDecl, protocols);
+
+      // Note synthesized protocols
+      for (auto kind : synthesizedProtocolAttrs)
+        structDecl->getAttrs().add(new (Impl.SwiftContext)
+                                       SynthesizedProtocolAttr(kind));
     }
 
     NominalTypeDecl *importAsOptionSetType(DeclContext *dc,
