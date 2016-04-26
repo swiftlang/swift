@@ -96,7 +96,24 @@ public:
   TypeRefBuilder &operator=(const TypeRefBuilder &other) = delete;
 
 private:
+  /// Makes sure dynamically allocated TypeRefs stick around for the life of
+  /// this TypeRefBuilder and are automatically released.
   std::vector<std::unique_ptr<const TypeRef>> TypeRefPool;
+
+#define TYPEREF(Id, Parent) \
+  std::unordered_map<TypeRefID, const Id##TypeRef *, \
+                     TypeRefID::Hash, TypeRefID::Equal> Id##TypeRefs;
+#include "swift/Reflection/TypeRefs.def"
+
+#define FIND_OR_CREATE_TYPEREF(TypeRefTy, ...) \
+  auto ID = TypeRefTy::Profile(__VA_ARGS__); \
+  auto Entry = TypeRefTy##s.find(ID); \
+  if (Entry != TypeRefTy##s.end()) \
+    return Entry->second; \
+  auto TR = TypeRefTy::create(*this, __VA_ARGS__); \
+  TypeRefTy##s.insert({ID, TR}); \
+  return TR;
+
   TypeConverter TC;
 
 public:
@@ -112,10 +129,11 @@ public:
   ///
 
   const BuiltinTypeRef *createBuiltinType(const std::string &mangledName) {
-    return BuiltinTypeRef::create(*this, mangledName);
+    FIND_OR_CREATE_TYPEREF(BuiltinTypeRef, mangledName);
   }
 
-  Optional<std::string> createNominalTypeDecl(const Demangle::NodePointer &node) {
+  Optional<std::string>
+  createNominalTypeDecl(const Demangle::NodePointer &node) {
     return Demangle::mangleNode(node);
   }
 
@@ -126,20 +144,22 @@ public:
   const NominalTypeRef *createNominalType(
                                     const Optional<std::string> &mangledName,
                                     const TypeRef *parent) {
-    return NominalTypeRef::create(*this, *mangledName, parent);
+    FIND_OR_CREATE_TYPEREF(NominalTypeRef, *mangledName, parent);
   }
 
   const BoundGenericTypeRef *
   createBoundGenericType(const Optional<std::string> &mangledName,
                          const std::vector<const TypeRef *> &args,
                          const TypeRef *parent) {
-    return BoundGenericTypeRef::create(*this, *mangledName, args, parent);
+    FIND_OR_CREATE_TYPEREF(BoundGenericTypeRef, *mangledName, args, parent);
   }
 
   const TupleTypeRef *
   createTupleType(const std::vector<const TypeRef *> &elements,
                   std::string &&labels, bool isVariadic) {
-    return TupleTypeRef::create(*this, elements, isVariadic);
+    // FIXME: Add uniqueness checks in TupleTypeRef::Profile and
+    // unittests/Reflection/TypeRef.cpp if using labels for identity.
+    FIND_OR_CREATE_TYPEREF(TupleTypeRef, elements, isVariadic);
   }
 
   const FunctionTypeRef *
@@ -148,13 +168,14 @@ public:
                      const TypeRef *result,
                      FunctionTypeFlags flags) {
     // FIXME: don't ignore inOutArgs
-    return FunctionTypeRef::create(*this, args, result, flags);
+    // and add test to unittests/Reflection/TypeRef.cpp
+    FIND_OR_CREATE_TYPEREF(FunctionTypeRef, args, result, flags);
   }
 
   const ProtocolTypeRef *createProtocolType(const std::string &mangledName,
                                             const std::string &moduleName,
                                             const std::string &name) {
-    return ProtocolTypeRef::create(*this, mangledName);
+    FIND_OR_CREATE_TYPEREF(ProtocolTypeRef, mangledName);
   }
 
   const ProtocolCompositionTypeRef *
@@ -163,21 +184,21 @@ public:
       if (!isa<ProtocolTypeRef>(protocol))
         return nullptr;
     }
-    return ProtocolCompositionTypeRef::create(*this, protocols);
+    FIND_OR_CREATE_TYPEREF(ProtocolCompositionTypeRef, protocols);
   }
 
   const ExistentialMetatypeTypeRef *
   createExistentialMetatypeType(const TypeRef *instance) {
-    return ExistentialMetatypeTypeRef::create(*this, instance);
+    FIND_OR_CREATE_TYPEREF(ExistentialMetatypeTypeRef, instance);
   }
 
   const MetatypeTypeRef *createMetatypeType(const TypeRef *instance) {
-    return MetatypeTypeRef::create(*this, instance);
+    FIND_OR_CREATE_TYPEREF(MetatypeTypeRef, instance);
   }
 
   const GenericTypeParameterTypeRef *
   createGenericTypeParameterType(unsigned depth, unsigned index) {
-    return GenericTypeParameterTypeRef::create(*this, depth, index);
+    FIND_OR_CREATE_TYPEREF(GenericTypeParameterTypeRef, depth, index);
   }
 
   const DependentMemberTypeRef *
@@ -186,32 +207,39 @@ public:
                             const TypeRef *protocol) {
     if (!isa<ProtocolTypeRef>(protocol))
       return nullptr;
-    return DependentMemberTypeRef::create(*this, member, base, protocol);
+    FIND_OR_CREATE_TYPEREF(DependentMemberTypeRef, member, base, protocol);
   }
 
   const UnownedStorageTypeRef *createUnownedStorageType(const TypeRef *base) {
-    return UnownedStorageTypeRef::create(*this, base);
+    FIND_OR_CREATE_TYPEREF(UnownedStorageTypeRef, base);
   }
 
   const UnmanagedStorageTypeRef *
   createUnmanagedStorageType(const TypeRef *base) {
-    return UnmanagedStorageTypeRef::create(*this, base);
+    FIND_OR_CREATE_TYPEREF(UnmanagedStorageTypeRef, base);
   }
 
   const WeakStorageTypeRef *createWeakStorageType(const TypeRef *base) {
-    return WeakStorageTypeRef::create(*this, base);
+    FIND_OR_CREATE_TYPEREF(WeakStorageTypeRef, base);
+  }
+
+  const ObjCClassTypeRef *
+  createObjCClassType(const std::string &mangledName) {
+    FIND_OR_CREATE_TYPEREF(ObjCClassTypeRef, mangledName);
   }
 
   const ObjCClassTypeRef *getUnnamedObjCClassType() {
-    return ObjCClassTypeRef::getUnnamed();
+    return createObjCClassType("");
   }
 
-  const ForeignClassTypeRef *createForeignClassType(std::string &&mangledName) {
-    return ForeignClassTypeRef::getUnnamed(); // FIXME
+  const ForeignClassTypeRef *
+  createForeignClassType(const std::string &mangledName) {
+    FIND_OR_CREATE_TYPEREF(ForeignClassTypeRef, mangledName);
   }
 
-  const ForeignClassTypeRef *getUnnamedForeignClassType() {
-    return ForeignClassTypeRef::getUnnamed();
+  const ForeignClassTypeRef *
+  getUnnamedForeignClassType() {
+    return createForeignClassType("");
   }
 
   const OpaqueTypeRef *getOpaqueType() {

@@ -36,6 +36,84 @@ enum class TypeRefKind {
 #undef TYPEREF
 };
 
+/// An identifier containing the unique bit pattern made up of all of the
+/// instance data needed to uniquely identify a TypeRef.
+///
+/// This allows for uniquing (via Equal) and for keying into a dictionary for
+/// caching.
+///
+/// TypeRefs should be comparable by pointers, so if the TypeRefBuilder
+/// gets a request to build a TypeRef with the same constructor arguments,
+/// it should return the one already created with those arguments, not a fresh
+/// copy. This allows for fast identity comparisons and substitutions, for
+/// example. We use a similar strategy for Types in the full AST.
+class TypeRefID {
+
+  std::vector<uint32_t> Bits;
+
+public:
+  TypeRefID() = default;
+
+  template <typename T>
+  void addPointer(const T *Pointer) {
+    auto Raw = reinterpret_cast<uint32_t *>(&Pointer);
+    Bits.push_back(Raw[0]);
+    if (sizeof(const T *) > 4) {
+      Bits.push_back(Raw[1]);
+    }
+  }
+
+  void addInteger(uint32_t Integer) {
+    Bits.push_back(Integer);
+  }
+
+  void addInteger(uint64_t Integer) {
+    Bits.push_back((uint32_t)Integer);
+    Bits.push_back(Integer >> 32);
+  }
+
+  void addString(const std::string &String) {
+    if (String.empty()) {
+      Bits.push_back(0);
+    } else {
+      size_t i = 0;
+      size_t chunks = String.size() / 4;
+      for (size_t chunk = 0; chunk < chunks; ++chunk, i+=4) {
+        uint32_t entry = ((uint32_t) String[i]) +
+                         (((uint32_t) String[i+1]) << 8) +
+                         (((uint32_t) String[i+2]) << 16) +
+                         (((uint32_t) String[i+3]) << 24);
+        Bits.push_back(entry);
+      }
+      for(; i < String.size(); ++i) {
+        Bits.push_back(String[i]);
+      }
+    }
+  }
+
+  struct Hash {
+    std::size_t operator()(TypeRefID const &ID) const {
+      size_t Hash = 0;
+      std::hash<uint32_t> h;
+      for (auto x : ID.Bits) {
+        Hash ^= h(x) + 0x9e3779b9 + (Hash << 6) + (Hash >> 2);
+      }
+      return Hash;
+    }
+  };
+
+  struct Equal {
+    bool operator()(const TypeRefID &lhs, const TypeRefID &rhs) const {
+      return lhs.Bits == rhs.Bits;
+    }
+  };
+
+
+  bool operator==(const TypeRefID &Other) {
+    return Bits == Other.Bits;
+  }
+};
+
 class TypeRef;
 class TypeRefBuilder;
 using DepthAndIndex = std::pair<unsigned, unsigned>;
@@ -80,6 +158,12 @@ public:
     return MangledName;
   }
 
+  static TypeRefID Profile(const std::string &MangledName) {
+    TypeRefID ID;
+    ID.addString(MangledName);
+    return ID;
+  }
+
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Builtin;
   }
@@ -107,6 +191,14 @@ public:
   }
 
   unsigned getDepth() const;
+
+  static TypeRefID Profile(const std::string &MangledName,
+                           const TypeRef *Parent) {
+    TypeRefID ID;
+    ID.addString(MangledName);
+    ID.addPointer(Parent);
+    return ID;
+  }
 };
 
 class NominalTypeRef final : public TypeRef, public NominalTypeTrait {
@@ -121,6 +213,8 @@ public:
                                       const TypeRef *Parent = nullptr) {
     return A.template makeTypeRef<NominalTypeRef>(MangledName, Parent);
   }
+
+  using NominalTypeTrait::Profile;
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Nominal;
@@ -152,6 +246,17 @@ public:
     return GenericParams;
   }
 
+  static TypeRefID Profile(const std::string &MangledName,
+                           const std::vector<const TypeRef *> &GenericParams,
+                           const TypeRef *Parent) {
+    TypeRefID ID;
+    ID.addString(MangledName);
+    for (auto Param : GenericParams)
+      ID.addPointer(Param);
+    ID.addPointer(Parent);
+    return ID;
+  }
+
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::BoundGeneric;
   }
@@ -178,6 +283,16 @@ public:
 
   bool isVariadic() const {
     return Variadic;
+  }
+
+  static TypeRefID Profile(const std::vector<const TypeRef *> &Elements,
+                           bool Variadic) {
+    TypeRefID ID;
+    for (auto Element : Elements)
+      ID.addPointer(Element);
+
+    ID.addInteger(static_cast<uint32_t>(Variadic));
+    return ID;
   }
 
   static bool classof(const TypeRef *TR) {
@@ -216,6 +331,18 @@ public:
     return Flags;
   }
 
+  static TypeRefID Profile(const std::vector<const TypeRef *> &Arguments,
+                           const TypeRef *Result,
+                           FunctionTypeFlags Flags) {
+    TypeRefID ID;
+    for (auto Argument : Arguments) {
+      ID.addPointer(Argument);
+    }
+    ID.addPointer(Result);
+    ID.addInteger(static_cast<uint64_t>(Flags.getIntValue()));
+    return ID;
+  }
+
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Function;
   }
@@ -236,6 +363,12 @@ public:
 
   const std::string &getMangledName() const {
     return MangledName;
+  }
+
+  static TypeRefID Profile(const std::string &MangledName) {
+    TypeRefID ID;
+    ID.addString(MangledName);
+    return ID;
   }
 
   static bool classof(const TypeRef *TR) {
@@ -267,6 +400,14 @@ public:
     return Protocols;
   }
 
+  static TypeRefID Profile(const std::vector<const TypeRef *> &Protocols) {
+    TypeRefID ID;
+    for (auto Protocol : Protocols) {
+      ID.addPointer(Protocol);
+    }
+    return ID;
+  }
+
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::ProtocolComposition;
   }
@@ -296,6 +437,12 @@ public:
     return InstanceType;
   }
 
+  static TypeRefID Profile(const TypeRef *InstanceType) {
+    TypeRefID ID;
+    ID.addPointer(InstanceType);
+    return ID;
+  }
+
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Metatype;
   }
@@ -316,6 +463,12 @@ public:
 
   const TypeRef *getInstanceType() const {
     return InstanceType;
+  }
+
+  static TypeRefID Profile(const TypeRef *InstanceType) {
+    TypeRefID ID;
+    ID.addPointer(InstanceType);
+    return ID;
   }
 
   static bool classof(const TypeRef *TR) {
@@ -343,6 +496,13 @@ public:
 
   uint32_t getIndex() const {
     return Index;
+  }
+
+  static TypeRefID Profile(uint32_t Depth, uint32_t Index) {
+    TypeRefID ID;
+    ID.addInteger(Depth);
+    ID.addInteger(Index);
+    return ID;
   }
 
   static bool classof(const TypeRef *TR) {
@@ -381,6 +541,15 @@ public:
     return cast<ProtocolTypeRef>(Protocol);
   }
 
+  static TypeRefID Profile(const std::string &Member, const TypeRef *Base,
+                           const TypeRef *Protocol) {
+    TypeRefID ID;
+    ID.addString(Member);
+    ID.addPointer(Base);
+    ID.addPointer(Protocol);
+    return ID;
+  }
+
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::DependentMember;
   }
@@ -388,13 +557,9 @@ public:
 
 class ForeignClassTypeRef final : public TypeRef {
   std::string Name;
-  static const ForeignClassTypeRef *UnnamedSingleton;
 public:
   ForeignClassTypeRef(const std::string &Name)
     : TypeRef(TypeRefKind::ForeignClass), Name(Name) {}
-
-  static const ForeignClassTypeRef *getUnnamed();
-
 
   template <typename Allocator>
   static ForeignClassTypeRef *create(Allocator &A,
@@ -404,6 +569,12 @@ public:
 
   const std::string &getName() const {
     return Name;
+  }
+
+  static TypeRefID Profile(const std::string &Name) {
+    TypeRefID ID;
+    ID.addString(Name);
+    return ID;
   }
 
   static bool classof(const TypeRef *TR) {
@@ -429,6 +600,12 @@ public:
     return Name;
   }
 
+  static TypeRefID Profile(const std::string &Name) {
+    TypeRefID ID;
+    ID.addString(Name);
+    return ID;
+  }
+
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::ObjCClass;
   }
@@ -440,6 +617,10 @@ public:
   OpaqueTypeRef() : TypeRef(TypeRefKind::Opaque) {}
 
   static const OpaqueTypeRef *get();
+
+  static TypeRefID Profile() {
+    return TypeRefID();
+  }
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Opaque;
@@ -457,6 +638,12 @@ public:
   const TypeRef *getType() const {
     return Type;
   }
+
+  static TypeRefID Profile(const TypeRef *Type) {
+    TypeRefID ID;
+    ID.addPointer(Type);
+    return ID;
+  }
 };
 
 class UnownedStorageTypeRef final : public ReferenceStorageTypeRef {
@@ -469,6 +656,8 @@ public:
                                        const TypeRef *Type) {
     return A.template makeTypeRef<UnownedStorageTypeRef>(Type);
   }
+
+  using ReferenceStorageTypeRef::Profile;
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::UnownedStorage;
@@ -486,6 +675,8 @@ public:
     return A.template makeTypeRef<WeakStorageTypeRef>(Type);
   }
 
+  using ReferenceStorageTypeRef::Profile;
+
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::WeakStorage;
   }
@@ -501,6 +692,8 @@ public:
                                                const TypeRef *Type) {
     return A.template makeTypeRef<UnmanagedStorageTypeRef>(Type);
   }
+
+  using ReferenceStorageTypeRef::Profile;
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::UnmanagedStorage;
