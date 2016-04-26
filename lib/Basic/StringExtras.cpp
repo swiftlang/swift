@@ -1219,6 +1219,19 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     return lowercaseAcronymsForReturn();
   }
 
+  if (camel_case::getFirstWord(baseName) == "set") {
+    StringRef newBaseName = ::omitNeedlessWords(
+                              baseName,
+                              contextType,
+                              NameRole::Property,
+                              allPropertyNames,
+                              scratch);
+    if (newBaseName != baseName) {
+      baseName = newBaseName;
+      anyChanges = true;
+    }
+  }
+
   // If needed, split the base name.
   if (!argNames.empty() &&
       splitBaseName(baseName, argNames[0], paramTypes[0], firstParamName))

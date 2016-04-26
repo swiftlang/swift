@@ -32,6 +32,8 @@
 -(void)drawGreebies:(nonnull SEGreebieArray*)greebies;
 -(void)doSomethingBoundBy:(NSInteger)value;
 -(void)doSomethingSeparatedBy:(NSInteger)value;
++(nonnull OmitNeedlessWords *)currentOmitNeedlessWords;
++(void)setCurrentOmitNeedlessWords:(nonnull OmitNeedlessWords *)value;
 @end
 
 @interface ABCDoodle : NSObject

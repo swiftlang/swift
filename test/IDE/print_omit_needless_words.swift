@@ -308,6 +308,10 @@
 // "separated by"
 // CHECK-OMIT-NEEDLESS-WORDS: func doSomething(separatedBy: Int)
 
+// "Property"-like stripping for "set" methods.
+// CHECK-OMIT-NEEDLESS-WORDS: class func current() -> OmitNeedlessWords
+// CHECK-OMIT-NEEDLESS-WORDS: class func setCurrent(_: OmitNeedlessWords)
+
 // Property-name sensitivity in the base name "Self" stripping.
 // CHECK-OMIT-NEEDLESS-WORDS: func addDoodle(_: ABCDoodle)
 
