@@ -13,8 +13,15 @@
 // FAILURE(KIND, TEXT, ARGTYS)
 
 FAILURE(Unknown, "an unknown failure occurred", ())
+FAILURE(BadArgument, "the API was called with a bad argument", ())
+
 FAILURE(Memory, "an unknown failure occurred while reading %0 at address %1",
         (String, Address))
+
+FAILURE(DependentArgument,
+        "API was called with a dependent type", ())
+FAILURE(TypeHasNoSuchMember,
+        "type has no member named '%0'", (String))
 
 FAILURE(CouldNotResolveTypeDecl,
         "could not resolve a type with mangled name '%0'", (String))
