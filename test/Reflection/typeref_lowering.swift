@@ -134,7 +134,7 @@ V12TypeLowering17ExistentialStruct
 // CHECK-NEXT:       (field name=metadata offset=24
 // CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
 // CHECK-NEXT:   (field name=anyObject offset=32
-// CHECK-NEXT:     (class_existential size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647
+// CHECK-NEXT:     (class_existential size=8 alignment=8 stride=8
 // CHECK-NEXT:       (field name=object offset=0
 // CHECK-NEXT:         (reference kind=strong refcounting=unknown))))
 // CHECK-NEXT:   (field name=anyProto offset=40
@@ -190,7 +190,7 @@ V12TypeLowering17ExistentialStruct
 // CHECK-NEXT:       (field name=wtable offset=16
 // CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
 // CHECK-NEXT:   (field name=weakAnyObject offset=200
-// CHECK-NEXT:     (class_existential size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647
+// CHECK-NEXT:     (class_existential size=8 alignment=8 stride=8
 // CHECK-NEXT:       (field name=object offset=0
 // CHECK-NEXT:         (reference kind=weak refcounting=unknown))))
 // CHECK-NEXT:   (field name=weakAnyClassBoundProto offset=208
