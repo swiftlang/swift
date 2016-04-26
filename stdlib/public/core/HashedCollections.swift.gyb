@@ -545,47 +545,37 @@ public struct Set<Element : Hashable> :
     return _variantStorage.index(forKey: member)
   }
 
-  /// Adds the given element to the set.
+  /// If `newMember`` is not already contained in `self`, inserts it.
   ///
-  /// If the element is already contained in the set, this method has no
-  /// effect. In this example, a new element is inserted into `classDays`, a
-  /// set of days of the week. When an existing element is inserted, the
-  /// `classDays` set does not change.
+  /// - Returns: `(true, newMember)` if `e` was not contained in `self`.
+  ///   Otherwise, returns `(false, oldMember)`, where `oldMember` is the
+  ///   member of `self` equal to `newMember` (which may be distinguishable
+  ///   from `newMember`, e.g. via `===`).
   ///
-  ///     enum DayOfTheWeek: Int {
-  ///         case Sunday, Monday, Tuesday, Wednesday, Thursday,
-  ///             Friday, Saturday
-  ///     }
-  /// 
-  ///     var classDays: Set<DayOfTheWeek> = [.Wednesday, .Friday]
-  ///     classDays.insert(.Monday)
-  ///     print(classDays)
-  ///     // Prints "[.Friday, .Wednesday, .Monday]"
-  /// 
-  ///     classDays.insert(.Friday)
-  ///     print(classDays)
-  ///     // Prints "[.Friday, .Wednesday, .Monday]"
-  ///
-  /// - Parameter newMember: The element to add to the set.
-  public mutating func insert(_ newMember: Element) {
+  /// - Postcondition: `self.contains(newMember)`.
+  public mutating func insert(
+    _ newMember: Element
+  ) -> (inserted: Bool, memberAfterInsert: Element) {
+    // FIXME: optimize this to do just one lookup
+    if let i = index(of: newMember) {
+      return (inserted: false, memberAfterInsert: self[i])
+    }
     _variantStorage.updateValue(newMember, forKey: newMember)
+    return (inserted: true, memberAfterInsert: newMember)
   }
 
-  /// Removes the specified element from the set.
+  /// Inserts `newMember` unconditionally.
   ///
-  /// For example:
+  /// - Returns: the former member of `self` equal to `newMember`
+  ///   (which may be distinguishable from `newMember`, e.g. via
+  ///   `===`), or `nil` if no such element existed.
   ///
-  ///     var ingredients: Set = ["cocoa beans", "sugar", "cocoa butter", "salt"]
-  ///     let toRemove = "sugar"
-  ///     if let removed = ingredients.remove(toRemove) {
-  ///         print("The recipe is now \(removed)-free.")
-  ///     }
-  ///     // Prints "The recipe is now sugar-free."
-  ///
-  /// - Parameter member: The element to remove from the set.
-  /// - Returns: The value of the `member` parameter if it was a member of the
-  ///   set; otherwise, `nil`.
-  @discardableResult
+  /// - Postcondition: `self.contains(newMember)`
+  public mutating func update(with newMember: Element) -> Element? {
+    return _variantStorage.updateValue(newMember, forKey: newMember)
+  }
+  
+  /// Remove the member from the set and return it if it was present.
   public mutating func remove(_ member: Element) -> Element? {
     return _variantStorage.removeValue(forKey: member)
   }
@@ -750,12 +740,12 @@ public struct Set<Element : Hashable> :
   /// - Returns: `true` if the set is a subset of `possibleSuperset`;
   ///   otherwise, `false`.
   @warn_unused_result
-  public func isSubsetOf<
+  public func isSubset<
     S : Sequence where S.Iterator.Element == Element
-  >(_ possibleSuperset: S) -> Bool {
+  >(of possibleSuperset: S) -> Bool {
     // FIXME(performance): isEmpty fast path, here and elsewhere.
     let other = Set(possibleSuperset)
-    return isSubsetOf(other)
+    return isSubset(of: other)
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict subset
@@ -779,12 +769,12 @@ public struct Set<Element : Hashable> :
   /// - Returns: `true` is the set is strict subset of
   ///   `possibleStrictSuperset`; otherwise, `false`.
   @warn_unused_result
-  public func isStrictSubsetOf<
+  public func isStrictSubset<
     S : Sequence where S.Iterator.Element == Element
-  >(_ possibleStrictSuperset: S) -> Bool {
+  >(of possibleStrictSuperset: S) -> Bool {
     // FIXME: code duplication.
     let other = Set(possibleStrictSuperset)
-    return isStrictSubsetOf(other)
+    return isStrictSubset(of: other)
   }
 
   /// Returns a Boolean value that indicates whether the set is a superset of
@@ -803,13 +793,13 @@ public struct Set<Element : Hashable> :
   /// - Returns: `true` if the set is a superset of `possibleSubset`;
   ///   otherwise, `false`.
   @warn_unused_result
-  public func isSupersetOf<
+  public func isSuperset<
     S : Sequence where S.Iterator.Element == Element
-  >(_ possibleSubset: S) -> Bool {
+  >(of possibleSubset: S) -> Bool {
     // FIXME(performance): Don't build a set; just ask if every element is in
     // `self`.
     let other = Set(possibleSubset)
-    return other.isSubsetOf(self)
+    return other.isSubset(of: self)
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict
@@ -831,11 +821,11 @@ public struct Set<Element : Hashable> :
   /// - Returns: `true` if the set is a strict superset of
   ///   `possibleStrictSubset`; otherwise, `false`.
   @warn_unused_result
-  public func isStrictSupersetOf<
+  public func isStrictSuperset<
     S : Sequence where S.Iterator.Element == Element
-  >(_ possibleStrictSubset: S) -> Bool {
+  >(of possibleStrictSubset: S) -> Bool {
     let other = Set(possibleStrictSubset)
-    return other.isStrictSubsetOf(self)
+    return other.isStrictSubset(of: self)
   }
 
   /// Returns a Boolean value that indicates whether the set has no members in
@@ -852,12 +842,12 @@ public struct Set<Element : Hashable> :
   /// - Returns: `true` if the set has no elements in common with `other`;
   ///   otherwise, `false`.
   @warn_unused_result
-  public func isDisjointWith<
+  public func isDisjoint<
     S : Sequence where S.Iterator.Element == Element
-  >(_ other: S) -> Bool {
+  >(with other: S) -> Bool {
     // FIXME(performance): Don't need to build a set.
     let otherSet = Set(other)
-    return isDisjointWith(otherSet)
+    return isDisjoint(with: otherSet)
   }
 
   /// Returns a new set with the elements of both this set and the given
@@ -888,32 +878,12 @@ public struct Set<Element : Hashable> :
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) -> Set<Element> {
     var newSet = self
-    newSet.unionInPlace(other)
+    newSet.formUnion(other)
     return newSet
   }
 
-  /// Adds the elements of the given sequence to the set.
-  ///
-  /// For example:
-  ///
-  ///     var attendees: Set = ["Alicia", "Bethany", "Diana"]
-  ///     let visitors = ["Marcia", "Nathaniel"]
-  ///     attendees.unionInPlace(visitors)
-  ///     print(attendees)
-  ///     // Prints "["Diana", "Nathaniel", "Bethany", "Alicia", "Marcia"]"
-  ///
-  /// If the set already contains one or more elements that are also in
-  /// `other`, the existing members are kept. If `other` contains multiple
-  /// instances of equivalent elements, only the first instance is kept. For
-  /// example:
-  ///
-  ///     var initialIndices = Set(0..<5)
-  ///     initialIndices.unionInPlace([2, 3, 6, 6, 7, 7])
-  ///     print(initialIndices)
-  ///     // Prints "[2, 4, 6, 7, 0, 1, 3]"
-  ///
-  /// - Parameter other: A sequence of elements. `other` must be finite.
-  public mutating func unionInPlace<
+  /// Inserts the elements of `other` into `self`.
+  public mutating func formUnion<
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) {
     for item in other {
@@ -935,17 +905,17 @@ public struct Set<Element : Hashable> :
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
   @warn_unused_result
-  public func subtract<
+  public func subtracting<
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) -> Set<Element> {
-    return _subtract(other)
+    return self._subtracting(other)
   }
 
-  internal func _subtract<
+  internal func _subtracting<
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) -> Set<Element> {
     var newSet = self
-    newSet.subtractInPlace(other)
+    newSet.subtract(other)
     return newSet
   }
 
@@ -960,13 +930,13 @@ public struct Set<Element : Hashable> :
   ///     // Prints "["Diana", "Chris", "Alicia"]"
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
-  public mutating func subtractInPlace<
+  public mutating func subtract<
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) {
-    _subtractInPlace(other)
+    _subtract(other)
   }
 
-  internal mutating func _subtractInPlace<
+  internal mutating func _subtract<
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) {
     for item in other {
@@ -988,11 +958,11 @@ public struct Set<Element : Hashable> :
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
   @warn_unused_result
-  public func intersect<
+  public func intersection<
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) -> Set<Element> {
     let otherSet = Set(other)
-    return intersect(otherSet)
+    return intersection(otherSet)
   }
 
   /// Removes the elements of the set that aren't also in the given sequence.
@@ -1001,12 +971,12 @@ public struct Set<Element : Hashable> :
   ///
   ///     var employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors = ["Bethany", "Eric", "Forlani", "Greta"]
-  ///     employees.intersectInPlace(neighbors)
+  ///     employees.formIntersection(neighbors)
   ///     print(employees)
   ///     // Prints "["Bethany", "Eric"]"
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
-  public mutating func intersectInPlace<
+  public mutating func formIntersection<
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) {
     // Because `intersect` needs to both modify and iterate over
@@ -1015,7 +985,7 @@ public struct Set<Element : Hashable> :
     //
     // FIXME(performance): perform this operation at a lower level
     // to avoid invalidating the index and avoiding a copy.
-    let result = self.intersect(other)
+    let result = self.intersection(other)
 
     // The result can only have fewer or the same number of elements.
     // If no elements were removed, don't perform a reassignment
@@ -1039,31 +1009,31 @@ public struct Set<Element : Hashable> :
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
   @warn_unused_result
-  public func exclusiveOr<
+  public func symmetricDifference<
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) -> Set<Element> {
     var newSet = self
-    newSet.exclusiveOrInPlace(other)
+    newSet.formSymmetricDifference(other)
     return newSet
   }
 
-  /// Removes the elements of the set that are also in the given sequence and
-  /// adds the members of the sequence that are not already in the set.
+  /// Replace `self` with the elements contained in `self` or `other`,
+  /// but not both.
   ///
   /// For example:
   ///
   ///     var employees: Set = ["Alicia", "Bethany", "Diana", "Eric"]
   ///     let neighbors = ["Bethany", "Eric", "Forlani"]
-  ///     employees.exclusiveOrInPlace(neighbors)
+  ///     employees.formSymmetricDifference(neighbors)
   ///     print(employees)
   ///     // Prints "["Diana", "Forlani", "Alicia"]"
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
-  public mutating func exclusiveOrInPlace<
+  public mutating func formSymmetricDifference<
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) {
     let otherSet = Set(other)
-    exclusiveOrInPlace(otherSet)
+    formSymmetricDifference(otherSet)
   }
 
   /// The hash value for the set.
@@ -4747,13 +4717,13 @@ extension Set {
   ///
   ///     var employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors = ["Bethany", "Eric", "Forlani", "Greta"]
-  ///     employees.subtractInPlace(neighbors)
+  ///     employees.subtract(neighbors)
   ///     print(employees)
   ///     // Prints "["Diana", "Chris", "Alicia"]"
   ///
   /// - Parameter other: Another set.
-  public mutating func subtractInPlace(_ other: Set<Element>) {
-    _subtractInPlace(other)
+  public mutating func subtract(_ other: Set<Element>) {
+    _subtract(other)
   }
 
   /// Returns a Boolean value that indicates whether this set is a subset of the
@@ -4772,7 +4742,7 @@ extension Set {
   /// - Returns: `true` if the set is a subset of `possibleSuperset`;
   ///   otherwise, `false`.
   @warn_unused_result
-  public func isSubsetOf(_ other: Set<Element>) -> Bool {
+  public func isSubset(of other: Set<Element>) -> Bool {
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset || isEqual
   }
@@ -4792,8 +4762,8 @@ extension Set {
   /// - Returns: `true` if the set is a superset of `possibleSubset`;
   ///   otherwise, `false`.
   @warn_unused_result
-  public func isSupersetOf(_ other: Set<Element>) -> Bool {
-    return other.isSubsetOf(self)
+  public func isSuperset(of other: Set<Element>) -> Bool {
+    return other.isSubset(of: self)
   }
 
   /// Returns a Boolean value that indicates whether this set has no members in
@@ -4803,14 +4773,14 @@ extension Set {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let visitors: Set = ["Marcia", "Nathaniel", "Olivia"]
-  ///     print(employees.isDisjointWith(visitors))
+  ///     print(employees.isDisjoint(with: visitors))
   ///     // Prints "true"
   ///
   /// - Parameter other: Another set.
   /// - Returns: `true` if the set has no elements in common with `other`;
   ///   otherwise, `false`.
   @warn_unused_result
-  public func isDisjointWith(_ other: Set<Element>) -> Bool {
+  public func isDisjoint(with other: Set<Element>) -> Bool {
     for member in self {
       if other.contains(member) {
         return false
@@ -4826,15 +4796,15 @@ extension Set {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
-  ///     let nonNeighbors = employees.subtract(neighbors)
+  ///     let nonNeighbors = employees.subtracting(neighbors)
   ///     print(nonNeighbors)
   ///     // Prints "["Diana", "Chris", "Alicia"]"
   ///
   /// - Parameter other: Another set.
   /// - Returns: A new set.
   @warn_unused_result
-  public func subtract(_ other: Set<Element>) -> Set<Element> {
-    return _subtract(other)
+  public func subtracting(_ other: Set<Element>) -> Set<Element> {
+    return self._subtracting(other)
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict
@@ -4846,17 +4816,17 @@ extension Set {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let attendees: Set = ["Alicia", "Bethany", "Diana"]
-  ///     print(employees.isStrictSupersetOf(attendees))
+  ///     print(employees.isStrictSuperset(of: attendees))
   ///     // Prints "true"
-  ///     print(employees.isStrictSupersetOf(employees))
+  ///     print(employees.isStrictSuperset(of: employees))
   ///     // Prints "false"
   ///
   /// - Parameter possibleStrictSubset: Another set.
   /// - Returns: `true` if the set is a strict superset of
   ///   `possibleStrictSubset`; otherwise, `false`.
   @warn_unused_result
-  public func isStrictSupersetOf(_ other: Set<Element>) -> Bool {
-    return self.isSupersetOf(other) && self != other
+  public func isStrictSuperset(of other: Set<Element>) -> Bool {
+    return self.isSuperset(of: other) && self != other
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict subset
@@ -4868,19 +4838,19 @@ extension Set {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let attendees: Set = ["Alicia", "Bethany", "Diana"]
-  ///     print(attendees.isStrictSubsetOf(employees))
+  ///     print(attendees.isStrictSubset(of: employees))
   ///     // Prints "true"
   ///
   ///     // A set is never a strict subset of itself:
-  ///     print(attendees.isStrictSubsetOf(attendees))
+  ///     print(attendees.isStrictSubset(of: attendees))
   ///     // Prints "false"
   ///
   /// - Parameter possibleStrictSuperset: Another set.
   /// - Returns: `true` if the set is a strict subset of
   ///   `possibleStrictSuperset`; otherwise, `false`.
   @warn_unused_result
-  public func isStrictSubsetOf(_ other: Set<Element>) -> Bool {
-    return other.isStrictSupersetOf(self)
+  public func isStrictSubset(of other: Set<Element>) -> Bool {
+    return other.isStrictSuperset(of: self)
   }
 
   /// Returns a new set with the elements that are common to both this set and
@@ -4890,14 +4860,14 @@ extension Set {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
-  ///     let bothNeighborsAndEmployees = employees.intersect(neighbors)
+  ///     let bothNeighborsAndEmployees = employees.intersection(neighbors)
   ///     print(bothNeighborsAndEmployees)
   ///     // Prints "["Bethany", "Eric"]"
   ///
   /// - Parameter other: Another set.
   /// - Returns: A new set.
   @warn_unused_result
-  public func intersect(_ other: Set<Element>) -> Set<Element> {
+  public func intersection(_ other: Set<Element>) -> Set<Element> {
     var newSet = Set<Element>()
     for member in self {
       if other.contains(member) {
@@ -4914,12 +4884,12 @@ extension Set {
   ///
   ///     var employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
-  ///     employees.exclusiveOrInPlace(neighbors)
+  ///     employees.formSymmetricDifference(neighbors)
   ///     print(employees)
   ///     // Prints "["Diana", "Chris", "Forlani", "Alicia", "Greta"]"
   ///
   /// - Parameter other: Another set.
-  public mutating func exclusiveOrInPlace(_ other: Set<Element>) {
+  public mutating func formSymmetricDifference(_ other: Set<Element>) {
     for member in other {
       if contains(member) {
         remove(member)

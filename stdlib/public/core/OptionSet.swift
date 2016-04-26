@@ -147,14 +147,14 @@ extension OptionSet {
   @warn_unused_result
   public func union(_ other: Self) -> Self {
     var r: Self = Self(rawValue: self.rawValue)
-    r.unionInPlace(other)
+    r.formUnion(other)
     return r
   }
   
   /// Returns a new option set with only the elements contained in both this
   /// set and the given set.
   ///
-  /// This example uses the `intersect(_:)` method to limit the available
+  /// This example uses the `intersection(_:)` method to limit the available
   /// shipping options to what can be used with a PO Box destination.
   ///
   ///     // Can only ship standard or priority to PO Boxes
@@ -162,7 +162,7 @@ extension OptionSet {
   ///     let memberShipping: ShippingOptions =
   ///             [.Standard, .Priority, .SecondDay]
   ///
-  ///     let availableOptions = memberShipping.intersect(poboxShipping)
+  ///     let availableOptions = memberShipping.intersection(poboxShipping)
   ///     print(availableOptions.contains(.Priority))
   ///     // Prints "true"
   ///     print(availableOptions.contains(.SecondDay))
@@ -172,9 +172,9 @@ extension OptionSet {
   /// - Returns: A new option set with only the elements contained in both this
   ///   set and `other`.
   @warn_unused_result
-  public func intersect(_ other: Self) -> Self {
+  public func intersection(_ other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
-    r.intersectInPlace(other)
+    r.formIntersection(other)
     return r
   }
   
@@ -185,9 +185,9 @@ extension OptionSet {
   /// - Returns: A new option set with only the elements contained in either
   ///   this set or `other`, but not in both.
   @warn_unused_result
-  public func exclusiveOr(_ other: Self) -> Self {
+  public func symmetricDifference(_ other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
-    r.exclusiveOrInPlace(other)
+    r.formSymmetricDifference(other)
     return r
   }
 }
@@ -216,7 +216,7 @@ extension OptionSet where Element == Self {
   ///   `false`.
   @warn_unused_result
   public func contains(_ member: Self) -> Bool {
-    return self.isSupersetOf(member)
+    return self.isSuperset(of: member)
   }
   
   /// Inserts the given element into the option set if it is not already
@@ -233,9 +233,24 @@ extension OptionSet where Element == Self {
   ///     print(freeOptions.contains(.Priority))
   ///     // Prints "true"
   ///
-  /// - Parameter member: The element to insert.
-  public mutating func insert(_ member: Element) {
-    self.unionInPlace(member)
+  /// - Parameter newMember: The element to insert.
+  /// - Returns: `(true, newMember)` if `e` was not contained in `self`.
+  ///   Otherwise, returns `(false, oldMember)`, where `oldMember` is the
+  ///   member of `self` equal to `newMember`.
+  ///
+  /// - Postcondition: `self.contains(newMember)`.
+  public mutating func insert(
+    _ newMember: Element
+  ) -> (inserted: Bool, memberAfterInsert: Element) {
+    let oldMember = self.intersection(newMember)
+    let shouldInsert = oldMember != newMember
+    let result = (
+      inserted: shouldInsert,
+      memberAfterInsert: shouldInsert ? newMember : oldMember)
+    if shouldInsert {
+      self.formUnion(newMember)
+    }
+    return result
   }
   
   /// Removes a given element if it is contained in the option set; otherwise,
@@ -258,23 +273,38 @@ extension OptionSet where Element == Self {
   ///
   /// - Parameter member: The element of the set to remove.
   /// - Returns: `member` if it was contained in the set; otherwise, `nil`.
+  /// - Postcondition: `self.intersection([member]).isEmpty`
   @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
-    let r = isSupersetOf(member) ? Optional(member) : nil
-    self.subtractInPlace(member)
+    let r = isSuperset(of: member) ? Optional(member) : nil
+    self.subtract(member)
     return r
+  }
+
+  /// Inserts `e` unconditionally.
+  ///
+  /// - Returns: a former member `r` of `self` such that
+  ///   `self.intersection([e]) == [r]` if `self.intersection([e])` was
+  ///   non-empty.  Returns `nil` otherwise.
+  ///
+  /// - Postcondition: `self.contains(e)`
+  public mutating func update(with e: Element) -> Element? {
+    let r = self.intersection(e)
+    self.formUnion(e)
+    return r.isEmpty ? nil : r
   }
 }
 
 /// `OptionSet` requirements for which default implementations are
 /// supplied when `RawValue` conforms to `BitwiseOperations`,
 /// which is the usual case.  Each distinct bit of an option set's
-/// `.rawValue` corresponds to a disjoint element of the option set.
+/// `.rawValue` corresponds to a disjoint value of the `OptionSet`.
 ///
-/// - `union` is implemented as a bitwise `OR` (`|`) of `rawValue`s
-/// - `intersection` is implemented as a bitwise `AND` (`&`) of `rawValue`s
-/// - `exclusiveOr` is implemented as a bitwise `XOR` (`^`) of
+/// - `union` is implemented as a bitwise "or" (`|`) of `rawValue`s
+/// - `intersection` is implemented as a bitwise "and" (`&`) of
 ///   `rawValue`s
+/// - `symmetricDifference` is implemented as a bitwise "exclusive or"
+///    (`^`) of `rawValue`s
 ///
 /// - Note: A type conforming to `OptionSet` can implement any of
 ///   these initializers or methods, and those implementations will be
@@ -295,7 +325,8 @@ extension OptionSet where RawValue : BitwiseOperations {
   /// two sets' raw values.
   ///
   /// - Parameter other: An option set.
-  public mutating func unionInPlace(_ other: Self) {
+  /// - Postcondition: `self.isSuperset(of: other)`
+  public mutating func formUnion(_ other: Self) {
     self = Self(rawValue: self.rawValue | other.rawValue)
   }
   
@@ -306,7 +337,8 @@ extension OptionSet where RawValue : BitwiseOperations {
   /// two sets' raw values.
   ///
   /// - Parameter other: An option set.
-  public mutating func intersectInPlace(_ other: Self) {
+  /// - Postcondition: `self.isSubset(of: other)`
+  public mutating func formIntersection(_ other: Self) {
     self = Self(rawValue: self.rawValue & other.rawValue)
   }
   
@@ -317,7 +349,7 @@ extension OptionSet where RawValue : BitwiseOperations {
   /// operation on the two sets' raw values.
   ///
   /// - Parameter other: An option set.
-  public mutating func exclusiveOrInPlace(_ other: Self) {
+  public mutating func formSymmetricDifference(_ other: Self) {
     self = Self(rawValue: self.rawValue ^ other.rawValue)
   }
 }
