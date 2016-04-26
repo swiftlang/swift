@@ -69,11 +69,8 @@ typealias FooTypedef1 = Int32
 var fooIntVar: Int32
 
 /// Aaa.  fooFunc1.  Bbb.
-@discardableResult
 func fooFunc1(_ a: Int32) -> Int32
-@discardableResult
 func fooFunc1AnonymousParam(_: Int32) -> Int32
-@discardableResult
 func fooFunc3(_ a: Int32, _ b: Float, _ c: Double, _ d: UnsafeMutablePointer<Int32>!) -> Int32
 func fooFuncWithBlock(_ blk: ((Float) -> Int32)!)
 func fooFuncWithFunctionPointer(_ fptr: (@convention(c) (Float) -> Int32)!)
@@ -114,10 +111,8 @@ func fooFuncWithComment4()
 func fooFuncWithComment5()
 
 /// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
-@discardableResult
 func redeclaredInMultipleModulesFunc1(_ a: Int32) -> Int32
 @available(*, unavailable, message: "Variadic function is unavailable")
-@discardableResult
 func fooFuncUsingVararg(_ a: Int32, _ varargs: Any...) -> Int32
 
 /// Aaa.  FooProtocolBase.  Bbb.
@@ -146,9 +141,7 @@ protocol FooProtocolDerived : FooProtocolBase {
 class FooClassBase {
   class func fooBaseInstanceFunc0()
   func fooBaseInstanceFunc0()
-  @discardableResult
   class func fooBaseInstanceFunc1(_ anObject: AnyObject!) -> FooClassBase!
-  @discardableResult
   func fooBaseInstanceFunc1(_ anObject: AnyObject!) -> FooClassBase!
   init!()
   convenience init!(float f: Float)
@@ -157,7 +150,6 @@ class FooClassBase {
   class func fooBaseClassFunc0()
   /*not inherited*/ init!(_ x: Int32)
   @available(*, unavailable, message: "use object construction 'FooClassBase(_:)'")
-  @discardableResult
   class func fooClassBase(_ x: Int32) -> FooClassBase!
 }
 
@@ -204,25 +196,17 @@ struct _InternalStruct {
   init(x: Int32)
 }
 extension FooClassBase {
-  @discardableResult
   class func _internalMeth1() -> AnyObject!
-  @discardableResult
   func _internalMeth1() -> AnyObject!
 }
 extension FooClassBase {
-  @discardableResult
   class func _internalMeth2() -> AnyObject!
-  @discardableResult
   func _internalMeth2() -> AnyObject!
-  @discardableResult
   class func nonInternalMeth() -> AnyObject!
-  @discardableResult
   func nonInternalMeth() -> AnyObject!
 }
 extension FooClassBase {
-  @discardableResult
   class func _internalMeth3() -> AnyObject!
-  @discardableResult
   func _internalMeth3() -> AnyObject!
 }
 protocol _InternalProt {
@@ -254,7 +238,6 @@ class FooClassWithClassProperties : FooClassBase {
 class FooUnavailableMembers : FooClassBase {
   convenience init!(int i: Int32)
   @available(*, unavailable, message: "use object construction 'FooUnavailableMembers(int:)'")
-  @discardableResult
   class func withInt(_ i: Int32) -> Self!
   @available(*, unavailable, message: "x")
   func unavailable()
@@ -310,7 +293,6 @@ enum SCNFilterMode : Int {
   @available(*, unavailable)
   case SCNNoFiltering
 }
-@discardableResult
 func fooSubFunc1(_ a: Int32) -> Int32
 struct FooSubEnum1 : RawRepresentable, Equatable {
   init(_ rawValue: UInt32)

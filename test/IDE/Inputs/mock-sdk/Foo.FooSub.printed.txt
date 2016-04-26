@@ -1,6 +1,5 @@
 @_exported import FooHelper
 
-@discardableResult
 func fooSubFunc1(_ a: Int32) -> Int32
 struct FooSubEnum1 : RawRepresentable, Equatable {
   init(_ rawValue: UInt32)
