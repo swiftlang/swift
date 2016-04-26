@@ -476,8 +476,8 @@ internal func _product<C1 : Collection, C2 : Collection>(
     wrapValueIntoEquatable: (
       MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
 
-    extractValueFromEquatable: (
-      CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue,
+    extractValueFromEquatable:
+      ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
@@ -1515,7 +1515,7 @@ extension TestSuite {
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
           stackTrace: SourceLocStack().with(test.loc))
-    }
+      }
     }
 
     //===------------------------------------------------------------------===//

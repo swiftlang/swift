@@ -967,8 +967,8 @@ public struct ${Self}<Element> : ${SelfProtocols} {
 
   public subscript(bounds: Range<MinimalIndex>) -> ${SelfSlice}<${Self}<Base._Element>> {
     get {
+      // FIXME: swift-3-indexing-model: range check.
       return ${SelfSlice}(base: self, bounds: bounds)
-      fatalError("FIXME: swift-3-indexing-model: range check")
     }
 %     if Mutable:
     set {
