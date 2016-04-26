@@ -1,0 +1,34 @@
+
+extension CSSearchableItemAttributeSet {
+  var pixelHeight: NSNumber?
+  var pixelWidth: NSNumber?
+  var pixelCount: NSNumber?
+  var colorSpace: String?
+  var bitsPerSample: NSNumber?
+  var flashOn: NSNumber?
+  var focalLength: NSNumber?
+  var focalLength35mm: NSNumber?
+  var acquisitionMake: String?
+  var acquisitionModel: String?
+  var cameraOwner: String?
+  var lensModel: String?
+  var isoSpeed: NSNumber?
+  var orientation: NSNumber?
+  var layerNames: [String]?
+  var whiteBalance: NSNumber?
+  var aperture: NSNumber?
+  var profileName: String?
+  var resolutionWidthDPI: NSNumber?
+  var resolutionHeightDPI: NSNumber?
+  var exposureMode: NSNumber?
+  var exposureTime: NSNumber?
+  var exifVersion: String?
+  var exifgpsVersion: String?
+  var hasAlphaChannel: NSNumber?
+  var redEyeOn: NSNumber?
+  var meteringMode: String?
+  var maxAperture: NSNumber?
+  var fNumber: NSNumber?
+  var exposureProgram: String?
+  var exposureTimeString: String?
+}

@@ -1,0 +1,23 @@
+
+protocol CLLocationManagerDelegate : NSObjectProtocol {
+  @available(OSX 10.6, *)
+  optional func locationManager(_ manager: CLLocationManager, didUpdateTo newLocation: CLLocation, from oldLocation: CLLocation)
+  @available(OSX 10.9, *)
+  optional func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [AnyObject])
+  @available(OSX 10.10, *)
+  optional func locationManager(_ manager: CLLocationManager, didDetermineState state: CLRegionState, for region: CLRegion)
+  @available(OSX 10.8, *)
+  optional func locationManager(_ manager: CLLocationManager, didEnter region: CLRegion)
+  @available(OSX 10.8, *)
+  optional func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion)
+  @available(OSX 10.6, *)
+  optional func locationManager(_ manager: CLLocationManager, didFailWithError error: NSError)
+  @available(OSX 10.8, *)
+  optional func locationManager(_ manager: CLLocationManager, monitoringDidFailFor region: CLRegion?, withError error: NSError)
+  @available(OSX 10.7, *)
+  optional func locationManager(_ manager: CLLocationManager, didChange status: CLAuthorizationStatus)
+  @available(OSX 10.8, *)
+  optional func locationManager(_ manager: CLLocationManager, didStartMonitoringFor region: CLRegion)
+  @available(OSX 10.9, *)
+  optional func locationManager(_ manager: CLLocationManager, didFinishDeferredUpdatesWithError error: NSError?)
+}

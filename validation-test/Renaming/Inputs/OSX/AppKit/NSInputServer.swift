@@ -1,0 +1,5 @@
+
+protocol NSInputServiceProvider {
+}
+protocol NSInputServerMouseTracker {
+}

@@ -1,0 +1,3 @@
+
+@discardableResult
+func DRGetVersion() -> NumVersion

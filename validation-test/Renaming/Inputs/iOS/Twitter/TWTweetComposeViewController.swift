@@ -1,0 +1,5 @@
+
+var TWTweetComposeViewControllerResultCancelled: Int { get }
+var TWTweetComposeViewControllerResultDone: Int { get }
+typealias TWTweetComposeViewControllerResult = SLComposeViewControllerResult
+typealias TWTweetComposeViewControllerCompletionHandler = SLComposeViewControllerCompletionHandler

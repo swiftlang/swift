@@ -1,0 +1,2 @@
+
+let GKSessionErrorDomain: String
