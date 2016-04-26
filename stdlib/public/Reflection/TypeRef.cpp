@@ -429,6 +429,107 @@ bool NominalTypeTrait::isClass() const {
   return ::isClass(Demangled);
 }
 
+class ThickenMetatype
+  : public TypeRefVisitor<ThickenMetatype, const TypeRef *> {
+  TypeRefBuilder &Builder;
+public:
+  using TypeRefVisitor<ThickenMetatype, const TypeRef *>::visit;
+
+  ThickenMetatype(TypeRefBuilder &Builder) : Builder(Builder) {}
+
+  const TypeRef *visitBuiltinTypeRef(const BuiltinTypeRef *B) {
+    return B;
+  }
+
+  const TypeRef *visitNominalTypeRef(const NominalTypeRef *N) {
+    return N;
+  }
+
+  const TypeRef *visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
+    std::vector<const TypeRef *> GenericParams;
+    for (auto Param : BG->getGenericParams())
+      GenericParams.push_back(visit(Param));
+    return BoundGenericTypeRef::create(Builder, BG->getMangledName(),
+                                       GenericParams);
+  }
+
+  const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
+    std::vector<const TypeRef *> Elements;
+    for (auto Element : T->getElements())
+      Elements.push_back(visit(Element));
+    return TupleTypeRef::create(Builder, Elements);
+  }
+
+  const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
+    std::vector<const TypeRef *> SubstitutedArguments;
+    for (auto Argument : F->getArguments())
+      SubstitutedArguments.push_back(visit(Argument));
+
+    auto SubstitutedResult = visit(F->getResult());
+
+    return FunctionTypeRef::create(Builder, SubstitutedArguments,
+                                   SubstitutedResult, F->getFlags());
+  }
+
+  const TypeRef *visitProtocolTypeRef(const ProtocolTypeRef *P) {
+    return P;
+  }
+
+  const TypeRef *
+  visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    return PC;
+  }
+
+  const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
+    return MetatypeTypeRef::create(Builder, visit(M->getInstanceType()),
+                                   /*WasAbstract=*/true);
+  }
+
+  const TypeRef *
+  visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
+    return EM;
+  }
+
+  const TypeRef *
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
+    return GTP;
+  }
+
+  const TypeRef *visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
+    return DM;
+  }
+
+  const TypeRef *visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
+    return F;
+  }
+
+  const TypeRef *visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
+    return OC;
+  }
+
+  const TypeRef *visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
+    return US;
+  }
+
+  const TypeRef *visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
+    return WS;
+  }
+
+  const TypeRef *
+  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
+    return US;
+  }
+
+  const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
+    return O;
+  }
+};
+
+static const TypeRef *
+thickenMetatypes(TypeRefBuilder &Builder, const TypeRef *TR) {
+  return ThickenMetatype(Builder).visit(TR);
+}
+
 class TypeRefSubstitution
   : public TypeRefVisitor<TypeRefSubstitution, const TypeRef *> {
   TypeRefBuilder &Builder;
@@ -457,9 +558,8 @@ public:
 
   const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
     std::vector<const TypeRef *> Elements;
-    for (auto Element : T->getElements()) {
+    for (auto Element : T->getElements())
       Elements.push_back(visit(Element));
-    }
     return TupleTypeRef::create(Builder, Elements);
   }
 
@@ -484,7 +584,10 @@ public:
   }
 
   const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
-    return MetatypeTypeRef::create(Builder, visit(M->getInstanceType()));
+    if (M->isConcrete())
+      return M;
+    return MetatypeTypeRef::create(Builder, visit(M->getInstanceType()),
+                                   /*WasAbstract=*/true);
   }
 
   const TypeRef *
@@ -498,7 +601,7 @@ public:
     auto found = Substitutions.find({GTP->getDepth(), GTP->getIndex()});
     assert(found != Substitutions.end());
     assert(found->second->isConcrete());
-    return found->second;
+    return thickenMetatypes(Builder, found->second);
   }
 
   const TypeRef *visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
@@ -522,7 +625,8 @@ public:
     }
 
     assert(TypeWitness);
-    return TypeWitness->subst(Builder, SubstBase->getSubstMap());
+    auto *Subst = TypeWitness->subst(Builder, SubstBase->getSubstMap());
+    return thickenMetatypes(Builder, Subst);
   }
 
   const TypeRef *visitForeignClassTypeRef(const ForeignClassTypeRef *F) {

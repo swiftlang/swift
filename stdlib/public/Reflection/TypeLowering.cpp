@@ -113,6 +113,9 @@ public:
       case RecordKind::ClassExistential:
         printHeader("class_existential");
         break;
+      case RecordKind::ExistentialMetatype:
+        printHeader("existential_metatype");
+        break;
       }
       printBasic(TI);
       printFields(RecordTI);
@@ -311,6 +314,26 @@ public:
 
     return builder.build();
   }
+
+  const TypeInfo *buildMetatype() {
+    if (Invalid)
+      return nullptr;
+
+    if (ObjC) {
+      if (WitnessTableCount > 0)
+        return nullptr;
+
+      return TC.getTypeInfo(TC.getRawPointerTypeRef());
+    }
+
+    RecordTypeInfoBuilder builder(TC, RecordKind::ExistentialMetatype);
+
+    builder.addField("metadata", TC.getRawPointerTypeRef());
+    for (unsigned i = 0; i < WitnessTableCount; i++)
+      builder.addField("wtable", TC.getRawPointerTypeRef());
+
+    return builder.build();
+  }
 };
 
 }
@@ -360,6 +383,14 @@ TypeConverter::getThickFunctionTypeInfo() {
   return ThickFunctionTI;
 }
 
+const TypeInfo *TypeConverter::getEmptyTypeInfo() {
+  if (EmptyTI != nullptr)
+    return EmptyTI;
+
+  EmptyTI = makeTypeInfo<TypeInfo>(TypeInfoKind::Builtin, 0, 1, 0, 0);
+  return EmptyTI;
+}
+
 const TypeRef *TypeConverter::getRawPointerTypeRef() {
   if (RawPointerTR != nullptr)
     return RawPointerTR;
@@ -383,6 +414,143 @@ const TypeRef *TypeConverter::getUnknownObjectTypeRef() {
   UnknownObjectTR = BuiltinTypeRef::create(Builder, "BO");
   return UnknownObjectTR;
 }
+
+enum class MetatypeRepresentation : unsigned {
+  Thin,
+  Thick,
+  Unknown
+};
+
+MetatypeRepresentation combineRepresentations(MetatypeRepresentation rep1,
+                                              MetatypeRepresentation rep2) {
+  if (rep1 == rep2)
+    return rep1;
+
+  if (rep1 == MetatypeRepresentation::Unknown ||
+      rep2 == MetatypeRepresentation::Unknown)
+    return MetatypeRepresentation::Unknown;
+
+  if (rep1 == MetatypeRepresentation::Thick ||
+      rep2 == MetatypeRepresentation::Thick)
+    return MetatypeRepresentation::Thick;
+
+  return MetatypeRepresentation::Thin;
+}
+
+class HasSingletonMetatype
+  : public TypeRefVisitor<HasSingletonMetatype, MetatypeRepresentation> {
+  TypeRefBuilder &Builder;
+
+public:
+  HasSingletonMetatype(TypeRefBuilder &Builder) : Builder(Builder) {}
+
+  using TypeRefVisitor<HasSingletonMetatype, MetatypeRepresentation>::visit;
+
+  MetatypeRepresentation visitBuiltinTypeRef(const BuiltinTypeRef *B) {
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation visitAnyNominalTypeRef(const TypeRef *TR) {
+    const FieldDescriptor *FD = Builder.getFieldTypeInfo(TR);
+    if (FD == nullptr)
+      return MetatypeRepresentation::Unknown;
+
+    switch (FD->Kind) {
+    case FieldDescriptorKind::Class:
+      return MetatypeRepresentation::Thick;
+
+    case FieldDescriptorKind::Struct:
+    case FieldDescriptorKind::Enum:
+      return MetatypeRepresentation::Thin;
+
+    case FieldDescriptorKind::ObjCProtocol:
+    case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::Protocol:
+      return MetatypeRepresentation::Unknown;
+    }
+  }
+
+  MetatypeRepresentation visitNominalTypeRef(const NominalTypeRef *N) {
+    return visitAnyNominalTypeRef(N);
+  }
+
+  MetatypeRepresentation visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
+    return visitAnyNominalTypeRef(BG);
+  }
+
+  MetatypeRepresentation visitTupleTypeRef(const TupleTypeRef *T) {
+    auto result = MetatypeRepresentation::Thin;
+    for (auto Element : T->getElements())
+      result = combineRepresentations(result, visit(Element));
+    return result;
+  }
+
+  MetatypeRepresentation visitFunctionTypeRef(const FunctionTypeRef *F) {
+    auto result = visit(F->getResult());
+    for (auto Arg : F->getArguments())
+      result = combineRepresentations(result, visit(Arg));
+    return result;
+  }
+
+  MetatypeRepresentation visitProtocolTypeRef(const ProtocolTypeRef *P) {
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation
+  visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation visitMetatypeTypeRef(const MetatypeTypeRef *M) {
+    if (M->wasAbstract())
+      return MetatypeRepresentation::Thick;
+    return visit(M->getInstanceType());
+  }
+
+  MetatypeRepresentation
+  visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
+    assert(false && "Must have concrete TypeRef");
+    return MetatypeRepresentation::Unknown;
+  }
+
+  MetatypeRepresentation
+  visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
+    assert(false && "Must have concrete TypeRef");
+    return MetatypeRepresentation::Unknown;
+  }
+
+  MetatypeRepresentation
+  visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
+    return MetatypeRepresentation::Unknown;
+  }
+
+  MetatypeRepresentation visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
+    return MetatypeRepresentation::Unknown;
+  }
+
+  MetatypeRepresentation
+  visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
+    return MetatypeRepresentation::Unknown;
+  }
+
+  MetatypeRepresentation visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
+    return MetatypeRepresentation::Unknown;
+  }
+
+  MetatypeRepresentation
+  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
+    return MetatypeRepresentation::Unknown;
+  }
+
+  MetatypeRepresentation visitOpaqueTypeRef(const OpaqueTypeRef *O) {
+    return MetatypeRepresentation::Unknown;
+  }
+};
 
 class LowerType
   : public TypeRefVisitor<LowerType, const TypeInfo *> {
@@ -508,14 +676,31 @@ public:
   }
 
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
-    // FIXME
-    return nullptr;
+    switch (HasSingletonMetatype(TC.getBuilder()).visit(M)) {
+    case MetatypeRepresentation::Unknown:
+      return nullptr;
+    case MetatypeRepresentation::Thin:
+      return TC.getEmptyTypeInfo();
+    case MetatypeRepresentation::Thick:
+      return TC.getTypeInfo(TC.getRawPointerTypeRef());
+    }
   }
 
   const TypeInfo *
   visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
-    // FIXME
-    return nullptr;
+    ExistentialTypeInfoBuilder builder(TC);
+    auto *TR = EM->getInstanceType();
+
+    if (auto *P = dyn_cast<ProtocolTypeRef>(TR)) {
+      builder.addProtocol(P);
+    } else if (auto *PC = dyn_cast<ProtocolCompositionTypeRef>(TR)) {
+      for (auto *P : PC->getProtocols())
+        builder.addProtocol(P);
+    } else {
+      return nullptr;
+    }
+
+    return builder.buildMetatype();
   }
 
   const TypeInfo *
@@ -594,7 +779,7 @@ public:
     return visitAnyStorageTypeRef(US, ReferenceKind::Unmanaged);
   }
 
-  const TypeInfo *visitOpaqueTypeRef(const OpaqueTypeRef *Op) {
+  const TypeInfo *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     assert(false && "Can't lower opaque TypeRef");
     return nullptr;
   }

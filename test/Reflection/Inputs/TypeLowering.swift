@@ -68,3 +68,18 @@ public struct ExistentialStruct {
   public weak var weakAnyObject: AnyObject?
   public weak var weakAnyClassBoundProto: CP1?
 }
+
+public struct MetadataHolder<T, U> {
+  let t: T
+  let u: U.Type
+}
+
+public struct MetatypeStruct {
+  public let any: Any.Type
+  public let anyObject: AnyObject.Type
+  public let anyProto: P1.Type
+  public let anyProtoComposition: protocol<P1, P2, P3>.Type
+  public let structMetatype: BasicStruct.Type
+  public let classMetatype: C.Type
+  public let abstractMetatype: MetadataHolder<BasicStruct.Type, BasicStruct>
+}

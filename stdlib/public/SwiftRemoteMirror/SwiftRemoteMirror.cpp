@@ -118,6 +118,8 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
       return SWIFT_EXISTENTIAL;
     case RecordKind::ClassExistential:
       return SWIFT_CLASS_EXISTENTIAL;
+    case RecordKind::ExistentialMetatype:
+      return SWIFT_EXISTENTIAL_METATYPE;
     }
   }
   case TypeInfoKind::Reference: {

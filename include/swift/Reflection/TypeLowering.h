@@ -48,6 +48,9 @@ enum class RecordKind : unsigned {
   // A class existential is a retainable pointer followed by witness
   // tables.
   ClassExistential,
+
+  // An existential metatype.
+  ExistentialMetatype,
 };
 
 enum class ReferenceCounting : unsigned {
@@ -157,6 +160,7 @@ class TypeConverter {
   const TypeRef *NativeObjectTR = nullptr;
   const TypeRef *UnknownObjectTR = nullptr;
   const TypeInfo *ThickFunctionTI = nullptr;
+  const TypeInfo *EmptyTI = nullptr;
 
 public:
   explicit TypeConverter(TypeRefBuilder &Builder) : Builder(Builder) {}
@@ -174,6 +178,7 @@ public:
   const TypeRef *getNativeObjectTypeRef();
   const TypeRef *getUnknownObjectTypeRef();
   const TypeInfo *getThickFunctionTypeInfo();
+  const TypeInfo *getEmptyTypeInfo();
 
   template <typename TypeInfoTy, typename... Args>
   const TypeInfoTy *makeTypeInfo(Args... args) {

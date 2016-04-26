@@ -274,15 +274,22 @@ public:
 
 class MetatypeTypeRef final : public TypeRef {
   const TypeRef *InstanceType;
+  bool WasAbstract;
 
 public:
-  MetatypeTypeRef(const TypeRef *InstanceType)
-    : TypeRef(TypeRefKind::Metatype), InstanceType(InstanceType) {}
+  MetatypeTypeRef(const TypeRef *InstanceType, bool WasAbstract)
+    : TypeRef(TypeRefKind::Metatype), InstanceType(InstanceType),
+      WasAbstract(WasAbstract) {}
 
   template <typename Allocator>
   static const MetatypeTypeRef *create(Allocator &A,
-                                 const TypeRef *InstanceType) {
-    return A.template makeTypeRef<MetatypeTypeRef>(InstanceType);
+                                 const TypeRef *InstanceType,
+                                 bool WasAbstract = false) {
+    return A.template makeTypeRef<MetatypeTypeRef>(InstanceType, WasAbstract);
+  }
+
+  bool wasAbstract() const {
+    return WasAbstract;
   }
 
   const TypeRef *getInstanceType() const {

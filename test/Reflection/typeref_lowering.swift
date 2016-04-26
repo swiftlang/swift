@@ -200,6 +200,42 @@ V12TypeLowering17ExistentialStruct
 // CHECK-NEXT:       (field name=wtable offset=8
 // CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1)))))
 
+V12TypeLowering14MetatypeStruct
+// CHECK:      (struct TypeLowering.MetatypeStruct)
+// CHECK-NEXT: (struct size=80 alignment=8 stride=80 num_extra_inhabitants=0
+// CHECK-NEXT:   (field name=any offset=0
+// CHECK-NEXT:     (existential_metatype size=8 alignment=8 stride=8 num_extra_inhabitants=1
+// CHECK-NEXT:       (field name=metadata offset=0
+// CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
+// CHECK-NEXT:   (field name=anyObject offset=8
+// CHECK-NEXT:     (existential_metatype size=8 alignment=8 stride=8 num_extra_inhabitants=1
+// CHECK-NEXT:       (field name=metadata offset=0
+// CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
+// CHECK-NEXT:   (field name=anyProto offset=16
+// CHECK-NEXT:     (existential_metatype size=16 alignment=8 stride=16 num_extra_inhabitants=0
+// CHECK-NEXT:       (field name=metadata offset=0
+// CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
+// CHECK-NEXT:       (field name=wtable offset=8
+// CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
+// CHECK-NEXT:   (field name=anyProtoComposition offset=32
+// CHECK-NEXT:     (existential_metatype size=24 alignment=8 stride=24 num_extra_inhabitants=0
+// CHECK-NEXT:       (field name=metadata offset=0
+// CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
+// CHECK-NEXT:       (field name=wtable offset=8
+// CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
+// CHECK-NEXT:       (field name=wtable offset=16
+// CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
+// CHECK-NEXT:   (field name=structMetatype offset=56
+// CHECK-NEXT:     (builtin size=0 alignment=1 stride=0 num_extra_inhabitants=0))
+// CHECK-NEXT:   (field name=classMetatype offset=56
+// CHECK-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
+// CHECK-NEXT:   (field name=abstractMetatype offset=64
+// CHECK-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=0
+// CHECK-NEXT:       (field name=t offset=0
+// CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
+// CHECK-NEXT:       (field name=u offset=8
+// CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1)))))
+
 Bo
 // CHECK:      (builtin Builtin.NativeObject)
 // CHECK-NEXT: (reference kind=strong refcounting=native)
