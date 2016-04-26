@@ -52,7 +52,6 @@ TEST(TypeRefTest, UniqueNominalTypeRef) {
   auto N5 = Builder.createNominalType(ABC, N1);
 
   EXPECT_EQ(N4, N5);
-  EXPECT_NE(N4, N1);
 }
 
 TEST(TypeRefTest, UniqueBoundGenericTypeRef) {
@@ -72,7 +71,7 @@ TEST(TypeRefTest, UniqueBoundGenericTypeRef) {
 
   auto BG4 = Builder.createBoundGenericType(ABC, GenericParams, nullptr);
   auto BG5 = Builder.createBoundGenericType(ABC, GenericParams, nullptr);
-  auto BG6 = Builder.createBoundGenericType(ABC, GenericParams, BG1);
+  auto BG6 = Builder.createBoundGenericType(ABCD, GenericParams, nullptr);
 
   EXPECT_EQ(BG4, BG5);
   EXPECT_NE(BG5, BG6);

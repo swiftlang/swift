@@ -196,7 +196,6 @@ public:
                            const TypeRef *Parent) {
     TypeRefID ID;
     ID.addString(MangledName);
-    ID.addPointer(Parent);
     return ID;
   }
 };
@@ -253,7 +252,6 @@ public:
     ID.addString(MangledName);
     for (auto Param : GenericParams)
       ID.addPointer(Param);
-    ID.addPointer(Parent);
     return ID;
   }
 
