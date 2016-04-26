@@ -68,3 +68,20 @@ printType(I<Int>.self)
 // TODO: non-generic types nested in generic types
 // TODO: generic types nested in generic types
 // TODO: generic types nested in non-generic types
+
+protocol J {}
+
+printType(J.self)
+// CHECK: found type: J
+printType(J.Protocol.self)
+// CHECK: found type: J.Protocol
+printType(J.Type.self)
+// CHECK: found type: J.Type
+
+protocol K {}
+typealias JK = protocol<J,K>
+typealias KJ = protocol<K,J>
+printType(JK.self)
+// CHECK: found type: protocol<J, K>
+printType(KJ.self)
+// CHECK: found type: protocol<J, K>
