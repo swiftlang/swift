@@ -182,17 +182,17 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
   internal var _current: Element
   internal let _end: Element
   internal let _stride: Element.Stride
-  internal var _done: Bool = false
+  internal var _didReturnEnd: Bool = false
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   public mutating func next() -> Element? {
-    if _done {
-      return nil
-    }
     if _stride > 0 ? _current >= _end : _current <= _end {
-      if _current == _end {
-        _done = true
+      // This check is needed because if we just changed the above operators
+      // to > and <, respectively, we might advance current past the end
+      // and throw it out of bounds (e.g. above Int.max) unnecessarily.
+      if _current == _end && !_didReturnEnd {
+        _didReturnEnd = true
         return _current
       }
       return nil
