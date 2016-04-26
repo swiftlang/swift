@@ -1286,11 +1286,6 @@ namespace {
             // For now, fall through and treat as a struct
           case clang::SwiftNewtypeAttr::NK_Struct: {
 
-            auto underlyingType = Impl.importType(
-                Decl->getUnderlyingType(), ImportTypeKind::Typedef,
-                isInSystemModule(DC),
-                Decl->getUnderlyingType()->isBlockPointerType());
-
             auto &cxt = Impl.SwiftContext;
             auto Loc = Impl.importSourceLoc(Decl->getLocation());
 
@@ -1301,9 +1296,33 @@ namespace {
             ProtocolDecl *protocols[] = {
                 cxt.getProtocol(KnownProtocolKind::RawRepresentable),
             };
-            makeStructRawValued(structDecl, underlyingType,
-                                {KnownProtocolKind::RawRepresentable},
-                                protocols);
+
+            // Import the type of the underlying storage
+            auto storedUnderlyingType = Impl.importType(
+                Decl->getUnderlyingType(), ImportTypeKind::Value,
+                isInSystemModule(DC),
+                Decl->getUnderlyingType()->isBlockPointerType());
+
+            // Find a bridged type, which may be different
+            auto computedPropertyUnderlyingType = Impl.importType(
+                Decl->getUnderlyingType(), ImportTypeKind::Property,
+                isInSystemModule(DC),
+                Decl->getUnderlyingType()->isBlockPointerType());
+
+            if (storedUnderlyingType.getCanonicalTypeOrNull() ==
+                computedPropertyUnderlyingType.getCanonicalTypeOrNull()) {
+              // Simple, our stored type is already bridged
+              makeStructRawValued(structDecl, storedUnderlyingType,
+                                  {KnownProtocolKind::RawRepresentable},
+                                  protocols);
+            } else {
+              // We need to make a stored rawValue or storage type, and a
+              // computed one of bridged type.
+              makeStructRawValuedWithBridge(
+                  structDecl, storedUnderlyingType,
+                  computedPropertyUnderlyingType,
+                  {KnownProtocolKind::RawRepresentable}, protocols);
+            }
 
             Impl.ImportedDecls[Decl->getCanonicalDecl()] = structDecl;
             Impl.registerExternalDecl(structDecl);
@@ -1483,6 +1502,112 @@ namespace {
 
       structDecl->addMember(patternBinding);
       structDecl->addMember(var);
+    }
+
+    /// Make a struct declaration into a raw-value-backed struct, with
+    /// bridged computed rawValue property which differs from stored backing
+    ///
+    /// \param structDecl the struct to make a raw value for
+    /// \param storedUnderlyingType the type of the stored raw value
+    /// \param bridgedType the type of the 'rawValue' computed property bridge
+    /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
+    /// \param protocols the protocols to make this struct conform to
+    ///
+    /// This will perform most of the work involved in making a new Swift struct
+    /// be backed by a stored raw value and computed raw value of bridged type.
+    /// This will populated derived protocols and synthesized protocols, add the
+    /// new variable and pattern bindings, and create the inits parameterized
+    /// over a bridged type that will cast to the stored type, as appropriate.
+    ///
+    template <unsigned N> void makeStructRawValuedWithBridge(
+        StructDecl *structDecl,
+        Type storedUnderlyingType,
+        Type bridgedType,
+        ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
+        ProtocolDecl *const(&protocols)[N]) {
+      auto &cxt = Impl.SwiftContext;
+      populateInheritedTypes(structDecl, protocols);
+
+      // Note synthesized protocols
+      for (auto kind : synthesizedProtocolAttrs)
+        structDecl->getAttrs().add(new (cxt) SynthesizedProtocolAttr(kind));
+
+      auto storedVarName = cxt.getIdentifier("_rawValue");
+      auto computedVarName = cxt.Id_rawValue;
+
+      //
+      // Create a variable to store the underlying value.
+      auto storedVar = new (cxt) VarDecl(
+          /*static*/ false,
+          /*IsLet*/ false, SourceLoc(), storedVarName, storedUnderlyingType,
+          structDecl);
+      storedVar->setImplicit();
+      storedVar->setAccessibility(Accessibility::Public);
+      storedVar->setSetterAccessibility(Accessibility::Private);
+
+      // Create a pattern binding to describe the variable.
+      Pattern *storedVarPattern = createTypedNamedPattern(storedVar);
+      auto storedPatternBinding = PatternBindingDecl::create(
+          cxt, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+          storedVarPattern, nullptr, structDecl);
+
+      //
+      // Create a computed value variable
+      auto dre = new (cxt) DeclRefExpr(
+          storedVar, {}, true, AccessSemantics::Ordinary, storedUnderlyingType);
+      auto coerce = new (cxt)
+          CoerceExpr(dre, {}, {nullptr, bridgedType});
+      auto computedVar = cast<VarDecl>(Impl.createConstant(
+          computedVarName, structDecl, bridgedType, coerce,
+          ConstantConvertKind::Coerce, false, {}));
+      computedVar->setImplicit();
+      computedVar->setAccessibility(Accessibility::Public);
+
+      // Create a pattern binding to describe the variable.
+
+      Pattern *computedVarPattern = createTypedNamedPattern(computedVar);
+      auto computedPatternBinding = PatternBindingDecl::create(
+          cxt, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+          computedVarPattern, nullptr, structDecl);
+
+      auto init = createValueConstructor(structDecl, computedVar,
+                                         /*wantCtorParamNames=*/true,
+                                         /*wantBody=*/false);
+      // Insert our custom init body
+      if (!Impl.hasFinishedTypeChecking()) {
+        auto selfDecl = ParamDecl::createSelf(SourceLoc(), structDecl,
+                                              /*static*/ false, /*inout*/ true);
+        // Construct left-hand side.
+        Expr *lhs = new (cxt) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                          /*Implicit=*/true);
+        lhs = new (cxt) MemberRefExpr(lhs, SourceLoc(), storedVar,
+                                      DeclNameLoc(), /*Implicit=*/true);
+
+        // Construct right-hand side.
+        // FIXME: get the parameter from the init, and plug it in here.
+        auto rhs = new (cxt)
+            DeclRefExpr(init->getParameterList(1)->get(0), DeclNameLoc(),
+                        /*Implicit=*/true);
+
+        // Add assignment.
+        auto assign = new (cxt) AssignExpr(lhs, SourceLoc(), rhs,
+                                           /*Implicit=*/true);
+        auto body = BraceStmt::create(cxt, SourceLoc(), {assign}, SourceLoc());
+        init->setBody(body);
+
+        // We want to inline away as much of this as we can
+        init->getAttrs().add(new (cxt) TransparentAttr(/*implicit*/ true));
+      }
+
+      // Create constructor for computed value
+      structDecl->setHasDelayedMembers();
+
+      structDecl->addMember(init);
+
+      structDecl->addMember(storedPatternBinding);
+      structDecl->addMember(storedVar);
+      structDecl->addMember(computedVar);
+      structDecl->addMember(computedPatternBinding);
     }
 
     /// \brief Create a constructor that initializes a struct from its members.
@@ -6200,9 +6325,14 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               ClangNode ClangN) {
   auto &context = SwiftContext;
 
-  auto var = createDeclWithClangNode<VarDecl>(ClangN,
-                                   isStatic, /*IsLet*/ false,
-                                   SourceLoc(), name, type, dc);
+  VarDecl *var = nullptr;
+  if (ClangN) {
+    var = createDeclWithClangNode<VarDecl>(ClangN, isStatic, /*IsLet*/ false,
+                                           SourceLoc(), name, type, dc);
+  } else {
+    var = new (SwiftContext)
+        VarDecl(isStatic, /*IsLet*/ false, SourceLoc(), name, type, dc);
+  }
 
   // Form the argument patterns.
   SmallVector<ParameterList*, 3> getterArgs;
