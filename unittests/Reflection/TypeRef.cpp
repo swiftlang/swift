@@ -52,7 +52,6 @@ TEST(TypeRefTest, UniqueNominalTypeRef) {
   auto N5 = Builder.createNominalType(ABC, N1);
 
   EXPECT_EQ(N4, N5);
-  EXPECT_NE(N4, N1);
 }
 
 TEST(TypeRefTest, UniqueBoundGenericTypeRef) {
@@ -72,7 +71,7 @@ TEST(TypeRefTest, UniqueBoundGenericTypeRef) {
 
   auto BG4 = Builder.createBoundGenericType(ABC, GenericParams, nullptr);
   auto BG5 = Builder.createBoundGenericType(ABC, GenericParams, nullptr);
-  auto BG6 = Builder.createBoundGenericType(ABC, GenericParams, BG1);
+  auto BG6 = Builder.createBoundGenericType(ABCD, GenericParams, nullptr);
 
   EXPECT_EQ(BG4, BG5);
   EXPECT_NE(BG5, BG6);
@@ -181,12 +180,14 @@ TEST(TypeRefTest, UniqueMetatypeTypeRef) {
   TypeRefBuilder Builder;
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
-  auto M1 = Builder.createMetatypeType(N1);
-  auto M2 = Builder.createMetatypeType(N1);
-  auto MM3 = Builder.createMetatypeType(M1);
+  auto M1 = Builder.createMetatypeType(N1, false);
+  auto M2 = Builder.createMetatypeType(N1, false);
+  auto MM3 = Builder.createMetatypeType(M1, false);
+  auto M4 = Builder.createMetatypeType(N1, true);
 
   EXPECT_EQ(M1, M2);
   EXPECT_NE(M2, MM3);
+  EXPECT_NE(M1, M4);
 }
 
 TEST(TypeRefTest, UniqueExistentialMetatypeTypeRef) {
