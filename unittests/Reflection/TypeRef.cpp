@@ -181,12 +181,14 @@ TEST(TypeRefTest, UniqueMetatypeTypeRef) {
   TypeRefBuilder Builder;
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
-  auto M1 = Builder.createMetatypeType(N1);
-  auto M2 = Builder.createMetatypeType(N1);
-  auto MM3 = Builder.createMetatypeType(M1);
+  auto M1 = Builder.createMetatypeType(N1, false);
+  auto M2 = Builder.createMetatypeType(N1, false);
+  auto MM3 = Builder.createMetatypeType(M1, false);
+  auto M4 = Builder.createMetatypeType(N1, true);
 
   EXPECT_EQ(M1, M2);
   EXPECT_NE(M2, MM3);
+  EXPECT_NE(M1, M4);
 }
 
 TEST(TypeRefTest, UniqueExistentialMetatypeTypeRef) {

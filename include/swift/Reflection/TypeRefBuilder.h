@@ -192,8 +192,9 @@ public:
     FIND_OR_CREATE_TYPEREF(ExistentialMetatypeTypeRef, instance);
   }
 
-  const MetatypeTypeRef *createMetatypeType(const TypeRef *instance) {
-    FIND_OR_CREATE_TYPEREF(MetatypeTypeRef, instance);
+  const MetatypeTypeRef *createMetatypeType(const TypeRef *instance,
+                                            bool WasAbstract = false) {
+    FIND_OR_CREATE_TYPEREF(MetatypeTypeRef, instance, WasAbstract);
   }
 
   const GenericTypeParameterTypeRef *

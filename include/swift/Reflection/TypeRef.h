@@ -437,9 +437,10 @@ public:
     return InstanceType;
   }
 
-  static TypeRefID Profile(const TypeRef *InstanceType) {
+  static TypeRefID Profile(const TypeRef *InstanceType, bool WasAbstract) {
     TypeRefID ID;
     ID.addPointer(InstanceType);
+    ID.addInteger(static_cast<uint32_t>(WasAbstract));
     return ID;
   }
 
