@@ -56,9 +56,11 @@ public:
 
   template <typename T>
   void addPointer(const T *Pointer) {
-    auto Raw = reinterpret_cast<uintptr_t>(Pointer);
-    Bits.push_back((uint32_t)Raw);
-    Bits.push_back(Raw >> 32);
+    auto Raw = reinterpret_cast<uint32_t *>(&Pointer);
+    Bits.push_back(Raw[0]);
+    if (sizeof(const T *) > 4) {
+      Bits.push_back(Raw[1]);
+    }
   }
 
   void addInteger(uint32_t Integer) {
