@@ -43,6 +43,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 from swift_build_support.toolchain import host_toolchain  # noqa (E402)
 import swift_build_support.debug      # noqa (E402)
 from swift_build_support import migration  # noqa (E402)
+from swift_build_support import products  # noqa (E402)
 from swift_build_support import shell  # noqa (E402)
 import swift_build_support.tar        # noqa (E402)
 import swift_build_support.targets    # noqa (E402)
@@ -392,6 +393,10 @@ details of the setups of other systems or automated environments.""")
         help="build libdispatch",
         action="store_true",
         dest="build_libdispatch")
+    projects_group.add_argument(
+        "--build-ninja",
+        help="build the Ninja tool",
+        action="store_true")
 
     extra_actions_group = parser.add_argument_group(
         title="Extra actions to perform before or in addition to building")
@@ -938,6 +943,27 @@ details of the setups of other systems or automated environments.""")
         metavar="MAJOR.MINOR.PATCH")
 
     parser.add_argument(
+        "--darwin-deployment-version-osx",
+        help="minimum deployment target version for OS X",
+        metavar="MAJOR.MINOR",
+        default="10.9")
+    parser.add_argument(
+        "--darwin-deployment-version-ios",
+        help="minimum deployment target version for iOS",
+        metavar="MAJOR.MINOR",
+        default="7.0")
+    parser.add_argument(
+        "--darwin-deployment-version-tvos",
+        help="minimum deployment target version for tvOS",
+        metavar="MAJOR.MINOR",
+        default="9.0")
+    parser.add_argument(
+        "--darwin-deployment-version-watchos",
+        help="minimum deployment target version for watchOS",
+        metavar="MAJOR.MINOR",
+        default="2.0")
+
+    parser.add_argument(
         "--extra-cmake-options",
         help="Pass through extra options to CMake in the form of comma "
              "separated options '-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp'. Can be "
@@ -1097,6 +1123,11 @@ details of the setups of other systems or automated environments.""")
     if args.cmake_generator is None:
         args.cmake_generator = "Ninja"
 
+    ninja_required = (
+        args.cmake_generator == 'Ninja' or args.build_foundation)
+    if ninja_required and toolchain.ninja is None:
+        args.build_ninja = True
+
     # SwiftPM and XCTest have a dependency on Foundation.
     # On OS X, Foundation is built automatically using xcodebuild.
     # On Linux, we must ensure that it is built manually.
@@ -1199,9 +1230,41 @@ details of the setups of other systems or automated environments.""")
         source_root=SWIFT_SOURCE_ROOT,
         build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
 
-    # Clean build_dir if requested.
+    if args.build_ninja:
+        if not os.path.exists(workspace.source_dir("ninja")):
+            print_with_argv0("Can't find source directory for ninja "
+                             "(tried %s)" % (workspace.source_dir("ninja")))
+            return 1
+
+    # Unset environment variables that might affect how tools behave.
+    for v in [
+            'MAKEFLAGS',
+            'SDKROOT',
+            'MACOSX_DEPLOYMENT_TARGET',
+            'IPHONEOS_DEPLOYMENT_TARGET',
+            'TVOS_DEPLOYMENT_TARGET',
+            'WATCHOS_DEPLOYMENT_TARGET']:
+        os.environ.pop(v, None)
+
+    if args.show_sdks:
+        swift_build_support.debug.print_xcodebuild_versions()
+
+    # Clean build direcotry if requested.
     if args.clean:
         shell.rmtree(workspace.build_root)
+
+    # Create build directory.
+    shell.makedirs(workspace.build_root)
+
+    # Build ninja if required.
+    if args.build_ninja:
+        ninja_build = products.Ninja(
+            args=args,
+            toolchain=toolchain,
+            source_dir=workspace.source_dir("ninja"),
+            build_dir=workspace.build_dir("build", "ninja"))
+        ninja_build.do_build()
+        toolchain.ninja = ninja_build.ninja_bin_path
 
     cmake = CMake(args=args,
                   toolchain=toolchain)
@@ -1216,6 +1279,14 @@ details of the setups of other systems or automated environments.""")
         "--host-cc", toolchain.cc,
         "--host-cxx", toolchain.cxx,
         "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
+        "--darwin-deployment-version-osx=%s" % (
+            args.darwin_deployment_version_osx),
+        "--darwin-deployment-version-ios=%s" % (
+            args.darwin_deployment_version_ios),
+        "--darwin-deployment-version-tvos=%s" % (
+            args.darwin_deployment_version_tvos),
+        "--darwin-deployment-version-watchos=%s" % (
+            args.darwin_deployment_version_watchos),
         "--cmake", toolchain.cmake,
         "--cmark-build-type", args.cmark_build_variant,
         "--llvm-build-type", args.llvm_build_variant,
@@ -1237,6 +1308,8 @@ details of the setups of other systems or automated environments.""")
             pipes.quote(arg) for arg in cmake.build_args()),
     ]
 
+    if toolchain.ninja:
+        build_script_impl_args += ["--ninja-bin=%s" % toolchain.ninja]
     if args.distcc:
         build_script_impl_args += [
             "--distcc",
@@ -1256,8 +1329,6 @@ details of the setups of other systems or automated environments.""")
         build_script_impl_args += [
             "--install-symroot", os.path.abspath(args.install_symroot)
         ]
-    if args.cmake_generator == 'Ninja' and toolchain.ninja is None:
-        build_script_impl_args += ["--build-ninja"]
 
     if args.skip_build:
         build_script_impl_args += ["--skip-build-cmark",
@@ -1380,19 +1451,6 @@ details of the setups of other systems or automated environments.""")
         ]
 
     build_script_impl_args += args.build_script_impl_args
-
-    # Unset environment variables that might affect how tools behave.
-    for v in [
-            'MAKEFLAGS',
-            'SDKROOT',
-            'MACOSX_DEPLOYMENT_TARGET',
-            'IPHONEOS_DEPLOYMENT_TARGET',
-            'TVOS_DEPLOYMENT_TARGET',
-            'WATCHOS_DEPLOYMENT_TARGET']:
-        os.environ.pop(v, None)
-
-    if args.show_sdks:
-        swift_build_support.debug.print_xcodebuild_versions()
 
     check_call([build_script_impl] + build_script_impl_args,
                disable_sleep=True)

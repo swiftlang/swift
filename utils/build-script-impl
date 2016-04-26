@@ -60,7 +60,7 @@ KNOWN_SETTINGS=(
     host-cc                     ""               "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
     host-cxx                    ""               "the path to CXX, the 'clang++' compiler for the host platform. **This argument is required**"
     darwin-xcrun-toolchain      "default"        "the name of the toolchain to use on Darwin"
-    build-ninja                 ""               "build the Ninja tool"
+    ninja-bin                   ""               "the path to Ninja tool"
     cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
     lldb-extra-cmake-args       ""               "extra command line args to pass to lldb cmake"
     lldb-extra-xcodebuild-args  ""               "extra command line args to pass to lldb xcodebuild"
@@ -1258,43 +1258,6 @@ function set_swiftpm_bootstrap_command() {
     fi
 }
 
-mkdir -p "${BUILD_DIR}"
-
-#
-# Build Ninja
-#
-if [[ "${BUILD_NINJA}" ]] ; then
-    build_dir=$(build_directory build ninja)
-    if [ ! -f "${build_dir}/ninja" ] ; then
-        if [ ! -d "${NINJA_SOURCE_DIR}" ] ; then
-          echo "Can't find source directory for ninja (tried ${NINJA_SOURCE_DIR})"
-          exit 1
-        fi
-
-        # Ninja can only be built in-tree.  Copy the source tree to the build
-        # directory.
-        set -x
-        rm -rf "${build_dir}"
-        cp -r "${NINJA_SOURCE_DIR}" "${build_dir}"
-        if [[ $(uname -s) == "Darwin" ]]; then
-          (cd "${build_dir}" && \
-            env CXX=$(xcrun --sdk macosx -find clang++) \
-                CFLAGS="-isysroot $(xcrun --sdk macosx --show-sdk-path) -mmacosx-version-min=${DARWIN_DEPLOYMENT_VERSION_OSX}" \
-                LDFLAGS="-mmacosx-version-min=${DARWIN_DEPLOYMENT_VERSION_OSX}" \
-                python ./configure.py --bootstrap)
-          { set +x; } 2>/dev/null
-        else
-          (cd "${build_dir}" && python ./configure.py --bootstrap)
-          { set +x; } 2>/dev/null
-        fi
-    fi
-    NINJA_BIN="${build_dir}/ninja"
-    COMMON_CMAKE_OPTIONS=(
-        "${COMMON_CMAKE_OPTIONS[@]}"
-        -DCMAKE_MAKE_PROGRAM=${NINJA_BIN}
-    )
-fi
-
 #
 # Configure and build each product
 #
@@ -1809,7 +1772,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARG
                 SWIFT_BIN="$(build_directory_bin ${deployment_target} swift)/swift"
                 SWIFT_BUILD_PATH="$(build_directory ${deployment_target} swift)"
                 LLVM_BIN="$(build_directory_bin ${deployment_target} llvm)"
-                NINJA_BIN="ninja"
 
                 # Staging: require opt-in for building with dispatch
                 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
@@ -1821,11 +1783,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARG
                     SWIFT_USE_LINKER="-fuse-ld=gold"
                 fi
 
-                if [[ "${BUILD_NINJA}" ]]; then
-                    NINJA_BUILD_DIR=$(build_directory build ninja)
-                    NINJA_BIN="${NINJA_BUILD_DIR}/ninja"
-                fi
-                
                 set -x
                 pushd "${FOUNDATION_SOURCE_DIR}"
                 SWIFTC="${SWIFTC_BIN}" CLANG="${LLVM_BIN}"/clang SWIFT="${SWIFT_BIN}" \
