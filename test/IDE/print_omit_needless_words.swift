@@ -305,6 +305,9 @@
 // "bound by"
 // CHECK-OMIT-NEEDLESS-WORDS: func doSomething(boundBy: Int)
 
+// "separated by"
+// CHECK-OMIT-NEEDLESS-WORDS: func doSomething(separatedBy: Int)
+
 // Property-name sensitivity in the base name "Self" stripping.
 // CHECK-OMIT-NEEDLESS-WORDS: func addDoodle(_: ABCDoodle)
 

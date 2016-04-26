@@ -953,6 +953,11 @@ static bool priorWordExtendsPreposition(StringRef preceding,
       camel_case::sameWordIgnoreFirstCase(preposition, "by"))
     return true;
 
+  // separated by
+  if (camel_case::sameWordIgnoreFirstCase(preceding, "separated") &&
+      camel_case::sameWordIgnoreFirstCase(preposition, "by"))
+    return true;
+
   return false;
 }
 

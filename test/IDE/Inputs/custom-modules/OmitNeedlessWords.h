@@ -31,6 +31,7 @@
 -(void)drawFilledPolygonWithPoints:(NSPointArray)points count:(NSInteger)count;
 -(void)drawGreebies:(nonnull SEGreebieArray*)greebies;
 -(void)doSomethingBoundBy:(NSInteger)value;
+-(void)doSomethingSeparatedBy:(NSInteger)value;
 @end
 
 @interface ABCDoodle : NSObject
