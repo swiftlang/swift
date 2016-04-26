@@ -193,7 +193,7 @@ func testFunctionPointers() {
   let fp = getFunctionPointer()
   useFunctionPointer(fp)
 
-  _ = fp as (@convention(c) (CInt) -> CInt)
+  _ = fp as (@convention(c) (CInt) -> CInt)?
 
   let wrapper: FunctionPointerWrapper = FunctionPointerWrapper(a: nil, b: nil)
   _ = FunctionPointerWrapper(a: fp, b: fp)
@@ -204,7 +204,7 @@ func testFunctionPointers() {
     = getFunctionPointer2()
 
   useFunctionPointer2(anotherFP)
-  anotherFP = fp // expected-error {{cannot assign value of type 'fptr!' to type '@convention(c) (CInt, CLong, UnsafeMutablePointer<Void>?) -> Void'}}
+  anotherFP = fp // expected-error {{cannot assign value of type 'fptr?' to type '@convention(c) (CInt, CLong, UnsafeMutablePointer<Void>?) -> Void'}}
 }
 
 func testStructDefaultInit() {

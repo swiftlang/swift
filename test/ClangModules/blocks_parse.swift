@@ -28,16 +28,18 @@ func testNoEscape(f: @noescape @convention(block) () -> Void, nsStr: NSString,
 
 func checkTypeImpl<T>(_ a: inout T, _: T.Type) {}
 do {
-  var block = blockWithoutNullability()
-  checkTypeImpl(&block, ImplicitlyUnwrappedOptional<dispatch_block_t>.self)
+  var blockOpt = blockWithoutNullability()
+  checkTypeImpl(&blockOpt, Optional<dispatch_block_t>.self)
+  var block: dispatch_block_t = blockWithoutNullability()
 }
 do {
   var block = blockWithNonnull()
   checkTypeImpl(&block, dispatch_block_t.self)
 }
 do {
-  var block = blockWithNullUnspecified()
-  checkTypeImpl(&block, ImplicitlyUnwrappedOptional<dispatch_block_t>.self)
+  var blockOpt = blockWithNullUnspecified()
+  checkTypeImpl(&blockOpt, Optional<dispatch_block_t>.self)
+  var block: dispatch_block_t = blockWithNullUnspecified()
 }
 do {
   var block = blockWithNullable()

@@ -88,7 +88,7 @@ func opt_to_class(_ obj: AnyObject) {
   // CHECK-NEXT: [[OPT:%.*]] = load [[OPTTEMP]]
   // CHECK-NEXT: store [[OPT]] to [[PBOPT]] : $*ImplicitlyUnwrappedOptional<() -> ()>
   // CHECK-NEXT: dealloc_stack [[OPTTEMP]]
-  var of = obj.f
+  var of: (() -> ())! = obj.f
 
   // Exit
   // CHECK-NEXT: strong_release [[OBJ_SELF]] : $@opened({{".*"}}) AnyObject
@@ -120,7 +120,7 @@ func opt_to_static_method(_ obj: AnyObject) {
   // CHECK-NEXT: [[OBJCMETA:%[0-9]+]] = thick_to_objc_metatype [[OPENMETA]]
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<() -> ()>
   // CHECK-NEXT: dynamic_method_br [[OBJCMETA]] : $@objc_metatype (@opened({{".*"}}) AnyObject).Type, #X.staticF!1.foreign, [[HASMETHOD:[A-Za-z0-9_]+]], [[NOMETHOD:[A-Za-z0-9_]+]]
-  var optF = obj.dynamicType.staticF
+  var optF: (() -> ())! = obj.dynamicType.staticF
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup15opt_to_property

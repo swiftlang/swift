@@ -218,7 +218,7 @@ ClassProperties.test("runtime") {
 
   let nameAsCString = property_getName(prop)
   expectTrue(nameAsCString != nil)
-  expectEqual("value", String(cString: nameAsCString))
+  expectEqual("value", String(cString: nameAsCString!))
 }
 
 runAllTests()

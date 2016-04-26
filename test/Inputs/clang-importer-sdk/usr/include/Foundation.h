@@ -186,20 +186,20 @@ __attribute__((availability(ios,introduced=8.0)))
 typedef __INT32_TYPE__ int32_t;
 
 @interface NSNumber : NSValue
-+ (NSNumber *)numberWithInt:(int)value;
-+ (NSNumber *)numberWithInteger:(NSInteger)value;
-+ (NSNumber *)numberWithUnsignedInteger:(NSUInteger)value;
-+ (NSNumber *)numberWithDouble:(double)value;
++ (nonnull NSNumber *)numberWithInt:(int)value;
++ (nonnull NSNumber *)numberWithInteger:(NSInteger)value;
++ (nonnull NSNumber *)numberWithUnsignedInteger:(NSUInteger)value;
++ (nonnull NSNumber *)numberWithDouble:(double)value;
 
-- (NSNumber *)initWithInteger:(NSInteger)value;
-- (NSNumber *)initWithUnsignedInteger:(NSUInteger)value;
-- (NSNumber *)initWithDouble:(double)value;
-- (NSNumber *)addDouble:(double)value;
-- (NSNumber *)addBool:(BOOL)value;
+- (nonnull NSNumber *)initWithInteger:(NSInteger)value;
+- (nonnull NSNumber *)initWithUnsignedInteger:(NSUInteger)value;
+- (nonnull NSNumber *)initWithDouble:(double)value;
+- (nonnull NSNumber *)addDouble:(double)value;
+- (nonnull NSNumber *)addBool:(BOOL)value;
 
-- (NSNumber *)addUInt16:(unsigned short)value;
-- (NSNumber *)addInt:(int)value;
-- (NSNumber *)subtractInt32:(int32_t)value;
+- (nonnull NSNumber *)addUInt16:(unsigned short)value;
+- (nonnull NSNumber *)addInt:(int)value;
+- (nonnull NSNumber *)subtractInt32:(int32_t)value;
 
 @property NSInteger integerValue;
 @property NSUInteger unsignedIntegerValue;

@@ -118,7 +118,7 @@ internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
   let header = unsafeBitCast(_dyld_get_image_header(i),
     to: UnsafePointer<MachHeader>.self)
 
-  let imageName = _dyld_get_image_name(i)
+  let imageName = _dyld_get_image_name(i)!
   if let fieldmd = getSectionInfo("__swift3_fieldmd", header),
      let typeref = getSectionInfo("__swift3_typeref", header),
      let assocty = getSectionInfo("__swift3_assocty", header) {
@@ -197,7 +197,7 @@ internal func sendReflectionInfos() {
 
 internal func printErrnoAndExit() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
-  let errorCString = strerror(errno)
+  let errorCString = strerror(errno)!
   let message = String(validatingUTF8: errorCString)! + "\n"
   let bytes = Array(message.utf8)
   fwrite(bytes, 1, bytes.count, stderr)

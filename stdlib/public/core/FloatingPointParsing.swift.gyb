@@ -61,7 +61,7 @@ extension ${Self} {
         _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(
           chars, UnsafeMutablePointer($0))
       }
-      return (result, endPtr == nil ? 0 : UnsafePointer(endPtr) - chars)
+      return (result, endPtr == nil ? 0 : UnsafePointer(endPtr!) - chars)
     }
 
     let (result, n) = text.withCString(parseNTBS)

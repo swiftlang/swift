@@ -190,9 +190,9 @@ func testProtocols(_ b: B, bp: BProto) {
   bp2 = b.getAsProto()
 
   var c1 : Cat1Proto = b
-  var bcat1 = b.getAsProtoWithCat()
+  var bcat1 = b.getAsProtoWithCat()!
   c1 = bcat1
-  bcat1 = c1 // expected-error{{cannot assign value of type 'Cat1Proto' to type 'protocol<BProto, Cat1Proto>!'}}
+  bcat1 = c1 // expected-error{{value of type 'Cat1Proto' does not conform to 'protocol<BProto, Cat1Proto>' in assignment}}
 }
 
 // Methods only defined in a protocol
@@ -321,12 +321,12 @@ func testDynamicSelf(_ queen: Bee, wobbler: NSWobbling) {
   hive = hive1
 
   // Instance method with instancetype result.
-  var hive2 = hive.visit()
+  var hive2 = hive!.visit()
   hive2 = hive
   hive = hive2
 
   // Instance method on a protocol with instancetype result.
-  var wobbler2 = wobbler.returnMyself()
+  var wobbler2 = wobbler.returnMyself()!
   var wobbler: NSWobbling = wobbler2
   wobbler2 = wobbler
 
