@@ -302,6 +302,9 @@
 // Non-parameterized Objective-C class ending in "Array".
 // CHECK-OMIT-NEEDLESS-WORDS: func draw(_: SEGreebieArray)
 
+// "bound by"
+// CHECK-OMIT-NEEDLESS-WORDS: func doSomething(boundBy: Int)
+
 // Property-name sensitivity in the base name "Self" stripping.
 // CHECK-OMIT-NEEDLESS-WORDS: func addDoodle(_: ABCDoodle)
 

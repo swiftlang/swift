@@ -948,6 +948,11 @@ static bool priorWordExtendsPreposition(StringRef preceding,
       camel_case::sameWordIgnoreFirstCase(preposition, "to"))
     return true;
 
+  // bound by
+  if (camel_case::sameWordIgnoreFirstCase(preceding, "bound") &&
+      camel_case::sameWordIgnoreFirstCase(preposition, "by"))
+    return true;
+
   return false;
 }
 
