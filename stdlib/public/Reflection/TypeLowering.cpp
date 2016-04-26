@@ -277,7 +277,6 @@ public:
       ObjC = true;
       break;
     case FieldDescriptorKind::ClassProtocol:
-      ObjC = true;
       Class = true;
       WitnessTableCount++;
       break;
