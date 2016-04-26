@@ -138,7 +138,7 @@ public:
 
   const TupleTypeRef *
   createTupleType(const std::vector<const TypeRef *> &elements,
-                  bool isVariadic) {
+                  std::string &&labels, bool isVariadic) {
     return TupleTypeRef::create(*this, elements, isVariadic);
   }
 

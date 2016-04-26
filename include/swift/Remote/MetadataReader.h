@@ -172,15 +172,39 @@ class TypeDecoder {
       return decodeMangledType(Node->getChild(0));
     case NodeKind::NonVariadicTuple:
     case NodeKind::VariadicTuple: {
-      std::vector<BuiltType> Elements;
-      for (auto element : *Node) {
-        auto elementType = decodeMangledType(element);
+      std::vector<BuiltType> elements;
+      std::string labels;
+      for (auto &element : *Node) {
+        if (element->getKind() != NodeKind::TupleElement)
+          return BuiltType();
+
+        // If the tuple element is labelled, add its label to 'labels'.
+        unsigned typeChildIndex = 0;
+        if (element->getChild(0)->getKind() == NodeKind::TupleElementName) {
+          // Add spaces to terminate all the previous labels if this
+          // is the first we've seen.
+          if (labels.empty()) labels.append(elements.size(), ' ');
+
+          // Add the label and its terminator.
+          labels += element->getChild(0)->getText();
+          labels += ' ';
+          typeChildIndex = 1;
+
+        // Otherwise, add a space if a previous element had a label.
+        } else if (!labels.empty()) {
+          labels += ' ';
+        }
+
+        // Decode the element type.
+        BuiltType elementType =
+          decodeMangledType(element->getChild(typeChildIndex));
         if (!elementType)
           return BuiltType();
-        Elements.push_back(elementType);
+
+        elements.push_back(elementType);
       }
-      bool Variadic = (Node->getKind() == NodeKind::VariadicTuple);
-      return Builder.createTupleType(Elements, Variadic);
+      bool variadic = (Node->getKind() == NodeKind::VariadicTuple);
+      return Builder.createTupleType(elements, std::move(labels), variadic);
     }
     case NodeKind::TupleElement:
       if (Node->getChild(0)->getKind() == NodeKind::TupleElementName)
@@ -459,24 +483,35 @@ public:
     case MetadataKind::Optional:
       return readNominalTypeFromMetadata(Meta);
     case MetadataKind::Tuple: {
-      auto TupleMeta = cast<TargetTupleTypeMetadata<Runtime>>(Meta);
-      std::vector<BuiltType> Elements;
-      StoredPointer ElementAddress = MetadataAddress +
+      auto tupleMeta = cast<TargetTupleTypeMetadata<Runtime>>(Meta);
+
+      std::vector<BuiltType> elementTypes;
+      elementTypes.reserve(tupleMeta->NumElements);
+
+      StoredPointer elementAddress = MetadataAddress +
         sizeof(TargetTupleTypeMetadata<Runtime>);
       using Element = typename TargetTupleTypeMetadata<Runtime>::Element;
-      for (StoredPointer i = 0; i < TupleMeta->NumElements; ++i,
-           ElementAddress += sizeof(Element)) {
-        Element E;
-        if (!Reader->readBytes(RemoteAddress(ElementAddress),
-                               (uint8_t*)&E, sizeof(Element)))
+      for (StoredPointer i = 0; i < tupleMeta->NumElements; ++i,
+           elementAddress += sizeof(Element)) {
+        Element element;
+        if (!Reader->readBytes(RemoteAddress(elementAddress),
+                               (uint8_t*)&element, sizeof(Element)))
           return BuiltType();
 
-        if (auto ElementTypeRef = readTypeFromMetadata(E.Type))
-          Elements.push_back(ElementTypeRef);
+        if (auto elementType = readTypeFromMetadata(element.Type))
+          elementTypes.push_back(elementType);
         else
           return BuiltType();
       }
-      return Builder.createTupleType(Elements, /*variadic*/ false);
+
+      // Read the labels string.
+      std::string labels;
+      if (tupleMeta->Labels &&
+          !Reader->readString(RemoteAddress(tupleMeta->Labels), labels))
+        return BuiltType();
+
+      return Builder.createTupleType(elementTypes, std::move(labels),
+                                     /*variadic*/ false);
     }
     case MetadataKind::Function: {
       auto Function = cast<TargetFunctionTypeMetadata<Runtime>>(Meta);

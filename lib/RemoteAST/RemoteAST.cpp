@@ -184,14 +184,22 @@ public:
     return genericType;
   }
 
-  Type createTupleType(ArrayRef<Type> eltTypes, bool isVariadic) {
+  Type createTupleType(ArrayRef<Type> eltTypes, StringRef labels,
+                       bool isVariadic) {
     // Just bail out on variadic tuples for now.
     if (isVariadic) return Type();
 
     SmallVector<TupleTypeElt, 4> elements;
     elements.reserve(eltTypes.size());
     for (auto eltType : eltTypes) {
-      elements.push_back(eltType);
+      Identifier label;
+      if (!labels.empty()) {
+        auto split = labels.split(' ');
+        if (!split.first.empty())
+          label = Ctx.getIdentifier(split.first);
+        labels = split.second;
+      }
+      elements.emplace_back(eltType, label);
     }
 
     return TupleType::get(elements, Ctx);
