@@ -300,20 +300,6 @@ struct TypeRefIsConcrete
   }
 };
 
-const ForeignClassTypeRef *
-ForeignClassTypeRef::UnnamedSingleton = new ForeignClassTypeRef("");
-
-const ForeignClassTypeRef *ForeignClassTypeRef::getUnnamed() {
-  return UnnamedSingleton;
-}
-
-const ObjCClassTypeRef *
-ObjCClassTypeRef::UnnamedSingleton = new ObjCClassTypeRef("");
-
-const ObjCClassTypeRef *ObjCClassTypeRef::getUnnamed() {
-  return UnnamedSingleton;
-}
-
 const OpaqueTypeRef *
 OpaqueTypeRef::Singleton = new OpaqueTypeRef();
 
