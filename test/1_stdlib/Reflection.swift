@@ -101,12 +101,6 @@ dump(any)
 print("Character:")
 dump(Character("a"))
 
-let range = 3...9
-// CHECK-NEXT: Range(3..<10)
-// CHECK-NEXT:  startIndex: 3
-// CHECK-NEXT:  endIndex: 10
-dump(range)
-
 protocol Fooable {}
 extension Int : Fooable {}
 extension Double : Fooable {}

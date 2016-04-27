@@ -253,17 +253,26 @@ public let joinWithSeparatorTests = [
 
 var JoinTestSuite = TestSuite("Join")
 
-% from itertools import product
-% traversals = ['Forward', 'Bidirectional', 'RandomAccess']
-% base_kinds = ['Defaulted', 'Minimal']
-% collections = [
-%   ('{}{}RangeReplaceableCollection'.format(base_kind, traversal), traversal)
-%     for base_kind, traversal in product(base_kinds, traversals)
-% ]
-% other_array_types = ['Array', 'ArraySlice', 'ContiguousArray']
-% collections += [(array, 'RandomAccess') for array in other_array_types]
+%{
 
-% for Base, traversal in collections:
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    sliceTypeName
+)
+
+from itertools import product
+
+base_kinds = [ 'Defaulted', 'Minimal' ]
+collections = [
+  (base_kind + sliceTypeName(traversal=traversal, mutable=False, rangeReplaceable=True).replace('Slice', 'Collection'), traversal)
+    for base_kind, traversal in product(base_kinds, TRAVERSALS)
+]
+other_array_types = [ 'Array', 'ArraySlice', 'ContiguousArray' ]
+collections += [(array, 'RandomAccess') for array in other_array_types]
+
+}%
+
+% for Base, TRAVERSALS in collections:
 %   if Base not in other_array_types:
 %     label = 'elements:'
 %   else:

@@ -31,12 +31,16 @@ public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
 }
 
 /// A collection whose element type is `Element` but that is always empty.
-public struct EmptyCollection<Element> : Collection {
+public struct EmptyCollection<Element> :
+  RandomAccessCollection, MutableCollection
+{
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Int
+  public typealias IndexDistance = Int
+  public typealias SubSequence = EmptyCollection<Element>
 
   /// Construct an instance.
   public init() {}
@@ -51,6 +55,26 @@ public struct EmptyCollection<Element> : Collection {
     return 0
   }
 
+  /// Always traps.
+  ///
+  /// EmptyCollection does not have any element indices, so it is not
+  /// possible to advance indices.
+  @warn_unused_result
+  public func index(after i: Index) -> Index {
+    // TODO: swift-3-indexing-model: tests for traps.
+    _preconditionFailure("EmptyCollection can't advance indices")
+  }
+
+  /// Always traps.
+  ///
+  /// EmptyCollection does not have any element indices, so it is not
+  /// possible to advance indices.
+  @warn_unused_result
+  public func index(before i: Index) -> Index {
+    // TODO: swift-3-indexing-model: tests for traps.
+    _preconditionFailure("EmptyCollection can't advance indices")
+  }
+
   /// Returns an empty iterator.
   ///
   /// - Complexity: O(1).
@@ -62,13 +86,74 @@ public struct EmptyCollection<Element> : Collection {
   ///
   /// Should never be called, since this collection is always empty.
   public subscript(position: Index) -> Element {
-    _preconditionFailure("Index out of range")
+    // TODO: swift-3-indexing-model: tests for traps.
+    get {
+      _preconditionFailure("Index out of range")
+    }
+    set {
+      _preconditionFailure("Index out of range")
+    }
+  }
+
+  public subscript(bounds: Range<Index>) -> EmptyCollection<Element> {
+    get {
+      _preconditionFailure("Index out of range")
+    }
+    set {
+      _preconditionFailure("Index out of range")
+    }
   }
 
   /// The number of elements (always zero).
   public var count: Int {
     return 0
   }
+
+  /// Always traps.
+  ///
+  /// EmptyCollection does not have any element indices, so it is not
+  /// possible to advance indices.
+  @warn_unused_result
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    // TODO: swift-3-indexing-model: tests for traps.
+    _preconditionFailure("EmptyCollection can't advance indices")
+  }
+
+  /// Always traps.
+  ///
+  /// EmptyCollection does not have any element indices, so it is not
+  /// possible to advance indices.
+  @warn_unused_result
+  public func index(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    // TODO: swift-3-indexing-model: tests for traps.
+    _preconditionFailure("EmptyCollection can't advance indices")
+  }
+
+  /// The distance between two indexes (always zero).
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    // TODO: swift-3-indexing-model: tests for traps.
+    _precondition(start == 0, "From must be startIndex (or endIndex)")
+    _precondition(end == 0, "To must be endIndex (or startIndex)")
+    return 0
+  }
+
+  public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
+    _precondition(index == 0, "out of bounds")
+    _precondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
+      "invalid bounds for an empty collection")
+  }
+
+  public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
+    _precondition(range.lowerBound == 0 && range.upperBound == 0,
+      "invalid range for an empty collection")
+    _precondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
+      "invalid bounds for an empty collection")
+  }
+
+  // TODO: swift-3-indexing-model - fast fail any others from RandomAccessCollection (and up inheritance)?
 }
 
 @available(*, unavailable, renamed: "EmptyIterator")

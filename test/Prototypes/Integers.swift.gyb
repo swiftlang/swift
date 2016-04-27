@@ -1404,7 +1404,7 @@ tests.test("Equality") {
   expectNotEqual(-49 as Int8, 49)
 }
 
-func indexOrder<T: RandomAccessIndex>(_ x: T, y: T)
+func indexOrder<T: Comparable>(x: T, y: T)
   -> ExpectedComparisonResult {
   return x < y ? .lt : x > y ? .gt : .eq
 }

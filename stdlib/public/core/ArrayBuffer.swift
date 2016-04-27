@@ -193,7 +193,7 @@ extension _ArrayBuffer {
       // Could be sped up, e.g. by using
       // enumerateObjectsAtIndexes:options:usingBlock: in the
       // non-native case.
-      for i in subRange {
+      for i in CountableRange(subRange) {
         _typeCheckSlowPath(i)
       }
     }
@@ -214,8 +214,8 @@ extension _ArrayBuffer {
     let nonNative = _nonNative
 
     let nsSubRange = SwiftShims._SwiftNSRange(
-      location: bounds.startIndex,
-      length: bounds.endIndex - bounds.startIndex)
+      location: bounds.lowerBound,
+      length: bounds.upperBound - bounds.lowerBound)
 
     let buffer = UnsafeMutablePointer<AnyObject>(target)
     
@@ -224,7 +224,7 @@ extension _ArrayBuffer {
     
     // Make another pass to retain the copied objects
     var result = target
-    for _ in bounds {
+    for _ in CountableRange(bounds) {
       result.initialize(with: result.pointee)
       result += 1
     }
@@ -245,13 +245,14 @@ extension _ArrayBuffer {
       if boundsCount == 0 {
         return _SliceBuffer(
           _ContiguousArrayBuffer<Element>(),
-          shiftedToStartIndex: bounds.startIndex)
+          shiftedToStartIndex: bounds.lowerBound)
       }
 
       // Look for contiguous storage in the NSArray
       let nonNative = self._nonNative
       let cocoa = _CocoaArrayWrapper(nonNative)
-      let cocoaStorageBaseAddress = cocoa.contiguousStorage(self.indices)
+      let cocoaStorageBaseAddress =
+        cocoa.contiguousStorage(Range(self.indices))
 
       if let cocoaStorageBaseAddress = cocoaStorageBaseAddress {
         return _SliceBuffer(
@@ -268,11 +269,9 @@ extension _ArrayBuffer {
       // Tell Cocoa to copy the objects into our storage
       cocoa.buffer.getObjects(
         UnsafeMutablePointer(result.firstElementAddress),
-        range: _SwiftNSRange(
-          location: bounds.startIndex,
-          length: boundsCount))
+        range: _SwiftNSRange(location: bounds.lowerBound, length: boundsCount))
 
-      return _SliceBuffer(result, shiftedToStartIndex: bounds.startIndex)
+      return _SliceBuffer(result, shiftedToStartIndex: bounds.lowerBound)
     }
     set {
       fatalError("not implemented")
@@ -395,7 +394,9 @@ extension _ArrayBuffer {
       else {
         var refCopy = self
         refCopy.replace(
-          subRange: i...i, with: 1, elementsOf: CollectionOfOne(newValue))
+          subRange: i..<(i + 1),
+          with: 1,
+          elementsOf: CollectionOfOne(newValue))
       }
     }
   }
@@ -467,9 +468,15 @@ extension _ArrayBuffer {
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
+  /// `index(after:)`.
   public var endIndex: Int {
     return count
+  }
+
+  public typealias Indices = CountableRange<Int>
+
+  public var indices: CountableRange<Int> {
+    return startIndex..<endIndex
   }
 
   //===--- private --------------------------------------------------------===//

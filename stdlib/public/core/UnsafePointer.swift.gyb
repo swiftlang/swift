@@ -33,7 +33,7 @@
 /// - Memory is allocated and value is initialized.
 @_fixed_layout
 public struct ${Self}<Pointee>
-  : RandomAccessIndex, Hashable, _Pointer {
+  : Strideable, Hashable, _Pointer {
 
   public typealias Distance = Int
 

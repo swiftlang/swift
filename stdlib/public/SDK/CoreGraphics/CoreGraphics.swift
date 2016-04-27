@@ -170,13 +170,13 @@ public extension CGRect {
   }
 
   @_transparent // @fragile
-  mutating func unionInPlace(_ rect: CGRect) {
+  mutating func formUnion(_ rect: CGRect) {
     self = union(rect)
   }
 
   @_transparent // @fragile
-  mutating func intersectInPlace(_ rect: CGRect) {
-    self = intersect(rect)
+  mutating func formIntersection(_ rect: CGRect) {
+    self = intersection(rect)
   }
 
   @_transparent // @fragile

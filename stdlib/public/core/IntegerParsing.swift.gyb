@@ -49,9 +49,9 @@ internal func _parseUnsignedAsciiAsUIntMax(
   for c in u16 {
     let n: UIntMax
     switch c {
-    case digit: n = UIntMax(c - digit.startIndex)
-    case lower: n = UIntMax(c - lower.startIndex) + 10
-    case upper: n = UIntMax(c - upper.startIndex) + 10
+    case digit: n = UIntMax(c - digit.lowerBound)
+    case lower: n = UIntMax(c - lower.lowerBound) + 10
+    case upper: n = UIntMax(c - upper.lowerBound) + 10
     default: return nil
     }
     if n >= uRadix { return nil }

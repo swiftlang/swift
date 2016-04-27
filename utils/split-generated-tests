@@ -1,0 +1,46 @@
+#!/usr/bin/env python
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+from __future__ import print_function
+
+import sys
+
+def main():
+    with open(sys.argv[1], 'r') as f:
+        content = f.readlines()
+
+    while len(content) != 0:
+        startIndex = -1
+        endIndex = -1
+        testFilename = ''
+        for i, line in enumerate(content):
+            if line.startswith('// Start of file: '):
+                testFilename = line[18:].strip()
+                startIndex = i
+                break
+        if startIndex == -1:
+            return 0
+        for i, line in enumerate(content):
+            if line.startswith('// End of file: '):
+                assert line[16:].strip() == testFilename
+                endIndex = i
+                break
+        testContent = content[startIndex+1:endIndex]
+
+        with open(testFilename, 'w') as testFile:
+            for line in testContent:
+                if not '###sourceLocation' in line:
+                    testFile.write(line)
+
+        content = content[endIndex+1:]
+
+if __name__ == "__main__":
+    sys.exit(main())
+

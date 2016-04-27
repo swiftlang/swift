@@ -49,16 +49,19 @@ public protocol SplittableCollection : Collection {
   func split(_ range: Range<Index>) -> [Range<Index>]
 }
 
-internal func _splitRandomAccessIndexRange<Index : RandomAccessIndex>(
-  _ range: Range<Index>
-) -> [Range<Index>] {
-  let startIndex = range.startIndex
-  let endIndex = range.endIndex
-  let length = startIndex.distance(to: endIndex).toIntMax()
+internal func _splitRandomAccessIndexRange<
+  C : RandomAccessCollection
+>(
+  _ elements: C,
+  _ range: Range<C.Index>
+) -> [Range<C.Index>] {
+  let startIndex = range.lowerBound
+  let endIndex = range.upperBound
+  let length = elements.distance(from: startIndex, to: endIndex).toIntMax()
   if length < 2 {
     return [range]
   }
-  let middle = startIndex.advanced(by: Index.Distance(length / 2))
+  let middle = elements.index(startIndex, offsetBy: C.IndexDistance(length / 2))
   return [startIndex ..< middle, middle ..< endIndex]
 }
 
@@ -124,7 +127,7 @@ public protocol BuildableCollectionProtocol : Collection {
 
 extension Array : SplittableCollection {
   public func split(_ range: Range<Int>) -> [Range<Int>] {
-    return _splitRandomAccessIndexRange(range)
+    return _splitRandomAccessIndexRange(self, range)
   }
 }
 
@@ -230,7 +233,7 @@ struct _ForkJoinMutex {
     _mutex.deallocateCapacity(1)
   }
 
-  func withLock<Result>(body: @noescape () -> Result) -> Result {
+  func withLock<Result>(_ body: @noescape () -> Result) -> Result {
     if pthread_mutex_lock(_mutex) != 0 {
       fatalError("pthread_mutex_lock")
     }
@@ -944,9 +947,11 @@ final internal class _CollectionTransformerStepCollectionSource<
     _ range: Range<InputCollection.Index>,
     _ collector: inout Collector
   ) {
-    for i in range {
+    var i = range.lowerBound
+    while i != range.upperBound {
       let e = c[i]
       collector.append(e)
+      c.formIndex(after: &i)
     }
   }
 }
@@ -1120,7 +1125,7 @@ final class _CollectionTransformerFinalizerReduce<
     InputCollection.Iterator.Element == PipelineInputElement
   >(_ c: InputCollection) -> U {
     var collector = _ElementCollectorReduce(_initial, _combine)
-    _input.transform(c, c.indices, &collector)
+    _input.transform(c, c.startIndex..<c.endIndex, &collector)
     return collector.takeResult()
   }
 }
@@ -1182,7 +1187,7 @@ final class _CollectionTransformerFinalizerCollectTo<
     InputCollection.Iterator.Element == PipelineInputElement
   >(_ c: InputCollection) -> U {
     var collector = _ElementCollectorCollectTo<U>()
-    _input.transform(c, c.indices, &collector)
+    _input.transform(c, c.startIndex..<c.endIndex, &collector)
     return collector.takeResult()
   }
 }
@@ -1407,7 +1412,10 @@ func _parallelMap(_ input: [Int], transform: (Int) -> Int, range: Range<Int>)
 
 func parallelMap(_ input: [Int], transform: (Int) -> Int) -> [Int] {
   let t = ForkJoinPool.commonPool.forkTask {
-    _parallelMap(input, transform: transform, range: input.indices)
+    _parallelMap(
+      input,
+      transform: transform,
+      range: input.startIndex..<input.endIndex)
   }
   var builder = t.waitAndGetResult()
   return builder.takeResult()
@@ -1445,3 +1453,4 @@ http://habrahabr.ru/post/255659/
 */
 
 runAllTests()
+

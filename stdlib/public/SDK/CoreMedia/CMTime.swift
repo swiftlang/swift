@@ -53,7 +53,7 @@ extension CMTime {
 
   public var isNumeric: Bool {
     return
-      self.flags.intersect([.valid, .impliedValueFlagsMask]) == .valid
+      self.flags.intersection([.valid, .impliedValueFlagsMask]) == .valid
   }
 
   public var hasBeenRounded: Bool {

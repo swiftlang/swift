@@ -36,7 +36,7 @@ Functions:
 - Name: CGRectUnion
   SwiftName: "CGRect.union(self:_:)"
 - Name: CGRectIntersection
-  SwiftName: "CGRect.intersect(self:_:)"
+  SwiftName: "CGRect.intersection(self:_:)"
 - Name: CGRectContainsRect
   SwiftName: "CGRect.contains(self:_:)"
 - Name: CGRectContainsPoint

@@ -12,18 +12,20 @@ ${Test}.test("flatMap/${Kind}/Lazy") {
       elements: test.sequence.map(OpaqueValue.init))
     let closureLifetimeTracker = LifetimeTracked(0)
     var timesClosureWasCalled = 0
+
     var result = s.lazy.flatMap {
       (element: OpaqueValue<Int>) -> ${Minimal}<OpaqueValue<Int32>> in
       _blackHole(closureLifetimeTracker)
       timesClosureWasCalled += 1
+      let elements = test.transform(element.value)
       return ${Minimal}<OpaqueValue<Int32>>(
-        elements: test.transform(element.value).map { OpaqueValue(Int32($0)) })
+        elements: elements.map { OpaqueValue($0) })
     }
     expectEqual(0, timesClosureWasCalled, "Unexpected eagerness")
 
 %   if Kind == 'Sequence':
-    check${Kind}(
-      test.expected.map(OpaqueValue.init), result,
+    let expected = test.expected.map(OpaqueValue.init)
+    check${Kind}(expected, result,
       stackTrace: SourceLocStack().with(test.loc),
       resiliencyChecks: .none
     ) { $0.value == $1.value }
@@ -47,8 +49,9 @@ ${Test}.test("flatMap/${Kind}/Lazy") {
 
     // FIXME: we are not calling check${Kind} because of the same issue again.
     // <rdar://problem/21989896>
+    let expected = test.expected.map(OpaqueValue.init)
     expectEqualSequence(
-      test.expected.map(OpaqueValue.init), result,
+      expected, result,
       stackTrace: SourceLocStack().with(test.loc)
     ) { $0.value == $1.value }
 %   end

@@ -18,7 +18,6 @@
 // CHECK-UNDERSCORED-PROT: public protocol _Incrementable
 // CHECK-UNDERSCORED-PROT: public protocol _Integer
 // CHECK-UNDERSCORED-PROT: public protocol _IntegerArithmetic
-// CHECK-UNDERSCORED-PROT: public protocol _RandomAccessAmbiguity
 // CHECK-UNDERSCORED-PROT: public protocol _SequenceWrapper
 // CHECK-UNDERSCORED-PROT: public protocol _SignedInteger
 // CHECK-UNDERSCORED-PROT-NOT: protocol _

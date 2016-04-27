@@ -159,12 +159,22 @@ public struct JoinedSequence<
 }
 
 extension Sequence where Iterator.Element : Sequence {
-  /// Returns a view, whose elements are the result of interposing a given
-  /// `separator` between the elements of the sequence `self`.
+  /// Returns the concatenated elements of this sequence of sequences,
+  /// inserting the given separator between each element.
   ///
-  /// For example,
-  /// `[[1, 2, 3], [4, 5, 6], [7, 8, 9]].joined(separator: [-1, -2])`
-  /// yields `[1, 2, 3, -1, -2, 4, 5, 6, -1, -2, 7, 8, 9]`.
+  /// This example shows how an array of `[Int]` instances can be joined, using
+  /// another `[Int]` instance as the separator:
+  ///
+  ///     let nestedNumbers = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+  ///     let joined = nestedNumbers.join(separator: [-1, -2])
+  ///     print(Array(joined))
+  ///     // Prints "[1, 2, 3, -1, -2, 4, 5, 6, -1, -2, 7, 8, 9]"
+  ///
+  /// - Parameter separator: A sequence to insert between each of this
+  ///   sequence's elements.
+  /// - Returns: The joined sequence of elements.
+  ///
+  /// - SeeAlso: `flatten()`
   @warn_unused_result
   public func joined<
     Separator : Sequence

@@ -5,6 +5,7 @@
 // UNSUPPORTED: OS=watchos
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 
 
 import CoreAudio
@@ -105,7 +106,7 @@ CoreAudioTestSuite.test(
 
   expectCrashLater()
   // An overflow happens when we try to compute the value for mDataByteSize.
-  AudioBuffer(buffer, numberOfChannels: 2)
+  _ = AudioBuffer(buffer, numberOfChannels: 2)
 }
 
 CoreAudioTestSuite.test("AudioBufferList.sizeInBytes(maximumBuffers: Int)") {
@@ -283,7 +284,7 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer/Collection") {
   }
 
   // FIXME: use checkMutableRandomAccessCollection, when we have that function.
-  checkRandomAccessCollection(expected, ablPtrWrapper)
+  checkForwardCollection(expected, ablPtrWrapper)
   free(ablPtrWrapper.unsafeMutablePointer)
 }
 

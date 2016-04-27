@@ -920,7 +920,7 @@ extension NSEnumerator : Sequence {
 
 extension NSRange {
   public init(_ x: Range<Int>) {
-    location = x.startIndex
+    location = x.lowerBound
     length = x.count
   }
 

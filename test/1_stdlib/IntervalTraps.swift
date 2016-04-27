@@ -29,9 +29,11 @@ IntervalTraps.test("HalfOpen")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var interval = 1.0..<1.0
-  expectType(HalfOpenInterval<Double>.self, &interval)
+  // FIXME: the plan is for floating point numbers to no longer be
+  // strideable; then this will drop the "OfStrideable"
+  expectType(Range<Double>.self, &interval)
   expectCrashLater()
-  1.0..<0.0
+  _ = 1.0..<0.0
 }
 
 IntervalTraps.test("Closed")
@@ -40,10 +42,12 @@ IntervalTraps.test("Closed")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var interval = 1.0...1.0
-  expectType(ClosedInterval<Double>.self, &interval)
+  // FIXME: the plan is for floating point numbers to no longer be
+  // strideable; then this will drop the "OfStrideable"
+  expectType(ClosedRange<Double>.self, &interval)
 
   expectCrashLater()
-  1.0...0.0
+  _ = 1.0...0.0
 }
 
 runAllTests()

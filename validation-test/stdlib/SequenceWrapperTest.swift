@@ -23,9 +23,9 @@ struct BasicSequenceWrapper<
 
 var sequenceWrapperTests = TestSuite("SequenceWrapper")
 
-let base = LoggingSequence([OpaqueValue(1)])
+let base = LoggingSequence(wrapping: [OpaqueValue(1)])
 let direct = BasicSequenceWrapper(_base: base)
-let indirect = LoggingSequence(direct)
+let indirect = LoggingSequence(wrapping: direct)
 let dispatchLog = base.log
 
 func expectWrapperDispatch<R1, R2>(

@@ -19,7 +19,7 @@ CharacterTraps.test("CharacterFromEmptyString")
   .code {
   var s = ""
   expectCrashLater()
-  Character(s)
+  _ = Character(s)
 }
 
 CharacterTraps.test("CharacterFromMoreThanOneGraphemeCluster")
@@ -29,7 +29,7 @@ CharacterTraps.test("CharacterFromMoreThanOneGraphemeCluster")
   .code {
   var s = "ab"
   expectCrashLater()
-  Character(s)
+  _ = Character(s)
 }
 
 runAllTests()

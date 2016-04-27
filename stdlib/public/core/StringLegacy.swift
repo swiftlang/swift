@@ -180,7 +180,7 @@ extension String {
     for i in rng.indices {
       if rng[i] == delim {
         return (String(rng[rng.startIndex..<i]), 
-                String(rng[i.successor()..<rng.endIndex]), 
+                String(rng[rng.index(after: i)..<rng.endIndex]),
                 true)
       }
     }
@@ -199,7 +199,7 @@ extension String {
       if predicate(rng[i]) {
         return (String(rng[rng.startIndex..<i]),
                 rng[i], 
-                String(rng[i.successor()..<rng.endIndex]), 
+                String(rng[rng.index(after: i)..<rng.endIndex]),
                 true)
       }
     }

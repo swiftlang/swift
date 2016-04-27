@@ -301,7 +301,7 @@ SequenceTypeTests.test("starts(with:)/WhereElementIsEquatable") {
 
     // Use different types for the sequence and prefix.
     do {
-      let s = MinimalForwardCollection<MinimalEquatableValue>(
+      let s = MinimalCollection<MinimalEquatableValue>(
         elements: test.sequence.map(MinimalEquatableValue.init))
       let prefix = MinimalSequence<MinimalEquatableValue>(
         elements: test.prefix.map(MinimalEquatableValue.init))
@@ -356,7 +356,7 @@ SequenceTypeTests.test("starts(with:)/Predicate") {
 
     // Use different types for the sequence and prefix.
     do {
-      let s = MinimalForwardCollection<OpaqueValue<Int>>(
+      let s = MinimalCollection<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
       let prefix = MinimalSequence<OpaqueValue<Int>>(
         elements: test.prefix.map(OpaqueValue.init))
@@ -399,7 +399,7 @@ SequenceTypeTests.test("elementsEqual/WhereElementIsEquatable") {
 
     // Use different types for the sequence and other.
     do {
-      let s = MinimalForwardCollection<MinimalEquatableValue>(
+      let s = MinimalCollection<MinimalEquatableValue>(
         elements: test.sequence.map(MinimalEquatableValue.init))
       let other = MinimalSequence<MinimalEquatableValue>(
         elements: test.other.map(MinimalEquatableValue.init))
@@ -438,7 +438,7 @@ SequenceTypeTests.test("elementsEqual/Predicate") {
 
     // Use different types for the sequence and other.
     do {
-      let s = MinimalForwardCollection<OpaqueValue<Int>>(
+      let s = MinimalCollection<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
       let other = MinimalSequence<OpaqueValue<Int>>(
         elements: test.other.map(OpaqueValue.init))
@@ -481,7 +481,7 @@ SequenceTypeTests.test("lexicographicallyPrecedes(_:)/WhereElementIsComparable")
 
     // Use different types for the sequence and other.
     do {
-      let s = MinimalForwardCollection<MinimalComparableValue>(
+      let s = MinimalCollection<MinimalComparableValue>(
         elements: test.sequence.map(MinimalComparableValue.init))
       let other = MinimalSequence<MinimalComparableValue>(
         elements: test.other.map(MinimalComparableValue.init))
@@ -520,7 +520,7 @@ SequenceTypeTests.test("lexicographicallyPrecedes(_:)/Predicate") {
 
     // Use different types for the sequence and other.
     do {
-      let s = MinimalForwardCollection<OpaqueValue<Int>>(
+      let s = MinimalCollection<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
       let other = MinimalSequence<OpaqueValue<Int>>(
         elements: test.other.map(OpaqueValue.init))
@@ -602,42 +602,6 @@ SequenceTypeTests.test("Set<T>.contains/CustomImplementation/${dispatch}") {
 
 % end
 
-SequenceTypeTests.test("Range<Element>.contains/WhereElementIsComparable/staticDispatch") {
-  let start = 10
-  let end = 20
-  let range: Range<MinimalComparableIndexValue> =
-    MinimalComparableIndexValue(start)..<MinimalComparableIndexValue(end)
-  expectEqual(
-    1, MinimalComparableIndexValue.timesLessWasCalled.value)
-  let count = 30
-  for test in 0..<count {
-    expectEqual(
-      test >= start && test < end,
-      range.contains(MinimalComparableIndexValue(test)))
-  }
-  expectEqual(
-    51, MinimalComparableIndexValue.timesLessWasCalled.value)
-}
-
-SequenceTypeTests.test("Range<Element>.contains/WhereElementIsComparable/dispatch") {
-  let start = 10
-  let end = 20
-  let range: Range<MinimalComparableIndexValue> =
-    MinimalComparableIndexValue(start)..<MinimalComparableIndexValue(end)
-  expectEqual(
-    1, MinimalComparableIndexValue.timesLessWasCalled.value)
-  let count = 30
-  for test in 0..<count {
-    expectEqual(
-      test >= start && test < end,
-      LoggingCollection(range).contains(MinimalComparableIndexValue(test)))
-  }
-  // Dispatch through a protocol does not get the optimization because the
-  // custom contains method is not getting into the witness table.
-  expectEqual(
-    1, MinimalComparableIndexValue.timesLessWasCalled.value)
-}
-
 SequenceTypeTests.test("contains/Predicate") {
   for test in findTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
@@ -699,13 +663,13 @@ SequenceTypeTests.test("reverse/WhereIndexIsBidirectional,BidirectionalReverseVi
       elements: test.sequence.map(OpaqueValue.init))
     var result = s.reversed()
     expectType(
-      ReverseCollection<MinimalBidirectionalCollection<OpaqueValue<Int>>>.self,
+      ReversedCollection<MinimalBidirectionalCollection<OpaqueValue<Int>>>.self,
       &result)
     expectEqual(
       test.expected, result.map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
 
-    // Check ReverseCollection's Collection conformance.
+    // Check ReversedCollection's Collection conformance.
     checkBidirectionalCollection(
       test.expected.map(OpaqueValue.init) as [OpaqueValue<Int>],
       result) { $0.value == $1.value }
@@ -718,17 +682,15 @@ SequenceTypeTests.test("reverse/WhereIndexIsRandomAccess,RandomAccessReverseView
       elements: test.sequence.map(OpaqueValue.init))
     var result = s.reversed()
     expectType(
-      ReverseRandomAccessCollection<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self,
+      ReversedRandomAccessCollection<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self,
       &result)
     expectEqual(
       test.expected, result.map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
 
-    // Check ReverseRandomAccessCollection Collection conformance.
-    checkRandomAccessCollection(
-      test.expected.map(OpaqueValue.init) as [OpaqueValue<Int>],
-      result) { $0.value == $1.value }
-
+    // Check ReversedRandomAccessCollection Collection conformance.
+    let expected = test.expected.map(OpaqueValue.init) as [OpaqueValue<Int>]
+    checkRandomAccessCollection(expected, result) { $0.value == $1.value }
   }
 }
 
@@ -1009,7 +971,7 @@ SequenceTypeTests.test("dropLast/dispatch") {
 SequenceTypeTests.test("prefix/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   tester.prefix(1)
-  expectCustomizable(tester, tester.log.prefix)
+  expectCustomizable(tester, tester.log.prefixMaxLength)
 }
 
 //===----------------------------------------------------------------------===//
@@ -1019,7 +981,7 @@ SequenceTypeTests.test("prefix/dispatch") {
 SequenceTypeTests.test("suffix/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   tester.suffix(1)
-  expectCustomizable(tester, tester.log.suffix)
+  expectCustomizable(tester, tester.log.suffixMaxLength)
 }
 
 //===----------------------------------------------------------------------===//

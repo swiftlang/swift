@@ -35,7 +35,7 @@ public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
 }
 
 /// A collection containing a single element of type `Element`.
-public struct CollectionOfOne<Element> : Collection {
+public struct CollectionOfOne<Element> : RandomAccessCollection {
 
   /// Construct an instance containing just `element`.
   public init(_ element: Element) {
@@ -48,11 +48,18 @@ public struct CollectionOfOne<Element> : Collection {
   }
 
   /// The "past the end" position; always identical to
-  /// `startIndex.successor()`.
+  /// `index(after: startIndex)`.
   ///
   /// - Note: `endIndex` is not a valid argument to `subscript`.
   public var endIndex: Int {
     return 1
+  }
+  
+  /// Always returns `endIndex`.
+  @warn_unused_result
+  public func index(after i: Int) -> Int {
+    _precondition(i == startIndex)
+    return endIndex
   }
 
   /// Returns an iterator over the elements of this sequence.

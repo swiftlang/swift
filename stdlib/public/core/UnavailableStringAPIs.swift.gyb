@@ -60,14 +60,15 @@ ${stringSubscriptComment}
     fatalError("unavailable function can't be called")
   }
 
+% for Range in 'Range', 'ClosedRange', 'CountableRange', 'CountableClosedRange':
 ${stringSubscriptComment}
   @available(
     *, unavailable,
-    message: "cannot subscript String with a Range<Int>, see the documentation comment for discussion")
-  public subscript(bounds: Range<Int>) -> String {
+    message: "cannot subscript String with a ${Range}<Int>, see the documentation comment for discussion")
+  public subscript(bounds: ${Range}<Int>) -> String {
     fatalError("unavailable function can't be called")
   }
-
+% end
   /// The unavailable `String.count` API.
   ///
   /// The concept of "the number of characters in a string" has

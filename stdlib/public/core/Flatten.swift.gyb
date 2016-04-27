@@ -10,6 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+%{
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal,
+    sliceTypeName
+)
+}%
+
 /// An iterator that produces the elements contained in each segment
 /// produced by some `Base` Iterator.
 ///
@@ -23,8 +31,8 @@ public struct FlattenIterator<
 > : IteratorProtocol, Sequence {
 
   /// Construct around a `base` iterator.
-  internal init(_ base: Base) {
-    self._base = base
+  internal init(_base: Base) {
+    self._base = _base
   }
 
   /// Advance to the next element and return it, or `nil` if no next
@@ -76,25 +84,49 @@ public struct FlattenSequence<
   /// Creates a concatenation of the elements of the elements of `base`.
   ///
   /// - Complexity: O(1)
-  internal init(_ base: Base) {
-    self._base = base
+  internal init(_base: Base) {
+    self._base = _base
   }
 
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func makeIterator() -> FlattenIterator<Base.Iterator> {
-    return FlattenIterator(_base.makeIterator())
+    return FlattenIterator(_base: _base.makeIterator())
   }
   
   internal var _base: Base
 }
 
 extension Sequence where Iterator.Element : Sequence {
-  /// A concatenation of the elements of `self`.
+  /// Returns the elements of this sequence of sequences, concatenated.
+  ///
+  /// In this example, an array of three ranges is flattened so that the
+  /// elements of each range can be iterated in turn.
+  ///
+  ///     let ranges = [0..<3, 8..<10, 15..<17]
+  ///
+  ///     // A for-in loop over 'ranges' accesses each range:
+  ///     for range in ranges {
+  ///       print(range)
+  ///     }
+  ///     // Prints "0..<3"
+  ///     // Prints "8..<10"
+  ///     // Prints "15..<17"
+  ///
+  ///     // Use 'flatten()' to access each element of each range:
+  ///     for index in ranges.flatten() {
+  ///         print(index, terminator: " ")
+  ///     }
+  ///     // Prints: "0 1 2 8 9 15 16"
+  ///
+  /// - Returns: A flattened view of the elements of this
+  ///   sequence of sequences.
+  ///
+  /// - SeeAlso: `flatMap(_:)`, `joinWithSeparator(_:)`
   @warn_unused_result
   public func flatten() -> FlattenSequence<Self> {
-    return FlattenSequence(self)
+    return FlattenSequence(_base: self)
   }
 }
 
@@ -108,105 +140,42 @@ extension LazySequenceProtocol
   public func flatten() -> LazySequence<
     FlattenSequence<Elements>
   > {
-    return FlattenSequence(elements).lazy
+    return FlattenSequence(_base: elements).lazy
   }
 }
 
-% for traversal in ('Forward', 'Bidirectional'):
-%   t = '' if traversal == 'Forward' else traversal
-%   Collection = 'Flatten%sCollection' % t
-%   constraints = '%(Base)sIterator.Element : Collection'
+% for traversal in ['Forward', 'Bidirectional']:
+%   Collection = 'Flatten' + collectionForTraversal(traversal)
+%   if traversal == 'Forward':
+%     constraints = '%(Base)sIterator.Element : Collection'
 %   if traversal == 'Bidirectional':
-%     constraints += ''',
-%   %(Base)sIndex : BidirectionalIndex, 
-%   %(Base)sIterator.Element.Index : BidirectionalIndex'''
+%     constraints = '%(Base)sIterator.Element : BidirectionalCollection'
 %   Index = Collection + 'Index'
+%   Slice = sliceTypeName(traversal=traversal, mutable=False, rangeReplaceable=False)
 /// A position in a `${Collection}`.
 public struct ${Index}<
-  BaseElements: Collection where ${constraints % {'Base': 'BaseElements.'}}
-> : ${traversal}Index {
-  /// Returns the next consecutive value after `self`.
-  ///
-  /// - Precondition: The next value is representable.
-  public func successor() -> ${Index} {
-    let nextInner = _inner!.successor()
-    if _fastPath(nextInner != _innerCollection!.endIndex) {
-      return ${Index}(_base, _outer, nextInner, _innerCollection)
-    }
-    for nextOuter in _outer.successor()..<_base.endIndex {
-      let nextInnerCollection = _base[nextOuter]
-      if !nextInnerCollection.isEmpty {
-        return ${Index}(
-          _base, nextOuter, nextInnerCollection.startIndex, nextInnerCollection)
-      }
-    }
-    return ${Index}(_endIndexOfFlattened: _base)
-  }
-  
-% if traversal == 'Bidirectional':
-  /// Returns the previous consecutive value before `self`.
-  ///
-  /// - Precondition: The previous value is representable.
-  public func predecessor() -> ${Index} {
-    var prevOuter = _outer
-    var prevInnerCollection : BaseElements.Iterator.Element
-    if let ic = _innerCollection {
-      prevInnerCollection = ic
-    } else {
-      prevOuter._predecessorInPlace()
-      prevInnerCollection = _base[prevOuter]
-    }
-    var prevInner = _inner ?? prevInnerCollection.endIndex
-
-    while prevInner == prevInnerCollection.startIndex {
-      prevOuter._predecessorInPlace()
-      prevInnerCollection = _base[prevOuter]
-      prevInner = prevInnerCollection.endIndex
-    }
-
-    return ${Index}(
-      _base, prevOuter, prevInner.predecessor(), prevInnerCollection)
-  }
-% end
-
-  /// Construct the `startIndex` for a flattened view of `base`.
-  internal init(_startIndexOfFlattened base: BaseElements) {
-    for outer in base.indices {
-      let innerCollection = base[outer]
-      if !innerCollection.isEmpty {
-        self._base = base
-        self._outer = outer
-        self._innerCollection = innerCollection
-        self._inner = innerCollection.startIndex
-        return
-      }
-    }
-    self = ${Index}(_endIndexOfFlattened: base)
-  }
-
-  /// Construct the `endIndex` for a flattened view of `base`.
-  internal init(_endIndexOfFlattened _base: BaseElements) {
-    self._base = _base
-    self._outer = _base.endIndex
-    self._inner = nil
-    self._innerCollection = nil
-  }
+  BaseElements : ${collectionForTraversal(traversal)}
+  where
+  ${constraints % {'Base': 'BaseElements.'}}
+> : Comparable {
 
   internal init(
-    _ _base: BaseElements,
-    _ outer: BaseElements.Index,
-    _ inner: BaseElements.Iterator.Element.Index?,
-    _ innerCollection: BaseElements.Iterator.Element?) {
-    self._base = _base
-    self._outer = outer
+    _ _outer: BaseElements.Index,
+    _ inner: BaseElements.Iterator.Element.Index?) {
+    self._outer = _outer
     self._inner = inner
-    self._innerCollection = innerCollection
   }
-  
-  internal let _base: BaseElements
+
+  /// The position in the outer collection of collections.
   internal let _outer: BaseElements.Index
+
+  /// The position in the inner collection at `base[_outer]`, or `nil` if
+  /// `_outer == base.endIndex`.
+  ///
+  /// When `_inner != nil`, `_inner!` is a valid subscript of `base[_outer]`;
+  /// when `_inner == nil`, `_outer == base.endIndex` and this index is
+  /// `endIndex` of the `${Collection}`.
   internal let _inner: BaseElements.Iterator.Element.Index?
-  internal let _innerCollection: BaseElements.Iterator.Element?
 }
 
 @warn_unused_result
@@ -217,7 +186,29 @@ public func == <BaseElements> (
   return lhs._outer == rhs._outer && lhs._inner == rhs._inner
 }
 
-/// A flattened view of a base collection-of-collections.
+@warn_unused_result
+public func < <BaseElements> (
+  lhs: ${Index}<BaseElements>, 
+  rhs: ${Index}<BaseElements>
+) -> Bool {
+  // FIXME: swift-3-indexing-model: tests.
+  if lhs._outer != rhs._outer {
+    return lhs._outer < rhs._outer
+  }
+
+  if let lhsInner = lhs._inner, rhsInner = rhs._inner {
+    return lhsInner < rhsInner
+  }
+
+  // When combined, the two conditions above guarantee that both
+  // `_outer` indices are `_base.endIndex` and both `_inner` indices
+  // are `nil`, since `_inner` is `nil` iff `_outer == base.endIndex`.
+  _precondition(lhs._inner == nil && rhs._inner == nil)
+
+  return false
+}
+
+/// A flattened view of a base collection of collections.
 ///
 /// The elements of this view are a concatenation of the elements of
 /// each collection in the base.
@@ -234,19 +225,25 @@ public func == <BaseElements> (
 ///   that depend on `startIndex`, or of advancing a `${Collection}Index`
 ///   depends on how many empty subcollections are found in the base
 ///   collection, and may not offer the usual performance given by
-///   `CollectionType` or `${traversal}IndexType`. Be aware, therefore, that
+///   `Collection` or `${traversal}Index`. Be aware, therefore, that
 ///   general operations on `${Collection}` instances may not have the
 ///   documented complexity.
 ///
 /// - See also: `FlattenSequence`
 public struct ${Collection}<
-  Base: Collection where ${constraints % {'Base': 'Base.'}}
-> : Collection {
+  Base : ${collectionForTraversal(traversal)}
+  where
+  ${constraints % {'Base': 'Base.'}}
+> : ${collectionForTraversal(traversal)} {
+  // FIXME: swift-3-indexing-model: check test coverage for collection.
+
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = ${Index}<Base>
+
+  public typealias IndexDistance = Base.IndexDistance
   
   /// Creates a flattened view of `base`.
   public init(_ base: Base) {
@@ -257,24 +254,76 @@ public struct ${Collection}<
   ///
   /// - Complexity: O(1).
   public func makeIterator() -> FlattenIterator<Base.Iterator> {
-    return FlattenIterator(_base.makeIterator())
+    return FlattenIterator(_base: _base.makeIterator())
   }
 
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
   public var startIndex: Index {
-    return ${Index}(_startIndexOfFlattened: _base)
+    let end = _base.endIndex
+    var outer = _base.startIndex
+    while outer != end {
+      let innerCollection = _base[outer]
+      if !innerCollection.isEmpty {
+        return ${Index}(outer, innerCollection.startIndex)
+      }
+      _base.formIndex(after: &outer)
+    }
+
+    return endIndex
   }
 
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
+  /// `index(after:)`.
   public var endIndex: Index {
-    return ${Index}(_endIndexOfFlattened: _base)
+    return ${Index}(_base.endIndex, nil)
   }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func index(after i: Index) -> Index {
+    let innerCollection = _base[i._outer]
+    let nextInner = innerCollection.index(after: i._inner!)
+    if _fastPath(nextInner != innerCollection.endIndex) {
+      return ${Index}(i._outer, nextInner)
+    }
+
+    var nextOuter = _base.index(after: i._outer)
+    while nextOuter != _base.endIndex {
+      let nextInnerCollection = _base[nextOuter]
+      if !nextInnerCollection.isEmpty {
+        return ${Index}(nextOuter, nextInnerCollection.startIndex)
+      }
+      _base.formIndex(after: &nextOuter)
+    }
+
+    return endIndex
+  }
+
+% if traversal == 'Bidirectional':
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func index(before i: Index) -> Index {
+    var prevOuter = i._outer
+    if prevOuter == _base.endIndex {
+      prevOuter = _base.index(before: prevOuter)
+    }
+    var prevInnerCollection = _base[prevOuter]
+    var prevInner = i._inner ?? prevInnerCollection.endIndex
+
+    while prevInner == prevInnerCollection.startIndex {
+      prevOuter = _base.index(before: prevOuter)
+      prevInnerCollection = _base[prevOuter]
+      prevInner = prevInnerCollection.endIndex
+    }
+
+    return ${Index}(prevOuter, prevInnerCollection.index(before: prevInner))
+  }
+% end
 
   /// Access the element at `position`.
   ///
@@ -283,7 +332,12 @@ public struct ${Collection}<
   public subscript(
     position: Index
   ) -> Base.Iterator.Element.Iterator.Element {
-    return position._innerCollection![position._inner!]
+    return _base[position._outer][position._inner!]
+  }
+
+  public subscript(bounds: Range<Index>)
+    -> ${Slice}<${Collection}> {
+    return ${Slice}(base: self, bounds: bounds)
   }
 
   // To return any estimate of the number of elements, we have to start
@@ -301,11 +355,49 @@ public struct ${Collection}<
     return _copySequenceToNativeArrayBuffer(self)
   }
 
+  // TODO: swift-3-indexing-model - add docs
+  public func forEach(
+    _ body: @noescape (Base.Iterator.Element.Iterator.Element) throws -> Void
+  ) rethrows {
+    // FIXME: swift-3-indexing-model: tests.
+    for innerCollection in _base {
+      try innerCollection.forEach(body)
+    }
+  }
+
+  // FIXME(performance): swift-3-indexing-model: add custom advance/distance
+  // methods that skip over inner collections when random-access
+
   internal var _base: Base
 }
 
-extension Collection where ${constraints % {'Base': ''}} {
-  /// A concatenation of the elements of `self`.
+extension ${collectionForTraversal(traversal)}
+  where ${constraints % {'Base': ''}} {
+  /// Returns the elements of this collection of collections, concatenated.
+  ///
+  /// In this example, an array of three ranges is flattened so that the
+  /// elements of each range can be iterated in turn.
+  ///
+  ///     let ranges = [0..<3, 8..<10, 15..<17]
+  ///
+  ///     // A for-in loop over 'ranges' accesses each range:
+  ///     for range in ranges {
+  ///       print(range)
+  ///     }
+  ///     // Prints "0..<3"
+  ///     // Prints "8..<10"
+  ///     // Prints "15..<17"
+  ///
+  ///     // Use 'flatten()' to access each element of each range:
+  ///     for index in ranges.flatten() {
+  ///         print(index, terminator: " ")
+  ///     }
+  ///     // Prints: "0 1 2 8 9 15 16"
+  ///
+  /// - Returns: A flattened view of the elements of this
+  ///   collection of collections.
+  ///
+  /// - SeeAlso: `flatMap(_:)`, `joinWithSeparator(_:)`
   @warn_unused_result
   public func flatten() -> ${Collection}<Self> {
     return ${Collection}(self)
@@ -313,7 +405,10 @@ extension Collection where ${constraints % {'Base': ''}} {
 }
 
 extension LazyCollectionProtocol
-  where ${constraints % {'Base': ''}}, 
+  where
+  Self : ${collectionForTraversal(traversal)},
+  Elements : ${collectionForTraversal(traversal)},
+  ${constraints % {'Base': ''}},
   ${constraints % {'Base': 'Elements.'}},
   Iterator.Element == Elements.Iterator.Element {
   /// A concatenation of the elements of `self`.
@@ -338,9 +433,7 @@ extension FlattenSequence {
 }
 
 % for traversal in ('Forward', 'Bidirectional'):
-%   t = '' if traversal == 'Forward' else traversal
-%   Collection = 'Flatten%sCollection' % t
-extension ${Collection} {
+extension Flatten${collectionForTraversal(traversal)} {
   @available(*, unavailable, message: "Please use underestimatedCount property instead.")
   public func underestimateCount() -> Int {
     fatalError("unavailable function can't be called")
