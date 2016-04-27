@@ -1,6 +1,6 @@
 @import Foundation;
 
-typedef NSString *SNTErrorDomain __attribute((swift_newtype(struct)))
+typedef NSString *__nonnull SNTErrorDomain __attribute((swift_newtype(struct)))
 __attribute((swift_name("ErrorDomain")));
 
 extern void SNTErrorDomainProcess(SNTErrorDomain d)
@@ -18,9 +18,15 @@ extern const SNTErrorDomain SNTFive
 extern const SNTErrorDomain SNTElsewhere
     __attribute((swift_name("Foo.err")));
 
-typedef NSString *SNTClosedEnum __attribute((swift_newtype(enum)))
+typedef NSString *__nullable SNTClosedEnum __attribute((swift_newtype(enum)))
 __attribute((swift_name("ClosedEnum")));
 
 extern const SNTClosedEnum SNTFirstClosedEntryEnum;
 extern const SNTClosedEnum SNTSecondEntry;
 extern const SNTClosedEnum SNTClosedEnumThirdEntry;
+
+typedef NSString * IUONewtype __attribute((swift_newtype(struct)));
+
+typedef float MyFloat __attribute((swift_newtype(struct)));
+extern const MyFloat globalFloat;
+
