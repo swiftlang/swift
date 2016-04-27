@@ -795,7 +795,9 @@ func r22211854() {
 
 // <rdar://problem/22348394> Compiler crash on invoking function with labeled defaulted param with non-labeled argument
 func r22348394() {
+  // expected-note @+1 {{use '_' to remove the argument label for 'f'}} {{10-10=_ }}
   func f(x: Int = 0) { }
+  // expected-note @+1 {{add missing argument label 'x:'}} {{5-5=x: }}
   f(Int(3)) // expected-error{{missing argument label 'x:' in call}}
 }
 

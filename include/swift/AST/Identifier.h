@@ -18,6 +18,8 @@
 #define SWIFT_AST_IDENTIFIER_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/StringExtras.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -122,6 +124,19 @@ public:
 
   static bool isEditorPlaceholder(StringRef name) {
     return name.startswith("<#");
+  }
+    
+  bool canBeArgumentLabel() const {
+    return !empty() && ::swift::canBeArgumentLabel(str());
+  }
+  
+  void getAsArgumentLabel(SmallVectorImpl<char> &buffer) const {
+    bool isReserved = !canBeArgumentLabel();
+    if (isReserved)
+      buffer.append(1, '`');
+    buffer.append(str().begin(), str().end());
+    if (isReserved)
+      buffer.append(1, '`');
   }
 
   bool isEditorPlaceholder() const {

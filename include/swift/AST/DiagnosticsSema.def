@@ -700,6 +700,10 @@ ERROR(argument_out_of_order,none,
       "argument %0 must precede argument %1", (Identifier, Identifier))
 ERROR(argument_out_of_order_named_unnamed,none,
       "argument %0 must precede unnamed parameter #%1", (Identifier, unsigned))
+NOTE(hide_first_argument_label,none,
+      "use '_' to remove the argument label for %0", (Identifier))
+NOTE(add_missing_argument_label,none,
+      "add missing argument label '%0'", (StringRef))
 
 ERROR(instance_member_use_on_type,none,
       "use of instance member %1 on type %0; "
