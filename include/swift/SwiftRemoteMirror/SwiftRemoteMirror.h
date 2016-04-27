@@ -36,6 +36,7 @@ extern "C" {
 /// \returns An opaque reflection context.
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(
+    void *ReaderContext,
     PointerSizeFunction getPointerSize,
     SizeSizeFunction getSizeSize,
     ReadBytesFunction readBytes,
