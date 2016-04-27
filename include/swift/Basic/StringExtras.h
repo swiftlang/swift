@@ -34,6 +34,9 @@ namespace swift {
   /// \seealso Token::canBeArgumentLabel()
   bool canBeArgumentLabel(StringRef identifier);
 
+  /// Determine whether the given string can be the name of a member.
+  bool canBeMemberName(StringRef identifier);
+
   /// Describes the kind of preposition a word is.
   enum PrepositionKind {
     PK_None = 0,

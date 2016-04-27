@@ -96,8 +96,8 @@
 // Note: property name stripping property type.
 // CHECK-FOUNDATION: var uppercased: String
 
-// Note: don't map base name down to a keyword.
-// CHECK-FOUNDATION: func doSelector(_: Selector!)
+// Note: ok to map base name down to a keyword.
+// CHECK-FOUNDATION: func `do`(_: Selector!)
 
 // Note: Strip names preceded by a gerund.
 // CHECK-FOUNDATION: func startSquashing(_: Bee)
@@ -287,7 +287,7 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func objectAtIndexedSubscript(_: UInt) -> AnyObject
 
 // CHECK-OMIT-NEEDLESS-WORDS: func exportPresets(bestMatching: String)
-// CHECK-OMIT-NEEDLESS-WORDS: func isCompatibleWith(_: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func `is`(compatibleWith: String)
 
 // CHECK-OMIT-NEEDLESS-WORDS: func add(_: AnyObject)
 
