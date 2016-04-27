@@ -367,7 +367,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=1",
 
       // Request new APIs from libdispatch.
-      "-DSWIFT_SDK_OVERLAY_DISPATCH_EPOCH=1",
+      "-DSWIFT_SDK_OVERLAY_DISPATCH_EPOCH=0",
     });
 
     // Get the version of this compiler and pass it to
