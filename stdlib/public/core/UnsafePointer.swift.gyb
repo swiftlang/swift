@@ -162,6 +162,17 @@ ${comment}
     }
 %  end
   }
+  
+    /// Call `body(m)`, where `m` is the underlying raw memory
+%  if mutable:
+    func withMemory<R>(@noescape body: inout Memory throws -> R) rethrows -> R {
+        return try body(&memory)
+    }
+%  else:
+    func withMemory<R>(@noescape body: Memory throws -> R) rethrows -> R {
+        return try body(memory)
+    }
+%  end
 
 %  if mutable:
   /// Initialize the value the pointer points to, to construct
