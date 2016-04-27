@@ -166,6 +166,7 @@ public:
 
 void TypeInfo::dump(std::ostream &OS, unsigned Indent) const {
   PrintTypeInfo(OS, Indent).print(*this);
+  OS << '\n';
 }
 
 namespace {

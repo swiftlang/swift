@@ -28,7 +28,7 @@ using namespace Demangle;
 
 static void errorAndExit(const std::string &message) {
   std::cerr << message << ": " << strerror(errno) << std::endl;
-  exit(EXIT_FAILURE);
+  abort();
 }
 
 namespace {
@@ -56,6 +56,28 @@ struct RemoteReflectionInfo {
   const StoredPointer StartAddress;
   const StoredSize TotalSize;
 
+  static StoredPointer getStartAddress(std::vector<Section<Runtime>> &&elts) {
+    StoredPointer Start = 0;
+    for (auto elt : elts) {
+      if (elt.StartAddress != 0) {
+        if (Start != 0)
+          Start = std::min(Start, elt.StartAddress);
+        else
+          Start = elt.StartAddress;
+      }
+    }
+    return Start;
+  }
+
+  static StoredPointer getEndAddress(std::vector<Section<Runtime>> &&elts) {
+    StoredPointer End = 0;
+    for (auto elt : elts) {
+      if (elt.StartAddress != 0)
+        End = std::max(End, elt.getEndAddress());
+    }
+    return End;
+  }
+
   RemoteReflectionInfo(std::string ImageName,
                        Section<Runtime> fieldmd,
                        Section<Runtime> assocty,
@@ -68,18 +90,18 @@ struct RemoteReflectionInfo {
       builtin(builtin),
       typeref(typeref),
       reflstr(reflstr),
-      StartAddress(std::min({
-        fieldmd.StartAddress,
-  assocty.StartAddress,
-  builtin.StartAddress,
-  typeref.StartAddress,
-  reflstr.StartAddress})),
-      TotalSize(std::max({
-        fieldmd.getEndAddress(),
-        assocty.getEndAddress(),
-  builtin.getEndAddress(),
-  typeref.getEndAddress(),
-  reflstr.getEndAddress()}) - StartAddress) {}
+      StartAddress(getStartAddress({
+                     fieldmd,
+                     assocty,
+                     builtin,
+                     typeref,
+                     reflstr})),
+      TotalSize(getEndAddress({
+                     fieldmd,
+                     assocty,
+                     builtin,
+                     typeref,
+                     reflstr}) - StartAddress) {}
 };
 }
 
@@ -133,9 +155,11 @@ public:
 
   template <typename T>
   void collectBytesFromPipe(T *Value, size_t Size) {
-    auto Dest = reinterpret_cast<uint8_t *>(&Value);
+    auto Dest = reinterpret_cast<uint8_t *>(Value);
     while (Size) {
-      auto bytesRead = read(getParentReadFD(), Value, Size);
+      auto bytesRead = read(getParentReadFD(), Dest, Size);
+      if (bytesRead == -EINTR)
+        continue;
       if (bytesRead <= 0)
         errorAndExit("collectBytesFromPipe");
       Size -= bytesRead;
@@ -239,6 +263,9 @@ public:
     std::vector<ReflectionInfo> Infos;
     for (auto &RemoteInfo : RemoteInfos) {
 
+      std::cerr << "Fetching reflection info for " << RemoteInfo.ImageName
+                << "\n";
+
       auto buffer = (uint8_t *)malloc(RemoteInfo.TotalSize);
 
       if (!readBytes(RemoteAddress(RemoteInfo.StartAddress), buffer,
@@ -324,7 +351,7 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
       StoredPointer instance = Pipe->receiveInstanceAddress();
       assert(instance);
       std::cout << "Parent: instance pointer in child address space: 0x";
-      std::cout << std::hex << instance << std::endl;
+      std::cout << std::hex << instance << "\n";
 
       StoredPointer isa;
       if (!Pipe->readInteger(RemoteAddress(instance), &isa))
@@ -334,19 +361,15 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
         RC.addReflectionInfo(Info);
 
       std::cout << "Parent: metadata pointer in child address space: 0x";
-      std::cout << std::hex << isa << std::endl;
+      std::cout << std::hex << isa << "\n";
 
-      std::cout << "Decoding type reference ..." << std::endl;
+      std::cout << "Decoding type reference ...\n";
       auto TR = RC.readTypeFromMetadata(isa);
       TR->dump(std::cout, 0);
 
-      auto Fields = RC.getFieldTypeRefs(isa);
-      for (auto &Field : Fields) {
-        std::cout << Field.first << ":\n";
-        Field.second->dump(std::cout , 0);
-        // TODO: Print field layout here.
-        std::cout << std::endl;
-      }
+      auto TI = RC.getTypeInfo(isa);
+      if (TI != nullptr)
+        TI->dump();
     }
   }
 
@@ -355,7 +378,7 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
 }
 
 void printUsageAndExit() {
-  std::cerr << "swift-reflection-test <arch> <binary filename>" << std::endl;
+  std::cerr << "swift-reflection-test <arch> <binary filename>\n";
   exit(EXIT_FAILURE);
 }
 

@@ -248,8 +248,6 @@ static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
         continue;
       }
       typeInfo->dump(OS);
-
-      OS << '\n';
     }
     break;
   }
