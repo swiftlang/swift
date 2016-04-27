@@ -546,9 +546,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   // Create the IR emitter.
   IRGenModuleDispatcher dispatcher;
-  const llvm::Triple &Triple = Ctx.LangOpts.Target;
   IRGenModule IGM(dispatcher, nullptr, Ctx, LLVMContext, Opts, ModuleName,
-                  DataLayout, Triple,
+                  DataLayout,
                   TargetMachine, SILMod, Opts.getSingleOutputFilename());
 
   initLLVMModule(IGM);
@@ -679,7 +678,6 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     const llvm::DataLayout DataLayout = TargetMachine->createDataLayout();
     
     LLVMContext *Context = new LLVMContext();
-    const llvm::Triple &Triple = Ctx.LangOpts.Target;
 
     // There must be an output filename for each source file.
     // We ignore additional output filenames.
@@ -691,7 +689,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   
     // Create the IR emitter.
     IRGenModule *IGM = new IRGenModule(dispatcher, nextSF, Ctx, *Context,
-                                       Opts, ModuleName, DataLayout, Triple,
+                                       Opts, ModuleName, DataLayout,
                                        TargetMachine, SILMod, *OutputIter++);
     IGMcreated = true;
 
@@ -869,7 +867,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   const llvm::Triple &Triple = Ctx.LangOpts.Target;
   IRGenModuleDispatcher dispatcher;
   IRGenModule IGM(dispatcher, nullptr, Ctx, *VMContext, Opts, OutputPath,
-                  DataLayout, Triple,
+                  DataLayout,
                   TargetMachine, &SILMod, Opts.getSingleOutputFilename());
   initLLVMModule(IGM);
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());

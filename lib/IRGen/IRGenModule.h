@@ -763,7 +763,6 @@ public:
               llvm::LLVMContext &LLVMContext,
               IRGenOptions &Opts, StringRef ModuleName,
               const llvm::DataLayout &DataLayout,
-              const llvm::Triple &Triple,
               llvm::TargetMachine *TargetMachine,
               SILModule *SILMod,
               StringRef OutputFilename);
