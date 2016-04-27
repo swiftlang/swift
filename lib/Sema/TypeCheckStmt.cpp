@@ -87,6 +87,16 @@ namespace {
         return { false, E };
       } 
 
+      // Capture lists need to be reparented to enclosing autoclosures.
+      if (auto CapE = dyn_cast<CaptureListExpr>(E)) {
+        if (isa<AutoClosureExpr>(ParentDC)) {
+          for (auto &Cap : CapE->getCaptureList()) {
+            Cap.Init->setDeclContext(ParentDC);
+            Cap.Var->setDeclContext(ParentDC);
+          }
+        }
+      }
+
       // Explicit closures start their own sequence.
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
         // In the repl, the parent top-level context may have been re-written.
