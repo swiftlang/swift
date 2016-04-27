@@ -543,7 +543,7 @@ extension _ContiguousArrayBuffer : Collection {
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `location(after:)`.
+  /// `index(after:)`.
   public var endIndex: Int {
     return count
   }
@@ -628,7 +628,7 @@ internal func _copyCollectionToNativeArrayBuffer<
   for _ in 0..<count {
     // FIXME(performance): use _copyContents(initializing:).
     p.initialize(with: source[i])
-    source.formLocation(after: &i)
+    source.formIndex(after: &i)
     p += 1
   }
   _expectEnd(i, source)

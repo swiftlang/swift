@@ -596,7 +596,7 @@ final class EvilCollection : Collection {
   // Default implementation will call _failEarlyRangeCheck,
   // passing in a startIndex that will grow _count faster than
   // necessary.
-  func formLocation(after i: inout Int) {
+  func formIndex(after i: inout Int) {
     i += 1
   }
 }

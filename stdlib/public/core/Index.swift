@@ -23,12 +23,12 @@ public postfix func -- <T : _Incrementable> (i: inout T) -> T {
   fatalError("unavailable operator can't be called")
 }
 
-@available(*, unavailable, message: "Use \'+= 1\' or call 'collection.location(after: Index)")
+@available(*, unavailable, message: "Use \'+= 1\' or call 'collection.index(after: Index)")
 public prefix func ++ <T : _Incrementable> (i: inout T) -> T {
   fatalError("unavailable operator can't be called")
 }
 
-@available(*, unavailable, message: "Use \'+= 1\' or call 'collection.location(after: Index)")
+@available(*, unavailable, message: "Use \'+= 1\' or call 'collection.index(after: Index)")
 public postfix func ++ <T : _Incrementable> (i: inout T) -> T {
   fatalError("unavailable operator can't be called")
 }

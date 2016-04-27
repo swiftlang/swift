@@ -119,7 +119,7 @@ extension ${Self} : ${TraversalCollection} {
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `location(after:)`.
+  /// `index(after:)`.
   public var endIndex: Base.Index {
     return _base.endIndex
   }
@@ -130,8 +130,8 @@ extension ${Self} : ${TraversalCollection} {
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func location(after i: Base.Index) -> Base.Index {
-    return _base.location(after: i)
+  public func index(after i: Base.Index) -> Base.Index {
+    return _base.index(after: i)
   }
 
   /// Access the element at `position`.
@@ -183,16 +183,16 @@ extension ${Self} : ${TraversalCollection} {
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func location(_ i: Index, offsetBy n: Base.IndexDistance) -> Index {
-    return _base.location(i, offsetBy: n)
+  public func index(_ i: Index, offsetBy n: Base.IndexDistance) -> Index {
+    return _base.index(i, offsetBy: n)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func location(
+  public func index(
     _ i: Index, offsetBy n: Base.IndexDistance, limitedBy limit: Index
   ) -> Index? {
-    return _base.location(i, offsetBy: n, limitedBy: limit)
+    return _base.index(i, offsetBy: n, limitedBy: limit)
   }
 
   // TODO: swift-3-indexing-model - add docs
@@ -204,8 +204,8 @@ extension ${Self} : ${TraversalCollection} {
 %   if Traversal != 'Forward':
 
   @warn_unused_result
-  public func location(before i: Base.Index) -> Base.Index {
-    return _base.location(before: i)
+  public func index(before i: Base.Index) -> Base.Index {
+    return _base.index(before: i)
   }
 
   public var last: Base.Iterator.Element? {

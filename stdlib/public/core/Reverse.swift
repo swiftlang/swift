@@ -93,27 +93,27 @@ public struct ReversedCollection<
   }
 
   @warn_unused_result
-  public func location(after i: Index) -> Index {
-    return ReversedIndex(_base.location(before: i.base))
+  public func index(after i: Index) -> Index {
+    return ReversedIndex(_base.index(before: i.base))
   }
 
   @warn_unused_result
-  public func location(before i: Index) -> Index {
-    return ReversedIndex(_base.location(after: i.base))
+  public func index(before i: Index) -> Index {
+    return ReversedIndex(_base.index(after: i.base))
   }
 
   @warn_unused_result
-  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
-    return ReversedIndex(_base.location(i.base, offsetBy: -n))
+    return ReversedIndex(_base.index(i.base, offsetBy: -n))
   }
 
   @warn_unused_result
-  public func location(
+  public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
-    return _base.location(i.base, offsetBy: -n, limitedBy: limit.base).map { ReversedIndex($0) }
+    return _base.index(i.base, offsetBy: -n, limitedBy: limit.base).map { ReversedIndex($0) }
   }
 
   @warn_unused_result
@@ -123,7 +123,7 @@ public struct ReversedCollection<
 
   public typealias _Element = Base.Iterator.Element
   public subscript(position: Index) -> Base.Iterator.Element {
-    return _base[_base.location(before: position.base)]
+    return _base[_base.index(before: position.base)]
   }
 
   public subscript(bounds: Range<Index>) -> BidirectionalSlice<ReversedCollection> {
@@ -206,29 +206,29 @@ public struct ReversedRandomAccessCollection<
   }
 
   @warn_unused_result
-  public func location(after i: Index) -> Index {
-    return ReversedRandomAccessIndex(_base.location(before: i.base))
+  public func index(after i: Index) -> Index {
+    return ReversedRandomAccessIndex(_base.index(before: i.base))
   }
 
   @warn_unused_result
-  public func location(before i: Index) -> Index {
-    return ReversedRandomAccessIndex(_base.location(after: i.base))
+  public func index(before i: Index) -> Index {
+    return ReversedRandomAccessIndex(_base.index(after: i.base))
   }
 
   @warn_unused_result
-  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
     // FIXME: swift-3-indexing-model: tests.
-    return ReversedRandomAccessIndex(_base.location(i.base, offsetBy: -n))
+    return ReversedRandomAccessIndex(_base.index(i.base, offsetBy: -n))
   }
 
   @warn_unused_result
-  public func location(
+  public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
     // FIXME: swift-3-indexing-model: tests.
-    return _base.location(i.base, offsetBy: -n, limitedBy: limit.base).map { Index($0) }
+    return _base.index(i.base, offsetBy: -n, limitedBy: limit.base).map { Index($0) }
   }
 
   @warn_unused_result
@@ -241,7 +241,7 @@ public struct ReversedRandomAccessCollection<
   // FIXME(compiler limitation): this typealias should be inferred.
 
   public subscript(position: Index) -> Base.Iterator.Element {
-    return _base[_base.location(before: position.base)]
+    return _base[_base.index(before: position.base)]
   }
 
   // FIXME: swift-3-indexing-model: the rest of methods.

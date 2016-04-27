@@ -33,7 +33,7 @@ extension BidirectionalCollection {
   ///     }
   ///     // Prints "50"
   public var last: Iterator.Element? {
-    return isEmpty ? nil : self[location(before: endIndex)]
+    return isEmpty ? nil : self[index(before: endIndex)]
   }
 }
 
@@ -73,7 +73,7 @@ extension Collection where ${IElement} : Equatable {
       if self[i] == element {
         return i
       }
-      self.formLocation(after: &i)
+      self.formIndex(after: &i)
     }
     return nil
   }
@@ -111,7 +111,7 @@ extension Collection {
       if try predicate(self[i]) {
         return i
       }
-      self.formLocation(after: &i)
+      self.formIndex(after: &i)
     }
     return nil
   }
@@ -269,7 +269,7 @@ ${orderingExplanation}
       return unsafeBufferPivot - bufferPointer.startIndex
     }
     if let offset = maybeOffset {
-      return location(startIndex, offsetBy: numericCast(offset))
+      return index(startIndex, offsetBy: numericCast(offset))
     }
 
 %   if preds:
@@ -585,7 +585,7 @@ ${subscriptCommentPost}
         Range(
           uncheckedBounds: (
             lower: bounds.lowerBound,
-            upper: location(after: bounds.upperBound)))
+            upper: index(after: bounds.upperBound)))
       ]
     }
 %   if 'Mutable' in Self:
@@ -594,7 +594,7 @@ ${subscriptCommentPost}
         Range(
           uncheckedBounds: (
             lower: bounds.lowerBound,
-            upper: location(after: bounds.upperBound)))
+            upper: index(after: bounds.upperBound)))
       ] = newValue
     }
 %   end

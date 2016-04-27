@@ -33,8 +33,8 @@ internal func _writeBackMutableSlice<
     newElementIndex != newElementsEndIndex {
 
     self_[selfElementIndex] = slice[newElementIndex]
-    self_.formLocation(after: &selfElementIndex)
-    slice.formLocation(after: &newElementIndex)
+    self_.formIndex(after: &selfElementIndex)
+    slice.formIndex(after: &newElementIndex)
   }
 
   _precondition(

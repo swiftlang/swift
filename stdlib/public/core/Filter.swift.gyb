@@ -210,7 +210,7 @@ public struct ${Self}<
   public var startIndex: Index {
     var index = _base.startIndex
     while index != _base.endIndex && !_predicate(_base[index]) {
-      _base.formLocation(after: &index)
+      _base.formIndex(after: &index)
     }
     return LazyFilterIndex(base: index)
   }
@@ -219,7 +219,7 @@ public struct ${Self}<
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `location(after:)`.
+  /// `index(after:)`.
   ///
   /// - Complexity: O(1).
   public var endIndex: Index {
@@ -228,21 +228,21 @@ public struct ${Self}<
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func location(after i: Index) -> Index {
+  public func index(after i: Index) -> Index {
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
     return LazyFilterIndex(base: _nextFiltered(i.base))
   }
 
 %   if Traversal == 'Bidirectional':
   @warn_unused_result
-  public func location(before i: Index) -> Index {
+  public func index(before i: Index) -> Index {
     fatalError("FIXME: swift-3-indexing-model: implement")
   }
 %   end
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
@@ -256,7 +256,7 @@ public struct ${Self}<
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func location(
+  public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     _precondition(n >= 0,
@@ -291,7 +291,7 @@ public struct ${Self}<
   internal func _nextFilteredInPlace(_ index: inout Base.Index) {
     _precondition(index != _base.endIndex, "can't advance past endIndex")
     repeat {
-      _base.formLocation(after: &index)
+      _base.formIndex(after: &index)
     } while index != _base.endIndex && !_predicate(_base[index])
   }
 

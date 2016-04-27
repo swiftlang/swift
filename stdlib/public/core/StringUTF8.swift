@@ -132,7 +132,7 @@ extension String {
       /// - Precondition: The next value is representable.
       @warn_unused_result
       internal func successor() -> Index {
-        // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.location(after: Index)
+        // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.index(after: Index)
         // FIXME: swift-3-indexing-model: remove the successor() function.
         let currentUnit = UTF8.CodeUnit(truncatingBitPattern: _buffer)
         let hiNibble = currentUnit >> 4
@@ -216,14 +216,14 @@ extension String {
     ///
     /// `endIndex` is not a valid argument to `subscript`, and is always
     /// reachable from `startIndex` by zero or more applications of
-    /// `location(after:)`.
+    /// `index(after:)`.
     public var endIndex: Index {
       return self._endIndex
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func location(after i: Index) -> Index {
+    public func index(after i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
       return i.successor()
     }
@@ -387,7 +387,7 @@ extension String.UTF8View.Index {
       // surrogate will be decoded as a single replacement character,
       // thus making the corresponding position valid in UTF8.
       if UTF16.isTrailSurrogate(utf16[utf16Index])
-        && UTF16.isLeadSurrogate(utf16[utf16.location(before: utf16Index)]) {
+        && UTF16.isLeadSurrogate(utf16[utf16.index(before: utf16Index)]) {
         return nil
       }
     }

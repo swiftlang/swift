@@ -25,17 +25,17 @@ public protocol BidirectionalIndexable : Indexable {
   /// Returns the position immediately preceding `i`.
   ///
   /// - If `i >= startIndex && i < endIndex`,
-  ///   `location(before: location(after: i)) == i`.
+  ///   `index(before: index(after: i)) == i`.
   /// 
   /// - If `i > startIndex && i <= endIndex`
-  ///   `location(after: location(before: i)) == i`.
+  ///   `index(after: index(before: i)) == i`.
   ///
   /// - Precondition: `i > startIndex && i <= endIndex` 
   @warn_unused_result
-  func location(before i: Index) -> Index
+  func index(before i: Index) -> Index
 
   /// Replaces `i` with its predecessor.
-  func formLocation(before i: inout Index)
+  func formIndex(before i: inout Index)
 }
 
 /// A collection that supports backward as well as forward traversal.
@@ -43,10 +43,10 @@ public protocol BidirectionalIndexable : Indexable {
 /// For any index `i` into a bidirectional collection `c`:
 ///
 /// - If `i >= c.startIndex && i < c.endIndex`,
-///   `c.location(before: c.location(after: i)) == i`.
+///   `c.index(before: c.index(after: i)) == i`.
 ///
 /// - If `i > c.startIndex && i <= c.endIndex`
-///   `c.location(after: c.location(before: i)) == i`.
+///   `c.index(after: c.index(before: i)) == i`.
 public protocol BidirectionalCollection
   : BidirectionalIndexable, Collection {
 
@@ -55,12 +55,12 @@ public protocol BidirectionalCollection
   ///
   /// - Precondition: `i > startIndex && i <= endIndex` 
   @warn_unused_result
-  func location(before i: Index) -> Index
+  func index(before i: Index) -> Index
 
   /// Replaces `i` with its predecessor.
   ///
   /// - Precondition: `i > startIndex && i <= endIndex`
-  func formLocation(before i: inout Index)
+  func formIndex(before i: inout Index)
 
   associatedtype SubSequence : BidirectionalIndexable, Collection
     = BidirectionalSlice<Self>
@@ -81,24 +81,24 @@ public protocol BidirectionalCollection
 extension BidirectionalIndexable {
 
   @inline(__always)
-  public func formLocation(before i: inout Index) {
-    i = location(before: i)
+  public func formIndex(before i: inout Index) {
+    i = index(before: i)
   }
 
   @warn_unused_result
-  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n)
     }
     var i = i
     for _ in stride(from: 0, to: n, by: -1) {
-      formLocation(before: &i)
+      formIndex(before: &i)
     }
     return i
   }
 
   @warn_unused_result
-  public func location(
+  public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     if n >= 0 {
@@ -109,7 +109,7 @@ extension BidirectionalIndexable {
       if i == limit {
         return nil
       }
-      formLocation(before: &i)
+      formIndex(before: &i)
     }
     return i
   }
@@ -122,13 +122,13 @@ extension BidirectionalIndexable {
     if start < end {
       while start != end {
         count += 1 as IndexDistance
-        formLocation(after: &start)
+        formIndex(after: &start)
       }
     }
     else if start > end {
       while start != end {
         count -= 1 as IndexDistance
-        formLocation(before: &start)
+        formIndex(before: &start)
       }
     }
 
@@ -145,7 +145,7 @@ extension BidirectionalIndexable
   Index.Stride : SignedInteger {
 
   @warn_unused_result
-  public func location(before i: Index) -> Index {
+  public func index(before i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i: should allow `endIndex`.
     //_failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
 
@@ -153,13 +153,13 @@ extension BidirectionalIndexable
   }
 
   @warn_unused_result
-  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // FIXME: swift-3-indexing-model: range check i
     return i.advanced(by: n)
   }
 
   @warn_unused_result
-  public func location(
+  public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: range check i
@@ -199,7 +199,7 @@ extension BidirectionalCollection where SubSequence == Self {
   public mutating func popLast() -> Iterator.Element? {
     guard !isEmpty else { return nil }
     let element = last!
-    self = self[startIndex..<location(before: endIndex)]
+    self = self[startIndex..<index(before: endIndex)]
     return element
   }
 
@@ -210,7 +210,7 @@ extension BidirectionalCollection where SubSequence == Self {
   @discardableResult
   public mutating func removeLast() -> Iterator.Element {
     let element = last!
-    self = self[startIndex..<location(before: endIndex)]
+    self = self[startIndex..<index(before: endIndex)]
     return element
   }
 
@@ -225,7 +225,7 @@ extension BidirectionalCollection where SubSequence == Self {
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it contains")
-    self = self[startIndex..<location(endIndex, offsetBy: numericCast(-n))]
+    self = self[startIndex..<index(endIndex, offsetBy: numericCast(-n))]
   }
 }
 
@@ -238,7 +238,7 @@ extension BidirectionalCollection {
   public func dropLast(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
-    let end = location(
+    let end = index(
       endIndex,
       offsetBy: numericCast(-n),
       limitedBy: startIndex) ?? startIndex
@@ -258,7 +258,7 @@ extension BidirectionalCollection {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
-    let start = location(
+    let start = index(
       endIndex,
       offsetBy: numericCast(-maxLength),
       limitedBy: startIndex) ?? startIndex

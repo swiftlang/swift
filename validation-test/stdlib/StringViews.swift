@@ -99,7 +99,7 @@ tests.test("index-mapping/character-to-utf8") {
     winter.characters.indices.map {
       i in (0..<3).map {
         winter.utf8[
-          winter.utf8.location(
+          winter.utf8.index(
             i.samePosition(in: winter.utf8), offsetBy: $0)]
       }
     }, sameValue: ==)
@@ -138,7 +138,7 @@ tests.test("index-mapping/unicode-scalar-to-utf8") {
     winter.unicodeScalars.indices.map {
       i in (0..<3).map {
         winter.utf8[
-          winter.utf8.location(i.samePosition(in: winter.utf8), offsetBy: $0)]
+          winter.utf8.index(i.samePosition(in: winter.utf8), offsetBy: $0)]
       }
     }, sameValue: ==)
 
@@ -182,7 +182,7 @@ tests.test("index-mapping/utf16-to-utf8") {
     winter.utf16.indices.map {
       i16 in i16.samePosition(in: winter.utf8).map {
         i8 in (0..<3).map {
-          winter.utf8[winter.utf8.location(i8, offsetBy: $0)]
+          winter.utf8[winter.utf8.index(i8, offsetBy: $0)]
         }
       } ?? []
     }, sameValue: ==)
@@ -615,8 +615,8 @@ tests.test("UTF8 indexes") {
   do {
     let start = String.UTF8Index(abc.startIndex, within: abc.utf8)
     expectEqual(
-      abc.utf8.location(after: start),
-      String.UTF8Index(abc.location(after: abc.startIndex), within: abc.utf8))
+      abc.utf8.index(after: start),
+      String.UTF8Index(abc.index(after: abc.startIndex), within: abc.utf8))
   }
 
   let diverseCharacters = summer + winter + winter + summer
@@ -658,7 +658,7 @@ tests.test("UTF8 indexes") {
             // We only have well-formed UTF16 in this string, so the
             // successor points to a trailing surrogate of a pair and
             // thus shouldn't convert to a UTF8 position
-            expectEmpty(u16.location(after: u16i0a).samePosition(in: u8))
+            expectEmpty(u16.index(after: u16i0a).samePosition(in: u8))
           }
           
           dsa = dsa.advanced(by: 1) // we're moving off the beginning of a new Unicode scalar
@@ -666,7 +666,7 @@ tests.test("UTF8 indexes") {
         else {
           expectEmpty(u8i0a.samePosition(in: u16))
         }
-        u8i0a = u8.location(u8i0a, offsetBy: 1)
+        u8i0a = u8.index(u8i0a, offsetBy: 1)
       }
 
       expectEqual(u8i0a, u8i1) // We should be there now
@@ -678,10 +678,10 @@ tests.test("UTF8 indexes") {
         for n1 in 0..<8 {
           expectEqual(u8i0b, u8i1b, sameValue: n0 == n1 ? (==) : (!=))
           if u8i1b == u8.endIndex { break }
-          u8i1b = u8.location(u8i1b, offsetBy: 1)
+          u8i1b = u8.index(u8i1b, offsetBy: 1)
         }
         if u8i0b == u8.endIndex { break }
-        u8i0b = u8.location(u8i0b, offsetBy: 1)
+        u8i0b = u8.index(u8i0b, offsetBy: 1)
       }
     }
   }

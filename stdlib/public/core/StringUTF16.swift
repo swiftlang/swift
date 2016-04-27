@@ -42,7 +42,7 @@ extension String {
     ///
     /// `endIndex` is not a valid argument to `subscript`, and is always
     /// reachable from `startIndex` by zero or more applications of
-    /// `location(after:)`.
+    /// `index(after:)`.
     public var endIndex: Index {
       return Index(_offset: _length)
     }
@@ -60,28 +60,28 @@ extension String {
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func location(after i: Index) -> Index {
+    public func index(after i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
       return Index(_offset: _unsafePlus(i._offset, 1))
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func location(before i: Index) -> Index {
+    public func index(before i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
       return Index(_offset: _unsafeMinus(i._offset, 1))
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
       return Index(_offset: i._offset.advanced(by: n))
     }
 
     // TODO: swift-3-indexing-model - add docs
     @warn_unused_result
-    public func location(
+    public func index(
       _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
     ) -> Index? {
       // FIXME: swift-3-indexing-model: range check i?
@@ -380,39 +380,39 @@ extension String.UTF16View.Indices : BidirectionalCollection {
   }
 
   @warn_unused_result
-  public func location(after i: Index) -> Index {
+  public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
-    return _elements.location(after: i)
+    return _elements.index(after: i)
   }
 
-  public func formLocation(after i: inout Index) {
+  public func formIndex(after i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
-    _elements.formLocation(after: &i)
-  }
-
-  @warn_unused_result
-  public func location(before i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: range check.
-    return _elements.location(before: i)
-  }
-
-  public func formLocation(before i: inout Index) {
-    // FIXME: swift-3-indexing-model: range check.
-    _elements.formLocation(before: &i)
+    _elements.formIndex(after: &i)
   }
 
   @warn_unused_result
-  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(before i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check.
+    return _elements.index(before: i)
+  }
+
+  public func formIndex(before i: inout Index) {
+    // FIXME: swift-3-indexing-model: range check.
+    _elements.formIndex(before: &i)
+  }
+
+  @warn_unused_result
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // FIXME: swift-3-indexing-model: range check i?
-    return _elements.location(i, offsetBy: n)
+    return _elements.index(i, offsetBy: n)
   }
 
   @warn_unused_result
-  public func location(
+  public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: range check i?
-    return _elements.location(i, offsetBy: n, limitedBy: limit)
+    return _elements.index(i, offsetBy: n, limitedBy: limit)
   }
 
   // TODO: swift-3-indexing-model - add docs

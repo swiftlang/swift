@@ -212,12 +212,12 @@ tests.test("${TestedType}: dispatch to wrapped") {
     // makes a unique copy.
     Log.successor.expectIncrement(Base.self) {
       Log.formSuccessor.expectUnchanged(Base.self) {
-        c.formLocation(after: &i)
+        c.formIndex(after: &i)
       }
     }
     Log.successor.expectUnchanged(Base.self) {
       Log.formSuccessor.expectIncrement(Base.self) {
-        c.formLocation(after: &i)
+        c.formIndex(after: &i)
       }
     }
   }
@@ -230,12 +230,12 @@ tests.test("${TestedType}: dispatch to wrapped") {
     // makes a unique copy.
     Log.predecessor.expectIncrement(Base.self) {
       Log.formPredecessor.expectUnchanged(Base.self) {
-        c.formLocation(before: &i)
+        c.formIndex(before: &i)
       }
     }
     Log.predecessor.expectUnchanged(Base.self) {
       Log.formPredecessor.expectIncrement(Base.self) {
-        c.formLocation(before: &i)
+        c.formIndex(before: &i)
       }
     }
   }
@@ -243,7 +243,7 @@ tests.test("${TestedType}: dispatch to wrapped") {
 
   do {
     var startIndex = c.startIndex
-    var badBounds = c.location(c.startIndex, offsetBy: 3)..<c.endIndex
+    var badBounds = c.index(c.startIndex, offsetBy: 3)..<c.endIndex
 
     Log.subscriptIndex.expectIncrement(Base.self) {
       Log.subscriptRange.expectUnchanged(Base.self) {
@@ -270,20 +270,20 @@ tests.test("${TestedType}: dispatch to wrapped") {
     var i = c.startIndex
     Log.successor.expectIncrement(Base.self) {
       Log.formSuccessor.expectUnchanged(Base.self) {
-        i = c.location(after: i)
+        i = c.index(after: i)
       }
     }
 
     Log.successor.expectUnchanged(Base.self) {
       Log.formSuccessor.expectIncrement(Base.self) {
-        c.formLocation(after: &i)
+        c.formIndex(after: &i)
       }
     }
 
     var x = i
     Log.successor.expectIncrement(Base.self) {
       Log.formSuccessor.expectUnchanged(Base.self) {
-        i = c.location(after: i)
+        i = c.index(after: i)
       }
     }
     _blackHole(x)
@@ -296,20 +296,20 @@ tests.test("${TestedType}: dispatch to wrapped") {
 
     Log.predecessor.expectIncrement(Base.self) {
       Log.formPredecessor.expectUnchanged(Base.self) {
-        i = c.location(before: i)
+        i = c.index(before: i)
       }
     }
 
     Log.predecessor.expectUnchanged(Base.self) {
       Log.formPredecessor.expectIncrement(Base.self) {
-        c.formLocation(before: &i)
+        c.formIndex(before: &i)
       }
     }
 
     var x = i
     Log.predecessor.expectIncrement(Base.self) {
       Log.formPredecessor.expectUnchanged(Base.self) {
-        i = c.location(before: i)
+        i = c.index(before: i)
       }
     }
     _blackHole(x)

@@ -37,10 +37,10 @@ func makeCollection(elements: [OpaqueValue<Int>])
   baseElements.append(contentsOf: elements)
   baseElements.append(contentsOf: suffix.map(OpaqueValue.init))
   let base = DefaultedRandomAccessCollection(elements: baseElements)
-  let startIndex = base.location(
+  let startIndex = base.index(
     base.startIndex,
     offsetBy: numericCast(prefix.count))
-  let endIndex = base.location(
+  let endIndex = base.index(
     base.startIndex,
     offsetBy: numericCast(prefix.count + elements.count))
   return RandomAccessSlice(
@@ -54,10 +54,10 @@ func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
   baseElements.append(contentsOf: elements)
   baseElements.append(contentsOf: suffix.map(MinimalEquatableValue.init))
   let base = DefaultedRandomAccessCollection(elements: baseElements)
-  let startIndex = base.location(
+  let startIndex = base.index(
     base.startIndex,
     offsetBy: numericCast(prefix.count))
-  let endIndex = base.location(
+  let endIndex = base.index(
     base.startIndex,
     offsetBy: numericCast(prefix.count + elements.count))
   return RandomAccessSlice(
@@ -71,10 +71,10 @@ func makeCollectionOfComparable(elements: [MinimalComparableValue])
   baseElements.append(contentsOf: elements)
   baseElements.append(contentsOf: suffix.map(MinimalComparableValue.init))
   let base = DefaultedRandomAccessCollection(elements: baseElements)
-  let startIndex = base.location(
+  let startIndex = base.index(
     base.startIndex,
     offsetBy: numericCast(prefix.count))
-  let endIndex = base.location(
+  let endIndex = base.index(
     base.startIndex,
     offsetBy: numericCast(prefix.count + elements.count))
   return RandomAccessSlice(

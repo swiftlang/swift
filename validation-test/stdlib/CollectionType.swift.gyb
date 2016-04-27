@@ -45,7 +45,7 @@ struct CollectionWithDefaultUnderestimatedCount : Collection {
   }
 
   @warn_unused_result
-  func location(after i: MinimalIndex) -> MinimalIndex {
+  func index(after i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
       collectionState: _collectionState,
       position: i.position + 1, startIndex: 0, endIndex: _count)
@@ -89,8 +89,8 @@ struct MinimalCollectionWith${Implementation}Filter<Element>
   }
 
   @warn_unused_result
-  func location(after i: MinimalIndex) -> MinimalIndex {
-    return _data.location(after: i)
+  func index(after i: MinimalIndex) -> MinimalIndex {
+    return _data.index(after: i)
   }
 
   subscript(i: MinimalIndex) -> Element {
@@ -226,8 +226,8 @@ struct MinimalCollectionWith${Implementation}Map<Element>
   }
 
   @warn_unused_result
-  func location(after i: MinimalIndex) -> MinimalIndex {
-    return _data.location(after: i)
+  func index(after i: MinimalIndex) -> MinimalIndex {
+    return _data.index(after: i)
   }
 
   subscript(i: MinimalIndex) -> Element {
@@ -391,7 +391,7 @@ struct CollectionWithCustomUnderestimatedCount : Collection {
   }
 
   @warn_unused_result
-  func location(after i: MinimalIndex) -> MinimalIndex {
+  func index(after i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
       collectionState: _collectionState,
       position: i.position + 1, startIndex: 0, endIndex: 0xffff)
@@ -445,7 +445,7 @@ struct MinimalCollectionWithDefaultIterator : Collection {
   }
 
   @warn_unused_result
-  func location(after i: MinimalIndex) -> MinimalIndex {
+  func index(after i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
       collectionState: _collectionState,
       position: i.position + 1, startIndex: 0, endIndex: _count)
@@ -519,7 +519,7 @@ struct MinimalCollectionWithCustomIterator : Collection {
   }
 
   @warn_unused_result
-  func location(after i: MinimalIndex) -> MinimalIndex {
+  func index(after i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
       collectionState: _collectionState,
       position: i.position + 1, startIndex: 0, endIndex: _count)
@@ -582,7 +582,7 @@ CollectionTypeTests.test("subscript(_: Range<Index>)/writeback") {
   var collection = MinimalMutableRandomAccessCollection(
     elements: [ 5, 4, 3, 2, 1, 0, -1, -2, -3, -4 ])
   var i = collection.startIndex
-  var j = collection.location(i, offsetBy: 5)
+  var j = collection.index(i, offsetBy: 5)
   collection[i..<j].sort()
   expectEqualSequence(
     [ 1, 2, 3, 4, 5, 0, -1, -2, -3, -4 ], collection)
@@ -698,7 +698,7 @@ extension Collection where
     var tail = self[startIndex..<endIndex]
     while let foundIndex = tail.index(of: element) {
       result.append(foundIndex)
-      tail = tail[location(after: foundIndex)..<endIndex]
+      tail = tail[index(after: foundIndex)..<endIndex]
     }
     return result
   }

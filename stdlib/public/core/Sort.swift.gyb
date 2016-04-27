@@ -42,7 +42,7 @@ func _insertionSort<
 
     // One element is trivially already-sorted, thus pre-increment
     // Continue until the sorted elements cover the whole sequence
-    elements.formLocation(after: &sortedEnd)
+    elements.formIndex(after: &sortedEnd)
     while sortedEnd != range.upperBound {
       // get the first unsorted element
       let x: C.Iterator.Element = elements[sortedEnd]
@@ -51,7 +51,7 @@ func _insertionSort<
       // moving elements forward to make room.
       var i = sortedEnd
       repeat {
-        let predecessor: C.Iterator.Element = elements[elements.location(before: i)]
+        let predecessor: C.Iterator.Element = elements[elements.index(before: i)]
 
         // if x doesn't belong before y, we've found its position
         if !${cmp("x", "predecessor", p)} {
@@ -60,14 +60,14 @@ func _insertionSort<
 
         // Move y forward
         elements[i] = predecessor
-        elements.formLocation(before: &i)
+        elements.formIndex(before: &i)
       } while i != start
 
       if i != sortedEnd {
         // Plop x into position
         elements[i] = x
       }
-      elements.formLocation(after: &sortedEnd)
+      elements.formIndex(after: &sortedEnd)
     }
   }
 }
@@ -97,19 +97,19 @@ func _partition<
 
 Loop: while true {
   FindLo: repeat {
-      elements.formLocation(after: &lo)
+      elements.formIndex(after: &lo)
       while lo != hi {
         if !${cmp("elements[lo]", "pivot", p)} { break FindLo }
-        elements.formLocation(after: &lo)
+        elements.formIndex(after: &lo)
       }
       break Loop
     } while false
 
   FindHi: repeat {
-      elements.formLocation(before: &hi)
+      elements.formIndex(before: &hi)
       while hi != lo {
         if ${cmp("elements[hi]", "pivot", p)} { break FindHi }
-        elements.formLocation(before: &hi)
+        elements.formIndex(before: &hi)
       }
       break Loop
     } while false
@@ -117,7 +117,7 @@ Loop: while true {
     swap(&elements[lo], &elements[hi])
   }
 
-  elements.formLocation(before: &lo)
+  elements.formIndex(before: &lo)
   if lo != range.lowerBound {
     // swap the pivot into place
     swap(&elements[lo], &elements[range.lowerBound])
@@ -192,7 +192,7 @@ func _introSortImpl<
     depthLimit: depthLimit &- 1)
   _introSortImpl(
     &elements,
-    subRange: (elements.location(after: partIdx))..<range.upperBound,
+    subRange: (elements.index(after: partIdx))..<range.upperBound,
     ${"isOrderedBefore: &isOrderedBefore, " if p else ""}
     depthLimit: depthLimit &- 1)
 }
@@ -213,14 +213,14 @@ func _siftDown<
   if countToIndex + 1 >= countFromIndex {
     return
   }
-  let left = elements.location(index, offsetBy: countToIndex + 1)
+  let left = elements.index(index, offsetBy: countToIndex + 1)
   var largest = index
   if ${cmp("elements[largest]", "elements[left]", p)} {
     largest = left
   }
   // Check if right child is also within bounds before trying to examine it.
   if countToIndex + 2 < countFromIndex {
-    let right = elements.location(after: left)
+    let right = elements.index(after: left)
     if ${cmp("elements[largest]", "elements[right]", p)} {
       largest = right
     }
@@ -251,13 +251,13 @@ func _heapify<
   // We skip the rightmost half of the array, because these nodes don't have
   // any children.
   let root = range.lowerBound
-  var node = elements.location(
+  var node = elements.index(
     root,
     offsetBy: elements.distance(
       from: range.lowerBound, to: range.upperBound) / 2)
   
   while node != root {
-    elements.formLocation(before: &node)
+    elements.formIndex(before: &node)
     _siftDown(
       &elements,
       index: node,
@@ -279,7 +279,7 @@ func _heapSort<
     &elements,
     subRange: range
     ${", isOrderedBefore: &isOrderedBefore" if p else ""})
-  elements.formLocation(before: &hi)
+  elements.formIndex(before: &hi)
   while hi != lo {
     swap(&elements[lo], &elements[hi])
     _siftDown(
@@ -287,7 +287,7 @@ func _heapSort<
       index: lo,
       subRange: lo..<hi
       ${", isOrderedBefore: &isOrderedBefore" if p else ""})
-    elements.formLocation(before: &hi)
+    elements.formIndex(before: &hi)
   }
 }
 

@@ -815,15 +815,15 @@ tests.test("LazyFilterIndex/base") {
   let odds = base.lazy.filter { $0.value % 2 != 0 }
 
   expectEqual(base.startIndex, evens.startIndex.base)
-  expectEqual(base.location(after: base.startIndex), odds.startIndex.base)
+  expectEqual(base.index(after: base.startIndex), odds.startIndex.base)
 
   expectEqual(
-    base.location(after: base.location(after: base.startIndex)),
-    evens.location(after: evens.startIndex).base)
+    base.index(after: base.index(after: base.startIndex)),
+    evens.index(after: evens.startIndex).base)
 
   expectEqual(
-    base.location(after: base.location(after: base.location(after: base.startIndex))),
-    odds.location(after: odds.startIndex).base)
+    base.index(after: base.index(after: base.index(after: base.startIndex))),
+    odds.index(after: odds.startIndex).base)
 }
 
 tests.test("LazyFilterCollection") {

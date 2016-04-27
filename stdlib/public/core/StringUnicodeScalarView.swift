@@ -87,7 +87,7 @@ extension String {
     ///
     /// `endIndex` is not a valid argument to `subscript`, and is always
     /// reachable from `startIndex` by zero or more applications of
-    /// `location(after:)`.
+    /// `index(after:)`.
     public var endIndex: Index {
       return Index(_core.endIndex, _core)
     }
@@ -96,7 +96,7 @@ extension String {
     ///
     /// - Precondition: The next location exists.
     @warn_unused_result
-    public func location(after i: Index) -> Index {
+    public func index(after i: Index) -> Index {
       var scratch = _ScratchIterator(_core, i._position)
       var decoder = UTF16()
       let (_, length) = decoder._decodeOne(&scratch)
@@ -107,7 +107,7 @@ extension String {
     ///
     /// - Precondition: The previous location exists.
     @warn_unused_result
-    public func location(before i: Index) -> Index {
+    public func index(before i: Index) -> Index {
       var i = i._position-1
       let codeUnit = _core[i]
       if _slowPath((codeUnit >> 10) == 0b1101_11) {
@@ -318,7 +318,7 @@ extension String.UnicodeScalarIndex {
       // surrogate will be decoded as a single replacement character,
       // thus making the corresponding position valid.
       if UTF16.isTrailSurrogate(utf16[utf16Index])
-        && UTF16.isLeadSurrogate(utf16[utf16.location(before: utf16Index)]) {
+        && UTF16.isLeadSurrogate(utf16[utf16.index(before: utf16Index)]) {
         return nil
       }
     }
@@ -394,7 +394,7 @@ extension String.UnicodeScalarIndex {
     if self == scalars.startIndex || self == scalars.endIndex {
       return true
     }
-    let precedingScalar = scalars[scalars.location(before: self)]
+    let precedingScalar = scalars[scalars.index(before: self)]
 
     let graphemeClusterBreakProperty =
       _UnicodeGraphemeClusterBreakPropertyTrie()

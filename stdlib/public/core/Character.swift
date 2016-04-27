@@ -94,7 +94,7 @@ public struct Character :
     _precondition(
       s._core.count != 0, "Can't form a Character from an empty String")
     _precondition(
-      s.location(after: s.startIndex) == s.endIndex,
+      s.index(after: s.startIndex) == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 
     let (count, initialUTF8) = s._core._encodeSomeUTF8(from: 0)
@@ -155,7 +155,7 @@ public struct Character :
     ///
     /// `endIndex` is not a valid argument to `subscript`, and is always
     /// reachable from `startIndex` by zero or more applications of
-    /// `location(after:)`.
+    /// `index(after:)`.
     var endIndex: Int {
       return Int(count)
     }
@@ -292,7 +292,7 @@ extension String {
         UTF8.self, input: smallUTF8)
     case let .large(value):
       let buf = String(_StringCore(_StringBuffer(value)))
-      self = buf[buf.startIndex..<buf.location(after: buf.startIndex)]
+      self = buf[buf.startIndex..<buf.index(after: buf.startIndex)]
     }
   }
 }

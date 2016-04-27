@@ -93,7 +93,7 @@ struct BadIndexable2 : Indexable {
   subscript(pos: String) -> Int { return 0 }
   subscript(bounds: Range<String>) -> [Int] { return [] }
 
-  // Since String is not Strideable, 'location(after:)' will not be defaulted
+  // Since String is not Strideable, 'index(after:)' will not be defaulted
 }
 
 struct GoodBidirectionalIndexable1 : BidirectionalIndexable {
@@ -113,8 +113,8 @@ struct GoodBidirectionalIndexable2 : BidirectionalIndexable {
   subscript(pos: String) -> Int { return 0 }
   subscript(bounds: Range<String>) -> [Int] { return [] }
 
-  func location(after i: String) -> String { return "" }
-  func location(before i: String) -> String { return "" }
+  func index(after i: String) -> String { return "" }
+  func index(before i: String) -> String { return "" }
 }
 
 // expected-error@+1 {{type 'BadBidirectionalIndexable' does not conform to protocol 'BidirectionalIndexable'}}
@@ -125,7 +125,7 @@ struct BadBidirectionalIndexable : BidirectionalIndexable {
   subscript(pos: String) -> Int { return 0 }
   subscript(bounds: Range<String>) -> [Int] { return [] }
 
-  func location(after i: String) -> String { return "" }
+  func index(after i: String) -> String { return "" }
 
-  // Since String is not Strideable, 'location(before:)' will not be defaulted
+  // Since String is not Strideable, 'index(before:)' will not be defaulted
 }

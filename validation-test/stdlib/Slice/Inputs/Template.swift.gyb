@@ -107,10 +107,10 @@ func makeCollection(elements: [OpaqueValue<Int>])
   baseElements.append(contentsOf: elements)
   baseElements.append(contentsOf: suffix.map(OpaqueValue.init))
   let base = ${test.base}(elements: baseElements)
-  let startIndex = base.location(
+  let startIndex = base.index(
     base.startIndex,
     offsetBy: numericCast(prefix.count))
-  let endIndex = base.location(
+  let endIndex = base.index(
     base.startIndex,
     offsetBy: numericCast(prefix.count + elements.count))
   return ${test.base_slice}(
@@ -124,10 +124,10 @@ func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
   baseElements.append(contentsOf: elements)
   baseElements.append(contentsOf: suffix.map(MinimalEquatableValue.init))
   let base = ${test.base}(elements: baseElements)
-  let startIndex = base.location(
+  let startIndex = base.index(
     base.startIndex,
     offsetBy: numericCast(prefix.count))
-  let endIndex = base.location(
+  let endIndex = base.index(
     base.startIndex,
     offsetBy: numericCast(prefix.count + elements.count))
   return ${test.base_slice}(
@@ -141,10 +141,10 @@ func makeCollectionOfComparable(elements: [MinimalComparableValue])
   baseElements.append(contentsOf: elements)
   baseElements.append(contentsOf: suffix.map(MinimalComparableValue.init))
   let base = ${test.base}(elements: baseElements)
-  let startIndex = base.location(
+  let startIndex = base.index(
     base.startIndex,
     offsetBy: numericCast(prefix.count))
-  let endIndex = base.location(
+  let endIndex = base.index(
     base.startIndex,
     offsetBy: numericCast(prefix.count + elements.count))
   return ${test.base_slice}(

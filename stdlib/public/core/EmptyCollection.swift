@@ -60,7 +60,7 @@ public struct EmptyCollection<Element> :
   /// EmptyCollection does not have any element indices, so it is not
   /// possible to advance indices.
   @warn_unused_result
-  public func location(after i: Index) -> Index {
+  public func index(after i: Index) -> Index {
     // TODO: swift-3-indexing-model: tests for traps.
     _preconditionFailure("EmptyCollection can't advance indices")
   }
@@ -70,7 +70,7 @@ public struct EmptyCollection<Element> :
   /// EmptyCollection does not have any element indices, so it is not
   /// possible to advance indices.
   @warn_unused_result
-  public func location(before i: Index) -> Index {
+  public func index(before i: Index) -> Index {
     // TODO: swift-3-indexing-model: tests for traps.
     _preconditionFailure("EmptyCollection can't advance indices")
   }
@@ -114,7 +114,7 @@ public struct EmptyCollection<Element> :
   /// EmptyCollection does not have any element indices, so it is not
   /// possible to advance indices.
   @warn_unused_result
-  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // TODO: swift-3-indexing-model: tests for traps.
     _preconditionFailure("EmptyCollection can't advance indices")
   }
@@ -124,7 +124,7 @@ public struct EmptyCollection<Element> :
   /// EmptyCollection does not have any element indices, so it is not
   /// possible to advance indices.
   @warn_unused_result
-  public func location(
+  public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     // TODO: swift-3-indexing-model: tests for traps.

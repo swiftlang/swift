@@ -27,20 +27,20 @@ internal enum RangeSelection {
       case .leftEdge: return c.startIndex..<c.startIndex
       case .rightEdge: return c.endIndex..<c.endIndex
       case .middle:
-        let start = c.location(c.startIndex, offsetBy: c.count / 4)
-        let end = c.location(c.startIndex, offsetBy: 3 * c.count / 4 + 1)
+        let start = c.index(c.startIndex, offsetBy: c.count / 4)
+        let end = c.index(c.startIndex, offsetBy: 3 * c.count / 4 + 1)
         return start..<end
       case .leftHalf:
         let start = c.startIndex
-        let end = c.location(start, offsetBy: c.count / 2)
+        let end = c.index(start, offsetBy: c.count / 2)
         return start..<end
       case .rightHalf:
-        let start = c.location(c.startIndex, offsetBy: c.count / 2)
+        let start = c.index(c.startIndex, offsetBy: c.count / 2)
         let end = c.endIndex
         return start..<end
       case .offsets(let offsets):
-        let start = c.location(c.startIndex, offsetBy: numericCast(offsets.lowerBound))
-        let end = c.location(c.startIndex, offsetBy: numericCast(offsets.upperBound))
+        let start = c.index(c.startIndex, offsetBy: numericCast(offsets.lowerBound))
+        let end = c.index(c.startIndex, offsetBy: numericCast(offsets.upperBound))
         return start..<end
     }
   }
@@ -55,9 +55,9 @@ internal enum IndexSelection {
   internal func index<C : Collection>(in c: C) -> C.Index {
     switch self {
       case .start: return c.startIndex
-      case .middle: return c.location(c.startIndex, offsetBy: c.count / 2)
+      case .middle: return c.index(c.startIndex, offsetBy: c.count / 2)
       case .end: return c.endIndex
-      case .last: return c.location(c.startIndex, offsetBy: c.count - 1)
+      case .last: return c.index(c.startIndex, offsetBy: c.count - 1)
     }
   }
 }

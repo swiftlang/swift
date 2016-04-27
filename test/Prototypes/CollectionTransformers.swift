@@ -61,7 +61,7 @@ internal func _splitRandomAccessIndexRange<
   if length < 2 {
     return [range]
   }
-  let middle = elements.location(startIndex, offsetBy: C.IndexDistance(length / 2))
+  let middle = elements.index(startIndex, offsetBy: C.IndexDistance(length / 2))
   return [startIndex ..< middle, middle ..< endIndex]
 }
 
@@ -951,7 +951,7 @@ final internal class _CollectionTransformerStepCollectionSource<
     while i != range.upperBound {
       let e = c[i]
       collector.append(e)
-      c.formLocation(after: &i)
+      c.formIndex(after: &i)
     }
   }
 }

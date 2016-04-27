@@ -71,13 +71,13 @@ public func check${inc.capitalize()}rementable<
   checkEquatable(instances, oracle: equalityOracle, ${trace})
   for i in instances {
     if i != ${end}Index {
-      let next = baseCollection.location(${direction}: i)
-      // location(${direction}:) gets us a new index value
+      let next = baseCollection.index(${direction}: i)
+      // index(${direction}:) gets us a new index value
       expectNotEqual(i, next, ${trace})
 
-      // Which is the same as if we apply formLocation(${direction}:)
+      // Which is the same as if we apply formIndex(${direction}:)
       var j = i
-      baseCollection.formLocation(${direction}: &j)
+      baseCollection.formIndex(${direction}: &j)
       expectEqual(j, next, ${trace})
     }
   }
@@ -108,8 +108,8 @@ internal func _checkIncrementalAdvance<
 
     var offset: BaseCollection.IndexDistance = 0
     for _ in 0...(d * sign).toIntMax() {
-      let j = baseCollection.location(i, offsetBy: offset)
-      let k = baseCollection.location(i, offsetBy: offset + sign, limitedBy: limit) ?? limit
+      let j = baseCollection.index(i, offsetBy: offset)
+      let k = baseCollection.index(i, offsetBy: offset + sign, limitedBy: limit) ?? limit
       let jAtLimit = offset == d
       if jAtLimit {
         expectEqual(limit, j, ${trace})
@@ -145,7 +145,7 @@ public func checkForwardIndex<
 
   _checkIncrementalAdvance(instances, of: baseCollection,
     equalityOracle: equalityOracle, limit: endIndex,
-    sign: 1, next: { baseCollection.location(after: $0) }, ${trace})
+    sign: 1, next: { baseCollection.index(after: $0) }, ${trace})
 }
 
 /// Test that the elements of `instances` satisfy the semantic requirements of
@@ -179,7 +179,7 @@ public func checkBidirectionalIndex<
 
   _checkIncrementalAdvance(instances, of: baseCollection,
     equalityOracle: equalityOracle, limit: startIndex,
-    sign: -1, next: { baseCollection.location(before: $0) }, ${trace})
+    sign: -1, next: { baseCollection.index(before: $0) }, ${trace})
 }
 
 /// Test that the elements of `instances` satisfy the semantic requirements of
@@ -257,11 +257,11 @@ public func checkAdvancesAndDistances<
 
   for i in instances.indices {
     let x = instances[i]
-    expectEqual(x, baseCollection.location(x, offsetBy: 0))
+    expectEqual(x, baseCollection.index(x, offsetBy: 0))
 
     for j in distances.indices {
       let y = distances[j]
-      expectEqual(advanceOracle(i, j), baseCollection.location(x, offsetBy: y))
+      expectEqual(advanceOracle(i, j), baseCollection.index(x, offsetBy: y))
     }
 
     for j in instances.indices {
@@ -299,9 +299,9 @@ public func check${Traversal}Collection<
       resiliencyChecks: resiliencyChecks, sameValue: sameValue)
   }
 
-  let succ = { collection.location(after: $0) }
+  let succ = { collection.index(after: $0) }
 %     if Traversal != 'Forward':
-  let pred = { collection.location(before: $0) }
+  let pred = { collection.index(before: $0) }
 %     end
   // Advances up to 1 positions without passing endIndex.  Don't use
   // advanced(by: n) to do this because it's under test here.
@@ -347,7 +347,7 @@ public func check${Traversal}Collection<
   }
 
   func nextN(_ n: Distance, _ i: C.Index) -> C.Index {
-    return collection.location(i, offsetBy: n)
+    return collection.index(i, offsetBy: n)
   }
 
   let instances = _allIndices(into: collection, in: partWay0..<partWay1)
@@ -489,8 +489,8 @@ public func checkSliceableWithBidirectionalIndex<
 
   let expectedArray = Array(expected)
 
-  let succ = { sliceable.location(after: $0) }
-  let pred = { sliceable.location(before: $0) }
+  let succ = { sliceable.index(after: $0) }
+  let pred = { sliceable.index(before: $0) }
 
   var start = sliceable.startIndex
   for startNumericIndex in 0...expectedArray.count {

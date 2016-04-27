@@ -13,11 +13,11 @@ import Foundation  // For NSRange
 extension Collection {
   internal func index(_nth n: Int) -> Index {
     precondition(n >= 0)
-    return location(startIndex, offsetBy: numericCast(n))
+    return index(startIndex, offsetBy: numericCast(n))
   }
   internal func index(_nthLast n: Int) -> Index {
     precondition(n >= 0)
-    return location(endIndex, offsetBy: -numericCast(n))
+    return index(endIndex, offsetBy: -numericCast(n))
   }
 }
 
@@ -101,9 +101,9 @@ func checkUnicodeScalarViewIteration(
     let end = us.endIndex
     var decoded: [UInt32] = []
     while i != end {
-      expectTrue(i < us.location(after: i)) // Check for Comparable conformance
+      expectTrue(i < us.index(after: i)) // Check for Comparable conformance
       decoded.append(us[i].value)
-      i = us.location(after: i)
+      i = us.index(after: i)
     }
     expectEqual(expectedScalars, decoded)
   }
@@ -113,7 +113,7 @@ func checkUnicodeScalarViewIteration(
     var i = us.endIndex
     var decoded: [UInt32] = []
     while i != start {
-      i = us.location(before: i)
+      i = us.index(before: i)
       decoded.append(us[i].value)
     }
     expectEqual(expectedScalars, decoded)
@@ -172,7 +172,7 @@ StringTests.test("ForeignIndexes/Valid") {
     let donor = "abcdef"
     let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
     expectEqual("\u{fffd}", acceptor[donor.startIndex])
-    expectEqual("\u{fffd}", acceptor[donor.location(after: donor.startIndex)])
+    expectEqual("\u{fffd}", acceptor[donor.index(after: donor.startIndex)])
     expectEqualUnicodeScalars([ 0xfffd, 0x1f602, 0xfffd ],
       acceptor[donor.index(_nth: 1)..<donor.index(_nth: 5)])
     expectEqualUnicodeScalars([ 0x1f602, 0xfffd ],
@@ -277,7 +277,7 @@ StringTests.test("ForeignIndexes/removeSubrange/OutOfBoundsTrap/1") {
     var acceptor = "uvw"
 
     acceptor.removeSubrange(
-      donor.startIndex..<donor.location(after: donor.startIndex))
+      donor.startIndex..<donor.index(after: donor.startIndex))
     expectEqual("vw", acceptor)
   }
 
@@ -1084,7 +1084,7 @@ StringTests.test("unicodeViews") {
       winter.utf8[
         winter.utf8.startIndex
         ..<
-        winter.utf8.location(after: winter.utf8.location(after: winter.utf8.startIndex))
+        winter.utf8.index(after: winter.utf8.index(after: winter.utf8.startIndex))
       ]))
   
   expectEqual(

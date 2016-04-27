@@ -155,9 +155,9 @@ public protocol MutableIndexable : Indexable {
   ///
   /// - Precondition: `i` has a well-defined successor.
   @warn_unused_result
-  func location(after i: Index) -> Index
+  func index(after i: Index) -> Index
 
-  func formLocation(after i: inout Index)
+  func formIndex(after i: inout Index)
 }
 
 // TODO: swift-3-indexing-model - review the following

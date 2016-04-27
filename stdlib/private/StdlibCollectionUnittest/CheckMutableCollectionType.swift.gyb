@@ -150,7 +150,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.endIndex
     expectCrashLater()
-    index = c.location(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
+    index = c.index(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
     c[index] = wrapValue(OpaqueValue(9999))
   }
 
@@ -158,7 +158,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     var c = makeWrappedCollection([])
     var index = c.endIndex
     expectCrashLater()
-    index = c.location(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
+    index = c.index(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
     c[index] = wrapValue(OpaqueValue(9999))
   }
 
@@ -175,8 +175,8 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     print("\(elements)/sliceFromLeft=\(sliceFromLeft)/sliceFromRight=\(sliceFromRight)")
     let base = makeWrappedCollection(elements)
     let sliceStartIndex =
-      base.location(base.startIndex, offsetBy: numericCast(sliceFromLeft))
-    let sliceEndIndex = base.location(
+      base.index(base.startIndex, offsetBy: numericCast(sliceFromLeft))
+    let sliceEndIndex = base.index(
       base.startIndex,
       offsetBy: numericCast(elements.count - sliceFromRight))
     var slice = base[sliceStartIndex..<sliceEndIndex]
@@ -205,12 +205,12 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
       return
     case .outOfRangeToTheLeft:
       if sliceFromLeft == 0 { return }
-      index = base.location(
+      index = base.index(
         base.startIndex,
         offsetBy: numericCast(sliceFromLeft - 1))
     case .outOfRangeToTheRight:
       if sliceFromRight == 0 { return }
-      index = base.location(
+      index = base.index(
         base.startIndex,
         offsetBy: numericCast(elements.count - sliceFromRight))
     case .baseEndIndex:
@@ -328,8 +328,8 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
     print("\(elements)/sliceFromLeft=\(sliceFromLeft)/sliceFromRight=\(sliceFromRight)")
     let base = makeWrappedCollection(elements)
     let sliceStartIndex =
-      base.location(base.startIndex, offsetBy: numericCast(sliceFromLeft))
-    let sliceEndIndex = base.location(
+      base.index(base.startIndex, offsetBy: numericCast(sliceFromLeft))
+    let sliceEndIndex = base.index(
       base.startIndex,
       offsetBy: numericCast(elements.count - sliceFromRight))
     var slice = base[sliceStartIndex..<sliceEndIndex]
@@ -371,28 +371,28 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
       return
     case .outOfRangeToTheLeftEmpty:
       if sliceFromLeft == 0 { return }
-      let index = base.location(
+      let index = base.index(
         base.startIndex,
         offsetBy: numericCast(sliceFromLeft - 1))
       bounds = index..<index
       break
     case .outOfRangeToTheLeftNonEmpty:
       if sliceFromLeft == 0 { return }
-      let index = base.location(
+      let index = base.index(
         base.startIndex,
         offsetBy: numericCast(sliceFromLeft - 1))
       bounds = index..<sliceStartIndex
       break
     case .outOfRangeToTheRightEmpty:
       if sliceFromRight == 0 { return }
-      let index = base.location(
+      let index = base.index(
         base.startIndex,
         offsetBy: numericCast(elements.count - sliceFromRight + 1))
       bounds = index..<index
       break
     case .outOfRangeToTheRightNonEmpty:
       if sliceFromRight == 0 { return }
-      let index = base.location(
+      let index = base.index(
         base.startIndex,
         offsetBy: numericCast(elements.count - sliceFromRight + 1))
       bounds = sliceEndIndex..<index
@@ -401,11 +401,11 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
       if sliceFromLeft == 0 { return }
       if sliceFromRight == 0 { return }
       bounds =
-        base.location(
+        base.index(
           base.startIndex,
           offsetBy: numericCast(sliceFromLeft - 1))
         ..<
-        base.location(
+        base.index(
           base.startIndex,
           offsetBy: numericCast(elements.count - sliceFromRight + 1))
       break
@@ -537,9 +537,9 @@ func checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
   // Check that the elements are sorted.
   if verifyOrder {
     for i in extractedResult.indices {
-      if i != extractedResult.location(before: extractedResult.endIndex) {
+      if i != extractedResult.index(before: extractedResult.endIndex) {
         let first = extractedResult[i].value
-        let second = extractedResult[extractedResult.location(after: i)].value
+        let second = extractedResult[extractedResult.index(after: i)].value
         expectFalse(lessImpl(second, first))
       }
     }
@@ -672,7 +672,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.startIndex
     expectCrashLater()
-    index = c.location(index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
+    index = c.index(index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
     c[index] = wrapValue(OpaqueValue(9999))
   }
 
@@ -680,7 +680,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     var c = makeWrappedCollection([])
     var index = c.startIndex
     expectCrashLater()
-    index = c.location(index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
+    index = c.index(index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
     c[index] = wrapValue(OpaqueValue(9999))
   }
 }
@@ -828,9 +828,9 @@ func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'
   // Check that the elements are sorted.
   if verifyOrder {
     for i in extractedResult.indices {
-      if i != extractedResult.location(before: extractedResult.endIndex) {
+      if i != extractedResult.index(before: extractedResult.endIndex) {
         let first = extractedResult[i].value
-        let second = extractedResult[extractedResult.location(after: i)].value
+        let second = extractedResult[extractedResult.index(after: i)].value
         expectFalse(lessImpl(second, first))
       }
     }

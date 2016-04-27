@@ -1511,7 +1511,7 @@ internal struct _InitializeMemoryFromCollection<
     var q = newValues.startIndex
     for _ in 0..<count {
       p.initialize(with: newValues[q])
-      newValues.formLocation(after: &q)
+      newValues.formIndex(after: &q)
       p += 1
     }
     _expectEnd(q, newValues)

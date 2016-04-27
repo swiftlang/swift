@@ -468,7 +468,7 @@ extension _ArrayBuffer {
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `location(after:)`.
+  /// `index(after:)`.
   public var endIndex: Int {
     return count
   }

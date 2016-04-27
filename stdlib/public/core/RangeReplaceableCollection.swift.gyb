@@ -588,17 +588,17 @@ extension RangeReplaceableCollection {
   /// Calling this method may invalidate any existing indices for use with this
   /// collection.
   ///
-  /// - Parameter index: The position of the element to remove. `index` must be
+  /// - Parameter position: The position of the element to remove. `position` must be
   ///   a valid index of the collection that is not equal to the collection's
   ///   end index.
   /// - Returns: The removed element.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @discardableResult
-  public mutating func remove(at index: Index) -> Iterator.Element {
+  public mutating func remove(at position: Index) -> Iterator.Element {
     _precondition(!isEmpty, "can't remove from an empty collection")
-    let result: Iterator.Element = self[index]
-    replaceSubrange(index..<location(after: index), with: EmptyCollection())
+    let result: Iterator.Element = self[position]
+    replaceSubrange(position..<index(after: position), with: EmptyCollection())
     return result
   }
 
@@ -645,7 +645,7 @@ extension RangeReplaceableCollection {
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it has")
-    let end = location(startIndex, offsetBy: numericCast(n))
+    let end = index(startIndex, offsetBy: numericCast(n))
     removeSubrange(startIndex..<end)
   }
 
@@ -723,7 +723,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
   public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
-    self = self[location(after: startIndex)..<endIndex]
+    self = self[index(after: startIndex)..<endIndex]
     return element
   }
 
@@ -747,7 +747,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it contains")
-    self = self[location(startIndex, offsetBy: numericCast(n))..<endIndex]
+    self = self[index(startIndex, offsetBy: numericCast(n))..<endIndex]
   }
 }
 
@@ -765,7 +765,7 @@ extension RangeReplaceableCollection
 %   if 'Closed' in Range:
     return Range(uncheckedBounds: (
       lower: r.lowerBound,
-      upper: location(after: r.upperBound)))
+      upper: index(after: r.upperBound)))
 %   else:
     return Range(r)
 %   end
@@ -861,13 +861,13 @@ extension RangeReplaceableCollection
   @warn_unused_result
   public mutating func _customRemoveLast() -> Iterator.Element? {
     let element = last!
-    self = self[startIndex..<location(before: endIndex)]
+    self = self[startIndex..<index(before: endIndex)]
     return element
   }
 
   @warn_unused_result
   public mutating func _customRemoveLast(_ n: Int) -> Bool {
-    self = self[startIndex..<location(endIndex, offsetBy: numericCast(-n))]
+    self = self[startIndex..<index(endIndex, offsetBy: numericCast(-n))]
     return true
   }
 }
@@ -889,7 +889,7 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
     if let result = _customRemoveLast() {
       return result
     }
-    return remove(at: location(before: endIndex))
+    return remove(at: index(before: endIndex))
   }
 
   /// Removes the specified number of elements from the end of the
@@ -916,7 +916,7 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
       return
     }
     let end = endIndex
-    removeSubrange(location(end, offsetBy: numericCast(-n))..<end)
+    removeSubrange(index(end, offsetBy: numericCast(-n))..<end)
   }
 }
 
@@ -944,7 +944,7 @@ extension RangeReplaceableCollection
     if let result = _customRemoveLast() {
       return result
     }
-    return remove(at: location(before: endIndex))
+    return remove(at: index(before: endIndex))
   }
 
   /// Removes the specified number of elements from the end of the
@@ -971,7 +971,7 @@ extension RangeReplaceableCollection
       return
     }
     let end = endIndex
-    removeSubrange(location(end, offsetBy: numericCast(-n))..<end)
+    removeSubrange(index(end, offsetBy: numericCast(-n))..<end)
   }
 }
 

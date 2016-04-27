@@ -35,7 +35,7 @@ internal struct _CollectionOf<
     return AnyIterator {
       () -> Element? in
       if _fastPath(index != self.endIndex) {
-        self.formLocation(after: &index)
+        self.formIndex(after: &index)
         return self._subscriptImpl(index)
       }
       return nil
@@ -46,7 +46,7 @@ internal struct _CollectionOf<
   internal let endIndex: IndexType
 
   @warn_unused_result
-  internal func location(after i: IndexType) -> IndexType {
+  internal func index(after i: IndexType) -> IndexType {
     return i.advanced(by: 1)
   }
 

@@ -25,33 +25,33 @@ extension String {
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `location(after:)`.
+  /// `index(after:)`.
   public var endIndex: Index { return characters.endIndex }
 
     // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func location(after i: Index) -> Index {
-    return characters.location(after: i)
+  public func index(after i: Index) -> Index {
+    return characters.index(after: i)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func location(before i: Index) -> Index {
-    return characters.location(before: i)
+  public func index(before i: Index) -> Index {
+    return characters.index(before: i)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    return characters.location(i, offsetBy: n)
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    return characters.index(i, offsetBy: n)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @warn_unused_result
-  public func location(
+  public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
-    return characters.location(i, offsetBy: n, limitedBy: limit)
+    return characters.index(i, offsetBy: n, limitedBy: limit)
   }
 
   // TODO: swift-3-indexing-model - add docs

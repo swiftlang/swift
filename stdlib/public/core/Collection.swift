@@ -142,10 +142,10 @@ public protocol IndexableBase {
   ///
   /// - Precondition: `(startIndex..<endIndex).contains(i)`
   @warn_unused_result
-  func location(after i: Index) -> Index
+  func index(after i: Index) -> Index
 
   /// Replaces `i` with its successor.
-  func formLocation(after i: inout Index)
+  func formIndex(after i: inout Index)
 }
 
 public protocol Indexable : IndexableBase {
@@ -153,7 +153,7 @@ public protocol Indexable : IndexableBase {
   /// `Index` values where one value is reachable from the other.
   ///
   /// Reachability is defined by the ability to produce one value from
-  /// the other via zero or more applications of `location(after: i)`.
+  /// the other via zero or more applications of `index(after: i)`.
   associatedtype IndexDistance : SignedInteger = Int
 
   /// Returns the result of advancing `i` by `n` positions.
@@ -173,7 +173,7 @@ public protocol Indexable : IndexableBase {
   ///   - O(1) if `Self` conforms to `RandomAccessCollection`.
   ///   - O(`abs(n)`) otherwise.
   @warn_unused_result
-  func location(_ i: Index, offsetBy n: IndexDistance) -> Index
+  func index(_ i: Index, offsetBy n: IndexDistance) -> Index
 
   /// Returns the result of advancing `i` by `n` positions, or `nil` if it
   /// reaches the `limit`.
@@ -192,7 +192,7 @@ public protocol Indexable : IndexableBase {
   ///   - O(1) if `Self` conforms to `RandomAccessCollection`.
   ///   - O(`abs(n)`) otherwise.
   @warn_unused_result
-  func location(
+  func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index?
 
@@ -207,7 +207,7 @@ public protocol Indexable : IndexableBase {
   /// - Complexity:
   ///   - O(1) if `Self` conforms to `RandomAccessCollection`.
   ///   - O(`abs(n)`) otherwise.
-  func formLocation(_ i: inout Index, offsetBy n: IndexDistance)
+  func formIndex(_ i: inout Index, offsetBy n: IndexDistance)
 
   /// Advances `i` by `n` positions, or until it equals `limit`.
   ///
@@ -220,7 +220,7 @@ public protocol Indexable : IndexableBase {
   /// - Complexity:
   ///   - O(1) if `Self` conforms to `RandomAccessCollection`.
   ///   - O(`abs(n)`) otherwise.
-  func formLocation(
+  func formIndex(
     _ i: inout Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Bool
 
@@ -327,7 +327,7 @@ public struct IndexingIterator<
   public mutating func next() -> Elements._Element? {
     if _position == _elements.endIndex { return nil }
     let element = _elements[_position]
-    _elements.formLocation(after: &_position)
+    _elements.formIndex(after: &_position)
     return element
   }
 
@@ -466,7 +466,7 @@ public protocol Collection : Indexable, Sequence {
   /// `Index` values where one value is reachable from the other.
   ///
   /// Reachability is defined by the ability to produce one value from
-  /// the other via zero or more applications of `location(after:)`.
+  /// the other via zero or more applications of `index(after:)`.
   associatedtype IndexDistance : SignedInteger = Int
 
   /// A type that provides the sequence's iteration interface and
@@ -563,7 +563,7 @@ public protocol Collection : Indexable, Sequence {
   /// - Note: `indices` can hold a strong reference to the collection itself,
   ///   causing the collection to be non-uniquely referenced.  If you need to
   ///   mutate the collection while iterating over its indices, use the
-  ///   `location(after:)` method starting with `startIndex` to produce indices
+  ///   `index(after:)` method starting with `startIndex` to produce indices
   ///   instead.
   ///   
   ///   ```
@@ -571,7 +571,7 @@ public protocol Collection : Indexable, Sequence {
   ///   var i = c.startIndex
   ///   while i != c.endIndex {
   ///       c[i] /= 5
-  ///       i = c.location(after: i)
+  ///       i = c.index(after: i)
   ///   }
   ///   // c == [2, 4, 6, 8, 10]
   ///   ```
@@ -715,7 +715,7 @@ public protocol Collection : Indexable, Sequence {
   ///   - O(1) if `Self` conforms to `RandomAccessCollection`.
   ///   - O(`abs(n)`) otherwise.
   @warn_unused_result
-  func location(_ i: Index, offsetBy n: IndexDistance) -> Index
+  func index(_ i: Index, offsetBy n: IndexDistance) -> Index
 
   // FIXME: swift-3-indexing-model: Should this mention preconditions on `n`?
   /// Returns the result of advancing `i` by `n` positions, or `nil` if it
@@ -735,7 +735,7 @@ public protocol Collection : Indexable, Sequence {
   ///   - O(1) if `Self` conforms to `RandomAccessCollection`.
   ///   - O(`abs(n)`) otherwise.
   @warn_unused_result
-  func location(
+  func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index?
 
@@ -753,9 +753,9 @@ public protocol Collection : Indexable, Sequence {
 /// Default implementation for forward collections.
 extension Indexable {
   @inline(__always)
-  public func formLocation(after i: inout Index) {
+  public func formIndex(after i: inout Index) {
     // FIXME: swift-3-indexing-model: tests.
-    i = location(after: i)
+    i = index(after: i)
   }
 
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
@@ -785,27 +785,27 @@ extension Indexable {
   }
 
   @warn_unused_result
-  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // FIXME: swift-3-indexing-model: tests.
     return self._advanceForward(i, by: n)
   }
 
   @warn_unused_result
-  public func location(
+  public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: tests.
     return self._advanceForward(i, by: n, limitedBy: limit)
   }
 
-  public func formLocation(_ i: inout Index, offsetBy n: IndexDistance) {
-    i = location(i, offsetBy: n)
+  public func formIndex(_ i: inout Index, offsetBy n: IndexDistance) {
+    i = index(i, offsetBy: n)
   }
 
-  public func formLocation(
+  public func formIndex(
     _ i: inout Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Bool {
-    if let advancedIndex = location(i, offsetBy: n, limitedBy: limit) {
+    if let advancedIndex = index(i, offsetBy: n, limitedBy: limit) {
       i = advancedIndex
       return true
     }
@@ -823,7 +823,7 @@ extension Indexable {
     var count: IndexDistance = 0
     while start != end {
       count = count + 1
-      formLocation(after: &start)
+      formIndex(after: &start)
     }
     return count
   }
@@ -837,7 +837,7 @@ extension Indexable {
 
     var i = i
     for _ in stride(from: 0, to: n, by: 1) {
-      formLocation(after: &i)
+      formIndex(after: &i)
     }
     return i
   }
@@ -857,7 +857,7 @@ extension Indexable {
       if i == limit {
         return nil
       }
-      formLocation(after: &i)
+      formIndex(after: &i)
     }
     return i
   }
@@ -872,7 +872,7 @@ extension Indexable
   Index.Stride : SignedInteger {
 
   @warn_unused_result
-  public func location(after i: Index) -> Index {
+  public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests.
     _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
 
@@ -880,7 +880,7 @@ extension Indexable
   }
 
   @warn_unused_result
-  public func location(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // FIXME: swift-3-indexing-model: range check i
@@ -888,7 +888,7 @@ extension Indexable
   }
 
   @warn_unused_result
-  public func location(
+  public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     _precondition(n >= 0,
@@ -962,7 +962,7 @@ extension Collection where SubSequence == Self {
   public mutating func popFirst() -> Iterator.Element? {
     guard !isEmpty else { return nil }
     let element = first!
-    self = self[location(after: startIndex)..<endIndex]
+    self = self[index(after: startIndex)..<endIndex]
     return element
   }
 }
@@ -1091,7 +1091,7 @@ extension Collection {
 
     for _ in 0..<count {
       result.append(try transform(self[i]))
-      formLocation(after: &i)
+      formIndex(after: &i)
     }
 
     _expectEnd(i, self)
@@ -1120,7 +1120,7 @@ extension Collection {
   @warn_unused_result
   public func dropFirst(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
-    let start = location(startIndex,
+    let start = index(startIndex,
       offsetBy: numericCast(n), limitedBy: endIndex) ?? endIndex
     return self[start..<endIndex]
   }
@@ -1147,7 +1147,7 @@ extension Collection {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = Swift.max(0, numericCast(count) - n)
-    let end = location(startIndex,
+    let end = index(startIndex,
       offsetBy: numericCast(amount), limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
@@ -1173,7 +1173,7 @@ extension Collection {
     _precondition(
       maxLength >= 0,
       "Can't take a prefix of negative length from a collection")
-    let end = location(startIndex,
+    let end = index(startIndex,
       offsetBy: numericCast(maxLength), limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
@@ -1203,7 +1203,7 @@ extension Collection {
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
     let amount = Swift.max(0, numericCast(count) - maxLength)
-    let start = location(startIndex,
+    let start = index(startIndex,
       offsetBy: numericCast(amount), limitedBy: endIndex) ?? endIndex
     return self[start..<endIndex]
   }
@@ -1287,7 +1287,7 @@ extension Collection {
   /// - SeeAlso: `prefix(upTo:)`
   @warn_unused_result
   public func prefix(through position: Index) -> SubSequence {
-    return prefix(upTo: location(after: position))
+    return prefix(upTo: index(after: position))
   }
 
   // TODO: swift-3-indexing-model - review the following
@@ -1363,14 +1363,14 @@ extension Collection {
     while subSequenceEnd != cachedEndIndex {
       if try isSeparator(self[subSequenceEnd]) {
         let didAppend = appendSubsequence(end: subSequenceEnd)
-        formLocation(after: &subSequenceEnd)
+        formIndex(after: &subSequenceEnd)
         subSequenceStart = subSequenceEnd
         if didAppend && result.count == maxSplits {
           break
         }
         continue
       }
-      formLocation(after: &subSequenceEnd)
+      formIndex(after: &subSequenceEnd)
     }
 
     if subSequenceStart != cachedEndIndex || !omittingEmptySubsequences {
@@ -1453,7 +1453,7 @@ extension Collection where SubSequence == Self {
   public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
-    self = self[location(after: startIndex)..<endIndex]
+    self = self[index(after: startIndex)..<endIndex]
     return element
   }
 
@@ -1471,7 +1471,7 @@ extension Collection where SubSequence == Self {
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it contains")
-    self = self[location(startIndex, offsetBy: numericCast(n))..<endIndex]
+    self = self[index(startIndex, offsetBy: numericCast(n))..<endIndex]
   }
 }
 

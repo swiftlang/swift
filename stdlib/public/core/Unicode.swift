@@ -619,13 +619,13 @@ internal func _transcodeSomeUTF16AsUTF8<
           // Replace it with U+FFFD.
           r = 0xbdbfef
           scalarUtf8Length = 3
-        } else if _slowPath(input.location(nextIndex, offsetBy: 1) == endIndex) {
+        } else if _slowPath(input.index(nextIndex, offsetBy: 1) == endIndex) {
           // We have seen a high-surrogate and EOF, so we have an ill-formed
           // sequence.  Replace it with U+FFFD.
           r = 0xbdbfef
           scalarUtf8Length = 3
         } else {
-          let unit1 = UInt(input[input.location(nextIndex, offsetBy: 1)])
+          let unit1 = UInt(input[input.index(nextIndex, offsetBy: 1)])
           if _fastPath((unit1 >> 10) == 0b1101_11) {
             // `unit1` is a low-surrogate.  We have a well-formed surrogate
             // pair.
@@ -653,7 +653,7 @@ internal func _transcodeSomeUTF16AsUTF8<
       result |= numericCast(r) << shift
       utf8Count += scalarUtf8Length
     }
-    nextIndex = input.location(nextIndex, offsetBy: utf16Length)
+    nextIndex = input.index(nextIndex, offsetBy: utf16Length)
   }
   // FIXME: Annoying check, courtesy of <rdar://problem/16740169>
   if utf8Count < sizeofValue(result) {

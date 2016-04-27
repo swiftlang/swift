@@ -147,7 +147,7 @@ public struct CountableClosedRange<
   /// The range's upper bound.
   ///
   /// `upperBound` is always reachable from `lowerBound` by zero or
-  /// more applications of `location(after:)`.
+  /// more applications of `index(after:)`.
   public let upperBound: Bound
 
   public typealias Element = Bound
@@ -175,19 +175,19 @@ public struct CountableClosedRange<
 
   /// Returns the position immediately after `i`.
   @warn_unused_result
-  public func location(after i: Index) -> Index {
+  public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range checks and tests.
     return i._successor(upperBound: upperBound)
   }
 
   /// Returns the position immediately preceding `i`.
   @warn_unused_result
-  public func location(before i: Index) -> Index {
+  public func index(before i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range checks and tests.
     return i._predecessor(upperBound: upperBound)
   }
 
-  // FIXME: swift-3-indexing-model: implement O(1) `location(_:offsetBy:)`
+  // FIXME: swift-3-indexing-model: implement O(1) `index(_:offsetBy:)`
   // and `distance(from:to:)`, and write tests for them.
 
   /// Access the element at `position`.

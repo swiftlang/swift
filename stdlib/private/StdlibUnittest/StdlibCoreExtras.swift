@@ -57,8 +57,8 @@ func findSubstring(_ string: String, _ substring: String) -> String.Index? {
       }
       if needle[needleIndex] == haystack[matchIndex] {
         // keep advancing through both the string and search string on match
-        matchIndex = haystack.location(after: matchIndex)
-        needleIndex = haystack.location(after: needleIndex)
+        matchIndex = haystack.index(after: matchIndex)
+        needleIndex = haystack.index(after: needleIndex)
       } else {
         // no match, go back to finding a starting match in the string.
         break

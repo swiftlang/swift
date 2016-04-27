@@ -23,8 +23,8 @@ public struct SubscriptRangeTest {
 
   public func bounds<C : Collection>(in c: C) -> Range<C.Index> {
     let i = c.startIndex
-    return c.location(i, offsetBy: numericCast(bounds.lowerBound)) ..<
-           c.location(i, offsetBy: numericCast(bounds.upperBound))
+    return c.index(i, offsetBy: numericCast(bounds.lowerBound)) ..<
+           c.index(i, offsetBy: numericCast(bounds.upperBound))
   }
 
   public init(
@@ -305,7 +305,7 @@ let removeFirstTests: [RemoveFirstNTest] = [
 
 extension Collection {
   public func nthIndex(_ offset: Int) -> Index {
-    return self.location(self.startIndex, offsetBy: numericCast(offset))
+    return self.index(self.startIndex, offsetBy: numericCast(offset))
   }
 }
 
@@ -342,7 +342,7 @@ public struct IndexStepsFromTest {
     self.distance = distance
     self.expectedOffset = expectedOffset
     self.limit = limit
-    self.loc = SourceLoc(file, line, comment: "location(_:offsetBy:) test data")
+    self.loc = SourceLoc(file, line, comment: "index(_:offsetBy:) test data")
   }
 }
 
@@ -387,7 +387,7 @@ internal func _allIndices<C : Collection>(
   var i = bounds.lowerBound
   while i != bounds.upperBound {
     result.append(i)
-    i = c.location(after: i)
+    i = c.index(after: i)
   }
   return result
 }
@@ -546,14 +546,14 @@ extension TestSuite {
         let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
         let index = c.endIndex
         expectCrashLater()
-        _blackHole(c.location(index, offsetBy: numericCast(outOfBoundsIndexOffset)))
+        _blackHole(c.index(index, offsetBy: numericCast(outOfBoundsIndexOffset)))
       }
 
       self.test("\(testNamePrefix).Index/OutOfBounds/Right/Empty") {
         let c = makeWrappedCollection([])
         let index = c.endIndex
         expectCrashLater()
-        _blackHole(c.location(index, offsetBy: numericCast(outOfBoundsIndexOffset)))
+        _blackHole(c.index(index, offsetBy: numericCast(outOfBoundsIndexOffset)))
       }
     }
 
@@ -566,7 +566,7 @@ extension TestSuite {
         let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
         var index = c.endIndex
         expectCrashLater()
-        index = c.location(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
+        index = c.index(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
         _blackHole(c[index])
       }
 
@@ -574,7 +574,7 @@ extension TestSuite {
         let c = makeWrappedCollection([])
         var index = c.endIndex
         expectCrashLater()
-        index = c.location(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
+        index = c.index(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
         _blackHole(c[index])
       }
 
@@ -591,8 +591,8 @@ extension TestSuite {
         print("\(elements)/sliceFromLeft=\(sliceFromLeft)/sliceFromRight=\(sliceFromRight)")
         let base = makeWrappedCollection(elements)
         let sliceStartIndex =
-          base.location(base.startIndex, offsetBy: numericCast(sliceFromLeft))
-        let sliceEndIndex = base.location(
+          base.index(base.startIndex, offsetBy: numericCast(sliceFromLeft))
+        let sliceEndIndex = base.index(
           base.startIndex,
           offsetBy: numericCast(elements.count - sliceFromRight))
         var slice = base[sliceStartIndex..<sliceEndIndex]
@@ -616,12 +616,12 @@ extension TestSuite {
           return
         case .outOfRangeToTheLeft:
           if sliceFromLeft == 0 { return }
-          index = base.location(
+          index = base.index(
             base.startIndex,
             offsetBy: numericCast(sliceFromLeft - 1))
         case .outOfRangeToTheRight:
           if sliceFromRight == 0 { return }
-          index = base.location(
+          index = base.index(
             base.startIndex,
             offsetBy: numericCast(elements.count - sliceFromRight))
         case .baseEndIndex:
@@ -665,7 +665,7 @@ extension TestSuite {
         let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
         var index = c.endIndex
         expectCrashLater()
-        index = c.location(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
+        index = c.index(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
         _blackHole(c[index..<index])
       }
 
@@ -673,7 +673,7 @@ extension TestSuite {
         let c = makeWrappedCollection([])
         var index = c.endIndex
         expectCrashLater()
-        index = c.location(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
+        index = c.index(index, offsetBy: numericCast(outOfBoundsSubscriptOffset))
         _blackHole(c[index..<index])
       }
 
@@ -693,8 +693,8 @@ extension TestSuite {
           + "/sliceFromRight=\(sliceFromRight)")
         let base = makeWrappedCollection(elements)
         let sliceStartIndex =
-          base.location(base.startIndex, offsetBy: numericCast(sliceFromLeft))
-        let sliceEndIndex = base.location(
+          base.index(base.startIndex, offsetBy: numericCast(sliceFromLeft))
+        let sliceEndIndex = base.index(
           base.startIndex,
           offsetBy: numericCast(elements.count - sliceFromRight))
         var slice = base[sliceStartIndex..<sliceEndIndex]
@@ -728,28 +728,28 @@ extension TestSuite {
           return
         case .outOfRangeToTheLeftEmpty:
           if sliceFromLeft == 0 { return }
-          let index = base.location(
+          let index = base.index(
             base.startIndex,
             offsetBy: numericCast(sliceFromLeft - 1))
           bounds = index..<index
           break
         case .outOfRangeToTheLeftNonEmpty:
           if sliceFromLeft == 0 { return }
-          let index = base.location(
+          let index = base.index(
             base.startIndex,
             offsetBy: numericCast(sliceFromLeft - 1))
           bounds = index..<sliceStartIndex
           break
         case .outOfRangeToTheRightEmpty:
           if sliceFromRight == 0 { return }
-          let index = base.location(
+          let index = base.index(
             base.startIndex,
             offsetBy: numericCast(elements.count - sliceFromRight + 1))
           bounds = index..<index
           break
         case .outOfRangeToTheRightNonEmpty:
           if sliceFromRight == 0 { return }
-          let index = base.location(
+          let index = base.index(
             base.startIndex,
             offsetBy: numericCast(elements.count - sliceFromRight + 1))
           bounds = sliceEndIndex..<index
@@ -758,11 +758,11 @@ extension TestSuite {
           if sliceFromLeft == 0 { return }
           if sliceFromRight == 0 { return }
           bounds =
-            base.location(
+            base.index(
               base.startIndex,
               offsetBy: numericCast(sliceFromLeft - 1))
             ..<
-            base.location(
+            base.index(
               base.startIndex,
               offsetBy: numericCast(elements.count - sliceFromRight + 1))
           break
@@ -778,12 +778,12 @@ extension TestSuite {
     }
 
     // FIXME: swift-3-indexing-model - add tests for the following?
-    //          location(after: i: Index) -> Index
-    //          formLocation(after: i: inout Index)
-    //          location(i: Index, offsetBy n: IndexDistance) -> Index
-    //          location(i: Index, offsetBy n: IndexDistance, limitedBy: Index) -> Index
-    //          formLocation(i: inout Index, offsetBy n: IndexDistance) -> Index
-    //          formLocation(i: inout Index, offsetBy n: IndexDistance, limitedBy: Index) -> Index
+    //          index(after: i: Index) -> Index
+    //          formIndex(after: i: inout Index)
+    //          index(i: Index, offsetBy n: IndexDistance) -> Index
+    //          index(i: Index, offsetBy n: IndexDistance, limitedBy: Index) -> Index
+    //          formIndex(i: inout Index, offsetBy n: IndexDistance) -> Index
+    //          formIndex(i: inout Index, offsetBy n: IndexDistance, limitedBy: Index) -> Index
     //          distance(from start: Index, to end: Index) -> IndexDistance
     //          _failEarlyRangeCheck(index: Index, bounds: Range<Index>)
     //          _failEarlyRangeCheck(range: Range<Index>, bounds: Range<Index>)
@@ -971,7 +971,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).prefix(through:)/semantics") {
       for test in prefixThroughTests {
         let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-        let index = c.location(
+        let index = c.index(
           c.startIndex, offsetBy: numericCast(test.position))
         let result = c.prefix(through: index)
         expectEqualSequence(
@@ -987,7 +987,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).prefix(upTo:)/semantics") {
       for test in prefixUpToTests {
         let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-        let index = c.location(c.startIndex, offsetBy: numericCast(test.end))
+        let index = c.index(c.startIndex, offsetBy: numericCast(test.end))
         let result = c.prefix(upTo: index)
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
@@ -1002,7 +1002,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).suffix(from:)/semantics") {
       for test in suffixFromTests {
         let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-        let index = c.location(c.startIndex, offsetBy: numericCast(test.start))
+        let index = c.index(c.startIndex, offsetBy: numericCast(test.start))
         let result = c.suffix(from: index)
 
         expectEqualSequence(
@@ -1021,7 +1021,7 @@ extension TestSuite {
         var slice = c[c.startIndex..<c.endIndex]
         let survivingIndices = _allIndices(
           into: slice,
-          in: slice.location(after: slice.startIndex)..<slice.endIndex)
+          in: slice.index(after: slice.startIndex)..<slice.endIndex)
         let removedElement = slice.removeFirst()
         expectEqual(test.collection.first, extractValue(removedElement).value)
         expectEqualSequence(
@@ -1061,7 +1061,7 @@ extension TestSuite {
         var slice = c[c.startIndex..<c.endIndex]
         let survivingIndices = _allIndices(
           into: slice,
-          in: slice.location(
+          in: slice.index(
             slice.startIndex,
             offsetBy: numericCast(test.numberToRemove)) ..< slice.endIndex
         )
@@ -1120,7 +1120,7 @@ extension TestSuite {
         var slice = c[c.startIndex..<c.endIndex]
         let survivingIndices = _allIndices(
           into: slice,
-          in: slice.location(after: slice.startIndex)..<slice.endIndex)
+          in: slice.index(after: slice.startIndex)..<slice.endIndex)
         let removedElement = slice.popFirst()!
         expectEqual(test.collection.first, extractValue(removedElement).value)
         expectEqualSequence(
@@ -1182,8 +1182,8 @@ extension TestSuite {
     testNamePrefix += String(C.Type)
 
     // FIXME: swift-3-indexing-model - add tests for the follow?
-    //          location(before: of i: Index) -> Index
-    //          formLocation(before: i: inout Index)
+    //          index(before: of i: Index) -> Index
+    //          formIndex(before: i: inout Index)
 
     // FIXME: swift-3-indexing-model - 
     //   enhance the following for negative direction?
@@ -1222,7 +1222,7 @@ extension TestSuite {
         let survivingIndices = _allIndices(
             into: slice,
           in: slice.startIndex
-            ..< slice.location(
+            ..< slice.index(
               slice.endIndex, offsetBy: numericCast(-test.numberToRemove))
         )
         let removedElement = slice.removeLast()
@@ -1267,7 +1267,7 @@ extension TestSuite {
         let survivingIndices = _allIndices(
           into: slice,
           in: slice.startIndex
-            ..< slice.location(
+            ..< slice.index(
                   slice.endIndex, offsetBy: numericCast(-test.numberToRemove))
         )
         slice.removeLast(test.numberToRemove)
@@ -1328,7 +1328,7 @@ extension TestSuite {
         let survivingIndices = _allIndices(
           into: slice,
           in: slice.startIndex
-              ..< slice.location(
+              ..< slice.index(
                     slice.endIndex, offsetBy: numericCast(-test.numberToRemove))
         )
         let removedElement = slice.popLast()!
@@ -1373,7 +1373,7 @@ extension TestSuite {
         let index = c.startIndex
         expectCrashLater()
         _blackHole(
-          c.location(index, offsetBy: numericCast(-outOfBoundsIndexOffset)))
+          c.index(index, offsetBy: numericCast(-outOfBoundsIndexOffset)))
       }
 
       self.test("\(testNamePrefix).Index/OutOfBounds/Left/Empty") {
@@ -1381,7 +1381,7 @@ extension TestSuite {
         let index = c.startIndex
         expectCrashLater()
         _blackHole(
-          c.location(index, offsetBy: numericCast(-outOfBoundsIndexOffset)))
+          c.index(index, offsetBy: numericCast(-outOfBoundsIndexOffset)))
       }
     }
 
@@ -1397,7 +1397,7 @@ extension TestSuite {
           [ 1010, 2020, 3030 ].map(OpaqueValue.init))
         var index = c.startIndex
         expectCrashLater()
-        index = c.location(
+        index = c.index(
           index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
         _blackHole(c[index])
       }
@@ -1408,7 +1408,7 @@ extension TestSuite {
         let c = makeWrappedCollection([])
         var index = c.startIndex
         expectCrashLater()
-        index = c.location(
+        index = c.index(
           index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
         _blackHole(c[index])
       }
@@ -1426,7 +1426,7 @@ extension TestSuite {
           [ 1010, 2020, 3030 ].map(OpaqueValue.init))
         var index = c.startIndex
         expectCrashLater()
-        index = c.location(
+        index = c.index(
           index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
         _blackHole(c[index..<index])
       }
@@ -1437,7 +1437,7 @@ extension TestSuite {
         let c = makeWrappedCollection([])
         var index = c.startIndex
         expectCrashLater()
-        index = c.location(
+        index = c.index(
           index, offsetBy: numericCast(-outOfBoundsSubscriptOffset))
         _blackHole(c[index..<index])
       }

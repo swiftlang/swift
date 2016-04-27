@@ -120,11 +120,11 @@ public struct Mirror {
   /// might write:
   ///
   ///     if let b = AnyBidirectionalCollection(someMirror.children) {
-  ///       var i = xs.location(b.endIndex, offsetBy: -20,
+  ///       var i = xs.index(b.endIndex, offsetBy: -20,
   ///         limitedBy: b.startIndex) ?? b.startIndex
   ///       while i != xs.endIndex {
   ///          print(b[i])
-  ///          b.formLocation(after: &i)
+  ///          b.formIndex(after: &i)
   ///       }
   ///     }
   public typealias Children = AnyCollection<Child>
@@ -420,13 +420,13 @@ extension Mirror {
   ///
   ///     var d = nil
   ///     let children = Mirror(reflecting: x).children
-  ///     if let p0 = children.location(children.startIndex,
+  ///     if let p0 = children.index(children.startIndex,
   ///       offsetBy: 1, limitedBy: children.endIndex) {
   ///       let grandChildren = Mirror(reflecting: children[p0].value).children
   ///       SeekTwo: for g in grandChildren {
   ///         if g.label == "two" {
   ///           let greatGrandChildren = Mirror(reflecting: g.value).children
-  ///           if let p1 = greatGrandChildren.location(
+  ///           if let p1 = greatGrandChildren.index(
   ///             greatGrandChildren.startIndex,
   ///             offsetBy: 3, limitedBy: greatGrandChildren.endIndex) {
   ///             d = greatGrandChildren[p1].value
@@ -455,7 +455,7 @@ extension Mirror {
         position = children.index { $0.label == label } ?? children.endIndex
       }
       else if let offset = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
-        position = children.location(children.startIndex,
+        position = children.index(children.startIndex,
           offsetBy: offset,
           limitedBy: children.endIndex) ?? children.endIndex
       }
@@ -765,7 +765,7 @@ extension DictionaryLiteral : Collection {
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `location(after:)`.
+  /// `index(after:)`.
   ///
   /// - Complexity: O(1).
   public var endIndex: Int { return _elements.endIndex }

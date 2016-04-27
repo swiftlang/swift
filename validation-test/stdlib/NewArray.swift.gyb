@@ -100,7 +100,7 @@ func test<
   let bufferId2 = checkReallocation(x, bufferId1, true)
 
   let y = x
-  x[x.location(before: x.endIndex)] = LifetimeTracked(17)
+  x[x.index(before: x.endIndex)] = LifetimeTracked(17)
   let bufferId3 = checkReallocation(x, bufferId2, true)
   checkEqual(x, y, false)
 
