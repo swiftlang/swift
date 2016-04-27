@@ -217,9 +217,8 @@ extension Collection where SubSequence == Self {
   @warn_unused_result
   public mutating func popFirst() -> Iterator.Element? {
     guard !isEmpty else { return nil }
-    let element = first!
-    self = self[startIndex.successor()..<endIndex]
-    return element
+    defer { self = self[startIndex.successor()..<endIndex] }
+    return first!
   }
 }
 
@@ -232,9 +231,8 @@ extension Collection where
   @warn_unused_result
   public mutating func popLast() -> Iterator.Element? {
     guard !isEmpty else { return nil }
-    let element = last!
-    self = self[startIndex..<endIndex.predecessor()]
-    return element
+    defer { self = self[startIndex..<endIndex.predecessor()] }
+    return last!
   }
 }
 
@@ -539,9 +537,8 @@ extension Collection where SubSequence == Self {
   @discardableResult
   public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
-    let element = first!
-    self = self[startIndex.successor()..<endIndex]
-    return element
+    defer { self = self[startIndex.successor()..<endIndex] }
+    return first!
   }
 
   /// Remove the first `n` elements.
@@ -570,9 +567,8 @@ extension Collection
   /// - Precondition: `!self.isEmpty`
   @discardableResult
   public mutating func removeLast() -> Iterator.Element {
-    let element = last!
-    self = self[startIndex..<endIndex.predecessor()]
-    return element
+    defer { self = self[startIndex..<endIndex.predecessor()] }
+    return last!
   }
 
   /// Remove the last `n` elements.
