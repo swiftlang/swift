@@ -263,7 +263,7 @@ namespace {
       assert(!ElementsWithPayload.empty());
       
       return T.getEnumElementType(ElementsWithPayload[0].decl,
-                                  *IGM.SILMod);
+                                  IGM.getSILModule());
     }
 
   public:
@@ -517,7 +517,7 @@ namespace {
 
       // Get the value witness table for the element.
       SILType eltTy = T.getEnumElementType(ElementsWithPayload[0].decl,
-                                           *IGM.SILMod);
+                                           IGM.getSILModule());
       llvm::Value *eltLayout = IGF.emitTypeLayoutRef(eltTy);
 
       Address vwtAddr(vwtable, IGF.IGM.getPointerAlignment());
@@ -1326,7 +1326,7 @@ namespace {
 
     SILType getPayloadType(IRGenModule &IGM, SILType T) const {
       return T.getEnumElementType(ElementsWithPayload[0].decl,
-                                  *IGM.SILMod);
+                                  IGM.getSILModule());
     }
 
     const TypeInfo &getPayloadTypeInfo() const {
@@ -2535,7 +2535,7 @@ namespace {
       // Ask the runtime to do our layout using the payload metadata and number
       // of empty cases.
       auto payloadTy = T.getEnumElementType(ElementsWithPayload[0].decl,
-                                            *IGM.SILMod);
+                                            IGM.getSILModule());
       auto payloadLayout = IGF.emitTypeLayoutRef(payloadTy);
       auto emptyCasesVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                                   ElementsWithNoPayload.size());
@@ -3852,7 +3852,7 @@ namespace {
         unsigned tagIndex = 0;
         for (auto &payloadCasePair : ElementsWithPayload) {
           SILType PayloadT = T.getEnumElementType(payloadCasePair.decl,
-                                                  *IGF.IGM.SILMod);
+                                                  IGF.getSILModule());
           auto &payloadTI = *payloadCasePair.ti;
           // Trivial and, in the case of a take, bitwise-takable payloads,
           // can all share the default path.
@@ -3956,7 +3956,8 @@ namespace {
             // Destroy the data.
             Address dataAddr = IGF.Builder.CreateBitCast(addr,
                                       elt.ti->getStorageType()->getPointerTo());
-            SILType payloadT = T.getEnumElementType(elt.decl, *IGF.IGM.SILMod);
+            SILType payloadT =
+              T.getEnumElementType(elt.decl, IGF.getSILModule());
             elt.ti->destroy(IGF, dataAddr, payloadT);
           });
         return;
@@ -4198,7 +4199,7 @@ namespace {
                                                   IGF.IGM.getPointerSize() * i);
         if (i == 0) firstAddr = eltAddr.getAddress();
         
-        auto payloadTy = T.getEnumElementType(elt.decl, *IGF.IGM.SILMod);
+        auto payloadTy = T.getEnumElementType(elt.decl, IGF.getSILModule());
         
         auto metadata = IGF.emitTypeLayoutRef(payloadTy);
         
@@ -4679,7 +4680,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       continue;
     }
 
-    auto origArgLoweredTy = TC.IGM.SILMod->Types.getLoweredType(origArgType);
+    auto origArgLoweredTy = TC.IGM.getLoweredType(origArgType);
     const TypeInfo *origArgTI
       = TC.tryGetCompleteTypeInfo(origArgLoweredTy.getSwiftRValueType());
     assert(origArgTI && "didn't complete type info?!");
@@ -4701,7 +4702,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       // *Now* apply the substitutions and get the type info for the instance's
       // payload type, since we know this case carries an apparent payload in
       // the generic case.
-      SILType fieldTy = type.getEnumElementType(elt, *TC.IGM.SILMod);
+      SILType fieldTy = type.getEnumElementType(elt, TC.IGM.getSILModule());
       auto *substArgTI = &TC.IGM.getTypeInfo(fieldTy);
 
       elementsWithPayload.push_back({elt, substArgTI, origArgTI});

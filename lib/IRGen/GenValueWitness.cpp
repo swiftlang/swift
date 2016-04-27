@@ -1346,7 +1346,7 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
                                  bool &canBeConstant) {
   CanType concreteFormalType = getFormalTypeInContext(abstractType);
 
-  auto concreteLoweredType = IGM.SILMod->Types.getLoweredType(concreteFormalType);
+  auto concreteLoweredType = IGM.getLoweredType(concreteFormalType);
   auto &concreteTI = IGM.getTypeInfo(concreteLoweredType);
   FixedPacking packing = concreteTI.getFixedPacking(IGM);
 

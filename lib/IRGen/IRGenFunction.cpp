@@ -51,9 +51,9 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM,
   // Apply sanitizer attributes to the function.
   // TODO: Check if the function is ASan black listed either in the external
   // file or via annotations.
-  if (IGM.Opts.Sanitize == SanitizerKind::Address)
+  if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Address)
     Fn->addFnAttr(llvm::Attribute::SanitizeAddress);
-  if (IGM.Opts.Sanitize == SanitizerKind::Thread)
+  if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
     Fn->addFnAttr(llvm::Attribute::SanitizeThread);
 
   emitPrologue();
@@ -67,6 +67,18 @@ IRGenFunction::~IRGenFunction() {
 
   // Tear down any side-table data structures.
   if (LocalTypeData) destroyLocalTypeData();
+}
+
+ModuleDecl *IRGenFunction::getSwiftModule() const {
+  return IGM.getSwiftModule();
+}
+
+SILModule &IRGenFunction::getSILModule() const {
+  return IGM.getSILModule();
+}
+
+Lowering::TypeConverter &IRGenFunction::getSILTypes() const {
+  return IGM.getSILTypes();
 }
 
 /// Call the llvm.memcpy intrinsic.  The arguments need not already

@@ -293,7 +293,7 @@ namespace {
     void addDirectFieldsFromClass(ClassDecl *theClass,
                                   SILType classType) {
       for (VarDecl *var : theClass->getStoredProperties()) {
-        SILType type = classType.getFieldType(var, *IGM.SILMod);
+        SILType type = classType.getFieldType(var, IGM.getSILModule());
         auto &eltType = IGM.getTypeInfo(type);
 
         if (!eltType.isFixedSize()) {
@@ -406,7 +406,7 @@ static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
                                         llvm::Value *offset,
                                         VarDecl *field) {
   auto &fieldTI =
-    IGF.getTypeInfo(baseType.getFieldType(field, *IGF.IGM.SILMod));
+    IGF.getTypeInfo(baseType.getFieldType(field, IGF.getSILModule()));
   auto addr = IGF.emitByteOffsetGEP(base, offset, fieldTI,
                               base->getName() + "." + field->getName().str());
   return OwnedAddress(addr, base);
@@ -580,7 +580,7 @@ static bool getInstanceSizeByMethod(IRGenFunction &IGF,
                    ResilienceExpansion::Minimal,
                    /*uncurryLevel*/ 1,
                    /*foreign*/ false);
-  SILFunction *silFn = IGF.IGM.SILMod->lookUpFunction(fnRef);
+  SILFunction *silFn = IGF.getSILModule().lookUpFunction(fnRef);
   if (!silFn)
     return false;
 
@@ -1215,7 +1215,7 @@ namespace {
                          ResilienceExpansion::Minimal,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
                          /*isForeign=*/true);
-      if (auto silFn = IGM.SILMod->lookUpFunction(dtorRef))
+      if (auto silFn = IGM.getSILModule().lookUpFunction(dtorRef))
         return silFn->isDefinition();
 
       // The Objective-C thunk was never even declared, so it is not defined.
@@ -1367,7 +1367,7 @@ namespace {
       // metadata statically, so compute the field layout using the
       // originally-declared type.
       SILType fieldType =
-        IGM.getLoweredType(IGM.SILMod->Types.getAbstractionPattern(var),
+        IGM.getLoweredType(IGM.getSILTypes().getAbstractionPattern(var),
                            var->getType());
       Ivars.push_back(buildIvar(var, fieldType));
 

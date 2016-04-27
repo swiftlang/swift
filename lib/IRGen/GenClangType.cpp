@@ -381,7 +381,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   // The first two are structs; the last is an enum.
   OptionalTypeKind OTK;
   if (auto underlyingTy = SILType::getPrimitiveObjectType(type)
-        .getAnyOptionalObjectType(*IGM.SILMod, OTK)) {
+        .getAnyOptionalObjectType(IGM.getSILModule(), OTK)) {
     // The underlying type could be a bridged type, which makes any
     // sort of casual assertion here difficult.
     return Converter.convert(IGM, underlyingTy.getSwiftRValueType());

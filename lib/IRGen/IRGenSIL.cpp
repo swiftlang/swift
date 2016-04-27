@@ -586,7 +586,7 @@ public:
                               StringRef Name, unsigned ArgNo,
                               Alignment Align = Alignment(0)) {
     auto Ty = Storage->getType();
-    if (IGM.Opts.Optimize || (ArgNo == 0) ||
+    if (IGM.IRGen.Opts.Optimize || (ArgNo == 0) ||
         isa<llvm::AllocaInst>(Storage) ||
         isa<llvm::UndefValue>(Storage) ||
         Ty == IGM.RefCountedPtrTy) // No debug info is emitted for refcounts.
@@ -612,7 +612,7 @@ public:
                       StringRef Name, unsigned ArgNo,
                       llvm::SmallVectorImpl<llvm::Value *> &copy) {
     // Only do this at -O0.
-    if (IGM.Opts.Optimize) {
+    if (IGM.IRGen.Opts.Optimize) {
       copy.append(vals.begin(), vals.end());
       return;
     }
@@ -659,7 +659,7 @@ public:
     // Force all archetypes referenced by the type to be bound by this point.
     // TODO: just make sure that we have a path to them that the debug info
     //       can follow.
-    if (!IGM.Opts.Optimize && Ty.getType()->hasArchetype())
+    if (!IGM.IRGen.Opts.Optimize && Ty.getType()->hasArchetype())
       Ty.getType()->getCanonicalType().visit([&](Type t) {
         if (auto archetype = dyn_cast<ArchetypeType>(CanType(t)))
           emitTypeMetadataRef(archetype);
@@ -1666,7 +1666,7 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
   SILValue op = i->getOperand();
   SILType opType = op->getType();
 
-  switch (opType.getPreferredExistentialRepresentation(*IGM.SILMod)) {
+  switch (opType.getPreferredExistentialRepresentation(IGM.getSILModule())) {
   case ExistentialRepresentation::Metatype: {
     Explosion existential = getLoweredExplosion(op);
     emitMetatypeOfMetatype(*this, existential, opType, result);
@@ -1754,7 +1754,7 @@ static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
 static llvm::Value *emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
                                               CanSILFunctionType origCalleeType,
                                               ArrayRef<Substitution> subs) {
-  auto &M = *IGF.IGM.SILMod->getSwiftModule();
+  auto &M = *IGF.getSwiftModule();
   llvm::Value *wtable;
 
   if (auto *proto = origCalleeType->getDefaultWitnessMethodProtocol(M)) {
@@ -3476,7 +3476,7 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
   if (i->canAllocOnStack()) {
     estimateStackSize();
     // Is there enough space for stack allocation?
-    StackAllocSize = IGM.Opts.StackPromotionSizeLimit - EstimatedStackSize;
+    StackAllocSize = IGM.IRGen.Opts.StackPromotionSizeLimit - EstimatedStackSize;
   }
   llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC(),
                                              StackAllocSize);
@@ -3542,7 +3542,7 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
   // deallocated in the final release.
   assert(ARI->canAllocOnStack());
   if (StackAllocs.count(ARI)) {
-    if (IGM.Opts.EmitStackPromotionChecks) {
+    if (IGM.IRGen.Opts.EmitStackPromotionChecks) {
       selfValue = Builder.CreateBitCast(selfValue, IGM.RefCountedPtrTy);
       emitVerifyEndOfLifetimeCall(selfValue);
     } else {
@@ -4693,7 +4693,7 @@ static llvm::Constant *getConstantValue(IRGenModule &IGM, llvm::StructType *STy,
 
 void IRGenModule::emitSILStaticInitializers() {
   SmallVector<SILFunction *, 8> StaticInitializers;
-  for (SILGlobalVariable &Global : SILMod->getSILGlobals()) {
+  for (SILGlobalVariable &Global : getSILModule().getSILGlobals()) {
     if (!Global.getInitializer())
       continue;
 
@@ -4720,8 +4720,4 @@ void IRGenModule::emitSILStaticInitializers() {
     auto *TI = cast<TupleInst>(InitValue);
     IRGlobal->setInitializer(getConstantValue(*this, STy, TI));
   }
-}
-
-ModuleDecl *IRGenModule::getSwiftModule() const {
-  return SILMod->getSwiftModule();
 }

@@ -94,7 +94,7 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
     auto metaType = cast<MetatypeType>(toType.getSwiftRValueType());
     assert(metaType->getRepresentation() != MetatypeRepresentation::ObjC &&
            "not implemented");
-    toType = IGF.IGM.SILMod->Types.getLoweredType(metaType.getInstanceType());
+    toType = IGF.IGM.getLoweredType(metaType.getInstanceType());
   }
   // Emit a reference to the heap metadata for the target type.
   const bool allowConservative = true;
@@ -734,7 +734,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
 
   OptionalTypeKind optKind;
   if (auto sourceOptObjectType =
-        sourceType.getAnyOptionalObjectType(*IGF.IGM.SILMod, optKind)) {
+        sourceType.getAnyOptionalObjectType(IGF.getSILModule(), optKind)) {
 
     // Translate the value from an enum representation to a possibly-null
     // representation.  Note that we assume that this projection is safe
