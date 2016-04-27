@@ -23,14 +23,14 @@ using NativeReflectionContext
   = ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
 
 SwiftReflectionContextRef
-swift_reflection_createReflectionContext(void *reader_context,
+swift_reflection_createReflectionContext(void *ReaderContext,
                                          PointerSizeFunction getPointerSize,
                                          SizeSizeFunction getSizeSize,
                                          ReadBytesFunction readBytes,
                                          GetStringLengthFunction getStringLength,
                                          GetSymbolAddressFunction getSymbolAddress) {
   MemoryReaderImpl ReaderImpl {
-    reader_context,
+    ReaderContext,
     getPointerSize,
     getSizeSize,
     readBytes,

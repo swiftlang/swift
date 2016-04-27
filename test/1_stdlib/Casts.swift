@@ -35,7 +35,7 @@ CastsTests.test("No overrelease of existential boxes in failed casts") {
     // We fail casts of an existential box repeatedly
     // to ensure it does not get over-released.
     func bar<T>(_ t: T) {
-        for i in 0..<10 {
+        for _ in 0..<10 {
             if case let a as P = t {
                 _ = a
             }

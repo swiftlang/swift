@@ -10,9 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SwiftShims
+%{
 
-% traversals = ['Forward', 'Bidirectional', 'RandomAccess']
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal
+)
+
+}%
+
+// TODO: swift-3-indexing-model: perform type erasure on the associated
+// `Indices` type.
+
+import SwiftShims
 
 @noreturn @inline(never)
 internal func _abstract(_ file: StaticString = #file, line: UInt = #line) {
@@ -28,11 +38,10 @@ internal func _abstract(_ file: StaticString = #file, line: UInt = #line) {
 /// iterator having the same `Element` type, hiding the specifics of the
 /// underlying `IteratorProtocol`.
 ///
-/// - seealso:
-///   - `struct AnySequence<S : Sequence>`
+/// - SeeAlso: `AnySequence`
 public struct AnyIterator<Element> : IteratorProtocol {
-  /// Create a `IteratorProtocol` instance that wraps `base` but whose type
-  /// depends only on the type of `I.Element`.
+  /// Creates an iterator that wraps `base` but whose type depends only on the
+  /// type of `I.Element`.
   ///
   /// Example:
   ///
@@ -45,20 +54,19 @@ public struct AnyIterator<Element> : IteratorProtocol {
   ///         = lazyStrings.makeIterator()
   ///       return AnyIterator(iterator)
   ///     }
-  public // @testable
-  init<I : IteratorProtocol where I.Element == Element>(_ base: I) {
+  public init<I : IteratorProtocol where I.Element == Element>(_ base: I) {
     self._box = _IteratorBox(base)
   }
 
-  /// Create a `IteratorProtocol` instance whose `next` method invokes
-  /// `body` and returns the result.
+  /// Creates an iterator whose `next` method invokes `body` and returns the
+  /// result.
   ///
   /// Example:
   ///
   ///     var x = 7
   ///     let iterator = AnyIterator { x < 15 ? x++ : nil }
   ///     let a = Array(iterator) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
-  public init(body: () -> Element?) {
+  public init(_ body: () -> Element?) {
     self._box = _IteratorBox(_ClosureBasedIterator(body))
   }
 
@@ -66,7 +74,7 @@ public struct AnyIterator<Element> : IteratorProtocol {
     self._box = _box
   }
 
-  /// Advance to the next element and return it, or `nil` if no next
+  /// Advances to the next element and returns it, or `nil` if no next
   /// element exists.
   public func next() -> Element? {
     return _box.next()
@@ -87,12 +95,8 @@ internal struct _ClosureBasedIterator<Element> : IteratorProtocol {
   internal let _body: () -> Element?
 }
 
-internal class _AnyIteratorBase {}
-
-internal class _AnyIteratorBoxBase<Element>
-  : _AnyIteratorBase, IteratorProtocol {
-
-  /// Advance to the next element and return it, or `nil` if no next
+internal class _AnyIteratorBoxBase<Element> : IteratorProtocol {
+  /// Advances to the next element and returns it, or `nil` if no next
   /// element exists.
   ///
   /// - Note: Subclasses must override this method.
@@ -115,93 +119,446 @@ internal func _typeID(_ instance: AnyObject) -> ObjectIdentifier {
 //===--- Sequence ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal class _AnySequenceBox<Element> {
-  internal func makeIterator() -> AnyIterator<Element> { _abstract() }
+% for Kind in ['Sequence', 'Collection', 'BidirectionalCollection', 'RandomAccessCollection']:
+
+%   if Kind == 'Sequence':
+internal class _AnySequenceBox<Element>
+%   elif Kind == 'Collection':
+internal class _AnyCollectionBox<Element> : _AnySequenceBox<Element>
+%   elif Kind == 'BidirectionalCollection':
+internal class _AnyBidirectionalCollectionBox<Element>
+  : _AnyCollectionBox<Element>
+%   elif Kind == 'RandomAccessCollection':
+internal class _AnyRandomAccessCollectionBox<Element>
+  : _AnyBidirectionalCollectionBox<Element>
+%   else:
+%     assert False, 'Unknown kind'
+%   end
+{
+
+%   if Kind == 'Sequence':
+  @warn_unused_result
+  internal func _makeIterator() -> AnyIterator<Element> { _abstract() }
 
   internal var _underestimatedCount: Int { _abstract() }
 
-  internal func _copyContents(initializing ptr: UnsafeMutablePointer<Element>)
+  @warn_unused_result
+  internal func _map<T>(
+    _ transform: @noescape (Element) throws -> T
+  ) rethrows -> [T] {
+    _abstract()
+  }
+
+  @warn_unused_result
+  internal func _filter(
+    _ includeElement: @noescape (Element) throws -> Bool
+  ) rethrows -> [Element] {
+    _abstract()
+  }
+
+  internal func _forEach(
+    _ body: @noescape (Element) throws -> Void
+  ) rethrows {
+    _abstract()
+  }
+
+  @warn_unused_result
+  internal func __customContainsEquatableElement(
+    _ element: Element
+  ) -> Bool? {
+    _abstract()
+  }
+
+  @warn_unused_result
+  internal func __preprocessingPass<R>(
+    _ preprocess: @noescape () throws -> R
+  ) rethrows -> R? {
+    _abstract()
+  }
+
+  @warn_unused_result
+  internal func __copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
+    _abstract()
+  }
+
+  @warn_unused_result
+  internal func __copyContents(initializing ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
     _abstract()
   }
-  internal func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
+
+%   end
+
+%   override = 'override' if Kind != 'Sequence' else ''
+  @warn_unused_result
+  internal ${override} func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
-  internal func _dropFirst(_ n: Int) -> _AnySequenceBox<Element> { _abstract() }
-  internal func _prefix(_ maxLength: Int) -> _AnySequenceBox<Element> {
+  @warn_unused_result
+  internal ${override} func _dropLast(_ n: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
-}
 
-internal class _AnyCollectionBoxBase<Element> : _AnySequenceBox<Element> {
+  @warn_unused_result
+  internal ${override} func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
+    _abstract()
+  }
+
+  @warn_unused_result
+  internal ${override} func _suffix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
+    _abstract()
+  }
+
+  @warn_unused_result
+  internal func _split(
+    maxSplits: Int, omittingEmptySubsequences: Bool,
+    isSeparator: @noescape (Element) throws -> Bool
+  ) rethrows -> [Any${Kind}<Element>] {
+    _abstract()
+  }
+
+%   if Kind == 'Collection':
+  internal subscript(i: _AnyIndexBox) -> Element { _abstract() }
+  
+  @warn_unused_result
+  internal func _index(after i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
+  
+  internal func _formIndex(after i: _AnyIndexBox) { _abstract() }
+  
+  @warn_unused_result
+  internal func _index(
+    _ i: _AnyIndexBox, offsetBy n: IntMax
+  ) -> _AnyIndexBox {
+    _abstract()
+  }
+  
+  @warn_unused_result
+  internal func _index(
+    _ i: _AnyIndexBox, offsetBy n: IntMax, limitedBy limit: _AnyIndexBox
+  ) -> _AnyIndexBox? {
+    _abstract()
+  }
+  
+  internal func _formIndex(_ i: inout _AnyIndexBox, offsetBy n: IntMax) {
+    _abstract()
+  }
+  
+  internal func _formIndex(
+    _ i: inout _AnyIndexBox, offsetBy n: IntMax, limitedBy limit: _AnyIndexBox
+  ) -> Bool {
+    _abstract()
+  }
+  
+  @warn_unused_result
+  internal func _distance(
+    from start: _AnyIndexBox, to end: _AnyIndexBox
+  ) -> IntMax {
+    _abstract()
+  }
+
+  // TODO: swift-3-indexing-model: forward the following methods.
+  /*
+  var _indices: Indices
+
+  @warn_unused_result
+  func prefix(upTo end: Index) -> SubSequence
+
+  @warn_unused_result
+  func suffix(from start: Index) -> SubSequence
+
+  @warn_unused_result
+  func prefix(through position: Index) -> SubSequence
+
+  var isEmpty: Bool { get }
+  */
+
+  internal var _count: IntMax { _abstract() }
+
+  // TODO: swift-3-indexing-model: forward the following methods.
+  /*
+  @warn_unused_result
+  func _customIndexOfEquatableElement(element: Iterator.Element) -> Index??
+  */
+
+  internal var _first: Element? { _abstract() }
+
   internal init(
-    startIndex: _ForwardIndexBoxProtocol, endIndex: _ForwardIndexBoxProtocol
+    _startIndex: _AnyIndexBox,
+    endIndex: _AnyIndexBox
   ) {
-    self.startIndex = startIndex
-    self.endIndex = endIndex
+    self._startIndex = _startIndex
+    self._endIndex = endIndex
   }
-  internal let startIndex: _ForwardIndexBoxProtocol
-  internal let endIndex: _ForwardIndexBoxProtocol
-}
 
-% for Kind in ['Sequence', 'Collection']:
-// FIXME: can't make this a protocol due to <rdar://20209031>
+  internal let _startIndex: _AnyIndexBox
+  internal let _endIndex: _AnyIndexBox
+%   end
+
+%   if Kind in ['Collection', 'BidirectionalCollection', 'RandomAccessCollection']:
+%     override = 'override' if Kind != 'Collection' else ''
+  internal ${override} subscript(
+    start start: _AnyIndexBox,
+    end end: _AnyIndexBox
+  ) -> _Any${Kind}Box<Element> { _abstract() }
+%   end
+
+%   if Kind == 'BidirectionalCollection':
+  internal func _index(before i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
+  internal func _formIndex(before i: _AnyIndexBox) { _abstract() }
+  internal var _last: Element? { _abstract() }
+
+  internal override init(
+    _startIndex: _AnyIndexBox,
+    endIndex: _AnyIndexBox
+  ) {
+    super.init(_startIndex: _startIndex, endIndex: endIndex)
+  }
+%   end
+
+%   if Kind == 'RandomAccessCollection':
+  internal override init(
+    _startIndex: _AnyIndexBox,
+    endIndex: _AnyIndexBox
+  ) {
+    super.init(_startIndex: _startIndex, endIndex: endIndex)
+  }
+%   end
+
+}
+% end
+
+% for Kind in ['Sequence', 'Collection', 'BidirectionalCollection', 'RandomAccessCollection']:
+%   if Kind == 'Sequence':
+%     EqualAndWeakerKinds = ['Sequence']
+%   elif Kind == 'Collection':
+%     EqualAndWeakerKinds = ['Sequence', 'Collection']
+%   elif Kind == 'BidirectionalCollection':
+%     EqualAndWeakerKinds = ['Sequence', 'Collection', 'BidirectionalCollection']
+%   elif Kind == 'RandomAccessCollection':
+%     EqualAndWeakerKinds = ['Sequence', 'Collection', 'BidirectionalCollection', 'RandomAccessCollection']
+%   else:
+%     assert False, 'Unknown kind'
+%   end
+
 internal final class _${Kind}Box<
   S : ${Kind}
-%   if Kind == 'Sequence':
   where
-    S.SubSequence : ${Kind},
-    S.SubSequence.Iterator.Element == S.Iterator.Element,
-    S.SubSequence.SubSequence == S.SubSequence
+  S.SubSequence : ${Kind},
+  S.SubSequence.Iterator.Element == S.Iterator.Element,
+  S.SubSequence.SubSequence == S.SubSequence
+%   if Kind != 'Sequence':
+  ,
+  S.SubSequence.Index == S.Index,
+  S.SubSequence.Indices : ${Kind},
+  S.SubSequence.Indices.Iterator.Element == S.Index,
+  S.SubSequence.Indices.Index == S.Index,
+  S.SubSequence.Indices.SubSequence == S.SubSequence.Indices,
+  S.Indices : ${Kind},
+  S.Indices.Iterator.Element == S.Index,
+  S.Indices.Index == S.Index,
+  S.Indices.SubSequence == S.Indices
 %   end
 > : _Any${Kind}Box<S.Iterator.Element> {
-  typealias Element = S.Iterator.Element
+  internal typealias Element = S.Iterator.Element
 
-  override func makeIterator() -> AnyIterator<Element> {
+  @warn_unused_result
+  internal override func _makeIterator() -> AnyIterator<Element> {
     return AnyIterator(_base.makeIterator())
   }
-  override var _underestimatedCount: Int {
+  internal override var _underestimatedCount: Int {
     return _base.underestimatedCount
   }
-  override func _copyContents(initializing ptr: UnsafeMutablePointer<Element>)
+  @warn_unused_result
+  internal override func _map<T>(
+    _ transform: @noescape (Element) throws -> T
+  ) rethrows -> [T] {
+    return try _base.map(transform)
+  }
+  @warn_unused_result
+  internal override func _filter(
+    _ includeElement: @noescape (Element) throws -> Bool
+  ) rethrows -> [Element] {
+    return try _base.filter(includeElement)
+  }
+  internal override func _forEach(
+    _ body: @noescape (Element) throws -> Void
+  ) rethrows {
+    return try _base.forEach(body)
+  }
+  @warn_unused_result
+  internal override func __customContainsEquatableElement(
+    _ element: Element
+  ) -> Bool? {
+    return _base._customContainsEquatableElement(element)
+  }
+  @warn_unused_result
+  internal override func __preprocessingPass<R>(
+    _ preprocess: @noescape () throws -> R
+  ) rethrows -> R? {
+    return try _base._preprocessingPass(preprocess)
+  }
+  @warn_unused_result
+  internal override func __copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
+    return _base._copyToNativeArrayBuffer()._storage
+  }
+  @warn_unused_result
+  internal override func __copyContents(initializing ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
     return _base._copyContents(initializing: ptr)
   }
-  override func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
-    return _base._copyToNativeArrayBuffer()._storage
+  @warn_unused_result
+  internal override func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
+    return _${Kind}Box<S.SubSequence>(_base: _base.dropFirst(n))
   }
-%   if Kind == 'Sequence':
-  internal override func _dropFirst(_ n: Int) -> _AnySequenceBox<Element> {
-    return _SequenceBox<S.SubSequence>(_base.dropFirst(n))
+  @warn_unused_result
+  internal override func _dropLast(_ n: Int) -> _Any${Kind}Box<Element> {
+    return _${Kind}Box<S.SubSequence>(_base: _base.dropLast(n))
   }
-  internal override func _prefix(_ maxLength: Int) -> _AnySequenceBox<Element> {
-    return _SequenceBox<S.SubSequence>(_base.prefix(maxLength))
+  @warn_unused_result
+  internal override func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
+    return _${Kind}Box<S.SubSequence>(_base: _base.prefix(maxLength))
+  }
+  @warn_unused_result
+  internal override func _suffix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
+    return _${Kind}Box<S.SubSequence>(_base: _base.suffix(maxLength))
+  }
+%   for ResultKind in EqualAndWeakerKinds:
+  @warn_unused_result
+  internal override func _split(
+    maxSplits: Int, omittingEmptySubsequences: Bool,
+    isSeparator: @noescape (Element) throws -> Bool
+  ) rethrows -> [Any${ResultKind}<Element>] {
+    return try _base.split(
+      maxSplits: maxSplits,
+      omittingEmptySubsequences: omittingEmptySubsequences,
+      isSeparator: isSeparator)
+      .map {
+        Any${ResultKind}(_box: _${Kind}Box<S.SubSequence>(_base: $0))
+      }
   }
 %   end
 
-%   if Kind == 'Collection':
-  override func _count() -> IntMax {
-    return numericCast(_base.count)
+%   if Kind == 'Sequence':
+  internal init(_base: S) {
+    self._base = _base
   }
-  override subscript(position: _ForwardIndexBoxProtocol) -> Element {
+%   else:
+  internal init(_base: S) {
+    self._base = _base
+    super.init(
+      _startIndex: _IndexBox(_base: _base.startIndex),
+      endIndex: _IndexBox(_base: _base.endIndex))
+  }
+
+  internal func _unbox(
+    _ position: _AnyIndexBox, file: StaticString = #file, line: UInt = #line
+  ) -> S.Index {
     if let i = position._unbox() as S.Index? {
-      return _base[i]
+      return i
+    }
+    fatalError("Index type mismatch!", file: file, line: line)
+  }
+
+  internal override subscript(position: _AnyIndexBox) -> Element {
+    return _base[_unbox(position)]
+  }
+
+  internal override subscript(start start: _AnyIndexBox, end end: _AnyIndexBox)
+    -> _Any${Kind}Box<Element>
+  {
+    return _${Kind}Box<S.SubSequence>(_base:
+      _base[_unbox(start)..<_unbox(end)]
+    )
+  }
+
+  @warn_unused_result
+  internal override func _index(after position: _AnyIndexBox) -> _AnyIndexBox {
+    return _IndexBox(_base: _base.index(after: _unbox(position)))
+  }
+
+  internal override func _formIndex(after position: _AnyIndexBox) {
+    if let p = position as? _IndexBox<S.Index> {
+      return _base.formIndex(after: &p._base)
     }
     fatalError("Index type mismatch!")
   }
-  init(
-    _ base: S,
-    startIndex: _ForwardIndexBoxProtocol,
-    endIndex: _ForwardIndexBoxProtocol
+
+  @warn_unused_result
+  internal override func _index(
+    _ i: _AnyIndexBox, offsetBy n: IntMax
+  ) -> _AnyIndexBox {
+    return _IndexBox(_base: _base.index(_unbox(i), offsetBy: numericCast(n)))
+  }
+
+  @warn_unused_result
+  internal override func _index(
+    _ i: _AnyIndexBox,
+    offsetBy n: IntMax,
+    limitedBy limit: _AnyIndexBox
+  ) -> _AnyIndexBox? {
+    return _base.index(
+        _unbox(i),
+        offsetBy: numericCast(n),
+        limitedBy: _unbox(limit))
+      .map { _IndexBox(_base: $0) }
+  }
+
+  internal override func _formIndex(
+    _ i: inout _AnyIndexBox, offsetBy n: IntMax
   ) {
-    self._base = base
-    super.init(startIndex: startIndex, endIndex: endIndex)
+    if let box = i as? _IndexBox<S.Index> {
+      return _base.formIndex(&box._base, offsetBy: numericCast(n))
+    }
+    fatalError("Index type mismatch!")
   }
-%   else:
-  init(_ base: S) {
-    self._base = base
+
+  internal override func _formIndex(
+    _ i: inout _AnyIndexBox, offsetBy n: IntMax, limitedBy limit: _AnyIndexBox
+  ) -> Bool {
+    if let box = i as? _IndexBox<S.Index> {
+      return _base.formIndex(
+        &box._base,
+        offsetBy: numericCast(n),
+        limitedBy: _unbox(limit))
+    }
+    fatalError("Index type mismatch!")
   }
+
+  @warn_unused_result
+  internal override func _distance(
+    from start: _AnyIndexBox,
+    to end: _AnyIndexBox
+  ) -> IntMax {
+    return numericCast(_base.distance(from: _unbox(start), to: _unbox(end)))
+  }
+
+  internal override var _count: IntMax {
+    return numericCast(_base.count)
+  }
+
+  internal override var _first: Element? {
+    return _base.first
+  }
+
+%     if Kind in ['BidirectionalCollection', 'RandomAccessCollection']:
+  @warn_unused_result
+  internal override func _index(before position: _AnyIndexBox) -> _AnyIndexBox {
+    return _IndexBox(_base: _base.index(before: _unbox(position)))
+  }
+
+  internal override func _formIndex(before position: _AnyIndexBox) {
+    if let p = position as? _IndexBox<S.Index> {
+      return _base.formIndex(before: &p._base)
+    }
+    fatalError("Index type mismatch!")
+  }
+
+  internal override var _last: Element? {
+    return _base.last
+  }
+%     end
+
 %   end
   internal var _base: S
 }
@@ -227,24 +584,21 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
 /// same `Element` type, hiding the specifics of the underlying
 /// `Sequence`.
 ///
-/// - SeeAlso: `AnyIterator<Element>`.
+/// - SeeAlso: `AnyIterator`
 public struct AnySequence<Element> : Sequence {
-  @available(*, unavailable, renamed: "Element")
-  public typealias T = Element
-
-  /// Wrap and forward operations to `base`.
+  /// Creates a new sequence that wraps and forwards operations to `base`.
   public init<
-    S: Sequence
+    S : Sequence
     where
-      S.Iterator.Element == Element,
-      S.SubSequence : Sequence,
-      S.SubSequence.Iterator.Element == Element,
-      S.SubSequence.SubSequence == S.SubSequence
+    S.Iterator.Element == Element,
+    S.SubSequence : Sequence,
+    S.SubSequence.Iterator.Element == Element,
+    S.SubSequence.SubSequence == S.SubSequence
   >(_ base: S) {
-    _box = _SequenceBox(base)
+    self._box = _SequenceBox(_base: base)
   }
 
-  /// Create a sequence whose `makeIterator()` method forwards to
+  /// Creates a sequence whose `makeIterator()` method forwards to
   /// `makeUnderlyingIterator`.
   public init<I : IteratorProtocol where I.Element == Element>(
     _ makeUnderlyingIterator: () -> I
@@ -252,298 +606,250 @@ public struct AnySequence<Element> : Sequence {
     self.init(_ClosureBasedSequence(makeUnderlyingIterator))
   }
 
-  internal init(_ box: _AnySequenceBox<Element>) {
-    _box = box
-  }
-
-  /// Returns an iterator over the elements of this sequence.
-  ///
-  /// - Complexity: O(1).
-  public func makeIterator() -> AnyIterator<Element> {
-    return _box.makeIterator()
+  internal init(_box: _AnySequenceBox<Element>) {
+    self._box = _box
   }
 
   internal let _box: _AnySequenceBox<Element>
 }
 
-extension AnySequence {
-  @warn_unused_result
-  public func dropFirst(_ n: Int) -> AnySequence<Element> {
-    return AnySequence(_box._dropFirst(n))
-  }
-
-  @warn_unused_result
-  public func prefix(_ maxLength: Int) -> AnySequence<Element> {
-    return AnySequence(_box._prefix(maxLength))
-  }
-}
-
-% for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
+% for Kind in ['Sequence', 'Collection', 'BidirectionalCollection', 'RandomAccessCollection']:
 extension Any${Kind} {
+%   if Kind == 'Sequence':
+  /// Returns an iterator over the elements of this sequence.
+%   else:
+  /// Returns an iterator over the elements of this collection.
+%   end
+  ///
+  /// - Complexity: O(1).
+  @warn_unused_result
+  public func makeIterator() -> AnyIterator<Element> {
+    return _box._makeIterator()
+  }
+
   public var underestimatedCount: Int {
     return _box._underestimatedCount
   }
 
+  @warn_unused_result
+  public func map<T>(
+    _ transform: @noescape (Element) throws -> T
+  ) rethrows -> [T] {
+    return try _box._map(transform)
+  }
+
+  @warn_unused_result
+  public func filter(
+    _ includeElement: @noescape (Element) throws -> Bool
+  ) rethrows -> [Element] {
+    return try _box._filter(includeElement)
+  }
+
+  public func forEach(
+    _ body: @noescape (Element) throws -> Void
+  ) rethrows {
+    return try _box._forEach(body)
+  }
+
+  @warn_unused_result
+  public func dropFirst(_ n: Int) -> Any${Kind}<Element> {
+    return Any${Kind}(_box: _box._dropFirst(n))
+  }
+
+  @warn_unused_result
+  public func dropLast(_ n: Int) -> Any${Kind}<Element> {
+    return Any${Kind}(_box: _box._dropLast(n))
+  }
+
+  @warn_unused_result
+  public func prefix(_ maxLength: Int) -> Any${Kind}<Element> {
+    return Any${Kind}(_box: _box._prefix(maxLength))
+  }
+
+  @warn_unused_result
+  public func suffix(_ maxLength: Int) -> Any${Kind}<Element> {
+    return Any${Kind}(_box: _box._suffix(maxLength))
+  }
+
+  @warn_unused_result
+  public func split(
+    maxSplits: Int = Int.max,
+    omittingEmptySubsequences: Bool = true,
+    isSeparator: @noescape (Element) throws -> Bool
+  ) rethrows -> [Any${Kind}<Element>] {
+    return try _box._split(
+      maxSplits: maxSplits,
+      omittingEmptySubsequences: omittingEmptySubsequences,
+      isSeparator: isSeparator)
+  }
+
+  @warn_unused_result
+  public func _preprocessingPass<R>(
+    _ preprocess: @noescape () throws -> R
+  ) rethrows -> R? {
+    return try _box.__preprocessingPass(preprocess)
+  }
+
+  @warn_unused_result
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
+    return _ContiguousArrayBuffer(self._box.__copyToNativeArrayBuffer())
+  }
+
+  @warn_unused_result
   public func _copyContents(initializing ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
-    return _box._copyContents(initializing: ptr)
-  }
-
-  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
-    return _ContiguousArrayBuffer(self._box._copyToNativeArrayBuffer())
+    return _box.__copyContents(initializing: ptr)
   }
 }
-
 % end
 
-//===--- ForwardIndex -----------------------------------------------------===//
+//===--- Index ------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal protocol _ForwardIndexBoxProtocol : class {
-  var typeID: ObjectIdentifier { get }
+internal protocol _AnyIndexBox : class {
+  var _typeID: ObjectIdentifier { get }
 
   @warn_unused_result
-  func successor() -> _ForwardIndexBoxProtocol
-
-  func _successorInPlace()
+  func _unbox<T : Comparable>() -> T?
 
   @warn_unused_result
-  func equals(_ other: _ForwardIndexBoxProtocol) -> Bool
+  func _equal(to rhs: _AnyIndexBox) -> Bool
 
   @warn_unused_result
-  func _unbox<T : ForwardIndex>() -> T?
+  func _notEqual(to rhs: _AnyIndexBox) -> Bool
 
   @warn_unused_result
-  func _distance(to other: _ForwardIndexBoxProtocol) -> AnyForwardIndex.Distance
-
-  // FIXME: Can't return Self from _advanced(by:) pending <rdar://20181253>
-  @warn_unused_result
-  func _advanced(by distance: AnyForwardIndex.Distance) -> _ForwardIndexBoxProtocol
+  func _less(than rhs: _AnyIndexBox) -> Bool
 
   @warn_unused_result
-  func _advanced(
-    by distance: AnyForwardIndex.Distance,
-    limit: _ForwardIndexBoxProtocol
-  ) -> _ForwardIndexBoxProtocol
+  func _lessOrEqual(to rhs: _AnyIndexBox) -> Bool
+
+  @warn_unused_result
+  func _greater(than rhs: _AnyIndexBox) -> Bool
+
+  @warn_unused_result
+  func _greaterOrEqual(to rhs: _AnyIndexBox) -> Bool
 }
 
-internal class _ForwardIndexBox<
-  BaseIndex: ForwardIndex
-> : _ForwardIndexBoxProtocol {
-  required init(_ base: BaseIndex) {
-    self.base = base
+internal final class _IndexBox<
+  BaseIndex : Comparable
+> : _AnyIndexBox {
+  internal var _base: BaseIndex
+
+  internal init(_base: BaseIndex) {
+    self._base = _base
   }
 
-  func successor() -> _ForwardIndexBoxProtocol {
-    return self.dynamicType.init(self.base.successor())
+  @warn_unused_result
+  internal func _unsafeUnbox(_ other: _AnyIndexBox) -> BaseIndex {
+    return unsafeDowncast(other, to: _IndexBox.self)._base
   }
-
-  func _successorInPlace() {
-    self.base._successorInPlace()
-  }
-
-  func unsafeUnbox(_ other: _ForwardIndexBoxProtocol) -> BaseIndex {
-    return unsafeDowncast(other, to: _ForwardIndexBox.self).base
-  }
-
-  func equals(_ other: _ForwardIndexBoxProtocol) -> Bool {
-    return base == unsafeUnbox(other)
-  }
-
-  func _distance(to other: _ForwardIndexBoxProtocol) -> AnyForwardIndex.Distance {
-    return numericCast(base.distance(to: unsafeUnbox(other)))
-  }
-
-  func _advanced(by n: AnyForwardIndex.Distance) -> _ForwardIndexBoxProtocol {
-    return self.dynamicType.init(base.advanced(by: numericCast(n)))
-  }
-
-  func _advanced(
-    by n: AnyForwardIndex.Distance,
-    limit: _ForwardIndexBoxProtocol
-  ) -> _ForwardIndexBoxProtocol {
-    return self.dynamicType.init(
-      base.advanced(by: numericCast(n), limit: unsafeUnbox(limit)))
-  }
-
-  func _unbox<T : ForwardIndex>() -> T? {
-    if T.self is BaseIndex.Type {
-      _sanityCheck(BaseIndex.self is T.Type)
-      // This bit cast is really nothing as we have proven they are
-      // the same type.
-      return unsafeBitCast(base, to: T.self)
-    }
-    return nil
-  }
-
-  var typeID: ObjectIdentifier { return _typeID(self) }
-
-  internal // private
-  var base: BaseIndex
-}
-
-//===--- BidirectionalIndex -----------------------------------------------===//
-//===----------------------------------------------------------------------===//
-
-internal protocol _BidirectionalIndexBoxProtocol : _ForwardIndexBoxProtocol {
-  func predecessor() -> _BidirectionalIndexBoxProtocol
-  func _predecessorInPlace()
-}
-
-internal class _BidirectionalIndexBox<
-  BaseIndex: BidirectionalIndex
-> : _ForwardIndexBox<BaseIndex>, _BidirectionalIndexBoxProtocol {
-  required init(_ base: BaseIndex) {
-    super.init(base)
-  }
-
-  override func successor() -> _ForwardIndexBoxProtocol {
-    return self.dynamicType.init(self.base.successor())
-  }
-
-  func predecessor() -> _BidirectionalIndexBoxProtocol {
-    return self.dynamicType.init(self.base.predecessor())
-  }
-
-  func _predecessorInPlace() {
-    self.base._predecessorInPlace()
-  }
-}
-
-//===--- RandomAccessIndex ------------------------------------------------===//
-//===----------------------------------------------------------------------===//
-
-internal protocol _RandomAccessIndexBoxProtocol : _BidirectionalIndexBoxProtocol {}
-
-internal final class _RandomAccessIndexBox<
-  BaseIndex: RandomAccessIndex
-> : _BidirectionalIndexBox<BaseIndex>, _RandomAccessIndexBoxProtocol {
-  required init(_ base: BaseIndex) {
-    super.init(base)
-  }
-}
-
-//===--- All Index Protocols ----------------------------------------------===//
-//===----------------------------------------------------------------------===//
-
-% for Traversal in traversals:
-
-%   Self = 'Any%sIndex' % Traversal
-/// A wrapper over an underlying `${Traversal}Index` that hides
-/// the specific underlying type.
-///
-/// - SeeAlso: `Any${Traversal}Collection`
-public struct ${Self} : ${Traversal}Index {
-  public typealias Distance = IntMax
-
-  /// Wrap and forward operations to `base`.
-  public init<BaseIndex : ${Traversal}Index>(_ base: BaseIndex) {
-    _box = _${Traversal}IndexBox(base)
-  }
-
-  /// Returns the next consecutive value in a discrete sequence of
-  /// `${Self}` values.
-  ///
-  /// - Precondition: `self` has a well-defined successor.
-  public func successor() -> ${Self} {
-    return ${Self}(_box.successor())
-  }
-
-  public mutating func _successorInPlace() {
-    if _fastPath(_isUnique_native(&_box)) {
-      _box._successorInPlace()
-    }
-    else {
-      self = successor()
-    }
-  }
-
-  % if Traversal != 'Forward':
-  /// Returns the previous consecutive value in a discrete sequence of
-  /// `${Self}` values.
-  ///
-  /// - Precondition: `self` has a well-defined predecessor.
-  public func predecessor() -> ${Self} {
-    return ${Self}(_box.predecessor())
-  }
-
-  public mutating func _predecessorInPlace() {
-    if _fastPath(_isUnique_native(&_box)) {
-      _box._predecessorInPlace()
-    }
-    else {
-      self = predecessor()
-    }
-  }
-  % end
-
-  % if Traversal == 'RandomAccess':
-  public func distance(to other: ${Self}) -> Distance {
-    return _box._distance(to: other._box)
-  }
-
-  public func advanced(by amount: Distance) -> ${Self} {
-    return ${Self}(_box._advanced(by: amount))
-  }
-
-  public func advanced(by amount: Distance, limit: ${Self}) -> ${Self} {
-    return ${Self}(_box._advanced(by: amount, limit: limit._box))
-  }
-  % end
-
-  //===--- private --------------------------------------------------------===//
 
   internal var _typeID: ObjectIdentifier {
-    return _box.typeID
+    return Swift._typeID(self)
   }
 
-  internal init(_ box: _ForwardIndexBoxProtocol) {
-    self._box = box${
-      '' if Traversal == 'Forward' else ' as! _%sIndexBoxProtocol' % Traversal}
+  @warn_unused_result
+  internal func _unbox<T : Comparable>() -> T? {
+    return (self as _AnyIndexBox as? _IndexBox<T>)?._base
   }
 
-  // _box is passed inout to _isUnique.  Although its value
-  // is unchanged, it must appear mutable to the optimizer.
-  internal var _box: _${Traversal}IndexBoxProtocol
+  @warn_unused_result
+  internal func _equal(to rhs: _AnyIndexBox) -> Bool {
+    return _base == _unsafeUnbox(rhs)
+  }
 
-  public func _distance(to other: ${Self}) -> ${Self}.Distance {
-    precondition(
-      self._typeID == other._typeID,
-      "distance: base index types differ.")
-    return self._box._distance(to: other._box)
+  @warn_unused_result
+  internal func _notEqual(to rhs: _AnyIndexBox) -> Bool {
+    return _base != _unsafeUnbox(rhs)
+  }
+
+  @warn_unused_result
+  internal func _less(than rhs: _AnyIndexBox) -> Bool {
+    return _base < _unsafeUnbox(rhs)
+  }
+
+  @warn_unused_result
+  internal func _lessOrEqual(to rhs: _AnyIndexBox) -> Bool {
+    return _base <= _unsafeUnbox(rhs)
+  }
+
+  @warn_unused_result
+  internal func _greater(than rhs: _AnyIndexBox) -> Bool {
+    return _base > _unsafeUnbox(rhs)
+  }
+
+  @warn_unused_result
+  internal func _greaterOrEqual(to rhs: _AnyIndexBox) -> Bool {
+    return _base >= _unsafeUnbox(rhs)
   }
 }
 
-/// Returns `true` iff `lhs` and `rhs` wrap equal underlying
-/// `${Self}`s.
+/// A wrapper over an underlying index that hides
+/// the specific underlying type.
+///
+/// - SeeAlso: `AnyCollection`
+public struct AnyIndex : Comparable {
+  /// Creates a new index wrapping `base`.
+  public init<BaseIndex : Comparable>(_ base: BaseIndex) {
+    self._box = _IndexBox(_base: base)
+  }
+
+  internal init(_box: _AnyIndexBox) {
+    self._box = _box
+  }
+
+  internal var _typeID: ObjectIdentifier {
+    return _box._typeID
+  }
+
+  internal var _box: _AnyIndexBox
+}
+
+/// Returns `true` iff `lhs` and `rhs` wrap equal underlying indices.
 ///
 /// - Precondition: The types of indices wrapped by `lhs` and `rhs` are
 ///   identical.
 @warn_unused_result
-public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  precondition(lhs._typeID == rhs._typeID, "base index types differ.")
-  return lhs._box.equals(rhs._box)
+public func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+  precondition(lhs._typeID == rhs._typeID, "base index types differ")
+  return lhs._box._equal(to: rhs._box)
 }
-% end
+
+@warn_unused_result
+public func != (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+  precondition(lhs._typeID == rhs._typeID, "base index types differ")
+  return lhs._box._notEqual(to: rhs._box)
+}
+
+@warn_unused_result
+public func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+  precondition(lhs._typeID == rhs._typeID, "base index types differ")
+  return lhs._box._less(than: rhs._box)
+}
+
+@warn_unused_result
+public func <= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+  precondition(lhs._typeID == rhs._typeID, "base index types differ")
+  return lhs._box._lessOrEqual(to: rhs._box)
+}
+
+@warn_unused_result
+public func > (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+  precondition(lhs._typeID == rhs._typeID, "base index types differ")
+  return lhs._box._greater(than: rhs._box)
+}
+
+@warn_unused_result
+public func >= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+  precondition(lhs._typeID == rhs._typeID, "base index types differ")
+  return lhs._box._greaterOrEqual(to: rhs._box)
+}
 
 //===--- Collections ------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase<Element> {
-  internal subscript(_: _ForwardIndexBoxProtocol) -> Element { _abstract() }
-  internal func _count() -> IntMax { _abstract() }
-
-  // FIXME: should be inherited, but a known bug prevents it since
-  // this class is generic.
-  internal override init(
-    startIndex: _ForwardIndexBoxProtocol,
-    endIndex: _ForwardIndexBoxProtocol
-  ) {
-    super.init(startIndex: startIndex, endIndex: endIndex)
-  }
-}
-
-/// A protocol for `AnyForwardCollection<Element>`,
+/// A protocol for `AnyCollection<Element>`,
 /// `AnyBidirectionalCollection<Element>`, and
 /// `AnyRandomAccessCollection<Element>`.
 ///
@@ -571,7 +877,9 @@ public func !== <
   return lhs._underlyingCollectionID != rhs._underlyingCollectionID
 }
 
-% for (ti, Traversal) in enumerate(traversals):
+% for (ti, Traversal) in enumerate(TRAVERSALS):
+%   SelfProtocol = collectionForTraversal(Traversal)
+%   Self = 'Any' + SelfProtocol
 /// A type-erased wrapper over any collection with indices that
 /// support ${Traversal.lower().replace('omacc', 'om acc')} traversal.
 ///
@@ -579,90 +887,208 @@ public func !== <
 /// same `Element` type, hiding the specifics of the underlying
 /// `Collection`.
 ///
-/// - SeeAlso: ${', '.join('`Any%sType`' % t for t in (2 * traversals)[ti + 1 : ti + 3]) }
-public struct Any${Traversal}Collection<Element> : AnyCollectionProtocol {
-  typealias Box = _AnyCollectionBox<Element>
+/// - SeeAlso: ${', '.join('`Any%sCollection`' % t for t in (2 * TRAVERSALS)[ti + 1 : ti + 3]) }
+public struct ${Self}<Element>
+  : AnyCollectionProtocol, ${SelfProtocol} {
 
-%   for SubTraversal in traversals[ti:]:
-  /// Create an `Any${Traversal}Collection` that stores `base` as its
-  /// underlying collection.
+  internal init(_box: _${Self}Box<Element>) {
+    self._box = _box
+  }
+
+%   for SubTraversal in TRAVERSALS[ti:]:
+%     SubProtocol = collectionForTraversal(SubTraversal)
+  /// Creates an `${Self}` that
+  /// stores `base` as its underlying collection.
   ///
   /// - Complexity: O(1).
   public init<
-    C : Collection
+    C : ${SubProtocol}
     where
-    C.Index : ${SubTraversal}Index, C.Iterator.Element == Element
+    C.Iterator.Element == Element,
+
+    // FIXME(compiler limitation): these constraints should be applied to
+    // associated types of Collection.
+    C.SubSequence : ${SubProtocol},
+    C.SubSequence.Iterator.Element == Element,
+    C.SubSequence.Index == C.Index,
+    C.SubSequence.Indices : ${SubProtocol},
+    C.SubSequence.Indices.Iterator.Element == C.Index,
+    C.SubSequence.Indices.Index == C.Index,
+    C.SubSequence.Indices.SubSequence == C.SubSequence.Indices,
+    C.SubSequence.SubSequence == C.SubSequence,
+    C.Indices : ${SubProtocol},
+    C.Indices.Iterator.Element == C.Index,
+    C.Indices.Index == C.Index,
+    C.Indices.SubSequence == C.Indices
   >(_ base: C) {
-    self._box = _CollectionBox<C>(
-      base,
-      startIndex: _${SubTraversal}IndexBox(base.startIndex),
-      endIndex: _${SubTraversal}IndexBox(base.endIndex))
+    // Traversal: ${Traversal}
+    // SubTraversal: ${SubTraversal}
+    self._box = _${SubProtocol}Box<C>(
+      _base: base)
   }
 
-  /// Create an `Any${Traversal}Collection` having the same underlying
+  /// Creates an `Any${Traversal}Collection` having the same underlying
   /// collection as `other`.
   ///
   /// - Postcondition: The result is `===` to `other`.
   ///
   /// - Complexity: O(1).
-  public init(_ other: Any${SubTraversal}Collection<Element>) {
+  public init(
+    _ other: Any${SubProtocol}<Element>
+  ) {
     self._box = other._box
   }
 %   end
 
-%   for SuperTraversal in traversals[:ti]:
-  /// If the indices of the underlying collection stored by `other`
-  /// satisfy `${Traversal}Index`, create an
-  /// `Any${Traversal}Collection` having the same underlying
-  /// collection as `other`.  Otherwise, the result is `nil`.
+%   for SuperTraversal in TRAVERSALS[:ti]:
+  /// If the underlying collection stored by `other` satisfies
+  /// `${SelfProtocol}`, creates an `${Self}` having the same
+  /// underlying collection as `other`.  Otherwise, the result is
+  /// `nil`.
   ///
   /// - Complexity: O(1).
-  public init?(_ other: Any${SuperTraversal}Collection<Element>) {
-    if !(other._box.startIndex is _${Traversal}IndexBoxProtocol) {
+  public init?(
+    _ other: Any${collectionForTraversal(SuperTraversal)}<Element>
+  ) {
+    guard let box =
+      other._box as? _${Self}Box<Element> else {
       return nil
     }
-    _sanityCheck(other._box.endIndex is _${Traversal}IndexBoxProtocol)
-    self._box = other._box
+    self._box = box
   }
 %   end
 
-  /// Returns an iterator over the elements of this collection.
-  ///
-  /// - Complexity: O(1).
-  public func makeIterator() -> AnyIterator<Element> {
-    return _box.makeIterator()
-  }
+  public typealias Index = AnyIndex
+  public typealias IndexDistance = IntMax
 
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
-  public var startIndex: Any${Traversal}Index {
-    return Any${Traversal}Index(_box.startIndex)
+  public var startIndex: AnyIndex {
+    return AnyIndex(_box: _box._startIndex)
   }
 
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
-  public var endIndex: Any${Traversal}Index {
-    return Any${Traversal}Index(_box.endIndex)
+  /// `index(after:)`.
+  public var endIndex: AnyIndex {
+    return AnyIndex(_box: _box._endIndex)
   }
 
-  /// Access the element indicated by `position`.
+  /// Accesses the element indicated by `position`.
   ///
   /// - Precondition: `position` indicates a valid position in `self` and
   ///   `position != endIndex`.
-  public subscript(position: Any${Traversal}Index) -> Element {
+  public subscript(position: AnyIndex) -> Element {
     return _box[position._box]
+  }
+
+  public subscript(bounds: Range<AnyIndex>) -> ${Self}<Element> {
+    return ${Self}(_box:
+      _box[start: bounds.lowerBound._box, end: bounds.upperBound._box])
+  }
+
+  public func _failEarlyRangeCheck(_ index: AnyIndex, bounds: Range<AnyIndex>) {
+    // Do nothing.  Doing a range check would involve unboxing indices,
+    // performing dynamic dispatch etc.  This seems to be too costly for a fast
+    // range check for QoI purposes.
+  }
+
+  public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
+    // Do nothing.  Doing a range check would involve unboxing indices,
+    // performing dynamic dispatch etc.  This seems to be too costly for a fast
+    // range check for QoI purposes.
+  }
+
+  @warn_unused_result
+  public func index(after i: AnyIndex) -> AnyIndex {
+    return AnyIndex(_box: _box._index(after: i._box))
+  }
+
+  public func formIndex(after i: inout AnyIndex) {
+    if _isUnique(&i._box) {
+      _box._formIndex(after: i._box)
+    }
+    else {
+      i = index(after: i)
+    }
+  }
+
+  @warn_unused_result
+  public func index(_ i: AnyIndex, offsetBy n: IntMax) -> AnyIndex {
+    return AnyIndex(_box: _box._index(i._box, offsetBy: n))
+  }
+
+  @warn_unused_result
+  public func index(
+    _ i: AnyIndex,
+    offsetBy n: IntMax,
+    limitedBy limit: AnyIndex
+  ) -> AnyIndex? {
+    return _box._index(i._box, offsetBy: n, limitedBy: limit._box)
+      .map { AnyIndex(_box:$0) }
+  }
+
+  public func formIndex(_ i: inout AnyIndex, offsetBy n: IntMax) {
+    if _isUnique(&i._box) {
+      return _box._formIndex(&i._box, offsetBy: n)
+    } else {
+      i = index(i, offsetBy: n)
+    }
+  }
+
+  public func formIndex(
+    _ i: inout AnyIndex,
+    offsetBy n: IntMax,
+    limitedBy limit: AnyIndex
+  ) -> Bool {
+    if _isUnique(&i._box) {
+      return _box._formIndex(&i._box, offsetBy: n, limitedBy: limit._box)
+    }
+    if let advanced = index(i, offsetBy: n, limitedBy: limit) {
+      i = advanced
+      return true
+    }
+    i = limit
+    return false
+  }
+
+  @warn_unused_result
+  public func distance(from start: AnyIndex, to end: AnyIndex) -> IntMax {
+    return _box._distance(from: start._box, to: end._box)
   }
 
   /// The number of elements.
   ///
   /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(N)'}.
   public var count: IntMax {
-    return _box._count()
+    return _box._count
   }
+
+  public var first: Element? {
+    return _box._first
+  }
+
+%   if Traversal == 'Bidirectional' or Traversal == 'RandomAccess':
+  public func index(before i: AnyIndex) -> AnyIndex {
+    return AnyIndex(_box: _box._index(before: i._box))
+  }
+
+  public func formIndex(before i: inout AnyIndex) {
+    if _isUnique(&i._box) {
+      _box._formIndex(before: i._box)
+    }
+    else {
+      i = index(before: i)
+    }
+  }
+
+  public var last: Element? {
+    return _box._last
+  }
+%   end
 
   /// Uniquely identifies the stored underlying collection.
   public // Due to language limitations only
@@ -670,7 +1096,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionProtocol {
     return ObjectIdentifier(_box)
   }
 
-  internal let _box: Box
+  internal let _box: _${Self}Box<Element>
 }
 % end
 
@@ -684,7 +1110,7 @@ extension AnyIterator {
   }
 }
 
-% for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
+% for Kind in ['Sequence', 'Collection', 'BidirectionalCollection', 'RandomAccessCollection']:
 extension Any${Kind} {
 
   @available(*, unavailable, message: "Please use underestimatedCount property instead.")

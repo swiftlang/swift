@@ -41,8 +41,18 @@ extension DictionaryIterator
   }
 }
 
-
 var DictionaryTestSuite = TestSuite("Dictionary")
+
+DictionaryTestSuite.test("AssociatedTypes") {
+  typealias Collection = Dictionary<MinimalHashableValue, OpaqueValue<Int>>
+  expectCollectionAssociatedTypes(
+    collectionType: Collection.self,
+    iteratorType: DictionaryIterator<MinimalHashableValue, OpaqueValue<Int>>.self,
+    subSequenceType: Slice<Collection>.self,
+    indexType: DictionaryIndex<MinimalHashableValue, OpaqueValue<Int>>.self,
+    indexDistanceType: Int.self,
+    indicesType: DefaultIndices<Collection>.self)
+}
 
 DictionaryTestSuite.test("sizeof") {
   var dict = [1: "meow", 2: "meow"]
@@ -1540,7 +1550,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
   assert(identity1 == unsafeBitCast(d, to: Int.self))
 
   var pairs = Array<(Int, Int)>()
-  for i in startIndex..<endIndex {
+  for i in d.indices {
     var (key, value) = d[i]
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs += [kv]
@@ -1568,7 +1578,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
   assert(identity1 == unsafeBitCast(d, to: Int.self))
 
   var pairs = Array<(Int, Int)>()
-  for i in startIndex..<endIndex {
+  for i in d.indices {
     var (key, value) = d[i]
     let kv = (key.value, value.value)
     pairs += [kv]

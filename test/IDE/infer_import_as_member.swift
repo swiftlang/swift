@@ -1,11 +1,12 @@
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=InferImportAsMember -always-argument-labels -enable-infer-import-as-member > %t.printed.A.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/custom-modules/CollisionImportAsMember.h -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=InferImportAsMember -always-argument-labels -enable-infer-import-as-member > %t.printed.A.txt
+// RUN: %target-swift-frontend -parse -import-objc-header %S/Inputs/custom-modules/CollisionImportAsMember.h -I %t -I %S/Inputs/custom-modules %s -enable-infer-import-as-member -verify
 // RUN: FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
 
 import InferImportAsMember
+let mine = IAMStruct1()
 
 // TODO: more cases, eventually exhaustive, as we start inferring the result we
 // want
-
 
 // PRINT-LABEL: struct IAMStruct1 {
 // PRINT-NEXT:    var x: Double
@@ -45,6 +46,7 @@ import InferImportAsMember
 // PRINT-NEXT:    func getNonPropertyNoSelf() -> Float
 // PRINT-NEXT:    static func setNonPropertyNoSelf(x x: Double, y y: Double)
 // PRINT-NEXT:    func setNonPropertyNoGet(x x: Double)
+// PRINT-NEXT:    func setNonPropertyExternalCollision(x x: Double)
 //
 // PRINT-LABEL:   /// Various static functions that can't quite be imported as properties.
 // PRINT-NEXT:    static func staticGetNonPropertyNumParams() -> Float

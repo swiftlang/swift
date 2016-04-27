@@ -167,7 +167,7 @@ func for_loops2() {
   // rdar://problem/19316670
   // CHECK: [[NEXT:%[0-9]+]] = function_ref @_TFVs16IndexingIterator4next
   // CHECK-NEXT: alloc_stack $Optional<MyClass>
-  // CHECK-NEXT: apply [[NEXT]]<Array<MyClass>,
+  // CHECK-NEXT: apply [[NEXT]]<[MyClass],
   // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo!1
   let objects = [MyClass(), MyClass() ]
   for obj in objects {

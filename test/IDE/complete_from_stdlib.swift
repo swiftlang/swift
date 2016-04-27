@@ -67,7 +67,6 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_EXT_STRING_1 | FileCheck %s -check-prefix=INFIX_EXT_STRING
 
 // NO_STDLIB_PRIVATE: Begin completions
-// NO_STDLIB_PRIVATE-NOT: Decl[{{.*}}]{{[^:]*}}: _
 // NO_STDLIB_PRIVATE: End completions
 
 #^PLAIN_TOP_LEVEL_1^#
@@ -106,7 +105,7 @@ func protocolExtCollection2<C : Collection where C.Index : BidirectionalIndex>(_
 
 // PRIVATE_NOMINAL_MEMBERS_3: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceMethod]/Super:         map({#(transform): (C.Iterator.Element) throws -> T##(C.Iterator.Element) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceVar]/Super:            last[#C.Iterator.Element?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceVar]/Super:            lazy[#LazySequence<Collection>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_3-DAG: index({#where: (C.Iterator.Element) throws -> Bool##(C.Iterator.Element) throws -> Bool#})[' rethrows'][#C.Index?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_3: End completions
 // NEGATIVE_PRIVATE_NOMINAL_MEMBERS_3-NOT: Decl{{.*}}:         index({#({{.*}}): Self.Iterator.Element
@@ -151,8 +150,7 @@ func testArchetypeReplacement2<BAR : Equatable>(_ a: [BAR]) {
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         min({#isOrderedBefore: (Equatable, Equatable) throws -> Bool##(Equatable, Equatable) throws -> Bool#})[' rethrows'][#Equatable?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         max({#isOrderedBefore: (Equatable, Equatable) throws -> Bool##(Equatable, Equatable) throws -> Bool#})[' rethrows'][#Equatable?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         reduce({#(initial): T#}, {#combine: (T, Equatable) throws -> T##(T, Equatable) throws -> T#})[' rethrows'][#T#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         reversed()[#ReverseCollection<[Equatable]>#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         reversed()[#ReverseRandomAccessCollection<[Equatable]>#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         dropFirst({#(n): Int#})[#ArraySlice<Equatable>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         flatMap({#(transform): (Equatable) throws -> Sequence##(Equatable) throws -> Sequence#})[' rethrows'][#[S.Iterator.Element]#]{{; name=.+}}
 
 func testArchetypeReplacement3 (_ a : [Int]) {
@@ -243,7 +241,7 @@ func testInfixOperator1(_ x: Int) {
   x#^INFIX_INT_1^#
 }
 // INFIX_INT: Begin completions
-// INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  ... {#Int#}[#Range<Int>#]
+// INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  ... {#Int#}[#CountableClosedRange<Int>#]
 // INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  &+ {#Int#}[#Int#]
 // INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#Int#}[#Int#]
 // INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  << {#Int#}[#Int#]
@@ -256,7 +254,7 @@ func testInfixOperator2(_ x: inout Int) {
   x#^INFIX_INT_2^#
 }
 // INFIX_LVALUE_INT: Begin completions
-// INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  ... {#Int#}[#Range<Int>#]
+// INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  ... {#Int#}[#CountableClosedRange<Int>#]
 // INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  &+ {#Int#}[#Int#]
 // INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#Int#}[#Int#]
 // INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  << {#Int#}[#Int#]

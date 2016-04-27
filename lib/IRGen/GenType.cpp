@@ -647,7 +647,7 @@ void TypeConverter::pushGenericContext(CanGenericSignature signature) {
   
   // Push the generic context down to the SIL TypeConverter, so we can share
   // archetypes with SIL.
-  IGM.SILMod->Types.pushGenericContext(signature);
+  IGM.getSILTypes().pushGenericContext(signature);
 }
 
 void TypeConverter::popGenericContext(CanGenericSignature signature) {
@@ -655,14 +655,14 @@ void TypeConverter::popGenericContext(CanGenericSignature signature) {
     return;
 
   // Pop the SIL TypeConverter's generic context too.
-  IGM.SILMod->Types.popGenericContext(signature);
+  IGM.getSILTypes().popGenericContext(signature);
   
   Types.DependentCache.clear();
 }
 
 ArchetypeBuilder &TypeConverter::getArchetypes() {
-  auto moduleDecl = IGM.SILMod->getSwiftModule();
-  auto genericSig = IGM.SILMod->Types.getCurGenericContext();
+  auto moduleDecl = IGM.getSwiftModule();
+  auto genericSig = IGM.getSILTypes().getCurGenericContext();
   return *moduleDecl->getASTContext()
       .getOrCreateArchetypeBuilder(genericSig, moduleDecl);
 }
@@ -831,7 +831,12 @@ const TypeInfo &IRGenFunction::getTypeInfo(SILType T) {
 
 /// Return the SIL-lowering of the given type.
 SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) {
-  return SILMod->Types.getLoweredType(orig, subst);
+  return getSILTypes().getLoweredType(orig, subst);
+}
+
+/// Return the SIL-lowering of the given type.
+SILType IRGenModule::getLoweredType(Type subst) {
+  return getSILTypes().getLoweredType(subst);
 }
 
 /// Get a pointer to the storage type for the given type.  Note that,
@@ -848,7 +853,7 @@ llvm::PointerType *IRGenModule::getStoragePointerTypeForLowered(CanType T) {
 }
 
 llvm::Type *IRGenModule::getStorageTypeForUnlowered(Type subst) {
-  return getStorageType(SILMod->Types.getLoweredType(subst));
+  return getStorageType(getSILTypes().getLoweredType(subst));
 }
 
 llvm::Type *IRGenModule::getStorageType(SILType T) {
@@ -886,7 +891,7 @@ IRGenModule::getTypeInfoForUnlowered(AbstractionPattern orig, Type subst) {
 /// have yet undergone SIL type lowering.
 const TypeInfo &
 IRGenModule::getTypeInfoForUnlowered(AbstractionPattern orig, CanType subst) {
-  return getTypeInfo(SILMod->Types.getLoweredType(orig, subst));
+  return getTypeInfo(getSILTypes().getLoweredType(orig, subst));
 }
 
 /// Get the fragile type information for the given type, which is known
@@ -1114,7 +1119,7 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   auto contextTy = canonicalTy;
   if (contextTy->hasTypeParameter()) {
     // The type we got should be lowered, so lower it like a SILType.
-    contextTy = getArchetypes().substDependentType(*IGM.SILMod,
+    contextTy = getArchetypes().substDependentType(IGM.getSILModule(),
                                    SILType::getPrimitiveAddressType(contextTy))
       .getSwiftRValueType();
     
@@ -1857,7 +1862,7 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     
     auto field = allFields.begin();
     if (!allFields.empty() && std::next(field) == allFields.end())
-      return t.getFieldType(*field, *IGM.SILMod);
+      return t.getFieldType(*field, IGM.getSILModule());
 
     return SILType();
   }
@@ -1873,7 +1878,7 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     auto theCase = allCases.begin();
     if (!allCases.empty() && std::next(theCase) == allCases.end()
         && (*theCase)->hasArgumentType())
-      return t.getEnumElementType(*theCase, *IGM.SILMod);
+      return t.getEnumElementType(*theCase, IGM.getSILModule());
 
     return SILType();
   }

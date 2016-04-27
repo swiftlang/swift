@@ -28,7 +28,7 @@ public func run_SetIsSubsetOf(_ N: Int) {
 
   var isSubset = false;
   for _ in 0 ..< N * 5000 {
-    isSubset = set.isSubsetOf(otherSet)
+    isSubset = set.isSubset(of: otherSet)
     if isSubset {
       break
     }
@@ -57,7 +57,7 @@ public func run_SetExclusiveOr(_ N: Int) {
 
   var xor = Set<Int>()
   for _ in 0 ..< N * 100 {
-    xor = set.exclusiveOr(otherSet)
+    xor = set.symmetricDifference(otherSet)
   }
   sink(&xor)
 }
@@ -99,7 +99,7 @@ public func run_SetIntersect(_ N: Int) {
 
   var and = Set<Int>()
   for _ in 0 ..< N * 100 {
-    and = set.intersect(otherSet)
+    and = set.intersection(otherSet)
   }
   sink(&and)
 }
@@ -139,7 +139,7 @@ public func run_SetIsSubsetOf_OfObjects(_ N: Int) {
 
   var isSubset = false;
   for _ in 0 ..< N * 5000 {
-    isSubset = set.isSubsetOf(otherSet)
+    isSubset = set.isSubset(of: otherSet)
     if isSubset {
       break
     }
@@ -168,7 +168,7 @@ public func run_SetExclusiveOr_OfObjects(_ N: Int) {
 
   var xor = Set<Box<Int>>()
   for _ in 0 ..< N * 100 {
-    xor = set.exclusiveOr(otherSet)
+    xor = set.symmetricDifference(otherSet)
   }
   sink(&xor)
 }
@@ -210,7 +210,7 @@ public func run_SetIntersect_OfObjects(_ N: Int) {
 
   var and = Set<Box<Int>>()
   for _ in 0 ..< N * 100 {
-    and = set.intersect(otherSet)
+    and = set.intersection(otherSet)
   }
   sink(&and)
 }

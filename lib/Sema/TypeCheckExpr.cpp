@@ -1216,22 +1216,6 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
 
   if (AFR.hasType() && !AFR.isObjC()) {
     finder.checkType(AFR.getType(), AFR.getLoc());
-#if 0
-    for (auto paramList : AFR.getParameterLists()) {
-      for (auto param : *paramList) {
-        // Passing parameters of class type doesn't require their metadata.
-        if (param->hasType()
-            && !param->getType()->is<MetatypeType>()
-            && !param->getType()->hasRetainablePointerRepresentation())
-          finder.checkType(param->getType(), param->getLoc());
-      }
-    }
-    
-    if (AFR.getBodyResultType()
-        && !AFR.getBodyResultType()->is<MetatypeType>()
-        && !AFR.getBodyResultType()->hasRetainablePointerRepresentation())
-      finder.checkType(AFR.getBodyResultType(), AFR.getLoc());
-#endif
   }
 
   // If this is an init(), explicitly walk the initializer values for members of

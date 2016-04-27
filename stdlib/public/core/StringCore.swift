@@ -271,19 +271,19 @@ public struct _StringCore {
   /// Returns the given sub-`_StringCore`.
   public subscript(bounds: Range<Int>) -> _StringCore {
     _precondition(
-      bounds.startIndex >= 0,
+      bounds.lowerBound >= 0,
       "subscript: subrange start precedes String start")
 
     _precondition(
-      bounds.endIndex <= count,
+      bounds.upperBound <= count,
       "subscript: subrange extends past String end")
 
-    let newCount = bounds.endIndex - bounds.startIndex
+    let newCount = bounds.upperBound - bounds.lowerBound
     _sanityCheck(UInt(newCount) & _flagMask == 0)
 
     if hasContiguousStorage {
       return _StringCore(
-        baseAddress: _pointer(toElementAt: bounds.startIndex),
+        baseAddress: _pointer(toElementAt: bounds.lowerBound),
         _countAndFlags: (_countAndFlags & _flagMask) | UInt(newCount),
         owner: _owner)
     }
@@ -587,7 +587,7 @@ extension _StringCore : RangeReplaceableCollection {
 
   /// Replace the elements within `bounds` with `newElements`.
   ///
-  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
+  /// - Complexity: O(`bounds.count`) if `bounds.upperBound
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == UTF16.CodeUnit
@@ -595,17 +595,17 @@ extension _StringCore : RangeReplaceableCollection {
     _ bounds: Range<Int>, with newElements: C
   ) {
     _precondition(
-      bounds.startIndex >= 0,
+      bounds.lowerBound >= 0,
       "replaceSubrange: subrange start precedes String start")
 
     _precondition(
-      bounds.endIndex <= count,
+      bounds.upperBound <= count,
       "replaceSubrange: subrange extends past String end")
 
     let width = elementWidth == 2 || newElements.contains { $0 > 0x7f } ? 2 : 1
     let replacementCount = numericCast(newElements.count) as Int
     let replacedCount = bounds.count
-    let tailCount = count - bounds.endIndex
+    let tailCount = count - bounds.upperBound
     let growth = replacementCount - replacedCount
     let newCount = count + growth
 
@@ -614,7 +614,7 @@ extension _StringCore : RangeReplaceableCollection {
     // strings, i.e., when we're appending.  Already-used characters
     // can only be mutated when we have a unique reference to the
     // buffer.
-    let appending = bounds.startIndex == endIndex
+    let appending = bounds.lowerBound == endIndex
 
     let existingStorage = !hasCocoaBuffer && (
       appending || isUniquelyReferencedNonObjC(&_owner)
@@ -622,7 +622,7 @@ extension _StringCore : RangeReplaceableCollection {
 
     if _fastPath(existingStorage != nil) {
       let rangeStart = UnsafeMutablePointer<UInt8>(
-        _pointer(toElementAt:bounds.startIndex))
+        _pointer(toElementAt:bounds.lowerBound))
       let tailStart = rangeStart + (replacedCount << elementShift)
 
       if growth > 0 {
@@ -660,9 +660,9 @@ extension _StringCore : RangeReplaceableCollection {
             : isRepresentableAsASCII() && !newElements.contains { $0 > 0x7f } ? 1
             : 2
         ))
-      r.append(contentsOf: self[0..<bounds.startIndex])
+      r.append(contentsOf: self[0..<bounds.lowerBound])
       r.append(contentsOf: newElements)
-      r.append(contentsOf: self[bounds.endIndex..<count])
+      r.append(contentsOf: self[bounds.upperBound..<count])
       self = r
     }
   }

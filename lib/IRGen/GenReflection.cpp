@@ -322,7 +322,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
       addBuiltinTypeRefs(type);
     }
 
-    if (IGM.Opts.EnableReflectionNames) {
+    if (IGM.IRGen.Opts.EnableReflectionNames) {
       auto fieldName = IGM.getAddrOfFieldName(value->getNameStr());
       addRelativeAddress(fieldName);
     } else {
@@ -772,8 +772,8 @@ llvm::Constant *IRGenModule::getAddrOfCaptureDescriptor(SILFunction &SILFn,
 
 void IRGenModule::emitReflectionMetadataRecords() {
   auto DoNotHaveDecls = NominalTypeDecls.empty() && ExtensionDecls.empty();
-  if (!Opts.EnableReflectionMetadata ||
-      (!Opts.EnableReflectionBuiltins && DoNotHaveDecls))
+  if (!IRGen.Opts.EnableReflectionMetadata ||
+      (!IRGen.Opts.EnableReflectionBuiltins && DoNotHaveDecls))
     return;
 
   // We collect all referenced builtin types and emit records for them.
@@ -800,7 +800,7 @@ void IRGenModule::emitReflectionMetadataRecords() {
       addUsedGlobal(var);
   }
 
-  if (Opts.EnableReflectionBuiltins) {
+  if (IRGen.Opts.EnableReflectionBuiltins) {
     BuiltinTypes.insert(Context.TheNativeObjectType);
     BuiltinTypes.insert(Context.TheUnknownObjectType);
     BuiltinTypes.insert(Context.TheBridgeObjectType);

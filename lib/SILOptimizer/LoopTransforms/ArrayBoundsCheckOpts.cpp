@@ -1059,6 +1059,51 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
   return Changed;
 }
 
+/// Match a range check that is exactly within the bounds of the induction
+/// variable.
+static bool matchRangeCheck(CondFailInst *CondFail, InductionInfo &IndVar, DominanceInfo *DT) {
+  if (!IndVar.IsOverflowCheckInserted ||
+      IndVar.Cmp != BuiltinValueKind::ICMP_EQ)
+    return false;
+
+  SILValue CheckedCondition;
+  // This check matches a pattern that includes a predicate that is checked
+  // outside of the loop to be false.
+  if (match(CondFail->getOperand(),
+            m_Or(m_Or(m_SILValue(CheckedCondition),
+                      m_ApplyInst(BuiltinValueKind::Xor,
+                                  m_ApplyInst(BuiltinValueKind::ICMP_SLE,
+                                              m_Specific(IndVar.Start),
+                                              m_Specific(IndVar.HeaderVal)),
+                                  m_One())),
+                 m_ApplyInst(BuiltinValueKind::Xor,
+                             m_ApplyInst(BuiltinValueKind::ICMP_SLT,
+                                         m_Specific(IndVar.HeaderVal),
+                                         m_Specific(IndVar.End)),
+                             m_One())))) {
+    auto *Inst = dyn_cast<SILInstruction>(CheckedCondition);
+    if (Inst &&
+        std::next(SILBasicBlock::iterator(Inst)) != Inst->getParent()->end()) {
+      auto *CF =
+          dyn_cast<CondFailInst>(std::next(SILBasicBlock::iterator(Inst)));
+      if (CF && DT->properlyDominates(CF, CondFail))
+        return true;
+    }
+  }
+
+  return match(CondFail->getOperand(),
+               m_Or(m_ApplyInst(BuiltinValueKind::Xor,
+                                m_ApplyInst(BuiltinValueKind::ICMP_SLE,
+                                            m_Specific(IndVar.Start),
+                                            m_Specific(IndVar.HeaderVal)),
+                                m_One()),
+                    m_ApplyInst(BuiltinValueKind::Xor,
+                                m_ApplyInst(BuiltinValueKind::ICMP_SLT,
+                                            m_Specific(IndVar.HeaderVal),
+                                            m_Specific(IndVar.End)),
+                                m_One())));
+}
+
 /// Analyse the loop for arrays that are not modified and perform dominator tree
 /// based redundant bounds check removal.
 static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
@@ -1120,13 +1165,29 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   }
 
   // Hoist the overflow check of induction variables out of the loop. This also
-  // needs to happen for memory safety.
-  if (IVarsFound)
-    for (auto *Arg: Header->getBBArgs())
+  // needs to happen for memory safety. Also remove superflous range checks.
+  if (IVarsFound) {
+    SmallPtrSet<SILInstruction *, 8> InstsToDelete;
+    for (auto *Arg: Header->getBBArgs()) {
       if (auto *IV = IndVars[Arg]) {
         SILBuilderWithScope B(Preheader->getTerminator(), IV->getInstruction());
         IV->checkOverflow(B);
+
+        if (!IV->IsOverflowCheckInserted)
+          continue;
+
+        for (auto &Inst : *Header) {
+          auto *CondFail = dyn_cast<CondFailInst>(&Inst);
+          if (!CondFail)
+            continue;
+          if (matchRangeCheck(CondFail, *IV, DT))
+            InstsToDelete.insert(CondFail);
+        }
       }
+    }
+    for (auto *Inst : InstsToDelete)
+      Inst->eraseFromParent();
+  }
 
   DEBUG(Preheader->getParent()->dump());
 

@@ -106,7 +106,10 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
       "${SWIFT_SOURCE_DIR}/utils/GYBUnicodeDataUtils.py"
       "${SWIFT_SOURCE_DIR}/utils/SwiftIntTypes.py"
       "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakProperty.txt"
-      "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakTest.txt")
+      "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakTest.txt"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_support.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_unittest_support.py"
+  )
   foreach (src ${${sources_var_name}})
     string(REGEX REPLACE "[.]gyb$" "" src_sans_gyb "${src}")
     if(src STREQUAL src_sans_gyb)

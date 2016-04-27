@@ -187,7 +187,7 @@ public struct _StringBuffer {
   ) -> Bool {
     // The substring to be grown could be pointing in the middle of this
     // _StringBuffer.
-    let offset = (r.startIndex - UnsafePointer(start)) >> elementShift
+    let offset = (r.lowerBound - UnsafePointer(start)) >> elementShift
     return cap + offset <= capacity
   }
 
@@ -210,7 +210,7 @@ public struct _StringBuffer {
     // The substring to be grown could be pointing in the middle of this
     // _StringBuffer.  Adjust the size so that it covers the imaginary
     // substring from the start of the buffer to `oldUsedEnd`.
-    newUsedCount += (bounds.startIndex - UnsafePointer(start)) >> elementShift
+    newUsedCount += (bounds.lowerBound - UnsafePointer(start)) >> elementShift
 
     if _slowPath(newUsedCount > capacity) {
       return false
@@ -228,13 +228,13 @@ public struct _StringBuffer {
     // place.  The operation should be implemented in a thread-safe way,
     // though.
     //
-    // if usedEnd == bounds.endIndex {
+    // if usedEnd == bounds.upperBound {
     //  usedEnd = newUsedEnd
     //  return true
     // }
     let usedEndPhysicalPtr =
       UnsafeMutablePointer<UnsafeMutablePointer<_RawByte>>(_storage._value)
-    var expected = UnsafeMutablePointer<_RawByte>(bounds.endIndex)
+    var expected = UnsafeMutablePointer<_RawByte>(bounds.upperBound)
     if _stdlib_atomicCompareExchangeStrongPtr(
       object: usedEndPhysicalPtr, expected: &expected, desired: newUsedEnd) {
       return true

@@ -54,6 +54,10 @@ namespace swift {
   class Substitution;
   class ValueDecl;
   class VarDecl;
+
+namespace Lowering {
+  class TypeConverter;
+}
   
 namespace irgen {
   class Explosion;
@@ -76,6 +80,9 @@ public:
   IRBuilder Builder;
 
   llvm::Function *CurFn;
+  ModuleDecl *getSwiftModule() const;
+  SILModule &getSILModule() const;
+  Lowering::TypeConverter &getSILTypes() const;
 
   IRGenFunction(IRGenModule &IGM, llvm::Function *fn,
                 const SILDebugScope *DbgScope = nullptr,

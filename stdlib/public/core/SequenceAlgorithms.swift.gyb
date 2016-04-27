@@ -16,6 +16,32 @@
 # a shorthand that we can use today.
 GElement = "Iterator.Element"
 
+orderingExplanation = """\
+  /// The predicate must be a *strict weak ordering* over the elements. That
+  /// is, for any elements `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `isOrderedBefore(a, a)` is always `false`. (Irreflexivity)
+  /// - If `isOrderedBefore(a, b)` and `isOrderedBefore(b, c)` are both `true`,
+  ///   then `isOrderedBefore(a, c)` is also `true`. (Transitive
+  ///   comparability)
+  /// - Two elements are *incomparable* if neither is ordered before the other
+  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
+  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
+  ///   (Transitive incomparability)
+  ///"""
+
+equivalenceExplanation = """\
+  /// The predicate must be a *equivalence relation* over the elements. That
+  /// is, for any elements `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `isEquivalent(a, a)` is always `true`. (Reflexivity)
+  /// - `isEquivalent(a, b)` implies `isEquivalent(b, a)`. (Symmetry)
+  /// - If `isEquivalent(a, b)` and `isEquivalent(b, c)` are both `true`, then
+  ///   `isEquivalent(a, c)` is also `true`. (Transitivity)
+  ///"""
+
 }%
 
 //===----------------------------------------------------------------------===//
@@ -23,18 +49,23 @@ GElement = "Iterator.Element"
 //===----------------------------------------------------------------------===//
 
 extension Sequence {
-  /// Returns a lazy `Sequence` containing pairs (*n*, *x*), where
-  /// *n*s are consecutive `Int`s starting at zero, and *x*s are
-  /// the elements of `self`:
+  /// Returns a sequence of pairs (*n*, *x*), where *n* represents a
+  /// consecutive integer starting at zero, and *x* represents an element of
+  /// the sequence.
+  ///
+  /// This example enumerates the characters of the string "Swift" and prints
+  /// each character along with its place in the string.
   ///
   ///     > for (n, c) in "Swift".characters.enumerated() {
   ///         print("\(n): '\(c)'")
-  ///       }
-  ///     0: 'S'
-  ///     1: 'w'
-  ///     2: 'i'
-  ///     3: 'f'
-  ///     4: 't'
+  ///     }
+  ///     // Prints "0: 'S'"
+  ///     // Prints "1: 'w'"
+  ///     // Prints "2: 'i'"
+  ///     // Prints "3: 'f'"
+  ///     // Prints "4: 't'"
+  ///
+  /// - Returns: A sequence of pairs enumerating the sequence.
   public func enumerated() -> EnumeratedSequence<Self> {
     return EnumeratedSequence(_base: self)
   }
@@ -47,26 +78,45 @@ extension Sequence {
 % # Generate two versions: with explicit predicates and with
 % # a Comparable requirement.
 % for preds in [True, False]:
-
-%{
-if preds:
-  orderingRequirement = """
-  /// - Precondition: `isOrderedBefore` is a
-  ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
-  ///   over `self`."""
-  rethrows_ = "rethrows "
-else:
-  orderingRequirement = ""
-  rethrows_ = ""
-}%
+%   rethrows_ = "rethrows " if preds else ""
 
 extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 
-  /// Returns the minimum element in `self` or `nil` if the sequence is empty.
+%   if preds:
+  /// Returns the minimum element in the sequence, using the given predicate as
+  /// the comparison between elements.
   ///
-  /// - Complexity: O(`elements.count`).
+${orderingExplanation}
+  /// This example shows how to use the `min(isOrderedBefore:)` method on a
+  /// dictionary to find the key-value pair with the lowest value.
   ///
-  /// ${orderingRequirement}
+  ///     let hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
+  ///     let leastHue = hues.min { a, b in a.value < b.value }
+  ///     print(leastHue)
+  ///     // Prints "Optional(("Coral", 16))"
+  ///
+  /// - Parameter isOrderedBefore: A predicate that returns `true` if its first
+  ///   argument should be ordered before its second argument; otherwise,
+  ///   `false`.
+  /// - Returns: The sequence's minimum element, according to
+  ///   `isOrderedBefore`. If the sequence has no elements, returns `nil`.
+  ///
+  /// - SeeAlso: `min()`
+%   else:
+  /// Returns the minimum element in the sequence.
+  ///
+  /// This example finds the smallest value in an array of height measurements.
+  ///
+  ///     let heights = [67.5, 65.7, 64.3, 61.1, 58.5, 60.3, 64.9]
+  ///     let lowestHeight = heights.min()
+  ///     print(lowestHeight)
+  ///     // Prints "Optional(58.5)"
+  ///
+  /// - Returns: The sequence's minimum element. If the sequence has no
+  ///   elements, returns `nil`.
+  ///
+  /// - SeeAlso: `min(isOrderedBefore:)`
+%   end
   @warn_unused_result
   public func min(
 %   if preds:
@@ -85,10 +135,41 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
     return result
   }
 
-  /// Returns the maximum element in `self` or `nil` if the sequence is empty.
+%   if preds:
+  /// Returns the maximum element in the sequence, using the given predicate
+  /// as the comparison between elements.
   ///
-  /// - Complexity: O(`elements.count`).
-  ///   ${orderingRequirement}
+${orderingExplanation}
+  /// This example shows how to use the `max(isOrderedBefore:)` method on a
+  /// dictionary to find the key-value pair with the highest value.
+  ///
+  ///     let hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
+  ///     let greatestHue = hues.max { a, b in a.value < b.value }
+  ///     print(greatestHue)
+  ///     // Prints "Optional(("Heliotrope", 296))"
+  ///
+  /// - Parameter isOrderedBefore:  A predicate that returns `true` if its
+  ///   first argument should be ordered before its second argument;
+  ///   otherwise, `false`.
+  /// - Returns: The sequence's maximum element if the sequence is not empty;
+  ///   otherwise, `nil`.
+  ///
+  /// - SeeAlso: `max()`
+%   else:
+  /// Returns the maximum element in the sequence.
+  ///
+  /// This example finds the smallest value in an array of height measurements.
+  ///
+  ///     let heights = [67.5, 65.7, 64.3, 61.1, 58.5, 60.3, 64.9]
+  ///     let greatestHeight = heights.max()
+  ///     print(greatestHeight)
+  ///     // Prints "Optional(67.5)"
+  ///
+  /// - Returns: The sequence's maximum element. If the sequence has no
+  ///   elements, returns `nil`.
+  ///
+  /// - SeeAlso: `max(isOrderedBefore:)`
+%   end
   @warn_unused_result
   public func max(
 %   if preds:
@@ -117,27 +198,46 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 % # Generate two versions: with explicit predicates and with
 % # an Equatable requirement.
 % for preds in [True, False]:
+%   rethrows_ = "rethrows " if preds else ""
 
 extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 
-%{
-if preds:
-  comment = """
-  /// Returns `true` iff `self` begins with elements equivalent to those of
-  /// `other`, using `isEquivalent` as the equivalence test.  Returns `true` if
-  /// `other` is empty.
+%   if preds:
+  /// Returns a Boolean value indicating whether the initial elements of the
+  /// sequence are equivalent to the elements in another sequence, using
+  /// the given predicate as the equivalence test.
   ///
-  /// - Precondition: `isEquivalent` is an
-  ///   [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)."""
-
-  rethrows_ = "rethrows "
-else:
-  comment = """
-  /// Returns `true` iff the initial elements of `self` are equal to `prefix`.
-  /// Returns `true` if `other` is empty."""
-  rethrows_ = ""
-}%
-  ${comment}
+${equivalenceExplanation}
+  /// - Parameters:
+  ///   - possiblePrefix: A sequence to compare to this sequence.
+  ///   - isEquivalent: A predicate that returns `true` if its two arguments
+  ///     are equivalent; otherwise, `false`.
+  /// - Returns: `true` if the initial elements of the sequence are equivalent
+  ///   to the elements of `possiblePrefix`; otherwise, `false`. Returns
+  ///   `true` if `possiblePrefix` has no elements.
+  ///
+  /// - SeeAlso: `starts(with:)`
+%   else:
+  /// Returns a Boolean value indicating whether the initial elements of the
+  /// sequence are the same as the elements in another sequence.
+  ///
+  /// For example:
+  ///
+  ///     let a = 1...3
+  ///     let b = 1...10
+  ///
+  ///     print(b.starts(with: a))
+  ///     // Prints "true"
+  ///     print(b.starts(with: []))
+  ///     // Prints "true"
+  ///
+  /// - Parameter possiblePrefix: A sequence to compare to this sequence.
+  /// - Returns: `true` if the initial elements of the sequence are the same as
+  ///   the elements of `possiblePrefix`; otherwise, `false`. Returns `true`
+  ///   if `possiblePrefix` has no elements.
+  ///
+  /// - SeeAlso: `starts(with:isEquivalent:)`
+%   end
   @warn_unused_result
   public func starts<
     PossiblePrefix : Sequence where PossiblePrefix.${GElement} == ${GElement}
@@ -171,26 +271,48 @@ else:
 % # Generate two versions: with explicit predicates and with
 % # an Equatable requirement.
 % for preds in [True, False]:
+%   rethrows_ = "rethrows " if preds else ""
 
 extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 
-%{
-if preds:
-  comment = """
-  /// Returns `true` iff `self` and `other` contain equivalent elements, using
-  /// `isEquivalent` as the equivalence test.
+%   if preds:
+  /// Returns a Boolean value indicating whether the sequence and a given
+  /// sequence contain equivalent elements, using the given predicate as the
+  /// equivalence test.
   ///
-  /// - Precondition: `isEquivalent` is an
-  ///   [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)."""
-  rethrows_ = "rethrows "
-else:
-  comment = """
-  /// Returns `true` iff `self` and `other` contain the same elements in the
-  /// same order."""
-  rethrows_ = ""
-}%
-
-  ${comment}
+  /// At least one of the sequences must be finite.
+  ///
+${equivalenceExplanation}
+  /// - Parameters:
+  ///   - other: A sequence to compare to this sequence.
+  ///   - isEquivalent: A predicate that returns `true` if its two arguments
+  ///     are equivalent; otherwise, `false`.
+  /// - Returns: `true` if this sequence and `other` contain equivalent items,
+  ///   using `isEquivalent` as the equivalence test; otherwise, `false.`
+  ///
+  /// - SeeAlso: `elementsEqual(_:)`
+%   else:
+  /// Returns a Boolean value indicating whether the sequence and a given
+  /// sequence contain the same elements in the same order.
+  ///
+  /// At least one of the sequences must be finite.
+  ///
+  /// For example:
+  ///
+  ///     let a = 1...3
+  ///     let b = 1...10
+  ///
+  ///     print(a.elementsEqual(b))
+  ///     // Prints "false"
+  ///     print(a.elementsEqual([1, 2, 3]))
+  ///     // Prints "true"
+  ///
+  /// - Parameter other: A sequence to compare to this sequence.
+  /// - Returns: `true` if this sequence and `other` contain the same elements
+  ///   in the same order.
+  ///
+  /// - SeeAlso: `elementsEqual(_:isEquivalent:)`
+%   end
   @warn_unused_result
   public func elementsEqual<
     OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
@@ -227,38 +349,54 @@ else:
 % # Generate two versions: with explicit predicates and with
 % # Comparable requirement.
 % for preds in [True, False]:
+%   rethrows_ = "rethrows " if preds else ""
 
 extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 
-%{
-if preds:
-  comment = """
-  /// Returns `true` iff `self` precedes `other` in a lexicographical 
-  /// ("dictionary") ordering, using `isOrderedBefore` as the comparison 
-  /// between elements.
+%   if preds:
+  /// Returns a Boolean value indicating whether the sequence precedes another
+  /// sequence in a lexicographical ("dictionary") ordering, using the given
+  /// predicate to compare elements.
+  ///
+${orderingExplanation}
+  /// - Parameters:
+  ///   - other: A sequence to compare to this sequence.
+  ///   - isOrderedBefore:  A predicate that returns `true` if its first
+  ///     argument should be ordered before its second argument; otherwise,
+  ///     `false`.
+  /// - Returns: `true` if this sequence precedes `other` in a dictionary
+  ///   ordering as ordered by `isOrderedBefore`; otherwise, `false`.
   ///
   /// - Note: This method implements the mathematical notion of lexicographical
-  ///   ordering, which has no connection to Unicode.  If you are sorting strings
-  ///   to present to the end-user, you should use `String` APIs that perform
-  /// localized comparison.
+  ///   ordering, which has no connection to Unicode.  If you are sorting
+  ///   strings to present to the end user, use `String` APIs that perform
+  ///   localized comparison instead.
+  /// - SeeAlso: `lexicographicallyPrecedes(_:)`
+%   else:
+  /// Returns a Boolean value indicating whether the sequence precedes another
+  /// sequence in a lexicographical ("dictionary") ordering, using the
+  /// less-than operator (`<`) to compare elements.
   ///
-  /// - Precondition: `isOrderedBefore` is a
-  ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
-  ///   over the elements of `self` and `other`."""
-  rethrows_ = "rethrows "
-else:
-  comment = """
-  /// Returns `true` iff `self` precedes `other` in a lexicographical
-  /// ("dictionary") ordering, using "<" as the comparison between elements.
+  /// For example:
+  ///
+  ///     let a = [1, 2, 2, 2]
+  ///     let b = [1, 2, 3, 4]
+  ///
+  ///     print(a.lexicographicallyPrecedes(b))
+  ///     // Prints "true"
+  ///     print(b.lexicographicallyPrecedes(b))
+  ///     // Prints "false"
+  ///
+  /// - Parameter other: A sequence to compare to this sequence.
+  /// - Returns: `true` if this sequence precedes `other` in a dictionary
+  ///   ordering; otherwise, `false`.
   ///
   /// - Note: This method implements the mathematical notion of lexicographical
-  ///   ordering, which has no connection to Unicode.  If you are sorting strings
-  ///   to present to the end-user, you should use `String` APIs that perform
-  /// localized comparison."""
-  rethrows_ = ""
-}%
-
-  ${comment}
+  ///   ordering, which has no connection to Unicode.  If you are sorting
+  ///   strings to present to the end user, you should use `String` APIs that
+  ///   perform localized comparison.
+  /// - SeeAlso: `lexicographicallyPrecedes(_:isOrderedBefore:)`
+%   end
   @warn_unused_result
   public func lexicographicallyPrecedes<
     OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
@@ -296,7 +434,21 @@ else:
 //===----------------------------------------------------------------------===//
 
 extension Sequence where Iterator.Element : Equatable {
-  /// Returns `true` iff `element` is in `self`.
+  /// Returns a Boolean value indicating whether the sequence contains the
+  /// given element.
+  ///
+  /// This example checks to see whether a favorite actor is in an array
+  /// storing a movie's cast.
+  ///
+  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
+  ///     print(cast.contains("Marlon"))
+  ///     // Prints "true"
+  ///     print(cast.contains("James"))
+  ///     // Prints "false"
+  ///
+  /// - Parameter element: The element to find in the sequence.
+  /// - Returns: `true` if the element was found in the sequence; otherwise,
+  ///   `false`.
   @warn_unused_result
   public func contains(_ element: ${GElement}) -> Bool {
     if let result = _customContainsEquatableElement(element) {
@@ -313,7 +465,41 @@ extension Sequence where Iterator.Element : Equatable {
 }
 
 extension Sequence {
-  /// Returns `true` iff an element in `self` satisfies `predicate`.
+  /// Returns a Boolean value indicating whether the sequence contains an
+  /// element that satisfies the given predicate.
+  ///
+  /// You can use the predicate to check for an element of a type that
+  /// doesn't conform to the `Equatable` protocol, such as the
+  /// `HTTPResponse` enumeration in this example.
+  ///
+  ///     enum HTTPResponse {
+  ///         case ok
+  ///         case error(Int)
+  ///     }
+  /// 
+  ///     let lastThreeResponses: [HTTPResponse] = [.ok, .ok, .error(404)]
+  ///     let hadError = lastThreeResponses.contains { element in
+  ///         if case .error = element {
+  ///             return true
+  ///         } else {
+  ///             return false
+  ///         }
+  ///     }
+  ///     // 'hadError' == true
+  ///
+  /// Alternatively, a predicate can be satisfied by a range of `Equatable`
+  /// elements or a general condition. This example shows how you can check an
+  /// array for an expense greater than $100.
+  ///
+  ///     let expenses = [21.37, 55.21, 9.32, 10.18, 388.77, 11.41]
+  ///     let hasBigPurchase = expenses.contains { $0 > 100 }
+  ///     // 'hasBigPurchase' == true
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence
+  ///   as its argument and returns a Boolean value that indicates whether
+  ///   the passed element represents a match.
+  /// - Returns: `true` if the sequence contains an element that satisfies
+  ///   `predicate`; otherwise, `false`.
   @warn_unused_result
   public func contains(
     _ predicate: @noescape (${GElement}) throws -> Bool
@@ -332,11 +518,35 @@ extension Sequence {
 //===----------------------------------------------------------------------===//
 
 extension Sequence {
-  /// Returns the result of repeatedly calling `combine` with an
-  /// accumulated value initialized to `initial` and each element of
-  /// `self`, in turn, i.e. return
-  /// `combine(combine(...combine(combine(initial, self[0]),
-  /// self[1]),...self[count-2]), self[count-1])`.
+  /// Returns the result of calling the given combining closure with each
+  /// element of this sequence and an accumulating value.
+  ///
+  /// The `combine` closure is called sequentially with an accumulating
+  /// value initialized to `initial` and each element of the sequence. This
+  /// example shows how to find the sum of an array of numbers.
+  ///
+  ///     let numbers = [1, 2, 3, 4]
+  ///     let addTwo: (Int, Int) -> Int = { x, y in x + y }
+  ///     let numberSum = numbers.reduce(0, combine: addTwo)
+  ///     // 'numberSum' == 10
+  ///
+  /// When `numbers.reduce(_:combine:)` is called, the following steps
+  /// occur:
+  ///
+  /// 1. The `combine` closure is called with the initial value and the
+  ///    first element of `numbers`, returning the sum: `1`.
+  /// 2. The closure is called again repeatedly with the previous call's
+  ///    return value and each element of the sequence.
+  /// 3. When the sequence is exhausted, the last value returned from the
+  ///    closure is returned to the caller.
+  ///
+  /// - Parameters:
+  ///   - initial: A value to use as the initial value for accumulation.
+  ///   - combine: A closure that combines an accumulating value and an
+  ///     element of the sequence into a new accumulating value, to be used
+  ///     in the next call of the `combine` closure or returned to the
+  ///     caller.
+  /// - Returns: The final accumulated value.
   @warn_unused_result
   public func reduce<T>(
     _ initial: T, combine: @noescape (T, ${GElement}) throws -> T
@@ -354,10 +564,15 @@ extension Sequence {
 //===----------------------------------------------------------------------===//
 
 extension Sequence {
-  /// Returns an `Array` containing the elements of `self` in reverse
+  /// Returns an array containing the elements of this sequence in reverse
   /// order.
   ///
-  /// Complexity: O(N), where N is the length of `self`.
+  /// The sequence must be finite.
+  ///
+  /// - Complexity: O(N), where N is the length of the sequence.
+  ///
+  /// - Returns: An array containing the elements of this sequence in
+  ///   reverse order.
   @warn_unused_result
   public func reversed() -> [${GElement}] {
     // FIXME(performance): optimize to 1 pass?  But Array(self) can be
@@ -377,17 +592,33 @@ extension Sequence {
 //===----------------------------------------------------------------------===//
 
 extension Sequence {
-  /// Returns an `Array` containing the concatenated results of mapping
-  /// `transform` over `self`.
+  /// Returns an array containing the concatenated results of calling the
+  /// given transformation with each element of this sequence.
   ///
-  ///     s.flatMap(transform)
+  /// Use this method to receive a single-level collection when your
+  /// transformation produces a sequence or collection for each element.
   ///
-  /// is equivalent to
+  /// In this example, note the difference in the result of using `map` and
+  /// `flatMap` with a transformation that returns an array.
   ///
-  ///     Array(s.map(transform).flatten())
+  ///     let numbers = [1, 2, 3, 4]
+  /// 
+  ///     let mapped = numbers.map { Array(count: $0, repeatedValue: $0) }
+  ///     // [[1], [2, 2], [3, 3, 3], [4, 4, 4, 4]]
+  /// 
+  ///     let flatMapped = numbers.flatMap { Array(count: $0, repeatedValue: $0) }
+  ///     // [1, 2, 2, 3, 3, 3, 4, 4, 4, 4]
   ///
-  /// - Complexity: O(*M* + *N*), where *M* is the length of `self`
-  ///   and *N* is the length of the result.
+  /// In fact, `s.flatMap(transform)`  is equivalent to
+  /// `Array(s.map(transform).flatten())`.
+  ///
+  /// - Parameter transform: A closure that accepts an element of this
+  ///   sequence as its argument and returns a sequence or collection.
+  /// - Returns: The resulting flattened array.
+  ///
+  /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
+  ///   and *n* is the length of the result.
+  /// - SeeAlso: `flatten()`, `map(_:)`
   @warn_unused_result
   public func flatMap<S : Sequence>(
     _ transform: @noescape (${GElement}) throws -> S
@@ -401,11 +632,30 @@ extension Sequence {
 }
 
 extension Sequence {
-  /// Returns an `Array` containing the non-nil results of mapping
-  /// `transform` over `self`.
+  /// Returns an array containing the non-`nil` results of calling the given
+  /// transformation with each element of this sequence.
   ///
-  /// - Complexity: O(*M* + *N*), where *M* is the length of `self`
-  ///   and *N* is the length of the result.
+  /// Use this method to receive an array of nonoptional values when your
+  /// transformation produces an optional value.
+  ///
+  /// In this example, note the difference in the result of using `map` and
+  /// `flatMap` with a transformation that returns an optional `Int` value.
+  ///
+  ///     let possibleNumbers = ["1", "2", "three", "///4///", "5"]
+  /// 
+  ///     let mapped: [Int?] = numbers.map { str in Int(str) }
+  ///     // [1, 2, nil, nil, 5]
+  /// 
+  ///     let flatMapped: [Int] = numbers.flatMap { str in Int(str) }
+  ///     // [1, 2, 5]
+  ///
+  /// - Parameter transform: A closure that accepts an element of this
+  ///   sequence as its argument and returns an optional value.
+  /// - Returns: An array of the non-`nil` results of calling `transform`
+  ///   with each element of the sequence.
+  ///
+  /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
+  ///   and *n* is the length of the result.
   @warn_unused_result
   public func flatMap<T>(
     _ transform: @noescape (${GElement}) throws -> T?

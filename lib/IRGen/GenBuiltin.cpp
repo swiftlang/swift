@@ -120,8 +120,7 @@ static void emitTypeTraitBuiltin(IRGenFunction &IGF,
 
 static std::pair<SILType, const TypeInfo &>
 getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
-  auto lowered = IGM.SILMod->Types.getLoweredType(
-                                            unloweredType->getCanonicalType());
+  auto lowered = IGM.getLoweredType(unloweredType);
   return {lowered, IGM.getTypeInfo(lowered)};
 }
 
@@ -131,7 +130,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
                             Explosion &args, Explosion &out,
                             ArrayRef<Substitution> substitutions) {
   // Decompose the function's name into a builtin name and type list.
-  const BuiltinInfo &Builtin = IGF.IGM.SILMod->getBuiltinInfo(FnId);
+  const BuiltinInfo &Builtin = IGF.getSILModule().getBuiltinInfo(FnId);
 
   if (Builtin.ID == BuiltinValueKind::UnsafeGuaranteedEnd) {
     // Just consume the incoming argument.
@@ -220,7 +219,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
   // Everything else cares about the (rvalue) argument.
 
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
-  const IntrinsicInfo &IInfo = IGF.IGM.SILMod->getIntrinsicInfo(FnId);
+  const IntrinsicInfo &IInfo = IGF.getSILModule().getIntrinsicInfo(FnId);
   llvm::Intrinsic::ID IID = IInfo.ID;
 
   // Calls to the int_instrprof_increment intrinsic are emitted during SILGen.

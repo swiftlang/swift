@@ -45,12 +45,12 @@ extension UTF32 : TestableUnicodeCodec {
 }
 
 // The valid ranges of Unicode scalar values
-var unicodeScalarRanges: [Range<UInt32>] = [UInt32(0)...0xd7ff, 0xe000...0x10ffff]
+var unicodeScalarRanges: [CountableClosedRange<UInt32>] = [UInt32(0)...0xd7ff, 0xe000...0x10ffff]
 
 var unicodeScalarCount: Int {
   var count = 0
   for r in unicodeScalarRanges {
-    count += Int(r.endIndex - r.startIndex)
+    count += Int(r.upperBound - r.lowerBound)
   }
   return count
 }
@@ -58,9 +58,9 @@ var unicodeScalarCount: Int {
 func nthUnicodeScalar(_ n: UInt32) -> UnicodeScalar {
   var count: UInt32 = 0
   for r in unicodeScalarRanges {
-    count += r.endIndex - r.startIndex
+    count += r.upperBound - r.lowerBound
     if count > n {
-      return UnicodeScalar(r.endIndex - (count - n))
+      return UnicodeScalar(r.upperBound - (count - n))
     }
   }
   _preconditionFailure("Index out of range")

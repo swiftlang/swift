@@ -3,8 +3,9 @@
 // REQUIRES: objc_interop
 
 // PRINT-LABEL: struct ErrorDomain : RawRepresentable {
-// PRINT-NEXT:    init(rawValue: NSString)
-// PRINT-NEXT:    let rawValue: NSString
+// PRINT-NEXT:    init(rawValue: String)
+// PRINT-NEXT:    var _rawValue: NSString
+// PRINT-NEXT:    var rawValue: String { get }
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension ErrorDomain {
 // PRINT-NEXT:    func process()
@@ -20,16 +21,27 @@
 // PRINT-NEXT:  extension Foo {
 // PRINT-NEXT:    static let err: ErrorDomain
 // PRINT-NEXT:  }
-//
-// TODO: update test when we can import it as actual new enum
-// PRINT-LABEL: struct ClosedEnum : RawRepresentable {
-// PRINT-NEXT:    init(rawValue: NSString)
-// PRINT-NEXT:    let rawValue: NSString
+// PRINT-NEXT:  struct ClosedEnum : RawRepresentable {
+// PRINT-NEXT:    init(rawValue: String?)
+// PRINT-NEXT:    var _rawValue: NSString?
+// PRINT-NEXT:    var rawValue: String? { get }
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension ClosedEnum {
 // PRINT-NEXT:    static let firstClosedEntryEnum: ClosedEnum
 // PRINT-NEXT:    static let secondEntry: ClosedEnum
 // PRINT-NEXT:    static let thirdEntry: ClosedEnum
+// PRINT-NEXT:  }
+// PRINT-NEXT:  struct IUONewtype : RawRepresentable {
+// PRINT-NEXT:    init(rawValue: String!)
+// PRINT-NEXT:    var _rawValue: NSString!
+// PRINT-NEXT:    var rawValue: String! { get }
+// PRINT-NEXT:  }
+// PRINT-NEXT:  struct MyFloat : RawRepresentable {
+// PRINT-NEXT:    init(rawValue: Float)
+// PRINT-NEXT:    let rawValue: Float
+// PRINT-NEXT:  }
+// PRINT-NEXT:  extension MyFloat {
+// PRINT-NEXT:    static let globalFloat: MyFloat
 // PRINT-NEXT:  }
 
 // RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules -enable-swift-newtype
@@ -47,7 +59,7 @@ func tests() {
 	thirdEnum.process()
 	  // expected-error@-1{{value of type 'ClosedEnum' has no member 'process'}}
 
-	let _ = ErrorDomain(rawValue: thirdEnum.rawValue)
+	let _ = ErrorDomain(rawValue: thirdEnum.rawValue!)
 	let _ = ClosedEnum(rawValue: errOne.rawValue)
 
 }

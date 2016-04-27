@@ -1589,7 +1589,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Don't emit a witness table that is available externally if we are emitting
   // code for the JIT. We do not do any optimization for the JIT and it has
   // problems with external symbols that get merged with non-external symbols.
-  if (Opts.UseJIT && !mustEmitDefinition)
+  if (IRGen.Opts.UseJIT && !mustEmitDefinition)
     return;
 
   // Build the witnesses.
@@ -1870,7 +1870,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     GenericTypeRequirements requirements(IGF.IGM, generic->getDecl());
     auto &requirement = requirements.getRequirements()[reqtIndex];
 
-    auto module = IGF.IGM.SILMod->getSwiftModule();
+    auto module = IGF.getSwiftModule();
     auto generics = generic->getDecl()->getGenericSignatureOfContext()
                                       ->getCanonicalSignature();
 
@@ -2385,7 +2385,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
     return SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
                                 /*callee*/ ParameterConvention::Direct_Unowned,
                                 params, /*results*/ {}, /*error*/ None,
-                                IGM.SILMod->getASTContext());
+                                IGM.Context);
   }();
 
   // Figure out what we're actually still required to pass 

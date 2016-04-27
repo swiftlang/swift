@@ -137,7 +137,7 @@ llvm::Value *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
   // If we're emitting optimized code, record the string in the module
   // and let the late ARC pass insert it, but don't generate any calls
   // right now.
-  if (Opts.Optimize) {
+  if (IRGen.Opts.Optimize) {
     llvm::NamedMDNode *metadata =
       Module.getOrInsertNamedMetadata(
                             "clang.arc.retainAutoreleasedReturnValueMarker");
@@ -974,7 +974,7 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
 /// Create the LLVM function declaration for a thunk that acts like
 /// an Objective-C method for a Swift method implementation.
 static llvm::Constant *findSwiftAsObjCThunk(IRGenModule &IGM, SILDeclRef ref) {
-  SILFunction *SILFn = IGM.SILMod->lookUpFunction(ref);
+  SILFunction *SILFn = IGM.getSILModule().lookUpFunction(ref);
   assert(SILFn && "no IR function for swift-as-objc thunk");
   auto fn = IGM.getAddrOfSILFunction(SILFn, NotForDefinition);
   fn->setVisibility(llvm::GlobalValue::DefaultVisibility);
@@ -1090,7 +1090,7 @@ static SILDeclRef getObjCMethodRef(AbstractFunctionDecl *method) {
 
 static CanSILFunctionType getObjCMethodType(IRGenModule &IGM,
                                             AbstractFunctionDecl *method) {  
-  return IGM.SILMod->Types.getConstantFunctionType(getObjCMethodRef(method));
+  return IGM.getSILTypes().getConstantFunctionType(getObjCMethodRef(method));
 }
 
 static clang::CanQualType getObjCPropertyType(IRGenModule &IGM,

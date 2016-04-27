@@ -374,7 +374,10 @@ class SHA1 : Hash {
 
     // Init the rest of the "W" buffer.
     for t in 16..<80 {
-      w[t] = rol((w[t-3] ^ w[t-8] ^ w[t-14] ^ w[t-16]) ,1)
+      // splitting into 2 subexpressions to help typechecker
+      let lhs = w[t-3] ^ w[t-8]
+      let rhs = w[t-14] ^ w[t-16]
+      w[t] = rol(lhs ^ rhs, 1)
     }
 
     dataLength = 0

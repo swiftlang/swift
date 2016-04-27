@@ -41,7 +41,9 @@ struct A2X<T : StaticArrayProtocol> : StaticArrayProtocol {
   func count() -> Int { return upper.count() + lower.count() }
 }
 
-struct StaticArray<T : StaticArrayProtocol> : StaticArrayProtocol, MutableCollection {
+struct StaticArray<
+  T : StaticArrayProtocol
+> : StaticArrayProtocol, RandomAccessCollection, MutableCollection {
   init(_ defaultValue : T.ElemTy) { values = T(defaultValue) }
   var values : T
   func get(_ idx: Int) -> T.ElemTy { return values.get(idx) }
@@ -49,6 +51,7 @@ struct StaticArray<T : StaticArrayProtocol> : StaticArrayProtocol, MutableCollec
   func count() -> Int { return values.count() }
 
   typealias Index = Int
+  typealias IndexDistance = Int
   let startIndex: Int = 0
   var endIndex: Int { return count()}
 
@@ -62,6 +65,11 @@ struct StaticArray<T : StaticArrayProtocol> : StaticArrayProtocol, MutableCollec
   }
 
   typealias Iterator = IndexingIterator<StaticArray>
+
+  subscript(bounds: Range<Index>) -> StaticArray<T> {
+    get { fatalError() }
+    set { fatalError() }
+  }
 }
 
 typealias SA2Int   = StaticArray<A0<Int>>

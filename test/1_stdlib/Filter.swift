@@ -32,7 +32,7 @@ extension LazyFilterSequence where Base : TestProtocol1 {
   }
 }
 
-extension LazyFilterIndex where BaseElements : TestProtocol1 {
+extension LazyFilterIndex where Base : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }

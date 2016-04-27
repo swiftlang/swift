@@ -56,16 +56,16 @@ internal struct _CocoaArrayWrapper : Collection {
     var enumerationState = _makeSwiftNSFastEnumerationState()
 
     // This function currently returns nil unless the first
-    // subRange.endIndex items are stored contiguously.  This is an
+    // subRange.upperBound items are stored contiguously.  This is an
     // acceptable conservative behavior, but could potentially be
     // optimized for other cases.
     let contiguousCount = withUnsafeMutablePointer(&enumerationState) {
       self.buffer.countByEnumerating(with: $0, objects: nil, count: 0)
     }
     
-    return contiguousCount >= subRange.endIndex
+    return contiguousCount >= subRange.upperBound
       ? UnsafeMutablePointer<AnyObject>(enumerationState.itemsPtr!)
-        + subRange.startIndex
+        + subRange.lowerBound
       : nil
   }
 
