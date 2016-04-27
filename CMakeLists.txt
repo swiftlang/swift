@@ -394,8 +394,8 @@ const std::regex broken_regex{
 int main() {}
 ")
 
-    check_cxx_source_runs("${std_regex_test_source}" result)
-    if (result)
+    check_cxx_source_runs("${std_regex_test_source}" "${result_var_name}_TEST")
+    if ("${${result_var_name}_TEST}")
       set("${result_var_name}" TRUE PARENT_SCOPE)
     else()
       set("${result_var_name}" FALSE PARENT_SCOPE)
