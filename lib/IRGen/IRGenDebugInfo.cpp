@@ -103,7 +103,6 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
     M(M),
     DBuilder(M),
     IGM(IGM),
-    EntryPointFn(nullptr),
     MetadataTypeDecl(nullptr),
     InternalType(nullptr),
     LastDebugLoc({}),
@@ -141,21 +140,6 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
           ? llvm::DIBuilder::LineTablesOnly
           : llvm::DIBuilder::FullDebug);
   MainFile = getOrCreateFile(BumpAllocatedString(AbsMainFile).data());
-
-  if (auto *MainFunc =
-        IGM.getSILModule().lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)) {
-    IsLibrary = false;
-    auto *MainIGM = IGM.IRGen.getGenModule(MainFunc->getDeclContext());
-    
-    // Don't create the function type if we are in a different llvm module than
-    // the module where @main is defined. This is the case for non-primary
-    // modules when doing multi-threaded whole-module compilation.
-    if (MainIGM == &IGM) {
-      EntryPointFn = DBuilder.createReplaceableCompositeType(
-          llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
-          MainFile, MainFile, 0);
-    }
-  }
 
   // Because the swift compiler relies on Clang to setup the Module,
   // the clang CU is always created first.  Several dwarf-reading
@@ -524,7 +508,18 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     return getOrCreateContext(DC->getParent());
 
   case DeclContextKind::TopLevelCodeDecl:
+    // Lazily create EntryPointFn.
+    if (!EntryPointFn) {
+      auto main = IGM.getSILModule().lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
+      assert(main && "emitting TopLevelCodeDecl in module without "
+                     SWIFT_ENTRY_POINT_FUNCTION "?");
+      EntryPointFn = DBuilder.createReplaceableCompositeType(
+            llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
+            MainFile, MainFile, 0);
+    }
+
     return cast<llvm::DIScope>(EntryPointFn);
+
   case DeclContextKind::Module:
     return getOrCreateModule({Module::AccessPathTy(), cast<ModuleDecl>(DC)});
   case DeclContextKind::FileUnit:
@@ -712,10 +707,12 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
 
   // RAUW the entry point function forward declaration with the real thing.
   if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
-    assert(EntryPointFn->isTemporary() &&
-           "more than one entry point function");
-    EntryPointFn->replaceAllUsesWith(SP);
-    llvm::MDNode::deleteTemporary(EntryPointFn);
+    if (EntryPointFn) {
+      assert(EntryPointFn->isTemporary() &&
+             "more than one entry point function");
+      EntryPointFn->replaceAllUsesWith(SP);
+      llvm::MDNode::deleteTemporary(EntryPointFn);
+    }
     EntryPointFn = SP;
   }
 

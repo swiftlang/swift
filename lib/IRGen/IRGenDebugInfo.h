@@ -73,13 +73,12 @@ class IRGenDebugInfo {
   llvm::DICompileUnit *TheCU = nullptr; /// The current compilation unit.
   llvm::DIFile *MainFile = nullptr;     /// The main file.
   llvm::DIModule *MainModule = nullptr; /// The current module.
-  llvm::MDNode *EntryPointFn;           /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
+  llvm::MDNode *EntryPointFn = nullptr; /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
   TypeAliasDecl *MetadataTypeDecl;      /// The type decl for swift.type.
   llvm::DIType *InternalType; /// Catch-all type for opaque internal types.
 
   SILLocation::DebugLoc LastDebugLoc; /// The last location that was emitted.
   const SILDebugScope *LastScope;     /// The scope of that last location.
-  bool IsLibrary; /// Whether this is a library or a top level module.
 #ifndef NDEBUG
   /// The basic block where the location was last changed.
   llvm::BasicBlock *LastBasicBlock;
