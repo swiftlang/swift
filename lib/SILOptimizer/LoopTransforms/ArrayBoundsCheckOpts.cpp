@@ -1061,10 +1061,35 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
 
 /// Match a range check that is exactly within the bounds of the induction
 /// variable.
-static bool matchRangeCheck(CondFailInst *CondFail, InductionInfo &IndVar) {
+static bool matchRangeCheck(CondFailInst *CondFail, InductionInfo &IndVar, DominanceInfo *DT) {
   if (!IndVar.IsOverflowCheckInserted ||
       IndVar.Cmp != BuiltinValueKind::ICMP_EQ)
     return false;
+
+  SILValue CheckedCondition;
+  // This check matches a pattern that includes a predicate that is checked
+  // outside of the loop to be false.
+  if (match(CondFail->getOperand(),
+            m_Or(m_Or(m_SILValue(CheckedCondition),
+                      m_ApplyInst(BuiltinValueKind::Xor,
+                                  m_ApplyInst(BuiltinValueKind::ICMP_SLE,
+                                              m_Specific(IndVar.Start),
+                                              m_Specific(IndVar.HeaderVal)),
+                                  m_One())),
+                 m_ApplyInst(BuiltinValueKind::Xor,
+                             m_ApplyInst(BuiltinValueKind::ICMP_SLT,
+                                         m_Specific(IndVar.HeaderVal),
+                                         m_Specific(IndVar.End)),
+                             m_One())))) {
+    auto *Inst = dyn_cast<SILInstruction>(CheckedCondition);
+    if (Inst &&
+        std::next(SILBasicBlock::iterator(Inst)) != Inst->getParent()->end()) {
+      auto *CF =
+          dyn_cast<CondFailInst>(std::next(SILBasicBlock::iterator(Inst)));
+      if (CF && DT->properlyDominates(CF, CondFail))
+        return true;
+    }
+  }
 
   return match(CondFail->getOperand(),
                m_Or(m_ApplyInst(BuiltinValueKind::Xor,
@@ -1155,7 +1180,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
           auto *CondFail = dyn_cast<CondFailInst>(&Inst);
           if (!CondFail)
             continue;
-          if (matchRangeCheck(CondFail, *IV))
+          if (matchRangeCheck(CondFail, *IV, DT))
             InstsToDelete.insert(CondFail);
         }
       }
