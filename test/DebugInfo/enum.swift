@@ -10,6 +10,7 @@ enum Either {
 // CHECK-SAME:             line: [[@LINE-3]],
 // CHECK-SAME:             size: {{328|168}},
 }
+// CHECK: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "_TtSi"
 let E : Either = .Neither;
 
 // CHECK: !DICompositeType(tag: DW_TAG_union_type, name: "Color",
@@ -19,8 +20,9 @@ let E : Either = .Neither;
 enum Color : UInt64 {
 // This is effectively a 2-bit bitfield:
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "Red"
-// CHECK-SAME:           baseType: !"_TtVs6UInt64"
+// CHECK-SAME:           baseType: ![[UINT64:[0-9]+]]
 // CHECK-SAME:           size: 8, align: 8{{[,)]}}
+// CHECK: ![[UINT64]] = !DICompositeType({{.*}}identifier: "_TtVs6UInt64"
   case Red, Green, Blue
 }
 
@@ -30,11 +32,12 @@ enum Color : UInt64 {
 // CHECK-SAME:             identifier: "_TtO4enum12MaybeIntPair"
 enum MaybeIntPair {
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "none"
-// CHECK-SAME:           baseType: !"_TtSi", align: 8{{[,)]}}
+// CHECK-SAME:           baseType: ![[INT]], align: 8{{[,)]}}
   case none
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "just"
-// CHECK-SAME:           baseType: !"_TtTVs5Int64S__"
+// CHECK-SAME:           baseType: ![[INTTUP:[0-9]+]]
 // CHECK-SAME:           size: 128, align: 64{{[,)]}}
+// CHECK: ![[INTTUP]] = !DICompositeType({{.*}}identifier: "_TtTVs5Int64S__"
   case just(Int64, Int64)
 }
 
@@ -76,10 +79,11 @@ public enum Tuple<P> {
 
 func bar<T>(_ x : Tuple<T>) -> Tuple<T> { return x }
 
+// CHECK: ![[LIST:.*]] = !DICompositeType({{.*}}identifier: "_TtGO4enum4ListQq_S0__"
 public enum List<T> {
        indirect case Tail(List, T)
        case End
 
-// CHECK: !DILocalVariable(name: "self", arg: 1, {{.*}} line: [[@LINE+1]], type: !"_TtGO4enum4ListQq_S0__", flags: DIFlagArtificial)
+// CHECK: !DILocalVariable(name: "self", arg: 1, {{.*}} line: [[@LINE+1]], type: ![[LIST]], flags: DIFlagArtificial)
        func fooMyList() {}
 }

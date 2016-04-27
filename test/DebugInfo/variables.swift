@@ -60,9 +60,10 @@ var g = foo(1.0);
 // Tuple types.
 var tuple: (Int, Bool) = (1, true)
 // CHECK-DAG: !DIGlobalVariable(name: "tuple", linkageName: "_Tv{{9variables|4main}}5tupleTSiSb_",{{.*}} type: ![[TUPTY:[^,)]+]]
-// CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type,{{.*}} elements: ![[ELEMS:[0-9]+]],{{.*}} identifier: [[TUPTY]]
+// CHECK-DAG: ![[TUPTY]] = !DICompositeType(tag: DW_TAG_structure_type,{{.*}} elements: ![[ELEMS:[0-9]+]]
 // CHECK-DAG: ![[ELEMS]] = !{![[MI64:[0-9]+]], ![[MB:[0-9]+]]}
-// CHECK-DAG: ![[MI64]] = !DIDerivedType(tag: DW_TAG_member,{{.*}} baseType: !"_TtSi"
+// CHECK-DAG: ![[INTTY:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int"
+// CHECK-DAG: ![[MI64]] = !DIDerivedType(tag: DW_TAG_member,{{.*}} baseType: ![[INTTY]]
 // CHECK-DAG: ![[MB]] = !DIDerivedType(tag: DW_TAG_member,{{.*}} baseType: ![[B]]
 func myprint(_ p: (i: Int, b: Bool)) {
      print("\(p.i) -> \(p.b)")
@@ -73,8 +74,8 @@ func myprint(_ p: (i: Int, b: Bool)) {
 myprint(tuple)
 
 // Arrays are represented as an instantiation of Array.
-// CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "Array",{{.*}} identifier: [[Array:"[^"]+"]]
-// CHECK-DAG: !DIGlobalVariable(name: "array_of_tuples",{{.*}} type: ![[Array]]
+// CHECK-DAG: ![[ARRAYTY:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Array",
+// CHECK-DAG: !DIGlobalVariable(name: "array_of_tuples",{{.*}} type: ![[ARRAYTY]]
 var array_of_tuples : [(a : Int, b : Int)] = [(1,2)]
 var twod : [[Int]] = [[1]]
 
@@ -83,7 +84,7 @@ func bar(_ x: [(a : Int, b : Int)], y: [[Int]]) {
 
 
 // CHECK-DAG: !DIGlobalVariable(name: "P",{{.*}} type: ![[PTY:[0-9]+]]
-// CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtT1xSd1ySd1zSd_",{{.*}} identifier: [[PTUP:[^,)]+]]
+// CHECK-DAG: ![[PTUP:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "_TtT1xSd1ySd1zSd_",
 // CHECK-DAG: ![[PTY]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_Tta{{9variables|4main}}5Point",{{.*}} baseType: ![[PTUP]]
 typealias Point = (x: Double, y: Double, z: Double)
 var P:Point = (1, 2, 3)
@@ -104,8 +105,8 @@ enum TriValue {
   case true_
   case top
 }
-// CHECK-DAG: !DIGlobalVariable(name: "unknown",{{.*}} type: !"_TtO{{9variables|4main}}8TriValue"
-// CHECK-DAG: !DICompositeType(tag: DW_TAG_union_type, name: "TriValue", {{.*}}identifier: "_TtO{{9variables|4main}}8TriValue"
+// CHECK-DAG: !DIGlobalVariable(name: "unknown",{{.*}} type: ![[TRIVAL:[0-9]+]]
+// CHECK-DAG: ![[TRIVAL]] = !DICompositeType(tag: DW_TAG_union_type, name: "TriValue",
 var unknown = TriValue.top
 func myprint(_ value: TriValue) {
      switch value {

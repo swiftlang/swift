@@ -73,12 +73,12 @@ StringRef IRGenDebugInfo::BumpAllocatedString(StringRef S) {
 }
 
 /// Return the size reported by a type.
-static unsigned getSizeInBits(llvm::DIType *Ty, const TrackingDIRefMap &Map) {
+static unsigned getSizeInBits(llvm::DIType *Ty) {
   // Follow derived types until we reach a type that
   // reports back a size.
   while (isa<llvm::DIDerivedType>(Ty) && !Ty->getSizeInBits()) {
     auto *DT = cast<llvm::DIDerivedType>(Ty);
-    Ty = DT->getBaseType().resolve(Map);
+    Ty = DT->getBaseType().resolve();
     if (!Ty)
       return 0;
   }
@@ -86,10 +86,9 @@ static unsigned getSizeInBits(llvm::DIType *Ty, const TrackingDIRefMap &Map) {
 }
 
 /// Return the size reported by the variable's type.
-static unsigned getSizeInBits(const llvm::DILocalVariable *Var,
-                              const TrackingDIRefMap &Map) {
-  llvm::DIType *Ty = Var->getType().resolve(Map);
-  return getSizeInBits(Ty, Map);
+static unsigned getSizeInBits(const llvm::DILocalVariable *Var) {
+  llvm::DIType *Ty = Var->getType().resolve();
+  return getSizeInBits(Ty);
 }
 
 IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
@@ -908,7 +907,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
   auto *BB = Builder.GetInsertBlock();
   bool IsPiece = Storage.size() > 1;
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
-  unsigned VarSizeInBits = getSizeInBits(Var, DIRefMap);
+  unsigned VarSizeInBits = getSizeInBits(Var);
 
   // Running variables for the current/previous piece.
   unsigned SizeInBits = 0;
@@ -1025,7 +1024,7 @@ IRGenDebugInfo::createMemberType(DebugTypeInfo DbgTy, StringRef Name,
   auto *DITy = DBuilder.createMemberType(
       Scope, Name, File, 0, SizeOfByte * DbgTy.size.getValue(),
       SizeOfByte * DbgTy.align.getValue(), OffsetInBits, Flags, Ty);
-  OffsetInBits += getSizeInBits(Ty, DIRefMap);
+  OffsetInBits += getSizeInBits(Ty);
   OffsetInBits = llvm::alignTo(OffsetInBits,
                                           SizeOfByte * DbgTy.align.getValue());
   return DITy;

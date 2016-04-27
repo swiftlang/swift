@@ -17,11 +17,9 @@ class MyObject : NSObject {
   // LOC-CHECK: ret
   var MyArr = NSArray()
 // IMPORT-CHECK: filename: "test-foundation.swift"
-// IMPORT-CHECK: [[FOUNDATION:[0-9]+]] = !DIModule({{.*}} name: "Foundation",
-// IMPORT-CHECK-SAME:                              {{.*}} includePath:
-// IMPORT-CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray",
-// IMPORT-CHECK-SAME:             scope: ![[FOUNDATION]]
-// IMPORT-CHECK: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}entity: ![[FOUNDATION]]
+// IMPORT-CHECK-DAG: [[FOUNDATION:[0-9]+]] = !DIModule({{.*}} name: "Foundation",{{.*}} includePath:
+// IMPORT-CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray", scope: ![[FOUNDATION]]
+// IMPORT-CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}entity: ![[FOUNDATION]]
 
   func foo(_ obj: MyObject) {
     return obj.foo(obj)
@@ -35,8 +33,8 @@ extension MyObject {
   }
 }
 
-// SANITY-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "NSObject",{{.*}} identifier: "_TtCSo8NSObject"
-// SANITY-DAG: !DIGlobalVariable(name: "NsObj",{{.*}} line: [[@LINE+1]],{{.*}} type: !"_TtCSo8NSObject",{{.*}} isDefinition: true
+// SANITY-DAG: ![[NSOBJECT:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "NSObject",{{.*}} identifier: "_TtCSo8NSObject"
+// SANITY-DAG: !DIGlobalVariable(name: "NsObj",{{.*}} line: [[@LINE+1]],{{.*}} type: ![[NSOBJECT]],{{.*}} isDefinition: true
 var NsObj: NSObject
 NsObj = MyObject()
 var MyObj: MyObject

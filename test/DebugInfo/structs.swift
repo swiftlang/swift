@@ -12,23 +12,19 @@ func test(_ x : A) {
 }
 // CHECK:    define hidden void @_TF7structs4test
 // CHECK: [[X_DBG:%.*]] = alloca
-// CHECK: call void @llvm.dbg.declare(metadata {{.*}}* [[X_DBG]], metadata ![[X_MD:[0-9]+]], metadata
-// CHECK: }
-
-// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "A"
-// CHECK-SAME:             identifier: [[A_DI:"[^"]+"]]
+// CHECK: call void @llvm.dbg.declare(metadata {{.*}}* [[X_DBG]], metadata [[X_MD:!.*]], metadata
+// CHECK: ![[A_DI:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "A",{{.*}}identifier
 
 class C {
   var lots_of_extra_storage: (Int, Int, Int) = (1, 2, 3)
   var member: C = C()
 }
 
+// CHECK: [[X_MD]] = !DILocalVariable(name: "x", arg: 1
+// CHECK-SAME:                         type: ![[A_DI]]
+
 // A class is represented by a pointer, so B's total size should be PTRSIZE.
-// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "B",
-// CHECK-SAME:             {{.*}}size: [[PTRSIZE]]
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "B",{{.*}}size: [[PTRSIZE]]
 struct B {
   var c : C
 }
-
-// CHECK: ![[X_MD]] = !DILocalVariable(name: "x", arg: 1
-// CHECK-SAME:                         type: ![[A_DI]]

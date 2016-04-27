@@ -10,8 +10,9 @@ func makeIncrementor(_ inc : Int64) -> () -> Int64
     // CHECK-SAME:                        metadata ![[EMPTY:.*]])
     // CHECK: ![[EMPTY]] = !DIExpression()
     // CHECK: ![[SUM_CAPTURE]] = !DILocalVariable(name: "sum", arg: 1,
-    // CHECK-SAME:     line: [[@LINE-8]], type: !"_TtRVs5Int64"
-    //                                               ^ inout type.
+    // CHECK-SAME:     line: [[@LINE-8]], type: ![[INOUTTY:[0-9]+]]
+    // CHECK: ![[INOUTTY]] = !DICompositeType({{.*}}identifier: "_TtRVs5Int64"
+    //                                                              ^ inout type.
     sum += inc
     return sum
   }
