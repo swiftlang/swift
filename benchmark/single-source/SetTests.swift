@@ -13,7 +13,7 @@
 import TestsUtils
 
 @inline(never)
-public func run_SetIsSubset(of N: Int) {
+public func run_SetIsSubsetOf(_ N: Int) {
   let size = 200
 
   SRand()
