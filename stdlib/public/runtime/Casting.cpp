@@ -2337,6 +2337,8 @@ static bool _dynamicCastValueToClassViaObjCBridgeable(
     *reinterpret_cast<void **>(dest) = cast;
     success = true;
   } else {
+    // We don't need the object anymore.
+    swift_unknownRelease(srcBridgedObject);
     success = false;
   }
 
