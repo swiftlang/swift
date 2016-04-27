@@ -36,19 +36,19 @@
 ///     struct ShippingOptions: OptionSet {
 ///         let rawValue: Int
 ///
-///         static let NextDay    = ShippingOptions(rawValue: 1 << 0)
-///         static let SecondDay  = ShippingOptions(rawValue: 1 << 1)
-///         static let Priority   = ShippingOptions(rawValue: 1 << 2)
-///         static let Standard   = ShippingOptions(rawValue: 1 << 3)
+///         static let nextDay    = ShippingOptions(rawValue: 1 << 0)
+///         static let secondDay  = ShippingOptions(rawValue: 1 << 1)
+///         static let priority   = ShippingOptions(rawValue: 1 << 2)
+///         static let standard   = ShippingOptions(rawValue: 1 << 3)
 ///
-///         static let Express: ShippingOptions = [NextDay, SecondDay]
-///         static let All: ShippingOptions = [Express, Priority, Standard]
+///         static let express: ShippingOptions = [.nextDay, .secondDay]
+///         static let all: ShippingOptions = [.express, .priority, .standard]
 ///     }
 ///
 /// Declare additional preconfigured option set values as static properties
 /// initialized with an array literal containing other option values. In the
-/// example, because the `Express` static property is assigned an array
-/// literal with the `NextDay` and `SecondDay` options, it will contain those
+/// example, because the `express` static property is assigned an array
+/// literal with the `nextDay` and `secondDay` options, it will contain those
 /// two elements.
 ///
 /// Using an Option Set Type
@@ -60,8 +60,8 @@
 /// multiple static members of the option set. To create an empty instance,
 /// assign an empty array literal to your variable.
 ///
-///     let singleOption: ShippingOptions = .Priority
-///     let multipleOptions: ShippingOptions = [.NextDay, .SecondDay, .Priority]
+///     let singleOption: ShippingOptions = .priority
+///     let multipleOptions: ShippingOptions = [.nextDay, .secondDay, .priority]
 ///     let noOptions: ShippingOptions = []
 ///
 /// Use set-related operations to check for membership and to add or remove
@@ -73,10 +73,10 @@
 ///
 ///     var freeOptions: ShippingOptions = []
 ///     if purchasePrice > 50 {
-///         freeOptions.insert(.Priority)
+///         freeOptions.insert(.priority)
 ///     }
 ///
-///     if freeOptions.contains(.Priority) {
+///     if freeOptions.contains(.priority) {
 ///         print("You've earned free priority shipping!")
 ///     } else {
 ///         print("Add more to your cart for free priority shipping!")
@@ -112,7 +112,7 @@ public protocol OptionSet : SetAlgebra, RawRepresentable {
   /// declared static members.
   ///
   ///     let extraOptions = ShippingOptions(rawValue: 255)
-  ///     print(extraOptions.isStrictSupersetOf(.All))
+  ///     print(extraOptions.isStrictSuperset(of: .all))
   ///     // Prints "true"
   ///
   /// - Parameter rawValue: The raw value of the option set to create.
@@ -136,9 +136,9 @@ extension OptionSet {
   /// This example uses the `union(_:)` method to add two more shipping options to
   /// the default set.
   ///
-  ///     let defaultShipping = ShippingOptions.Standard
-  ///     let memberShipping = defaultShipping.union([.SecondDay, .Priority])
-  ///     print(memberShipping.contains(.Priority))
+  ///     let defaultShipping = ShippingOptions.standard
+  ///     let memberShipping = defaultShipping.union([.secondDay, .priority])
+  ///     print(memberShipping.contains(.priority))
   ///     // Prints "true"
   ///
   /// - Parameter other: An option set.
@@ -158,14 +158,14 @@ extension OptionSet {
   /// shipping options to what can be used with a PO Box destination.
   ///
   ///     // Can only ship standard or priority to PO Boxes
-  ///     let poboxShipping: ShippingOptions = [.Standard, .Priority]
+  ///     let poboxShipping: ShippingOptions = [.standard, .priority]
   ///     let memberShipping: ShippingOptions =
-  ///             [.Standard, .Priority, .SecondDay]
+  ///             [.standard, .priority, .secondDay]
   ///
   ///     let availableOptions = memberShipping.intersection(poboxShipping)
-  ///     print(availableOptions.contains(.Priority))
+  ///     print(availableOptions.contains(.priority))
   ///     // Prints "true"
-  ///     print(availableOptions.contains(.SecondDay))
+  ///     print(availableOptions.contains(.secondDay))
   ///     // Prints "false"
   ///
   /// - Parameter other: An option set.
@@ -205,8 +205,8 @@ extension OptionSet where Element == Self {
   /// This example uses the `contains(_:)` method to check whether next-day
   /// shipping is in the `availableOptions` instance.
   ///
-  ///     let availableOptions = ShippingOptions.Express
-  ///     if availableOptions.contains(.NextDay) {
+  ///     let availableOptions = ShippingOptions.express
+  ///     if availableOptions.contains(.nextDay) {
   ///         print("Next day shipping available")
   ///     }
   ///     // Prints "Next day shipping available"
@@ -226,11 +226,11 @@ extension OptionSet where Element == Self {
   ///
   ///     let purchasePrice = 87.55
   ///
-  ///     var freeOptions: ShippingOptions = [.Standard]
+  ///     var freeOptions: ShippingOptions = [.standard]
   ///     if purchasePrice > 50 {
-  ///         freeOptions.insert(.Priority)
+  ///         freeOptions.insert(.priority)
   ///     }
-  ///     print(freeOptions.contains(.Priority))
+  ///     print(freeOptions.contains(.priority))
   ///     // Prints "true"
   ///
   /// - Parameter newMember: The element to insert.
@@ -256,17 +256,17 @@ extension OptionSet where Element == Self {
   /// Removes a given element if it is contained in the option set; otherwise,
   /// removes all elements subsumed by the given element.
   ///
-  /// In the following example, removing `.Express` empties the option set but
+  /// In the following example, removing `.express` empties the option set but
   /// returns `nil` because the option set doesn't contain all the elements of
-  /// `.Express`.
+  /// `.express`.
   ///
-  ///     var options: ShippingOptions = [.SecondDay, .Priority]
-  ///     let priorityOption = options.remove(.Priority)
-  ///     print(priorityOption == .Priority)
+  ///     var options: ShippingOptions = [.secondDay, .priority]
+  ///     let priorityOption = options.remove(.priority)
+  ///     print(priorityOption == .priority)
   ///     // Prints "true"
   ///
-  ///     let expressOption = options.remove(.Express)
-  ///     print(expressOption == .Express)
+  ///     let expressOption = options.remove(.express)
+  ///     print(expressOption == .express)
   ///     // Prints "false"
   ///     print(options.isEmpty)
   ///     // Prints "true"

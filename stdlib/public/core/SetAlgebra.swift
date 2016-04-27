@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A mutable set of a given `Element` type.
+/// A type that provides mathematical set operations.
 ///
 /// You use types that conform to the `SetAlgebra` protocol when you need
 /// efficient membership tests or mathematical set operations such as
@@ -23,10 +23,9 @@
 /// create bit masks with `SetAlgebra` conformance using the `OptionSet`
 /// protocol. See those types for more information.
 ///
-/// - Note: Unlike ordinary set types, the `Element` type of an
-///   `OptionSet` is identical to the `OptionSet` type itself. This
-///   protocol is specifically designed to accomodate both kinds of
-///   set.
+/// - Note: Unlike ordinary set types, the `Element` type of an `OptionSet` is
+///   identical to the `OptionSet` type itself. The `SetAlgebra` protocol is
+///   specifically designed to accomodate both kinds of set.
 ///
 /// Conforming to the SetAlgebra Protocol
 /// =====================================
@@ -39,63 +38,24 @@
 /// type `S.Element`---the type that the set holds.
 ///
 /// - `S() == []`
-/// - `x.intersect(x) == x`
-/// - `x.intersect([]) == []`
+/// - `x.intersection(x) == x`
+/// - `x.intersection([]) == []`
 /// - `x.union(x) == x`
 /// - `x.union([]) == x`
 /// - `x.contains(e)` implies `x.union(y).contains(e)`
 /// - `x.union(y).contains(e)` implies `x.contains(e) || y.contains(e)`
 /// - `x.contains(e) && y.contains(e)` if and only if
-///   `x.intersect(y).contains(e)`
-/// - `x.isSubsetOf(y)` if and only if `y.isSupersetOf(x)`
-/// - `x.isStrictSupersetOf(y)` if and only if `x.isSupersetOf(y) && x != y`
-/// - `x.isStrictSubsetOf(y)` if and only if `x.isSubsetOf(y) && x != y`
-///
-/// Nondisjoint Elements
-/// --------------------
-///
-/// The `SetAlgebra` protocol supports set types for which elements of the set
-/// are not necessarily unique. In a `SetAlgebra` model, some elements may
-/// *subsume* other elements. Here, an element `e` subsumes an element `f` if
-/// and only if the modeled set of `e` is a superset of the modeled set of
-/// `f`. Two elements are *disjoint* when neither one subsumes the other.
-///
-/// In many concrete implementations of `SetAlgebra`, such as `Set<Element>`,
-/// an element `e` subsumes an element `f` if and only if the two elements are
-/// equal, but that is not always the case. For example, an element of an
-/// option set may subsume another element without the two being equal.
-///
-/// Consider an option set called `Directions` that defines the four directions
-/// you can move in a game. The `Directions` type declares the set of each of
-/// those four distinct directions as static properties, and it declares a
-/// fifth set of all directions as another static property.
-///
-///     struct Directions: OptionSet {
-///         let rawValue: UInt8
-///
-///         static let up    = Directions(rawValue: 1 << 0)
-///         static let down  = Directions(rawValue: 1 << 1)
-///         static let left  = Directions(rawValue: 1 << 2)
-///         static let right = Directions(rawValue: 1 << 3)
-///
-///         static let allDirections: Directions = [up, down, left, right]
-///     }
-///
-/// In this example, the `allDirections` property is both an instance of *and*
-/// an element of the `Directions` option set. As such, it can be said to
-/// subsume each of the distinct directions, whereas the distinct directions
-/// are disjoint from one another.
-///
-///     print(Directions.element(.allDirections, subsumes: .up))
-///     // Prints "true"
-///     print(Directions.element(.right, isDisjointWith: .left))
-///     // Prints "true"
-///
+///   `x.intersection(y).contains(e)`
+/// - `x.isSubset(of: y)` if and only if `y.isSuperset(of: x)`
+/// - `x.isStrictSuperset(of: y)` if and only if
+///   `x.isSuperset(of: y) && x != y`
+/// - `x.isStrictSubset(of: y)` if and only if `x.isSubset(of: y) && x != y`
+/// 
 /// - SeeAlso: `OptionSet`, `Set`
 public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   // FIXME: write tests for SetAlgebra
   
-  /// A type for which `Self` provides a containment test.
+  /// A type for which the conforming type provides a containment test.
   associatedtype Element
   
   /// Creates an empty set.
@@ -132,12 +92,30 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   @warn_unused_result
   func contains(_ member: Element) -> Bool
 
-  /// Returns the set of elements contained in `self`, in `other`, or in
-  /// both `self` and `other`.
+  /// Returns a new set with the elements of both this and the given set.
   ///
-  /// - Note: if `self` and `other` contain elements that are equal
-  ///   but distinguishable (e.g. via `===`), which of these elements is 
-  ///   present in the result is unspecified.
+  /// For example:
+  ///
+  ///     let attendees: Set = ["Alicia", "Bethany", "Diana"]
+  ///     let visitors = ["Marcia", "Nathaniel"]
+  ///     let attendeesAndVisitors = attendees.union(visitors)
+  ///     print(attendeesAndVisitors)
+  ///     // Prints "["Diana", "Nathaniel", "Bethany", "Alicia", "Marcia"]"
+  ///
+  /// If the set already contains one or more elements that are also in
+  /// `other`, the existing members are kept. For example:
+  ///
+  ///     let initialIndices = Set(0..<5)
+  ///     let expandedIndices = initialIndices.union([2, 3, 6, 7])
+  ///     print(expandedIndices)
+  ///     // Prints "[2, 4, 6, 7, 0, 1, 3]"
+  ///
+  /// - Parameter other: A set of the same type as the current set.
+  /// - Returns: A new set with the unique elements of this set and `other`.
+  ///
+  /// - Note: if this set and `other` contain elements that are equal but
+  ///   distinguishable (e.g. via `===`), which of these elements is present
+  ///   in the result is unspecified.
   @warn_unused_result
   func union(_ other: Self) -> Self
   
@@ -148,15 +126,16 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
-  ///     let bothNeighborsAndEmployees = employees.intersect(neighbors)
+  ///     let bothNeighborsAndEmployees = employees.intersection(neighbors)
   ///     print(bothNeighborsAndEmployees)
   ///     // Prints "["Bethany", "Eric"]"
   ///
   /// - Parameter other: A set of the same type as the current set.
   /// - Returns: A new set.
-  /// - Note: if `self` and `other` contain elements that are equal
-  ///   but distinguishable (e.g. via `===`), which of these elements is 
-  ///   present in the result is unspecified.
+  ///
+  /// - Note: if this set and `other` contain elements that are equal but
+  ///   distinguishable (e.g. via `===`), which of these elements is present
+  ///   in the result is unspecified.
   @warn_unused_result
   func intersection(_ other: Self) -> Self
 
@@ -167,7 +146,7 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani"]
-  ///     let eitherNeighborsOrEmployees = employees.exclusiveOr(neighbors)
+  ///     let eitherNeighborsOrEmployees = employees.symmetricDifference(neighbors)
   ///     print(eitherNeighborsOrEmployees)
   ///     // Prints "["Diana", "Forlani", "Alicia"]"
   ///
@@ -184,23 +163,25 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// `classDays` set does not change.
   ///
   ///     enum DayOfTheWeek: Int {
-  ///         case Sunday, Monday, Tuesday, Wednesday, Thursday,
-  ///             Friday, Saturday
+  ///         case sunday, monday, tuesday, wednesday, thursday,
+  ///             friday, saturday
   ///     }
   ///
-  ///     var classDays: Set<DayOfTheWeek> = [.Wednesday, .Friday]
-  ///     classDays.insert(.Monday)
+  ///     var classDays: Set<DayOfTheWeek> = [.wednesday, .friday]
+  ///     print(classDays.insert(.monday))
+  ///     // Prints "(true, .monday)"
   ///     print(classDays)
-  ///     // Prints "[.Friday, .Wednesday, .Monday]"
+  ///     // Prints "[.friday, .wednesday, .monday]"
   ///
-  ///     classDays.insert(.Friday)
+  ///     print(classDays.insert(.friday))
+  ///     // Prints "(false, .friday)"
   ///     print(classDays)
-  ///     // Prints "[.Friday, .Wednesday, .Monday]"
+  ///     // Prints "[.friday, .wednesday, .monday]"
   ///
-  /// - Returns: `(true, newMember)` if `e` was not contained in `self`.
-  ///   Otherwise, returns `(false, oldMember)`, where `oldMember` is the
-  ///   member of `self` equal to `newMember` (which may be distinguishable
-  ///   from `newMember`, e.g. via `===`).
+  /// - Returns: `(true, newMember)` if `newMember` was not contained in
+  ///   `self`. Otherwise, returns `(false, oldMember)`, where `oldMember` is
+  ///   the member of `self` equal to `newMember` (which may be
+  ///   distinguishable from `newMember`, e.g. via `===`).
   ///
   /// - Postcondition: `self.contains(newMember)`.
   mutating func insert(
@@ -233,27 +214,68 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// - Postcondition: `self.contains(e)`
   mutating func update(with e: Element) -> Element?
   
-  /// Insert all elements of `other` into `self`.
+  /// Adds the elements of the given set to the set.
   ///
-  /// - Equivalent to replacing `self` with `self.union(other)`.
-  /// - Postcondition: `self.isSuperset(of: other)`
+  /// For example:
+  ///
+  ///     var attendees: Set = ["Alicia", "Bethany", "Diana"]
+  ///     let visitors: Set = ["Marcia", "Nathaniel"]
+  ///     attendees.formUnion(visitors)
+  ///     print(attendees)
+  ///     // Prints "["Diana", "Nathaniel", "Bethany", "Alicia", "Marcia"]"
+  ///
+  /// If the set already contains one or more elements that are also in
+  /// `other`, the existing members are kept. For example:
+  ///
+  ///     var initialIndices = Set(0..<5)
+  ///     initialIndices.formUnion([2, 3, 6, 7])
+  ///     print(initialIndices)
+  ///     // Prints "[2, 4, 6, 7, 0, 1, 3]"
+  ///
+  /// - Parameter other: A set of the same type as the current set.
   mutating func formUnion(_ other: Self)
 
-  /// Removes all elements of `self` that are not also present in
-  /// `other`.
+  /// Removes the elements of this set that aren't also in the given set.
   ///
-  /// - Equivalent to replacing `self` with `self.intersection(other)`
-  /// - Postcondition: `self.isSubset(of: other)`
+  /// For example:
+  ///
+  ///     var employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
+  ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
+  ///     employees.formIntersection(neighbors)
+  ///     print(employees)
+  ///     // Prints "["Bethany", "Eric"]"
+  ///
+  /// - Parameter other: A set of the same type as the current set.
   mutating func formIntersection(_ other: Self)
 
-  /// Replaces `self` with a set containing all elements contained in
-  /// either `self` or `other`, but not both.
+  /// Removes the elements of the set that are also in the given set and
+  /// adds the members of the given set that are not already in the set.
   ///
-  /// - Equivalent to replacing `self` with `self.symmetricDifference(other)`
-  mutating func formSymmetricDifference(_ other: Self)  
+  /// For example:
+  ///
+  ///     var employees: Set = ["Alicia", "Bethany", "Diana", "Eric"]
+  ///     let neighbors: Set = ["Bethany", "Eric", "Forlani"]
+  ///     employees.formSymmetricDifference(neighbors)
+  ///     print(employees)
+  ///     // Prints "["Diana", "Forlani", "Alicia"]"
+  ///
+  /// - Parameter other: A set of the same type.
+  mutating func formSymmetricDifference(_ other: Self)
 
   //===--- Requirements with default implementations ----------------------===//
-  /// Returns the set of elements contained in `self` but not in `other`.
+  /// Returns a new set containing the elements of this set that do not occur
+  /// in the given set.
+  ///
+  /// For example:
+  ///
+  ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
+  ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
+  ///     let nonNeighbors = employees.subtracting(neighbors)
+  ///     print(nonNeighbors)
+  ///     // Prints "["Diana", "Chris", "Alicia"]"
+  ///
+  /// - Parameter other: A set of the same type as the current set.
+  /// - Returns: A new set.
   @warn_unused_result
   func subtracting(_ other: Self) -> Self
 
@@ -265,7 +287,7 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let attendees: Set = ["Alicia", "Bethany", "Diana"]
-  ///     print(attendees.isSubsetOf(employees))
+  ///     print(attendees.isSubset(of: employees))
   ///     // Prints "true"
   ///
   /// - Parameter other: A set of the same type as the current set.
@@ -273,7 +295,19 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   @warn_unused_result
   func isSubset(of other: Self) -> Bool
 
-  /// Returns `true` iff `self.intersection(other).isEmpty`.
+  /// Returns a Boolean value that indicates whether the set has no members in
+  /// common with the given set.
+  ///
+  /// For example:
+  ///
+  ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
+  ///     let visitors: Set = ["Marcia", "Nathaniel", "Olivia"]
+  ///     print(employees.isDisjoint(with: visitors))
+  ///     // Prints "true"
+  ///
+  /// - Parameter other: A set of the same type as the current set.
+  /// - Returns: `true` if the set has no elements in common with `other`;
+  ///   otherwise, `false`.
   @warn_unused_result
   func isDisjoint(with other: Self) -> Bool
 
@@ -285,7 +319,7 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let attendees: Set = ["Alicia", "Bethany", "Diana"]
-  ///     print(employees.isSupersetOf(attendees))
+  ///     print(employees.isSuperset(of: attendees))
   ///     // Prints "true"
   ///
   /// - Parameter other: A set of the same type as the current set.
@@ -302,7 +336,7 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// Use this initializer to create a new set from an existing sequence, like
   /// an array or a range:
   ///
-  ///     let validIndices = Set(0..<7).subtract([2, 4, 5])
+  ///     let validIndices = Set(0..<7).subtracting([2, 4, 5])
   ///     print(validIndices)
   ///     // Prints "[6, 0, 1, 3]"
   ///
@@ -313,7 +347,13 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///
   /// For example:
   ///
-  /// - Equivalent to replacing `self` with `self.subtracting(other)`.
+  ///     var employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
+  ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
+  ///     employees.subtract(neighbors)
+  ///     print(employees)
+  ///     // Prints "["Diana", "Chris", "Alicia"]"
+  ///
+  /// - Parameter other: A set of the same type as the current set.
   mutating func subtract(_ other: Self)
 }
 
@@ -329,7 +369,7 @@ extension SetAlgebra {
   /// Use this initializer to create a new set from an existing sequence, like
   /// an array or a range:
   ///
-  ///     let validIndices = Set(0..<7).subtract([2, 4, 5])
+  ///     let validIndices = Set(0..<7).subtracting([2, 4, 5])
   ///     print(validIndices)
   ///     // Prints "[6, 0, 1, 3]"
   ///
@@ -358,7 +398,7 @@ extension SetAlgebra {
   ///     }
   ///     // Prints "Whatever it is, it's bound to be delicious!"
   ///
-  /// - Parameter arrayLiteral: A variadic list of elements of the new set.
+  /// - Parameter arrayLiteral: A list of elements of the new set.
   public init(arrayLiteral: Element...) {
     self.init(arrayLiteral)
   }
@@ -367,7 +407,13 @@ extension SetAlgebra {
   ///
   /// For example:
   ///
-  /// - Equivalent to replacing `self` with `self.subtracting(other)`.
+  ///     var employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
+  ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
+  ///     employees.subtract(neighbors)
+  ///     print(employees)
+  ///     // Prints "["Diana", "Chris", "Alicia"]"
+  ///
+  /// - Parameter other: A set of the same type as the current set.
   public mutating func subtract(_ other: Self) {
     self.formIntersection(self.symmetricDifference(other))
   }
@@ -380,7 +426,7 @@ extension SetAlgebra {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let attendees: Set = ["Alicia", "Bethany", "Diana"]
-  ///     print(attendees.isSubsetOf(employees))
+  ///     print(attendees.isSubset(of: employees))
   ///     // Prints "true"
   ///
   /// - Parameter other: A set of the same type as the current set.
@@ -398,18 +444,30 @@ extension SetAlgebra {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let attendees: Set = ["Alicia", "Bethany", "Diana"]
-  ///     print(employees.isSupersetOf(attendees))
+  ///     print(employees.isSuperset(of: attendees))
   ///     // Prints "true"
   ///
   /// - Parameter other: A set of the same type as the current set.
-  /// - Returns: `true` if the set is a superset of `possibleSubset`;
-  ///   otherwise, `false`.
+  /// - Returns: `true` if the set is a superset of `other`; otherwise,
+  ///   `false`.
   @warn_unused_result
   public func isSuperset(of other: Self) -> Bool {
     return other.isSubset(of: self)
   }
 
-  /// Returns `true` iff `self.intersection(other).isEmpty`.
+  /// Returns a Boolean value that indicates whether the set has no members in
+  /// common with the given set.
+  ///
+  /// For example:
+  ///
+  ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
+  ///     let visitors: Set = ["Marcia", "Nathaniel", "Olivia"]
+  ///     print(employees.isDisjoint(with: visitors))
+  ///     // Prints "true"
+  ///
+  /// - Parameter other: A set of the same type as the current set.
+  /// - Returns: `true` if the set has no elements in common with `other`;
+  ///   otherwise, `false`.
   @warn_unused_result
   public func isDisjoint(with other: Self) -> Bool {
     return self.intersection(other).isEmpty
@@ -447,9 +505,9 @@ extension SetAlgebra {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let attendees: Set = ["Alicia", "Bethany", "Diana"]
-  ///     print(employees.isStrictSupersetOf(attendees))
+  ///     print(employees.isStrictSuperset(of: attendees))
   ///     // Prints "true"
-  ///     print(employees.isStrictSupersetOf(employees))
+  ///     print(employees.isStrictSuperset(of: employees))
   ///     // Prints "false"
   ///
   /// - Parameter other: A set of the same type as the current set.
@@ -469,11 +527,11 @@ extension SetAlgebra {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let attendees: Set = ["Alicia", "Bethany", "Diana"]
-  ///     print(attendees.isStrictSubsetOf(employees))
+  ///     print(attendees.isStrictSubset(of: employees))
   ///     // Prints "true"
   ///
   ///     // A set is never a strict subset of itself:
-  ///     print(attendees.isStrictSubsetOf(attendees))
+  ///     print(attendees.isStrictSubset(of: attendees))
   ///     // Prints "false"
   ///
   /// - Parameter other: A set of the same type as the current set.
