@@ -107,7 +107,7 @@ public var errno : Int32 {
 #elseif os(Android) || os(Windows)
     return __errno().pointee
 #else
-    return __errno_index().pointee
+    return __errno_location().pointee
 #endif
   }
   set(val) {
@@ -116,7 +116,7 @@ public var errno : Int32 {
 #elseif os(Android) || os(Windows)
     return __errno().pointee = val
 #else
-    return __errno_index().pointee = val
+    return __errno_location().pointee = val
 #endif
   }
 }
