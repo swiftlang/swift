@@ -762,7 +762,6 @@ public:
               ASTContext &Context,
               llvm::LLVMContext &LLVMContext,
               IRGenOptions &Opts, StringRef ModuleName,
-              const llvm::DataLayout &DataLayout,
               llvm::TargetMachine *TargetMachine,
               SILModule *SILMod,
               StringRef OutputFilename);
