@@ -318,14 +318,9 @@ template <> struct Failure::ArgTypesForFailureKind<Failure::KIND##_t> {  \
 };
 #include "swift/Remote/FailureKinds.def"
 
-template <>
-struct Failure::IsAcceptableArgType<Failure::ArgType_String, const char *> {
-  static constexpr bool value = true;
-};
-
-template <>
-struct Failure::IsAcceptableArgType<Failure::ArgType_String, std::string> {
-  static constexpr bool value = true;
+template <class T>
+struct Failure::IsAcceptableArgType<Failure::ArgType_String, T> {
+  static constexpr bool value = std::is_convertible<T, std::string>::value;
 };
 
 template <>

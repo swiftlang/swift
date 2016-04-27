@@ -21,7 +21,7 @@ import Foundation
 }
 
 func selectorArg1(obj: NSObject) {
-  obj.doSelector(#^SELECTOR_ARG1^#
+  obj.`do`(#^SELECTOR_ARG1^#
 }
 
 func selectorArg2(obj: NSObject) {

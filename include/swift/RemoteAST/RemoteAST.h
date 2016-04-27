@@ -182,12 +182,22 @@ public:
   getDeclForRemoteNominalTypeDescriptor(remote::RemoteAddress address);
 
   /// Given a type in the local AST, try to resolve the offset of its
-  /// property with the given name.
+  /// member with the given name.  This supports:
   ///
-  /// This may fail by returning an empty optional.  Failure may indicate
-  /// that an offset for the property could not be resolved, or it may
-  /// simply indicate that the property has a non-zero offset.
-  Result<uint64_t> getOffsetForProperty(Type type, StringRef propertyName);
+  ///   - stored properties of structs
+  ///   - stored properties of classes
+  ///   - elements of tuples
+  ///
+  /// Failure may indicate that an offset for the property could not be
+  /// resolved, or it may simply indicate that the property is not laid
+  /// out at a known offset.
+  ///
+  /// If the caller has the address of type metadata for the type, it may
+  /// pass it in; this may allow the implementation to compute an offset in
+  /// situations where it otherwise cannot.
+  Result<uint64_t> getOffsetOfMember(Type type,
+                                     remote::RemoteAddress optMetadataAddress,
+                                     StringRef memberName);
 };
 
 } // end namespace remoteAST

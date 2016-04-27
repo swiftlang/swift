@@ -617,8 +617,48 @@ public:
   getKindForRemoteTypeMetadata(RemoteAddress metadata) = 0;
   virtual Result<NominalTypeDecl*>
   getDeclForRemoteNominalTypeDescriptor(RemoteAddress descriptor) = 0;
-  virtual Result<uint64_t>
-  getOffsetForProperty(Type type, StringRef propertyName) = 0;
+
+  Result<uint64_t>
+  getOffsetOfMember(Type type, RemoteAddress optMetadata, StringRef memberName){
+    // Sanity check: obviously invalid arguments.
+    if (!type || memberName.empty())
+      return Result<uint64_t>::emplaceFailure(Failure::BadArgument);
+
+    // Sanity check: if the caller gave us a dependent type, there's no way
+    // we can handle that.
+    if (type->hasTypeParameter() || type->hasArchetype())
+      return Result<uint64_t>::emplaceFailure(Failure::DependentArgument);
+
+    // Split into cases.
+    if (auto typeDecl = type->getNominalOrBoundGenericNominal()) {
+      return getOffsetOfMember(type, typeDecl, optMetadata, memberName);
+    } else if (auto tupleType = type->getAs<TupleType>()) {
+      return getOffsetOfMember(tupleType, optMetadata, memberName);
+    } else {
+      return Result<uint64_t>::emplaceFailure(Failure::TypeHasNoSuchMember,
+                                              memberName);
+    }
+  }
+
+  Result<uint64_t>
+  getOffsetOfMember(Type type, NominalTypeDecl *typeDecl,
+                    RemoteAddress optMetadata, StringRef memberName) {
+    // FIXME
+    return Result<uint64_t>::emplaceFailure(Failure::Unknown);
+  }
+
+  Result<uint64_t>
+  getOffsetOfMember(TupleType *type, RemoteAddress optMetadata,
+                    StringRef memberName) {
+    // Check that the member "name" is a valid index into the tuple.
+    unsigned index;
+    if (memberName.getAsInteger(10, index) || index >= type->getNumElements())
+      return Result<uint64_t>::emplaceFailure(Failure::TypeHasNoSuchMember,
+                                              memberName);
+
+    // FIXME
+    return Result<uint64_t>::emplaceFailure(Failure::Unknown);
+  }
 };
 
 /// A template for generating concrete implementations of the
@@ -659,12 +699,6 @@ public:
       return result;
     return getBuilder().template getFailureAsResult<NominalTypeDecl*>(
              Failure::Unknown);
-  }
-
-  Result<uint64_t>
-  getOffsetForProperty(Type type, StringRef propertyName) override {
-    // TODO
-    return Result<uint64_t>::emplaceFailure(Failure::Unknown);
   }
 };
 
@@ -713,6 +747,7 @@ RemoteASTContext::getDeclForRemoteNominalTypeDescriptor(RemoteAddress address) {
 }
 
 Result<uint64_t>
-RemoteASTContext::getOffsetForProperty(Type type, StringRef propertyName) {
-  return asImpl(Impl)->getOffsetForProperty(type, propertyName);
+RemoteASTContext::getOffsetOfMember(Type type, RemoteAddress optMetadata,
+                                    StringRef memberName) {
+  return asImpl(Impl)->getOffsetOfMember(type, optMetadata, memberName);
 }

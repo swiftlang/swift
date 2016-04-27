@@ -6,7 +6,7 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: %target-swift-frontend %s -parse
 
 // Issue found by https://github.com/neilpa (neilpa)
 // http://www.openradar.me/20220559

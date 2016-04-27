@@ -5638,7 +5638,7 @@ void ClangImporter::Implementation::importAttributes(
   } else {
     if (auto MD = dyn_cast<FuncDecl>(MappedDecl)) {
       if (!MD->getResultType()->isVoid()) {
-        MD->getAttrs().add(new (C) DiscardableResultAttr(/*implicit*/false));
+        MD->getAttrs().add(new (C) DiscardableResultAttr(/*implicit*/true));
       }
     }
   }

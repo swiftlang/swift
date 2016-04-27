@@ -69,6 +69,22 @@ static bool isArithmeticOperatorDecl(ValueDecl *vd) {
    vd->getName().str() == "%");
 }
 
+static bool mergeRepresentativeEquivalenceClasses(ConstraintSystem &CS,
+                                                  TypeVariableType* tyvar1,
+                                                  TypeVariableType* tyvar2) {
+  if (tyvar1 && tyvar2) {
+    auto rep1 = CS.getRepresentative(tyvar1);
+    auto rep2 = CS.getRepresentative(tyvar2);
+
+    if (rep1 != rep2) {
+      CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
+      return true;
+    }
+  }
+
+  return false;
+}
+
 namespace {
   
   /// Internal struct for tracking information about types within a series
@@ -327,14 +343,7 @@ namespace {
           auto tyvar1 = acp1->getType()->getAs<TypeVariableType>();
           auto tyvar2 = acp2->getType()->getAs<TypeVariableType>();
 
-          if (tyvar1 && tyvar2) {
-            auto rep1 = CS.getRepresentative(tyvar1);
-            auto rep2 = CS.getRepresentative(tyvar2);
-
-            if (rep1 != rep2) {
-              CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-            }
-          }
+          mergeRepresentativeEquivalenceClasses(CS, tyvar1, tyvar2);
         }
       }
     }
@@ -1859,6 +1868,12 @@ namespace {
       return arrayTy;
     }
 
+    static bool isMergeableValueKind(Expr *expr) {
+      return isa<CollectionExpr>(expr) ||
+             isa<StringLiteralExpr>(expr) || isa<IntegerLiteralExpr>(expr) ||
+             isa<FloatLiteralExpr>(expr);
+    }
+
     Type visitDictionaryExpr(DictionaryExpr *expr) {
       ASTContext &C = CS.getASTContext();
       // A dictionary expression can be of a type T that conforms to the
@@ -1908,16 +1923,67 @@ namespace {
                                     TupleTypeElt(dictionaryValueTy) };
       Type elementTy = TupleType::get(tupleElts, C);
 
+      // Keep track of which elements have been "merged". This way, we won't create
+      // needless conversion constraints for elements whose equivalence classes have
+      // been merged.
+      llvm::DenseSet<Expr *> mergedElements;
+
+      // If no contextual type is present, Merge equivalence classes of key 
+      // and value types as necessary.
+      if (!CS.getContextualType(expr)) {
+        for (auto element1 : expr->getElements()) {
+          for (auto element2 : expr->getElements()) {
+            if (element1 == element2)
+              continue;
+
+            auto tty1 = element1->getType()->getAs<TupleType>();
+            auto tty2 = element2->getType()->getAs<TupleType>();
+
+            if (tty1 && tty2) {
+              auto mergedKey = false;
+              auto mergedValue = false;
+
+              auto keyTyvar1 = tty1->getElementTypes()[0]->
+                                getAs<TypeVariableType>();
+              auto keyTyvar2 = tty2->getElementTypes()[0]->
+                                getAs<TypeVariableType>();
+
+              mergedKey = mergeRepresentativeEquivalenceClasses(CS, 
+                            keyTyvar1, keyTyvar2);
+
+              auto valueTyvar1 = tty1->getElementTypes()[1]->
+                                  getAs<TypeVariableType>();
+              auto valueTyvar2 = tty2->getElementTypes()[1]->
+                                  getAs<TypeVariableType>();
+
+              auto elemExpr1 = dyn_cast<TupleExpr>(element1)->getElements()[1];
+              auto elemExpr2 = dyn_cast<TupleExpr>(element2)->getElements()[1];
+
+              if (elemExpr1->getKind() == elemExpr2->getKind() &&
+                isMergeableValueKind(elemExpr1)) {
+                mergedValue = mergeRepresentativeEquivalenceClasses(CS, 
+                                valueTyvar1, valueTyvar2);
+              }
+
+              if (mergedKey && mergedValue)
+                mergedElements.insert(element2);
+            }
+          }
+        }
+      }      
+
       // Introduce conversions from each element to the element type of the
-      // dictionary.
+      // dictionary. (If the equivalence class of an element has already been
+      // merged with a previous one, skip it.)
       unsigned index = 0;
       for (auto element : expr->getElements()) {
-        CS.addConstraint(ConstraintKind::Conversion,
-                         element->getType(),
-                         elementTy,
-                         CS.getConstraintLocator(
-                           expr,
-                           LocatorPathElt::getTupleElement(index++)));
+        if (!mergedElements.count(element))
+          CS.addConstraint(ConstraintKind::Conversion,
+                           element->getType(),
+                           elementTy,
+                           CS.getConstraintLocator(
+                             expr,
+                             LocatorPathElt::getTupleElement(index++)));
       }
 
       return dictionaryTy;
