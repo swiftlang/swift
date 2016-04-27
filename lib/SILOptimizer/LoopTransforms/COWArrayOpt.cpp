@@ -938,7 +938,7 @@ stripValueProjections(SILValue V,
 /// If we found a make_mutable call this means that check_subscript was removed
 /// by the array bounds check elimination pass.
 static SILInstruction *
-findPreceedingCheckSubscriptOrMakeMutable(ApplyInst *GetElementAddr) {
+findPrecedingCheckSubscriptOrMakeMutable(ApplyInst *GetElementAddr) {
   for (auto ReverseIt =
            SILBasicBlock::reverse_iterator(GetElementAddr->getIterator()),
             End = GetElementAddr->getParent()->rend();
@@ -1131,7 +1131,7 @@ private:
     // strong_release %120
     //
     // Find the check_subscript call.
-    auto *Check = findPreceedingCheckSubscriptOrMakeMutable(GetElementAddrCall);
+    auto *Check = findPrecedingCheckSubscriptOrMakeMutable(GetElementAddrCall);
     if (!Check)
       return false;
 
