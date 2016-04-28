@@ -38,7 +38,8 @@ extension TestSuite {
 
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-    outOfBoundsIndexOffset: Int = 1
+    outOfBoundsIndexOffset: Int = 1,
+    collectionIsBidirectional: Bool = false
   ) {
     var testNamePrefix = testNamePrefix
 
@@ -58,7 +59,9 @@ extension TestSuite {
       extractValueFromEquatable: extractValueFromEquatable,
       checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks,
-      outOfBoundsIndexOffset: outOfBoundsIndexOffset)
+      outOfBoundsIndexOffset: outOfBoundsIndexOffset,
+      collectionIsBidirectional: collectionIsBidirectional
+    )
 
     func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
@@ -192,7 +195,9 @@ extension TestSuite {
       extractValueFromEquatable: extractValueFromEquatable,
       checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks,
-      outOfBoundsIndexOffset: outOfBoundsIndexOffset)
+      outOfBoundsIndexOffset: outOfBoundsIndexOffset,
+      collectionIsBidirectional: true
+    )
 
     addRangeReplaceableBidirectionalCollectionTests(
       testNamePrefix,

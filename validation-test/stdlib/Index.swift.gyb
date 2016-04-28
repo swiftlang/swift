@@ -50,87 +50,10 @@ Index.test("${TraversalCollection}/index(_:offsetBy:limitedBy:)/dispatch") {
 
 % end
 
-% for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
+% for Traversal in ['RandomAccess']:
 %   Collection = collectionForTraversal(Traversal).replace('Collection', '')
-%   for Base in ['Minimal', 'Defaulted']:
+%   for Base in ['Defaulted']:
 %     Kind = '{}{}'.format(Base, Collection)
-
-Index.test("${Kind}Collection/distance(from:to:)/semantics") {
-  let c = ${Kind}Collection(elements: Array(0..<20))
-  for test in distanceFromToTests {
-    let d = c.distance(
-      from: c.nthIndex(test.startOffset), to: c.nthIndex(test.endOffset))
-    expectEqual(
-      test.expectedDistance, d, stackTrace: SourceLocStack().with(test.loc))
-  }
-}
-
-Index.test("${Kind}Collection/index(_:stepsFrom: n)/semantics") {
-  for test in indexStepsFromTests.filter(
-    {$0.limit == nil && $0.distance >= 0}
-  ) {
-    let c = ${Kind}Collection(elements: Array(0..<10))
-
-    let new = c.index(c.nthIndex(test.startOffset), offsetBy: test.distance)
-    // Since the `nthIndex(offset:)` method performs the same operation
-    // (i.e. advances `c.startIndex` by `test.distance`, it would be
-    // silly to compare index values. Luckily the underlying collection
-    // contains exactly index offsets.
-    expectEqual(test.expectedOffset!, c[new],
-      stackTrace: SourceLocStack().with(test.loc))
-  }
-}
-
-%     if Traversal == 'Forward':
-Index.test("${Kind}Collection/index(_:stepsFrom: -n)/semantics") {
-  for test in indexStepsFromTests.filter({$0.limit == nil && $0.distance < 0}) {
-    let c = ${Kind}Collection(elements: Array(0..<10))
-    let start = c.nthIndex(test.startOffset)
-    expectCrashLater()
-    _ = c.index(start, offsetBy: test.distance)
-  }
-}
-%     end
-
-%     if Traversal == 'Forward':
-Index.test("${Kind}Collection/advance(by: -n, limitedBy:)/semantics") {
-  for test in indexStepsFromTests.filter({$0.limit != nil && $0.distance < 0}) {
-    let c = ${Kind}Collection(elements: Array(0..<10))
-    let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
-    let start = c.nthIndex(test.startOffset)
-    expectCrashLater()
-    _ = c.index(start, offsetBy: test.distance, limitedBy: limit)
-  }
-}
-%     end
-
-Index.test("${Kind}Collection/advance(by: n, limitedBy:)/semantics") {
-  for test in indexStepsFromTests.filter(
-    {$0.limit != nil && $0.distance >= 0}
-  ) {
-    let c = ${Kind}Collection(elements: Array(0..<20))
-    let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
-
-%     if Traversal == 'Forward':
-
-    if test.distance < 0 {
-      expectCrashLater()
-    }
-
-%     end
-
-    let new = c.index(
-      c.nthIndex(test.startOffset),
-      offsetBy: test.distance,
-      limitedBy: limit)
-    if test.expectedOffset == nil {
-      expectEmpty(new)
-    } else {
-      expectEqual(c.nthIndex(test.expectedOffset!), new!,
-        stackTrace: SourceLocStack().with(test.loc))
-    }
-  }
-}
 
 // Check that a random access collection doesn't call into O(n) predecessor
 // calls when it has a more efficient implementation.

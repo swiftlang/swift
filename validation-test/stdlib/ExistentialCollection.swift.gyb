@@ -451,7 +451,8 @@ do {
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
     checksAdded: checksAdded,
-    resiliencyChecks: CollectionMisuseResiliencyChecks.all
+    resiliencyChecks: CollectionMisuseResiliencyChecks.all,
+    collectionIsBidirectional: ${'false' if Traversal == 'Forward' else 'true'}
   )
 }
 

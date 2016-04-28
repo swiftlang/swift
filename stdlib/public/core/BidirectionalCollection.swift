@@ -163,14 +163,11 @@ extension BidirectionalIndexable
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: range check i
-    if n == 0 {
-      return i
-    }
-    let i = i.advanced(by: n)
-    if (n > 0) ? (i > limit) : (i < limit) {
+    let l = i.distance(to: limit)
+    if n > 0 ? l >= 0 && l < n : l <= 0 && l > n {
       return nil
     }
-    return i
+    return index(i, offsetBy: n)
   }
 
   @warn_unused_result

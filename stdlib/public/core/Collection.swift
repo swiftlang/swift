@@ -893,12 +893,11 @@ extension Indexable
   ) -> Index? {
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
-    // FIXME: swift-3-indexing-model: range check i
-    let i = i.advanced(by: n)
-    if (i > limit) {
+    let l = i.distance(to: limit)
+    if l >= 0 && l < n {
       return nil
     }
-    return i
+    return index(i, offsetBy: n)
   }
 
   @warn_unused_result
