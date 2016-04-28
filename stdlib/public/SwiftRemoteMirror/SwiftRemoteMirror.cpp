@@ -15,6 +15,8 @@
 #include "swift/Remote/CMemoryReader.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
 
+#include <iostream>
+
 using namespace swift;
 using namespace swift::reflection;
 using namespace swift::remote;
@@ -219,4 +221,13 @@ bool swift_reflection_project_existential(SwiftReflectionContextRef ContextRef,
                                           addr_t *StartOfInstanceData) {
   // TODO
   return false;
+}
+
+void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+  if (TR == nullptr) {
+    std::cerr << "<null type reference>" << std::endl;
+  } else {
+    TR->dump();
+  }
 }
