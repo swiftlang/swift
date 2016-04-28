@@ -557,11 +557,11 @@ static SymbolSubKind getSubKindForAccessor(AccessorKind AK) {
   case AccessorKind::IsSetter:    return SymbolSubKind::AccessorSetter;
   case AccessorKind::IsWillSet:   return SymbolSubKind::AccessorWillSet;
   case AccessorKind::IsDidSet:    return SymbolSubKind::AccessorDidSet;
-  case AccessorKind::IsMaterializeForSet:
-    return SymbolSubKind::AccessorMaterializeForSet;
   case AccessorKind::IsAddressor: return SymbolSubKind::AccessorAddressor;
   case AccessorKind::IsMutableAddressor:
     return SymbolSubKind::AccessorMutableAddressor;
+  case AccessorKind::IsMaterializeForSet:
+    llvm_unreachable("unexpected MaterializeForSet");
   }
 }
 

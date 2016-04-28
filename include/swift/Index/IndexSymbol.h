@@ -64,7 +64,6 @@ enum class SymbolSubKind {
   AccessorSetter,
   AccessorWillSet,
   AccessorDidSet,
-  AccessorMaterializeForSet,
   AccessorAddressor,
   AccessorMutableAddressor,
 

@@ -578,8 +578,6 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolKind kind, SymbolSubKind subKind,
       return UID_FOR(AccessorWillSet);
     case SymbolSubKind::AccessorDidSet:
       return UID_FOR(AccessorDidSet);
-    case SymbolSubKind::AccessorMaterializeForSet:
-      llvm_unreachable("unexpected MaterializeForSet");
     case SymbolSubKind::AccessorAddressor:
       return UID_FOR(AccessorAddress);
     case SymbolSubKind::AccessorMutableAddressor:
