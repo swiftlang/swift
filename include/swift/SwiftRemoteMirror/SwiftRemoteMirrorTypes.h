@@ -54,6 +54,7 @@ typedef enum swift_layout_kind_t {
   SWIFT_EXISTENTIAL,
   SWIFT_CLASS_EXISTENTIAL,
   SWIFT_EXISTENTIAL_METATYPE,
+  SWIFT_CLASS_INSTANCE,
 
   // References to other objects in the heap.
   SWIFT_STRONG_REFERENCE,

@@ -465,6 +465,29 @@ public:
     return {true, meta->getKind()};
   }
 
+  /// Given a remote pointer to class metadata, attempt to discover its class
+  /// instance start offset.
+  std::pair<bool, unsigned>
+  readInstanceStartFromClassMetadata(StoredPointer MetadataAddress) {
+    auto meta = readMetadata(MetadataAddress);
+    if (!meta)
+      return {false, 0};
+
+    auto address = readAddressOfNominalTypeDescriptor(meta);
+    if (!address)
+      return {false, 0};
+
+    auto descriptor = readNominalTypeDescriptor(address);
+    if (!descriptor)
+      return {false, 0};
+
+    if (descriptor->Class.NumFields == 0)
+      return {true, sizeof(StoredPointer)};
+
+    // return {true, meta->getFieldOffsets()[0]};
+    return {true, sizeof(StoredPointer)};
+  }
+
   /// Given a remote pointer to metadata, attempt to turn it into a type.
   BuiltType readTypeFromMetadata(StoredPointer MetadataAddress) {
     auto Cached = TypeCache.find(MetadataAddress);

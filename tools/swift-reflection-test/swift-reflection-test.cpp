@@ -56,6 +56,8 @@ struct RemoteReflectionInfo {
   const StoredPointer StartAddress;
   const StoredSize TotalSize;
 
+  /// Return the lowest start address, excluding sections with a zero start
+  /// address, which denotes the section is missing.
   static StoredPointer getStartAddress(std::vector<Section<Runtime>> &&elts) {
     StoredPointer Start = 0;
     for (auto elt : elts) {
@@ -69,6 +71,7 @@ struct RemoteReflectionInfo {
     return Start;
   }
 
+  /// Return the largest end address.
   static StoredPointer getEndAddress(std::vector<Section<Runtime>> &&elts) {
     StoredPointer End = 0;
     for (auto elt : elts) {
@@ -367,7 +370,7 @@ static int doDumpHeapInstance(std::string BinaryFilename) {
       auto TR = RC.readTypeFromMetadata(isa);
       TR->dump(std::cout, 0);
 
-      auto TI = RC.getTypeInfo(isa);
+      auto TI = RC.getInstanceTypeInfo(isa);
       if (TI != nullptr)
         TI->dump();
     }

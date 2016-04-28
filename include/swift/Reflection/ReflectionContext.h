@@ -67,10 +67,29 @@ public:
 
   /// Return a description of the layout of a heap object having the given
   /// metadata as its isa pointer.
-  const TypeInfo *getTypeInfo(StoredPointer MetadataAddress) {
-    // This is wrong...
+  const TypeInfo *getInstanceTypeInfo(StoredPointer MetadataAddress) {
+    // FIXME: Add caching
+    auto &TC = getBuilder().getTypeConverter();
+
     auto TR = readTypeFromMetadata(MetadataAddress);
-    return getTypeInfo(TR);
+    if (TR == nullptr)
+      return nullptr;
+
+    auto kind = this->readKindFromMetadata(MetadataAddress);
+    if (!kind.first)
+      return nullptr;
+
+    switch (kind.second) {
+    case MetadataKind::Class: {
+      auto start = this->readInstanceStartFromClassMetadata(MetadataAddress);
+      if (!start.first)
+        return nullptr;
+      auto *TI = TC.getInstanceTypeInfo(TR, start.second);
+      return TI;
+    }
+    default:
+      return nullptr;
+    }
   }
 
   /// Return a description of the layout of a value with the given type.

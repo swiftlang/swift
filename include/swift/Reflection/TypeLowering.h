@@ -51,6 +51,10 @@ enum class RecordKind : unsigned {
 
   // An existential metatype.
   ExistentialMetatype,
+
+  // A class instance layout, consisting of the stored properties of
+  // one class, excluding superclasses.
+  ClassInstance,
 };
 
 enum class ReferenceCounting : unsigned {
@@ -167,7 +171,16 @@ public:
 
   TypeRefBuilder &getBuilder() { return Builder; }
 
+  /// Returns layout information for a value of the given type.
+  /// For a class, this returns the lowering of the reference value.
   const TypeInfo *getTypeInfo(const TypeRef *TR);
+
+  /// Returns layout information for an instance of the given
+  /// class.
+  ///
+  /// Not cached.
+  const TypeInfo *getInstanceTypeInfo(const TypeRef *TR,
+                                      unsigned InstanceStart);
 
   /* Not really public */
   const ReferenceTypeInfo *
