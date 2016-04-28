@@ -452,7 +452,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.push_back("-fmodules-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
   }
-  
+
   if (importerOpts.DetailedPreprocessingRecord) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
       "-Xclang", "-detailed-preprocessing-record",
@@ -822,7 +822,7 @@ void ClangImporter::Implementation::addMacrosToLookupTable(
       // Check whether we have a macro defined in this module.
       auto info = pp.getMacroInfo(macro.first);
       if (!info || info->isFromASTFile() || info->isBuiltinMacro()) continue;
-      
+
       // Only interested in macro definitions.
       auto *defMD = dyn_cast<clang::DefMacroDirective>(MD);
       if (!defMD) continue;
@@ -900,7 +900,7 @@ bool ClangImporter::Implementation::importHeader(
   // Force the import to occur.
   pp.LookAhead(0);
 
-  SmallVector<clang::DeclGroupRef, 16> allParsedDecls;  
+  SmallVector<clang::DeclGroupRef, 16> allParsedDecls;
   auto handleParsed = [&](clang::DeclGroupRef parsed) {
     if (trackParsedSymbols) {
       for (auto *D : parsed) {
@@ -2870,7 +2870,7 @@ isAccessibilityConformingContext(const clang::DeclContext *ctx) {
       return true;
   }
   return false;
-  
+
 }
 
 /// Determine whether the given method potentially conflicts with the
@@ -3614,7 +3614,7 @@ static bool isVisibleClangEntry(clang::ASTContext &ctx,
   // Check whether the macro is defined.
   auto clangMacro = entry.get<clang::MacroInfo *>();
   if (auto moduleID = clangMacro->getOwningModuleID()) {
-    if (auto module = ctx.getExternalSource()->getModule(moduleID)) 
+    if (auto module = ctx.getExternalSource()->getModule(moduleID))
       return module->NameVisibility == clang::Module::AllVisible;
   }
 
@@ -3683,7 +3683,8 @@ void ClangImporter::loadObjCMethods(
   SmallVector<clang::ObjCMethodDecl *, 4> objcMethods;
   auto &sema = Impl.Instance->getSema();
   sema.CollectMultipleMethodsInGlobalPool(clangSelector, objcMethods,
-                                          isInstanceMethod);
+                                          isInstanceMethod,
+                                          /*CheckTheOther=*/false);
 
   // Check whether this method is in the class we care about.
   SmallVector<AbstractFunctionDecl *, 4> foundMethods;
@@ -3761,10 +3762,12 @@ void ClangModuleUnit::lookupObjCMethods(
   auto &clangSema = owner.Impl.getClangSema();
   clangSema.CollectMultipleMethodsInGlobalPool(clangSelector,
                                                objcMethods,
-                                               /*instance=*/true);
+                                               /*instance=*/true,
+                                               /*CheckTheOther=*/false);
   clangSema.CollectMultipleMethodsInGlobalPool(clangSelector,
                                                objcMethods,
-                                               /*instance=*/false);
+                                               /*instance=*/false,
+                                               /*CheckTheOther=*/false);
 
   // Import the methods.
   auto &clangCtx = clangSema.getASTContext();
@@ -3808,7 +3811,7 @@ void ClangModuleUnit::collectLinkLibraries(
       kind = LibraryKind::Framework;
     else
       kind = LibraryKind::Library;
-    
+
     callback(LinkLibrary(clangLinkLib.Library, kind));
   }
 }
@@ -4362,7 +4365,7 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
 
         /// FIXME: Other type declarations should also be okay?
       }
-    }    
+    }
   }
 
   return EffectiveClangContext();
