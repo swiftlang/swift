@@ -24,6 +24,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <iostream>
 
 namespace swift {
 namespace remote {
@@ -465,27 +466,59 @@ public:
     return {true, meta->getKind()};
   }
 
-  /// Given a remote pointer to class metadata, attempt to discover its class
-  /// instance start offset.
-  std::pair<bool, unsigned>
-  readInstanceStartFromClassMetadata(StoredPointer MetadataAddress) {
+  /// Given a remote pointer to class metadata, attempt to read its superclass.
+  StoredPointer
+  readSuperClassFromClassMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
-    if (!meta)
-      return {false, 0};
+    if (!meta || meta->getKind() != MetadataKind::Class)
+      return StoredPointer();
 
-    auto address = readAddressOfNominalTypeDescriptor(meta);
-    if (!address)
-      return {false, 0};
+    auto classMeta = cast<TargetClassMetadata<Runtime>>(meta);
+    return classMeta->SuperClass;
+  }
 
-    auto descriptor = readNominalTypeDescriptor(address);
-    if (!descriptor)
-      return {false, 0};
+  /// Given a remote pointer to class metadata, attempt to discover its class
+  /// instance size and alignment.
+  std::tuple<bool, unsigned, unsigned>
+  readInstanceSizeAndAlignmentFromClassMetadata(StoredPointer MetadataAddress) {
+    auto superMeta = readMetadata(MetadataAddress);
+    if (!superMeta || superMeta->getKind() != MetadataKind::Class)
+      return {false, 0, 0};
+    auto super = cast<TargetClassMetadata<Runtime>>(superMeta);
 
-    if (descriptor->Class.NumFields == 0)
-      return {true, sizeof(StoredPointer)};
+    // See swift_initClassMetadata_UniversalStrategy()
+    uint32_t size, align;
+    if (super->isTypeMetadata()) {
+      size = super->getInstanceSize();
+      align = super->getInstanceAlignMask() + 1;
+    } else {
+      std::cerr << "data: " << super->Data << "\n";
+      auto rodata = (super->Data & ~StoredPointer(1));
+      auto address = rodata + sizeof(uint32_t) * 2;
 
-    // return {true, meta->getFieldOffsets()[0]};
-    return {true, sizeof(StoredPointer)};
+      align = 16; // malloc alignment guarantee
+
+      {
+        unsigned x;
+        Reader->readInteger(RemoteAddress(rodata), &x);
+        std::cerr << "x: " << x << "\n";
+      }
+      {
+        unsigned x;
+        Reader->readInteger(RemoteAddress(rodata + 4), &x);
+        std::cerr << "x: " << x << "\n";
+      }
+      {
+        unsigned x;
+        Reader->readInteger(RemoteAddress(rodata + 8), &x);
+        std::cerr << "x: " << x << "\n";
+      }
+
+      if (!Reader->readInteger(RemoteAddress(address), &size))
+        return {false, 0, 0};
+    }
+
+    return {true, size, align};
   }
 
   /// Given a remote pointer to metadata, attempt to turn it into a type.
@@ -789,7 +822,28 @@ private:
       return 0;
     }
   }
+/*
+  StoredPointer readAddressOfSuperClass(MetadataRef metadata) {
+    switch (metadata->getKind()) {
+    case MetadataKind::Class: {
+      auto classMeta = cast<TargetClassMetadata<Runtime>>(metadata);
+      return resolveRelativeOffset<StoredPointer>(metadata.getAddress() +
+                                       classMeta->offsetToDescriptorOffset());
+    }
 
+    case MetadataKind::Struct:
+    case MetadataKind::Optional:
+    case MetadataKind::Enum: {
+      auto valueMeta = cast<TargetValueMetadata<Runtime>>(metadata);
+      return resolveRelativeOffset<StoredPointer>(metadata.getAddress() +
+                                       valueMeta->offsetToDescriptorOffset());
+    }
+
+    default:
+      return 0;
+    }
+  }
+*/
   /// Given the address of a nominal type descriptor, attempt to read it.
   NominalTypeDescriptorRef
   readNominalTypeDescriptor(StoredPointer address) {

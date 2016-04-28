@@ -18,6 +18,8 @@
 #ifndef SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 #define SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 
+#include "llvm/ADT/DenseMap.h"
+
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
@@ -27,7 +29,6 @@
 
 #include <iostream>
 #include <vector>
-#include <unordered_map>
 
 namespace swift {
 namespace reflection {
@@ -40,12 +41,12 @@ class ReflectionContext
        : public remote::MetadataReader<Runtime, TypeRefBuilder> {
   using super = remote::MetadataReader<Runtime, TypeRefBuilder>;
 
+  llvm::DenseMap<typename super::StoredPointer, const TypeInfo *> Cache;
+  
 public:
   using super::getBuilder;
   using super::readTypeFromMetadata;
   using typename super::StoredPointer;
-
-public:
 
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
     : super(std::move(reader)) {}
@@ -68,28 +69,34 @@ public:
   /// Return a description of the layout of a heap object having the given
   /// metadata as its isa pointer.
   const TypeInfo *getInstanceTypeInfo(StoredPointer MetadataAddress) {
-    // FIXME: Add caching
     auto &TC = getBuilder().getTypeConverter();
 
+    const TypeInfo *TI = nullptr;
+
     auto TR = readTypeFromMetadata(MetadataAddress);
-    if (TR == nullptr)
-      return nullptr;
-
     auto kind = this->readKindFromMetadata(MetadataAddress);
-    if (!kind.first)
-      return nullptr;
+    if (TR != nullptr && kind.first) {
+      switch (kind.second) {
+      case MetadataKind::Class: {
+        bool valid;
+        unsigned size, align;
+        auto super =
+            this->readSuperClassFromClassMetadata(MetadataAddress);
+        if (super) {
+          std::tie(valid, size, align) =
+              this->readInstanceSizeAndAlignmentFromClassMetadata(super);
+          if (valid)
+            TI = TC.getInstanceTypeInfo(TR, size, align);
+        }
+        break;
+      }
+      default:
+        break;
+      }
+    }
 
-    switch (kind.second) {
-    case MetadataKind::Class: {
-      auto start = this->readInstanceStartFromClassMetadata(MetadataAddress);
-      if (!start.first)
-        return nullptr;
-      auto *TI = TC.getInstanceTypeInfo(TR, start.second);
-      return TI;
-    }
-    default:
-      return nullptr;
-    }
+    Cache[MetadataAddress] = TI;
+    return TI;
   }
 
   /// Return a description of the layout of a value with the given type.

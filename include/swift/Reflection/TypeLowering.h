@@ -180,7 +180,8 @@ public:
   ///
   /// Not cached.
   const TypeInfo *getInstanceTypeInfo(const TypeRef *TR,
-                                      unsigned InstanceStart);
+                                      unsigned start,
+                                      unsigned align);
 
   /* Not really public */
   const ReferenceTypeInfo *

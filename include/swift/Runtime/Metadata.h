@@ -1659,7 +1659,7 @@ public:
     Flags = flags;
   }
 
-  StoredPointer getInstanceSize() const {
+  StoredSize getInstanceSize() const {
     assert(isTypeMetadata());
     return InstanceSize;
   }
