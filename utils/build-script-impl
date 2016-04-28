@@ -2325,7 +2325,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                     # executing ninja directly, have it dump the commands it would
                     # run, strip Ninja's progress prefix with sed, and tell the
                     # shell to execute that.
-                    sh -c "set -x && $("${build_cmd[@]}" -n -v ${target} | sed -e 's/[^]]*] //')"
+                    sh -e -x -c "$("${build_cmd[@]}" -n -v ${target} | sed -e 's/[^]]*] //')"
                 else
                     set -x
                     "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${target}
