@@ -89,17 +89,23 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
 
       set(section_magic_begin_name "section_magic_begin-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
       set(section_magic_end_name "section_magic_end-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-      add_custom_command_target(${section_magic_begin_name}_begin
-        OUTPUT  "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
-        COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${section_magic_begin_name}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}" "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
-        DEPENDS ${section_magic_begin_name})
+      add_custom_command_target(section_magic_o
+        COMMAND
+            "${CMAKE_COMMAND}" -E copy
+            "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${section_magic_begin_name}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}"
+            "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
+        COMMAND
+            "${CMAKE_COMMAND}" -E copy
+            "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${section_magic_end_name}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}"
+            "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
+        OUTPUT
+            "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
+            "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
+        DEPENDS
+            ${section_magic_begin_name}
+            ${section_magic_end_name})
 
-      add_custom_command_target(${section_magic_begin_name}_end
-        OUTPUT  "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
-        COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${section_magic_end_name}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}" "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
-        DEPENDS ${section_magic_end_name})
-
-      list(APPEND object_target_list "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o" "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o")
+      list(APPEND object_target_list "${section_magic_o}")
 
       swift_install_in_component(stdlib
           FILES "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o" "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
