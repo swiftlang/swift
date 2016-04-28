@@ -608,6 +608,54 @@ tests.test("LazyMapCollection/Passthrough") {
   }
 }
 
+tests.test("LazyMapSequence/AssociatedTypes") {
+  typealias Base = MinimalSequence<OpaqueValue<Int>>
+  typealias Subject = LazyMapSequence<Base, OpaqueValue<Int32>>
+  expectSequenceAssociatedTypes(
+    sequenceType: Subject.self,
+    iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
+    subSequenceType: AnySequence<OpaqueValue<Int32>>.self)
+}
+
+tests.test("LazyMapCollection/AssociatedTypes") {
+  typealias Base = MinimalCollection<OpaqueValue<Int>>
+  typealias Subject = LazyMapCollection<Base, OpaqueValue<Int32>>
+  expectCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
+    // FIXME(ABI): SubSequence should be `LazyMapCollection<Base.Slice>`.
+    subSequenceType: Slice<Subject>.self,
+    indexType: Base.Index.self,
+    indexDistanceType: Base.IndexDistance.self,
+    indicesType: Base.Indices.self)
+}
+
+tests.test("LazyMapBidirectionalCollection/AssociatedTypes") {
+  typealias Base = MinimalBidirectionalCollection<OpaqueValue<Int>>
+  typealias Subject = LazyMapBidirectionalCollection<Base, OpaqueValue<Int32>>
+  expectBidirectionalCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
+    // FIXME(ABI): SubSequence should be `LazyMapBidirectionalCollection<Base.Slice>`.
+    subSequenceType: BidirectionalSlice<Subject>.self,
+    indexType: Base.Index.self,
+    indexDistanceType: Base.IndexDistance.self,
+    indicesType: Base.Indices.self)
+}
+
+tests.test("LazyMapRandomAccessCollection/AssociatedTypes") {
+  typealias Base = MinimalRandomAccessCollection<OpaqueValue<Int>>
+  typealias Subject = LazyMapRandomAccessCollection<Base, OpaqueValue<Int32>>
+  expectRandomAccessCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
+    // FIXME(ABI): SubSequence should be `LazyMapRandomAccessCollection<Base.Slice>`.
+    subSequenceType: RandomAccessSlice<Subject>.self,
+    indexType: Base.Index.self,
+    indexDistanceType: Base.IndexDistance.self,
+    indicesType: Base.Indices.self)
+}
+
 tests.test("lazy.mapped/TypeInference") {
   let baseArray: [OpaqueValue<Int>] = (0..<10).map(OpaqueValue.init)
   do {
@@ -856,6 +904,41 @@ tests.test("LazyFilterCollection") {
   checkFilterIteratorBase(
     base.lazy.filter { $0.value % 2 == 0 },
     base.lazy.filter { $0.value % 2 != 0 })
+}
+
+tests.test("LazyFilterSequence/AssociatedTypes") {
+  typealias Base = MinimalSequence<OpaqueValue<Int>>
+  typealias Subject = LazyFilterSequence<Base>
+  expectSequenceAssociatedTypes(
+    sequenceType: Subject.self,
+    iteratorType: LazyFilterIterator<Base.Iterator>.self,
+    subSequenceType: AnySequence<OpaqueValue<Int>>.self)
+}
+
+tests.test("LazyFilterCollection/AssociatedTypes") {
+  typealias Base = MinimalCollection<OpaqueValue<Int>>
+  typealias Subject = LazyFilterCollection<Base>
+  expectCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: LazyFilterIterator<Base.Iterator>.self,
+    // FIXME(ABI): SubSequence should be `LazyFilterCollection<Base.Slice>`.
+    subSequenceType: Slice<Subject>.self,
+    indexType: LazyFilterIndex<Base>.self,
+    indexDistanceType: Base.IndexDistance.self,
+    indicesType: DefaultIndices<Subject>.self)
+}
+
+tests.test("LazyFilterBidirectionalCollection/AssociatedTypes") {
+  typealias Base = MinimalBidirectionalCollection<OpaqueValue<Int>>
+  typealias Subject = LazyFilterBidirectionalCollection<Base>
+  expectBidirectionalCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: LazyFilterIterator<Base.Iterator>.self,
+    // FIXME(ABI): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
+    subSequenceType: BidirectionalSlice<Subject>.self,
+    indexType: LazyFilterIndex<Base>.self,
+    indexDistanceType: Base.IndexDistance.self,
+    indicesType: DefaultBidirectionalIndices<Subject>.self)
 }
 
 tests.test("lazy.filter/TypeInference") {

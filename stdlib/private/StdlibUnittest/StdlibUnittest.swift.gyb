@@ -363,6 +363,24 @@ public func expectMutableSliceType<
   X.SubSequence == X
 >(_ mutableSliceType: X.Type) {}
 
+/// Check that all associated types of a `Sequence` are what we expect them
+/// to be.
+public func expectSequenceAssociatedTypes<
+  X : Sequence
+  where
+
+  // FIXME(ABI)(compiler limitation): there should be no constraints in
+  // the 'where' clause, all of these should be required by the protocol.
+  X.SubSequence : Sequence,
+  X.SubSequence.Iterator.Element == X.Iterator.Element,
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI): can't have this constraint now.
+  X.SubSequence.SubSequence == X.SubSequence
+>(
+  sequenceType: X.Type,
+  iteratorType: X.Iterator.Type,
+  subSequenceType: X.SubSequence.Type
+) {}
+
 /// Check that all associated types of a `Collection` are what we expect them
 /// to be.
 public func expectCollectionAssociatedTypes<
@@ -375,7 +393,7 @@ public func expectCollectionAssociatedTypes<
   X.SubSequence : Collection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.Index == X.Index,
-  // X.SubSequence.Indices == X.Indices, // FIXME: can't have this constraint now.
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : Collection,
   X.Indices.Iterator.Element == X.Index,
@@ -402,7 +420,7 @@ public func expectBidirectionalCollectionAssociatedTypes<
   X.SubSequence : BidirectionalCollection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.Index == X.Index,
-  // X.SubSequence.Indices == X.Indices, // FIXME: can't have this constraint now.
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : BidirectionalCollection,
   X.Indices.Iterator.Element == X.Index,
@@ -429,7 +447,7 @@ public func expectRandomAccessCollectionAssociatedTypes<
   X.SubSequence : RandomAccessCollection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.Index == X.Index,
-  // X.SubSequence.Indices == X.Indices, // FIXME: can't have this constraint now.
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : RandomAccessCollection,
   X.Indices.Iterator.Element == X.Index,
