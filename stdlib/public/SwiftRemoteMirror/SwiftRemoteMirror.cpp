@@ -231,3 +231,26 @@ void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
     TR->dump();
   }
 }
+
+void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
+                                          uintptr_t Metadata) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto TI = Context->getInstanceTypeInfo(Metadata);
+  if (TI == nullptr) {
+    std::cerr << "<null type info>" << std::endl;
+  } else {
+    TI->dump();
+  }
+}
+
+void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
+                                         swift_typeref_t OpaqueTypeRef) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+  auto TI = Context->getTypeInfo(TR);
+  if (TI == nullptr) {
+    std::cerr << "<null type info>" << std::endl;
+  } else {
+    TI->dump();
+  }
+}

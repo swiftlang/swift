@@ -126,6 +126,14 @@ bool swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
 /// Dump a brief description of the typeref as a tree to stderr.
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef);
 
+/// Dump information about the layout of a class instance from its isa pointer.
+void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
+                                          uintptr_t Metadata);
+
+/// Dump information about the layout for a typeref.
+void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
+                                         swift_typeref_t OpaqueTypeRef);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
