@@ -104,11 +104,11 @@ let gz = CGFloat(3.3)
 let ix = Int(11)
 
 // outputs
-var d1, d2: Double
-var f1, f2: Float
-var g1, g2: CGFloat
-var i1, i2, i3: Int
-var b1, b2, b3: Bool
+var d1: Double = 0, d2: Double = 0
+var f1: Float = 0, f2: Float = 0
+var g1: CGFloat = 0, g2: CGFloat = 0
+var i1 = 0, i2 = 0, i3 = 0
+var b1 = false, b2 = false, b3 = false
 
 MathTests.test("Unary functions") {
   (d1, f1, g1) = (acos(dx), acos(fx), acos(gx))
