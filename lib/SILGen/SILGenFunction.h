@@ -443,7 +443,7 @@ public:
 
   /// Emit code to increment a counter for profiling.
   void emitProfilerIncrement(ASTNode N) {
-    if (SGM.Profiler)
+    if (SGM.Profiler && SGM.Profiler->hasRegionCounters())
       SGM.Profiler->emitCounterIncrement(B, N);
   }
   
