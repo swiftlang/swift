@@ -128,7 +128,11 @@ public struct UnsafeMutableAudioBufferListPointer {
 
 // FIXME: swift-3-indexing-model: conform to RandomAccessCollection
 // and update the test to reflect the change.
-extension UnsafeMutableAudioBufferListPointer : MutableCollection {
+extension UnsafeMutableAudioBufferListPointer
+  : MutableCollection, RandomAccessCollection {
+
+  public typealias Index = Int
+
   /// Always zero, which is the index of the first `AudioBuffer`.
   public var startIndex: Int {
     return 0
@@ -151,6 +155,22 @@ extension UnsafeMutableAudioBufferListPointer : MutableCollection {
         "subscript index out of range")
       (_audioBuffersPointer + index).pointee = newValue
     }
+  }
+
+  public subscript(bounds: Range<Int>)
+    -> MutableRandomAccessSlice<UnsafeMutableAudioBufferListPointer> {
+    get {
+      return MutableRandomAccessSlice(base: self, bounds: bounds)
+    }
+    set {
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
+  }
+
+  public typealias Indices = CountableRange<Int>
+
+  public var indices: Indices {
+    return startIndex..<endIndex
   }
 }
 

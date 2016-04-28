@@ -159,6 +159,16 @@ CoreAudioTestSuite.test("AudioBufferList.allocate(maximumBuffers: Int)/trap/over
   AudioBufferList.allocate(maximumBuffers: Int.max)
 }
 
+CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer/AssociatedTypes") {
+  typealias Subject = UnsafeMutableAudioBufferListPointer
+  expectRandomAccessCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: IndexingIterator<Subject>.self,
+    subSequenceType: MutableRandomAccessSlice<Subject>.self,
+    indexType: Int.self,
+    indexDistanceType: Int.self,
+    indicesType: CountableRange<Int>.self)
+}
 
 CoreAudioTestSuite.test(
   "UnsafeMutableAudioBufferListPointer.init(_: UnsafeMutablePointer<AudioBufferList>)," +
@@ -284,7 +294,7 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer/Collection") {
   }
 
   // FIXME: use checkMutableRandomAccessCollection, when we have that function.
-  checkForwardCollection(expected, ablPtrWrapper)
+  checkRandomAccessCollection(expected, ablPtrWrapper)
   free(ablPtrWrapper.unsafeMutablePointer)
 }
 
