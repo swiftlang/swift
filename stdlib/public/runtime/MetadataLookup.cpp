@@ -263,7 +263,7 @@ _typeByMangledName(const llvm::StringRef typeName) {
     return Value->getMetadata();
 
   // Check type metadata records
-  T.SectionsToScanLock.lock([&] {
+  T.SectionsToScanLock.withLock([&] {
     foundMetadata = _searchTypeMetadataRecords(T, typeName);
   });
 

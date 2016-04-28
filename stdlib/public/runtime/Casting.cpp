@@ -354,30 +354,40 @@ swift_getTypeName(const Metadata *type, bool qualified) {
   Key key(type, qualified);
   auto &cache = TypeNameCache.get();
 
-  Pair pair;
-  TypeNameCacheLock.readWriteLock(
-      [&] {
-        auto found = cache.find(key);
-        if (found != cache.end()) {
-          auto result = found->second;
-          pair = Pair{result.first, result.second};
-          return true; // Cache hit, return true (e.g. done)
-        }
-        return false; // Cache missed, return false to move to write lock.
-      },
-      [&] {
-        // Build the metadata name.
-        auto name = nameForMetadata(type, qualified);
-        // Copy it to memory we can reference forever.
-        auto size = name.size();
-        auto result = (char *)malloc(size + 1);
-        memcpy(result, name.data(), size);
-        result[size] = 0;
-        cache.insert({key, {result, size}});
-        pair = Pair{result, size};
-      });
+  // Attempt read-only lookup of cache entry.
+  {
+    StaticScopedReadLock guard(TypeNameCacheLock);
 
-  return pair;
+    auto found = cache.find(key);
+    if (found != cache.end()) {
+      auto result = found->second;
+      return Pair{result.first, result.second};
+    }
+  }
+
+  // Read-only lookup failed to find item, we may need to create it.
+  {
+    StaticScopedWriteLock guard(TypeNameCacheLock);
+
+    // Do lookup again just to make sure it wasn't created by another
+    // thread before we acquired the write lock.
+    auto found = cache.find(key);
+    if (found != cache.end()) {
+      auto result = found->second;
+      return Pair{result.first, result.second};
+    }
+
+    // Build the metadata name.
+    auto name = nameForMetadata(type, qualified);
+    // Copy it to memory we can reference forever.
+    auto size = name.size();
+    auto result = (char *)malloc(size + 1);
+    memcpy(result, name.data(), size);
+    result[size] = 0;
+
+    cache.insert({key, {result, size}});
+    return Pair{result, size};
+  }
 }
 
 /// Report a dynamic cast failure.

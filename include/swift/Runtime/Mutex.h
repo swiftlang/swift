@@ -136,7 +136,7 @@ public:
   ///
   /// Precondition: Mutex not held by this thread, undefined otherwise.
   template <typename CriticalSection>
-  void lock(CriticalSection criticalSection) {
+  void withLock(CriticalSection criticalSection) {
     lock();
     criticalSection();
     unlock();
@@ -155,7 +155,7 @@ public:
   /// ...all while being correctly protected by mutex.
   ///
   /// ```
-  ///   mutex.lockOrWait(condition, [&value] {
+  ///   mutex.withLockOrWait(condition, [&value] {
   ///     if (value > 0) {
   ///       value--;
   ///       return true;
@@ -166,9 +166,9 @@ public:
   ///
   /// Precondition: Mutex not held by this thread, undefined otherwise.
   template <typename CriticalSection>
-  void lockOrWait(ConditionVariable &condition,
-                  CriticalSection criticalSection) {
-    lock([&] {
+  void withLockOrWait(ConditionVariable &condition,
+                      CriticalSection criticalSection) {
+    withLock([&] {
       while (!criticalSection()) {
         wait(condition);
       }
@@ -185,14 +185,14 @@ public:
   /// then notifies one condition waiter about this change.
   ///
   /// ```
-  ///   mutex.lockAndNotifyOne([&value] { value++; });
+  ///   mutex.withLockThenNotifyOne(condition, [&value] { value++; });
   /// ```
   ///
   /// Precondition: Mutex not held by this thread, undefined otherwise.
   template <typename CriticalSection>
-  void lockAndNotifyOne(ConditionVariable &condition,
-                        CriticalSection criticalSection) {
-    lock([&] {
+  void withLockThenNotifyOne(ConditionVariable &condition,
+                             CriticalSection criticalSection) {
+    withLock([&] {
       criticalSection();
       condition.notifyOne();
     });
@@ -208,14 +208,14 @@ public:
   /// then notifies all condition waiters about this change.
   ///
   /// ```
-  ///   mutex.lockAndNotifyAll([&value] { value++; });
+  ///   mutex.withLockThenNotifyAll(condition, [&value] { value++; });
   /// ```
   ///
   /// Precondition: Mutex not held by this thread, undefined otherwise.
   template <typename CriticalSection>
-  void lockAndNotifyAll(ConditionVariable &condition,
-                        CriticalSection criticalSection) {
-    lock([&] {
+  void withLockThenNotifyAll(ConditionVariable &condition,
+                             CriticalSection criticalSection) {
+    withLock([&] {
       criticalSection();
       condition.notifyAll();
     });
@@ -343,12 +343,12 @@ public:
   /// the read lock.
   ///
   /// ```
-  ///   rw.readLock([&value] { value = cachedValue; });
+  ///   rw.withReadLock([&value] { value = cachedValue; });
   /// ```
   ///
   /// Precondition: ReadWriteLock not held by this thread, undefined otherwise.
   template <typename CriticalSection>
-  void readLock(CriticalSection criticalSection) {
+  void withReadLock(CriticalSection criticalSection) {
     readLock();
     criticalSection();
     readUnlock();
@@ -363,59 +363,15 @@ public:
   /// the write lock.
   ///
   /// ```
-  ///   rw.writeLock([&newValue] { cachedValue = newValue });
+  ///   rw.withWriteLock([&newValue] { cachedValue = newValue });
   /// ```
   ///
   /// Precondition: ReadWriteLock not held by this thread, undefined otherwise.
   template <typename CriticalSection>
-  void writeLock(CriticalSection criticalSection) {
+  void withWriteLock(CriticalSection criticalSection) {
     writeLock();
     criticalSection();
     writeUnlock();
-  }
-
-  /// Acquires read lock before calling the read critical section and if
-  /// the critical section returns `true` (done) readWriteLock returns to the
-  /// caller. If the read critical section returns `false` the read lock
-  /// will be dropped, the write lock will be acquired and then the read
-  /// critical section will be called again. Then if the critical section
-  /// returns `true` (done) readWriteLock returns to the caller. If the read
-  /// critical section returns `false` then the write critical section will
-  /// be called (with write lock still held).
-  ///
-  /// Note in all situations on return to caller the ReadWriteLock will
-  /// not be held.
-  ///
-  /// For example the following attempts to get a cachedValue if it exists
-  /// if not found it will create the needed cachedValue.
-  ///
-  /// ```
-  ///   rw.readWriteLock(
-  ///     [&value] {
-  ///       if (cachedValue) {
-  ///         value = cachedValue;
-  ///         return true;
-  ///       }
-  ///       return false;
-  ///     },
-  ///     [&value] {
-  ///       cachedValue = createValue();
-  ///       value = cachedValue;
-  ///     });
-  /// ```
-  ///
-  /// Precondition: ReadWriteLock not held by this thread, undefined otherwise.
-  template <typename ReadonlySection, typename WriteSection>
-  void readWriteLock(ReadonlySection readSection, WriteSection writeSection) {
-    bool done;
-    readLock([&done, &readSection] { done = readSection(); });
-    if (!done) {
-      writeLock([&readSection, &writeSection] {
-        if (!readSection()) {
-          writeSection();
-        }
-      });
-    }
   }
 
 private:
@@ -485,38 +441,38 @@ public:
 
   /// See Mutex::lock
   template <typename CriticalSection>
-  void lock(CriticalSection criticalSection) {
+  void withLock(CriticalSection criticalSection) {
     lock();
     criticalSection();
     unlock();
   }
 
-  /// See Mutex::lockOrWait
+  /// See Mutex::withLockOrWait
   template <typename CriticalSection>
-  void lockOrWait(StaticConditionVariable &condition,
-                  CriticalSection criticalSection) {
-    lock([&] {
+  void withLockOrWait(StaticConditionVariable &condition,
+                      CriticalSection criticalSection) {
+    withLock([&] {
       while (!criticalSection()) {
         wait(condition);
       }
     });
   }
 
-  /// See Mutex::lockAndNotifyOne
+  /// See Mutex::withLockThenNotifyOne
   template <typename CriticalSection>
-  void lockAndNotifyOne(StaticConditionVariable &condition,
-                        CriticalSection criticalSection) {
-    lock([&] {
+  void withLockThenNotifyOne(StaticConditionVariable &condition,
+                             CriticalSection criticalSection) {
+    withLock([&] {
       criticalSection();
       condition.notifyOne();
     });
   }
 
-  /// See Mutex::lockAndNotifyAll
+  /// See Mutex::withLockThenNotifyAll
   template <typename CriticalSection>
-  void lockAndNotifyAll(StaticConditionVariable &condition,
-                        CriticalSection criticalSection) {
-    lock([&] {
+  void withLockThenNotifyAll(StaticConditionVariable &condition,
+                             CriticalSection criticalSection) {
+    withLock([&] {
       criticalSection();
       condition.notifyAll();
     });
@@ -566,34 +522,20 @@ public:
   /// See ReadWriteLock::writeUnlock
   void writeUnlock() { ReadWriteLockPlatformHelper::writeUnlock(Handle); }
 
-  /// See ReadWriteLock::readLock
+  /// See ReadWriteLock::withReadLock
   template <typename CriticalSection>
-  void readLock(CriticalSection criticalSection) {
+  void withReadLock(CriticalSection criticalSection) {
     readLock();
     criticalSection();
     readUnlock();
   }
 
-  /// See ReadWriteLock::writeLock
+  /// See ReadWriteLock::withWriteLock
   template <typename CriticalSection>
-  void writeLock(CriticalSection criticalSection) {
+  void withWriteLock(CriticalSection criticalSection) {
     writeLock();
     criticalSection();
     writeUnlock();
-  }
-
-  /// See ReadWriteLock::readWriteLock
-  template <typename ReadonlySection, typename WriteSection>
-  void readWriteLock(ReadonlySection readSection, WriteSection writeSection) {
-    bool done;
-    readLock([&done, &readSection] { done = readSection(); });
-    if (!done) {
-      writeLock([&readSection, &writeSection] {
-        if (!readSection()) {
-          writeSection();
-        }
-      });
-    }
   }
 
 private:
