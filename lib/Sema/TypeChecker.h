@@ -1743,6 +1743,11 @@ public:
   /// Returns true if the reference or any of its parents is an
   /// unavailable (or obsoleted) declaration.
   bool isInsideUnavailableDeclaration(SourceRange ReferenceRange,
+                                      const DeclContext *DC);
+
+  /// Returns true if the reference is lexically contained in a declaration
+  /// that is deprecated on all deployment targets.
+  bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
                                      const DeclContext *DC);
 
   /// Returns the availability attribute indicating deprecation if the

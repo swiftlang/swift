@@ -2200,7 +2200,7 @@ static bool someEnclosingDeclMatches(SourceRange ReferenceRange,
 
 bool TypeChecker::isInsideImplicitFunction(SourceRange ReferenceRange,
                                            const DeclContext *DC) {
-  std::function<bool(const Decl *)> IsInsideImplicitFunc = [](const Decl *D) {
+  auto IsInsideImplicitFunc = [](const Decl *D) {
     auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
     return AFD && AFD->isImplicit();
   };
@@ -2212,7 +2212,7 @@ bool TypeChecker::isInsideImplicitFunction(SourceRange ReferenceRange,
 
 bool TypeChecker::isInsideUnavailableDeclaration(
     SourceRange ReferenceRange, const DeclContext *ReferenceDC) {
-  std::function<bool(const Decl *)> IsUnavailable = [](const Decl *D) {
+  auto IsUnavailable = [](const Decl *D) {
     return D->getAttrs().getUnavailable(D->getASTContext());
   };
 
@@ -2220,71 +2220,14 @@ bool TypeChecker::isInsideUnavailableDeclaration(
                                   IsUnavailable);
 }
 
-/// Returns true if the reference is lexically contained in a declaration
-/// that is deprecated on all deployment targets.
-static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
-                                          const DeclContext *ReferenceDC,
-                                          TypeChecker &TC) {
+bool TypeChecker::isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
+                                                const DeclContext *ReferenceDC){
   std::function<bool(const Decl *)> IsDeprecated = [](const Decl *D) {
     return D->getAttrs().getDeprecated(D->getASTContext());
   };
 
-  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, TC,
+  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, *this,
                                   IsDeprecated);
-}
-
-void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
-                                     const DeclContext *ReferenceDC,
-                                     const AvailableAttr *Attr,
-                                     DeclName Name) {
-  // We match the behavior of clang to not report deprecation warnings
-  // inside declarations that are themselves deprecated on all deployment
-  // targets.
-  if (isInsideDeprecatedDeclaration(ReferenceRange, ReferenceDC, *this)) {
-    return;
-  }
-
-  if (!Context.LangOpts.DisableAvailabilityChecking) {
-    AvailabilityContext RunningOSVersions =
-        overApproximateAvailabilityAtLocation(ReferenceRange.Start,ReferenceDC);
-    if (RunningOSVersions.isKnownUnreachable()) {
-      // Suppress a deprecation warning if the availability checking machinery
-      // thinks the reference program location will not execute on any
-      // deployment target for the current platform.
-      return;
-    }
-  }
-
-  StringRef Platform = Attr->prettyPlatformString();
-  clang::VersionTuple DeprecatedVersion;
-  if (Attr->Deprecated)
-    DeprecatedVersion = Attr->Deprecated.getValue();
-
-  if (Attr->Message.empty() && Attr->Rename.empty()) {
-    diagnose(ReferenceRange.Start, diag::availability_deprecated, Name,
-             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
-             DeprecatedVersion)
-      .highlight(Attr->getRange());
-    return;
-  }
-
-  if (Attr->Message.empty()) {
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_rename, Name,
-             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
-             DeprecatedVersion, Attr->Rename)
-      .highlight(Attr->getRange());
-  } else {
-    EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name,
-             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
-             DeprecatedVersion, EncodedMessage.Message)
-      .highlight(Attr->getRange());
-  }
-
-  if (!Attr->Rename.empty()) {
-    diagnose(ReferenceRange.Start, diag::note_deprecated_rename, Attr->Rename)
-      .fixItReplace(ReferenceRange, Attr->Rename);
-  }
 }
 
 // checkForForbiddenPrefix is for testing purposes.
