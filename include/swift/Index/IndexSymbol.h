@@ -26,7 +26,6 @@ enum class SymbolKind {
 
   Module,
   ClangModule, // FIXME: collapse into Module and use a separate Language field.
-  SourceFile,
 
   Enum,
   Struct,

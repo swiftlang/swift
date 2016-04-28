@@ -410,10 +410,6 @@ bool IndexSwiftASTWalker::visitImports(
     for (auto File : Mod->getFiles()) {
       switch (File->getKind()) {
       case FileUnitKind::Source:
-        assert(ImportKind == SymbolKind::Unknown &&
-               "cannot handle multi-file modules");
-        ImportKind = SymbolKind::SourceFile;
-        break;
       case FileUnitKind::Builtin:
       case FileUnitKind::Derived:
         break;

@@ -30,7 +30,6 @@ using namespace swift::index;
 
 static UIdent KindImportModuleClang("source.lang.swift.import.module.clang");
 static UIdent KindImportModuleSwift("source.lang.swift.import.module.swift");
-static UIdent KindImportSourceFile("source.lang.swift.import.sourcefile");
 
 static UIdent getUIDForDependencyKind(SymbolKind depKind) {
   switch (depKind) {
@@ -38,8 +37,6 @@ static UIdent getUIDForDependencyKind(SymbolKind depKind) {
     return KindImportModuleSwift;
   case SymbolKind::ClangModule:
     return KindImportModuleClang;
-  case SymbolKind::SourceFile:
-    return KindImportSourceFile;
   default:
     return UIdent();
   }
