@@ -624,6 +624,29 @@ public:
     return buildNominalTypeDecl(descriptor);
   }
 
+  /// Try to read the offset of a tuple element from a tuple metadata.
+  bool readTupleElementOffset(StoredPointer metadataAddress, unsigned eltIndex,
+                              StoredSize *offset) {
+    // Read the metadata.
+    auto metadata = readMetadata(metadataAddress);
+    if (!metadata)
+      return false;
+
+    // Ensure that the metadata actually is tuple metadata.
+    auto tupleMetadata = dyn_cast<TargetTupleTypeMetadata<Runtime>>(metadata);
+    if (!tupleMetadata)
+      return false;
+
+    // Ensure that the element is in-bounds.
+    if (eltIndex >= tupleMetadata->NumElements)
+      return false;
+
+    // Read the offset.
+    const auto &element = tupleMetadata->getElement(eltIndex);
+    *offset = element.Offset;
+    return true;
+  }
+
 protected:
   template<typename Offset>
   StoredPointer resolveRelativeOffset(StoredPointer targetAddress) {

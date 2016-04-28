@@ -2174,12 +2174,12 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
     }
   };
 
-  TargetPointer<Runtime, Element> getElements() {
-    return reinterpret_cast<TargetPointer<Runtime, Element>>(this + 1);
+  Element *getElements() {
+    return reinterpret_cast<Element*>(this + 1);
   }
 
-  TargetPointer<Runtime, const Element> getElements() const {
-    return reinterpret_cast<TargetPointer<Runtime, const Element>>(this + 1);
+  const Element *getElements() const {
+    return reinterpret_cast<const Element*>(this + 1);
   }
 
   const Element &getElement(unsigned i) const {

@@ -52,6 +52,56 @@ extern "C" void printMetadataType(const Metadata *typeMetadata) {
   }
 }
 
+static void printMemberOffset(const Metadata *typeMetadata,
+                              StringRef memberName, bool passMetadata) {
+  assert(Context && "context was not set");
+
+  std::shared_ptr<MemoryReader> reader(new InProcessMemoryReader());
+  RemoteASTContext remoteAST(*Context, std::move(reader));
+
+  auto &out = llvm::outs();
+
+  // The first thing we have to do is get the type.
+  auto typeResult =
+    remoteAST.getTypeForRemoteTypeMetadata(RemoteAddress(typeMetadata));
+  if (!typeResult) {
+    out << "failed to find type: " << typeResult.getFailure().render() << '\n';
+    return;
+  }
+
+  Type type = typeResult.getValue();
+
+  RemoteAddress address =
+    (passMetadata ? RemoteAddress(typeMetadata) : RemoteAddress(nullptr));
+
+  auto offsetResult =
+    remoteAST.getOffsetOfMember(type, address, memberName);
+  if (!offsetResult) {
+    out << "failed to find offset: "
+        << offsetResult.getFailure().render() << '\n';
+    return;
+  }
+
+  out << "found offset: " << offsetResult.getValue() << '\n';
+}
+
+// FIXME: swiftcall
+/// func printTypeMemberOffset(forType: Any.Type, memberName: StaticString)
+LLVM_ATTRIBUTE_USED
+extern "C" void printTypeMemberOffset(const Metadata *typeMetadata,
+                                      const char *memberName) {
+  printMemberOffset(typeMetadata, memberName, /*pass metadata*/ false);
+}
+
+// FIXME: swiftcall
+/// func printTypeMetadataMemberOffset(forType: Any.Type,
+///                                    memberName: StaticString)
+LLVM_ATTRIBUTE_USED
+extern "C" void printTypeMetadataMemberOffset(const Metadata *typeMetadata,
+                                              const char *memberName) {
+  printMemberOffset(typeMetadata, memberName, /*pass metadata*/ true);
+}
+
 namespace {
 
 struct Observer : public FrontendObserver {
