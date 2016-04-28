@@ -38,14 +38,10 @@ enum class SymbolKind {
   GenericTypeParam,
 
   Function,
+  Variable,
   PrefixOperator,
   PostfixOperator,
   InfixOperator,
-
-  LocalVariable,
-  GlobalVariable,
-  ParamVariable,
-
   Accessor,
   Subscript,
   EnumElement,
