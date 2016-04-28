@@ -81,6 +81,10 @@ public:
     return Layout.getByteOffset();
   }
 
+  unsigned getNonFixedElementIndex() const {
+    return Layout.getNonFixedElementIndex();
+  }
+
   std::pair<unsigned, unsigned> getProjectionRange() const {
     return {Begin, End};
   }

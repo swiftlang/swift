@@ -47,6 +47,8 @@
 #include "IRGenModule.h"
 #include "GenHeap.h"
 #include "HeapTypeInfo.h"
+#include "Linking.h"
+#include "MemberAccessStrategy.h"
 
 
 using namespace swift;
@@ -474,6 +476,45 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
     auto offset =
       IGF.Builder.CreateLoad(Address(offsetA, IGF.IGM.getPointerAlignment()));
     return emitAddressAtOffset(IGF, baseType, base, offset, field);
+  }
+  }
+  llvm_unreachable("bad field-access strategy");
+}
+
+MemberAccessStrategy
+irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
+                                            SILType baseType, VarDecl *field) {
+  auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();
+  ClassDecl *baseClass = baseType.getClassOrBoundGenericClass();
+
+  auto &classLayout = baseClassTI.getClassLayout(IGM);
+  unsigned fieldIndex = classLayout.getFieldIndex(field);
+
+  switch (classLayout.AllFieldAccesses[fieldIndex]) {
+  case FieldAccess::ConstantDirect: {
+    auto &element = baseClassTI.getElements(IGM)[fieldIndex];
+    return MemberAccessStrategy::getDirectFixed(element.getByteOffset());
+  }
+
+  case FieldAccess::NonConstantDirect: {
+    std::string symbol =
+      LinkEntity::forFieldOffset(field, /*indirect*/ false).mangleAsString();
+    return MemberAccessStrategy::getDirectGlobal(std::move(symbol),
+                                 MemberAccessStrategy::OffsetKind::Bytes_Word);
+  }
+
+  case FieldAccess::ConstantIndirect: {
+    Size indirectOffset = getClassFieldOffset(IGM, baseClass, field);
+    return MemberAccessStrategy::getIndirectFixed(indirectOffset,
+                                 MemberAccessStrategy::OffsetKind::Bytes_Word);
+  }
+
+  case FieldAccess::NonConstantIndirect: {
+    std::string symbol =
+      LinkEntity::forFieldOffset(field, /*indirect*/ true).mangleAsString();
+    return MemberAccessStrategy::getIndirectGlobal(std::move(symbol),
+                                 MemberAccessStrategy::OffsetKind::Bytes_Word,
+                                 MemberAccessStrategy::OffsetKind::Bytes_Word);
   }
   }
   llvm_unreachable("bad field-access strategy");
