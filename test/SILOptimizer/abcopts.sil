@@ -1,5 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -loop-rotate -dce -simplify-cfg -abcopts -enable-abcopts=1 %s | FileCheck %s
 // RUN: %target-sil-opt -enable-sil-verify-all -loop-rotate -dce -simplify-cfg -abcopts -dce -enable-abcopts -enable-abc-hoisting %s | FileCheck %s --check-prefix=HOIST
+// RUN: %target-sil-opt -enable-sil-verify-all  -abcopts  %s | FileCheck %s --check-prefix=RANGECHECK
 
 sil_stage canonical
 
@@ -1022,11 +1023,14 @@ sil [_semantics "array.check_subscript"] @checkbounds3 : $@convention(method) (I
 // CHECK: bb0
 // CHECK:   cond_br {{.*}}, bb2, bb1
 // CHECK: bb1
+// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:   br bb3
 // CHECK: bb2
 // CHECK:   return
 // CHECK: bb3([[IV:%.*]] : $Builtin.Int64):
-// CHECK-NOT: cond_fail
+// CHECK:   builtin "xor_Int1"([[TRUE]]
+// CHECK:   builtin "xor_Int1"([[TRUE]]
+// CHECK:   cond_fail
 // CHECK:   cond_br {{.*}}, bb2, bb4
 // CHECK: bb4:
 // CHECK:   br bb3
@@ -1068,11 +1072,16 @@ bb3(%15 : $Builtin.Int64):
 // CHECK: bb0
 // CHECK:   cond_br {{.*}}, bb2, bb1
 // CHECK: bb1
+// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK: [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK:   br bb3
 // CHECK: bb2
 // CHECK:   return
 // CHECK: bb3([[IV:%.*]] : $Builtin.Int64):
-// CHECK-NOT: cond_fail
+// CHECK:   builtin "xor_Int1"([[TRUE]]
+// CHECK:   builtin "xor_Int1"([[TRUE]]
+// CHECK:   builtin "or_Int1"([[FALSE]]
+// CHECK:   cond_fail
 // CHECK:   cond_br {{.*}}, bb2, bb4
 // CHECK: bb4:
 // CHECK:   br bb3
@@ -1103,6 +1112,61 @@ bb3(%15 : $Builtin.Int64):
   %20 = builtin "or_Int1"(%7 : $Builtin.Int1, %17 : $Builtin.Int1) : $Builtin.Int1
   %21 = builtin "or_Int1"(%20 : $Builtin.Int1, %19 : $Builtin.Int1) : $Builtin.Int1
   cond_fail %21 : $Builtin.Int1
+  %22 = builtin "sadd_with_overflow_Int64"(%15 : $Builtin.Int64, %11 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %23 = tuple_extract %22 : $(Builtin.Int64, Builtin.Int1), 0
+  %24 = tuple_extract %22 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %24 : $Builtin.Int1
+  %28 = builtin "cmp_eq_Int64"(%23 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %28, bb2, bb3(%23 : $Builtin.Int64)
+}
+
+sil @unknown : $@convention(thin) () -> Builtin.Int1
+
+// RANGECHECK-LABEL: sil @rangeCheck_early_exit
+// RANGECHECK: bb0
+// RANGECHECK:   cond_br {{.*}}, bb2, bb1
+// RANGECHECK: bb1
+// RANGECHECK:  [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
+// RANGECHECK:   br bb3
+// RANGECHECK: bb2
+// RANGECHECK:  return
+// RANGECHECK: bb3
+// RANGECHECK:  cond_br {{.*}}, bb4, bb2
+// RANGECHECK: bb4
+// RANGECHECK:   builtin "xor_Int1"([[TRUE]]
+// RANGECHECK:   builtin "xor_Int1"([[TRUE]]
+// RANGECHECK:   cond_br {{.*}}, bb2, bb3
+// RANGECHECK: }
+sil @rangeCheck_early_exit : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %3 = integer_literal $Builtin.Int64, 0
+  %5 = builtin "cmp_sle_Int64"(%3 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int1
+  %6 = integer_literal $Builtin.Int1, -1
+  %7 = builtin "xor_Int1"(%5 : $Builtin.Int1, %6 : $Builtin.Int1) : $Builtin.Int1
+  cond_fail %7 : $Builtin.Int1
+  %9 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %9, bb2, bb1
+
+bb1:
+  %11 = integer_literal $Builtin.Int64, 1
+  br bb3(%3 : $Builtin.Int64)
+
+bb2:
+  %13 = tuple ()
+  return %13 : $()
+
+bb3(%15 : $Builtin.Int64):
+  %1 = function_ref @unknown : $@convention(thin) () -> Builtin.Int1
+  %2 = apply %1() : $@convention(thin) () -> Builtin.Int1
+  cond_br %2, bb4, bb2
+
+bb4:
+  %16 = builtin "cmp_sle_Int64"(%3 : $Builtin.Int64, %15 : $Builtin.Int64) : $Builtin.Int1
+  %17 = builtin "xor_Int1"(%16 : $Builtin.Int1, %6 : $Builtin.Int1) : $Builtin.Int1
+  %18 = builtin "cmp_slt_Int64"(%15 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int1
+  %19 = builtin "xor_Int1"(%18 : $Builtin.Int1, %6 : $Builtin.Int1) : $Builtin.Int1
+  %20 = builtin "or_Int1"(%17 : $Builtin.Int1, %19 : $Builtin.Int1) : $Builtin.Int1
+  cond_fail %20 : $Builtin.Int1
   %22 = builtin "sadd_with_overflow_Int64"(%15 : $Builtin.Int64, %11 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %23 = tuple_extract %22 : $(Builtin.Int64, Builtin.Int1), 0
   %24 = tuple_extract %22 : $(Builtin.Int64, Builtin.Int1), 1
