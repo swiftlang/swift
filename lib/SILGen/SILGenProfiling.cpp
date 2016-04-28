@@ -29,10 +29,16 @@
 using namespace swift;
 using namespace Lowering;
 
+static bool isUnmappedDecl(Decl *D) {
+  return (D->isImplicit() && !isa<ConstructorDecl>(D) &&
+          !isa<DestructorDecl>(D)) ||
+         isa<EnumCaseDecl>(D);
+}
+
 ProfilerRAII::ProfilerRAII(SILGenModule &SGM, AbstractFunctionDecl *D)
     : SGM(SGM) {
   const auto &Opts = SGM.M.getOptions();
-  if (!Opts.GenerateProfile)
+  if (!Opts.GenerateProfile || isUnmappedDecl(D))
     return;
   SGM.Profiler =
       llvm::make_unique<SILGenProfiling>(SGM, Opts.EmitProfileCoverageMapping);
@@ -55,6 +61,8 @@ struct MapRegionCounters : public ASTWalker {
       : NextCounter(0), CounterMap(CounterMap) {}
 
   bool walkToDeclPre(Decl *D) override {
+    if (isUnmappedDecl(D))
+      return false;
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
       CounterMap[AFD->getBody()] = NextCounter++;
     return true;
@@ -435,7 +443,7 @@ public:
   }
 
   bool walkToDeclPre(Decl *D) override {
-    if (D->isImplicit())
+    if (isUnmappedDecl(D))
       return false;
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
       assignCounter(AFD->getBody());
