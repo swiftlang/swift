@@ -329,9 +329,9 @@ public func expectSequenceType<
   X.SubSequence.SubSequence == X.SubSequence
 >(_ x: X) -> X { return x }
 
-public func expectIndexable<X : Indexable>(_ x: X) -> X { return x }
-public func expectCollectionType<
-  X : Collection
+% for Mutable in ['', 'Mutable']:
+public func expect${Mutable}CollectionType<
+  X : ${Mutable}Collection
   where
 
   // FIXME(ABI)(compiler limitation): there should be no constraints in
@@ -345,7 +345,8 @@ public func expectCollectionType<
   X.Indices.Iterator.Element == X.Index,
   X.Indices.Index == X.Index,
   X.Indices.SubSequence == X.Indices
->(_ x: X) -> X { return x }
+>(_ x: X.Type) {}
+% end
 
 /// A slice is a `Collection` that when sliced returns an instance of
 /// itself.
