@@ -137,8 +137,8 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
       Lang, AbsMainFile, Opts.DebugCompilationDir, Producer, IsOptimized,
       Flags, MajorRuntimeVersion, SplitName,
       Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables
-          ? llvm::DIBuilder::LineTablesOnly
-          : llvm::DIBuilder::FullDebug);
+          ? llvm::DICompileUnit::LineTablesOnly
+          : llvm::DICompileUnit::FullDebug);
   MainFile = getOrCreateFile(BumpAllocatedString(AbsMainFile).data());
 
   // Because the swift compiler relies on Clang to setup the Module,
@@ -1458,7 +1458,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
         llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, 0,
           llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
           MangledName));
-    
+
     DITypeCache[DbgTy.getType()] = llvm::TrackingMDNodeRef(FwdDecl.get());
 
     unsigned RealSize;
@@ -1663,7 +1663,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto *CanTy = DictionaryTy->getDesugaredType();
     return getOrCreateDesugaredType(CanTy, DbgTy);
   }
-    
+
   case TypeKind::GenericTypeParam: {
     auto *ParamTy = cast<GenericTypeParamType>(BaseTy);
     // FIXME: Provide a more meaningful debug type.
