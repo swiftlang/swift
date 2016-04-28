@@ -119,6 +119,27 @@ let _: Int
 @available(OSX, introduced: 1.0.0x4) // expected-error{{expected version number in 'available' attribute}}
 let _: Int
 
+@available(*, renamed: "bad name") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
+let _: Int
+
+@available(*, renamed: "Overly.Nested.Name") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
+let _: Int
+
+@available(*, renamed: "_") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
+let _: Int
+
+@available(*, renamed: "a+b") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
+let _: Int
+
+@available(*, renamed: "a(") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
+let _: Int
+
+@available(*, renamed: "a(:)") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
+let _: Int
+
+@available(*, renamed: "a(:b:)") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
+let _: Int
+
 @available(*, deprecated, unavailable, message: "message") // expected-error{{'available' attribute cannot be both unconditionally 'unavailable' and 'deprecated'}}
 struct BadUnconditionalAvailability { };
 
@@ -204,4 +225,62 @@ func OutputStreamTest(message: String, to: inout OutputStream) {
 // expected-note@+1{{'T' has been explicitly marked unavailable here}}
 struct UnavailableGenericParam<@available(*, unavailable, message: "nope") T> {
   func f(t: T) { } // expected-error{{'T' is unavailable: nope}}
+}
+
+
+struct DummyType {}
+
+@available(*, unavailable, renamed: "&+")
+func +(x: DummyType, y: DummyType) {} // expected-note {{here}}
+@available(*, deprecated, renamed: "&-")
+func -(x: DummyType, y: DummyType) {}
+
+func testOperators(x: DummyType, y: DummyType) {
+  x + y // expected-error {{'+' has been renamed to '&+'}} {{5-6=&+}}
+  x - y // expected-warning {{'-' is deprecated: renamed to '&-'}} expected-note {{use '&-' instead}} {{5-6=&-}}
+}
+
+@available(*, unavailable, renamed: "DummyType.foo")
+func unavailableMember() {} // expected-note {{here}}
+@available(*, deprecated, renamed: "DummyType.bar")
+func deprecatedMember() {}
+
+@available(*, unavailable, renamed: "DummyType.Foo")
+struct UnavailableType {} // expected-note {{here}}
+@available(*, deprecated, renamed: "DummyType.Bar")
+typealias DeprecatedType = Int
+
+func testGlobalToMembers() {
+  unavailableMember() // expected-error {{'unavailableMember()' has been renamed to 'DummyType.foo'}} {{3-20=DummyType.foo}}
+  deprecatedMember() // expected-warning {{'deprecatedMember()' is deprecated: renamed to 'DummyType.bar'}} expected-note {{use 'DummyType.bar' instead}} {{3-19=DummyType.bar}}
+  let x: UnavailableType? = nil // expected-error {{'UnavailableType' has been renamed to 'DummyType.Foo'}} {{10-25=DummyType.Foo}}
+  _ = x
+  let y: DeprecatedType? = nil // expected-warning {{'DeprecatedType' is deprecated: renamed to 'DummyType.Bar'}} expected-note {{use 'DummyType.Bar' instead}} {{10-24=DummyType.Bar}}
+  _ = y
+}
+
+
+@available(*, unavailable, renamed: "shinyLabeledArguments(example:)")
+func unavailableArgNames(a: Int) {} // expected-note {{here}}
+@available(*, deprecated, renamed: "moreShinyLabeledArguments(example:)")
+func deprecatedArgNames(b: Int) {}
+@available(*, unavailable, renamed: "DummyType.shinyLabeledArguments(example:)")
+func unavailableMemberArgNames(a: Int) {} // expected-note {{here}}
+@available(*, deprecated, renamed: "DummyType.moreShinyLabeledArguments(example:)")
+func deprecatedMemberArgNames(b: Int) {}
+@available(*, unavailable, renamed: "DummyType.shinyLabeledArguments(example:)", message: "ha")
+func unavailableMemberArgNamesMsg(a: Int) {} // expected-note {{here}}
+@available(*, deprecated, renamed: "DummyType.moreShinyLabeledArguments(example:)", message: "ha")
+func deprecatedMemberArgNamesMsg(b: Int) {}
+
+func testArgNames() {
+  // FIXME: These are all wrong.
+  unavailableArgNames(a: 0) // expected-error {{'unavailableArgNames(a:)' has been renamed to 'shinyLabeledArguments(example:)'}} {{3-22=shinyLabeledArguments(example:)}}
+  deprecatedArgNames(b: 1) // expected-warning {{'deprecatedArgNames(b:)' is deprecated: renamed to 'moreShinyLabeledArguments(example:)'}} expected-note {{use 'moreShinyLabeledArguments(example:)' instead}} {{3-21=moreShinyLabeledArguments(example:)}}
+
+  unavailableMemberArgNames(a: 0) // expected-error {{'unavailableMemberArgNames(a:)' has been renamed to 'DummyType.shinyLabeledArguments(example:)'}} {{3-28=DummyType.shinyLabeledArguments(example:)}}
+  deprecatedMemberArgNames(b: 1) // expected-warning {{'deprecatedMemberArgNames(b:)' is deprecated: renamed to 'DummyType.moreShinyLabeledArguments(example:)'}} expected-note {{use 'DummyType.moreShinyLabeledArguments(example:)' instead}} {{3-27=DummyType.moreShinyLabeledArguments(example:)}}
+
+  unavailableMemberArgNamesMsg(a: 0) // expected-error {{'unavailableMemberArgNamesMsg(a:)' has been renamed to 'DummyType.shinyLabeledArguments(example:)': ha}} {{3-31=DummyType.shinyLabeledArguments(example:)}}
+  deprecatedMemberArgNamesMsg(b: 1) // expected-warning {{'deprecatedMemberArgNamesMsg(b:)' is deprecated: ha}} expected-note {{use 'DummyType.moreShinyLabeledArguments(example:)' instead}} {{3-30=DummyType.moreShinyLabeledArguments(example:)}}
 }

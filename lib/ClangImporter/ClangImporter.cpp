@@ -2160,7 +2160,7 @@ auto ClangImporter::Implementation::importFullName(
 
     // Parse the name.
     ParsedDeclName parsedName = parseDeclName(nameAttr->getName());
-    if (!parsedName) return result;
+    if (!parsedName || parsedName.isOperator()) return result;
 
     // If we have an Objective-C method that is being mapped to an
     // initializer (e.g., a factory method whose name doesn't fit the
