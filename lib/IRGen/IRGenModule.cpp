@@ -88,13 +88,13 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   CGO.DisableFPElim = Opts.DisableFPElim;
   switch (Opts.DebugInfoKind) {
   case IRGenDebugInfoKind::None:
-    CGO.setDebugInfo(clang::CodeGenOptions::DebugInfoKind::NoDebugInfo);
+    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::NoDebugInfo);
     break;
   case IRGenDebugInfoKind::LineTables:
-    CGO.setDebugInfo(clang::CodeGenOptions::DebugInfoKind::DebugLineTablesOnly);
+    CGO.setDebugInfo(clang::CodeGenOptions::codegenoptions::DebugLineTablesOnly);
     break;
  case IRGenDebugInfoKind::Normal:
-    CGO.setDebugInfo(clang::CodeGenOptions::DebugInfoKind::FullDebugInfo);
+    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }
   if (Opts.DebugInfoKind != IRGenDebugInfoKind::None) {
@@ -147,7 +147,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   } else {
     EnableValueNames = (opts.OutputKind == IRGenOutputKind::LLVMAssembly);
   }
-  
+
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
@@ -206,9 +206,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int16Ty,                // default witness count
     Int32Ty                 // padding
   });
-  
+
   ProtocolDescriptorPtrTy = ProtocolDescriptorStructTy->getPointerTo();
-  
+
   // A tuple type metadata record has a couple extra fields.
   auto tupleElementTy = createStructType(*this, "swift.tuple_element_type", {
     TypeMetadataPtrTy,      // Metadata *Type;
@@ -275,7 +275,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     FunctionPtrTy,
     RefCountedPtrTy,
   });
-  
+
   OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
                   ->getPointerTo(DefaultAS);
 
@@ -333,7 +333,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     ObjCClassPtrTy
   };
   ObjCSuperStructTy->setBody(objcSuperElts);
-  
+
   ObjCBlockStructTy = llvm::StructType::create(LLVMContext, "objc_block");
   ObjCBlockPtrTy = ObjCBlockStructTy->getPointerTo(DefaultAS);
   llvm::Type *objcBlockElts[] = {
@@ -346,11 +346,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                     // point too.
   };
   ObjCBlockStructTy->setBody(objcBlockElts);
-  
+
   auto ErrorStructTy = llvm::StructType::create(LLVMContext, "swift.error");
   // ErrorStruct is currently opaque to the compiler.
   ErrorPtrTy = ErrorStructTy->getPointerTo(DefaultAS);
-  
+
   llvm::Type *openedErrorTriple[] = {
     OpaquePtrTy,
     TypeMetadataPtrTy,
@@ -360,11 +360,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                                               openedErrorTriple,
                                               /*packed*/ false);
   OpenedErrorTriplePtrTy = OpenedErrorTripleTy->getPointerTo(DefaultAS);
-  
+
   InvariantMetadataID = LLVMContext.getMDKindID("invariant.load");
   InvariantNode = llvm::MDNode::get(LLVMContext, {});
   DereferenceableID = LLVMContext.getMDKindID("dereferenceable");
-  
+
   C_CC = llvm::CallingConv::C;
   // TODO: use "tinycc" on platforms that support it
   DefaultCC = SWIFT_LLVM_CC(DefaultCC);
@@ -435,7 +435,7 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                       ArrayRef<Attribute::AttrKind> attrs) {
   if (cache)
     return cache;
-  
+
   llvm::Type *retTy;
   if (retTypes.size() == 1)
     retTy = *retTypes.begin();
@@ -717,7 +717,7 @@ llvm::AttributeSet IRGenModule::getAllocAttrs() {
 /// Construct initial attributes from options.
 llvm::AttributeSet IRGenModule::constructInitialAttributes() {
   llvm::AttributeSet attrsUpdated;
-  // Add DisableFPElim. 
+  // Add DisableFPElim.
   if (!IRGen.Opts.DisableFPElim) {
     attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
                      llvm::AttributeSet::FunctionIndex,
@@ -915,10 +915,10 @@ void IRGenModule::emitAutolinkInfo() {
     auto EntriesConstant = llvm::ConstantDataArray::getString(
       LLVMContext, EntriesString, /*AddNull=*/false);
 
-    auto var = new llvm::GlobalVariable(*getModule(), 
+    auto var = new llvm::GlobalVariable(*getModule(),
                                         EntriesConstant->getType(), true,
                                         llvm::GlobalValue::PrivateLinkage,
-                                        EntriesConstant, 
+                                        EntriesConstant,
                                         "_swift1_autolink_entries");
     var->setSection(".swift1_autolink_entries");
     var->setAlignment(getPointerAlignment().getValue());
