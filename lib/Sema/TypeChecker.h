@@ -30,6 +30,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include <functional>
 
 namespace swift {
@@ -406,7 +407,8 @@ enum class ObjCReason {
   ExplicitlyNSManaged,
   MemberOfObjCProtocol,
   ImplicitlyObjC,
-  OverridesObjC
+  OverridesObjC,
+  WitnessToObjC,
 };
 
 /// Return the %select discriminator for the OBJC_ATTR_SELECT macro used to
@@ -1471,6 +1473,18 @@ public:
   /// Check all of the conformances in the given context.
   void checkConformancesInContext(DeclContext *dc,
                                   IterableDeclContext *idc);
+
+  /// Find the @objc requirement that are witnessed by the given
+  /// declaration.
+  ///
+  /// \param onlyFirstRequirement If true, only returns the first such
+  /// requirement, rather than all of them.
+  ///
+  /// \returns the set of requirements to which the given witness is a
+  /// witness.
+  llvm::TinyPtrVector<ValueDecl *> findWitnessedObjCRequirements(
+                                     const ValueDecl *witness,
+                                     bool onlyFirstRequirement);
 
   /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
   void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);

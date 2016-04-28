@@ -2550,7 +2550,7 @@ ERROR(objc_enum_case_multi,none,
       "'@objc' enum case declaration defines multiple enum cases with the same Objective-C name", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement}"
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
@@ -2595,6 +2595,9 @@ NOTE(objc_inferring_on_objc_protocol_member,none,
 NOTE(objc_overriding_objc_decl,none,
      "overriding '@objc' %select{property|subscript|initializer|method}0 %1 "
      "here", (unsigned, DeclName))
+NOTE(objc_witness_objc_requirement,none,
+     "satisfying requirement for %0 %1 in protocol %2",
+     (DescriptiveDeclKind, DeclName, DeclName))
 
 ERROR(objc_invalid_on_func_curried,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because curried functions "
