@@ -98,6 +98,31 @@ swift_typeref_t
 swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
                                           unsigned Index);
 
+/// Projects the type inside of an existential container.
+///
+/// Takes the address of the start of an existential container and the typeref
+/// for the existential, and sets two out parameters:
+///
+/// - InstanceTypeRef: A type reference for the type inside of the existential
+///   container.
+/// - StartOfInstanceData: The address to the start of the inner type's instance
+///   data, which may or may not be inside the container directly.
+///   If the type is a reference type, the pointer to the instance is the first
+///   word in the container.
+///
+///   If the existential contains a value type that can fit in the first three
+///   spare words of the container, *StartOfInstanceData == InstanceAddress.
+///   If it's a value type that can't fit in three words, the data will be in
+///   its own heap box, so *StartOfInstanceData will be the address of that box.
+///
+/// Returns true if InstanceTypeRef and StartOfInstanceData contain valid
+/// valid values.
+bool swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
+                                         addr_t InstanceAddress,
+                                         swift_typeref_t ExistentialTypeRef,
+                                         swift_typeref_t *OutInstanceTypeRef,
+                                         addr_t *OutStartOfInstanceData);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
