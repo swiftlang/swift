@@ -110,34 +110,6 @@ public enum UnderestimatedCountBehavior {
   case value(Int)
 }
 
-// FIXME: swift-3-indexing-model: fold this type into its only user.
-public protocol StrictSequence : Sequence {
-  associatedtype Element
-  init(base: MinimalSequence<Element>)
-  var base: MinimalSequence<Element> { get }
-}
-
-extension StrictSequence {
-  public init<S : Sequence where S.Iterator.Element == Element>(
-    elements: S,
-    underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) {
-    self.init(base: MinimalSequence(
-      elements: elements, underestimatedCount: underestimatedCount))
-  }
-
-  public var underestimatedCount: Int {
-    return base.underestimatedCount
-  }
-}
-
-extension StrictSequence where Iterator : _MinimalIterator {
-  @warn_unused_result
-  public func makeIterator() -> MinimalIterator<Element> {
-    return base.makeIterator()
-  }
-}
-
 /// A Sequence that implements the protocol contract in the most
 /// narrow way possible.
 ///
@@ -844,11 +816,28 @@ public struct ${Self}<T> : ${SelfProtocols} {
 
 /// A Sequence that uses as many default implementations as
 /// `Sequence` can provide.
-public struct DefaultedSequence<Element> : StrictSequence {
+public struct DefaultedSequence<Element> : Sequence {
   public let base: MinimalSequence<Element>
 
   public init(base: MinimalSequence<Element>) {
     self.base = base
+  }
+
+  public init<S : Sequence where S.Iterator.Element == Element>(
+    elements: S,
+    underestimatedCount: UnderestimatedCountBehavior = .value(0)
+  ) {
+    self.init(base: MinimalSequence(
+      elements: elements, underestimatedCount: underestimatedCount))
+  }
+
+  @warn_unused_result
+  public func makeIterator() -> MinimalIterator<Element> {
+    return base.makeIterator()
+  }
+
+  public var underestimatedCount: Int {
+    return base.underestimatedCount
   }
 }
 
