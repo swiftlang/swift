@@ -50,30 +50,20 @@ internal struct ReflectionInfo : Sequence {
   /// The name of the loaded image
   internal let imageName: String
 
-  /// The Field Metadata section
-  internal let fieldmd: Section
-
-  /// The Typeref section
-  internal let typeref: Section
-
-  /// The Reflection Strings section, which holds property names and other
-  /// general-purpose strings.
-  ///
-  /// This section can be stripped out by having compiled with
-  /// `-strip-reflection-names` and so is optional.
+  /// Reflection metadata sections
+  internal let fieldmd: Section?
+  internal let assocty: Section?
+  internal let builtin: Section?
+  internal let typeref: Section?
   internal let reflstr: Section?
-
-  /// The Associated Types section, which indicates which type aliases 
-  /// are provided by a type to conform to some protocol's associated
-  /// type requirements.
-  internal let assocty: Section
 
   internal func makeIterator() -> AnyIterator<Section?> {
     return AnyIterator([
       fieldmd,
+      assocty,
+      builtin,
       typeref,
-      reflstr,
-      assocty
+      reflstr
     ].makeIterator())
   }
 }
@@ -106,8 +96,9 @@ internal func getSectionInfo(_ name: String,
 /// An image of interest must have the following sections in the __DATA
 /// segment:
 /// - __swift3_fieldmd
-/// - __swift3_typeref
 /// - __swift3_assocty
+/// - __swift3_builtin
+/// - __swift3_typeref
 /// - __swift3_reflstr (optional, may have been stripped out)
 ///
 /// - Parameter i: The index of the loaded image as reported by Dyld.
@@ -119,15 +110,17 @@ internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
     to: UnsafePointer<MachHeader>.self)
 
   let imageName = _dyld_get_image_name(i)!
-  if let fieldmd = getSectionInfo("__swift3_fieldmd", header),
-     let typeref = getSectionInfo("__swift3_typeref", header),
-     let assocty = getSectionInfo("__swift3_assocty", header) {
+  if let fieldmd = getSectionInfo("__swift3_fieldmd", header) {
+     let assocty = getSectionInfo("__swift3_assocty", header)
+     let builtin = getSectionInfo("__swift3_builtin", header)
+     let typeref = getSectionInfo("__swift3_typeref", header)
      let reflstr = getSectionInfo("__swift3_reflstr", header)
       return ReflectionInfo(imageName: String(validatingUTF8: imageName)!,
-        fieldmd: fieldmd,
-        typeref: typeref,
-        reflstr: reflstr,
-        assocty: assocty)
+                            fieldmd: fieldmd,
+                            assocty: assocty,
+                            builtin: builtin,
+                            typeref: typeref,
+                            reflstr: reflstr)
   }
   return nil
 }

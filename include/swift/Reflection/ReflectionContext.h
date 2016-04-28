@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements the context for allocations and management of structures related
-// to reflection, such as TypeRefs.
+// Implements the context for reflection of values in the address space of a
+// remote process.
 //
 //===----------------------------------------------------------------------===//
 
@@ -61,25 +61,38 @@ public:
     getBuilder().dumpAllSections();
   }
 
-  std::vector<std::pair<std::string, const TypeRef *>>
-  getFieldTypeRefs(const TypeRef *TR) {
-    TypeRefBuilder &Builder = getBuilder();
-    auto *FD = Builder.getFieldTypeInfo(TR);
-    if (FD == nullptr)
-      return {};
-    return Builder.getFieldTypeRefs(TR, FD);
-  }
-
-  std::vector<std::pair<std::string, const TypeRef *>>
-  getFieldTypeRefs(StoredPointer MetadataAddress) {
-    auto TR = readTypeFromMetadata(MetadataAddress);
-    return getFieldTypeRefs(TR);
-  }
-
   void addReflectionInfo(ReflectionInfo I) {
     getBuilder().addReflectionInfo(I);
   }
 
+  /// Return a description of the layout of a heap object having the given
+  /// metadata as its isa pointer.
+  const TypeInfo *getInstanceTypeInfo(StoredPointer MetadataAddress) {
+    // FIXME: Add caching
+    auto &TC = getBuilder().getTypeConverter();
+
+    auto TR = readTypeFromMetadata(MetadataAddress);
+    if (TR == nullptr)
+      return nullptr;
+
+    auto kind = this->readKindFromMetadata(MetadataAddress);
+    if (!kind.first)
+      return nullptr;
+
+    switch (kind.second) {
+    case MetadataKind::Class: {
+      auto start = this->readInstanceStartFromClassMetadata(MetadataAddress);
+      if (!start.first)
+        return nullptr;
+      auto *TI = TC.getInstanceTypeInfo(TR, start.second);
+      return TI;
+    }
+    default:
+      return nullptr;
+    }
+  }
+
+  /// Return a description of the layout of a value with the given type.
   const TypeInfo *getTypeInfo(const TypeRef *TR) {
     return getBuilder().getTypeConverter().getTypeInfo(TR);
   }

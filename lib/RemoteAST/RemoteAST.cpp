@@ -24,11 +24,47 @@
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangImporter.h"
 
+// TODO: Develop a proper interface for this.
+#include "swift/AST/IRGenOptions.h"
+#include "swift/AST/SILOptions.h"
+#include "swift/SIL/SILModule.h"
+#include "../IRGen/IRGenModule.h"
+#include "../IRGen/FixedTypeInfo.h"
+#include "../IRGen/GenTuple.h"
+
 using namespace swift;
 using namespace swift::remote;
 using namespace swift::remoteAST;
 
+using irgen::Alignment;
+using irgen::Size;
+
 namespace {
+
+/// A "minimal" class for querying IRGen.
+struct IRGenContext {
+  IRGenOptions IROpts;
+  SILOptions SILOpts;
+  std::unique_ptr<SILModule> SILMod;
+  llvm::LLVMContext LLVMContext;
+  irgen::IRGenerator IRGen;
+  irgen::IRGenModule IGM;
+
+private:
+  IRGenContext(ASTContext &ctx, ModuleDecl *module)
+    : SILMod(SILModule::createEmptyModule(module, SILOpts)),
+      IRGen(IROpts, *SILMod),
+      IGM(IRGen, IRGen.createTargetMachine(), /*SourceFile*/ nullptr,
+          LLVMContext, "<fake module name>", "<fake output filename>") {
+    }
+
+public:
+  static std::unique_ptr<IRGenContext>
+  create(ASTContext &ctx, DeclContext *nominalDC) {
+    auto module = nominalDC->getParentModule();
+    return std::unique_ptr<IRGenContext>(new IRGenContext(ctx, module));
+  }
+};
 
 /// An implementation of MetadataReader's BuilderType concept that
 /// just finds and builds things in the AST.
@@ -45,6 +81,10 @@ public:
   using BuiltType = swift::Type;
   using BuiltNominalTypeDecl = swift::NominalTypeDecl*;
   explicit RemoteASTTypeBuilder(ASTContext &ctx) : Ctx(ctx) {}
+
+  std::unique_ptr<IRGenContext> createIRGenContext() {
+    return IRGenContext::create(Ctx, getNotionalDC());
+  }
 
   template <class Result, class FailureKindTy, class... FailureArgTys>
   Result fail(FailureKindTy kind, FailureArgTys &&...failureArgs) {
@@ -605,8 +645,10 @@ RemoteASTTypeBuilder::findForeignNominalTypeDecl(Identifier name,
 
 namespace {
 
-/// An interface for implementations of the RemoteASTContext interface.
+/// The basic implementation of the RemoteASTContext interface.
+/// The template subclasses do target-specific logic.
 class RemoteASTContextImpl {
+  std::unique_ptr<IRGenContext> IRGen;
 public:
   RemoteASTContextImpl() = default;
   virtual ~RemoteASTContextImpl() = default;
@@ -640,6 +682,24 @@ public:
     }
   }
 
+protected:
+  template <class T>
+  Result<T> getFailure() {
+    return getBuilder().getFailureAsResult<T>(Failure::Unknown);
+  }
+
+private:
+  virtual RemoteASTTypeBuilder &getBuilder() = 0;
+  virtual std::unique_ptr<IRGenContext> createIRGenContext() = 0;
+  virtual Result<uint64_t>
+  getOffsetOfTupleElementFromMetadata(RemoteAddress metadata,
+                                      unsigned elementIndex) = 0;
+
+  IRGenContext *getIRGen() {
+    if (!IRGen) IRGen = createIRGenContext();
+    return IRGen.get();
+  }
+
   Result<uint64_t>
   getOffsetOfMember(Type type, NominalTypeDecl *typeDecl,
                     RemoteAddress optMetadata, StringRef memberName) {
@@ -651,23 +711,87 @@ public:
   getOffsetOfMember(TupleType *type, RemoteAddress optMetadata,
                     StringRef memberName) {
     // Check that the member "name" is a valid index into the tuple.
-    unsigned index;
-    if (memberName.getAsInteger(10, index) || index >= type->getNumElements())
+    unsigned targetIndex;
+    if (memberName.getAsInteger(10, targetIndex) ||
+        targetIndex >= type->getNumElements())
       return Result<uint64_t>::emplaceFailure(Failure::TypeHasNoSuchMember,
                                               memberName);
 
-    // FIXME
-    return Result<uint64_t>::emplaceFailure(Failure::Unknown);
+    // Fast path: element 0 is always at offset 0.
+    if (targetIndex == 0) return uint64_t(0);
+
+    // Create an IRGen instance.
+    auto irgen = getIRGen();
+    if (!irgen) return Result<uint64_t>::emplaceFailure(Failure::Unknown);
+    auto &IGM = irgen->IGM;
+
+    SILType loweredTy = IGM.getSILTypes().getLoweredType(type);
+
+    // If the type has a statically fixed offset, return that.
+    if (auto offset =
+          irgen::getFixedTupleElementOffset(IGM, loweredTy, targetIndex))
+      return offset->getValue();
+
+    // If we have metadata, go load from that.
+    if (optMetadata)
+      return getOffsetOfTupleElementFromMetadata(optMetadata, targetIndex);
+
+    // Okay, reproduce tuple layout.
+
+    // Find the last element with a known offset.  Note that we don't
+    // have to ask IRGen about element 0 because we know its size is zero.
+    Size lastOffset = Size(0);
+    unsigned lastIndex = targetIndex;
+    for (--lastIndex; lastIndex != 0; --lastIndex) {
+      if (auto offset =
+            irgen::getFixedTupleElementOffset(IGM, loweredTy, lastIndex)) {
+        lastOffset = *offset;
+        break;
+      }
+    }
+
+    // Okay, iteratively build up from there.
+    for (; ; ++lastIndex) {
+      // Try to get the size and alignment of this element.
+      SILType eltTy = loweredTy.getTupleElementType(lastIndex);
+      auto sizeAndAlignment = getTypeSizeAndAlignment(IGM, eltTy);
+      if (!sizeAndAlignment) return getFailure<uint64_t>();
+
+      // Round up to the alignment of the element.
+      lastOffset = lastOffset.roundUpToAlignment(sizeAndAlignment->second);
+
+      // If this is the target, we're done.
+      if (lastIndex == targetIndex)
+        return lastOffset.getValue();
+
+      // Otherwise, skip forward by the size of the element.
+      lastOffset += sizeAndAlignment->first;
+    }
+
+    llvm_unreachable("didn't reach target index");
+  }
+
+  /// Attempt to discover the size and alignment of the given type.
+  Optional<std::pair<Size, Alignment>>
+  getTypeSizeAndAlignment(irgen::IRGenModule &IGM, SILType eltTy) {
+    auto &eltTI = IGM.getTypeInfo(eltTy);
+    if (auto fixedTI = dyn_cast<irgen::FixedTypeInfo>(&eltTI)) {
+      return std::make_pair(fixedTI->getFixedSize(),
+                            fixedTI->getFixedAlignment());
+    }
+
+    // TODO: handle resilient types
+    return None;
   }
 };
 
-/// A template for generating concrete implementations of the
+/// A template for generating target-specific implementations of the
 /// RemoteASTContext interface.
 template <class Runtime>
 class RemoteASTContextConcreteImpl final : public RemoteASTContextImpl {
   MetadataReader<Runtime, RemoteASTTypeBuilder> Reader;
 
-  RemoteASTTypeBuilder &getBuilder() {
+  RemoteASTTypeBuilder &getBuilder() override {
     return Reader.Builder;
   }
 
@@ -679,8 +803,7 @@ public:
   Result<Type> getTypeForRemoteTypeMetadata(RemoteAddress metadata) override {
     if (auto result = Reader.readTypeFromMetadata(metadata.getAddressData()))
       return result;
-    return getBuilder().template getFailureAsResult<Type>(
-             Failure::Unknown);
+    return getFailure<Type>();
   }
 
   Result<MetadataKind>
@@ -688,8 +811,7 @@ public:
     auto result = Reader.readKindFromMetadata(metadata.getAddressData());
     if (result.first)
       return result.second;
-    return getBuilder().template getFailureAsResult<MetadataKind>(
-             Failure::Unknown);
+    return getFailure<MetadataKind>();
   }
 
   Result<NominalTypeDecl*>
@@ -697,8 +819,21 @@ public:
     if (auto result =
           Reader.readNominalTypeFromDescriptor(descriptor.getAddressData()))
       return result;
-    return getBuilder().template getFailureAsResult<NominalTypeDecl*>(
-             Failure::Unknown);
+    return getFailure<NominalTypeDecl*>();
+  }
+
+  std::unique_ptr<IRGenContext> createIRGenContext() override {
+    return getBuilder().createIRGenContext();
+  }
+
+  Result<uint64_t>
+  getOffsetOfTupleElementFromMetadata(RemoteAddress metadata,
+                                      unsigned index) override {
+    typename Runtime::StoredSize offset;
+    if (Reader.readTupleElementOffset(metadata.getAddressData(),
+                                      index, &offset))
+      return uint64_t(offset);
+    return getFailure<uint64_t>();
   }
 };
 

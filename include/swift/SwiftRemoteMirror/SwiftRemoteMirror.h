@@ -62,18 +62,32 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
 /// NULL if one can't be constructed.
 swift_typeref_t
 swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
-                                    uintptr_t metadata);
+                                    uintptr_t Metadata);
 
-/// Returns a structure describing the overall layout of a typeref.
+/// Returns a structure describing the layout of a value of a typeref.
+/// For classes, this returns the reference value itself.
 swift_typeinfo_t
 swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef);
 
-/// Returns the information about a child by index.
+/// Returns the information about a child field of a value by index.
 swift_childinfo_t
-swift_reflection_infoForField(SwiftReflectionContextRef ContextRef,
-                              swift_typeref_t OpaqueTypeRef,
-                              unsigned Index);
+swift_reflection_childOfTypeRef(SwiftReflectionContextRef ContextRef,
+                                swift_typeref_t OpaqueTypeRef,
+                                unsigned Index);
+
+/// Returns a structure describing the layout of a class instance
+/// from the isa pointer of a class.
+swift_typeinfo_t
+swift_reflection_infoForMetadata(SwiftReflectionContextRef ContextRef,
+                                 uintptr_t Metadata);
+
+/// Returns the information about a child field of a class instance
+/// by index.
+swift_childinfo_t
+swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
+                                 uintptr_t Metadata,
+                                 unsigned Index);
 
 /// Returns a fully instantiated typeref for a generic argument by index.
 unsigned
@@ -83,6 +97,35 @@ swift_reflection_genericArgumentCountOfTypeRef(swift_typeref_t OpaqueTypeRef);
 swift_typeref_t
 swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
                                           unsigned Index);
+
+/// Projects the type inside of an existential container.
+///
+/// Takes the address of the start of an existential container and the typeref
+/// for the existential, and sets two out parameters:
+///
+/// - InstanceTypeRef: A type reference for the type inside of the existential
+///   container.
+/// - StartOfInstanceData: The address to the start of the inner type's instance
+///   data, which may or may not be inside the container directly.
+///   If the type is a reference type, the pointer to the instance is the first
+///   word in the container.
+///
+///   If the existential contains a value type that can fit in the first three
+///   spare words of the container, *StartOfInstanceData == InstanceAddress.
+///   If it's a value type that can't fit in three words, the data will be in
+///   its own heap box, so *StartOfInstanceData will be the address of that box.
+///
+/// Returns true if InstanceTypeRef and StartOfInstanceData contain valid
+/// valid values.
+bool swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
+                                         addr_t InstanceAddress,
+                                         swift_typeref_t ExistentialTypeRef,
+                                         swift_typeref_t *OutInstanceTypeRef,
+                                         addr_t *OutStartOfInstanceData);
+
+/// Dump a brief description of the typeref as a tree to stderr.
+void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

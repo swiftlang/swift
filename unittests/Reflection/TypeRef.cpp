@@ -312,3 +312,37 @@ TEST(TypeRefTest, UniqueUnmanagedStorageType) {
   EXPECT_EQ(RS1, RS2);
   EXPECT_NE(RS2, RS3);
 }
+
+// Tests that a concrete ABC<Int, Int> is the exact same typeref
+// (with the same pointer) as an ABC<T, U> that got substituted
+// with T : Int and U : Int.
+TEST(TypeRefTest, UniqueAfterSubstitution) {
+  TypeRefBuilder Builder;
+
+  std::string MangledIntName("Si");
+  auto NominalInt = Builder.createNominalType(MangledIntName,
+                                              /*parent*/ nullptr);
+  std::vector<const TypeRef *> ConcreteArgs { NominalInt, NominalInt };
+
+  std::string MangledName("ABC");
+
+  auto ConcreteBG = Builder.createBoundGenericType(MangledName,
+                                                   ConcreteArgs,
+                                                   /*parent*/ nullptr);
+
+  auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
+  auto GTP01 = Builder.createGenericTypeParameterType(0, 1);
+  std::vector<const TypeRef *> GenericParams { GTP00, GTP01 };
+
+  auto Unbound = Builder.createBoundGenericType(MangledName, GenericParams,
+                                                /*parent*/ nullptr);
+
+  GenericArgumentMap Subs;
+  Subs[{0,0}] = NominalInt;
+  Subs[{0,1}] = NominalInt;
+
+  auto SubstitutedBG = Unbound->subst(Builder, Subs);
+
+  EXPECT_EQ(ConcreteBG, SubstitutedBG);
+}
+

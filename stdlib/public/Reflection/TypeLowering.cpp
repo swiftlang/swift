@@ -119,6 +119,9 @@ public:
       case RecordKind::ExistentialMetatype:
         printHeader("existential_metatype");
         break;
+      case RecordKind::ClassInstance:
+        printHeader("class_instance");
+        break;
       }
       printBasic(TI);
       printFields(RecordTI);
@@ -166,6 +169,7 @@ public:
 
 void TypeInfo::dump(std::ostream &OS, unsigned Indent) const {
   PrintTypeInfo(OS, Indent).print(*this);
+  OS << '\n';
 }
 
 namespace {
@@ -196,6 +200,25 @@ public:
     : TC(TC), Size(0), Alignment(1), Stride(0), NumExtraInhabitants(0),
       Kind(Kind), Invalid(false) {}
 
+  unsigned addField(unsigned fieldSize, unsigned fieldAlignment) {
+    // Align the current size appropriately
+    Size = ((Size + fieldAlignment - 1) & ~(fieldAlignment - 1));
+
+    // Record the offset
+    unsigned offset = Size;
+
+    // Update the aggregate size
+    Size += fieldSize;
+
+    // Update the aggregate alignment
+    Alignment = std::max(Alignment, fieldAlignment);
+
+    // Re-calculate the stride
+    Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+
+    return offset;
+  }
+
   void addField(const std::string &Name, const TypeRef *TR) {
     const TypeInfo *TI = TC.getTypeInfo(TR);
     if (TI == nullptr) {
@@ -212,20 +235,8 @@ public:
     unsigned fieldSize = TI->getSize();
     unsigned fieldAlignment = TI->getAlignment();
 
-    // Align the current size appropriately
-    Size = ((Size + fieldAlignment - 1) & ~(fieldAlignment - 1));
-
-    // Add the field at the aligned offset
-    Fields.push_back({Name, Size, TR, *TI});
-
-    // Update the aggregate size
-    Size += fieldSize;
-
-    // Update the aggregate alignment
-    Alignment = std::max(Alignment, fieldAlignment);
-
-    // Re-calculate the stride
-    Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+    unsigned fieldOffset = addField(fieldSize, fieldAlignment);
+    Fields.push_back({Name, fieldOffset, TR, *TI});
   }
 
   const RecordTypeInfo *build() {
@@ -857,4 +868,36 @@ const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
     Cache[TR] = TI;
 
   return TI;
+}
+
+const TypeInfo *TypeConverter::getInstanceTypeInfo(const TypeRef *TR,
+                                                   unsigned InstanceStart) {
+  const FieldDescriptor *FD = getBuilder().getFieldTypeInfo(TR);
+  if (FD == nullptr)
+    return nullptr;
+
+  switch (FD->Kind) {
+  case FieldDescriptorKind::Class: {
+    // Lower the class's fields using substitutions from the
+    // TypeRef to make field types concrete.
+    RecordTypeInfoBuilder builder(*this, RecordKind::ClassInstance);
+    auto *ReferenceTI = getTypeInfo(getNativeObjectTypeRef());
+    if (ReferenceTI == nullptr)
+      return nullptr;
+
+    // Start layout from the given instance start offset.
+    builder.addField(InstanceStart, ReferenceTI->getAlignment());
+
+    for (auto Field : getBuilder().getFieldTypeRefs(TR, FD))
+      builder.addField(Field.first, Field.second);
+    return builder.build();
+  }
+  case FieldDescriptorKind::Struct:
+  case FieldDescriptorKind::Enum:
+  case FieldDescriptorKind::ObjCProtocol:
+  case FieldDescriptorKind::ClassProtocol:
+  case FieldDescriptorKind::Protocol:
+    // Invalid field descriptor.
+    return nullptr;
+  }
 }

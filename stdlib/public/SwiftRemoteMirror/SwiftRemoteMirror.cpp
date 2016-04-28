@@ -15,6 +15,8 @@
 #include "swift/Remote/CMemoryReader.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
 
+#include <iostream>
+
 using namespace swift;
 using namespace swift::reflection;
 using namespace swift::remote;
@@ -120,6 +122,8 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
       return SWIFT_CLASS_EXISTENTIAL;
     case RecordKind::ExistentialMetatype:
       return SWIFT_EXISTENTIAL_METATYPE;
+    case RecordKind::ClassInstance:
+      return SWIFT_CLASS_INSTANCE;
     }
   }
   case TypeInfoKind::Reference: {
@@ -138,13 +142,7 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   }
 }
 
-swift_typeinfo_t
-swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
-                                swift_typeref_t OpaqueTypeRef) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
-  auto TI = Context->getTypeInfo(TR);
-
+static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {
   if (TI == nullptr) {
     return {
       SWIFT_UNKNOWN,
@@ -168,14 +166,8 @@ swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
   };
 }
 
-swift_childinfo_t
-swift_reflection_infoForChild(SwiftReflectionContextRef ContextRef,
-                              swift_typeref_t OpaqueTypeRef,
-                              unsigned Index) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
-
-  auto *RecordTI = cast<RecordTypeInfo>(Context->getTypeInfo(TR));
+static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
+  auto *RecordTI = cast<RecordTypeInfo>(TI);
   auto FieldInfo = RecordTI->getFields()[Index];
 
   return {
@@ -184,4 +176,58 @@ swift_reflection_infoForChild(SwiftReflectionContextRef ContextRef,
     getTypeInfoKind(FieldInfo.TI),
     reinterpret_cast<swift_typeref_t>(FieldInfo.TR),
   };
+}
+
+swift_typeinfo_t
+swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
+                                swift_typeref_t OpaqueTypeRef) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+  auto TI = Context->getTypeInfo(TR);
+  return convertTypeInfo(TI);
+}
+
+swift_childinfo_t
+swift_reflection_childOfTypeRef(SwiftReflectionContextRef ContextRef,
+                                swift_typeref_t OpaqueTypeRef,
+                                unsigned Index) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+  auto *TI = Context->getTypeInfo(TR);
+  return convertChild(TI, Index);
+}
+
+swift_typeinfo_t
+swift_reflection_infoForMetadata(SwiftReflectionContextRef ContextRef,
+                                 uintptr_t Metadata) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto *TI = Context->getInstanceTypeInfo(Metadata);
+  return convertTypeInfo(TI);
+}
+
+swift_childinfo_t
+swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
+                                 uintptr_t Metadata,
+                                 unsigned Index) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto *TI = Context->getInstanceTypeInfo(Metadata);
+  return convertChild(TI, Index);
+}
+
+bool swift_reflection_project_existential(SwiftReflectionContextRef ContextRef,
+                                          addr_t InstanceAddress,
+                                          swift_typeref_t ExistentialTypeRef,
+                                          swift_typeref_t *InstanceTypeRef,
+                                          addr_t *StartOfInstanceData) {
+  // TODO
+  return false;
+}
+
+void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+  if (TR == nullptr) {
+    std::cerr << "<null type reference>" << std::endl;
+  } else {
+    TR->dump();
+  }
 }

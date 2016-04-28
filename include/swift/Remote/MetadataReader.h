@@ -465,6 +465,29 @@ public:
     return {true, meta->getKind()};
   }
 
+  /// Given a remote pointer to class metadata, attempt to discover its class
+  /// instance start offset.
+  std::pair<bool, unsigned>
+  readInstanceStartFromClassMetadata(StoredPointer MetadataAddress) {
+    auto meta = readMetadata(MetadataAddress);
+    if (!meta)
+      return {false, 0};
+
+    auto address = readAddressOfNominalTypeDescriptor(meta);
+    if (!address)
+      return {false, 0};
+
+    auto descriptor = readNominalTypeDescriptor(address);
+    if (!descriptor)
+      return {false, 0};
+
+    if (descriptor->Class.NumFields == 0)
+      return {true, sizeof(StoredPointer)};
+
+    // return {true, meta->getFieldOffsets()[0]};
+    return {true, sizeof(StoredPointer)};
+  }
+
   /// Given a remote pointer to metadata, attempt to turn it into a type.
   BuiltType readTypeFromMetadata(StoredPointer MetadataAddress) {
     auto Cached = TypeCache.find(MetadataAddress);
@@ -622,6 +645,29 @@ public:
       return BuiltNominalTypeDecl();
 
     return buildNominalTypeDecl(descriptor);
+  }
+
+  /// Try to read the offset of a tuple element from a tuple metadata.
+  bool readTupleElementOffset(StoredPointer metadataAddress, unsigned eltIndex,
+                              StoredSize *offset) {
+    // Read the metadata.
+    auto metadata = readMetadata(metadataAddress);
+    if (!metadata)
+      return false;
+
+    // Ensure that the metadata actually is tuple metadata.
+    auto tupleMetadata = dyn_cast<TargetTupleTypeMetadata<Runtime>>(metadata);
+    if (!tupleMetadata)
+      return false;
+
+    // Ensure that the element is in-bounds.
+    if (eltIndex >= tupleMetadata->NumElements)
+      return false;
+
+    // Read the offset.
+    const auto &element = tupleMetadata->getElement(eltIndex);
+    *offset = element.Offset;
+    return true;
   }
 
 protected:

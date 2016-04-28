@@ -1165,7 +1165,7 @@ void Remangler::mangleImplConvention(Node *node) {
   } else if (text == "@unowned") {
     Out << 'd';
   } else if (text == "@unowned_inner_pointer") {
-    Out << 'd'; // only in results
+    Out << 'D'; // only in results
   } else if (text == "@guaranteed") {
     Out << 'g';
   } else if (text == "@deallocating") {

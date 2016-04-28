@@ -1129,7 +1129,7 @@ function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_LINK_LIBRARIES_WITHOUT_ICU)
   foreach(item ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
     if(NOT "${item}" STREQUAL "icucore")
-      list(APPEND SWIFTLIB_SINGLE_LINK_LIBRARIES_WITHOUT_ICU "{$item}")
+      list(APPEND SWIFTLIB_SINGLE_LINK_LIBRARIES_WITHOUT_ICU "${item}")
     endif()
   endforeach()
 
