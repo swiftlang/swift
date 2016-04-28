@@ -80,6 +80,8 @@ class StackPromoter {
   class WorkListType {
     /// The nesting depth of stack allocation instructions for each block.
     /// A value of -1 means: not known yet.
+    /// A value of -2 means: not known and not visited yet.
+    /// All blocks in this map with a value >= -1 are already visited.
     llvm::DenseMap<SILBasicBlock *, int> Block2StackDepth;
 
     /// The work list of not yet handled blocks.
@@ -93,7 +95,7 @@ class StackPromoter {
     /// Insert a block into the worklist and set its stack depth.
     void insert(SILBasicBlock *BB, int StackDepth) {
       auto Iter = Block2StackDepth.find(BB);
-      if (Iter != Block2StackDepth.end()) {
+      if (Iter != Block2StackDepth.end() && Iter->second >= -1) {
         // We already handled the block.
         assert(StackDepth >= 0);
         if (Iter->second < 0) {
@@ -107,6 +109,10 @@ class StackPromoter {
         Block2StackDepth[BB] = StackDepth;
         ToHandle.push_back(BB);
       }
+    }
+
+    bool insertAsUnhandled(SILBasicBlock *Pred) {
+      return Block2StackDepth.insert({Pred, -2}).second;
     }
 
     int getStackDepth(SILBasicBlock *BB) {
@@ -144,6 +150,13 @@ class StackPromoter {
                                SILInstruction *&RestartPoint,
                                EscapeAnalysis::CGNode *Node,
                                int NumUsePointsToFind);
+
+  /// If \p CurrentBB is in a loop update the \p EndBlock so that it post-
+  /// dominates the loop.
+  /// Returns the new EndBlock or null if no one could be found.
+  SILBasicBlock *updateEndBlock(SILBasicBlock *CurrentBB,
+                                SILBasicBlock *EndBlock,
+                                WorkListType &WorkList);
 
   bool strictlyDominates(SILBasicBlock *A, SILBasicBlock *B) {
     return A != B && DT->dominates(A, B);
@@ -533,15 +546,9 @@ SILInstruction *StackPromoter::findDeallocPoint(SILInstruction *StartInst,
       //     cond_br ..., loop, exit
       //   exit:
       //     ... // this is the new EndBlock
-      for (SILBasicBlock *Pred : BB->getPreds()) {
-        // Extend the lifetime region until the EndBlock post dominates the
-        // StartBlock.
-        while (!strictlyPostDominates(EndBlock, Pred)) {
-          EndBlock = getImmediatePostDom(EndBlock);
-          if (!EndBlock)
-            return nullptr;
-        }
-      }
+      EndBlock = updateEndBlock(BB, EndBlock, WorkList);
+      if (!EndBlock)
+        return nullptr;
       Iter = BB->begin();
       StackDepth = WorkList.getStackDepth(BB);
     }
@@ -626,6 +633,30 @@ SILInstruction *StackPromoter::findDeallocPoint(SILInstruction *StartInst,
       WorkList.insert(Succ, StackDepth);
     }
   }
+}
+
+SILBasicBlock *StackPromoter::updateEndBlock(SILBasicBlock *CurrentBB,
+                                             SILBasicBlock *EndBlock,
+                                             WorkListType &WorkList) {
+  llvm::SmallVector<SILBasicBlock *, 8> PredsToHandle;
+  PredsToHandle.push_back(CurrentBB);
+
+  // Starting from BB, go back the control flow graph until we reach already
+  // handled blocks.
+  while (!PredsToHandle.empty()) {
+    SILBasicBlock *BB = PredsToHandle.pop_back_val();
+    for (SILBasicBlock *Pred : BB->getPreds()) {
+      // Make sure that the EndBlock post-dominates all blocks we are visiting.
+      while (!strictlyPostDominates(EndBlock, Pred)) {
+        EndBlock = getImmediatePostDom(EndBlock);
+        if (!EndBlock)
+          return nullptr;
+      }
+      if (WorkList.insertAsUnhandled(Pred))
+        PredsToHandle.push_back(Pred);
+    }
+  }
+  return EndBlock;
 }
 
 //===----------------------------------------------------------------------===//
