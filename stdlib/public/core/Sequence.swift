@@ -354,6 +354,23 @@ extension Sequence {
 
     return Array(result)
   }
+    
+    /// Returns first element of `self`,
+    /// that satisfy the predicate `includeElement`.
+    @warn_unused_result
+    public func findFirst(@noescape includeElement: (Iterator.Element) throws -> Bool
+        ) rethrows -> Iterator.Element? {
+        
+        var iterator = self.makeIterator()
+        
+        while let element = iterator.next() {
+            if try includeElement(element) {
+                return element
+            }
+        }
+        
+        return nil
+    }
 
   @warn_unused_result
   public func suffix(maxLength: Int) -> AnySequence<Iterator.Element> {
