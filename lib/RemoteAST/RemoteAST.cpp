@@ -832,7 +832,7 @@ private:
     switch (kind) {
     case MemberAccessStrategy::OffsetKind::Bytes_Word: {
       int64_t rawOffset;
-      if (readWordOffset(address, &rawOffset))
+      if (!readWordOffset(address, &rawOffset))
         return false;
       offset = Size(rawOffset);
       return true;
