@@ -314,7 +314,10 @@ private:
 
 public:
   /// \brief Mapping of already-imported declarations.
-  llvm::DenseMap<const clang::Decl *, Decl *> ImportedDecls;
+  ///
+  /// The "char" in the key is a "bool" in disguise that indicates whether this
+  /// is a Swift 2 name vs. a Swift 3 name.
+  llvm::DenseMap<std::pair<const clang::Decl *, char>, Decl *> ImportedDecls;
 
   /// \brief The set of "special" typedef-name declarations, which are
   /// mapped to specific Swift types.
@@ -1025,7 +1028,7 @@ public:
   /// \returns The imported declaration, or null if this declaration could not
   /// be represented in Swift.
   Decl *importMirroredDecl(const clang::NamedDecl *decl, DeclContext *dc,
-                           ProtocolDecl *proto);
+                           bool useSwift2Name, ProtocolDecl *proto);
 
   /// \brief Import the given Clang declaration context into Swift.
   ///

@@ -3971,8 +3971,9 @@ void ClangImporter::verifyAllModules() {
   // more decls to be imported and modify the map while we are iterating it.
   SmallVector<Decl *, 8> Decls;
   for (auto &I : Impl.ImportedDecls)
-    if (Decl *D = I.second)
-      Decls.push_back(D);
+    if (!I.first.second)
+      if (Decl *D = I.second)
+        Decls.push_back(D);
 
   for (auto D : Decls)
     verify(D);

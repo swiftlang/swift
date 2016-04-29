@@ -1374,7 +1374,8 @@ namespace {
                   {KnownProtocolKind::RawRepresentable}, protocols);
             }
 
-            Impl.ImportedDecls[Decl->getCanonicalDecl()] = structDecl;
+            Impl.ImportedDecls[{Decl->getCanonicalDecl(), useSwift2Name}]
+              = structDecl;
             Impl.registerExternalDecl(structDecl);
             return structDecl;
           }
@@ -2039,7 +2040,7 @@ namespace {
         break;
       }
       }
-      Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+      Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}] = result;
 
       // Import each of the enumerators.
       
@@ -2142,7 +2143,7 @@ namespace {
                                  Impl.importSourceLoc(decl->getLocation()),
                                  None, nullptr, dc);
       result->computeType();
-      Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+      Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}] = result;
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
       // solution would be to turn them into members and add conversion
@@ -2359,7 +2360,7 @@ namespace {
                                           clang::APValue(decl->getInitVal()),
                                           ConstantConvertKind::Coerce,
                                           /*static*/ false, decl);
-        Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+        Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}] = result;
         return result;
       }
 
@@ -2391,7 +2392,7 @@ namespace {
                                           clang::APValue(decl->getInitVal()),
                                           ConstantConvertKind::Construction,
                                           /*static*/ false, decl);
-        Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+        Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}] = result;
         return result;
       }
 
@@ -2770,7 +2771,7 @@ namespace {
                                                      property));
       if (!swiftGetter) return nullptr;
       Impl.importAttributes(getter, swiftGetter);
-      Impl.ImportedDecls[getter] = swiftGetter;
+      Impl.ImportedDecls[{getter, useSwift2Name}] = swiftGetter;
 
       // Import the setter.
       FuncDecl *swiftSetter = nullptr;
@@ -2779,7 +2780,7 @@ namespace {
                         VisitFunctionDecl(setter, setterName, property));
         if (!swiftSetter) return nullptr;
         Impl.importAttributes(setter, swiftSetter);
-        Impl.ImportedDecls[setter] = swiftSetter;
+        Impl.ImportedDecls[{setter, useSwift2Name}] = swiftSetter;
       }
 
       // Make this a computed property.
@@ -3213,7 +3214,8 @@ namespace {
           dc == Impl.importDeclContextOf(decl, decl->getDeclContext())) {
         // FIXME: Should also be able to do this for forced class
         // methods.
-        auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
+        auto known = Impl.ImportedDecls.find({decl->getCanonicalDecl(),
+                                              useSwift2Name});
         if (known != Impl.ImportedDecls.end())
           return known->second;
       }
@@ -3288,7 +3290,8 @@ namespace {
           dc == Impl.importDeclContextOf(decl, decl->getDeclContext())) {
         // FIXME: Should also be able to do this for forced class
         // methods.
-        auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
+        auto known = Impl.ImportedDecls.find({decl->getCanonicalDecl(),
+                                              useSwift2Name});
         if (known != Impl.ImportedDecls.end())
           return known->second;
       }
@@ -3381,8 +3384,9 @@ namespace {
       // Check whether there's some special method to import.
       if (!forceClassMethod) {
         if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext()) &&
-            !Impl.ImportedDecls[decl->getCanonicalDecl()])
-          Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+            !Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}])
+          Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}]
+            = result;
 
         if (importedName.isSubscriptAccessor()) {
           // If this was a subscript accessor, try to create a
@@ -4744,7 +4748,8 @@ namespace {
             if (inNearbyCategory)
               continue;
 
-            if (auto imported = Impl.importMirroredDecl(objcProp, dc, proto)) {
+            if (auto imported = Impl.importMirroredDecl(objcProp, dc,
+                                                        useSwift2Name, proto)) {
               members.push_back(imported);
               // FIXME: We should mirror properties of the root class onto the
               // metatype.
@@ -4780,7 +4785,8 @@ namespace {
           }
 
           // Import the method.
-          if (auto imported = Impl.importMirroredDecl(objcMethod, dc, proto)) {
+          if (auto imported = Impl.importMirroredDecl(objcMethod, dc,
+                                                      useSwift2Name, proto)) {
             members.push_back(imported);
 
             if (auto alternate = Impl.getAlternateDecl(imported))
@@ -4970,7 +4976,7 @@ namespace {
 
       // Create the extension declaration and record it.
       objcClass->addExtension(result);
-      Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+      Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}] = result;
       SmallVector<TypeLoc, 4> inheritedTypes;
       importObjCProtocols(result, decl->getReferencedProtocols(),
                           inheritedTypes);
@@ -4990,7 +4996,8 @@ namespace {
         if (auto singleResult = dyn_cast<T>(results.front())) {
           if (auto typeResolver = Impl.getTypeResolver())
             typeResolver->resolveDeclSignature(singleResult);
-          Impl.ImportedDecls[decl->getCanonicalDecl()] = singleResult;
+          Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}]
+            = singleResult;
           return singleResult;
         }
       }
@@ -5098,7 +5105,7 @@ namespace {
       if (declaredNative)
         markMissingSwiftDecl(result);
 
-      Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+      Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}] = result;
 
       // Create the archetype for the implicit 'Self'.
       auto selfId = Impl.SwiftContext.Id_Self;
@@ -5174,7 +5181,7 @@ namespace {
                                                         SourceLoc(), None,
                                                         nullptr, dc);
         result->computeType();
-        Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+        Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}] = result;
         result->setCircularityCheck(CircularityCheck::Checked);
         result->setSuperclass(Type());
         result->setCheckedInheritanceClause();
@@ -5262,7 +5269,7 @@ namespace {
 
       result->computeType();
 
-      Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+      Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}] = result;
       result->setCircularityCheck(CircularityCheck::Checked);
       result->setAddedImplicitInitializers();
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
@@ -5463,7 +5470,8 @@ namespace {
 
       // Check whether the property already got imported.
       if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext())) {
-        auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
+        auto known = Impl.ImportedDecls.find({decl->getCanonicalDecl(),
+                                              useSwift2Name});
         if (known != Impl.ImportedDecls.end())
           return known->second;
       }
@@ -5561,7 +5569,7 @@ namespace {
 
 Decl *ClangImporter::Implementation::importDeclCached(
     const clang::NamedDecl *ClangDecl) {
-  auto Known = ImportedDecls.find(ClangDecl->getCanonicalDecl());
+  auto Known = ImportedDecls.find({ClangDecl->getCanonicalDecl(), false});
   if (Known != ImportedDecls.end())
     return Known->second;
 
@@ -5826,7 +5834,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   }
 
   if (!Result) {
-    SwiftDeclConverter converter(*this, /*FIXME:*/false);
+    SwiftDeclConverter converter(*this, /*useSwift2Name=*/false);
     Result = converter.Visit(ClangDecl);
     HadForwardDeclaration = converter.hadForwardDeclaration();
   }
@@ -6065,7 +6073,7 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   }
 
   if (!HadForwardDeclaration)
-    ImportedDecls[Canon] = Result;
+    ImportedDecls[{Canon, false}] = Result;
 
   if (!SuperfluousTypedefsAreTransparent && TypedefIsSuperfluous)
     return nullptr;
@@ -6076,6 +6084,7 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
 Decl *
 ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
                                                   DeclContext *dc,
+                                                  bool useSwift2Name,
                                                   ProtocolDecl *proto) {
   assert(dc);
   if (!decl)
@@ -6090,7 +6099,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
   if (known != ImportedProtocolDecls.end())
     return known->second;
 
-  SwiftDeclConverter converter(*this, /*FIXME:*/false);
+  SwiftDeclConverter converter(*this, useSwift2Name);
   Decl *result;
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(decl)) {
     result = converter.VisitObjCMethodDecl(method, dc);
@@ -6536,7 +6545,8 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
                                     Instance->getSourceManager(),
                                     "loading members for");
 
-  SwiftDeclConverter converter(*this, /*FIXME:*/false);
+  SwiftDeclConverter converter(*this, /*useSwift2Name=*/false);
+  SwiftDeclConverter swift2Converter(*this, /*useSwift2Name=*/true);
 
   DeclContext *DC;
   IterableDeclContext *IDC;
@@ -6556,6 +6566,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
   SmallVector<Decl *, 16> members;
   converter.importObjCMembers(objcContainer, DC, members);
+  swift2Converter.importObjCMembers(objcContainer, DC, members);
 
   protos = takeImportedProtocols(D);
   if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(objcContainer)) {
@@ -6566,6 +6577,9 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     if (clangClass->getName() != "Protocol") {
       converter.importInheritedConstructors(const_cast<ClassDecl *>(swiftClass),
                                             members);
+      swift2Converter.importInheritedConstructors(
+        const_cast<ClassDecl *>(swiftClass),
+        members);
     }
 
   } else if (auto clangProto
@@ -6578,6 +6592,8 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   // FIXME: This is supposed to be a short-term hack.
   converter.importMirroredProtocolMembers(objcContainer, DC,
                                           protos, members, SwiftContext);
+  swift2Converter.importMirroredProtocolMembers(objcContainer, DC,
+                                                protos, members, SwiftContext);
 
   // Add the members now, before ~ImportingEntityRAII does work that might
   // involve them.
