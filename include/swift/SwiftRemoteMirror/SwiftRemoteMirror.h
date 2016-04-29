@@ -96,7 +96,7 @@ swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata,
                                  unsigned Index);
 
-/// Returns a fully instantiated typeref for a generic argument by index.
+/// Returns the number of generic arguments of a typeref.
 unsigned
 swift_reflection_genericArgumentCountOfTypeRef(swift_typeref_t OpaqueTypeRef);
 
