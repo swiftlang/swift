@@ -76,6 +76,50 @@ OptionalTests.test("Equatable") {
   expectEqual([false, true, false, false, true, false], testRelation(<))
 }
 
+OptionalTests.test("CustomReflectable") {
+  // Test with a non-refcountable type.
+  do {
+    let value: OpaqueValue<Int>? = nil
+    var output = ""
+    dump(value, to: &output)
+    expectEqual("- nil\n", output)
+    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+  }
+  do {
+    let value: OpaqueValue<Int>? = OpaqueValue(1010)
+    var output = ""
+    dump(value, to: &output)
+    let expected =
+      "▿ Optional(StdlibUnittest.OpaqueValue<Swift.Int>(value: 1010, identity: 0))\n" +
+      "  ▿ some: StdlibUnittest.OpaqueValue<Swift.Int>\n" +
+      "    - value: 1010\n" +
+      "    - identity: 0\n"
+    expectEqual(expected, output)
+    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+  }
+  // Test with a reference type.
+  do {
+    let value: LifetimeTracked? = nil
+    var output = ""
+    dump(value, to: &output)
+    expectEqual("- nil\n", output)
+    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+  }
+  do {
+    let value: LifetimeTracked? = LifetimeTracked(1010)
+    var output = ""
+    dump(value, to: &output)
+    let expected =
+      "▿ Optional(1010)\n" +
+      "  ▿ some: 1010 #0\n" +
+      "    - value: 1010\n" +
+      "    - identity: 0\n" +
+      "    - serialNumber: 1\n"
+    expectEqual(expected, output)
+    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+  }
+}
+
 struct X {}
 class C {}
 class D {}
