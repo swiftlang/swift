@@ -44,6 +44,7 @@ class ReflectionContext
 
 public:
   using super::getBuilder;
+  using super::readIsaMask;
   using super::readTypeFromMetadata;
   using typename super::StoredPointer;
 
@@ -65,11 +66,7 @@ public:
     getBuilder().addReflectionInfo(I);
   }
 
-  std::pair<bool, StoredPointer> readIsaMask() {
-    return getReader().readIsaMask();
-  }
-
-  /// Return a description of the layout of a heap object having the given
+  /// Return a description of the layout of a class instance with the given
   /// metadata as its isa pointer.
   const TypeInfo *getInstanceTypeInfo(StoredPointer MetadataAddress) {
     // See if we cached the layout already
