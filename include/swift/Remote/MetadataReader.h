@@ -425,6 +425,10 @@ private:
   using OwnedCaptureDescriptor =
     std::unique_ptr<const CaptureDescriptor, delete_with_free>;
 
+  /// Cached isa mask.
+  StoredPointer isaMask;
+  bool hasIsaMask = false;
+
 public:
   BuilderType Builder;
 
@@ -454,6 +458,19 @@ public:
   /// Given a demangle tree, attempt to turn it into a type.
   BuiltType decodeMangledType(const Demangle::NodePointer &Node) {
     return swift::remote::decodeMangledType(Builder, Node);
+  }
+
+  /// Get the remote process's swift_isaMask.
+  std::pair<bool, StoredPointer> readIsaMask() {
+    auto address = Reader->getSymbolAddress("swift_isaMask");
+    if (!address)
+      return {false, 0};
+
+    if (!Reader->readInteger(address, &isaMask))
+      return {false, 0};
+
+    hasIsaMask = true;
+    return {true, isaMask};
   }
 
   /// Given a remote pointer to metadata, attempt to discover its MetadataKind.

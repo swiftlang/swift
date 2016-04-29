@@ -410,12 +410,19 @@ int doDumpHeapInstance(const char *BinaryFilename) {
                                            Info.reflstr);
       }
 
+      uintptr_t isaMask;
+      if (!swift_reflection_readIsaMask(RC, &isaMask))
+        errorAndExit("Couldn't read isa mask");
+      printf("Parent: isa mask in child address space: 0x%lx\n", isaMask);
+
+      isa &= isaMask;
+
       printf("Parent: metadata pointer in child address space: 0x%lx\n", isa);
       printf("Decoding type reference ...\n");
 
       swift_typeref_t TR = swift_reflection_typeRefForMetadata(RC, isa);
       swift_reflection_dumpTypeRef(TR);
-      swift_reflection_dumpInfoForTypeRef(RC, TR);
+      swift_reflection_dumpInfoForMetadata(RC, isa);
     }
   }
 

@@ -65,6 +65,10 @@ public:
     getBuilder().addReflectionInfo(I);
   }
 
+  std::pair<bool, StoredPointer> readerIsaMask() {
+    return getReader().readIsaMask();
+  }
+
   /// Return a description of the layout of a heap object having the given
   /// metadata as its isa pointer.
   const TypeInfo *getInstanceTypeInfo(StoredPointer MetadataAddress) {

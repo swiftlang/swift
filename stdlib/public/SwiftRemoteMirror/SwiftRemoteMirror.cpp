@@ -69,6 +69,15 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
   Context->addReflectionInfo(Info);
 }
 
+int
+swift_reflection_readIsaMask(SwiftReflectionContextRef ContextRef,
+                             uintptr_t *outIsaMask) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto isaMask = Context->readIsaMask();
+  *outIsaMask = isaMask.second;
+  return isaMask.first;
+}
+
 swift_typeref_t
 swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
                                     uintptr_t metadata) {

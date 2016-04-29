@@ -59,6 +59,12 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_section_t reflstr);
 
 
+/// Returns a boolean indicating if the isa mask was successfully
+/// read, in which case it is stored in the isaMask out parameter.
+int
+swift_reflection_readIsaMask(SwiftReflectionContextRef ContextRef,
+                             uintptr_t *outIsaMask);
+
 /// Returns an opaque type reference for a metadata pointer, or
 /// NULL if one can't be constructed.
 swift_typeref_t
