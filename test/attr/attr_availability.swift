@@ -273,14 +273,64 @@ func unavailableMemberArgNamesMsg(a: Int) {} // expected-note {{here}}
 @available(*, deprecated, renamed: "DummyType.moreShinyLabeledArguments(example:)", message: "ha")
 func deprecatedMemberArgNamesMsg(b: Int) {}
 
+@available(*, unavailable, renamed: "shinyLabeledArguments()")
+func unavailableNoArgs() {} // expected-note {{here}}
+
+@available(*, unavailable, renamed: "shinyLabeledArguments(a:)")
+func unavailableSame(a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments(example:)")
+func unavailableUnnamed(_ a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments(_:)")
+func unavailableUnnamedSame(_ a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments(_:)")
+func unavailableNewlyUnnamed(a: Int) {} // expected-note {{here}}
+
+@available(*, unavailable, renamed: "shinyLabeledArguments(a:b:)")
+func unavailableMultiSame(a: Int, b: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments(example:another:)")
+func unavailableMultiUnnamed(_ a: Int, _ b: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)")
+func unavailableMultiUnnamedSame(_ a: Int, _ b: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)")
+func unavailableMultiNewlyUnnamed(a: Int, b: Int) {} // expected-note {{here}}
+
+
 func testArgNames() {
-  // FIXME: These are all wrong.
-  unavailableArgNames(a: 0) // expected-error {{'unavailableArgNames(a:)' has been renamed to 'shinyLabeledArguments(example:)'}} {{3-22=shinyLabeledArguments(example:)}}
-  deprecatedArgNames(b: 1) // expected-warning {{'deprecatedArgNames(b:)' is deprecated: renamed to 'moreShinyLabeledArguments(example:)'}} expected-note {{use 'moreShinyLabeledArguments(example:)' instead}} {{3-21=moreShinyLabeledArguments(example:)}}
+  unavailableArgNames(a: 0) // expected-error {{'unavailableArgNames(a:)' has been renamed to 'shinyLabeledArguments(example:)'}} {{3-22=shinyLabeledArguments}} {{23-24=example}}
+  deprecatedArgNames(b: 1) // expected-warning {{'deprecatedArgNames(b:)' is deprecated: renamed to 'moreShinyLabeledArguments(example:)'}} expected-note {{use 'moreShinyLabeledArguments(example:)' instead}} {{3-21=moreShinyLabeledArguments}} {{22-23=example}}
 
-  unavailableMemberArgNames(a: 0) // expected-error {{'unavailableMemberArgNames(a:)' has been renamed to 'DummyType.shinyLabeledArguments(example:)'}} {{3-28=DummyType.shinyLabeledArguments(example:)}}
-  deprecatedMemberArgNames(b: 1) // expected-warning {{'deprecatedMemberArgNames(b:)' is deprecated: renamed to 'DummyType.moreShinyLabeledArguments(example:)'}} expected-note {{use 'DummyType.moreShinyLabeledArguments(example:)' instead}} {{3-27=DummyType.moreShinyLabeledArguments(example:)}}
+  unavailableMemberArgNames(a: 0) // expected-error {{'unavailableMemberArgNames(a:)' has been renamed to 'DummyType.shinyLabeledArguments(example:)'}} {{3-28=DummyType.shinyLabeledArguments}} {{29-30=example}}
+  deprecatedMemberArgNames(b: 1) // expected-warning {{'deprecatedMemberArgNames(b:)' is deprecated: renamed to 'DummyType.moreShinyLabeledArguments(example:)'}} expected-note {{use 'DummyType.moreShinyLabeledArguments(example:)' instead}} {{3-27=DummyType.moreShinyLabeledArguments}} {{28-29=example}}
 
-  unavailableMemberArgNamesMsg(a: 0) // expected-error {{'unavailableMemberArgNamesMsg(a:)' has been renamed to 'DummyType.shinyLabeledArguments(example:)': ha}} {{3-31=DummyType.shinyLabeledArguments(example:)}}
-  deprecatedMemberArgNamesMsg(b: 1) // expected-warning {{'deprecatedMemberArgNamesMsg(b:)' is deprecated: ha}} expected-note {{use 'DummyType.moreShinyLabeledArguments(example:)' instead}} {{3-30=DummyType.moreShinyLabeledArguments(example:)}}
+  unavailableMemberArgNamesMsg(a: 0) // expected-error {{'unavailableMemberArgNamesMsg(a:)' has been renamed to 'DummyType.shinyLabeledArguments(example:)': ha}} {{3-31=DummyType.shinyLabeledArguments}} {{32-33=example}}
+  deprecatedMemberArgNamesMsg(b: 1) // expected-warning {{'deprecatedMemberArgNamesMsg(b:)' is deprecated: ha}} expected-note {{use 'DummyType.moreShinyLabeledArguments(example:)' instead}} {{3-30=DummyType.moreShinyLabeledArguments}} {{31-32=example}}
+
+  unavailableNoArgs() // expected-error {{'unavailableNoArgs()' has been renamed to 'shinyLabeledArguments()'}} {{3-20=shinyLabeledArguments}}
+  unavailableSame(a: 0) // expected-error {{'unavailableSame(a:)' has been renamed to 'shinyLabeledArguments(a:)'}} {{3-18=shinyLabeledArguments}}
+  unavailableUnnamed(0) // expected-error {{'unavailableUnnamed' has been renamed to 'shinyLabeledArguments(example:)'}} {{3-21=shinyLabeledArguments}} {{22-22=example: }}
+  unavailableUnnamedSame(0) // expected-error {{'unavailableUnnamedSame' has been renamed to 'shinyLabeledArguments(_:)'}} {{3-25=shinyLabeledArguments}}
+  unavailableNewlyUnnamed(a: 0) // expected-error {{'unavailableNewlyUnnamed(a:)' has been renamed to 'shinyLabeledArguments(_:)'}} {{3-26=shinyLabeledArguments}} {{27-30=}}
+  unavailableMultiSame(a: 0, b: 1) // expected-error {{'unavailableMultiSame(a:b:)' has been renamed to 'shinyLabeledArguments(a:b:)'}} {{3-23=shinyLabeledArguments}}
+  unavailableMultiUnnamed(0, 1) // expected-error {{'unavailableMultiUnnamed' has been renamed to 'shinyLabeledArguments(example:another:)'}} {{3-26=shinyLabeledArguments}} {{27-27=example: }} {{30-30=another: }}
+  unavailableMultiUnnamedSame(0, 1) // expected-error {{'unavailableMultiUnnamedSame' has been renamed to 'shinyLabeledArguments(_:_:)'}} {{3-30=shinyLabeledArguments}}
+  unavailableMultiNewlyUnnamed(a: 0, b: 1) // expected-error {{'unavailableMultiNewlyUnnamed(a:b:)' has been renamed to 'shinyLabeledArguments(_:_:)'}} {{3-31=shinyLabeledArguments}} {{32-35=}} {{38-41=}}
+}
+
+@available(*, unavailable, renamed: "shinyLabeledArguments()")
+func unavailableTooFew(a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments()")
+func unavailableTooFewUnnamed(_ a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments(a:b:)")
+func unavailableTooMany(a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments(a:b:)")
+func unavailableTooManyUnnamed(_ a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments(a:)")
+func unavailableNoArgsTooMany() {} // expected-note {{here}}
+
+func testRenameArgMismatch() {
+  unavailableTooFew(a: 0) // expected-error{{'unavailableTooFew(a:)' has been renamed to 'shinyLabeledArguments()'}} {{3-20=shinyLabeledArguments}}
+  unavailableTooFewUnnamed(0) // expected-error{{'unavailableTooFewUnnamed' has been renamed to 'shinyLabeledArguments()'}} {{3-27=shinyLabeledArguments}}
+  unavailableTooMany(a: 0) // expected-error{{'unavailableTooMany(a:)' has been renamed to 'shinyLabeledArguments(a:b:)'}} {{3-21=shinyLabeledArguments}}
+  unavailableTooManyUnnamed(0) // expected-error{{'unavailableTooManyUnnamed' has been renamed to 'shinyLabeledArguments(a:b:)'}} {{3-28=shinyLabeledArguments}}
+  unavailableNoArgsTooMany() // expected-error{{'unavailableNoArgsTooMany()' has been renamed to 'shinyLabeledArguments(a:)'}} {{3-27=shinyLabeledArguments}}
 }

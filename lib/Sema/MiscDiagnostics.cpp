@@ -22,6 +22,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
@@ -994,10 +995,75 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
 // Diagnose availability.
 //===----------------------------------------------------------------------===//
 
+void swift::fixItAvailableAttrRename(TypeChecker &TC,
+                                     InFlightDiagnostic &diag,
+                                     SourceRange referenceRange,
+                                     const AvailableAttr *attr,
+                                     const CallExpr *CE) {
+  ParsedDeclName parsed = swift::parseDeclName(attr->Rename);
+  if (!parsed || parsed.isInstanceMember() || parsed.isPropertyAccessor())
+    return;
+
+  SmallString<64> baseReplace;
+  if (!parsed.ContextName.empty()) {
+    baseReplace += parsed.ContextName;
+    baseReplace += '.';
+  }
+  baseReplace += parsed.BaseName;
+  diag.fixItReplace(referenceRange, baseReplace);
+
+  if (!CE || !parsed.IsFunctionName)
+    return;
+
+  SmallVector<Identifier, 4> argumentLabelIDs;
+  std::transform(parsed.ArgumentLabels.begin(), parsed.ArgumentLabels.end(),
+                 std::back_inserter(argumentLabelIDs),
+                 [&TC](StringRef labelStr) -> Identifier {
+    return labelStr.empty() ? Identifier() : TC.Context.getIdentifier(labelStr);
+  });
+
+  const Expr *argExpr = CE->getArg();
+  if (auto args = dyn_cast<TupleExpr>(argExpr)) {
+    if (argumentLabelIDs.size() != args->getNumElements()) {
+      // Mismatched lengths; give up.
+      return;
+    }
+
+    if (args->hasElementNames()) {
+      if (std::equal(argumentLabelIDs.begin(), argumentLabelIDs.end(),
+                     args->getElementNames().begin())) {
+        // Already matching.
+        return;
+      }
+
+    } else {
+      if (std::all_of(argumentLabelIDs.begin(), argumentLabelIDs.end(),
+                      std::mem_fn(&Identifier::empty))) {
+        // Already matching (as in, there are no labels).
+        return;
+      }
+    }
+
+  } else {
+    if (argumentLabelIDs.size() != 1) {
+      // Mismatched lengths; give up.
+      return;
+    }
+
+    if (argumentLabelIDs.front().empty()) {
+      // Already matching (no labels).
+      return;
+    }
+  }
+
+  diagnoseArgumentLabelError(TC, argExpr, argumentLabelIDs, false, &diag);
+}
+
 void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
                                      const DeclContext *ReferenceDC,
                                      const AvailableAttr *Attr,
-                                     DeclName Name) {
+                                     DeclName Name,
+                                     const CallExpr *CE) {
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
@@ -1043,8 +1109,10 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
   }
 
   if (!Attr->Rename.empty()) {
-    diagnose(ReferenceRange.Start, diag::note_deprecated_rename, Attr->Rename)
-      .fixItReplace(ReferenceRange, Attr->Rename);
+    auto renameDiag = diagnose(ReferenceRange.Start,
+                               diag::note_deprecated_rename,
+                               Attr->Rename);
+    fixItAvailableAttrRename(*this, renameDiag, ReferenceRange, Attr, CE);
   }
 }
 
@@ -1053,7 +1121,8 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
                                                  SourceRange R,
-                                                 const DeclContext *DC) {
+                                                 const DeclContext *DC,
+                                                 const CallExpr *CE) {
   auto *Attr = AvailableAttr::isUnavailable(D);
   if (!Attr)
     return false;
@@ -1079,13 +1148,13 @@ bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
   case UnconditionalAvailabilityKind::Unavailable:
     if (!Attr->Rename.empty()) {
       if (Attr->Message.empty()) {
-        diagnose(Loc, diag::availability_decl_unavailable_rename, Name,
-                 Attr->Rename)
-          .fixItReplace(R, Attr->Rename);
+        auto diag = diagnose(Loc, diag::availability_decl_unavailable_rename,
+                             Name, Attr->Rename);
+        fixItAvailableAttrRename(*this, diag, R, Attr, CE);
       } else {
-        diagnose(Loc, diag::availability_decl_unavailable_rename_msg, Name,
-                 Attr->Rename, Attr->Message)
-          .fixItReplace(R, Attr->Rename);
+        auto diag = diagnose(Loc,diag::availability_decl_unavailable_rename_msg,
+                             Name, Attr->Rename, Attr->Message);
+        fixItAvailableAttrRename(*this, diag, R, Attr, CE);
       }
     } else if (Attr->Message.empty()) {
       diagnose(Loc, diag::availability_decl_unavailable, Name).highlight(R);
@@ -1169,17 +1238,20 @@ public:
     };
 
     if (auto DR = dyn_cast<DeclRefExpr>(E))
-      diagAvailability(DR->getDecl(), DR->getSourceRange());
+      diagAvailability(DR->getDecl(), DR->getSourceRange(),
+                       getEnclosingCallExpr());
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
       walkMemberRef(MR);
       return skipChildren();
     }
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
       diagAvailability(OCDR->getDecl(),
-                       OCDR->getConstructorLoc().getSourceRange());
+                       OCDR->getConstructorLoc().getSourceRange(),
+                       getEnclosingCallExpr());
     if (auto DMR = dyn_cast<DynamicMemberRefExpr>(E))
       diagAvailability(DMR->getMember().getDecl(),
-                       DMR->getNameLoc().getSourceRange());
+                       DMR->getNameLoc().getSourceRange(),
+                       getEnclosingCallExpr());
     if (auto DS = dyn_cast<DynamicSubscriptExpr>(E))
       diagAvailability(DS->getMember().getDecl(), DS->getSourceRange());
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
@@ -1206,9 +1278,32 @@ public:
   }
 
 private:
-  bool diagAvailability(const ValueDecl *D, SourceRange R);
+  bool diagAvailability(const ValueDecl *D, SourceRange R,
+                        const CallExpr *CE = nullptr);
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
                              const AvailableAttr *Attr);
+
+  /// Walks up from a potential callee to the enclosing CallExpr.
+  const CallExpr *getEnclosingCallExpr() const {
+    ArrayRef<const Expr *> parents = ExprStack;
+    assert(!parents.empty() && "must be called while visiting an expression");
+    size_t idx = parents.size() - 1;
+
+    do {
+      if (idx == 0)
+        return nullptr;
+      --idx;
+    } while (isa<DotSyntaxBaseIgnoredExpr>(parents[idx]) || // Mod.f(a)
+             isa<SelfApplyExpr>(parents[idx]) || // obj.f(a)
+             isa<IdentityExpr>(parents[idx]) || // (f)(a)
+             isa<ForceValueExpr>(parents[idx]) || // f!(a)
+             isa<BindOptionalExpr>(parents[idx])); // f?(a)
+
+    auto *call = dyn_cast<CallExpr>(parents[idx]);
+    if (!call || call->getFn() != parents[idx+1])
+      return nullptr;
+    return call;
+  }
 
   /// Walk an assignment expression, checking for availability.
   void walkAssignExpr(AssignExpr *E) {
@@ -1320,7 +1415,8 @@ private:
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
-bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R) {
+bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
+                                          const CallExpr *CE) {
   if (!D)
     return false;
 
@@ -1328,12 +1424,12 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R) {
     if (diagnoseIncDecRemoval(D, R, attr))
       return true;
 
-  if (TC.diagnoseExplicitUnavailability(D, R, DC))
+  if (TC.diagnoseExplicitUnavailability(D, R, DC, CE))
     return true;
 
   // Diagnose for deprecation
   if (const AvailableAttr *Attr = TypeChecker::getDeprecated(D)) {
-    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName());
+    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName(), CE);
   }
 
   if (TC.getLangOpts().DisableAvailabilityChecking)

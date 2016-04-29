@@ -17,6 +17,7 @@
 
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
+#include "MiscDiagnostics.h"
 
 #include "swift/Strings.h"
 #include "swift/AST/ASTVisitor.h"
@@ -1189,9 +1190,10 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
 
       case UnconditionalAvailabilityKind::Unavailable:
         if (!Attr->Rename.empty()) {
-          TC.diagnose(Loc, diag::availability_decl_unavailable_rename,
-                      CI->getIdentifier(), Attr->Rename)
-            .fixItReplace(Loc, Attr->Rename);
+          auto diag = TC.diagnose(Loc,
+                                  diag::availability_decl_unavailable_rename,
+                                  CI->getIdentifier(), Attr->Rename);
+          fixItAvailableAttrRename(TC, diag, Loc, Attr, /*call*/nullptr);
         } else if (Attr->Message.empty()) {
           TC.diagnose(Loc, diag::availability_decl_unavailable,
                       CI->getIdentifier())
@@ -1227,7 +1229,7 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
 
     if (auto *Attr = TypeChecker::getDeprecated(TypeDecl)) {
       TC.diagnoseDeprecated(CI->getSourceRange(), DC, Attr,
-                            CI->getIdentifier());
+                            CI->getIdentifier(), /*call, N/A*/nullptr);
     }
 
     if (AllowPotentiallyUnavailableProtocol && isa<ProtocolDecl>(TypeDecl))

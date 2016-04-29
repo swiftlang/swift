@@ -893,7 +893,7 @@ namespace {
     /// Emit a diagnostic and return true if this is an error condition we can
     /// handle uniformly.  This should be called after filtering the candidate
     /// list.
-    bool diagnoseSimpleErrors(SourceLoc loc);
+    bool diagnoseSimpleErrors(const Expr *E);
     
     void dump() const LLVM_ATTRIBUTE_USED;
     
@@ -1684,12 +1684,15 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
 /// Emit a diagnostic and return true if this is an error condition we can
 /// handle uniformly.  This should be called after filtering the candidate
 /// list.
-bool CalleeCandidateInfo::diagnoseSimpleErrors(SourceLoc loc) {
+bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
+  SourceLoc loc = E->getLoc();
+
   // Handle symbols marked as explicitly unavailable.
   if (closeness == CC_Unavailable) {
     auto decl = candidates[0].getDecl();
     assert(decl && "Only decl-based candidates may be marked unavailable");
-    return CS->TC.diagnoseExplicitUnavailability(decl, loc, CS->DC);
+    return CS->TC.diagnoseExplicitUnavailability(decl, loc, CS->DC,
+                                                 dyn_cast<CallExpr>(E));
   }
 
   // Handle symbols that are matches, but are not accessible from the current
@@ -2177,8 +2180,9 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   
   if (allUnavailable) {
     auto firstDecl = result.ViableCandidates[0].getDecl();
+    // FIXME: We need the enclosing CallExpr to rewrite the argument labels.
     if (CS->TC.diagnoseExplicitUnavailability(firstDecl, anchor->getLoc(),
-                                              CS->DC))
+                                              CS->DC, /*call*/nullptr))
       return true;
   }
   
@@ -3904,7 +3908,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     return true;
 
   // Diagnose some simple and common errors.
-  if (calleeInfo.diagnoseSimpleErrors(SE->getLoc()))
+  if (calleeInfo.diagnoseSimpleErrors(SE))
     return true;
 
 
@@ -4079,7 +4083,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     return true; // already diagnosed.
   
   // Diagnose some simple and common errors.
-  if (calleeInfo.diagnoseSimpleErrors(callExpr->getLoc()))
+  if (calleeInfo.diagnoseSimpleErrors(callExpr))
     return true;
   
   
@@ -4999,7 +5003,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   case CC_Unavailable:
   case CC_Inaccessible:
     // Diagnose some simple and common errors.
-    if (candidateInfo.diagnoseSimpleErrors(E->getLoc()))
+    if (candidateInfo.diagnoseSimpleErrors(E))
       return true;
     return false;
       

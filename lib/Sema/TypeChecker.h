@@ -1559,7 +1559,8 @@ public:
   /// marked as unavailable, either through "unavailable" or "obsoleted:".
   bool diagnoseExplicitUnavailability(const ValueDecl *D,
                                       SourceRange R,
-                                      const DeclContext *DC);
+                                      const DeclContext *DC,
+                                      const CallExpr *CE);
 
   /// @}
 
@@ -1760,7 +1761,8 @@ public:
   void diagnoseDeprecated(SourceRange SourceRange,
                           const DeclContext *ReferenceDC,
                           const AvailableAttr *Attr,
-                          DeclName Name);
+                          DeclName Name,
+                          const CallExpr *CE);
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
