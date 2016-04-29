@@ -1298,8 +1298,7 @@ static const TypeInfo *createErrorExistentialTypeInfo(IRGenModule &IGM,
                                       refcounting);
 }
 
-static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
-                                            TypeBase *T,
+static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T,
                                             ArrayRef<ProtocolDecl*> protocols) {
   SmallVector<llvm::Type*, 5> fields;
   SmallVector<ProtocolEntry, 4> entries;
@@ -1318,11 +1317,11 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
   }
 
   llvm::StructType *type;
-  if (auto *protoT = T->getAs<ProtocolType>())
-    type = IGM.createNominalType(protoT->getDecl());
-  else if (auto *compT = T->getAs<ProtocolCompositionType>())
+  if (isa<ProtocolType>(T))
+    type = IGM.createNominalType(T);
+  else if (auto compT = dyn_cast<ProtocolCompositionType>(T))
     // Protocol composition types are not nominal, but we name them anyway.
-    type = IGM.createNominalType(compT);
+    type = IGM.createNominalType(compT.getPointer());
   else
     llvm_unreachable("unknown existential type kind");
     
@@ -1415,7 +1414,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
 
 const TypeInfo *TypeConverter::convertProtocolType(ProtocolType *T) {
   // Protocol types are nominal.
-  return createExistentialTypeInfo(IGM, T, T->getDecl());
+  return createExistentialTypeInfo(IGM, CanType(T), T->getDecl());
 }
 
 const TypeInfo *
@@ -1424,7 +1423,7 @@ TypeConverter::convertProtocolCompositionType(ProtocolCompositionType *T) {
   SmallVector<ProtocolDecl*, 4> protocols;
   T->getAnyExistentialTypeProtocols(protocols);
 
-  return createExistentialTypeInfo(IGM, T, protocols);
+  return createExistentialTypeInfo(IGM, CanType(T), protocols);
 }
 
 const TypeInfo *

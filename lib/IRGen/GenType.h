@@ -117,7 +117,7 @@ private:
   TypeCacheEntry convertType(CanType T);
   TypeCacheEntry convertAnyNominalType(CanType T, NominalTypeDecl *D);
   const TypeInfo *convertTupleType(TupleType *T);
-  const TypeInfo *convertClassType(ClassDecl *D);
+  const TypeInfo *convertClassType(CanType type, ClassDecl *D);
   const TypeInfo *convertEnumType(TypeBase *key, CanType type, EnumDecl *D);
   const TypeInfo *convertStructType(TypeBase *key, CanType type, StructDecl *D);
   const TypeInfo *convertFunctionType(SILFunctionType *T);

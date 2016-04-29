@@ -564,7 +564,7 @@ public:
   llvm::PointerType *getStoragePointerTypeForUnlowered(Type T);
   llvm::PointerType *getStoragePointerTypeForLowered(CanType T);
   llvm::PointerType *getStoragePointerType(SILType T);
-  llvm::StructType *createNominalType(TypeDecl *D);
+  llvm::StructType *createNominalType(CanType type);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
   void getSchema(SILType T, ExplosionSchema &schema);
   ExplosionSchema getSchema(SILType T);

@@ -1846,8 +1846,8 @@ llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
 }
 
 const TypeInfo *
-TypeConverter::convertClassType(ClassDecl *D) {
-  llvm::StructType *ST = IGM.createNominalType(D);
+TypeConverter::convertClassType(CanType type, ClassDecl *D) {
+  llvm::StructType *ST = IGM.createNominalType(type);
   llvm::PointerType *irType = ST->getPointerTo();
   ReferenceCounting refcount = ::getReferenceCountingForClass(IGM, D);
   

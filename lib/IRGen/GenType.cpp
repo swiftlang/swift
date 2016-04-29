@@ -1533,7 +1533,7 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
       llvm_unreachable("protocol types shouldn't be handled here");
 
     case DeclKind::Class:
-      return convertClassType(cast<ClassDecl>(decl));
+      return convertClassType(type, cast<ClassDecl>(decl));
     case DeclKind::Enum:
       return convertEnumType(type.getPointer(), type, cast<EnumDecl>(decl));
     case DeclKind::Struct:
@@ -1618,9 +1618,17 @@ TypeConverter::getMetatypeTypeInfo(MetatypeRepresentation representation) {
 }
 
 /// createNominalType - Create a new nominal type.
-llvm::StructType *IRGenModule::createNominalType(TypeDecl *decl) {
+llvm::StructType *IRGenModule::createNominalType(CanType type) {
+  assert(type.getNominalOrBoundGenericNominal());
+
+  // We share type infos for different instantiations of a generic type
+  // when the archetypes have the same exemplars.  Mangling the archetypes
+  // in this case can be very misleading, so we just mangle the base name.
+  if (type->hasArchetype())
+    type = type.getNominalOrBoundGenericNominal()->getDeclaredType()
+                                                 ->getCanonicalType();
+
   llvm::SmallString<32> typeName;
-  auto type = decl->getDeclaredType()->getCanonicalType();
   LinkEntity::forTypeMangling(type).mangle(typeName);
   return llvm::StructType::create(getLLVMContext(), typeName.str());
 }

@@ -89,7 +89,7 @@ import Swift
 // -- Dynamic enums. The type layout is opaque; we dynamically bitcast to
 //    the element type.
 // CHECK: %O4enum20DynamicSinglePayload = type <{}>
-// CHECK: [[DYNAMIC_SINGLE_EMPTY_PAYLOAD:%O4enum20DynamicSinglePayload\.[0-9]+]] = type <{ [1 x i8] }>
+// CHECK: [[DYNAMIC_SINGLE_EMPTY_PAYLOAD:%GO4enum20DynamicSinglePayloadT__]] = type <{ [1 x i8] }>
 
 // -- Address-only multi-payload enums. We can't use spare bits.
 // CHECK-64: %O4enum32MultiPayloadAddressOnlySpareBits = type <{ [16 x i8], [1 x i8] }>
@@ -2495,7 +2495,7 @@ struct StructWithWeakVar {
 weak var delegate: delegateProtocol?
 }
 
-// CHECK-64-LABEL: define{{( protected)?}} void @weak_optional(%Sq{{.*}}* noalias nocapture dereferenceable({{.*}}))
+// CHECK-64-LABEL: define{{( protected)?}} void @weak_optional(%GSqV4enum17StructWithWeakVar_* noalias nocapture dereferenceable({{.*}}))
 sil @weak_optional : $@convention(thin) (@in StructWithWeakVar?) -> () {
 entry(%x : $*StructWithWeakVar?):
   // CHECK-64:      icmp eq [[WORD]] {{%.*}}, 0

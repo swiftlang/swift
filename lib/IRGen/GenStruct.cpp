@@ -842,7 +842,7 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
     return &getResilientStructTypeInfo();
 
   // Create the struct type.
-  auto ty = IGM.createNominalType(D);
+  auto ty = IGM.createNominalType(type);
 
   // Register a forward declaration before we look at any of the child types.
   addForwardDecl(key, ty);
