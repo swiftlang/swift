@@ -221,11 +221,11 @@ swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
   return convertChild(TI, Index);
 }
 
-int swift_reflection_project_existential(SwiftReflectionContextRef ContextRef,
-                                         addr_t InstanceAddress,
-                                         swift_typeref_t ExistentialTypeRef,
-                                         swift_typeref_t *InstanceTypeRef,
-                                         addr_t *StartOfInstanceData) {
+int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
+                                        addr_t InstanceAddress,
+                                        swift_typeref_t ExistentialTypeRef,
+                                        swift_typeref_t *InstanceTypeRef,
+                                        addr_t *StartOfInstanceData) {
   // TODO
   return false;
 }

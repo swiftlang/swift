@@ -65,7 +65,7 @@ public:
     getBuilder().addReflectionInfo(I);
   }
 
-  std::pair<bool, StoredPointer> readerIsaMask() {
+  std::pair<bool, StoredPointer> readIsaMask() {
     return getReader().readIsaMask();
   }
 
