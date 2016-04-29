@@ -914,6 +914,8 @@ public:
   enum class ImportNameFlags {
     /// Suppress the factory-method-as-initializer transformation.
     SuppressFactoryMethodAsInit = 0x01,
+    /// Produce the Swift 2 name of the given entity.
+    Swift2Name = 0x02,
   };
 
   /// Options that control the import of names in importFullName.

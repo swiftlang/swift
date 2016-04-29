@@ -788,6 +788,14 @@ void ClangImporter::Implementation::addEntryToLookupTable(
       table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript,
                               ArrayRef<Identifier>()),
                      named, importedName.EffectiveContext);
+
+    // Import the Swift 2 name of this entity, and record it as well if it is
+    // different.
+    if (auto swift2Name = importFullName(named, ImportNameFlags::Swift2Name,
+                                         &clangSema)) {
+      if (swift2Name.Imported != importedName.Imported)
+        table.addEntry(swift2Name.Imported, named, swift2Name.EffectiveContext);
+    }
   } else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
     // If the category is invalid, don't add it.
     if (category->isInvalidDecl()) return;
@@ -2045,6 +2053,114 @@ static clang::TypedefNameDecl *findSwiftNewtype(const clang::Decl *decl,
   return nullptr;
 }
 
+/// Match the name of the given Objective-C method to its enclosing class name
+/// to determine the name prefix that would be stripped if the class method
+/// were treated as an initializer.
+static Optional<unsigned> matchFactoryAsInitName(
+                            const clang::ObjCMethodDecl *method){
+  // Only class methods can be mapped to initializers in this way.
+  if (!method->isClassMethod()) return None;
+
+  // Said class methods must be in an actual class.
+  auto objcClass = method->getClassInterface();
+  if (!objcClass) return None;
+
+  // See if we can match the class name to the beginning of the first
+  // selector piece.
+  auto firstPiece = method->getSelector().getNameForSlot(0);
+  StringRef firstArgLabel = matchLeadingTypeName(firstPiece,
+                                                 objcClass->getName());
+  if (firstArgLabel.size() == firstPiece.size())
+    return None;
+
+  // FIXME: Factory methods cannot have dummy parameters added for
+  // historical reasons.
+  if (!firstArgLabel.empty() && method->getSelector().getNumArgs() == 0)
+    return None;
+
+  // Return the prefix length.
+  return firstPiece.size() - firstArgLabel.size();
+}
+
+/// Determine the kind of initializer the given factory method could be mapped
+/// to, or produce \c None.
+static Optional<CtorInitializerKind>
+determineCtorInitializerKind(const clang::ObjCMethodDecl *method) {
+  // Determine whether we have a suitable return type.
+  if (method->hasRelatedResultType()) {
+    // When the factory method has an "instancetype" result type, we
+    // can import it as a convenience factory method.
+    return CtorInitializerKind::ConvenienceFactory;
+  }
+
+  if (auto objcPtr = method->getReturnType()
+                       ->getAs<clang::ObjCObjectPointerType>()) {
+    auto objcClass = method->getClassInterface();
+    if (!objcClass) return None;
+
+    if (objcPtr->getInterfaceDecl() != objcClass) {
+      // FIXME: Could allow a subclass here, but the rest of the compiler
+      // isn't prepared for that yet.
+      return None;
+    }
+
+    // Factory initializer.
+    return CtorInitializerKind::Factory;
+  }
+
+  // Not imported as an initializer.
+  return None;
+}
+
+/// Find the swift_name attribute associated with this declaration, if
+/// any.
+///
+/// \param swift2Name When true, restrict the results to those that were
+/// present in Swift 2.
+static clang::SwiftNameAttr *findSwiftNameAttr(const clang::Decl *decl,
+                                               bool swift2Name) {
+  // Find the attribute.
+  auto attr = decl->getAttr<clang::SwiftNameAttr>();
+  if (!attr) return nullptr;
+
+  // If we're not emulating the Swift 2 behavior, return what we got.
+  if (!swift2Name) return attr;
+
+  // API notes produce implicit attributes; ignore them because they weren't
+  // used for naming in Swift 2.
+  if (attr->isImplicit()) return nullptr;
+
+  // Whitelist certain explicitly-written Swift names that were
+  // permitted and used in Swift 2. All others are ignored, so that we are
+  // assuming a more direct translation from the Objective-C APIs into Swift.
+
+  if (auto enumerator = dyn_cast<clang::EnumConstantDecl>(decl)) {
+    // Foundation's NSXMLDTDKind had an explicit swift_name attribute in
+    // Swift 2. Honor it.
+    if (enumerator->getName() == "NSXMLDTDKind") return attr;
+    return nullptr;
+  }
+
+  if (auto method = dyn_cast<clang::ObjCMethodDecl>(decl)) {
+    // Special case: mapping to an initializer.
+    if (attr->getName().startswith("init(")) {
+      // If we have a class method, honor the annotation to turn a class
+      // method into an initializer.
+      if (method->isClassMethod()) return attr;
+
+      return nullptr;
+    }
+
+    // Special case: preventing a mapping to an initializer.
+    if (matchFactoryAsInitName(method) && determineCtorInitializerKind(method))
+      return attr;
+
+    return nullptr;
+  }
+
+  return nullptr;
+}
+
 auto ClangImporter::Implementation::importFullName(
        const clang::NamedDecl *D,
        ImportNameOptions options,
@@ -2052,6 +2168,12 @@ auto ClangImporter::Implementation::importFullName(
   clang::Sema &clangSema = clangSemaOverride ? *clangSemaOverride
                                              : getClangSema();
   ImportedName result;
+
+  /// Whether we want the Swift 2.0 name.
+  bool swift2Name = options.contains(ImportNameFlags::Swift2Name);
+
+  /// Whether we should honor the swift_newtype/swift_wrapper attribute.
+  bool honorSwiftNewtypeAttr = HonorSwiftNewtypeAttr && !swift2Name;
 
   // Objective-C categories and extensions don't have names, despite
   // being "named" declarations.
@@ -2080,7 +2202,7 @@ auto ClangImporter::Implementation::importFullName(
       break;
     }
   // Import onto a swift_newtype if present
-  } else if (auto newtypeDecl = findSwiftNewtype(D, HonorSwiftNewtypeAttr)) {
+  } else if (auto newtypeDecl = findSwiftNewtype(D, honorSwiftNewtypeAttr)) {
     result.EffectiveContext = newtypeDecl;
   // Everything else goes into its redeclaration context.
   } else {
@@ -2155,7 +2277,7 @@ auto ClangImporter::Implementation::importFullName(
   }
 
   // If we have a swift_name attribute, use that.
-  if (auto *nameAttr = D->getAttr<clang::SwiftNameAttr>()) {
+  if (auto *nameAttr = findSwiftNameAttr(D, swift2Name)) {
     bool skipCustomName = false;
 
     // Parse the name.
@@ -2230,7 +2352,8 @@ auto ClangImporter::Implementation::importFullName(
 
       return result;
     }
-  } else if ((InferImportAsMember ||
+  } else if (!swift2Name &&
+             (InferImportAsMember ||
               moduleIsInferImportAsMember(D, clangSema)) &&
              (isa<clang::VarDecl>(D) || isa<clang::FunctionDecl>(D)) &&
              dc->isTranslationUnit()) {
@@ -2281,9 +2404,11 @@ auto ClangImporter::Implementation::importFullName(
 
     // For Objective-C BOOL properties, use the name of the getter
     // which, conventionally, has an "is" prefix.
-    if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
-      if (isBoolType(clangSema.Context, property->getType()))
-        baseName = property->getGetterName().getNameForSlot(0);
+    if (!swift2Name) {
+      if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
+        if (isBoolType(clangSema.Context, property->getType()))
+          baseName = property->getGetterName().getNameForSlot(0);
+      }
     }
 
     // For C functions, create empty argument names.
@@ -2555,7 +2680,7 @@ auto ClangImporter::Implementation::importFullName(
 
   // swift_newtype-ed declarations may have common words with the type name
   // stripped.
-  if (auto newtypeDecl = findSwiftNewtype(D, HonorSwiftNewtypeAttr)) {
+  if (auto newtypeDecl = findSwiftNewtype(D, honorSwiftNewtypeAttr)) {
     // Skip a leading 'k' in a 'kConstant' pattern
     if (baseName.size() >= 2 && baseName[0] == 'k' &&
         clang::isUppercase(baseName[1]))
@@ -2570,7 +2695,7 @@ auto ClangImporter::Implementation::importFullName(
     }
   }
 
-  if (!result.isSubscriptAccessor()) {
+  if (!result.isSubscriptAccessor() && !swift2Name) {
     // Check whether the module in which the declaration resides has a
     // module prefix and will map into Swift as a type. If so, strip
     // that prefix off when present.
@@ -2709,6 +2834,7 @@ auto ClangImporter::Implementation::importFullName(
                               aliasIsFunction);
   return result;
 }
+
 
 Identifier
 ClangImporter::Implementation::importIdentifier(
@@ -3034,52 +3160,28 @@ bool ClangImporter::Implementation::shouldImportAsInitializer(
     prefixLength = 0;
     break;
 
-  case FactoryAsInitKind::Infer: {
+  case FactoryAsInitKind::Infer:
     // See if we can match the class name to the beginning of the first
     // selector piece.
-    auto firstPiece = method->getSelector().getNameForSlot(0);
-    StringRef firstArgLabel = matchLeadingTypeName(firstPiece,
-                                                   objcClass->getName());
-    if (firstArgLabel.size() == firstPiece.size())
-      return false;
+    if (auto matchedLength = matchFactoryAsInitName(method)) {
+      prefixLength = *matchedLength;
+      break;
+    }
 
-    // FIXME: Factory methods cannot have dummy parameters added for
-    // historical reasons.
-    if (!firstArgLabel.empty() && method->getSelector().getNumArgs() == 0)
-      return false;
-
-    // Store the prefix length.
-    prefixLength = firstPiece.size() - firstArgLabel.size();
-
-    // Continue checking the result type, below.
-    break;
-  }
+    return false;
 
   case FactoryAsInitKind::AsClassMethod:
     return false;
   }
 
-  // Determine whether we have a suitable return type.
-  if (method->hasRelatedResultType()) {
-    // When the factory method has an "instancetype" result type, we
-    // can import it as a convenience factory method.
-    kind = CtorInitializerKind::ConvenienceFactory;
-  } else if (auto objcPtr = method->getReturnType()
-                              ->getAs<clang::ObjCObjectPointerType>()) {
-    if (objcPtr->getInterfaceDecl() != objcClass) {
-      // FIXME: Could allow a subclass here, but the rest of the compiler
-      // isn't prepared for that yet.
-      return false;
-    }
-
-    // Factory initializer.
-    kind = CtorInitializerKind::Factory;
-  } else {
-    // Not imported as an initializer.
-    return false;
+  // Determine what kind of initializer we're creating.
+  if (auto initKind = determineCtorInitializerKind(method)) {
+    kind = *initKind;
+    return true;
   }
 
-  return true;
+  // Not imported as an initializer.
+  return false;
 }
 
 #pragma mark Name lookup

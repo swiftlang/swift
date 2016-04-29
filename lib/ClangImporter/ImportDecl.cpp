@@ -782,6 +782,12 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
   return { getterDecl, setterDecl };
 }
 
+namespace {
+  using ImportedName = ClangImporter::Implementation::ImportedName;
+  using ImportNameFlags = ClangImporter::Implementation::ImportNameFlags;
+  using ImportNameOptions = ClangImporter::Implementation::ImportNameOptions;
+}
+
 /// \brief Create a declaration name for anonymous enums, unions and structs.
 ///
 /// Since Swift does not natively support these features, we fake them by
@@ -791,15 +797,16 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
 /// generated name will most likely be unique.
 static ClangImporter::Implementation::ImportedName
 getClangDeclName(ClangImporter::Implementation &Impl,
-                 const clang::TagDecl *decl) {
+                 const clang::TagDecl *decl,
+                 ImportNameOptions options) {
   // If we have a name for this declaration, use it.
-  if (auto name = Impl.importFullName(decl)) return name;
+  if (auto name = Impl.importFullName(decl, options)) return name;
 
   // If that didn't succeed, check whether this is an anonymous tag declaration
   // with a corresponding typedef-name declaration.
   if (decl->getDeclName().isEmpty()) {
     if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
-      return Impl.importFullName(typedefForAnon);
+      return Impl.importFullName(typedefForAnon, options);
   }
 
   if (!decl->isRecord())
@@ -979,14 +986,33 @@ namespace {
     : public clang::ConstDeclVisitor<SwiftDeclConverter, Decl *>
   {
     ClangImporter::Implementation &Impl;
+    bool useSwift2Name;
     bool forwardDeclaration = false;
 
   public:
-    explicit SwiftDeclConverter(ClangImporter::Implementation &impl)
-      : Impl(impl) { }
+    explicit SwiftDeclConverter(ClangImporter::Implementation &impl,
+                                bool useSwift2Name)
+      : Impl(impl), useSwift2Name(useSwift2Name) { }
 
     bool hadForwardDeclaration() const {
       return forwardDeclaration;
+    }
+
+    /// Determine the default set of import name options to use.
+    ImportNameOptions getDefaultImportNameOptions() {
+      if (useSwift2Name) return ImportNameFlags::Swift2Name;
+      return None;
+    }
+
+    /// Import the name of the given entity.
+    ///
+    /// This version of importFullName introduces any context-specific
+    /// name importing options (e.g., if we're importing the Swift 2 version).
+    ///
+    /// Note: Use this rather than calling Impl.importFullName directly!
+    ImportedName importFullName(const clang::NamedDecl *D,
+                                ImportNameOptions options = None) {
+      return Impl.importFullName(D, options | getDefaultImportNameOptions());
     }
 
     Decl *VisitDecl(const clang::Decl *decl) {
@@ -1150,7 +1176,7 @@ namespace {
     }
 
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
-      auto importedName = Impl.importFullName(Decl);
+      auto importedName = importFullName(Decl);
       auto Name = importedName.Imported.getBaseName();
       if (Name.empty())
         return nullptr;
@@ -1300,7 +1326,7 @@ namespace {
         return nullptr;
 
       // Check for swift_newtype
-      if (!SwiftType && Impl.HonorSwiftNewtypeAttr) {
+      if (!SwiftType && Impl.HonorSwiftNewtypeAttr && !useSwift2Name) {
         if (auto newtypeAttr =
                 Decl->template getAttr<clang::SwiftNewtypeAttr>()) {
           switch (newtypeAttr->getNewtypeKind()) {
@@ -1703,7 +1729,7 @@ namespace {
                          const clang::EnumDecl *clangEnum,
                          EnumDecl *theEnum) {
       auto &context = Impl.SwiftContext;
-      auto name = Impl.importFullName(decl).Imported.getBaseName();
+      auto name = importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
       
@@ -1756,7 +1782,7 @@ namespace {
     Decl *importOptionConstant(const clang::EnumConstantDecl *decl,
                                const clang::EnumDecl *clangEnum,
                                NominalTypeDecl *theStruct) {
-      auto name = Impl.importFullName(decl).Imported.getBaseName();
+      auto name = importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -1794,7 +1820,7 @@ namespace {
                               EnumElementDecl *original,
                               const clang::EnumDecl *clangEnum,
                               NominalTypeDecl *importedEnum) {
-      auto name = Impl.importFullName(alias).Imported.getBaseName();
+      auto name = importFullName(alias).Imported.getBaseName();
       if (name.empty())
         return nullptr;
       
@@ -1880,7 +1906,8 @@ namespace {
         return nullptr;
       }
       
-      auto importedName = getClangDeclName(Impl, decl);
+      auto importedName = getClangDeclName(Impl, decl,
+                                           getDefaultImportNameOptions());
       if (!importedName)
         return nullptr;
 
@@ -2098,7 +2125,8 @@ namespace {
         return nullptr;
       }
 
-      auto importedName = getClangDeclName(Impl, decl);
+      auto importedName = getClangDeclName(Impl, decl,
+                                           getDefaultImportNameOptions());
       if (!importedName)
         return nullptr;
 
@@ -2295,7 +2323,7 @@ namespace {
     Decl *VisitEnumConstantDecl(const clang::EnumConstantDecl *decl) {
       auto clangEnum = cast<clang::EnumDecl>(decl->getDeclContext());
       
-      auto importedName = Impl.importFullName(decl);
+      auto importedName = importFullName(decl);
       if (!importedName) return nullptr;
 
       auto name = importedName.Imported.getBaseName();
@@ -2397,7 +2425,7 @@ namespace {
             return nullptr;
         }
       }
-      auto importedName = Impl.importFullName(decl);
+      auto importedName = importFullName(decl);
       if (!importedName) return nullptr;
 
       auto name = importedName.Imported.getBaseName();
@@ -2596,8 +2624,6 @@ namespace {
       return result;
     }
 
-    using ImportedName = ClangImporter::Implementation::ImportedName;
-
     /// Create an implicit property given the imported name of one of
     /// the accessors.
     VarDecl *getImplicitProperty(ImportedName importedName,
@@ -2653,7 +2679,7 @@ namespace {
 
         if (!getter) {
           // Find the self index for the getter.
-          getterName = Impl.importFullName(function);
+          getterName = importFullName(function);
           if (!getterName) continue;
 
           getter = function;
@@ -2662,7 +2688,7 @@ namespace {
 
         if (!setter) {
           // Find the self index for the setter.
-          setterName = Impl.importFullName(function);
+          setterName = importFullName(function);
           if (!setterName) continue;
 
           setter = function;
@@ -2768,7 +2794,7 @@ namespace {
 
     Decl *VisitFunctionDecl(const clang::FunctionDecl *decl) {
       // Import the name of the function.
-      auto importedName = Impl.importFullName(decl);
+      auto importedName = importFullName(decl);
       if (!importedName)
         return nullptr;
 
@@ -2883,7 +2909,7 @@ namespace {
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
       // Fields are imported as variables.
-      auto importedName = Impl.importFullName(decl);
+      auto importedName = importFullName(decl);
       if (!importedName) return nullptr;
 
       auto name = importedName.Imported.getBaseName();
@@ -2930,7 +2956,7 @@ namespace {
         return nullptr;
 
       // Variables are imported as... variables.
-      auto importedName = Impl.importFullName(decl);
+      auto importedName = importFullName(decl);
       if (!importedName) return nullptr;
 
       auto name = importedName.Imported.getBaseName();
@@ -3087,7 +3113,7 @@ namespace {
                                      ObjCSelector selector,
                                      DeclContext *dc) {
       // Import the full name of the method.
-      auto importedName = Impl.importFullName(decl);
+      auto importedName = importFullName(decl);
 
       // Check that we imported an initializer name.
       DeclName initName = importedName;
@@ -3200,9 +3226,8 @@ namespace {
         return nullptr;
 
       auto importedName
-        = Impl.importFullName(decl,
-                              ClangImporter::Implementation::ImportNameFlags
-                                ::SuppressFactoryMethodAsInit);
+        = importFullName(decl,
+                         ImportNameFlags::SuppressFactoryMethodAsInit);
       if (!importedName)
         return nullptr;
 
@@ -3472,7 +3497,7 @@ namespace {
       };
 
       bool variadic = objcMethod->isVariadic();
-      auto importedName = Impl.importFullName(objcMethod);
+      auto importedName = importFullName(objcMethod);
       if (!importedName) return nullptr;
 
       // If we dropped the variadic, handle it now.
@@ -4811,7 +4836,7 @@ namespace {
             assert(ctor->getInitKind() ==
                      CtorInitializerKind::ConvenienceFactory);
 
-            ImportedName importedName = Impl.importFullName(objcMethod);
+            ImportedName importedName = importFullName(objcMethod);
             importedName.HasCustomName = true;
             bool redundant;
             if (auto newCtor = importConstructor(objcMethod, classDecl,
@@ -5031,7 +5056,7 @@ namespace {
     }
     
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
-      auto importedName = Impl.importFullName(decl);
+      auto importedName = importFullName(decl);
       if (!importedName) return nullptr;
 
       Identifier name = importedName.Imported.getBaseName();
@@ -5133,7 +5158,7 @@ namespace {
     }
 
     Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
-      auto importedName = Impl.importFullName(decl);
+      auto importedName = importFullName(decl);
       if (!importedName) return nullptr;
 
       auto name = importedName.Imported.getBaseName();
@@ -5373,7 +5398,7 @@ namespace {
                                 DeclContext *dc) {
       assert(dc);
 
-      auto name = Impl.importFullName(decl).Imported.getBaseName();
+      auto name = importFullName(decl).Imported.getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -5801,7 +5826,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   }
 
   if (!Result) {
-    SwiftDeclConverter converter(*this);
+    SwiftDeclConverter converter(*this, /*FIXME:*/false);
     Result = converter.Visit(ClangDecl);
     HadForwardDeclaration = converter.hadForwardDeclaration();
   }
@@ -6065,7 +6090,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
   if (known != ImportedProtocolDecls.end())
     return known->second;
 
-  SwiftDeclConverter converter(*this);
+  SwiftDeclConverter converter(*this, /*FIXME:*/false);
   Decl *result;
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(decl)) {
     result = converter.VisitObjCMethodDecl(method, dc);
@@ -6511,7 +6536,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
                                     Instance->getSourceManager(),
                                     "loading members for");
 
-  SwiftDeclConverter converter(*this);
+  SwiftDeclConverter converter(*this, /*FIXME:*/false);
 
   DeclContext *DC;
   IterableDeclContext *IDC;
