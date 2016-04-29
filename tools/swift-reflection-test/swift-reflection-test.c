@@ -160,14 +160,12 @@ int PipeMemoryReader_getChildReadFD(const PipeMemoryReader *Reader) {
     return Reader->to_child[ReadEnd];
 }
 
-uint8_t PipeMemoryReader_getPointerSize() {
-  // FIXME: Return based on -arch argument to the test tool
-  return 8;
+uint8_t PipeMemoryReader_getPointerSize(void *Context) {
+  return sizeof(uintptr_t);
 }
 
-uint8_t PipeMemoryReader_getSizeSize() {
-  // FIXME: Return based on -arch argument to the test tool
-  return 8;
+uint8_t PipeMemoryReader_getSizeSize(void *Context) {
+  return sizeof(size_t);
 }
 
 void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
@@ -386,7 +384,7 @@ int doDumpHeapInstance(const char *BinaryFilename) {
         PipeMemoryReader_getStringLength,
         PipeMemoryReader_getSymbolAddress);
 
-      uint8_t PointerSize = PipeMemoryReader_getPointerSize();
+      uint8_t PointerSize = PipeMemoryReader_getPointerSize((void*)&Pipe);
       if (PointerSize != sizeof(uintptr_t))
         errorAndExit("Child process had unexpected architecture");
 
@@ -428,32 +426,15 @@ int doDumpHeapInstance(const char *BinaryFilename) {
 }
 
 void printUsageAndExit() {
-  fprintf(stderr, "swift-reflection-test <arch> <binary filename>\n");
+  fprintf(stderr, "swift-reflection-test <binary filename>\n");
   exit(EXIT_FAILURE);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 3)
+  if (argc != 2)
     printUsageAndExit();
 
-  const char *arch = argv[1];
-  const char *BinaryFilename = argv[2];
+  const char *BinaryFilename = argv[1];
 
-  unsigned PointerSize = 0;
-  if (strcmp(arch, "x86_64") == 0) {
-    PointerSize = 8;
-  } else if (strcmp(arch, "i386") == 0) {
-    PointerSize = 4;
-  } else if (strcmp(arch, "arm64") == 0) {
-    PointerSize = 8;
-  } else if (strcmp(arch, "arm") == 0 ||
-           strcmp(arch, "armv7") == 0 ||
-           strcmp(arch, "armv7s") == 0) {
-    PointerSize = 4;
-  } else if (strcmp(arch, "armv7k") == 0) {
-    PointerSize = 4;
-  } else {
-    errorAndExit("Unsupported architecture");
-  }
   return doDumpHeapInstance(BinaryFilename);
 }
