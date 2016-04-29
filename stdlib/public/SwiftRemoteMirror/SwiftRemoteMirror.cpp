@@ -175,7 +175,7 @@ static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {
 
 static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
   auto *RecordTI = cast<RecordTypeInfo>(TI);
-  auto FieldInfo = RecordTI->getFields()[Index];
+  auto &FieldInfo = RecordTI->getFields()[Index];
 
   return {
     FieldInfo.Name.c_str(),
