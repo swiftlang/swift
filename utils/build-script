@@ -15,6 +15,7 @@ import argparse
 import multiprocessing
 import os
 import platform
+import re
 import shutil
 import sys
 import pipes
@@ -74,6 +75,16 @@ def argparse_shell_split(string):
     lex.whitespace_split = True
     lex.whitespace += ','
     return list(lex)
+
+
+# Parse version string and split into a tuple of strings (major, minor, patch)
+# Support only "MAJOR.MINOR.PATCH" format.
+def argparse_clang_compiler_version(string):
+    m = re.match(r'([0-9]*)\.([0-9]*)\.([0-9]*)', string)
+    if m is not None:
+        return m.group(1, 2, 3)
+    raise argparse.ArgumentTypeError(
+        "%r is invalid version value. must be 'MAJOR.MINOR.PATCH'" % string)
 
 
 # Main entry point for the preset mode.
@@ -838,6 +849,7 @@ details of the setups of other systems or automated environments.""")
     parser.add_argument(
         "--clang-compiler-version",
         help="string that indicates a compiler version for Clang",
+        type=argparse_clang_compiler_version,
         metavar="MAJOR.MINOR.PATCH")
 
     parser.add_argument(
@@ -1286,7 +1298,7 @@ details of the setups of other systems or automated environments.""")
         build_script_impl_args += ["--enable-ubsan"]
     if args.clang_compiler_version:
         build_script_impl_args += [
-            "--clang-compiler-version", args.clang_compiler_version
+            "--clang-compiler-version=%s.%s.%s" % args.clang_compiler_version
         ]
     if args.verbose_build:
         build_script_impl_args += ["--verbose-build"]

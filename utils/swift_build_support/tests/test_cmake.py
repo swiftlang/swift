@@ -141,7 +141,7 @@ class CMakeTestCase(unittest.TestCase):
 
     def test_common_options_clang_compiler_version(self):
         args = self.default_args()
-        args.clang_compiler_version = "3.8.0"
+        args.clang_compiler_version = ("3", "8", "0")
         cmake = self.cmake(args)
         self.assertEqual(
             list(cmake.common_options()),
@@ -159,7 +159,7 @@ class CMakeTestCase(unittest.TestCase):
         args.export_compile_commands = True
         args.distcc = True
         args.cmake_generator = 'Xcode'
-        args.clang_compiler_version = "3.8.0"
+        args.clang_compiler_version = ("3", "8", "0")
         cmake = self.cmake(args)
         self.assertEqual(
             list(cmake.common_options()),

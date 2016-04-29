@@ -16,7 +16,6 @@
 
 from numbers import Number
 import platform
-import re
 import subprocess
 
 from . import xcrun
@@ -129,12 +128,10 @@ class CMake(object):
                    "Debug;Release;MinSizeRel;RelWithDebInfo")
 
         if args.clang_compiler_version:
-            m = re.match(r'([0-9]*)\.([0-9]*)\.([0-9]*)',
-                         args.clang_compiler_version)
-            if m is not None:
-                define("LLVM_VERSION_MAJOR:STRING", m.group(1))
-                define("LLVM_VERSION_MINOR:STRING", m.group(2))
-                define("LLVM_VERSION_PATCH:STRING", m.group(3))
+            major, minor, patch = args.clang_compiler_version
+            define("LLVM_VERSION_MAJOR:STRING", major)
+            define("LLVM_VERSION_MINOR:STRING", minor)
+            define("LLVM_VERSION_PATCH:STRING", patch)
 
         return options
 
