@@ -753,8 +753,7 @@ tests.test("ReversedCollection/Lazy") {
     var calls = 0
     let reversedAndMapped = reversed.map { (x) -> Int in calls += 1; return x }
     expectEqual(0, calls)
-    // FIXME: swift-3-indexing-model: should be checkRandomAccessCollection(0...11, reversedAndMapped)
-    checkBidirectionalCollection(0...11, reversedAndMapped)
+    checkRandomAccessCollection(0...11, reversedAndMapped)
     expectNotEqual(0, calls)
   }
 
