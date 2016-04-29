@@ -759,7 +759,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
                     classTI.getLayout(*this),
                     classTI.getClassLayout(*this));
   emitNestedTypeDecls(D->getMembers());
-  addNominalTypeDecl(D);
+  emitReflectionMetadata(D);
 }
 
 namespace {

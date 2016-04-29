@@ -27,6 +27,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
@@ -269,9 +270,6 @@ public:
 
   /// Emit type metadata records for types without explicit protocol conformance.
   void emitTypeMetadataRecords();
-
-  /// Emit reflection metadata records for nominal types.
-  void emitReflectionMetadataRecords();
 
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
@@ -624,7 +622,11 @@ public:
                                 llvm::Function *fn);
   llvm::Constant *emitProtocolConformances();
   llvm::Constant *emitTypeMetadataRecords();
-  void emitReflectionMetadataRecords();
+  void emitReflectionMetadata(const NominalTypeDecl *Decl);
+  void emitAssociatedTypeMetadataRecord(const NominalTypeDecl *Decl);
+  void emitAssociatedTypeMetadataRecord(const ExtensionDecl *Ext);
+  void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
+  void emitBuiltinReflectionMetadata();
   llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
   llvm::Constant *getAddrOfFieldName(StringRef Name);
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &SILFn,
@@ -686,11 +688,9 @@ private:
   SmallVector<NormalProtocolConformance *, 4> ProtocolConformances;
   /// List of nominal types to generate type metadata records for.
   SmallVector<CanType, 4> RuntimeResolvableTypes;
-  /// Collection of nominal types to generate field metadata records.
-  SmallVector<const NominalTypeDecl *, 4> NominalTypeDecls;
-  /// Collection of extensions to generate associated type metadata records
-  /// if they added conformance to a protocol with associated type requirements.
-  SmallVector<const ExtensionDecl *, 4> ExtensionDecls;
+  /// Builtin types referenced by types in this module when emitting
+  /// reflection metadata.
+  llvm::SetVector<CanType> BuiltinTypes;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
@@ -802,7 +802,6 @@ public:
   void emitClangDecl(clang::Decl *decl);
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
-  void addNominalTypeDecl(const NominalTypeDecl *Decl);
 
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeSet &attrs,

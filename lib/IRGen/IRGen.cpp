@@ -586,7 +586,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       // In JIT mode these are manually registered above.
       IGM.emitProtocolConformances();
       IGM.emitTypeMetadataRecords();
-      IGM.emitReflectionMetadataRecords();
+      IGM.emitBuiltinReflectionMetadata();
     }
 
     // Okay, emit any definitions that we suddenly need.
@@ -739,7 +739,6 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   IRGenModule *PrimaryGM = irgen.getPrimaryIGM();
 
   irgen.emitProtocolConformances();
-  irgen.emitReflectionMetadataRecords();
 
   // Okay, emit any definitions that we suddenly need.
   irgen.emitLazyDefinitions();
