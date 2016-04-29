@@ -632,6 +632,7 @@ public:
   std::string getBuiltinTypeMetadataSectionName();
   std::string getFieldTypeMetadataSectionName();
   std::string getAssociatedTypeMetadataSectionName();
+  std::string getCaptureDescriptorMetadataSectionName();
   std::string getReflectionStringsSectionName();
   std::string getReflectionTypeRefSectionName();
 

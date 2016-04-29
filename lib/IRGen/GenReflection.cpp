@@ -689,7 +689,8 @@ public:
                                         /*isConstant*/ true,
                                         llvm::GlobalValue::PrivateLinkage,
                                         init,
-                                        "capture_descriptor");
+                                        "\x01l__swift3_capture_descriptor");
+    var->setSection(IGM.getCaptureDescriptorMetadataSectionName());
     var->setAlignment(IGM.getPointerAlignment().getValue());
 
     auto replacer = llvm::ConstantExpr::getBitCast(var, IGM.Int8PtrTy);
@@ -729,6 +730,10 @@ std::string IRGenModule::getBuiltinTypeMetadataSectionName() {
 
 std::string IRGenModule::getAssociatedTypeMetadataSectionName() {
   return getReflectionSectionName(*this, "assocty");
+}
+
+std::string IRGenModule::getCaptureDescriptorMetadataSectionName() {
+  return getReflectionSectionName(*this, "capture");
 }
 
 std::string IRGenModule::getReflectionStringsSectionName() {
