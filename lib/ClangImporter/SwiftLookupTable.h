@@ -119,7 +119,7 @@ public:
   Kind getKind() const { return TheKind; }
 
   /// Retrieve the declaration context.
-  const clang::DeclContext *getAsDeclContext() {
+  const clang::DeclContext *getAsDeclContext() const {
     return getKind() == DeclContext ? DC : nullptr;
   }
 
@@ -310,6 +310,10 @@ public:
 
   /// Maps a stored entry to an actual Clang AST node.
   SingleEntry mapStored(uintptr_t &entry);
+
+  /// Translate a Clang DeclContext into a context kind and name.
+  static llvm::Optional<StoredContext> translateDeclContext(
+                                         const clang::DeclContext *dc);
 
   /// Translate a Clang effective context into a context kind and name.
   llvm::Optional<StoredContext> translateContext(EffectiveClangContext context);

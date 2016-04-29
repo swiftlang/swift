@@ -94,29 +94,32 @@ translateDeclToContext(clang::NamedDecl *decl) {
   return None;
 }
 
+auto SwiftLookupTable::translateDeclContext(const clang::DeclContext *dc)
+    -> Optional<SwiftLookupTable::StoredContext> {
+  // Translation unit context.
+  if (dc->isTranslationUnit())
+    return std::make_pair(ContextKind::TranslationUnit, StringRef());
+
+  // Tag declaration context.
+  if (auto tag = dyn_cast<clang::TagDecl>(dc))
+    return translateDeclToContext(const_cast<clang::TagDecl *>(tag));
+
+  // Objective-C class context.
+  if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(dc))
+    return std::make_pair(ContextKind::ObjCClass, objcClass->getName());
+
+  // Objective-C protocol context.
+  if (auto objcProtocol = dyn_cast<clang::ObjCProtocolDecl>(dc))
+    return std::make_pair(ContextKind::ObjCProtocol, objcProtocol->getName());
+
+  return None;
+}
+
 Optional<SwiftLookupTable::StoredContext>
 SwiftLookupTable::translateContext(EffectiveClangContext context) {
   switch (context.getKind()) {
   case EffectiveClangContext::DeclContext: {
-    auto dc = context.getAsDeclContext();
-
-    // Translation unit context.
-    if (dc->isTranslationUnit())
-      return std::make_pair(ContextKind::TranslationUnit, StringRef());
-    
-    // Tag declaration context.
-    if (auto tag = dyn_cast<clang::TagDecl>(dc))
-      return translateDeclToContext(const_cast<clang::TagDecl *>(tag));
-
-    // Objective-C class context.
-    if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(dc))
-      return std::make_pair(ContextKind::ObjCClass, objcClass->getName());
-
-    // Objective-C protocol context.
-    if (auto objcProtocol = dyn_cast<clang::ObjCProtocolDecl>(dc))
-      return std::make_pair(ContextKind::ObjCProtocol, objcProtocol->getName());
-
-    return None;
+    return translateDeclContext(context.getAsDeclContext());
   }
 
   case EffectiveClangContext::TypedefContext:

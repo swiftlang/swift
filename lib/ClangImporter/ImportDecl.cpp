@@ -788,70 +788,6 @@ namespace {
   using ImportNameOptions = ClangImporter::Implementation::ImportNameOptions;
 }
 
-/// \brief Create a declaration name for anonymous enums, unions and structs.
-///
-/// Since Swift does not natively support these features, we fake them by
-/// importing them as declarations with generated names. The generated name
-/// is derived from the name of the field in the outer type. Since the
-/// anonymous type is imported as a nested type of the outer type, this
-/// generated name will most likely be unique.
-static ClangImporter::Implementation::ImportedName
-getClangDeclName(ClangImporter::Implementation &Impl,
-                 const clang::TagDecl *decl,
-                 ImportNameOptions options) {
-  // If we have a name for this declaration, use it.
-  if (auto name = Impl.importFullName(decl, options)) return name;
-
-  // If that didn't succeed, check whether this is an anonymous tag declaration
-  // with a corresponding typedef-name declaration.
-  if (decl->getDeclName().isEmpty()) {
-    if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
-      return Impl.importFullName(typedefForAnon, options);
-  }
-
-  if (!decl->isRecord())
-    return ClangImporter::Implementation::ImportedName();
-
-  // If the type has no name and no structure name, but is not anonymous,
-  // generate a name for it. Specifically this is for cases like:
-  //   struct a {
-  //     struct {} z;
-  //   }
-  // Where the member z is an unnamed struct, but does have a member-name
-  // and is accessible as a member of struct a.
-  if (auto recordDecl = dyn_cast<clang::RecordDecl>(
-                          decl->getLexicalDeclContext())) {
-    for (auto field : recordDecl->fields()) {
-      if (field->getType()->getAsTagDecl() == decl) {
-        // We found the field. The field should not be anonymous, since we are
-        // using its name to derive the generated declaration name.
-        assert(!field->isAnonymousStructOrUnion());
-
-        // Create a name for the declaration from the field name.
-        std::string Id;
-        llvm::raw_string_ostream IdStream(Id);
-
-        const char *kind;
-        if (decl->isStruct())
-          kind = "struct";
-        else if (decl->isUnion())
-          kind = "union";
-        else
-          llvm_unreachable("unknown decl kind");
-
-        IdStream << "__Unnamed_" << kind
-                 << "_" << field->getName();
-        ClangImporter::Implementation::ImportedName Result;
-        Result.Imported = Impl.SwiftContext.getIdentifier(IdStream.str());
-        Result.EffectiveContext = decl->getDeclContext();
-        return Result;
-      }
-    }
-  }
-
-  return ClangImporter::Implementation::ImportedName();
-}
-
 /// Add an AvailableAttr to the declaration for the given
 /// version range.
 static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
@@ -989,21 +925,6 @@ namespace {
     bool useSwift2Name;
     bool forwardDeclaration = false;
 
-  public:
-    explicit SwiftDeclConverter(ClangImporter::Implementation &impl,
-                                bool useSwift2Name)
-      : Impl(impl), useSwift2Name(useSwift2Name) { }
-
-    bool hadForwardDeclaration() const {
-      return forwardDeclaration;
-    }
-
-    /// Determine the default set of import name options to use.
-    ImportNameOptions getDefaultImportNameOptions() {
-      if (useSwift2Name) return ImportNameFlags::Swift2Name;
-      return None;
-    }
-
     /// Import the name of the given entity.
     ///
     /// This version of importFullName introduces any context-specific
@@ -1011,8 +932,102 @@ namespace {
     ///
     /// Note: Use this rather than calling Impl.importFullName directly!
     ImportedName importFullName(const clang::NamedDecl *D,
+                                Optional<ImportedName> &swift3Name,
                                 ImportNameOptions options = None) {
-      return Impl.importFullName(D, options | getDefaultImportNameOptions());
+      // Special handling when we import using the Swift 2 name.
+      if (useSwift2Name) {
+        // First, import based on the Swift 3 name. If that fails, we won't
+        // do anything.
+        swift3Name = Impl.importFullName(D, options);
+        if (!*swift3Name) return *swift3Name;
+
+        // Import using the Swift 2 name. If that fails, or if it's identical
+        // to the Swift name, we won't introduce a Swift 2 stub declaration.
+        auto swift2Name =
+          Impl.importFullName(D, options | ImportNameFlags::Swift2Name);
+        if (!swift2Name || swift2Name.Imported == swift3Name->Imported)
+          return ImportedName();
+
+        // Okay, return the Swift 2 name.
+        return swift2Name;
+      }
+
+      // Just import the Swift 2 name.
+      swift3Name = None;
+      return Impl.importFullName(D, options);
+    }
+
+    /// \brief Create a declaration name for anonymous enums, unions and
+    /// structs.
+    ///
+    /// Since Swift does not natively support these features, we fake them by
+    /// importing them as declarations with generated names. The generated name
+    /// is derived from the name of the field in the outer type. Since the
+    /// anonymous type is imported as a nested type of the outer type, this
+    /// generated name will most likely be unique.
+    ImportedName getClangDeclName(const clang::TagDecl *decl,
+                                  Optional<ImportedName> &swift3Name) {
+      // If we have a name for this declaration, use it.
+      if (auto name = importFullName(decl, swift3Name)) return name;
+
+      // If that didn't succeed, check whether this is an anonymous tag declaration
+      // with a corresponding typedef-name declaration.
+      if (decl->getDeclName().isEmpty()) {
+        if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
+          return importFullName(typedefForAnon, swift3Name);
+      }
+
+      if (!decl->isRecord())
+        return ImportedName();
+
+      // If the type has no name and no structure name, but is not anonymous,
+      // generate a name for it. Specifically this is for cases like:
+      //   struct a {
+      //     struct {} z;
+      //   }
+      // Where the member z is an unnamed struct, but does have a member-name
+      // and is accessible as a member of struct a.
+      swift3Name = None;
+      if (auto recordDecl = dyn_cast<clang::RecordDecl>(
+                              decl->getLexicalDeclContext())) {
+        for (auto field : recordDecl->fields()) {
+          if (field->getType()->getAsTagDecl() == decl) {
+            // We found the field. The field should not be anonymous, since we are
+            // using its name to derive the generated declaration name.
+            assert(!field->isAnonymousStructOrUnion());
+
+            // Create a name for the declaration from the field name.
+            std::string Id;
+            llvm::raw_string_ostream IdStream(Id);
+
+            const char *kind;
+            if (decl->isStruct())
+              kind = "struct";
+            else if (decl->isUnion())
+              kind = "union";
+            else
+              llvm_unreachable("unknown decl kind");
+
+            IdStream << "__Unnamed_" << kind
+            << "_" << field->getName();
+            ImportedName Result;
+            Result.Imported = Impl.SwiftContext.getIdentifier(IdStream.str());
+            Result.EffectiveContext = decl->getDeclContext();
+            return Result;
+          }
+        }
+      }
+      
+      return ImportedName();
+    }
+
+  public:
+    explicit SwiftDeclConverter(ClangImporter::Implementation &impl,
+                                bool useSwift2Name)
+      : Impl(impl), useSwift2Name(useSwift2Name) { }
+
+    bool hadForwardDeclaration() const {
+      return forwardDeclaration;
     }
 
     Decl *VisitDecl(const clang::Decl *decl) {
@@ -1175,11 +1190,77 @@ namespace {
       return theClass;
     }
 
+    /// Mark the given declaration as the Swift 2 variant of a Swift 3
+    /// declaration with the given name.
+    static void markAsSwift2Variant(Decl *decl, ImportedName swift3Name) {
+      ASTContext &ctx = decl->getASTContext();
+
+      llvm::SmallString<64> renamed;
+      {
+        // Render a swift_name string.
+        llvm::raw_svector_ostream os(renamed);
+        swift3Name.printSwiftName(os);
+      }
+
+      auto attr = AvailableAttr::createUnconditional(
+                    ctx, StringRef(), ctx.AllocateCopy(renamed.str()));
+      decl->getAttrs().add(attr);
+    }
+
+    /// Create a typealias for the Swift 2 name of a Clang type declaration.
+    Decl *importSwift2TypeAlias(const clang::NamedDecl *decl,
+                                ImportedName swift2Name,
+                                ImportedName swift3Name) {
+      // Import the referenced declaration. If it doesn't come in as a type,
+      // we don't care.
+      auto importedDecl = Impl.importDecl(decl);
+      auto typeDecl = dyn_cast_or_null<TypeDecl>(importedDecl);
+      if (!typeDecl) return nullptr;
+
+      // FIXME: We cannot currently handle generic types.
+      if (auto generic = dyn_cast<GenericTypeDecl>(typeDecl)) {
+        if (generic->getGenericSignature())
+          return nullptr;
+      }
+
+      // Import the declaration context where this name will go. Note that
+      // this is the "natural" context for the declaration, without
+      // import-as-member inference or swift_name tricks.
+      EffectiveClangContext effectiveContext(
+                              decl->getDeclContext()->getRedeclContext());
+      auto dc = Impl.importDeclContextOf(decl, effectiveContext);
+      if (!dc) return nullptr;
+
+      // Create the type alias.
+      auto underlyingType = typeDecl->getDeclaredInterfaceType();
+      auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
+                     decl,
+                     Impl.importSourceLoc(decl->getLocStart()),
+                     swift2Name.Imported.getBaseName(),
+                     Impl.importSourceLoc(decl->getLocation()),
+                     TypeLoc::withoutLoc(underlyingType),
+                     /*genericparams*/nullptr, dc);
+      alias->computeType();
+
+      // Record that this is the Swift 2 version of this declaration.
+      Impl.ImportedDecls[{decl->getCanonicalDecl(), true}] = alias;
+
+      // Mark it as the Swift 2 variant.
+      markAsSwift2Variant(alias, swift3Name);
+      return alias;
+    }
+
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
-      auto importedName = importFullName(Decl);
+      Optional<ImportedName> swift3Name;
+      auto importedName = importFullName(Decl, swift3Name);
       auto Name = importedName.Imported.getBaseName();
       if (Name.empty())
         return nullptr;
+
+      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // typealias.
+      if (swift3Name)
+        return importSwift2TypeAlias(Decl, importedName, *swift3Name);
 
       Type SwiftType;
       if (Decl->getDeclContext()->getRedeclContext()->isTranslationUnit()) {
@@ -1730,10 +1811,26 @@ namespace {
                          const clang::EnumDecl *clangEnum,
                          EnumDecl *theEnum) {
       auto &context = Impl.SwiftContext;
-      auto name = importFullName(decl).Imported.getBaseName();
+      Optional<ImportedName> swift3Name;
+      auto name = importFullName(decl, swift3Name).Imported.getBaseName();
       if (name.empty())
         return nullptr;
-      
+
+      if (swift3Name) {
+        // We're creating a Swift 2 stub. Treat it as an enum case alias.
+        auto swift3Decl = Impl.importDecl(decl);
+        if (!swift3Decl) return nullptr;
+
+        auto swift3Case = dyn_cast<EnumElementDecl>(swift3Decl);
+        if (!swift3Case) return nullptr;
+
+        auto swift2Case = importEnumCaseAlias(name, decl, swift3Case,
+                                              clangEnum, theEnum);
+        if (swift2Case) markAsSwift2Variant(swift2Case, *swift3Name);
+
+        return swift2Case;
+      }
+
       // Use the constant's underlying value as its raw value in Swift.
       bool negative = false;
       llvm::APSInt rawValue = decl->getInitVal();
@@ -1744,7 +1841,7 @@ namespace {
       auto insertResult =
           Impl.EnumConstantValues.insert({{clangEnum, rawValue}, nullptr});
       if (!insertResult.second)
-        return importEnumCaseAlias(decl, insertResult.first->second,
+        return importEnumCaseAlias(name, decl, insertResult.first->second,
                                    clangEnum, theEnum);
 
       if (clangEnum->getIntegerType()->isSignedIntegerOrEnumerationType()
@@ -1783,7 +1880,8 @@ namespace {
     Decl *importOptionConstant(const clang::EnumConstantDecl *decl,
                                const clang::EnumDecl *clangEnum,
                                NominalTypeDecl *theStruct) {
-      auto name = importFullName(decl).Imported.getBaseName();
+      Optional<ImportedName> swift3Name;
+      auto name = importFullName(decl, swift3Name).Imported.getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -1809,6 +1907,10 @@ namespace {
         CD->getAttrs().add(attr);
       }
 
+      // If this is a Swift 2 stub, mark it as such.
+      if (swift3Name)
+        markAsSwift2Variant(CD, *swift3Name);
+
       return CD;
     }
 
@@ -1817,11 +1919,11 @@ namespace {
     /// This builds the getter in a way that's compatible with switch
     /// statements. Changing the body here may require changing
     /// TypeCheckPattern.cpp as well.
-    Decl *importEnumCaseAlias(const clang::EnumConstantDecl *alias,
+    Decl *importEnumCaseAlias(Identifier name,
+                              const clang::EnumConstantDecl *alias,
                               EnumElementDecl *original,
                               const clang::EnumDecl *clangEnum,
                               NominalTypeDecl *importedEnum) {
-      auto name = importFullName(alias).Imported.getBaseName();
       if (name.empty())
         return nullptr;
       
@@ -1906,11 +2008,16 @@ namespace {
         forwardDeclaration = true;
         return nullptr;
       }
-      
-      auto importedName = getClangDeclName(Impl, decl,
-                                           getDefaultImportNameOptions());
+
+      Optional<ImportedName> swift3Name;
+      auto importedName = getClangDeclName(decl, swift3Name);
       if (!importedName)
         return nullptr;
+
+      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // typealias.
+      if (swift3Name)
+        return importSwift2TypeAlias(decl, importedName, *swift3Name);
 
       auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
       if (!dc)
@@ -2126,10 +2233,16 @@ namespace {
         return nullptr;
       }
 
-      auto importedName = getClangDeclName(Impl, decl,
-                                           getDefaultImportNameOptions());
+      // Import the name.
+      Optional<ImportedName> swift3Name;
+      auto importedName = getClangDeclName(decl, swift3Name);
       if (!importedName)
         return nullptr;
+
+      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // typealias.
+      if (swift3Name)
+        return importSwift2TypeAlias(decl, importedName, *swift3Name);
 
       auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
       if (!dc)
@@ -2324,7 +2437,8 @@ namespace {
     Decl *VisitEnumConstantDecl(const clang::EnumConstantDecl *decl) {
       auto clangEnum = cast<clang::EnumDecl>(decl->getDeclContext());
       
-      auto importedName = importFullName(decl);
+      Optional<ImportedName> swift3Name;
+      auto importedName = importFullName(decl, swift3Name);
       if (!importedName) return nullptr;
 
       auto name = importedName.Imported.getBaseName();
@@ -2361,6 +2475,11 @@ namespace {
                                           ConstantConvertKind::Coerce,
                                           /*static*/ false, decl);
         Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}] = result;
+
+        // If this is a Swift 2 stub, mark it as such.
+        if (swift3Name)
+          markAsSwift2Variant(result, *swift3Name);
+
         return result;
       }
 
@@ -2381,6 +2500,7 @@ namespace {
                           /*isFullyBridgeable*/false);
         if (!enumType)
           return nullptr;
+
         // FIXME: Importing the type will can recursively revisit this same
         // EnumConstantDecl. Short-circuit out if we already emitted the import
         // for this decl.
@@ -2393,6 +2513,11 @@ namespace {
                                           ConstantConvertKind::Construction,
                                           /*static*/ false, decl);
         Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}] = result;
+
+        // If this is a Swift 2 stub, mark it as such.
+        if (swift3Name)
+          markAsSwift2Variant(result, *swift3Name);
+
         return result;
       }
 
@@ -2426,7 +2551,9 @@ namespace {
             return nullptr;
         }
       }
-      auto importedName = importFullName(decl);
+
+      Optional<ImportedName> swift3Name;
+      auto importedName = importFullName(decl, swift3Name);
       if (!importedName) return nullptr;
 
       auto name = importedName.Imported.getBaseName();
@@ -2447,6 +2574,11 @@ namespace {
                        /*static*/ false, /*IsLet*/ false,
                        Impl.importSourceLoc(decl->getLocStart()),
                        name, type, dc);
+
+      // If this is a Swift 2 stub, mark is as such.
+      if (swift3Name)
+        markAsSwift2Variant(result, *swift3Name);
+
       return result;
     }
 
@@ -2640,8 +2772,10 @@ namespace {
       // Determine whether we have the getter or setter.
       const clang::FunctionDecl *getter = nullptr;
       ImportedName getterName;
+      Optional<ImportedName> swift3GetterName;
       const clang::FunctionDecl *setter = nullptr;
       ImportedName setterName;
+      Optional<ImportedName> swift3SetterName;
       switch (importedName.AccessorKind) {
       case ImportedAccessorKind::None:
       case ImportedAccessorKind::SubscriptGetter:
@@ -2680,7 +2814,7 @@ namespace {
 
         if (!getter) {
           // Find the self index for the getter.
-          getterName = importFullName(function);
+          getterName = importFullName(function, swift3GetterName);
           if (!getterName) continue;
 
           getter = function;
@@ -2689,7 +2823,7 @@ namespace {
 
         if (!setter) {
           // Find the self index for the setter.
-          setterName = importFullName(function);
+          setterName = importFullName(function, swift3SetterName);
           if (!setterName) continue;
 
           setter = function;
@@ -2767,20 +2901,24 @@ namespace {
 
       // Import the getter.
       FuncDecl *swiftGetter =
-        dyn_cast_or_null<FuncDecl>(VisitFunctionDecl(getter, getterName,
+        dyn_cast_or_null<FuncDecl>(VisitFunctionDecl(getter, getterName, None,
                                                      property));
       if (!swiftGetter) return nullptr;
       Impl.importAttributes(getter, swiftGetter);
       Impl.ImportedDecls[{getter, useSwift2Name}] = swiftGetter;
+      if (swift3GetterName)
+        markAsSwift2Variant(swiftGetter, *swift3GetterName);
 
       // Import the setter.
       FuncDecl *swiftSetter = nullptr;
       if (setter) {
         swiftSetter = dyn_cast_or_null<FuncDecl>(
-                        VisitFunctionDecl(setter, setterName, property));
+                        VisitFunctionDecl(setter, setterName, None, property));
         if (!swiftSetter) return nullptr;
         Impl.importAttributes(setter, swiftSetter);
         Impl.ImportedDecls[{setter, useSwift2Name}] = swiftSetter;
+        if (swift3SetterName)
+          markAsSwift2Variant(swiftSetter, *swift3SetterName);
       }
 
       // Make this a computed property.
@@ -2795,7 +2933,8 @@ namespace {
 
     Decl *VisitFunctionDecl(const clang::FunctionDecl *decl) {
       // Import the name of the function.
-      auto importedName = importFullName(decl);
+      Optional<ImportedName> swift3Name;
+      auto importedName = importFullName(decl, swift3Name);
       if (!importedName)
         return nullptr;
 
@@ -2824,12 +2963,13 @@ namespace {
         return property->getSetter();
       }
 
-      return VisitFunctionDecl(decl, importedName, nullptr);
+      return VisitFunctionDecl(decl, importedName, swift3Name, nullptr);
     }
 
     Decl *VisitFunctionDecl(
             const clang::FunctionDecl *decl,
-            ClangImporter::Implementation::ImportedName importedName,
+            ImportedName importedName,
+            Optional<ImportedName> swift3Name,
             AbstractStorageDecl *owningStorage) {
       auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
       if (!dc)
@@ -2839,6 +2979,8 @@ namespace {
       bool hasCustomName = importedName.HasCustomName;
 
       if (importedName.ImportAsMember) {
+        assert(!swift3Name && "Swift 2 didn't support import-as-member!");
+
         // Handle initializers.
         if (name.getBaseName() == Impl.SwiftContext.Id_init)
           return importGlobalAsInitializer(decl, name, dc,
@@ -2880,6 +3022,11 @@ namespace {
 
       result->setAccessibility(Accessibility::Public);
       finishFuncDecl(decl, result);
+
+      // If this is a Swift 2 stub, mark it as such.
+      if (swift3Name)
+        markAsSwift2Variant(result, *swift3Name);
+
       return result;
     }
 
@@ -2910,7 +3057,8 @@ namespace {
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
       // Fields are imported as variables.
-      auto importedName = importFullName(decl);
+      Optional<ImportedName> swift3Name;
+      auto importedName = importFullName(decl, swift3Name);
       if (!importedName) return nullptr;
 
       auto name = importedName.Imported.getBaseName();
@@ -2938,6 +3086,10 @@ namespace {
             new (Impl.SwiftContext) IBOutletAttr(/*IsImplicit=*/false));
       // FIXME: Handle IBOutletCollection.
 
+      // If this is a Swift 2 stub, handle it as such.
+      if (swift3Name)
+        markAsSwift2Variant(result, *swift3Name);
+
       return result;
     }
 
@@ -2957,7 +3109,8 @@ namespace {
         return nullptr;
 
       // Variables are imported as... variables.
-      auto importedName = importFullName(decl);
+      Optional<ImportedName> swift3Name;
+      auto importedName = importFullName(decl, swift3Name);
       if (!importedName) return nullptr;
 
       auto name = importedName.Imported.getBaseName();
@@ -2999,6 +3152,10 @@ namespace {
 
       if (!decl->hasExternalStorage())
         Impl.registerExternalDecl(result);
+
+      // If this is a Swift 2 stub, mark it as such.
+      if (swift3Name)
+        markAsSwift2Variant(result, *swift3Name);
 
       return result;
     }
@@ -3114,7 +3271,8 @@ namespace {
                                      ObjCSelector selector,
                                      DeclContext *dc) {
       // Import the full name of the method.
-      auto importedName = importFullName(decl);
+      Optional<ImportedName> swift3Name;
+      auto importedName = importFullName(decl, swift3Name);
 
       // Check that we imported an initializer name.
       DeclName initName = importedName;
@@ -3154,8 +3312,12 @@ namespace {
 
       /// Record the initializer as an alternative declaration for the
       /// member.
-      if (result)
+      if (result) {
         Impl.AlternateDecls[member] = result;
+
+        if (swift3Name)
+          markAsSwift2Variant(result, *swift3Name);
+      }
 
       return result;
     }
@@ -3224,11 +3386,12 @@ namespace {
       // imported into this context.
       ObjCSelector selector = Impl.importSelector(decl->getSelector());
       bool isInstance = decl->isInstanceMethod() && !forceClassMethod;
-      if (methodAlreadyImported(selector, isInstance, dc))
+      if (!useSwift3Name && methodAlreadyImported(selector, isInstance, dc))
         return nullptr;
 
+      Optional<ImportedName> swift3Name;
       auto importedName
-        = importFullName(decl,
+        = importFullName(decl, swift3Name,
                          ImportNameFlags::SuppressFactoryMethodAsInit);
       if (!importedName)
         return nullptr;
@@ -3408,6 +3571,11 @@ namespace {
         }
 
       }
+
+      // If this is a Swift 2 stub, mark it as such.
+      if (swift3Name)
+        markAsSwift2Variant(result, *swift3Name);
+
       return result;
     }
 
@@ -3491,7 +3659,8 @@ namespace {
       
       // Check whether there is already a method with this selector.
       auto selector = Impl.importSelector(objcMethod->getSelector());
-      if (methodAlreadyImported(selector, /*isInstance=*/true, dc))
+      if (!useSwift2Name &&
+          methodAlreadyImported(selector, /*isInstance=*/true, dc))
         return nullptr;
 
       // Map the name and complete the import.
@@ -3501,7 +3670,8 @@ namespace {
       };
 
       bool variadic = objcMethod->isVariadic();
-      auto importedName = importFullName(objcMethod);
+      Optional<ImportedName> swift3Name;
+      auto importedName = importFullName(objcMethod, swift3Name);
       if (!importedName) return nullptr;
 
       // If we dropped the variadic, handle it now.
@@ -3513,9 +3683,15 @@ namespace {
       }
 
       bool redundant;
-      return importConstructor(objcMethod, dc, implicit, kind, required,
-                               selector, importedName, params,
-                               variadic, redundant);
+      auto result =  importConstructor(objcMethod, dc, implicit, kind, required,
+                                       selector, importedName, params,
+                                       variadic, redundant);
+
+      // If this is a Swift 2 stub, mark it as such.
+      if (result && swift3Name)
+        markAsSwift2Variant(result, *swift3Name);
+
+      return result;
     }
 
     /// Returns the latest "introduced" version on the current platform for
@@ -4842,7 +5018,8 @@ namespace {
             assert(ctor->getInitKind() ==
                      CtorInitializerKind::ConvenienceFactory);
 
-            ImportedName importedName = importFullName(objcMethod);
+            Optional<ImportedName> swift3Name;
+            ImportedName importedName = importFullName(objcMethod, swift3Name);
             importedName.HasCustomName = true;
             bool redundant;
             if (auto newCtor = importConstructor(objcMethod, classDecl,
@@ -4854,6 +5031,10 @@ namespace {
                                                  objcMethod->parameters(),
                                                  objcMethod->isVariadic(),
                                                  redundant)) {
+              // If this is a Swift 2 stub, mark it as such.
+              if (swift3Name)
+                markAsSwift2Variant(newCtor, *swift3Name);
+
               Impl.importAttributes(objcMethod, newCtor, curObjCClass);
               newMembers.push_back(newCtor);
             }
@@ -5063,8 +5244,14 @@ namespace {
     }
     
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
-      auto importedName = importFullName(decl);
+      Optional<ImportedName> swift3Name;
+      auto importedName = importFullName(decl, swift3Name);
       if (!importedName) return nullptr;
+
+      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // typealias.
+      if (swift3Name)
+        return importSwift2TypeAlias(decl, importedName, *swift3Name);
 
       Identifier name = importedName.Imported.getBaseName();
 
@@ -5165,8 +5352,14 @@ namespace {
     }
 
     Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
-      auto importedName = importFullName(decl);
+      Optional<ImportedName> swift3Name;
+      auto importedName = importFullName(decl, swift3Name);
       if (!importedName) return nullptr;
+
+      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // typealias.
+      if (swift3Name)
+        return importSwift2TypeAlias(decl, importedName, *swift3Name);
 
       auto name = importedName.Imported.getBaseName();
 
@@ -5405,7 +5598,8 @@ namespace {
                                 DeclContext *dc) {
       assert(dc);
 
-      auto name = importFullName(decl).Imported.getBaseName();
+      Optional<ImportedName> swift3Name;
+      auto name = importFullName(decl, swift3Name).Imported.getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -5501,6 +5695,10 @@ namespace {
 
       if (overridden)
         result->setOverriddenDecl(overridden);
+
+      // If this is a Swift 2 stub, mark it as such.
+      if (swift3Name)
+        markAsSwift2Variant(result, *swift3Name);
 
       return result;
     }
@@ -5638,7 +5836,7 @@ void ClangImporter::Implementation::importAttributes(
 
   // Scan through Clang attributes and map them onto Swift
   // equivalents.
-  bool AnyUnavailable = false;
+  bool AnyUnavailable = MappedDecl->getAttrs().isUnavailable(C);
   for (clang::NamedDecl::attr_iterator AI = ClangDecl->attr_begin(),
        AE = ClangDecl->attr_end(); AI != AE; ++AI) {
     //

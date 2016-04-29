@@ -911,6 +911,10 @@ public:
         return true;
       }
     }
+
+    /// Print this imported name as a string suitable for the swift_name
+    /// attribute.
+    void printSwiftName(llvm::raw_ostream &os) const;
   };
 
   /// Flags that control the import of names in importFullName.

@@ -1916,6 +1916,87 @@ namespace {
   typedef ClangImporter::Implementation::ImportedName ImportedName;
 }
 
+void ClangImporter::Implementation::ImportedName::printSwiftName(
+       llvm::raw_ostream &os) const {
+  // Property accessors.
+  bool isGetter = false;
+  bool isSetter = false;
+  switch (AccessorKind) {
+  case ImportedAccessorKind::None:
+    break;
+
+  case ImportedAccessorKind::PropertyGetter:
+  case ImportedAccessorKind::SubscriptGetter:
+    os << "getter:";
+    isGetter = true;
+    break;
+
+  case ImportedAccessorKind::PropertySetter:
+  case ImportedAccessorKind::SubscriptSetter:
+    os << "setter:";
+    isSetter = true;
+    break;
+  }
+
+  // If we're importing a global as a member, we need to provide the
+  // effective context.
+  if (ImportAsMember) {
+    switch (EffectiveContext.getKind()) {
+    case EffectiveClangContext::DeclContext:
+      os << SwiftLookupTable::translateDeclContext(
+              EffectiveContext.getAsDeclContext())->second;
+      break;
+
+    case EffectiveClangContext::TypedefContext:
+      os << EffectiveContext.getTypedefName()->getName();
+      break;
+
+    case EffectiveClangContext::UnresolvedContext:
+      os << EffectiveContext.getUnresolvedName();
+      break;
+    }
+
+    os << ".";
+  }
+
+  // Base name.
+  os << Imported.getBaseName().str();
+
+  // Determine the number of argument labels we'll be producing.
+  auto argumentNames = Imported.getArgumentNames();
+  unsigned numArguments = argumentNames.size();
+  if (SelfIndex) ++numArguments;
+  if (isSetter) ++numArguments;
+
+  // If the result is a simple name that is not a getter, we're done.
+  if (numArguments == 0 && Imported.isSimpleName() && !isGetter) return;
+
+  // We need to produce a function name.
+  os << "(";
+  unsigned currentArgName = 0;
+  for (unsigned i = 0; i != numArguments; ++i) {
+    // The "self" parameter.
+    if (SelfIndex && *SelfIndex == i) {
+      os << "self:";
+      continue;
+    }
+
+    if (currentArgName < argumentNames.size()) {
+      if (argumentNames[currentArgName].empty())
+        os << "_";
+      else
+        os << argumentNames[currentArgName].str();
+      os << ":";
+      ++currentArgName;
+      continue;
+    }
+
+    // We don't have a name for this argument.
+    os << "_:";
+  }
+  os << ")";
+}
+
 namespace llvm {
   // An Identifier is "pointer like".
   template<typename T> class PointerLikeTypeTraits;
