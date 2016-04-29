@@ -53,6 +53,8 @@ void fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
 ///
 /// If \p existingDiag is null, the fix-its will be attached to an appropriate
 /// error diagnostic.
+///
+/// \returns true if the issue was diagnosed
 bool diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
                                 ArrayRef<Identifier> newNames,
                                 bool isSubscript,

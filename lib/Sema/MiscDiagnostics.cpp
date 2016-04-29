@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
@@ -827,6 +828,11 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
 
   auto tuple = dyn_cast<TupleExpr>(expr);
   if (!tuple) {
+    llvm::SmallString<16> str;
+    // If the diagnostic is local, flush it before returning.
+    // This makes sure it's emitted before 'str' is destroyed.
+    defer { diagOpt.reset(); };
+
     if (newNames[0].empty()) {
       // This is probably a conversion from a value of labeled tuple type to
       // a scalar.
@@ -837,7 +843,6 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
         if (scalarFieldIdx >= 0) {
           auto &field = tupleTy->getElement(scalarFieldIdx);
           if (field.hasName()) {
-            llvm::SmallString<16> str;
             str = ".";
             str += field.getName().str();
             if (!existingDiag) {
@@ -864,7 +869,6 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
     if (auto parenExpr = dyn_cast<ParenExpr>(expr))
       expr = parenExpr->getSubExpr();
 
-    llvm::SmallString<16> str;
     str += newNames[0].str();
     str += ": ";
     if (!existingDiag) {
@@ -987,6 +991,9 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
     diag.fixItReplace(tuple->getElementNameLocs()[i], newStr);
   }
 
+  // If the diagnostic is local, flush it before returning.
+  // This makes sure it's emitted before the message text buffers are destroyed.
+  diagOpt.reset();
   return true;
 }
 
