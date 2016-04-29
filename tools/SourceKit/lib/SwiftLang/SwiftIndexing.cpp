@@ -121,7 +121,7 @@ private:
       initEntity(info, symbol);
       auto call = static_cast<const CallRefIndexSymbol &>(symbol);
       info.ReceiverUSR = call.ReceiverUSR;
-      info.IsDynamic = call.IsDynamic;
+      info.IsDynamic = call.roles & (unsigned)SymbolRole::Dynamic;
       return func(info);
     }
     }

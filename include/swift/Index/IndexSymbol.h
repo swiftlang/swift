@@ -106,8 +106,6 @@ struct FuncDeclIndexSymbol : public IndexSymbol {
 
 struct CallRefIndexSymbol : public IndexSymbol {
   StringRef ReceiverUSR;
-  bool IsDynamic = false;
-
   CallRefIndexSymbol() : IndexSymbol(CallReference) {}
 };
 

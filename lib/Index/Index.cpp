@@ -867,6 +867,8 @@ bool IndexSwiftASTWalker::initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
   if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
     return true;
 
+  Info.roles |= (unsigned)SymbolRole::Call;
+
   Expr *BaseE = nullptr;
   if (auto DotE = dyn_cast<DotSyntaxCallExpr>(ParentE))
     BaseE = DotE->getBase();
@@ -888,7 +890,8 @@ bool IndexSwiftASTWalker::initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
       StringRef unused;
       if (getNameAndUSR(TyD, unused, Info.ReceiverUSR))
         return true;
-      Info.IsDynamic = isDynamicCall(BaseE, D);
+      if (isDynamicCall(BaseE, D))
+        Info.roles |= (unsigned)SymbolRole::Dynamic;
     }
   }
 
