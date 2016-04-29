@@ -92,41 +92,19 @@ private:
 
   template <typename F>
   bool withEntityInfo(const IndexSymbol &symbol, F func) {
-    auto initEntity = [](EntityInfo &info, const IndexSymbol &symbol) {
-      bool isRef = symbol.roles & (unsigned)SymbolRole::Reference;
-      info.Kind = SwiftLangSupport::getUIDForSymbol(symbol.kind, symbol.subKinds,
-                                                    isRef);
-      info.Name = symbol.name;
-      info.USR = symbol.USR;
-      info.Group = symbol.group;
-      info.Line = symbol.line;
-      info.Column = symbol.column;
-    };
-
-    if (symbol.roles & (unsigned)SymbolRole::Call) {
-      assert(symbol.entityType == IndexSymbol::Base);
-      CallRefEntityInfo info;
-      initEntity(info, symbol);
-      info.ReceiverUSR = symbol.receiverUSR;
-      info.IsDynamic = symbol.roles & (unsigned)SymbolRole::Dynamic;
-      return func(info);
-    }
-
-    switch (symbol.entityType) {
-    case IndexSymbol::Base: {
-      EntityInfo info;
-      initEntity(info, symbol);
-      return func(info);
-    }
-    case IndexSymbol::FuncDecl: {
-      FuncDeclEntityInfo info;
-      initEntity(info, symbol);
-      info.IsTestCandidate =
-          static_cast<const FuncDeclIndexSymbol &>(symbol).IsTestCandidate;
-      return func(info);
-    }
-    }
-    llvm_unreachable("unexpected symbol kind");
+    EntityInfo info;
+    bool isRef = symbol.roles & (unsigned)SymbolRole::Reference;
+    info.Kind = SwiftLangSupport::getUIDForSymbol(symbol.kind, symbol.subKinds,
+                                                  isRef);
+    info.Name = symbol.name;
+    info.USR = symbol.USR;
+    info.Group = symbol.group;
+    info.Line = symbol.line;
+    info.Column = symbol.column;
+    info.ReceiverUSR = symbol.receiverUSR;
+    info.IsDynamic = symbol.roles & (unsigned)SymbolRole::Dynamic;
+    info.IsTestCandidate = symbol.subKinds & SymbolSubKind::UnitTest;
+    return func(info);
   }
 
 private:

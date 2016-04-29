@@ -72,6 +72,8 @@ enum class SymbolSubKind : uint32_t {
   ExtensionOfClass              = 1 << 7,
   ExtensionOfEnum               = 1 << 8,
   ExtensionOfProtocol           = 1 << 9,
+
+  UnitTest                      = 1 << 10,
 };
 
 typedef uint32_t SymbolSubKindSet;
@@ -90,9 +92,6 @@ using SymbolRole = clang::index::SymbolRole;
 using SymbolRoleSet = clang::index::SymbolRoleSet;
 
 struct IndexSymbol {
-  enum TypeKind { Base, FuncDecl };
-  TypeKind entityType = Base;
-
   SymbolKind kind;
   SymbolSubKindSet subKinds = SymbolSubKindSet(0);
   SymbolRoleSet roles = SymbolRoleSet(0);
@@ -106,17 +105,7 @@ struct IndexSymbol {
   unsigned column = 0;
 
   IndexSymbol() = default;
-
-protected:
-  IndexSymbol(TypeKind TK) : entityType(TK) {}
 };
-
-struct FuncDeclIndexSymbol : public IndexSymbol {
-  bool IsTestCandidate = false;
-
-  FuncDeclIndexSymbol() : IndexSymbol(FuncDecl) {}
-};
-
 
 SymbolKind getSymbolKindForDecl(const Decl *D);
 

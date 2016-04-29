@@ -278,7 +278,7 @@ private:
 
   bool initIndexSymbol(ValueDecl *D, SourceLoc Loc, bool IsRef,
                        IndexSymbol &Info);
-  bool initFuncDeclIndexSymbol(ValueDecl *D, FuncDeclIndexSymbol &Info);
+  bool initFuncDeclIndexSymbol(ValueDecl *D, IndexSymbol &Info);
   bool initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE, ValueDecl *D,
                               SourceLoc Loc, IndexSymbol &Info);
 
@@ -458,7 +458,7 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
     return false;
 
   if (isa<FuncDecl>(D)) {
-    FuncDeclIndexSymbol Info;
+    IndexSymbol Info;
     if (initFuncDeclIndexSymbol(D, Info))
       return false;
 
@@ -818,11 +818,13 @@ static bool isTestCandidate(ValueDecl *D) {
 }
 
 bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(ValueDecl *D,
-                                                  FuncDeclIndexSymbol &Info) {
+                                                  IndexSymbol &Info) {
   if (initIndexSymbol(D, D->getLoc(), /*IsRef=*/false, Info))
     return true;
 
-  Info.IsTestCandidate = isTestCandidate(D);
+  if (isTestCandidate(D))
+    Info.subKinds |= SymbolSubKind::UnitTest;
+
   if (auto Group = D->getGroupName())
     Info.group = Group.getValue();
   return false;
