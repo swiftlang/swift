@@ -7,6 +7,7 @@
 // RUN: %S/../../../utils/line-directive %t/main.swift -- %target-run %t/LazyFilterCollection.swift.a.out
 // REQUIRES: executable_test
 
+import SwiftPrivate
 import StdlibUnittest
 import StdlibCollectionUnittest
 
@@ -20,13 +21,11 @@ variations = [('', 'Sequence'), ('', 'Collection'), ('Bidirectional', 'Collectio
 % for (traversal, kind) in variations:
 CollectionTests.add${traversal}${kind}Tests(
   make${kind}: { (elements: [OpaqueValue<Int>]) -> LazyFilter${traversal}${kind}<Minimal${traversal}${kind}<OpaqueValue<Int>>> in
-    // FIXME: create a better sequence and filter
     Minimal${traversal}${kind}(elements: elements).lazy.filter { _ in return true }
   },
   wrapValue: identity,
   extractValue: identity,
   make${kind}OfEquatable: { (elements: [MinimalEquatableValue]) -> LazyFilter${traversal}${kind}<Minimal${traversal}${kind}<MinimalEquatableValue>> in
-    // FIXME: create a better sequence and filter
     Minimal${traversal}${kind}(elements: elements).lazy.filter { _ in return true }
   },
   wrapValueIntoEquatable: identityEq,
@@ -123,26 +122,31 @@ CollectionTests.test("LazyFilterCollection instances (${traversal}${kind})") {
   do {
     var resiliency = CollectionMisuseResiliencyChecks.all
     resiliency.callNextOnExhaustedGenerator = false
+    let predicate: Int -> Bool = { $0 % 3 == 0 || $0 % 5 == 0 }
 
-    let expected = [2, 4, 6, 8, 10, 12, 14, 16]
-    let base = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    let base = randArray(500)
+    var expected : [Int] = []
+    for element in base where predicate(element) {
+      expected.append(element)
+    }
+
 % if kind == 'Sequence':
     checkSequence(
       expected,
-      MinimalSequence(elements: base).lazy.filter { $0 % 2 == 0 },
+      MinimalSequence(elements: base).lazy.filter(predicate),
       resiliencyChecks: resiliency
     )
 % elif traversal == '' and kind == 'Collection':
     checkForwardCollection(
       expected,
-      MinimalCollection(elements: base).lazy.filter { $0 % 2 == 0 },
+      MinimalCollection(elements: base).lazy.filter(predicate),
       resiliencyChecks: resiliency,
       sameValue: { $0 == $1 }
     )
 % else:
     check${traversal}${kind}(
       expected,
-      Minimal${traversal}${kind}(elements: base).lazy.filter { $0 % 2 == 0 },
+      Minimal${traversal}${kind}(elements: base).lazy.filter(predicate),
       resiliencyChecks: resiliency,
       sameValue: { $0 == $1 }
     )
