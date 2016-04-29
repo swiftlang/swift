@@ -126,8 +126,6 @@ public struct UnsafeMutableAudioBufferListPointer {
   public var unsafeMutablePointer: UnsafeMutablePointer<AudioBufferList>
 }
 
-// FIXME: swift-3-indexing-model: conform to RandomAccessCollection
-// and update the test to reflect the change.
 extension UnsafeMutableAudioBufferListPointer
   : MutableCollection, RandomAccessCollection {
 
