@@ -1825,6 +1825,9 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DFILECHECK_EXECUTABLE:PATH="$(build_directory_bin ${deployment_target} llvm)/FileCheck"
                     -DCMAKE_BUILD_TYPE:STRING="${LLBUILD_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
+                    # We disable all bindings, since llbuild builds before Swift
+                    # and can't use the unbuilt `swiftc`.
+                    -DLLBUILD_SUPPORT_BINDINGS:=
                 )
                 ;;
             swiftpm)
