@@ -165,6 +165,5 @@ entry(%x : $ClassConstrainedGenericField<ClassConstraintConformance>):
 }
 // CHECK-LABEL: define{{( protected)?}} %C5class26ClassConstraintConformance* @fixed_class_generic_field(%C5class28ClassConstrainedGenericField*)
 // CHECK:         [[FIELD_ADDR_GENERIC:%.*]] = getelementptr inbounds %C5class28ClassConstrainedGenericField, %C5class28ClassConstrainedGenericField* %0, i32 0, i32 1
-// CHECK:         [[FIELD_ADDR_CONCRETE:%.*]] = bitcast %objc_object** [[FIELD_ADDR_GENERIC]] to %C5class26ClassConstraintConformance**
-// CHECK:         load %C5class26ClassConstraintConformance*, %C5class26ClassConstraintConformance** [[FIELD_ADDR_CONCRETE]]
+// CHECK:         load %C5class26ClassConstraintConformance*, %C5class26ClassConstraintConformance** [[FIELD_ADDR_GENERIC]]
 
