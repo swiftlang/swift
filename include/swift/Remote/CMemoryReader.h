@@ -72,7 +72,7 @@ public:
 
   bool readBytes(RemoteAddress address, uint8_t *dest, uint64_t size) override {
     return Impl.readBytes(Impl.reader_context,
-                          address.getAddressData(), dest, size);
+                          address.getAddressData(), dest, size) != 0;
   }
 };
 

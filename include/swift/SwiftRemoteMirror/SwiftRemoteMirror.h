@@ -20,6 +20,7 @@
 #ifndef SWIFT_REFLECTION_SWIFT_REFLECTION_H
 #define SWIFT_REFLECTION_SWIFT_REFLECTION_H
 
+#include "MemoryReaderInterface.h"
 #include "SwiftRemoteMirrorTypes.h"
 
 /// Major version changes when there are ABI or source incompatible changes.
@@ -117,11 +118,11 @@ swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
 ///
 /// Returns true if InstanceTypeRef and StartOfInstanceData contain valid
 /// valid values.
-bool swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
-                                         addr_t InstanceAddress,
-                                         swift_typeref_t ExistentialTypeRef,
-                                         swift_typeref_t *OutInstanceTypeRef,
-                                         addr_t *OutStartOfInstanceData);
+int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
+                                        addr_t InstanceAddress,
+                                        swift_typeref_t ExistentialTypeRef,
+                                        swift_typeref_t *OutInstanceTypeRef,
+                                        addr_t *OutStartOfInstanceData);
 
 /// Dump a brief description of the typeref as a tree to stderr.
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef);
