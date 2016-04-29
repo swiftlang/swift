@@ -112,5 +112,5 @@ void MetadataSource::dump() const {
 
 void MetadataSource::dump(std::ostream &OS, unsigned Indent) const {
   PrintMetadataSource(OS, Indent).visit(this);
-  OS << std::endl;
+  OS << '\n';
 }

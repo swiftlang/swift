@@ -233,7 +233,7 @@ int swift_reflection_project_existential(SwiftReflectionContextRef ContextRef,
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   if (TR == nullptr) {
-    std::cerr << "<null type reference>" << std::endl;
+    std::cerr << "<null type reference>\n";
   } else {
     TR->dump();
   }
@@ -244,7 +244,7 @@ void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   auto TI = Context->getInstanceTypeInfo(Metadata);
   if (TI == nullptr) {
-    std::cerr << "<null type info>" << std::endl;
+    std::cerr << "<null type info>\n";
   } else {
     TI->dump();
   }
@@ -256,7 +256,7 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   auto TI = Context->getTypeInfo(TR);
   if (TI == nullptr) {
-    std::cerr << "<null type info>" << std::endl;
+    std::cerr << "<null type info>\n";
   } else {
     TI->dump();
   }
