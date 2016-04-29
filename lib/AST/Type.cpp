@@ -1804,8 +1804,9 @@ static bool isBindableTo(Type a, Type b, LazyResolver *resolver) {
                  == substSubs[subi].getConformances().size());
           for (unsigned conformancei :
                  indices(origSubs[subi].getConformances())) {
-            if (origSubs[subi].getConformances()[conformancei]
-                  != substSubs[subi].getConformances()[conformancei])
+            if (origSubs[subi].getConformances()[conformancei].isConcrete() &&
+                origSubs[subi].getConformances()[conformancei] !=
+                    substSubs[subi].getConformances()[conformancei])
               return false;
           }
         }

@@ -389,17 +389,30 @@ getSubstitutionsForCallee(SILModule &M, CanSILFunctionType GenCalleeType,
   CanSILFunctionType AIGenCalleeType =
       AI.getCallee()->getType().castTo<SILFunctionType>();
 
-  CanType AISelfClass = AIGenCalleeType->getSelfParameter().getType();
-
   unsigned NextMethodParamIdx = 0;
   unsigned NumMethodParams = 0;
   if (AIGenCalleeType->isPolymorphic()) {
-    NextMethodParamIdx = 0;
-    // Generic parameters of the method start after generic parameters
-    // of the instance class.
-    if (auto AISelfClassSig =
-            AISelfClass.getClassBound()->getGenericSignature()) {
-      NextMethodParamIdx = AISelfClassSig->getGenericParams().size();
+    NextMethodParamIdx = AISubs.size();
+    if (auto AIMethodSig = AI.getOrigCalleeType()->getGenericSignature()) {
+      // Find out if the apply instruction contains any substitutions for
+      // a method itself, not for the class where it is declared.
+      // If there are any such parameters, remember where they start
+      // in the substitutions list.
+      auto InnermostGenericParams = AIMethodSig->getInnermostGenericParams();
+      auto InnermostGenericParamsNum = InnermostGenericParams.size();
+      if (InnermostGenericParamsNum != AIMethodSig->getGenericParams().size()) {
+        auto Depth = InnermostGenericParams[0]->getDepth();
+        for (NextMethodParamIdx = 0; NextMethodParamIdx < AISubs.size();
+             ++NextMethodParamIdx) {
+          if (auto SubstTy = dyn_cast<SubstitutedType>(
+                  AISubs[NextMethodParamIdx].getReplacement().getPointer())) {
+            if (auto *GenParamTy = dyn_cast<GenericTypeParamType>(
+                    SubstTy->getOriginal().getPointer()))
+              if (GenParamTy->getDepth() == Depth)
+                break;
+          }
+        }
+      }
     }
     NumMethodParams = AISubs.size() - NextMethodParamIdx;
   }
@@ -477,37 +490,42 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
       return false;
   }
 
+  // Type of the actual function to be called.
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
 
-  auto Subs = getSubstitutionsForCallee(Mod, GenCalleeType,
-                                        ClassOrMetatypeType, AI);
+  // Type of the actual function to be called with substitutions applied.
+  CanSILFunctionType SubstCalleeType = GenCalleeType;
 
   // For polymorphic functions, bail if the number of substitutions is
   // not the same as the number of expected generic parameters.
   if (GenCalleeType->isPolymorphic()) {
+    // First, find proper list of substitutions for the concrete
+    // method to be called.
+    auto Subs = getSubstitutionsForCallee(Mod, GenCalleeType,
+                                          ClassOrMetatypeType, AI);
+
     auto GenericSig = GenCalleeType->getGenericSignature();
     // Get the number of expected generic parameters, which
     // is a sum of the number of explicit generic parameters
     // and the number of their recursive member types exposed
     // through protocol requirements.
     auto DepTypes = GenericSig->getAllDependentTypes();
-    unsigned ExpectedGenParamsNum = 0;
+    unsigned ExpectedSubsNum = 0;
 
     for (auto DT: DepTypes) {
       (void)DT;
-      ExpectedGenParamsNum++;
+      ExpectedSubsNum++;
     }
 
-    if (ExpectedGenParamsNum != Subs.size())
+    if (ExpectedSubsNum != Subs.size()) {
       return false;
+    }
+
+    SubstCalleeType =
+        GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
   }
 
   // Check if the optimizer knows how to cast the return type.
-  CanSILFunctionType SubstCalleeType = GenCalleeType;
-  if (GenCalleeType->isPolymorphic())
-    SubstCalleeType =
-        GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
-
   SILType ReturnType = SubstCalleeType->getSILResult();
 
   if (!canCastValueToABICompatibleType(Mod, ReturnType, AI.getType()))

@@ -509,10 +509,11 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     return true;
   }
   auto NewInstPair = tryDevirtualizeClassMethod(AI, SubTypeValue);
-  assert(NewInstPair.first && "Expected to be able to devirtualize apply!");
-  replaceDeadApply(AI, NewInstPair.first);
-
-  return true;
+  if (NewInstPair.first) {
+    replaceDeadApply(AI, NewInstPair.first);
+    return true;
+  }
+  return Changed;
 }
 
 namespace {
