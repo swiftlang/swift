@@ -103,6 +103,15 @@ private:
       info.Column = symbol.column;
     };
 
+    if (symbol.roles & (unsigned)SymbolRole::Call) {
+      assert(symbol.entityType == IndexSymbol::Base);
+      CallRefEntityInfo info;
+      initEntity(info, symbol);
+      info.ReceiverUSR = symbol.receiverUSR;
+      info.IsDynamic = symbol.roles & (unsigned)SymbolRole::Dynamic;
+      return func(info);
+    }
+
     switch (symbol.entityType) {
     case IndexSymbol::Base: {
       EntityInfo info;
@@ -114,14 +123,6 @@ private:
       initEntity(info, symbol);
       info.IsTestCandidate =
           static_cast<const FuncDeclIndexSymbol &>(symbol).IsTestCandidate;
-      return func(info);
-    }
-    case IndexSymbol::CallReference: {
-      CallRefEntityInfo info;
-      initEntity(info, symbol);
-      auto call = static_cast<const CallRefIndexSymbol &>(symbol);
-      info.ReceiverUSR = call.ReceiverUSR;
-      info.IsDynamic = call.roles & (unsigned)SymbolRole::Dynamic;
       return func(info);
     }
     }

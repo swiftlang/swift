@@ -280,7 +280,7 @@ private:
                        IndexSymbol &Info);
   bool initFuncDeclIndexSymbol(ValueDecl *D, FuncDeclIndexSymbol &Info);
   bool initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE, ValueDecl *D,
-                              SourceLoc Loc, CallRefIndexSymbol &Info);
+                              SourceLoc Loc, IndexSymbol &Info);
 
   std::pair<unsigned, unsigned> getLineCol(SourceLoc Loc) {
     if (Loc.isInvalid())
@@ -481,7 +481,7 @@ bool IndexSwiftASTWalker::startEntityRef(ValueDecl *D, SourceLoc Loc) {
     return false;
 
   if (isa<AbstractFunctionDecl>(D)) {
-    CallRefIndexSymbol Info;
+    IndexSymbol Info;
     if (initCallRefIndexSymbol(ExprStack.back(), getParentExpr(), D, Loc, Info))
       return false;
 
@@ -590,7 +590,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
   };
 
   if (IsRef) {
-    CallRefIndexSymbol Info;
+    IndexSymbol Info;
     if (initCallRefIndexSymbol(ExprStack.back(), getParentExpr(), D, Loc, Info))
       return true; // continue walking.
 
@@ -860,7 +860,7 @@ static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
 
 bool IndexSwiftASTWalker::initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
                                                  ValueDecl *D, SourceLoc Loc,
-                                                 CallRefIndexSymbol &Info) {
+                                                 IndexSymbol &Info) {
   if (!ParentE)
     return true;
 
@@ -888,7 +888,7 @@ bool IndexSwiftASTWalker::initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
 
     if (auto TyD = ReceiverTy->getAnyNominal()) {
       StringRef unused;
-      if (getNameAndUSR(TyD, unused, Info.ReceiverUSR))
+      if (getNameAndUSR(TyD, unused, Info.receiverUSR))
         return true;
       if (isDynamicCall(BaseE, D))
         Info.roles |= (unsigned)SymbolRole::Dynamic;

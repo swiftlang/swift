@@ -78,7 +78,7 @@ using SymbolRole = clang::index::SymbolRole;
 using SymbolRoleSet = clang::index::SymbolRoleSet;
 
 struct IndexSymbol {
-  enum TypeKind { Base, FuncDecl, CallReference };
+  enum TypeKind { Base, FuncDecl };
   TypeKind entityType = Base;
 
   SymbolKind kind;
@@ -89,6 +89,7 @@ struct IndexSymbol {
   StringRef name;
   StringRef USR; // USR may be safely compared by pointer.
   StringRef group;
+  StringRef receiverUSR;
   unsigned line = 0;
   unsigned column = 0;
 
@@ -104,10 +105,6 @@ struct FuncDeclIndexSymbol : public IndexSymbol {
   FuncDeclIndexSymbol() : IndexSymbol(FuncDecl) {}
 };
 
-struct CallRefIndexSymbol : public IndexSymbol {
-  StringRef ReceiverUSR;
-  CallRefIndexSymbol() : IndexSymbol(CallReference) {}
-};
 
 SymbolKind getSymbolKindForDecl(const Decl *D);
 
