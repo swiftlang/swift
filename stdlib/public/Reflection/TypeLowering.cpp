@@ -43,13 +43,13 @@ class PrintTypeInfo {
     return OS;
   }
 
-  std::ostream &printHeader(std::string Name) {
-    indent(Indent) << '(' << Name;
+  std::ostream &printHeader(const std::string &name) {
+    indent(Indent) << '(' << name;
     return OS;
   }
 
   template<typename T>
-  std::ostream &printField(std::string name, const T &value) {
+  std::ostream &printField(const std::string &name, const T &value) {
     if (!name.empty())
       OS << " " << name << "=" << value;
     else
