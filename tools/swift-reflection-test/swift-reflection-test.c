@@ -310,8 +310,6 @@ PipeMemoryReader_receiveReflectionInfo(const PipeMemoryReader *Reader,
   for (size_t i = 0; i < *NumReflectionInfos; ++i) {
     RemoteReflectionInfo RemoteInfo = RemoteInfos[i];
 
-    printf("Fetching reflection info for %s\n", RemoteInfo.ImageName);
-
     uintptr_t buffer = (uintptr_t)malloc(RemoteInfo.TotalSize);
 
     int Success = PipeMemoryReader_readBytes((void*)Reader,
