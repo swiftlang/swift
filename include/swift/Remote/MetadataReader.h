@@ -676,6 +676,23 @@ public:
     }
   }
 
+  /// Read the isa pointer of a class or closure context instance and apply
+  /// the isa mask.
+  std::pair<bool, StoredPointer> readMetadataFromInstance(
+      StoredPointer ObjectAddress) {
+    auto isaMask = readIsaMask();
+    if (!isaMask.first)
+      return {false, 0};
+
+    StoredPointer MetadataAddress;
+    if (!Reader->readBytes(RemoteAddress(ObjectAddress),
+                           (uint8_t*)&MetadataAddress,
+                           sizeof(StoredPointer)))
+      return {false, 0};
+
+    return {true, MetadataAddress & isaMask.second};
+  }
+
   /// Given the address of a nominal type descriptor, attempt to resolve
   /// its nominal type declaration.
   BuiltNominalTypeDecl readNominalTypeFromDescriptor(StoredPointer address) {

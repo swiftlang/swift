@@ -870,9 +870,9 @@ const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
   return TI;
 }
 
-const TypeInfo *TypeConverter::getInstanceTypeInfo(const TypeRef *TR,
-                                                   unsigned start,
-                                                   unsigned align) {
+const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
+                                                        unsigned start,
+                                                        unsigned align) {
   const FieldDescriptor *FD = getBuilder().getFieldTypeInfo(TR);
   if (FD == nullptr)
     return nullptr;

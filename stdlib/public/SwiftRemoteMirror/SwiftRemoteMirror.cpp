@@ -80,9 +80,20 @@ swift_reflection_readIsaMask(SwiftReflectionContextRef ContextRef,
 
 swift_typeref_t
 swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
-                                    uintptr_t metadata) {
+                                    uintptr_t Metadata) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  auto TR = Context->readTypeFromMetadata(metadata);
+  auto TR = Context->readTypeFromMetadata(Metadata);
+  return reinterpret_cast<swift_typeref_t>(TR);
+}
+
+swift_typeref_t
+swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
+                                    uintptr_t Object) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto MetadataAddress = Context->readMetadataFromInstance(Object);
+  if (!MetadataAddress.first)
+    return 0;
+  auto TR = Context->readTypeFromMetadata(MetadataAddress.second);
   return reinterpret_cast<swift_typeref_t>(TR);
 }
 
@@ -208,7 +219,7 @@ swift_typeinfo_t
 swift_reflection_infoForMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  auto *TI = Context->getInstanceTypeInfo(Metadata);
+  auto *TI = Context->getMetadataTypeInfo(Metadata);
   return convertTypeInfo(TI);
 }
 
@@ -217,7 +228,24 @@ swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata,
                                  unsigned Index) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  auto *TI = Context->getInstanceTypeInfo(Metadata);
+  auto *TI = Context->getMetadataTypeInfo(Metadata);
+  return convertChild(TI, Index);
+}
+
+swift_typeinfo_t
+swift_reflection_infoForInstance(SwiftReflectionContextRef ContextRef,
+                                 uintptr_t Object) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto *TI = Context->getInstanceTypeInfo(Object);
+  return convertTypeInfo(TI);
+}
+
+swift_childinfo_t
+swift_reflection_childOfInstance(SwiftReflectionContextRef ContextRef,
+                                 uintptr_t Object,
+                                 unsigned Index) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto *TI = Context->getInstanceTypeInfo(Object);
   return convertChild(TI, Index);
 }
 
@@ -239,10 +267,11 @@ void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
   }
 }
 
-void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
-                                          uintptr_t Metadata) {
+void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
+                                         swift_typeref_t OpaqueTypeRef) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  auto TI = Context->getInstanceTypeInfo(Metadata);
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+  auto TI = Context->getTypeInfo(TR);
   if (TI == nullptr) {
     std::cerr << "<null type info>\n";
   } else {
@@ -250,11 +279,21 @@ void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
   }
 }
 
-void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
-                                         swift_typeref_t OpaqueTypeRef) {
+void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
+                                          uintptr_t Metadata) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
-  auto TI = Context->getTypeInfo(TR);
+  auto TI = Context->getMetadataTypeInfo(Metadata);
+  if (TI == nullptr) {
+    std::cerr << "<null type info>\n";
+  } else {
+    TI->dump();
+  }
+}
+
+void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
+                                          uintptr_t Object) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto TI = Context->getInstanceTypeInfo(Object);
   if (TI == nullptr) {
     std::cerr << "<null type info>\n";
   } else {
