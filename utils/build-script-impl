@@ -89,6 +89,7 @@ KNOWN_SETTINGS=(
     enable-ubsan                ""               "enable Undefined Behavior Sanitizer"
     cmake                       ""               "path to the cmake binary"
     distcc                      ""               "use distcc in pump mode"
+    distcc-pump                 ""               "the path to distcc pump executable. This argument is required if distcc is set."
     build-runtime-with-host-compiler   "1"       "use the host c++ compiler to build everything"
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of 'cmake --help' for choices"
     verbose-build               ""               "print the commands executed during the build"
@@ -218,8 +219,8 @@ KNOWN_SETTINGS=(
     android-icu-uc-include             ""        "Path to a directory containing headers for libicuuc"
     android-icu-i18n                   ""        "Path to a directory containing libicui18n.so"
     android-icu-i18n-include           ""        "Path to a directory containing headers libicui18n"
-    export-compile-commands            ""        "set to generate JSON compilation databases for each build product"
     check-args-only                    ""        "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
+    common-cmake-options               ""        "CMake options used for all targets, including LLVM/Clang"
     # TODO: Remove this some time later.
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
 )
@@ -245,13 +246,6 @@ function true_false() {
 
 function to_varname() {
     toupper "${1//-/_}"
-}
-
-function join_array_with_delimiter() {
-    # $1 is the delimiter
-    local IFS="$1"
-    shift
-    echo "$*"
 }
 
 function set_lldb_build_mode() {
@@ -780,6 +774,12 @@ if [[ "${SKIP_BUILD_WATCHOS_SIMULATOR}" ]] ; then
     SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
 
+# FIXME: We currently do not support building compiler-rt with the
+# Xcode generator.
+if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
+    SKIP_COMPILER_RT=1
+fi
+
 # FIXME: We currently do not support cross-compiling swift with compiler-rt.
 if [[ "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS}" ]]; then
     SKIP_COMPILER_RT=1
@@ -1132,110 +1132,15 @@ if ! [[ "${SKIP_TEST_BENCHMARKS}" ]] &&
 fi
 echo
 
-# CMake options used for all targets, including LLVM/Clang
-COMMON_CMAKE_OPTIONS=(
-    -G "${CMAKE_GENERATOR}"
-)
-
 COMMON_C_FLAGS=""
-SANITIZERS=()
-if [[ "${ENABLE_ASAN}" ]] ; then
-    SANITIZERS=(
-        "${SANITIZERS[@]}"
-        "Address"
-    )
-fi
-
-if [[ "${ENABLE_UBSAN}" ]] ; then
-    SANITIZERS=(
-        "${SANITIZERS[@]}"
-        "Undefined"
-    )
-fi
-
-if [[ -n "${SANITIZERS[@]}" ]] ; then
-    COMMON_CMAKE_OPTIONS=(
-        "${COMMON_CMAKE_OPTIONS[@]}"
-        -DLLVM_USE_SANITIZER=$(join_array_with_delimiter ";" "${SANITIZERS[@]}")
-    )
-fi
-
-if [[ "${EXPORT_COMPILE_COMMANDS}" ]] ; then
-    COMMON_CMAKE_OPTIONS=(
-        "${COMMON_CMAKE_OPTIONS[@]}"
-        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-    )
-fi
 
 # Convert to an array.
+eval COMMON_CMAKE_OPTIONS=(${COMMON_CMAKE_OPTIONS})
 eval EXTRA_CMAKE_OPTIONS=(${EXTRA_CMAKE_OPTIONS})
+eval BUILD_ARGS=(${BUILD_ARGS})
 
-if [[ "${DISTCC}" ]] ; then
-    # On some platforms, 'pump' may be unrelated to distcc, in which case it's
-    # called 'distcc-pump'.
-    DISTCC_PUMP="$(which distcc-pump || which pump)"
-    COMMON_CMAKE_OPTIONS=(
-        "${COMMON_CMAKE_OPTIONS[@]}"
-        -DCMAKE_C_COMPILER:PATH="$(which distcc)"
-        -DCMAKE_C_COMPILER_ARG1="${HOST_CC}"
-        -DCMAKE_CXX_COMPILER:PATH="$(which distcc)"
-        -DCMAKE_CXX_COMPILER_ARG1="${HOST_CXX}"
-    )
-else
-    COMMON_CMAKE_OPTIONS=(
-        "${COMMON_CMAKE_OPTIONS[@]}"
-        -DCMAKE_C_COMPILER:PATH="${HOST_CC}"
-        -DCMAKE_CXX_COMPILER:PATH="${HOST_CXX}"
-    )
-fi
-
-
-CMAKE_JOBS="${BUILD_JOBS}"
-if [[ "${DISTCC}" ]] ; then
-    CMAKE_JOBS="$(distcc -j)"
-fi
-
-case "${CMAKE_GENERATOR}" in
-    Ninja)
-        BUILD_ARGS="${BUILD_ARGS} -j${CMAKE_JOBS}"
-        if [[ "${VERBOSE_BUILD}" ]] ; then
-            BUILD_ARGS="${BUILD_ARGS} -v"
-        fi
-        ;;
-    'Unix Makefiles')
-        BUILD_ARGS="${BUILD_ARGS} -j${CMAKE_JOBS}"
-        if [[ "${VERBOSE_BUILD}" ]] ; then
-            BUILD_ARGS="${BUILD_ARGS} VERBOSE=1"
-        fi
-        ;;
-    Xcode)
-        # -parallelizeTargets is an unsupported flag from the Xcode 3 days,
-        # but since we're not using proper Xcode 4 schemes, this is the
-        # only way to get target-level parallelism.
-        BUILD_ARGS="${BUILD_ARGS} -parallelizeTargets"
-        BUILD_ARGS="${BUILD_ARGS} -jobs ${CMAKE_JOBS}"
-        BUILD_TARGET_FLAG="-target"
-        COMMON_CMAKE_OPTIONS=(
-            "${COMMON_CMAKE_OPTIONS[@]}"
-            -DCMAKE_CONFIGURATION_TYPES="Debug;Release;MinSizeRel;RelWithDebInfo"
-        )
-
-        # FIXME: We currently do not support building compiler-rt with the
-        # Xcode generator.
-        SKIP_COMPILER_RT=1
-        ;;
-esac
-
-if [[ "${CLANG_COMPILER_VERSION}" ]] ; then
-    major_version=$(echo "${CLANG_COMPILER_VERSION}" | sed -e 's/\([0-9]*\).*/\1/')
-    minor_version=$(echo "${CLANG_COMPILER_VERSION}" | sed -e 's/[^.]*\.\([0-9]*\).*/\1/')
-    patch_version=$(echo "${CLANG_COMPILER_VERSION}" | sed -e 's/[^.]*\.[^.]*\.\([0-9]*\)/\1/')
-    COMMON_CMAKE_OPTIONS=(
-        "${COMMON_CMAKE_OPTIONS[@]}"
-        -DLLVM_VERSION_MAJOR:STRING="${major_version}"
-        -DLLVM_VERSION_MINOR:STRING="${minor_version}"
-        -DLLVM_VERSION_PATCH:STRING="${patch_version}"
-    )
+if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
+    BUILD_TARGET_FLAG="-target"
 fi
 
 function build_directory() {
@@ -2065,7 +1970,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             fi
 
             set -x
-            ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- ${BUILD_ARGS} ${build_targets[@]}
+            ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
             { set +x; } 2>/dev/null
         fi
 

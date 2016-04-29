@@ -15,6 +15,7 @@ import argparse
 import multiprocessing
 import os
 import platform
+import re
 import shutil
 import sys
 import pipes
@@ -48,6 +49,7 @@ from swift_build_support import migration  # noqa (E402)
 import swift_build_support.ninja      # noqa (E402)
 import swift_build_support.tar        # noqa (E402)
 import swift_build_support.targets    # noqa (E402)
+from swift_build_support.cmake import CMake  # noqa (E402)
 
 
 # A strict parser for bools (unlike Python's `bool()`, where
@@ -73,6 +75,16 @@ def argparse_shell_split(string):
     lex.whitespace_split = True
     lex.whitespace += ','
     return list(lex)
+
+
+# Parse version string and split into a tuple of strings (major, minor, patch)
+# Support only "MAJOR.MINOR.PATCH" format.
+def argparse_clang_compiler_version(string):
+    m = re.match(r'([0-9]*)\.([0-9]*)\.([0-9]*)', string)
+    if m is not None:
+        return m.group(1, 2, 3)
+    raise argparse.ArgumentTypeError(
+        "%r is invalid version value. must be 'MAJOR.MINOR.PATCH'" % string)
 
 
 # Main entry point for the preset mode.
@@ -813,6 +825,34 @@ details of the setups of other systems or automated environments.""")
         metavar="PATH")
 
     parser.add_argument(
+        "--host-cc",
+        help="the absolute path to CC, the 'clang' compiler for the host "
+             "platform. Default is auto detected.",
+        metavar="PATH")
+    parser.add_argument(
+        "--host-cxx",
+        help="the absolute path to CXX, the 'clang++' compiler for the host "
+             "platform. Default is auto detected.",
+        metavar="PATH")
+    parser.add_argument(
+        "--distcc",
+        help="use distcc in pump mode",
+        action="store_true")
+    parser.add_argument(
+        "--enable-asan",
+        help="enable Address Sanitizer",
+        action="store_true")
+    parser.add_argument(
+        "--enable-ubsan",
+        help="enable Undefined Behavior Sanitizer",
+        action="store_true")
+    parser.add_argument(
+        "--clang-compiler-version",
+        help="string that indicates a compiler version for Clang",
+        type=argparse_clang_compiler_version,
+        metavar="MAJOR.MINOR.PATCH")
+
+    parser.add_argument(
         "--extra-cmake-options",
         help="Pass through extra options to CMake in the form of comma "
              "separated options '-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp'. Can be "
@@ -820,6 +860,19 @@ details of the setups of other systems or automated environments.""")
         action="append",
         type=argparse_shell_split,
         default=[])
+
+    parser.add_argument(
+        "--build-args",
+        help="arguments to the build tool. This would be prepended to the "
+             "default argument that is '-j8' when CMake generator is "
+             "\"Ninja\".",
+        type=argparse_shell_split,
+        default=[])
+
+    parser.add_argument(
+        "--verbose-build",
+        help="print the commands executed during the build",
+        action="store_true")
 
     args = migration.parse_args(parser, sys.argv[1:])
 
@@ -954,11 +1007,6 @@ details of the setups of other systems or automated environments.""")
         args.skip_test_watchos_simulator = True
 
     build_script_impl_inferred_args = []
-
-    if args.export_compile_commands:
-        build_script_impl_inferred_args += [
-            "--export-compile-commands"
-        ]
 
     if not args.test and not args.validation_test and not args.long_test:
         build_script_impl_inferred_args += [
@@ -1166,9 +1214,16 @@ details of the setups of other systems or automated environments.""")
 
     host_clang = swift_build_support.toolchain.host_clang(
         xcrun_toolchain=args.darwin_xcrun_toolchain)
-    if not host_clang:
+    if args.host_cc is None and host_clang is not None:
+        args.host_cc = str(host_clang.cc)
+    if args.host_cxx is None and host_clang is not None:
+        args.host_cxx = str(host_clang.cxx)
+    is_host_clang_ok = (
+        args.host_cc is not None and os.access(args.host_cc, os.X_OK) and
+        args.host_cxx is not None and os.access(args.host_cxx, os.X_OK))
+    if not is_host_clang_ok:
         print_with_argv0(
-            "Can't find clang.  Please install clang-3.5 or a later version.")
+            "Can't find clang. Please install clang-3.5 or a later version.")
         return 1
 
     host_cmake = args.cmake
@@ -1178,14 +1233,38 @@ details of the setups of other systems or automated environments.""")
     if not host_cmake:
         print_with_argv0("Can't find CMake. Please install CMake.")
         return 1
+
+    # distcc usage.
+    host_distcc = None
+    host_distcc_pump = None
+    if args.distcc:
+        host_distcc = swift_build_support.which('distcc')
+        # On some platforms, 'pump' may be unrelated to distcc, in which case
+        # it's called 'distcc-pump'.
+        host_distcc_pump = swift_build_support.which('distcc-pump')
+        if host_distcc_pump is None:
+            host_distcc_pump = swift_build_support.which('pump')
+
+        if host_distcc is None or host_distcc_pump is None:
+            print_with_argv0(
+                "Can't find distcc. Please install distcc")
+
+        host_distcc = str(host_distcc)
+        host_distcc_pump = str(host_distcc_pump)
+
+    cmake = CMake(args=args,
+                  host_cc=args.host_cc,
+                  host_cxx=args.host_cxx,
+                  host_distcc=host_distcc)
+
     build_script_impl_args = [
         "--build-dir", build_dir,
         "--install-prefix", os.path.abspath(args.install_prefix),
         "--host-target", args.host_target,
         "--stdlib-deployment-targets",
         " ".join(args.stdlib_deployment_targets),
-        "--host-cc", host_clang.cc,
-        "--host-cxx", host_clang.cxx,
+        "--host-cc", args.host_cc,
+        "--host-cxx", args.host_cxx,
         "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
         "--cmake", host_cmake,
         "--cmark-build-type", args.cmark_build_variant,
@@ -1201,8 +1280,28 @@ details of the setups of other systems or automated environments.""")
             args.swift_analyze_code_coverage).lower(),
         "--cmake-generator", args.cmake_generator,
         "--build-jobs", str(args.build_jobs),
-        "--workspace", SWIFT_SOURCE_ROOT
+        "--workspace", SWIFT_SOURCE_ROOT,
+        "--common-cmake-options=%s" % ' '.join(
+            pipes.quote(opt) for opt in cmake.common_options()),
+        "--build-args=%s" % ' '.join(
+            pipes.quote(arg) for arg in cmake.build_args()),
     ]
+
+    if args.distcc:
+        build_script_impl_args += [
+            "--distcc",
+            "--distcc-pump=%s" % host_distcc_pump
+        ]
+    if args.enable_asan:
+        build_script_impl_args += ["--enable-asan"]
+    if args.enable_ubsan:
+        build_script_impl_args += ["--enable-ubsan"]
+    if args.clang_compiler_version:
+        build_script_impl_args += [
+            "--clang-compiler-version=%s.%s.%s" % args.clang_compiler_version
+        ]
+    if args.verbose_build:
+        build_script_impl_args += ["--verbose-build"]
     if args.install_symroot:
         build_script_impl_args += [
             "--install-symroot", os.path.abspath(args.install_symroot)
