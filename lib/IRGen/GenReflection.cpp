@@ -660,6 +660,7 @@ public:
     for (auto CaptureType : CaptureTypes) {
       addTypeRef(Callee.getModule().getSwiftModule(), CaptureType,
                  /*global*/ true);
+      addBuiltinTypeRefs(CaptureType);
     }
 
     // Add the pairs that make up the generic param -> metadata source map
