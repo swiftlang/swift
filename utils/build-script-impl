@@ -1083,7 +1083,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
         if [[ "${BUILD_SWIFT_STDLIB_UNITTEST_EXTRA}" == "1" ]] ; then
             SWIFT_STDLIB_TARGETS+=("swift-stdlib-${deployment_target}")
         else
-            if [[ "${VALIDATION_TEST}" == "1" ]] ; then
+            if [[ "${VALIDATION_TEST}" == "1" || "${LONG_TEST}" == "1" ]] ; then
                 SWIFT_STDLIB_TARGETS+=("swift-stdlib-${deployment_target}")
             else
                 SWIFT_STDLIB_TARGETS+=("swift-test-stdlib-${deployment_target}")
