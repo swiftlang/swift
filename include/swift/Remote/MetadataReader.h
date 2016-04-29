@@ -482,27 +482,48 @@ public:
     return {true, meta->getKind()};
   }
 
-  /// Given a remote pointer to class metadata, attempt to discover its class
-  /// instance start offset.
-  std::pair<bool, unsigned>
-  readInstanceStartFromClassMetadata(StoredPointer MetadataAddress) {
+  /// Given a remote pointer to class metadata, attempt to read its superclass.
+  StoredPointer
+  readSuperClassFromClassMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
-    if (!meta)
-      return {false, 0};
+    if (!meta || meta->getKind() != MetadataKind::Class)
+      return StoredPointer();
 
-    auto address = readAddressOfNominalTypeDescriptor(meta);
-    if (!address)
-      return {false, 0};
+    auto classMeta = cast<TargetClassMetadata<Runtime>>(meta);
+    return classMeta->SuperClass;
+  }
 
-    auto descriptor = readNominalTypeDescriptor(address);
-    if (!descriptor)
-      return {false, 0};
+  /// Given a remote pointer to class metadata, attempt to discover its class
+  /// instance size and alignment.
+  std::tuple<bool, unsigned, unsigned>
+  readInstanceSizeAndAlignmentFromClassMetadata(StoredPointer MetadataAddress) {
+    auto superMeta = readMetadata(MetadataAddress);
+    if (!superMeta || superMeta->getKind() != MetadataKind::Class)
+      return {false, 0, 0};
+    auto super = cast<TargetClassMetadata<Runtime>>(superMeta);
 
-    if (descriptor->Class.NumFields == 0)
-      return {true, sizeof(StoredPointer)};
+    // See swift_initClassMetadata_UniversalStrategy()
+    uint32_t size, align;
+    if (super->isTypeMetadata()) {
+      size = super->getInstanceSize();
+      align = super->getInstanceAlignMask() + 1;
+    } else {
+      // The following algorithm only works on the non-fragile Apple runtime.
 
-    // return {true, meta->getFieldOffsets()[0]};
-    return {true, sizeof(StoredPointer)};
+      // Grab the RO-data pointer.  This part is not ABI.
+      StoredPointer roDataPtr = readObjCRODataPtr(MetadataAddress);
+      if (!roDataPtr)
+        return false;
+
+      auto address = roDataPtr + sizeof(uint32_t) * 2;
+
+      align = 16; // malloc alignment guarantee
+
+      if (!Reader->readInteger(RemoteAddress(address), &size))
+        return {false, 0, 0};
+    }
+
+    return {true, size, align};
   }
 
   /// Given a remote pointer to metadata, attempt to turn it into a type.
