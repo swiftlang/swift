@@ -871,7 +871,8 @@ const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
 }
 
 const TypeInfo *TypeConverter::getInstanceTypeInfo(const TypeRef *TR,
-                                                   unsigned InstanceStart) {
+                                                   unsigned start,
+                                                   unsigned align) {
   const FieldDescriptor *FD = getBuilder().getFieldTypeInfo(TR);
   if (FD == nullptr)
     return nullptr;
@@ -881,12 +882,9 @@ const TypeInfo *TypeConverter::getInstanceTypeInfo(const TypeRef *TR,
     // Lower the class's fields using substitutions from the
     // TypeRef to make field types concrete.
     RecordTypeInfoBuilder builder(*this, RecordKind::ClassInstance);
-    auto *ReferenceTI = getTypeInfo(getNativeObjectTypeRef());
-    if (ReferenceTI == nullptr)
-      return nullptr;
 
     // Start layout from the given instance start offset.
-    builder.addField(InstanceStart, ReferenceTI->getAlignment());
+    builder.addField(start, align);
 
     for (auto Field : getBuilder().getFieldTypeRefs(TR, FD))
       builder.addField(Field.first, Field.second);
