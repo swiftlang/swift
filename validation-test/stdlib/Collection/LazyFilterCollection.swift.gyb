@@ -1,0 +1,154 @@
+// -*- swift -*-
+
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %S/../../../utils/gyb %s -o %t/main.swift
+// RUN: %S/../../../utils/line-directive %t/main.swift -- %target-build-swift %t/main.swift -o %t/LazyFilterCollection.swift.a.out
+// RUN: %S/../../../utils/line-directive %t/main.swift -- %target-run %t/LazyFilterCollection.swift.a.out
+// REQUIRES: executable_test
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+var CollectionTests = TestSuite("Collection")
+
+%{
+variations = [('', 'Sequence'), ('', 'Collection'), ('Bidirectional', 'Collection')]
+}%
+
+// Test collections using value types as elements.
+% for (traversal, kind) in variations:
+CollectionTests.add${traversal}${kind}Tests(
+  make${kind}: { (elements: [OpaqueValue<Int>]) -> LazyFilter${traversal}${kind}<Minimal${traversal}${kind}<OpaqueValue<Int>>> in
+    // FIXME: create a better sequence and filter
+    Minimal${traversal}${kind}(elements: elements).lazy.filter { _ in return true }
+  },
+  wrapValue: identity,
+  extractValue: identity,
+  make${kind}OfEquatable: { (elements: [MinimalEquatableValue]) -> LazyFilter${traversal}${kind}<Minimal${traversal}${kind}<MinimalEquatableValue>> in
+    // FIXME: create a better sequence and filter
+    Minimal${traversal}${kind}(elements: elements).lazy.filter { _ in return true }
+  },
+  wrapValueIntoEquatable: identityEq,
+  extractValueFromEquatable: identityEq
+)
+% end
+
+// Test collections using reference types as elements.
+% for (traversal, kind) in variations:
+CollectionTests.add${traversal}${kind}Tests(
+  make${kind}: { (elements: [LifetimeTracked]) -> LazyFilter${traversal}${kind}<Minimal${traversal}${kind}<LifetimeTracked>> in
+    // FIXME: create a better sequence and filter
+    Minimal${traversal}${kind}(elements: elements).lazy.filter { _ in return true }
+  },
+  wrapValue: { (element: OpaqueValue<Int>) in
+    LifetimeTracked(element.value, identity: element.identity)
+  },
+  extractValue: { (element: LifetimeTracked) in
+    OpaqueValue(element.value, identity: element.identity)
+  },
+  make${kind}OfEquatable: { (elements: [LifetimeTracked]) -> LazyFilter${traversal}${kind}<Minimal${traversal}${kind}<LifetimeTracked>> in
+    // FIXME: create a better sequence and filter
+    Minimal${traversal}${kind}(elements: elements).lazy.filter { _ in return true }
+  },
+  wrapValueIntoEquatable: { (element: MinimalEquatableValue) in
+    LifetimeTracked(element.value, identity: element.identity)
+  },
+  extractValueFromEquatable: { (element: LifetimeTracked) in
+    MinimalEquatableValue(element.value, identity: element.identity)
+  }
+)
+% end
+
+// Test collection instances and iterators.
+% for (traversal, kind) in variations:
+CollectionTests.test("LazyFilterCollection instances (${traversal}${kind})") {
+  do {
+    // MinimalIterator will error if next() is called after exhaustion
+    var resiliency = CollectionMisuseResiliencyChecks.all
+    resiliency.callNextOnExhaustedGenerator = false
+
+    let expected : [String] = []
+    let base = ["apple", "orange", "banana", "grapefruit", "lychee"]
+% if kind == 'Sequence':
+    checkSequence(
+      expected,
+      MinimalSequence(elements: base).lazy.filter { _ in return false },
+      resiliencyChecks: resiliency
+    )
+% elif traversal == '' and kind == 'Collection':
+    checkForwardCollection(
+      expected,
+      MinimalCollection(elements: base).lazy.filter { _ in return false },
+      resiliencyChecks: resiliency,
+      sameValue: { $0 == $1 }
+    )
+% else:
+    check${traversal}${kind}(
+      expected,
+      Minimal${traversal}${kind}(elements: base).lazy.filter { _ in return false },
+      resiliencyChecks: resiliency,
+      sameValue: { $0 == $1 }
+    )
+% end
+  }
+  do {
+    var resiliency = CollectionMisuseResiliencyChecks.all
+    resiliency.callNextOnExhaustedGenerator = false
+
+    let expected = ["apple", "orange", "banana", "grapefruit", "lychee"]
+    let base = ["apple", "orange", "banana", "grapefruit", "lychee"]
+% if kind == 'Sequence':
+    checkSequence(
+      expected,
+      MinimalSequence(elements: base).lazy.filter { _ in return true },
+      resiliencyChecks: resiliency
+    )
+% elif traversal == '' and kind == 'Collection':
+    checkForwardCollection(
+      expected,
+      MinimalCollection(elements: base).lazy.filter { _ in return true },
+      resiliencyChecks: resiliency,
+      sameValue: { $0 == $1 }
+    )
+% else:
+    check${traversal}${kind}(
+      expected,
+      Minimal${traversal}${kind}(elements: base).lazy.filter { _ in return true },
+      resiliencyChecks: resiliency,
+      sameValue: { $0 == $1 }
+    )
+% end
+  }
+  do {
+    var resiliency = CollectionMisuseResiliencyChecks.all
+    resiliency.callNextOnExhaustedGenerator = false
+
+    let expected = [2, 4, 6, 8, 10, 12, 14, 16]
+    let base = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+% if kind == 'Sequence':
+    checkSequence(
+      expected,
+      MinimalSequence(elements: base).lazy.filter { $0 % 2 == 0 },
+      resiliencyChecks: resiliency
+    )
+% elif traversal == '' and kind == 'Collection':
+    checkForwardCollection(
+      expected,
+      MinimalCollection(elements: base).lazy.filter { $0 % 2 == 0 },
+      resiliencyChecks: resiliency,
+      sameValue: { $0 == $1 }
+    )
+% else:
+    check${traversal}${kind}(
+      expected,
+      Minimal${traversal}${kind}(elements: base).lazy.filter { $0 % 2 == 0 },
+      resiliencyChecks: resiliency,
+      sameValue: { $0 == $1 }
+    )
+% end
+  }
+}
+% end
+
+runAllTests()

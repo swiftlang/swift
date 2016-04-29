@@ -179,7 +179,7 @@ public func > <Base : Collection>(
 ///   general operations on `LazyFilterCollection` instances may not have the
 ///   documented complexity.
 public struct ${Self}<
-  Base : Collection
+  Base : ${collectionForTraversal(Traversal)}
 > : LazyCollectionProtocol, ${collectionForTraversal(Traversal)} {
 
   /// A type that represents a valid position in the collection.
@@ -236,42 +236,9 @@ public struct ${Self}<
 %   if Traversal == 'Bidirectional':
   @warn_unused_result
   public func index(before i: Index) -> Index {
-    fatalError("FIXME: swift-3-indexing-model: implement")
+    return LazyFilterIndex(base: _previousFiltered(i.base))
   }
 %   end
-
-  // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    _precondition(n >= 0,
-      "Only BidirectionalCollections can be advanced by a negative amount")
-    // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
-
-    var index = i.base
-    for _ in stride(from: 0, to: n, by: 1) {
-      _nextFilteredInPlace(&index)
-    }
-    return LazyFilterIndex(base: index)
-  }
-
-  // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
-  public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
-  ) -> Index? {
-    _precondition(n >= 0,
-      "Only BidirectionalCollections can be advanced by a negative amount")
-    // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
-
-    var index = i.base
-    for _ in stride(from: 0, to: n, by: 1) {
-      if index == limit.base {
-        return nil
-      }
-      _nextFilteredInPlace(&index)
-    }
-    return LazyFilterIndex(base: index)
-  }
 
   /// Returns the next `index` of an element that `self._predicate` matches
   /// otherwise `self._base.endIndex`
@@ -294,6 +261,30 @@ public struct ${Self}<
       _base.formIndex(after: &index)
     } while index != _base.endIndex && !_predicate(_base[index])
   }
+
+%   if Traversal == 'Bidirectional':
+  /// Returns the previous `index` of an element that `self._predicate` matches
+  /// otherwise `self._base.startIndex`
+  @inline(__always)
+  internal func _previousFiltered(_ index: Base.Index) -> Base.Index {
+    var index = index
+    _previousFilteredInPlace(&index)
+    return index
+  }
+
+  /// Returns the first index `i` preceding `index` where
+  /// `_predicate(base[i]) == true`.
+  ///
+  /// - Precondition: `index != startIndex`
+  /// - Postcondition: `i < index`
+  @inline(__always)
+  internal func _previousFilteredInPlace(_ index: inout Base.Index) {
+    _precondition(index != _base.startIndex, "can't retreat before startIndex")
+    repeat {
+      _base.formIndex(before: &index)
+    } while !_predicate(_base[index])
+  }
+%   end
 
   /// Access the element at `position`.
   ///
