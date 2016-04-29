@@ -833,9 +833,9 @@ extension TestSuite {
 
     self.test("\(testNamePrefix).index(where:)/semantics") {
       for test in findTests {
-        let c = makeWrappedCollectionWithEquatableElement(test.sequence)
         let closureLifetimeTracker = LifetimeTracked(0)
         expectEqual(1, LifetimeTracked.instances)
+        let c = makeWrappedCollectionWithEquatableElement(test.sequence)
         let result = c.index {
           (candidate) in
           _blackHole(closureLifetimeTracker)

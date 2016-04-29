@@ -44,16 +44,15 @@ CollectionTests.add${traversal}${kind}Tests(
   extractValue: { (element: LifetimeTracked) in
     OpaqueValue(element.value, identity: element.identity)
   },
-  // FIXME: use LifetimeTracked once bug is validated/fixed
-  make${kind}OfEquatable: { (elements: [MinimalEquatableValue]) -> LazyMap${traversal}${kind}<Minimal${traversal}${kind}<MinimalEquatableValue>, MinimalEquatableValue> in // -> LazyMap${traversal}${kind}<Minimal${traversal}${kind}<LifetimeTracked>, LifetimeTracked> in
+  make${kind}OfEquatable: { (elements: [LifetimeTracked]) -> LazyMap${traversal}${kind}<Minimal${traversal}${kind}<LifetimeTracked>, LifetimeTracked> in
     Minimal${traversal}${kind}(elements: elements).lazy.map { $0 }
   },
-  wrapValueIntoEquatable: identityEq, //{ (element: MinimalEquatableValue) in
-//    LifetimeTracked(element.value, identity: element.identity)
-//  },
-  extractValueFromEquatable: identityEq //{ (element: LifetimeTracked) in
-//    MinimalEquatableValue(element.value, identity: element.identity)
-//  }
+  wrapValueIntoEquatable: { (element: MinimalEquatableValue) in
+    LifetimeTracked(element.value, identity: element.identity)
+  },
+  extractValueFromEquatable: { (element: LifetimeTracked) in
+    MinimalEquatableValue(element.value, identity: element.identity)
+  }
 )
 % end
 
