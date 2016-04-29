@@ -39,6 +39,8 @@ using namespace swift;
 using namespace swift::ide;
 using swift::index::SymbolKind;
 using swift::index::SymbolSubKind;
+using swift::index::SymbolRole;
+using swift::index::SymbolRoleSet;
 
 static UIdent KindDeclFunctionFree("source.lang.swift.decl.function.free");
 static UIdent KindRefFunctionFree("source.lang.swift.ref.function.free");

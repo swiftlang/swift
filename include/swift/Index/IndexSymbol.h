@@ -14,6 +14,7 @@
 #define SWIFT_INDEX_INDEXSYMBOL_H
 
 #include "swift/Basic/LLVM.h"
+#include "clang/Index/IndexSymbol.h"
 #include "llvm/ADT/SmallString.h"
 
 namespace swift {
@@ -73,13 +74,16 @@ enum class SymbolSubKind {
   ExtensionOfProtocol,
 };
 
+using SymbolRole = clang::index::SymbolRole;
+using SymbolRoleSet = clang::index::SymbolRoleSet;
+
 struct IndexSymbol {
   enum TypeKind { Base, FuncDecl, CallReference };
   TypeKind entityType = Base;
 
   SymbolKind kind;
   SymbolSubKind subKind = SymbolSubKind::None;
-  bool isRef;
+  SymbolRoleSet roles = SymbolRoleSet(0);
   // The following strings are guaranteed to live at least as long as the
   // current indexing action.
   StringRef name;

@@ -86,7 +86,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     Decl *D;
     SymbolKind Kind;
     SymbolSubKind SubKind;
-    bool IsRef;
+    SymbolRoleSet Roles;
   };
   SmallVector<Entity, 6> EntitiesStack;
   SmallVector<Expr *, 8> ExprStack;
@@ -269,7 +269,7 @@ private:
     Entity CurrEnt = EntitiesStack.pop_back_val();
     assert(CurrEnt.Kind != SymbolKind::Unknown);
     if (!IdxConsumer.finishSourceEntity(CurrEnt.Kind, CurrEnt.SubKind,
-                                        CurrEnt.IsRef)) {
+                                        CurrEnt.Roles)) {
       Cancelled = true;
       return false;
     }
@@ -502,7 +502,7 @@ bool IndexSwiftASTWalker::startEntity(ValueDecl *D, const IndexSymbol &Info) {
     return false;
   }
 
-  EntitiesStack.push_back({D, Info.kind, Info.subKind, Info.isRef});
+  EntitiesStack.push_back({D, Info.kind, Info.subKind, Info.roles});
   return true;
 }
 
@@ -582,7 +582,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
       Cancelled = true;
       return false;
     }
-    if (!IdxConsumer.finishSourceEntity(Info.kind, Info.subKind, Info.isRef)) {
+    if (!IdxConsumer.finishSourceEntity(Info.kind, Info.subKind, Info.roles)) {
       Cancelled = true;
       return false;
     }
@@ -653,7 +653,7 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
   if (Cancelled)
     return false;
 
-  EntitiesStack.push_back({D, Info.kind, Info.subKind, Info.isRef});
+  EntitiesStack.push_back({D, Info.kind, Info.subKind, Info.roles});
   return true;
 }
 
@@ -769,7 +769,10 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
     Info.subKind = getSubKindForAccessor(cast<FuncDecl>(D)->getAccessorKind());
   // Cannot be extension, which is not a ValueDecl.
 
-  Info.isRef = IsRef;
+  if (IsRef)
+    Info.roles |= (unsigned)SymbolRole::Reference;
+  else
+    Info.roles |= (unsigned)SymbolRole::Definition;
 
   if (getNameAndUSR(D, Info.name, Info.USR))
     return true;
