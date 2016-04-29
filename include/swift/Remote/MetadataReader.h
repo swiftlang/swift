@@ -499,7 +499,8 @@ public:
   readInstanceSizeAndAlignmentFromClassMetadata(StoredPointer MetadataAddress) {
     auto superMeta = readMetadata(MetadataAddress);
     if (!superMeta || superMeta->getKind() != MetadataKind::Class)
-      return {false, 0, 0};
+      return std::make_tuple(false, 0, 0);
+
     auto super = cast<TargetClassMetadata<Runtime>>(superMeta);
 
     // See swift_initClassMetadata_UniversalStrategy()
@@ -513,17 +514,17 @@ public:
       // Grab the RO-data pointer.  This part is not ABI.
       StoredPointer roDataPtr = readObjCRODataPtr(MetadataAddress);
       if (!roDataPtr)
-        return false;
+        return std::make_tuple(false, 0, 0);
 
       auto address = roDataPtr + sizeof(uint32_t) * 2;
 
       align = 16; // malloc alignment guarantee
 
       if (!Reader->readInteger(RemoteAddress(address), &size))
-        return {false, 0, 0};
+        return std::make_tuple(false, 0, 0);
     }
 
-    return {true, size, align};
+    return std::make_tuple(true, size, align);
   }
 
   /// Given a remote pointer to metadata, attempt to turn it into a type.
