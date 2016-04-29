@@ -388,7 +388,7 @@ int doDumpHeapInstance(const char *BinaryFilename) {
 
       uintptr_t instance = PipeMemoryReader_receiveInstanceAddress(&Pipe);
       assert(instance);
-      printf("Parent: instance pointer in child address space: 0x%lx\n",
+      printf("Instance pointer in child address space: 0x%lx\n",
         instance);
 
       uintptr_t isa;
@@ -413,15 +413,19 @@ int doDumpHeapInstance(const char *BinaryFilename) {
       uintptr_t isaMask;
       if (!swift_reflection_readIsaMask(RC, &isaMask))
         errorAndExit("Couldn't read isa mask");
-      printf("Parent: isa mask in child address space: 0x%lx\n", isaMask);
+      printf("isa mask in child address space: 0x%lx\n", isaMask);
 
       isa &= isaMask;
 
-      printf("Parent: metadata pointer in child address space: 0x%lx\n", isa);
-      printf("Decoding type reference ...\n");
+      printf("Metadata pointer in child address space: 0x%lx\n\n", isa);
+
+      printf("Type reference:\n");
 
       swift_typeref_t TR = swift_reflection_typeRefForMetadata(RC, isa);
       swift_reflection_dumpTypeRef(TR);
+      printf("\n");
+
+      printf("Type info:\n");
       swift_reflection_dumpInfoForMetadata(RC, isa);
     }
   }
