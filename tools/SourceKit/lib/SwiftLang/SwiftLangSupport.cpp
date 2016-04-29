@@ -39,6 +39,7 @@ using namespace swift;
 using namespace swift::ide;
 using swift::index::SymbolKind;
 using swift::index::SymbolSubKind;
+using swift::index::SymbolSubKindSet;
 using swift::index::SymbolRole;
 using swift::index::SymbolRoleSet;
 
@@ -522,7 +523,7 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureElementKind(
   }
 }
 
-UIdent SwiftLangSupport::getUIDForSymbol(SymbolKind kind, SymbolSubKind subKind,
+UIdent SwiftLangSupport::getUIDForSymbol(SymbolKind kind, SymbolSubKindSet subKinds,
                                          bool isRef) {
 
 #define UID_FOR(CLASS) isRef ? KindRef##CLASS : KindDecl##CLASS;
@@ -571,30 +572,29 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolKind kind, SymbolSubKind subKind,
     assert(!isRef && "reference to extension decl?");
     SWIFT_FALLTHROUGH;
   case SymbolKind::Accessor:
-    switch (subKind) {
-    case SymbolSubKind::AccessorGetter:
+    if (subKinds & SymbolSubKind::AccessorGetter) {
       return UID_FOR(AccessorGetter);
-    case SymbolSubKind::AccessorSetter:
+    } else if (subKinds & SymbolSubKind::AccessorSetter) {
       return UID_FOR(AccessorSetter);
-    case SymbolSubKind::AccessorWillSet:
+    } else if (subKinds & SymbolSubKind::AccessorWillSet) {
       return UID_FOR(AccessorWillSet);
-    case SymbolSubKind::AccessorDidSet:
+    } else if (subKinds & SymbolSubKind::AccessorDidSet) {
       return UID_FOR(AccessorDidSet);
-    case SymbolSubKind::AccessorAddressor:
+    } else if (subKinds & SymbolSubKind::AccessorAddressor) {
       return UID_FOR(AccessorAddress);
-    case SymbolSubKind::AccessorMutableAddressor:
+    } else if (subKinds & SymbolSubKind::AccessorMutableAddressor) {
       return UID_FOR(AccessorMutableAddress);
 
-    case SymbolSubKind::ExtensionOfStruct:
+    } else if (subKinds & SymbolSubKind::ExtensionOfStruct) {
       return KindDeclExtensionStruct;
-    case SymbolSubKind::ExtensionOfClass:
+    } else if (subKinds & SymbolSubKind::ExtensionOfClass) {
       return KindDeclExtensionClass;
-    case SymbolSubKind::ExtensionOfEnum:
+    } else if (subKinds & SymbolSubKind::ExtensionOfEnum) {
       return KindDeclExtensionEnum;
-    case SymbolSubKind::ExtensionOfProtocol:
+    } else if (subKinds & SymbolSubKind::ExtensionOfProtocol) {
       return KindDeclExtensionProtocol;
 
-    case SymbolSubKind::None:
+    } else {
       llvm_unreachable("missing sub kind");
     }
 

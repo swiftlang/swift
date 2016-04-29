@@ -58,21 +58,33 @@ enum class SymbolKind {
   Destructor,
 };
 
-enum class SymbolSubKind {
-  None,
+enum class SymbolSubKind : uint32_t {
+  None                          = 0,
 
-  AccessorGetter,
-  AccessorSetter,
-  AccessorWillSet,
-  AccessorDidSet,
-  AccessorAddressor,
-  AccessorMutableAddressor,
+  AccessorGetter                = 1 << 0,
+  AccessorSetter                = 1 << 1,
+  AccessorWillSet               = 1 << 2,
+  AccessorDidSet                = 1 << 3,
+  AccessorAddressor             = 1 << 4,
+  AccessorMutableAddressor      = 1 << 5,
 
-  ExtensionOfStruct,
-  ExtensionOfClass,
-  ExtensionOfEnum,
-  ExtensionOfProtocol,
+  ExtensionOfStruct             = 1 << 6,
+  ExtensionOfClass              = 1 << 7,
+  ExtensionOfEnum               = 1 << 8,
+  ExtensionOfProtocol           = 1 << 9,
 };
+
+typedef uint32_t SymbolSubKindSet;
+
+inline SymbolSubKindSet operator&(SymbolSubKindSet SKSet, SymbolSubKind SK) {
+  return SKSet & (SymbolSubKindSet)SK;
+}
+inline SymbolSubKindSet operator|(SymbolSubKindSet SKSet, SymbolSubKind SK) {
+  return SKSet | (SymbolSubKindSet)SK;
+}
+inline SymbolSubKindSet &operator|=(SymbolSubKindSet &SKSet, SymbolSubKind SK) {
+  return SKSet = SKSet | SK;
+}
 
 using SymbolRole = clang::index::SymbolRole;
 using SymbolRoleSet = clang::index::SymbolRoleSet;
@@ -82,7 +94,7 @@ struct IndexSymbol {
   TypeKind entityType = Base;
 
   SymbolKind kind;
-  SymbolSubKind subKind = SymbolSubKind::None;
+  SymbolSubKindSet subKinds = SymbolSubKindSet(0);
   SymbolRoleSet roles = SymbolRoleSet(0);
   // The following strings are guaranteed to live at least as long as the
   // current indexing action.

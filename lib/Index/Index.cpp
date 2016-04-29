@@ -85,7 +85,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   struct Entity {
     Decl *D;
     SymbolKind Kind;
-    SymbolSubKind SubKind;
+    SymbolSubKindSet SubKinds;
     SymbolRoleSet Roles;
   };
   SmallVector<Entity, 6> EntitiesStack;
@@ -268,7 +268,7 @@ private:
   bool finishCurrentEntity() {
     Entity CurrEnt = EntitiesStack.pop_back_val();
     assert(CurrEnt.Kind != SymbolKind::Unknown);
-    if (!IdxConsumer.finishSourceEntity(CurrEnt.Kind, CurrEnt.SubKind,
+    if (!IdxConsumer.finishSourceEntity(CurrEnt.Kind, CurrEnt.SubKinds,
                                         CurrEnt.Roles)) {
       Cancelled = true;
       return false;
@@ -502,7 +502,7 @@ bool IndexSwiftASTWalker::startEntity(ValueDecl *D, const IndexSymbol &Info) {
     return false;
   }
 
-  EntitiesStack.push_back({D, Info.kind, Info.subKind, Info.roles});
+  EntitiesStack.push_back({D, Info.kind, Info.subKinds, Info.roles});
   return true;
 }
 
@@ -573,7 +573,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
 
   auto handleInfo = [this, D, AccKind](IndexSymbol &Info) {
     Info.kind = SymbolKind::Accessor;
-    Info.subKind = getSubKindForAccessor(AccKind);
+    Info.subKinds |= getSubKindForAccessor(AccKind);
     Info.name = "";
     Info.USR = getAccessorUSR(D, AccKind);
     Info.group = "";
@@ -582,7 +582,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
       Cancelled = true;
       return false;
     }
-    if (!IdxConsumer.finishSourceEntity(Info.kind, Info.subKind, Info.roles)) {
+    if (!IdxConsumer.finishSourceEntity(Info.kind, Info.subKinds, Info.roles)) {
       Cancelled = true;
       return false;
     }
@@ -634,15 +634,15 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
 
   Info.kind = getSymbolKindForDecl(D);
   if (isa<StructDecl>(NTD))
-    Info.subKind = SymbolSubKind::ExtensionOfStruct;
+    Info.subKinds |= SymbolSubKind::ExtensionOfStruct;
   else if (isa<ClassDecl>(NTD))
-    Info.subKind = SymbolSubKind::ExtensionOfClass;
+    Info.subKinds |= SymbolSubKind::ExtensionOfClass;
   else if (isa<EnumDecl>(NTD))
-    Info.subKind = SymbolSubKind::ExtensionOfEnum;
+    Info.subKinds |= SymbolSubKind::ExtensionOfEnum;
   else if (isa<ProtocolDecl>(NTD))
-    Info.subKind = SymbolSubKind::ExtensionOfProtocol;
+    Info.subKinds |= SymbolSubKind::ExtensionOfProtocol;
 
-  assert(Info.subKind != SymbolSubKind::None);
+  assert(Info.subKinds != 0);
 
   if (!IdxConsumer.startSourceEntity(Info)) {
     Cancelled = true;
@@ -653,7 +653,7 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
   if (Cancelled)
     return false;
 
-  EntitiesStack.push_back({D, Info.kind, Info.subKind, Info.roles});
+  EntitiesStack.push_back({D, Info.kind, Info.subKinds, Info.roles});
   return true;
 }
 
@@ -766,7 +766,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
     return true;
 
   if (Info.kind == SymbolKind::Accessor)
-    Info.subKind = getSubKindForAccessor(cast<FuncDecl>(D)->getAccessorKind());
+    Info.subKinds |= getSubKindForAccessor(cast<FuncDecl>(D)->getAccessorKind());
   // Cannot be extension, which is not a ValueDecl.
 
   if (IsRef)

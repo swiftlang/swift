@@ -83,10 +83,10 @@ private:
     });
   }
 
-  bool finishSourceEntity(SymbolKind kind, SymbolSubKind subKind,
+  bool finishSourceEntity(SymbolKind kind, SymbolSubKindSet subKinds,
                           SymbolRoleSet roles) override {
     bool isRef = roles & (unsigned)SymbolRole::Reference;
-    auto UID = SwiftLangSupport::getUIDForSymbol(kind, subKind, isRef);
+    auto UID = SwiftLangSupport::getUIDForSymbol(kind, subKinds, isRef);
     return impl.finishSourceEntity(UID);
   }
 
@@ -94,7 +94,7 @@ private:
   bool withEntityInfo(const IndexSymbol &symbol, F func) {
     auto initEntity = [](EntityInfo &info, const IndexSymbol &symbol) {
       bool isRef = symbol.roles & (unsigned)SymbolRole::Reference;
-      info.Kind = SwiftLangSupport::getUIDForSymbol(symbol.kind, symbol.subKind,
+      info.Kind = SwiftLangSupport::getUIDForSymbol(symbol.kind, symbol.subKinds,
                                                     isRef);
       info.Name = symbol.name;
       info.USR = symbol.USR;
