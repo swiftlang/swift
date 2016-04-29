@@ -759,6 +759,9 @@ NOTE(c_function_pointer_captures_here,none,
 
 ERROR(var_type_not_materializable,none,
       "type %0 of variable is not materializable", (Type))
+ERROR(param_type_non_materializable_tuple,none,
+      "named parameter has type %0 which includes nested inout parameters",
+      (Type))
 ERROR(enum_element_not_materializable,none,
       "type of enum case is not materializable", ())
 
