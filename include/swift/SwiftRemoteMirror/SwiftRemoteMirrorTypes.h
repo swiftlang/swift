@@ -18,6 +18,8 @@
 #ifndef SWIFT_REMOTE_MIRROR_TYPES_H
 #define SWIFT_REMOTE_MIRROR_TYPES_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
