@@ -85,7 +85,7 @@ internal func getSectionInfo(_ name: String,
   _ imageHeader: UnsafePointer<MachHeader>) -> Section? {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   var size: UInt = 0
-  let address = getsectiondata(imageHeader, "__DATA", name, &size)
+  let address = getsectiondata(imageHeader, "__TEXT", name, &size)
   guard let nonNullAddress = address else { return nil }
   guard size != 0 else { return nil }
   return Section(startAddress: nonNullAddress, size: size)
