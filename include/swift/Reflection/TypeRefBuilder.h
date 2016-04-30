@@ -71,7 +71,6 @@ using BuiltinTypeSection = ReflectionSection<BuiltinTypeDescriptorIterator>;
 using GenericSection = ReflectionSection<const void *>;
 
 struct ReflectionInfo {
-  std::string ImageName;
   FieldSection fieldmd;
   AssociatedTypeSection assocty;
   BuiltinTypeSection builtin;

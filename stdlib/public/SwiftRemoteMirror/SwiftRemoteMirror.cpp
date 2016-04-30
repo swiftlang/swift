@@ -51,22 +51,9 @@ void swift_reflection_destroyReflectionContext(SwiftReflectionContextRef Context
 
 void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
-                                   const char *ImageName,
-                                   swift_reflection_section_t fieldmd,
-                                   swift_reflection_section_t assocty,
-                                   swift_reflection_section_t builtin,
-                                   swift_reflection_section_t typeref,
-                                   swift_reflection_section_t reflstr) {
-  ReflectionInfo Info {
-    ImageName,
-    FieldSection(fieldmd.Begin, fieldmd.End),
-    AssociatedTypeSection(assocty.Begin, assocty.End),
-    BuiltinTypeSection(builtin.Begin, builtin.End),
-    GenericSection(typeref.Begin, typeref.End),
-    GenericSection(reflstr.Begin, reflstr.End)
-  };
+                                   swift_reflection_info_t Info) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  Context->addReflectionInfo(Info);
+  Context->addReflectionInfo(*reinterpret_cast<ReflectionInfo *>(&Info));
 }
 
 int

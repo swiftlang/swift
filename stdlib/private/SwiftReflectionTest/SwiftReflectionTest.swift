@@ -171,16 +171,10 @@ internal func sendReflectionInfos() {
 
   var numInfos = infos.count
   debugLog("\(numInfos) reflection info bundles.")
-  sendBytes(from: &numInfos, count: sizeof(UInt.self))
   precondition(numInfos >= 1)
+  sendBytes(from: &numInfos, count: sizeof(UInt.self))
   for info in infos {
     debugLog("Sending info for \(info.imageName)")
-    let imageNameBytes = Array(info.imageName.utf8)
-    var imageNameLength = UInt(imageNameBytes.count)
-    fwrite(&imageNameLength, sizeof(UInt.self), 1, stdout)
-    fflush(stdout)
-    fwrite(imageNameBytes, 1, imageNameBytes.count, stdout)
-    fflush(stdout)
     for section in info {
       sendValue(section?.startAddress)
       sendValue(section?.size ?? 0)

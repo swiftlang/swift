@@ -51,12 +51,7 @@ swift_reflection_destroyReflectionContext(SwiftReflectionContextRef Context);
 /// Add reflection sections for a loaded Swift image.
 void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
-                                   const char *ImageName,
-                                   swift_reflection_section_t fieldmd,
-                                   swift_reflection_section_t builtin,
-                                   swift_reflection_section_t assocty,
-                                   swift_reflection_section_t typeref,
-                                   swift_reflection_section_t reflstr);
+                                   swift_reflection_info_t Info);
 
 
 /// Returns a boolean indicating if the isa mask was successfully

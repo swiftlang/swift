@@ -40,7 +40,6 @@ typedef struct PipeMemoryReader {
 } PipeMemoryReader;
 
 typedef struct RemoteReflectionInfo {
-  const char *ImageName;
   RemoteSection fieldmd;
   RemoteSection assocty;
   RemoteSection builtin;
@@ -49,15 +48,6 @@ typedef struct RemoteReflectionInfo {
   uintptr_t StartAddress;
   size_t TotalSize;
 } RemoteReflectionInfo;
-
-typedef struct LocalReflectionInfo {
-  const char *ImageName;
-  swift_reflection_section_t fieldmd;
-  swift_reflection_section_t assocty;
-  swift_reflection_section_t builtin;
-  swift_reflection_section_t typeref;
-  swift_reflection_section_t reflstr;
-} LocalReflectionInfo;
 
 static void errorAndExit(const char *message) {
   fprintf(stderr, "%s: %s\n", message, strerror(errno));
@@ -104,14 +94,12 @@ uintptr_t getEndAddress(const RemoteSection Sections[], size_t Count) {
   return End;
 }
 
-RemoteReflectionInfo makeRemoteReflectionInfo(const char *ImageName,
-                                              RemoteSection fieldmd,
+RemoteReflectionInfo makeRemoteReflectionInfo(RemoteSection fieldmd,
                                               RemoteSection assocty,
                                               RemoteSection builtin,
                                               RemoteSection typeref,
                                               RemoteSection reflstr) {
   RemoteReflectionInfo Info = {
-    ImageName,
     fieldmd,
     assocty,
     builtin,
@@ -240,7 +228,7 @@ PipeMemoryReader createPipeMemoryReader() {
   return Reader;
 }
 
-const LocalReflectionInfo *
+const swift_reflection_info_t *
 PipeMemoryReader_receiveReflectionInfo(const PipeMemoryReader *Reader,
                                        size_t *NumReflectionInfos) {
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
@@ -255,12 +243,6 @@ PipeMemoryReader_receiveReflectionInfo(const PipeMemoryReader *Reader,
   RemoteReflectionInfo *RemoteInfos = (RemoteReflectionInfo*)malloc(Size);
 
   for (size_t i = 0; i < *NumReflectionInfos; ++i) {
-    size_t ImageNameLength;
-    PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)&ImageNameLength,
-                                          sizeof(ImageNameLength));
-    const char *ImageName = (const char *)malloc(ImageNameLength);
-    PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)ImageName,
-                                          ImageNameLength);
     uintptr_t fieldmd_start;
     size_t fieldmd_size;
     uintptr_t assocty_start;
@@ -294,7 +276,6 @@ PipeMemoryReader_receiveReflectionInfo(const PipeMemoryReader *Reader,
                                           sizeof(reflstr_size));
 
     RemoteInfos[i] = makeRemoteReflectionInfo(
-      ImageName,
       makeRemoteSection(fieldmd_start, fieldmd_size),
       makeRemoteSection(assocty_start, assocty_size),
       makeRemoteSection(builtin_start, builtin_size),
@@ -304,8 +285,8 @@ PipeMemoryReader_receiveReflectionInfo(const PipeMemoryReader *Reader,
 
   // Now pull in the remote sections into our address space.
 
-  LocalReflectionInfo *Infos
-    = malloc(sizeof(LocalReflectionInfo) * *NumReflectionInfos);
+  swift_reflection_info_t *Infos
+    = malloc(sizeof(swift_reflection_info_t) * *NumReflectionInfos);
 
   for (size_t i = 0; i < *NumReflectionInfos; ++i) {
     RemoteReflectionInfo RemoteInfo = RemoteInfos[i];
@@ -330,8 +311,7 @@ PipeMemoryReader_receiveReflectionInfo(const PipeMemoryReader *Reader,
     uintptr_t reflstr_base
       = buffer + RemoteInfo.reflstr.StartAddress - RemoteInfo.StartAddress;
 
-    LocalReflectionInfo Info = {
-      RemoteInfo.ImageName,
+    swift_reflection_info_t Info = {
       makeLocalSection(fieldmd_base, RemoteInfo.fieldmd.Size),
       makeLocalSection(assocty_base, RemoteInfo.assocty.Size),
       makeLocalSection(builtin_base, RemoteInfo.builtin.Size),
@@ -392,18 +372,11 @@ int doDumpHeapInstance(const char *BinaryFilename) {
         instance);
 
       size_t NumReflectionInfos = 0;
-      const LocalReflectionInfo *Infos
+      const swift_reflection_info_t *Infos
         = PipeMemoryReader_receiveReflectionInfo(&Pipe, &NumReflectionInfos);
 
-      for (size_t i = 0; i < NumReflectionInfos; ++i) {
-        const LocalReflectionInfo Info = Infos[i];
-        swift_reflection_addReflectionInfo(RC, Info.ImageName,
-                                           Info.fieldmd,
-                                           Info.assocty,
-                                           Info.builtin,
-                                           Info.typeref,
-                                           Info.reflstr);
-      }
+      for (size_t i = 0; i < NumReflectionInfos; ++i)
+        swift_reflection_addReflectionInfo(RC, Infos[i]);
 
       printf("Type reference:\n");
 
