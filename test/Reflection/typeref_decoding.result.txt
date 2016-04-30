@@ -595,6 +595,22 @@ typealias Inner = A
 typealias Outer = A
 (generic_type_parameter depth=0 index=0)
 
+- TypesToReflect.C4 : TypesToReflect.P1
+typealias Inner = A
+(generic_type_parameter depth=0 index=0)
+
+- TypesToReflect.C4 : TypesToReflect.P2
+typealias Outer = A
+(generic_type_parameter depth=0 index=0)
+
+- TypesToReflect.S4 : TypesToReflect.P1
+typealias Inner = A
+(generic_type_parameter depth=0 index=0)
+
+- TypesToReflect.S4 : TypesToReflect.P2
+typealias Outer = A
+(generic_type_parameter depth=0 index=0)
+
 - TypesToReflect.S4 : TypesToReflect.P1
 typealias Inner = A
 (generic_type_parameter depth=0 index=0)
@@ -617,22 +633,6 @@ typealias First = A
 
 typealias Second = B
 (generic_type_parameter depth=0 index=1)
-
-- TypesToReflect.C4 : TypesToReflect.P1
-typealias Inner = A
-(generic_type_parameter depth=0 index=0)
-
-- TypesToReflect.C4 : TypesToReflect.P2
-typealias Outer = A
-(generic_type_parameter depth=0 index=0)
-
-- TypesToReflect.S4 : TypesToReflect.P1
-typealias Inner = A
-(generic_type_parameter depth=0 index=0)
-
-- TypesToReflect.S4 : TypesToReflect.P2
-typealias Outer = A
-(generic_type_parameter depth=0 index=0)
 
 - TypesToReflect.E4 : TypesToReflect.P1
 typealias Inner = A

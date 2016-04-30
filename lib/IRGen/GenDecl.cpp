@@ -849,10 +849,6 @@ void IRGenModule::finishEmitAfterTopLevel() {
   finalizeClangCodeGen();
 }
 
-void IRGenModule::addNominalTypeDecl(const NominalTypeDecl *Decl) {
-  NominalTypeDecls.push_back(Decl);
-}
-
 static void emitLazyTypeMetadata(IRGenModule &IGM, CanType type) {
   auto decl = type.getAnyNominal();
   assert(decl);
@@ -879,13 +875,6 @@ void IRGenerator::emitTypeMetadataRecords() {
     m.second->emitTypeMetadataRecords();
   }
 }
-
-void IRGenerator::emitReflectionMetadataRecords() {
-  for (auto &m : *this) {
-    m.second->emitReflectionMetadataRecords();
-  }
-}
-
 
 /// Emit any lazy definitions (of globals or functions or whatever
 /// else) that we require.
@@ -2766,8 +2755,7 @@ static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
 }
 
 void IRGenModule::emitExtension(ExtensionDecl *ext) {
-  ExtensionDecls.push_back(ext);
-
+  emitAssociatedTypeMetadataRecord(ext);
   emitNestedTypeDecls(ext->getMembers());
 
   // Generate a category if the extension either introduces a

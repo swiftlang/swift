@@ -26,4 +26,4 @@
 // CHECK-DAG: private constant [3 x i8] c"GS\00", section "{{[^"]*}}swift3_reflstr{{[^"]*}}"
 // CHECK-DAG: private constant [3 x i8] c"GE\00", section "{{[^"]*}}swift3_reflstr{{[^"]*}}"
 
-// CHECK: @"\01l__swift3_reflection_metadata" = private constant <{ {{.*}} }>
+// CHECK: @"\01l__swift3_reflection_metadata{{.*}}" = private constant <{ {{.*}} }>

@@ -811,7 +811,7 @@ irgen::getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
 void IRGenModule::emitStructDecl(StructDecl *st) {
   emitStructMetadata(*this, st);
   emitNestedTypeDecls(st->getMembers());
-  addNominalTypeDecl(st);
+  emitReflectionMetadata(st);
 }
 
 namespace {
