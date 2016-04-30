@@ -82,6 +82,20 @@ getSingleUnsafeGuaranteedValueResult(BuiltinInst *BI) {
   return std::make_pair(GuaranteedValue, Token);
 }
 
+static bool hasUnsafeGuarantedOperand(SILValue UnsafeGuaranteedValue,
+                                      SILValue UnsafeGuaranteedValueOperand,
+                                      RCIdentityFunctionInfo &RCII,
+                                      SILBasicBlock::iterator ReleaseIt) {
+  assert(isa<StrongReleaseInst>(ReleaseIt) ||
+         isa<ReleaseValueInst>(ReleaseIt) && "Expecting a release");
+
+  auto RCRoot =
+      RCII.getRCIdentityRoot(cast<SILInstruction>(ReleaseIt)->getOperand(0));
+
+  return RCRoot == UnsafeGuaranteedValue ||
+         RCRoot == UnsafeGuaranteedValueOperand;
+}
+
 /// Walk backwards from an unsafeGuaranteedEnd builtin instruction looking for a
 /// release on the reference returned by the matching unsafeGuaranteed builtin
 /// ignoring releases on the way.
@@ -93,35 +107,57 @@ getSingleUnsafeGuaranteedValueResult(BuiltinInst *BI) {
 ///    strong_release %6 : $Foo // Ignore.
 ///    %12 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
 ///
+/// Alternatively, look for the release after the unsafeGuaranteedEnd.
 static SILBasicBlock::iterator findReleaseToMatchUnsafeGuaranteedValue(
-    SILInstruction *UnsafeGuaranteedEndI, SILValue UnsafeGuaranteedValue,
-    SILBasicBlock &BB, RCIdentityFunctionInfo &RCIA) {
+    SILInstruction *UnsafeGuaranteedEndI, SILInstruction *UnsafeGuaranteedI,
+    SILValue UnsafeGuaranteedValue, SILBasicBlock &BB,
+    RCIdentityFunctionInfo &RCIA) {
 
   auto UnsafeGuaranteedEndIIt = SILBasicBlock::iterator(UnsafeGuaranteedEndI);
   if (UnsafeGuaranteedEndIIt == BB.begin())
     return BB.end();
   auto LastReleaseIt = std::prev(UnsafeGuaranteedEndIIt);
-  auto UnsafeGuaranteedRCIdentityRoot =
-      RCIA.getRCIdentityRoot(UnsafeGuaranteedValue);
+  auto UnsafeGuaranteedRoot = RCIA.getRCIdentityRoot(UnsafeGuaranteedValue);
+  auto UnsafeGuaranteedOpdRoot =
+      RCIA.getRCIdentityRoot(UnsafeGuaranteedI->getOperand(0));
+
+  // Look before the "unsafeGuaranteedEnd".
   while (LastReleaseIt != BB.begin() &&
          (((isa<StrongReleaseInst>(*LastReleaseIt) ||
             isa<ReleaseValueInst>(*LastReleaseIt)) &&
-           RCIA.getRCIdentityRoot(LastReleaseIt->getOperand(0)) !=
-               UnsafeGuaranteedRCIdentityRoot &&
-           LastReleaseIt->getOperand(0) !=
-               cast<SILInstruction>(UnsafeGuaranteedValue)->getOperand(0)) ||
+           !hasUnsafeGuarantedOperand(UnsafeGuaranteedRoot,
+                                      UnsafeGuaranteedOpdRoot, RCIA,
+                                      LastReleaseIt)) ||
           !LastReleaseIt->mayHaveSideEffects() ||
           isa<DebugValueInst>(*LastReleaseIt) ||
           isa<DebugValueInst>(*LastReleaseIt)))
     --LastReleaseIt;
+  if ((isa<StrongReleaseInst>(*LastReleaseIt) ||
+       isa<ReleaseValueInst>(*LastReleaseIt)) &&
+      hasUnsafeGuarantedOperand(UnsafeGuaranteedRoot, UnsafeGuaranteedOpdRoot,
+                                RCIA, LastReleaseIt))
+    return LastReleaseIt;
+
+  // Otherwise, try finding it after the "unsafeGuaranteedEnd".
+  LastReleaseIt = std::next(SILBasicBlock::iterator(UnsafeGuaranteedEndI));
+  while (LastReleaseIt != BB.end() &&
+         (((isa<StrongReleaseInst>(*LastReleaseIt) ||
+            isa<ReleaseValueInst>(*LastReleaseIt)) &&
+           !hasUnsafeGuarantedOperand(UnsafeGuaranteedRoot,
+                                      UnsafeGuaranteedOpdRoot, RCIA,
+                                      LastReleaseIt)) ||
+          !LastReleaseIt->mayHaveSideEffects() ||
+          isa<DebugValueInst>(*LastReleaseIt) ||
+          isa<DebugValueInst>(*LastReleaseIt)))
+    ++LastReleaseIt;
+  if (LastReleaseIt == BB.end())
+    return LastReleaseIt;
   if ((!isa<StrongReleaseInst>(*LastReleaseIt) &&
        !isa<ReleaseValueInst>(*LastReleaseIt)) ||
-      (RCIA.getRCIdentityRoot(LastReleaseIt->getOperand(0)) !=
-           UnsafeGuaranteedRCIdentityRoot &&
-       LastReleaseIt->getOperand(0) !=
-           cast<SILInstruction>(UnsafeGuaranteedValue)->getOperand(0))) {
+      !hasUnsafeGuarantedOperand(UnsafeGuaranteedRoot, UnsafeGuaranteedOpdRoot,
+                                 RCIA, LastReleaseIt))
     return BB.end();
-  }
+
   return LastReleaseIt;
 }
 
@@ -224,10 +260,10 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
       // Find the release to match with the unsafeGuaranteedValue.
       auto &UnsafeGuaranteedEndBB = *UnsafeGuaranteedEndI->getParent();
       auto LastReleaseIt = findReleaseToMatchUnsafeGuaranteedValue(
-          UnsafeGuaranteedEndI, UnsafeGuaranteedValue, UnsafeGuaranteedEndBB,
-          RCIA);
+          UnsafeGuaranteedEndI, UnsafeGuaranteedI, UnsafeGuaranteedValue,
+          UnsafeGuaranteedEndBB, RCIA);
       if (LastReleaseIt == UnsafeGuaranteedEndBB.end()) {
-        DEBUG(llvm::dbgs() << "  no release before unsafeGuaranteedEnd found\n");
+        DEBUG(llvm::dbgs() << "  no release before/after unsafeGuaranteedEnd found\n");
         continue;
       }
       SILInstruction *LastRelease = &*LastReleaseIt;
