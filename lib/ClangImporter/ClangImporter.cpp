@@ -3503,7 +3503,7 @@ void ClangImporter::lookupBridgingHeaderDecls(
   for (auto *ClangD : Impl.BridgeHeaderTopLevelDecls) {
     if (filter(ClangD)) {
       if (auto *ND = dyn_cast<clang::NamedDecl>(ClangD)) {
-        if (Decl *imported = Impl.importDeclReal(ND))
+        if (Decl *imported = Impl.importDeclReal(ND, /*useSwift2Name=*/false))
           receiver(imported);
       }
     }
@@ -3569,7 +3569,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
         continue;
       if (filter(ClangD)) {
         if (auto *ND = dyn_cast<clang::NamedDecl>(ClangD)) {
-          if (Decl *imported = Impl.importDeclReal(ND))
+          if (Decl *imported = Impl.importDeclReal(ND, /*useSwift2Name=*/false))
             receiver(imported);
         }
       }
@@ -3674,7 +3674,7 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     // Add the extensions produced by importing categories.
     for (auto category : lookupTable->categories()) {
       if (auto extension = cast_or_null<ExtensionDecl>(
-                            owner.Impl.importDecl(category)))
+                            owner.Impl.importDecl(category, false)))
         results.push_back(extension);
     }
 
@@ -3685,7 +3685,7 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     llvm::SmallPtrSet<ExtensionDecl *, 8> knownExtensions;
     for (auto entry : lookupTable->allGlobalsAsMembers()) {
       auto decl = entry.get<clang::NamedDecl *>();
-      auto importedDecl = owner.Impl.importDecl(decl);
+      auto importedDecl = owner.Impl.importDecl(decl, false);
       if (!importedDecl) continue;
 
       auto ext = dyn_cast<ExtensionDecl>(importedDecl->getDeclContext());
@@ -3817,7 +3817,7 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
     for (auto I = objcClass->visible_categories_begin(),
            E = objcClass->visible_categories_end();
          I != E; ++I) {
-      Impl.importDeclReal(*I);
+      Impl.importDeclReal(*I, /*useSwift2Name=*/false);
     }
   }
 
@@ -3877,7 +3877,7 @@ void ClangImporter::loadObjCMethods(
       continue;
 
     if (auto method = dyn_cast_or_null<AbstractFunctionDecl>(
-                        Impl.importDecl(objcMethod))) {
+                        Impl.importDecl(objcMethod, false))) {
       foundMethods.push_back(method);
     }
   }
@@ -3961,13 +3961,14 @@ void ClangModuleUnit::lookupObjCMethods(
 
     // If we found a property accessor, import the property.
     if (objcMethod->isPropertyAccessor())
-      (void)owner.Impl.importDecl(objcMethod->findPropertyDecl(true));
+      (void)owner.Impl.importDecl(objcMethod->findPropertyDecl(true),
+                                  false);
 
     // Import it.
     // FIXME: Retrying a failed import works around recursion bugs in the Clang
     // importer.
-    auto imported = owner.Impl.importDecl(objcMethod);
-    if (!imported) imported = owner.Impl.importDecl(objcMethod);
+    auto imported = owner.Impl.importDecl(objcMethod, false);
+    if (!imported) imported = owner.Impl.importDecl(objcMethod, false);
     if (!imported) continue;
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(imported))
@@ -4036,7 +4037,7 @@ std::string ClangImporter::getClangModuleHash() const {
 }
 
 Decl *ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
-  return Impl.importDeclCached(ClangDecl);
+  return Impl.importDeclCached(ClangDecl, /*useSwift2Name=*/false);
 }
 
 void ClangImporter::printStatistics() const {
@@ -4418,11 +4419,10 @@ void ClangImporter::Implementation::lookupValue(
     if (!isVisibleClangEntry(clangCtx, entry)) continue;
 
     ValueDecl *decl;
-
     // If it's a Clang declaration, try to import it.
     if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
       decl = cast_or_null<ValueDecl>(
-               importDeclReal(clangDecl->getMostRecentDecl()));
+               importDeclReal(clangDecl->getMostRecentDecl(), false));
       if (!decl) continue;
     } else {
       // Try to import a macro.
@@ -4439,15 +4439,34 @@ void ClangImporter::Implementation::lookupValue(
       continue;
 
     // If the name matched, report this result.
+    bool anyMatching = false;
     if (decl->getFullName().matchesRef(name)) {
       consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
+      anyMatching = true;
     }
 
     // If there is an alternate declaration and the name matches,
     // report this result.
     if (auto alternate = getAlternateDecl(decl)) {
-      if (alternate->getFullName().matchesRef(name))
+      if (alternate->getFullName().matchesRef(name)) {
         consumer.foundDecl(alternate, DeclVisibilityKind::VisibleAtTopLevel);
+        anyMatching = true;
+      }
+    }
+
+    // If we have a declaration and nothing matched so far, try the Swift 2
+    // name.
+    if (!anyMatching) {
+      if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
+        if (auto swift2Decl = cast_or_null<ValueDecl>(
+                                importDeclReal(clangDecl->getMostRecentDecl(),
+                                               true))) {
+          if (swift2Decl->getFullName().matchesRef(name)) {
+            consumer.foundDecl(swift2Decl,
+                               DeclVisibilityKind::VisibleAtTopLevel);
+          }
+        }
+      }
     }
   }
 }
@@ -4477,19 +4496,34 @@ void ClangImporter::Implementation::lookupObjCMembers(
     if (!isVisibleClangEntry(clangCtx, clangDecl)) continue;
 
     // Import the declaration.
-    auto decl = cast_or_null<ValueDecl>(importDeclReal(clangDecl));
+    auto decl = cast_or_null<ValueDecl>(importDeclReal(clangDecl, false));
     if (!decl)
       continue;
 
     // If the name we found matches, report the declaration.
-    if (decl->getFullName().matchesRef(name))
+    bool matchedAny = false;
+    if (decl->getFullName().matchesRef(name)) {
       consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup);
+      matchedAny = true;
+    }
 
     // Check for an alternate declaration; if it's name matches,
     // report it.
     if (auto alternate = getAlternateDecl(decl)) {
-      if (alternate->getFullName().matchesRef(name))
+      if (alternate->getFullName().matchesRef(name)) {
         consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup);
+        matchedAny = true;
+      }
+    }
+
+    // If we didn't find anything, try under the Swift 2 name.
+    if (!matchedAny) {
+      if (auto swift2Decl = cast_or_null<ValueDecl>(
+                              importDeclReal(clangDecl, true))) {
+        if (swift2Decl->getFullName().matchesRef(name)) {
+          consumer.foundDecl(swift2Decl, DeclVisibilityKind::DynamicLookup);
+        }
+      }
     }
   }
 }

@@ -146,7 +146,7 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 /// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 13; // swift_newtype(struct)
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 14; // Swift 2 names
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.
