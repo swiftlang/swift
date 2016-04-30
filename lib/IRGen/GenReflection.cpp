@@ -785,6 +785,9 @@ llvm::Constant *IRGenModule::getAddrOfCaptureDescriptor(SILFunction &SILFn,
 }
 
 void IRGenModule::emitReflectionMetadata(const NominalTypeDecl *Decl) {
+  if (!IRGen.Opts.EnableReflectionMetadata)
+    return;
+
   llvm::SetVector<CanType> BuiltinTypes;
 
   emitFieldMetadataRecord(Decl);
