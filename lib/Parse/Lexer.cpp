@@ -1435,7 +1435,6 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     if (CurChar != '\\') {
       TempString.push_back(CurChar);
       if (CurChar == '\r' || CurChar == '\n') {
-        BytesPtr++;
         while (*BytesPtr == '\r' || *BytesPtr == '\n')
           TempString.push_back(*BytesPtr++);
         assert(nextNonWhitespaceIsQuote(BytesPtr, '"') && "Invalid string continuation");
@@ -1462,7 +1461,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     case '\\': TempString.push_back('\\'); continue;
     case '\n':
     case '\r':
-      assert(nextNonWhitespaceIsQuote(BytesPtr, '"') && "Invalid string continuation");
+      assert(nextNonWhitespaceIsQuote(BytesPtr, '"') && "Invalid string continuation 2");
       continue;
         
     // String interpolation.
