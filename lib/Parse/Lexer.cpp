@@ -1460,8 +1460,10 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     case '"': TempString.push_back('"'); continue;
     case '\'': TempString.push_back('\''); continue;
     case '\\': TempString.push_back('\\'); continue;
-    case '\n': BytesPtr--; continue;
-    case '\r': BytesPtr--; continue;
+    case '\n':
+    case '\r':
+      assert(nextNonWhitespaceIsQuote(BytesPtr, '"') && "Invalid string continuation");
+      continue;
         
     // String interpolation.
     case '(':
