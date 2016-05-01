@@ -2411,7 +2411,7 @@ bool Parser::isCollectionLiteralStartingWithLSquareLit() {
    BacktrackingScope backtracking(*this);
    (void)consumeToken(tok::l_square_lit);
    switch (Tok.getKind()) {
-     // Handle both dengerate '#' and '# identifier'.
+     // Handle both degenerate '#' and '# identifier'.
      case tok::pound:
       (void) consumeToken();
       if (Tok.is(tok::identifier)) skipSingle();

@@ -1112,7 +1112,7 @@ extension Collection {
   ///
   /// - Parameter n: The number of elements to drop from the beginning of
   ///   the sequence. `n` must be greater than or equal to zero.
-  /// - Returns: A subsquence starting after the specified number of
+  /// - Returns: A subsequence starting after the specified number of
   ///   elements.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements to drop from

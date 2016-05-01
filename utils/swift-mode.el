@@ -182,7 +182,7 @@ Use `M-x hs-show-all' to show them again."
     s))
 
 (defun swift-skip-comments-and-space ()
-  "Skip comments and whiltespace, returning t"
+  "Skip comments and whitespace, returning t"
   (while (forward-comment 1))
   t)
 

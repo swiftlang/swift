@@ -2292,7 +2292,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
   auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
   if (attr && attr->hasName()) return;
 
-  // When no overridde determined the Objective-C name, look for
+  // When no override determined the Objective-C name, look for
   // requirements for which this declaration is a witness.
   Optional<ObjCSelector> requirementObjCName;
   for (auto req : tc.findWitnessedObjCRequirements(decl,

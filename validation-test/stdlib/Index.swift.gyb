@@ -73,7 +73,7 @@ Index.test("${Kind}Collection/index(_:stepsFrom: n)/semantics") {
 
     let new = c.index(c.nthIndex(test.startOffset), offsetBy: test.distance)
     // Since the `nthIndex(offset:)` method performs the same operation
-    // (i.e. adavances `c.startIndex` by `test.distance`, it would be
+    // (i.e. advances `c.startIndex` by `test.distance`, it would be
     // silly to compare index values. Luckily the underlying collection
     // contains exactly index offsets.
     expectEqual(test.expectedOffset!, c[new],

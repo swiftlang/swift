@@ -23,7 +23,7 @@
 #if (defined(__APPLE__) || defined(__linux__) || defined(__CYGWIN__) || defined(__FreeBSD__))
 #include "swift/Runtime/MutexPThread.h"
 #else
-#error "Implement equvalent of MutexPThread.h/cpp for your platform."
+#error "Implement equivalent of MutexPThread.h/cpp for your platform."
 #endif
 
 namespace swift {
@@ -718,7 +718,7 @@ static_assert(std::is_literal_type<StaticMutex>::value,
 static_assert(std::is_literal_type<StaticUnsafeMutex>::value,
               "StaticUnsafeMutex must be literal type");
 #else
-// Your platform doesn't currently support staticly allocated Mutex
+// Your platform doesn't currently support statically allocated Mutex
 // you will possibly see global-constructors warnings
 #endif
 
@@ -726,7 +726,7 @@ static_assert(std::is_literal_type<StaticUnsafeMutex>::value,
 static_assert(std::is_literal_type<StaticConditionVariable>::value,
               "StaticConditionVariable must be literal type");
 #else
-// Your platform doesn't currently support staticly allocated ConditionVar
+// Your platform doesn't currently support statically allocated ConditionVar
 // you will possibly see global-constructors warnings
 #endif
 
@@ -734,7 +734,7 @@ static_assert(std::is_literal_type<StaticConditionVariable>::value,
 static_assert(std::is_literal_type<StaticReadWriteLock>::value,
               "StaticReadWriteLock must be literal type");
 #else
-// Your platform doesn't currently support staticly allocated ReadWriteLocks
+// Your platform doesn't currently support statically allocated ReadWriteLocks
 // you will possibly see global-constructors warnings
 #endif
 }
