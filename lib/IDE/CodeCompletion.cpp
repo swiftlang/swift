@@ -1529,6 +1529,8 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool PreferFunctionReferencesToCalls = false;
   bool HaveLeadingSpace = false;
 
+  bool IncludeInstanceMembers = false;
+
   /// \brief True if we are code completing inside a static method.
   bool InsideStaticMethod = false;
 
@@ -1684,6 +1686,10 @@ public:
   }
 
   void setHaveLeadingSpace(bool value) { HaveLeadingSpace = value; }
+
+  void includeInstanceMembers() {
+    IncludeInstanceMembers = true;
+  }
 
   void addExpressionSpecificDecl(const Decl *D) {
     ExpressionSpecificDecls.insert(D);
@@ -1915,12 +1921,6 @@ public:
 
     StringRef Name = VD->getName().get();
     assert(!Name.empty() && "name should not be empty");
-
-    assert(VD->isStatic() ||
-           !(InsideStaticMethod &&
-            VD->getDeclContext() == CurrentMethod->getDeclContext()) &&
-           "name lookup bug -- cannot see an instance variable "
-           "in a static function");
 
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
@@ -2737,6 +2737,12 @@ public:
         if (FD->isAccessor())
           return;
 
+        // Do we want compound function names here?
+        if (PreferFunctionReferencesToCalls) {
+          addCompoundFunctionName(FD, Reason);
+          return;
+        }
+
         addMethodCall(FD, Reason);
         return;
       }
@@ -2899,12 +2905,14 @@ public:
           getTupleExprCompletions(TT);
         } else {
           lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
-                                   TypeResolver.get());
+                                   TypeResolver.get(),
+                                   IncludeInstanceMembers);
         }
       }
     } else if (Type Unwrapped = ExprType->getImplicitlyUnwrappedOptionalObjectType()) {
       lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
-                               TypeResolver.get());
+                               TypeResolver.get(),
+                               IncludeInstanceMembers);
     } else {
       return false;
     }
@@ -2941,7 +2949,8 @@ public:
     tryStdlibOptionalCompletions(ExprType);
     if (!Done) {
       lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
-                               TypeResolver.get());
+                               TypeResolver.get(),
+                               IncludeInstanceMembers);
     }
   }
 
@@ -3698,7 +3707,8 @@ public:
     NeedLeadingDot = !HaveDot;
     Type MetaBase = MetatypeType::get(BaseType);
     lookupVisibleMemberDecls(*this, MetaBase,
-                             CurrDeclContext, TypeResolver.get());
+                             CurrDeclContext, TypeResolver.get(),
+                             IncludeInstanceMembers);
     addKeyword("Type", MetaBase);
     addKeyword("self", BaseType, SemanticContextKind::CurrentNominal);
   }
@@ -4032,13 +4042,30 @@ public:
 
     if (Type CurrTy = CurrDeclContext->getDeclaredTypeInContext()) {
       lookupVisibleMemberDecls(*this, CurrTy, CurrDeclContext,
-                               TypeResolver.get());
+                               TypeResolver.get(),
+                               /*includeInstanceMembers=*/false);
       addDesignatedInitializers(CurrTy);
       addAssociatedTypes(CurrTy);
     }
   }
 };
 } // end anonymous namespace
+
+static void addSelectorModifierKeywords(CodeCompletionResultSink &sink) {
+  auto addKeyword = [&](StringRef Name, CodeCompletionKeywordKind Kind) {
+    CodeCompletionResultBuilder Builder(
+                                  sink,
+                                  CodeCompletionResult::ResultKind::Keyword,
+                                  SemanticContextKind::None, {});
+    Builder.setKeywordKind(Kind);
+    Builder.addTextChunk(Name);
+    Builder.addCallParameterColon();
+    Builder.addSimpleTypedParameter("@objc property", /*isVarArg=*/false);
+  };
+
+  addKeyword("getter", CodeCompletionKeywordKind::None);
+  addKeyword("setter", CodeCompletionKeywordKind::None);
+}
 
 void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E, SourceLoc DotLoc) {
   assert(P.Tok.is(tok::code_complete));
@@ -4048,8 +4075,10 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E, SourceLoc DotLoc) {
     return;
 
   Kind = CompletionKind::DotExpr;
-  if (InObjCSelectorExpr)
+  if (ParseExprSelectorContext != ObjCSelectorContext::None) {
     PreferFunctionReferencesToCalls = true;
+    CompleteExprSelectorContext = ParseExprSelectorContext;
+  }
 
   ParsedExpr = E;
   this->DotLoc = DotLoc;
@@ -4072,8 +4101,14 @@ void CodeCompletionCallbacksImpl::completePostfixExprBeginning(CodeCompletionExp
     return;
 
   Kind = CompletionKind::PostfixExprBeginning;
-  if (InObjCSelectorExpr)
+  if (ParseExprSelectorContext != ObjCSelectorContext::None) {
     PreferFunctionReferencesToCalls = true;
+    CompleteExprSelectorContext = ParseExprSelectorContext;
+    if (CompleteExprSelectorContext == ObjCSelectorContext::MethodSelector) {
+      addSelectorModifierKeywords(CompletionContext.getResultSink());
+    }
+  }
+
 
   CurDeclContext = P.CurDeclContext;
   CStyleForLoopIterationVariable =
@@ -4090,8 +4125,10 @@ void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E, bool hasSpace) {
 
   HasSpace = hasSpace;
   Kind = CompletionKind::PostfixExpr;
-  if (InObjCSelectorExpr)
+  if (ParseExprSelectorContext != ObjCSelectorContext::None) {
     PreferFunctionReferencesToCalls = true;
+    CompleteExprSelectorContext = ParseExprSelectorContext;
+  }
 
   ParsedExpr = E;
   CurDeclContext = P.CurDeclContext;
@@ -4131,8 +4168,10 @@ void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
     return;
 
   Kind = CompletionKind::SuperExpr;
-  if (InObjCSelectorExpr)
+  if (ParseExprSelectorContext != ObjCSelectorContext::None) {
     PreferFunctionReferencesToCalls = true;
+    CompleteExprSelectorContext = ParseExprSelectorContext;
+  }
 
   ParsedExpr = SRE;
   CurDeclContext = P.CurDeclContext;
@@ -4144,8 +4183,10 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
     return;
 
   Kind = CompletionKind::SuperExprDot;
-  if (InObjCSelectorExpr)
+  if (ParseExprSelectorContext != ObjCSelectorContext::None) {
     PreferFunctionReferencesToCalls = true;
+    CompleteExprSelectorContext = ParseExprSelectorContext;
+  }
 
   ParsedExpr = SRE;
   CurDeclContext = P.CurDeclContext;
@@ -4695,6 +4736,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (ExprType) {
     Lookup.setIsStaticMetatype(ParsedExpr->isStaticallyDerivedMetatype());
   }
+  if (isInsideObjCSelector())
+    Lookup.includeInstanceMembers();
   if (PreferFunctionReferencesToCalls)
     Lookup.setPreferFunctionReferencesToCalls();
 

@@ -587,12 +587,24 @@ ParserResult<Expr> Parser::parseExprSelector() {
     selectorKind = ObjCSelectorExpr::Method;
   }
 
+  ObjCSelectorContext selectorContext;
+  switch (selectorKind) {
+  case ObjCSelectorExpr::Getter:
+    selectorContext = ObjCSelectorContext::GetterSelector;
+    break;
+  case ObjCSelectorExpr::Setter:
+    selectorContext = ObjCSelectorContext::SetterSelector;
+    break;
+  case ObjCSelectorExpr::Method:
+    selectorContext = ObjCSelectorContext::MethodSelector;
+  }
+
   // Parse the subexpression.
   CodeCompletionCallbacks::InObjCSelectorExprRAII
-    InObjCSelectorExpr(CodeCompletion);
+    InObjCSelectorExpr(CodeCompletion, selectorContext);
   ParserResult<Expr> subExpr = parseExpr(diag::expr_selector_expected_expr);
   if (subExpr.hasCodeCompletion())
-    return subExpr;
+    return makeParserCodeCompletionResult<Expr>();
 
   // Parse the closing ')'
   SourceLoc rParenLoc;
@@ -608,9 +620,19 @@ ParserResult<Expr> Parser::parseExprSelector() {
   }
 
   // If the subexpression was in error, just propagate the error.
-  if (subExpr.isParseError())
-    return makeParserResult<Expr>(
-             new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
+  if (subExpr.isParseError()) {
+    if (subExpr.hasCodeCompletion()) {
+      auto res = makeParserResult(
+                   new (Context) ObjCSelectorExpr(selectorKind, keywordLoc,
+                                                  lParenLoc, modifierLoc,
+                                                  subExpr.get(), rParenLoc));
+      res.setHasCodeCompletion();
+      return res;
+    } else {
+      return makeParserResult<Expr>(
+               new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
+    }
+  }
 
   return makeParserResult<Expr>(
     new (Context) ObjCSelectorExpr(selectorKind, keywordLoc, lParenLoc,

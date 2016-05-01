@@ -238,7 +238,8 @@ void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               Type BaseTy,
                               const DeclContext *CurrDC,
-                              LazyResolver *typeResolver);
+                              LazyResolver *typeResolver,
+                              bool includeInstanceMembers);
 
 namespace namelookup {
 enum class ResolutionKind {

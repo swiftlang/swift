@@ -18,6 +18,17 @@
 
 namespace swift {
 
+enum class ObjCSelectorContext {
+  /// Code completion is not performed inside #selector
+  None,
+  /// Code completion is performed in a method #selector
+  MethodSelector,
+  /// Code completion is performed inside #selector(getter:)
+  GetterSelector,
+  /// Code completion is performed inside #selector(setter:)
+  SetterSelector
+};
+
 /// \brief Parser's interface to code completion.
 class CodeCompletionCallbacks {
 protected:
@@ -26,7 +37,7 @@ protected:
   Parser::ParserPosition ExprBeginPosition;
 
   /// The declaration parsed during delayed parsing that was caused by code
-  /// completion.  This declaration contained the code completion token.
+  /// completion. This declaration contained the code completion token.
   Decl *DelayedParsedDecl = nullptr;
 
   /// If code completion is done inside a controlling expression of a C-style
@@ -37,8 +48,13 @@ protected:
   /// case.
   bool InEnumElementRawValue = false;
 
-  /// True if code completion is done inside a #selector expression.
-  bool InObjCSelectorExpr = false;
+  /// Whether or not the expression that is currently parsed is inside a
+  /// \c #selector and if so, which kind of selector
+  ObjCSelectorContext ParseExprSelectorContext = ObjCSelectorContext::None;
+
+  /// Whether or not the expression that shall be completed is inside a
+  /// \c #selector and if so, which kind of selector
+  ObjCSelectorContext CompleteExprSelectorContext = ObjCSelectorContext::None;
 
   std::vector<Expr *> leadingSequenceExprs;
 
@@ -48,6 +64,10 @@ public:
   }
 
   virtual ~CodeCompletionCallbacks() {}
+
+  bool isInsideObjCSelector() const {
+    return CompleteExprSelectorContext != ObjCSelectorContext::None;
+  }
 
   void setExprBeginning(Parser::ParserPosition PP) {
     ExprBeginPosition = PP;
@@ -104,15 +124,16 @@ public:
     CodeCompletionCallbacks *Callbacks;
 
   public:
-    InObjCSelectorExprRAII(CodeCompletionCallbacks *Callbacks)
+    InObjCSelectorExprRAII(CodeCompletionCallbacks *Callbacks,
+                           ObjCSelectorContext SelectorContext)
         : Callbacks(Callbacks) {
       if (Callbacks)
-        Callbacks->InObjCSelectorExpr = true;
+        Callbacks->ParseExprSelectorContext = SelectorContext;
     }
 
     ~InObjCSelectorExprRAII() {
       if (Callbacks)
-        Callbacks->InObjCSelectorExpr = false;
+        Callbacks->ParseExprSelectorContext = ObjCSelectorContext::None;
     }
   };
 
