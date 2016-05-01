@@ -14,9 +14,10 @@
 #
 # ----------------------------------------------------------------------------
 
-from numbers import Number
 import platform
 import subprocess
+
+from numbers import Number
 
 from . import xcrun
 from .which import which

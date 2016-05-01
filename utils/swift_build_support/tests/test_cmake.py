@@ -13,9 +13,9 @@ import unittest
 from argparse import Namespace
 
 from swift_build_support.cmake import (
-    host_cmake,
-    CMakeOptions,
     CMake,
+    CMakeOptions,
+    host_cmake,
 )
 
 
