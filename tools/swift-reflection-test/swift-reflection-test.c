@@ -1,4 +1,4 @@
-//===--- swift-reflection-test.cpp - Reflection testing application -------===//
+//===--- swift-reflection-test.c - Reflection testing application ---------===//
 //
 // This source file is part of the Swift.org open source project
 //

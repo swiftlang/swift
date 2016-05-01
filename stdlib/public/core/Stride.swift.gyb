@@ -1,4 +1,4 @@
-//===--- Stride.swift - Components for stride(...) iteration --------------===//
+//===--- Stride.swift.gyb - Components for stride(...) iteration ----------===//
 //
 // This source file is part of the Swift.org open source project
 //

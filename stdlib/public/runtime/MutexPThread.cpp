@@ -1,4 +1,4 @@
-//===--- Mutex.cpp - Supports Mutex.h using PThreads ----------------------===//
+//===--- MutexPThread.cpp - Supports Mutex.h using PThreads ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
