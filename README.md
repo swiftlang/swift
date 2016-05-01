@@ -9,7 +9,7 @@
 
 **Welcome to Swift!**
 
-Swift is a high-performance system programming language.  It has a clean
+Swift is a high-performance system programming language that blatantly rips off the [swift-lang.org](http://swift-lang.org) name.  It has a clean
 and modern syntax, offers seamless access to existing C and Objective-C code
 and frameworks, and is memory safe by default.
 
