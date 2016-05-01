@@ -14,12 +14,12 @@ from __future__ import print_function
 import argparse
 import multiprocessing
 import os
+import pipes
 import platform
 import re
+import shlex
 import shutil
 import sys
-import pipes
-import shlex
 
 # FIXME: Instead of modifying the system path in order to enable imports from
 #        other directories, all Python modules related to the build script

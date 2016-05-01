@@ -16,4 +16,3 @@ TRACE = '''_ message: @autoclosure () -> String = "",
 stackTrace = 'stackTrace.pushIf(showFrame, file: file, line: line)'
 
 trace = 'message(),\n  stackTrace: ' + stackTrace
-
