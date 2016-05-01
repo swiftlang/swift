@@ -1029,7 +1029,7 @@ unsigned Lexer::lexUnicodeEscape(const char *&CurPtr, Lexer *Diags) {
 ///   character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]' | [\]0
 ///   character_escape  ::= unicode_character_escape
 unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
-                             bool EmitDiagnostics) {
+                             bool EmitDiagnostics, char modifier) {
   const char *CharStart = CurPtr;
 
   switch (*CurPtr++) {
@@ -1069,8 +1069,8 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     if (EmitDiagnostics)
       diagnose(CurPtr-1, diag::lex_unterminated_string);
     return ~1U;
-  case '\n':  // String """ literals can now have \n or \r in them.
-  case '\r':  // These are checked for in calling functions anyway.
+  case '\n':  // String literals can now have \n or \r in them.
+  case '\r':  // These are checked for in calling functions.
     return CurPtr[-1];
   case '\\':  // Escapes.
     break;
@@ -1080,6 +1080,8 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   // Escape processing.  We already ate the "\".
   switch (*CurPtr) {
   default:  // Invalid escape.
+    if (modifier == 'e')
+        return '\\'; // e"" non-escaped
     if (EmitDiagnostics)
       diagnose(CurPtr, diag::lex_invalid_escape);
     // If this looks like a plausible escape character, recover as though this
@@ -1095,6 +1097,8 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   case '"': ++CurPtr; return '"';
   case '\'': ++CurPtr; return '\'';
   case '\\': ++CurPtr; return '\\';
+  case '\n': return '\n';
+  case '\r': return '\r';
   case 'u': {  //  \u HEX HEX HEX HEX
     ++CurPtr;
     if (*CurPtr != '{') {
@@ -1219,20 +1223,19 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
   }
 }
 
+static bool nextNonWhitespaceIsQuote(const char *&CurPtr, char StopQuote) {
+    while (isWhitespace(*CurPtr))
+        CurPtr++;
+    return *CurPtr++ == StopQuote;
+}
+
 /// lexStringLiteral:
 ///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
-void Lexer::lexStringLiteral() {
+void Lexer::lexStringLiteral(char modifier) {
   const char *TokStart = CurPtr-1;
   assert((*TokStart == '"' || *TokStart == '\'') && "Unexpected start");
   // NOTE: We only allow single-quote string literals so we can emit useful
   // diagnostics about changing them to double quotes.
-
-  bool isMultiLine = false;
-  if (*TokStart == '"' && *CurPtr == '"' && *(CurPtr + 1) == '"') {
-    isMultiLine = true;
-    TokStart += 2;
-    CurPtr += 2;
-  }
 
   bool wasErroneous = false;
   
@@ -1253,13 +1256,18 @@ void Lexer::lexStringLiteral() {
       continue;
     }
 
-    // String literals cannot have \n or \r in them unless multi-line.
-    if (((*CurPtr == '\r' || *CurPtr == '\n') && !isMultiLine) || CurPtr == BufferEnd) {
+    // String literals cannot have \n or \r in them - unless multi-line.
+    if (*CurPtr == '\r' || *CurPtr == '\n' || CurPtr >= BufferEnd) {
+      const char *TmpPtr = CurPtr;
+      if (nextNonWhitespaceIsQuote(TmpPtr, *TokStart)) {
+        CurPtr = TmpPtr;
+        continue;
+      }
       diagnose(TokStart, diag::lex_unterminated_string);
       return formToken(tok::unknown, TokStart);
     }
     
-    unsigned CharValue = lexCharacter(CurPtr, *TokStart, true);
+    unsigned CharValue = lexCharacter(CurPtr, *TokStart, true, modifier);
     wasErroneous |= CharValue == ~1U;
 
     // If this is the end of string, we are done.  If it is a normal character
@@ -1303,14 +1311,14 @@ void Lexer::lexStringLiteral() {
                              replacement);
       }
 
-      if (isMultiLine) {
-        if (*CurPtr == '"' && *(CurPtr + 1) == '"') {
+      if (modifier == '_') {
+        if (*CurPtr != '_')
+          continue;
+        else {
           formToken(tok::string_literal, TokStart);
-          CurPtr += 2;
+          CurPtr++;
           return;
         }
-        else
-          continue;
       }
 
       return formToken(tok::string_literal, TokStart);
@@ -1426,6 +1434,12 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     char CurChar = *BytesPtr++;
     if (CurChar != '\\') {
       TempString.push_back(CurChar);
+      if (CurChar == '\r' || CurChar == '\n') {
+        BytesPtr++;
+        while (*BytesPtr == '\r' || *BytesPtr == '\n')
+          TempString.push_back(*BytesPtr++);
+        assert(nextNonWhitespaceIsQuote(BytesPtr, '"') && "Invalid string continuation");
+      }
       continue;
     }
     
@@ -1433,9 +1447,11 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     // just ignore them here.
     unsigned CharValue = 0; // Unicode character value for \x, \u, \U.
     switch (*BytesPtr++) {
-    default:
-      continue;   // Invalid escape, ignore it.
-          
+    default:  // Invalid escape, pass it through.
+      TempString.push_back('\\');
+      TempString.push_back(BytesPtr[-1]);
+      continue;
+
       // Simple single-character escapes.
     case '0': TempString.push_back('\0'); continue;
     case 'n': TempString.push_back('\n'); continue;
@@ -1444,7 +1460,8 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     case '"': TempString.push_back('"'); continue;
     case '\'': TempString.push_back('\''); continue;
     case '\\': TempString.push_back('\\'); continue;
-      
+    case '\n': BytesPtr--; continue;
+    case '\r': BytesPtr--; continue;
         
     // String interpolation.
     case '(':
@@ -1706,15 +1723,21 @@ Restart:
   case '&': case '|': case '^': case '~': case '.':
     return lexOperatorIdentifier();
 
+  case '_': case 'e':
+    if (*CurPtr == '"') {
+      CurPtr++;
+      return lexStringLiteral(CurPtr[-2]);
+    }
+    SWIFT_FALLTHROUGH;
+
   case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
   case 'H': case 'I': case 'J': case 'K': case 'L': case 'M': case 'N':
   case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T': case 'U':
   case 'V': case 'W': case 'X': case 'Y': case 'Z':
-  case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g':
+  case 'a': case 'b': case 'c': case 'd': case 'f': case 'g':
   case 'h': case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':
   case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'u':
   case 'v': case 'w': case 'x': case 'y': case 'z':
-  case '_':
     return lexIdentifier();
 
   case '$':

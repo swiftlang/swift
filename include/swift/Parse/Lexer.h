@@ -432,8 +432,8 @@ private:
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr,
-                        char StopQuote, bool EmitDiagnostics);
-  void lexStringLiteral();
+                        char StopQuote, bool EmitDiagnostics, char modifier = 0);
+  void lexStringLiteral(char modifier = 0);
   void lexEscapedIdentifier();
 
   void tryLexEditorPlaceholder();
