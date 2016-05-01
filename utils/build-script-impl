@@ -277,10 +277,15 @@ function float_min() {
 function num_llvm_parallel_lto_link_jobs() {
     case "$(uname -s -m)" in
         Darwin\ x86_64)
-            # Currently with -gline-tables-only clang is ~3.5GB on Darwin. Use
-            # the formula GB Memory/3.5GB to get the number of parallel link
-            # threads we can support.
-            local NUM_MEMORY_THREADS=$(echo $(system_memory_in_bytes)/1000000000.0/3.5 | bc)
+            # *WARNING! HUERISTIC!*
+            #
+            # Use the formula (GB Memory - 3)/6.0GB to get the number of
+            # parallel link threads we can support. This gives the OS 3 GB of
+            # room to work with.
+            #
+            # This is a bit conservative, but I have found that this number
+            # prevents me from swapping on my test machine.
+            local NUM_MEMORY_THREADS=$(echo \( $(system_memory_in_bytes)/1000000000.0 - 3.0 \) / 6.0 | bc)
             echo $(float_min "${NUM_MEMORY_THREADS}" "${BUILD_JOBS}")
             ;;
         *)
@@ -293,10 +298,15 @@ function num_llvm_parallel_lto_link_jobs() {
 function num_swift_parallel_lto_link_jobs() {
     case "$(uname -s -m)" in
         Darwin\ x86_64)
-            # Currently with -gline-tables-only swift is ~5-6GB on Darwin. Use
-            # the formula GB Memory/6GB to get the number of parallel link
-            # threads we can support.
-            local NUM_MEMORY_THREADS=$(echo $(system_memory_in_bytes)/1000000000/6.0 | bc)
+            # *WARNING! HUERISTIC!*
+            #
+            # Use the formula (GB Memory - 3)/8.0GB to get the number of
+            # parallel link threads we can support. This gives the OS 3 GB of
+            # room to work with.
+            #
+            # This is a bit conservative, but I have found that this number
+            # prevents me from swapping on my test machine.
+            local NUM_MEMORY_THREADS=$(echo \( $(system_memory_in_bytes)/1000000000 - 3.0 \) / 8.0 | bc)
             echo $(float_min "${NUM_MEMORY_THREADS}" "${BUILD_JOBS}")
             ;;
         *)
