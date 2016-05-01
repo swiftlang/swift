@@ -244,7 +244,7 @@ public protocol IteratorProtocol {
 ///
 /// The `Sequence` protocol provides default implementations for many common
 /// operations that depend on sequential access to a sequence's values. For
-/// clearer, more consise code, the example above could use the array's
+/// clearer, more concise code, the example above could use the array's
 /// `contains(_:)` method, which every sequence inherits from `Sequence`,
 /// instead of iterating manually:
 ///
@@ -445,7 +445,7 @@ public protocol Sequence {
   ///
   /// - Parameter n: The number of elements to drop from the beginning of
   ///   the sequence. `n` must be greater than or equal to zero.
-  /// - Returns: A subsquence starting after the specified number of
+  /// - Returns: A subsequence starting after the specified number of
   ///   elements.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements to drop from
@@ -1039,7 +1039,7 @@ extension Sequence where
   ///
   /// - Parameter n: The number of elements to drop from the beginning of
   ///   the sequence. `n` must be greater than or equal to zero.
-  /// - Returns: A subsquence starting after the specified number of
+  /// - Returns: A subsequence starting after the specified number of
   ///   elements.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements to drop from

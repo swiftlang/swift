@@ -104,7 +104,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++"])
 
-    def test_common_options_export_compie_commands(self):
+    def test_common_options_export_compile_commands(self):
         args = self.default_args()
         args.export_compile_commands = True
         cmake = self.cmake(args)

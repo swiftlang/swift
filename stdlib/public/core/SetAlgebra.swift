@@ -18,7 +18,7 @@
 ///
 /// You use types that conform to the `SetAlgebra` protocol when you need
 /// efficient membership tests or mathematical set operations such as
-/// intersection, union, and substraction. In the standard library, you can
+/// intersection, union, and subtraction. In the standard library, you can
 /// use the `Set` type with elements of any hashable type, or you can easily
 /// create bit masks with `SetAlgebra` conformance using the `OptionSet`
 /// protocol. See those types for more information.
