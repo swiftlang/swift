@@ -389,7 +389,7 @@ extension SetAlgebra {
   /// square brackets. You can use an array literal anywhere a set is expected
   /// by the type context.
   ///
-  /// Here, an set of strings is created from an array literal holding only
+  /// Here, a set of strings is created from an array literal holding only
   /// strings:
   ///
   ///     let ingredients: Set = ["cocoa beans", "sugar", "cocoa butter", "salt"]
