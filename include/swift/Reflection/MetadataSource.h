@@ -101,8 +101,8 @@ class MetadataSource {
   template <typename Allocator>
   static const MetadataSource *
   decodeMetadataCapture(Allocator &A,
-                       std::string::const_iterator &it,
-                       const std::string::const_iterator &end) {
+                        std::string::const_iterator &it,
+                        const std::string::const_iterator &end) {
     if (it == end)
       return nullptr;
 
