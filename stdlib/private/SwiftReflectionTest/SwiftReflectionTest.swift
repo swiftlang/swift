@@ -26,7 +26,7 @@ let RequestReflectionInfos = "r"
 let RequestReadBytes = "b";
 let RequestSymbolAddress = "s"
 let RequestStringLength = "l"
-let RequestExit = "e"
+let RequestDone = "d"
 let RequestPointerSize = "p"
 
 internal func debugLog(_ message: String) {
@@ -255,6 +255,10 @@ internal func sendPointerSize() {
 /// - Get the pointer size of this process, which affects assumptions about the
 ///   the layout of runtime structures with pointer-sized fields.
 /// - Read raw bytes out of this process's address space.
+///
+/// The parent sends a Done message to indicate that it's done
+/// looking at this instance. It will continue to ask for instances,
+/// so call doneReflecting() when you don't have any more instances.
 public func reflect(_ instance: AnyObject) {
   while let command = readLine(strippingNewline: true) {
     switch command {
@@ -270,12 +274,18 @@ public func reflect(_ instance: AnyObject) {
       sendStringLength()
     case String(validatingUTF8: RequestPointerSize)!:
       sendPointerSize();
-    case String(validatingUTF8: RequestExit)!:
-      exit(EXIT_SUCCESS)
+    case String(validatingUTF8: RequestDone)!:
+      return;
     default:
       fatalError("Unknown request received!")
     }
   }
+}
+
+/// Call this function to indicate to the parent that there are
+/// no more instances to look at.
+public func doneReflecting() {
+  sendValue(UInt(0))
 }
 
 /* Example usage
