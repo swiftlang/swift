@@ -935,6 +935,7 @@ Types
   type ::= 'Xw' type                         // @weak type
   type ::= 'XF' impl-function-type           // function implementation type
   type ::= 'Xf' type type                    // @thin function type
+  type ::= 'Xb' type                         // SIL @box type
   nominal-type ::= known-nominal-type
   nominal-type ::= substitution
   nominal-type ::= nominal-type-kind declaration-name

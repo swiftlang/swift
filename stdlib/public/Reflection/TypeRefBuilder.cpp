@@ -284,6 +284,7 @@ void ClosureContextInfo::dump(std::ostream &OS) {
     else
       MS.second->dump(OS);
   }
+  OS << "\n";
 }
 
 void TypeRefBuilder::dumpCaptureSection(std::ostream &OS) {

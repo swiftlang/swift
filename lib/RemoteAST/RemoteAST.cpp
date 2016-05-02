@@ -362,6 +362,10 @@ public:
     return WeakStorageType::get(base, Ctx);
   }
 
+  Type createSILBoxType(Type base) {
+    return SILBoxType::get(base->getCanonicalType());
+  }
+
   Type createObjCClassType(StringRef name) {
     Identifier ident = Ctx.getIdentifier(name);
     auto typeDecl =

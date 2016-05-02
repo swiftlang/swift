@@ -243,6 +243,12 @@ class TypeDecoder {
         return BuiltType();
       return Builder.createWeakStorageType(base);
     }
+    case NodeKind::SILBoxType: {
+      auto base = decodeMangledType(Node->getChild(0));
+      if (!base)
+        return BuiltType();
+      return Builder.createSILBoxType(base);
+    }
     default:
       return BuiltType();
     }

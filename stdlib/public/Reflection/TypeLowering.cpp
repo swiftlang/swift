@@ -553,6 +553,11 @@ public:
   }
 
   MetatypeRepresentation
+  visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
     assert(false && "Must have concrete TypeRef");
     return MetatypeRepresentation::Unknown;
@@ -842,6 +847,11 @@ public:
   const TypeInfo *
   visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
     return visitAnyStorageTypeRef(US->getType(), ReferenceKind::Unmanaged);
+  }
+
+  const TypeInfo *visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
+    return TC.getReferenceTypeInfo(ReferenceKind::Strong,
+                                   ReferenceCounting::Native);
   }
 
   const TypeInfo *visitOpaqueTypeRef(const OpaqueTypeRef *O) {

@@ -229,6 +229,10 @@ public:
     return WeakStorageTypeRef::create(*this, base);
   }
 
+  const SILBoxTypeRef *createSILBoxType(const TypeRef *base) {
+    return SILBoxTypeRef::create(*this, base);
+  }
+
   const ObjCClassTypeRef *
   createObjCClassType(const std::string &mangledName) {
     return ObjCClassTypeRef::create(*this, mangledName);
