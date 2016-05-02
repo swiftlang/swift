@@ -654,7 +654,7 @@ public:
         }
 
         // FIXME: If the unsubstituted payload type is empty, but not
-        // resilient, we treat the case as an no-payload case.
+        // resilient, we treat the case as a no-payload case.
         //
         // This should be handled by IRGen emitting the enum strategy
         // explicitly.

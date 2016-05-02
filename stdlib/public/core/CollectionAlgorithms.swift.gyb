@@ -85,7 +85,7 @@ extension Collection {
   ///
   /// You can use the predicate to find an element of a type that doesn't
   /// conform to the `Equatable` protocol or to find an element that matches
-  /// particular criteria. Here's a example that finds a student name that
+  /// particular criteria. Here's an example that finds a student name that
   /// begins with the letter "A":
   ///
   ///     let students = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
