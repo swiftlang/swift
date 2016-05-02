@@ -175,15 +175,12 @@ public protocol Indexable : IndexableBase {
   @warn_unused_result
   func index(_ i: Index, offsetBy n: IndexDistance) -> Index
 
-  /// Returns the result of advancing `i` by `n` positions, or `nil` if it
-  /// reaches the `limit`.
+  /// Returns the result of advancing `i` by `n` positions, or `nil`
+  /// if doing so would pass `limit`.
   ///
   /// - Returns:
-  ///   - If `n > 0`, the `n`th successor of `i` or `nil` if the `limit` has
-  ///     been reached.
-  ///   - If `n < 0`, the `n`th predecessor of `i` or `nil` if the `limit` has
-  ///     been reached.
-  ///   - Otherwise, `i` unmodified.
+  ///   - `nil` if `(limit > i) == (n > 0) && abs(distance(i, limit)) < abs(n)`
+  ///   - Otherwise, `index(i, offsetBy: n)`
   ///
   /// - Precondition: `n >= 0` unless `Self` conforms to
   ///   `BidirectionalCollection`.
