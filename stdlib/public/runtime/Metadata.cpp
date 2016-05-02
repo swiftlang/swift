@@ -1556,11 +1556,13 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
   return theClass;
 }
 
+#if SWIFT_OBJC_INTEROP
 static MetadataAllocator &getResilientMetadataAllocator() {
   // This should be constant-initialized, but this is safe.
   static MetadataAllocator allocator;
   return allocator;
 }
+#endif
 
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
