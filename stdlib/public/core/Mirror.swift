@@ -525,7 +525,7 @@ internal extension Mirror {
   /// appropriate for random access!  To avoid this pitfall, convert
   /// mirrors to use the new style, which only present forward
   /// traversal in general.
-  internal struct LegacyChildren : Collection {
+  internal struct LegacyChildren : RandomAccessCollection {
     init(_ oldMirror: _Mirror) {
       self._oldMirror = oldMirror
     }
