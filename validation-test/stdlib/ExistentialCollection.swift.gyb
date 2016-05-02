@@ -440,7 +440,6 @@ do {
     return ${AnyCollection}(base)
   }
 
-  var checksAdded: Box<Set<String>> = Box([])
 
   AnyCollectionTests.add${collectionForTraversal(Traversal)}Tests(
     "tests.",
@@ -450,7 +449,6 @@ do {
     makeCollectionOfEquatable: makeCollectionOfEquatable,
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
-    checksAdded: checksAdded,
     resiliencyChecks: CollectionMisuseResiliencyChecks.all,
     collectionIsBidirectional: ${'false' if Traversal == 'Forward' else 'true'}
   )

@@ -12,6 +12,8 @@
 
 import StdlibUnittest
 
+internal var checksAdded: Set<String> = []
+
 public struct SubscriptRangeTest {
   public let expected: [OpaqueValue<Int>]
   public let collection: [OpaqueValue<Int>]
@@ -479,7 +481,6 @@ internal func _product<C1 : Collection, C2 : Collection>(
     extractValueFromEquatable:
       ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
-    checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
     outOfBoundsSubscriptOffset: Int = 1, 
@@ -498,10 +499,10 @@ extension TestSuite {
   >(${testParams} = false) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(#function) {
+    if checksAdded.contains(#function) {
       return
     }
-    checksAdded.value.insert(#function)
+    checksAdded.insert(#function)
 
     addSequenceTests(
       testNamePrefix,
@@ -511,7 +512,6 @@ extension TestSuite {
       makeSequenceOfEquatable: makeCollectionOfEquatable,
       wrapValueIntoEquatable: wrapValueIntoEquatable,
       extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks)
 
     func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
@@ -1164,10 +1164,10 @@ extension TestSuite {
     ${testConstraints('BidirectionalCollection')}
   >(${testParams} = true) {
     var testNamePrefix = testNamePrefix
-    if checksAdded.value.contains(#function) {
+    if checksAdded.contains(#function) {
       return
     }
-    checksAdded.value.insert(#function)
+    checksAdded.insert(#function)
 
     addCollectionTests(${forwardTestArgs})
 
@@ -1477,10 +1477,10 @@ extension TestSuite {
   >(${testParams} = true) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(#function) {
+    if checksAdded.contains(#function) {
       return
     }
-    checksAdded.value.insert(#function)
+    checksAdded.insert(#function)
 
     addBidirectionalCollectionTests(${forwardTestArgs})
     
@@ -1526,10 +1526,10 @@ extension TestSuite {
   func addCommonTests<
     ${testConstraints(collectionForTraversal(Traversal))}
   >(${testParams}) {
-    if checksAdded.value.contains(#function) {
+    if checksAdded.contains(#function) {
       return
     }
-    checksAdded.value.insert(#function)
+    checksAdded.insert(#function)
 
     func toCollection(_ r: CountableRange<Int>) -> C {
       return makeCollection(r.map { wrapValue(OpaqueValue($0)) })

@@ -1122,7 +1122,6 @@ SequenceTypeTests.test("_copyToNativeArrayBuffer/OverestimatedCount")
 
 % for Base in ['DefaultedSequence', 'MinimalSequence']:
 do {
-  let checksAdded: Box<Set<String>> = Box([])
   let resiliencyChecks = CollectionMisuseResiliencyChecks.all
 
   SequenceTypeTests.addSequenceTests(
@@ -1136,7 +1135,6 @@ do {
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
-    checksAdded: checksAdded,
     resiliencyChecks: resiliencyChecks)
 }
 % end

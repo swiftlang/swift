@@ -102,7 +102,6 @@ extension TestSuite {
     wrapValueIntoComparable: (MinimalComparableValue) -> CollectionWithComparableElement.Iterator.Element,
     extractValueFromComparable: ((CollectionWithComparableElement.Iterator.Element) -> MinimalComparableValue),
 
-    checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
     outOfBoundsSubscriptOffset: Int = 1,
@@ -112,10 +111,10 @@ extension TestSuite {
   ) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(#function) {
+    if checksAdded.contains(#function) {
       return
     }
-    checksAdded.value.insert(#function)
+    checksAdded.insert(#function)
 
     addCollectionTests(
       testNamePrefix,
@@ -125,7 +124,6 @@ extension TestSuite {
       makeCollectionOfEquatable: makeCollectionOfEquatable,
       wrapValueIntoEquatable: wrapValueIntoEquatable,
       extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset,
       outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset,
@@ -614,7 +612,6 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
     wrapValueIntoComparable: (MinimalComparableValue) -> CollectionWithComparableElement.Iterator.Element,
     extractValueFromComparable: ((CollectionWithComparableElement.Iterator.Element) -> MinimalComparableValue),
 
-    checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
     outOfBoundsSubscriptOffset: Int = 1,
@@ -623,10 +620,10 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
   ) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(#function) {
+    if checksAdded.contains(#function) {
       return
     }
-    checksAdded.value.insert(#function)
+    checksAdded.insert(#function)
 
     addMutableCollectionTests(
       testNamePrefix,
@@ -639,7 +636,6 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
       makeCollectionOfComparable: makeCollectionOfComparable,
       wrapValueIntoComparable: wrapValueIntoComparable,
       extractValueFromComparable: extractValueFromComparable,
-      checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset,
       outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset,
@@ -657,7 +653,6 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
       makeCollectionOfEquatable: makeCollectionOfEquatable,
       wrapValueIntoEquatable: wrapValueIntoEquatable,
       extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset,
       outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset)
@@ -725,7 +720,6 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     wrapValueIntoComparable: (MinimalComparableValue) -> CollectionWithComparableElement.Iterator.Element,
     extractValueFromComparable: ((CollectionWithComparableElement.Iterator.Element) -> MinimalComparableValue),
 
-    checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
     outOfBoundsSubscriptOffset: Int = 1,
@@ -734,10 +728,10 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
   ) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(#function) {
+    if checksAdded.contains(#function) {
       return
     }
-    checksAdded.value.insert(#function)
+    checksAdded.insert(#function)
 
     addMutableBidirectionalCollectionTests(
       testNamePrefix,
@@ -750,7 +744,6 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
       makeCollectionOfComparable: makeCollectionOfComparable,
       wrapValueIntoComparable: wrapValueIntoComparable,
       extractValueFromComparable: extractValueFromComparable,
-      checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset,
       outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset,
@@ -766,7 +759,6 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
       makeCollectionOfEquatable: makeCollectionOfEquatable,
       wrapValueIntoEquatable: wrapValueIntoEquatable,
       extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset,
       outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset)
