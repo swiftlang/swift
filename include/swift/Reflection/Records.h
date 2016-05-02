@@ -85,6 +85,10 @@ struct FieldRecordIterator {
     return *Cur;
   }
 
+  const FieldRecord *operator->() const {
+    return Cur;
+  }
+
   FieldRecordIterator &operator++() {
     ++Cur;
     return *this;
@@ -159,6 +163,10 @@ public:
     return *reinterpret_cast<const FieldDescriptor *>(Cur);
   }
 
+  const FieldDescriptor *operator->() const {
+    return reinterpret_cast<const FieldDescriptor *>(Cur);
+  }
+
   FieldDescriptorIterator &operator++() {
     const auto &FR = this->operator*();
     const void *Next = reinterpret_cast<const char *>(Cur)
@@ -205,6 +213,10 @@ struct AssociatedTypeRecordIterator {
 
   const AssociatedTypeRecord &operator*() const {
     return *Cur;
+  }
+
+  const AssociatedTypeRecord *operator->() const {
+    return Cur;
   }
 
   AssociatedTypeRecordIterator &operator++() {
@@ -278,6 +290,10 @@ public:
     return *reinterpret_cast<const AssociatedTypeDescriptor *>(Cur);
   }
 
+  const AssociatedTypeDescriptor *operator->() const {
+    return reinterpret_cast<const AssociatedTypeDescriptor *>(Cur);
+  }
+
   AssociatedTypeIterator &operator++() {
     const auto &ATR = this->operator*();
     size_t Size = sizeof(AssociatedTypeDescriptor) +
@@ -326,6 +342,10 @@ public:
 
   const BuiltinTypeDescriptor &operator*() const {
     return *reinterpret_cast<const BuiltinTypeDescriptor *>(Cur);
+  }
+
+  const BuiltinTypeDescriptor *operator->() const {
+    return reinterpret_cast<const BuiltinTypeDescriptor *>(Cur);;
   }
 
   BuiltinTypeDescriptorIterator &operator++() {
