@@ -37,6 +37,10 @@ public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
 /// A collection containing a single element of type `Element`.
 public struct CollectionOfOne<Element> : RandomAccessCollection {
 
+  public var indices: CountableRange<Int> {
+    return startIndex..<endIndex
+  }
+
   /// Construct an instance containing just `element`.
   public init(_ element: Element) {
     self._element = element

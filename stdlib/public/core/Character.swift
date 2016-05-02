@@ -137,6 +137,10 @@ public struct Character :
   }
 
   internal struct _SmallUTF8 : RandomAccessCollection {
+    var indices: CountableRange<Int> {
+      return startIndex..<endIndex
+    }
+
     init(_ u8: UInt64) {
       let utf8Count = Character._smallSize(u8)
       _sanityCheck(utf8Count <= 8, "Character with more than 8 UTF-8 code units")
@@ -199,6 +203,10 @@ public struct Character :
   }
 
   struct _SmallUTF16 : RandomAccessCollection {
+    var indices: CountableRange<Int> {
+      return startIndex..<endIndex
+    }
+    
     init(_ u8: UInt64) {
       let count = UTF16.transcodedLength(
         of: _SmallUTF8(u8).makeIterator(),
