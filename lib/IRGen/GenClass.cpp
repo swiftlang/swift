@@ -1648,12 +1648,20 @@ namespace {
     llvm::Constant *buildPropertyList(ForMetaClass_t classOrMeta) {
       Size eltSize = 2 * IGM.getPointerSize();
       StringRef namePrefix;
+
       if (classOrMeta == ForClass) {
         return buildOptionalList(InstanceProperties, eltSize,
                                  chooseNamePrefix("_PROPERTIES_",
                                                   "_CATEGORY_PROPERTIES_",
                                                   "_PROTOCOL_PROPERTIES_"));
       }
+
+      // Older OSs' libobjcs can't handle class property data.
+      if ((IGM.Triple.isMacOSX() && IGM.Triple.isMacOSXVersionLT(10, 11)) ||
+          (IGM.Triple.isiOS() && IGM.Triple.isOSVersionLT(9))) {
+        return null();
+      }
+
       return buildOptionalList(ClassProperties, eltSize,
                                chooseNamePrefix("_CLASS_PROPERTIES_",
                                                 "_CATEGORY_CLASS_PROPERTIES_",

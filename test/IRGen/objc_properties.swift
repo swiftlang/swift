@@ -1,6 +1,9 @@
-// RUN: %target-swift-frontend %s -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s
+// This file is also used by objc_properties_ios.swift.
 
-// REQUIRES: CPU=x86_64
+// RUN: %swift -target x86_64-apple-macosx10.11 %s -disable-target-os-checking -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck -check-prefix=CHECK -check-prefix=CHECK-NEW %s
+// RUN: %swift -target x86_64-apple-macosx10.10 %s -disable-target-os-checking -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck -check-prefix=CHECK -check-prefix=CHECK-OLD %s
+
+// REQUIRES: OS=macosx
 // REQUIRES: objc_interop
 
 @objc class SomeObject {
@@ -94,14 +97,14 @@ class Class17127126 {
 // CHECK: [[SHARED_NAME:@.*]] = private unnamed_addr constant [11 x i8] c"sharedProp\00"
 // CHECK: [[SHARED_ATTRS:@.*]] = private unnamed_addr constant [17 x i8] c"Tq,N,VsharedProp\00"
 
-// CHECK: @_CLASS_PROPERTIES__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
-// CHECK:   i32 16,
-// CHECK:   i32 1,
-// CHECK:   [1 x { i8*, i8* }] [{
-// CHECK:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SHARED_NAME]], i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([17 x i8], [17 x i8]* [[SHARED_ATTRS]], i64 0, i64 0)
-// CHECK:   }]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK-NEW: @_CLASS_PROPERTIES__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
+// CHECK-NEW:   i32 16,
+// CHECK-NEW:   i32 1,
+// CHECK-NEW:   [1 x { i8*, i8* }] [{
+// CHECK-NEW:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SHARED_NAME]], i64 0, i64 0),
+// CHECK-NEW:     i8* getelementptr inbounds ([17 x i8], [17 x i8]* [[SHARED_ATTRS]], i64 0, i64 0)
+// CHECK-NEW:   }]
+// CHECK-NEW: }, section "__DATA, __objc_const", align 8
 
 // CHECK: @_METACLASS_DATA__TtC15objc_properties10SomeObject = private constant { {{.*}} } {
 // CHECK-SAME:   i32 {{[0-9]+}}, i32 {{[0-9]+}}, i32 {{[0-9]+}}, i32 {{[0-9]+}},
@@ -109,7 +112,8 @@ class Class17127126 {
 // CHECK-SAME:   i8* getelementptr inbounds ([{{.+}} x i8], [{{.+}} x i8]* {{@.+}}, i64 0, i64 0),
 // CHECK-SAME:   { {{.+}} }* @_CLASS_METHODS__TtC15objc_properties10SomeObject,
 // CHECK-SAME:   i8* null, i8* null, i8* null,
-// CHECK-SAME:   { {{.+}} }* @_CLASS_PROPERTIES__TtC15objc_properties10SomeObject
+// CHECK-NEW-SAME:   { {{.+}} }* @_CLASS_PROPERTIES__TtC15objc_properties10SomeObject
+// CHECK-OLD-SAME:   i8* null
 // CHECK-SAME: }, section "__DATA, __objc_const", align 8
 
 // CHECK: @_INSTANCE_METHODS__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
@@ -207,14 +211,14 @@ class Class17127126 {
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
-// CHECK: @"_CATEGORY_CLASS_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.*}}] } {
-// CHECK:   i32 16,
-// CHECK:   i32 1,
-// CHECK:   [1 x { i8*, i8* }] [{
-// CHECK:     i8* getelementptr inbounds ([19 x i8], [19 x i8]* [[EXTENSIONCLASSPROPERTY_NAME]], i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[EXTENSIONCLASSPROPERTY_ATTRS]], i64 0, i64 0)
-// CHECK:   }]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK-NEW: @"_CATEGORY_CLASS_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.*}}] } {
+// CHECK-NEW:   i32 16,
+// CHECK-NEW:   i32 1,
+// CHECK-NEW:   [1 x { i8*, i8* }] [{
+// CHECK-NEW:     i8* getelementptr inbounds ([19 x i8], [19 x i8]* [[EXTENSIONCLASSPROPERTY_NAME]], i64 0, i64 0),
+// CHECK-NEW:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[EXTENSIONCLASSPROPERTY_ATTRS]], i64 0, i64 0)
+// CHECK-NEW:   }]
+// CHECK-NEW: }, section "__DATA, __objc_const", align 8
 
 // CHECK: @"_CATEGORY__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.+}} } {
 // CHECK:   i8* getelementptr inbounds ([{{.+}} x i8], [{{.+}} x i8]* {{@.+}}, i64 0, i64 0),
@@ -223,7 +227,8 @@ class Class17127126 {
 // CHECK:   { {{.+}} }* @"_CATEGORY_CLASS_METHODS__TtC15objc_properties10SomeObject_$_objc_properties",
 // CHECK:   i8* null,
 // CHECK:   { {{.+}} }* @"_CATEGORY_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties", 
-// CHECK:   { {{.+}} }* @"_CATEGORY_CLASS_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties",
+// CHECK-NEW:   { {{.+}} }* @"_CATEGORY_CLASS_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties",
+// CHECK-OLD:   i8* null,
 // CHECK:   i32 60
 // CHECK: }, section "__DATA, __objc_const", align 8
 
@@ -248,7 +253,8 @@ class Class17127126 {
 // CHECK:   i32 96, i32 1,
 // CHECK:   { {{.+}} }* @_PROTOCOL_METHOD_TYPES__TtP15objc_properties5Proto_,
 // CHECK:   i8* null,
-// CHECK:   { {{.+}} }* @_PROTOCOL_CLASS_PROPERTIES__TtP15objc_properties5Proto_
+// CHECK-NEW:   { {{.+}} }* @_PROTOCOL_CLASS_PROPERTIES__TtP15objc_properties5Proto_
+// CHECK-OLD:   i8* null
 // CHECK: }, section "__DATA, __objc_const", align 8
 
 
@@ -267,11 +273,11 @@ class Class17127126 {
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
-// CHECK: @_PROTOCOL_CLASS_PROPERTIES__TtP15objc_properties5Proto_ = private constant { {{.*}}] } {
-// CHECK:   i32 16,
-// CHECK:   i32 1,
-// CHECK:   [1 x { i8*, i8* }] [{
-// CHECK:     i8* getelementptr inbounds ([15 x i8], [15 x i8]* [[PROTOCOLCLASSPROPERTY_NAME]], i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[PROTOCOLCLASSPROPERTY_ATTRS]], i64 0, i64 0)
-// CHECK:   }]
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK-NEW: @_PROTOCOL_CLASS_PROPERTIES__TtP15objc_properties5Proto_ = private constant { {{.*}}] } {
+// CHECK-NEW:   i32 16,
+// CHECK-NEW:   i32 1,
+// CHECK-NEW:   [1 x { i8*, i8* }] [{
+// CHECK-NEW:     i8* getelementptr inbounds ([15 x i8], [15 x i8]* [[PROTOCOLCLASSPROPERTY_NAME]], i64 0, i64 0),
+// CHECK-NEW:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[PROTOCOLCLASSPROPERTY_ATTRS]], i64 0, i64 0)
+// CHECK-NEW:   }]
+// CHECK-NEW: }, section "__DATA, __objc_const", align 8
