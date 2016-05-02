@@ -760,7 +760,7 @@ public struct DictionaryLiteral<Key, Value> : DictionaryLiteralConvertible {
 /// interoperate with the rest of the standard library.
 extension DictionaryLiteral : RandomAccessCollection {
 
-  public var indices: CountableRange<Int> {
+  var indices: CountableRange<Int> {
     return startIndex..<endIndex
   }
   
