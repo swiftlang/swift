@@ -39,15 +39,12 @@ SubstringTests.test("CharacterView")
   checkMatch(s.characters, t, t.index(after: t.startIndex))
   checkMatch(s.characters, t, t.index(before: t.endIndex))
   
-  t.replaceSubrange(t.startIndex...t.startIndex, with: ["C"])
-  expectEqual(String(t), "Cdefg")
-  expectEqual(s, "abcdefg")
-  
   checkMatch(s.characters, t, u.startIndex)
   checkMatch(t, u, u.startIndex)
   checkMatch(t, u, u.index(after: u.startIndex))
   checkMatch(t, u, u.index(before: u.endIndex))
   
+  t.replaceSubrange(t.startIndex...t.startIndex, with: ["C"])
   u.replaceSubrange(u.startIndex...u.startIndex, with: ["E"])
   expectEqual(String(u), "Efg")
   expectEqual(String(t), "Cdefg")
@@ -65,15 +62,12 @@ SubstringTests.test("UnicodeScalars")
   checkMatch(s.unicodeScalars, t, t.index(after: t.startIndex))
   checkMatch(s.unicodeScalars, t, t.index(before: t.endIndex))
   
-  t.replaceSubrange(t.startIndex...t.startIndex, with: ["C"])
-  expectEqual(String(t), "Cdefg")
-  expectEqual(s, "abcdefg")
-  
   checkMatch(s.unicodeScalars, t, u.startIndex)
   checkMatch(t, u, u.startIndex)
   checkMatch(t, u, u.index(after: u.startIndex))
   checkMatch(t, u, u.index(before: u.endIndex))
   
+  t.replaceSubrange(t.startIndex...t.startIndex, with: ["C"])
   u.replaceSubrange(u.startIndex...u.startIndex, with: ["E"])
   expectEqual(String(u), "Efg")
   expectEqual(String(t), "Cdefg")
