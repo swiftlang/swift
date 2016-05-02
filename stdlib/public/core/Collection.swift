@@ -209,7 +209,7 @@ public protocol Indexable : IndexableBase {
   /// Advances `i` by `n` positions, or until it equals `limit`.
   ///
   /// - Returns `true` if index has been advanced by exactly `n` steps without
-  ///   reaching the `limit`, and `false` otherwise.
+  ///   passing the `limit`, and `false` otherwise.
   ///
   /// - Precondition: `n >= 0` unless `Self` conforms to
   ///   `BidirectionalCollection`.
@@ -715,15 +715,12 @@ public protocol Collection : Indexable, Sequence {
   func index(_ i: Index, offsetBy n: IndexDistance) -> Index
 
   // FIXME: swift-3-indexing-model: Should this mention preconditions on `n`?
-  /// Returns the result of advancing `i` by `n` positions, or `nil` if it
-  /// reaches the `limit`.
+  /// Returns the result of advancing `i` by `n` positions, or `nil`
+  /// if doing so would pass `limit`.
   ///
   /// - Returns:
-  ///   - If `n > 0`, the `n`th successor of `i` or `nil` if the `limit` has
-  ///     been reached.
-  ///   - If `n < 0`, the `n`th predecessor of `i` or `nil` if the `limit` has
-  ///     been reached.
-  ///   - Otherwise, `i` unmodified.
+  ///   - `nil` if `(limit > i) == (n > 0) && abs(distance(i, limit)) < abs(n)`
+  ///   - Otherwise, `index(i, offsetBy: n)`
   ///
   /// - Precondition: `n >= 0` unless `Self` conforms to
   ///   `BidirectionalCollection`.
