@@ -183,3 +183,24 @@ func test6() {
 // VOID_1_RAW-NEXT: key.context: source.codecompletion.context.thismodule,
 // VOID_1_RAW-NEXT: key.num_bytes_to_erase: 0,
 // VOID_1_RAW-NEXT: key.not_recommended: 1,
+
+
+
+// RUN: %complete-test -tok=CASE_0 %s | FileCheck %s -check-prefix=CASE_0
+func test7() {
+  struct CaseSensitiveCheck {
+    var member: Int = 0
+  }
+  let caseSensitiveCheck = CaseSensitiveCheck()
+  #^CASE_0,caseSensitiveCheck,CaseSensitiveCheck^#
+}
+// CASE_0: Results for filterText: caseSensitiveCheck [
+// CASE_0: caseSensitiveCheck
+// CASE_0: CaseSensitiveCheck
+// CASE_0: caseSensitiveCheck.
+// CASE_0: ]
+// CASE_0: Results for filterText: CaseSensitiveCheck [
+// CASE_0: caseSensitiveCheck
+// CASE_0: CaseSensitiveCheck
+// CASE_0: CaseSensitiveCheck(
+// CASE_0: ]

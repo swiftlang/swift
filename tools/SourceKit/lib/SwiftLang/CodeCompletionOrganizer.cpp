@@ -586,8 +586,17 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
     bool isExactMatch = match && completion->getName().equals_lower(filterText);
 
     if (isExactMatch) {
-      if (!exactMatch)
+      if (!exactMatch) { // first match
         exactMatch = completion;
+      } else if (completion->getName() != exactMatch->getName()) {
+        if (completion->getName() == filterText && // first case-sensitive match
+            exactMatch->getName() != filterText)
+          exactMatch = completion;
+        else if (pattern.scoreCandidate(completion->getName()) > // better match
+                 pattern.scoreCandidate(exactMatch->getName()))
+          exactMatch = completion;
+      }
+
       match = (options.addInnerResults || options.addInnerOperators)
                   ? options.includeExactMatch
                   : true;
