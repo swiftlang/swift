@@ -2305,6 +2305,11 @@ public:
   /// True if this is a C function that was imported as a member of a type in
   /// Swift.
   bool isImportAsMember() const;
+
+  /// True if this matches what XCTest considers to be a viable test: a class
+  /// instance method that takes no parameters, returns void, and begins with
+  /// "test".
+  bool isTestCandidate() const;
 };
 
 /// This is a common base class for declarations which declare a type.

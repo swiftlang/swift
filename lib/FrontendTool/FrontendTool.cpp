@@ -699,6 +699,7 @@ static bool performCompile(CompilerInstance &Instance,
       Action == FrontendOptions::DumpAST ||
       Action == FrontendOptions::PrintAST ||
       Action == FrontendOptions::DumpTypeRefinementContexts ||
+      Action == FrontendOptions::DumpXCTestMethods ||
       Action == FrontendOptions::DumpInterfaceHash) {
     SourceFile *SF = PrimarySourceFile;
     if (!SF) {
@@ -709,6 +710,8 @@ static bool performCompile(CompilerInstance &Instance,
       SF->print(llvm::outs(), PrintOptions::printEverything());
     else if (Action == FrontendOptions::DumpTypeRefinementContexts)
       SF->getTypeRefinementContext()->dump(llvm::errs(), Context.SourceMgr);
+    else if (Action == FrontendOptions::DumpXCTestMethods)
+      SF->dumpXCTestMethods(llvm::errs());
     else if (Action == FrontendOptions::DumpInterfaceHash)
       SF->dumpInterfaceHash(llvm::errs());
     else

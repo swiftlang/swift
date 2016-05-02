@@ -791,39 +791,12 @@ static NominalTypeDecl *getNominalParent(ValueDecl *D) {
   return Ty->getAnyNominal();
 }
 
-static bool isTestCandidate(ValueDecl *D) {
-  if (!D->hasName())
-    return false;
-
-  // A 'test candidate' is a class instance method that returns void, has no
-  // parameters and starts with 'test'.
-  // FIXME: Also test if it is ObjC exportable ?
-  if (auto FD = dyn_cast<FuncDecl>(D)) {
-    if (FD->isStatic())
-      return false;
-    if (!D->getDeclContext()->isTypeContext())
-      return false;
-    auto NTD = getNominalParent(D);
-    if (!NTD)
-      return false;
-    Type RetTy = FD->getResultType();
-    if (FD->getParameterLists().size() != 2)
-      return false;
-    auto paramList = FD->getParameterList(1);
-    if (RetTy && RetTy->isVoid() && isa<ClassDecl>(NTD) &&
-        paramList->size() == 0 && FD->getName().str().startswith("test"))
-      return true;
-  }
-
-  return false;
-}
-
 bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(ValueDecl *D,
                                                   IndexSymbol &Info) {
   if (initIndexSymbol(D, D->getLoc(), /*IsRef=*/false, Info))
     return true;
 
-  if (isTestCandidate(D))
+  if (D->isTestCandidate())
     Info.subKinds |= SymbolSubKind::UnitTest;
 
   if (auto Group = D->getGroupName())

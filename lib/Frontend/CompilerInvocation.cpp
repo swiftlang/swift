@@ -245,6 +245,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::DumpAST;
     } else if (Opt.matches(OPT_dump_type_refinement_contexts)) {
       Action = FrontendOptions::DumpTypeRefinementContexts;
+    } else if (Opt.matches(OPT_dump_xctest_methods)) {
+      Action = FrontendOptions::DumpXCTestMethods;
     } else if (Opt.matches(OPT_dump_interface_hash)) {
       Action = FrontendOptions::DumpInterfaceHash;
     } else if (Opt.matches(OPT_print_ast)) {
@@ -424,6 +426,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
     case FrontendOptions::DumpTypeRefinementContexts:
+    case FrontendOptions::DumpXCTestMethods:
       // Textual modes.
       Opts.setSingleOutputFilename("-");
       break;
@@ -613,6 +616,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
     case FrontendOptions::DumpTypeRefinementContexts:
+    case FrontendOptions::DumpXCTestMethods:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
@@ -639,6 +643,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
     case FrontendOptions::DumpTypeRefinementContexts:
+    case FrontendOptions::DumpXCTestMethods:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
@@ -667,6 +672,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
     case FrontendOptions::DumpTypeRefinementContexts:
+    case FrontendOptions::DumpXCTestMethods:
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:

@@ -946,6 +946,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     case options::OPT_dump_ast:
     case options::OPT_print_ast:
     case options::OPT_dump_type_refinement_contexts:
+    case options::OPT_dump_xctest_methods:
     case options::OPT_dump_interface_hash:
       OI.CompilerOutputType = types::TY_Nothing;
       break;

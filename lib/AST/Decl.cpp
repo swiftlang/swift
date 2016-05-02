@@ -1357,6 +1357,46 @@ bool ValueDecl::needsCapture() const {
   return true;
 }
 
+bool ValueDecl::isTestCandidate() const {
+  if (!this->hasName())
+    return false;
+
+  // A 'test candidate' is:
+  // 1. An instance method...
+  auto FD = dyn_cast<FuncDecl>(this);
+  if (!FD)
+    return false;
+  if (FD->isStatic())
+    return false;
+  if (!this->getDeclContext()->isTypeContext())
+    return false;
+  Type Ty = this->getDeclContext()->getDeclaredTypeOfContext();
+  if (!Ty)
+    return false;
+  auto NTD = Ty->getAnyNominal();
+  if (!NTD)
+    return false;
+  if (!isa<ClassDecl>(NTD))
+    return false;
+
+  // 2. ...that returns void...
+  Type RetTy = FD->getResultType();
+  if (RetTy && !RetTy->isVoid())
+    return false;
+
+  // 3. ...takes no parameters...
+  if (FD->getParameterLists().size() != 2)
+    return false;
+  if (FD->getParameterList(1)->size() != 0)
+    return false;
+
+  // 4. ...and starts with "test".
+  if (FD->getName().str().startswith("test"))
+    return true;
+
+  return false;
+}
+
 ValueDecl *ValueDecl::getOverriddenDecl() const {
   if (auto fd = dyn_cast<FuncDecl>(this))
     return fd->getOverriddenDecl();
