@@ -54,20 +54,14 @@ static void errorAndExit(const char *message) {
   abort();
 }
 
-RemoteSection makeRemoteSection(uintptr_t StartAddress, uintptr_t Size) {
-  RemoteSection RS = {
-    StartAddress,
-    Size,
-    StartAddress + Size
-  };
-  return RS;
-}
-
 swift_reflection_section_t
-makeLocalSection(uintptr_t StartAddress, size_t Size) {
+makeLocalSection(void *Buffer, RemoteSection Section,
+                 RemoteReflectionInfo Info) {
+  uintptr_t Base
+    = (uintptr_t)Buffer + Section.StartAddress - Info.StartAddress;
   swift_reflection_section_t LS = {
-    (void *)StartAddress,
-    (void *)(StartAddress + Size)
+    (void *)Base,
+    (void *)(Base + Section.Size)
   };
   return LS;
 }
@@ -157,7 +151,7 @@ uint8_t PipeMemoryReader_getSizeSize(void *Context) {
 }
 
 void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
-                                           uint8_t *Dest, size_t Size) {
+                                           void *Dest, size_t Size) {
   int ReadFD = PipeMemoryReader_getParentReadFD(Reader);
   while (Size) {
     int bytesRead = read(ReadFD, Dest, Size);
@@ -171,7 +165,7 @@ void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
 }
 
 int PipeMemoryReader_readBytes(void *Context,
-                               addr_t Address, uint8_t *Dest, uint64_t Size) {
+                               addr_t Address, void *Dest, uint64_t Size) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
   uintptr_t TargetAddress = Address;
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
@@ -228,99 +222,68 @@ PipeMemoryReader createPipeMemoryReader() {
   return Reader;
 }
 
-const swift_reflection_info_t *
-PipeMemoryReader_receiveReflectionInfo(const PipeMemoryReader *Reader,
-                                       size_t *NumReflectionInfos) {
+RemoteSection makeRemoteSection(const PipeMemoryReader *Reader) {
+  uintptr_t Start;
+  size_t Size;
+
+  PipeMemoryReader_collectBytesFromPipe(Reader, &Start, sizeof(Start));
+  PipeMemoryReader_collectBytesFromPipe(Reader, &Size, sizeof(Size));
+
+  RemoteSection RS = {Start, Size, Start + Size};
+  return RS;
+}
+
+void
+PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
+                                       const PipeMemoryReader *Reader) {
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
   write(WriteFD, REQUEST_REFLECTION_INFO, 2);
-  PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)NumReflectionInfos,
+  size_t NumReflectionInfos;
+  PipeMemoryReader_collectBytesFromPipe(Reader, &NumReflectionInfos,
                                         sizeof(NumReflectionInfos));
 
-  if (*NumReflectionInfos == 0)
-    return NULL;
+  if (NumReflectionInfos == 0)
+    return;
 
-  size_t Size = sizeof(RemoteReflectionInfo) * *NumReflectionInfos;
-  RemoteReflectionInfo *RemoteInfos = (RemoteReflectionInfo*)malloc(Size);
+  RemoteReflectionInfo *RemoteInfos = calloc(NumReflectionInfos,
+                                             sizeof(RemoteReflectionInfo));
+  if (RemoteInfos == NULL)
+    errorAndExit("malloc failed");
 
-  for (size_t i = 0; i < *NumReflectionInfos; ++i) {
-    uintptr_t fieldmd_start;
-    size_t fieldmd_size;
-    uintptr_t assocty_start;
-    size_t assocty_size;
-    uintptr_t builtin_start;
-    size_t builtin_size;
-    uintptr_t typeref_start;
-    size_t typeref_size;
-    uintptr_t reflstr_start;
-    size_t reflstr_size;
-
-    PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)&fieldmd_start,
-                                          sizeof(fieldmd_start));
-    PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)&fieldmd_size,
-                                          sizeof(fieldmd_size));
-    PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)&assocty_start,
-                                          sizeof(assocty_start));
-    PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)&assocty_size,
-                                          sizeof(assocty_size));
-    PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)&builtin_start,
-                                          sizeof(builtin_start));
-    PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)&builtin_size,
-                                          sizeof(builtin_size));
-    PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)&typeref_start,
-                                          sizeof(typeref_start));
-    PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)&typeref_size,
-                                          sizeof(typeref_size));
-    PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)&reflstr_start,
-                                          sizeof(reflstr_start));
-    PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)&reflstr_size,
-                                          sizeof(reflstr_size));
-
+  for (size_t i = 0; i < NumReflectionInfos; ++i) {
     RemoteInfos[i] = makeRemoteReflectionInfo(
-      makeRemoteSection(fieldmd_start, fieldmd_size),
-      makeRemoteSection(assocty_start, assocty_size),
-      makeRemoteSection(builtin_start, builtin_size),
-      makeRemoteSection(typeref_start, typeref_size),
-      makeRemoteSection(reflstr_start, reflstr_size));
+      makeRemoteSection(Reader),
+      makeRemoteSection(Reader),
+      makeRemoteSection(Reader),
+      makeRemoteSection(Reader),
+      makeRemoteSection(Reader));
   }
 
   // Now pull in the remote sections into our address space.
 
-  swift_reflection_info_t *Infos
-    = malloc(sizeof(swift_reflection_info_t) * *NumReflectionInfos);
-
-  for (size_t i = 0; i < *NumReflectionInfos; ++i) {
+  for (size_t i = 0; i < NumReflectionInfos; ++i) {
     RemoteReflectionInfo RemoteInfo = RemoteInfos[i];
 
-    uintptr_t buffer = (uintptr_t)malloc(RemoteInfo.TotalSize);
+    void *Buffer = malloc(RemoteInfo.TotalSize);
 
-    int Success = PipeMemoryReader_readBytes((void*)Reader,
+    int Success = PipeMemoryReader_readBytes((void *)Reader,
                                              RemoteInfo.StartAddress,
-                                             (uint8_t*)buffer,
+                                             Buffer,
                                              RemoteInfo.TotalSize);
     if (!Success)
       errorAndExit("Couldn't read reflection information");
 
-    uintptr_t fieldmd_base
-      = buffer + RemoteInfo.fieldmd.StartAddress - RemoteInfo.StartAddress;
-    uintptr_t assocty_base
-      = buffer + RemoteInfo.assocty.StartAddress - RemoteInfo.StartAddress;
-    uintptr_t builtin_base
-      = buffer + RemoteInfo.builtin.StartAddress - RemoteInfo.StartAddress;
-    uintptr_t typeref_base
-      = buffer + RemoteInfo.typeref.StartAddress - RemoteInfo.StartAddress;
-    uintptr_t reflstr_base
-      = buffer + RemoteInfo.reflstr.StartAddress - RemoteInfo.StartAddress;
-
     swift_reflection_info_t Info = {
-      makeLocalSection(fieldmd_base, RemoteInfo.fieldmd.Size),
-      makeLocalSection(assocty_base, RemoteInfo.assocty.Size),
-      makeLocalSection(builtin_base, RemoteInfo.builtin.Size),
-      makeLocalSection(typeref_base, RemoteInfo.typeref.Size),
-      makeLocalSection(reflstr_base, RemoteInfo.reflstr.Size)
+      makeLocalSection(Buffer, RemoteInfo.fieldmd, RemoteInfo),
+      makeLocalSection(Buffer, RemoteInfo.assocty, RemoteInfo),
+      makeLocalSection(Buffer, RemoteInfo.builtin, RemoteInfo),
+      makeLocalSection(Buffer, RemoteInfo.typeref, RemoteInfo),
+      makeLocalSection(Buffer, RemoteInfo.reflstr, RemoteInfo)
     };
-    Infos[i] = Info;
+    swift_reflection_addReflectionInfo(RC, Info);
   }
-  return Infos;
+
+  free(RemoteInfos);
 }
 
 uint64_t PipeMemoryReader_getStringLength(void *Context, addr_t Address) {
@@ -329,8 +292,7 @@ uint64_t PipeMemoryReader_getStringLength(void *Context, addr_t Address) {
   write(WriteFD, REQUEST_STRING_LENGTH, 2);
   write(WriteFD, &Address, sizeof(Address));
   uintptr_t Length = 0;
-  PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)&Length,
-                                         sizeof(Length));
+  PipeMemoryReader_collectBytesFromPipe(Reader, &Length, sizeof(Length));
   return Length;
 }
 
@@ -371,12 +333,7 @@ int doDumpHeapInstance(const char *BinaryFilename) {
       printf("Instance pointer in child address space: 0x%lx\n",
         instance);
 
-      size_t NumReflectionInfos = 0;
-      const swift_reflection_info_t *Infos
-        = PipeMemoryReader_receiveReflectionInfo(&Pipe, &NumReflectionInfos);
-
-      for (size_t i = 0; i < NumReflectionInfos; ++i)
-        swift_reflection_addReflectionInfo(RC, Infos[i]);
+      PipeMemoryReader_receiveReflectionInfo(RC, &Pipe);
 
       printf("Type reference:\n");
 
