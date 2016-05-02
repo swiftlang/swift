@@ -753,7 +753,7 @@ public struct DictionaryLiteral<Key, Value> : DictionaryLiteralConvertible {
 
 /// `Collection` conformance that allows `DictionaryLiteral` to
 /// interoperate with the rest of the standard library.
-extension DictionaryLiteral : Collection {
+extension DictionaryLiteral : RandomAccessCollection {
   /// The position of the first element in a non-empty `DictionaryLiteral`.
   ///
   /// Identical to `endIndex` in an empty `DictionaryLiteral`.
