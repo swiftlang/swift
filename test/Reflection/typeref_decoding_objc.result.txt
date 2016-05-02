@@ -54,10 +54,12 @@ CAPTURE DESCRIPTORS:
 (struct Swift.UInt)
 (struct Swift.UInt)
 - Metadata sources:
+
 - Capture types:
 - Metadata sources:
 !!! Invalid typeref
 !!! Invalid matadata source
+
 - Capture types:
 (struct Swift.StaticString)
 (bound_generic_struct Swift.UnsafeBufferPointer
@@ -65,10 +67,12 @@ CAPTURE DESCRIPTORS:
 (struct Swift.UInt)
 (struct Swift.UInt)
 - Metadata sources:
+
 - Capture types:
 - Metadata sources:
 !!! Invalid typeref
 !!! Invalid matadata source
+
 - Capture types:
 (bound_generic_struct Swift.UnsafeBufferPointer
   (struct Swift.UInt8))
@@ -77,8 +81,10 @@ CAPTURE DESCRIPTORS:
 (struct Swift.UInt)
 (struct Swift.UInt)
 - Metadata sources:
+
 - Capture types:
 - Metadata sources:
 !!! Invalid typeref
 !!! Invalid matadata source
+
 
