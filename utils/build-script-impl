@@ -105,9 +105,6 @@ KNOWN_SETTINGS=(
     swift-sdks                  ""               "build target binaries only for specified SDKs (semicolon-separated list)"
     swift-primary-variant-sdk   ""               "default SDK for target binaries"
     swift-primary-variant-arch  ""               "default arch for target binaries"
-    skip-ios                    ""               "set to skip everything iOS-related"
-    skip-tvos                   ""               "set to skip everything tvOS-related"
-    skip-watchos                ""               "set to skip everything watchOS-related"
     skip-build-cmark            ""               "set to skip building CommonMark"
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
     skip-build-swift            ""               "set to skip building Swift"
@@ -115,13 +112,10 @@ KNOWN_SETTINGS=(
     skip-build-freebsd          ""               "set to skip building Swift stdlibs for FreeBSD"
     skip-build-cygwin           ""               "set to skip building Swift stdlibs for Cygwin"
     skip-build-osx              ""               "set to skip building Swift stdlibs for OSX"
-    skip-build-ios              ""               "set to skip building Swift stdlibs for iOS"
     skip-build-ios-device       ""               "set to skip building Swift stdlibs for iOS devices (i.e. build simulators only)"
     skip-build-ios-simulator    ""               "set to skip building Swift stdlibs for iOS simulators (i.e. build devices only)"
-    skip-build-tvos             ""               "set to skip building Swift stdlibs for tvOS"
     skip-build-tvos-device      ""               "set to skip building Swift stdlibs for tvOS devices (i.e. build simulators only)"
     skip-build-tvos-simulator   ""               "set to skip building Swift stdlibs for tvOS simulators (i.e. build devices only)"
-    skip-build-watchos          ""               "set to skip building Swift stdlibs for Apple watchOS"
     skip-build-watchos-device   ""               "set to skip building Swift stdlibs for Apple watchOS devices (i.e. build simulators only)"
     skip-build-watchos-simulator ""              "set to skip building Swift stdlibs for Apple watchOS simulators (i.e. build devices only)"
     skip-build-android          ""               "set to skip building Swift stdlibs for Android"
@@ -704,81 +698,6 @@ fi
 
 if [[ "${CHECK_ARGS_ONLY}" ]]; then
     exit 0
-fi
-
-if [[ "${SKIP_IOS}" ]] ; then
-    SKIP_BUILD_IOS=1
-    SKIP_BUILD_IOS_DEVICE=1
-    SKIP_BUILD_IOS_SIMULATOR=1
-    SKIP_TEST_IOS_HOST=1
-    SKIP_TEST_IOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_TVOS}" ]] ; then
-    SKIP_BUILD_TVOS=1
-    SKIP_BUILD_TVOS_DEVICE=1
-    SKIP_BUILD_TVOS_SIMULATOR=1
-    SKIP_TEST_TVOS_HOST=1
-    SKIP_TEST_TVOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_WATCHOS}" ]] ; then
-    SKIP_BUILD_WATCHOS=1
-    SKIP_BUILD_WATCHOS_DEVICE=1
-    SKIP_BUILD_WATCHOS_SIMULATOR=1
-    SKIP_TEST_WATCHOS_HOST=1
-    SKIP_TEST_WATCHOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_BUILD_IOS}" ]] ; then
-    SKIP_BUILD_IOS=1
-    SKIP_BUILD_IOS_DEVICE=1
-    SKIP_BUILD_IOS_SIMULATOR=1
-    SKIP_TEST_IOS_HOST=1
-    SKIP_TEST_IOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_BUILD_TVOS}" ]] ; then
-    SKIP_BUILD_TVOS=1
-    SKIP_BUILD_TVOS_DEVICE=1
-    SKIP_BUILD_TVOS_SIMULATOR=1
-    SKIP_TEST_TVOS_HOST=1
-    SKIP_TEST_TVOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_BUILD_WATCHOS}" ]] ; then
-    SKIP_BUILD_WATCHOS=1
-    SKIP_BUILD_WATCHOS_DEVICE=1
-    SKIP_BUILD_WATCHOS_SIMULATOR=1
-    SKIP_TEST_WATCHOS_HOST=1
-    SKIP_TEST_WATCHOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_BUILD_IOS_DEVICE}" ]] ; then
-    SKIP_BUILD_IOS_DEVICE=1
-fi
-
-if [[ "${SKIP_BUILD_TVOS_DEVICE}" ]] ; then
-    SKIP_BUILD_TVOS_DEVICE=1
-fi
-
-if [[ "${SKIP_BUILD_WATCHOS_DEVICE}" ]] ; then
-    SKIP_BUILD_WATCHOS_DEVICE=1
-fi
-
-if [[ "${SKIP_BUILD_IOS_SIMULATOR}" ]] ; then
-    SKIP_BUILD_IOS_SIMULATOR=1
-    SKIP_TEST_IOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_BUILD_TVOS_SIMULATOR}" ]] ; then
-    SKIP_BUILD_TVOS_SIMULATOR=1
-    SKIP_TEST_TVOS_SIMULATOR=1
-fi
-
-if [[ "${SKIP_BUILD_WATCHOS_SIMULATOR}" ]] ; then
-    SKIP_BUILD_WATCHOS_SIMULATOR=1
-    SKIP_TEST_WATCHOS_SIMULATOR=1
 fi
 
 # FIXME: We currently do not support building compiler-rt with the
