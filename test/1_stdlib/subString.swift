@@ -16,9 +16,8 @@ func checkMatch<S: Collection, T: Collection
   expectEqual(x[i], y[i])
 }
 
-let s = "abcdefg"
-
 SubstringTests.test("String") {
+  let s = "abcdefg"
   let s1 = s[s.index(s.startIndex, offsetBy: 2) ..<
     s.index(s.startIndex, offsetBy: 4)]
   let s2 = s1[s1.startIndex..<s1.endIndex]
@@ -32,6 +31,7 @@ SubstringTests.test("String") {
 SubstringTests.test("CharacterView")
   .xfail(.always("CharacterView slices don't share indices"))
   .code {
+  let s = "abcdefg"
   var t = s.characters.dropFirst(2)
   var u = t.dropFirst(2)
   
@@ -57,6 +57,7 @@ SubstringTests.test("CharacterView")
 SubstringTests.test("UnicodeScalars")
   .xfail(.always("UnicodeScalarsView slices don't share indices"))
   .code {
+  let s = "abcdefg"
   var t = s.unicodeScalars.dropFirst(2)
   var u = t.dropFirst(2)
   
@@ -82,8 +83,9 @@ SubstringTests.test("UnicodeScalars")
 SubstringTests.test("UTF16View")
   .xfail(.always("UTF16View slices don't share indices"))
   .code {
-  var t = s.utf16.dropFirst(2)
-  var u = t.dropFirst(2)
+  let s = "abcdefg"
+  let t = s.utf16.dropFirst(2)
+  let u = t.dropFirst(2)
   
   checkMatch(s.utf16, t, t.startIndex)
   checkMatch(s.utf16, t, t.index(after: t.startIndex))
@@ -96,8 +98,9 @@ SubstringTests.test("UTF16View")
 }
 
 SubstringTests.test("UTF8View") {
-  var t = s.utf8.dropFirst(2)
-  var u = t.dropFirst(2)
+  let s = "abcdefg"
+  let t = s.utf8.dropFirst(2)
+  let u = t.dropFirst(2)
   
   checkMatch(s.utf8, t, t.startIndex)
   checkMatch(s.utf8, t, t.index(after: t.startIndex))
