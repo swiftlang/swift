@@ -106,6 +106,8 @@ NOTE(lex_comment_start,none,
      "comment started here", ())
 
 
+ERROR(lex_invalid_modifier,none,
+      "invalid string modifier", ())
 ERROR(lex_unterminated_string,none,
       "unterminated string literal", ())
 ERROR(lex_invalid_escape,none,

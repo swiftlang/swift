@@ -560,6 +560,23 @@ tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
   return Kind;
 }
 
+bool Lexer::buildModifiers(const char *ModPtr, StringLiteralModifiers &modifiers) {
+  modifiers = (StringLiteralModifiers)0;
+  while (ModPtr < CurPtr)
+    switch (*ModPtr++) {
+    case '_':
+      modifiers = (StringLiteralModifiers)(modifiers | StringLiteralUnderscore);
+      break;
+    case 'e':
+      modifiers = (StringLiteralModifiers)(modifiers | StringLiteralExtraEscapes);
+      break;
+    default:
+      diagnose(ModPtr, diag::lex_invalid_modifier);
+      return false;
+    }
+  return true;
+}
+
 /// lexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
 void Lexer::lexIdentifier() {
   const char *TokStart = CurPtr-1;
@@ -570,6 +587,12 @@ void Lexer::lexIdentifier() {
 
   // Lex [a-zA-Z_$0-9[[:XID_Continue:]]]*
   while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
+
+  StringLiteralModifiers modifiers;
+  if (*CurPtr == '"' && buildModifiers(TokStart, modifiers)) {
+    CurPtr++;
+    return lexStringLiteral(modifiers);
+  }
 
   tok Kind = kindOfIdentifier(StringRef(TokStart, CurPtr-TokStart), InSILMode);
   return formToken(Kind, TokStart);
@@ -1029,7 +1052,7 @@ unsigned Lexer::lexUnicodeEscape(const char *&CurPtr, Lexer *Diags) {
 ///   character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]' | [\]0
 ///   character_escape  ::= unicode_character_escape
 unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
-                             bool EmitDiagnostics, char modifier) {
+                             bool EmitDiagnostics, StringLiteralModifiers modifiers) {
   const char *CharStart = CurPtr;
 
   switch (*CurPtr++) {
@@ -1080,7 +1103,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   // Escape processing.  We already ate the "\".
   switch (*CurPtr) {
   default:  // Invalid escape.
-    if (modifier == 'e')
+    if (modifiers & StringLiteralExtraEscapes)
         return '\\'; // e"" non-escaped
     if (EmitDiagnostics)
       diagnose(CurPtr, diag::lex_invalid_escape);
@@ -1231,7 +1254,7 @@ static bool nextNonWhitespaceIsQuote(const char *&CurPtr, char StopQuote) {
 
 /// lexStringLiteral:
 ///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
-void Lexer::lexStringLiteral(char modifier) {
+void Lexer::lexStringLiteral(StringLiteralModifiers modifiers) {
   const char *TokStart = CurPtr-1;
   assert((*TokStart == '"' || *TokStart == '\'') && "Unexpected start");
   // NOTE: We only allow single-quote string literals so we can emit useful
@@ -1267,7 +1290,7 @@ void Lexer::lexStringLiteral(char modifier) {
       return formToken(tok::unknown, TokStart);
     }
     
-    unsigned CharValue = lexCharacter(CurPtr, *TokStart, true, modifier);
+    unsigned CharValue = lexCharacter(CurPtr, *TokStart, true, modifiers);
     wasErroneous |= CharValue == ~1U;
 
     // If this is the end of string, we are done.  If it is a normal character
@@ -1311,7 +1334,7 @@ void Lexer::lexStringLiteral(char modifier) {
                              replacement);
       }
 
-      if (modifier == '_') {
+      if (modifiers & StringLiteralUnderscore) {
         if (*CurPtr != '_')
           continue;
         else {
@@ -1433,17 +1456,17 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
   while (BytesPtr != Bytes.end()) {
     char CurChar = *BytesPtr++;
     if (CurChar != '\\') {
-      TempString.push_back(CurChar);
-      if (CurChar == '\r' || CurChar == '\n') {
-        while (*BytesPtr == '\r' || *BytesPtr == '\n')
-          TempString.push_back(*BytesPtr++);
+      if (CurChar != '\r')
+        TempString.push_back(CurChar);
+      else
+        TempString.push_back('\n');
+      if (CurChar == '\r' || CurChar == '\n')
         assert(nextNonWhitespaceIsQuote(BytesPtr, '"') && "Invalid string continuation");
-      }
       continue;
     }
     
-    // Invalid escapes are accepted by the lexer but diagnosed as an error.  We
-    // just ignore them here.
+    // Invalid escapes can now be passed through by the lexer for the e"" modifier.
+    // just pass them on to the encoded string.
     unsigned CharValue = 0; // Unicode character value for \x, \u, \U.
     switch (*BytesPtr++) {
     default:  // Invalid escape, pass it through.
@@ -1724,21 +1747,15 @@ Restart:
   case '&': case '|': case '^': case '~': case '.':
     return lexOperatorIdentifier();
 
-  case '_': case 'e':
-    if (*CurPtr == '"') {
-      CurPtr++;
-      return lexStringLiteral(CurPtr[-2]);
-    }
-    SWIFT_FALLTHROUGH;
-
   case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
   case 'H': case 'I': case 'J': case 'K': case 'L': case 'M': case 'N':
   case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T': case 'U':
   case 'V': case 'W': case 'X': case 'Y': case 'Z':
-  case 'a': case 'b': case 'c': case 'd': case 'f': case 'g':
+  case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g':
   case 'h': case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':
   case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'u':
   case 'v': case 'w': case 'x': case 'y': case 'z':
+  case '_':
     return lexIdentifier();
 
   case '$':

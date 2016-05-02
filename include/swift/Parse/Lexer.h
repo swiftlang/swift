@@ -36,6 +36,11 @@ enum class CommentRetentionMode {
   ReturnAsTokens,
 };
 
+enum StringLiteralModifiers : unsigned {
+  StringLiteralUnderscore = 1<<0,
+  StringLiteralExtraEscapes = 1<<1
+};
+
 class Lexer {
   const LangOptions &LangOpts;
   const SourceManager &SourceMgr;
@@ -432,8 +437,9 @@ private:
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr,
-                        char StopQuote, bool EmitDiagnostics, char modifier = 0);
-  void lexStringLiteral(char modifier = 0);
+                        char StopQuote, bool EmitDiagnostics, StringLiteralModifiers modifiers = (StringLiteralModifiers)0);
+  bool buildModifiers(const char *ModPtr, StringLiteralModifiers &modifiers);
+  void lexStringLiteral(StringLiteralModifiers modifiers = (StringLiteralModifiers)0);
   void lexEscapedIdentifier();
 
   void tryLexEditorPlaceholder();
