@@ -455,10 +455,6 @@ public func check${Traversal}Collection<
   C.Iterator.Element == ${Element},
   C.Indices.Iterator.Element == C.Index,
   ${Element} : Equatable
-%     if Traversal == 'RandomAccess':
-  , C.Index : Strideable
-  , C.Index.Stride == C.IndexDistance
-%     end
 >(
   _ expected: ${Expected}, _ collection: C,
   ${TRACE},

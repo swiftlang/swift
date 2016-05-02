@@ -57,7 +57,11 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     return count
   }
 
-  public typealias Indices = DefaultRandomAccessIndices<Unsafe${Mutable}BufferPointer<Element>>
+  public typealias Indices = CountableRange<Int>
+
+  public var indices: Indices {
+    return startIndex..<endIndex
+  }
 
   /// Access the `i`th element in the buffer.
   public subscript(i: Int) -> Element {

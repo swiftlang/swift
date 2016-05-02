@@ -403,6 +403,11 @@ public:
   substSelfTypeIntoProtocolRequirementType(CanGenericFunctionType reqtTy,
                                            ProtocolConformance *conformance);
 
+  /// Emit a `mark_function_escape` instruction for top-level code when a
+  /// function or closure at top level refers to script globals.
+  void emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
+                                                const CaptureInfo &captureInfo);
+
 private:
   /// Emit the deallocator for a class that uses the objc allocator.
   void emitObjCAllocatorDestructor(ClassDecl *cd, DestructorDecl *dd);

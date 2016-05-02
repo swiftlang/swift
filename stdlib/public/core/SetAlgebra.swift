@@ -18,7 +18,7 @@
 ///
 /// You use types that conform to the `SetAlgebra` protocol when you need
 /// efficient membership tests or mathematical set operations such as
-/// intersection, union, and substraction. In the standard library, you can
+/// intersection, union, and subtraction. In the standard library, you can
 /// use the `Set` type with elements of any hashable type, or you can easily
 /// create bit masks with `SetAlgebra` conformance using the `OptionSet`
 /// protocol. See those types for more information.
@@ -389,7 +389,7 @@ extension SetAlgebra {
   /// square brackets. You can use an array literal anywhere a set is expected
   /// by the type context.
   ///
-  /// Here, an set of strings is created from an array literal holding only
+  /// Here, a set of strings is created from an array literal holding only
   /// strings:
   ///
   ///     let ingredients: Set = ["cocoa beans", "sugar", "cocoa butter", "salt"]

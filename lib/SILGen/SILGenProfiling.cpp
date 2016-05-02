@@ -29,17 +29,24 @@
 using namespace swift;
 using namespace Lowering;
 
+static bool isUnmappedDecl(Decl *D) {
+  if (isa<ConstructorDecl>(D) || isa<DestructorDecl>(D))
+    return false;
+
+  return D->isImplicit() || isa<EnumCaseDecl>(D);
+}
+
 ProfilerRAII::ProfilerRAII(SILGenModule &SGM, AbstractFunctionDecl *D)
-    : SGM(SGM) {
+    : SGM(SGM), PreviousProfiler(std::move(SGM.Profiler)) {
   const auto &Opts = SGM.M.getOptions();
-  if (!Opts.GenerateProfile)
+  if (!Opts.GenerateProfile || isUnmappedDecl(D))
     return;
   SGM.Profiler =
       llvm::make_unique<SILGenProfiling>(SGM, Opts.EmitProfileCoverageMapping);
   SGM.Profiler->assignRegionCounters(D);
 }
 
-ProfilerRAII::~ProfilerRAII() { SGM.Profiler = nullptr; }
+ProfilerRAII::~ProfilerRAII() { SGM.Profiler = std::move(PreviousProfiler); }
 
 namespace {
 
@@ -55,6 +62,8 @@ struct MapRegionCounters : public ASTWalker {
       : NextCounter(0), CounterMap(CounterMap) {}
 
   bool walkToDeclPre(Decl *D) override {
+    if (isUnmappedDecl(D))
+      return false;
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
       CounterMap[AFD->getBody()] = NextCounter++;
     return true;
@@ -435,7 +444,7 @@ public:
   }
 
   bool walkToDeclPre(Decl *D) override {
-    if (D->isImplicit())
+    if (isUnmappedDecl(D))
       return false;
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
       assignCounter(AFD->getBody());

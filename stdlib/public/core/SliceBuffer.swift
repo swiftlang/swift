@@ -12,7 +12,7 @@
 
 /// Buffer type for `ArraySlice<Element>`.
 public // @testable
-struct _SliceBuffer<Element> : _ArrayBufferProtocol {
+struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   internal typealias NativeStorage = _ContiguousArrayStorage<Element>
   public typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
@@ -308,10 +308,6 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   }
 
   public typealias Indices = CountableRange<Int>
-
-  public var indices: CountableRange<Int> {
-    return startIndex..<endIndex
-  }
 
   //===--- misc -----------------------------------------------------------===//
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the

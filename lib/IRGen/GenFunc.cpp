@@ -1289,7 +1289,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                     /*typeToFill*/ nullptr,
                     std::move(bindings));
 
-  auto Descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, layout);
+  auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, layout);
 
   llvm::Value *data;
   if (layout.isKnownEmpty()) {
@@ -1298,9 +1298,8 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     // Allocate a new object.
     HeapNonFixedOffsets offsets(IGF, layout);
 
-    data = IGF.emitUnmanagedAlloc(layout, "closure", Descriptor, &offsets);
+    data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets);
     Address dataAddr = layout.emitCastTo(IGF, data);
-
     
     unsigned i = 0;
     

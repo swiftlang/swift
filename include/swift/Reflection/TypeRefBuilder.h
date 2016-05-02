@@ -19,6 +19,7 @@
 #define SWIFT_REFLECTION_TYPEREFBUILDER_H
 
 #include "swift/Remote/MetadataReader.h"
+#include "swift/Reflection/MetadataSourceBuilder.h"
 #include "swift/Reflection/Records.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
@@ -68,15 +69,24 @@ public:
 using FieldSection = ReflectionSection<FieldDescriptorIterator>;
 using AssociatedTypeSection = ReflectionSection<AssociatedTypeIterator>;
 using BuiltinTypeSection = ReflectionSection<BuiltinTypeDescriptorIterator>;
+using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
 using GenericSection = ReflectionSection<const void *>;
 
 struct ReflectionInfo {
-  std::string ImageName;
   FieldSection fieldmd;
   AssociatedTypeSection assocty;
   BuiltinTypeSection builtin;
+  CaptureSection capture;
   GenericSection typeref;
   GenericSection reflstr;
+};
+
+struct ClosureContextInfo {
+  std::vector<const TypeRef *> CaptureTypes;
+  std::vector<std::pair<const TypeRef *, const MetadataSource *>> MetadataSources;
+  unsigned NumBindings = 0;
+
+  void dump(std::ostream &OS);
 };
 
 /// An implementation of MetadataReader's BuilderType concept for
@@ -104,6 +114,7 @@ private:
   std::vector<std::unique_ptr<const TypeRef>> TypeRefPool;
 
   TypeConverter TC;
+  MetadataSourceBuilder MSB;
 
 #define TYPEREF(Id, Parent) \
   std::unordered_map<TypeRefID, const Id##TypeRef *, \
@@ -274,6 +285,9 @@ public:
   /// Get the primitive type lowering for a builtin type.
   const BuiltinTypeDescriptor *getBuiltinTypeInfo(const TypeRef *TR);
 
+  /// Get the unsubstituted capture types for a closure context.
+  ClosureContextInfo getClosureContextInfo(const CaptureDescriptor &CD);
+
   ///
   /// Dumping typerefs, field declarations, associated types
   ///
@@ -283,6 +297,7 @@ public:
   void dumpFieldSection(std::ostream &OS);
   void dumpAssociatedTypeSection(std::ostream &OS);
   void dumpBuiltinTypeSection(std::ostream &OS);
+  void dumpCaptureSection(std::ostream &OS);
   void dumpAllSections(std::ostream &OS);
 };
 

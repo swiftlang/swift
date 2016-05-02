@@ -124,7 +124,7 @@ void threadedExecute(M &mutex, C &condition, bool &doneCondition,
   }
 
   // Inform consumers that producers are done.
-  mutex.lockAndNotifyAll(condition, [&] {
+  mutex.withLockThenNotifyAll(condition, [&] {
     if (trace)
       printf("### Informing consumers we are done.\n");
     doneCondition = true;
@@ -276,7 +276,7 @@ template <typename M> void criticalSectionThreaded(M &mutex) {
 
   threadedExecute(10, [&](int) {
     for (int j = 0; j < 50; ++j) {
-      mutex.lock([&] {
+      mutex.withLock([&] {
         auto count = count2;
         count1++;
         count2 = count + 1;
@@ -354,14 +354,14 @@ TEST(StaticMutexTest, ConditionThreaded) {
 }
 
 template <typename SU, typename M, typename C>
-void conditionLockOrWaitLockAndNotifyThreaded(M &mutex, C &condition) {
+void conditionLockOrWaitLockThenNotifyThreaded(M &mutex, C &condition) {
   bool doneCondition = false;
   int count = 200;
 
   threadedExecute(
       mutex, condition, doneCondition,
       [&](int index) {
-        mutex.lockOrWait(condition, [&, index] {
+        mutex.withLockOrWait(condition, [&, index] {
           while (true) {
             if (count > 50) {
               count -= 1;
@@ -383,7 +383,7 @@ void conditionLockOrWaitLockAndNotifyThreaded(M &mutex, C &condition) {
       },
       [&](int index) {
         for (int j = 0; j < 10; j++) {
-          mutex.lockAndNotifyOne(condition, [&, index] {
+          mutex.withLockThenNotifyOne(condition, [&, index] {
             count += index;
             if (trace)
               printf("Producer[%d] count = %d.\n", index, count);
@@ -396,17 +396,17 @@ void conditionLockOrWaitLockAndNotifyThreaded(M &mutex, C &condition) {
   ASSERT_EQ(count, 50);
 }
 
-TEST(MutexTest, ConditionLockOrWaitLockAndNotifyThreaded) {
+TEST(MutexTest, ConditionLockOrWaitLockThenNotifyThreaded) {
   Mutex mutex(/* checked = */ true);
   ConditionVariable condition;
-  conditionLockOrWaitLockAndNotifyThreaded<ScopedUnlock>(mutex, condition);
+  conditionLockOrWaitLockThenNotifyThreaded<ScopedUnlock>(mutex, condition);
 }
 
-TEST(StaticMutexTest, ConditionLockOrWaitLockAndNotifyThreaded) {
+TEST(StaticMutexTest, ConditionLockOrWaitLockThenNotifyThreaded) {
   static StaticMutex mutex;
   static StaticConditionVariable condition;
-  conditionLockOrWaitLockAndNotifyThreaded<StaticScopedUnlock>(mutex,
-                                                               condition);
+  conditionLockOrWaitLockThenNotifyThreaded<StaticScopedUnlock>(mutex,
+                                                                condition);
 }
 
 template <typename SRL, bool Locking, typename RW>
@@ -454,7 +454,7 @@ void scopedReadThreaded(RW &lock) {
 
   for (auto &history : readerHistory) {
     for (auto value : history) {
-      ASSERT_EQ(writerHistory.count(value), 1);
+      ASSERT_EQ(writerHistory.count(value), 1U);
     }
   }
 }
@@ -528,7 +528,7 @@ void scopedWriteLockThreaded(RW &lock) {
   }
 
   for (auto value : readerHistory) {
-    ASSERT_EQ(mergedHistory.count(value), 1);
+    ASSERT_EQ(mergedHistory.count(value), 1U);
   }
 }
 
@@ -562,7 +562,7 @@ template <typename RW> void readLockWhileReadLockedThreaded(RW &lock) {
   threadedExecute(10,
                   [&](int index) {
                     while (!done) {
-                      lock.readLock([&] {
+                      lock.withReadLock([&] {
                         results[index] = true;
                         std::this_thread::sleep_for(
                             std::chrono::milliseconds(5));
@@ -602,7 +602,7 @@ template <typename RW> void readLockWhileWriteLockedThreaded(RW &lock) {
   threadedExecute(10,
                   [&](int index) {
                     while (!done) {
-                      lock.readLock([&] {
+                      lock.withReadLock([&] {
                         results[index] += 1;
                         std::this_thread::sleep_for(
                             std::chrono::milliseconds(5));
@@ -643,7 +643,7 @@ template <typename RW> void writeLockWhileReadLockedThreaded(RW &lock) {
   threadedExecute(threadCount,
                   [&](int index) {
                     while (!done) {
-                      lock.writeLock([&] {
+                      lock.withWriteLock([&] {
                         results[index] += 1;
                         std::this_thread::sleep_for(
                             std::chrono::milliseconds(5));
@@ -684,7 +684,7 @@ template <typename RW> void writeLockWhileWriteLockedThreaded(RW &lock) {
   threadedExecute(threadCount,
                   [&](int index) {
                     while (!done) {
-                      lock.writeLock([&] {
+                      lock.withWriteLock([&] {
                         results[index] += 1;
                         std::this_thread::sleep_for(
                             std::chrono::milliseconds(5));
@@ -841,39 +841,7 @@ TEST(StaticReadWriteLockTest, TryWriteLockWhileReadLockedThreaded) {
   tryWriteLockWhileReadLockedThreaded(lock);
 }
 
-template <typename RW> void readWriteLockCriticalSection(RW &lock) {
-  int count = 0;
-  lock.readWriteLock(
-      [&] {
-        count++;
-        return false;
-      },
-      [&] { count++; });
-
-  ASSERT_EQ(count, 3);
-
-  count = 0;
-  lock.readWriteLock(
-      [&] {
-        count++;
-        return true;
-      },
-      [&] { count++; });
-
-  ASSERT_EQ(count, 1);
-}
-
-TEST(ReadWriteLockTest, ReadWriteLockCriticalSection) {
-  ReadWriteLock lock;
-  readWriteLockCriticalSection(lock);
-}
-
-TEST(StaticReadWriteLockTest, ReadWriteLockCriticalSection) {
-  static StaticReadWriteLock lock;
-  readWriteLockCriticalSection(lock);
-}
-
-template <typename RW> void readWriteLockCriticalSectionThreaded(RW &lock) {
+template <typename RW> void readWriteLockCacheExampleThreaded(RW &lock) {
   std::map<uint8_t, uint32_t> cache;
   std::vector<std::thread> workers;
   std::vector<std::set<uint8_t>> workerHistory;
@@ -910,26 +878,36 @@ template <typename RW> void readWriteLockCriticalSectionThreaded(RW &lock) {
 
       for (int j = 0; j < 50; j++) {
         uint8_t key = dis(gen);
-        lock.readWriteLock(
-            [&] {
-              auto value = cache.find(key);
-              if (value == cache.end()) {
-                if (trace)
-                  printf("Worker[%d] miss for key = %d.\n", i, key);
-                return false; // cache miss, need to grab write lock
-              }
-              if (trace)
-                printf("Worker[%d] HIT for key = %d, value = %d.\n", i, key,
-                       value->second);
-              return true; // cache hit, no need to grab write lock
-            },
-            [&] {
-              if (trace)
-                printf("Worker[%d] create for key = %d, value = %d.\n", i, key,
-                       i);
-              cache[key] = i;
-              workerHistory[i].insert(key);
-            });
+        bool found = false;
+
+        auto cacheLookupSection = [&] {
+          auto value = cache.find(key);
+          if (value == cache.end()) {
+            if (trace)
+              printf("Worker[%d] miss for key = %d.\n", i, key);
+            found = false; // cache miss, need to grab write lock
+          }
+          if (trace)
+            printf("Worker[%d] HIT for key = %d, value = %d.\n", i, key,
+                   value->second);
+          found = true; // cache hit, no need to grab write lock
+        };
+
+        lock.withReadLock(cacheLookupSection);
+        if (found) {
+          continue;
+        }
+
+        lock.withWriteLock([&] {
+          cacheLookupSection();
+          if (!found) {
+            if (trace)
+              printf("Worker[%d] create for key = %d, value = %d.\n", i, key,
+                     i);
+            cache[key] = i;
+            workerHistory[i].insert(key);
+          }
+        });
       }
 
       if (trace)
@@ -957,12 +935,12 @@ template <typename RW> void readWriteLockCriticalSectionThreaded(RW &lock) {
   }
 }
 
-TEST(ReadWriteLockTest, ReadWriteLockCriticalSectionThreaded) {
+TEST(ReadWriteLockTest, ReadWriteLockCacheExampleThreaded) {
   ReadWriteLock lock;
-  readWriteLockCriticalSectionThreaded(lock);
+  readWriteLockCacheExampleThreaded(lock);
 }
 
-TEST(StaticReadWriteLockTest, ReadWriteLockCriticalSectionThreaded) {
+TEST(StaticReadWriteLockTest, ReadWriteLockCacheExampleThreaded) {
   static StaticReadWriteLock lock;
-  readWriteLockCriticalSectionThreaded(lock);
+  readWriteLockCacheExampleThreaded(lock);
 }

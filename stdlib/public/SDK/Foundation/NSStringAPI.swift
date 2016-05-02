@@ -1916,7 +1916,7 @@ extension String {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "addingPercentEncoding(withAllowedCharacters:")
+  @available(*, unavailable, renamed: "addingPercentEncoding(withAllowedCharacters:)")
   public func addingPercentEncodingWithAllowedCharacters(
     _ allowedCharacters: NSCharacterSet
   ) -> String? {

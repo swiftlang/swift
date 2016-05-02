@@ -51,29 +51,36 @@ void swift_reflection_destroyReflectionContext(SwiftReflectionContextRef Context
 
 void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
-                                   const char *ImageName,
-                                   swift_reflection_section_t fieldmd,
-                                   swift_reflection_section_t assocty,
-                                   swift_reflection_section_t builtin,
-                                   swift_reflection_section_t typeref,
-                                   swift_reflection_section_t reflstr) {
-  ReflectionInfo Info {
-    ImageName,
-    FieldSection(fieldmd.Begin, fieldmd.End),
-    AssociatedTypeSection(assocty.Begin, assocty.End),
-    BuiltinTypeSection(builtin.Begin, builtin.End),
-    GenericSection(typeref.Begin, typeref.End),
-    GenericSection(reflstr.Begin, reflstr.End)
-  };
+                                   swift_reflection_info_t Info) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  Context->addReflectionInfo(Info);
+  Context->addReflectionInfo(*reinterpret_cast<ReflectionInfo *>(&Info));
+}
+
+int
+swift_reflection_readIsaMask(SwiftReflectionContextRef ContextRef,
+                             uintptr_t *outIsaMask) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto isaMask = Context->readIsaMask();
+  *outIsaMask = isaMask.second;
+  return isaMask.first;
 }
 
 swift_typeref_t
 swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
-                                    uintptr_t metadata) {
+                                    uintptr_t Metadata) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  auto TR = Context->readTypeFromMetadata(metadata);
+  auto TR = Context->readTypeFromMetadata(Metadata);
+  return reinterpret_cast<swift_typeref_t>(TR);
+}
+
+swift_typeref_t
+swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
+                                    uintptr_t Object) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto MetadataAddress = Context->readMetadataFromInstance(Object);
+  if (!MetadataAddress.first)
+    return 0;
+  auto TR = Context->readTypeFromMetadata(MetadataAddress.second);
   return reinterpret_cast<swift_typeref_t>(TR);
 }
 
@@ -166,7 +173,7 @@ static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {
 
 static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
   auto *RecordTI = cast<RecordTypeInfo>(TI);
-  auto FieldInfo = RecordTI->getFields()[Index];
+  auto &FieldInfo = RecordTI->getFields()[Index];
 
   return {
     FieldInfo.Name.c_str(),
@@ -199,7 +206,7 @@ swift_typeinfo_t
 swift_reflection_infoForMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  auto *TI = Context->getInstanceTypeInfo(Metadata);
+  auto *TI = Context->getMetadataTypeInfo(Metadata);
   return convertTypeInfo(TI);
 }
 
@@ -208,6 +215,75 @@ swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata,
                                  unsigned Index) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  auto *TI = Context->getInstanceTypeInfo(Metadata);
+  auto *TI = Context->getMetadataTypeInfo(Metadata);
   return convertChild(TI, Index);
+}
+
+swift_typeinfo_t
+swift_reflection_infoForInstance(SwiftReflectionContextRef ContextRef,
+                                 uintptr_t Object) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto *TI = Context->getInstanceTypeInfo(Object);
+  return convertTypeInfo(TI);
+}
+
+swift_childinfo_t
+swift_reflection_childOfInstance(SwiftReflectionContextRef ContextRef,
+                                 uintptr_t Object,
+                                 unsigned Index) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto *TI = Context->getInstanceTypeInfo(Object);
+  return convertChild(TI, Index);
+}
+
+int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
+                                        addr_t InstanceAddress,
+                                        swift_typeref_t ExistentialTypeRef,
+                                        swift_typeref_t *InstanceTypeRef,
+                                        addr_t *StartOfInstanceData) {
+  // TODO
+  return false;
+}
+
+void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+  if (TR == nullptr) {
+    std::cerr << "<null type reference>\n";
+  } else {
+    TR->dump();
+  }
+}
+
+void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
+                                         swift_typeref_t OpaqueTypeRef) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+  auto TI = Context->getTypeInfo(TR);
+  if (TI == nullptr) {
+    std::cerr << "<null type info>\n";
+  } else {
+    TI->dump();
+  }
+}
+
+void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
+                                          uintptr_t Metadata) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto TI = Context->getMetadataTypeInfo(Metadata);
+  if (TI == nullptr) {
+    std::cerr << "<null type info>\n";
+  } else {
+    TI->dump();
+  }
+}
+
+void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
+                                          uintptr_t Object) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto TI = Context->getInstanceTypeInfo(Object);
+  if (TI == nullptr) {
+    std::cerr << "<null type info>\n";
+  } else {
+    TI->dump();
+  }
 }

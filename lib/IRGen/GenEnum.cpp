@@ -5446,7 +5446,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
   if (IGM.isResilient(theEnum, ResilienceExpansion::Maximal))
     storageType = cast<llvm::StructType>(IGM.OpaquePtrTy->getElementType());
   else
-    storageType = IGM.createNominalType(theEnum);
+    storageType = IGM.createNominalType(type);
 
   // Create a forward declaration for that type.
   addForwardDecl(key, storageType);
@@ -5514,7 +5514,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
 void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
   emitEnumMetadata(*this, theEnum);
   emitNestedTypeDecls(theEnum->getMembers());
-  addNominalTypeDecl(theEnum);
+  emitReflectionMetadata(theEnum);
 }
 
 void irgen::emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,

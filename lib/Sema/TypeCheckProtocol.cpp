@@ -4607,6 +4607,41 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   }
 }
 
+llvm::TinyPtrVector<ValueDecl *>
+TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
+                                           bool onlyFirstRequirement) {
+  llvm::TinyPtrVector<ValueDecl *> result;
+
+  // Types don't infer @objc this way.
+  if (isa<TypeDecl>(witness)) return result;
+
+  auto dc = witness->getDeclContext();
+  auto name = witness->getFullName();
+  for (auto conformance : dc->getLocalConformances(ConformanceLookupKind::All,
+                                                   nullptr, /*sorted=*/true)) {
+    // We only care about Objective-C protocols.
+    auto proto = conformance->getProtocol();
+    if (!proto->isObjC()) continue;
+
+    for (auto req : proto->lookupDirect(name, true)) {
+      // Skip anything in a protocol extension.
+      if (req->getDeclContext() != proto) continue;
+
+      // Skip types.
+      if (isa<TypeDecl>(req)) continue;
+
+      // Determine whether the witness for this conformance is in fact
+      // our witness.
+      if (conformance->getWitness(req, this).getDecl() == witness) {
+        result.push_back(req);
+        if (onlyFirstRequirement) return result;
+      }
+    }
+  }
+
+  return result;
+}
+
 void TypeChecker::resolveTypeWitness(
        const NormalProtocolConformance *conformance,
        AssociatedTypeDecl *assocType) {

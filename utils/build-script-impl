@@ -89,6 +89,7 @@ KNOWN_SETTINGS=(
     enable-ubsan                ""               "enable Undefined Behavior Sanitizer"
     cmake                       ""               "path to the cmake binary"
     distcc                      ""               "use distcc in pump mode"
+    distcc-pump                 ""               "the path to distcc pump executable. This argument is required if distcc is set."
     build-runtime-with-host-compiler   "1"       "use the host c++ compiler to build everything"
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of 'cmake --help' for choices"
     verbose-build               ""               "print the commands executed during the build"
@@ -218,8 +219,8 @@ KNOWN_SETTINGS=(
     android-icu-uc-include             ""        "Path to a directory containing headers for libicuuc"
     android-icu-i18n                   ""        "Path to a directory containing libicui18n.so"
     android-icu-i18n-include           ""        "Path to a directory containing headers libicui18n"
-    export-compile-commands            ""        "set to generate JSON compilation databases for each build product"
     check-args-only                    ""        "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
+    common-cmake-options               ""        "CMake options used for all targets, including LLVM/Clang"
     # TODO: Remove this some time later.
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
 )
@@ -245,13 +246,6 @@ function true_false() {
 
 function to_varname() {
     toupper "${1//-/_}"
-}
-
-function join_array_with_delimiter() {
-    # $1 is the delimiter
-    local IFS="$1"
-    shift
-    echo "$*"
 }
 
 function set_lldb_build_mode() {
@@ -283,10 +277,15 @@ function float_min() {
 function num_llvm_parallel_lto_link_jobs() {
     case "$(uname -s -m)" in
         Darwin\ x86_64)
-            # Currently with -gline-tables-only clang is ~3.5GB on Darwin. Use
-            # the formula GB Memory/3.5GB to get the number of parallel link
-            # threads we can support.
-            local NUM_MEMORY_THREADS=$(echo $(system_memory_in_bytes)/1000000000.0/3.5 | bc)
+            # *WARNING! HUERISTIC!*
+            #
+            # Use the formula (GB Memory - 3)/6.0GB to get the number of
+            # parallel link threads we can support. This gives the OS 3 GB of
+            # room to work with.
+            #
+            # This is a bit conservative, but I have found that this number
+            # prevents me from swapping on my test machine.
+            local NUM_MEMORY_THREADS=$(echo \( $(system_memory_in_bytes)/1000000000.0 - 3.0 \) / 6.0 | bc)
             echo $(float_min "${NUM_MEMORY_THREADS}" "${BUILD_JOBS}")
             ;;
         *)
@@ -299,10 +298,15 @@ function num_llvm_parallel_lto_link_jobs() {
 function num_swift_parallel_lto_link_jobs() {
     case "$(uname -s -m)" in
         Darwin\ x86_64)
-            # Currently with -gline-tables-only swift is ~5-6GB on Darwin. Use
-            # the formula GB Memory/6GB to get the number of parallel link
-            # threads we can support.
-            local NUM_MEMORY_THREADS=$(echo $(system_memory_in_bytes)/1000000000/6.0 | bc)
+            # *WARNING! HUERISTIC!*
+            #
+            # Use the formula (GB Memory - 3)/8.0GB to get the number of
+            # parallel link threads we can support. This gives the OS 3 GB of
+            # room to work with.
+            #
+            # This is a bit conservative, but I have found that this number
+            # prevents me from swapping on my test machine.
+            local NUM_MEMORY_THREADS=$(echo \( $(system_memory_in_bytes)/1000000000 - 3.0 \) / 8.0 | bc)
             echo $(float_min "${NUM_MEMORY_THREADS}" "${BUILD_JOBS}")
             ;;
         *)
@@ -537,10 +541,6 @@ function set_deployment_target_based_options() {
                 fi
 
                 llvm_cmake_options+=(
-                    "-DCMAKE_C_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
-                    "-DCMAKE_CXX_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
-                    "-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
-                    "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
                     "-DLLVM_PARALLEL_LINK_JOBS=$(num_llvm_parallel_lto_link_jobs)"
                 )
             fi
@@ -778,6 +778,12 @@ fi
 if [[ "${SKIP_BUILD_WATCHOS_SIMULATOR}" ]] ; then
     SKIP_BUILD_WATCHOS_SIMULATOR=1
     SKIP_TEST_WATCHOS_SIMULATOR=1
+fi
+
+# FIXME: We currently do not support building compiler-rt with the
+# Xcode generator.
+if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
+    SKIP_COMPILER_RT=1
 fi
 
 # FIXME: We currently do not support cross-compiling swift with compiler-rt.
@@ -1083,7 +1089,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
         if [[ "${BUILD_SWIFT_STDLIB_UNITTEST_EXTRA}" == "1" ]] ; then
             SWIFT_STDLIB_TARGETS+=("swift-stdlib-${deployment_target}")
         else
-            if [[ "${VALIDATION_TEST}" == "1" ]] ; then
+            if [[ "${VALIDATION_TEST}" == "1" || "${LONG_TEST}" == "1" ]] ; then
                 SWIFT_STDLIB_TARGETS+=("swift-stdlib-${deployment_target}")
             else
                 SWIFT_STDLIB_TARGETS+=("swift-test-stdlib-${deployment_target}")
@@ -1132,110 +1138,15 @@ if ! [[ "${SKIP_TEST_BENCHMARKS}" ]] &&
 fi
 echo
 
-# CMake options used for all targets, including LLVM/Clang
-COMMON_CMAKE_OPTIONS=(
-    -G "${CMAKE_GENERATOR}"
-)
-
 COMMON_C_FLAGS=""
-SANITIZERS=()
-if [[ "${ENABLE_ASAN}" ]] ; then
-    SANITIZERS=(
-        "${SANITIZERS[@]}"
-        "Address"
-    )
-fi
-
-if [[ "${ENABLE_UBSAN}" ]] ; then
-    SANITIZERS=(
-        "${SANITIZERS[@]}"
-        "Undefined"
-    )
-fi
-
-if [[ -n "${SANITIZERS[@]}" ]] ; then
-    COMMON_CMAKE_OPTIONS=(
-        "${COMMON_CMAKE_OPTIONS[@]}"
-        -DLLVM_USE_SANITIZER=$(join_array_with_delimiter ";" "${SANITIZERS[@]}")
-    )
-fi
-
-if [[ "${EXPORT_COMPILE_COMMANDS}" ]] ; then
-    COMMON_CMAKE_OPTIONS=(
-        "${COMMON_CMAKE_OPTIONS[@]}"
-        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-    )
-fi
 
 # Convert to an array.
+eval COMMON_CMAKE_OPTIONS=(${COMMON_CMAKE_OPTIONS})
 eval EXTRA_CMAKE_OPTIONS=(${EXTRA_CMAKE_OPTIONS})
+eval BUILD_ARGS=(${BUILD_ARGS})
 
-if [[ "${DISTCC}" ]] ; then
-    # On some platforms, 'pump' may be unrelated to distcc, in which case it's
-    # called 'distcc-pump'.
-    DISTCC_PUMP="$(which distcc-pump || which pump)"
-    COMMON_CMAKE_OPTIONS=(
-        "${COMMON_CMAKE_OPTIONS[@]}"
-        -DCMAKE_C_COMPILER:PATH="$(which distcc)"
-        -DCMAKE_C_COMPILER_ARG1="${HOST_CC}"
-        -DCMAKE_CXX_COMPILER:PATH="$(which distcc)"
-        -DCMAKE_CXX_COMPILER_ARG1="${HOST_CXX}"
-    )
-else
-    COMMON_CMAKE_OPTIONS=(
-        "${COMMON_CMAKE_OPTIONS[@]}"
-        -DCMAKE_C_COMPILER:PATH="${HOST_CC}"
-        -DCMAKE_CXX_COMPILER:PATH="${HOST_CXX}"
-    )
-fi
-
-
-CMAKE_JOBS="${BUILD_JOBS}"
-if [[ "${DISTCC}" ]] ; then
-    CMAKE_JOBS="$(distcc -j)"
-fi
-
-case "${CMAKE_GENERATOR}" in
-    Ninja)
-        BUILD_ARGS="${BUILD_ARGS} -j${CMAKE_JOBS}"
-        if [[ "${VERBOSE_BUILD}" ]] ; then
-            BUILD_ARGS="${BUILD_ARGS} -v"
-        fi
-        ;;
-    'Unix Makefiles')
-        BUILD_ARGS="${BUILD_ARGS} -j${CMAKE_JOBS}"
-        if [[ "${VERBOSE_BUILD}" ]] ; then
-            BUILD_ARGS="${BUILD_ARGS} VERBOSE=1"
-        fi
-        ;;
-    Xcode)
-        # -parallelizeTargets is an unsupported flag from the Xcode 3 days,
-        # but since we're not using proper Xcode 4 schemes, this is the
-        # only way to get target-level parallelism.
-        BUILD_ARGS="${BUILD_ARGS} -parallelizeTargets"
-        BUILD_ARGS="${BUILD_ARGS} -jobs ${CMAKE_JOBS}"
-        BUILD_TARGET_FLAG="-target"
-        COMMON_CMAKE_OPTIONS=(
-            "${COMMON_CMAKE_OPTIONS[@]}"
-            -DCMAKE_CONFIGURATION_TYPES="Debug;Release;MinSizeRel;RelWithDebInfo"
-        )
-
-        # FIXME: We currently do not support building compiler-rt with the
-        # Xcode generator.
-        SKIP_COMPILER_RT=1
-        ;;
-esac
-
-if [[ "${CLANG_COMPILER_VERSION}" ]] ; then
-    major_version=$(echo "${CLANG_COMPILER_VERSION}" | sed -e 's/\([0-9]*\).*/\1/')
-    minor_version=$(echo "${CLANG_COMPILER_VERSION}" | sed -e 's/[^.]*\.\([0-9]*\).*/\1/')
-    patch_version=$(echo "${CLANG_COMPILER_VERSION}" | sed -e 's/[^.]*\.[^.]*\.\([0-9]*\)/\1/')
-    COMMON_CMAKE_OPTIONS=(
-        "${COMMON_CMAKE_OPTIONS[@]}"
-        -DLLVM_VERSION_MAJOR:STRING="${major_version}"
-        -DLLVM_VERSION_MINOR:STRING="${minor_version}"
-        -DLLVM_VERSION_PATCH:STRING="${patch_version}"
-    )
+if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
+    BUILD_TARGET_FLAG="-target"
 fi
 
 function build_directory() {
@@ -1333,6 +1244,9 @@ function llvm_c_flags() {
     echo -n " $(common_cross_c_flags $1)"
     if [[ $(is_cmake_release_build_type "${LLVM_BUILD_TYPE}") ]] ; then
         echo -n " -fno-stack-protector"
+    fi
+    if [[ $(true_false "${LLVM_ENABLE_LTO}") ]] ; then
+        echo -n " -gline-tables-only"
     fi
 }
 
@@ -1622,6 +1536,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}"
                     -DLLVM_INCLUDE_TESTS:BOOL=$(true_false "${SOURCE_TREE_INCLUDES_TESTS}")
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
+                    -DLLVM_ENABLE_LTO=$(true_false "${LLVM_ENABLE_LTO}")
                     "${llvm_cmake_options[@]}"
                 )
                 if [[ $(is_cross_tools_deployment_target ${deployment_target}) ]] ; then
@@ -1714,6 +1629,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DCMAKE_CXX_FLAGS="$(swift_c_flags ${deployment_target})"
                     -DCMAKE_BUILD_TYPE:STRING="${SWIFT_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${SWIFT_ENABLE_ASSERTIONS}")
+                    -DLLVM_ENABLE_LTO=$(true_false "${LLVM_ENABLE_LTO}")
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
@@ -1920,6 +1836,9 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DFILECHECK_EXECUTABLE:PATH="$(build_directory_bin ${deployment_target} llvm)/FileCheck"
                     -DCMAKE_BUILD_TYPE:STRING="${LLBUILD_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
+                    # We disable all bindings, since llbuild builds before Swift
+                    # and can't use the unbuilt `swiftc`.
+                    -DLLBUILD_SUPPORT_BINDINGS:=
                 )
                 ;;
             swiftpm)
@@ -1934,6 +1853,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             xctest)
                 SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
                 XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
+                FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                     # xcodebuild requires swift-stdlib-tool to build a Swift
                     # framework. This is normally present when building XCTest
@@ -1941,27 +1861,16 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     # swiftc that was just built--no toolchain exists yet. As a
                     # result, we must copy swift-stdlib-tool ourselves.
                     copy_swift_stdlib_tool_substitute "$(build_directory_bin ${deployment_target} swift)/swift-stdlib-tool"
-
-                    set -x
-                    xcodebuild \
-                        -workspace "${XCTEST_SOURCE_DIR}"/XCTest.xcworkspace \
-                        -scheme SwiftXCTest \
-                        SWIFT_EXEC="${SWIFTC_BIN}" \
-                        SWIFT_LINK_OBJC_RUNTIME=YES \
-                        SYMROOT="${XCTEST_BUILD_DIR}" \
-                        OBJROOT="${XCTEST_BUILD_DIR}"
-                    { set +x; } 2>/dev/null
-                else
-                    FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
-                    set -x
-                    # FIXME: Use XCTEST_BUILD_TYPE (which is never properly
-                    #        set) to build either --debug or --release.
-                    "${XCTEST_SOURCE_DIR}"/build_script.py \
-                        --swiftc="${SWIFTC_BIN}" \
-                        --build-dir="${XCTEST_BUILD_DIR}" \
-                        --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation"
-                    { set +x; } 2>/dev/null
                 fi
+
+                set -x
+                # FIXME: Use XCTEST_BUILD_TYPE (which is never properly
+                #        set) to build either --debug or --release.
+                "${XCTEST_SOURCE_DIR}"/build_script.py \
+                    --swiftc="${SWIFTC_BIN}" \
+                    --build-dir="${XCTEST_BUILD_DIR}" \
+                    --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation"
+                { set +x; } 2>/dev/null
 
                 # XCTest builds itself and doesn't rely on cmake
                 continue
@@ -2075,7 +1984,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
             fi
 
             set -x
-            ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- ${BUILD_ARGS} ${build_targets[@]}
+            ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
             { set +x; } 2>/dev/null
         fi
 
@@ -2243,26 +2152,14 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 fi
                 echo "--- Running tests for ${product} ---"
                 SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
-                if [[ "$(uname -s)" == "Darwin" ]] ; then
-                    set -x
-                    xcodebuild \
-                        -workspace "${XCTEST_SOURCE_DIR}"/XCTest.xcworkspace \
-                        -scheme SwiftXCTestFunctionalTests \
-                        SWIFT_EXEC="${SWIFTC_BIN}" \
-                        SWIFT_LINK_OBJC_RUNTIME=YES \
-                        SYMROOT="${XCTEST_BUILD_DIR}" \
-                        OBJROOT="${XCTEST_BUILD_DIR}"
-                    { set +x; } 2>/dev/null
-                else
-                    FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
-                    XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
-                    set -x
-                    "${XCTEST_SOURCE_DIR}"/build_script.py test \
-                        --swiftc="${SWIFTC_BIN}" \
-                        --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation" \
-                        "${XCTEST_BUILD_DIR}"
-                    { set +x; } 2>/dev/null
-                fi
+                FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
+                XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
+                set -x
+                "${XCTEST_SOURCE_DIR}"/build_script.py test \
+                    --swiftc="${SWIFTC_BIN}" \
+                    --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation" \
+                    "${XCTEST_BUILD_DIR}"
+                { set +x; } 2>/dev/null
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;

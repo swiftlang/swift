@@ -58,38 +58,58 @@ using namespace metadataimpl;
 
 void *MetadataAllocator::alloc(size_t size) {
 #if defined(__APPLE__)
-  const uintptr_t pagesizeMask = vm_page_mask;
+  const uintptr_t PageSizeMask = vm_page_mask;
 #else
-  static const uintptr_t pagesizeMask = sysconf(_SC_PAGESIZE) - 1;
+  static const uintptr_t PageSizeMask = sysconf(_SC_PAGESIZE) - 1;
 #endif
   // If the requested size is a page or larger, map page(s) for it
   // specifically.
-  if (LLVM_UNLIKELY(size > pagesizeMask)) {
-    auto mem = mmap(nullptr, (size + pagesizeMask) & ~pagesizeMask,
+  if (LLVM_UNLIKELY(size > PageSizeMask)) {
+    auto mem = mmap(nullptr, (size + PageSizeMask) & ~PageSizeMask,
                     PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE,
                     VM_TAG_FOR_SWIFT_METADATA, 0);
     if (mem == MAP_FAILED)
       crash("unable to allocate memory for metadata cache");
     return mem;
   }
-  
-  char *end = next + size;
-  
-  // Allocate a new page if we need one.
-  if (LLVM_UNLIKELY(((uintptr_t)next & ~pagesizeMask)
-                      != (((uintptr_t)end & ~pagesizeMask)))){
-    next = (char*)
-      mmap(nullptr, pagesizeMask+1, PROT_READ|PROT_WRITE,
-           MAP_ANON|MAP_PRIVATE, VM_TAG_FOR_SWIFT_METADATA, 0);
 
-    if (next == MAP_FAILED)
-      crash("unable to allocate memory for metadata cache");
-    end = next + size;
-  }
+  uintptr_t curValue = NextValue.load(std::memory_order_relaxed);
+  while (true) {
+    char *next = reinterpret_cast<char*>(curValue);
+    char *end = next + size;
   
-  char *addr = next;
-  next = end;
-  return addr;
+    // If we wrap over the end of the page, allocate a new page.
+    void *allocation = nullptr;
+    if (LLVM_UNLIKELY(((uintptr_t)next & ~PageSizeMask)
+                        != (((uintptr_t)end & ~PageSizeMask)))) {
+      // Allocate a new page if we haven't already.
+      allocation = mmap(nullptr, PageSizeMask + 1,
+                        PROT_READ|PROT_WRITE,
+                        MAP_ANON|MAP_PRIVATE,
+                        VM_TAG_FOR_SWIFT_METADATA,
+                        /*offset*/ 0);
+
+      if (allocation == MAP_FAILED)
+        crash("unable to allocate memory for metadata cache");
+
+      next = (char*) allocation;
+      end = next + size;
+    }
+
+    // Swap it into place.
+    if (LLVM_LIKELY(std::atomic_compare_exchange_weak_explicit(
+            &NextValue, &curValue, reinterpret_cast<uintptr_t>(end),
+            std::memory_order_relaxed, std::memory_order_relaxed))) {
+      return next;
+    }
+
+    // If that didn't succeed, and we allocated, free the allocation.
+    // This potentially causes us to perform multiple mmaps under contention,
+    // but it keeps the fast path pristine.
+    if (allocation) {
+      munmap(allocation, PageSizeMask + 1);
+    }
+  }
 }
 
 namespace {

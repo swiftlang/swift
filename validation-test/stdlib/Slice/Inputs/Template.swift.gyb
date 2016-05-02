@@ -152,7 +152,6 @@ func makeCollectionOfComparable(elements: [MinimalComparableValue])
     bounds: startIndex..<endIndex)
 }
 
-var checksAdded: Box<Set<String>> = Box([])
 var resiliencyChecks = CollectionMisuseResiliencyChecks.all
 resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .trap
 resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior = .trap
@@ -172,7 +171,6 @@ SliceTests.add${method}Tests(
   wrapValueIntoComparable: identityComp,
   extractValueFromComparable: identityComp,
 %   end
-  checksAdded: checksAdded,
   resiliencyChecks: resiliencyChecks,
   outOfBoundsIndexOffset: 6
 %   if 'Mutable' in method:

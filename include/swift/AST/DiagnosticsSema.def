@@ -429,6 +429,9 @@ ERROR(serialization_malformed_module,Fatal,
 ERROR(serialization_module_too_new,Fatal,
       "module file was created by a newer version of the compiler: %0",
       (StringRef))
+ERROR(serialization_module_language_version_mismatch,Fatal,
+      "module compiled with Swift %0 cannot be imported in Swift %1: %2",
+      (StringRef, StringRef, StringRef))
 ERROR(serialization_module_too_old,Fatal,
       "module file was created by an older version of the compiler; "
       "rebuild %0 and try again: %1",
@@ -759,6 +762,9 @@ NOTE(c_function_pointer_captures_here,none,
 
 ERROR(var_type_not_materializable,none,
       "type %0 of variable is not materializable", (Type))
+ERROR(param_type_non_materializable_tuple,none,
+      "named parameter has type %0 which includes nested inout parameters",
+      (Type))
 ERROR(enum_element_not_materializable,none,
       "type of enum case is not materializable", ())
 
@@ -2547,7 +2553,7 @@ ERROR(objc_enum_case_multi,none,
       "'@objc' enum case declaration defines multiple enum cases with the same Objective-C name", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement}"
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
@@ -2592,6 +2598,9 @@ NOTE(objc_inferring_on_objc_protocol_member,none,
 NOTE(objc_overriding_objc_decl,none,
      "overriding '@objc' %select{property|subscript|initializer|method}0 %1 "
      "here", (unsigned, DeclName))
+NOTE(objc_witness_objc_requirement,none,
+     "satisfying requirement for %0 %1 in protocol %2",
+     (DescriptiveDeclKind, DeclName, DeclName))
 
 ERROR(objc_invalid_on_func_curried,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because curried functions "

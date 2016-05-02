@@ -29,12 +29,12 @@ extern "C" {
 typedef uint64_t addr_t;
 
 typedef uint8_t (*PointerSizeFunction)(void *reader_context);
-typedef uint8_t (*SizeSizeFunction)(void * reader_context);
-typedef bool (*ReadBytesFunction)(void * reader_context, addr_t address,
-                                  uint8_t *dest, uint64_t size);
-typedef uint64_t (*GetStringLengthFunction)(void * reader_context,
+typedef uint8_t (*SizeSizeFunction)(void *reader_context);
+typedef int (*ReadBytesFunction)(void *reader_context, addr_t address,
+                                  void *dest, uint64_t size);
+typedef uint64_t (*GetStringLengthFunction)(void *reader_context,
                                             addr_t address);
-typedef addr_t (*GetSymbolAddressFunction)(void * reader_context,
+typedef addr_t (*GetSymbolAddressFunction)(void *reader_context,
                                            const char *name,
                                            uint64_t name_length);
 

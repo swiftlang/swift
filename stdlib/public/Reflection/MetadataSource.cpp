@@ -60,28 +60,28 @@ public:
 
   void
   visitClosureBindingMetadataSource(const ClosureBindingMetadataSource *CB) {
-    printHeader("closure-binding");
+    printHeader("closure_binding");
     printField("index", CB->getIndex());
     closeForm();
   }
 
   void
   visitReferenceCaptureMetadataSource(const ReferenceCaptureMetadataSource *RC){
-    printHeader("reference-capture");
+    printHeader("reference_capture");
     printField("index", RC->getIndex());
     closeForm();
   }
 
   void
   visitMetadataCaptureMetadataSource(const MetadataCaptureMetadataSource *MC){
-    printHeader("metadata-capture");
+    printHeader("metadata_capture");
     printField("index", MC->getIndex());
     closeForm();
   }
 
   void
   visitGenericArgumentMetadataSource(const GenericArgumentMetadataSource *GA) {
-    printHeader("generic-argument");
+    printHeader("generic_argument");
     printField("index", GA->getIndex());
     printRec(GA->getSource());
     closeForm();
@@ -89,7 +89,7 @@ public:
 
   void
   visitParentMetadataSource(const ParentMetadataSource *P) {
-    printHeader("parent-of");
+    printHeader("parent_of");
     printRec(P->getChild());
     closeForm();
   }
@@ -101,7 +101,7 @@ public:
 
   void
   visitSelfWitnessTableMetadataSource(const SelfWitnessTableMetadataSource *W) {
-    printHeader("self-witness-table");
+    printHeader("self_witness_table");
     closeForm();
   }
 };
@@ -112,5 +112,5 @@ void MetadataSource::dump() const {
 
 void MetadataSource::dump(std::ostream &OS, unsigned Indent) const {
   PrintMetadataSource(OS, Indent).visit(this);
-  OS << std::endl;
+  OS << '\n';
 }

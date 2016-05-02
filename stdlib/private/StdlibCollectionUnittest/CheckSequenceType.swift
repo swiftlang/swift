@@ -1463,15 +1463,14 @@ extension TestSuite {
     wrapValueIntoEquatable: (MinimalEquatableValue) -> SequenceWithEquatableElement.Iterator.Element,
     extractValueFromEquatable: ((SequenceWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
-    checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all
   ) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(#function) {
+    if checksAdded.contains(#function) {
       return
     }
-    checksAdded.value.insert(#function)
+    checksAdded.insert(#function)
 
     func makeWrappedSequence(_ elements: [OpaqueValue<Int>]) -> S {
       return makeSequence(elements.map(wrapValue))

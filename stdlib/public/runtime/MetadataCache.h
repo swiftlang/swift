@@ -37,10 +37,10 @@ class MetadataAllocator {
   ///
   /// Initializing to -1 instead of nullptr ensures that the first allocation
   /// triggers a page allocation since it will always span a "page" boundary.
-  char *next = (char*)(~(uintptr_t)0U);
+  std::atomic<uintptr_t> NextValue;
   
 public:
-  constexpr MetadataAllocator() = default;
+  constexpr MetadataAllocator() : NextValue(~(uintptr_t)0) {}
 
   // Don't copy or move, please.
   MetadataAllocator(const MetadataAllocator &) = delete;
@@ -337,7 +337,7 @@ public:
       // appear there.  Note that we have to check again immediately
       // after acquiring the lock to prevent a race.
       auto concurrency = Concurrency.get();
-      concurrency->Lock.lockOrWait(concurrency->Queue, [&value, &entry, this] {
+      concurrency->Lock.withLockOrWait(concurrency->Queue, [&, this] {
         if ((value = entry->getValue())) {
           return true; // found a value, done waiting
         }
@@ -373,9 +373,8 @@ public:
 
     // Acquire the lock, set the value, and notify any waiters.
     auto concurrency = Concurrency.get();
-    concurrency->Lock.lockAndNotifyAll(concurrency->Queue, [&entry, &value] {
-      entry->setValue(value);
-    });
+    concurrency->Lock.withLockThenNotifyAll(
+        concurrency->Queue, [&entry, &value] { entry->setValue(value); });
 
     return value;
   }

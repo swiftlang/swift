@@ -418,9 +418,6 @@ struct ClassLayout {
   ArrayRef<VarDecl*> InheritedStoredProperties;
   /// Lazily-initialized array of all field access methods.
   ArrayRef<FieldAccess> AllFieldAccesses;
-  /// Lazily-initialized metadata access method. See the comment in
-  /// ClassLayoutBuilder.
-  FieldAccess MetadataAccess;
   /// Does the class metadata require dynamic initialization.
   bool MetadataRequiresDynamicInitialization;
 

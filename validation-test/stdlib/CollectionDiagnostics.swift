@@ -3,7 +3,6 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-
 //
 // Check that Collection.SubSequence is constrained to Collection.
 //
@@ -67,6 +66,7 @@ func sortResultIgnored<
 }
 
 struct GoodIndexable : Indexable {
+  func index(after i: Int) -> Int { return i + 1 }
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
 
@@ -77,6 +77,7 @@ struct GoodIndexable : Indexable {
 
 // expected-error@+1 {{type 'BadIndexable1' does not conform to protocol 'IndexableBase'}}
 struct BadIndexable1 : Indexable {
+  func index(after i: Int) -> Int { return i + 1 }
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
 
@@ -87,45 +88,36 @@ struct BadIndexable1 : Indexable {
 
 // expected-error@+1 {{type 'BadIndexable2' does not conform to protocol 'IndexableBase'}}
 struct BadIndexable2 : Indexable {
-  var startIndex: String { return "" }
-  var endIndex: String { return "" }
+  var startIndex: Int { return 0 }
+  var endIndex: Int { return 0 }
 
-  subscript(pos: String) -> Int { return 0 }
-  subscript(bounds: Range<String>) -> [Int] { return [] }
-
-  // Since String is not Strideable, 'index(after:)' will not be defaulted
+  subscript(pos: Int) -> Int { return 0 }
+  subscript(bounds: Range<Int>) -> [Int] { return [] }
+  // Missing index(after:) -> Int
 }
 
 struct GoodBidirectionalIndexable1 : BidirectionalIndexable {
+  var startIndex: Int { return 0 }
+  var endIndex: Int { return 0 }
+  func index(after i: Int) -> Int { return i + 1 }
+  func index(before i: Int) -> Int { return i - 1 }
+
+  subscript(pos: Int) -> Int { return 0 }
+  subscript(bounds: Range<Int>) -> [Int] { return [] }
+}
+
+// We'd like to see: {{type 'BadBidirectionalIndexable' does not conform to protocol 'BidirectionalIndexable'}}
+// But the compiler doesn't generate that error.
+struct BadBidirectionalIndexable : BidirectionalIndexable {
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
 
   subscript(pos: Int) -> Int { return 0 }
   subscript(bounds: Range<Int>) -> [Int] { return [] }
 
-  // all the methods have default implementations in extensions
-}
-
-struct GoodBidirectionalIndexable2 : BidirectionalIndexable {
-  var startIndex: String { return "" }
-  var endIndex: String { return "" }
-
-  subscript(pos: String) -> Int { return 0 }
-  subscript(bounds: Range<String>) -> [Int] { return [] }
-
-  func index(after i: String) -> String { return "" }
-  func index(before i: String) -> String { return "" }
-}
-
-// expected-error@+1 {{type 'BadBidirectionalIndexable' does not conform to protocol 'BidirectionalIndexable'}}
-struct BadBidirectionalIndexable : BidirectionalIndexable {
-  var startIndex: String { return "" }
-  var endIndex: String { return "" }
-
-  subscript(pos: String) -> Int { return 0 }
-  subscript(bounds: Range<String>) -> [Int] { return [] }
-
-  func index(after i: String) -> String { return "" }
-
-  // Since String is not Strideable, 'index(before:)' will not be defaulted
+  // This is a poor error message; it would be better to get a message
+  // that index(before:) was missing.
+  //
+  // expected-error@+1 {{'index(after:)' has different argument names from those required by protocol 'BidirectionalIndexable' ('index(before:)'}}
+  func index(after i: Int) -> Int { return 0 }
 }

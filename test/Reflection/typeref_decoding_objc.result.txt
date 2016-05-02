@@ -46,3 +46,39 @@ ASSOCIATED TYPES:
 BUILTIN TYPES:
 ==============
 
+CAPTURE DESCRIPTORS:
+====================
+- Capture types:
+(struct Swift.StaticString)
+(struct Swift.StaticString)
+(struct Swift.UInt)
+(struct Swift.UInt)
+- Metadata sources:
+- Capture types:
+- Metadata sources:
+!!! Invalid typeref
+!!! Invalid matadata source
+- Capture types:
+(struct Swift.StaticString)
+(bound_generic_struct Swift.UnsafeBufferPointer
+  (struct Swift.UInt8))
+(struct Swift.UInt)
+(struct Swift.UInt)
+- Metadata sources:
+- Capture types:
+- Metadata sources:
+!!! Invalid typeref
+!!! Invalid matadata source
+- Capture types:
+(bound_generic_struct Swift.UnsafeBufferPointer
+  (struct Swift.UInt8))
+(bound_generic_struct Swift.UnsafeBufferPointer
+  (struct Swift.UInt8))
+(struct Swift.UInt)
+(struct Swift.UInt)
+- Metadata sources:
+- Capture types:
+- Metadata sources:
+!!! Invalid typeref
+!!! Invalid matadata source
+

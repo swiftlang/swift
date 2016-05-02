@@ -12,6 +12,9 @@
 
 /// A collection whose elements are all identical `Element`s.
 public struct Repeated<Element> : RandomAccessCollection {
+
+  public typealias Indices = CountableRange<Int>
+
   /// A type that represents a valid position in the collection.
   /// 
   /// Valid indices consist of the position of every element and a

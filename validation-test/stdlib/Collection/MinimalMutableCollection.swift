@@ -27,7 +27,6 @@ var CollectionTests = TestSuite("Collection")
 
 // Test collections using value types as elements.
 do {
-  var checksAdded: Box<Set<String>> = Box([])
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
   resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .trap
 
@@ -47,7 +46,6 @@ do {
     },
     wrapValueIntoComparable: identityComp,
     extractValueFromComparable: identityComp,
-    checksAdded: checksAdded,
     resiliencyChecks: resiliencyChecks
     , withUnsafeMutableBufferPointerIsSupported: false,
     isFixedLengthCollection: true
@@ -56,7 +54,6 @@ do {
 
 // Test collections using a reference type as element.
 do {
-  var checksAdded: Box<Set<String>> = Box([])
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
   resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .trap
 
@@ -82,7 +79,6 @@ do {
     },
     wrapValueIntoComparable: identityComp,
     extractValueFromComparable: identityComp,
-    checksAdded: checksAdded,
     resiliencyChecks: resiliencyChecks
     , withUnsafeMutableBufferPointerIsSupported: false,
     isFixedLengthCollection: true

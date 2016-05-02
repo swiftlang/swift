@@ -1299,6 +1299,11 @@ struct ParsedDeclName {
   /// Whether this is a property accessor.
   bool isPropertyAccessor() const { return IsGetter || IsSetter; }
 
+  /// Whether this is an operator.
+  bool isOperator() const {
+    return Lexer::isOperator(BaseName);
+  }
+
   /// Form a declaration name from this parsed declaration name.
   DeclName formDeclName(ASTContext &ctx) const;
 };
