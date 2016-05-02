@@ -43,6 +43,7 @@ typedef struct RemoteReflectionInfo {
   RemoteSection fieldmd;
   RemoteSection assocty;
   RemoteSection builtin;
+  RemoteSection capture;
   RemoteSection typeref;
   RemoteSection reflstr;
   uintptr_t StartAddress;
@@ -91,25 +92,27 @@ uintptr_t getEndAddress(const RemoteSection Sections[], size_t Count) {
 RemoteReflectionInfo makeRemoteReflectionInfo(RemoteSection fieldmd,
                                               RemoteSection assocty,
                                               RemoteSection builtin,
+                                              RemoteSection capture,
                                               RemoteSection typeref,
                                               RemoteSection reflstr) {
   RemoteReflectionInfo Info = {
     fieldmd,
     assocty,
     builtin,
+    capture,
     typeref,
     reflstr,
     0,
     0
   };
 
-  const RemoteSection Sections[5] = {
-    fieldmd, assocty, builtin, typeref, reflstr
+  const RemoteSection Sections[6] = {
+    fieldmd, assocty, builtin, capture, typeref, reflstr
   };
 
-  Info.StartAddress = getStartAddress(Sections, 5);
+  Info.StartAddress = getStartAddress(Sections, 6);
 
-  uintptr_t EndAddress = getEndAddress(Sections, 5);
+  uintptr_t EndAddress = getEndAddress(Sections, 6);
   Info.TotalSize = EndAddress - Info.StartAddress;
 
   return Info;
@@ -256,6 +259,7 @@ PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
       makeRemoteSection(Reader),
       makeRemoteSection(Reader),
       makeRemoteSection(Reader),
+      makeRemoteSection(Reader),
       makeRemoteSection(Reader));
   }
 
@@ -277,6 +281,7 @@ PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
       makeLocalSection(Buffer, RemoteInfo.fieldmd, RemoteInfo),
       makeLocalSection(Buffer, RemoteInfo.assocty, RemoteInfo),
       makeLocalSection(Buffer, RemoteInfo.builtin, RemoteInfo),
+      makeLocalSection(Buffer, RemoteInfo.capture, RemoteInfo),
       makeLocalSection(Buffer, RemoteInfo.typeref, RemoteInfo),
       makeLocalSection(Buffer, RemoteInfo.reflstr, RemoteInfo)
     };

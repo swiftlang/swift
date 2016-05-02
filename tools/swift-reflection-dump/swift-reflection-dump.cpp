@@ -113,6 +113,8 @@ static ReflectionInfo findReflectionInfo(const ObjectFile *objectFile) {
       objectFile, {"__swift3_assocty", ".swift3_assocty"});
   auto builtinTypeSection = findReflectionSection<BuiltinTypeSection>(
       objectFile, {"__swift3_builtin", ".swift3_builtin"});
+  auto captureSection = findReflectionSection<CaptureSection>(
+      objectFile, {"__swift3_capture", ".swift3_capture"});
   auto typeRefSection = findReflectionSection<GenericSection>(
       objectFile, {"__swift3_typeref", ".swift3_typeref"});
   auto reflectionStringsSection = findReflectionSection<GenericSection>(
@@ -122,6 +124,7 @@ static ReflectionInfo findReflectionInfo(const ObjectFile *objectFile) {
     fieldSection,
     associatedTypeSection,
     builtinTypeSection,
+    captureSection,
     typeRefSection,
     reflectionStringsSection,
   };

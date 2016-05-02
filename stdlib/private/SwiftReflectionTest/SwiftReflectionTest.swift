@@ -54,6 +54,7 @@ internal struct ReflectionInfo : Sequence {
   internal let fieldmd: Section?
   internal let assocty: Section?
   internal let builtin: Section?
+  internal let capture: Section?
   internal let typeref: Section?
   internal let reflstr: Section?
 
@@ -62,6 +63,7 @@ internal struct ReflectionInfo : Sequence {
       fieldmd,
       assocty,
       builtin,
+      capture,
       typeref,
       reflstr
     ].makeIterator())
@@ -98,6 +100,7 @@ internal func getSectionInfo(_ name: String,
 /// - __swift3_fieldmd
 /// - __swift3_assocty
 /// - __swift3_builtin
+/// - __swift3_capture
 /// - __swift3_typeref
 /// - __swift3_reflstr (optional, may have been stripped out)
 ///
@@ -111,14 +114,16 @@ internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
 
   let imageName = _dyld_get_image_name(i)
   if let fieldmd = getSectionInfo("__swift3_fieldmd", header) {
-     let assocty = getSectionInfo("__swift3_assocty", header)
-     let builtin = getSectionInfo("__swift3_builtin", header)
-     let typeref = getSectionInfo("__swift3_typeref", header)
-     let reflstr = getSectionInfo("__swift3_reflstr", header)
+      let assocty = getSectionInfo("__swift3_assocty", header)
+      let builtin = getSectionInfo("__swift3_builtin", header)
+      let capture = getSectionInfo("__swift3_capture", header)
+      let typeref = getSectionInfo("__swift3_typeref", header)
+      let reflstr = getSectionInfo("__swift3_reflstr", header)
       return ReflectionInfo(imageName: String(validatingUTF8: imageName)!,
                             fieldmd: fieldmd,
                             assocty: assocty,
                             builtin: builtin,
+                            capture: capture,
                             typeref: typeref,
                             reflstr: reflstr)
   }

@@ -68,12 +68,14 @@ public:
 using FieldSection = ReflectionSection<FieldDescriptorIterator>;
 using AssociatedTypeSection = ReflectionSection<AssociatedTypeIterator>;
 using BuiltinTypeSection = ReflectionSection<BuiltinTypeDescriptorIterator>;
+using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
 using GenericSection = ReflectionSection<const void *>;
 
 struct ReflectionInfo {
   FieldSection fieldmd;
   AssociatedTypeSection assocty;
   BuiltinTypeSection builtin;
+  CaptureSection capture;
   GenericSection typeref;
   GenericSection reflstr;
 };

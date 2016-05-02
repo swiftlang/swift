@@ -38,6 +38,7 @@ typedef struct swift_reflection_info {
   swift_reflection_section_t fieldmd;
   swift_reflection_section_t builtin;
   swift_reflection_section_t assocty;
+  swift_reflection_section_t capture;
   swift_reflection_section_t typeref;
   swift_reflection_section_t reflstr;
 } swift_reflection_info_t;
