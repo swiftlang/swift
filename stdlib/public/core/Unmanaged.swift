@@ -178,8 +178,7 @@ public struct Unmanaged<Instance : AnyObject> {
   public func _withUnsafeGuaranteedRef<Result>(
     _ closure: @noescape (Instance) throws -> Result
   ) rethrows -> Result {
-    let instance = _value
-    let (guaranteedInstance, token) = Builtin.unsafeGuaranteed(instance)
+    let (guaranteedInstance, token) = Builtin.unsafeGuaranteed(_value)
     let result = try closure(guaranteedInstance)
     Builtin.unsafeGuaranteedEnd(token)
     return result
