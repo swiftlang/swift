@@ -102,3 +102,21 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
 
   return "";
 }
+
+StringRef swift::getMajorArchitectureName(const llvm::Triple &Triple) {
+  if (Triple.isOSLinux()) {
+    switch(Triple.getSubArch()) {
+    default:
+      return Triple.getArchName();
+      break;
+    case llvm::Triple::SubArchType::ARMSubArch_v7:
+      return "armv7";
+      break;
+    case llvm::Triple::SubArchType::ARMSubArch_v6:
+      return "armv6";
+      break;
+    }
+  } else {
+    return Triple.getArchName();
+  }
+}
