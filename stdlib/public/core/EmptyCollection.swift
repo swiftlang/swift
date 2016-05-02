@@ -32,7 +32,7 @@ public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
 
 /// A collection whose element type is `Element` but that is always empty.
 public struct EmptyCollection<Element> :
-  RandomAccessCollection, MutableCollection
+  RandomAccessCollection, MutableCollection, Equatable
 {
   /// A type that represents a valid position in the collection.
   ///
@@ -61,7 +61,6 @@ public struct EmptyCollection<Element> :
   /// possible to advance indices.
   @warn_unused_result
   public func index(after i: Index) -> Index {
-    // TODO: swift-3-indexing-model: tests for traps.
     _preconditionFailure("EmptyCollection can't advance indices")
   }
 
@@ -71,7 +70,6 @@ public struct EmptyCollection<Element> :
   /// possible to advance indices.
   @warn_unused_result
   public func index(before i: Index) -> Index {
-    // TODO: swift-3-indexing-model: tests for traps.
     _preconditionFailure("EmptyCollection can't advance indices")
   }
 
@@ -86,7 +84,6 @@ public struct EmptyCollection<Element> :
   ///
   /// Should never be called, since this collection is always empty.
   public subscript(position: Index) -> Element {
-    // TODO: swift-3-indexing-model: tests for traps.
     get {
       _preconditionFailure("Index out of range")
     }
@@ -97,10 +94,13 @@ public struct EmptyCollection<Element> :
 
   public subscript(bounds: Range<Index>) -> EmptyCollection<Element> {
     get {
-      _preconditionFailure("Index out of range")
+      _precondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
+        "Index out of range")
+      return self
     }
     set {
-      _preconditionFailure("Index out of range")
+      _precondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
+        "Index out of range")
     }
   }
 
@@ -109,32 +109,24 @@ public struct EmptyCollection<Element> :
     return 0
   }
 
-  /// Always traps.
-  ///
-  /// EmptyCollection does not have any element indices, so it is not
-  /// possible to advance indices.
   @warn_unused_result
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    // TODO: swift-3-indexing-model: tests for traps.
-    _preconditionFailure("EmptyCollection can't advance indices")
+    _precondition(i == startIndex && n == 0, "Index out of range")
+    return i
   }
 
-  /// Always traps.
-  ///
-  /// EmptyCollection does not have any element indices, so it is not
-  /// possible to advance indices.
   @warn_unused_result
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
-    // TODO: swift-3-indexing-model: tests for traps.
-    _preconditionFailure("EmptyCollection can't advance indices")
+    _precondition(i == startIndex && limit == startIndex,
+      "Index out of range")
+    return n == 0 ? i : nil
   }
 
   /// The distance between two indexes (always zero).
   @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    // TODO: swift-3-indexing-model: tests for traps.
     _precondition(start == 0, "From must be startIndex (or endIndex)")
     _precondition(end == 0, "To must be endIndex (or startIndex)")
     return 0
@@ -142,18 +134,30 @@ public struct EmptyCollection<Element> :
 
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     _precondition(index == 0, "out of bounds")
-    _precondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
+    _precondition(bounds == Range(indices),
       "invalid bounds for an empty collection")
   }
 
-  public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
-    _precondition(range.lowerBound == 0 && range.upperBound == 0,
+  public func _failEarlyRangeCheck(
+    _ range: Range<Index>, bounds: Range<Index>
+  ) {
+    _precondition(range == Range(indices),
       "invalid range for an empty collection")
-    _precondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
+    _precondition(bounds == Range(indices),
       "invalid bounds for an empty collection")
   }
 
-  // TODO: swift-3-indexing-model - fast fail any others from RandomAccessCollection (and up inheritance)?
+  public typealias Indices = CountableRange<Int>
+
+  public var indices: CountableRange<Int> {
+    return startIndex..<endIndex
+  }
+}
+
+public func == <Element>(
+  lhs: EmptyCollection<Element>, rhs: EmptyCollection<Element>
+) -> Bool {
+  return true
 }
 
 @available(*, unavailable, renamed: "EmptyIterator")
