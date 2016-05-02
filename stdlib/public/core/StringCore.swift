@@ -573,9 +573,7 @@ public struct _StringCore {
 
 extension _StringCore : RandomAccessCollection {
   
-  public var indices: CountableRange<Int> {
-    return startIndex..<endIndex
-  }
+  public typealias Indices = CountableRange<Int>
 
   public // @testable
   var startIndex: Int {

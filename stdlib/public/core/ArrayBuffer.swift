@@ -475,10 +475,6 @@ extension _ArrayBuffer {
 
   public typealias Indices = CountableRange<Int>
 
-  public var indices: CountableRange<Int> {
-    return startIndex..<endIndex
-  }
-
   //===--- private --------------------------------------------------------===//
   typealias Storage = _ContiguousArrayStorage<Element>
   public typealias NativeBuffer = _ContiguousArrayBuffer<Element>

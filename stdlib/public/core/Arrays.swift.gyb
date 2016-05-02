@@ -455,8 +455,8 @@ ${SelfDocComment}
 %end
 public struct ${Self}<Element>
   : RandomAccessCollection,
-  MutableCollection,
-  _DestructorSafeContainer
+    MutableCollection,
+    _DestructorSafeContainer
 {
 
   public typealias Index = Int
@@ -504,10 +504,6 @@ public struct ${Self}<Element>
   }
 
   public typealias Indices = CountableRange<Int>
-
-  public var indices: CountableRange<Int> {
-    return startIndex..<endIndex
-  }
 
 %{
 SubscriptDocComment="""\

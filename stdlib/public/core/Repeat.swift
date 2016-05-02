@@ -13,9 +13,7 @@
 /// A collection whose elements are all identical `Element`s.
 public struct Repeated<Element> : RandomAccessCollection {
 
-  public var indices: CountableRange<Int> {
-    return startIndex..<endIndex
-  }
+  public typealias Indices = CountableRange<Int>
 
   /// A type that represents a valid position in the collection.
   /// 

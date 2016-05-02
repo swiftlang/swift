@@ -549,10 +549,6 @@ extension _ContiguousArrayBuffer : RandomAccessCollection {
   }
 
   public typealias Indices = CountableRange<Int>
-
-  public var indices: CountableRange<Int> {
-    return startIndex..<endIndex
-  }
 }
 
 extension Sequence {

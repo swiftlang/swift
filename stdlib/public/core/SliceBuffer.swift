@@ -309,10 +309,6 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
 
   public typealias Indices = CountableRange<Int>
 
-  public var indices: CountableRange<Int> {
-    return startIndex..<endIndex
-  }
-
   //===--- misc -----------------------------------------------------------===//
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.

@@ -12,7 +12,9 @@
 
 /// The underlying buffer for an ArrayType conforms to
 /// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
-public protocol _ArrayBufferProtocol : MutableCollection {
+public protocol _ArrayBufferProtocol
+  : MutableCollection, RandomAccessCollection {
+
   /// The type of elements stored in the buffer.
   associatedtype Element
 
@@ -124,6 +126,8 @@ public protocol _ArrayBufferProtocol : MutableCollection {
 }
 
 extension _ArrayBufferProtocol where Index == Int {
+  public typealias Indices = CountableRange<Int>
+
   public var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }

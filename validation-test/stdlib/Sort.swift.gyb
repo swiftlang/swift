@@ -61,6 +61,8 @@ func expectSortedCollection(_ sortedAry: ArraySlice<Int>, _ originalAry: ArraySl
 }
 
 class OffsetCollection : MutableCollection, RandomAccessCollection {
+  typealias Indices = CountableRange<Int>
+  
   let offset: Int
   var data: [Int] = []
   let forward: Bool

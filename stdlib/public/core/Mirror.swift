@@ -526,10 +526,7 @@ internal extension Mirror {
   /// mirrors to use the new style, which only present forward
   /// traversal in general.
   internal struct LegacyChildren : RandomAccessCollection {
-
-    public var indices: CountableRange<Int> {
-      return startIndex..<endIndex
-    }
+    typealias Indices = CountableRange<Int>
     
     init(_ oldMirror: _Mirror) {
       self._oldMirror = oldMirror
@@ -759,10 +756,7 @@ public struct DictionaryLiteral<Key, Value> : DictionaryLiteralConvertible {
 /// `Collection` conformance that allows `DictionaryLiteral` to
 /// interoperate with the rest of the standard library.
 extension DictionaryLiteral : RandomAccessCollection {
-
-  var indices: CountableRange<Int> {
-    return startIndex..<endIndex
-  }
+  public typealias Indices = CountableRange<Int>
   
   /// The position of the first element in a non-empty `DictionaryLiteral`.
   ///

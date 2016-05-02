@@ -136,47 +136,6 @@ extension BidirectionalIndexable {
   }
 }
 
-/// Supply optimized defaults for `BidirectionalCollection` models that use
-/// some model of `Strideable` as their `Index`.
-extension BidirectionalIndexable
-  where
-  Index : Strideable,
-  Index.Stride == IndexDistance,
-  Index.Stride : SignedInteger {
-
-  @warn_unused_result
-  public func index(before i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: range check i: should allow `endIndex`.
-    //_failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
-
-    return i.advanced(by: -1)
-  }
-
-  @warn_unused_result
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    // FIXME: swift-3-indexing-model: range check i
-    return i.advanced(by: n)
-  }
-
-  @warn_unused_result
-  public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
-  ) -> Index? {
-    // FIXME: swift-3-indexing-model: range check i
-    let l = i.distance(to: limit)
-    if n > 0 ? l >= 0 && l < n : l <= 0 && l > n {
-      return nil
-    }
-    return index(i, offsetBy: n)
-  }
-
-  @warn_unused_result
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
-    // FIXME: swift-3-indexing-model: range check supplies start and end?
-    return start.distance(to: end)
-  }
-}
-
 /// Supply the default "slicing" `subscript` for `BidirectionalCollection`
 /// models that accept the default associated `SubSequence`,
 /// `BidirectionalSlice<Self>`.

@@ -26,9 +26,7 @@ import SwiftShims
 /// `_NSArrayCore` conform directly?  It's a class, and I
 /// don't want to pay for the dynamic dispatch overhead.
 internal struct _CocoaArrayWrapper : RandomAccessCollection {
-  var indices: CountableRange<Int> {
-    return startIndex..<endIndex
-  }
+  typealias Indices = CountableRange<Int>
   
   var startIndex: Int {
     return 0

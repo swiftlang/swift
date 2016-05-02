@@ -37,6 +37,11 @@ public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
 /// A collection containing a single element of type `Element`.
 public struct CollectionOfOne<Element> : RandomAccessCollection {
 
+  // FIXME: swift-3-indexing-model - compiler bug prevents this
+  // typealias from being sufficient.  Instead we need to define the
+  // var below.
+  //
+  // public typealias indices = CountableRange<Int>
   public var indices: CountableRange<Int> {
     return startIndex..<endIndex
   }

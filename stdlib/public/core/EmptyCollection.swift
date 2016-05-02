@@ -34,6 +34,8 @@ public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
 public struct EmptyCollection<Element> :
   RandomAccessCollection, MutableCollection, Equatable
 {
+  public typealias Indices = CountableRange<Int>
+  
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a

@@ -240,9 +240,7 @@ extension UnicodeScalar {
 
 extension UnicodeScalar.UTF16View : RandomAccessCollection {
 
-  var indices: CountableRange<Int> {
-    return startIndex..<endIndex
-  }
+  typealias Indices = CountableRange<Int>
 
   /// The position of the first code unit.
   var startIndex: Int {

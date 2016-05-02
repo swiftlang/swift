@@ -166,9 +166,5 @@ extension UnsafeMutableAudioBufferListPointer
   }
 
   public typealias Indices = CountableRange<Int>
-
-  public var indices: Indices {
-    return startIndex..<endIndex
-  }
 }
 

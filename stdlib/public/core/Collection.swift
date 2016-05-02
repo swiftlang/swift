@@ -857,52 +857,6 @@ extension Indexable {
   }
 }
 
-/// Supply optimized defaults for `Collection` models that use some model
-/// of `Strideable` as their `Index`.
-extension Indexable
-  where
-  Index : Strideable,
-  Index.Stride == IndexDistance,
-  Index.Stride : SignedInteger {
-
-  @warn_unused_result
-  public func index(after i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: tests.
-    _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
-
-    return i.advanced(by: 1)
-  }
-
-  @warn_unused_result
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    _precondition(n >= 0,
-      "Only BidirectionalCollections can be advanced by a negative amount")
-    // FIXME: swift-3-indexing-model: range check i
-    return i.advanced(by: n)
-  }
-
-  @warn_unused_result
-  public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
-  ) -> Index? {
-    _precondition(n >= 0,
-      "Only BidirectionalCollections can be advanced by a negative amount")
-    let l = i.distance(to: limit)
-    if l >= 0 && l < n {
-      return nil
-    }
-    return index(i, offsetBy: n)
-  }
-
-  @warn_unused_result
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
-    _precondition(start <= end,
-      "Only BidirectionalCollections can have end come before start")
-    // FIXME: swift-3-indexing-model: range check supplied start and end?
-    return start.distance(to: end)
-  }
-}
-
 /// Supply the default `makeIterator()` method for `Collection` models
 /// that accept the default associated `Iterator`,
 /// `IndexingIterator<Self>`.

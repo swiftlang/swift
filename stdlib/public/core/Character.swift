@@ -137,6 +137,8 @@ public struct Character :
   }
 
   internal struct _SmallUTF8 : RandomAccessCollection {
+    typealias Indices = CountableRange<Int>
+    
     var indices: CountableRange<Int> {
       return startIndex..<endIndex
     }
@@ -203,9 +205,7 @@ public struct Character :
   }
 
   struct _SmallUTF16 : RandomAccessCollection {
-    var indices: CountableRange<Int> {
-      return startIndex..<endIndex
-    }
+    typealias Indices = CountableRange<Int>
     
     init(_ u8: UInt64) {
       let count = UTF16.transcodedLength(
