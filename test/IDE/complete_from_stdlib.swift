@@ -235,7 +235,7 @@ func testPostfixOperator2(_ x: inout Int) {
 func testPostfixOperator3(_ x: MyInt??) {
   x#^POSTFIX_OPTIONAL_1^#
 }
-// POSTFIX_OPTIONAL: Pattern/None: ![#MyInt?#]; name=!
+// POSTFIX_OPTIONAL: BuiltinOperator/None: ![#MyInt?#]; name=!
 
 func testInfixOperator1(_ x: Int) {
   x#^INFIX_INT_1^#
