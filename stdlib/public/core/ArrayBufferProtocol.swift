@@ -15,6 +15,8 @@
 public protocol _ArrayBufferProtocol
   : MutableCollection, RandomAccessCollection {
 
+  associatedtype Indices : RandomAccessCollection = CountableRange<Int>
+
   /// The type of elements stored in the buffer.
   associatedtype Element
 
@@ -126,7 +128,6 @@ public protocol _ArrayBufferProtocol
 }
 
 extension _ArrayBufferProtocol where Index == Int {
-  public typealias Indices = CountableRange<Int>
 
   public var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
