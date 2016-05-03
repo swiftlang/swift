@@ -4937,38 +4937,38 @@ extension Set {
 extension Set {
   @available(*, unavailable, renamed: "remove(at:)")
   public mutating func removeAtIndex(_ index: Index) -> Element {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> SetIterator<Element> {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "index(of:)")
   public func indexOf(_ member: Element) -> Index? {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
 extension Dictionary {
   @available(*, unavailable, renamed: "remove(at:)")
   public mutating func removeAtIndex(_ index: Index) -> Element {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "index(forKey:)")
   public func indexForKey(_ key: Key) -> Index? {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "removeValue(forKey:)")
   public mutating func removeValueForKey(_ key: Key) -> Value? {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> DictionaryIterator<Key, Value> {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

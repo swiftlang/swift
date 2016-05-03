@@ -203,6 +203,6 @@ public typealias LazySequenceType = LazySequenceProtocol
 extension LazySequenceProtocol {
   @available(*, unavailable, message: "Please use Array initializer instead.")
   public var array: [Iterator.Element] {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

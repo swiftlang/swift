@@ -1468,12 +1468,12 @@ extension Collection {
 
   @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> Iterator {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, message: "Removed in Swift 3. Please use underestimatedCount property.")
   public func underestimateCount() -> Int {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, message: "Please use split(maxSplits:omittingEmptySubsequences:isSeparator:) instead")
@@ -1482,7 +1482,7 @@ extension Collection {
     allowEmptySlices: Bool = false,
     isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
@@ -1493,7 +1493,7 @@ extension Collection where Iterator.Element : Equatable {
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false
   ) -> [SubSequence] {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 

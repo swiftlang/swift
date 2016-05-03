@@ -530,12 +530,12 @@ extension AutoreleasingUnsafeMutablePointer {
 
   @available(*, unavailable, renamed: "pointee")
   public var memory: Pointee {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, message: "Removed in Swift 3. Please use nil literal instead.")
   public init() {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 #endif

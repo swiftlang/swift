@@ -348,7 +348,7 @@ extension LazyFilterIterator {
     _ base: Base,
     whereElementsSatisfy predicate: (Base.Element) -> Bool
   ) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
@@ -358,12 +358,12 @@ extension LazyFilterSequence {
     _ base: Base,
     whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
   ) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
@@ -373,12 +373,12 @@ extension LazyFilterCollection {
     _ base: Base,
     whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
   ) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 

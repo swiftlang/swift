@@ -350,28 +350,28 @@ extension LazyCollectionProtocol
 extension ReversedCollection {
   @available(*, unavailable, message: "use the 'reversed()' method on the collection")
   public init(_ base: Base) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
 extension ReversedRandomAccessCollection {
   @available(*, unavailable, message: "use the 'reversed()' method on the collection")
   public init(_ base: Base) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
 extension BidirectionalCollection {
   @available(*, unavailable, renamed: "reversed")
   public func reverse() -> ReversedCollection<Self> {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
 extension RandomAccessCollection {
   @available(*, unavailable, renamed: "reversed")
   public func reverse() -> ReversedRandomAccessCollection<Self> {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
@@ -385,7 +385,7 @@ extension LazyCollectionProtocol
   public func reverse() -> LazyCollection<
     ReversedCollection<Elements>
   > {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
@@ -398,7 +398,7 @@ extension LazyCollectionProtocol
   public func reverse() -> LazyCollection<
     ReversedRandomAccessCollection<Elements>
   > {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 

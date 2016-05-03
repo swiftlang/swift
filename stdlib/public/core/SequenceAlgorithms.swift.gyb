@@ -673,26 +673,26 @@ extension Sequence {
 extension Sequence {
   @available(*, unavailable, renamed: "enumerated")
   public func enumerate() -> EnumeratedSequence<Self> {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "min")
   public func minElement(
     _ isOrderedBefore: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "max")
   public func maxElement(
     _ isOrderedBefore: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "reversed")
   public func reverse() -> [Iterator.Element] {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "starts")
@@ -702,7 +702,7 @@ extension Sequence {
     with possiblePrefix: PossiblePrefix,
     isEquivalent: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows-> Bool {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "lexicographicallyPrecedes")
@@ -712,19 +712,19 @@ extension Sequence {
     _ other: OtherSequence,
     isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
   ) rethrows -> Bool {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
 extension Sequence where Iterator.Element : Comparable {
   @available(*, unavailable, renamed: "min")
   public func minElement() -> Iterator.Element? {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "max")
   public func maxElement() -> Iterator.Element? {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "starts")
@@ -733,7 +733,7 @@ extension Sequence where Iterator.Element : Comparable {
   >(
     with possiblePrefix: PossiblePrefix
   ) -> Bool {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "lexicographicallyPrecedes")
@@ -742,6 +742,6 @@ extension Sequence where Iterator.Element : Comparable {
   >(
     _ other: OtherSequence
   ) -> Bool {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

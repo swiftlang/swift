@@ -204,7 +204,7 @@ public func unsafeAddress(of object: AnyObject) -> UnsafePointer<Void> {
 
 @available(*, unavailable, renamed: "unsafeAddress(of:)")
 public func unsafeAddressOf(_ object: AnyObject) -> UnsafePointer<Void> {
-  fatalError("unavailable function can't be called")
+  Builtin.unreachable()
 }
 
 /// Converts a reference of type `T` to a reference of type `U` after
@@ -594,5 +594,5 @@ func _isOptional<T>(_ type: T.Type) -> Bool {
 
 @available(*, unavailable, message: "Removed in Swift 3. Please use Optional.unsafelyUnwrapped instead.")
 public func unsafeUnwrap<T>(_ nonEmpty: T?) -> T {
-  fatalError("unavailable function can't be called")
+  Builtin.unreachable()
 }

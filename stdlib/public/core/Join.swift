@@ -193,7 +193,7 @@ public struct JoinGenerator<
 extension JoinedSequence {
   @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> JoinedIterator<Base.Iterator> {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
@@ -204,6 +204,6 @@ extension Sequence where Iterator.Element : Sequence {
     where
     Separator.Iterator.Element == Iterator.Element.Iterator.Element
   >(_ separator: Separator) -> JoinedSequence<Self> {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

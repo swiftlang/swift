@@ -539,42 +539,42 @@ extension ${Self} {
 
   @available(*, unavailable, message: "use 'nil' literal")
   public init() {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, message: "use the '${Self}(allocatingCapacity:)' initializer")
   public static func alloc(_ num: Int) -> ${Self} {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "deallocateCapacity")
   public func dealloc(_ num: Int) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "pointee")
   public var memory: Pointee {
     get {
-      fatalError("unavailable function can't be called")
+      Builtin.unreachable()
     }
     set {
-      fatalError("unavailable function can't be called")
+      Builtin.unreachable()
     }
   }
 
   @available(*, unavailable, renamed: "initialize(with:)")
   public func initialize(_ newvalue: Pointee) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "deinitialize(count:)")
   public func destroy() {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "deinitialize(count:)")
   public func destroy(_ count: Int) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
