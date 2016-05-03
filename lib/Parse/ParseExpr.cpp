@@ -1285,16 +1285,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         continue;
       }
       
-      // Handle "x.<tab>" for code completion.
-      if (Tok.is(tok::code_complete)) {
-        if (CodeCompletion && Result.isNonNull())
-          CodeCompletion->completeDotExpr(Result.get(), /*DotLoc=*/TokLoc);
-        // Eat the code completion token because we handled it.
-        consumeToken(tok::code_complete);
-        Result.setHasCodeCompletion();
-        return Result;
-      }
-      
+           
       // If we have '.<keyword><code_complete>', try to recover by creating
       // an identifier with the same spelling as the keyword.
       if (Tok.isKeyword() && peekToken().is(tok::code_complete)) {
@@ -1304,8 +1295,19 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
                                             Name, DeclNameLoc(Tok.getLoc()),
                                             /*Implicit=*/false));
         consumeToken();
+        // Fall into the next code completion handler.
       }
 
+      // Handle "x.<tab>" for code completion.
+      if (Tok.is(tok::code_complete)) {
+        if (CodeCompletion && Result.isNonNull())
+          CodeCompletion->completeDotExpr(Result.get(), /*DotLoc=*/TokLoc);
+        // Eat the code completion token because we handled it.
+        consumeToken(tok::code_complete);
+        Result.setHasCodeCompletion();
+        return Result;
+      }
+ 
       // Non-identifier cases.
       if (Tok.isNot(tok::identifier, tok::kw_init)) {
         checkForInputIncomplete();
