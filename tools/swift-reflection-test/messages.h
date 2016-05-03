@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+static const char *REQUEST_INSTANCE_KIND = "k\n";
 static const char *REQUEST_INSTANCE_ADDRESS = "i\n";
 static const char *REQUEST_REFLECTION_INFO = "r\n";
 static const char *REQUEST_READ_BYTES = "b\n";
@@ -17,3 +18,10 @@ static const char *REQUEST_SYMBOL_ADDRESS = "s\n";
 static const char *REQUEST_STRING_LENGTH = "l\n";
 static const char *REQUEST_POINTER_SIZE = "p\n";
 static const char *REQUEST_DONE = "d\n";
+
+typedef enum InstanceKind {
+  None,
+  Object,
+  Existential,
+  Closure
+} InstanceKind;
