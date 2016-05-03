@@ -77,9 +77,12 @@ const ClassMetadata *swift::_swift_getClass(const void *object) {
 #if SWIFT_OBJC_INTEROP
 struct SwiftObject_s {
   void *isa  __attribute__((unavailable));
-  long refCount  __attribute__((unavailable));
+  uint32_t strongRefCount  __attribute__((unavailable));
+  uint32_t weakRefCount  __attribute__((unavailable));
 };
 
+static_assert(sizeof(SwiftObject_s) == sizeof(HeapObject),
+              "SwiftObject and HeapObject must have the same header");
 static_assert(std::is_trivially_constructible<SwiftObject_s>::value,
               "SwiftObject must be trivially constructible");
 static_assert(std::is_trivially_destructible<SwiftObject_s>::value,
@@ -89,13 +92,7 @@ static_assert(std::is_trivially_destructible<SwiftObject_s>::value,
 __attribute__((objc_root_class))
 #endif
 @interface SwiftObject<NSObject> {
-  // FIXME: rdar://problem/18950072 Clang emits ObjC++ classes as having
-  // non-trivial structors if they contain any struct fields at all, regardless of
-  // whether they in fact have nontrivial default constructors. Dupe the body
-  // of SwiftObject_s into here as a workaround because we don't want to pay
-  // the cost of .cxx_destruct method dispatch at deallocation time.
-  void *magic_isa  __attribute__((unavailable));
-  long magic_refCount  __attribute__((unavailable));
+  SwiftObject_s header;
 }
 
 - (BOOL)isEqual:(id)object;

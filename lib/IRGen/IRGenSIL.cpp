@@ -4316,6 +4316,10 @@ void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrIn
       return emitAllocateBuffer(*this, i->getLoweredConcreteType(), buffer);
     }
   }();
+
+  // Make sure we have a value of the right type.
+  address =
+    Builder.CreateBitCast(address, srcTI.getStorageType()->getPointerTo());
   
   setLoweredAddress(SILValue(i, 0), address);
 }
