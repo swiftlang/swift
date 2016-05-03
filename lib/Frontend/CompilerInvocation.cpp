@@ -1217,6 +1217,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
 
+  Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);
+
   // This is set to true by default.
   Opts.UseIncrementalLLVMCodeGen &=
     !Args.hasArg(OPT_disable_incremental_llvm_codegeneration);
