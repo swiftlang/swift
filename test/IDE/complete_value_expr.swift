@@ -170,6 +170,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_1 | FileCheck %s -check-prefix=GENERIC_TYPEALIAS_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_2 | FileCheck %s -check-prefix=GENERIC_TYPEALIAS_2
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AFTER_SPACE_1 | FileCheck %s -check-prefix=AFTER_SPACE_1
+
 // Test code completion of expressions that produce a value.
 
 struct FooStruct {
@@ -1882,3 +1884,8 @@ func testGenericTypealias2() {
   Enclose.#^GENERIC_TYPEALIAS_2^#
 }
 // GENERIC_TYPEALIAS_2: Decl[TypeAlias]/CurrNominal:        MyPair[#(T, T)#];
+
+func testAfterSpace(x: Int?) {
+  x #^AFTER_SPACE_1^#
+// AFTER_SPACE_1-NOT: CurrNominal
+}
