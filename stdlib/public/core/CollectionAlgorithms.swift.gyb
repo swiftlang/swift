@@ -642,7 +642,7 @@ extension MutableCollection where Self : RandomAccessCollection {
     _ range: Range<Index>,
     isOrderedBefore: (${IElement}, ${IElement}) -> Bool
   ) -> Index {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
@@ -651,7 +651,7 @@ extension MutableCollection
 
   @available(*, unavailable, message: "slice the collection using the range, and call partition()")
   public mutating func partition(_ range: Range<Index>) -> Index {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
@@ -662,7 +662,7 @@ extension MutableCollection
 
   @available(*, unavailable, renamed: "sort")
   public mutating func sortInPlace() {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
@@ -671,7 +671,7 @@ extension MutableCollection where Self : RandomAccessCollection {
   public mutating func sortInPlace(
     _ isOrderedBefore: @noescape (Iterator.Element, Iterator.Element) -> Bool
   ) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
@@ -679,7 +679,7 @@ extension Collection where ${IElement} : Equatable {
   @available(*, unavailable, renamed: "index(of:)")
   @warn_unused_result
   public func indexOf(_ element: ${IElement}) -> Index? {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
@@ -689,6 +689,6 @@ extension Collection {
   public func indexOf(
     _ predicate: @noescape (${IElement}) throws -> Bool
   ) rethrows -> Index? {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

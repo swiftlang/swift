@@ -831,7 +831,7 @@ public func transcode<
   _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
   stoppingOnError stopOnError: Bool
 ) -> Bool {
-  fatalError("unavailable function can't be called")
+  Builtin.unreachable()
 }
 
 extension UTF16 {
@@ -842,6 +842,6 @@ extension UTF16 {
   >(
     _: Encoding.Type, input: Input, repairIllFormedSequences: Bool
   ) -> (Int, Bool)? {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

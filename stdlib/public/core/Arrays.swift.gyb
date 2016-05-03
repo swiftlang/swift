@@ -2057,19 +2057,19 @@ extension ContiguousArray {
 extension ${Self} {
   @available(*, unavailable, message: "Please use init(repeating:count:) instead")
   init(count: Int, repeatedValue: Element) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "remove")
   public mutating func removeAtIndex(_ index: Int) -> Element {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "replaceSubrange")
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == _Buffer.Element
   >(_ subRange: Range<Int>, with newElements: C) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "append(contentsOf:)")
@@ -2078,7 +2078,7 @@ extension ${Self} {
     where
     S.Iterator.Element == Element
   >(_ newElements: S) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 %end

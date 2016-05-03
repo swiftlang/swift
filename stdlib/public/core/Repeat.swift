@@ -68,6 +68,6 @@ public struct Repeat<Element> {}
 extension Repeated {
   @available(*, unavailable, renamed: "repeatElement")
   public init(count: Int, repeatedValue: Element) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

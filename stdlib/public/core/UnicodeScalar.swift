@@ -287,11 +287,11 @@ extension UnicodeScalar {
   /// Creates an instance of the NUL scalar value.
   @available(*, unavailable, message: "use the 'UnicodeScalar(\"\\0\")'")
   public init() {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "escaped")
   public func escape(asASCII forceASCII: Bool) -> String {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

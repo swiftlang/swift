@@ -94,7 +94,7 @@ extension String {
   @available(*, unavailable, message: "Please use String.init?(validatingUTF8:) instead. Note that it no longer accepts NULL as a valid input. Also consider using String(cString:), that will attempt to repair ill-formed code units.")
   @warn_unused_result
   public static func fromCString(_ cs: UnsafePointer<CChar>) -> String? {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, message: "Please use String.init(cString:) instead. Note that it no longer accepts NULL as a valid input. See also String.decodeCString if you need more control.")
@@ -102,6 +102,6 @@ extension String {
   public static func fromCStringRepairingIllFormedUTF8(
     _ cs: UnsafePointer<CChar>
   ) -> (String?, hadError: Bool) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

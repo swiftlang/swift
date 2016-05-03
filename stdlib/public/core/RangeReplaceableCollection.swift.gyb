@@ -1078,12 +1078,12 @@ extension RangeReplaceableCollection {
   >(
     _ subrange: Range<Index>, with newElements: C
   ) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
   
   @available(*, unavailable, renamed: "removeAt")
   public mutating func removeAtIndex(_ i: Index) -> Iterator.Element {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "removeSubrange")
@@ -1096,14 +1096,14 @@ extension RangeReplaceableCollection {
     where
     S.Iterator.Element == Iterator.Element
   >(_ newElements: S) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "insert(contentsOf:at:)")
   public mutating func insertContentsOf<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(_ newElements: C, at i: Index) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 

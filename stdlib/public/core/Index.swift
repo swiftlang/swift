@@ -15,22 +15,22 @@ public protocol _Incrementable : Equatable {}
 
 @available(*, unavailable, message: "Use \'-= 1\' or call collection.prior(Index)")
 public prefix func -- <T : _Incrementable> (i: inout T) -> T {
-  fatalError("unavailable operator can't be called")
+  Builtin.unreachable()
 }
 
 @available(*, unavailable, message: "Use \'-= 1\' or call collection.prior(Index)")
 public postfix func -- <T : _Incrementable> (i: inout T) -> T {
-  fatalError("unavailable operator can't be called")
+  Builtin.unreachable()
 }
 
 @available(*, unavailable, message: "Use \'+= 1\' or call 'collection.index(after: Index)")
 public prefix func ++ <T : _Incrementable> (i: inout T) -> T {
-  fatalError("unavailable operator can't be called")
+  Builtin.unreachable()
 }
 
 @available(*, unavailable, message: "Use \'+= 1\' or call 'collection.index(after: Index)")
 public postfix func ++ <T : _Incrementable> (i: inout T) -> T {
-  fatalError("unavailable operator can't be called")
+  Builtin.unreachable()
 }
 
 @available(*, unavailable, renamed: "Comparable")
