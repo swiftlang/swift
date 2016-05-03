@@ -69,9 +69,9 @@ using GetTypeParameterInContextFn =
 /// Given a required value, map the requirement into the given
 /// context and bind the value.
 void bindGenericRequirement(IRGenFunction &IGF,
-                                     GenericRequirement requirement,
-                                     llvm::Value *requiredValue,
-                                     GetTypeParameterInContextFn getInContext);
+                            GenericRequirement requirement,
+                            llvm::Value *requiredValue,
+                            GetTypeParameterInContextFn getInContext);
 
 void bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
                                        ArrayRef<GenericRequirement> reqts,
