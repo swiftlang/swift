@@ -24,11 +24,11 @@ func _arrayReplace<B: _ArrayBufferProtocol, C: Collection
   _ target: inout B, _ subRange: Range<Int>, _ newValues: C
 ) {
   _precondition(
-    subRange.startIndex >= 0,
+    subRange.lowerBound >= 0,
     "Array replace: subRange start is negative")
 
   _precondition(
-    subRange.endIndex <= target.endIndex,
+    subRange.upperBound <= target.endIndex,
     "Array replace: subRange extends past the end")
 
   let oldCount = target.count

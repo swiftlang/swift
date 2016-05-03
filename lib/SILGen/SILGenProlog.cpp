@@ -294,8 +294,32 @@ struct ArgumentInitHelper {
       makeArgumentIntoBinding(PD->getType(), &*f.begin(), PD);
       return;
     }
-    
-    ManagedValue argrv = makeArgument(PD->getType(), &*f.begin(), PD);
+
+    emitAnonymousParam(PD->getType(), PD, PD);
+  }
+
+  void emitAnonymousParam(Type type, SILLocation paramLoc, ParamDecl *PD) {
+    assert(!PD || PD->getType()->isEqual(type));
+
+    // Allow non-materializable tuples to be bound to anonymous parameters.
+    if (!type->isMaterializable()) {
+      if (auto tupleType = type->getAs<TupleType>()) {
+        for (auto eltType : tupleType->getElementTypes()) {
+          emitAnonymousParam(eltType, paramLoc, nullptr);
+        }
+        return;
+      }
+    }
+
+    // A value bound to _ is unused and can be immediately released.
+    Scope discardScope(gen.Cleanups, CleanupLocation(PD));
+
+    // Manage the parameter.
+    ManagedValue argrv = makeArgument(type, &*f.begin(), paramLoc);
+
+    // Don't do anything else if we don't have a parameter.
+    if (!PD) return;
+
     // Emit debug information for the argument.
     SILLocation loc(PD);
     loc.markAsPrologue();
@@ -303,10 +327,6 @@ struct ArgumentInitHelper {
       gen.B.createDebugValueAddr(loc, argrv.getValue(), {PD->isLet(), ArgNo});
     else
       gen.B.createDebugValue(loc, argrv.getValue(), {PD->isLet(), ArgNo});
-
-    // A value bound to _ is unused and can be immediately released.
-    Scope discardScope(gen.Cleanups, CleanupLocation(PD));
-    // Popping the scope destroys the value.
   }
 };
 } // end anonymous namespace

@@ -32,8 +32,8 @@ func _toNSArray<T, U : AnyObject>(_ a: [T], f: @noescape (T) -> U) -> NSArray {
 @warn_unused_result
 func _toNSRange(_ r: Range<String.Index>) -> NSRange {
   return NSRange(
-    location: r.startIndex._utf16Index,
-    length: r.endIndex._utf16Index - r.startIndex._utf16Index)
+    location: r.lowerBound._utf16Index,
+    length: r.upperBound._utf16Index - r.lowerBound._utf16Index)
 }
 
 @warn_unused_result
@@ -125,7 +125,7 @@ extension String {
   /// memory referred to by `index`
   func _withOptionalOutParameter<Result>(
     _ index: UnsafeMutablePointer<Index>?,
-    body: @noescape (UnsafeMutablePointer<Int>?) -> Result
+    _ body: @noescape (UnsafeMutablePointer<Int>?) -> Result
   ) -> Result {
     var utf16Index: Int = 0
     let result = (index != nil ? body(&utf16Index) : body(nil))
@@ -138,7 +138,7 @@ extension String {
   /// it into the memory referred to by `range`
   func _withOptionalOutParameter<Result>(
     _ range: UnsafeMutablePointer<Range<Index>>?,
-    body: @noescape (UnsafeMutablePointer<NSRange>?) -> Result
+    _ body: @noescape (UnsafeMutablePointer<NSRange>?) -> Result
   ) -> Result {
     var nsRange = NSRange(location: 0, length: 0)
     let result = (range != nil ? body(&nsRange) : body(nil))
@@ -354,14 +354,19 @@ extension String {
     // dispatching to the minimal selector for the supplied options.
     // So let's do that; the switch should compile away anyhow.
     return locale != nil ? _ns.compare(
-      aString, options: mask,
-      range: _toNSRange(range ?? self.characters.indices),
-      locale: locale)
+      aString,
+      options: mask,
+      range: _toNSRange(
+        range ?? self.characters.startIndex..<self.characters.endIndex
+      ),
+      locale: locale
+    )
 
     : range != nil ? _ns.compare(
       aString,
       options: mask,
-      range: _toNSRange(range ?? self.characters.indices))
+      range: _toNSRange(range!)
+    )
 
     : !mask.isEmpty ? _ns.compare(aString, options: mask)
 
@@ -1209,8 +1214,13 @@ extension String {
   ) -> Range<Index>? {
     return _optionalRange(
       _ns.rangeOfCharacter(
-        from: aSet, options: mask,
-        range: _toNSRange(aRange ?? self.characters.indices)))
+        from: aSet,
+        options: mask,
+        range: _toNSRange(
+          aRange ?? self.characters.startIndex..<self.characters.endIndex
+        )
+      )
+    )
   }
 
   // - (NSRange)rangeOfComposedCharacterSequenceAtIndex:(NSUInteger)anIndex
@@ -1269,7 +1279,9 @@ extension String {
       locale != nil ? _ns.range(
         of: aString,
         options: mask,
-        range: _toNSRange(searchRange ?? self.characters.indices),
+        range: _toNSRange(
+          searchRange ?? self.characters.startIndex..<self.characters.endIndex
+        ),
         locale: locale
       )
       : searchRange != nil ? _ns.range(
@@ -1517,7 +1529,9 @@ extension String {
       of: target,
       with: replacement,
       options: options,
-      range: _toNSRange(searchRange ?? self.characters.indices)
+      range: _toNSRange(
+        searchRange ?? self.characters.startIndex..<self.characters.endIndex
+      )
     )
     : _ns.replacingOccurrences(of: target, with: replacement)
   }
@@ -1902,7 +1916,7 @@ extension String {
     fatalError("unavailable function can't be called")
   }
 
-  @available(*, unavailable, renamed: "addingPercentEncoding(withAllowedCharacters:")
+  @available(*, unavailable, renamed: "addingPercentEncoding(withAllowedCharacters:)")
   public func addingPercentEncodingWithAllowedCharacters(
     _ allowedCharacters: NSCharacterSet
   ) -> String? {

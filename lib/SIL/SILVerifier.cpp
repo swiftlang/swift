@@ -1434,7 +1434,8 @@ public:
             "unowned_release requires unowned type to be loadable");
   }
   void checkDeallocStackInst(DeallocStackInst *DI) {
-    require(isa<AllocStackInst>(DI->getOperand()),
+    require(isa<SILUndef>(DI->getOperand()) ||
+                isa<AllocStackInst>(DI->getOperand()),
             "Operand of dealloc_stack must be an alloc_stack");
   }
   void checkDeallocRefInst(DeallocRefInst *DI) {

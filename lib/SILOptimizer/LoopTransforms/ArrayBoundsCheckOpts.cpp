@@ -1059,6 +1059,32 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
   return Changed;
 }
 
+
+/// A dominating cond_fail on the same value ensures that this value is false.
+static bool isValueKnownFalseAt(SILValue Val, SILInstruction *At,
+                                DominanceInfo *DT) {
+  auto *Inst = dyn_cast<SILInstruction>(Val);
+  if (!Inst ||
+      std::next(SILBasicBlock::iterator(Inst)) == Inst->getParent()->end())
+    return false;
+  auto *CF = dyn_cast<CondFailInst>(std::next(SILBasicBlock::iterator(Inst)));
+  return CF && DT->properlyDominates(CF, At);
+}
+
+/// Based on the induction variable information this comparison is known to be
+/// true.
+static bool isComparisonKnownTrue(BuiltinInst *Builtin, InductionInfo &IndVar) {
+  if (!IndVar.IsOverflowCheckInserted ||
+      IndVar.Cmp != BuiltinValueKind::ICMP_EQ)
+    return false;
+  return match(Builtin,
+               m_ApplyInst(BuiltinValueKind::ICMP_SLE, m_Specific(IndVar.Start),
+                           m_Specific(IndVar.HeaderVal))) ||
+         match(Builtin, m_ApplyInst(BuiltinValueKind::ICMP_SLT,
+                                    m_Specific(IndVar.HeaderVal),
+                                    m_Specific(IndVar.End)));
+}
+
 /// Analyse the loop for arrays that are not modified and perform dominator tree
 /// based redundant bounds check removal.
 static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
@@ -1107,7 +1133,20 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   if (!ExitingBlk || !Latch || !ExitBlk) {
     DEBUG(llvm::dbgs()
           << "No single exiting block or latch found\n");
-    return Changed;
+    if (!Latch)
+      return Changed;
+
+    // Look back a split edge.
+    if (!Loop->isLoopExiting(Latch) && Latch->getSinglePredecessor() &&
+        Loop->isLoopExiting(Latch->getSinglePredecessor()))
+      Latch = Latch->getSinglePredecessor();
+    if (Loop->isLoopExiting(Latch) && Latch->getSuccessors().size() == 2) {
+      ExitingBlk = Latch;
+      ExitBlk = Loop->contains(Latch->getSuccessors()[0])
+                    ? Latch->getSuccessors()[1]
+                    : Latch->getSuccessors()[0];
+      DEBUG(llvm::dbgs() << "Found a latch ...\n");
+    } else return Changed;
   }
 
   DEBUG(Preheader->getParent()->dump());
@@ -1120,13 +1159,54 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   }
 
   // Hoist the overflow check of induction variables out of the loop. This also
-  // needs to happen for memory safety.
-  if (IVarsFound)
-    for (auto *Arg: Header->getBBArgs())
+  // needs to happen for memory safety. Also remove superflous range checks.
+  if (IVarsFound) {
+    SILValue TrueVal;
+    SILValue FalseVal;
+    for (auto *Arg: Header->getBBArgs()) {
       if (auto *IV = IndVars[Arg]) {
         SILBuilderWithScope B(Preheader->getTerminator(), IV->getInstruction());
         IV->checkOverflow(B);
+
+        if (!IV->IsOverflowCheckInserted)
+          continue;
+        for (auto *BB : Loop->getBlocks())
+          for (auto &Inst : *BB) {
+            auto *Builtin = dyn_cast<BuiltinInst>(&Inst);
+            if (!Builtin)
+              continue;
+            if (isComparisonKnownTrue(Builtin, *IV)) {
+              if (!TrueVal)
+                TrueVal = SILValue(B.createIntegerLiteral(
+                    Builtin->getLoc(), Builtin->getType(), -1));
+              Builtin->replaceAllUsesWith(TrueVal);
+              Changed = true;
+              continue;
+            }
+            // Check whether a dominating check of the condition let's us
+            // replace
+            // the condition by false.
+            SILValue Left, Right;
+            if (match(Builtin, m_Or(m_SILValue(Left), m_SILValue(Right)))) {
+              if (isValueKnownFalseAt(Left, Builtin, DT)) {
+                if (!FalseVal)
+                  FalseVal = SILValue(B.createIntegerLiteral(
+                      Builtin->getLoc(), Builtin->getType(), 0));
+                Builtin->setOperand(0, FalseVal);
+                Changed = true;
+              }
+              if (isValueKnownFalseAt(Right, Builtin, DT)) {
+                if (!FalseVal)
+                  FalseVal = SILValue(B.createIntegerLiteral(
+                      Builtin->getLoc(), Builtin->getType(), 0));
+                Builtin->setOperand(1, FalseVal);
+                Changed = true;
+              }
+            }
+          }
       }
+    }
+  }
 
   DEBUG(Preheader->getParent()->dump());
 

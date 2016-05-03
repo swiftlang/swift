@@ -1113,7 +1113,7 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   // current LLVM ARM backend.
   auto load = IGF.Builder.CreateLoad(cache);
   // Make this barrier explicit when building for TSan to avoid false positives.
-  if (IGM.Opts.Sanitize == SanitizerKind::Thread)
+  if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
     load->setOrdering(llvm::AtomicOrdering::Acquire);
 
 
@@ -1914,7 +1914,7 @@ namespace {
       SmallVector<ProtocolDecl*, 2> protocols;
       if (referent.isAnyExistentialType(protocols))
         for (auto *proto : protocols)
-          if (IGF.IGM.SILMod->Types.protocolRequiresWitnessTable(proto))
+          if (IGF.getSILTypes().protocolRequiresWitnessTable(proto))
             return visitType(type);
 
       // Unmanaged references are plain pointers with extra inhabitants,
@@ -2671,7 +2671,7 @@ void
 IRGenModule::addLazyFieldTypeAccessor(NominalTypeDecl *type,
                                       ArrayRef<FieldTypeInfo> fieldTypes,
                                       llvm::Function *fn) {
-  dispatcher.addLazyFieldTypeAccessor(type, fieldTypes, fn, this);
+  IRGen.addLazyFieldTypeAccessor(type, fieldTypes, fn, this);
 }
 
 void
@@ -3130,7 +3130,7 @@ static llvm::Value *emitInitializeFieldOffsetVector(IRGenFunction &IGF,
   unsigned index = 0;
   for (auto prop : storedProperties) {
     auto propFormalTy = prop->getType()->getCanonicalType();
-    SILType propLoweredTy = IGF.IGM.SILMod->Types.getLoweredType(propFormalTy);
+    SILType propLoweredTy = IGF.IGM.getLoweredType(propFormalTy);
     auto &propTI = IGF.getTypeInfo(propLoweredTy);
     auto sizeAndAlignMask
       = propTI.getSizeAndAlignmentMask(IGF, propLoweredTy);
@@ -3199,7 +3199,7 @@ namespace {
                              llvm::GlobalVariable *relativeAddressBase)
       : super(IGM, theClass), Layout(layout), FieldLayout(fieldLayout) {
       setRelativeAddressBase(relativeAddressBase);
-      VTable = IGM.SILMod->lookUpVTable(Target);
+      VTable = IGM.getSILModule().lookUpVTable(Target);
     }
 
     void computeClassObjectExtents() {
@@ -3249,7 +3249,7 @@ namespace {
       auto dtorRef = SILDeclRef(Target->getDestructor(),
                                 SILDeclRef::Kind::Deallocator,
                                 expansion);
-      SILFunction *dtorFunc = IGM.SILMod->lookUpFunction(dtorRef);
+      SILFunction *dtorFunc = IGM.getSILModule().lookUpFunction(dtorRef);
       if (dtorFunc) {
         addWord(IGM.getAddrOfSILFunction(dtorFunc, NotForDefinition));
       } else {
@@ -3450,7 +3450,8 @@ namespace {
 
       // Find the vtable entry.
       assert(VTable && "no vtable?!");
-      if (SILFunction *func = VTable->getImplementation(*IGM.SILMod, fn)) {
+      if (SILFunction *func =
+            VTable->getImplementation(IGM.getSILModule(), fn)) {
         addWord(IGM.getAddrOfSILFunction(func, NotForDefinition));
       } else {
         // The method is removed by dead method elimination.
@@ -5132,7 +5133,7 @@ llvm::Value *IRGenFunction::emitObjCSelectorRefLoad(StringRef selector) {
   // When generating JIT'd code, we need to call sel_registerName() to force
   // the runtime to unique the selector. For non-JIT'd code, the linker will
   // do it for us.
-  if (IGM.Opts.UseJIT) {
+  if (IGM.IRGen.Opts.UseJIT) {
     loadSel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(), loadSel);
   }
 
@@ -5391,13 +5392,13 @@ namespace {
 
 llvm::Constant *
 IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
-  // Create a temporary base for relative references.
-  auto tempBase = createTemporaryRelativeAddressBase(*this);
-
   // What we save in GlobalVars is actually the offsetted value.
   auto entity = LinkEntity::forForeignTypeMetadataCandidate(type);
   if (auto entry = GlobalVars[entity])
     return entry;
+
+  // Create a temporary base for relative references.
+  auto tempBase = createTemporaryRelativeAddressBase(*this);
   
   // Compute the constant initializer and the offset of the type
   // metadata candidate within it.
@@ -5649,7 +5650,7 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   if (protocol->isObjC()) {
     // In JIT mode, we need to create protocol descriptors using the ObjC
     // runtime in JITted code.
-    if (Opts.UseJIT)
+    if (IRGen.Opts.UseJIT)
       return;
     
     // Native ObjC protocols are emitted on-demand in ObjC and uniqued by the
@@ -5663,7 +5664,7 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
 
   SILDefaultWitnessTable *defaultWitnesses = nullptr;
   if (!protocol->hasFixedLayout())
-    defaultWitnesses = SILMod->lookUpDefaultWitnessTable(protocol);
+    defaultWitnesses = getSILModule().lookUpDefaultWitnessTable(protocol);
   ProtocolDescriptorBuilder builder(*this, protocol, defaultWitnesses);
   builder.layout();
 
@@ -5673,6 +5674,8 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
                                                    init->getType()));
   var->setConstant(true);
   var->setInitializer(init);
+
+  emitReflectionMetadata(protocol);
 }
 
 /// \brief Load a reference to the protocol descriptor for the given protocol.

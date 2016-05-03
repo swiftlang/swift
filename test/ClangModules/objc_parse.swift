@@ -264,7 +264,8 @@ func classAnyObject(_ obj: NSObject) {
 class Wobbler : NSWobbling { // expected-note{{candidate has non-matching type '()'}}
   @objc func wobble() { }
 
-  func returnMyself() -> Self { return self } // expected-error{{non-'@objc' method 'returnMyself()' does not satisfy '@objc' requirement in protocol 'NSWobbling'}}{{3-3=@objc }}
+  func returnMyself() -> Self { return self } // expected-error{{non-'@objc' method 'returnMyself()' does not satisfy requirement of '@objc' protocol 'NSWobbling'}}{{3-3=@objc }}
+  // expected-error@-1{{method cannot be an implementation of an @objc requirement because its result type cannot be represented in Objective-C}}
 }
 
 extension Wobbler : NSMaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'NSMaybeInitWobble'}}

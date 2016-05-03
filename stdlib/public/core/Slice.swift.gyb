@@ -11,6 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 %{
+
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal,
+    sliceTypeName,
+    protocolsForCollectionFeatures
+)
+
 def get_slice_doc_comment(Self):
   return """\
 /// A view into a sub-sequence of elements of another collection.
@@ -39,48 +47,39 @@ def get_slice_doc_comment(Self):
 """ % (Self, Self, Self, Self, Self)
 }%
 
-${get_slice_doc_comment('Slice')}
-public struct Slice<Base : Indexable> : Collection {
+// FIXME(ABI)(compiler limitation): There should be just one slice type
+// that has conditional conformances to `BidirectionalCollection`,
+// `RandomAccessCollection`, `RangeReplaceableCollection`, and
+// `MutableCollection`.
 
-  public typealias Index = Base.Index
+% for Traversal in TRAVERSALS:
+%   for Mutable in [ False, True ]:
+%     for RangeReplaceable in [ False, True ]:
+%       Self = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
+%       BaseRequirements = [collectionForTraversal(Traversal).replace('Collection', 'Indexable')]
+%       if Mutable:
+%         BaseRequirements.append('MutableIndexable')
+%       if RangeReplaceable:
+%         BaseRequirements.append('RangeReplaceableIndexable')
+%       BaseRequirements = 'protocol<' + ', '.join(BaseRequirements) + '>'
+%       SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
 
-  public let startIndex: Index
-  public let endIndex: Index
-
-  public subscript(index: Index) -> Base._Element {
-    Index._failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
-    return _base[index]
-  }
-
-  public subscript(bounds: Range<Index>) -> Slice {
-    Index._failEarlyRangeCheck2(
-      rangeStart: bounds.startIndex, rangeEnd: bounds.endIndex,
-      boundsStart: startIndex, boundsEnd: endIndex)
-    return Slice(_base: _base, bounds: bounds)
-  }
-
-  /// Create a view into collection `base` that allows access within `bounds`.
-  ///
-  /// - Complexity: O(1).
-  public // @testable
-  init(_base: Base, bounds: Range<Index>) {
-    self._base = _base
-    self.startIndex = bounds.startIndex
-    self.endIndex = bounds.endIndex
-  }
-
-  internal let _base: Base
-}
-
-${get_slice_doc_comment('MutableSlice')}
+${get_slice_doc_comment(Self)}
+%     if Mutable:
 ///
-/// - Warning: `MutableSlice` requires the setter of `Base.subscript(_: Index)`
+/// - Warning: `${Self}` requires the setter of `Base.subscript(_: Index)`
 ///   to not invalidate indices.  If you are writing a collection and mutations
-///   need to invalidate indices, don't use `MutableSlice`, use `Slice` or
+///   need to invalidate indices, don't use `${Self}`, use `Slice` or
 ///   define your own `Base.SubSequence` type that takes that into account.
-public struct MutableSlice<Base : MutableIndexable> : MutableCollection {
+%     end
+public struct ${Self}<Base : ${BaseRequirements}>
+  : ${SelfProtocols} {
 
   public typealias Index = Base.Index
+  public typealias IndexDistance = Base.IndexDistance
+
+  public var _startIndex: Index
+  public var _endIndex: Index
 
   public var startIndex: Index {
     return _startIndex
@@ -92,52 +91,300 @@ public struct MutableSlice<Base : MutableIndexable> : MutableCollection {
 
   public subscript(index: Index) -> Base._Element {
     get {
-      Index._failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
+      _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
       return _base[index]
     }
+%     if Mutable:
     set {
-      Index._failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
+      _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
       _base[index] = newValue
       // MutableSlice requires that the underlying collection's subscript
       // setter does not invalidate indices, so our `startIndex` and `endIndex`
       // continue to be valid.
     }
+%     end
   }
 
-  public subscript(bounds: Range<Index>) -> MutableSlice {
+  public typealias SubSequence = ${Self}<Base>
+
+  public subscript(bounds: Range<Index>) -> ${Self}<Base> {
     get {
-      Index._failEarlyRangeCheck2(
-        rangeStart: bounds.startIndex, rangeEnd: bounds.endIndex,
-        boundsStart: startIndex, boundsEnd: endIndex)
-      return MutableSlice(_base: _base, bounds: bounds)
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      return ${Self}(base: _base, bounds: bounds)
     }
+%     if Mutable:
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
+%     end
   }
 
-  public // @testable
-  init(_base: Base, bounds: Range<Index>) {
-    self._base = _base
-    self._startIndex = bounds.startIndex
-    self._endIndex = bounds.endIndex
+  // FIXME(ABI)(compiler limitation):
+  //
+  //   public typealias Indices = Base.Indices
+  //   public var indices: Indices { ... }
+  //
+  // We can't do it right now because we don't have enough
+  // constraints on the Base.Indices type in this context.
+
+  @warn_unused_result
+  public func index(after i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check.
+    return _base.index(after: i)
   }
 
+  public func formIndex(after i: inout Index) {
+    // FIXME: swift-3-indexing-model: range check.
+    _base.formIndex(after: &i)
+  }
+
+%     if Traversal in ['Bidirectional', 'RandomAccess']:
+  @warn_unused_result
+  public func index(before i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check.
+    return _base.index(before: i)
+  }
+
+  public func formIndex(before i: inout Index) {
+    // FIXME: swift-3-indexing-model: range check.
+    _base.formIndex(before: &i)
+  }
+%     end
+
+  @warn_unused_result
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    // FIXME: swift-3-indexing-model: range check.
+    return _base.index(i, offsetBy: n)
+  }
+
+  @warn_unused_result
+  public func index(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    // FIXME: swift-3-indexing-model: range check.
+    return _base.index(i, offsetBy: n, limitedBy: limit)
+  }
+
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    // FIXME: swift-3-indexing-model: range check.
+    return _base.distance(from: start, to: end)
+  }
+
+  public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
+    _base._failEarlyRangeCheck(index, bounds: bounds)
+  }
+
+  public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
+    _base._failEarlyRangeCheck(range, bounds: bounds)
+  }
+
+%     if RangeReplaceable:
+  public init() {
+    self._base = Base()
+    self._startIndex = _base.startIndex
+    self._endIndex = _base.endIndex
+  }
+
+  public init(repeating repeatedValue: Base._Element, count: Int) {
+    self._base = Base(repeating: repeatedValue, count: count)
+    self._startIndex = _base.startIndex
+    self._endIndex = _base.endIndex
+  }
+
+  public init<
+    S : Sequence where S.Iterator.Element == Base._Element
+  >(_ elements: S) {
+    self._base = Base(elements)
+    self._startIndex = _base.startIndex
+    self._endIndex = _base.endIndex
+  }
+
+  public mutating func replaceSubrange<
+    C : Collection where C.Iterator.Element == Base._Element
+  >(
+    _ subRange: Range<Index>, with newElements: C
+  ) {
+    // FIXME: swift-3-indexing-model: range check.
+%     if Traversal == 'Forward':
+    let sliceOffset: IndexDistance =
+      _base.distance(from: _base.startIndex, to: _startIndex)
+    let newSliceCount: IndexDistance =
+      _base.distance(from: _startIndex, to: subRange.lowerBound)
+      + _base.distance(from: subRange.upperBound, to: _endIndex)
+      + numericCast(newElements.count)
+    _base.replaceSubrange(subRange, with: newElements)
+    _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
+    _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
+%     else:
+    if subRange.lowerBound == _base.startIndex {
+      let newSliceCount: IndexDistance =
+        _base.distance(from: _startIndex, to: subRange.lowerBound)
+        + _base.distance(from: subRange.upperBound, to: _endIndex)
+        + numericCast(newElements.count)
+      _base.replaceSubrange(subRange, with: newElements)
+      _startIndex = _base.startIndex
+      _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
+    } else {
+      let shouldUpdateStartIndex = subRange.lowerBound == _startIndex
+      let lastValidIndex = _base.index(before: subRange.lowerBound)
+      let newEndIndexOffset =
+        _base.distance(from: subRange.upperBound, to: _endIndex)
+        + numericCast(newElements.count) + 1
+      _base.replaceSubrange(subRange, with: newElements)
+      if shouldUpdateStartIndex {
+        _startIndex = _base.index(after: lastValidIndex)
+      }
+      _endIndex = _base.index(lastValidIndex, offsetBy: newEndIndexOffset)
+    }
+%     end
+  }
+
+  public mutating func insert(_ newElement: Base._Element, at i: Index) {
+    // FIXME: swift-3-indexing-model: range check.
+%     if Traversal == 'Forward':
+    let sliceOffset: IndexDistance =
+      _base.distance(from: _base.startIndex, to: _startIndex)
+    let newSliceCount: IndexDistance = count + 1
+    _base.insert(newElement, at: i)
+    _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
+    _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
+%     else:
+    if i == _base.startIndex {
+      let newSliceCount: IndexDistance = count + 1
+      _base.insert(newElement, at: i)
+      _startIndex = _base.startIndex
+      _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
+    } else {
+      let shouldUpdateStartIndex = i == _startIndex
+      let lastValidIndex = _base.index(before: i)
+      let newEndIndexOffset = _base.distance(from: i, to: _endIndex) + 2
+      _base.insert(newElement, at: i)
+      if shouldUpdateStartIndex {
+        _startIndex = _base.index(after: lastValidIndex)
+      }
+      _endIndex = _base.index(lastValidIndex, offsetBy: newEndIndexOffset)
+    }
+%     end
+  }
+
+  public mutating func insert<
+    S : Collection where S.Iterator.Element == Base._Element
+  >(contentsOf newElements: S, at i: Index) {
+    // FIXME: swift-3-indexing-model: range check.
+%     if Traversal == 'Forward':
+    let sliceOffset: IndexDistance =
+      _base.distance(from: _base.startIndex, to: _startIndex)
+    let newSliceCount: IndexDistance =
+      count + numericCast(newElements.count)
+    _base.insert(contentsOf: newElements, at: i)
+    _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
+    _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
+%     else:
+    if i == _base.startIndex {
+      let newSliceCount: IndexDistance =
+        count + numericCast(newElements.count)
+      _base.insert(contentsOf: newElements, at: i)
+      _startIndex = _base.startIndex
+      _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
+    } else {
+      let shouldUpdateStartIndex = i == _startIndex
+      let lastValidIndex = _base.index(before: i)
+      let newEndIndexOffset =
+        _base.distance(from: i, to: _endIndex)
+        + numericCast(newElements.count) + 1
+      _base.insert(contentsOf: newElements, at: i)
+      if shouldUpdateStartIndex {
+        _startIndex = _base.index(after: lastValidIndex)
+      }
+      _endIndex = _base.index(lastValidIndex, offsetBy: newEndIndexOffset)
+    }
+%     end
+  }
+
+  public mutating func remove(at i: Index) -> Base._Element {
+    // FIXME: swift-3-indexing-model: range check.
+%     if Traversal == 'Forward':
+    let sliceOffset: IndexDistance =
+      _base.distance(from: _base.startIndex, to: _startIndex)
+    let newSliceCount: IndexDistance = count - 1
+    let result = _base.remove(at: i)
+    _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
+    _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
+    return result
+%     else:
+    if i == _base.startIndex {
+      let newSliceCount: IndexDistance = count - 1
+      let result = _base.remove(at: i)
+      _startIndex = _base.startIndex
+      _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
+      return result
+    } else {
+      let shouldUpdateStartIndex = i == _startIndex
+      let lastValidIndex = _base.index(before: i)
+      let newEndIndexOffset = _base.distance(from: i, to: _endIndex)
+      let result = _base.remove(at: i)
+      if shouldUpdateStartIndex {
+        _startIndex = _base.index(after: lastValidIndex)
+      }
+      _endIndex = _base.index(lastValidIndex, offsetBy: newEndIndexOffset)
+      return result
+    }
+%     end
+  }
+
+  public mutating func removeSubrange(_ bounds: Range<Index>) {
+    // FIXME: swift-3-indexing-model: range check.
+%     if Traversal == 'Forward':
+    let sliceOffset: IndexDistance =
+      _base.distance(from: _base.startIndex, to: _startIndex)
+    let newSliceCount: IndexDistance =
+      count - distance(from: bounds.lowerBound, to: bounds.upperBound)
+    _base.removeSubrange(bounds)
+    _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
+    _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
+%     else:
+    if bounds.lowerBound == _base.startIndex {
+      let newSliceCount: IndexDistance =
+        count
+        - _base.distance(from: bounds.lowerBound, to: bounds.upperBound)
+      _base.removeSubrange(bounds)
+      _startIndex = _base.startIndex
+      _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
+    } else {
+      let shouldUpdateStartIndex = bounds.lowerBound == _startIndex
+      let lastValidIndex = _base.index(before: bounds.lowerBound)
+      let newEndIndexOffset =
+        _base.distance(from: bounds.lowerBound, to: _endIndex)
+        - _base.distance(from: bounds.lowerBound, to: bounds.upperBound)
+        + 1
+      _base.removeSubrange(bounds)
+      if shouldUpdateStartIndex {
+        _startIndex = _base.index(after: lastValidIndex)
+      }
+      _endIndex = _base.index(lastValidIndex, offsetBy: newEndIndexOffset)
+    }
+%     end
+  }
+%     end
+
+  /// Create a view into collection `base` that allows access within `bounds`.
+  ///
+  /// - Complexity: O(1).
+  public init(base: Base, bounds: Range<Index>) {
+    self._base = base
+    self._startIndex = bounds.lowerBound
+    self._endIndex = bounds.upperBound
+  }
+
+%     if Mutable or RangeReplaceable:
   internal var _base: Base
-  internal var _startIndex: Index
-  internal var _endIndex: Index
+%     else:
+  internal let _base: Base
+%     end
 }
 
-extension Slice {
-  @available(*, unavailable, message: "use the slicing syntax")
-  public init(base: Base, bounds: Range<Index>) {
-    fatalError("unavailable function can't be called")
-  }
-}
+%     end
+%   end
+% end
 
-extension MutableSlice {
-  @available(*, unavailable, message: "use the slicing syntax")
-  public init(base: Base, bounds: Range<Index>) {
-    fatalError("unavailable function can't be called")
-  }
-}

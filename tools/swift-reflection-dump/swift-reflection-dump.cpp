@@ -41,9 +41,8 @@ using namespace swift::remote;
 using namespace Demangle;
 
 enum class ActionType {
-  None,
   DumpReflectionSections,
-  DumpHeapInstance
+  DumpTypeLowering
 };
 
 namespace options {
@@ -53,15 +52,15 @@ Action(llvm::cl::desc("Mode:"),
          clEnumValN(ActionType::DumpReflectionSections,
                     "dump-reflection-sections",
                     "Dump the field reflection section"),
-         clEnumValN(ActionType::DumpHeapInstance,
-                    "dump-heap-instance",
-                    "Dump the field layout for a heap instance by running "
-                    "a Swift executable"),
-         clEnumValEnd));
+         clEnumValN(ActionType::DumpTypeLowering,
+                    "dump-type-lowering",
+                    "Dump the field layout for typeref strings read from stdin"),
+         clEnumValEnd),
+       llvm::cl::init(ActionType::DumpReflectionSections));
 
-static llvm::cl::opt<std::string>
-BinaryFilename("binary-filename", llvm::cl::desc("Filename of the binary file"),
-               llvm::cl::Required);
+static llvm::cl::list<std::string>
+BinaryFilename("binary-filename", llvm::cl::desc("Filenames of the binary files"),
+               llvm::cl::OneOrMore);
 
 static llvm::cl::opt<std::string>
 Architecture("arch", llvm::cl::desc("Architecture to inspect in the binary"),
@@ -76,9 +75,8 @@ static T unwrap(llvm::ErrorOr<T> value) {
   exit(EXIT_FAILURE);
 }
 
-static llvm::object::SectionRef
-getSectionRef(const ObjectFile *objectFile,
-              ArrayRef<StringRef> anySectionNames) {
+static SectionRef getSectionRef(const ObjectFile *objectFile,
+                                ArrayRef<StringRef> anySectionNames) {
   for (auto section : objectFile->sections()) {
     StringRef sectionName;
     section.getName(sectionName);
@@ -91,137 +89,114 @@ getSectionRef(const ObjectFile *objectFile,
   return SectionRef();
 }
 
-static int doDumpReflectionSections(std::string binaryFilename,
-                                    StringRef arch) {
-  // Note: binaryOrError and objectOrError own the memory for our ObjectFile;
-  // once they go out of scope, we can no longer do anything.
-  OwningBinary<Binary> binaryOwner;
-  std::unique_ptr<llvm::object::ObjectFile> objectOwner;
+template<typename Section>
+static Section findReflectionSection(const ObjectFile *objectFile,
+                                     ArrayRef<StringRef> anySectionNames) {
+  auto sectionRef = getSectionRef(objectFile, anySectionNames);
 
-  auto Expected = llvm::object::createBinary(binaryFilename);
-  if (!Expected) {
-    std::cerr << "Could not create binary for " << binaryFilename;
-    return EXIT_FAILURE;
-  }
+  if (sectionRef.getObject() == nullptr)
+    return {nullptr, nullptr};
 
-  binaryOwner = std::move(Expected.get());
-  const llvm::object::Binary *binaryFile = binaryOwner.getBinary();
+  StringRef sectionContents;
+  sectionRef.getContents(sectionContents);
 
-  // The object file we are doing lookups in -- either the binary itself, or
-  // a particular slice of a universal binary.
-  const ObjectFile *objectFile;
-
-  if (auto o = dyn_cast<ObjectFile>(binaryFile)) {
-    objectFile = o;
-  } else {
-    auto universal = cast<MachOUniversalBinary>(binaryFile);
-    objectOwner = unwrap(universal->getObjectForArch(arch));
-    objectFile = objectOwner.get();
-  }
-
-  // Field descriptor section
-  auto fieldSectionRef = getSectionRef(objectFile, {
-    "__swift3_fieldmd", ".swift3_fieldmd"
-  });
-
-  if (fieldSectionRef.getObject() == nullptr) {
-    std::cerr << binaryFilename;
-    std::cerr << " doesn't have a field reflection section!\n";
-    return EXIT_FAILURE;
-  }
-
-  StringRef fieldSectionContents;
-  fieldSectionRef.getContents(fieldSectionContents);
-
-  const FieldSection fieldSection {
-    reinterpret_cast<const void *>(fieldSectionContents.begin()),
-    reinterpret_cast<const void *>(fieldSectionContents.end())
+  return {
+    reinterpret_cast<const void *>(sectionContents.begin()),
+    reinterpret_cast<const void *>(sectionContents.end())
   };
+}
 
-  // Associated type section - optional
-  AssociatedTypeSection associatedTypeSection {nullptr, nullptr};
+static ReflectionInfo findReflectionInfo(const ObjectFile *objectFile) {
+  auto fieldSection = findReflectionSection<FieldSection>(
+      objectFile, {"__swift3_fieldmd", ".swift3_fieldmd"});
+  auto associatedTypeSection = findReflectionSection<AssociatedTypeSection>(
+      objectFile, {"__swift3_assocty", ".swift3_assocty"});
+  auto builtinTypeSection = findReflectionSection<BuiltinTypeSection>(
+      objectFile, {"__swift3_builtin", ".swift3_builtin"});
+  auto captureSection = findReflectionSection<CaptureSection>(
+      objectFile, {"__swift3_capture", ".swift3_capture"});
+  auto typeRefSection = findReflectionSection<GenericSection>(
+      objectFile, {"__swift3_typeref", ".swift3_typeref"});
+  auto reflectionStringsSection = findReflectionSection<GenericSection>(
+      objectFile, {"__swift3_reflstr", ".swift3_reflstr"});
 
-  auto associatedTypeSectionRef = getSectionRef(objectFile, {
-    "__swift3_assocty", ".swift3_assocty"
-  });
-
-  if (associatedTypeSectionRef.getObject() != nullptr) {
-    StringRef associatedTypeSectionContents;
-    associatedTypeSectionRef.getContents(associatedTypeSectionContents);
-    associatedTypeSection = {
-      reinterpret_cast<const void *>(associatedTypeSectionContents.begin()),
-      reinterpret_cast<const void *>(associatedTypeSectionContents.end()),
-    };
-  }
-
-  // Builtin types section
-  BuiltinTypeSection builtinTypeSection {nullptr, nullptr};
-
-  auto builtinTypeSectionRef = getSectionRef(objectFile, {
-    "__swift3_builtin", ".swift3_builtin"
-  });
-
-  if (builtinTypeSectionRef.getObject() != nullptr) {
-    StringRef builtinTypeSectionContents;
-    builtinTypeSectionRef.getContents(builtinTypeSectionContents);
-
-    builtinTypeSection = {
-      reinterpret_cast<const void *>(builtinTypeSectionContents.begin()),
-      reinterpret_cast<const void *>(builtinTypeSectionContents.end())
-    };
-  }
-
-  // Typeref section
-  auto typeRefSectionRef = getSectionRef(objectFile, {
-    "__swift3_typeref", ".swift3_typeref"
-  });
-
-  if (typeRefSectionRef.getObject() == nullptr) {
-    std::cerr << binaryFilename;
-    std::cerr << " doesn't have an associated typeref section!\n";
-    return EXIT_FAILURE;
-  }
-
-  StringRef typeRefSectionContents;
-  typeRefSectionRef.getContents(typeRefSectionContents);
-
-  const GenericSection typeRefSection {
-    reinterpret_cast<const void *>(typeRefSectionContents.begin()),
-    reinterpret_cast<const void *>(typeRefSectionContents.end())
-  };
-
-  // Reflection strings section
-  auto reflectionStringsSectionRef = getSectionRef(objectFile, {
-    "__swift3_reflstr", ".swift3_reflstr"
-  });
-
-  if (reflectionStringsSectionRef.getObject() == nullptr) {
-    std::cerr << binaryFilename;
-    std::cerr << " doesn't have an associated reflection strings section!\n";
-    return EXIT_FAILURE;
-  }
-
-  StringRef reflectionStringsSectionContents;
-  reflectionStringsSectionRef.getContents(reflectionStringsSectionContents);
-
-  const GenericSection reflectionStringsSection {
-    reinterpret_cast<const void *>(reflectionStringsSectionContents.begin()),
-    reinterpret_cast<const void *>(reflectionStringsSectionContents.end())
-  };
-
-  // Construct the TypeRefBuilder
-  TypeRefBuilder builder;
-  builder.addReflectionInfo({
-    binaryFilename,
+  return {
     fieldSection,
     associatedTypeSection,
     builtinTypeSection,
+    captureSection,
     typeRefSection,
     reflectionStringsSection,
-  });
+  };
+}
 
-  // Dump everything
-  builder.dumpAllSections(std::cout);
+static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
+                                    StringRef arch,
+                                    ActionType action,
+                                    std::ostream &OS) {
+  // Note: binaryOrError and objectOrError own the memory for our ObjectFile;
+  // once they go out of scope, we can no longer do anything.
+  std::vector<OwningBinary<Binary>> binaryOwners;
+  std::vector<std::unique_ptr<ObjectFile>> objectOwners;
+
+  // Construct the TypeRefBuilder
+  TypeRefBuilder builder;
+
+  for (auto binaryFilename : binaryFilenames) {
+    auto binaryOwner = unwrap(createBinary(binaryFilename));
+    Binary *binaryFile = binaryOwner.getBinary();
+
+    // The object file we are doing lookups in -- either the binary itself, or
+    // a particular slice of a universal binary.
+    std::unique_ptr<ObjectFile> objectOwner;
+    const ObjectFile *objectFile;
+
+    if (auto o = dyn_cast<ObjectFile>(binaryFile)) {
+      objectFile = o;
+    } else {
+      auto universal = cast<MachOUniversalBinary>(binaryFile);
+      objectOwner = unwrap(universal->getObjectForArch(arch));
+      objectFile = objectOwner.get();
+    }
+
+    builder.addReflectionInfo(findReflectionInfo(objectFile));
+
+    // Retain the objects that own section memory
+    binaryOwners.push_back(std::move(binaryOwner));
+    objectOwners.push_back(std::move(objectOwner));
+  }
+
+  switch (action) {
+  case ActionType::DumpReflectionSections:
+    // Dump everything
+    builder.dumpAllSections(OS);
+    break;
+  case ActionType::DumpTypeLowering: {
+    for (std::string line; std::getline(std::cin, line); ) {
+      if (line.empty())
+        continue;
+
+      if (StringRef(line).startswith("//"))
+        continue;
+
+      auto demangled = Demangle::demangleTypeAsNode(line);
+      auto *typeRef = swift::remote::decodeMangledType(builder, demangled);
+      if (typeRef == nullptr) {
+        OS << "Invalid typeref: " << line << "\n";
+        continue;
+      }
+
+      typeRef->dump(OS);
+      auto *typeInfo = builder.getTypeConverter().getTypeInfo(typeRef);
+      if (typeInfo == nullptr) {
+        OS << "Invalid lowering\n";
+        continue;
+      }
+      typeInfo->dump(OS);
+    }
+    break;
+  }
+  }
 
   return EXIT_SUCCESS;
 }
@@ -229,6 +204,8 @@ static int doDumpReflectionSections(std::string binaryFilename,
 int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Reflection Dump\n");
   return doDumpReflectionSections(options::BinaryFilename,
-                                  options::Architecture);
+                                  options::Architecture,
+                                  options::Action,
+                                  std::cout);
 }
 

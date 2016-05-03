@@ -103,6 +103,20 @@ extension Optional : CustomDebugStringConvertible {
   }
 }
 
+extension Optional : CustomReflectable {
+  public var customMirror: Mirror {
+    switch self {
+    case .some(let value):
+      return Mirror(
+        self,
+        children: [ "some": value ],
+        displayStyle: .optional)
+    case .none:
+      return Mirror(self, children: [:], displayStyle: .optional)
+    }
+  }
+}
+
 @_transparent
 @warn_unused_result
 public // COMPILER_INTRINSIC

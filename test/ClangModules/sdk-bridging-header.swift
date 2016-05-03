@@ -16,7 +16,7 @@
 
 import Foundation
 
-let `true` = Predicate.truePredicate()
+let `true` = Predicate.`true`()
 let not = Predicate.not()
 let and = Predicate.and([])
 let or = Predicate.or([not, and])

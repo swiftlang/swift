@@ -157,6 +157,17 @@ public:
     }
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
+  
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger") {
+    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      return afd->dump();
+    }
+    if (auto ce = TheFunction.dyn_cast<AbstractClosureExpr *>()) {
+      return ce->dump();
+    }
+    llvm_unreachable("unexpected AnyFunctionRef representation");
+  }
 };
 
 } // namespace swift

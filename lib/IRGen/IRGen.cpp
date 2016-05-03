@@ -428,8 +428,8 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
   return false;
 }
 
-static llvm::TargetMachine *createTargetMachine(IRGenOptions &Opts,
-                                                ASTContext &Ctx) {
+std::unique_ptr<llvm::TargetMachine>
+static createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
   const llvm::Triple &Triple = Ctx.LangOpts.Target;
   std::string Error;
   const Target *Target = TargetRegistry::lookupTarget(Triple.str(), Error);
@@ -465,7 +465,15 @@ static llvm::TargetMachine *createTargetMachine(IRGenOptions &Opts,
                        Triple.str(), "no LLVM target machine");
     return nullptr;
   }
-  return TargetMachine;
+  return std::unique_ptr<llvm::TargetMachine>(TargetMachine);
+}
+
+IRGenerator::IRGenerator(IRGenOptions &options, SILModule &module)
+  : Opts(options), SIL(module), QueueIndex(0) {
+}
+
+std::unique_ptr<llvm::TargetMachine> IRGenerator::createTargetMachine() {
+  return ::createTargetMachine(Opts, SIL.getASTContext());
 }
 
 // With -embed-bitcode, save a copy of the llvm IR as data in the
@@ -540,25 +548,21 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   auto &Ctx = M->getASTContext();
   assert(!Ctx.hadError());
 
-  llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, Ctx);
-  if (!TargetMachine)
-    return nullptr;
+  IRGenerator irgen(Opts, *SILMod);
 
-  const llvm::DataLayout DataLayout = TargetMachine->createDataLayout();
+  auto targetMachine = irgen.createTargetMachine();
+  if (!targetMachine) return nullptr;
 
   // Create the IR emitter.
-  IRGenModuleDispatcher dispatcher;
-  const llvm::Triple &Triple = Ctx.LangOpts.Target;
-  IRGenModule IGM(dispatcher, nullptr, Ctx, LLVMContext, Opts, ModuleName,
-                  DataLayout, Triple,
-                  TargetMachine, SILMod, Opts.getSingleOutputFilename());
+  IRGenModule IGM(irgen, std::move(targetMachine), nullptr,
+                  LLVMContext, ModuleName, Opts.getSingleOutputFilename());
 
   initLLVMModule(IGM);
   
   {
     SharedTimer timer("IRGen");
     // Emit the module contents.
-    dispatcher.emitGlobalTopLevel();
+    irgen.emitGlobalTopLevel();
 
     if (SF) {
       IGM.emitSourceFile(*SF, StartElem);
@@ -584,11 +588,11 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       // In JIT mode these are manually registered above.
       IGM.emitProtocolConformances();
       IGM.emitTypeMetadataRecords();
-      IGM.emitReflectionMetadataRecords();
+      IGM.emitBuiltinReflectionMetadata();
     }
 
     // Okay, emit any definitions that we suddenly need.
-    dispatcher.emitLazyDefinitions();
+    irgen.emitLazyDefinitions();
 
     // Emit symbols for eliminated dead methods.
     IGM.emitVTableStubs();
@@ -628,24 +632,24 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   embedBitcode(IGM.getModule(), Opts);
 
-  if (performLLVM(IGM.Opts, IGM.Context.Diags, nullptr, IGM.ModuleHash,
-                  IGM.getModule(), IGM.TargetMachine, IGM.OutputFilename))
+  if (performLLVM(Opts, IGM.Context.Diags, nullptr, IGM.ModuleHash,
+                  IGM.getModule(), IGM.TargetMachine.get(), IGM.OutputFilename))
     return nullptr;
   return std::unique_ptr<llvm::Module>(IGM.releaseModule());
 }
 
-static void ThreadEntryPoint(IRGenModuleDispatcher *dispatcher,
+static void ThreadEntryPoint(IRGenerator *irgen,
                              llvm::sys::Mutex *DiagMutex, int ThreadIdx) {
-  while (IRGenModule *IGM = dispatcher->fetchFromQueue()) {
+  while (IRGenModule *IGM = irgen->fetchFromQueue()) {
     DEBUG(
       DiagMutex->lock();
       dbgs() << "thread " << ThreadIdx << ": fetched " << IGM->OutputFilename <<
           "\n";
       DiagMutex->unlock();
     );
-    embedBitcode(IGM->getModule(), IGM->Opts);
-    performLLVM(IGM->Opts, IGM->Context.Diags, DiagMutex, IGM->ModuleHash,
-                IGM->getModule(), IGM->TargetMachine, IGM->OutputFilename);
+    embedBitcode(IGM->getModule(), irgen->Opts);
+    performLLVM(irgen->Opts, IGM->Context.Diags, DiagMutex, IGM->ModuleHash,
+                IGM->getModule(), IGM->TargetMachine.get(), IGM->OutputFilename);
     if (IGM->Context.Diags.hadAnyError())
       return;
   }
@@ -663,11 +667,26 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
                                         SILModule *SILMod,
                                         StringRef ModuleName, int numThreads) {
 
-  IRGenModuleDispatcher dispatcher;
+  IRGenerator irgen(Opts, *SILMod);
+
+  // Enter a cleanup to delete all the IGMs and their associated LLVMContexts
+  // that have been associated with the IRGenerator.
+  struct IGMDeleter {
+    IRGenerator &IRGen;
+    IGMDeleter(IRGenerator &irgen) : IRGen(irgen) {}
+    ~IGMDeleter() {
+      for (auto it = IRGen.begin(); it != IRGen.end(); ++it) {
+        IRGenModule *IGM = it->second;
+        LLVMContext *Context = &IGM->LLVMContext;
+        delete IGM;
+        delete Context;
+      }
+    }
+  } _igmDeleter(irgen);
   
   auto OutputIter = Opts.OutputFilenames.begin();
   bool IGMcreated = false;
-  
+
   auto &Ctx = M->getASTContext();
   // Create an IRGenModule for each source file.
   for (auto *File : M->getFiles()) {
@@ -675,14 +694,6 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     if (!nextSF || nextSF->ASTStage < SourceFile::TypeChecked)
       continue;
     
-    // Create a target machine.
-    llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, Ctx);
-    
-    const llvm::DataLayout DataLayout = TargetMachine->createDataLayout();
-    
-    LLVMContext *Context = new LLVMContext();
-    const llvm::Triple &Triple = Ctx.LangOpts.Target;
-
     // There must be an output filename for each source file.
     // We ignore additional output filenames.
     if (OutputIter == Opts.OutputFilenames.end()) {
@@ -690,11 +701,18 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
       Ctx.Diags.diagnose(SourceLoc(), diag::too_few_output_filenames);
       return;
     }
+
+    auto targetMachine = irgen.createTargetMachine();
+    if (!targetMachine) continue;
+
+    // This (and the IGM itself) will get deleted by the IGMDeleter
+    // as long as the IGM is registered with the IRGenerator. 
+    auto Context = new LLVMContext();
   
     // Create the IR emitter.
-    IRGenModule *IGM = new IRGenModule(dispatcher, nextSF, Ctx, *Context,
-                                       Opts, ModuleName, DataLayout, Triple,
-                                       TargetMachine, SILMod, *OutputIter++);
+    IRGenModule *IGM = new IRGenModule(irgen, std::move(targetMachine),
+                                       nextSF, *Context,
+                                       ModuleName, *OutputIter++);
     IGMcreated = true;
 
     initLLVMModule(*IGM);
@@ -707,26 +725,25 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   }
 
   // Emit the module contents.
-  dispatcher.emitGlobalTopLevel();
+  irgen.emitGlobalTopLevel();
   
   for (auto *File : M->getFiles()) {
     if (SourceFile *SF = dyn_cast<SourceFile>(File)) {
-      IRGenModule *IGM = dispatcher.getGenModule(SF);
+      IRGenModule *IGM = irgen.getGenModule(SF);
       IGM->emitSourceFile(*SF, 0);
     } else {
-      File->collectLinkLibraries([&dispatcher](LinkLibrary LinkLib) {
-        dispatcher.getPrimaryIGM()->addLinkLibrary(LinkLib);
+      File->collectLinkLibraries([&](LinkLibrary LinkLib) {
+        irgen.getPrimaryIGM()->addLinkLibrary(LinkLib);
       });
     }
   }
   
-  IRGenModule *PrimaryGM = dispatcher.getPrimaryIGM();
+  IRGenModule *PrimaryGM = irgen.getPrimaryIGM();
 
-  dispatcher.emitProtocolConformances();
-  dispatcher.emitReflectionMetadataRecords();
+  irgen.emitProtocolConformances();
 
   // Okay, emit any definitions that we suddenly need.
-  dispatcher.emitLazyDefinitions();
+  irgen.emitLazyDefinitions();
   
  // Emit symbols for eliminated dead methods.
   PrimaryGM->emitVTableStubs();
@@ -758,7 +775,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   
   llvm::StringSet<> referencedGlobals;
 
-  for (auto it = dispatcher.begin(); it != dispatcher.end(); ++it) {
+  for (auto it = irgen.begin(); it != irgen.end(); ++it) {
     IRGenModule *IGM = it->second;
     llvm::Module *M = IGM->getModule();
     auto collectReference = [&](llvm::GlobalObject &G) {
@@ -776,7 +793,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     }
   }
 
-  for (auto it = dispatcher.begin(); it != dispatcher.end(); ++it) {
+  for (auto it = irgen.begin(); it != irgen.end(); ++it) {
     IRGenModule *IGM = it->second;
     llvm::Module *M = IGM->getModule();
     
@@ -810,23 +827,15 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
 
   // Start all the threads and do the LLVM compilation.
   for (int ThreadIdx = 1; ThreadIdx < numThreads; ++ThreadIdx) {
-    Threads.push_back(std::thread(ThreadEntryPoint, &dispatcher, &DiagMutex,
+    Threads.push_back(std::thread(ThreadEntryPoint, &irgen, &DiagMutex,
                                   ThreadIdx));
   }
 
-  ThreadEntryPoint(&dispatcher, &DiagMutex, 0);
+  ThreadEntryPoint(&irgen, &DiagMutex, 0);
 
   // Wait for all threads.
   for (std::thread &Thread : Threads) {
     Thread.join();
-  }
-
-  // Cleanup.
-  for (auto it = dispatcher.begin(); it != dispatcher.end(); ++it) {
-    IRGenModule *IGM = it->second;
-    LLVMContext *Context = &IGM->LLVMContext;
-    delete IGM;
-    delete Context;
   }
 }
 
@@ -855,28 +864,25 @@ performIRGeneration(IRGenOptions &Opts, SourceFile &SF, SILModule *SILMod,
 void
 swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
                                    StringRef OutputPath) {
-  LLVMContext *VMContext = new LLVMContext();
+  LLVMContext VMContext;
 
   auto &Ctx = SILMod.getASTContext();
   assert(!Ctx.hadError());
 
   IRGenOptions Opts;
   Opts.OutputKind = IRGenOutputKind::ObjectFile;
-  llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, Ctx);
-  if (!TargetMachine)
-    return;
+  IRGenerator irgen(Opts, SILMod);
 
-  const auto DataLayout = TargetMachine->createDataLayout();
+  auto targetMachine = irgen.createTargetMachine();
+  if (!targetMachine) return;
 
   const llvm::Triple &Triple = Ctx.LangOpts.Target;
-  IRGenModuleDispatcher dispatcher;
-  IRGenModule IGM(dispatcher, nullptr, Ctx, *VMContext, Opts, OutputPath,
-                  DataLayout, Triple,
-                  TargetMachine, &SILMod, Opts.getSingleOutputFilename());
+  IRGenModule IGM(irgen, std::move(targetMachine), nullptr, VMContext,
+                  OutputPath, Opts.getSingleOutputFilename());
   initLLVMModule(IGM);
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
   auto *Data =
-      llvm::ConstantDataArray::getString(*VMContext, Buffer, /*AddNull=*/false);
+      llvm::ConstantDataArray::getString(VMContext, Buffer, /*AddNull=*/false);
   auto &M = *IGM.getModule();
   auto *ASTSym = new llvm::GlobalVariable(M, Ty, /*constant*/ true,
                                           llvm::GlobalVariable::InternalLinkage,
@@ -892,19 +898,19 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   ASTSym->setSection(Section);
   ASTSym->setAlignment(8);
   ::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, IGM.getModule(),
-                TargetMachine, OutputPath);
+                IGM.TargetMachine.get(), OutputPath);
 }
 
 bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
                         llvm::Module *Module) {
   // Build TargetMachine.
-  llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, Ctx);
+  auto TargetMachine = createTargetMachine(Opts, Ctx);
   if (!TargetMachine)
     return true;
 
   embedBitcode(Module, Opts);
-  if (::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, Module, TargetMachine,
-                    Opts.getSingleOutputFilename()))
+  if (::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, Module,
+                    TargetMachine.get(), Opts.getSingleOutputFilename()))
     return true;
   return false;
 }

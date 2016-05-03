@@ -94,6 +94,7 @@ public:
 namespace IntrinsicPrecedences {
   enum : unsigned char {
     MinPrecedence = 0,
+    ArrowExpr = 0, // ->
     IfExpr = 100, // ?:
     AssignExpr = 90, // =
     ExplicitCastExpr = 132, // 'is' and 'as'
@@ -656,6 +657,10 @@ public:
 
   /// An optional replacement string to emit in a fixit.  This allows simple
   /// declaration renames to be applied by Xcode.
+  ///
+  /// This should take the form of an operator, identifier, or full function
+  /// name, optionally with a prefixed type, similar to the syntax used for
+  /// the `NS_SWIFT_NAME` annotation in Objective-C.
   const StringRef Rename;
 
   /// Indicates when the symbol was introduced.

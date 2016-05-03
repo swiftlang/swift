@@ -741,12 +741,14 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
 
   // Create the getter.
   auto *getter = createGetterPrototype(storage, TC);
+  if (storage->hasAccessorFunctions()) return;
 
   // Create the setter.
   FuncDecl *setter = nullptr;
   ParamDecl *setterValueParam = nullptr;
   if (doesStorageNeedSetter(storage)) {
     setter = createSetterPrototype(storage, setterValueParam, TC);
+    if (storage->hasAccessorFunctions()) return;
   }
   
   // Okay, we have both the getter and setter.  Set them in VD.
@@ -964,10 +966,12 @@ static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
 
   // Create the getter.
   auto *Get = createGetterPrototype(VD, TC);
+  if (VD->hasAccessorFunctions()) return;
 
   // Create the setter.
   ParamDecl *SetValueDecl = nullptr;
   auto *Set = createSetterPrototype(VD, SetValueDecl, TC);
+  if (VD->hasAccessorFunctions()) return;
 
   // Okay, we have both the getter and setter.  Set them in VD.
   VD->makeComputed(VD->getLoc(), Get, Set, nullptr, VD->getLoc());

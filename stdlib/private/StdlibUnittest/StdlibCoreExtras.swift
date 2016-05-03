@@ -32,7 +32,7 @@ func findSubstring(_ string: String, _ substring: String) -> String.Index? {
     return string.startIndex
   }
 #if _runtime(_ObjC)
-  return string.range(of: substring)?.startIndex
+  return string.range(of: substring)?.lowerBound
 #else
   // FIXME(performance): This is a very non-optimal algorithm, with a worst
   // case of O((n-m)*m). When non-objc String has a match function that's better,
@@ -57,8 +57,8 @@ func findSubstring(_ string: String, _ substring: String) -> String.Index? {
       }
       if needle[needleIndex] == haystack[matchIndex] {
         // keep advancing through both the string and search string on match
-        matchIndex = matchIndex.successor()
-        needleIndex = needleIndex.successor()
+        matchIndex = haystack.index(after: matchIndex)
+        needleIndex = haystack.index(after: needleIndex)
       } else {
         // no match, go back to finding a starting match in the string.
         break

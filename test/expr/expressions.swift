@@ -6,7 +6,7 @@
 
 // Comment.  With unicode characters: ¡ç®åz¥!
 
-func markUsed<T>(_ t: T) {}
+func markUsed<T>(_: T) {}
 
 // Various function types.
 var func1 : () -> ()    // No input, no output.
@@ -701,7 +701,7 @@ func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
 
 
 // <rdar://problem/19657458> Nil Coalescing operator (??) should have a higher precedence
-func testNilCoalescePrecedence(_ cond: Bool, a: Int?, r: Range<Int>?) {
+func testNilCoalescePrecedence(cond: Bool, a: Int?, r: CountableClosedRange<Int>?) {
   // ?? should have higher precedence than logical operators like || and comparisons.
   if cond || (a ?? 42 > 0) {}  // Ok.
   if (cond || a) ?? 42 > 0 {}  // Not ok: expected-error {{cannot be used as a boolean}} {{6-6=(}} {{17-17= != nil)}}
@@ -712,7 +712,7 @@ func testNilCoalescePrecedence(_ cond: Bool, a: Int?, r: Range<Int>?) {
 
   // ?? should have lower precedence than range and arithmetic operators.
   let r1 = r ?? (0...42) // ok
-  let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'Range<Int>?' and 'Int'}}
+  let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'CountableClosedRange<Int>?' and 'Int'}}
   // expected-note @-1 {{overloads for '??' exist with these partially matching parameter lists:}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
 }
@@ -816,7 +816,6 @@ func r22913570() {
 func swift22_deprecation_increment_decrement() {
   var i = 0
   var f = 1.0
-  var si = "foo".startIndex
 
   i++     // expected-error {{'++' is unavailable}} {{4-6= += 1}}
   --i     // expected-error {{'--' is unavailable}} {{3-5=}} {{6-6= -= 1}}
@@ -825,14 +824,6 @@ func swift22_deprecation_increment_decrement() {
   ++f     // expected-error {{'++' is unavailable}} {{3-5=}} {{6-6= += 1}}
   f--     // expected-error {{'--' is unavailable}} {{4-6= -= 1}}
   _ = f-- // expected-error {{'--' is unavailable}} {{none}}
-
-
-  ++si      // expected-error {{'++' is unavailable}} {{3-5=}} {{7-7= = si.successor()}}
-  --si      // expected-error {{'--' is unavailable}} {{3-5=}} {{7-7= = si.predecessor()}}
-  si++      // expected-error {{'++' is unavailable}} {{5-7= = si.successor()}}
-  si--      // expected-error {{'--' is unavailable}} {{5-7= = si.predecessor()}}
-  _ = --si  // expected-error {{'--' is unavailable}} {{none}}
-
 
   // <rdar://problem/24530312> Swift ++fix-it produces bad code in nested expressions
   // This should not get a fixit hint.
@@ -843,7 +834,7 @@ func swift22_deprecation_increment_decrement() {
 // SR-628 mixing lvalues and rvalues in tuple expression
 var x = 0
 var y = 1
-let _ = (x, x.successor()).0
+let _ = (x, x + 1).0
 let _ = (x, 3).1
 (x,y) = (2,3)
 (x,4) = (1,2) // expected-error {{cannot assign to value: literals are not mutable}}

@@ -611,6 +611,10 @@ ERROR(rethrows_after_function_result,none,
       "'rethrows' may only occur before '->'", ())
 ERROR(throw_in_function_type,none,
       "expected throwing specifier; did you mean 'throws'?", ())
+ERROR(expected_type_before_arrow,none,
+      "expected type before '->'", ())
+ERROR(expected_type_after_arrow,none,
+      "expected type after '->'", ())
 
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,PointsToFirstBadToken,
@@ -1042,12 +1046,14 @@ ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
       "expected ']' in container literal expression", ())
 
 // Object literal expressions
-ERROR(expected_identifier_after_l_square_lit,none,
-      "expected identifier after '[#' in object literal expression", ())
+ERROR(expected_object_literal_identifier,none,
+      "expected identifier after '#' in object literal expression", ())
 ERROR(expected_arg_list_in_object_literal,none,
       "expected argument list in object literal", ())
-ERROR(expected_r_square_lit_after_object_literal,none,
-      "expected '#]' at end of object literal expression", ())
+ERROR(object_literal_legacy_name,none,
+      "'%0' has been renamed to '%1", (StringRef, StringRef))
+ERROR(legacy_object_literal_syntax,none,
+       "object literal syntax no longer uses '[# ... #]'", ())
 
 // If expressions
 ERROR(expected_expr_after_if_question,none,
@@ -1148,6 +1154,9 @@ ERROR(attr_availability_unavailable_deprecated,none,
 
 WARNING(attr_availability_unknown_platform,none,
 "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
+ERROR(attr_availability_invalid_renamed,none,
+      "'renamed' argument of '%0' attribute must be an operator, identifier, "
+      "or full function name, optionally prefixed by a type name", (StringRef))
 
 ERROR(attr_availability_expected_option,none,
       "expected '%0' option such as 'unavailable', 'introduced', 'deprecated', "

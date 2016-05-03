@@ -33,5 +33,6 @@ TYPEREF(Opaque, TypeRef)
 TYPEREF(UnownedStorage, TypeRef)
 TYPEREF(UnmanagedStorage, TypeRef)
 TYPEREF(WeakStorage, TypeRef)
+TYPEREF(SILBox, TypeRef)
 
 #undef TYPEREF

@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements the context for allocations and management of structures related
-// to reflection, such as TypeRefs.
+// Implements the context for reflection of values in the address space of a
+// remote process.
 //
 //===----------------------------------------------------------------------===//
 
@@ -21,9 +21,9 @@
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
+#include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
-#include "swift/SwiftRemoteMirror/SwiftRemoteMirrorTypes.h"
 
 #include <iostream>
 #include <vector>
@@ -40,12 +40,14 @@ class ReflectionContext
        : public remote::MetadataReader<Runtime, TypeRefBuilder> {
   using super = remote::MetadataReader<Runtime, TypeRefBuilder>;
 
-public:
-  using super::getBuilder;
-  using super::readTypeFromMetadata;
-  using typename super::StoredPointer;
+  std::unordered_map<typename super::StoredPointer, const TypeInfo *> Cache;
 
 public:
+  using super::getBuilder;
+  using super::readIsaMask;
+  using super::readTypeFromMetadata;
+  using super::readMetadataFromInstance;
+  using typename super::StoredPointer;
 
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
     : super(std::move(reader)) {}
@@ -61,43 +63,65 @@ public:
     getBuilder().dumpAllSections();
   }
 
-  std::vector<std::pair<std::string, const TypeRef *>>
-  getFieldTypeRefs(const TypeRef *TR) {
-    TypeRefBuilder &Builder = getBuilder();
-    auto *FD = Builder.getFieldTypeInfo(TR);
-    if (FD == nullptr)
-      return {};
-    return Builder.getFieldTypeRefs(TR, FD);
-  }
-
-  std::vector<std::pair<std::string, const TypeRef *>>
-  getFieldTypeRefs(StoredPointer MetadataAddress) {
-    auto TR = readTypeFromMetadata(MetadataAddress);
-    return getFieldTypeRefs(TR);
-  }
-
   void addReflectionInfo(ReflectionInfo I) {
     getBuilder().addReflectionInfo(I);
   }
 
-  swift_typeinfo_t getInfoForTypeRef(const TypeRef *TR) {
-    // TODO
-    return {
-      SWIFT_UNKNOWN,
-      NULL,
-      0,
-      0,
-      0
-    };
+  /// Return a description of the layout of a class instance with the given
+  /// metadata as its isa pointer.
+  const TypeInfo *getMetadataTypeInfo(StoredPointer MetadataAddress) {
+    // See if we cached the layout already
+    auto found = Cache.find(MetadataAddress);
+    if (found != Cache.end())
+      return found->second;
+
+    auto &TC = getBuilder().getTypeConverter();
+
+    const TypeInfo *TI = nullptr;
+
+    auto TR = readTypeFromMetadata(MetadataAddress);
+    auto kind = this->readKindFromMetadata(MetadataAddress);
+    if (TR != nullptr && kind.first) {
+      switch (kind.second) {
+      case MetadataKind::Class: {
+        // Figure out where the stored properties of this class begin
+        // by looking at the size of the superclass
+        bool valid;
+        unsigned size, align;
+        auto super =
+            this->readSuperClassFromClassMetadata(MetadataAddress);
+        if (super) {
+          std::tie(valid, size, align) =
+              this->readInstanceSizeAndAlignmentFromClassMetadata(super);
+
+          // Perform layout
+          if (valid)
+            TI = TC.getClassInstanceTypeInfo(TR, size, align);
+        }
+        break;
+      }
+      default:
+        break;
+      }
+    }
+
+    // Cache the result for future lookups
+    Cache[MetadataAddress] = TI;
+    return TI;
   }
 
-  swift_childinfo_t getInfoForChild(const TypeRef *TR, unsigned Index) {
-    // TODO
-    return {
-      0,
-      NULL,
-      0,
-    };
+  /// Return a description of the layout of a class instance with the given
+  /// metadata as its isa pointer.
+  const TypeInfo *getInstanceTypeInfo(StoredPointer ObjectAddress) {
+    auto MetadataAddress = readMetadataFromInstance(ObjectAddress);
+    if (!MetadataAddress.first)
+      return nullptr;
+    return getMetadataTypeInfo(MetadataAddress.second);
+  }
+
+  /// Return a description of the layout of a value with the given type.
+  const TypeInfo *getTypeInfo(const TypeRef *TR) {
+    return getBuilder().getTypeConverter().getTypeInfo(TR);
   }
 };
 

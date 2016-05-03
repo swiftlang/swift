@@ -138,20 +138,18 @@ public struct SomeIterator<
     fatalError()
   }
 }
-func f1<
-  S: Collection 
-  where S.Index: BidirectionalIndex
->(_ seq: S) {
+func f1<T>(seq: Array<T>) {
   let x = (seq.indices).lazy.reversed()
   SomeIterator(elements: seq, indices: x) // expected-warning{{unused}}
   SomeIterator(elements: seq, indices: seq.indices.reversed()) // expected-warning{{unused}}
 }
 
-// <rdar://problem/16078944>
-func count16078944<C: Collection>(_ x: C) -> Int { return 0 }
 
-func test16078944 <T: ForwardIndex>(_ lhs: T, args: T) -> Int {
-    return count16078944(lhs..<args) // don't crash
+// <rdar://problem/16078944>
+func count16078944<T>(_ x: Range<T>) -> Int { return 0 }
+
+func test16078944 <T: Comparable>(lhs: T, args: T) -> Int {
+  return count16078944(lhs..<args) // don't crash
 }
 
 

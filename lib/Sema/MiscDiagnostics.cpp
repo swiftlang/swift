@@ -19,9 +19,11 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
@@ -811,15 +813,323 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
   const_cast<Expr *>(E)->walk(DiagnoseWalker(TC, isAlreadyInClosure));
 }
 
+/// Diagnose an argument labeling issue, returning true if we successfully
+/// diagnosed the issue.
+bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
+                                       ArrayRef<Identifier> newNames,
+                                       bool isSubscript,
+                                       InFlightDiagnostic *existingDiag) {
+  Optional<InFlightDiagnostic> diagOpt;
+  auto getDiag = [&]() -> InFlightDiagnostic & {
+    if (existingDiag)
+      return *existingDiag;
+    return *diagOpt;
+  };
+
+  auto tuple = dyn_cast<TupleExpr>(expr);
+  if (!tuple) {
+    llvm::SmallString<16> str;
+    // If the diagnostic is local, flush it before returning.
+    // This makes sure it's emitted before 'str' is destroyed.
+    defer { diagOpt.reset(); };
+
+    if (newNames[0].empty()) {
+      // This is probably a conversion from a value of labeled tuple type to
+      // a scalar.
+      // FIXME: We want this issue to disappear completely when single-element
+      // labelled tuples go away.
+      if (auto tupleTy = expr->getType()->getRValueType()->getAs<TupleType>()) {
+        int scalarFieldIdx = tupleTy->getElementForScalarInit();
+        if (scalarFieldIdx >= 0) {
+          auto &field = tupleTy->getElement(scalarFieldIdx);
+          if (field.hasName()) {
+            str = ".";
+            str += field.getName().str();
+            if (!existingDiag) {
+              diagOpt.emplace(TC.diagnose(expr->getStartLoc(),
+                                          diag::extra_named_single_element_tuple,
+                                          field.getName().str()));
+            }
+            getDiag().fixItInsertAfter(expr->getEndLoc(), str);
+            return true;
+          }
+        }
+      }
+
+      // We don't know what to do with this.
+      return false;
+    }
+
+    // This is a scalar-to-tuple conversion. Add the  name.  We "know"
+    // that we're inside a ParenExpr, because ParenExprs are required
+    // by the syntax and locator resolution looks through on level of
+    // them.
+
+    // Look through the paren expression, if there is one.
+    if (auto parenExpr = dyn_cast<ParenExpr>(expr))
+      expr = parenExpr->getSubExpr();
+
+    str += newNames[0].str();
+    str += ": ";
+    if (!existingDiag) {
+      diagOpt.emplace(TC.diagnose(expr->getStartLoc(),
+                                  diag::missing_argument_labels,
+                                  false, str.str().drop_back(), isSubscript));
+    }
+    getDiag().fixItInsert(expr->getStartLoc(), str);
+    return true;
+  }
+
+  // Figure out how many extraneous, missing, and wrong labels are in
+  // the call.
+  unsigned numExtra = 0, numMissing = 0, numWrong = 0;
+  unsigned n = std::max(tuple->getNumElements(), (unsigned)newNames.size());
+
+  llvm::SmallString<16> missingBuffer;
+  llvm::SmallString<16> extraBuffer;
+  for (unsigned i = 0; i != n; ++i) {
+    Identifier oldName;
+    if (i < tuple->getNumElements())
+      oldName = tuple->getElementName(i);
+    Identifier newName;
+    if (i < newNames.size())
+      newName = newNames[i];
+
+    if (oldName == newName ||
+        (tuple->hasTrailingClosure() && i == tuple->getNumElements()-1))
+      continue;
+
+    if (oldName.empty()) {
+      ++numMissing;
+      missingBuffer += newName.str();
+      missingBuffer += ":";
+    } else if (newName.empty()) {
+      ++numExtra;
+      extraBuffer += oldName.str();
+      extraBuffer += ':';
+    } else
+      ++numWrong;
+  }
+
+  // Emit the diagnostic.
+  assert(numMissing > 0 || numExtra > 0 || numWrong > 0);
+  llvm::SmallString<16> haveBuffer; // note: diagOpt has references to this
+  llvm::SmallString<16> expectedBuffer; // note: diagOpt has references to this
+
+  // If we had any wrong labels, or we have both missing and extra labels,
+  // emit the catch-all "wrong labels" diagnostic.
+  if (!existingDiag) {
+    bool plural = (numMissing + numExtra + numWrong) > 1;
+    if (numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
+      for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+        auto haveName = tuple->getElementName(i);
+        if (haveName.empty())
+          haveBuffer += '_';
+        else
+          haveBuffer += haveName.str();
+        haveBuffer += ':';
+      }
+
+      for (auto expected : newNames) {
+        if (expected.empty())
+          expectedBuffer += '_';
+        else
+          expectedBuffer += expected.str();
+        expectedBuffer += ':';
+      }
+
+      StringRef haveStr = haveBuffer;
+      StringRef expectedStr = expectedBuffer;
+      diagOpt.emplace(TC.diagnose(expr->getLoc(), diag::wrong_argument_labels,
+                                  plural, haveStr, expectedStr, isSubscript));
+    } else if (numMissing > 0) {
+      StringRef missingStr = missingBuffer;
+      diagOpt.emplace(TC.diagnose(expr->getLoc(), diag::missing_argument_labels,
+                                  plural, missingStr, isSubscript));
+    } else {
+      assert(numExtra > 0);
+      StringRef extraStr = extraBuffer;
+      diagOpt.emplace(TC.diagnose(expr->getLoc(), diag::extra_argument_labels,
+                                  plural, extraStr, isSubscript));
+    }
+  }
+
+  // Emit Fix-Its to correct the names.
+  auto &diag = getDiag();
+  for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+    Identifier oldName = tuple->getElementName(i);
+    Identifier newName;
+    if (i < newNames.size())
+      newName = newNames[i];
+
+    if (oldName == newName || (i == n-1 && tuple->hasTrailingClosure()))
+      continue;
+
+    if (newName.empty()) {
+      // Delete the old name.
+      diag.fixItRemoveChars(tuple->getElementNameLocs()[i],
+                            tuple->getElement(i)->getStartLoc());
+      continue;
+    }
+
+    bool newNameIsReserved = !canBeArgumentLabel(newName.str());
+    llvm::SmallString<16> newStr;
+    if (newNameIsReserved)
+      newStr += "`";
+    newStr += newName.str();
+    if (newNameIsReserved)
+      newStr += "`";
+
+    if (oldName.empty()) {
+      // Insert the name.
+      newStr += ": ";
+      diag.fixItInsert(tuple->getElement(i)->getStartLoc(), newStr);
+      continue;
+    }
+
+    // Change the name.
+    diag.fixItReplace(tuple->getElementNameLocs()[i], newStr);
+  }
+
+  // If the diagnostic is local, flush it before returning.
+  // This makes sure it's emitted before the message text buffers are destroyed.
+  diagOpt.reset();
+  return true;
+}
+
+
 //===----------------------------------------------------------------------===//
 // Diagnose availability.
 //===----------------------------------------------------------------------===//
+
+void swift::fixItAvailableAttrRename(TypeChecker &TC,
+                                     InFlightDiagnostic &diag,
+                                     SourceRange referenceRange,
+                                     const AvailableAttr *attr,
+                                     const CallExpr *CE) {
+  ParsedDeclName parsed = swift::parseDeclName(attr->Rename);
+  if (!parsed || parsed.isInstanceMember() || parsed.isPropertyAccessor())
+    return;
+
+  SmallString<64> baseReplace;
+  if (!parsed.ContextName.empty()) {
+    baseReplace += parsed.ContextName;
+    baseReplace += '.';
+  }
+  baseReplace += parsed.BaseName;
+  diag.fixItReplace(referenceRange, baseReplace);
+
+  if (!CE || !parsed.IsFunctionName)
+    return;
+
+  SmallVector<Identifier, 4> argumentLabelIDs;
+  std::transform(parsed.ArgumentLabels.begin(), parsed.ArgumentLabels.end(),
+                 std::back_inserter(argumentLabelIDs),
+                 [&TC](StringRef labelStr) -> Identifier {
+    return labelStr.empty() ? Identifier() : TC.Context.getIdentifier(labelStr);
+  });
+
+  const Expr *argExpr = CE->getArg();
+  if (auto args = dyn_cast<TupleExpr>(argExpr)) {
+    if (argumentLabelIDs.size() != args->getNumElements()) {
+      // Mismatched lengths; give up.
+      return;
+    }
+
+    if (args->hasElementNames()) {
+      if (std::equal(argumentLabelIDs.begin(), argumentLabelIDs.end(),
+                     args->getElementNames().begin())) {
+        // Already matching.
+        return;
+      }
+
+    } else {
+      if (std::all_of(argumentLabelIDs.begin(), argumentLabelIDs.end(),
+                      std::mem_fn(&Identifier::empty))) {
+        // Already matching (as in, there are no labels).
+        return;
+      }
+    }
+
+  } else {
+    if (argumentLabelIDs.size() != 1) {
+      // Mismatched lengths; give up.
+      return;
+    }
+
+    if (argumentLabelIDs.front().empty()) {
+      // Already matching (no labels).
+      return;
+    }
+  }
+
+  diagnoseArgumentLabelError(TC, argExpr, argumentLabelIDs, false, &diag);
+}
+
+void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
+                                     const DeclContext *ReferenceDC,
+                                     const AvailableAttr *Attr,
+                                     DeclName Name,
+                                     const CallExpr *CE) {
+  // We match the behavior of clang to not report deprecation warnings
+  // inside declarations that are themselves deprecated on all deployment
+  // targets.
+  if (isInsideDeprecatedDeclaration(ReferenceRange, ReferenceDC)) {
+    return;
+  }
+
+  if (!Context.LangOpts.DisableAvailabilityChecking) {
+    AvailabilityContext RunningOSVersions =
+        overApproximateAvailabilityAtLocation(ReferenceRange.Start,ReferenceDC);
+    if (RunningOSVersions.isKnownUnreachable()) {
+      // Suppress a deprecation warning if the availability checking machinery
+      // thinks the reference program location will not execute on any
+      // deployment target for the current platform.
+      return;
+    }
+  }
+
+  StringRef Platform = Attr->prettyPlatformString();
+  clang::VersionTuple DeprecatedVersion;
+  if (Attr->Deprecated)
+    DeprecatedVersion = Attr->Deprecated.getValue();
+
+  if (Attr->Message.empty() && Attr->Rename.empty()) {
+    diagnose(ReferenceRange.Start, diag::availability_deprecated, Name,
+             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
+             DeprecatedVersion)
+      .highlight(Attr->getRange());
+    return;
+  }
+
+  if (Attr->Message.empty()) {
+    diagnose(ReferenceRange.Start, diag::availability_deprecated_rename, Name,
+             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
+             DeprecatedVersion, Attr->Rename)
+      .highlight(Attr->getRange());
+  } else {
+    EncodedDiagnosticMessage EncodedMessage(Attr->Message);
+    diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name,
+             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
+             DeprecatedVersion, EncodedMessage.Message)
+      .highlight(Attr->getRange());
+  }
+
+  if (!Attr->Rename.empty()) {
+    auto renameDiag = diagnose(ReferenceRange.Start,
+                               diag::note_deprecated_rename,
+                               Attr->Rename);
+    fixItAvailableAttrRename(*this, renameDiag, ReferenceRange, Attr, CE);
+  }
+}
+
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
                                                  SourceRange R,
-                                                 const DeclContext *DC) {
+                                                 const DeclContext *DC,
+                                                 const CallExpr *CE) {
   auto *Attr = AvailableAttr::isUnavailable(D);
   if (!Attr)
     return false;
@@ -845,13 +1155,13 @@ bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
   case UnconditionalAvailabilityKind::Unavailable:
     if (!Attr->Rename.empty()) {
       if (Attr->Message.empty()) {
-        diagnose(Loc, diag::availability_decl_unavailable_rename, Name,
-                 Attr->Rename)
-          .fixItReplace(R, Attr->Rename);
+        auto diag = diagnose(Loc, diag::availability_decl_unavailable_rename,
+                             Name, Attr->Rename);
+        fixItAvailableAttrRename(*this, diag, R, Attr, CE);
       } else {
-        diagnose(Loc, diag::availability_decl_unavailable_rename_msg, Name,
-                 Attr->Rename, Attr->Message)
-          .fixItReplace(R, Attr->Rename);
+        auto diag = diagnose(Loc,diag::availability_decl_unavailable_rename_msg,
+                             Name, Attr->Rename, Attr->Message);
+        fixItAvailableAttrRename(*this, diag, R, Attr, CE);
       }
     } else if (Attr->Message.empty()) {
       diagnose(Loc, diag::availability_decl_unavailable, Name).highlight(R);
@@ -935,17 +1245,20 @@ public:
     };
 
     if (auto DR = dyn_cast<DeclRefExpr>(E))
-      diagAvailability(DR->getDecl(), DR->getSourceRange());
+      diagAvailability(DR->getDecl(), DR->getSourceRange(),
+                       getEnclosingCallExpr());
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
       walkMemberRef(MR);
       return skipChildren();
     }
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
       diagAvailability(OCDR->getDecl(),
-                       OCDR->getConstructorLoc().getSourceRange());
+                       OCDR->getConstructorLoc().getSourceRange(),
+                       getEnclosingCallExpr());
     if (auto DMR = dyn_cast<DynamicMemberRefExpr>(E))
       diagAvailability(DMR->getMember().getDecl(),
-                       DMR->getNameLoc().getSourceRange());
+                       DMR->getNameLoc().getSourceRange(),
+                       getEnclosingCallExpr());
     if (auto DS = dyn_cast<DynamicSubscriptExpr>(E))
       diagAvailability(DS->getMember().getDecl(), DS->getSourceRange());
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
@@ -972,9 +1285,32 @@ public:
   }
 
 private:
-  bool diagAvailability(const ValueDecl *D, SourceRange R);
+  bool diagAvailability(const ValueDecl *D, SourceRange R,
+                        const CallExpr *CE = nullptr);
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
                              const AvailableAttr *Attr);
+
+  /// Walks up from a potential callee to the enclosing CallExpr.
+  const CallExpr *getEnclosingCallExpr() const {
+    ArrayRef<const Expr *> parents = ExprStack;
+    assert(!parents.empty() && "must be called while visiting an expression");
+    size_t idx = parents.size() - 1;
+
+    do {
+      if (idx == 0)
+        return nullptr;
+      --idx;
+    } while (isa<DotSyntaxBaseIgnoredExpr>(parents[idx]) || // Mod.f(a)
+             isa<SelfApplyExpr>(parents[idx]) || // obj.f(a)
+             isa<IdentityExpr>(parents[idx]) || // (f)(a)
+             isa<ForceValueExpr>(parents[idx]) || // f!(a)
+             isa<BindOptionalExpr>(parents[idx])); // f?(a)
+
+    auto *call = dyn_cast<CallExpr>(parents[idx]);
+    if (!call || call->getFn() != parents[idx+1])
+      return nullptr;
+    return call;
+  }
 
   /// Walk an assignment expression, checking for availability.
   void walkAssignExpr(AssignExpr *E) {
@@ -1086,7 +1422,8 @@ private:
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
-bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R) {
+bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
+                                          const CallExpr *CE) {
   if (!D)
     return false;
 
@@ -1094,12 +1431,12 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R) {
     if (diagnoseIncDecRemoval(D, R, attr))
       return true;
 
-  if (TC.diagnoseExplicitUnavailability(D, R, DC))
+  if (TC.diagnoseExplicitUnavailability(D, R, DC, CE))
     return true;
 
   // Diagnose for deprecation
   if (const AvailableAttr *Attr = TypeChecker::getDeprecated(D)) {
-    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName());
+    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName(), CE);
   }
 
   if (TC.getLangOpts().DisableAvailabilityChecking)
@@ -2532,13 +2869,10 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   return "";
 }
 
-/// Attempt to omit needless words from the name of the given declaration.
-static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
+Optional<DeclName> swift::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
-  if (!Context.LangOpts.WarnOmitNeedlessWords)
-    return None;
 
-  if (afd->isInvalid())
+  if (afd->isInvalid() || isa<DestructorDecl>(afd))
     return None;
 
   DeclName name = afd->getFullName();
@@ -2624,14 +2958,10 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
   return DeclName(Context, newBaseName, newArgNames);
 }
 
-/// Attempt to omit needless words from the name of the given declaration.
-static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
+Optional<Identifier> swift::omitNeedlessWords(VarDecl *var) {
   auto &Context = var->getASTContext();
 
   if (var->isInvalid())
-    return None;
-
-  if (!Context.LangOpts.WarnOmitNeedlessWords)
     return None;
 
   if (var->getName().empty())
@@ -2646,7 +2976,7 @@ static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
 
   // Dig out the type of the variable.
   Type type = var->getInterfaceType()->getReferenceStorageReferent()
-  ->getLValueOrInOutObjectType();
+                ->getLValueOrInOutObjectType();
   while (auto optObjectTy = type->getAnyOptionalObjectType())
     type = optObjectTy;
 
@@ -2674,7 +3004,10 @@ static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
 }
 
 void TypeChecker::checkOmitNeedlessWords(AbstractFunctionDecl *afd) {
-  auto newName = ::omitNeedlessWords(afd);
+  if (!Context.LangOpts.WarnOmitNeedlessWords)
+    return;
+
+  auto newName = omitNeedlessWords(afd);
   if (!newName)
     return;
 
@@ -2685,7 +3018,10 @@ void TypeChecker::checkOmitNeedlessWords(AbstractFunctionDecl *afd) {
 }
 
 void TypeChecker::checkOmitNeedlessWords(VarDecl *var) {
-  auto newName = ::omitNeedlessWords(var);
+  if (!Context.LangOpts.WarnOmitNeedlessWords)
+    return;
+
+  auto newName = omitNeedlessWords(var);
   if (!newName)
     return;
 
@@ -2859,7 +3195,7 @@ void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
     return;
 
   // Determine whether the callee has any needless words in it.
-  auto newName = ::omitNeedlessWords(afd);
+  auto newName = omitNeedlessWords(afd);
 
   bool renamed;
   if (!newName) {
@@ -2961,7 +3297,7 @@ void TypeChecker::checkOmitNeedlessWords(MemberRefExpr *memberRef) {
     return;
 
   // Check whether any needless words were omitted.
-  auto newName = ::omitNeedlessWords(var);
+  auto newName = omitNeedlessWords(var);
   if (!newName)
     return;
 

@@ -15,4 +15,6 @@ func testSwiftName() {
 
   let rect: Rect
   let rect2: RectStruct // expected-error{{use of undeclared type 'RectStruct'}}
+
+  let d: Double = __will_be_private
 }

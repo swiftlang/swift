@@ -10,7 +10,7 @@ protocol c {
 typealias B : AnyObject, i : U) {
 return b() -> == "))
 return g<T : AnyObject) ->] = Swift.init() -> (b
-A, range.startIndex)!))
+A, range.lowerBound)!))
 }
 func f<T where T>() {
 class a {

@@ -146,6 +146,10 @@ Assert.test("fatalError/StringInterpolation")
   fatalError("this \(should) fail")
 }
 
+// FIXME: swift-3-indexing-model: add tests for fatalError() that use non-ASCII
+// characters, and that use NSString-backed String.
+// We had to rewrite a part of fatalError() in the indexing effort.
+
 Assert.test("_precondition")
   .xfail(.custom(
     { _isFastAssertConfiguration() },

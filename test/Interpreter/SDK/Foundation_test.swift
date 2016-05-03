@@ -181,7 +181,7 @@ FoundationTestSuite.test("patternMatching") {
 // Type checker used to crash on this.
 class ClassWithDtor : NSObject {
   deinit {
-    let noteCenter = NSNotificationCenter.defaultCenter()
+    let noteCenter = NSNotificationCenter.`default`()
     noteCenter.removeObserver(self, name: "ReceivedContentNotification", object: nil)
   }
 }

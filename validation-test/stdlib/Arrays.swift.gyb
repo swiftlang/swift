@@ -9,58 +9,69 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-
-//===--- struct MrMcRange -------------------------------------------------===//
-// A wrapper around Range<Tracked> that allows us to detect when it is
-// being treated as a Collection rather than merely a Sequence, which
-// helps us to prove that an optimization is being used.  In
-// particular, when constructing a _ContiguousArrayBuffer from a
-// Collection, the necessary storage should be pre-allocated.
-struct MrMcRange : Collection {
-  static var timesStartIndexWasCalled = ResettableValue(0)
-
-  typealias Base = Range<Int>
-
-  init(_ base: Base) {
-    self.base = base
-  }
-
-  var startIndex: Int {
-    MrMcRange.timesStartIndexWasCalled.value += 1
-    return base.startIndex
-  }
-
-  var endIndex: Int {
-    return base.endIndex
-  }
-
-  subscript(i: Int) -> LifetimeTracked {
-    return LifetimeTracked(i)
-  }
-
-  var base: Base
-}
-
 let CopyToNativeArrayBufferTests = TestSuite("CopyToNativeArrayBufferTests")
 
 CopyToNativeArrayBufferTests.test("Sequence._copyToNativeArrayBuffer()") {
-  let sequence: MinimalSequence<LifetimeTracked> =
-    MinimalSequence(elements: LifetimeTracked(10)..<LifetimeTracked(27))
-  let buffer = sequence._copyToNativeArrayBuffer()
-  expectEqualSequence(
-    Array(10..<27),
-    buffer.map { $0.value })
+  do {
+    // Call from a static context.
+    let s =
+      MinimalSequence(elements: LifetimeTracked(10)..<LifetimeTracked(27))
+
+    expectEqual(0, s.timesMakeIteratorCalled.value)
+    let buffer = s._copyToNativeArrayBuffer()
+    expectEqual(1, s.timesMakeIteratorCalled.value)
+    expectEqualSequence(
+      Array(10..<27),
+      buffer.map { $0.value })
+  }
+  do {
+    // Call from a generic context.
+    let wrapped = MinimalSequence(elements: LifetimeTracked(10)..<LifetimeTracked(27))
+    let s = LoggingSequence(wrapping: wrapped)
+
+    expectEqual(0, wrapped.timesMakeIteratorCalled.value)
+    let buffer = s._copyToNativeArrayBuffer()
+    expectEqual(1, wrapped.timesMakeIteratorCalled.value)
+    expectEqualSequence(
+      Array(10..<27),
+      buffer.map { $0.value })
+  }
 }
 
 CopyToNativeArrayBufferTests.test("Collection._copyToNativeArrayBuffer()") {
-  let buffer = MrMcRange(3..<23)._copyToNativeArrayBuffer()
   // Check that collections are handled with the collection-specific API.  This
   // means that we are calling the right default implementation (one for
   // collections, not the one for sequences).
-  expectNotEqual(0, MrMcRange.timesStartIndexWasCalled.value)
-  expectEqualSequence(
-    Array(3..<23),
-    buffer.map { $0.value })
+
+  do {
+    // Call from a static context.
+    let c =
+      DefaultedCollection(elements: LifetimeTracked(10)..<LifetimeTracked(27))
+
+    expectEqual(0, c.timesMakeIteratorCalled.value)
+    expectEqual(0, c.timesStartIndexCalled.value)
+    let buffer = c._copyToNativeArrayBuffer()
+    expectEqual(0, c.timesMakeIteratorCalled.value)
+    expectNotEqual(0, c.timesStartIndexCalled.value)
+    expectEqualSequence(
+      Array(10..<27),
+      buffer.map { $0.value })
+  }
+  do {
+    // Call from a generic context.
+    let wrapped =
+      DefaultedCollection(elements: LifetimeTracked(10)..<LifetimeTracked(27))
+    let s = LoggingSequence(wrapping: wrapped)
+    expectEqual(0, wrapped.timesMakeIteratorCalled.value)
+    expectEqual(0, wrapped.timesStartIndexCalled.value)
+    let buffer = s._copyToNativeArrayBuffer()
+    expectEqual(0, wrapped.timesMakeIteratorCalled.value)
+    expectNotEqual(0, wrapped.timesStartIndexCalled.value)
+
+    expectEqualSequence(
+      Array(10..<27),
+      buffer.map { $0.value })
+  }
 }
 
 %{
@@ -531,7 +542,36 @@ ArrayTestSuite.test(
 
 let evilBoundsError = "EvilCollection: index out of range"
 
+final class EvilSequence : Sequence {
+  init(_ growth: Int) {
+    self.growth = growth
+  }
+
+  var growth: Int
+  var _count: Int = 20
+
+  var underestimatedCount: Int {
+    defer { _count += growth }
+    return _count
+  }
+
+  @warn_unused_result
+  func makeIterator() -> AnyIterator<LifetimeTracked> {
+    var i = 0
+    return AnyIterator {
+      if i >= self._count { return nil }
+      let result = LifetimeTracked(i)
+      i += 1
+      return result
+    }
+  }
+}
+
 final class EvilCollection : Collection {
+  func index(after i: Int) -> Int {
+    return i + 1
+  }
+  
   init(_ growth: Int, boundsChecked: Bool) {
     self.growth = growth
     self.boundsChecked = boundsChecked
@@ -556,6 +596,13 @@ final class EvilCollection : Collection {
     }
     return LifetimeTracked(i)
   }
+
+  // Default implementation will call _failEarlyRangeCheck,
+  // passing in a startIndex that will grow _count faster than
+  // necessary.
+  func formIndex(after i: inout Int) {
+    i += 1
+  }
 }
 
 for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
@@ -578,9 +625,22 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
   let boundsChecked = evilBoundsCheck ? "BoundsChecked" : "NoBoundsCheck"
   let testPrefix = "MemorySafety/\(boundsChecked)/Evil\(natureOfEvil)"
 
-  let t = ArrayTestSuite.test("\(testPrefix)/Infrastructure")
+  ArrayTestSuite.test("\(testPrefix)/Infrastructure/EvilSequence") {
+    let evil = EvilSequence(step)
+    let count0 = evil.underestimatedCount
+    let count1 = evil.underestimatedCount
+    expectNotEqual(count0, count1)
+   if step > 0 {
+      expectLE(count0, count1)
+    }
+    else {
+      expectGE(count0, count1)
+    }
+  }
+
+  let t1 = ArrayTestSuite.test("\(testPrefix)/Infrastructure/EvilCollection")
   (evilBoundsCheck && _isDebugAssertConfiguration()
-    ? t.crashOutputMatches(evilBoundsError) : t)
+    ? t1.crashOutputMatches(evilBoundsError) : t1)
   .code {
     let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
     let count0 = evil.count
@@ -644,12 +704,12 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
-    let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
+    let evil = EvilSequence(step)
 
     if step < 0 {
       expectCrashLater()
     }
-    let a = AnySequence(evil).map { $0 }
+    let a = evil.map { $0 }
     _blackHole(a)
   }
 
@@ -714,6 +774,20 @@ ArrayTestSuite.test("${array_type}<Void>/map") {
 //===----------------------------------------------------------------------===//
 
 % for array_type in all_array_types:
+ArrayTestSuite.test("${array_type}/AssociatedTypes") {
+  typealias Collection = ${array_type}<OpaqueValue<Int>>
+  typealias CollectionSlice = ArraySlice<OpaqueValue<Int>>
+  expectCollectionAssociatedTypes(
+    collectionType: Collection.self,
+    iteratorType: IndexingIterator<Collection>.self,
+    subSequenceType: CollectionSlice.self,
+    indexType: Int.self,
+    indexDistanceType: Int.self,
+    indicesType: CountableRange<Int>.self)
+}
+% end
+
+% for array_type in all_array_types:
 %     collection_or_slice = 'Slice' if 'Slice' in array_type else 'Collection'
 
 do {
@@ -724,7 +798,7 @@ do {
   resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .none
 
   // Test MutableCollectionType conformance with value type elements.
-  ArrayTestSuite.addRandomAccessMutableCollectionTests(
+  ArrayTestSuite.addMutableRandomAccessCollectionTests(
     makeCollection: { (elements: [OpaqueValue<Int>]) in
       return ${array_type}(elements)
     },
@@ -746,7 +820,7 @@ do {
 
 
   // Test MutableCollectionType conformance with reference type elements.
-  ArrayTestSuite.addRandomAccessMutableCollectionTests(
+  ArrayTestSuite.addMutableRandomAccessCollectionTests(
     makeCollection: { (elements: [LifetimeTracked]) in
       return ${array_type}(elements)
     },
@@ -774,7 +848,7 @@ do {
 
 
   // Test RangeReplaceableCollectionType conformance with value type elements.
-  ArrayTestSuite.addRandomAccessRangeReplaceable${collection_or_slice}Tests(
+  ArrayTestSuite.addRangeReplaceableRandomAccess${collection_or_slice}Tests(
     makeCollection: { (elements: [OpaqueValue<Int>]) in
       return ${array_type}(elements)
     },
@@ -789,7 +863,7 @@ do {
 
 
   // Test RangeReplaceableCollectionType conformance with reference type elements.
-  ArrayTestSuite.addRandomAccessRangeReplaceable${collection_or_slice}Tests(
+  ArrayTestSuite.addRangeReplaceableRandomAccess${collection_or_slice}Tests(
     makeCollection: { (elements: [LifetimeTracked]) in
       return ${array_type}(elements)
     },

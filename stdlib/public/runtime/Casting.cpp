@@ -22,6 +22,7 @@
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Mutex.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "swift/Runtime/Debug.h"
@@ -33,10 +34,6 @@
 
 #include <cstring>
 #include <type_traits>
-
-// FIXME: SR-946 - we ideally want to switch off of using pthread_rwlock
-//                 directly and instead expand Mutex.h to support rwlocks.
-#include <mutex>
 
 // FIXME: Clang defines max_align_t in stddef.h since 3.6.
 // Remove this hack when we don't care about older Clangs on all platforms.
@@ -349,42 +346,48 @@ TwoWordPair<const char *, uintptr_t>::Return
 swift_getTypeName(const Metadata *type, bool qualified) {
   using Pair = TwoWordPair<const char *, uintptr_t>;
   using Key = llvm::PointerIntPair<const Metadata *, 1, bool>;
-  
-  static pthread_rwlock_t TypeNameCacheLock = PTHREAD_RWLOCK_INITIALIZER;
+
+  static StaticReadWriteLock TypeNameCacheLock;
   static Lazy<llvm::DenseMap<Key, std::pair<const char *, size_t>>>
     TypeNameCache;
   
   Key key(type, qualified);
   auto &cache = TypeNameCache.get();
-  
-  pthread_rwlock_rdlock(&TypeNameCacheLock);
-  auto found = cache.find(key);
-  if (found != cache.end()) {
-    auto result = found->second;
-    pthread_rwlock_unlock(&TypeNameCacheLock);
-    return Pair{result.first, result.second};
+
+  // Attempt read-only lookup of cache entry.
+  {
+    StaticScopedReadLock guard(TypeNameCacheLock);
+
+    auto found = cache.find(key);
+    if (found != cache.end()) {
+      auto result = found->second;
+      return Pair{result.first, result.second};
+    }
   }
-  
-  pthread_rwlock_unlock(&TypeNameCacheLock);
-  pthread_rwlock_wrlock(&TypeNameCacheLock);
-  // Someone may have beaten us to the write lock.
-  found = cache.find(key);
-  if (found != cache.end()) {
-    auto result = found->second;
-    pthread_rwlock_unlock(&TypeNameCacheLock);
-    return Pair{result.first, result.second};
+
+  // Read-only lookup failed to find item, we may need to create it.
+  {
+    StaticScopedWriteLock guard(TypeNameCacheLock);
+
+    // Do lookup again just to make sure it wasn't created by another
+    // thread before we acquired the write lock.
+    auto found = cache.find(key);
+    if (found != cache.end()) {
+      auto result = found->second;
+      return Pair{result.first, result.second};
+    }
+
+    // Build the metadata name.
+    auto name = nameForMetadata(type, qualified);
+    // Copy it to memory we can reference forever.
+    auto size = name.size();
+    auto result = (char *)malloc(size + 1);
+    memcpy(result, name.data(), size);
+    result[size] = 0;
+
+    cache.insert({key, {result, size}});
+    return Pair{result, size};
   }
-  
-  // Build the metadata name.
-  auto name = nameForMetadata(type, qualified);
-  // Copy it to memory we can reference forever.
-  auto size = name.size();
-  auto result = (char*)malloc(size + 1);
-  memcpy(result, name.data(), size);
-  result[size] = 0;
-  cache.insert({key, {result, size}});
-  pthread_rwlock_unlock(&TypeNameCacheLock);
-  return Pair{result, size};
 }
 
 /// Report a dynamic cast failure.
@@ -2344,6 +2347,8 @@ static bool _dynamicCastValueToClassViaObjCBridgeable(
     *reinterpret_cast<void **>(dest) = cast;
     success = true;
   } else {
+    // We don't need the object anymore.
+    swift_unknownRelease(srcBridgedObject);
     success = false;
   }
 

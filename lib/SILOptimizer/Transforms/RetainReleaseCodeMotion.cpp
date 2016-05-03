@@ -34,7 +34,7 @@
 /// blocking operation between where the retain was in Region A to where it is
 /// sunk to in Region B. Since we only sink retains (we do not move any other
 /// instructions) which themselves are NOT MayDecrement operations, and moving
-/// retains cant turn non-decrement instruction MayDecrement.
+/// retains can't turn non-decrement instruction MayDecrement.
 ///
 /// 2. Releases are blocked by MayInterfere. If a release is hoisted from
 /// Region B to Region A, that means there is no blocking operation from where
@@ -457,7 +457,7 @@ void RetainCodeMotionContext::initializeCodeMotionBBMaxSet() {
    }
 
    // Process the instructions in the basic block to find what refcounted
-   // roots are retained. If we know that an RC root cant be retained at a
+   // roots are retained. If we know that an RC root can't be retained at a
    // basic block, then we know we do not need to consider it for the killset.
    // NOTE: this is a conservative approximation, because some retains may be
    // blocked before it reaches this block.
@@ -602,7 +602,7 @@ void RetainCodeMotionContext::computeCodeMotionInsertPoints() {
     // Is this block interesting. If we are sure this block does not generate
     // retains nor does it block any retains (i.e. no insertion point will be
     // created), we can skip it, as the BBSetOut has been converged if this is
-    // a multiiteration function.
+    // a multi-iteration function.
     if (MultiIteration && !InterestBlocks.count(BB))
       continue;
 
@@ -683,7 +683,7 @@ class ReleaseCodeMotionContext : public CodeMotionContext {
     if (isReleaseInstruction(II) && getRCRoot(II) == Ptr)
       return true;
     // Stop at may interfere.
-    if (mayHaveSymmetricInteference(II, Ptr, AA))
+    if (mayHaveSymmetricInterference(II, Ptr, AA))
       return true;
     // This instruction does not block the release.
     return false;
@@ -796,7 +796,7 @@ void ReleaseCodeMotionContext::initializeCodeMotionBBMaxSet() {
    }
 
    // Process the instructions in the basic block to find what refcounted
-   // roots are released. If we know that an RC root cant be released at a
+   // roots are released. If we know that an RC root can't be released at a
    // basic block, then we know we do not need to consider it for the killset.
    // NOTE: this is a conservative approximation, because some releases may be
    // blocked before it reaches this block.

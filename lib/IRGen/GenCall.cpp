@@ -150,7 +150,6 @@ llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
 
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
-    //   TODO: maybe add 'inreg' to the first non-result argument.
     SWIFT_FALLTHROUGH;
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Thick:

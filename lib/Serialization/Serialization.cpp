@@ -26,6 +26,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Timer.h"
+#include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/SerializationOptions.h"
@@ -54,6 +55,7 @@
 using namespace swift;
 using namespace swift::serialization;
 using namespace llvm::support;
+using swift::version::Version;
 using llvm::BCBlockRAII;
 
 /// Used for static_assert.
@@ -571,15 +573,14 @@ void Serializer::writeHeader(const SerializationOptions &options) {
 
     ModuleName.emit(ScratchRecord, M->getName().str());
 
-    // FIXME: put a real version in here.
-#ifdef LLVM_VERSION_INFO
-# define EXTRA_VERSION_STRING PACKAGE_STRING LLVM_VERSION_INFO
-#else
-# define EXTRA_VERSION_STRING PACKAGE_STRING
-#endif
+    SmallString<32> versionStringBuf;
+    llvm::raw_svector_ostream versionString(versionStringBuf);
+    versionString << Version::getCurrentLanguageVersion();
+    size_t shortVersionStringLength = versionString.tell();
+    versionString << '/' << version::getSwiftFullVersion();
     Metadata.emit(ScratchRecord,
-                  VERSION_MAJOR, VERSION_MINOR, EXTRA_VERSION_STRING);
-#undef EXTRA_VERSION_STRING
+                  VERSION_MAJOR, VERSION_MINOR, shortVersionStringLength,
+                  versionString.str());
 
     Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
 
@@ -619,15 +620,10 @@ void Serializer::writeDocHeader() {
     control_block::MetadataLayout Metadata(Out);
     control_block::TargetLayout Target(Out);
 
-    // FIXME: put a real version in here.
-#ifdef LLVM_VERSION_INFO
-# define EXTRA_VERSION_STRING PACKAGE_STRING LLVM_VERSION_INFO
-#else
-# define EXTRA_VERSION_STRING PACKAGE_STRING
-#endif
     Metadata.emit(ScratchRecord,
-                  VERSION_MAJOR, VERSION_MINOR, EXTRA_VERSION_STRING);
-#undef EXTRA_VERSION_STRING
+                  VERSION_MAJOR, VERSION_MINOR,
+                  /*short version string length*/0,
+                  version::getSwiftFullVersion());
 
     Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
   }

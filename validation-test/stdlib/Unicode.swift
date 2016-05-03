@@ -6,6 +6,7 @@
 
 import SwiftPrivate
 import StdlibUnittest
+import StdlibCollectionUnittest
 
 
 import Foundation
@@ -59,37 +60,37 @@ UTF16APIs.test("leadSurrogate,trailSurrogate") {
 UTF16APIs.test("leadSurrogate/trap/U+0000") {
   let us: UnicodeScalar = "\u{00}"
   expectCrashLater()
-  UTF16.leadSurrogate(us)
+  _ = UTF16.leadSurrogate(us)
 }
 
 UTF16APIs.test("leadSurrogate/trap/U+005A") {
   let us: UnicodeScalar = "\u{5A}"
   expectCrashLater()
-  UTF16.leadSurrogate(us)
+  _ = UTF16.leadSurrogate(us)
 }
 
 UTF16APIs.test("leadSurrogate/trap/U+FFFF") {
   let us: UnicodeScalar = "\u{FFFF}"
   expectCrashLater()
-  UTF16.leadSurrogate(us)
+  _ = UTF16.leadSurrogate(us)
 }
 
 UTF16APIs.test("trailSurrogate/trap/U+0000") {
   let us: UnicodeScalar = "\u{00}"
   expectCrashLater()
-  UTF16.trailSurrogate(us)
+  _ = UTF16.trailSurrogate(us)
 }
 
 UTF16APIs.test("trailSurrogate/trap/U+005A") {
   let us: UnicodeScalar = "\u{5A}"
   expectCrashLater()
-  UTF16.trailSurrogate(us)
+  _ = UTF16.trailSurrogate(us)
 }
 
 UTF16APIs.test("trailSurrogate/trap/U+FFFF") {
   let us: UnicodeScalar = "\u{FFFF}"
   expectCrashLater()
-  UTF16.trailSurrogate(us)
+  _ = UTF16.trailSurrogate(us)
 }
 
 class EOFCountingIterator<T> : IteratorProtocol {
@@ -814,7 +815,9 @@ UTF8Decoder.test("Internal/_decodeOne") {
   // Check number of valid/invalid sequences of different lengths
   var validLengthCounts = [ 0, 0, 0, 0, 0 ]
   var maximalSubpartCounts = [ 0, 0, 0, 0, 0 ]
-  func countSequences(head head: Range<UInt32>, tail: Range<UInt32>) {
+  func countValidSequences(
+    head head: CountableClosedRange<UInt32>, tail: CountableClosedRange<UInt32>
+  ) {
     for cu0 in head {
       for rest in tail {
         let data = rest << 8 | cu0
@@ -828,10 +831,10 @@ UTF8Decoder.test("Internal/_decodeOne") {
     }
   }
 
-  countSequences(head: 0x00...0x7f, tail: 0...0)
-  countSequences(head: 0xc0...0xdf, tail: 0...0xff)
-  countSequences(head: 0xe0...0xef, tail: 0...0xffff)
-  countSequences(head: 0xf0...0xff, tail: 0...0xffffff)
+  countValidSequences(head: 0x00...0x7f, tail: 0...0)
+  countValidSequences(head: 0xc0...0xdf, tail: 0...0xff)
+  countValidSequences(head: 0xe0...0xef, tail: 0...0xffff)
+  countValidSequences(head: 0xf0...0xff, tail: 0...0xffffff)
 
   // Valid sequences
   expectEqualSequence(validLengthCounts,

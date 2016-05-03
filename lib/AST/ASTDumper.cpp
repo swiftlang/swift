@@ -1623,9 +1623,8 @@ public:
   }
 
   void visitObjectLiteralExpr(ObjectLiteralExpr *E) {
-    printCommon(E, "object_literal")
-      << " name=" << E->getName();
-    OS << '\n';
+    printCommon(E, "object_literal") 
+      << " kind='" << E->getLiteralKindPlainName() << "'\n";
     printRec(E->getArg());
   }
 
@@ -2122,6 +2121,13 @@ public:
   }
   void visitCoerceExpr(CoerceExpr *E) {
     printExplicitCastExpr(E, "coerce_expr");
+  }
+  void visitArrowExpr(ArrowExpr *E) {
+    printCommon(E, "arrow") << '\n';
+    printRec(E->getArgsExpr());
+    OS << '\n';
+    printRec(E->getResultExpr());
+    OS << ')';
   }
   void visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
     printCommon(E, "rebind_self_in_constructor_expr") << '\n';

@@ -321,10 +321,10 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    None,
                                    C);
 
-  return M.getOrCreateFunction(SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION,
-                               topLevelType, nullptr, Loc, IsBare,
-                               IsNotTransparent, IsNotFragile, IsNotThunk,
-                               SILFunction::NotRelevant);
+  return M.createFunction(SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION,
+                          topLevelType, nullptr, Loc, IsBare,
+                          IsNotTransparent, IsNotFragile, IsNotThunk,
+                          SILFunction::NotRelevant);
 }
 
 SILType SILGenModule::getConstantType(SILDeclRef constant) {
@@ -513,6 +513,28 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
   F->verify();
 }
 
+void SILGenModule::
+emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
+                                             const CaptureInfo &captureInfo) {
+  assert(TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()
+         && "no valid code generator for top-level function?!");
+
+  SmallVector<SILValue, 4> Captures;
+  
+  for (auto capture : captureInfo.getCaptures()) {
+    // Decls captured by value don't escape.
+    auto It = TopLevelSGF->VarLocs.find(capture.getDecl());
+    if (It == TopLevelSGF->VarLocs.end() ||
+        !It->getSecond().value->getType().isAddress())
+      continue;
+    
+    Captures.push_back(It->second.value);
+  }
+  
+  if (!Captures.empty())
+    TopLevelSGF->B.createMarkFunctionEscape(loc, Captures);
+}
+
 void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // Emit any default argument generators.
   {
@@ -528,20 +550,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // reason about this escape point.
   if (!AFD->getDeclContext()->isLocalContext() &&
       TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()) {
-    SmallVector<SILValue, 4> Captures;
-
-    for (auto capture : AFD->getCaptureInfo().getCaptures()) {
-      // Decls captured by value don't escape.
-      auto It = TopLevelSGF->VarLocs.find(capture.getDecl());
-      if (It == TopLevelSGF->VarLocs.end() ||
-          !It->getSecond().value->getType().isAddress())
-        continue;
-
-      Captures.push_back(It->second.value);
-    }
-
-    if (!Captures.empty())
-      TopLevelSGF->B.createMarkFunctionEscape(AFD, Captures);
+    emitMarkFunctionEscapeForTopLevelCodeGlobals(AFD, AFD->getCaptureInfo());
   }
   
   // If the declaration is exported as a C function, emit its native-to-foreign
@@ -696,9 +705,18 @@ void SILGenModule::emitEnumConstructor(EnumElementDecl *decl) {
 }
 
 SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
-  // Closures are emitted by need, so don't required delayed emission.
   SILDeclRef constant(ce);
   SILFunction *f = getFunction(constant, ForDefinition);
+
+  // Generate the closure function, if we haven't already.
+  //
+  // We may visit the same closure expr multiple times in some cases,
+  // for instance, when closures appear as in-line initializers of stored
+  // properties. In these cases the closure will be emitted into every
+  // initializer of the containing type.
+  if (!f->isExternalDeclaration())
+    return f;
+
   preEmitFunction(constant, ce, f, ce);
   PrettyStackTraceSILFunction X("silgen closureexpr", f);
   SILGenFunction(*this, *f).emitClosure(ce);
@@ -857,14 +875,14 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
   auto *f =
-      M.getOrCreateFunction(makeModuleFragile
-                                ? SILLinkage::Public
-                                : SILLinkage::Private,
-                            funcName, initSILType, nullptr,
-                            SILLocation(binding), IsNotBare, IsNotTransparent,
-                            makeModuleFragile
-                                ? IsFragile
-                                : IsNotFragile);
+      M.createFunction(makeModuleFragile
+                           ? SILLinkage::Public
+                           : SILLinkage::Private,
+                       funcName, initSILType, nullptr,
+                       SILLocation(binding), IsNotBare, IsNotTransparent,
+                       makeModuleFragile
+                           ? IsFragile
+                           : IsNotFragile);
   f->setDebugScope(
       new (M) SILDebugScope(RegularLocation(binding->getInit(pbdEntry)), f));
   f->setLocation(binding);

@@ -22,6 +22,7 @@
 #include "swift/Remote/Failure.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ABI/MetadataValues.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -49,7 +50,7 @@ class Result {
   Storage S;
   bool IsSuccess;
 
-  Result(bool isSuccess) {}
+  Result(bool isSuccess) : IsSuccess(isSuccess) {}
 
 public:
   /*implicit*/ Result(const T &value) : IsSuccess(true) {
@@ -169,6 +170,11 @@ public:
   /// resolve it to a specific type in the local AST.
   Result<Type> getTypeForRemoteTypeMetadata(remote::RemoteAddress address);
 
+  /// Given an address which is supposedly of type metadata, try to
+  /// resolve it to a specific MetadataKind value for its backing type.
+  Result<MetadataKind>
+  getKindForRemoteTypeMetadata(remote::RemoteAddress address);
+
   /// Given an address which is supposedly of a nominal type descriptor,
   /// try to resolve it to a specific nominal type declaration in the
   /// local AST.
@@ -176,12 +182,22 @@ public:
   getDeclForRemoteNominalTypeDescriptor(remote::RemoteAddress address);
 
   /// Given a type in the local AST, try to resolve the offset of its
-  /// property with the given name.
+  /// member with the given name.  This supports:
   ///
-  /// This may fail by returning an empty optional.  Failure may indicate
-  /// that an offset for the property could not be resolved, or it may
-  /// simply indicate that the property has a non-zero offset.
-  Result<uint64_t> getOffsetForProperty(Type type, StringRef propertyName);
+  ///   - stored properties of structs
+  ///   - stored properties of classes
+  ///   - elements of tuples
+  ///
+  /// Failure may indicate that an offset for the property could not be
+  /// resolved, or it may simply indicate that the property is not laid
+  /// out at a known offset.
+  ///
+  /// If the caller has the address of type metadata for the type, it may
+  /// pass it in; this may allow the implementation to compute an offset in
+  /// situations where it otherwise cannot.
+  Result<uint64_t> getOffsetOfMember(Type type,
+                                     remote::RemoteAddress optMetadataAddress,
+                                     StringRef memberName);
 };
 
 } // end namespace remoteAST

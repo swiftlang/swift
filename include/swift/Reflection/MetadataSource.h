@@ -22,6 +22,7 @@
 #ifndef SWIFT_REFLECTION_METADATASOURCE_H
 #define SWIFT_REFLECTION_METADATASOURCE_H
 
+#include "llvm/ADT/Optional.h"
 #include "llvm/Support/Casting.h"
 
 using llvm::cast;
@@ -39,6 +40,156 @@ enum class MetadataSourceKind {
 
 class MetadataSource {
   MetadataSourceKind Kind;
+
+  static bool decodeNatural(std::string::const_iterator &it,
+                            const std::string::const_iterator &end,
+                            unsigned &result) {
+    auto begin = it;
+    while (it != end) {
+      if (*it >= '0' && *it <= '9')
+        ++it;
+      else
+        break;
+    }
+
+    std::string natural(begin, it);
+    if (natural.empty())
+      return false;
+
+    result = std::stoi(natural);
+    return true;
+  }
+
+  template <typename Allocator>
+  static const MetadataSource *
+  decodeClosureBinding(Allocator &A,
+                       std::string::const_iterator &it,
+                       const std::string::const_iterator &end) {
+    if (it == end)
+      return nullptr;
+
+    if (*it == 'B')
+      ++it;
+    else
+      return nullptr;
+
+    unsigned Index;
+    if (!decodeNatural(it, end, Index))
+      return nullptr;
+    return A.template createClosureBinding(Index);
+  }
+
+  template <typename Allocator>
+  static const MetadataSource *
+  decodeReferenceCapture(Allocator &A,
+                         std::string::const_iterator &it,
+                         const std::string::const_iterator &end) {
+    if (it == end)
+      return nullptr;
+
+    if (*it == 'R')
+      ++it;
+    else
+      return nullptr;
+
+    unsigned Index;
+    if (!decodeNatural(it, end, Index))
+      return nullptr;
+    return A.template createReferenceCapture(Index);
+  }
+
+  template <typename Allocator>
+  static const MetadataSource *
+  decodeMetadataCapture(Allocator &A,
+                        std::string::const_iterator &it,
+                        const std::string::const_iterator &end) {
+    if (it == end)
+      return nullptr;
+
+    if (*it == 'M')
+      ++it;
+    else
+      return nullptr;
+
+    unsigned Index;
+    if (!decodeNatural(it, end, Index))
+      return nullptr;
+    return A.template createMetadataCapture(Index);
+  }
+
+  template <typename Allocator>
+  static const MetadataSource *
+  decodeGenericArgument(Allocator &A,
+                        std::string::const_iterator &it,
+                        const std::string::const_iterator &end) {
+    if (it == end)
+      return nullptr;
+
+    if (*it == 'G')
+      ++it;
+    else
+      return nullptr;
+
+    unsigned Index;
+    if (!decodeNatural(it, end, Index))
+      return nullptr;
+
+    auto Source = decode(A, it, end);
+    if (!Source)
+      return nullptr;
+
+    if (it == end || *it != '_')
+      return nullptr;
+
+    ++it;
+
+    return A.template createGenericArgument(Index, Source);
+  }
+
+  template <typename Allocator>
+  static const MetadataSource*
+  decodeParent(Allocator &A,
+               std::string::const_iterator &it,
+               const std::string::const_iterator &end) {
+    if (it == end || *it != 'P')
+      return nullptr;
+
+    ++it;
+    auto Child = decode(A, it, end);
+    if (!Child)
+      return nullptr;
+
+    if (it == end || *it != '_')
+      return nullptr;
+
+    return A.template createParent(Child);
+  }
+
+  template <typename Allocator>
+  static const MetadataSource *decode(Allocator &A,
+                                      std::string::const_iterator &it,
+                                      const std::string::const_iterator &end) {
+    if (it == end) return nullptr;
+
+    switch (*it) {
+      case 'B':
+        return decodeClosureBinding(A, it, end);
+      case 'R':
+        return decodeReferenceCapture(A, it, end);
+      case 'M':
+        return decodeMetadataCapture(A, it, end);
+      case 'G':
+        return decodeGenericArgument(A, it, end);
+      case 'P':
+        return decodeParent(A, it, end);
+      case 'S':
+        ++it;
+        return A.template createSelf();
+      default:
+        return nullptr;
+    }
+  }
+
 public:
   MetadataSource(MetadataSourceKind Kind) : Kind(Kind) {}
 
@@ -48,6 +199,11 @@ public:
 
   void dump() const;
   void dump(std::ostream &OS, unsigned Indent = 0) const;
+  template <typename Allocator>
+  static const MetadataSource *decode(Allocator &A, const std::string &str) {
+    auto begin = str.begin();
+    return MetadataSource::decode<Allocator>(A, begin, str.end());
+  }
 
   virtual ~MetadataSource() = default;
 };
@@ -59,8 +215,15 @@ class ClosureBindingMetadataSource final : public MetadataSource {
   unsigned Index;
 
 public:
-  ClosureBindingMetadataSource(unsigned Index) :
-    MetadataSource(MetadataSourceKind::ClosureBinding) {}
+
+  ClosureBindingMetadataSource(unsigned Index)
+    : MetadataSource(MetadataSourceKind::ClosureBinding), Index(Index) {}
+
+  template <typename Allocator>
+  static const ClosureBindingMetadataSource *
+  create(Allocator &A, unsigned Index) {
+    return A.template make_source<ClosureBindingMetadataSource>(Index);
+  }
 
   unsigned getIndex() const {
     return Index;
@@ -75,9 +238,16 @@ public:
 /// be followed to the heap instance's data, then its metadata pointer.
 class ReferenceCaptureMetadataSource final : public MetadataSource {
   unsigned Index;
+
 public:
-  ReferenceCaptureMetadataSource(unsigned Index):
-    MetadataSource(MetadataSourceKind::ReferenceCapture) {}
+  ReferenceCaptureMetadataSource(unsigned Index)
+    : MetadataSource(MetadataSourceKind::ReferenceCapture), Index(Index) {}
+
+  template <typename Allocator>
+  static const ReferenceCaptureMetadataSource *
+  create(Allocator &A, unsigned Index) {
+    return A.template make_source<ReferenceCaptureMetadataSource>(Index);
+  }
 
   unsigned getIndex() const {
     return Index;
@@ -85,6 +255,29 @@ public:
 
   static bool classof(const MetadataSource *MS) {
     return MS->getKind() == MetadataSourceKind::ReferenceCapture;
+  }
+};
+
+/// Represents a capture of a metadata pointer as an argument to a polymorphic function. These are direct sources of metadata.
+class MetadataCaptureMetadataSource final : public MetadataSource {
+  unsigned Index;
+
+public:
+  MetadataCaptureMetadataSource(unsigned Index)
+  : MetadataSource(MetadataSourceKind::MetadataCapture), Index(Index) {}
+
+  template <typename Allocator>
+  static const MetadataCaptureMetadataSource *
+  create(Allocator &A, unsigned Index) {
+    return A.template make_source<MetadataCaptureMetadataSource>(Index);
+  }
+
+  unsigned getIndex() const {
+    return Index;
+  }
+
+  static bool classof(const MetadataSource *MS) {
+    return MS->getKind() == MetadataSourceKind::MetadataCapture;
   }
 };
 
@@ -106,6 +299,12 @@ public:
       Index(Index),
       Source(Source) {}
 
+  template <typename Allocator>
+  static const GenericArgumentMetadataSource *
+  create(Allocator &A, unsigned Index, const MetadataSource *Source) {
+    return A.template make_source<GenericArgumentMetadataSource>(Index, Source);
+  }
+
   unsigned getIndex() const {
     return Index;
   }
@@ -116,6 +315,64 @@ public:
 
   static bool classof(const MetadataSource *MS) {
     return MS->getKind() == MetadataSourceKind::GenericArgument;
+  }
+};
+
+/// Metadata gotten through the parent of a nominal type's metadata.
+class ParentMetadataSource final : public MetadataSource {
+  const MetadataSource *Child;
+public:
+  ParentMetadataSource(const MetadataSource *Child)
+    : MetadataSource(MetadataSourceKind::Parent),
+      Child(Child) {}
+
+  template <typename Allocator>
+  static const ParentMetadataSource*
+  create(Allocator &A, const MetadataSource *Child) {
+    return A.template make_source<ParentMetadataSource>(Child);
+  }
+
+  const MetadataSource *getChild() const {
+    return Child;
+  }
+
+  static bool classof(const MetadataSource *MS) {
+    return MS->getKind() == MetadataSourceKind::Parent;
+  }
+};
+
+/// A source of metadata from the Self metadata parameter passed via
+/// a witness_method convention function.
+class SelfMetadataSource final : public MetadataSource {
+public:
+  SelfMetadataSource() : MetadataSource(MetadataSourceKind::Self) {}
+
+  template <typename Allocator>
+  static const SelfMetadataSource*
+  create(Allocator &A) {
+    return A.template make_source<SelfMetadataSource>();
+  }
+
+  static bool classof(const MetadataSource *MS) {
+    return MS->getKind() == MetadataSourceKind::Self;
+  }
+};
+
+/// A source of metadata from the Self witness table parameter passed via
+/// a witness_method convention function.
+class SelfWitnessTableMetadataSource final : public MetadataSource {
+public:
+  SelfWitnessTableMetadataSource()
+    : MetadataSource(MetadataSourceKind::SelfWitnessTable) {}
+
+  template <typename Allocator>
+  static const SelfWitnessTableMetadataSource*
+  create(Allocator &A) {
+    return A.template make_source<SelfWitnessTableMetadataSource>();
+  }
+
+  static bool classof(const MetadataSource *MS) {
+    return MS->getKind() == MetadataSourceKind::SelfWitnessTable;
   }
 };
 

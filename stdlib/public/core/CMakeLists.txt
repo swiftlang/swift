@@ -26,6 +26,7 @@ set(SWIFTLIB_ESSENTIAL
   ArrayType.swift
   Assert.swift
   AssertCommon.swift
+  BidirectionalCollection.swift
   Bool.swift
   Boolean.swift
   BridgeObjectiveC.swift
@@ -37,13 +38,14 @@ set(SWIFTLIB_ESSENTIAL
   Collection.swift
   CollectionAlgorithms.swift.gyb
   CompilerProtocols.swift
+  ClosedRange.swift
   ContiguousArrayBuffer.swift
   CString.swift
   CTypes.swift
   EmptyCollection.swift
   ErrorType.swift
   Existential.swift
-  Filter.swift
+  Filter.swift.gyb
   FixedPoint.swift.gyb
   FlatMap.swift
   Flatten.swift.gyb
@@ -55,18 +57,19 @@ set(SWIFTLIB_ESSENTIAL
   HeapBuffer.swift
   ImplicitlyUnwrappedOptional.swift
   Index.swift
+  Indices.swift.gyb
   InputStream.swift
   IntegerArithmetic.swift.gyb
   IntegerParsing.swift.gyb
-  Interval.swift.gyb
   Join.swift
-  LazyCollection.swift
+  LazyCollection.swift.gyb
   LazySequence.swift
   LifetimeManager.swift
   ManagedBuffer.swift
-  Map.swift
+  Map.swift.gyb
   Mirrors.swift.gyb
   Misc.swift
+  MutableCollection.swift
   ObjCMirrors.swift
   Optional.swift
   OptionSet.swift
@@ -74,8 +77,9 @@ set(SWIFTLIB_ESSENTIAL
   Pointer.swift
   Policy.swift
   Print.swift
-  Range.swift
-  RangeReplaceableCollection.swift
+  RandomAccessCollection.swift
+  Range.swift.gyb
+  RangeReplaceableCollection.swift.gyb
   Reflection.swift
   Repeat.swift
   REPL.swift
@@ -90,7 +94,7 @@ set(SWIFTLIB_ESSENTIAL
   Slice.swift.gyb
   Sort.swift.gyb
   StaticString.swift
-  Stride.swift
+  Stride.swift.gyb
   StringCharacterView.swift # ORDER DEPENDENCY: Must precede String.swift
   String.swift
   StringBridge.swift
@@ -98,6 +102,8 @@ set(SWIFTLIB_ESSENTIAL
   StringCore.swift
   StringInterpolation.swift.gyb
   StringLegacy.swift
+  StringRangeReplaceableCollection.swift.gyb
+  StringIndexConversions.swift
   StringUnicodeScalarView.swift
   StringUTF16.swift
   StringUTF8.swift
@@ -109,6 +115,7 @@ set(SWIFTLIB_ESSENTIAL
   Unmanaged.swift
   UnsafeBufferPointer.swift.gyb
   UnsafePointer.swift.gyb
+  WriteBackMutableSlice.swift
   )
 
 # The complete list of sources in the core standard library.  Includes

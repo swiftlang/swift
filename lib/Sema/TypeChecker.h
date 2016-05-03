@@ -30,6 +30,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include <functional>
 
 namespace swift {
@@ -406,7 +407,8 @@ enum class ObjCReason {
   ExplicitlyNSManaged,
   MemberOfObjCProtocol,
   ImplicitlyObjC,
-  OverridesObjC
+  OverridesObjC,
+  WitnessToObjC,
 };
 
 /// Return the %select discriminator for the OBJC_ATTR_SELECT macro used to
@@ -1097,7 +1099,9 @@ public:
   /// \param convertType The type that the expression is being converted to,
   /// or null if the expression is standalone.  If the 'ConvertTypeIsOnlyAHint'
   /// option is specified, then this is only a hint, it doesn't produce a full
-  /// conversion constraint.
+  /// conversion constraint. The location information is only used for
+  /// diagnostics should the conversion fail; it is safe to pass a TypeLoc
+  /// without location information.
   ///
   /// \param options Options that control how type checking is performed.
   ///
@@ -1107,14 +1111,14 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
-                           Type convertType = Type(),
+                           TypeLoc convertType = TypeLoc(),
                            ContextualTypePurpose convertTypePurpose =CTP_Unused,
                            TypeCheckExprOptions options =TypeCheckExprOptions(),
                            ExprTypeCheckListener *listener = nullptr);
 
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            ExprTypeCheckListener *listener) {
-    return typeCheckExpression(expr, dc, Type(), CTP_Unused,
+    return typeCheckExpression(expr, dc, TypeLoc(), CTP_Unused,
                                TypeCheckExprOptions(), listener);
   }
 
@@ -1147,12 +1151,8 @@ public:
   /// \param expr The expression to type-check, which will be modified in
   /// place.
   ///
-  /// \param convertType The type that the expression is being converted to,
-  /// or null if the expression is standalone.
-  ///
   /// \returns true if an error occurred, false otherwise.
-  bool typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
-                                  Type convertType = Type());
+  bool typeCheckExpressionShallow(Expr *&expr, DeclContext *dc);
 
   /// \brief Type check whether the given type declaration includes members of
   /// unsupported recursive value types.
@@ -1474,6 +1474,18 @@ public:
   void checkConformancesInContext(DeclContext *dc,
                                   IterableDeclContext *idc);
 
+  /// Find the @objc requirement that are witnessed by the given
+  /// declaration.
+  ///
+  /// \param onlyFirstRequirement If true, only returns the first such
+  /// requirement, rather than all of them.
+  ///
+  /// \returns the set of requirements to which the given witness is a
+  /// witness.
+  llvm::TinyPtrVector<ValueDecl *> findWitnessedObjCRequirements(
+                                     const ValueDecl *witness,
+                                     bool onlyFirstRequirement);
+
   /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
   void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);
 
@@ -1561,7 +1573,8 @@ public:
   /// marked as unavailable, either through "unavailable" or "obsoleted:".
   bool diagnoseExplicitUnavailability(const ValueDecl *D,
                                       SourceRange R,
-                                      const DeclContext *DC);
+                                      const DeclContext *DC,
+                                      const CallExpr *CE);
 
   /// @}
 
@@ -1745,6 +1758,11 @@ public:
   /// Returns true if the reference or any of its parents is an
   /// unavailable (or obsoleted) declaration.
   bool isInsideUnavailableDeclaration(SourceRange ReferenceRange,
+                                      const DeclContext *DC);
+
+  /// Returns true if the reference is lexically contained in a declaration
+  /// that is deprecated on all deployment targets.
+  bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
                                      const DeclContext *DC);
 
   /// Returns the availability attribute indicating deprecation if the
@@ -1757,7 +1775,8 @@ public:
   void diagnoseDeprecated(SourceRange SourceRange,
                           const DeclContext *ReferenceDC,
                           const AvailableAttr *Attr,
-                          DeclName Name);
+                          DeclName Name,
+                          const CallExpr *CE);
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
@@ -1849,6 +1868,12 @@ public:
   /// The unescaped message to display to the user.
   const StringRef Message;
 };
+
+/// Attempt to omit needless words from the name of the given declaration.
+Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
+
+/// Attempt to omit needless words from the name of the given declaration.
+Optional<Identifier> omitNeedlessWords(VarDecl *var);
 
 } // end namespace swift
 

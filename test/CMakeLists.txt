@@ -41,7 +41,7 @@ function(get_test_dependencies SDK result_var_name)
 
   set(deps_binaries
       swift swift-ide-test sil-opt swift-llvm-opt swift-demangle sil-extract
-      lldb-moduleimport-test swift-reflection-dump)
+      lldb-moduleimport-test swift-reflection-dump swift-remoteast-test)
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries llc)
   endif()
@@ -243,6 +243,9 @@ if(PYTHONINTERP_FOUND)
             endif()
 
             list(APPEND LIT_ARGS "--param" "run_only_tests=long_tests")
+          endif()
+          if(test_subset STREQUAL "all")
+            list(APPEND LIT_ARGS "--param" "run_only_tests=all")
           endif()
 
           set(directories)

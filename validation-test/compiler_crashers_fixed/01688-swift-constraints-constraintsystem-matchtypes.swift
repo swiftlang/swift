@@ -12,7 +12,7 @@ protocol P {
 assert(n: U.a)(mx : A {
 }
 assert(A>()
-class a(range.startIndex, y: A> T: C {
+class a(range.lowerBound, y: A> T: C {
 e {
 protocol a {
 import Foundation

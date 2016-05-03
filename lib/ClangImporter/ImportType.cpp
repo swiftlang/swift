@@ -87,6 +87,9 @@ namespace {
 
       /// The source type is any other pointer type.
       OtherPointer,
+
+      /// The source type created a new Swift type, using swift_newtype
+      SwiftNewtype,
     };
 
     ImportHintKind Kind;
@@ -118,6 +121,7 @@ namespace {
     case ImportHint::NSUInteger:
     case ImportHint::Reference:
     case ImportHint::Void:
+    case ImportHint::SwiftNewtype:
       return false;
 
     case ImportHint::Block:
@@ -568,8 +572,12 @@ namespace {
       Type mappedType = decl->getDeclaredType();
       ImportHint hint = ImportHint::None;
 
+      if (Impl.HonorSwiftNewtypeAttr &&
+          type->getDecl()->hasAttr<clang::SwiftNewtypeAttr>()) {
+        hint = ImportHint::SwiftNewtype;
+
       // For certain special typedefs, we don't want to use the imported type.
-      if (auto specialKind = Impl.getSpecialTypedefKind(type->getDecl())) {
+      } else if (auto specialKind = Impl.getSpecialTypedefKind(type->getDecl())) {
         switch (specialKind.getValue()) {
         case MappedTypeNameKind::DoNothing:
         case MappedTypeNameKind::DefineAndUse:

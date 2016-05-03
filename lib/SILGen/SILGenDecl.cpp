@@ -1815,7 +1815,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   if (witness.isFragile())
     isFragile = IsFragile;
 
-  auto *f = M.getOrCreateFunction(
+  auto *f = M.createFunction(
       linkage, nameBuffer, witnessSILFnType,
       witnessContextParams, SILLocation(witness.getDecl()),
       IsNotBare, IsTransparent, isFragile, IsThunk,

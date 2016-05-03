@@ -25,7 +25,9 @@ import SwiftShims
 /// `Collection` conformance.  Why not make
 /// `_NSArrayCore` conform directly?  It's a class, and I
 /// don't want to pay for the dynamic dispatch overhead.
-internal struct _CocoaArrayWrapper : Collection {
+internal struct _CocoaArrayWrapper : RandomAccessCollection {
+  typealias Indices = CountableRange<Int>
+  
   var startIndex: Int {
     return 0
   }
@@ -56,16 +58,16 @@ internal struct _CocoaArrayWrapper : Collection {
     var enumerationState = _makeSwiftNSFastEnumerationState()
 
     // This function currently returns nil unless the first
-    // subRange.endIndex items are stored contiguously.  This is an
+    // subRange.upperBound items are stored contiguously.  This is an
     // acceptable conservative behavior, but could potentially be
     // optimized for other cases.
     let contiguousCount = withUnsafeMutablePointer(&enumerationState) {
       self.buffer.countByEnumerating(with: $0, objects: nil, count: 0)
     }
     
-    return contiguousCount >= subRange.endIndex
+    return contiguousCount >= subRange.upperBound
       ? UnsafeMutablePointer<AnyObject>(enumerationState.itemsPtr!)
-        + subRange.startIndex
+        + subRange.lowerBound
       : nil
   }
 

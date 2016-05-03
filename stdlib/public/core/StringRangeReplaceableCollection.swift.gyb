@@ -1,0 +1,212 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+// `String` does not conform to `RangeReplaceableCollection`, but provides a
+// similar API.
+
+extension String {
+  public typealias Index = CharacterView.Index
+  public typealias IndexDistance = CharacterView.IndexDistance
+
+  /// The position of the first `Character` in `self.characters` if
+  /// `self` is non-empty; identical to `endIndex` otherwise.
+  public var startIndex: Index { return characters.startIndex }
+
+  /// The "past the end" position in `self.characters`.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `index(after:)`.
+  public var endIndex: Index { return characters.endIndex }
+
+    // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func index(after i: Index) -> Index {
+    return characters.index(after: i)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func index(before i: Index) -> Index {
+    return characters.index(before: i)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    return characters.index(i, offsetBy: n)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func index(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    return characters.index(i, offsetBy: n, limitedBy: limit)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @warn_unused_result
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    return characters.distance(from: start, to: end)
+  }
+
+  /// Access the `Character` at `position`.
+  ///
+  /// - Precondition: `position` is a valid position in `self.characters`
+  ///   and `position != endIndex`.
+  public subscript(i: Index) -> Character { return characters[i] }
+
+  /// Return the characters within the given `bounds`.
+  ///
+  /// - Complexity: O(1) unless bridging from Objective-C requires an
+  ///   O(N) conversion.
+  public subscript(bounds: Range<Index>) -> String {
+    return String(characters[bounds])
+  }
+}
+
+@warn_unused_result
+public func == (lhs: String.Index, rhs: String.Index) -> Bool {
+  return lhs._base == rhs._base
+}
+
+@warn_unused_result
+public func < (lhs: String.Index, rhs: String.Index) -> Bool {
+  return lhs._base < rhs._base
+}
+
+extension String {
+  /// Create an instance containing `characters`.
+  public init<
+    S : Sequence where S.Iterator.Element == Character
+  >(_ characters: S) {
+    self._core = CharacterView(characters)._core
+  }
+
+  public mutating func reserveCapacity(_ n: Int) {
+    withMutableCharacters {
+      (v: inout CharacterView) in v.reserveCapacity(n)
+    }
+  }
+  public mutating func append(_ c: Character) {
+    withMutableCharacters {
+      (v: inout CharacterView) in v.append(c)
+    }
+  }
+
+  public mutating func append<
+    S : Sequence where S.Iterator.Element == Character
+  >(contentsOf newElements: S) {
+    withMutableCharacters {
+      (v: inout CharacterView) in v.append(contentsOf: newElements)
+    }
+  }
+
+% for Range in ['Range', 'ClosedRange']:
+  /// Replace the characters within `bounds` with the elements of
+  /// `replacement`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`bounds.count`) if `bounds.upperBound
+  ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
+  public mutating func replaceSubrange<
+    C : Collection where C.Iterator.Element == Character
+  >(
+    _ bounds: ${Range}<Index>, with newElements: C
+  ) {
+    // FIXME: swift-3-indexing-model: tests.
+    withMutableCharacters {
+      (v: inout CharacterView)
+      in v.replaceSubrange(bounds, with: newElements)
+    }
+  }
+
+  /// Replace the text in `bounds` with `replacement`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`bounds.count`) if `bounds.upperBound
+  ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
+  public mutating func replaceSubrange(
+    _ bounds: ${Range}<Index>, with newElements: String
+  ) {
+    // FIXME: swift-3-indexing-model: tests.
+    replaceSubrange(bounds, with: newElements.characters)
+  }
+% end
+
+  /// Insert `newElement` at position `i`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`self.count`).
+  public mutating func insert(_ newElement: Character, at i: Index) {
+    withMutableCharacters {
+      (v: inout CharacterView) in v.insert(newElement, at: i)
+    }
+  }
+
+  /// Insert `newElements` at position `i`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`self.count + newElements.count`).
+  public mutating func insert<
+    S : Collection where S.Iterator.Element == Character
+  >(contentsOf newElements: S, at i: Index) {
+    withMutableCharacters {
+      (v: inout CharacterView) in v.insert(contentsOf: newElements, at: i)
+    }
+  }
+
+  /// Remove and return the `Character` at position `i`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`self.count`).
+  @discardableResult
+  public mutating func remove(at i: Index) -> Character {
+    return withMutableCharacters {
+      (v: inout CharacterView) in v.remove(at: i)
+    }
+  }
+
+% for Range in ['Range', 'ClosedRange']:
+  /// Remove the characters in `bounds`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`self.count`).
+  public mutating func removeSubrange(_ bounds: ${Range}<Index>) {
+    // FIXME: swift-3-indexing-model: tests.
+    withMutableCharacters {
+      (v: inout CharacterView) in v.removeSubrange(bounds)
+    }
+  }
+% end
+
+  /// Replace `self` with the empty string.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - parameter keepCapacity: If `true`, prevents the release of
+  ///   allocated storage, which can be a useful optimization
+  ///   when `self` is going to be grown again.
+  public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
+    withMutableCharacters {
+      (v: inout CharacterView) in v.removeAll(keepingCapacity: keepCapacity)
+    }
+  }
+}
+

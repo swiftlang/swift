@@ -2,23 +2,23 @@
 // REQUIRES: OS=ios
 
 struct S: _ColorLiteralConvertible {
-  init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) {}
+  init(red: Float, green: Float, blue: Float, alpha: Float) {}
 }
 
-let y: S = [#Color(colorLiteralRed: 1, green: 0, blue: 0, alpha: 1)#]
-let y2 = [#Color(colorLiteralRed: 1, green: 0, blue: 0, alpha: 1)#] // expected-error{{could not infer type of color literal}} expected-note{{import UIKit to use 'UIColor' as the default color literal type}}
-let y3 = [#Color(colorLiteralRed: 1, bleen: 0, grue: 0, alpha: 1)#] // expected-error{{cannot convert value of type '(colorLiteralRed: Int, bleen: Int, grue: Int, alpha: Int)' to expected argument type '(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)'}}
+let y: S = #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)
+let y2 = #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1) // expected-error{{could not infer type of color literal}} expected-note{{import UIKit to use 'UIColor' as the default color literal type}}
+let y3 = #colorLiteral(red: 1, bleen: 0, grue: 0, alpha: 1) // expected-error{{cannot convert value of type '(red: Int, bleen: Int, grue: Int, alpha: Int)' to expected argument type '(red: Float, green: Float, blue: Float, alpha: Float)'}}
 
 struct I: _ImageLiteralConvertible {
-  init(imageLiteral: String) {}
+  init(resourceName: String) {}
 }
 
-let z: I = [#Image(imageLiteral: "hello.png")#]
-let z2 = [#Image(imageLiteral: "hello.png")#] // expected-error{{could not infer type of image literal}} expected-note{{import UIKit to use 'UIImage' as the default image literal type}}
+let z: I = #imageLiteral(resourceName: "hello.png")
+let z2 = #imageLiteral(resourceName: "hello.png") // expected-error{{could not infer type of image literal}} expected-note{{import UIKit to use 'UIImage' as the default image literal type}}
 
 struct Path: _FileReferenceLiteralConvertible {
-  init(fileReferenceLiteral: String) {}
+  init(resourceName: String) {}
 }
 
-let p1: Path = [#FileReference(fileReferenceLiteral: "what.txt")#]
-let p2 = [#FileReference(fileReferenceLiteral: "what.txt")#] // expected-error{{could not infer type of file reference literal}} expected-note{{import Foundation to use 'NSURL' as the default file reference literal type}}
+let p1: Path = #fileLiteral(resourceName: "what.txt")
+let p2 = #fileLiteral(resourceName: "what.txt") // expected-error{{could not infer type of file reference literal}} expected-note{{import Foundation to use 'NSURL' as the default file reference literal type}}

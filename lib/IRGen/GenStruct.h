@@ -31,6 +31,7 @@ namespace irgen {
   class Explosion;
   class IRGenFunction;
   class IRGenModule;
+  class MemberAccessStrategy;
   
   Address projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                              Address base,
@@ -47,6 +48,13 @@ namespace irgen {
   llvm::Constant *emitPhysicalStructMemberFixedOffset(IRGenModule &IGM,
                                                       SILType baseType,
                                                       VarDecl *field);
+
+  /// Return a strategy for accessing the given stored struct property.
+  ///
+  /// This API is used by RemoteAST.
+  MemberAccessStrategy
+  getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
+                                        SILType baseType, VarDecl *field);
 
 } // end namespace irgen
 } // end namespace swift

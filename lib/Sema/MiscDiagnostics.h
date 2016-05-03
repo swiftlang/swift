@@ -14,9 +14,16 @@
 #define SWIFT_SEMA_MISC_DIAGNOSTICS_H
 
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/Identifier.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Optional.h"
 
 namespace swift {
   class AbstractFunctionDecl;
+  class AvailableAttr;
+  class CallExpr;
   class DeclContext;
   class Expr;
   class InFlightDiagnostic;
@@ -41,6 +48,26 @@ void performAbstractFuncDeclDiagnostics(TypeChecker &TC,
 void fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
                         Accessibility desiredAccess, bool isForSetter = false);
 
+/// Emit fix-its to correct the argument labels in \p expr, which is the
+/// argument tuple or single argument of a call.
+///
+/// If \p existingDiag is null, the fix-its will be attached to an appropriate
+/// error diagnostic.
+///
+/// \returns true if the issue was diagnosed
+bool diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
+                                ArrayRef<Identifier> newNames,
+                                bool isSubscript,
+                                InFlightDiagnostic *existingDiag = nullptr);
+
+/// Emit fix-its to rename the base name at \p referenceRange based on the
+/// "renamed" argument in \p attr. If \p CE is provided, the argument labels
+/// will also be updated.
+void fixItAvailableAttrRename(TypeChecker &TC,
+                              InFlightDiagnostic &diag,
+                              SourceRange referenceRange,
+                              const AvailableAttr *attr,
+                              const CallExpr *CE);
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

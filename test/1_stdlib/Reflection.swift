@@ -101,12 +101,6 @@ dump(any)
 print("Character:")
 dump(Character("a"))
 
-let range = 3...9
-// CHECK-NEXT: Range(3..<10)
-// CHECK-NEXT:  startIndex: 3
-// CHECK-NEXT:  endIndex: 10
-dump(range)
-
 protocol Fooable {}
 extension Int : Fooable {}
 extension Double : Fooable {}
@@ -153,13 +147,6 @@ switch true.customPlaygroundQuickLook {
   case .bool(let x): print("Logical: \(x)")
   default: print("wrong quicklook type")
 }
-
-// CHECK-NEXT: Optional("Hello world")
-// CHECK-NEXT:   some: "Hello world"
-dump(Optional<String>("Hello world"))
-// CHECK-NEXT: - nil
-let noneString: String? = nil
-dump(noneString)
 
 let intArray = [1,2,3,4,5]
 // CHECK-NEXT: 5 elements

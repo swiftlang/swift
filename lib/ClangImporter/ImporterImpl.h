@@ -263,6 +263,7 @@ public:
   const bool ImportForwardDeclarations;
   const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
+  const bool HonorSwiftNewtypeAttr;
 
   constexpr static const char * const moduleImportBufferName =
     "<swift-imported-modules>";

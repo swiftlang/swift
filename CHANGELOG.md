@@ -1,7 +1,58 @@
 Note: This is in reverse chronological order, so newer entries are added to the top.
 
 Swift 3.0
--------
+---------
+
+* [SE-0071](https://github.com/apple/swift-evolution/blob/master/proposals/0071-member-keywords.md):
+  "Allow (most) keywords in member references" is implemented.  This allows the
+  use of members after a dot without backticks, e.g. "foo.default".
+
+* [SE-0057](https://github.com/apple/swift-evolution/blob/master/proposals/0057-importing-objc-generics.md):
+  Objective-C lightweight generic classes are now imported as generic types
+  in Swift. Because Objective-C generics are not represented at runtime,
+  there are some limitations on what can be done with them in Swift:
+
+  - If an ObjC generic class is used in a checked `as?`, `as!`, or `is` cast,
+    the generic parameters are not checked at runtime. The cast succeeds if the
+    operand is an instance of the ObjC class, regardless of parameters.
+
+    ```swift
+    let x = NSFoo<NSNumber>(value: NSNumber(integer: 0))
+    let y: AnyObject = x
+    let z = y as! NSFoo<NSString> // Succeeds
+    ```
+
+  - Swift subclasses can only inherit an ObjC generic class if its generic
+    parameters are fully specified.
+
+    ```swift
+    // Error: Can't inherit ObjC generic class with unbound parameter T
+    class SwiftFoo1<T>: NSFoo<T> { }
+
+    // OK: Can inherit ObjC generic class with specific parameters
+    class SwiftFoo2<T>: NSFoo<NSString> { }
+    ```
+
+  - Swift can extend ObjC generic classes, but the extensions cannot be
+    constrained, and definitions inside the extension do not have access to
+    the class's generic parameters.
+
+    ```swift
+    extension NSFoo {
+      // Error: Can't access generic param T
+      func foo() -> T {
+        return T()
+      }
+    }
+
+    // Error: extension can't be constrained
+    extension NSFoo where T: NSString {
+    }
+    ```
+
+  - Foundation container classes `NS[Mutable]Array`, `NS[Mutable]Set`, and
+    `NS[Mutable]Dictionary` are still imported as nongeneric classes for
+    the time being.
 
 * As part of the changes for SE-0055 (see below), the *pointee* types of
   imported pointers (e.g. the `id` in `id *`) are no longer assumed to always

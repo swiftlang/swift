@@ -158,7 +158,7 @@ func _squeezeHashValue(_ hashValue: Int, _ resultRange: Range<Int>) -> Int {
   // An efficient way to compute the length is to rely on two's complement
   // arithmetic.
   let resultCardinality =
-    UInt(bitPattern: resultRange.endIndex &- resultRange.startIndex)
+    UInt(bitPattern: resultRange.upperBound &- resultRange.lowerBound)
 
   // Calculate the result as `UInt` to handle the case when
   // `resultCardinality >= Int.max`.
@@ -171,16 +171,16 @@ func _squeezeHashValue(_ hashValue: Int, _ resultRange: Range<Int>) -> Int {
   // We cannot convert the latter to `Int`.
   return
     Int(bitPattern:
-      UInt(bitPattern: resultRange.startIndex) &+ unsignedResult)
+      UInt(bitPattern: resultRange.lowerBound) &+ unsignedResult)
 }
 
 @warn_unused_result
 public // @testable
 func _squeezeHashValue(_ hashValue: Int, _ resultRange: Range<UInt>) -> UInt {
   let mixedHashValue = UInt(bitPattern: _mixInt(hashValue))
-  let resultCardinality: UInt = resultRange.endIndex - resultRange.startIndex
+  let resultCardinality: UInt = resultRange.upperBound - resultRange.lowerBound
   if _isPowerOf2(resultCardinality) {
     return mixedHashValue & (resultCardinality - 1)
   }
-  return resultRange.startIndex + (mixedHashValue % resultCardinality)
+  return resultRange.lowerBound + (mixedHashValue % resultCardinality)
 }

@@ -126,7 +126,11 @@ public struct UnsafeMutableAudioBufferListPointer {
   public var unsafeMutablePointer: UnsafeMutablePointer<AudioBufferList>
 }
 
-extension UnsafeMutableAudioBufferListPointer : MutableCollection {
+extension UnsafeMutableAudioBufferListPointer
+  : MutableCollection, RandomAccessCollection {
+
+  public typealias Index = Int
+
   /// Always zero, which is the index of the first `AudioBuffer`.
   public var startIndex: Int {
     return 0
@@ -150,5 +154,17 @@ extension UnsafeMutableAudioBufferListPointer : MutableCollection {
       (_audioBuffersPointer + index).pointee = newValue
     }
   }
+
+  public subscript(bounds: Range<Int>)
+    -> MutableRandomAccessSlice<UnsafeMutableAudioBufferListPointer> {
+    get {
+      return MutableRandomAccessSlice(base: self, bounds: bounds)
+    }
+    set {
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
+  }
+
+  public typealias Indices = CountableRange<Int>
 }
 

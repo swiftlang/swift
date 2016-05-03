@@ -8,9 +8,6 @@
 // RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Release
 // REQUIRES: executable_test
 
-// FIXME: Assertion failiure in StrongRefCount::decrementFromOneAndDeallocateNonAtomic
-// UNSUPPORTED: linux
-
 import StdlibUnittest
 
 

@@ -60,7 +60,9 @@ func expectSortedCollection(_ sortedAry: ArraySlice<Int>, _ originalAry: ArraySl
   expectSortedCollection([Int](sortedAry), [Int](originalAry))
 }
 
-class OffsetCollection : MutableCollection {
+class OffsetCollection : MutableCollection, RandomAccessCollection {
+  typealias Indices = CountableRange<Int>
+  
   let offset: Int
   var data: [Int] = []
   let forward: Bool
@@ -79,8 +81,18 @@ class OffsetCollection : MutableCollection {
     self.offset = offset
     self.forward = forward
   }
+  typealias Index = Int
+  subscript(bounds: Range<Int>) -> MutableRandomAccessSlice<OffsetCollection> {
+    get {
+      return MutableRandomAccessSlice(base: self, bounds: bounds)
+    }
+    set {
+      for i in CountableRange(bounds) {
+        self[i] = newValue[i]
+      }
+    }
+  }
 }
-
 
 // Generate two versions of tests: one for sort with explicitly passed
 // predicate and the other using default comparison operator.
@@ -144,7 +156,7 @@ Algorithm.test("sort/CollectionsWithUnusualIndices") {
 }
 
 Algorithm.test("partition/CrashOnSingleElement") {
-  var a = DefaultedRandomAccessMutableCollection([10])
+  var a = DefaultedMutableRandomAccessCollection([10])
   expectEqual(a.startIndex, a.partition())
 }
 

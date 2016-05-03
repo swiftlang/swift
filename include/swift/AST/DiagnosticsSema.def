@@ -429,6 +429,9 @@ ERROR(serialization_malformed_module,Fatal,
 ERROR(serialization_module_too_new,Fatal,
       "module file was created by a newer version of the compiler: %0",
       (StringRef))
+ERROR(serialization_module_language_version_mismatch,Fatal,
+      "module compiled with Swift %0 cannot be imported in Swift %1: %2",
+      (StringRef, StringRef, StringRef))
 ERROR(serialization_module_too_old,Fatal,
       "module file was created by an older version of the compiler; "
       "rebuild %0 and try again: %1",
@@ -514,8 +517,8 @@ ERROR(pattern_used_in_type,none,
 NOTE(note_module_as_type,none,
      "cannot use module %0 as a type", (Identifier))
 
-ERROR(use_unknown_object_literal,none,
-     "use of unknown object literal name %0", (Identifier))
+ERROR(use_unknown_object_literal_protocol,none,
+     "cannot deduce protocol for %0 literal", (StringRef))
 ERROR(object_literal_default_type_missing,none,
      "could not infer type of %0 literal", (StringRef))
 NOTE(object_literal_resolve_import,none,
@@ -759,6 +762,9 @@ NOTE(c_function_pointer_captures_here,none,
 
 ERROR(var_type_not_materializable,none,
       "type %0 of variable is not materializable", (Type))
+ERROR(param_type_non_materializable_tuple,none,
+      "named parameter has type %0 which includes nested inout parameters",
+      (Type))
 ERROR(enum_element_not_materializable,none,
       "type of enum case is not materializable", ())
 
@@ -1204,7 +1210,7 @@ NOTE(ambiguous_witnesses_type,none,
 NOTE(protocol_witness_exact_match,none,
      "candidate exactly matches%0", (StringRef))
 NOTE(protocol_witness_renamed,none,
-     "candidate matches (with renaming)%0", (StringRef))
+     "rename to %0 to satisfy this requirement%1", (DeclName, StringRef))
 NOTE(protocol_witness_kind_conflict,none,
      "candidate is not %select{an initializer|a function|a variable|"
      "a subscript}0", (RequirementKind))
@@ -1269,27 +1275,19 @@ NOTE(protocol_conformance_implied_here,none,
      "implied protocol conformance %0 here can be made explicit", (Identifier))
 
 // "Near matches"
-WARNING(optional_req_nonobjc_near_match,none,
-        "non-@objc %select{initializer %1|method %1|property %1|subscript}0 "
-        "does not satisfy optional requirement of @objc protocol %2",
-        (RequirementKind, DeclName, DeclName))
-NOTE(optional_req_nonobjc_near_match_add_objc,none,
-     "add '@objc' to provide an Objective-C entrypoint", ())
-NOTE(optional_req_nonobjc_near_match_silence,none,
-     "add '@nonobjc' to silence this warning", ())
-
 WARNING(optional_req_near_match,none,
         "%0 %1 nearly matches optional requirement %2 of protocol %3",
         (DescriptiveDeclKind, DeclName, DeclName, DeclName))
-NOTE(optional_req_near_match_rename,none,
+NOTE(optional_req_nonobjc_near_match_add_objc,none,
+     "add '@objc' to provide an Objective-C entrypoint", ())
+NOTE(optional_req_nonobjc_to_objc,none,
      "rename to %0 to satisfy this requirement",
      (DeclName))
 NOTE(optional_req_near_match_move,none,
      "move %0 to %select{an|another}1 extension to silence this warning",
      (DeclName, unsigned))
 NOTE(optional_req_near_match_nonobjc,none,
-     "move %0 to %select{an|another}1 extension or add '@nonobjc' to "
-     "silence this warning", (DeclName))
+     "add '@nonobjc' to silence this %select{warning|error}0", (bool))
 NOTE(optional_req_near_match_accessibility,none,
      "make %0 %select{ERROR|private|private or internal}1 to silence this "
      "warning", (DeclName, Accessibility))
@@ -2555,7 +2553,7 @@ ERROR(objc_enum_case_multi,none,
       "'@objc' enum case declaration defines multiple enum cases with the same Objective-C name", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement}"
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
@@ -2600,6 +2598,9 @@ NOTE(objc_inferring_on_objc_protocol_member,none,
 NOTE(objc_overriding_objc_decl,none,
      "overriding '@objc' %select{property|subscript|initializer|method}0 %1 "
      "here", (unsigned, DeclName))
+NOTE(objc_witness_objc_requirement,none,
+     "satisfying requirement for %0 %1 in protocol %2",
+     (DescriptiveDeclKind, DeclName, DeclName))
 
 ERROR(objc_invalid_on_func_curried,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because curried functions "
@@ -2700,12 +2701,24 @@ NOTE(objc_optional_requirement_swift_rename,none,
      "requirement %1", (bool, DeclName))
 
 ERROR(witness_non_objc,none,
-      "non-'@objc' " OBJC_DIAG_SELECT " does not satisfy '@objc' requirement in "
-      "protocol %2", (unsigned, DeclName, DeclName))
+      "non-'@objc' " OBJC_DIAG_SELECT " does not satisfy requirement "
+      "of '@objc' protocol %2",
+      (unsigned, DeclName, DeclName))
+
+WARNING(witness_non_objc_optional,none,
+        "non-'@objc' " OBJC_DIAG_SELECT " does not satisfy optional "
+        "requirement of '@objc' protocol %2",
+        (unsigned, DeclName, DeclName))
 
 ERROR(witness_non_objc_storage,none,
-      "non-'@objc' %select{property %1|subscript}0 does not satisfy '@objc' "
-      "requirement in protocol %2", (bool, DeclName, DeclName))
+      "non-'@objc' %select{property %1|subscript}0 does not satisfy "
+      "requirement of '@objc' protocol %2",
+      (bool, DeclName, DeclName))
+
+WARNING(witness_non_objc_storage_optional,none,
+      "non-'@objc' %select{property %1|subscript}0 does not satisfy "
+      "optional requirement of '@objc' protocol %2",
+      (bool, DeclName, DeclName))
 
 ERROR(nonobjc_not_allowed,none,
       "declaration is %" OBJC_ATTR_SELECT "0, and cannot be marked @nonobjc",

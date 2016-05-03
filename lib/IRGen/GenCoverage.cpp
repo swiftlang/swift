@@ -41,7 +41,7 @@ static StringRef getCoverageSection(IRGenModule &IGM) {
 }
 
 void IRGenModule::emitCoverageMapping() {
-  const auto &Mappings = SILMod->getCoverageMapList();
+  const auto &Mappings = getSILModule().getCoverageMapList();
   // If there aren't any coverage maps, there's nothing to emit.
   if (Mappings.empty())
     return;

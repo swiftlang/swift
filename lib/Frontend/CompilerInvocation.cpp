@@ -48,27 +48,7 @@ static void updateRuntimeLibraryPath(SearchPathOptions &SearchPathOpts,
   llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
   SearchPathOpts.RuntimeLibraryPath = LibPath.str();
 
-  // The linux provided triple for ARM contains a trailing 'l'
-  // denoting little-endian.  This is not used in the path for
-  // libraries.  LLVM matches these SubArchTypes to the generic
-  // ARMSubArch_v7 (for example) type.  If that is the case,
-  // use the base of the architecture type in the library path.
-  if (Triple.isOSLinux()) {
-    switch(Triple.getSubArch()) {
-    default:
-      llvm::sys::path::append(LibPath, Triple.getArchName());
-      break;
-    case llvm::Triple::SubArchType::ARMSubArch_v7:
-      llvm::sys::path::append(LibPath, "armv7");
-      break;
-    case llvm::Triple::SubArchType::ARMSubArch_v6:
-      llvm::sys::path::append(LibPath, "armv6");
-      break;
-    }
-  } else {
-    llvm::sys::path::append(LibPath, Triple.getArchName());
-  }
-
+  llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
   SearchPathOpts.RuntimeLibraryImportPath = LibPath.str();
 }
 
@@ -112,32 +92,46 @@ static void debugFailWithCrash() {
   LLVM_BUILTIN_TRAP;
 }
 
-static unsigned readFileList(std::vector<std::string> &inputFiles,
-                             const llvm::opt::Arg *filelistPath,
-                             const llvm::opt::Arg *primaryFileArg = nullptr) {
-  bool foundPrimaryFile = false;
-  unsigned primaryFileIndex = 0;
-  StringRef primaryFile;
-  if (primaryFileArg)
-    primaryFile = primaryFileArg->getValue();
+/// Try to read a file list file.
+///
+/// Returns false on error.
+static bool readFileList(DiagnosticEngine &diags,
+                         std::vector<std::string> &inputFiles,
+                         const llvm::opt::Arg *filelistPath,
+                         const llvm::opt::Arg *primaryFileArg = nullptr,
+                         unsigned *primaryFileIndex = nullptr) {
+  assert((primaryFileArg == nullptr) || (primaryFileIndex != nullptr) &&
+         "did not provide argument for primary file index");
 
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
       llvm::MemoryBuffer::getFile(filelistPath->getValue());
-  assert(buffer && "can't read filelist; unrecoverable");
+  if (!buffer) {
+    diags.diagnose(SourceLoc(), diag::cannot_open_file,
+                   filelistPath->getValue(), buffer.getError().message());
+    return false;
+  }
+
+  bool foundPrimaryFile = false;
+  if (primaryFileIndex) *primaryFileIndex = 0;
 
   for (StringRef line : make_range(llvm::line_iterator(*buffer.get()), {})) {
     inputFiles.push_back(line);
-    if (foundPrimaryFile)
+
+    if (foundPrimaryFile || primaryFileArg == nullptr)
       continue;
-    if (line == primaryFile)
+    if (line == primaryFileArg->getValue())
       foundPrimaryFile = true;
     else
-      ++primaryFileIndex;
+      ++*primaryFileIndex;
   }
 
-  if (primaryFileArg)
-    assert(foundPrimaryFile && "primary file not found in filelist");
-  return primaryFileIndex;
+  if (primaryFileArg && !foundPrimaryFile) {
+    diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
+                   primaryFileArg->getValue(), filelistPath->getValue());
+    return false;
+  }
+
+  return true;
 }
 
 static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
@@ -199,11 +193,13 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_filelist)) {
     const Arg *primaryFileArg = Args.getLastArg(OPT_primary_file);
-    auto primaryFileIndex = readFileList(Opts.InputFilenames, A,
-                                         primaryFileArg);
-    if (primaryFileArg)
-      Opts.PrimaryInput = SelectedInput(primaryFileIndex);
-    assert(!Args.hasArg(OPT_INPUT) && "mixing -filelist with inputs");
+    unsigned primaryFileIndex = 0;
+    if (readFileList(Diags, Opts.InputFilenames, A,
+                     primaryFileArg, &primaryFileIndex)) {
+      if (primaryFileArg)
+        Opts.PrimaryInput = SelectedInput(primaryFileIndex);
+      assert(!Args.hasArg(OPT_INPUT) && "mixing -filelist with inputs");
+    }
   } else {
     for (const Arg *A : make_range(Args.filtered_begin(OPT_INPUT,
                                                        OPT_primary_file),
@@ -355,7 +351,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.InputKind = InputFileKind::IFK_Swift;
 
   if (const Arg *A = Args.getLastArg(OPT_output_filelist)) {
-    readFileList(Opts.OutputFilenames, A);
+    readFileList(Diags, Opts.OutputFilenames, A);
     assert(!Args.hasArg(OPT_o) && "don't use -o with -output-filelist");
   } else {
     Opts.OutputFilenames = Args.getAllArgValues(OPT_o);
@@ -767,7 +763,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_infer_iuos)) {
     Opts.InferIUOs = false;
   }
-  Opts.ImportObjCGenerics = Args.hasArg(OPT_enable_import_objc_generics);
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
 
@@ -879,6 +874,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   }
 
   Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
+  Opts.HonorSwiftNewtypeAttr |= Args.hasArg(OPT_enable_swift_newtype);
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
 
   if (Args.hasArg(OPT_embed_bitcode))
@@ -1262,17 +1258,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   if (Args.hasArg(OPT_enable_reflection_metadata)) {
-    Opts.StripReflectionMetadata = false;
-    Opts.StripReflectionNames = false;
-  }
-
-  if (Args.hasArg(OPT_strip_reflection_names)) {
-    Opts.StripReflectionNames = true;
-  }
-
-  if (Args.hasArg(OPT_strip_reflection_metadata)) {
-    Opts.StripReflectionMetadata = true;
-    Opts.StripReflectionNames = true;
+    Opts.EnableReflectionMetadata = true;
+    if (Args.hasArg(OPT_enable_reflection_names)) {
+      Opts.EnableReflectionNames = true;
+    }
+    if (Args.hasArg(OPT_enable_reflection_builtins)) {
+      Opts.EnableReflectionBuiltins = true;
+    }
   }
 
   return false;

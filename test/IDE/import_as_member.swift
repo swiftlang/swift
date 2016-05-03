@@ -19,17 +19,13 @@
 // PRINT-NEXT:   static var globalVar: Double
 // PRINT-NEXT:   init(value value: Double)
 // PRINT-NEXT:   init(specialLabel specialLabel: ())
-// PRINT-NEXT:   @discardableResult
 // PRINT-NEXT:   func inverted() -> Struct1
 // PRINT-NEXT:   mutating func invert()
-// PRINT-NEXT:   @discardableResult
 // PRINT-NEXT:   func translate(radians radians: Double) -> Struct1
-// PRINT-NEXT:   @discardableResult
 // PRINT-NEXT:   func scale(_ radians: Double) -> Struct1
 // PRINT-NEXT:   var radius: Double { get nonmutating set }
 // PRINT-NEXT:   var altitude: Double{{$}}
 // PRINT-NEXT:   var magnitude: Double { get }
-// PRINT-NEXT:   @discardableResult
 // PRINT-NEXT:   static func staticMethod() -> Int32
 // PRINT-NEXT:   static var property: Int32
 // PRINT-NEXT:   static var getOnlyProperty: Int32 { get }

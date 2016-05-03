@@ -5,10 +5,10 @@
 @objc class ObjCClass { }
 
 @objc protocol P1 {
-  func method1() // expected-note {{requirement 'method1()' declared here}}
+  func method1()
 
-  var property1: ObjCClass { get } // expected-note{{requirement 'property1' declared here}}
-  var property2: ObjCClass { get set } // expected-note{{requirement 'property2' declared here}}
+  var property1: ObjCClass { get }
+  var property2: ObjCClass { get set }
 }
 
 @objc class C1 : P1 {
@@ -29,28 +29,28 @@
 }
 
 class C1b : P1 {
-  func method1() { } // expected-error{{non-'@objc' method 'method1()' does not satisfy '@objc' requirement in protocol 'P1'}}{{3-3=@objc }}
-  var property1: ObjCClass = ObjCClass() // expected-error{{non-'@objc' property 'property1' does not satisfy '@objc' requirement in protocol 'P1'}}{{3-3=@objc }}
-  var property2: ObjCClass = ObjCClass() // expected-error{{non-'@objc' property 'property2' does not satisfy '@objc' requirement in protocol 'P1'}}{{3-3=@objc }}
+  func method1() { }
+  var property1: ObjCClass = ObjCClass()
+  var property2: ObjCClass = ObjCClass()
 }
 
 @objc protocol P2 {
   @objc(methodWithInt:withClass:)
-  func method(_: Int, class: ObjCClass) // expected-note{{'method(_:class:)' declared here}}
+  func method(_: Int, class: ObjCClass)
 
-  var empty: Bool { @objc(checkIfEmpty) get } // expected-note{{requirement 'empty' declared here}}
+  var empty: Bool { @objc(checkIfEmpty) get }
 }
 
 class C2a : P2 {
-  func method(_: Int, class: ObjCClass) { } // expected-error{{non-'@objc' method 'method(_:class:)' does not satisfy '@objc' requirement in protocol 'P2'}}{{3-3=@objc(methodWithInt:withClass:) }}
+  func method(_: Int, class: ObjCClass) { }
 
-  var empty: Bool { // expected-error{{non-'@objc' property 'empty' does not satisfy '@objc' requirement in protocol 'P2'}}{{3-3=@objc }}
-    get { }
+  var empty: Bool {
+    get { } // expected-error{{Objective-C method 'empty' provided by getter for 'empty' does not match the requirement's selector ('checkIfEmpty')}}
   }
 }
 
 class C2b : P2 {
-  @objc func method(_: Int, class: ObjCClass) { } // expected-error{{Objective-C method 'method:class:' provided by method 'method(_:class:)' does not match the requirement's selector ('methodWithInt:withClass:')}}{{8-8=(methodWithInt:withClass:)}}
+  @objc func method(_: Int, class: ObjCClass) { }
 
   @objc var empty: Bool {
     @objc get { } // expected-error{{Objective-C method 'empty' provided by getter for 'empty' does not match the requirement's selector ('checkIfEmpty')}}{{10-10=(checkIfEmpty)}}
@@ -99,9 +99,37 @@ class C3a : P3 {
 
 // rdar://problem/19879598
 @objc protocol Foo {
-  init() // expected-note{{requirement 'init()' declared here}}
+  init()
 }
 
 class Bar: Foo {
-  required init() {} // expected-error{{non-'@objc' initializer 'init()' does not satisfy '@objc' requirement in protocol 'Foo'}}{{3-3=@objc }}
+  required init() {}
+}
+
+@objc protocol P4 {
+  @objc(foo:bar:)
+  func method(x: Int, y: Int)
+}
+
+// Infer @objc and selector from requirement.
+class C4a : P4 {
+  func method(x: Int, y: Int) { }
+}
+
+// Infer selector from requirement.
+class C4b : P4 {
+  @objc
+  func method(x: Int, y: Int) { }
+}
+
+@objc protocol P5 {
+  @objc(wibble:wobble:)
+  func method(x: Int, y: Int)
+}
+
+// Don't infer when there is an ambiguity.
+class C4_5a : P4, P5 {
+  func method(x: Int, y: Int) { }
+  // expected-error@-1{{Objective-C method 'methodWithX:y:' provided by method 'method(x:y:)' does not match the requirement's selector ('foo:bar:')}}
+  // expected-error@-2{{Objective-C method 'methodWithX:y:' provided by method 'method(x:y:)' does not match the requirement's selector ('wibble:wobble:')}}
 }

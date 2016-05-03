@@ -14,3 +14,5 @@
 # utils/swift_build_support/ directory as a module.
 #
 # ----------------------------------------------------------------------------
+
+from .which import which

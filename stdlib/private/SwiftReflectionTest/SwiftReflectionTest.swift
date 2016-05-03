@@ -50,30 +50,22 @@ internal struct ReflectionInfo : Sequence {
   /// The name of the loaded image
   internal let imageName: String
 
-  /// The Field Metadata section
-  internal let fieldmd: Section
-
-  /// The Typeref section
-  internal let typeref: Section
-
-  /// The Reflection Strings section, which holds property names and other
-  /// general-purpose strings.
-  ///
-  /// This section can be stripped out by having compiled with
-  /// `-strip-reflection-names` and so is optional.
+  /// Reflection metadata sections
+  internal let fieldmd: Section?
+  internal let assocty: Section?
+  internal let builtin: Section?
+  internal let capture: Section?
+  internal let typeref: Section?
   internal let reflstr: Section?
-
-  /// The Associated Types section, which indicates which type aliases 
-  /// are provided by a type to conform to some protocol's associated
-  /// type requirements.
-  internal let assocty: Section
 
   internal func makeIterator() -> AnyIterator<Section?> {
     return AnyIterator([
       fieldmd,
+      assocty,
+      builtin,
+      capture,
       typeref,
-      reflstr,
-      assocty
+      reflstr
     ].makeIterator())
   }
 }
@@ -95,7 +87,7 @@ internal func getSectionInfo(_ name: String,
   _ imageHeader: UnsafePointer<MachHeader>) -> Section? {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   var size: UInt = 0
-  let address = getsectiondata(imageHeader, "__DATA", name, &size)
+  let address = getsectiondata(imageHeader, "__TEXT", name, &size)
   guard let nonNullAddress = address else { return nil }
   guard size != 0 else { return nil }
   return Section(startAddress: nonNullAddress, size: size)
@@ -106,8 +98,10 @@ internal func getSectionInfo(_ name: String,
 /// An image of interest must have the following sections in the __DATA
 /// segment:
 /// - __swift3_fieldmd
-/// - __swift3_typeref
 /// - __swift3_assocty
+/// - __swift3_builtin
+/// - __swift3_capture
+/// - __swift3_typeref
 /// - __swift3_reflstr (optional, may have been stripped out)
 ///
 /// - Parameter i: The index of the loaded image as reported by Dyld.
@@ -119,15 +113,19 @@ internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
     to: UnsafePointer<MachHeader>.self)
 
   let imageName = _dyld_get_image_name(i)
-  if let fieldmd = getSectionInfo("__swift3_fieldmd", header),
-     let typeref = getSectionInfo("__swift3_typeref", header),
-     let assocty = getSectionInfo("__swift3_assocty", header) {
-     let reflstr = getSectionInfo("__swift3_reflstr", header)
+  if let fieldmd = getSectionInfo("__swift3_fieldmd", header) {
+      let assocty = getSectionInfo("__swift3_assocty", header)
+      let builtin = getSectionInfo("__swift3_builtin", header)
+      let capture = getSectionInfo("__swift3_capture", header)
+      let typeref = getSectionInfo("__swift3_typeref", header)
+      let reflstr = getSectionInfo("__swift3_reflstr", header)
       return ReflectionInfo(imageName: String(validatingUTF8: imageName)!,
-        fieldmd: fieldmd,
-        typeref: typeref,
-        reflstr: reflstr,
-        assocty: assocty)
+                            fieldmd: fieldmd,
+                            assocty: assocty,
+                            builtin: builtin,
+                            capture: capture,
+                            typeref: typeref,
+                            reflstr: reflstr)
   }
   return nil
 }
@@ -178,16 +176,10 @@ internal func sendReflectionInfos() {
 
   var numInfos = infos.count
   debugLog("\(numInfos) reflection info bundles.")
-  sendBytes(from: &numInfos, count: sizeof(UInt.self))
   precondition(numInfos >= 1)
+  sendBytes(from: &numInfos, count: sizeof(UInt.self))
   for info in infos {
     debugLog("Sending info for \(info.imageName)")
-    let imageNameBytes = Array(info.imageName.utf8)
-    var imageNameLength = UInt(imageNameBytes.count)
-    fwrite(&imageNameLength, sizeof(UInt.self), 1, stdout)
-    fflush(stdout)
-    fwrite(imageNameBytes, 1, imageNameBytes.count, stdout)
-    fflush(stdout)
     for section in info {
       sendValue(section?.startAddress)
       sendValue(section?.size ?? 0)

@@ -55,8 +55,8 @@ func test002(abc: FooBar, abd: Base) {
 // TOP_LEVEL_1-LABEL: Results for filterText: abc [
 // TOP_LEVEL_1-NEXT:   abc
 // TOP_LEVEL_1-NEXT:   abc.
-// TOP_LEVEL_1-NEXT:   abc!==
 // TOP_LEVEL_1-NEXT:   abc===
+// TOP_LEVEL_1-NEXT:   abc!==
 // TOP_LEVEL_1-NEXT:   abc.method()
 // TOP_LEVEL_1-NEXT:   abc.prop
 // TOP_LEVEL_1-NEXT: ]
@@ -64,8 +64,8 @@ func test002(abc: FooBar, abd: Base) {
 // TOP_LEVEL_1-LABEL: Results for filterText: abd [
 // TOP_LEVEL_1-NEXT:   abd
 // TOP_LEVEL_1-NEXT:   abd.
-// TOP_LEVEL_1-NEXT:   abd!==
 // TOP_LEVEL_1-NEXT:   abd===
+// TOP_LEVEL_1-NEXT:   abd!==
 // TOP_LEVEL_1-NEXT:   abd.base()
 // TOP_LEVEL_1-NEXT: ]
 

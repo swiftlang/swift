@@ -19,11 +19,14 @@
 
 #include "swift/Basic/Demangle.h"
 #include "swift/Reflection/Records.h"
+#include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Remote/MetadataReader.h"
 
 using namespace swift;
 using namespace reflection;
+
+TypeRefBuilder::TypeRefBuilder() : TC(*this) {}
 
 const AssociatedTypeDescriptor * TypeRefBuilder::
 lookupAssociatedTypes(const std::string &MangledTypeName,
@@ -74,6 +77,8 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
     MangledName = N->getMangledName();
   else if (auto BG = dyn_cast<BoundGenericTypeRef>(TR))
     MangledName = BG->getMangledName();
+  else if (auto P = dyn_cast<ProtocolTypeRef>(TR))
+    MangledName = P->getMangledName();
   else
     return {};
 
@@ -132,6 +137,9 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
 
   for (auto Info : ReflectionInfos) {
     for (auto &BuiltinTypeDescriptor : Info.builtin) {
+      assert(BuiltinTypeDescriptor.Size > 0);
+      assert(BuiltinTypeDescriptor.Alignment > 0);
+      assert(BuiltinTypeDescriptor.Stride > 0);
       if (!BuiltinTypeDescriptor.hasMangledTypeName())
         continue;
       auto CandidateMangledName = BuiltinTypeDescriptor.getMangledTypeName();
@@ -144,8 +152,45 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
   return nullptr;
 }
 
+/// Get the unsubstituted capture types for a closure context.
+ClosureContextInfo
+TypeRefBuilder::getClosureContextInfo(const CaptureDescriptor &CD) {
+  ClosureContextInfo Info;
+
+  for (auto i = CD.capture_begin(), e = CD.capture_end(); i != e; ++i) {
+    const TypeRef *TR = nullptr;
+    if (i->hasMangledTypeName()) {
+      auto MangledName = i->getMangledTypeName();
+      auto DemangleTree = Demangle::demangleTypeAsNode(MangledName);
+      TR = swift::remote::decodeMangledType(*this, DemangleTree);
+    }
+    Info.CaptureTypes.push_back(TR);
+  }
+
+  for (auto i = CD.source_begin(), e = CD.source_end(); i != e; ++i) {
+    const TypeRef *TR = nullptr;
+    if (i->hasMangledTypeName()) {
+      auto MangledName = i->getMangledTypeName();
+      auto DemangleTree = Demangle::demangleTypeAsNode(MangledName);
+      TR = swift::remote::decodeMangledType(*this, DemangleTree);
+    }
+
+    const MetadataSource *MS = nullptr;
+    if (i->hasMangledMetadataSource()) {
+      auto MangledMetadataSource = i->getMangledMetadataSource();
+      MS = MetadataSource::decode(MSB, MangledMetadataSource);
+    }
+
+    Info.MetadataSources.push_back({TR, MS});
+  }
+
+  Info.NumBindings = CD.NumBindings;
+
+  return Info;
+}
+
 ///
-/// Dumping typerefs, field declarations, associated types
+/// Dumping reflection metadata
 ///
 
 void
@@ -220,6 +265,37 @@ void TypeRefBuilder::dumpBuiltinTypeSection(std::ostream &OS) {
   }
 }
 
+void ClosureContextInfo::dump(std::ostream &OS) {
+  OS << "- Capture types:\n";
+  for (auto *TR : CaptureTypes) {
+    if (TR == nullptr)
+      OS << "!!! Invalid typeref\n";
+    else
+      TR->dump(OS);
+  }
+  OS << "- Metadata sources:\n";
+  for (auto MS : MetadataSources) {
+    if (MS.first == nullptr)
+      OS << "!!! Invalid typeref\n";
+    else
+      MS.first->dump(OS);
+    if (MS.second == nullptr)
+      OS << "!!! Invalid matadata source\n";
+    else
+      MS.second->dump(OS);
+  }
+  OS << "\n";
+}
+
+void TypeRefBuilder::dumpCaptureSection(std::ostream &OS) {
+  for (const auto &sections : ReflectionInfos) {
+    for (const auto &descriptor : sections.capture) {
+      auto info = getClosureContextInfo(descriptor);
+      info.dump(OS);
+    }
+  }
+}
+
 void TypeRefBuilder::dumpAllSections(std::ostream &OS) {
   OS << "FIELDS:\n";
   OS << "=======\n";
@@ -232,5 +308,9 @@ void TypeRefBuilder::dumpAllSections(std::ostream &OS) {
   OS << "BUILTIN TYPES:\n";
   OS << "==============\n";
   dumpBuiltinTypeSection(OS);
+  OS << '\n';
+  OS << "CAPTURE DESCRIPTORS:\n";
+  OS << "====================\n";
+  dumpCaptureSection(OS);
   OS << '\n';
 }

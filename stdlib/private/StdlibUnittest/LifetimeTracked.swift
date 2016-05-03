@@ -10,7 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-public final class LifetimeTracked : ForwardIndex, CustomStringConvertible {
+/// A type that tracks the number of live instances.
+///
+/// To be useful in more contexts, `LifetimeTracked` conforms to various
+/// protocols in trivial ways.
+///
+/// `LifetimeTracked` is useful to check for leaks in algorithms and data
+/// structures.  `StdlibUnittest` harness automatically checks that after each
+/// test has done executing, no `LifetimeTracked` instances exist.
+public final class LifetimeTracked {
   public init(_ value: Int, identity: Int = 0) {
     LifetimeTracked.instances += 1
     LifetimeTracked._nextSerialNumber += 1
@@ -25,26 +33,37 @@ public final class LifetimeTracked : ForwardIndex, CustomStringConvertible {
     serialNumber = -serialNumber
   }
 
-  public var description: String {
-    assert(serialNumber > 0, "dead Tracked!")
-    return value.description
-  }
-
-  /// Returns the next consecutive value after `self`.
-  ///
-  /// Precondition: the next value is representable.
-  public func successor() -> LifetimeTracked {
-    return LifetimeTracked(self.value.successor())
-  }
-
   public static var instances: Int = 0
   internal static var _nextSerialNumber = 0
-  
+
   public let value: Int
   public var identity: Int
   public var serialNumber: Int = 0
 }
 
+extension LifetimeTracked : Strideable {
+  @warn_unused_result
+  public func distance(to other: LifetimeTracked) -> Int {
+    return self.value.distance(to: other.value)
+  }
+
+  @warn_unused_result
+  public func advanced(by n: Int) -> LifetimeTracked {
+    return LifetimeTracked(self.value.advanced(by: n))
+  }
+}
+
+extension LifetimeTracked : CustomStringConvertible {
+  public var description: String {
+    assert(serialNumber > 0, "dead Tracked!")
+    return value.description
+  }
+}
+
 public func == (x: LifetimeTracked, y: LifetimeTracked) -> Bool {
   return x.value == y.value
+}
+
+public func < (x: LifetimeTracked, y: LifetimeTracked) -> Bool {
+  return x.value < y.value
 }

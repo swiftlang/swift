@@ -3434,11 +3434,11 @@ public:
   }
 
   /// True if this protocol can only be conformed to by class types.
-  bool requiresClass() {
+  bool requiresClass() const {
     if (ProtocolDeclBits.RequiresClassValid)
       return ProtocolDeclBits.RequiresClass;
 
-    return requiresClassSlow();
+    return const_cast<ProtocolDecl *>(this)->requiresClassSlow();
   }
 
   /// Specify that this protocol is class-bounded, e.g., because it was

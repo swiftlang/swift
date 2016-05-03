@@ -128,14 +128,14 @@ public struct EnumerateSequence<Base : Sequence> {}
 extension EnumeratedIterator {
   @available(*, unavailable, message: "use the 'enumerated()' method on the sequence")
   public init(_ base: Base) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
 extension EnumeratedSequence {
   @available(*, unavailable, message: "use the 'enumerated()' method on the sequence")
   public init(_ base: Base) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 

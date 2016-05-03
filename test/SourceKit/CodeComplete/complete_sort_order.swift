@@ -86,8 +86,8 @@ func test2() {
 // EXPR: "abc"
 // EXPR: true
 // EXPR: false
-// EXPR: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
-// EXPR: [#Image(imageLiteral: String)#]
+// EXPR: #colorLiteral(red: Float, green: Float, blue: Float, alpha: Float)
+// EXPR: #imageLiteral(resourceName: String)
 // EXPR: [values]
 // EXPR: [key: value]
 // EXPR: (values)
@@ -107,8 +107,8 @@ func test3(x: Int) {
 // EXPR_TOP_1: "abc"
 // EXPR_TOP_1: true
 // EXPR_TOP_1: false
-// EXPR_TOP_1: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
-// EXPR_TOP_1: [#Image(imageLiteral: String)#]
+// EXPR_TOP_1: #colorLiteral(red: Float, green: Float, blue: Float, alpha: Float)
+// EXPR_TOP_1: #imageLiteral(resourceName: String)
 // EXPR_TOP_1: [values]
 // EXPR_TOP_1: [key: value]
 // EXPR_TOP_1: (values)
@@ -132,8 +132,8 @@ func test4(x: Int) {
 // EXPR_TOP_3: "abc"
 // EXPR_TOP_3: true
 // EXPR_TOP_3: false
-// EXPR_TOP_3: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
-// EXPR_TOP_3: [#Image(imageLiteral: String)#]
+// EXPR_TOP_3: #colorLiteral(red: Float, green: Float, blue: Float, alpha: Float)
+// EXPR_TOP_3: #imageLiteral(resourceName: String)
 // EXPR_TOP_3: [values]
 // EXPR_TOP_3: [key: value]
 // EXPR_TOP_3: (values)
@@ -183,3 +183,24 @@ func test6() {
 // VOID_1_RAW-NEXT: key.context: source.codecompletion.context.thismodule,
 // VOID_1_RAW-NEXT: key.num_bytes_to_erase: 0,
 // VOID_1_RAW-NEXT: key.not_recommended: 1,
+
+
+
+// RUN: %complete-test -tok=CASE_0 %s | FileCheck %s -check-prefix=CASE_0
+func test7() {
+  struct CaseSensitiveCheck {
+    var member: Int = 0
+  }
+  let caseSensitiveCheck = CaseSensitiveCheck()
+  #^CASE_0,caseSensitiveCheck,CaseSensitiveCheck^#
+}
+// CASE_0: Results for filterText: caseSensitiveCheck [
+// CASE_0: caseSensitiveCheck
+// CASE_0: CaseSensitiveCheck
+// CASE_0: caseSensitiveCheck.
+// CASE_0: ]
+// CASE_0: Results for filterText: CaseSensitiveCheck [
+// CASE_0: caseSensitiveCheck
+// CASE_0: CaseSensitiveCheck
+// CASE_0: CaseSensitiveCheck(
+// CASE_0: ]

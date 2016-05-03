@@ -1,0 +1,102 @@
+// -*- swift -*-
+
+//===----------------------------------------------------------------------===//
+// Automatically Generated From validation-test/stdlib/Slice/Inputs/Template.swift.gyb
+// Do Not Edit Directly!
+//===----------------------------------------------------------------------===//
+
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %S/../../../utils/gyb %s -o %t/main.swift
+// RUN: %S/../../../utils/line-directive %t/main.swift -- %target-build-swift %t/main.swift -o %t/RangeReplaceableSlice_Of_MinimalRangeReplaceableCollection_WithPrefix.swift.gyb.a.out
+// RUN: %S/../../../utils/line-directive %t/main.swift -- %target-run %t/RangeReplaceableSlice_Of_MinimalRangeReplaceableCollection_WithPrefix.swift.gyb.a.out
+// REQUIRES: executable_test
+
+// FIXME: the test is too slow when the standard library is not optimized.
+// REQUIRES: optimized_stdlib
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
+var SliceTests = TestSuite("Collection")
+
+let prefix: [Int] = [-9999, -9998, -9997]
+let suffix: [Int] = []
+
+func makeCollection(elements: [OpaqueValue<Int>])
+  -> RangeReplaceableSlice<MinimalRangeReplaceableCollection<OpaqueValue<Int>>> {
+  var baseElements = prefix.map(OpaqueValue.init)
+  baseElements.append(contentsOf: elements)
+  baseElements.append(contentsOf: suffix.map(OpaqueValue.init))
+  let base = MinimalRangeReplaceableCollection(elements: baseElements)
+  let startIndex = base.index(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count))
+  let endIndex = base.index(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count + elements.count))
+  return RangeReplaceableSlice(
+    base: base,
+    bounds: startIndex..<endIndex)
+}
+
+func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
+  -> RangeReplaceableSlice<MinimalRangeReplaceableCollection<MinimalEquatableValue>> {
+  var baseElements = prefix.map(MinimalEquatableValue.init)
+  baseElements.append(contentsOf: elements)
+  baseElements.append(contentsOf: suffix.map(MinimalEquatableValue.init))
+  let base = MinimalRangeReplaceableCollection(elements: baseElements)
+  let startIndex = base.index(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count))
+  let endIndex = base.index(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count + elements.count))
+  return RangeReplaceableSlice(
+    base: base,
+    bounds: startIndex..<endIndex)
+}
+
+func makeCollectionOfComparable(elements: [MinimalComparableValue])
+  -> RangeReplaceableSlice<MinimalRangeReplaceableCollection<MinimalComparableValue>> {
+  var baseElements = prefix.map(MinimalComparableValue.init)
+  baseElements.append(contentsOf: elements)
+  baseElements.append(contentsOf: suffix.map(MinimalComparableValue.init))
+  let base = MinimalRangeReplaceableCollection(elements: baseElements)
+  let startIndex = base.index(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count))
+  let endIndex = base.index(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count + elements.count))
+  return RangeReplaceableSlice(
+    base: base,
+    bounds: startIndex..<endIndex)
+}
+
+var resiliencyChecks = CollectionMisuseResiliencyChecks.all
+resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .trap
+resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior = .trap
+resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior = .trap
+
+SliceTests.addRangeReplaceableSliceTests(
+  "RangeReplaceableSlice_Of_MinimalRangeReplaceableCollection_WithPrefix.swift.gyb.",
+  makeCollection: makeCollection,
+  wrapValue: identity,
+  extractValue: identity,
+  makeCollectionOfEquatable: makeCollectionOfEquatable,
+  wrapValueIntoEquatable: identityEq,
+  extractValueFromEquatable: identityEq,
+  resiliencyChecks: resiliencyChecks,
+  outOfBoundsIndexOffset: 6
+)
+
+runAllTests()

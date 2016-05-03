@@ -531,12 +531,13 @@ void IRGenModule::emitRuntimeRegistration() {
     return;
   
   // Find the entry point.
-  SILFunction *EntryPoint = SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
+  SILFunction *EntryPoint =
+    getSILModule().lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
   
   // If we're debugging, we probably don't have a main. Find a
   // function marked with the LLDBDebuggerFunction attribute instead.
   if (!EntryPoint && Context.LangOpts.DebuggerSupport) {
-    for (SILFunction &SF : *SILMod) {
+    for (SILFunction &SF : getSILModule()) {
       if (SF.hasLocation()) {
         if (Decl* D = SF.getLocation().getAsASTNode<Decl>()) {
           if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
@@ -777,17 +778,17 @@ void IRGenModule::emitGlobalLists() {
                  false);
 }
 
-void IRGenModuleDispatcher::emitGlobalTopLevel() {
+void IRGenerator::emitGlobalTopLevel() {
   // Generate order numbers for the functions in the SIL module that
   // correspond to definitions in the LLVM module.
   unsigned nextOrderNumber = 0;
-  for (auto &silFn : PrimaryIGM->SILMod->getFunctions()) {
+  for (auto &silFn : PrimaryIGM->getSILModule().getFunctions()) {
     // Don't bother adding external declarations to the function order.
     if (!silFn.isDefinition()) continue;
     FunctionOrder.insert(std::make_pair(&silFn, nextOrderNumber++));
   }
 
-  for (SILGlobalVariable &v : PrimaryIGM->SILMod->getSILGlobals()) {
+  for (SILGlobalVariable &v : PrimaryIGM->getSILModule().getSILGlobals()) {
     Decl *decl = v.getDecl();
     CurrentIGMPtr IGM = getGenModule(decl ? decl->getDeclContext() : nullptr);
     IGM->emitSILGlobalVariable(&v);
@@ -795,8 +796,8 @@ void IRGenModuleDispatcher::emitGlobalTopLevel() {
   PrimaryIGM->emitCoverageMapping();
   
   // Emit SIL functions.
-  bool isWholeModule = PrimaryIGM->SILMod->isWholeModule();
-  for (SILFunction &f : *PrimaryIGM->SILMod) {
+  bool isWholeModule = PrimaryIGM->getSILModule().isWholeModule();
+  for (SILFunction &f : PrimaryIGM->getSILModule()) {
     // Only eagerly emit functions that are externally visible.
     if (!isPossiblyUsedExternally(f.getLinkage(), isWholeModule))
       continue;
@@ -812,7 +813,7 @@ void IRGenModuleDispatcher::emitGlobalTopLevel() {
   }
 
   // Emit witness tables.
-  for (SILWitnessTable &wt : PrimaryIGM->SILMod->getWitnessTableList()) {
+  for (SILWitnessTable &wt : PrimaryIGM->getSILModule().getWitnessTableList()) {
     CurrentIGMPtr IGM = getGenModule(wt.getConformance()->getDeclContext());
     IGM->emitSILWitnessTable(&wt);
   }
@@ -831,7 +832,7 @@ void IRGenModule::finishEmitAfterTopLevel() {
     };
 
     auto Imp = ImportDecl::create(Context,
-                                  SILMod->getSwiftModule(),
+                                  getSwiftModule(),
                                   SourceLoc(),
                                   ImportKind::Module, SourceLoc(),
                                   AccessPath);
@@ -846,10 +847,6 @@ void IRGenModule::finishEmitAfterTopLevel() {
   // Let ClangCodeGen emit its global data structures (llvm.used, debug info,
   // etc.)
   finalizeClangCodeGen();
-}
-
-void IRGenModule::addNominalTypeDecl(const NominalTypeDecl *Decl) {
-  NominalTypeDecls.push_back(Decl);
 }
 
 static void emitLazyTypeMetadata(IRGenModule &IGM, CanType type) {
@@ -867,28 +864,21 @@ static void emitLazyTypeMetadata(IRGenModule &IGM, CanType type) {
   }
 }
 
-void IRGenModuleDispatcher::emitProtocolConformances() {
+void IRGenerator::emitProtocolConformances() {
   for (auto &m : *this) {
     m.second->emitProtocolConformances();
   }
 }
 
-void IRGenModuleDispatcher::emitTypeMetadataRecords() {
+void IRGenerator::emitTypeMetadataRecords() {
   for (auto &m : *this) {
     m.second->emitTypeMetadataRecords();
   }
 }
 
-void IRGenModuleDispatcher::emitReflectionMetadataRecords() {
-  for (auto &m : *this) {
-    m.second->emitReflectionMetadataRecords();
-  }
-}
-
-
 /// Emit any lazy definitions (of globals or functions or whatever
 /// else) that we require.
-void IRGenModuleDispatcher::emitLazyDefinitions() {
+void IRGenerator::emitLazyDefinitions() {
   while (!LazyTypeMetadata.empty() ||
          !LazyFunctionDefinitions.empty() ||
          !LazyFieldTypeAccessors.empty()) {
@@ -912,7 +902,7 @@ void IRGenModuleDispatcher::emitLazyDefinitions() {
       SILFunction *f = LazyFunctionDefinitions.pop_back_val();
       CurrentIGMPtr IGM = getGenModule(f);
       assert(!isPossiblyUsedExternally(f->getLinkage(),
-                                       IGM->SILMod->isWholeModule())
+                                       IGM->getSILModule().isWholeModule())
              && "function with externally-visible linkage emitted lazily?");
       IGM->emitSILFunction(f);
     }
@@ -924,7 +914,8 @@ void IRGenModuleDispatcher::emitLazyDefinitions() {
 /// private method.
 void IRGenModule::emitVTableStubs() {
   llvm::Function *stub = nullptr;
-  for (auto I = SILMod->zombies_begin(); I != SILMod->zombies_end(); ++I) {
+  for (auto I = getSILModule().zombies_begin();
+           I != getSILModule().zombies_end(); ++I) {
     const SILFunction &F = *I;
     if (! F.isExternallyUsedSymbol())
       continue;
@@ -952,10 +943,10 @@ void IRGenModule::emitTypeVerifier() {
   // Look up the types to verify.
   
   SmallVector<CanType, 4> TypesToVerify;
-  for (auto name : Opts.VerifyTypeLayoutNames) {
+  for (auto name : IRGen.Opts.VerifyTypeLayoutNames) {
     // Look up the name in the module.
     SmallVector<ValueDecl*, 1> lookup;
-    swift::Module *M = SILMod->getSwiftModule();
+    swift::Module *M = getSwiftModule();
     M->lookupMember(lookup, M, DeclName(Context.getIdentifier(name)),
                     Identifier());
     if (lookup.empty()) {
@@ -997,7 +988,8 @@ void IRGenModule::emitTypeVerifier() {
     return;
 
   // Find the entry point.
-  SILFunction *EntryPoint = SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
+  SILFunction *EntryPoint =
+    getSILModule().lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
 
   if (!EntryPoint)
     return;
@@ -1049,7 +1041,7 @@ static SILLinkage getNonUniqueSILLinkage(FormalLinkage linkage,
 
 static SILLinkage getConformanceLinkage(IRGenModule &IGM,
                                         const ProtocolConformance *conf) {
-  if (auto wt = IGM.SILMod->lookUpWitnessTable(conf)) {
+  if (auto wt = IGM.getSILModule().lookUpWitnessTable(conf)) {
     return wt->getLinkage();
   } else {
     return SILLinkage::PublicExternal;
@@ -1142,7 +1134,7 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
 static bool isAvailableExternally(IRGenModule &IGM, DeclContext *dc) {
   dc = dc->getModuleScopeContext();
   if (isa<ClangModuleUnit>(dc) ||
-      dc == IGM.SILMod->getAssociatedContext())
+      dc == IGM.getSILModule().getAssociatedContext())
     return false;
   return true;
 }
@@ -1241,7 +1233,7 @@ llvm::GlobalValue::VISIBILITY##Visibility }
     return RESULT(External, Hidden);
 
   case SILLinkage::Private:
-    if (IGM.dispatcher.hasMultipleIGMs()) {
+    if (IGM.IRGen.hasMultipleIGMs()) {
       // In case of multiple llvm modules (in multi-threaded compilation) all
       // private decls must be visible from other files.
       return RESULT(External, Hidden);
@@ -1277,7 +1269,7 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
                    IGM,
                    entity.getLinkage(IGM, ForDefinition),
                    ForDefinition,
-                   entity.isWeakImported(IGM.SILMod->getSwiftModule()));
+                   entity.isWeakImported(IGM.getSwiftModule()));
   global->setLinkage(linkage.first);
   global->setVisibility(linkage.second);
 
@@ -1302,7 +1294,7 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
   std::tie(result.Linkage, result.Visibility) =
     getIRLinkage(IGM, entity.getLinkage(IGM, isDefinition),
                  isDefinition,
-                 entity.isWeakImported(IGM.SILMod->getSwiftModule()));
+                 entity.isWeakImported(IGM.getSwiftModule()));
 
   result.ForDefinition = isDefinition;
 
@@ -1638,15 +1630,16 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   // number for it; make sure to insert it in that position relative
   // to other ordered functions.
   if (hasOrderNumber) {
-    orderNumber = dispatcher.getFunctionOrder(f);
+    orderNumber = IRGen.getFunctionOrder(f);
     if (auto emittedFunctionIterator
           = EmittedFunctionsByOrder.findLeastUpperBound(orderNumber))
       insertBefore = *emittedFunctionIterator;
 
     // Also, if we have a lazy definition for it, be sure to queue that up.
     if (!forDefinition &&
-        !isPossiblyUsedExternally(f->getLinkage(), SILMod->isWholeModule()))
-      dispatcher.addLazyFunction(f);
+        !isPossiblyUsedExternally(f->getLinkage(),
+                                  getSILModule().isWholeModule()))
+      IRGen.addLazyFunction(f);
   }
     
   llvm::AttributeSet attrs;
@@ -2503,7 +2496,7 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   // If this is a use, and the type metadata is emitted lazily,
   // trigger lazy emission of the metadata.
   if (isTypeMetadataEmittedLazily(concreteType)) {
-    dispatcher.addLazyTypeMetadata(concreteType);
+    IRGen.addLazyTypeMetadata(concreteType);
   }
 
   LinkEntity entity
@@ -2579,7 +2572,7 @@ Optional<llvm::Function*> IRGenModule::getAddrOfIVarInitDestroy(
                     isForeign);
 
   // Find the SILFunction for the ivar initializer or destroyer.
-  if (auto silFn = SILMod->lookUpFunction(silRef)) {
+  if (auto silFn = getSILModule().lookUpFunction(silRef)) {
     return getAddrOfSILFunction(silFn, forDefinition);
   }
 
@@ -2762,8 +2755,7 @@ static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
 }
 
 void IRGenModule::emitExtension(ExtensionDecl *ext) {
-  ExtensionDecls.push_back(ext);
-
+  emitAssociatedTypeMetadataRecord(ext);
   emitNestedTypeDecls(ext->getMembers());
 
   // Generate a category if the extension either introduces a
@@ -2880,13 +2872,13 @@ StringRef IRGenModule::mangleType(CanType type, SmallVectorImpl<char> &buffer) {
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
 bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion) {
-  return !D->hasFixedLayout(SILMod->getSwiftModule(), expansion);
+  return !D->hasFixedLayout(getSwiftModule(), expansion);
 }
 
 // The most general resilience expansion where the given declaration is visible.
 ResilienceExpansion
 IRGenModule::getResilienceExpansionForAccess(NominalTypeDecl *decl) {
-  if (decl->getModuleContext() == SILMod->getSwiftModule() &&
+  if (decl->getModuleContext() == getSwiftModule() &&
       decl->getEffectiveAccess() != Accessibility::Public)
     return ResilienceExpansion::Maximal;
   return ResilienceExpansion::Minimal;

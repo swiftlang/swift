@@ -16,11 +16,20 @@
 #include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/Support/FileSystem.h"
 
 using namespace swift;
 using namespace swift::index;
+
+static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
+  if (!D->hasName())
+    return true;
+
+  OS << D->getFullName();
+  return false;
+}
 
 namespace {
 // Adapter providing a common interface for a SourceFile/Module.
@@ -76,12 +85,59 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   struct Entity {
     Decl *D;
     SymbolKind Kind;
-    SymbolSubKind SubKind;
-    bool IsRef;
+    SymbolSubKindSet SubKinds;
+    SymbolRoleSet Roles;
   };
   SmallVector<Entity, 6> EntitiesStack;
   SmallVector<Expr *, 8> ExprStack;
   bool Cancelled = false;
+
+  struct NameAndUSR {
+    StringRef USR;
+    StringRef name;
+  };
+  typedef llvm::PointerIntPair<Decl *, 3> DeclAccessorPair;
+  llvm::DenseMap<Decl *, NameAndUSR> nameAndUSRCache;
+  llvm::DenseMap<DeclAccessorPair, StringRef> accessorUSRCache;
+  StringScratchSpace stringStorage;
+
+  bool getNameAndUSR(ValueDecl *D, StringRef &name, StringRef &USR) {
+    auto &result = nameAndUSRCache[D];
+    if (result.USR.empty()) {
+      SmallString<128> storage;
+      {
+        llvm::raw_svector_ostream OS(storage);
+        if (ide::printDeclUSR(D, OS))
+          return true;
+        result.USR = stringStorage.copyString(OS.str());
+      }
+
+      storage.clear();
+      {
+        llvm::raw_svector_ostream OS(storage);
+        printDisplayName(D, OS);
+        result.name = stringStorage.copyString(OS.str());
+      }
+    }
+
+    name = result.name;
+    USR = result.USR;
+    return false;
+  }
+
+  StringRef getAccessorUSR(AbstractStorageDecl *D, AccessorKind AK) {
+    assert(AK != AccessorKind::NotAccessor);
+    assert(static_cast<int>(AK) < 0x111 && "AccessorKind too big for pair");
+    DeclAccessorPair key(D, static_cast<int>(AK));
+    auto &result = accessorUSRCache[key];
+    if (result.empty()) {
+      SmallString<128> storage;
+      llvm::raw_svector_ostream OS(storage);
+      ide::printAccessorUSR(D, AK, OS);
+      result = stringStorage.copyString(OS.str());
+    }
+    return result;
+  }
 
 public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
@@ -212,8 +268,8 @@ private:
   bool finishCurrentEntity() {
     Entity CurrEnt = EntitiesStack.pop_back_val();
     assert(CurrEnt.Kind != SymbolKind::Unknown);
-    if (!IdxConsumer.finishSourceEntity(CurrEnt.Kind, CurrEnt.SubKind,
-                                        CurrEnt.IsRef)) {
+    if (!IdxConsumer.finishSourceEntity(CurrEnt.Kind, CurrEnt.SubKinds,
+                                        CurrEnt.Roles)) {
       Cancelled = true;
       return false;
     }
@@ -222,9 +278,9 @@ private:
 
   bool initIndexSymbol(ValueDecl *D, SourceLoc Loc, bool IsRef,
                        IndexSymbol &Info);
-  bool initFuncDeclIndexSymbol(ValueDecl *D, FuncDeclIndexSymbol &Info);
+  bool initFuncDeclIndexSymbol(ValueDecl *D, IndexSymbol &Info);
   bool initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE, ValueDecl *D,
-                              SourceLoc Loc, CallRefIndexSymbol &Info);
+                              SourceLoc Loc, IndexSymbol &Info);
 
   std::pair<unsigned, unsigned> getLineCol(SourceLoc Loc) {
     if (Loc.isInvalid())
@@ -354,10 +410,6 @@ bool IndexSwiftASTWalker::visitImports(
     for (auto File : Mod->getFiles()) {
       switch (File->getKind()) {
       case FileUnitKind::Source:
-        assert(ImportKind == SymbolKind::Unknown &&
-               "cannot handle multi-file modules");
-        ImportKind = SymbolKind::SourceFile;
-        break;
       case FileUnitKind::Builtin:
       case FileUnitKind::Derived:
         break;
@@ -406,7 +458,7 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
     return false;
 
   if (isa<FuncDecl>(D)) {
-    FuncDeclIndexSymbol Info;
+    IndexSymbol Info;
     if (initFuncDeclIndexSymbol(D, Info))
       return false;
 
@@ -429,7 +481,7 @@ bool IndexSwiftASTWalker::startEntityRef(ValueDecl *D, SourceLoc Loc) {
     return false;
 
   if (isa<AbstractFunctionDecl>(D)) {
-    CallRefIndexSymbol Info;
+    IndexSymbol Info;
     if (initCallRefIndexSymbol(ExprStack.back(), getParentExpr(), D, Loc, Info))
       return false;
 
@@ -450,7 +502,7 @@ bool IndexSwiftASTWalker::startEntity(ValueDecl *D, const IndexSymbol &Info) {
     return false;
   }
 
-  EntitiesStack.push_back({D, Info.kind, Info.subKind, Info.isRef});
+  EntitiesStack.push_back({D, Info.kind, Info.subKinds, Info.roles});
   return true;
 }
 
@@ -505,11 +557,11 @@ static SymbolSubKind getSubKindForAccessor(AccessorKind AK) {
   case AccessorKind::IsSetter:    return SymbolSubKind::AccessorSetter;
   case AccessorKind::IsWillSet:   return SymbolSubKind::AccessorWillSet;
   case AccessorKind::IsDidSet:    return SymbolSubKind::AccessorDidSet;
-  case AccessorKind::IsMaterializeForSet:
-    return SymbolSubKind::AccessorMaterializeForSet;
   case AccessorKind::IsAddressor: return SymbolSubKind::AccessorAddressor;
   case AccessorKind::IsMutableAddressor:
     return SymbolSubKind::AccessorMutableAddressor;
+  case AccessorKind::IsMaterializeForSet:
+    llvm_unreachable("unexpected MaterializeForSet");
   }
 }
 
@@ -521,18 +573,16 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
 
   auto handleInfo = [this, D, AccKind](IndexSymbol &Info) {
     Info.kind = SymbolKind::Accessor;
-    Info.subKind = getSubKindForAccessor(AccKind);
-    Info.name.clear();
-    Info.USR.clear();
-    Info.group.clear();
-    llvm::raw_svector_ostream OS(Info.USR);
-    ide::printAccessorUSR(D, AccKind, OS);
+    Info.subKinds |= getSubKindForAccessor(AccKind);
+    Info.name = "";
+    Info.USR = getAccessorUSR(D, AccKind);
+    Info.group = "";
 
     if (!IdxConsumer.startSourceEntity(Info)) {
       Cancelled = true;
       return false;
     }
-    if (!IdxConsumer.finishSourceEntity(Info.kind, Info.subKind, Info.isRef)) {
+    if (!IdxConsumer.finishSourceEntity(Info.kind, Info.subKinds, Info.roles)) {
       Cancelled = true;
       return false;
     }
@@ -540,7 +590,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
   };
 
   if (IsRef) {
-    CallRefIndexSymbol Info;
+    IndexSymbol Info;
     if (initCallRefIndexSymbol(ExprStack.back(), getParentExpr(), D, Loc, Info))
       return true; // continue walking.
 
@@ -584,15 +634,15 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
 
   Info.kind = getSymbolKindForDecl(D);
   if (isa<StructDecl>(NTD))
-    Info.subKind = SymbolSubKind::ExtensionOfStruct;
+    Info.subKinds |= SymbolSubKind::ExtensionOfStruct;
   else if (isa<ClassDecl>(NTD))
-    Info.subKind = SymbolSubKind::ExtensionOfClass;
+    Info.subKinds |= SymbolSubKind::ExtensionOfClass;
   else if (isa<EnumDecl>(NTD))
-    Info.subKind = SymbolSubKind::ExtensionOfEnum;
+    Info.subKinds |= SymbolSubKind::ExtensionOfEnum;
   else if (isa<ProtocolDecl>(NTD))
-    Info.subKind = SymbolSubKind::ExtensionOfProtocol;
+    Info.subKinds |= SymbolSubKind::ExtensionOfProtocol;
 
-  assert(Info.subKind != SymbolSubKind::None);
+  assert(Info.subKinds != 0);
 
   if (!IdxConsumer.startSourceEntity(Info)) {
     Cancelled = true;
@@ -603,7 +653,7 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
   if (Cancelled)
     return false;
 
-  EntitiesStack.push_back({D, Info.kind, Info.subKind, Info.isRef});
+  EntitiesStack.push_back({D, Info.kind, Info.subKinds, Info.roles});
   return true;
 }
 
@@ -708,14 +758,6 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc) {
   return !Cancelled;
 }
 
-static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
-  if (!D->hasName())
-    return true;
-
-  OS << D->getFullName();
-  return false;
-}
-
 bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
                                           bool IsRef, IndexSymbol &Info) {
   assert(D);
@@ -724,23 +766,20 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
     return true;
 
   if (Info.kind == SymbolKind::Accessor)
-    Info.subKind = getSubKindForAccessor(cast<FuncDecl>(D)->getAccessorKind());
+    Info.subKinds |= getSubKindForAccessor(cast<FuncDecl>(D)->getAccessorKind());
   // Cannot be extension, which is not a ValueDecl.
 
-  Info.isRef = IsRef;
+  if (IsRef)
+    Info.roles |= (unsigned)SymbolRole::Reference;
+  else
+    Info.roles |= (unsigned)SymbolRole::Definition;
 
-  Info.name.clear();
-  llvm::raw_svector_ostream NameOS(Info.name);
-  printDisplayName(D, NameOS);
-
-  llvm::raw_svector_ostream OS(Info.USR);
-  if (ide::printDeclUSR(D, OS))
+  if (getNameAndUSR(D, Info.name, Info.USR))
     return true;
+
   std::tie(Info.line, Info.column) = getLineCol(Loc);
-  if (auto Group = D->getGroupName()) {
-    Info.group.clear();
-    Info.group.append(Group.getValue());
-  }
+  if (auto Group = D->getGroupName())
+    Info.group = Group.getValue();
   return false;
 }
 
@@ -779,15 +818,15 @@ static bool isTestCandidate(ValueDecl *D) {
 }
 
 bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(ValueDecl *D,
-                                                  FuncDeclIndexSymbol &Info) {
+                                                  IndexSymbol &Info) {
   if (initIndexSymbol(D, D->getLoc(), /*IsRef=*/false, Info))
     return true;
 
-  Info.IsTestCandidate = isTestCandidate(D);
-  if (auto Group = D->getGroupName()) {
-    Info.group.clear();
-    Info.group.append(Group.getValue());
-  }
+  if (isTestCandidate(D))
+    Info.subKinds |= SymbolSubKind::UnitTest;
+
+  if (auto Group = D->getGroupName())
+    Info.group = Group.getValue();
   return false;
 }
 
@@ -823,12 +862,14 @@ static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
 
 bool IndexSwiftASTWalker::initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
                                                  ValueDecl *D, SourceLoc Loc,
-                                                 CallRefIndexSymbol &Info) {
+                                                 IndexSymbol &Info) {
   if (!ParentE)
     return true;
 
   if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
     return true;
+
+  Info.roles |= (unsigned)SymbolRole::Call;
 
   Expr *BaseE = nullptr;
   if (auto DotE = dyn_cast<DotSyntaxCallExpr>(ParentE))
@@ -848,10 +889,11 @@ bool IndexSwiftASTWalker::initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
       ReceiverTy = MetaT->getInstanceType();
 
     if (auto TyD = ReceiverTy->getAnyNominal()) {
-      llvm::raw_svector_ostream OS(Info.ReceiverUSR);
-      ide::printDeclUSR(TyD, OS);
-
-      Info.IsDynamic = isDynamicCall(BaseE, D);
+      StringRef unused;
+      if (getNameAndUSR(TyD, unused, Info.receiverUSR))
+        return true;
+      if (isDynamicCall(BaseE, D))
+        Info.roles |= (unsigned)SymbolRole::Dynamic;
     }
   }
 

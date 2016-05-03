@@ -8,24 +8,71 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+import argparse
+import os
 import unittest
 
-from swift_build_support.migration import migrate_impl_args
+from swift_build_support import migration
 
 
 class MigrateImplArgsTestCase(unittest.TestCase):
-    def test_args_moved_before_separator(self):
-        # Tests that '-RT --foo=bar -- --foo=baz --flim' is parsed as
-        # '-RT --foo=bar --foo=baz -- --flim'
-        args = migrate_impl_args(
-            ['-RT', '--darwin-xcrun-toolchain=foo', '--',
-             '--darwin-xcrun-toolchain=bar', '--other'],
-            ['--darwin-xcrun-toolchain'])
+    def test_report_unknown_args(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-R', '--release', action='store_true')
+        parser.add_argument('-T', '--validation-test', action='store_true')
+        parser.add_argument('--darwin-xcrun-toolchain')
+
+        args = migration.parse_args(
+            parser,
+            ['-RT', '--unknown', 'true', '--darwin-xcrun-toolchain=foo', '--',
+             '--darwin-xcrun-toolchain=bar', '--other'])
 
         self.assertEqual(
             args,
-            ['-RT', '--darwin-xcrun-toolchain=foo',
-             '--darwin-xcrun-toolchain=bar', '--', '--other'])
+            argparse.Namespace(
+                release=True,
+                validation_test=True,
+                darwin_xcrun_toolchain='bar',
+                build_script_impl_args=['--unknown', 'true', '--other']))
+
+    def test_no_unknown_args(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-R', '--release', action='store_true')
+        parser.add_argument('-T', '--validation-test', action='store_true')
+        parser.add_argument('--darwin-xcrun-toolchain')
+
+        args = migration.parse_args(
+            parser,
+            ['-RT', '--darwin-xcrun-toolchain=bar'])
+
+        self.assertEqual(
+            args,
+            argparse.Namespace(
+                release=True,
+                validation_test=True,
+                darwin_xcrun_toolchain='bar',
+                build_script_impl_args=[]))
+
+    def test_check_impl_args(self):
+        # Assuming file locations:
+        #   utils/swift_build_support/tests/test_migration.py
+        #   utils/build-script-impl
+        build_script_impl = os.path.join(
+            os.path.dirname(__file__), '..', '..', 'build-script-impl')
+
+        self.assertIsNone(migration.check_impl_args(build_script_impl,
+                                                    ['--reconfigure']))
+
+        # FIXME: self.assertRaises context manager is not py2.6 compatible.
+        with self.assertRaises(ValueError) as cm:
+            migration.check_impl_args(build_script_impl, ['foo'])
+        self.assertIn('foo', str(cm.exception))
+
+        with self.assertRaises(ValueError) as cm:
+            migration.check_impl_args(build_script_impl, ['--reconfigure',
+                                                          '--foo=true'])
+        self.assertIn('foo', str(cm.exception))
+
 
 if __name__ == '__main__':
     unittest.main()
