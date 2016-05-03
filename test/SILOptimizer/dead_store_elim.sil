@@ -1340,3 +1340,30 @@ bb0(%0 : $*Int):
 
 sil @closure : $@convention(thin) (Bool, @in Int) -> Int
 
+// Make sure we invalidate the store in bb1 when we process the SILargument. If not
+// we could remove the store in bb1 which is incorrect.
+//
+// CHECK-LABEL: invalidate_base_for_silargument
+// CHECK: bb1([[A0:%.+]] : $foo):
+// CHECK: {{ store}}
+// CHECK: bb2:
+// CHECK: {{ store}}
+sil hidden @invalidate_base_for_silargument : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref $foo
+  %4 = integer_literal $Builtin.Int64, 12
+  %5 = struct $Int (%4 : $Builtin.Int64)
+  br bb1(%1 : $foo)
+
+bb1(%2 : $foo):
+  %6 = ref_element_addr %2 : $foo, #foo.a
+  store %5 to %6 : $*Int
+  %9 = alloc_ref $foo
+  cond_br undef, bb1(%9: $foo), bb2
+
+bb2:
+  %7 = ref_element_addr %2 : $foo, #foo.a
+  store %5 to %7 : $*Int
+  %14 = tuple ()
+  return %14 : $()
+}
