@@ -3,6 +3,10 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0071](https://github.com/apple/swift-evolution/blob/master/proposals/0071-member-keywords.md):
+  "Allow (most) keywords in member references" is implemented.  This allows the
+  use of members after a dot without backticks, e.g. "foo.default".
+
 * [SE-0057](https://github.com/apple/swift-evolution/blob/master/proposals/0057-importing-objc-generics.md):
   Objective-C lightweight generic classes are now imported as generic types
   in Swift. Because Objective-C generics are not represented at runtime,

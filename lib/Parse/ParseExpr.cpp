@@ -685,9 +685,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
     }
 
     DeclNameLoc nameLoc;
-    DeclName name = parseUnqualifiedDeclName(
-                      /*allowInit=*/true,
-                      nameLoc,
+    DeclName name = parseUnqualifiedDeclName(/*afterDot=*/true, nameLoc,
                       diag::expected_identifier_after_super_dot_expr);
     if (!name)
       return nullptr;
@@ -894,7 +892,7 @@ getMagicIdentifierLiteralKind(tok Kind) {
 ///
 ///   expr-dot:
 ///     expr-postfix '.' 'type'
-///     expr-postfix '.' identifier generic-args? expr-call-suffix?
+///     expr-postfix '.' (identifier|keyword) generic-args? expr-call-suffix?
 ///     expr-postfix '.' integer_literal
 ///
 ///   expr-subscript:
@@ -1109,7 +1107,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       return Result;
     }
 
-    Name = parseUnqualifiedDeclName(/*allowInit=*/true, NameLoc, 
+    Name = parseUnqualifiedDeclName(/*afterDot=*/true, NameLoc,
                                     diag::expected_identifier_after_dot_expr);
     if (!Name) return nullptr;
 
@@ -1307,17 +1305,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         Result.setHasCodeCompletion();
         return Result;
       }
- 
-      // Non-identifier cases.
-      if (Tok.isNot(tok::identifier, tok::kw_init)) {
-        checkForInputIncomplete();
-        diagnose(Tok, diag::expected_member_name);
-        return nullptr;
-      }
 
-      assert(Tok.isAny(tok::identifier, tok::kw_init));
       DeclNameLoc NameLoc;
-      DeclName Name = parseUnqualifiedDeclName(/*allowInit=*/true,
+      DeclName Name = parseUnqualifiedDeclName(/*allowDot=*/true,
                                                NameLoc,
                                                diag::expected_member_name);
       if (!Name) return nullptr;
@@ -1600,18 +1590,17 @@ void Parser::diagnoseEscapedArgumentLabel(const Token &tok) {
     .fixItRemoveChars(end.getAdvancedLoc(-1), end);
 }
 
-DeclName Parser::parseUnqualifiedDeclName(bool allowInit,
+DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
                                           DeclNameLoc &loc,
                                           const Diagnostic &diag) {
   // Consume the base name.
-  Identifier baseName;
+  Identifier baseName = Context.getIdentifier(Tok.getText());
   SourceLoc baseNameLoc;
-  if (Tok.is(tok::kw_init) && allowInit) {
-    baseName = Context.Id_init;
-    baseNameLoc = consumeToken(tok::kw_init);
-  } else if (Tok.is(tok::identifier) || Tok.is(tok::kw_Self) ||
-             Tok.is(tok::kw_self)) {
+  if (Tok.is(tok::identifier) || Tok.is(tok::kw_Self) ||
+      Tok.is(tok::kw_self)) {
     baseNameLoc = consumeIdentifier(&baseName);
+  } else if (afterDot && Tok.isKeyword()) {
+    baseNameLoc = consumeToken();
   } else {
     checkForInputIncomplete();
     diagnose(Tok, diag);
@@ -1713,7 +1702,7 @@ Expr *Parser::parseExprIdentifier() {
 
   // Parse the unqualified-decl-name.
   DeclNameLoc loc;
-  DeclName name = parseUnqualifiedDeclName(/*allowInit=*/false, loc,
+  DeclName name = parseUnqualifiedDeclName(/*afterDot=*/false, loc,
                                            diag::expected_expr);
 
   SmallVector<TypeRepr*, 8> args;

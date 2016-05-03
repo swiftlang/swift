@@ -1124,11 +1124,11 @@ public:
   ///     identifier
   ///     identifier '(' ((identifier | '_') ':') + ')'
   ///
-  ///
-  /// \param allowInit Whether to allow 'init' for initializers.
+  /// \param afterDot Whether this identifier is coming after a period, which
+  /// enables '.init' and '.default' like expressions.
   /// \param loc Will be populated with the location of the name.
   /// \param diag The diagnostic to emit if this is not a name.
-  DeclName parseUnqualifiedDeclName(bool allowInit, DeclNameLoc &loc,
+  DeclName parseUnqualifiedDeclName(bool afterDot, DeclNameLoc &loc,
                                     const Diagnostic &diag);
 
   Expr *parseExprIdentifier();
