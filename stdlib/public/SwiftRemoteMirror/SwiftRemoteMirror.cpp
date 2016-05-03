@@ -85,6 +85,15 @@ swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
 }
 
 swift_typeref_t
+swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
+                                           const char *MangledTypeName,
+                                           uint64_t Length) {
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto TR = Context->readTypeFromMangledName(MangledTypeName, Length);
+  return reinterpret_cast<swift_typeref_t>(TR);
+}
+
+swift_typeref_t
 swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
                                           unsigned Index) {
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);

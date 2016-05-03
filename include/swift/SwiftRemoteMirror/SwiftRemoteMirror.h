@@ -74,6 +74,12 @@ swift_typeref_t
 swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Object);
 
+/// Returns a typeref from a mangled type name string.
+swift_typeref_t
+swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
+                                           const char *MangledName,
+                                           uint64_t Length);
+
 /// Returns a structure describing the layout of a value of a typeref.
 /// For classes, this returns the reference value itself.
 swift_typeinfo_t
