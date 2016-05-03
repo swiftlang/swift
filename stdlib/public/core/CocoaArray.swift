@@ -25,7 +25,9 @@ import SwiftShims
 /// `Collection` conformance.  Why not make
 /// `_NSArrayCore` conform directly?  It's a class, and I
 /// don't want to pay for the dynamic dispatch overhead.
-internal struct _CocoaArrayWrapper : Collection {
+internal struct _CocoaArrayWrapper : RandomAccessCollection {
+  typealias Indices = CountableRange<Int>
+  
   var startIndex: Int {
     return 0
   }

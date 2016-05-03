@@ -350,7 +350,8 @@ private:
   /// Constructs a new module and validates it.
   ModuleFile(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
              std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-             bool isFramework, serialization::ExtendedValidationInfo *extInfo);
+             bool isFramework, serialization::ValidationInfo &info,
+             serialization::ExtendedValidationInfo *extInfo);
 
 public:
   /// Change the status of the current module. Default argument marks the module
@@ -479,15 +480,16 @@ public:
   /// \param[out] extInfo Optionally, extra info serialized about the module.
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
-  static Status
+  static serialization::ValidationInfo
   load(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        bool isFramework, std::unique_ptr<ModuleFile> &theModule,
        serialization::ExtendedValidationInfo *extInfo = nullptr) {
+    serialization::ValidationInfo info;
     theModule.reset(new ModuleFile(std::move(moduleInputBuffer),
                                    std::move(moduleDocInputBuffer),
-                                   isFramework, extInfo));
-    return theModule->getStatus();
+                                   isFramework, info, extInfo));
+    return info;
   }
 
   // Out of line to avoid instantiation OnDiskChainedHashTable here.
@@ -595,17 +597,6 @@ public:
   StringRef getModuleFilename() const {
     // FIXME: This seems fragile, maybe store the filename separately ?
     return ModuleInputBuffer->getBufferIdentifier();
-  }
-
-  /// Returns the module name as stored in the serialized data.
-  StringRef getModuleName() const {
-    return Name;
-  }
-
-  /// Returns the target triple the module was compiled for,
-  /// as stored in the serialized data.
-  StringRef getTargetTriple() const {
-    return TargetTriple;
   }
 
   /// AST-verify imported decls.

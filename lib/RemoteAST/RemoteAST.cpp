@@ -30,7 +30,10 @@
 #include "swift/SIL/SILModule.h"
 #include "../IRGen/IRGenModule.h"
 #include "../IRGen/FixedTypeInfo.h"
+#include "../IRGen/GenClass.h"
+#include "../IRGen/GenStruct.h"
 #include "../IRGen/GenTuple.h"
+#include "../IRGen/MemberAccessStrategy.h"
 
 using namespace swift;
 using namespace swift::remote;
@@ -38,6 +41,10 @@ using namespace swift::remoteAST;
 
 using irgen::Alignment;
 using irgen::Size;
+
+static inline RemoteAddress operator+(RemoteAddress address, Size offset) {
+  return RemoteAddress(address.getAddressData() + offset.getValue());
+}
 
 namespace {
 
@@ -353,6 +360,10 @@ public:
     if (!base->allowsOwnership())
       return Type();
     return WeakStorageType::get(base, Ctx);
+  }
+
+  Type createSILBoxType(Type base) {
+    return SILBoxType::get(base->getCanonicalType());
   }
 
   Type createObjCClassType(StringRef name) {
@@ -673,9 +684,9 @@ public:
 
     // Split into cases.
     if (auto typeDecl = type->getNominalOrBoundGenericNominal()) {
-      return getOffsetOfMember(type, typeDecl, optMetadata, memberName);
+      return getOffsetOfField(type, typeDecl, optMetadata, memberName);
     } else if (auto tupleType = type->getAs<TupleType>()) {
-      return getOffsetOfMember(tupleType, optMetadata, memberName);
+      return getOffsetOfTupleElement(tupleType, optMetadata, memberName);
     } else {
       return Result<uint64_t>::emplaceFailure(Failure::TypeHasNoSuchMember,
                                               memberName);
@@ -690,32 +701,176 @@ protected:
 
 private:
   virtual RemoteASTTypeBuilder &getBuilder() = 0;
+  virtual MemoryReader &getReader() = 0;
+  virtual bool readWordOffset(RemoteAddress address, int64_t *offset) = 0;
   virtual std::unique_ptr<IRGenContext> createIRGenContext() = 0;
   virtual Result<uint64_t>
   getOffsetOfTupleElementFromMetadata(RemoteAddress metadata,
                                       unsigned elementIndex) = 0;
+  virtual Result<uint64_t>
+  getOffsetOfFieldFromMetadata(RemoteAddress metadata,
+                               StringRef memberName) = 0;
 
   IRGenContext *getIRGen() {
     if (!IRGen) IRGen = createIRGenContext();
     return IRGen.get();
   }
 
-  Result<uint64_t>
-  getOffsetOfMember(Type type, NominalTypeDecl *typeDecl,
-                    RemoteAddress optMetadata, StringRef memberName) {
-    // FIXME
-    return Result<uint64_t>::emplaceFailure(Failure::Unknown);
+  template <class T, class KindTy, class... ArgTys>
+  Result<T> fail(KindTy kind, ArgTys &&...args) {
+    return Result<T>::emplaceFailure(kind, std::forward<ArgTys>(args)...);
   }
 
   Result<uint64_t>
-  getOffsetOfMember(TupleType *type, RemoteAddress optMetadata,
-                    StringRef memberName) {
+  getOffsetOfField(Type type, NominalTypeDecl *typeDecl,
+                   RemoteAddress optMetadata, StringRef memberName) {
+    if (!isa<StructDecl>(typeDecl) && !isa<ClassDecl>(typeDecl))
+      return fail<uint64_t>(Failure::Unimplemented,
+                            "access members of this kind of type");
+
+    // Try to find the member.
+    VarDecl *member = findField(typeDecl, memberName);
+
+    // If we found a member, try to find its offset statically.
+    if (member) {
+      if (auto irgen = getIRGen()) {
+        return getOffsetOfFieldFromIRGen(irgen->IGM, type, typeDecl,
+                                          optMetadata, member);
+      }
+    }
+
+    // Try searching the metadata for a member with the given name.
+    if (optMetadata) {
+      return getOffsetOfFieldFromMetadata(optMetadata, memberName);
+    }
+
+    // Okay, that's everything we know how to try.
+
+    // Use a specialized diagnostic if we couldn't find any such member.
+    if (!member) {
+      return fail<uint64_t>(Failure::TypeHasNoSuchMember, memberName);
+    }
+
+    return fail<uint64_t>(Failure::Unknown);
+  }
+
+  /// Look for an instance property of the given nominal type that's
+  /// known to be stored.
+  VarDecl *findField(NominalTypeDecl *typeDecl, StringRef memberName) {
+    for (auto field : typeDecl->getStoredProperties()) {
+      if (field->getName().str() == memberName)
+        return field;
+    }
+    return nullptr;
+  }
+
+  using MemberAccessStrategy = irgen::MemberAccessStrategy;
+
+  Result<uint64_t>
+  getOffsetOfFieldFromIRGen(irgen::IRGenModule &IGM, Type type,
+                            NominalTypeDecl *typeDecl,
+                            RemoteAddress optMetadata, VarDecl *member) {
+    SILType loweredTy = IGM.getSILTypes().getLoweredType(type);
+
+    MemberAccessStrategy strategy =
+      (isa<StructDecl>(typeDecl)
+        ? getPhysicalStructMemberAccessStrategy(IGM, loweredTy, member)
+        : getPhysicalClassMemberAccessStrategy(IGM, loweredTy, member));
+
+    switch (strategy.getKind()) {
+    case MemberAccessStrategy::Kind::Complex:
+      return fail<uint64_t>(Failure::Unimplemented,
+                            "access members with complex storage");
+
+    case MemberAccessStrategy::Kind::DirectFixed:
+      return uint64_t(strategy.getDirectOffset().getValue());
+
+    case MemberAccessStrategy::Kind::DirectGlobal: {
+      RemoteAddress directOffsetAddress =
+        getReader().getSymbolAddress(strategy.getDirectGlobalSymbol());
+      if (!directOffsetAddress)
+        return getFailure<uint64_t>();
+
+      return readDirectOffset(directOffsetAddress,
+                              strategy.getDirectOffsetKind());
+    }
+
+    case MemberAccessStrategy::Kind::IndirectFixed: {
+      // We can't apply indirect offsets without metadata.
+      if (!optMetadata)
+        return fail<uint64_t>(Failure::Unimplemented,
+                              "access generically-offset members without "
+                              "metadata");
+
+      Size indirectOffset = strategy.getIndirectOffset();
+      return readIndirectOffset(optMetadata, indirectOffset,
+                                strategy.getDirectOffsetKind());
+    }
+
+    case MemberAccessStrategy::Kind::IndirectGlobal: {
+      // We can't apply indirect offsets without metadata.
+      if (!optMetadata)
+        return fail<uint64_t>(Failure::Unimplemented,
+                              "access generically-offset members without "
+                              "metadata");
+
+      RemoteAddress indirectOffsetAddress =
+        getReader().getSymbolAddress(strategy.getIndirectGlobalSymbol());
+
+      Size indirectOffset;
+      if (!readOffset(indirectOffsetAddress,
+                      strategy.getIndirectOffsetKind(),
+                      indirectOffset))
+        return getFailure<uint64_t>();
+
+      return readIndirectOffset(optMetadata, indirectOffset,
+                                strategy.getDirectOffsetKind());
+    }
+    }
+    llvm_unreachable("bad member MemberAccessStrategy");
+  }
+
+  bool readOffset(RemoteAddress address,
+                  MemberAccessStrategy::OffsetKind kind,
+                  Size &offset) {
+    switch (kind) {
+    case MemberAccessStrategy::OffsetKind::Bytes_Word: {
+      int64_t rawOffset;
+      if (!readWordOffset(address, &rawOffset))
+        return false;
+      offset = Size(rawOffset);
+      return true;
+    }
+    }
+    llvm_unreachable("bad offset kind");
+  }
+
+  Result<uint64_t> readIndirectOffset(RemoteAddress metadata,
+                                      Size indirectOffset,
+                                      MemberAccessStrategy::OffsetKind kind) {
+    RemoteAddress directOffsetAddress = metadata + indirectOffset;
+    return readDirectOffset(directOffsetAddress, kind);
+  }
+
+
+  Result<uint64_t> readDirectOffset(RemoteAddress directOffsetAddress,
+                                    MemberAccessStrategy::OffsetKind kind) {
+    Size directOffset;
+    if (!readOffset(directOffsetAddress, kind, directOffset))
+      return getFailure<uint64_t>();
+
+    return uint64_t(directOffset.getValue());
+  }
+
+  /// Read the
+  Result<uint64_t>
+  getOffsetOfTupleElement(TupleType *type, RemoteAddress optMetadata,
+                          StringRef memberName) {
     // Check that the member "name" is a valid index into the tuple.
     unsigned targetIndex;
     if (memberName.getAsInteger(10, targetIndex) ||
         targetIndex >= type->getNumElements())
-      return Result<uint64_t>::emplaceFailure(Failure::TypeHasNoSuchMember,
-                                              memberName);
+      return fail<uint64_t>(Failure::TypeHasNoSuchMember, memberName);
 
     // Fast path: element 0 is always at offset 0.
     if (targetIndex == 0) return uint64_t(0);
@@ -795,6 +950,21 @@ class RemoteASTContextConcreteImpl final : public RemoteASTContextImpl {
     return Reader.Builder;
   }
 
+  MemoryReader &getReader() override {
+    return *Reader.Reader;
+  }
+
+  bool readWordOffset(RemoteAddress address, int64_t *extendedOffset) override {
+    using unsigned_size_t = typename Runtime::StoredSize;
+    using signed_size_t = typename std::make_signed<unsigned_size_t>::type;
+    signed_size_t offset;
+    if (!getReader().readInteger(address, &offset))
+      return false;
+
+    *extendedOffset = offset;
+    return true;
+  }
+
 public:
   RemoteASTContextConcreteImpl(std::shared_ptr<MemoryReader> &&reader,
                                ASTContext &ctx)
@@ -834,6 +1004,14 @@ public:
                                       index, &offset))
       return uint64_t(offset);
     return getFailure<uint64_t>();
+  }
+
+  Result<uint64_t>
+  getOffsetOfFieldFromMetadata(RemoteAddress metadata,
+                               StringRef memberName) override {
+    // TODO: this would be useful for resilience
+    return fail<uint64_t>(Failure::Unimplemented,
+                          "look up field offset by name");
   }
 };
 

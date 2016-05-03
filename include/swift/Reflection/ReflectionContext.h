@@ -40,12 +40,14 @@ class ReflectionContext
        : public remote::MetadataReader<Runtime, TypeRefBuilder> {
   using super = remote::MetadataReader<Runtime, TypeRefBuilder>;
 
-public:
-  using super::getBuilder;
-  using super::readTypeFromMetadata;
-  using typename super::StoredPointer;
+  std::unordered_map<typename super::StoredPointer, const TypeInfo *> Cache;
 
 public:
+  using super::getBuilder;
+  using super::readIsaMask;
+  using super::readTypeFromMetadata;
+  using super::readMetadataFromInstance;
+  using typename super::StoredPointer;
 
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
     : super(std::move(reader)) {}
@@ -65,31 +67,56 @@ public:
     getBuilder().addReflectionInfo(I);
   }
 
-  /// Return a description of the layout of a heap object having the given
+  /// Return a description of the layout of a class instance with the given
   /// metadata as its isa pointer.
-  const TypeInfo *getInstanceTypeInfo(StoredPointer MetadataAddress) {
-    // FIXME: Add caching
+  const TypeInfo *getMetadataTypeInfo(StoredPointer MetadataAddress) {
+    // See if we cached the layout already
+    auto found = Cache.find(MetadataAddress);
+    if (found != Cache.end())
+      return found->second;
+
     auto &TC = getBuilder().getTypeConverter();
 
+    const TypeInfo *TI = nullptr;
+
     auto TR = readTypeFromMetadata(MetadataAddress);
-    if (TR == nullptr)
-      return nullptr;
-
     auto kind = this->readKindFromMetadata(MetadataAddress);
-    if (!kind.first)
-      return nullptr;
+    if (TR != nullptr && kind.first) {
+      switch (kind.second) {
+      case MetadataKind::Class: {
+        // Figure out where the stored properties of this class begin
+        // by looking at the size of the superclass
+        bool valid;
+        unsigned size, align;
+        auto super =
+            this->readSuperClassFromClassMetadata(MetadataAddress);
+        if (super) {
+          std::tie(valid, size, align) =
+              this->readInstanceSizeAndAlignmentFromClassMetadata(super);
 
-    switch (kind.second) {
-    case MetadataKind::Class: {
-      auto start = this->readInstanceStartFromClassMetadata(MetadataAddress);
-      if (!start.first)
-        return nullptr;
-      auto *TI = TC.getInstanceTypeInfo(TR, start.second);
-      return TI;
+          // Perform layout
+          if (valid)
+            TI = TC.getClassInstanceTypeInfo(TR, size, align);
+        }
+        break;
+      }
+      default:
+        break;
+      }
     }
-    default:
+
+    // Cache the result for future lookups
+    Cache[MetadataAddress] = TI;
+    return TI;
+  }
+
+  /// Return a description of the layout of a class instance with the given
+  /// metadata as its isa pointer.
+  const TypeInfo *getInstanceTypeInfo(StoredPointer ObjectAddress) {
+    auto MetadataAddress = readMetadataFromInstance(ObjectAddress);
+    if (!MetadataAddress.first)
       return nullptr;
-    }
+    return getMetadataTypeInfo(MetadataAddress.second);
   }
 
   /// Return a description of the layout of a value with the given type.

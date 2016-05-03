@@ -741,34 +741,89 @@ bool SimplifyCFG::simplifyAfterDroppingPredecessor(SILBasicBlock *BB) {
   return false;
 }
 
+/// Tries to figure out the enum case of an enum value \p Val which is used in
+/// block \p UsedInBB.
+static NullablePtr<EnumElementDecl> getEnumCase(SILValue Val,
+                                                SILBasicBlock *UsedInBB,
+                                                int RecursionDepth) {
+  // Limit the number of recursions. This is an easy way to cope with cycles
+  // in the SSA graph.
+  if (RecursionDepth > 3)
+    return nullptr;
+
+  // Handle the obvious case.
+  if (auto *EI = dyn_cast<EnumInst>(Val))
+    return EI->getElement();
+
+  // Check if the value is dominated by a switch_enum, e.g.
+  //   switch_enum %val, case A: bb1, case B: bb2
+  // bb1:
+  //   use %val   // We know that %val has case A
+  SILBasicBlock *Pred = UsedInBB->getSinglePredecessor();
+  int Limit = 3;
+  // A very simple dominator check: just walk up the single predecessor chain.
+  // The limit is just there to not run into an infinite loop in case of an
+  // unreachable CFG cycle.
+  while (Pred && --Limit > 0) {
+    if (auto *PredSEI = dyn_cast<SwitchEnumInst>(Pred->getTerminator())) {
+      if (PredSEI->getOperand() == Val)
+        return PredSEI->getUniqueCaseForDestination(UsedInBB);
+    }
+    UsedInBB = Pred;
+    Pred = UsedInBB->getSinglePredecessor();
+  }
+
+  // In case of a block argument, recursively check the enum cases of all
+  // incoming predecessors.
+  if (auto *Arg = dyn_cast<SILArgument>(Val)) {
+    llvm::SmallVector<std::pair<SILBasicBlock *, SILValue>, 8> IncomingVals;
+    if (!Arg->getIncomingValues(IncomingVals))
+      return nullptr;
+
+    EnumElementDecl *CommonCase = nullptr;
+    for (std::pair<SILBasicBlock *, SILValue> Incoming : IncomingVals) {
+      NullablePtr<EnumElementDecl> IncomingCase =
+        getEnumCase(Incoming.second, Incoming.first, RecursionDepth + 1);
+      if (!IncomingCase)
+        return nullptr;
+      if (IncomingCase.get() != CommonCase) {
+        if (CommonCase)
+          return nullptr;
+        CommonCase = IncomingCase.get();
+      }
+    }
+    assert(CommonCase);
+    return CommonCase;
+  }
+  return nullptr;
+}
+
 /// couldSimplifyUsers - Check to see if any simplifications are possible if
 /// "Val" is substituted for BBArg.  If so, return true, if nothing obvious
 /// is possible, return false.
-static bool couldSimplifyUsers(SILArgument *BBArg, SILValue Val) {
+static bool couldSimplifyUsers(SILArgument *BBArg, BranchInst *BI,
+                              SILValue BIArg) {
   // If the value being substituted is an enum, check to see if there are any
   // switches on it.
-  auto *EI = dyn_cast<EnumInst>(Val);
-  if (!EI)
+  if (!getEnumCase(BIArg, BI->getParent(), 0))
     return false;
 
   for (auto UI : BBArg->getUses()) {
     auto *User = UI->getUser();
-    // We only know we can simplify if the switch_enum user is in the block we
-    // are trying to jump thread.
-    // The value must not be define in the same basic block as the switch enum
-    // user. If this is the case we have a single block switch_enum loop.
-    if (isa<SwitchEnumInst>(User) || isa<SelectEnumInst>(User))
-      if (BBArg->getParent() == User->getParent() &&
-          EI->getParent() != BBArg->getParent())
+    if (BBArg->getParent() == User->getParent()) {
+      // We only know we can simplify if the switch_enum user is in the block we
+      // are trying to jump thread.
+      // The value must not be define in the same basic block as the switch enum
+      // user. If this is the case we have a single block switch_enum loop.
+      if (isa<SwitchEnumInst>(User) || isa<SelectEnumInst>(User))
         return true;
 
-    // Also allow enum of enum, which usually can be combined to a single
-    // instruction. This helps to simplify the creation of an enum from an
-    // integer raw value.
-    if (isa<EnumInst>(User))
-      if (BBArg->getParent() == User->getParent() &&
-          EI->getParent() != BBArg->getParent())
+      // Also allow enum of enum, which usually can be combined to a single
+      // instruction. This helps to simplify the creation of an enum from an
+      // integer raw value.
+      if (isa<EnumInst>(User))
         return true;
+    }
   }
   return false;
 }
@@ -850,7 +905,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
 
   if (!WantToThread) {
     for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i)
-      if (couldSimplifyUsers(DestBB->getBBArg(i), BI->getArg(i))) {
+      if (couldSimplifyUsers(DestBB->getBBArg(i), BI, BI->getArg(i))) {
         WantToThread = true;
         break;
       }
@@ -1514,15 +1569,11 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
 /// switch_enum instruction that gets its operand from an enum
 /// instruction.
 bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
-  auto *EI = dyn_cast<EnumInst>(SEI->getOperand());
+  auto EnumCase = getEnumCase(SEI->getOperand(), SEI->getParent(), 0);
+  if (!EnumCase)
+    return false;
 
-  // If the operand is not from an enum, see if this is a case where
-  // only one destination of the branch has code that does not end
-  // with unreachable.
-  if (!EI)
-    return simplifySwitchEnumUnreachableBlocks(SEI);
-
-  auto *LiveBlock = SEI->getCaseDestination(EI->getElement());
+  auto *LiveBlock = SEI->getCaseDestination(EnumCase.get());
   auto *ThisBB = SEI->getParent();
 
   bool DroppedLiveBlock = false;
@@ -1536,13 +1587,22 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
     Dests.push_back(S);
   }
 
-  if (EI->hasOperand() && !LiveBlock->bbarg_empty())
-    SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock,
-                                             EI->getOperand());
-  else
-    SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock);
+  auto *EI = dyn_cast<EnumInst>(SEI->getOperand());
+  SILBuilderWithScope Builder(SEI);
+  if (!LiveBlock->bbarg_empty()) {
+    SILValue PayLoad;
+    if (EI) {
+      PayLoad = EI->getOperand();
+    } else {
+      PayLoad = Builder.createUncheckedEnumData(SEI->getLoc(),
+                                            SEI->getOperand(), EnumCase.get());
+    }
+    Builder.createBranch(SEI->getLoc(), LiveBlock, PayLoad);
+  } else {
+    Builder.createBranch(SEI->getLoc(), LiveBlock);
+  }
   SEI->eraseFromParent();
-  if (EI->use_empty()) EI->eraseFromParent();
+  if (EI && EI->use_empty()) EI->eraseFromParent();
 
   addToWorklist(ThisBB);
 
@@ -2058,10 +2118,16 @@ bool SimplifyCFG::simplifyBlocks() {
       // FIXME: Optimize for known switch values.
       Changed |= simplifySwitchValueBlock(cast<SwitchValueInst>(TI));
       break;
-    case TermKind::SwitchEnumInst:
-      Changed |= simplifySwitchEnumBlock(cast<SwitchEnumInst>(TI));
+    case TermKind::SwitchEnumInst: {
+      auto *SEI = cast<SwitchEnumInst>(TI);
+      if (simplifySwitchEnumBlock(SEI)) {
+        Changed = false;
+      } else {
+        Changed |= simplifySwitchEnumUnreachableBlocks(SEI);
+      }
       Changed |= simplifyTermWithIdenticalDestBlocks(BB);
       break;
+    }
     case TermKind::UnreachableInst:
       Changed |= simplifyUnreachableBlock(cast<UnreachableInst>(TI));
       break;

@@ -703,6 +703,33 @@ public:
   }
 };
 
+class SILBoxTypeRef final : public TypeRef {
+  const TypeRef *BoxedType;
+
+  static TypeRefID Profile(const TypeRef *BoxedType) {
+    TypeRefID ID;
+    ID.addPointer(BoxedType);
+    return ID;
+  }
+public:
+  SILBoxTypeRef(const TypeRef *BoxedType)
+    : TypeRef(TypeRefKind::SILBox), BoxedType(BoxedType) {}
+
+  template <typename Allocator>
+  static const SILBoxTypeRef *create(Allocator &A,
+                                     const TypeRef *BoxedType) {
+    FIND_OR_CREATE_TYPEREF(A, SILBoxTypeRef, BoxedType);
+  }
+
+  const TypeRef *getBoxedType() const {
+    return BoxedType;
+  }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::SILBox;
+  }
+};
+
 template <typename ImplClass, typename RetTy = void, typename... Args>
 class TypeRefVisitor {
 public:

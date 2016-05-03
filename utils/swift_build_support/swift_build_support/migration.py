@@ -31,7 +31,7 @@ def parse_args(parser, argv):
         build-script -RT -- --reconfigure
     """
     args, unknown_args = parser.parse_known_args(
-        arg for arg in argv if arg != '--')
+        list(arg for arg in argv if arg != '--'))
     args.build_script_impl_args = unknown_args
     return args
 

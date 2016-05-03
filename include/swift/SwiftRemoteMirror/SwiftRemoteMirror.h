@@ -20,6 +20,7 @@
 #ifndef SWIFT_REFLECTION_SWIFT_REFLECTION_H
 #define SWIFT_REFLECTION_SWIFT_REFLECTION_H
 
+#include "MemoryReaderInterface.h"
 #include "SwiftRemoteMirrorTypes.h"
 
 /// Major version changes when there are ABI or source incompatible changes.
@@ -50,19 +51,26 @@ swift_reflection_destroyReflectionContext(SwiftReflectionContextRef Context);
 /// Add reflection sections for a loaded Swift image.
 void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
-                                   const char *ImageName,
-                                   swift_reflection_section_t fieldmd,
-                                   swift_reflection_section_t builtin,
-                                   swift_reflection_section_t assocty,
-                                   swift_reflection_section_t typeref,
-                                   swift_reflection_section_t reflstr);
+                                   swift_reflection_info_t Info);
 
+
+/// Returns a boolean indicating if the isa mask was successfully
+/// read, in which case it is stored in the isaMask out parameter.
+int
+swift_reflection_readIsaMask(SwiftReflectionContextRef ContextRef,
+                             uintptr_t *outIsaMask);
 
 /// Returns an opaque type reference for a metadata pointer, or
 /// NULL if one can't be constructed.
 swift_typeref_t
 swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Metadata);
+
+/// Returns an opaque type reference for a class or closure context
+/// instance pointer, or NULL if one can't be constructed.
+swift_typeref_t
+swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
+                                    uintptr_t Object);
 
 /// Returns a structure describing the layout of a value of a typeref.
 /// For classes, this returns the reference value itself.
@@ -89,7 +97,20 @@ swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata,
                                  unsigned Index);
 
-/// Returns a fully instantiated typeref for a generic argument by index.
+/// Returns a structure describing the layout of a class or closure
+/// context instance, from a pointer to the object itself.
+swift_typeinfo_t
+swift_reflection_infoForInstance(SwiftReflectionContextRef ContextRef,
+                                 uintptr_t Object);
+
+/// Returns the information about a child field of a class or closure
+/// context instance.
+swift_childinfo_t
+swift_reflection_childOfInstance(SwiftReflectionContextRef ContextRef,
+                                 uintptr_t Object,
+                                 unsigned Index);
+
+/// Returns the number of generic arguments of a typeref.
 unsigned
 swift_reflection_genericArgumentCountOfTypeRef(swift_typeref_t OpaqueTypeRef);
 
@@ -117,14 +138,26 @@ swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
 ///
 /// Returns true if InstanceTypeRef and StartOfInstanceData contain valid
 /// valid values.
-bool swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
-                                         addr_t InstanceAddress,
-                                         swift_typeref_t ExistentialTypeRef,
-                                         swift_typeref_t *OutInstanceTypeRef,
-                                         addr_t *OutStartOfInstanceData);
+int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
+                                        addr_t InstanceAddress,
+                                        swift_typeref_t ExistentialTypeRef,
+                                        swift_typeref_t *OutInstanceTypeRef,
+                                        addr_t *OutStartOfInstanceData);
 
 /// Dump a brief description of the typeref as a tree to stderr.
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef);
+
+/// Dump information about the layout for a typeref.
+void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
+                                         swift_typeref_t OpaqueTypeRef);
+
+/// Dump information about the layout of a class instance from its isa pointer.
+void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
+                                          uintptr_t Metadata);
+
+/// Dump information about the layout of a class or closure context instance.
+void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
+                                          uintptr_t Object);
 
 #ifdef __cplusplus
 } // extern "C"

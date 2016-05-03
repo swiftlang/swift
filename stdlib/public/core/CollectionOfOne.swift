@@ -37,6 +37,15 @@ public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
 /// A collection containing a single element of type `Element`.
 public struct CollectionOfOne<Element> : RandomAccessCollection {
 
+  // FIXME: swift-3-indexing-model - compiler bug prevents this
+  // typealias from being sufficient.  Instead we need to define the
+  // var below.
+  //
+  // public typealias indices = CountableRange<Int>
+  public var indices: CountableRange<Int> {
+    return startIndex..<endIndex
+  }
+
   /// Construct an instance containing just `element`.
   public init(_ element: Element) {
     self._element = element
@@ -97,6 +106,6 @@ public struct GeneratorOfOne<Element> {}
 extension IteratorOverOne {
   @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> IteratorOverOne<Element> {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

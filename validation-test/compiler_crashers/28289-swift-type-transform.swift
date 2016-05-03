@@ -7,5 +7,5 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-enum T{class B{struct S<T where f:T>:A
-let f:S<T>
+{class B<t{typealias d<a>:S<a>class a:d
+class S<o

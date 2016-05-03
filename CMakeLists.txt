@@ -301,7 +301,10 @@ else()
 endif()
 
 # lipo is used to create universal binaries.
-find_program(LIPO "lipo")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  include(SwiftDarwin)
+  find_toolchain_tool(LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
+endif()
 
 if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_CROSS_COMPILING FALSE)

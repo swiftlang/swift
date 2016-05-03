@@ -57,7 +57,7 @@ ${stringSubscriptComment}
     *, unavailable,
     message: "cannot subscript String with an Int, see the documentation comment for discussion")
   public subscript(i: Int) -> Character {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
 % for Range in 'Range', 'ClosedRange', 'CountableRange', 'CountableClosedRange':
@@ -66,7 +66,7 @@ ${stringSubscriptComment}
     *, unavailable,
     message: "cannot subscript String with a ${Range}<Int>, see the documentation comment for discussion")
   public subscript(bounds: ${Range}<Int>) -> String {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 % end
   /// The unavailable `String.count` API.
@@ -106,6 +106,6 @@ ${stringSubscriptComment}
     *, unavailable,
     message: "there is no universally good answer, see the documentation comment for discussion")
   public var count: Int {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

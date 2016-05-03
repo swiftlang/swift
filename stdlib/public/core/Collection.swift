@@ -175,15 +175,12 @@ public protocol Indexable : IndexableBase {
   @warn_unused_result
   func index(_ i: Index, offsetBy n: IndexDistance) -> Index
 
-  /// Returns the result of advancing `i` by `n` positions, or `nil` if it
-  /// reaches the `limit`.
+  /// Returns the result of advancing `i` by `n` positions, or `nil`
+  /// if doing so would pass `limit`.
   ///
   /// - Returns:
-  ///   - If `n > 0`, the `n`th successor of `i` or `nil` if the `limit` has
-  ///     been reached.
-  ///   - If `n < 0`, the `n`th predecessor of `i` or `nil` if the `limit` has
-  ///     been reached.
-  ///   - Otherwise, `i` unmodified.
+  ///   - `nil` if `(limit > i) == (n > 0) && abs(distance(i, limit)) < abs(n)`
+  ///   - Otherwise, `index(i, offsetBy: n)`
   ///
   /// - Precondition: `n >= 0` unless `Self` conforms to
   ///   `BidirectionalCollection`.
@@ -212,7 +209,7 @@ public protocol Indexable : IndexableBase {
   /// Advances `i` by `n` positions, or until it equals `limit`.
   ///
   /// - Returns `true` if index has been advanced by exactly `n` steps without
-  ///   reaching the `limit`, and `false` otherwise.
+  ///   passing the `limit`, and `false` otherwise.
   ///
   /// - Precondition: `n >= 0` unless `Self` conforms to
   ///   `BidirectionalCollection`.
@@ -718,15 +715,12 @@ public protocol Collection : Indexable, Sequence {
   func index(_ i: Index, offsetBy n: IndexDistance) -> Index
 
   // FIXME: swift-3-indexing-model: Should this mention preconditions on `n`?
-  /// Returns the result of advancing `i` by `n` positions, or `nil` if it
-  /// reaches the `limit`.
+  /// Returns the result of advancing `i` by `n` positions, or `nil`
+  /// if doing so would pass `limit`.
   ///
   /// - Returns:
-  ///   - If `n > 0`, the `n`th successor of `i` or `nil` if the `limit` has
-  ///     been reached.
-  ///   - If `n < 0`, the `n`th predecessor of `i` or `nil` if the `limit` has
-  ///     been reached.
-  ///   - Otherwise, `i` unmodified.
+  ///   - `nil` if `(limit > i) == (n > 0) && abs(distance(i, limit)) < abs(n)`
+  ///   - Otherwise, `index(i, offsetBy: n)`
   ///
   /// - Precondition: `n >= 0` unless `Self` conforms to
   ///   `BidirectionalCollection`.
@@ -860,53 +854,6 @@ extension Indexable {
       formIndex(after: &i)
     }
     return i
-  }
-}
-
-/// Supply optimized defaults for `Collection` models that use some model
-/// of `Strideable` as their `Index`.
-extension Indexable
-  where
-  Index : Strideable,
-  Index.Stride == IndexDistance,
-  Index.Stride : SignedInteger {
-
-  @warn_unused_result
-  public func index(after i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: tests.
-    _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
-
-    return i.advanced(by: 1)
-  }
-
-  @warn_unused_result
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    _precondition(n >= 0,
-      "Only BidirectionalCollections can be advanced by a negative amount")
-    // FIXME: swift-3-indexing-model: range check i
-    return i.advanced(by: n)
-  }
-
-  @warn_unused_result
-  public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
-  ) -> Index? {
-    _precondition(n >= 0,
-      "Only BidirectionalCollections can be advanced by a negative amount")
-    // FIXME: swift-3-indexing-model: range check i
-    let i = i.advanced(by: n)
-    if (i > limit) {
-      return nil
-    }
-    return i
-  }
-
-  @warn_unused_result
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
-    _precondition(start <= end,
-      "Only BidirectionalCollections can have end come before start")
-    // FIXME: swift-3-indexing-model: range check supplied start and end?
-    return start.distance(to: end)
   }
 }
 
@@ -1112,7 +1059,7 @@ extension Collection {
   ///
   /// - Parameter n: The number of elements to drop from the beginning of
   ///   the sequence. `n` must be greater than or equal to zero.
-  /// - Returns: A subsquence starting after the specified number of
+  /// - Returns: A subsequence starting after the specified number of
   ///   elements.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements to drop from
@@ -1521,12 +1468,12 @@ extension Collection {
 
   @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> Iterator {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, message: "Removed in Swift 3. Please use underestimatedCount property.")
   public func underestimateCount() -> Int {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, message: "Please use split(maxSplits:omittingEmptySubsequences:isSeparator:) instead")
@@ -1535,7 +1482,7 @@ extension Collection {
     allowEmptySlices: Bool = false,
     isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
@@ -1546,7 +1493,7 @@ extension Collection where Iterator.Element : Equatable {
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false
   ) -> [SubSequence] {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 

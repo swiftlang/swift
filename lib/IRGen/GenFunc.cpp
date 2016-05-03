@@ -214,9 +214,19 @@ namespace {
     }
 
     void getSchema(ExplosionSchema &schema) const override {
-      llvm::StructType *structTy = cast<llvm::StructType>(getStorageType());
+      llvm::StructType *structTy = getStorageType();
       schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(0)));
       schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(1)));
+    }
+
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      auto ptrSize = IGM.getPointerSize();
+      llvm::StructType *structTy = getStorageType();
+      addScalarToAggLowering(IGM, lowering, structTy->getElementType(0),
+                             offset, ptrSize);
+      addScalarToAggLowering(IGM, lowering, structTy->getElementType(1),
+                             offset + ptrSize, ptrSize);
     }
 
     Address projectFunction(IRGenFunction &IGF, Address address) const {
@@ -1289,7 +1299,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                     /*typeToFill*/ nullptr,
                     std::move(bindings));
 
-  auto Descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, layout);
+  auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, layout);
 
   llvm::Value *data;
   if (layout.isKnownEmpty()) {
@@ -1298,9 +1308,8 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     // Allocate a new object.
     HeapNonFixedOffsets offsets(IGF, layout);
 
-    data = IGF.emitUnmanagedAlloc(layout, "closure", Descriptor, &offsets);
+    data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets);
     Address dataAddr = layout.emitCastTo(IGF, data);
-
     
     unsigned i = 0;
     

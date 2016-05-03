@@ -315,3 +315,13 @@ func r21375863() {
     [UInt8](repeating: 0, count: width*height)
   }
 }
+
+// <rdar://problem/25993258>
+//   Don't crash if we infer a closure argument to have a tuple type containing inouts.
+func r25993258_helper(_ fn: (inout Int, Int) -> ()) {}
+func r25993258a() {
+  r25993258_helper { x in () } // expected-error {{named parameter has type '(inout Int, Int)' which includes nested inout parameters}}
+}
+func r25993258b() {
+  r25993258_helper { _ in () }
+}

@@ -5675,7 +5675,7 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   var->setConstant(true);
   var->setInitializer(init);
 
-  addNominalTypeDecl(protocol);
+  emitReflectionMetadata(protocol);
 }
 
 /// \brief Load a reference to the protocol descriptor for the given protocol.

@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_IRGEN_H
 
 #include "llvm/Support/DataTypes.h"
+#include "clang/AST/CharUnits.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include <cassert>
@@ -323,6 +324,10 @@ public:
 
   unsigned log2() const {
     return llvm::Log2_64(Value);
+  }
+
+  clang::CharUnits asCharUnits() const {
+    return clang::CharUnits::fromQuantity(getValue());
   }
 
   friend bool operator< (Size L, Size R) { return L.Value <  R.Value; }

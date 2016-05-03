@@ -243,6 +243,12 @@ class TypeDecoder {
         return BuiltType();
       return Builder.createWeakStorageType(base);
     }
+    case NodeKind::SILBoxType: {
+      auto base = decodeMangledType(Node->getChild(0));
+      if (!base)
+        return BuiltType();
+      return Builder.createSILBoxType(base);
+    }
     default:
       return BuiltType();
     }
@@ -425,6 +431,10 @@ private:
   using OwnedCaptureDescriptor =
     std::unique_ptr<const CaptureDescriptor, delete_with_free>;
 
+  /// Cached isa mask.
+  StoredPointer isaMask;
+  bool hasIsaMask = false;
+
 public:
   BuilderType Builder;
 
@@ -456,6 +466,19 @@ public:
     return swift::remote::decodeMangledType(Builder, Node);
   }
 
+  /// Get the remote process's swift_isaMask.
+  std::pair<bool, StoredPointer> readIsaMask() {
+    auto address = Reader->getSymbolAddress("swift_isaMask");
+    if (!address)
+      return {false, 0};
+
+    if (!Reader->readInteger(address, &isaMask))
+      return {false, 0};
+
+    hasIsaMask = true;
+    return {true, isaMask};
+  }
+
   /// Given a remote pointer to metadata, attempt to discover its MetadataKind.
   std::pair<bool, MetadataKind>
   readKindFromMetadata(StoredPointer MetadataAddress) {
@@ -465,27 +488,49 @@ public:
     return {true, meta->getKind()};
   }
 
-  /// Given a remote pointer to class metadata, attempt to discover its class
-  /// instance start offset.
-  std::pair<bool, unsigned>
-  readInstanceStartFromClassMetadata(StoredPointer MetadataAddress) {
+  /// Given a remote pointer to class metadata, attempt to read its superclass.
+  StoredPointer
+  readSuperClassFromClassMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
-    if (!meta)
-      return {false, 0};
+    if (!meta || meta->getKind() != MetadataKind::Class)
+      return StoredPointer();
 
-    auto address = readAddressOfNominalTypeDescriptor(meta);
-    if (!address)
-      return {false, 0};
+    auto classMeta = cast<TargetClassMetadata<Runtime>>(meta);
+    return classMeta->SuperClass;
+  }
 
-    auto descriptor = readNominalTypeDescriptor(address);
-    if (!descriptor)
-      return {false, 0};
+  /// Given a remote pointer to class metadata, attempt to discover its class
+  /// instance size and alignment.
+  std::tuple<bool, unsigned, unsigned>
+  readInstanceSizeAndAlignmentFromClassMetadata(StoredPointer MetadataAddress) {
+    auto superMeta = readMetadata(MetadataAddress);
+    if (!superMeta || superMeta->getKind() != MetadataKind::Class)
+      return std::make_tuple(false, 0, 0);
 
-    if (descriptor->Class.NumFields == 0)
-      return {true, sizeof(StoredPointer)};
+    auto super = cast<TargetClassMetadata<Runtime>>(superMeta);
 
-    // return {true, meta->getFieldOffsets()[0]};
-    return {true, sizeof(StoredPointer)};
+    // See swift_initClassMetadata_UniversalStrategy()
+    uint32_t size, align;
+    if (super->isTypeMetadata()) {
+      size = super->getInstanceSize();
+      align = super->getInstanceAlignMask() + 1;
+    } else {
+      // The following algorithm only works on the non-fragile Apple runtime.
+
+      // Grab the RO-data pointer.  This part is not ABI.
+      StoredPointer roDataPtr = readObjCRODataPtr(MetadataAddress);
+      if (!roDataPtr)
+        return std::make_tuple(false, 0, 0);
+
+      auto address = roDataPtr + sizeof(uint32_t) * 2;
+
+      align = 16; // malloc alignment guarantee
+
+      if (!Reader->readInteger(RemoteAddress(address), &size))
+        return std::make_tuple(false, 0, 0);
+    }
+
+    return std::make_tuple(true, size, align);
   }
 
   /// Given a remote pointer to metadata, attempt to turn it into a type.
@@ -635,6 +680,23 @@ public:
     case MetadataKind::Opaque:
       return Builder.getOpaqueType(); // FIXME?
     }
+  }
+
+  /// Read the isa pointer of a class or closure context instance and apply
+  /// the isa mask.
+  std::pair<bool, StoredPointer> readMetadataFromInstance(
+      StoredPointer ObjectAddress) {
+    auto isaMask = readIsaMask();
+    if (!isaMask.first)
+      return {false, 0};
+
+    StoredPointer MetadataAddress;
+    if (!Reader->readBytes(RemoteAddress(ObjectAddress),
+                           (uint8_t*)&MetadataAddress,
+                           sizeof(StoredPointer)))
+      return {false, 0};
+
+    return {true, MetadataAddress & isaMask.second};
   }
 
   /// Given the address of a nominal type descriptor, attempt to resolve

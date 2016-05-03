@@ -532,7 +532,7 @@ public func += <
   }
 }
 
-extension _ContiguousArrayBuffer : Collection {
+extension _ContiguousArrayBuffer : RandomAccessCollection {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
@@ -549,10 +549,6 @@ extension _ContiguousArrayBuffer : Collection {
   }
 
   public typealias Indices = CountableRange<Int>
-
-  public var indices: CountableRange<Int> {
-    return startIndex..<endIndex
-  }
 }
 
 extension Sequence {

@@ -236,7 +236,7 @@ if True:
 ///     // Prints "nil, nil"
 ///
 /// You can access individual array elements through a subscript. The first
-/// element of an nonempty array is always at index zero. You can
+/// element of a nonempty array is always at index zero. You can
 /// subscript an array with any integer from zero up to, but not including,
 /// the count of the array. Using a negative number or an index equal to or
 /// greater than `count` triggers a runtime error. For example:
@@ -455,8 +455,8 @@ ${SelfDocComment}
 %end
 public struct ${Self}<Element>
   : RandomAccessCollection,
-  MutableCollection,
-  _DestructorSafeContainer
+    MutableCollection,
+    _DestructorSafeContainer
 {
 
   public typealias Index = Int
@@ -504,10 +504,6 @@ public struct ${Self}<Element>
   }
 
   public typealias Indices = CountableRange<Int>
-
-  public var indices: CountableRange<Int> {
-    return startIndex..<endIndex
-  }
 
 %{
 SubscriptDocComment="""\
@@ -2061,19 +2057,19 @@ extension ContiguousArray {
 extension ${Self} {
   @available(*, unavailable, message: "Please use init(repeating:count:) instead")
   init(count: Int, repeatedValue: Element) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "remove")
   public mutating func removeAtIndex(_ index: Int) -> Element {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "replaceSubrange")
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == _Buffer.Element
   >(_ subRange: Range<Int>, with newElements: C) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "append(contentsOf:)")
@@ -2082,7 +2078,7 @@ extension ${Self} {
     where
     S.Iterator.Element == Element
   >(_ newElements: S) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 %end

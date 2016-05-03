@@ -26,10 +26,12 @@ typedef pthread_cond_t ConditionHandle;
 typedef pthread_mutex_t MutexHandle;
 typedef pthread_rwlock_t ReadWriteLockHandle;
 
-#if defined(__CYGWIN__)
+#if defined(__CYGWIN__) || defined(__ANDROID__)
 // At the moment CYGWIN pthreads implementation doesn't support the use of
 // constexpr for static allocation versions. The way they define things
-// results in a reinterpret_cast which violates constexpr.
+// results in a reinterpret_cast which violates constexpr. Similarly, Android's
+// pthread implementation makes use of volatile attributes that prevent it from
+// being marked as constexpr.
 #define CONDITION_SUPPORTS_CONSTEXPR 0
 #define MUTEX_SUPPORTS_CONSTEXPR 0
 #define READWRITELOCK_SUPPORTS_CONSTEXPR 0

@@ -408,7 +408,7 @@ var fooObject: FooStruct
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorStringFunc3({#(a): Int#}, {#b: (Float, Double)#})[#String#]{{; name=.+$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    .extProp[#Int#]{{; name=.+$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .extFunc0()[#Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Pattern/None:                     = {#Foo
+// FOO_OBJECT_NO_DOT-NEXT: BuiltinOperator/None:                     = {#Foo
 // FOO_OBJECT_NO_DOT-NEXT: End completions
 
 // FOO_STRUCT_DOT: Begin completions
@@ -924,13 +924,13 @@ func testFuncTypeVars() {
   funcTypeVarsObject.funcVar1#^VF1^#
 // VF1: Begin completions
 // VF1-NEXT: Pattern/ExprSpecific: ()[#Double#]{{; name=.+$}}
-// VF1-NEXT: Pattern/None:         = {#() -> Double##() -> Double#}[#Void#]
+// VF1-NEXT: BuiltinOperator/None:         = {#() -> Double##() -> Double#}[#Void#]
 // VF1-NEXT: End completions
 
   funcTypeVarsObject.funcVar2#^VF2^#
 // VF2: Begin completions
 // VF2-NEXT: Pattern/ExprSpecific: ({#a: Int#})[#Double#]{{; name=.+$}}
-// VF2-NEXT: Pattern/None:         = {#(a: Int) -> Double##(a: Int) -> Double#}[#Void#]
+// VF2-NEXT: BuiltinOperator/None:         = {#(a: Int) -> Double##(a: Int) -> Double#}[#Void#]
 // VF2-NEXT: End completions
 }
 

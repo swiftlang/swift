@@ -1,5 +1,6 @@
 import Foo
 
+// RUN: rm -rf %t.ccp
 // RUN: %sourcekitd-test -req=complete.cache.ondisk -cache-path=%t.ccp == \
 // RUN:     -req=complete.open -pos=2:1 -req-opts=hidelowpriority=0 %s -- %s -F %S/../Inputs/libIDE-mock-sdk > %t.completions1
 

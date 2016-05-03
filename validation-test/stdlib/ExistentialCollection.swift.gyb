@@ -1,4 +1,4 @@
-//===--- ExistentialCollection.swift --------------------------------------===//
+//===--- ExistentialCollection.swift.gyb ----------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -440,7 +440,6 @@ do {
     return ${AnyCollection}(base)
   }
 
-  var checksAdded: Box<Set<String>> = Box([])
 
   AnyCollectionTests.add${collectionForTraversal(Traversal)}Tests(
     "tests.",
@@ -450,8 +449,8 @@ do {
     makeCollectionOfEquatable: makeCollectionOfEquatable,
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
-    checksAdded: checksAdded,
-    resiliencyChecks: CollectionMisuseResiliencyChecks.all
+    resiliencyChecks: CollectionMisuseResiliencyChecks.all,
+    collectionIsBidirectional: ${'false' if Traversal == 'Forward' else 'true'}
   )
 }
 

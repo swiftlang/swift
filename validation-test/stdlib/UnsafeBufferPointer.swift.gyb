@@ -4,13 +4,28 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 
 var UnsafeBufferPointerTestSuite = TestSuite("UnsafeBufferPointer")
 var UnsafeMutableBufferPointerTestSuite = TestSuite("UnsafeMutableBufferPointer")
 
-% for (SelfName, SelfType, PointerType) in [
-%         ('UnsafeBufferPointer', 'UnsafeBufferPointer<Float>', 'UnsafePointer<Float>'),
-%         ('UnsafeMutableBufferPointer', 'UnsafeMutableBufferPointer<Float>', 'UnsafeMutablePointer<Float>')]:
+% for (SelfName, IsMutable, SelfType, PointerType) in [
+%   ('UnsafeBufferPointer', False, 'UnsafeBufferPointer<Float>', 'UnsafePointer<Float>'),
+%   ('UnsafeMutableBufferPointer', True, 'UnsafeMutableBufferPointer<Float>', 'UnsafeMutablePointer<Float>')
+% ]:
+
+${SelfName}TestSuite.test("AssociatedTypes") {
+  typealias Subject = ${SelfName}<OpaqueValue<Int>>
+  expectRandomAccessCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: IndexingIterator<Subject>.self,
+    subSequenceType: ${'Mutable' if IsMutable else ''}RandomAccessSlice<Subject>.self,
+    indexType: Int.self,
+    indexDistanceType: Int.self,
+    indicesType: CountableRange<Int>.self)
+
+  expect${'Mutable' if IsMutable else ''}CollectionType(Subject.self)
+}
 
 ${SelfName}TestSuite.test("nilBaseAddress") {
   let emptyBuffer = ${SelfType}(start: nil, count: 0)

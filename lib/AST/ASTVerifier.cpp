@@ -1666,6 +1666,25 @@ struct ASTNodeBase {};
     void verifyChecked(VarDecl *var) {
       PrettyStackTraceDecl debugStack("verifying VarDecl", var);
 
+      // Variables must have materializable type, unless they are parameters,
+      // in which case they must either have l-value type or be anonymous.
+      if (!var->getType()->isMaterializable()) {
+        if (!isa<ParamDecl>(var)) {
+          Out << "Non-parameter VarDecl has non-materializable type: ";
+          var->getType().print(Out);
+          Out << "\n";
+          abort();
+        }
+
+        if (!var->getType()->is<InOutType>() && var->hasName()) {
+          Out << "ParamDecl may only have non-materializable tuple type "
+                 "when it is anonymous: ";
+          var->getType().print(Out);
+          Out << "\n";
+          abort();
+        }
+      }
+
       // The fact that this is *directly* be a reference storage type
       // cuts the code down quite a bit in getTypeOfReference.
       if (var->getAttrs().hasAttribute<OwnershipAttr>() !=

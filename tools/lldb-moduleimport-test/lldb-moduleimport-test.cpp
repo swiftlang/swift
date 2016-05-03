@@ -48,6 +48,8 @@ static void printValidationInfo(llvm::StringRef data) {
   if (info.status != swift::serialization::Status::Valid)
     return;
 
+  if (!info.shortVersion.empty())
+    llvm::outs() << "- Swift Version: " << info.shortVersion << "\n";
   llvm::outs() << "- Target: " << info.targetTriple << "\n";
   if (!extendedInfo.getSDKPath().empty())
     llvm::outs() << "- SDK path: " << extendedInfo.getSDKPath() << "\n";

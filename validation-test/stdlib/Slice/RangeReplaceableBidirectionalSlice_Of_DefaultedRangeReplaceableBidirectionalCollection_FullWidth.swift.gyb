@@ -82,7 +82,6 @@ func makeCollectionOfComparable(elements: [MinimalComparableValue])
     bounds: startIndex..<endIndex)
 }
 
-var checksAdded: Box<Set<String>> = Box([])
 var resiliencyChecks = CollectionMisuseResiliencyChecks.all
 resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .trap
 resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior = .trap
@@ -96,7 +95,6 @@ SliceTests.addRangeReplaceableBidirectionalSliceTests(
   makeCollectionOfEquatable: makeCollectionOfEquatable,
   wrapValueIntoEquatable: identityEq,
   extractValueFromEquatable: identityEq,
-  checksAdded: checksAdded,
   resiliencyChecks: resiliencyChecks,
   outOfBoundsIndexOffset: 6
 )

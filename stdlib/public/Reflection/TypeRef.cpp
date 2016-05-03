@@ -204,6 +204,12 @@ public:
     OS << ')';
   }
 
+  void visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
+    printHeader("sil_box");
+    printRec(SB->getBoxedType());
+    OS << ')';
+  }
+
   void visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     printHeader("opaque");
     OS << ')';
@@ -297,6 +303,10 @@ struct TypeRefIsConcrete
 
   bool visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
     return visit(US->getType());
+  }
+
+  bool visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
+    return visit(SB->getBoxedType());
   }
 };
 
@@ -508,6 +518,10 @@ public:
     return US;
   }
 
+  const TypeRef *visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
+    return SILBoxTypeRef::create(Builder, visit(SB->getBoxedType()));
+  }
+
   const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return O;
   }
@@ -658,6 +672,10 @@ public:
   const TypeRef *
   visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
     return UnmanagedStorageTypeRef::create(Builder, visit(US->getType()));
+  }
+
+  const TypeRef *visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
+    return SILBoxTypeRef::create(Builder, visit(SB->getBoxedType()));
   }
 
   const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *O) {

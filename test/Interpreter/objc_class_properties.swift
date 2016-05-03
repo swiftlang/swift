@@ -175,9 +175,7 @@ class NamingConflictSubclass : PropertyNamingConflict {
   override class var prop: AnyObject? { return NamingConflictSubclass() }
 }
 
-ClassProperties.test("namingConflict")
-  .skip(.osxMinorRange(10, 0...10, reason: "unexpected failures on 10.10"))
-  .code {
+ClassProperties.test("namingConflict") {
   let obj = PropertyNamingConflict()
   expectTrue(obj === obj.prop)
   expectEmpty(obj.dynamicType.prop)
@@ -200,25 +198,13 @@ extension NamingConflictSubclass : PropertyNamingConflictProto {
   }
 }
 
-ClassProperties.test("namingConflict/protocol")
-  .skip(.osxMinorRange(10, 0...10, reason: "unexpected failures on 10.10"))
-  .code {
+ClassProperties.test("namingConflict/protocol") {
   let obj: PropertyNamingConflictProto = NamingConflictSubclass()
   expectTrue(obj === obj.protoProp)
   expectEmpty(obj.dynamicType.protoProp)
 
   let type: PropertyNamingConflictProto.Type = NamingConflictSubclass.self
   expectEmpty(type.protoProp)
-}
-
-ClassProperties.test("runtime") {
-  let theClass: AnyObject = SwiftClass.self
-  let prop = class_getProperty(object_getClass(theClass), "value")
-  expectTrue(prop != nil)
-
-  let nameAsCString = property_getName(prop)
-  expectTrue(nameAsCString != nil)
-  expectEqual("value", String(cString: nameAsCString!))
 }
 
 runAllTests()

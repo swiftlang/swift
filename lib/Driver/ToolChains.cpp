@@ -1171,28 +1171,6 @@ toolchains::GenericUnix::constructInvocation(const AutolinkExtractJobAction &job
   return {"swift-autolink-extract", Arguments};
 }
 
-// This function maps triples to the architecture component of the path
-// where the swift_begin.o and swift_end.o objects can be found.  This
-// is a stop-gap until full Triple support (ala Clang) exists within swiftc.
-StringRef
-getSectionMagicArch(const llvm::Triple &Triple) {
-  if (Triple.isOSLinux()) {
-    switch(Triple.getSubArch()) {
-    default:
-      return Triple.getArchName();
-      break;
-    case llvm::Triple::SubArchType::ARMSubArch_v7:
-      return "armv7";
-      break;
-    case llvm::Triple::SubArchType::ARMSubArch_v6:
-      return "armv6";
-      break;
-    }
-  } else {
-    return Triple.getArchName();
-  }
-}
-
 std::string toolchains::GenericUnix::getDefaultLinker() const {
   switch(getTriple().getArch()) {
   case llvm::Triple::arm:
@@ -1223,7 +1201,8 @@ std::string toolchains::GenericUnix::getPreInputObjectPath(
   // On Linux and FreeBSD (really, ELF binaries) we need to add objects
   // to provide markers and size for the metadata sections.
   SmallString<128> PreInputObjectPath = RuntimeLibraryPath;
-  llvm::sys::path::append(PreInputObjectPath, getSectionMagicArch(getTriple()));
+  llvm::sys::path::append(PreInputObjectPath,
+      swift::getMajorArchitectureName(getTriple()));
   llvm::sys::path::append(PreInputObjectPath, "swift_begin.o");
   return PreInputObjectPath.str();
 }
@@ -1231,7 +1210,8 @@ std::string toolchains::GenericUnix::getPreInputObjectPath(
 std::string toolchains::GenericUnix::getPostInputObjectPath(
     StringRef RuntimeLibraryPath) const {
   SmallString<128> PostInputObjectPath = RuntimeLibraryPath;
-  llvm::sys::path::append(PostInputObjectPath, getSectionMagicArch(getTriple()));
+  llvm::sys::path::append(PostInputObjectPath,
+      swift::getMajorArchitectureName(getTriple()));
   llvm::sys::path::append(PostInputObjectPath, "swift_end.o");
   return PostInputObjectPath.str();
 }

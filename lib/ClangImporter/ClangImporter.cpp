@@ -398,7 +398,8 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
     llvm::sys::path::append(
       GlibcModuleMapPath,
-      swift::getPlatformNameForTriple(triple), triple.getArchName(),
+      swift::getPlatformNameForTriple(triple),
+      swift::getMajorArchitectureName(triple),
       "glibc.modulemap");
 
     // Only specify the module map if that file actually exists.
@@ -2160,7 +2161,7 @@ auto ClangImporter::Implementation::importFullName(
 
     // Parse the name.
     ParsedDeclName parsedName = parseDeclName(nameAttr->getName());
-    if (!parsedName) return result;
+    if (!parsedName || parsedName.isOperator()) return result;
 
     // If we have an Objective-C method that is being mapped to an
     // initializer (e.g., a factory method whose name doesn't fit the

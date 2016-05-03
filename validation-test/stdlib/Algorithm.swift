@@ -91,6 +91,8 @@ Algorithm.test("sorted/strings")
 // A wrapper around Array<T> that disables any type-specific algorithm
 // optimizations and forces bounds checking on.
 struct A<T> : MutableCollection, RandomAccessCollection {
+  typealias Indices = CountableRange<Int>
+
   init(_ a: Array<T>) {
     impl = a
   }
@@ -147,7 +149,7 @@ Algorithm.test("invalidOrderings") {
   withInvalidOrderings {
     var a: A<Int>
     a = randomArray()
-    a.partition(isOrderedBefore: $0)
+    _ = a.partition(isOrderedBefore: $0)
   }
   /*
   // FIXME: Disabled due to <rdar://problem/17734737> Unimplemented:

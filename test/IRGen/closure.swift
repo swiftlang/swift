@@ -4,7 +4,7 @@
 
 // -- partial_apply context metadata
 
-// CHECK: [[METADATA:@.*]] = private constant %swift.full_boxmetadata { void (%swift.refcounted*)* @objectdestroy.2, i8** null, %swift.type { i64 64 }, i32 16, i8* bitcast (<{ i32, i32, i32, i32, i32, i32 }>* @capture_descriptor.1 to i8*) }
+// CHECK: [[METADATA:@.*]] = private constant %swift.full_boxmetadata { void (%swift.refcounted*)* @objectdestroy.1, i8** null, %swift.type { i64 64 }, i32 16, i8* null }
 
 func a(i i: Int) -> (Int) -> Int {
   return { x in i }

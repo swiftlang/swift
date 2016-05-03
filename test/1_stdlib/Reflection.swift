@@ -148,13 +148,6 @@ switch true.customPlaygroundQuickLook {
   default: print("wrong quicklook type")
 }
 
-// CHECK-NEXT: Optional("Hello world")
-// CHECK-NEXT:   some: "Hello world"
-dump(Optional<String>("Hello world"))
-// CHECK-NEXT: - nil
-let noneString: String? = nil
-dump(noneString)
-
 let intArray = [1,2,3,4,5]
 // CHECK-NEXT: 5 elements
 // CHECK-NEXT: 1

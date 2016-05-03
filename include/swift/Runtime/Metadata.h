@@ -1659,7 +1659,7 @@ public:
     Flags = flags;
   }
 
-  StoredPointer getInstanceSize() const {
+  StoredSize getInstanceSize() const {
     assert(isTypeMetadata());
     return InstanceSize;
   }
@@ -1773,7 +1773,7 @@ using ClassMetadata = TargetClassMetadata<InProcess>;
 ///   captures (these aren't in the DATA segment, however).
 /// - a list of GenericMetadataSource objects - each element is a pair of:
 ///   - MangledTypeName (for a GenericTypeParameterTypeRef)
-///   - EncodededMetadataSource (an encoded string like TypeRefs, but describe
+///   - EncodedMetadataSource (an encoded string like TypeRefs, but describe
 ///     the method of crawling to the metadata for that generic type parameter.
 struct CaptureDescriptor {
 public:

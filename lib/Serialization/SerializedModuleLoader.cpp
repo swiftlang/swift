@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Version.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -163,11 +164,12 @@ FileUnit *SerializedModuleLoader::loadAST(
 
   serialization::ExtendedValidationInfo extendedInfo;
   std::unique_ptr<ModuleFile> loadedModuleFile;
-  serialization::Status err = ModuleFile::load(std::move(moduleInputBuffer),
-                                               std::move(moduleDocInputBuffer),
-                                               isFramework, loadedModuleFile,
-                                               &extendedInfo);
-  if (err == serialization::Status::Valid) {
+  serialization::ValidationInfo loadInfo =
+      ModuleFile::load(std::move(moduleInputBuffer),
+                       std::move(moduleDocInputBuffer),
+                       isFramework, loadedModuleFile,
+                       &extendedInfo);
+  if (loadInfo.status == serialization::Status::Valid) {
     Ctx.bumpGeneration();
 
     M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
@@ -180,9 +182,9 @@ FileUnit *SerializedModuleLoader::loadAST(
       M.setTestingEnabled();
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
-    err = loadedModuleFile->associateWithFileContext(fileUnit,
-                                                     diagLocOrInvalid);
-    if (err == serialization::Status::Valid) {
+    loadInfo.status =
+        loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid);
+    if (loadInfo.status == serialization::Status::Valid) {
       LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
                                      Ctx.getCurrentGeneration());
       return fileUnit;
@@ -195,15 +197,36 @@ FileUnit *SerializedModuleLoader::loadAST(
   if (!diagLoc)
     return nullptr;
 
-  switch (loadedModuleFile->getStatus()) {
+  auto diagnoseDifferentLanguageVersion = [&](StringRef shortVersion) -> bool {
+    if (shortVersion.empty())
+      return false;
+
+    SmallString<32> versionBuf;
+    llvm::raw_svector_ostream versionString(versionBuf);
+    versionString << version::Version::getCurrentLanguageVersion();
+    if (versionString.str() == shortVersion)
+      return false;
+
+    Ctx.Diags.diagnose(*diagLoc,
+                       diag::serialization_module_language_version_mismatch,
+                       loadInfo.shortVersion, versionString.str(),
+                       moduleBufferID);
+    return true;
+  };
+
+  switch (loadInfo.status) {
   case serialization::Status::Valid:
     llvm_unreachable("At this point we know loading has failed");
 
   case serialization::Status::FormatTooNew:
+    if (diagnoseDifferentLanguageVersion(loadInfo.shortVersion))
+      break;
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_new,
                        moduleBufferID);
     break;
   case serialization::Status::FormatTooOld:
+    if (diagnoseDifferentLanguageVersion(loadInfo.shortVersion))
+      break;
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_old,
                        M.getName(), moduleBufferID);
     break;
@@ -288,7 +311,7 @@ FileUnit *SerializedModuleLoader::loadAST(
     if (Ctx.LangOpts.DebuggerSupport)
       diagKind = diag::serialization_name_mismatch_repl;
     Ctx.Diags.diagnose(*diagLoc, diagKind,
-                       loadedModuleFile->getModuleName(), M.getName());
+                       loadInfo.name, M.getName());
     break;
   }
 
@@ -299,13 +322,12 @@ FileUnit *SerializedModuleLoader::loadAST(
     if (Ctx.LangOpts.DebuggerSupport)
       diagKind = diag::serialization_target_incompatible_repl;
     Ctx.Diags.diagnose(*diagLoc, diagKind,
-                       loadedModuleFile->getTargetTriple(), moduleBufferID);
+                       loadInfo.targetTriple, moduleBufferID);
     break;
   }
 
   case serialization::Status::TargetTooNew: {
-    StringRef moduleTargetTriple = loadedModuleFile->getTargetTriple();
-    llvm::Triple moduleTarget(llvm::Triple::normalize(moduleTargetTriple));
+    llvm::Triple moduleTarget(llvm::Triple::normalize(loadInfo.targetTriple));
 
     StringRef osName;
     unsigned major, minor, micro;

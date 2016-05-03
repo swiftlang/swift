@@ -75,9 +75,8 @@ static T unwrap(llvm::ErrorOr<T> value) {
   exit(EXIT_FAILURE);
 }
 
-static llvm::object::SectionRef
-getSectionRef(const ObjectFile *objectFile,
-              ArrayRef<StringRef> anySectionNames) {
+static SectionRef getSectionRef(const ObjectFile *objectFile,
+                                ArrayRef<StringRef> anySectionNames) {
   for (auto section : objectFile->sections()) {
     StringRef sectionName;
     section.getName(sectionName);
@@ -90,6 +89,47 @@ getSectionRef(const ObjectFile *objectFile,
   return SectionRef();
 }
 
+template<typename Section>
+static Section findReflectionSection(const ObjectFile *objectFile,
+                                     ArrayRef<StringRef> anySectionNames) {
+  auto sectionRef = getSectionRef(objectFile, anySectionNames);
+
+  if (sectionRef.getObject() == nullptr)
+    return {nullptr, nullptr};
+
+  StringRef sectionContents;
+  sectionRef.getContents(sectionContents);
+
+  return {
+    reinterpret_cast<const void *>(sectionContents.begin()),
+    reinterpret_cast<const void *>(sectionContents.end())
+  };
+}
+
+static ReflectionInfo findReflectionInfo(const ObjectFile *objectFile) {
+  auto fieldSection = findReflectionSection<FieldSection>(
+      objectFile, {"__swift3_fieldmd", ".swift3_fieldmd"});
+  auto associatedTypeSection = findReflectionSection<AssociatedTypeSection>(
+      objectFile, {"__swift3_assocty", ".swift3_assocty"});
+  auto builtinTypeSection = findReflectionSection<BuiltinTypeSection>(
+      objectFile, {"__swift3_builtin", ".swift3_builtin"});
+  auto captureSection = findReflectionSection<CaptureSection>(
+      objectFile, {"__swift3_capture", ".swift3_capture"});
+  auto typeRefSection = findReflectionSection<GenericSection>(
+      objectFile, {"__swift3_typeref", ".swift3_typeref"});
+  auto reflectionStringsSection = findReflectionSection<GenericSection>(
+      objectFile, {"__swift3_reflstr", ".swift3_reflstr"});
+
+  return {
+    fieldSection,
+    associatedTypeSection,
+    builtinTypeSection,
+    captureSection,
+    typeRefSection,
+    reflectionStringsSection,
+  };
+}
+
 static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
                                     StringRef arch,
                                     ActionType action,
@@ -97,18 +137,18 @@ static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
   // Note: binaryOrError and objectOrError own the memory for our ObjectFile;
   // once they go out of scope, we can no longer do anything.
   std::vector<OwningBinary<Binary>> binaryOwners;
-  std::vector<std::unique_ptr<llvm::object::ObjectFile>> objectOwners;
+  std::vector<std::unique_ptr<ObjectFile>> objectOwners;
 
   // Construct the TypeRefBuilder
   TypeRefBuilder builder;
 
   for (auto binaryFilename : binaryFilenames) {
-    auto binaryOwner = unwrap(llvm::object::createBinary(binaryFilename));
-    llvm::object::Binary *binaryFile = binaryOwner.getBinary();
+    auto binaryOwner = unwrap(createBinary(binaryFilename));
+    Binary *binaryFile = binaryOwner.getBinary();
 
     // The object file we are doing lookups in -- either the binary itself, or
     // a particular slice of a universal binary.
-    std::unique_ptr<llvm::object::ObjectFile> objectOwner;
+    std::unique_ptr<ObjectFile> objectOwner;
     const ObjectFile *objectFile;
 
     if (auto o = dyn_cast<ObjectFile>(binaryFile)) {
@@ -119,102 +159,7 @@ static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
       objectFile = objectOwner.get();
     }
 
-    // Field descriptor section
-    auto fieldSectionRef = getSectionRef(objectFile, {
-      "__swift3_fieldmd", ".swift3_fieldmd"
-    });
-
-    if (fieldSectionRef.getObject() == nullptr) {
-      OS << binaryFilename;
-      OS << " doesn't have a field reflection section!\n";
-      return EXIT_FAILURE;
-    }
-
-    StringRef fieldSectionContents;
-    fieldSectionRef.getContents(fieldSectionContents);
-
-    const FieldSection fieldSection {
-      reinterpret_cast<const void *>(fieldSectionContents.begin()),
-      reinterpret_cast<const void *>(fieldSectionContents.end())
-    };
-
-    // Associated type section - optional
-    AssociatedTypeSection associatedTypeSection {nullptr, nullptr};
-
-    auto associatedTypeSectionRef = getSectionRef(objectFile, {
-      "__swift3_assocty", ".swift3_assocty"
-    });
-
-    if (associatedTypeSectionRef.getObject() != nullptr) {
-      StringRef associatedTypeSectionContents;
-      associatedTypeSectionRef.getContents(associatedTypeSectionContents);
-      associatedTypeSection = {
-        reinterpret_cast<const void *>(associatedTypeSectionContents.begin()),
-        reinterpret_cast<const void *>(associatedTypeSectionContents.end()),
-      };
-    }
-
-    // Builtin types section
-    BuiltinTypeSection builtinTypeSection {nullptr, nullptr};
-
-    auto builtinTypeSectionRef = getSectionRef(objectFile, {
-      "__swift3_builtin", ".swift3_builtin"
-    });
-
-    if (builtinTypeSectionRef.getObject() != nullptr) {
-      StringRef builtinTypeSectionContents;
-      builtinTypeSectionRef.getContents(builtinTypeSectionContents);
-
-      builtinTypeSection = {
-        reinterpret_cast<const void *>(builtinTypeSectionContents.begin()),
-        reinterpret_cast<const void *>(builtinTypeSectionContents.end())
-      };
-    }
-
-    // Typeref section
-    auto typeRefSectionRef = getSectionRef(objectFile, {
-      "__swift3_typeref", ".swift3_typeref"
-    });
-
-    if (typeRefSectionRef.getObject() == nullptr) {
-      OS << binaryFilename;
-      OS << " doesn't have an associated typeref section!\n";
-      return EXIT_FAILURE;
-    }
-
-    StringRef typeRefSectionContents;
-    typeRefSectionRef.getContents(typeRefSectionContents);
-
-    const GenericSection typeRefSection {
-      reinterpret_cast<const void *>(typeRefSectionContents.begin()),
-      reinterpret_cast<const void *>(typeRefSectionContents.end())
-    };
-
-    // Reflection strings section - optional
-    GenericSection reflectionStringsSection {nullptr, nullptr};
-
-    auto reflectionStringsSectionRef = getSectionRef(objectFile, {
-      "__swift3_reflstr", ".swift3_reflstr"
-    });
-
-    if (reflectionStringsSectionRef.getObject() != nullptr) {
-      StringRef reflectionStringsSectionContents;
-      reflectionStringsSectionRef.getContents(reflectionStringsSectionContents);
-
-      reflectionStringsSection = {
-        reinterpret_cast<const void *>(reflectionStringsSectionContents.begin()),
-        reinterpret_cast<const void *>(reflectionStringsSectionContents.end())
-      };
-    }
-
-    builder.addReflectionInfo({
-      binaryFilename,
-      fieldSection,
-      associatedTypeSection,
-      builtinTypeSection,
-      typeRefSection,
-      reflectionStringsSection,
-    });
+    builder.addReflectionInfo(findReflectionInfo(objectFile));
 
     // Retain the objects that own section memory
     binaryOwners.push_back(std::move(binaryOwner));

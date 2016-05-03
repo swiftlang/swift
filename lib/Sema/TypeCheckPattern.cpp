@@ -1659,6 +1659,15 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
           !ty->is<ErrorType>())
         param->overwriteType(ty);
     }
+
+    if (!ty->isMaterializable()) {
+      if (ty->is<InOutType>()) {
+        param->setLet(false);
+      } else if (param->hasName()) {
+        diagnose(param->getStartLoc(),
+                 diag::param_type_non_materializable_tuple, ty);
+      }
+    }
     
     if (param->isInvalid())
       param->overwriteType(ErrorType::get(Context));
@@ -1666,8 +1675,6 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
       param->overwriteType(ty);
     
     checkTypeModifyingDeclAttributes(param);
-    if (ty->is<InOutType>())
-      param->setLet(false);
     return hadError;
   };
 

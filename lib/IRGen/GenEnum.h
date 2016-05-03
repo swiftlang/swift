@@ -23,6 +23,14 @@ namespace llvm {
   class Value;
 }
 
+namespace clang {
+namespace CodeGen {
+namespace swiftcall {
+  class SwiftAggLowering;
+}
+}
+}
+
 namespace swift {
   class EnumElementDecl;
   
@@ -31,6 +39,7 @@ namespace irgen {
   class EnumPayloadSchema;
   class IRGenFunction;
   class TypeConverter;
+  using clang::CodeGen::swiftcall::SwiftAggLowering;
 
 /// \brief Emit the dispatch branch(es) for an address-only enum.
 void emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,
@@ -342,6 +351,8 @@ public:
   
   /// \group Delegated TypeInfo operations
   
+  virtual void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                                Size offset) const = 0;
   virtual void getSchema(ExplosionSchema &schema) const = 0;
   virtual void destroy(IRGenFunction &IGF, Address addr, SILType T) const = 0;
 

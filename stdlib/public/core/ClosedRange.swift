@@ -27,6 +27,9 @@ internal enum _ClosedRangeIndexRepresentation<
 public struct ClosedRangeIndex<
   // WORKAROUND rdar://25214598 - should be Bound : Strideable
   Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
+  // swift-3-indexing-model: should conform to _Strideable, otherwise
+  // CountableClosedRange is not interchangeable with CountableRange in all
+  // contexts.
 > : Comparable {
   /// Creates the past-the-end position.
   internal init() { _value = .pastEnd }

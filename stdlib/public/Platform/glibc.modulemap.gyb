@@ -1,4 +1,4 @@
-//===--- glibc.modulemap.in -----------------------------------------------===//
+//===--- glibc.modulemap.gyb ----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

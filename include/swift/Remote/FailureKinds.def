@@ -14,6 +14,7 @@
 
 FAILURE(Unknown, "an unknown failure occurred", ())
 FAILURE(BadArgument, "the API was called with a bad argument", ())
+FAILURE(Unimplemented, "the implementation does not know how to %0", (String))
 
 FAILURE(Memory, "an unknown failure occurred while reading %0 at address %1",
         (String, Address))
