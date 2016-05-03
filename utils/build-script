@@ -872,7 +872,11 @@ details of the setups of other systems or automated environments.""")
     parser.add_argument(
         "--verbose-build",
         help="print the commands executed during the build",
-        action="store_true")
+        metavar="BOOL",
+        nargs='?',
+        type=argparse_bool,
+        default=False,
+        const=True)
 
     args = migration.parse_args(parser, sys.argv[1:])
 
