@@ -192,6 +192,15 @@ addr_t PipeMemoryReader_getSymbolAddress(void *Context, const char *SymbolName,
   return (uintptr_t)Address;
 }
 
+InstanceKind
+PipeMemoryReader_receiveInstanceKind(const PipeMemoryReader *Reader) {
+  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
+  write(WriteFD, REQUEST_INSTANCE_KIND, 2);
+  uint8_t KindValue = 0;
+  PipeMemoryReader_collectBytesFromPipe(Reader, &KindValue, sizeof(KindValue));
+  return KindValue;
+}
+
 uintptr_t
 PipeMemoryReader_receiveInstanceAddress(const PipeMemoryReader *Reader) {
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
@@ -202,9 +211,9 @@ PipeMemoryReader_receiveInstanceAddress(const PipeMemoryReader *Reader) {
   return InstanceAddress;
 }
 
-void PipeMemoryReader_sendExitMessage(const PipeMemoryReader *Reader) {
+void PipeMemoryReader_sendDoneMessage(const PipeMemoryReader *Reader) {
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
-  write(WriteFD, REQUEST_EXIT, 2);
+  write(WriteFD, REQUEST_DONE, 2);
 }
 
 uint8_t PipeMemoryReader_receivePointerSize(const PipeMemoryReader *Reader) {
@@ -301,6 +310,78 @@ uint64_t PipeMemoryReader_getStringLength(void *Context, addr_t Address) {
   return Length;
 }
 
+int reflectHeapObject(SwiftReflectionContextRef RC,
+                       const PipeMemoryReader Pipe) {
+  uintptr_t instance = PipeMemoryReader_receiveInstanceAddress(&Pipe);
+  if (instance == 0) {
+    // Child has no more instances to examine
+    PipeMemoryReader_sendDoneMessage(&Pipe);
+    return 0;
+  }
+  printf("Instance pointer in child address space: 0x%lx\n",
+         instance);
+
+  swift_typeref_t TR = swift_reflection_typeRefForInstance(RC, instance);
+
+  printf("Type reference:\n");
+  swift_reflection_dumpTypeRef(TR);
+  printf("\n");
+
+  printf("Type info:\n");
+  swift_reflection_dumpInfoForInstance(RC, instance);
+
+  printf("\n");
+
+  PipeMemoryReader_sendDoneMessage(&Pipe);
+  return 1;
+}
+
+int reflectExistential(SwiftReflectionContextRef RC,
+                        const PipeMemoryReader Pipe) {
+  uintptr_t instance = PipeMemoryReader_receiveInstanceAddress(&Pipe);
+  if (instance == 0) {
+    // Child has no more instances to examine
+    PipeMemoryReader_sendDoneMessage(&Pipe);
+    return 0;
+  }
+  printf("Instance pointer in child address space: 0x%lx\n",
+         instance);
+
+  uintptr_t isa = 0;
+  PipeMemoryReader_collectBytesFromPipe(&Pipe, (uint8_t *)&isa,
+                                        sizeof(isa));
+
+  uintptr_t isaMask = 0;
+  if (!swift_reflection_readIsaMask(RC, &isaMask))
+    errorAndExit("Couldn't read isa mask");
+
+  isa &= isaMask;
+
+  printf("isa pointer in child address space: 0x%lx\n", isa);
+  swift_typeref_t ExistentialTR = swift_reflection_typeRefForMetadata(RC, isa);
+  printf("Type reference from metadata:\n");
+  swift_reflection_dumpTypeRef(ExistentialTR);
+  printf("\n");
+
+  swift_typeref_t InstanceTypeRef;
+  addr_t StartOfInstanceData = 0;
+
+  if (!swift_reflection_projectExistential(RC, instance, ExistentialTR,
+                                      &InstanceTypeRef, &StartOfInstanceData)) {
+    // TODO
+    PipeMemoryReader_sendDoneMessage(&Pipe);
+    return 1;
+  }
+
+  printf("Type info:\n");
+  swift_reflection_dumpInfoForInstance(RC, instance);
+
+  printf("\n");
+
+  PipeMemoryReader_sendDoneMessage(&Pipe);
+  return 1;
+}
+
 int doDumpHeapInstance(const char *BinaryFilename) {
   PipeMemoryReader Pipe = createPipeMemoryReader();
 
@@ -320,7 +401,6 @@ int doDumpHeapInstance(const char *BinaryFilename) {
     default: { // Parent
       close(PipeMemoryReader_getChildReadFD(&Pipe));
       close(PipeMemoryReader_getChildWriteFD(&Pipe));
-
       SwiftReflectionContextRef RC = swift_reflection_createReflectionContext(
         (void*)&Pipe,
         PipeMemoryReader_getPointerSize,
@@ -332,26 +412,34 @@ int doDumpHeapInstance(const char *BinaryFilename) {
       uint8_t PointerSize = PipeMemoryReader_getPointerSize((void*)&Pipe);
       if (PointerSize != sizeof(uintptr_t))
         errorAndExit("Child process had unexpected architecture");
-
-      uintptr_t instance = PipeMemoryReader_receiveInstanceAddress(&Pipe);
-      assert(instance);
-      printf("Instance pointer in child address space: 0x%lx\n",
-        instance);
-
+      
       PipeMemoryReader_receiveReflectionInfo(RC, &Pipe);
 
-      printf("Type reference:\n");
-
-      swift_typeref_t TR = swift_reflection_typeRefForInstance(RC, instance);
-      swift_reflection_dumpTypeRef(TR);
-      printf("\n");
-
-      printf("Type info:\n");
-      swift_reflection_dumpInfoForInstance(RC, instance);
+      while (1) {
+        InstanceKind Kind = PipeMemoryReader_receiveInstanceKind(&Pipe);
+        switch (Kind) {
+        case Object:
+          printf("Reflecting an object.\n");
+          if (!reflectHeapObject(RC, Pipe))
+            return EXIT_SUCCESS;
+          break;
+        case Existential:
+          printf("Reflecting an existential.\n");
+          if (!reflectExistential(RC, Pipe))
+            return EXIT_SUCCESS;
+          break;
+        case Closure:
+          printf("Reflecting a closure.\n");
+          if (!reflectHeapObject(RC, Pipe))
+            return EXIT_SUCCESS;
+          break;
+        case None:
+          printf("Done.\n");
+          return EXIT_SUCCESS;
+        }
+      }
     }
   }
-
-  PipeMemoryReader_sendExitMessage(&Pipe);
   return EXIT_SUCCESS;
 }
 
