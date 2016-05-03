@@ -2654,9 +2654,6 @@ public:
       if (HaveLParen)
         return;
 
-      if (HaveLeadingSpace && !HaveDot)
-        return;
-
       if (auto *VD = dyn_cast<VarDecl>(D)) {
         addVarDeclRef(VD, Reason);
         return;

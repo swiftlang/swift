@@ -5,7 +5,6 @@
 // RUN: %complete-test -tok=OPT_OPERATORS %s | FileCheck %s -check-prefix=OPT
 // RUN: %complete-test -tok=KNOWN_OPERATORS_1 %s | FileCheck %s -check-prefix=KNOWN
 // RUN: %complete-test -tok=KNOWN_OPERATORS_2 %s | FileCheck %s -check-prefix=KNOWN
-// RUN: %complete-test -tok=NO_DOT %s | FileCheck %s -check-prefix=NO_DOT
 
 struct MyInt {
   var bigPowers: Int { return 1 }
@@ -168,11 +167,3 @@ func test6(x: DoesEverything) {
 // KNOWN: ===
 // KNOWN: !==
 // KNOWN: ~=
-
-func test7() {
-  var x: DoesEverything
-  x #^NO_DOT^#
-}
-// NO_DOT-NOT: .
-// NO_DOT: =
-// NO_DOT: ==
