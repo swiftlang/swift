@@ -26,6 +26,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/RecordLayout.h"
+#include "clang/CodeGen/SwiftCallingConv.h"
 
 #include "GenMeta.h"
 #include "GenRecord.h"
@@ -252,20 +253,28 @@ namespace {
   class ClangRecordTypeInfo final :
     public StructTypeInfoBase<ClangRecordTypeInfo, LoadableTypeInfo,
                               ClangFieldInfo> {
+    const clang::RecordDecl *ClangDecl;
   public:
     ClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
                         unsigned explosionSize,
                         llvm::Type *storageType, Size size,
-                        SpareBitVector &&spareBits, Alignment align)
+                        SpareBitVector &&spareBits, Alignment align,
+                        const clang::RecordDecl *clangDecl)
       : StructTypeInfoBase(StructTypeInfoKind::ClangRecordTypeInfo,
                            fields, explosionSize,
                            storageType, size, std::move(spareBits),
-                           align, IsPOD, IsFixedSize) {
+                           align, IsPOD, IsFixedSize),
+        ClangDecl(clangDecl) {
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address addr, SILType T) const override {
       ClangRecordTypeInfo::initialize(IGF, params, addr);
+    }
+
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      lowering.addTypedData(ClangDecl, offset.asCharUnits());
     }
 
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
@@ -297,6 +306,15 @@ namespace {
                            storageType, size, std::move(spareBits),
                            align, isPOD, alwaysFixedSize)
     {}
+
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      for (auto &field : getFields()) {
+        auto fieldOffset = offset + field.getFixedByteOffset();
+        cast<LoadableTypeInfo>(field.getTypeInfo())
+          .addToAggLowering(IGM, lowering, fieldOffset);
+      }
+    }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address addr, SILType T) const override {
@@ -599,7 +617,8 @@ public:
     llvmType->setBody(LLVMFields, /*packed*/ true);
     return ClangRecordTypeInfo::create(FieldInfos, NextExplosionIndex,
                                        llvmType, TotalSize,
-                                       std::move(SpareBits), TotalAlignment);
+                                       std::move(SpareBits), TotalAlignment,
+                                       ClangDecl);
   }
 
 private:

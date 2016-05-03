@@ -214,9 +214,19 @@ namespace {
     }
 
     void getSchema(ExplosionSchema &schema) const override {
-      llvm::StructType *structTy = cast<llvm::StructType>(getStorageType());
+      llvm::StructType *structTy = getStorageType();
       schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(0)));
       schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(1)));
+    }
+
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      auto ptrSize = IGM.getPointerSize();
+      llvm::StructType *structTy = getStorageType();
+      addScalarToAggLowering(IGM, lowering, structTy->getElementType(0),
+                             offset, ptrSize);
+      addScalarToAggLowering(IGM, lowering, structTy->getElementType(1),
+                             offset + ptrSize, ptrSize);
     }
 
     Address projectFunction(IRGenFunction &IGF, Address address) const {

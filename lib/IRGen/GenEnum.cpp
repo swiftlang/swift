@@ -111,6 +111,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/Analysis/CFG.h"
+#include "clang/CodeGen/SwiftCallingConv.h"
 
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
@@ -388,6 +389,12 @@ namespace {
       // type.
       schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
                                       getSingleton()->getBestKnownAlignment()));
+    }
+
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      if (auto singleton = getLoadableSingleton())
+        singleton->addToAggLowering(IGM, lowering, offset);
     }
 
     unsigned getExplosionSize() const override {
@@ -700,6 +707,10 @@ namespace {
 
     bool needsPayloadSizeInMetadata() const override { return false; }
 
+    Size getFixedSize() const {
+      return Size((getDiscriminatorType()->getBitWidth() + 7) / 8);
+    }
+
     llvm::Value *
     emitGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr)
     const override {
@@ -831,6 +842,12 @@ namespace {
 
     static Address projectScalar(IRGenFunction &IGF, Address addr) {
       return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
+    }
+
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      lowering.addOpaqueData(offset.asCharUnits(),
+                             getFixedSize().asCharUnits());
     }
 
     void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
@@ -1159,6 +1176,23 @@ namespace {
         schema.add(ExplosionSchema::Element::forScalar(extraTagTy));
     }
 
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      for (auto &elt : ElementsWithPayload) {
+        // Elements are always stored at offset 0.
+        // This will only be called on strategies for loadable types.
+        cast<LoadableTypeInfo>(elt.ti)->addToAggLowering(IGM, lowering, offset);
+      }
+
+      // Add the extra tag bits.
+      if (ExtraTagBitCount > 0) {
+        auto tagStoreSize = IGM.DataLayout.getTypeStoreSize(extraTagTy);
+        auto tagOffset = offset + getOffsetOfExtraTagBits();
+        lowering.addOpaqueData(tagOffset.asCharUnits(),
+                               Size(tagStoreSize).asCharUnits());
+      }
+    }
+
     unsigned getExplosionSize() const override {
       return unsigned(ExtraTagBitCount > 0) + PayloadElementCount;
     }
@@ -1175,8 +1209,12 @@ namespace {
         return IGF.Builder.CreateBitCast(addr, extraTagTy->getPointerTo());
       }
 
-      addr = IGF.Builder.CreateStructGEP(addr, 1, Size(PayloadBitCount/8U));
-      return IGF.Builder.CreateBitCast(addr, extraTagTy->getPointerTo());
+      addr = IGF.Builder.CreateStructGEP(addr, 1, getOffsetOfExtraTagBits());
+      return IGF.Builder.CreateElementBitCast(addr, extraTagTy);
+    }
+
+    Size getOffsetOfExtraTagBits() const {
+      return Size(PayloadBitCount / 8U);
     }
 
     void loadForSwitch(IRGenFunction &IGF, Address addr, Explosion &e)
@@ -4450,7 +4488,7 @@ namespace {
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       emitDestroyCall(IGF, T, addr);
     }
-    
+
     void getSchema(ExplosionSchema &schema) const override {
       schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
                                                   TI->getBestKnownAlignment()));
@@ -4458,6 +4496,11 @@ namespace {
 
     // \group Operations for loadable enums
 
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      llvm_unreachable("resilient enums are never loadable");
+    }
+    
     ClusteredBitVector
     getTagBitsForPayloads() const override {
       llvm_unreachable("resilient enums are always indirect");
@@ -4878,6 +4921,11 @@ namespace {
                          IsFixedSize_t alwaysFixedSize)
       : EnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD,
                          alwaysFixedSize) {}
+
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      Strategy.addToAggLowering(IGM, lowering, offset);
+    }
 
     unsigned getExplosionSize() const override {
       return Strategy.getExplosionSize();

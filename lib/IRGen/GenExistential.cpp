@@ -679,6 +679,20 @@ public:
       schema.add(ExplosionSchema::Element::forScalar(ty->getElementType(i)));
   }
 
+  void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                        Size offset) const override {
+    auto ptrSize = IGM.getPointerSize();
+    LoadableTypeInfo::addScalarToAggLowering(IGM, lowering,
+                                             asDerived().getValueType(),
+                                             offset, ptrSize);
+
+    llvm::StructType *ty = getStorageType();
+    for (unsigned i = 1, e = getExplosionSize(); i != e; ++i)
+      LoadableTypeInfo::addScalarToAggLowering(IGM, lowering,
+                                               ty->getElementType(i),
+                                               offset + i * ptrSize, ptrSize);
+  }
+
   /// Given the address of a class existential container, returns
   /// the address of a witness table pointer.
   Address projectWitnessTable(IRGenFunction &IGF, Address address,

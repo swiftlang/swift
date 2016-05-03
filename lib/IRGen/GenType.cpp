@@ -23,6 +23,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "clang/CodeGen/SwiftCallingConv.h"
 
 #include "EnumPayload.h"
 #include "LoadableTypeInfo.h"
@@ -144,6 +145,13 @@ LoadedRef LoadableTypeInfo::loadRefcountedPtr(IRGenFunction &IGF,
   IGF.IGM.error(loc, "Can only load from an address that holds a reference to "
                 "a refcounted type or an address of an optional reference.");
   llvm::report_fatal_error("loadRefcountedPtr: Invalid SIL in IRGen");
+}
+
+void LoadableTypeInfo::addScalarToAggLowering(IRGenModule &IGM,
+                                              SwiftAggLowering &lowering,
+                                              llvm::Type *type, Size offset,
+                                              Size storageSize) {
+  lowering.addTypedData(type, offset.asCharUnits(), storageSize.asCharUnits());
 }
 
 static llvm::Constant *asSizeConstant(IRGenModule &IGM, Size size) {
@@ -379,6 +387,8 @@ namespace {
                        IsFixedSize) {}
     unsigned getExplosionSize() const override { return 0; }
     void getSchema(ExplosionSchema &schema) const override {}
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {}
     void loadAsCopy(IRGenFunction &IGF, Address addr,
                     Explosion &e) const override {}
     void loadAsTake(IRGenFunction &IGF, Address addr,
@@ -491,7 +501,7 @@ namespace {
     
     void loadAsTake(IRGenFunction &IGF, Address addr,
                     Explosion &explosion) const override {
-      addr = IGF.Builder.CreateBitCast(addr, ScalarType->getPointerTo());
+      addr = IGF.Builder.CreateElementBitCast(addr, ScalarType);
       explosion.add(IGF.Builder.CreateLoad(addr));
     }
     
@@ -502,7 +512,7 @@ namespace {
     
     void initialize(IRGenFunction &IGF, Explosion &explosion,
                     Address addr) const override {
-      addr = IGF.Builder.CreateBitCast(addr, ScalarType->getPointerTo());
+      addr = IGF.Builder.CreateElementBitCast(addr, ScalarType);
       IGF.Builder.CreateStore(explosion.claimNext(), addr);
     }
     
@@ -531,6 +541,12 @@ namespace {
     
     void getSchema(ExplosionSchema &schema) const override {
       schema.add(ExplosionSchema::Element::forScalar(ScalarType));
+    }
+
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      lowering.addOpaqueData(offset.asCharUnits(),
+                             getFixedSize().asCharUnits());
     }
     
     void packIntoEnumPayload(IRGenFunction &IGF,

@@ -196,6 +196,14 @@ public:
                              unsigned offset) const override {
     dest.add(payload.extractValue(IGF, asDerived().getScalarType(), offset));
   }
+
+  void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                        Size offset) const override {
+    LoadableTypeInfo::addScalarToAggLowering(IGM, lowering,
+                                             asDerived().getScalarType(),
+                                             offset,
+                                           asDerived().Derived::getFixedSize());
+  }
 };
 
 /// PODSingleScalarTypeInfo - A further specialization of
