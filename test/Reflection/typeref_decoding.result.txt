@@ -665,12 +665,12 @@ CAPTURE DESCRIPTORS:
 - Metadata sources:
 (generic_type_parameter depth=0 index=0)
 (closure_binding index=0)
+(generic_type_parameter depth=0 index=1)
+(closure_binding index=1)
 
 - Capture types:
 (struct Swift.Int)
 - Metadata sources:
-(generic_type_parameter depth=0 index=0)
-!!! Invalid matadata source
 
 - Capture types:
 (bound_generic_class TypesToReflect.C1
@@ -680,6 +680,6 @@ CAPTURE DESCRIPTORS:
 (closure_binding index=0)
 (generic_type_parameter depth=0 index=1)
 (generic_argument index=0
-  (reference_capture index=1))
+  (reference_capture index=0))
 
 

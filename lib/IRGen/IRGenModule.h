@@ -629,8 +629,12 @@ public:
   void emitBuiltinReflectionMetadata();
   llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
   llvm::Constant *getAddrOfFieldName(StringRef Name);
-  llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &SILFn,
-                                             HeapLayout &Layout);
+  llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
+                                             CanSILFunctionType origCalleeType,
+                                             CanSILFunctionType substCalleeType,
+                                             ArrayRef<Substitution> subs,
+                                             HeapLayout &layout,
+                                             unsigned firstCaptureIndex);
   std::string getBuiltinTypeMetadataSectionName();
   std::string getFieldTypeMetadataSectionName();
   std::string getAssociatedTypeMetadataSectionName();

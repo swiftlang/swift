@@ -56,9 +56,8 @@ CAPTURE DESCRIPTORS:
 - Metadata sources:
 
 - Capture types:
-- Metadata sources:
 !!! Invalid typeref
-!!! Invalid matadata source
+- Metadata sources:
 
 - Capture types:
 (struct Swift.StaticString)
@@ -69,9 +68,8 @@ CAPTURE DESCRIPTORS:
 - Metadata sources:
 
 - Capture types:
-- Metadata sources:
 !!! Invalid typeref
-!!! Invalid matadata source
+- Metadata sources:
 
 - Capture types:
 (bound_generic_struct Swift.UnsafeBufferPointer
@@ -83,8 +81,7 @@ CAPTURE DESCRIPTORS:
 - Metadata sources:
 
 - Capture types:
-- Metadata sources:
 !!! Invalid typeref
-!!! Invalid matadata source
+- Metadata sources:
 
 
