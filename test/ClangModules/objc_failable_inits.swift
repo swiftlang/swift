@@ -18,11 +18,13 @@ func testString() throws {
   // Implicitly unwrapped optional
   let stringIUO = NSString(path: "blah")
   if stringIUO == nil { }
-  _ = stringIUO as NSString
+  _ = stringIUO as NSString?
+  let _: NSString = NSString(path: "blah")
 }
 
 func testHive() {
   let hiveIUO = Hive()
   if hiveIUO == nil { }
-  _ = hiveIUO as Hive
+  _ = hiveIUO as Hive?
+  let _: Hive = Hive()
 }

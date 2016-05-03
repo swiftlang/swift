@@ -19,7 +19,7 @@ func test1(_ power: Unmanaged<CCPowerSupply>) {
 }
 
 func test2() {
-  let fridge = CCRefrigeratorCreate(kCCPowerStandard)
+  let fridge = CCRefrigeratorCreate(kCCPowerStandard)!
   assertUnmanaged(fridge)
 }
 
@@ -31,7 +31,7 @@ func test4() {
   // FIXME: this should not require a type annotation
   let power: CCPowerSupply = kCCPowerStandard
   assertManaged(power)
-  let fridge = CCRefrigeratorCreate(power)
+  let fridge = CCRefrigeratorCreate(power)!
   assertUnmanaged(fridge)
 }
 
@@ -47,7 +47,7 @@ func test6() {
 }
 
 func test7() {
-  let value = CFBottom()
+  let value = CFBottom()!
   assertUnmanaged(value)
 }
 

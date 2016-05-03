@@ -37,7 +37,6 @@ PrintTests.test("Printable") {
 }
 
 PrintTests.test("Printable") {
-  expectPrinted("meow", String!("meow"))
   expectPrinted("Optional(\"meow\")", String?("meow"))
 }
 

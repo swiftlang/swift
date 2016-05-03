@@ -14,7 +14,7 @@ func callUnavailableObjC() {
   
   
   if #available(OSX 10.51, *) {
-    let o = NSAvailableOn10_51()
+    let o = NSAvailableOn10_51()!
     
     // Properties
     _ = o.propertyOn10_52 // expected-error {{'propertyOn10_52' is only available on OS X 10.52 or newer}}

@@ -554,7 +554,7 @@ func test20087517() {
   class Color {
     static func greenColor() -> Color { return Color() }
   }
-  let x: (Color!, Int) = (.greenColor(), 1)
+  let x: (Color?, Int) = (.greenColor(), 1)
 }
 
 func test20596042() {
