@@ -172,7 +172,7 @@ reportOnCrash(uint32_t flags, const char *message)
   // mutex calls fatalError when an error is detected and fatalError ends up
   // calling us. In other words we could get infinite recursion if the
   // mutex errors.
-  static StaticUnsafeMutex crashlogLock();
+  static swift::StaticUnsafeMutex crashlogLock();
 
   crashlogLock.lock();
 
