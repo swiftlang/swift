@@ -24,6 +24,7 @@
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
+#include "swift/SwiftRemoteMirror/MemoryReaderInterface.h"
 
 #include <iostream>
 #include <vector>
@@ -117,6 +118,85 @@ public:
     if (!MetadataAddress.first)
       return nullptr;
     return getMetadataTypeInfo(MetadataAddress.second);
+  }
+
+  bool
+  projectExistential(addr_t ExistentialAddress,
+                     const TypeRef *ExistentialTR,
+                     const TypeRef **OutInstanceTR,
+                     addr_t *OutInstanceAddress) {
+    if (ExistentialTR == nullptr)
+      return false;
+
+    auto ExistentialTI = getTypeInfo(ExistentialTR);
+    if (ExistentialTI == nullptr)
+      return false;
+
+    auto ExistentialRecordTI = dyn_cast<const RecordTypeInfo>(ExistentialTI);
+    if (ExistentialRecordTI == nullptr)
+      return false;
+
+    switch (ExistentialRecordTI->getRecordKind()) {
+    // Class existentials have trivial layout.
+    // The first word of the 3-word buffer has a pointer to the class instance.
+    case RecordKind::ClassExistential:
+      *OutInstanceTR = getBuilder().getTypeConverter().getUnknownObjectTypeRef();
+      *OutInstanceAddress = ExistentialAddress;
+      return true;
+
+    // Other existentials have two cases:
+    // If the value fits in three words, it starts at the beginning of the
+    // container. If it doesn't, the first word is a pointer to a heap box.
+    case RecordKind::Existential: {
+      auto Fields = ExistentialRecordTI->getFields();
+      auto Metadata = std::find_if(Fields.begin(), Fields.end(),
+                                   [](const FieldInfo &FI) -> bool {
+        return FI.Name.compare("metadata") == 0;
+      });
+      if (Metadata == Fields.end())
+        return false;
+
+      // Get the metadata pointer for the contained instance type.
+      // This is equivalent to:
+      // auto PointerArray = reinterpret_cast<uintptr_t*>(ExistentialAddress);
+      // uintptr_t MetadataAddress = PointerArray[Offset];
+      auto MetadataAddressAddress
+        = RemoteAddress(ExistentialAddress + Metadata->Offset);
+
+      StoredPointer MetadataAddress = 0;
+      if (!getReader().readInteger(MetadataAddressAddress, &MetadataAddress))
+        return false;
+
+      auto InstanceTR = readTypeFromMetadata(MetadataAddress);
+      if (!InstanceTR)
+        return false;
+
+      *OutInstanceTR = InstanceTR;
+
+      auto InstanceTI = getTypeInfo(InstanceTR);
+      if (!InstanceTI)
+        return false;
+
+      if (InstanceTI->getSize() < ExistentialRecordTI->getSize()) {
+        // The value fits in the existential container, so it starts at the
+        // start of the container.
+        *OutInstanceAddress = ExistentialAddress;
+      } else {
+        // Otherwise it's in a box somewhere off in the heap. The first word
+        // of the container has the address to that box.
+        StoredPointer BoxAddress = 0;
+
+        if (!getReader().readInteger(RemoteAddress(ExistentialAddress),
+                                    &BoxAddress))
+          return false;
+
+        *OutInstanceAddress = BoxAddress;
+      }
+      return true;
+    }
+    default:
+      return false;
+    }
   }
 
   /// Return a description of the layout of a value with the given type.

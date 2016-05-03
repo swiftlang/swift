@@ -579,7 +579,7 @@ public:
         return BuiltType();
 
       return Builder.createTupleType(elementTypes, std::move(labels),
-                                     /*variadic*/ false);
+                                     /*variardic*/ false);
     }
     case MetadataKind::Function: {
       auto Function = cast<TargetFunctionTypeMetadata<Runtime>>(Meta);

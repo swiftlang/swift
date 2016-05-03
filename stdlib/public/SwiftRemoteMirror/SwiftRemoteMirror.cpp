@@ -246,12 +246,14 @@ swift_reflection_childOfInstance(SwiftReflectionContextRef ContextRef,
 }
 
 int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
-                                        addr_t InstanceAddress,
+                                        addr_t ExistentialAddress,
                                         swift_typeref_t ExistentialTypeRef,
                                         swift_typeref_t *InstanceTypeRef,
                                         addr_t *StartOfInstanceData) {
-  // TODO
-  return false;
+  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
+  return Context->projectExistential(ExistentialAddress, ExistentialTR,
+    reinterpret_cast<const TypeRef **>(InstanceTypeRef), StartOfInstanceData);
 }
 
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {

@@ -21,6 +21,7 @@
 import MachO
 import Darwin
 
+let RequestInstanceKind = "k"
 let RequestInstanceAddress = "i"
 let RequestReflectionInfos = "r"
 let RequestReadBytes = "b";
@@ -34,6 +35,13 @@ internal func debugLog(_ message: String) {
   fputs("Child: \(message)\n", stderr)
   fflush(stderr)
 #endif
+}
+
+public enum InstanceKind : UInt8 {
+  case None
+  case Object
+  case Existential
+  case Closure
 }
 
 /// Represents a section in a loaded image in this process.
@@ -259,11 +267,13 @@ internal func sendPointerSize() {
 /// The parent sends a Done message to indicate that it's done
 /// looking at this instance. It will continue to ask for instances,
 /// so call doneReflecting() when you don't have any more instances.
-public func reflect(_ instance: AnyObject) {
+internal func reflect(instanceAddress: UInt, kind: InstanceKind) {
   while let command = readLine(strippingNewline: true) {
     switch command {
+    case String(validatingUTF8: RequestInstanceKind)!:
+      sendValue(kind.rawValue)
     case String(validatingUTF8: RequestInstanceAddress)!:
-      sendAddress(of: instance)
+      sendValue(instanceAddress)
     case String(validatingUTF8: RequestReflectionInfos)!:
       sendReflectionInfos()
     case String(validatingUTF8: RequestReadBytes)!:
@@ -277,15 +287,35 @@ public func reflect(_ instance: AnyObject) {
     case String(validatingUTF8: RequestDone)!:
       return;
     default:
-      fatalError("Unknown request received!")
+      fatalError("Unknown request received: '\(Array(command.utf8))'!")
     }
   }
+}
+
+/// Reflect a class instance.
+public func reflect(object: AnyObject) {
+  let address = unsafeAddress(of: object)
+  let addressValue = unsafeBitCast(address, to: UInt.self)
+  reflect(instanceAddress: addressValue, kind: .Object)
+}
+
+/// Reflect any type at all by boxing it into an existential container (an `Any`)
+///
+/// This function serves to exercise the projectExistential function of the
+/// SwiftRemoteMirror API.
+public func reflect<T>(any: T) {
+  let any: Any = any
+  let anyPointer = UnsafeMutablePointer<Any>(allocatingCapacity: sizeof(Any.self))
+  anyPointer.initialize(with: any)
+  let anyPointerValue = unsafeBitCast(anyPointer, to: UInt.self)
+  reflect(instanceAddress: anyPointerValue, kind: .Existential)
+  anyPointer.deallocateCapacity(sizeof(Any.self))
 }
 
 /// Call this function to indicate to the parent that there are
 /// no more instances to look at.
 public func doneReflecting() {
-  sendValue(UInt(0))
+  sendValue(InstanceKind.None.rawValue)
 }
 
 /* Example usage
