@@ -6,6 +6,7 @@ add_swift_executable(swift-ide-test
     swiftDriver
     swiftFrontend
     swiftIDE
+    LLVMCoverage
     LLVMDebugInfoCodeView
 )
 

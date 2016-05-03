@@ -24,7 +24,7 @@
 #include "swift/SIL/SILPrintContext.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
-#include "llvm/ProfileData/CoverageMapping.h"
+#include "llvm/ProfileData/Coverage/CoverageMapping.h"
 
 namespace llvm {
 namespace coverage {

@@ -20,8 +20,8 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/GlobalValue.h"
-#include "llvm/ProfileData/CoverageMapping.h"
-#include "llvm/ProfileData/CoverageMappingWriter.h"
+#include "llvm/ProfileData/Coverage/CoverageMapping.h"
+#include "llvm/ProfileData/Coverage/CoverageMappingWriter.h"
 #include "llvm/ProfileData/InstrProf.h"
 
 #include <forward_list>
