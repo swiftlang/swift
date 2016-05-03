@@ -5,6 +5,7 @@ add_swift_unittest(SourceKitSwiftLangTests
 
 target_link_libraries(SourceKitSwiftLangTests
   SourceKitSwiftLang
+  LLVMCoverage
   )
 
 set_property(TARGET SourceKitSwiftLangTests APPEND_STRING PROPERTY COMPILE_FLAGS

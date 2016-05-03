@@ -14,6 +14,7 @@ add_swift_executable(swift
     swiftClangImporter
     swiftOption
     clangAPINotes
+    LLVMCoverage
     LLVMDebugInfoCodeView
 )
 
