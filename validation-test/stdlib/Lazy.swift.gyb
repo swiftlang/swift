@@ -127,7 +127,13 @@ LazyTestSuite.test("CollectionOfOne/${name}")
 }
 % end
 
-LazyTestSuite.test("CollectionOfOne/subscript(Index)/Get/Set/Empty/NoTrap") {
+LazyTestSuite.test("CollectionOfOne/index(after:), index(before:)") {
+  let c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
+  expectEqual(1, c.index(after: 0))
+  expectEqual(0, c.index(before: 1))
+}
+
+LazyTestSuite.test("CollectionOfOne/subscript(Index)/Get/Set/NoTrap") {
   var c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
   c[0] = OpaqueValue(4242)
   expectEqual(4242, c[0].value)
