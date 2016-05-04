@@ -21,8 +21,7 @@ TestSuiteCrashes.test("uncaught") {
   raiseNSException()
 }
 // CHECK-LABEL: stdout>>> uncaught
-// CHECK: stderr>>> *** [StdlibUnittest] Terminating due to uncaught exception Trogdor: Optional(Burnination)
-// FIXME: listed reason above should be "Burnination", not "Optional(Burnination)"; may have to do with SE-0054
+// CHECK: stderr>>> *** [StdlibUnittest] Terminating due to uncaught exception Trogdor: Burnination
 // CHECK: stderr>>> CRASHED: SIG
 // CHECK: the test crashed unexpectedly
 // CHECK: [     FAIL ] NSExceptionCrashes.uncaught
@@ -33,7 +32,7 @@ TestSuiteCrashes.test("crashesAsExpected") {
   raiseNSException()
 }
 // CHECK-LABEL: stdout>>> crashesAsExpected
-// CHECK: stderr>>> *** [StdlibUnittest] Terminating due to uncaught exception Trogdor: Optional(Burnination)
+// CHECK: stderr>>> *** [StdlibUnittest] Terminating due to uncaught exception Trogdor: Burnination
 // CHECK: stderr>>> OK: saw expected "crashed: sig
 // CHECK: [       OK ] NSExceptionCrashes.crashesAsExpected
 
@@ -46,7 +45,7 @@ TestSuiteCrashes.test("crashesWithMessage")
   raiseNSException()
 }
 // CHECK-LABEL: stdout>>> crashesWithMessage
-// CHECK: stderr>>> *** [StdlibUnittest] Terminating due to uncaught exception Trogdor: Optional(Burnination)
+// CHECK: stderr>>> *** [StdlibUnittest] Terminating due to uncaught exception Trogdor: Burnination
 // CHECK: stderr>>> OK: saw expected "crashed: sig
 // CHECK: [       OK ] NSExceptionCrashes.crashesWithMessage
 
@@ -57,7 +56,7 @@ TestSuiteCrashes.test("nonNSException")
   objc_exception_throw("countryside")
 }
 // CHECK-LABEL: stdout>>> nonNSException
-// CHECK: stderr>>> *** [StdlibUnittest] Terminating due to uncaught exception: Optional(countryside)
+// CHECK: stderr>>> *** [StdlibUnittest] Terminating due to uncaught exception: countryside
 // CHECK: stderr>>> OK: saw expected "crashed: sig
 // CHECK: [       OK ] NSExceptionCrashes.nonNSException
 
