@@ -181,6 +181,51 @@ class TypeDecoder {
       return Builder.createFunctionType(arguments, argsAreInOut,
                                         result, flags);
     }
+    case NodeKind::ImplFunctionType: {
+      // Minimal support for lowered function types. These come up in
+      // reflection as capture types. For the reflection library's
+      // purposes, the only part that matters is the convention.
+      FunctionTypeFlags flags;
+
+      for (unsigned i = 0; i < Node->getNumChildren(); i++) {
+        auto child = Node->getChild(i);
+
+        if (child->getKind() == NodeKind::ImplConvention) {
+          if (!child->hasText())
+            return BuiltType();
+
+          auto &text = child->getText();
+
+          if (text == "@convention(thin)") {
+            flags =
+              flags.withConvention(FunctionMetadataConvention::Thin);
+          }
+        } else if (child->getKind() == NodeKind::ImplFunctionAttribute) {
+          if (!child->hasText())
+            return BuiltType();
+
+          auto &text = child->getText();
+          if (text == "@convention(c)") {
+            flags =
+              flags.withConvention(FunctionMetadataConvention::CFunctionPointer);
+          } else if (text == "@convention(block)") {
+            flags =
+              flags.withConvention(FunctionMetadataConvention::Block);
+          }
+        }
+      }
+
+      // Completely punt on argument types and results.
+      std::vector<BuiltType> arguments;
+      std::vector<bool> argsAreInOut;
+
+      std::vector<BuiltType> elements;
+      std::string labels;
+      auto result = Builder.createTupleType(elements, std::move(labels), false);
+
+      return Builder.createFunctionType(arguments, argsAreInOut,
+                                        result, flags);
+    }
     case NodeKind::ArgumentTuple:
       return decodeMangledType(Node->getChild(0));
     case NodeKind::ReturnType:
