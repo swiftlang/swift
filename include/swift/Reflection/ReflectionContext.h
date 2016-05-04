@@ -138,7 +138,7 @@ public:
 
     switch (ExistentialRecordTI->getRecordKind()) {
     // Class existentials have trivial layout.
-    // The first word of the 3-word buffer has a pointer to the class instance.
+    // It is itself the pointer to the instance followed by the witness tables.
     case RecordKind::ClassExistential:
       *OutInstanceTR = getBuilder().getTypeConverter().getUnknownObjectTypeRef();
       *OutInstanceAddress = ExistentialAddress;
