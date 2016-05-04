@@ -81,8 +81,8 @@ using namespace swift;
 /// If a large store is broken down to too many smaller stores, bail out.
 /// Currently, we only do partial dead store if we can form a single contiguous
 /// non-dead store.
-static llvm::cl::opt<unsigned> MaxPartialStoreCount("max-partial-store-count",
-                                         llvm::cl::init(1), llvm::cl::Hidden);
+static llvm::cl::opt<unsigned>
+MaxPartialStoreCount("max-partial-store-count", llvm::cl::init(1), llvm::cl::Hidden);
 
 STATISTIC(NumDeadStores, "Number of dead stores removed");
 STATISTIC(NumPartialDeadStores, "Number of partial dead stores removed");
@@ -102,6 +102,10 @@ enum class DSEKind : unsigned {
   PerformDSE = 2,
 };
 
+//===----------------------------------------------------------------------===//
+//                             Utility Functions
+//===----------------------------------------------------------------------===//
+
 /// Return the deallocate stack instructions corresponding to the given
 /// AllocStackInst.
 static llvm::SmallVector<SILInstruction *, 1>
@@ -114,10 +118,6 @@ findDeallocStackInst(AllocStackInst *ASI) {
   }
   return DSIs;
 }
-
-//===----------------------------------------------------------------------===//
-//                             Utility Functions
-//===----------------------------------------------------------------------===//
 
 static inline bool isComputeMaxStoreSet(DSEKind Kind) {
   return Kind == DSEKind::ComputeMaxStoreSet;
@@ -169,7 +169,6 @@ constexpr unsigned MaxLSLocationBBMultiplicationNone = 256*256;
 /// and 64 locations which is a sizeable function.
 constexpr unsigned MaxLSLocationBBMultiplicationPessimistic = 64*64;
 
-
 /// forward declaration.
 class DSEContext;
 /// BlockState summarizes how LSLocations are used in a basic block.
@@ -193,10 +192,8 @@ class DSEContext;
 /// 2. When a load instruction is encountered, remove the loaded location and
 ///    any location it may alias with from the BBWriteSetMid.
 ///
-/// 3. When an instruction reads from memory in an unknown way, the
-///    BBWriteSetMid bit is cleared if the instruction can read the
-///    corresponding LSLocation.
-///
+/// 3. When an instruction reads from memory in an unknown way, the BBWriteSet
+///    bit is cleared if the instruction can read the corresponding LSLocation.
 class BlockState {
 public:
   /// The basic block this BlockState represents.
@@ -257,9 +254,6 @@ public:
     init(LocationNum, Optimistic);
   }
 
-  /// Return the current basic block.
-  SILBasicBlock *getBB() const { return BB; }
-
   /// Initialize the bitvectors for the current basic block.
   void init(unsigned LocationNum, bool Optimistic);
 
@@ -303,6 +297,8 @@ bool BlockState::isTrackingLocation(llvm::SmallBitVector &BV, unsigned i) {
 
 namespace {
 
+/// The dead store elimination context, keep information about stores in a basic
+/// block granularity.
 class DSEContext {
 /// How to process the current function.
 enum class ProcessKind {
@@ -439,7 +435,7 @@ public:
              AliasAnalysis *AA, EscapeAnalysis *EA, TypeExpansionAnalysis *TE,
              llvm::BumpPtrAllocator &BPA,
              ConsumedArgToEpilogueReleaseMatcher &ERM)
-      : Mod(M), F(F), PM(PM), AA(AA), EA(EA), TE(TE), BPA(BPA), ERM(ERM) {}
+    : Mod(M), F(F), PM(PM), AA(AA), EA(EA), TE(TE), BPA(BPA), ERM(ERM) {}
 
   /// Entry point for dead store elimination.
   bool run();
@@ -447,14 +443,11 @@ public:
   /// Run the iterative DF to converge the BBWriteSetIn.
   void runIterativeDSE();
 
-  /// Returns the escape analysis we use.
-  EscapeAnalysis *getEA() { return EA; }
-
   /// Returns the location vault of the current function.
   std::vector<LSLocation> &getLocationVault() { return LocationVault; }
 
   /// Returns the epilogue release matcher we are using.
-  ConsumedArgToEpilogueReleaseMatcher &getERM() const { return ERM; };
+  ConsumedArgToEpilogueReleaseMatcher &getERM() const { return ERM; }
 
   /// Use a set of ad hoc rules to tell whether we should run a pessimistic
   /// one iteration data flow on the function.
@@ -688,8 +681,8 @@ void DSEContext::mergeSuccessorLiveIns(SILBasicBlock *BB) {
   auto Iter = BB->succ_begin();
   C->BBWriteSetOut = getBlockState(*Iter)->BBWriteSetIn;
 
-  /// Merge/intersection is very frequently performed, so it is important to make
-  /// it as cheap as possible.
+  /// Merge/intersection is very frequently performed, so it is important to
+  /// make it as cheap as possible.
   ///
   /// To do so, we canonicalize LSLocations, i.e. traced back to the underlying
   /// object. Therefore, no need to do a O(N^2) comparison to figure out what is
