@@ -1532,7 +1532,7 @@ static bool isOnlyUnreachable(SILBasicBlock *BB) {
 
 
 /// simplifySwitchEnumUnreachableBlocks - Attempt to replace a
-/// switch_enum_inst where all but one block consists of just an
+/// switch_enum where all but one block consists of just an
 /// "unreachable" with an unchecked_enum_data and branch.
 bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
   auto Count = SEI->getNumCases();
