@@ -303,6 +303,52 @@ public func reflect(object: AnyObject) {
 ///
 /// This function serves to exercise the projectExistential function of the
 /// SwiftRemoteMirror API.
+///
+/// It tests the three conditions of existential layout:
+///
+/// ## Class existentials
+///
+/// For example, a `MyClass as Any`:
+/// ```
+/// [Pointer to class instance]
+/// [Witness table 1]
+/// [Witness table 2]
+/// ...
+/// [Witness table n]
+/// ```
+///
+/// ## Existentials whose contained type fits in the 3-word buffer
+///
+/// For example, a `(1, 2) as Any`:
+/// ```
+/// [Tuple element 1: Int]
+/// [Tuple element 2: Int]
+/// [-Empty_]
+/// [Metadata Pointer]
+/// [Witness table 1]
+/// [Witness table 2]
+/// ...
+/// [Witness table n]
+/// ```
+///
+/// ## Existentials whose contained type has to be allocated into a
+///    heap buffer.
+///
+/// For example, a `LargeStruct<T> as Any`:
+/// ```
+/// [Pointer to unmanaged heap container] --> [Large struct]
+/// [-Empty-]
+/// [-Empty-]
+/// [Metadata Pointer]
+/// [Witness table 1]
+/// [Witness table 2]
+/// ...
+/// [Witness table n]
+/// ```
+///
+/// The test doesn't care about the witness tables - we only care
+/// about what's in the buffer, so we always put these values into
+/// an Any existential.
 public func reflect<T>(any: T) {
   let any: Any = any
   let anyPointer = UnsafeMutablePointer<Any>(allocatingCapacity: sizeof(Any.self))
