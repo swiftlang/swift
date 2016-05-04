@@ -21,12 +21,13 @@
 import MachO
 import Darwin
 
+let RequestInstanceKind = "k"
 let RequestInstanceAddress = "i"
 let RequestReflectionInfos = "r"
 let RequestReadBytes = "b";
 let RequestSymbolAddress = "s"
 let RequestStringLength = "l"
-let RequestExit = "e"
+let RequestDone = "d"
 let RequestPointerSize = "p"
 
 internal func debugLog(_ message: String) {
@@ -34,6 +35,13 @@ internal func debugLog(_ message: String) {
   fputs("Child: \(message)\n", stderr)
   fflush(stderr)
 #endif
+}
+
+public enum InstanceKind : UInt8 {
+  case None
+  case Object
+  case Existential
+  case Closure
 }
 
 /// Represents a section in a loaded image in this process.
@@ -255,11 +263,17 @@ internal func sendPointerSize() {
 /// - Get the pointer size of this process, which affects assumptions about the
 ///   the layout of runtime structures with pointer-sized fields.
 /// - Read raw bytes out of this process's address space.
-public func reflect(_ instance: AnyObject) {
+///
+/// The parent sends a Done message to indicate that it's done
+/// looking at this instance. It will continue to ask for instances,
+/// so call doneReflecting() when you don't have any more instances.
+internal func reflect(instanceAddress: UInt, kind: InstanceKind) {
   while let command = readLine(strippingNewline: true) {
     switch command {
+    case String(validatingUTF8: RequestInstanceKind)!:
+      sendValue(kind.rawValue)
     case String(validatingUTF8: RequestInstanceAddress)!:
-      sendAddress(of: instance)
+      sendValue(instanceAddress)
     case String(validatingUTF8: RequestReflectionInfos)!:
       sendReflectionInfos()
     case String(validatingUTF8: RequestReadBytes)!:
@@ -270,12 +284,38 @@ public func reflect(_ instance: AnyObject) {
       sendStringLength()
     case String(validatingUTF8: RequestPointerSize)!:
       sendPointerSize();
-    case String(validatingUTF8: RequestExit)!:
-      exit(EXIT_SUCCESS)
+    case String(validatingUTF8: RequestDone)!:
+      return;
     default:
-      fatalError("Unknown request received!")
+      fatalError("Unknown request received: '\(Array(command.utf8))'!")
     }
   }
+}
+
+/// Reflect a class instance.
+public func reflect(object: AnyObject) {
+  let address = unsafeAddress(of: object)
+  let addressValue = unsafeBitCast(address, to: UInt.self)
+  reflect(instanceAddress: addressValue, kind: .Object)
+}
+
+/// Reflect any type at all by boxing it into an existential container (an `Any`)
+///
+/// This function serves to exercise the projectExistential function of the
+/// SwiftRemoteMirror API.
+public func reflect<T>(any: T) {
+  let any: Any = any
+  let anyPointer = UnsafeMutablePointer<Any>(allocatingCapacity: sizeof(Any.self))
+  anyPointer.initialize(with: any)
+  let anyPointerValue = unsafeBitCast(anyPointer, to: UInt.self)
+  reflect(instanceAddress: anyPointerValue, kind: .Existential)
+  anyPointer.deallocateCapacity(sizeof(Any.self))
+}
+
+/// Call this function to indicate to the parent that there are
+/// no more instances to look at.
+public func doneReflecting() {
+  sendValue(InstanceKind.None.rawValue)
 }
 
 /* Example usage
