@@ -78,6 +78,12 @@
 
 using namespace swift;
 
+/// If a large store is broken down to too many smaller stores, bail out.
+/// Currently, we only do partial dead store if we can form a single contiguous
+/// non-dead store.
+static llvm::cl::opt<unsigned> MaxPartialStoreCount("max-partial-store-count",
+                                         llvm::cl::init(1), llvm::cl::Hidden);
+
 STATISTIC(NumDeadStores, "Number of dead stores removed");
 STATISTIC(NumPartialDeadStores, "Number of partial dead stores removed");
 
@@ -163,10 +169,6 @@ constexpr unsigned MaxLSLocationBBMultiplicationNone = 256*256;
 /// and 64 locations which is a sizeable function.
 constexpr unsigned MaxLSLocationBBMultiplicationPessimistic = 64*64;
 
-/// If a large store is broken down to too many smaller stores, bail out.
-/// Currently, we only do partial dead store if we can form a single contiguous
-/// non-dead store.
-constexpr unsigned MaxPartialDeadStoreCountLimit = 1;
 
 /// forward declaration.
 class DSEContext;
@@ -246,6 +248,7 @@ public:
   ///
   /// The first SILValue keeps the address of the live store and the second
   /// SILValue keeps the value of the store.
+  llvm::SetVector<SILValue> LiveAddr;
   llvm::DenseMap<SILValue, SILValue> LiveStores;
 
   /// Constructors.
@@ -956,7 +959,7 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
     LSLocation::reduce(L, Mod, Alives);
 
     // Oops, we have too many smaller stores generated, bail out.
-    if (Alives.size() > MaxPartialDeadStoreCountLimit)
+    if (Alives.size() > MaxPartialStoreCount)
       return;
 
     // At this point, we are performing a partial dead store elimination.
@@ -976,6 +979,7 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
     for (auto &X : Alives) {
       SILValue Value = X.getPath()->createExtract(Val, I, true);
       SILValue Addr = X.getPath()->createExtract(Mem, I, false);
+      S->LiveAddr.insert(Addr);
       S->LiveStores[Addr] = Value;
     }
 
@@ -1200,12 +1204,14 @@ bool DSEContext::run() {
   bool Changed = false;
   for (SILBasicBlock &BB : *F) {
     // Create the stores that are alive due to partial dead stores.
-    for (auto &I : getBlockState(&BB)->LiveStores) {
+    auto *S = getBlockState(&BB);
+    for (auto &X : S->LiveAddr) {
       Changed = true;
-      SILInstruction *Inst = cast<SILInstruction>(I.first);
+      auto I = S->LiveStores.find(X);
+      SILInstruction *Inst = cast<SILInstruction>(I->first);
       auto *IT = &*std::next(Inst->getIterator());
       SILBuilderWithScope Builder(IT);
-      Builder.createStore(Inst->getLoc(), I.second, Inst);
+      Builder.createStore(Inst->getLoc(), I->second, Inst);
     }
     // Delete the dead stores.
     for (auto &I : getBlockState(&BB)->DeadStores) {

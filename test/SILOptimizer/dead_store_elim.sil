@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -dead-store-elim -enable-sil-verify-all | FileCheck %s
+// RUN: %target-sil-opt %s -dead-store-elim -max-partial-store-count=2 -enable-sil-verify-all | FileCheck %s
 
 sil_stage canonical
 
@@ -1062,6 +1062,28 @@ bb0(%0 : $*S5):
 /// CHECK: store
 /// CHECK: store
 sil hidden @discontiguous_partial_dead_store_simple_struct : $@convention(thin) (@inout S6) -> () {
+bb0(%0 : $*S6):
+  %1 = function_ref @S6_init : $@convention(thin) (@thin S6.Type) -> S6
+  %2 = metatype $@thin S6.Type
+  %3 = apply %1(%2) : $@convention(thin) (@thin S6.Type) -> S6
+  store %3 to %0 : $*S6
+  %5 = integer_literal $Builtin.Int64, 10
+  %6 = struct $Int (%5 : $Builtin.Int64)
+  %7 = struct_element_addr %0 : $*S6, #S6.y
+  store %6 to %7 : $*Int
+  %9 = tuple ()
+  return %9 : $()
+}
+
+/// Make sure we generate the store to field x first.
+///
+/// CHECK-LABEL : sil hidden @discontiguous_partial_dead_store_lives_insert_determinstically
+/// CHECK: bb0([[A:%.*]] : $*S6):
+/// CHECK: [[IN:%.*]] = apply
+/// CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S6, #S6.x
+/// CHECK: [[EXT2:%.*]] =  struct_element_addr [[A]] : $*S6, #S6.x
+/// CHECK: store [[EXT1]] to [[EXT2]] : $*Int
+sil hidden @discontiguous_partial_dead_store_lives_insert_determinstically : $@convention(thin) (@inout S6) -> () {
 bb0(%0 : $*S6):
   %1 = function_ref @S6_init : $@convention(thin) (@thin S6.Type) -> S6
   %2 = metatype $@thin S6.Type
