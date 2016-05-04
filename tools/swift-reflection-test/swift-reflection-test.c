@@ -171,10 +171,11 @@ int PipeMemoryReader_readBytes(void *Context,
                                addr_t Address, void *Dest, uint64_t Size) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
   uintptr_t TargetAddress = Address;
+  size_t TargetSize = (size_t)Size;
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
   write(WriteFD, REQUEST_READ_BYTES, 2);
   write(WriteFD, &TargetAddress, sizeof(TargetAddress));
-  write(WriteFD, &Size, sizeof(size_t));
+  write(WriteFD, &TargetSize, sizeof(size_t));
   PipeMemoryReader_collectBytesFromPipe(Reader, Dest, Size);
   return 1;
 }
@@ -303,8 +304,9 @@ PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
 uint64_t PipeMemoryReader_getStringLength(void *Context, addr_t Address) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
+  uintptr_t TargetAddress = (uintptr_t)Address;
   write(WriteFD, REQUEST_STRING_LENGTH, 2);
-  write(WriteFD, &Address, sizeof(Address));
+  write(WriteFD, &TargetAddress, sizeof(TargetAddress));
   uintptr_t Length = 0;
   PipeMemoryReader_collectBytesFromPipe(Reader, &Length, sizeof(Length));
   return Length;
