@@ -2771,6 +2771,11 @@ static SILValue getInsertedValue(SILInstruction *Aggregate,
     auto *SEI = cast<StructExtractInst>(Extract);
     return Struct->getFieldValue(SEI->getField());
   }
+  if (auto *Enum = dyn_cast<EnumInst>(Aggregate)) {
+    assert(Enum->getElement() ==
+           cast<UncheckedEnumDataInst>(Extract)->getElement());
+    return Enum->getOperand();
+  }
   auto *Tuple = cast<TupleInst>(Aggregate);
   auto *TEI = cast<TupleExtractInst>(Extract);
   return Tuple->getElement(TEI->getFieldNo());
@@ -3240,8 +3245,8 @@ bool simplifyToSelectValue(SILBasicBlock *MergeBlock, unsigned ArgNum,
 
 // Attempt to simplify the ith argument of BB.  We simplify cases
 // where there is a single use of the argument that is an extract from
-// a struct or tuple and where the predecessors all build the struct
-// or tuple and pass it directly.
+// a struct, tuple or enum and where the predecessors all build the struct,
+// tuple or enum and pass it directly.
 bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   auto *A = BB->getBBArg(i);
 
@@ -3261,8 +3266,9 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
 
   auto *Use = *A->use_begin();
   auto *User = cast<SILInstruction>(Use->getUser());
-  if (!dyn_cast<StructExtractInst>(User) &&
-      !dyn_cast<TupleExtractInst>(User))
+  if (!isa<StructExtractInst>(User) &&
+      !isa<TupleExtractInst>(User) &&
+      !isa<UncheckedEnumDataInst>(User))
     return false;
 
   // For now, just handle the case where all predecessors are
@@ -3271,9 +3277,16 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
     if (!isa<BranchInst>(Pred->getTerminator()))
       return false;
     auto *Branch = cast<BranchInst>(Pred->getTerminator());
-    if (!isa<StructInst>(Branch->getArg(i)) &&
-        !isa<TupleInst>(Branch->getArg(i)))
-      return false;
+    SILValue BranchArg = Branch->getArg(i);
+    if (isa<StructInst>(BranchArg))
+      continue;
+    if (isa<TupleInst>(BranchArg))
+      continue;
+    if (auto *EI = dyn_cast<EnumInst>(BranchArg)) {
+      if (EI->getElement() == cast<UncheckedEnumDataInst>(User)->getElement())
+        continue;
+    }
+    return false;
   }
 
   // Okay, we'll replace the BB arg with one with the right type, replace
