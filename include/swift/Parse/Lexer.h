@@ -36,9 +36,12 @@ enum class CommentRetentionMode {
   ReturnAsTokens,
 };
 
+// number of bits must tally with Token.h
 enum StringLiteralModifiers : unsigned {
-  StringLiteralUnderscore = 1<<0,
-  StringLiteralExtraEscapes = 1<<1
+  StringLiteralNoModifiers = 0,
+  StringLiteralUnderscoreDelimited = 1<<0,
+  StringLiteralUnprocessedEscapes = 1<<1,
+  StringLiteralRegexInterpolating = 1<<2
 };
 
 class Lexer {
@@ -328,12 +331,15 @@ public:
     // Loc+Length for the segment inside the string literal, without quotes.
     SourceLoc Loc;
     unsigned Length;
-    
-    static StringSegment getLiteral(SourceLoc Loc, unsigned Length) {
+    unsigned Modifiers;
+
+    static StringSegment getLiteral(SourceLoc Loc, unsigned Length,
+                                    unsigned Modifiers = 0) {
       StringSegment Result;
       Result.Kind = Literal;
       Result.Loc = Loc;
       Result.Length = Length;
+      Result.Modifiers = Modifiers;
       return Result;
     }
     
@@ -350,12 +356,13 @@ public:
   /// If a copy needs to be made, it will be allocated out of the provided
   /// Buffer.
   static StringRef getEncodedStringSegment(StringRef Str,
-                                           SmallVectorImpl<char> &Buffer);
+                                           SmallVectorImpl<char> &Buffer,
+                                           unsigned Modifiers = 0);
   StringRef getEncodedStringSegment(StringSegment Segment,
                                     SmallVectorImpl<char> &Buffer) const {
     return getEncodedStringSegment(
         StringRef(getBufferPtrForSourceLoc(Segment.Loc), Segment.Length),
-        Buffer);
+        Buffer, Segment.Modifiers);
   }
 
   /// \brief Given a string literal token, separate it into string/expr segments
@@ -417,7 +424,7 @@ private:
     return diagnose(Loc, Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
   }
 
-  void formToken(tok Kind, const char *TokStart);
+  void formToken(tok Kind, const char *TokStart, unsigned Modifiers = 0);
 
   void skipToEndOfLine();
 
@@ -437,9 +444,9 @@ private:
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr,
-                        char StopQuote, bool EmitDiagnostics, StringLiteralModifiers modifiers = (StringLiteralModifiers)0);
-  bool buildModifiers(const char *ModPtr, StringLiteralModifiers &modifiers);
-  void lexStringLiteral(StringLiteralModifiers modifiers = (StringLiteralModifiers)0);
+                        char StopQuote, bool EmitDiagnostics, unsigned modifiers = 0);
+  bool buildModifiers(const char *ModPtr, unsigned &Modifiers);
+  void lexStringLiteral(unsigned Modifiers = 0);
   void lexEscapedIdentifier();
 
   void tryLexEditorPlaceholder();
