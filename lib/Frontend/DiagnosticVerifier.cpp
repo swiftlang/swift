@@ -697,7 +697,7 @@ bool swift::verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs) {
   auto *Verifier = (DiagnosticVerifier*)SM.getLLVMSourceMgr().getDiagContext();
   SM.getLLVMSourceMgr().setDiagHandler(nullptr, nullptr);
 
-  bool autoApplyFixes = false;
+  bool autoApplyFixes = true;
   
   bool HadError = false;
 
