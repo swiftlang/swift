@@ -33,8 +33,6 @@
 
 using namespace swift;
 
-llvm::cl::opt<bool> DisableARCRRMotion("disable-code-motion-arc", llvm::cl::init(true));
-
 //===----------------------------------------------------------------------===//
 //                          ARC Matching Set Builder
 //===----------------------------------------------------------------------===//
@@ -43,7 +41,7 @@ llvm::cl::opt<bool> DisableARCRRMotion("disable-code-motion-arc", llvm::cl::init
 /// were known safe.
 Optional<MatchingSetFlags>
 ARCMatchingSetBuilder::matchIncrementsToDecrements() {
-  MatchingSetFlags Flags = {true, false};
+  MatchingSetFlags Flags = {true, true};
 
   // For each increment in our list of new increments.
   //
@@ -70,19 +68,16 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
     }
 
     // We need to be known safe over all increments/decrements we are matching
-    // up
-    // to ignore insertion points.
+    // up to ignore insertion points.
     bool BUIsKnownSafe = (*BURefCountState)->second.isKnownSafe();
     DEBUG(llvm::dbgs() << "        KNOWNSAFE: "
                        << (BUIsKnownSafe ? "true" : "false") << "\n");
     Flags.KnownSafe &= BUIsKnownSafe;
 
-    // We can only move instructions if we know that we are not partial. We can
-    // still delete instructions in such cases though.
-    bool BUIsPartial = (*BURefCountState)->second.isPartial();
-    DEBUG(llvm::dbgs() << "        PARTIAL: "
-                       << (BUIsPartial ? "true" : "false") << "\n");
-    Flags.Partial |= BUIsPartial;
+    bool BUCodeMotionSafe = (*BURefCountState)->second.isCodeMotionSafe();
+    DEBUG(llvm::dbgs() << "        KNOWNSAFE: "
+                       << (BUIsKnownSafe ? "true" : "false") << "\n");
+    Flags.CodeMotionSafe &= BUCodeMotionSafe;
 
     // Now that we know we have an inst, grab the decrement.
     for (auto DecIter : (*BURefCountState)->second.getInstructions()) {
@@ -103,8 +98,7 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
                             "decrement.\n");
 
       // Make sure the increment we are looking at is also matched to our
-      // decrement.
-      // Otherwise bail.
+      // decrement. Otherwise bail.
       if (!(*TDRefCountState)->second.isTrackingRefCountInst() ||
           !(*TDRefCountState)->second.containsInstruction(Increment)) {
         DEBUG(
@@ -121,10 +115,6 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
         continue;
       }
 
-      // Collect the increment insertion point if it has one.
-      for (auto InsertPt : (*TDRefCountState)->second.getInsertPts()) {
-        MatchSet.IncrementInsertPts.insert(InsertPt);
-      }
       NewDecrements.push_back(Decrement);
     }
   }
@@ -134,7 +124,7 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
 
 Optional<MatchingSetFlags>
 ARCMatchingSetBuilder::matchDecrementsToIncrements() {
-  MatchingSetFlags Flags = {true, false};
+  MatchingSetFlags Flags = {true, true};
 
   // For each increment in our list of new increments.
   //
@@ -161,19 +151,16 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
     }
 
     // We need to be known safe over all increments/decrements we are matching
-    // up
-    // to ignore insertion points.
+    // up to ignore insertion points.
     bool TDIsKnownSafe = (*TDRefCountState)->second.isKnownSafe();
     DEBUG(llvm::dbgs() << "        KNOWNSAFE: "
                        << (TDIsKnownSafe ? "true" : "false") << "\n");
     Flags.KnownSafe &= TDIsKnownSafe;
 
-    // We can only move instructions if we know that we are not partial. We can
-    // still delete instructions in such cases though.
-    bool TDIsPartial = (*TDRefCountState)->second.isPartial();
-    DEBUG(llvm::dbgs() << "        PARTIAL: "
-                       << (TDIsPartial ? "true" : "false") << "\n");
-    Flags.Partial |= TDIsPartial;
+    bool TDCodeMotionSafe = (*TDRefCountState)->second.isCodeMotionSafe();
+    DEBUG(llvm::dbgs() << "        KNOWNSAFE: "
+                       << (TDIsKnownSafe ? "true" : "false") << "\n");
+    Flags.CodeMotionSafe &= TDCodeMotionSafe;
 
     // Now that we know we have an inst, grab the decrement.
     for (auto IncIter : (*TDRefCountState)->second.getInstructions()) {
@@ -213,10 +200,6 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
         continue;
       }
 
-      // Collect the decrement insertion point if we have one.
-      for (auto InsertPtIter : (*BURefCountState)->second.getInsertPts()) {
-        MatchSet.DecrementInsertPts.insert(InsertPtIter);
-      }
       NewIncrements.push_back(Increment);
     }
   }
@@ -231,13 +214,13 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
 bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
   bool KnownSafeTD = true;
   bool KnownSafeBU = true;
-  bool Partial = false;
+  bool CodeMotionSafeTD = true;
+  bool CodeMotionSafeBU = true;
 
   while (true) {
     DEBUG(llvm::dbgs() << "Attempting to match up increments -> decrements:\n");
     // For each increment in our list of new increments, attempt to match them
-    // up
-    // with decrements and gather the insertion points of the decrements.
+    // up with decrements and gather the insertion points of the decrements.
     auto Result = matchIncrementsToDecrements();
     if (!Result) {
       DEBUG(llvm::dbgs() << "    FAILED TO MATCH INCREMENTS -> DECREMENTS!\n");
@@ -247,10 +230,11 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
       DEBUG(llvm::dbgs() << "    NOT KNOWN SAFE!\n");
       KnownSafeTD = false;
     }
-    if (Result->Partial) {
-      DEBUG(llvm::dbgs() << "    IS PARTIAL!\n");
-      Partial = true;
+    if (!Result->CodeMotionSafe) {
+      DEBUG(llvm::dbgs() << "    NOT CODE MOTION SAFE!\n");
+      CodeMotionSafeTD = false;
     }
+      
     NewIncrements.clear();
 
     // If we do not have any decrements to attempt to match up with, bail.
@@ -267,9 +251,9 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
       DEBUG(llvm::dbgs() << "    NOT KNOWN SAFE!\n");
       KnownSafeBU = false;
     }
-    if (Result->Partial) {
-      DEBUG(llvm::dbgs() << "    IS PARTIAL!\n");
-      Partial = true;
+    if (!Result->CodeMotionSafe) {
+      DEBUG(llvm::dbgs() << "    NOT CODE MOTION SAFE!\n");
+      CodeMotionSafeBU = false;
     }
     NewDecrements.clear();
 
@@ -278,42 +262,29 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
       break;
   }
 
+  // There is no way we can get a top-down code motion but not a bottom-up, or vice
+  // versa.
+  assert(CodeMotionSafeTD == CodeMotionSafeBU && "Asymmetric code motion safety");
+
   bool UnconditionallySafe = (KnownSafeTD && KnownSafeBU);
-  if (UnconditionallySafe) {
-    DEBUG(llvm::dbgs() << "UNCONDITIONALLY SAFE! DELETING INSTS.\n");
-    MatchSet.IncrementInsertPts.clear();
-    MatchSet.DecrementInsertPts.clear();
+  bool CodeMotionSafe = (CodeMotionSafeTD && CodeMotionSafeBU);
+  if (UnconditionallySafe || CodeMotionSafe) {
+    DEBUG(llvm::dbgs() << "UNCONDITIONALLY OR CODE MOTION SAFE! DELETING INSTS.\n");
   } else {
-    DEBUG(llvm::dbgs() << "NOT UNCONDITIONALLY SAFE!\n");
-  }
-
-  bool HaveIncInsertPts = !MatchSet.IncrementInsertPts.empty();
-  bool HaveDecInsertPts = !MatchSet.DecrementInsertPts.empty();
-
-  // We should not have the case which retains have to be anchored topdown and
-  // releases do not have to be bottomup, or vice-versa.
-  assert(HaveIncInsertPts == HaveDecInsertPts &&
-         "Asymmetric insertion points for retains and releases");
-
-  bool CodeMotionBlocked = HaveIncInsertPts || HaveDecInsertPts;
-  if (DisableARCRRMotion && CodeMotionBlocked && !UnconditionallySafe) {
-    DEBUG(llvm::dbgs() << "Code motion blocked. Bailing!\n");
+    DEBUG(llvm::dbgs() << "NOT UNCONDITIONALLY SAFE AND CODE MOTION BLOCKED!\n");
     return false;
   }
 
-  // If we have insertion points and partial merges, return false to avoid
-  // control dependency issues.
-  if ((HaveIncInsertPts || HaveDecInsertPts) && Partial) {
-    DEBUG(llvm::dbgs() << "Found partial merge and insert pts. Bailing!\n");
-    return false;
-  }
+  // Make sure we always have increments and decrements in the match set.
+  assert(MatchSet.Increments.empty() == MatchSet.Decrements.empty() &&
+         "Match set without increments or decrements");
 
   // If we do not have any insertion points but we do have increments, we must
   // be eliminating pairs.
-  if (!HaveIncInsertPts && !MatchSet.Increments.empty())
+  if (!MatchSet.Increments.empty())
     MatchedPair = true;
 
   // Success!
-  DEBUG(llvm::dbgs() << "SUCCESS! We can move, remove things.\n");
+  DEBUG(llvm::dbgs() << "SUCCESS! We can remove things.\n");
   return true;
 }

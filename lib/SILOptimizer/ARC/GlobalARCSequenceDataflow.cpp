@@ -107,7 +107,7 @@ bool ARCSequenceDataflowEvaluator::processBBTopDown(ARCBBState &BBState) {
       if (Op && OtherState->first == Op)
         continue;
 
-      OtherState->second.updateForSameLoopInst(&I, &I, SetFactory, AA);
+      OtherState->second.updateForSameLoopInst(&I, SetFactory, AA);
     }
   }
 
@@ -270,10 +270,6 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
     // that the instruction "visits".
     SILValue Op = Result.RCIdentity;
 
-    // If I is a use of the value that we are going to track, this is the
-    // position right after I where we would want to move the release.
-    auto *InsertPt = &*std::next(SILBasicBlock::iterator(&I));
-
     // For all other (reference counted value, ref count state) we are
     // tracking...
     for (auto &OtherState : BBState.getBottomupStates()) {
@@ -286,7 +282,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
       if (Op && OtherState->first == Op)
         continue;
 
-      OtherState->second.updateForSameLoopInst(&I, InsertPt, SetFactory, AA);
+      OtherState->second.updateForSameLoopInst(&I, SetFactory, AA);
     }
   }
 
@@ -306,13 +302,12 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
     PredTerminators.push_back(TermInst);
   }
 
-  auto *InsertPt = &*BB.begin();
   for (auto &OtherState : BBState.getBottomupStates()) {
     // If the other state's value is blotted, skip it.
     if (!OtherState.hasValue())
       continue;
 
-    OtherState->second.updateForPredTerminators(PredTerminators, InsertPt,
+    OtherState->second.updateForPredTerminators(PredTerminators,
                                                 SetFactory, AA);
   }
 

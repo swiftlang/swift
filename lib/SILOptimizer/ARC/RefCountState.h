@@ -53,17 +53,6 @@ protected:
   /// since the outer retain will keep the reference counted value alive.
   bool KnownSafe = false;
 
-  /// The latest point we can move Instruction without moving it over an
-  /// instruction that might be able to decrement the value with reference
-  /// semantics.
-  ImmutablePointerSet<SILInstruction> *InsertPts =
-      ImmutablePointerSetFactory<SILInstruction>::getEmptySet();
-
-  /// Have we performed any partial merges of insertion points? We cannot
-  /// perform two partial merges in a row unless we are able to reason about
-  /// control dependency (which avoid for now).
-  bool Partial = false;
-
 public:
   RefCountState() = default;
   ~RefCountState() = default;
@@ -90,17 +79,12 @@ public:
     // Initialize value.
     RCRoot = RCFI->getRCIdentityRoot((*I->begin())->getOperand(0));
 
-    // Clear our insertion point list.
-    InsertPts = ImmutablePointerSetFactory<SILInstruction>::getEmptySet();
-
     return Nested;
   }
 
   /// Uninitialize the current state.
   void clear() {
     KnownSafe = false;
-    Partial = false;
-    InsertPts = ImmutablePointerSetFactory<SILInstruction>::getEmptySet();
   }
 
   /// Is this ref count initialized and tracking a ref count ptr.
@@ -141,22 +125,9 @@ public:
     return (bool)RCRoot;
   }
 
-  /// The latest point we can move the increment without bypassing instructions
-  /// that may have reference semantics.
-  using insertpts_iterator =
-      std::remove_pointer<decltype(InsertPts)>::type::iterator;
-  iterator_range<insertpts_iterator> getInsertPts() const {
-    return {InsertPts->begin(), InsertPts->end()};
-  }
-
   /// This retain is known safe if the operand we are tracking was already known
   /// incremented previously. This occurs when you have nested increments.
   bool isKnownSafe() const { return KnownSafe; }
-
-  /// This reference count state is partial if we found a partial merge of
-  /// insertion points. This stymies our ability to move instructions due to
-  /// potential control dependency issues.
-  bool isPartial() const { return Partial; }
 
   /// Set KnownSafe to true if \p NewValue is true. If \p NewValue is false,
   /// this is a no-op.
@@ -204,6 +175,11 @@ public:
   BottomUpRefCountState(BottomUpRefCountState &&) = default;
   BottomUpRefCountState &operator=(BottomUpRefCountState &&) = default;
 
+  /// Return true if the release can be moved to the retain.
+  bool isCodeMotionSafe() const {
+    return LatState != LatticeState::MightBeDecremented;
+  }
+
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
   bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I,
@@ -213,7 +189,7 @@ public:
   /// InsertPt is the point furthest up the CFG where we can move the currently
   /// tracked reference count.
   void
-  updateForSameLoopInst(SILInstruction *I, SILInstruction *InsertPt,
+  updateForSameLoopInst(SILInstruction *I,
                         ImmutablePointerSetFactory<SILInstruction> &SetFactory,
                         AliasAnalysis *AA);
 
@@ -225,14 +201,14 @@ public:
   /// is that if we see any decrements on a value, we treat it as being
   /// guaranteed used. We treat any uses as regular uses.
   void updateForDifferentLoopInst(
-      SILInstruction *I, ArrayRef<SILInstruction *> InsertPts,
+      SILInstruction *I,
       ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
   // Determine the conservative effect of the given list of predecessor
   // terminators upon this reference count.
   void updateForPredTerminators(
-      ArrayRef<SILInstruction *> PredTerms, SILInstruction *InsertPt,
+      ArrayRef<SILInstruction *> PredTerms,
       ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
@@ -278,7 +254,7 @@ private:
   /// lattice state. Return true if we do so and false otherwise. \p InsertPt is
   /// the location where if \p PotentialUser is a user of this ref count, we
   /// would insert a release.
-  bool handleUser(ArrayRef<SILInstruction *> InsertPt, SILValue RCIdentity,
+  bool handleUser(SILValue RCIdentity,
                   ImmutablePointerSetFactory<SILInstruction> &SetFactory,
                   AliasAnalysis *AA);
 
@@ -287,7 +263,6 @@ private:
   /// appropriately and return true. Otherwise return false.
   bool
   handlePotentialUser(SILInstruction *PotentialUser,
-                      ArrayRef<SILInstruction *> InsertPts,
                       ImmutablePointerSetFactory<SILInstruction> &SetFactory,
                       AliasAnalysis *AA);
 
@@ -300,8 +275,7 @@ private:
   /// the location where if \p PotentialUser is a user of this ref count, we
   /// would insert a release.
   bool
-  handleGuaranteedUser(ArrayRef<SILInstruction *> InsertPts,
-                       SILValue RCIdentity,
+  handleGuaranteedUser(SILValue RCIdentity,
                        ImmutablePointerSetFactory<SILInstruction> &SetFactory,
                        AliasAnalysis *AA);
 
@@ -309,7 +283,7 @@ private:
   /// with the value we are tracking. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
   bool handlePotentialGuaranteedUser(
-      SILInstruction *User, SILInstruction *InsertPt,
+      SILInstruction *User,
       ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
@@ -350,6 +324,11 @@ public:
   TopDownRefCountState(TopDownRefCountState &&) = default;
   TopDownRefCountState &operator=(TopDownRefCountState &&) = default;
 
+  /// Return true if the retain can be moved to the release.
+  bool isCodeMotionSafe() const {
+    return LatState != LatticeState::MightBeUsed;
+  }
+
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
   bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I,
@@ -370,7 +349,7 @@ public:
   /// InsertPt is the point furthest up the CFG where we can move the currently
   /// tracked reference count.
   void
-  updateForSameLoopInst(SILInstruction *I, SILInstruction *InsertPt,
+  updateForSameLoopInst(SILInstruction *I,
                         ImmutablePointerSetFactory<SILInstruction> &SetFactory,
                         AliasAnalysis *AA);
 
@@ -382,7 +361,7 @@ public:
   /// is that if we see any decrements on a value, we treat it as being
   /// guaranteed used. We treat any uses as regular uses.
   void updateForDifferentLoopInst(
-      SILInstruction *I, SILInstruction *InsertPt,
+      SILInstruction *I,
       ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
@@ -405,14 +384,13 @@ private:
   /// If advance the state's sequence appropriately for a decrement. If we do
   /// advance return true. Otherwise return false.
   bool handleDecrement(SILInstruction *PotentialDecrement,
-                       SILInstruction *InsertPt,
                        ImmutablePointerSetFactory<SILInstruction> &SetFactory);
 
   /// Check if PotentialDecrement can decrement the reference count associated
   /// with the value we are tracking. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
   bool handlePotentialDecrement(
-      SILInstruction *PotentialDecrement, SILInstruction *InsertPt,
+      SILInstruction *PotentialDecrement,
       ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
@@ -438,7 +416,7 @@ private:
   /// lattice state. Return true if we do so and false otherwise.
   bool
   handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
-                       SILInstruction *InsertPt, SILValue RCIdentity,
+                       SILValue RCIdentity,
                        ImmutablePointerSetFactory<SILInstruction> &SetFactory,
                        AliasAnalysis *AA);
 
@@ -446,7 +424,7 @@ private:
   /// with the value we are tracking. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
   bool handlePotentialGuaranteedUser(
-      SILInstruction *PotentialGuaranteedUser, SILInstruction *InsertPt,
+      SILInstruction *PotentialGuaranteedUser,
       ImmutablePointerSetFactory<SILInstruction> &SetFactory,
       AliasAnalysis *AA);
 
