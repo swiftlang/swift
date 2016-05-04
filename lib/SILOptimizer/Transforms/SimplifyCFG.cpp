@@ -2697,6 +2697,9 @@ static bool splitBBArguments(SILFunction &Fn) {
 }
 
 bool SimplifyCFG::run() {
+
+  DEBUG(llvm::dbgs() << "### Run SimplifyCFG on " << Fn.getName() << '\n');
+
   RemoveUnreachable RU(Fn);
 
   // First remove any block not reachable from the entry.
