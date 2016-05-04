@@ -191,7 +191,9 @@ func __pushAutoreleasePool() -> OpaquePointer
 @_silgen_name("_swift_objc_autoreleasePoolPop")
 func __popAutoreleasePool(_ pool: OpaquePointer)
 
-public func autoreleasepool<Result>(_ body: @noescape () throws -> Result) rethrows -> Result {
+public func autoreleasepool<Result>(
+  _ body: @noescape () throws -> Result
+) rethrows -> Result {
   let pool = __pushAutoreleasePool()
   defer {
     __popAutoreleasePool(pool)
