@@ -98,10 +98,25 @@ class TypeDecoder {
       return Builder.createExistentialMetatypeType(instance);
     }
     case NodeKind::Metatype: {
-      auto instance = decodeMangledType(Node->getChild(0));
+      unsigned i = 0;
+      bool wasAbstract = false;
+
+      // Handle lowered metatypes in a hackish way. If the representation
+      // was not thin, force the resulting typeref to have a non-empty
+      // representation.
+      if (Node->getNumChildren() == 2) {
+        auto repr = Node->getChild(i++);
+        if (repr->getKind() != NodeKind::MetatypeRepresentation ||
+            !repr->hasText())
+          return BuiltType();
+        auto &str = repr->getText();
+        if (str != "@thin")
+          wasAbstract = true;
+      }
+      auto instance = decodeMangledType(Node->getChild(i));
       if (!instance)
         return BuiltType();
-      return Builder.createMetatypeType(instance);
+      return Builder.createMetatypeType(instance, wasAbstract);
     }
     case NodeKind::ProtocolList: {
       std::vector<BuiltType> protocols;

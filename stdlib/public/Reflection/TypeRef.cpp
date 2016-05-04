@@ -147,6 +147,8 @@ public:
 
   void visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     printHeader("metatype");
+    if (M->wasAbstract())
+      printField("", "was_abstract");
     printRec(M->getInstanceType());
     OS << ')';
   }

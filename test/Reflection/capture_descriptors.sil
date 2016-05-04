@@ -13,23 +13,26 @@ import SwiftShims
 
 // Concrete caller and callee -- nothing interesting going on
 
-sil @concrete_callee1 : $@convention(thin) (Int, @owned @box Int) -> () {
-bb0(%i: $Int, %b: $@box Int):
+sil @concrete_callee1 : $@convention(thin) (Int, @owned @box Int, @thin Int.Type) -> () {
+bb0(%i: $Int, %b: $@box Int, %m: $@thin Int.Type):
   %12 = tuple ()
   return %12 : $()
 }
 
 sil @concrete_caller1 : $@convention(thin) (Int) -> @owned @callee_owned () -> () {
 bb0(%i: $Int):
-  %f = function_ref @concrete_callee1 : $@convention(thin) (Int, @owned @box Int) -> ()
+  %f = function_ref @concrete_callee1 : $@convention(thin) (Int, @owned @box Int, @thin Int.Type) -> ()
   %b = alloc_box $Int
-  %c = partial_apply %f(%i, %b) : $@convention(thin) (Int, @owned @box Int) -> ()
+  %m = metatype $@thin Int.Type
+  %c = partial_apply %f(%i, %b, %m) : $@convention(thin) (Int, @owned @box Int, @thin Int.Type) -> ()
   return %c : $@callee_owned () -> ()
 }
 
 // CHECK:      - Capture types:
 // CHECK-NEXT: (struct Swift.Int)
 // CHECK-NEXT: (sil_box
+// CHECK-NEXT:   (struct Swift.Int))
+// CHECK-NEXT: (metatype
 // CHECK-NEXT:   (struct Swift.Int))
 // CHECK-NEXT: - Metadata sources:
 
@@ -115,7 +118,11 @@ bb0:
 }
 
 // CHECK:      - Capture types:
-// CHECK-NEXT: !!! Invalid typeref
+// CHECK-NEXT: (metatype was_abstract
+// CHECK-NEXT:  (bound_generic_enum Swift.Optional
+// CHECK-NEXT:    (function
+// CHECK-NEXT:      (generic_type_parameter depth=0 index=1)
+// CHECK-NEXT:      (generic_type_parameter depth=0 index=2))))
 // CHECK-NEXT: - Metadata sources:
 // CHECK-NEXT: (function
 // CHECK-NEXT:   (generic_type_parameter depth=0 index=1)
