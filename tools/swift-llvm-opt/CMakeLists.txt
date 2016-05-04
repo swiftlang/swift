@@ -11,6 +11,7 @@ add_swift_executable(swift-llvm-opt
   clangBasic
   clangCodeGen
 
+  LLVMCoverage
   LLVMDebugInfoCodeView
 )
 

@@ -4,6 +4,7 @@ add_swift_executable(swift
   autolink_extract_main.cpp
   modulewrap_main.cpp
   LINK_LIBRARIES
+    LLVMCoverage
     LLVMDebugInfoCodeView
     swiftDriver
     swiftFrontendTool
