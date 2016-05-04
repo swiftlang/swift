@@ -23,6 +23,8 @@
 #include "MemoryReaderInterface.h"
 #include "SwiftRemoteMirrorTypes.h"
 
+#include <stdlib.h>
+
 /// Major version changes when there are ABI or source incompatible changes.
 #define SWIFT_REFLECTION_VERSION_MAJOR 3
 
@@ -158,6 +160,18 @@ void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
 /// Dump information about the layout of a class or closure context instance.
 void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
                                           uintptr_t Object);
+
+/// Demangle a type name.
+///
+/// Copies at most `MaxLength` bytes from the demangled name string into
+/// `OutDemangledName`.
+///
+/// Returns the length of the demangled string this function tried to copy
+/// into `OutDemangledName`.
+size_t swift_reflection_demangle(const char *MangledName,
+                                 size_t Length,
+                                 char *OutDemangledName,
+                                 size_t MaxLength);
 
 #ifdef __cplusplus
 } // extern "C"
