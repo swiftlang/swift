@@ -164,14 +164,6 @@ dump(justSomeFunction as Any)
 // CHECK-NEXT: Swift.String
 dump(String.self)
 
-// CHECK-NEXT: Swift.CollectionOfOne<Swift.String>
-// CHECK-NEXT:   element: "Howdy Swift!"
-dump(CollectionOfOne("Howdy Swift!"))
-
-// CHECK-NEXT: EmptyCollection
-var emptyCollectionOfInt: EmptyCollection<Int> = EmptyCollection()
-dump(emptyCollectionOfInt)
-
 // CHECK-NEXT: ▿
 // CHECK-NEXT: from: 1.0
 // CHECK-NEXT: through: 12.15
