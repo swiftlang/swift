@@ -287,3 +287,14 @@ void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
     TI->dump();
   }
 }
+
+size_t swift_reflection_demangle(const char *MangledName, size_t Length,
+                                 char *OutDemangledName, size_t MaxLength) {
+  if (MangledName == NULL || Length == 0)
+    return 0;
+
+  std::string Mangled(MangledName, Length);
+  auto Demangled = Demangle::demangleTypeAsString(Mangled);
+  strncpy(OutDemangledName, Demangled.c_str(), MaxLength);
+  return Demangled.size();
+}
