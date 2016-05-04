@@ -252,8 +252,20 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
                                         addr_t *StartOfInstanceData) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
-  return Context->projectExistential(ExistentialAddress, ExistentialTR,
-    reinterpret_cast<const TypeRef **>(InstanceTypeRef), StartOfInstanceData);
+  auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
+  const TypeRef *InstanceTR = nullptr;
+  RemoteAddress RemoteStartOfInstanceData(nullptr);
+  auto Success = Context->projectExistential(RemoteExistentialAddress,
+                                             ExistentialTR,
+                                             &InstanceTR,
+                                             &RemoteStartOfInstanceData);
+
+  if (Success) {
+    *InstanceTypeRef = reinterpret_cast<swift_typeref_t>(InstanceTR);
+    *StartOfInstanceData = RemoteStartOfInstanceData.getAddressData();
+  }
+
+  return Success;
 }
 
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {

@@ -24,7 +24,6 @@
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
-#include "swift/SwiftRemoteMirror/MemoryReaderInterface.h"
 
 #include <iostream>
 #include <vector>
@@ -121,10 +120,10 @@ public:
   }
 
   bool
-  projectExistential(addr_t ExistentialAddress,
+  projectExistential(RemoteAddress ExistentialAddress,
                      const TypeRef *ExistentialTR,
                      const TypeRef **OutInstanceTR,
-                     addr_t *OutInstanceAddress) {
+                     RemoteAddress *OutInstanceAddress) {
     if (ExistentialTR == nullptr)
       return false;
 
@@ -161,7 +160,8 @@ public:
       // auto PointerArray = reinterpret_cast<uintptr_t*>(ExistentialAddress);
       // uintptr_t MetadataAddress = PointerArray[Offset];
       auto MetadataAddressAddress
-        = RemoteAddress(ExistentialAddress + ExistentialMetadataField->Offset);
+        = RemoteAddress(ExistentialAddress.getAddressData() +
+                        ExistentialMetadataField->Offset);
 
       StoredPointer MetadataAddress = 0;
       if (!getReader().readInteger(MetadataAddressAddress, &MetadataAddress))
@@ -186,11 +186,10 @@ public:
         // of the container has the address to that box.
         StoredPointer BoxAddress = 0;
 
-        if (!getReader().readInteger(RemoteAddress(ExistentialAddress),
-                                    &BoxAddress))
+        if (!getReader().readInteger(ExistentialAddress, &BoxAddress))
           return false;
 
-        *OutInstanceAddress = BoxAddress;
+        *OutInstanceAddress = RemoteAddress(BoxAddress);
       }
       return true;
     }
