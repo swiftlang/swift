@@ -1025,7 +1025,7 @@ static void doWeakDestroy(WeakReference *addr, bool valueIsNative) {
 
 void swift::swift_unknownWeakInit(WeakReference *addr, void *value) {
   if (isObjCTaggedPointerOrNull(value)) {
-    addr->Value = (HeapObject*) value;
+    addr->Value = (uintptr_t) value;
     return;
   }
   doWeakInit(addr, value, usesNativeSwiftReferenceCounting_allocated(value));
@@ -1036,18 +1036,18 @@ void swift::swift_unknownWeakAssign(WeakReference *addr, void *newValue) {
   // and re-initialize.
   if (isObjCTaggedPointerOrNull(newValue)) {
     swift_unknownWeakDestroy(addr);
-    addr->Value = (HeapObject*) newValue;
+    addr->Value = (uintptr_t) newValue;
     return;
   }
 
   bool newIsNative = usesNativeSwiftReferenceCounting_allocated(newValue);
 
   // If the existing value is not allocated, this is just an initialize.
-  void *oldValue = addr->Value;
+  void *oldValue = (void*) addr->Value;
   if (isObjCTaggedPointerOrNull(oldValue))
     return doWeakInit(addr, newValue, newIsNative);
 
-  bool oldIsNative = usesNativeSwiftReferenceCounting_allocated(oldValue);
+  bool oldIsNative = isNativeSwiftWeakReference(addr);
 
   // If they're both native, we can use the native function.
   if (oldIsNative && newIsNative)
@@ -1064,53 +1064,62 @@ void swift::swift_unknownWeakAssign(WeakReference *addr, void *newValue) {
 }
 
 void *swift::swift_unknownWeakLoadStrong(WeakReference *addr) {
-  void *value = addr->Value;
+  if (isNativeSwiftWeakReference(addr)) {
+    return swift_weakLoadStrong(addr);
+  }
+
+  void *value = (void*) addr->Value;
   if (isObjCTaggedPointerOrNull(value)) return value;
 
-  if (usesNativeSwiftReferenceCounting_allocated(value)) {
-    return swift_weakLoadStrong(addr);
-  } else {
-    return (void*) objc_loadWeakRetained((id*) &addr->Value);
-  }
+  return (void*) objc_loadWeakRetained((id*) &addr->Value);
 }
 
 void *swift::swift_unknownWeakTakeStrong(WeakReference *addr) {
-  void *value = addr->Value;
+  if (isNativeSwiftWeakReference(addr)) {
+    return swift_weakTakeStrong(addr);
+  }
+
+  void *value = (void*) addr->Value;
   if (isObjCTaggedPointerOrNull(value)) return value;
 
-  if (usesNativeSwiftReferenceCounting_allocated(value)) {
-    return swift_weakTakeStrong(addr);
-  } else {
-    void *result = (void*) objc_loadWeakRetained((id*) &addr->Value);
-    objc_destroyWeak((id*) &addr->Value);
-    return result;
-  }
+  void *result = (void*) objc_loadWeakRetained((id*) &addr->Value);
+  objc_destroyWeak((id*) &addr->Value);
+  return result;
 }
 
 void swift::swift_unknownWeakDestroy(WeakReference *addr) {
+  if (isNativeSwiftWeakReference(addr)) {
+    return swift_weakDestroy(addr);
+  }
+
   id object = (id) addr->Value;
   if (isObjCTaggedPointerOrNull(object)) return;
-  doWeakDestroy(addr, usesNativeSwiftReferenceCounting_allocated(object));
+  objc_destroyWeak((id*) &addr->Value);
 }
+
 void swift::swift_unknownWeakCopyInit(WeakReference *dest, WeakReference *src) {
+  if (isNativeSwiftWeakReference(src)) {
+    return swift_weakCopyInit(dest, src);
+  }
+
   id object = (id) src->Value;
   if (isObjCTaggedPointerOrNull(object)) {
-    dest->Value = (HeapObject*) object;
-    return;
+    dest->Value = (uintptr_t) object;
+  } else {
+    objc_copyWeak((id*) &dest->Value, (id*) src);
   }
-  if (usesNativeSwiftReferenceCounting_allocated(object))
-    return swift_weakCopyInit(dest, src);
-  objc_copyWeak((id*) &dest->Value, (id*) src);
 }
 void swift::swift_unknownWeakTakeInit(WeakReference *dest, WeakReference *src) {
+  if (isNativeSwiftWeakReference(src)) {
+    return swift_weakTakeInit(dest, src);
+  }
+
   id object = (id) src->Value;
   if (isObjCTaggedPointerOrNull(object)) {
-    dest->Value = (HeapObject*) object;
-    return;
+    dest->Value = (uintptr_t) object;
+  } else {
+    objc_moveWeak((id*) &dest->Value, (id*) &src->Value);
   }
-  if (usesNativeSwiftReferenceCounting_allocated(object))
-    return swift_weakTakeInit(dest, src);
-  objc_moveWeak((id*) &dest->Value, (id*) &src->Value);
 }
 void swift::swift_unknownWeakCopyAssign(WeakReference *dest, WeakReference *src) {
   if (dest == src) return;
