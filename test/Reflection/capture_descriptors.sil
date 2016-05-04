@@ -174,3 +174,34 @@ sil_vtable GenericClass {}
 // CHECK-NEXT:   (generic_type_parameter depth=0 index=2))
 // CHECK-NEXT: (generic_argument index=1
 // CHECK-NEXT:   (reference_capture index=0))
+
+
+// Capturing lowered function types
+
+sil @function_callee : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method) () -> ()) -> () {
+bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: $@convention(block) () -> (), %thick: $@convention(thick) () -> (), %method: $@convention(method) () -> (), %witness_method: $@convention(witness_method) () -> ()):
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil @function_caller : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method) () -> ()) -> @owned @callee_owned () -> () {
+bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: $@convention(block) () -> (), %thick: $@convention(thick) () -> (), %method: $@convention(method) () -> (), %witness_method: $@convention(witness_method) () -> ()):
+  %f = function_ref @function_callee : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method) () -> ()) -> ()
+  %result = partial_apply %f(%thin, %c, %block, %thick, %method, %witness_method) : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method) () -> ()) -> ()
+  return %result : $@callee_owned () -> ()
+}
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (function convention=thin
+// CHECK-NEXT:   (tuple))
+// CHECK-NEXT: (function convention=c
+// CHECK-NEXT:   (tuple))
+// CHECK-NEXT: (function convention=block
+// CHECK-NEXT:   (tuple))
+// CHECK-NEXT: (function
+// CHECK-NEXT:   (tuple))
+// CHECK-NEXT: (function convention=thin
+// CHECK-NEXT:   (tuple))
+// CHECK-NEXT: (function convention=thin
+// CHECK-NEXT:   (tuple))
+// CHECK-NEXT: - Metadata sources:

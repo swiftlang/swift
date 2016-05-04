@@ -56,7 +56,8 @@ CAPTURE DESCRIPTORS:
 - Metadata sources:
 
 - Capture types:
-!!! Invalid typeref
+(function
+  (tuple))
 - Metadata sources:
 
 - Capture types:
@@ -68,7 +69,8 @@ CAPTURE DESCRIPTORS:
 - Metadata sources:
 
 - Capture types:
-!!! Invalid typeref
+(function
+  (tuple))
 - Metadata sources:
 
 - Capture types:
@@ -81,7 +83,8 @@ CAPTURE DESCRIPTORS:
 - Metadata sources:
 
 - Capture types:
-!!! Invalid typeref
+(function
+  (tuple))
 - Metadata sources:
 
 
