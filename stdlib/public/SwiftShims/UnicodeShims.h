@@ -17,6 +17,7 @@
 #ifndef SWIFT_STDLIB_SHIMS_UNICODESHIMS_H_
 #define SWIFT_STDLIB_SHIMS_UNICODESHIMS_H_
 
+#include "SwiftStdint.h"
 #include "Visibility.h"
 
 #ifdef __cplusplus
