@@ -49,6 +49,7 @@ extern void IAMStruct1SetNonPropertyNoSelf(double x, double y);
 
 // No set only properties
 extern void IAMStruct1SetNonPropertyNoGet(struct IAMStruct1 s, double x);
+extern void IAMStruct1SetNonPropertyExternalCollision(struct IAMStruct1 s, double x);
 
 /// Various static functions that can't quite be imported as properties.
 // Too many parameters

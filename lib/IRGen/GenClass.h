@@ -38,6 +38,7 @@ namespace irgen {
   class HeapLayout;
   class IRGenFunction;
   class IRGenModule;
+  class MemberAccessStrategy;
   class OwnedAddress;
   class Size;
   
@@ -50,6 +51,14 @@ namespace irgen {
                                                  SILType baseType,
                                                  SILType fieldType,
                                                  VarDecl *field);
+
+  /// Return a strategy for accessing the given stored class property.
+  ///
+  /// This API is used by RemoteAST.
+  MemberAccessStrategy
+  getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
+                                       SILType baseType, VarDecl *field);
+
 
   std::tuple<llvm::Constant * /*classData*/,
              llvm::Constant * /*metaclassData*/,

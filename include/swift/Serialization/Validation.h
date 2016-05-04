@@ -70,6 +70,7 @@ bool isSerializedAST(StringRef data);
 struct ValidationInfo {
   StringRef name = {};
   StringRef targetTriple = {};
+  StringRef shortVersion = {};
   size_t bytes = 0;
   Status status = Status::Malformed;
 };

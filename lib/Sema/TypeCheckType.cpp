@@ -17,6 +17,7 @@
 
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
+#include "MiscDiagnostics.h"
 
 #include "swift/Strings.h"
 #include "swift/AST/ASTVisitor.h"
@@ -1189,9 +1190,10 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
 
       case UnconditionalAvailabilityKind::Unavailable:
         if (!Attr->Rename.empty()) {
-          TC.diagnose(Loc, diag::availability_decl_unavailable_rename,
-                      CI->getIdentifier(), Attr->Rename)
-            .fixItReplace(Loc, Attr->Rename);
+          auto diag = TC.diagnose(Loc,
+                                  diag::availability_decl_unavailable_rename,
+                                  CI->getIdentifier(), Attr->Rename);
+          fixItAvailableAttrRename(TC, diag, Loc, Attr, /*call*/nullptr);
         } else if (Attr->Message.empty()) {
           TC.diagnose(Loc, diag::availability_decl_unavailable,
                       CI->getIdentifier())
@@ -1227,7 +1229,7 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
 
     if (auto *Attr = TypeChecker::getDeprecated(TypeDecl)) {
       TC.diagnoseDeprecated(CI->getSourceRange(), DC, Attr,
-                            CI->getIdentifier());
+                            CI->getIdentifier(), /*call, N/A*/nullptr);
     }
 
     if (AllowPotentiallyUnavailableProtocol && isa<ProtocolDecl>(TypeDecl))
@@ -1338,6 +1340,64 @@ Type TypeChecker::resolveIdentifierType(
   return result;
 }
 
+// Returns true if any illegal IUOs were found. If inference of IUO type is disabled, IUOs may only be specified in the following positions:
+//  * outermost type
+//  * function param
+//  * function return type
+static bool checkForIllegalIUOs(TypeChecker &TC, TypeRepr *Repr,
+                                TypeResolutionOptions Options) {
+  class IllegalIUOWalker : public ASTWalker {
+    TypeChecker &TC;
+    SmallVector<bool, 4> IUOsAllowed;
+    bool FoundIllegalIUO = false;
+
+  public:
+    IllegalIUOWalker(TypeChecker &TC, bool IsGenericParameter)
+      : TC(TC)
+      , IUOsAllowed{!IsGenericParameter} {}
+
+    bool walkToTypeReprPre(TypeRepr *T) {
+      bool iuoAllowedHere = IUOsAllowed.back();
+
+      // Raise a diagnostic if we run into a prohibited IUO.
+      if (!iuoAllowedHere) {
+        if (auto *iuoTypeRepr =
+            dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(T)) {
+          TC.diagnose(iuoTypeRepr->getStartLoc(), diag::iuo_in_illegal_position)
+            .fixItReplace(iuoTypeRepr->getExclamationLoc(), "?");
+          FoundIllegalIUO = true;
+        }
+      }
+
+      bool childIUOsAllowed = false;
+      if (iuoAllowedHere) {
+        if (auto *tupleTypeRepr = dyn_cast<TupleTypeRepr>(T)) {
+          if (tupleTypeRepr->isParenType()) {
+            childIUOsAllowed = true;
+          }
+        } else if (isa<FunctionTypeRepr>(T)) {
+          childIUOsAllowed = true;
+        } else if (isa<AttributedTypeRepr>(T) || isa<InOutTypeRepr>(T)) {
+          childIUOsAllowed = true;
+        }
+      }
+      IUOsAllowed.push_back(childIUOsAllowed);
+      return true;
+    }
+
+    bool walkToTypeReprPost(TypeRepr *T) {
+      IUOsAllowed.pop_back();
+      return true;
+    }
+
+    bool getFoundIllegalIUO() const { return FoundIllegalIUO; }
+  };
+
+  IllegalIUOWalker Walker(TC, Options.contains(TR_GenericSignature));
+  Repr->walk(Walker);
+  return Walker.getFoundIllegalIUO();
+}
+
 bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
                                TypeResolutionOptions options,
                                GenericTypeResolver *resolver,
@@ -1349,6 +1409,9 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
     return Loc.isError();
 
   if (Loc.getType().isNull()) {
+    // Raise error if we parse an IUO type in an illegal position.
+    checkForIllegalIUOs(*this, Loc.getTypeRepr(), options);
+
     auto type = resolveType(Loc.getTypeRepr(), DC, options, resolver,
                             unsatisfiedDependency);
     if (!type) {
@@ -2387,10 +2450,15 @@ static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
                   : 3;
 
     auto overridden = VD->getOverriddenDecl();
-    if (overridden->getLoc().isValid()) {
-      TC.diagnose(overridden->getLoc(), diag::objc_overriding_objc_decl,
-                  kind, VD->getOverriddenDecl()->getFullName());
-    }
+    TC.diagnose(overridden, diag::objc_overriding_objc_decl,
+                kind, VD->getOverriddenDecl()->getFullName());
+  } else if (Reason == ObjCReason::WitnessToObjC) {
+    auto requirement =
+      TC.findWitnessedObjCRequirements(VD, /*onlyFirst=*/true).front();
+    TC.diagnose(requirement, diag::objc_witness_objc_requirement,
+                VD->getDescriptiveKind(), requirement->getFullName(),
+                cast<ProtocolDecl>(requirement->getDeclContext())
+                  ->getFullName());
   }
 }
 

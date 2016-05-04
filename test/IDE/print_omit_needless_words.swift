@@ -96,8 +96,8 @@
 // Note: property name stripping property type.
 // CHECK-FOUNDATION: var uppercased: String
 
-// Note: don't map base name down to a keyword.
-// CHECK-FOUNDATION: func doSelector(_: Selector!)
+// Note: ok to map base name down to a keyword.
+// CHECK-FOUNDATION: func `do`(_: Selector!)
 
 // Note: Strip names preceded by a gerund.
 // CHECK-FOUNDATION: func startSquashing(_: Bee)
@@ -134,11 +134,11 @@
 // CHECK-FOUNDATION: static var reverse: EnumerationOptions
 
 // Note: usingBlock -> body
-// CHECK-FOUNDATION: func enumerateObjects(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>!) -> Void)!)
-// CHECK-FOUNDATION: func enumerateObjects(_: EnumerationOptions = [], using: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>!) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(_: ((AnyObject?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(_: EnumerationOptions = [], using: ((AnyObject?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
 
 // Note: WithBlock -> body, nullable closures default to nil.
-// CHECK-FOUNDATION: func enumerateObjectsRandomly(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>!) -> Void)? = nil)
+// CHECK-FOUNDATION: func enumerateObjectsRandomly(_: ((AnyObject?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)? = nil)
 
 // Note: id<Proto> treated as "Proto".
 // CHECK-FOUNDATION: func doSomething(with: Copying)
@@ -287,7 +287,7 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func objectAtIndexedSubscript(_: UInt) -> AnyObject
 
 // CHECK-OMIT-NEEDLESS-WORDS: func exportPresets(bestMatching: String)
-// CHECK-OMIT-NEEDLESS-WORDS: func isCompatibleWith(_: String)
+// CHECK-OMIT-NEEDLESS-WORDS: func `is`(compatibleWith: String)
 
 // CHECK-OMIT-NEEDLESS-WORDS: func add(_: AnyObject)
 
@@ -301,6 +301,16 @@
 
 // Non-parameterized Objective-C class ending in "Array".
 // CHECK-OMIT-NEEDLESS-WORDS: func draw(_: SEGreebieArray)
+
+// "bound by"
+// CHECK-OMIT-NEEDLESS-WORDS: func doSomething(boundBy: Int)
+
+// "separated by"
+// CHECK-OMIT-NEEDLESS-WORDS: func doSomething(separatedBy: Int)
+
+// "Property"-like stripping for "set" methods.
+// CHECK-OMIT-NEEDLESS-WORDS: class func current() -> OmitNeedlessWords
+// CHECK-OMIT-NEEDLESS-WORDS: class func setCurrent(_: OmitNeedlessWords)
 
 // Property-name sensitivity in the base name "Self" stripping.
 // CHECK-OMIT-NEEDLESS-WORDS: func addDoodle(_: ABCDoodle)

@@ -250,6 +250,7 @@ llvm::Constant *HeapLayout::createSizeFn(IRGenModule &IGM) const {
 static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
                                             const HeapLayout &layout,
                                             llvm::Constant *dtorFn,
+                                            llvm::Constant *captureDescriptor,
                                             MetadataKind kind) {
   // Build the fields of the private metadata.
   SmallVector<llvm::Constant*, 4> fields;
@@ -268,6 +269,8 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
     offset = Size(0);
   fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, offset.getValue()));
 
+  fields.push_back(captureDescriptor);
+
   llvm::Constant *init =
     llvm::ConstantStruct::get(IGM.FullBoxMetadataStructTy, fields);
 
@@ -285,17 +288,21 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
       /*Ty=*/nullptr, var, indices);
 }
 
-llvm::Constant *HeapLayout::getPrivateMetadata(IRGenModule &IGM) const {
+llvm::Constant *
+HeapLayout::getPrivateMetadata(IRGenModule &IGM,
+                               llvm::Constant *captureDescriptor) const {
   if (!privateMetadata)
     privateMetadata = buildPrivateMetadata(IGM, *this, createDtorFn(IGM, *this),
+                                           captureDescriptor,
                                            MetadataKind::HeapLocalVariable);
   return privateMetadata;
 }
 
 llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
                                                const llvm::Twine &name,
+                                           llvm::Constant *captureDescriptor,
                                            const HeapNonFixedOffsets *offsets) {
-  llvm::Value *metadata = layout.getPrivateMetadata(IGM);
+  llvm::Value *metadata = layout.getPrivateMetadata(IGM, captureDescriptor);
   llvm::Value *size, *alignMask;
   if (offsets) {
     size = offsets->getSize();
@@ -1234,7 +1241,7 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
 /// optimizer not to touch this value.
 void IRGenFunction::emitFixLifetime(llvm::Value *value) {
   // If we aren't running the LLVM ARC optimizer, we don't need to emit this.
-  if (!IGM.Opts.Optimize || IGM.Opts.DisableLLVMARCOpts)
+  if (!IGM.IRGen.Opts.Optimize || IGM.IRGen.Opts.DisableLLVMARCOpts)
     return;
   if (doesNotRequireRefCounting(value)) return;
   emitUnaryRefCountCall(*this, IGM.getFixLifetimeFn(), value);
@@ -1466,7 +1473,11 @@ public:
   allocate(IRGenFunction &IGF, SILType boxedType, const llvm::Twine &name)
   const override {
     // Allocate a new object using the layout.
-    llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout, name);
+
+    auto nullCaptureDescriptor
+      = llvm::ConstantPointerNull::get(IGF.IGM.CaptureDescriptorPtrTy);
+    llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout, name,
+                                                     nullCaptureDescriptor);
     Address rawAddr = project(IGF, allocation, boxedType);
     return {rawAddr, allocation};
   }

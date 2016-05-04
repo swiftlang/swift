@@ -29,6 +29,7 @@ grapheme_cluster_break_property_table = \
 
 import SwiftPrivate
 import StdlibUnittest
+import StdlibCollectionUnittest
 import Darwin
 import Foundation
 
@@ -93,7 +94,7 @@ class NonContiguousNSString : NSString {
 
   convenience init(_ scalars: [UInt32]) {
     var encoded: [UInt16] = []
-    var iter = scalars.makeIterator()
+    let iter = scalars.makeIterator()
     let output: (UInt16) -> Void = { encoded.append($0) }
     let hadError = transcode(
       iter,

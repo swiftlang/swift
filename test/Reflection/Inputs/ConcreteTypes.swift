@@ -33,6 +33,8 @@ public struct S {
   public let aTuple: (C, Box<S>, Box<E>, Int)
   public let aMetatype: C.Type
   public let aFunction: (C, S, E, Int) -> (Int)
+  public let aFunctionWithThinRepresentation: @convention(thin) () -> ()
+  public let aFunctionWithCRepresentation: @convention(c) () -> ()
 
   public struct NestedS {
     public let aField: Int
@@ -55,4 +57,5 @@ public struct References {
   public let strongRef: C
   public weak var weakRef: C?
   public unowned var unownedRef: C
+  public unowned(unsafe) var unownedUnsafeRef: C
 }

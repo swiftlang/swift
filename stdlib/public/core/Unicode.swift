@@ -588,7 +588,7 @@ internal func _transcodeSomeUTF16AsUTF8<
   while nextIndex != input.endIndex && utf8Count != utf8Max {
     let u = UInt(input[nextIndex])
     let shift = _UTF8Chunk(utf8Count * 8)
-    var utf16Length: Input.Index.Distance = 1
+    var utf16Length: Input.IndexDistance = 1
 
     if _fastPath(u <= 0x7f) {
       result |= _UTF8Chunk(u) << shift
@@ -619,13 +619,13 @@ internal func _transcodeSomeUTF16AsUTF8<
           // Replace it with U+FFFD.
           r = 0xbdbfef
           scalarUtf8Length = 3
-        } else if _slowPath(nextIndex.advanced(by: 1) == endIndex) {
+        } else if _slowPath(input.index(nextIndex, offsetBy: 1) == endIndex) {
           // We have seen a high-surrogate and EOF, so we have an ill-formed
           // sequence.  Replace it with U+FFFD.
           r = 0xbdbfef
           scalarUtf8Length = 3
         } else {
-          let unit1 = UInt(input[nextIndex.advanced(by: 1)])
+          let unit1 = UInt(input[input.index(nextIndex, offsetBy: 1)])
           if _fastPath((unit1 >> 10) == 0b1101_11) {
             // `unit1` is a low-surrogate.  We have a well-formed surrogate
             // pair.
@@ -653,7 +653,7 @@ internal func _transcodeSomeUTF16AsUTF8<
       result |= numericCast(r) << shift
       utf8Count += scalarUtf8Length
     }
-    nextIndex = nextIndex.advanced(by: utf16Length)
+    nextIndex = input.index(nextIndex, offsetBy: utf16Length)
   }
   // FIXME: Annoying check, courtesy of <rdar://problem/16740169>
   if utf8Count < sizeofValue(result) {
@@ -831,7 +831,7 @@ public func transcode<
   _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
   stoppingOnError stopOnError: Bool
 ) -> Bool {
-  fatalError("unavailable function can't be called")
+  Builtin.unreachable()
 }
 
 extension UTF16 {
@@ -842,6 +842,6 @@ extension UTF16 {
   >(
     _: Encoding.Type, input: Input, repairIllFormedSequences: Bool
   ) -> (Int, Bool)? {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

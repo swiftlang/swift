@@ -603,6 +603,32 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHashValuePointerNonASCII/NoLeak"
   expectEqual(0, nsStringCanaryCount)
 }
 
+RuntimeFoundationWrappers.test("_stdlib_NSStringHasPrefixNFDPointer/NoLeak") {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    let b = NSStringCanary()
+    expectEqual(2, nsStringCanaryCount)
+    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
+    let ptrB = unsafeBitCast(b, to: OpaquePointer.self)
+    _stdlib_NSStringHasPrefixNFDPointer(ptrA, ptrB)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_NSStringHasSuffixNFDPointer/NoLeak") {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    let b = NSStringCanary()
+    expectEqual(2, nsStringCanaryCount)
+    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
+    let ptrB = unsafeBitCast(b, to: OpaquePointer.self)
+    _stdlib_NSStringHasSuffixNFDPointer(ptrA, ptrB)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
 RuntimeFoundationWrappers.test("_stdlib_NSStringHasPrefixNFD/NoLeak") {
   nsStringCanaryCount = 0
   autoreleasepool {

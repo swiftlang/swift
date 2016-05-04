@@ -38,7 +38,7 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
   // Create a new empty function.
-  SILFunction *NewF = Orig->getModule().getOrCreateFunction(
+  SILFunction *NewF = Orig->getModule().createFunction(
       getSpecializedLinkage(Orig, Orig->getLinkage()), NewName,
       ReInfo.getSpecializedType(), nullptr,
       Orig->getLocation(), Orig->isBare(), Orig->isTransparent(),

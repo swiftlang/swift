@@ -1709,6 +1709,33 @@ void ValueDecl::setInterfaceType(Type type) {
   InterfaceTy = type;
 }
 
+Optional<ObjCSelector> ValueDecl::getObjCRuntimeName() const {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(this))
+    return func->getObjCSelector();
+
+  ASTContext &ctx = getASTContext();
+  auto makeSelector = [&](Identifier name) -> ObjCSelector {
+    return ObjCSelector(ctx, 0, { name });
+  };
+
+  if (auto classDecl = dyn_cast<ClassDecl>(this)) {
+    SmallString<32> scratch;
+    return makeSelector(
+             ctx.getIdentifier(classDecl->getObjCRuntimeName(scratch)));
+  }
+
+  if (auto protocol = dyn_cast<ProtocolDecl>(this)) {
+    SmallString<32> scratch;
+    return makeSelector(
+             ctx.getIdentifier(protocol->getObjCRuntimeName(scratch)));
+  }
+
+  if (auto var = dyn_cast<VarDecl>(this))
+    return makeSelector(var->getObjCPropertyName());
+
+  return None;
+}
+
 SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
   if (auto var = dyn_cast<VarDecl>(this)) {
     if (auto pbd = var->getParentPatternBinding()) {

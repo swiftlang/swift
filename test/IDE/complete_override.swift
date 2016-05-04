@@ -99,7 +99,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD7 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD8 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD9 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD10 -code-completion-keywords=false | FileCheck %s -check-prefix=WITH_PA
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD10 -code-completion-keywords=false | FileCheck %s -check-prefix=WITH_PA_NO_PROTOFUNCA
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAS_THROWING -code-completion-keywords=false | FileCheck %s -check-prefix=HAS_THROWING
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOC_TYPE1 -code-completion-keywords=false | FileCheck %s -check-prefix=ASSOC_TYPE1
@@ -129,6 +129,14 @@ protocol ProtocolA {
 // WITH_PA-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: Int{{; name=.+$}}
 // WITH_PA-DAG: Decl[InstanceVar]/Super:    var protoAVarRO: Int{{; name=.+$}}
 // WITH_PA: End completions
+
+// WITH_PA_NO_PROTOFUNCA: Begin completions
+// WITH_PA_NO_PROTOFUNCA-DAG: Decl[Constructor]/Super:    init(fromProtocolA: Int) {|}{{; name=.+$}}
+// WITH_PA_NO_PROTOFUNCA-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional() {|}{{; name=.+$}}
+// WITH_PA_NO_PROTOFUNCA-DAG: Decl[InstanceMethod]/Super: @noreturn func protoAFuncWithAttr() {|}{{; name=.+$}}
+// WITH_PA_NO_PROTOFUNCA-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: Int{{; name=.+$}}
+// WITH_PA_NO_PROTOFUNCA-DAG: Decl[InstanceVar]/Super:    var protoAVarRO: Int{{; name=.+$}}
+// WITH_PA_NO_PROTOFUNCA: End completions
 
 struct TagPB {}
 protocol ProtocolB : ProtocolA {
@@ -318,7 +326,7 @@ extension TestClass_BA_PA_Ext : ProtocolA {
 class TestClass_BA_PB : BaseA, ProtocolB {
   #^CLASS_BA_PB^#
 }
-// CLASS_BA_PB: Begin completions, 16 items
+// CLASS_BA_PB: Begin completions, 17 items
 
 class TestClass_BB : BaseB {
   #^CLASS_BB^#

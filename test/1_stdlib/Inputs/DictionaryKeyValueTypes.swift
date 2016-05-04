@@ -30,7 +30,9 @@ var _keySerial = _stdlib_AtomicInt(0)
 
 // A wrapper class that can help us track allocations and find issues with
 // object lifetime.
-class TestKeyTy : Equatable, Hashable, CustomStringConvertible {
+final class TestKeyTy 
+  : Equatable, Hashable, CustomStringConvertible, IntegerLiteralConvertible 
+{
   class var objectCount: Int {
     get {
       return _keyCount.load()
@@ -47,6 +49,10 @@ class TestKeyTy : Equatable, Hashable, CustomStringConvertible {
     self._hashValue = value
   }
 
+  convenience init(integerLiteral value: Int) {
+    self.init(value)
+  }
+  
   convenience init(value: Int, hashValue: Int) {
     self.init(value)
     self._hashValue = hashValue

@@ -86,6 +86,30 @@ static Pattern *createTypedNamedPattern(VarDecl *decl) {
   return P;
 }
 
+/// Create a var member for this struct, along with its pattern binding, and add
+/// it as a member
+static std::pair<VarDecl *, PatternBindingDecl *>
+createVarWithPattern(ASTContext &cxt, DeclContext *dc, Identifier name, Type ty,
+                     bool isLet, bool isImplicit,
+                     Accessibility setterAccessibility) {
+  // Create a variable to store the underlying value.
+  auto var = new (cxt) VarDecl(
+      /*static*/ false,
+      /*IsLet*/ isLet, SourceLoc(), name, ty, dc);
+  if (isImplicit)
+    var->setImplicit();
+  var->setAccessibility(Accessibility::Public);
+  var->setSetterAccessibility(setterAccessibility);
+
+  // Create a pattern binding to describe the variable.
+  Pattern *varPattern = createTypedNamedPattern(var);
+  auto patternBinding =
+      PatternBindingDecl::create(cxt, SourceLoc(), StaticSpellingKind::None,
+                                 SourceLoc(), varPattern, nullptr, dc);
+
+  return {var, patternBinding};
+}
+
 #ifndef NDEBUG
 static bool verifyNameMapping(MappedTypeNameKind NameMapping,
                               StringRef left, StringRef right) {
@@ -1275,6 +1299,66 @@ namespace {
       if (!DC)
         return nullptr;
 
+      // Check for swift_newtype
+      if (!SwiftType && Impl.HonorSwiftNewtypeAttr) {
+        if (auto newtypeAttr =
+                Decl->template getAttr<clang::SwiftNewtypeAttr>()) {
+          switch (newtypeAttr->getNewtypeKind()) {
+          case clang::SwiftNewtypeAttr::NK_Enum:
+            // TODO: import as closed enum instead
+
+            // For now, fall through and treat as a struct
+          case clang::SwiftNewtypeAttr::NK_Struct: {
+
+            auto &cxt = Impl.SwiftContext;
+            auto Loc = Impl.importSourceLoc(Decl->getLocation());
+
+            auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
+                Decl, Loc, Name, Loc, None, nullptr, DC);
+            structDecl->computeType();
+
+            ProtocolDecl *protocols[] = {
+                cxt.getProtocol(KnownProtocolKind::RawRepresentable),
+            };
+
+            // Import the type of the underlying storage
+            auto storedUnderlyingType = Impl.importType(
+                Decl->getUnderlyingType(), ImportTypeKind::Value,
+                isInSystemModule(DC),
+                Decl->getUnderlyingType()->isBlockPointerType(),
+                OTK_Optional);
+
+            // Find a bridged type, which may be different
+            auto computedPropertyUnderlyingType = Impl.importType(
+                Decl->getUnderlyingType(), ImportTypeKind::Property,
+                isInSystemModule(DC),
+                Decl->getUnderlyingType()->isBlockPointerType(),
+                OTK_Optional);
+
+            if (storedUnderlyingType.getCanonicalTypeOrNull() ==
+                computedPropertyUnderlyingType.getCanonicalTypeOrNull()) {
+              // Simple, our stored type is already bridged
+              makeStructRawValued(structDecl, storedUnderlyingType,
+                                  {KnownProtocolKind::RawRepresentable},
+                                  protocols);
+            } else {
+              // We need to make a stored rawValue or storage type, and a
+              // computed one of bridged type.
+              makeStructRawValuedWithBridge(
+                  structDecl, storedUnderlyingType,
+                  computedPropertyUnderlyingType,
+                  {KnownProtocolKind::RawRepresentable}, protocols);
+            }
+
+            Impl.ImportedDecls[Decl->getCanonicalDecl()] = structDecl;
+            Impl.registerExternalDecl(structDecl);
+            return structDecl;
+          }
+        }
+
+        }
+      }
+
       if (!SwiftType) {
         // Import typedefs of blocks as their fully-bridged equivalent Swift
         // type. That matches how we want to use them in most cases. All other
@@ -1283,7 +1367,8 @@ namespace {
         SwiftType = Impl.importType(ClangType,
                                     ImportTypeKind::Typedef,
                                     isInSystemModule(DC),
-                                    ClangType->isBlockPointerType());
+                                    ClangType->isBlockPointerType(),
+                                    OTK_Optional);
       }
 
       if (!SwiftType)
@@ -1377,6 +1462,150 @@ namespace {
 
       // We're done.
       return constructor;
+    }
+
+    /// Make a struct declaration into a raw-value-backed struct
+    ///
+    /// \param structDecl the struct to make a raw value for
+    /// \param underlyingType the type of the raw value
+    /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
+    /// \param protocols the protocols to make this struct conform to
+    /// \param setterAccessibility the accessibility of the raw value's setter
+    /// \param isLet whether the raw value should be a let
+    /// \param makeUnlabeledValueInit whether to also create an unlabeled init
+    /// \param isImplicit whether to mark the rawValue as implicit
+    ///
+    /// This will perform most of the work involved in making a new Swift struct
+    /// be backed by a raw value. This will populated derived protocols and
+    /// synthesized protocols, add the new variable and pattern bindings, and
+    /// create the inits parameterized over a raw value
+    ///
+    template <unsigned N>
+    void makeStructRawValued(
+        StructDecl *structDecl,
+        Type underlyingType,
+        ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
+        ProtocolDecl *const(&protocols)[N],
+        Accessibility setterAccessibility = Accessibility::Private,
+        bool isLet = true,
+        bool makeUnlabeledValueInit = false,
+        bool isImplicit = true) {
+      auto &cxt = Impl.SwiftContext;
+      addProtocolsToStruct(structDecl, synthesizedProtocolAttrs, protocols);
+
+      // Create a variable to store the underlying value.
+      VarDecl *var;
+      PatternBindingDecl *patternBinding;
+      std::tie(var, patternBinding) =
+          createVarWithPattern(cxt, structDecl, cxt.Id_rawValue, underlyingType,
+                               isLet, isImplicit, setterAccessibility);
+
+      structDecl->setHasDelayedMembers();
+
+      // Create constructors to initialize that value from a value of the
+      // underlying type.
+      if (makeUnlabeledValueInit)
+        structDecl->addMember(createValueConstructor(
+            structDecl, var,
+            /*wantCtorParamNames=*/false,
+            /*wantBody=*/!Impl.hasFinishedTypeChecking()));
+      structDecl->addMember(
+          createValueConstructor(structDecl, var,
+                                 /*wantCtorParamNames=*/true,
+                                 /*wantBody=*/!Impl.hasFinishedTypeChecking()));
+      structDecl->addMember(patternBinding);
+      structDecl->addMember(var);
+    }
+
+    /// Make a struct declaration into a raw-value-backed struct, with
+    /// bridged computed rawValue property which differs from stored backing
+    ///
+    /// \param structDecl the struct to make a raw value for
+    /// \param storedUnderlyingType the type of the stored raw value
+    /// \param bridgedType the type of the 'rawValue' computed property bridge
+    /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
+    /// \param protocols the protocols to make this struct conform to
+    ///
+    /// This will perform most of the work involved in making a new Swift struct
+    /// be backed by a stored raw value and computed raw value of bridged type.
+    /// This will populated derived protocols and synthesized protocols, add the
+    /// new variable and pattern bindings, and create the inits parameterized
+    /// over a bridged type that will cast to the stored type, as appropriate.
+    ///
+    template <unsigned N> void makeStructRawValuedWithBridge(
+        StructDecl *structDecl,
+        Type storedUnderlyingType,
+        Type bridgedType,
+        ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
+        ProtocolDecl *const(&protocols)[N]) {
+      auto &cxt = Impl.SwiftContext;
+      addProtocolsToStruct(structDecl, synthesizedProtocolAttrs,
+                           protocols);
+
+      auto storedVarName = cxt.getIdentifier("_rawValue");
+      auto computedVarName = cxt.Id_rawValue;
+
+      // Create a variable to store the underlying value.
+      VarDecl *storedVar;
+      PatternBindingDecl *storedPatternBinding;
+      std::tie(storedVar, storedPatternBinding) = createVarWithPattern(
+          cxt, structDecl, storedVarName, storedUnderlyingType, /*isLet=*/false,
+          /*isImplicit=*/true, Accessibility::Private);
+
+      //
+      // Create a computed value variable
+      auto dre = new (cxt) DeclRefExpr(
+          storedVar, {}, true, AccessSemantics::Ordinary, storedUnderlyingType);
+      auto coerce = new (cxt)
+          CoerceExpr(dre, {}, {nullptr, bridgedType});
+      auto computedVar = cast<VarDecl>(Impl.createConstant(
+          computedVarName, structDecl, bridgedType, coerce,
+          ConstantConvertKind::Coerce, false, {}));
+      computedVar->setImplicit();
+      computedVar->setAccessibility(Accessibility::Public);
+
+      // Create a pattern binding to describe the variable.
+
+      Pattern *computedVarPattern = createTypedNamedPattern(computedVar);
+      auto computedPatternBinding = PatternBindingDecl::create(
+          cxt, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+          computedVarPattern, nullptr, structDecl);
+
+      auto init = createValueConstructor(structDecl, computedVar,
+                                         /*wantCtorParamNames=*/true,
+                                         /*wantBody=*/false);
+      // Insert our custom init body
+      if (!Impl.hasFinishedTypeChecking()) {
+        auto selfDecl = ParamDecl::createSelf(SourceLoc(), structDecl,
+                                              /*static*/ false, /*inout*/ true);
+        // Construct left-hand side.
+        Expr *lhs = new (cxt) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                          /*Implicit=*/true);
+        lhs = new (cxt) MemberRefExpr(lhs, SourceLoc(), storedVar,
+                                      DeclNameLoc(), /*Implicit=*/true);
+
+        // Construct right-hand side.
+        // FIXME: get the parameter from the init, and plug it in here.
+        auto rhs = new (cxt)
+            DeclRefExpr(init->getParameterList(1)->get(0), DeclNameLoc(),
+                        /*Implicit=*/true);
+
+        // Add assignment.
+        auto assign = new (cxt) AssignExpr(lhs, SourceLoc(), rhs,
+                                           /*Implicit=*/true);
+        auto body = BraceStmt::create(cxt, SourceLoc(), {assign}, SourceLoc());
+        init->setBody(body);
+
+        // We want to inline away as much of this as we can
+        init->getAttrs().add(new (cxt) TransparentAttr(/*implicit*/ true));
+      }
+
+      structDecl->setHasDelayedMembers();
+      structDecl->addMember(init);
+      structDecl->addMember(storedPatternBinding);
+      structDecl->addMember(storedVar);
+      structDecl->addMember(computedPatternBinding);
+      structDecl->addMember(computedVar);
     }
 
     /// \brief Create a constructor that initializes a struct from its members.
@@ -1605,6 +1834,20 @@ namespace {
       nominal->setCheckedInheritanceClause();
     }
 
+    /// Add protocol conformances and synthesized protocol attributes
+    template <unsigned N>
+    void
+    addProtocolsToStruct(StructDecl *structDecl,
+                         ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
+                         ProtocolDecl *const(&protocols)[N]) {
+      populateInheritedTypes(structDecl, protocols);
+
+      // Note synthesized protocols
+      for (auto kind : synthesizedProtocolAttrs)
+        structDecl->getAttrs().add(new (Impl.SwiftContext)
+                                       SynthesizedProtocolAttr(kind));
+    }
+
     NominalTypeDecl *importAsOptionSetType(DeclContext *dc,
                                            Identifier name,
                                            const clang::EnumDecl *decl) {
@@ -1625,45 +1868,10 @@ namespace {
         Loc, name, Loc, None, nullptr, dc);
       structDecl->computeType();
 
-      // Note that this is a raw option set type.
-      structDecl->getAttrs().add(
-        new (Impl.SwiftContext) SynthesizedProtocolAttr(
-                                  KnownProtocolKind::OptionSet));
-
-      
-      // Create a field to store the underlying value.
-      auto varName = Impl.SwiftContext.Id_rawValue;
-      auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
-                                                 /*IsLet*/ true,
-                                                 SourceLoc(), varName,
-                                                 underlyingType,
-                                                 structDecl);
-      var->setImplicit();
-      var->setAccessibility(Accessibility::Public);
-      var->setSetterAccessibility(Accessibility::Private);
-
-      // Create a pattern binding to describe the variable.
-      Pattern *varPattern = createTypedNamedPattern(var);
-
-      auto patternBinding =
-          PatternBindingDecl::create(Impl.SwiftContext, SourceLoc(),
-                                     StaticSpellingKind::None, SourceLoc(),
-                                     varPattern, nullptr, structDecl);
-      
-      // Create the init(rawValue:) constructor.
-      auto labeledValueConstructor = createValueConstructor(
-                                structDecl, var,
-                                /*wantCtorParamNames=*/true,
-                                /*wantBody=*/!Impl.hasFinishedTypeChecking());
-
-      // Build an OptionSet conformance for the type.
       ProtocolDecl *protocols[]
         = {cxt.getProtocol(KnownProtocolKind::OptionSet)};
-      populateInheritedTypes(structDecl, protocols);
-
-      structDecl->addMember(labeledValueConstructor);
-      structDecl->addMember(patternBinding);
-      structDecl->addMember(var);
+      makeStructRawValued(structDecl, underlyingType,
+                          {KnownProtocolKind::OptionSet}, protocols);
       return structDecl;
     }
     
@@ -1714,49 +1922,12 @@ namespace {
         ProtocolDecl *protocols[]
           = {cxt.getProtocol(KnownProtocolKind::RawRepresentable),
              cxt.getProtocol(KnownProtocolKind::Equatable)};
-        populateInheritedTypes(structDecl, protocols);
-
-        // Note that this is a raw representable type.
-        structDecl->getAttrs().add(
-          new (Impl.SwiftContext) SynthesizedProtocolAttr(
-                                    KnownProtocolKind::RawRepresentable));
-
-        // Create a variable to store the underlying value.
-        auto varName = Impl.SwiftContext.Id_rawValue;
-        auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
-                                                   /*IsLet*/ false,
-                                                   SourceLoc(), varName,
-                                                   underlyingType,
-                                                   structDecl);
-        var->setAccessibility(Accessibility::Public);
-        var->setSetterAccessibility(Accessibility::Public);
-
-        // Create a pattern binding to describe the variable.
-        Pattern *varPattern = createTypedNamedPattern(var);
-
-        auto patternBinding =
-            PatternBindingDecl::create(Impl.SwiftContext, SourceLoc(),
-                                       StaticSpellingKind::None, SourceLoc(),
-                                       varPattern, nullptr, structDecl);
-
-        // Create a constructor to initialize that value from a value of the
-        // underlying type.
-        auto valueConstructor =
-            createValueConstructor(structDecl, var,
-                                   /*wantCtorParamNames=*/false,
-                                   /*wantBody=*/!Impl.hasFinishedTypeChecking());
-        auto labeledValueConstructor =
-            createValueConstructor(structDecl, var,
-                                   /*wantCtorParamNames=*/true,
-                                   /*wantBody=*/!Impl.hasFinishedTypeChecking());
-
-        structDecl->setHasDelayedMembers();
-
-        // Set the members of the struct.
-        structDecl->addMember(valueConstructor);
-        structDecl->addMember(labeledValueConstructor);
-        structDecl->addMember(patternBinding);
-        structDecl->addMember(var);
+        makeStructRawValued(structDecl, underlyingType,
+                            {KnownProtocolKind::RawRepresentable}, protocols,
+                            /*setterAccessibility=*/Accessibility::Public,
+                            /*isLet=*/false,
+                            /*makeUnlabeledValueInit=*/true,
+                            /*isImplicit=*/false);
 
         result = structDecl;
         break;
@@ -2478,7 +2649,7 @@ namespace {
         auto function = dyn_cast<clang::FunctionDecl>(decl);
         if (!function) continue;
 
-        if (function == accessor) {
+        if (function->getCanonicalDecl() == accessor->getCanonicalDecl()) {
           foundAccessor = true;
           continue;
         }
@@ -4332,9 +4503,6 @@ namespace {
     Optional<GenericParamList *> importObjCGenericParams(
        const clang::ObjCInterfaceDecl *decl, DeclContext *dc)
     {
-      if (!Impl.SwiftContext.LangOpts.ImportObjCGenerics) {
-        return nullptr;
-      }
       auto typeParamList = decl->getTypeParamList();
       if (!typeParamList) {
         return nullptr;
@@ -5607,7 +5775,7 @@ void ClangImporter::Implementation::importAttributes(
   } else {
     if (auto MD = dyn_cast<FuncDecl>(MappedDecl)) {
       if (!MD->getResultType()->isVoid()) {
-        MD->getAttrs().add(new (C) DiscardableResultAttr(/*implicit*/false));
+        MD->getAttrs().add(new (C) DiscardableResultAttr(/*implicit*/true));
       }
     }
   }
@@ -6169,9 +6337,14 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               ClangNode ClangN) {
   auto &context = SwiftContext;
 
-  auto var = createDeclWithClangNode<VarDecl>(ClangN,
-                                   isStatic, /*IsLet*/ false,
-                                   SourceLoc(), name, type, dc);
+  VarDecl *var = nullptr;
+  if (ClangN) {
+    var = createDeclWithClangNode<VarDecl>(ClangN, isStatic, /*IsLet*/ false,
+                                           SourceLoc(), name, type, dc);
+  } else {
+    var = new (SwiftContext)
+        VarDecl(isStatic, /*IsLet*/ false, SourceLoc(), name, type, dc);
+  }
 
   // Form the argument patterns.
   SmallVector<ParameterList*, 3> getterArgs;

@@ -26,6 +26,7 @@ namespace irgen {
   class Address;
   class Explosion;
   class IRGenFunction;
+  class Size;
 
   /// Project the address of a tuple element.
   Address projectTupleElementAddress(IRGenFunction &IGF,
@@ -39,6 +40,13 @@ namespace irgen {
                                         Explosion &tuple,
                                         unsigned fieldNo,
                                         Explosion &out);
+
+  /// Return the offset to the given tuple element, if it's fixed.
+  ///
+  /// This API is used by RemoteAST.
+  Optional<Size> getFixedTupleElementOffset(IRGenModule &IGM,
+                                            SILType tupleType,
+                                            unsigned fieldNo);
 
 } // end namespace irgen
 } // end namespace swift

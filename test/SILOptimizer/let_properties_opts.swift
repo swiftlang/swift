@@ -195,9 +195,9 @@ public func testClassLet1(_ f: inout Foo1) -> Int32 {
 
 // CHECK: sil [thunk] [always_inline] @_TF19let_properties_opts12testClassLetFCS_3FooVs5Int32 : $@convention(thin) (@owned Foo) -> Int32
 // CHECK: bb0
+// CHECK-NEXT: strong_release
 // CHECK: integer_literal $Builtin.Int32, 75
 // CHECK-NEXT: struct $Int32
-// CHECK-NEXT: strong_release
 // CHECK-NEXT: return
 public func testClassLet(_ f: Foo) -> Int32 {
   return f.Prop1 + f.Prop1 + f.Prop2 + f.Prop3
@@ -214,9 +214,9 @@ public func testClassLet(_ f: inout Foo) -> Int32 {
 
 // CHECK-LABEL: sil [thunk] [always_inline] @_TF19let_properties_opts18testClassPublicLetFCS_3FooVs5Int32 : $@convention(thin) (@owned Foo) -> Int32
 // CHECK: bb0
+// CHECK-NEXT: strong_release
 // CHECK: integer_literal $Builtin.Int32, 1
 // CHECK-NEXT: struct $Int32
-// CHECK-NEXT: strong_release
 // CHECK-NEXT: return
 public func testClassPublicLet(_ f: Foo) -> Int32 {
   return f.Prop0

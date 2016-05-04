@@ -244,9 +244,9 @@ func checkHasPrefixHasSuffix(
     }
   let expectHasPrefix = lhsNFDGraphemeClusters.starts(
     with: rhsNFDGraphemeClusters, isEquivalent: (==))
-  let expectHasSuffix =
-    lhsNFDGraphemeClusters.lazy.reversed().starts(
-      with: rhsNFDGraphemeClusters.lazy.reversed(), isEquivalent: (==))
+
+  let expectHasSuffix = lhsNFDGraphemeClusters.lazy.reversed()
+    .starts(with: rhsNFDGraphemeClusters.lazy.reversed(), isEquivalent: (==))
 
   expectEqual(expectHasPrefix, lhs.hasPrefix(rhs), stackTrace: stackTrace)
   expectEqual(
@@ -268,7 +268,6 @@ StringTests.test("hasPrefix,hasSuffix")
 }
 
 StringTests.test("Failures{hasPrefix,hasSuffix}-CF")
-  .xfail(.custom({ true }, reason: "rdar://problem/19034601"))
   .skip(.nativeRuntime(
     "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
   .code {
@@ -313,7 +312,11 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
   let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
 
   expectEqual("\u{fffd}\u{1f602}\u{fffd}",
-    acceptor[donor.startIndex.advanced(by: 1)..<donor.startIndex.advanced(by: 5)])
+    acceptor[
+      donor.index(donor.startIndex, offsetBy: 1) ..<
+      donor.index(donor.startIndex, offsetBy: 5)
+    ]
+  )
 }
 
 var CStringTests = TestSuite("CStringTests")

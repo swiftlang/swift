@@ -33,7 +33,7 @@ class ConsumedArgToEpilogueReleaseMatcher;
 
 namespace swift {
 
-/// The kind of a RCStateTransition.
+/// The kind of an RCStateTransition.
 enum class RCStateTransitionKind : uint8_t {
 #define KIND(K) K,
 #define ABSTRACT_VALUE(Name, StartKind, EndKind) \

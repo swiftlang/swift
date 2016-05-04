@@ -73,8 +73,8 @@ internal func _cocoaStringToContiguous(
   _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(source) == nil,
     "Known contiguously-stored strings should already be converted to Swift")
 
-  let startIndex = range.startIndex
-  let count = range.endIndex - startIndex
+  let startIndex = range.lowerBound
+  let count = range.upperBound - startIndex
 
   let buffer = _StringBuffer(capacity: max(count, minimumCapacity), 
                              initialSize: count, elementWidth: 2)
@@ -111,7 +111,7 @@ internal func _cocoaStringSlice(
 
   let cfResult: AnyObject = _swift_stdlib_CFStringCreateWithSubstring(
     nil, cfSelf, _swift_shims_CFRange(
-      location: bounds.startIndex, length: bounds.count))
+      location: bounds.lowerBound, length: bounds.count))
 
   return String(_cocoaString: cfResult)._core
 }
@@ -226,6 +226,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     return _core[index]
   }
 
+  @inline(__always) // Performance: To save on reference count operations.
   func getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange) {

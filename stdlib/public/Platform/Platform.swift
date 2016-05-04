@@ -103,7 +103,8 @@ public var errno : Int32 {
   get {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD)
     return __error().pointee
-#elseif os(Android)
+//FIXME: os(Windows) should be replaced, such as triple(Cygwin)
+#elseif os(Android) || os(Windows)
     return __errno().pointee
 #else
     return __errno_location().pointee
@@ -112,7 +113,7 @@ public var errno : Int32 {
   set(val) {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD)
     return __error().pointee = val
-#elseif os(Android)
+#elseif os(Android) || os(Windows)
     return __errno().pointee = val
 #else
     return __errno_location().pointee = val
@@ -317,8 +318,14 @@ public var SIG_DFL: sig_t? { return nil }
 public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
 public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
 public var SIG_HOLD: sig_t { return unsafeBitCast(5, to: sig_t.self) }
-#elseif os(Linux) || os(FreeBSD) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(Android) || os(Windows)
+#if os(Windows)
+// In Cygwin, the below SIG_* have the same value with Linux.
+// Verified with libstdc++6 v5.3.0 in Cygwin v2.4.1 64bit.
+public typealias sighandler_t = _sig_func_ptr
+#else
 public typealias sighandler_t = __sighandler_t
+#endif
 
 public var SIG_DFL: sighandler_t? { return nil }
 public var SIG_IGN: sighandler_t {
@@ -343,7 +350,7 @@ public var SEM_FAILED: UnsafeMutablePointer<sem_t>? {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   // The value is ABI.  Value verified to be correct for OS X, iOS, watchOS, tvOS.
   return UnsafeMutablePointer<sem_t>(bitPattern: -1)
-#elseif os(Linux) || os(FreeBSD) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(Android) || os(Windows)
   // The value is ABI.  Value verified to be correct on Glibc.
   return UnsafeMutablePointer<sem_t>(bitPattern: 0)
 #else

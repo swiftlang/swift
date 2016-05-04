@@ -389,6 +389,12 @@ public:
   void *getOpaqueValue() const { return SimpleOrCompound.getOpaqueValue(); }
   static DeclName getFromOpaqueValue(void *p) { return DeclName(p); }
 
+  /// Get a string representation of the name,
+  ///
+  /// \param scratch Scratch space to use.
+  StringRef getString(llvm::SmallVectorImpl<char> &scratch,
+                      bool skipEmptyArgumentNames = false) const;
+
   /// Print the representation of this declaration name to the given
   /// stream.
   ///

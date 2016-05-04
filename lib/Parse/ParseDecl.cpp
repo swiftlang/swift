@@ -882,8 +882,18 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           continue;
         }
 
-        StringRef &ArgField = ((ArgumentKind == IsMessage) ? Message : Renamed);
-        ArgField = Value.getValue();
+        if (ArgumentKind == IsMessage) {
+          Message = Value.getValue();
+        } else {
+          ParsedDeclName parsedName = parseDeclName(Value.getValue());
+          if (!parsedName || parsedName.isInstanceMember() ||
+              parsedName.isPropertyAccessor()) {
+            diagnose(Loc, diag::attr_availability_invalid_renamed, AttrName);
+            DiscardAttribute = true;
+            continue;
+          }
+          Renamed = Value.getValue();
+        }
         break;
       }
 

@@ -54,14 +54,18 @@ class Subject<T>: Observer, Observable {
     }
 }
 
+/*
+FIXME: <rdar://problem/25666028> swift-3-indexing-model: Generics/associated_self_constraints.swift
 struct X<T> {
-
-  mutating func replace<C : Collection where C.Iterator.Element == T>(_ a: C) {
+  mutating func replace<
+    C : Collection where C.Iterator.Element == T, C.Index : Strideable
+  >(a: C) {
     for i in a.startIndex..<a.endIndex {
       _ = a[i] as T
     }
   }
 }
+*/
 
 protocol P {
     associatedtype A

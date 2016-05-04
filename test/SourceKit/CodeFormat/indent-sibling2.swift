@@ -37,6 +37,11 @@ static func _consoleConnected(type: CGSNotificationType,
             _ cid: CGSConnectionID) {
 }
 
+public func someTestFunc(withArgumentLabel label: String,
+              someOtherArgumentLabel label2: String,
+                      andAnotherArgumentLabel label3: String) {
+}
+
 // RUN: %sourcekitd-test -req=format -line=6 -length=1 %s >%t.response
 // RUN: %sourcekitd-test -req=format -line=7 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=8 -length=1 %s >>%t.response
@@ -49,6 +54,8 @@ static func _consoleConnected(type: CGSNotificationType,
 // RUN: %sourcekitd-test -req=format -line=35 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=36 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=37 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=41 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=42 -length=1 %s >>%t.response
 
 // RUN: FileCheck --strict-whitespace %s <%t.response
 
@@ -80,3 +87,9 @@ static func _consoleConnected(type: CGSNotificationType,
 
 //                        "        _ arg: CGSNotificationArg,"
 // CHECK: key.sourcetext: "        _ cid: CGSConnectionID) {"
+
+//                        "public func someTestFunc(withArgumentLabel label: String,"
+// CHECK: key.sourcetext: "                         someOtherArgumentLabel label2: String,"
+
+//                        "              someOtherArgumentLabel label2: String,"
+// CHECK: key.sourcetext: "              andAnotherArgumentLabel label3: String) {"

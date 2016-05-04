@@ -147,7 +147,7 @@ func _getSummary<T>(_ out: UnsafeMutablePointer<String>, x: T) {
 /// of any type.
 @warn_unused_result
 @_silgen_name("swift_reflectAny")
-public func _reflect<T>(_ x: T) -> _Mirror
+internal func _reflect<T>(_ x: T) -> _Mirror
 
 /// Dump an object's contents using its mirror to the specified output stream.
 public func dump<T, TargetStream : OutputStream>(
@@ -276,7 +276,7 @@ internal func _dump_unlocked<TargetStream : OutputStream>(
     }
 
     let (name, child) = mirror.children[currentIndex]
-    currentIndex = currentIndex.successor()
+    mirror.children.formIndex(after: &currentIndex)
     _dump_unlocked(
       child,
       to: &target,
@@ -342,7 +342,7 @@ internal func _dumpSuperclass_unlocked<TargetStream : OutputStream>(
     }
 
     let (name, child) = mirror.children[currentIndex]
-    currentIndex = currentIndex.successor()
+    mirror.children.formIndex(after: &currentIndex)
     _dump_unlocked(
       child,
       to: &target,
@@ -645,6 +645,6 @@ struct _MetatypeMirror : _Mirror {
 extension ObjectIdentifier {
   @available(*, unavailable, message: "use the 'UInt(_:)' initializer")
   public var uintValue: UInt {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

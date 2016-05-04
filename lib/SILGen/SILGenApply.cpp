@@ -1001,6 +1001,8 @@ public:
         // Prepare the callee.  This can modify both selfValue and subs.
         Callee theCallee = prepareArchetypeCallee(SGF, e, constant, selfValue,
                                                   substFnType, subs);
+        AssumedPlusZeroSelf = selfValue.isRValue()
+          && selfValue.forceAndPeekRValue(SGF).peekIsPlusZeroRValueOrTrivial();
 
         setSelfParam(std::move(selfValue), thisCallSite);
         setCallee(std::move(theCallee));
@@ -1177,13 +1179,20 @@ public:
   }
   
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
+    // Emit the closure body.
+    SGF.SGM.emitClosure(e);
+
+    // If we're in top-level code, we don't need to physically capture script
+    // globals, but we still need to mark them as escaping so that DI can flag
+    // uninitialized uses.
+    if (&SGF == SGF.SGM.TopLevelSGF) {
+      SGF.SGM.emitMarkFunctionEscapeForTopLevelCodeGlobals(e,e->getCaptureInfo());
+    }
+    
     // A directly-called closure can be emitted as a direct call instead of
     // really producing a closure object.
     SILDeclRef constant(e);
-    // Emit the closure function if we haven't yet.
-    if (!SGF.SGM.hasFunction(constant))
-      SGF.SGM.emitClosure(e);
-    
+
     ArrayRef<Substitution> subs;
     CanFunctionType substFnType = getSubstFnType();
     
@@ -3718,7 +3727,16 @@ namespace {
 
       // Grab the SILLocation and the new managed value.
       SILLocation ArgLoc = ArgValue.getKnownRValueLocation();
-      ManagedValue ArgManagedValue = gen.emitManagedRetain(ArgLoc, ArgSILValue);
+      ManagedValue ArgManagedValue;
+      if (ArgSILValue->getType().isAddress()) {
+        auto result = gen.emitTemporaryAllocation(ArgLoc,
+                                                  ArgSILValue->getType());
+        gen.B.createCopyAddr(ArgLoc, ArgSILValue, result,
+                             IsNotTake, IsInitialization);
+        ArgManagedValue = gen.emitManagedBufferWithCleanup(result);
+      } else {
+        ArgManagedValue = gen.emitManagedRetain(ArgLoc, ArgSILValue);
+      }
 
       // Ok now we make our transformation. First set ArgValue to a used albeit
       // invalid, empty ArgumentSource.

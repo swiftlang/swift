@@ -471,13 +471,6 @@ void swift::trySpecializeApplyOfGeneric(
                                          Fragile, ReInfo);
   SILFunction *SpecializedF = FuncSpecializer.lookupSpecialization();
   if (SpecializedF) {
-    assert(ReInfo.getSpecializedType()
-           == SpecializedF->getLoweredFunctionType() &&
-           "Previously specialized function does not match expected type.");
-    assert(Fragile
-           == SpecializedF->isFragile() &&
-           "Previously specialized function does not match expected "
-           "resilience level.");
     // Even if the pre-specialization exists already, try to preserve it
     // if it is whitelisted.
     linkSpecialization(M, SpecializedF);
@@ -488,6 +481,17 @@ void swift::trySpecializeApplyOfGeneric(
 
     NewFunctions.push_back(SpecializedF);
   }
+
+  assert(ReInfo.getSpecializedType()
+         == SpecializedF->getLoweredFunctionType() &&
+         "Previously specialized function does not match expected type.");
+
+  // FIXME: Replace pre-specialization's "keep as public" hack with something
+  // more principled
+  assert((Fragile == SpecializedF->isFragile() ||
+          SpecializedF->isKeepAsPublic()) &&
+         "Previously specialized function does not match expected "
+         "resilience level.");
 
   DeadApplies.insert(Apply.getInstruction());
 
@@ -602,6 +606,18 @@ bool swift::isWhitelistedSpecialization(StringRef SpecName) {
       "_ContiguousArrayBuffer",
       "Range",
       "RangeIterator",
+      "CountableRange",
+      "CountableRangeIterator",
+      "ClosedRange",
+      "ClosedRangeIterator",
+      "CountableClosedRange",
+      "CountableClosedRangeIterator",
+      "IndexingIterator",
+      "Collection",
+      "MutableCollection",
+      "BidirectionalCollection",
+      "RandomAccessCollection",
+      "RangeReplaceableCollection",
       "_allocateUninitializedArray",
       "UTF8",
       "UTF16",

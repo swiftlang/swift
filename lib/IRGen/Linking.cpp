@@ -66,6 +66,15 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   llvm_unreachable("bad witness kind");
 }
 
+/// Mangle this entity as a std::string.
+std::string LinkEntity::mangleAsString() const {
+  std::string result; {
+    llvm::raw_string_ostream stream(result);
+    mangle(stream);
+  }
+  return result;
+}
+
 /// Mangle this entity into the given buffer.
 void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {
   llvm::raw_svector_ostream stream(buffer);

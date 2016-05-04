@@ -87,6 +87,9 @@ namespace {
 
       /// The source type is any other pointer type.
       OtherPointer,
+
+      /// The source type created a new Swift type, using swift_newtype
+      SwiftNewtype,
     };
 
     ImportHintKind Kind;
@@ -118,6 +121,7 @@ namespace {
     case ImportHint::NSUInteger:
     case ImportHint::Reference:
     case ImportHint::Void:
+    case ImportHint::SwiftNewtype:
       return false;
 
     case ImportHint::Block:
@@ -452,7 +456,8 @@ namespace {
       auto resultTy = Impl.importType(type->getReturnType(),
                                       ImportTypeKind::Result,
                                       AllowNSUIntegerAsInt,
-                                      CanFullyBridgeTypes);
+                                      CanFullyBridgeTypes,
+                                      OTK_Optional);
       if (!resultTy)
         return Type();
 
@@ -462,7 +467,8 @@ namespace {
            param != paramEnd; ++param) {
         auto swiftParamTy = Impl.importType(*param, ImportTypeKind::Parameter,
                                             AllowNSUIntegerAsInt,
-                                            CanFullyBridgeTypes);
+                                            CanFullyBridgeTypes,
+                                            OTK_Optional);
         if (!swiftParamTy)
           return Type();
 
@@ -485,7 +491,8 @@ namespace {
       auto resultTy = Impl.importType(type->getReturnType(),
                                       ImportTypeKind::Result,
                                       AllowNSUIntegerAsInt,
-                                      CanFullyBridgeTypes);
+                                      CanFullyBridgeTypes,
+                                      OTK_Optional);
       if (!resultTy)
         return Type();
 
@@ -544,8 +551,12 @@ namespace {
       Type mappedType = decl->getDeclaredType();
       ImportHint hint = ImportHint::None;
 
+      if (Impl.HonorSwiftNewtypeAttr &&
+          type->getDecl()->hasAttr<clang::SwiftNewtypeAttr>()) {
+        hint = ImportHint::SwiftNewtype;
+
       // For certain special typedefs, we don't want to use the imported type.
-      if (auto specialKind = Impl.getSpecialTypedefKind(type->getDecl())) {
+      } else if (auto specialKind = Impl.getSpecialTypedefKind(type->getDecl())) {
         switch (specialKind.getValue()) {
         case MappedTypeNameKind::DoNothing:
         case MappedTypeNameKind::DefineAndUse:

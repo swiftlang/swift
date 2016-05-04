@@ -18,6 +18,8 @@ func test001() {
 // TOP_LEVEL_0-NEXT:   aaa(x: B)
 // TOP_LEVEL_0-NEXT:   aaa(x: B, y: B)
 // TOP_LEVEL_0-NEXT:   aaa(x: B, y: B)
+// TOP_LEVEL_0-NEXT: #colorLiteral(red: Float, green: Float, blue: Float, alpha: Float)
+// TOP_LEVEL_0-NEXT: #imageLiteral(resourceName: String)
 // TOP_LEVEL_0-NEXT: aab()
 
 struct Foo {

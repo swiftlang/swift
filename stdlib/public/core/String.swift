@@ -553,81 +553,22 @@ extension String {
   }
 }
 
-extension String {
-  public typealias Index = CharacterView.Index
-  
-  /// The position of the first `Character` in `self.characters` if
-  /// `self` is non-empty; identical to `endIndex` otherwise.
-  public var startIndex: Index { return characters.startIndex }
-  
-  /// The "past the end" position in `self.characters`.
-  ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
-  public var endIndex: Index { return characters.endIndex }
-
-  /// Access the `Character` at `position`.
-  ///
-  /// - Precondition: `position` is a valid position in `self.characters`
-  ///   and `position != endIndex`.
-  public subscript(i: Index) -> Character { return characters[i] }
-}
-
-@warn_unused_result
-public func == (lhs: String.Index, rhs: String.Index) -> Bool {
-  return lhs._base == rhs._base
-}
-
-@warn_unused_result
-public func < (lhs: String.Index, rhs: String.Index) -> Bool {
-  return lhs._base < rhs._base
-}
-
-extension String {
-  /// Return the characters within the given `bounds`.
-  ///
-  /// - Complexity: O(1) unless bridging from Objective-C requires an
-  ///   O(N) conversion.
-  public subscript(bounds: Range<Index>) -> String {
-    return String(characters[bounds])
-  }
-}
-
-extension String {
-  public mutating func reserveCapacity(_ n: Int) {
-    withMutableCharacters {
-      (v: inout CharacterView) in v.reserveCapacity(n)
-    }
-  }
-  public mutating func append(_ c: Character) {
-    withMutableCharacters {
-      (v: inout CharacterView) in v.append(c)
-    }
-  }
-  
-  public mutating func append<
-    S : Sequence where S.Iterator.Element == Character
-  >(contentsOf newElements: S) {
-    withMutableCharacters {
-      (v: inout CharacterView) in v.append(contentsOf: newElements)
-    }
-  }
-  
-  /// Create an instance containing `characters`.
-  public init<
-    S : Sequence where S.Iterator.Element == Character
-  >(_ characters: S) {
-    self._core = CharacterView(characters)._core
-  }
-}
-
 extension Sequence where Iterator.Element == String {
 
-  /// Interpose the `separator` between elements of `self`, then concatenate
-  /// the result.  For example:
+  /// Returns a new string by concatenating the elements of the sequence,
+  /// adding the given separator between each element.
   ///
-  ///     ["foo", "bar", "baz"].joined(separator: "-|-") // "foo-|-bar-|-baz"
+  /// The following example shows how an array of strings can be joined to a
+  /// single, comma-separated string:
+  ///
+  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
+  ///     let list = cast.joined(separator: ", ")
+  ///     print(list)
+  ///     // Prints "Vivien, Marlon, Kim, Karl"
+  ///
+  /// - Parameter separator: A string to insert between each of the elements
+  ///   in this sequence.
+  /// - Returns: A single, concatenated string.
   @warn_unused_result
   public func joined(separator: String) -> String {
     var result = ""
@@ -671,96 +612,6 @@ extension Sequence where Iterator.Element == String {
   }
 }
 
-extension String {
-  /// Replace the characters within `bounds` with the elements of
-  /// `replacement`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
-  ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
-  public mutating func replaceSubrange<
-    C: Collection where C.Iterator.Element == Character
-  >(
-    _ bounds: Range<Index>, with newElements: C
-  ) {
-    withMutableCharacters {
-      (v: inout CharacterView) in v.replaceSubrange(bounds, with: newElements)
-    }
-  }
-
-  /// Replace the text in `bounds` with `replacement`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
-  ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
-  public mutating func replaceSubrange(
-    _ bounds: Range<Index>, with newElements: String
-  ) {
-    replaceSubrange(bounds, with: newElements.characters)
-  }
-
-  /// Insert `newElement` at position `i`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`self.count`).
-  public mutating func insert(_ newElement: Character, at i: Index) {
-    withMutableCharacters {
-      (v: inout CharacterView) in v.insert(newElement, at: i)
-    }
-  }
-
-  /// Insert `newElements` at position `i`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`self.count + newElements.count`).
-  public mutating func insert<
-    S : Collection where S.Iterator.Element == Character
-  >(contentsOf newElements: S, at i: Index) {
-    withMutableCharacters {
-      (v: inout CharacterView) in v.insert(contentsOf: newElements, at: i)
-    }
-  }
-
-  /// Remove and return the `Character` at position `i`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`self.count`).
-  @discardableResult
-  public mutating func remove(at i: Index) -> Character {
-    return withMutableCharacters {
-      (v: inout CharacterView) in v.remove(at: i)
-    }
-  }
-
-  /// Remove the characters in `bounds`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`self.count`).
-  public mutating func removeSubrange(_ bounds: Range<Index>) {
-    withMutableCharacters {
-      (v: inout CharacterView) in v.removeSubrange(bounds)
-    }
-  }
-
-  /// Replace `self` with the empty string.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - parameter keepCapacity: If `true`, prevents the release of
-  ///   allocated storage, which can be a useful optimization
-  ///   when `self` is going to be grown again.
-  public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
-    withMutableCharacters {
-      (v: inout CharacterView) in v.removeAll(keepingCapacity: keepCapacity)
-    }
-  }
-}
 #if _runtime(_ObjC)
 @warn_unused_result
 @_silgen_name("swift_stdlib_NSStringLowercaseString")
@@ -915,113 +766,24 @@ extension String {
   }
 }
 
-// Index conversions
-extension String.Index {
-  /// Construct the position in `characters` that corresponds exactly to
-  /// `unicodeScalarIndex`. If no such position exists, the result is `nil`.
-  ///
-  /// - Precondition: `unicodeScalarIndex` is an element of
-  ///   `characters.unicodeScalars.indices`.
-  public init?(
-    _ unicodeScalarIndex: String.UnicodeScalarIndex,
-    within characters: String
-  ) {
-    if !unicodeScalarIndex._isOnGraphemeClusterBoundary {
-      return nil
-    }
-    self.init(_base: unicodeScalarIndex)
-  }
-
-  /// Construct the position in `characters` that corresponds exactly to
-  /// `utf16Index`. If no such position exists, the result is `nil`.
-  ///
-  /// - Precondition: `utf16Index` is an element of
-  ///   `characters.utf16.indices`.
-  public init?(
-    _ utf16Index: String.UTF16Index,
-    within characters: String
-  ) {
-    if let me = utf16Index.samePosition(
-      in: characters.unicodeScalars
-    )?.samePosition(in: characters) {
-      self = me
-    }
-    else {
-      return nil
-    }
-  }
-
-  /// Construct the position in `characters` that corresponds exactly to
-  /// `utf8Index`. If no such position exists, the result is `nil`.
-  ///
-  /// - Precondition: `utf8Index` is an element of
-  ///   `characters.utf8.indices`.
-  public init?(
-    _ utf8Index: String.UTF8Index,
-    within characters: String
-  ) {
-    if let me = utf8Index.samePosition(
-      in: characters.unicodeScalars
-    )?.samePosition(in: characters) {
-      self = me
-    }
-    else {
-      return nil
-    }
-  }
-
-  /// Returns the position in `utf8` that corresponds exactly
-  /// to `self`.
-  ///
-  /// - Precondition: `self` is an element of `String(utf8).indices`.
-  @warn_unused_result
-  public func samePosition(
-    in utf8: String.UTF8View
-  ) -> String.UTF8View.Index {
-    return String.UTF8View.Index(self, within: utf8)
-  }
-
-  /// Returns the position in `utf16` that corresponds exactly
-  /// to `self`.
-  ///
-  /// - Precondition: `self` is an element of `String(utf16).indices`.
-  @warn_unused_result
-  public func samePosition(
-    in utf16: String.UTF16View
-  ) -> String.UTF16View.Index {
-    return String.UTF16View.Index(self, within: utf16)
-  }
-
-  /// Returns the position in `unicodeScalars` that corresponds exactly
-  /// to `self`.
-  ///
-  /// - Precondition: `self` is an element of `String(unicodeScalars).indices`.
-  @warn_unused_result
-  public func samePosition(
-    in unicodeScalars: String.UnicodeScalarView
-  ) -> String.UnicodeScalarView.Index {
-    return String.UnicodeScalarView.Index(self, within: unicodeScalars)
-  }
-}
-
 extension String {
   @available(*, unavailable, renamed: "append")
   public mutating func appendContentsOf(_ other: String) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "append(contentsOf:)")
   public mutating func appendContentsOf<
     S : Sequence where S.Iterator.Element == Character
   >(_ newElements: S) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "insert(contentsOf:at:)")
   public mutating func insertContentsOf<
     S : Collection where S.Iterator.Element == Character
   >(_ newElements: S, at i: Index) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "replaceSubrange")
@@ -1030,40 +792,40 @@ extension String {
   >(
     _ subRange: Range<Index>, with newElements: C
   ) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
     
   @available(*, unavailable, renamed: "replaceSubrange")
   public mutating func replaceRange(
     _ subRange: Range<Index>, with newElements: String
   ) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
   
   @available(*, unavailable, renamed: "removeAt")
   public mutating func removeAtIndex(_ i: Index) -> Character {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "removeSubrange")
   public mutating func removeRange(_ subRange: Range<Index>) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "lowercased()")
   public var lowercaseString: String {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "uppercased()")
   public var uppercaseString: String {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
 extension Sequence where Iterator.Element == String {
   @available(*, unavailable, renamed: "joined")
   public func joinWithSeparator(_ separator: String) -> String {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

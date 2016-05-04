@@ -203,14 +203,16 @@ def collect_frameworks(sdk):
     (exitcode, sdk_path, err) = run_command(
         ["xcrun", "--show-sdk-path", "-sdk", sdk])
     if exitcode != 0:
-        print('error: framework collection failed with error %d' % (exitcode))
+        print('error: framework collection failed to find SDK path for %s '
+              'with error %d' % (sdk, exitcode))
         return ()
     sdk_path = sdk_path.rstrip()
 
     (exitcode, sdk_version, err) = run_command(
         ["xcrun", "--show-sdk-version", "-sdk", sdk])
     if exitcode != 0:
-        print('error: framework collection failed with error %d' % (exitcode))
+        print('error: framework collection failed to find SDK version for %s '
+              'with error %d' % (sdk, exitcode))
         return ()
     sdk_version = sdk_version.rstrip()
 

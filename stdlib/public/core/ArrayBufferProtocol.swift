@@ -12,7 +12,11 @@
 
 /// The underlying buffer for an ArrayType conforms to
 /// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
-public protocol _ArrayBufferProtocol : MutableCollection {
+public protocol _ArrayBufferProtocol
+  : MutableCollection, RandomAccessCollection {
+
+  associatedtype Indices : RandomAccessCollection = CountableRange<Int>
+
   /// The type of elements stored in the buffer.
   associatedtype Element
 
@@ -123,7 +127,8 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   var startIndex: Int { get }
 }
 
-extension _ArrayBufferProtocol {
+extension _ArrayBufferProtocol where Index == Int {
+
   public var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }
@@ -143,11 +148,11 @@ extension _ArrayBufferProtocol {
     self.count = oldCount + growth
 
     let elements = self.subscriptBaseAddress
-    let oldTailIndex = subRange.endIndex
+    let oldTailIndex = subRange.upperBound
     let oldTailStart = elements + oldTailIndex
     let newTailIndex = oldTailIndex + growth
     let newTailStart = oldTailStart + growth
-    let tailCount = oldCount - subRange.endIndex
+    let tailCount = oldCount - subRange.upperBound
 
     if growth > 0 {
       // Slide the tail part of the buffer forwards, in reverse order
@@ -156,25 +161,25 @@ extension _ArrayBufferProtocol {
 
       // Assign over the original subRange
       var i = newValues.startIndex
-      for j in subRange {
+      for j in CountableRange(subRange) {
         elements[j] = newValues[i]
-        i._successorInPlace()
+        newValues.formIndex(after: &i)
       }
       // Initialize the hole left by sliding the tail forward
       for j in oldTailIndex..<newTailIndex {
         (elements + j).initialize(with: newValues[i])
-        i._successorInPlace()
+        newValues.formIndex(after: &i)
       }
       _expectEnd(i, newValues)
     }
     else { // We're not growing the buffer
       // Assign all the new elements into the start of the subRange
-      var i = subRange.startIndex
+      var i = subRange.lowerBound
       var j = newValues.startIndex
       for _ in 0..<newCount {
         elements[i] = newValues[j]
-        i._successorInPlace()
-        j._successorInPlace()
+        formIndex(after: &i)
+        newValues.formIndex(after: &j)
       }
       _expectEnd(j, newValues)
 

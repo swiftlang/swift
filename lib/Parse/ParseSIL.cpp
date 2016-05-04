@@ -393,8 +393,8 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
       P.diagnose(It->second.second, diag::sil_prior_reference);
       auto loc = RegularLocation(Loc);
       Fn =
-          SILMod.getOrCreateFunction(SILLinkage::Private, "", Ty, nullptr, loc,
-                                     IsNotBare, IsNotTransparent, IsNotFragile);
+          SILMod.createFunction(SILLinkage::Private, "", Ty, nullptr, loc,
+                                IsNotBare, IsNotTransparent, IsNotFragile);
       Fn->setDebugScope(new (SILMod) SILDebugScope(loc, Fn));
     }
     
@@ -414,16 +414,16 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
   if (SILMod.lookUpFunction(Name.str()) != nullptr) {
     P.diagnose(Loc, diag::sil_value_redefinition, Name.str());
     auto *fn =
-        SILMod.getOrCreateFunction(SILLinkage::Private, "", Ty, nullptr, loc,
-                                   IsNotBare, IsNotTransparent, IsNotFragile);
+        SILMod.createFunction(SILLinkage::Private, "", Ty, nullptr, loc,
+                              IsNotBare, IsNotTransparent, IsNotFragile);
     fn->setDebugScope(new (SILMod) SILDebugScope(loc, fn));
     return fn;
   }
 
   // Otherwise, this definition is the first use of this name.
-  auto *fn = SILMod.getOrCreateFunction(SILLinkage::Private, Name.str(), Ty,
-                                        nullptr, loc, IsNotBare,
-                                        IsNotTransparent, IsNotFragile);
+  auto *fn = SILMod.createFunction(SILLinkage::Private, Name.str(), Ty,
+                                   nullptr, loc, IsNotBare,
+                                   IsNotTransparent, IsNotFragile);
   fn->setDebugScope(new (SILMod) SILDebugScope(loc, fn));
   return fn;
 }
@@ -445,8 +445,8 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
       P.diagnose(Loc, diag::sil_value_use_type_mismatch,
                  Name.str(), FnRef->getLoweredFunctionType(), Ty);
       FnRef =
-          SILMod.getOrCreateFunction(SILLinkage::Private, "", Ty, nullptr, loc,
-                                     IsNotBare, IsNotTransparent, IsNotFragile);
+          SILMod.createFunction(SILLinkage::Private, "", Ty, nullptr, loc,
+                                IsNotBare, IsNotTransparent, IsNotFragile);
       FnRef->setDebugScope(new (SILMod) SILDebugScope(loc, FnRef));
     }
     return FnRef;
@@ -454,9 +454,9 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
   
   // If we didn't find a function, create a new one - it must be a forward
   // reference.
-  auto *Fn = SILMod.getOrCreateFunction(SILLinkage::Private, Name.str(), Ty,
-                                        nullptr, loc, IsNotBare,
-                                        IsNotTransparent, IsNotFragile);
+  auto *Fn = SILMod.createFunction(SILLinkage::Private, Name.str(), Ty,
+                                   nullptr, loc, IsNotBare,
+                                   IsNotTransparent, IsNotFragile);
   Fn->setDebugScope(new (SILMod) SILDebugScope(loc, Fn));
   TUState.ForwardRefFns[Name] = { Fn, IgnoreFwdRef ? SourceLoc() : Loc };
   TUState.Diags = &P.Diags;

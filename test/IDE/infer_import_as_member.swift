@@ -1,11 +1,12 @@
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=InferImportAsMember -always-argument-labels -enable-infer-import-as-member > %t.printed.A.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/custom-modules/CollisionImportAsMember.h -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=InferImportAsMember -always-argument-labels -enable-infer-import-as-member > %t.printed.A.txt
+// RUN: %target-swift-frontend -parse -import-objc-header %S/Inputs/custom-modules/CollisionImportAsMember.h -I %t -I %S/Inputs/custom-modules %s -enable-infer-import-as-member -verify
 // RUN: FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
 
 import InferImportAsMember
+let mine = IAMStruct1()
 
 // TODO: more cases, eventually exhaustive, as we start inferring the result we
 // want
-
 
 // PRINT-LABEL: struct IAMStruct1 {
 // PRINT-NEXT:    var x: Double
@@ -25,10 +26,8 @@ import InferImportAsMember
 // PRINT-NEXT:    init(specialLabel specialLabel: ())
 //
 // PRINT-LABEL:   /// Methods
-// PRINT-NEXT:    @discardableResult
 // PRINT-NEXT:    func invert() -> IAMStruct1
 // PRINT-NEXT:    mutating func invertInPlace()
-// PRINT-NEXT:    @discardableResult
 // PRINT-NEXT:    func rotate(radians radians: Double) -> IAMStruct1
 // PRINT-NEXT:    func selfComesLast(x x: Double)
 // PRINT-NEXT:    func selfComesThird(a a: Double, b b: Float, x x: Double)
@@ -40,34 +39,27 @@ import InferImportAsMember
 // PRINT-NEXT:    var length: Double
 //
 // PRINT-LABEL:   /// Various instance functions that can't quite be imported as properties.
-// PRINT-NEXT:    @discardableResult
 // PRINT-NEXT:    func getNonPropertyNumParams() -> Float
 // PRINT-NEXT:    func setNonPropertyNumParams(a a: Float, b b: Float)
-// PRINT-NEXT:    @discardableResult
 // PRINT-NEXT:    func getNonPropertyType() -> Float
 // PRINT-NEXT:    func setNonPropertyType(x x: Double)
-// PRINT-NEXT:    @discardableResult
 // PRINT-NEXT:    func getNonPropertyNoSelf() -> Float
 // PRINT-NEXT:    static func setNonPropertyNoSelf(x x: Double, y y: Double)
 // PRINT-NEXT:    func setNonPropertyNoGet(x x: Double)
+// PRINT-NEXT:    func setNonPropertyExternalCollision(x x: Double)
 //
 // PRINT-LABEL:   /// Various static functions that can't quite be imported as properties.
-// PRINT-NEXT:    @discardableResult
 // PRINT-NEXT:    static func staticGetNonPropertyNumParams() -> Float
 // PRINT-NEXT:    static func staticSetNonPropertyNumParams(a a: Float, b b: Float)
 // PRINT-NEXT:    static func staticGetNonPropertyNumParamsGetter(d d: Double)
-// PRINT-NEXT:    @discardableResult
 // PRINT-NEXT:    static func staticGetNonPropertyType() -> Float
 // PRINT-NEXT:    static func staticSetNonPropertyType(x x: Double)
-// PRINT-NEXT:    @discardableResult
 // PRINT-NEXT:    static func staticGetNonPropertyNoSelf() -> Float
 // PRINT-NEXT:    static func staticSetNonPropertyNoSelf(x x: Double, y y: Double)
 // PRINT-NEXT:    static func staticSetNonPropertyNoGet(x x: Double)
 //
 // PRINT-LABEL:   /// Static method
-// PRINT-NEXT:    @discardableResult
 // PRINT-NEXT:    static func staticMethod() -> Double
-// PRINT-NEXT:    @discardableResult
 // PRINT-NEXT:    static func tlaThreeLetterAcronym() -> Double
 //
 // PRINT-LABEL:   /// Static computed properties
@@ -75,7 +67,6 @@ import InferImportAsMember
 // PRINT-NEXT:    static var staticOnlyProperty: Double { get }
 //
 // PRINT-LABEL:   /// Omit needless words
-// PRINT-NEXT:    @discardableResult
 // PRINT-NEXT:    static func onwNeedlessTypeArgLabel(_ Double: Double) -> Double
 //
 // PRINT-LABEL:   /// Fuzzy
@@ -84,7 +75,6 @@ import InferImportAsMember
 // PRINT-NEXT:    init(fuzzyName fuzzyName: ())
 // PRINT-NEXT:  }
 //
-// PRINT-NEXT:  @discardableResult
 // PRINT-NEXT:  func __IAMStruct1IgnoreMe(_ s: IAMStruct1) -> Double
 //
 // PRINT-LABEL: /// Mutable

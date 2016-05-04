@@ -378,6 +378,14 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     wasSpecialized = true;
   }
 
+  // If we're in top-level code, we don't need to physically capture script
+  // globals, but we still need to mark them as escaping so that DI can flag
+  // uninitialized uses.
+  if (this == SGM.TopLevelSGF) {
+    SGM.emitMarkFunctionEscapeForTopLevelCodeGlobals(loc,
+                                                   TheClosure.getCaptureInfo());
+  }
+
   if (!TheClosure.getCaptureInfo().hasLocalCaptures() && !wasSpecialized) {
     auto result = ManagedValue::forUnmanaged(functionRef);
     return emitOrigToSubstValue(loc, result,

@@ -528,6 +528,14 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     return InfoMap;
   }
 
+  static bool isEnumRawType(const Decl* D, TypeLoc TL) {
+    assert (TL.getType());
+    if (auto ED = dyn_cast<EnumDecl>(D)) {
+      return ED->hasRawType() && ED->getRawType()->isEqual(TL.getType());
+    }
+    return false;
+  }
+
   std::unique_ptr<ExtensionInfoMap>
   collectSynthesizedExtensionInfo(MergeGroupVector &AllGroups) {
     if (Target->getKind() == DeclKind::Protocol) {
@@ -544,7 +552,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       }
     };
     for (auto TL : Target->getInherited()) {
-      addTypeLocNominal(TL);
+      if (!isEnumRawType(Target, TL))
+        addTypeLocNominal(TL);
     }
     while (!Unhandled.empty()) {
       NominalTypeDecl* Back = Unhandled.back();
@@ -558,7 +567,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
           MergeInfoMap.insert({E, Pair.second});
         }
         for (auto TL : Back->getInherited()) {
-          addTypeLocNominal(TL);
+          if (!isEnumRawType(Target, TL))
+            addTypeLocNominal(TL);
         }
       }
     }

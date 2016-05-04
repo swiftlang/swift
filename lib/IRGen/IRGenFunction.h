@@ -54,6 +54,10 @@ namespace swift {
   class Substitution;
   class ValueDecl;
   class VarDecl;
+
+namespace Lowering {
+  class TypeConverter;
+}
   
 namespace irgen {
   class Explosion;
@@ -76,6 +80,9 @@ public:
   IRBuilder Builder;
 
   llvm::Function *CurFn;
+  ModuleDecl *getSwiftModule() const;
+  SILModule &getSILModule() const;
+  Lowering::TypeConverter &getSILTypes() const;
 
   IRGenFunction(IRGenModule &IGM, llvm::Function *fn,
                 const SILDebugScope *DbgScope = nullptr,
@@ -223,6 +230,7 @@ private:
 public:
   llvm::Value *emitUnmanagedAlloc(const HeapLayout &layout,
                                   const llvm::Twine &name,
+                                  llvm::Constant *captureDescriptor,
                                   const HeapNonFixedOffsets *offsets = 0);
 
   // Functions that don't care about the reference-counting style.

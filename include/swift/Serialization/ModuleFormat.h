@@ -415,6 +415,7 @@ namespace control_block {
     METADATA, // ID
     BCFixed<16>, // Module format major version
     BCFixed<16>, // Module format minor version
+    BCVBR<8>, // length of "short version string" in the blob
     BCBlob // misc. version information
   >;
 

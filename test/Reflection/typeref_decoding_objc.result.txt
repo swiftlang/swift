@@ -11,14 +11,18 @@ nsString: __ObjC.NSString
 cfString: __ObjC.CFString
 (class __ObjC.CFString)
 
+aBlock: @convention(block) () -> ()
+(function convention=block
+  (tuple))
+
 TypesToReflect.GenericOC
 ------------------------
 ocnss: TypesToReflect.GenericOC<__ObjC.NSString>
-(bound-generic class TypesToReflect.GenericOC
+(bound_generic_class TypesToReflect.GenericOC
   (class __ObjC.NSString))
 
 occfs: TypesToReflect.GenericOC<__ObjC.CFString>
-(bound-generic class TypesToReflect.GenericOC
+(bound_generic_class TypesToReflect.GenericOC
   (class __ObjC.CFString))
 
 
@@ -41,4 +45,46 @@ ASSOCIATED TYPES:
 
 BUILTIN TYPES:
 ==============
+
+CAPTURE DESCRIPTORS:
+====================
+- Capture types:
+(struct Swift.StaticString)
+(struct Swift.StaticString)
+(struct Swift.UInt)
+(struct Swift.UInt)
+- Metadata sources:
+
+- Capture types:
+- Metadata sources:
+!!! Invalid typeref
+!!! Invalid matadata source
+
+- Capture types:
+(struct Swift.StaticString)
+(bound_generic_struct Swift.UnsafeBufferPointer
+  (struct Swift.UInt8))
+(struct Swift.UInt)
+(struct Swift.UInt)
+- Metadata sources:
+
+- Capture types:
+- Metadata sources:
+!!! Invalid typeref
+!!! Invalid matadata source
+
+- Capture types:
+(bound_generic_struct Swift.UnsafeBufferPointer
+  (struct Swift.UInt8))
+(bound_generic_struct Swift.UnsafeBufferPointer
+  (struct Swift.UInt8))
+(struct Swift.UInt)
+(struct Swift.UInt)
+- Metadata sources:
+
+- Capture types:
+- Metadata sources:
+!!! Invalid typeref
+!!! Invalid matadata source
+
 

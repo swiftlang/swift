@@ -24,6 +24,7 @@
 #include "swift/Driver/Job.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/FrontendTool/FrontendTool.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Errno.h"
@@ -48,9 +49,6 @@ std::string getExecutablePath(const char *FirstArg) {
   void *P = (void *)(intptr_t)getExecutablePath;
   return llvm::sys::fs::getMainExecutable(FirstArg, P);
 }
-
-extern int frontend_main(ArrayRef<const char *> Args, const char *Argv0,
-                         void *MainAddr);
 
 /// Run 'swift-autolink-extract'.
 extern int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
@@ -155,9 +153,9 @@ int main(int argc_, const char **argv_) {
   if (argv.size() > 1){
     StringRef FirstArg(argv[1]);
     if (FirstArg == "-frontend") {
-      return frontend_main(llvm::makeArrayRef(argv.data()+2,
-                                              argv.data()+argv.size()),
-                           argv[0], (void *)(intptr_t)getExecutablePath);
+      return performFrontend(llvm::makeArrayRef(argv.data()+2,
+                                                argv.data()+argv.size()),
+                             argv[0], (void *)(intptr_t)getExecutablePath);
     }
     if (FirstArg == "-modulewrap") {
       return modulewrap_main(llvm::makeArrayRef(argv.data()+2,

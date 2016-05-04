@@ -113,6 +113,9 @@ public:
     ScalarToTuple,
     /// \brief The load of an lvalue.
     Load,
+    /// The requirement that we're matching during protocol conformance
+    /// checking.
+    Requirement,
     /// The candidate witness during protocol conformance checking.
     Witness,
     /// This is referring to a type produced by opening a generic type at the
@@ -146,6 +149,7 @@ public:
     case ArrayElementType:
     case ScalarToTuple:
     case Load:
+    case Requirement:
     case Witness:
     case OpenedGeneric:
       return 0;
@@ -210,6 +214,7 @@ public:
     case InterpolationArgument:
     case NamedTupleElement:
     case TupleElement:
+    case Requirement:
     case Witness:
       return IsNotSimple;
     }
@@ -225,7 +230,7 @@ public:
     /// \brief Describes the kind of data stored here.
     enum StoredKind : unsigned char {
       StoredArchetype,
-      StoredAssociatedType,
+      StoredRequirement,
       StoredWitness,
       StoredKindAndValue
     };
@@ -293,15 +298,17 @@ public:
 
     PathElement(PathElementKind kind, ValueDecl *decl)
       : storage((reinterpret_cast<uintptr_t>(decl) >> 2)),
-        storedKind(StoredWitness)
+        storedKind(kind == Witness ? StoredWitness : StoredRequirement)
     {
-      assert(kind == Witness && "Not a witness element");
-      assert(getWitness() == decl);
+      assert((kind == Witness || kind == Requirement) &&
+             "Not a witness element");
+      assert(((kind == Requirement && getRequirement() == decl) ||
+              (kind == Witness && getWitness() == decl)));
     }
 
     PathElement(AssociatedTypeDecl *decl)
       : storage((reinterpret_cast<uintptr_t>(decl) >> 2)),
-        storedKind(StoredAssociatedType)
+        storedKind(StoredRequirement)
     {
       assert(getAssociatedType() == decl);
     }
@@ -342,8 +349,9 @@ public:
       case StoredArchetype:
         return Archetype;
 
-      case StoredAssociatedType:
-        return AssociatedType;
+      case StoredRequirement:
+        return isa<AssociatedTypeDecl>(getRequirement()) ? AssociatedType
+                                                         : Requirement;
 
       case StoredWitness:
         return Witness;
@@ -390,7 +398,14 @@ public:
       return reinterpret_cast<ArchetypeType *>(storage << 2);
     }
 
-      /// Retrieve the declaration for an associated type path element.
+    /// Retrieve the declaration for a requirement path element.
+    ValueDecl *getRequirement() const {
+      assert((static_cast<StoredKind>(storedKind) == StoredRequirement) &&
+             "Is not a requirement");
+      return reinterpret_cast<ValueDecl *>(storage << 2);
+    }
+
+    /// Retrieve the declaration for an associated type path element.
     AssociatedTypeDecl *getAssociatedType() const {
       assert(getKind() == AssociatedType && "Is not an associated type");
       return reinterpret_cast<AssociatedTypeDecl *>(storage << 2);
@@ -590,6 +605,25 @@ public:
 
   /// Attempt to simplify this locator to a single expression.
   Expr *trySimplifyToExpr() const;
+
+  /// Retrieve the last element in the path, if there is one.
+  Optional<LocatorPathElt> last() const {
+    // If we stored a path element here, grab it.
+    if (element) return *element;
+
+    // Otherwise, look in the previous builder if there is one.
+    if (auto prevBuilder = previous.dyn_cast<ConstraintLocatorBuilder *>())
+      return prevBuilder->last();
+
+    // Next, check the constraint locator itself.
+    if (auto locator = previous.dyn_cast<ConstraintLocator *>()) {
+      auto path = locator->getPath();
+      if (path.empty()) return None;
+      return path.back();
+    }
+
+    return None;
+  }
 };
 
 } } // end namespace swift::constraints

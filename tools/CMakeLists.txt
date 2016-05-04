@@ -1,6 +1,7 @@
 add_subdirectory(driver)
 add_subdirectory(sil-opt)
 add_subdirectory(swift-ide-test)
+add_subdirectory(swift-remoteast-test)
 add_subdirectory(swift-demangle)
 add_subdirectory(lldb-moduleimport-test)
 add_subdirectory(sil-extract)

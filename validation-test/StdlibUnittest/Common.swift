@@ -576,6 +576,24 @@ AssertionsTestSuite.test("UnexpectedCrash/NullPointerDereference") {
 // CHECK: the test crashed unexpectedly
 // CHECK: [     FAIL ] Assertions.UnexpectedCrash/NullPointerDereference
 
+AssertionsTestSuite.test("expectTrapping(_: Bound, in: RangeProtocol)") {
+  expectTrapping(0, in: 1..<10)
+}
+// CHECK: [ RUN      ] Assertions.expectTrapping(_: Bound, in: RangeProtocol)
+// CHECK-NEXT: stdout>>> check failed at {{.*}}.swift, line [[@LINE-3]]
+// CHECK: stdout>>> 0 in 1..<10{{$}}
+// CHECK: the test crashed unexpectedly
+// CHECK: [     FAIL ] Assertions.expectTrapping(_: Bound, in: RangeProtocol)
+
+AssertionsTestSuite.test("expectTrapping(_: RangeProtocol, in: RangeProtocol)") {
+  expectTrapping(0..<5, in: 1..<10)
+}
+// CHECK: [ RUN      ] Assertions.expectTrapping(_: RangeProtocol, in: RangeProtocol)
+// CHECK-NEXT: stdout>>> check failed at {{.*}}.swift, line [[@LINE-3]]
+// CHECK: stdout>>> 0..<5 in 1..<10{{$}}
+// CHECK: the test crashed unexpectedly
+// CHECK: [     FAIL ] Assertions.expectTrapping(_: RangeProtocol, in: RangeProtocol)
+
 var TestSuiteLifetimeTracked = TestSuite("TestSuiteLifetimeTracked")
 var leakMe: LifetimeTracked? = nil
 TestSuiteLifetimeTracked.test("failsIfLifetimeTrackedAreLeaked") {

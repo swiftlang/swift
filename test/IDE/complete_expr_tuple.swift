@@ -36,7 +36,7 @@ func testTupleNoDot1() {
 // TUPLE_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: < {#(Int, Double)#}[#Bool#]{{; name=.+$}}
 // TUPLE_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: != {#(Int, Double)#}[#Bool#]{{; name=.+$}}
 // TUPLE_NO_DOT_1-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: > {#(Int, Double)#}[#Bool#]{{; name=.+$}}
-// TUPLE_NO_DOT_1-DAG: Pattern/None:                                   = {#(Int, Double)#}[#Void#]{{; name=.+$}}
+// TUPLE_NO_DOT_1-DAG: BuiltinOperator/None:                                   = {#(Int, Double)#}[#Void#]{{; name=.+$}}
 // TUPLE_NO_DOT_1-NEXT: End completions
 
 func testTupleNoDot2() {
@@ -52,7 +52,7 @@ func testTupleNoDot2() {
 // TUPLE_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: < {#(Int, Double)#}[#Bool#]{{; name=.+$}}
 // TUPLE_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: != {#(Int, Double)#}[#Bool#]{{; name=.+$}}
 // TUPLE_NO_DOT_2-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: > {#(Int, Double)#}[#Bool#]{{; name=.+$}}
-// TUPLE_NO_DOT_2-DAG: Pattern/None:                                   = {#(foo: Int, bar: Double)#}[#Void#]{{; name=.+$}}
+// TUPLE_NO_DOT_2-DAG: BuiltinOperator/None:                                   = {#(foo: Int, bar: Double)#}[#Void#]{{; name=.+$}}
 // TUPLE_NO_DOT_2-NEXT: End completions
 
 func testTupleNoDot3() {
@@ -68,7 +68,7 @@ func testTupleNoDot3() {
 // TUPLE_NO_DOT_3-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: < {#(Int, Double)#}[#Bool#]{{; name=.+$}}
 // TUPLE_NO_DOT_3-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: != {#(Int, Double)#}[#Bool#]{{; name=.+$}}
 // TUPLE_NO_DOT_3-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: > {#(Int, Double)#}[#Bool#]{{; name=.+$}}
-// TUPLE_NO_DOT_3-DAG: Pattern/None:                                   = {#(foo: Int, Double)#}[#Void#]{{; name=.+$}}
+// TUPLE_NO_DOT_3-DAG: BuiltinOperator/None:                                   = {#(foo: Int, Double)#}[#Void#]{{; name=.+$}}
 // TUPLE_NO_DOT_3-NEXT: End completions
 
 func testTupleDot1() {

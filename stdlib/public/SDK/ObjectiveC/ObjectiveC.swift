@@ -149,7 +149,7 @@ extension Selector : CustomStringConvertible {
     if name == nil {
       return "<NULL>"
     }
-    return String(cString: name)
+    return String(cString: name!)
   }
 }
 

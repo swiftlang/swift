@@ -875,18 +875,15 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       }
     }
 
+    // Don't deduce IUO types.
     Type alternateType;
-    ASTContext &ctx = cs.getTypeChecker().Context;
-    if (!ctx.LangOpts.InferIUOs) {
-      // Don't deduce IUO types.
-      if (kind == AllowedBindingKind::Supertypes &&
-          constraint->getKind() >= ConstraintKind::Conversion &&
-          constraint->getKind() <= ConstraintKind::OperatorArgumentConversion) {
-        if (auto objectType =
-            cs.lookThroughImplicitlyUnwrappedOptionalType(type)) {
-          type = OptionalType::get(objectType);
-          alternateType = objectType;
-        }
+    if (kind == AllowedBindingKind::Supertypes &&
+        constraint->getKind() >= ConstraintKind::Conversion &&
+        constraint->getKind() <= ConstraintKind::OperatorArgumentConversion) {
+      if (auto objectType =
+          cs.lookThroughImplicitlyUnwrappedOptionalType(type)) {
+        type = OptionalType::get(objectType);
+        alternateType = objectType;
       }
     }
 

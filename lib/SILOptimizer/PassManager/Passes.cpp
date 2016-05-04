@@ -238,6 +238,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.addDCE();
 
   PM.addEarlyCodeMotion();
+  PM.addReleaseHoisting();
   PM.addARCSequenceOpts();
 
   PM.addSimplifyCFG();
@@ -249,6 +250,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   } else
     PM.addEarlyCodeMotion();
 
+  PM.addRetainSinking();
   PM.addARCSequenceOpts();
   PM.addRemovePins();
 }
@@ -379,6 +381,10 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // Remove dead code.
   PM.addDCE();
   PM.addSimplifyCFG();
+
+  // Try to hoist all releases, including epilogue releases. This should be
+  // after FSO.
+  PM.addLateReleaseHoisting();
 
   PM.runOneIteration();
 

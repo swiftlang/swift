@@ -140,14 +140,15 @@ public:
   unsigned HasValueNamesSetting : 1;
   unsigned ValueNames : 1;
 
-  /// Only strip the field names section from nominal type field metadata.
-  unsigned StripReflectionNames : 1;
+  /// Emit nominal type field metadata.
+  unsigned EnableReflectionMetadata : 1;
 
-  /// Strip all nominal type field metadata.
-  unsigned StripReflectionMetadata : 1;
+  /// Emit names of struct stored properties and enum cases.
+  unsigned EnableReflectionNames : 1;
 
-  /// List of backend command-line options for -embed-bitcode.
-  std::vector<uint8_t> CmdArgs;
+  /// Emit metadata for certain builtin types. Only for use by
+  /// standard library.
+  unsigned EnableReflectionBuiltins : 1;
 
   /// Should we try to build incrementally by not emitting an object file if it
   /// has the same IR hash as the module that we are preparing to emit?
@@ -155,6 +156,12 @@ public:
   /// This is a debugging option meant to make it easier to perform compile time
   /// measurements on a non-clean build directory.
   unsigned UseIncrementalLLVMCodeGen : 1;
+
+  /// Enable use of the swiftcall calling convention.
+  unsigned UseSwiftCall : 1;
+
+  /// List of backend command-line options for -embed-bitcode.
+  std::vector<uint8_t> CmdArgs;
 
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
                    Optimize(false), Sanitize(SanitizerKind::None),
@@ -165,8 +172,10 @@ public:
                    EmitStackPromotionChecks(false), GenerateProfile(false),
                    PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
                    HasValueNamesSetting(false), ValueNames(false),
-                   StripReflectionNames(true), StripReflectionMetadata(true),
-                   CmdArgs(), UseIncrementalLLVMCodeGen(true)
+                   EnableReflectionMetadata(false), EnableReflectionNames(false),
+                   EnableReflectionBuiltins(false),
+                   UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
+                   CmdArgs()
                    {}
 
   /// Gets the name of the specified output filename.

@@ -20,11 +20,13 @@ extension CGColor {
   @objc subscript(x: Int) -> CGFloat { return 0 } // expected-error{{method cannot be marked @objc because Core Foundation types are not classes in Objective-C}}
 }
 
-@objc protocol Foo { func foo() }
+@objc protocol Foo {
+  func foo() // expected-note{{satisfying requirement for instance method 'foo()' in protocol 'Foo'}}
+}
 
 // CHECK-LABEL: extension CGColor : Foo
 extension CGColor: Foo { // expected-error{{Core Foundation class 'CGColor' cannot conform to @objc protocol 'Foo' because Core Foundation types are not classes in Objective-C}}
   // CHECK-LABEL: {{^}} func foo()
-  func foo() {}
+  func foo() {} // expected-error{{method cannot be an implementation of an @objc requirement because Core Foundation types are not classes in Objective-C}}
 }
 

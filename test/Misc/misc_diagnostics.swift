@@ -99,14 +99,11 @@ func test17875634() {
   var col = 2
   var coord = (row, col)
 
-  match += (1, 2) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
-  // expected-note @-1 {{overloads for '+=' exist with these partially matching parameter lists:}}
-  
-  match += (row, col) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
-  // expected-note @-1 {{overloads for '+=' exist with these partially matching parameter lists:}}
+  match += (1, 2) // expected-error{{argument type '(Int, Int)' does not conform to expected type 'Sequence'}}
 
-  match += coord // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
-  // expected-note @-1 {{overloads for '+=' exist with these partially matching parameter lists:}}
+  match += (row, col) // expected-error{{argument type '(@lvalue Int, @lvalue Int)' does not conform to expected type 'Sequence'}}
+
+  match += coord // expected-error{{argument type '@lvalue (Int, Int)' does not conform to expected type 'Sequence'}}
 
   match.append(row, col) // expected-error{{extra argument in call}}
 
@@ -128,7 +125,7 @@ func test17875634() {
 
 // <rdar://problem/20770032> Pattern matching ranges against tuples crashes the compiler
 func test20770032() {
-  if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}} expected-error{{expression pattern of type 'Range<Int>' cannot match values of type '(Int, Int)'}}
+  if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}} expected-error{{expression pattern of type 'CountableClosedRange<Int>' cannot match values of type '(Int, Int)'}}
   }
 }
 

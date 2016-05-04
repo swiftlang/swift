@@ -190,9 +190,9 @@ func testProtocols(_ b: B, bp: BProto) {
   bp2 = b.getAsProto()
 
   var c1 : Cat1Proto = b
-  var bcat1 = b.getAsProtoWithCat()
+  var bcat1 = b.getAsProtoWithCat()!
   c1 = bcat1
-  bcat1 = c1 // expected-error{{cannot assign value of type 'Cat1Proto' to type 'protocol<BProto, Cat1Proto>!'}}
+  bcat1 = c1 // expected-error{{value of type 'Cat1Proto' does not conform to 'protocol<BProto, Cat1Proto>' in assignment}}
 }
 
 // Methods only defined in a protocol
@@ -261,16 +261,17 @@ func classAnyObject(_ obj: NSObject) {
 }
 
 // Protocol conformances
-class Wobbler : NSWobbling { // expected-note{{candidate is not '@objc', but protocol requires it}} {{7-7=@objc }}
-  // expected-error@-1{{type 'Wobbler' does not conform to protocol 'NSWobbling'}}
+class Wobbler : NSWobbling { // expected-note{{candidate has non-matching type '()'}}
   @objc func wobble() { }
-  func returnMyself() -> Self { return self } // expected-note{{candidate is not '@objc', but protocol requires it}} {{3-3=@objc }}
+
+  func returnMyself() -> Self { return self } // expected-error{{non-'@objc' method 'returnMyself()' does not satisfy requirement of '@objc' protocol 'NSWobbling'}}{{3-3=@objc }}
+  // expected-error@-1{{method cannot be an implementation of an @objc requirement because its result type cannot be represented in Objective-C}}
 }
 
 extension Wobbler : NSMaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'NSMaybeInitWobble'}}
 }
 
-@objc class Wobbler2 : NSObject, NSWobbling { // expected-note{{Objective-C method 'init' provided by implicit initializer 'init()' does not match the requirement's selector ('initWithWobble:')}}
+@objc class Wobbler2 : NSObject, NSWobbling { // expected-note{{candidate has non-matching type '()'}}
   func wobble() { }
   func returnMyself() -> Self { return self }
 }
@@ -321,12 +322,12 @@ func testDynamicSelf(_ queen: Bee, wobbler: NSWobbling) {
   hive = hive1
 
   // Instance method with instancetype result.
-  var hive2 = hive.visit()
+  var hive2 = hive!.visit()
   hive2 = hive
   hive = hive2
 
   // Instance method on a protocol with instancetype result.
-  var wobbler2 = wobbler.returnMyself()
+  var wobbler2 = wobbler.returnMyself()!
   var wobbler: NSWobbling = wobbler2
   wobbler2 = wobbler
 

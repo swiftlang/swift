@@ -54,7 +54,10 @@ OptionalTests.test("nil comparison") {
   }
 
   expectEqual("forced extraction: 1.", "forced extraction: \(x!).")
-  expectEqual("forced extraction use: 2.", "forced extraction use: \(x!.successor()).")
+  expectEqual(
+    "forced extraction use: 2.",
+    "forced extraction use: \(x!.advanced(by: 1))."
+  )
 }
 
 func testRelation(_ p: (Int?, Int?) -> Bool) -> [Bool] {
@@ -71,6 +74,50 @@ OptionalTests.test("Equatable") {
   expectEqual([true, false, false, false, false, true], testRelation(==))
   expectEqual([false, true, true, true, true, false], testRelation(!=))
   expectEqual([false, true, false, false, true, false], testRelation(<))
+}
+
+OptionalTests.test("CustomReflectable") {
+  // Test with a non-refcountable type.
+  do {
+    let value: OpaqueValue<Int>? = nil
+    var output = ""
+    dump(value, to: &output)
+    expectEqual("- nil\n", output)
+    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+  }
+  do {
+    let value: OpaqueValue<Int>? = OpaqueValue(1010)
+    var output = ""
+    dump(value, to: &output)
+    let expected =
+      "▿ Optional(StdlibUnittest.OpaqueValue<Swift.Int>(value: 1010, identity: 0))\n" +
+      "  ▿ some: StdlibUnittest.OpaqueValue<Swift.Int>\n" +
+      "    - value: 1010\n" +
+      "    - identity: 0\n"
+    expectEqual(expected, output)
+    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+  }
+  // Test with a reference type.
+  do {
+    let value: LifetimeTracked? = nil
+    var output = ""
+    dump(value, to: &output)
+    expectEqual("- nil\n", output)
+    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+  }
+  do {
+    let value: LifetimeTracked? = LifetimeTracked(1010)
+    var output = ""
+    dump(value, to: &output)
+    let expected =
+      "▿ Optional(1010)\n" +
+      "  ▿ some: 1010 #0\n" +
+      "    - value: 1010\n" +
+      "    - identity: 0\n" +
+      "    - serialNumber: 1\n"
+    expectEqual(expected, output)
+    expectEqual(.optional, Mirror(reflecting: value).displayStyle)
+  }
 }
 
 struct X {}
@@ -332,20 +379,6 @@ OptionalTests.test("Optional OutputStream") {
   expectEqual(String(optNoString), "Optional(main.TestNoString)")
   expectEqual(debugPrintStr(optNoString), "Optional(main.TestNoString)")
 
-  let iouNoString: TestNoString! = TestNoString()
-  // IUO directly conforms to CustomStringConvertible.
-  // Disabled pending SR-164
-  //   expectTrue(iouNoString is CustomStringConvertible)
-  expectTrue(canGenericCast(iouNoString, CustomStringConvertible.self))
-  expectFalse(iouNoString is Streamable)
-  expectFalse(canGenericCast(iouNoString, Streamable.self))
-  // CustomDebugStringConvertible conformance is a temporary hack.
-  // Disabled pending SR-164
-  //   expectTrue(iouNoString is CustomDebugStringConvertible)
-  expectTrue(canGenericCast(iouNoString, CustomDebugStringConvertible.self))
-  expectEqual(String(iouNoString), "main.TestNoString")
-  expectEqual(debugPrintStr(iouNoString), "main.TestNoString")
-
   let optString: TestString? = TestString()
   expectTrue(optString is CustomStringConvertible)
   expectTrue(canGenericCast(optString, CustomStringConvertible.self))
@@ -354,18 +387,6 @@ OptionalTests.test("Optional OutputStream") {
   expectEqual(String(TestString()), "AString")
   expectEqual(String(optString), "Optional(XString)")
   expectEqual(debugPrintStr(optString), "Optional(XString)")
-
-  let iouString: TestString! = TestString()
-  expectTrue(iouString is CustomStringConvertible)
-  expectTrue(canGenericCast(iouString, CustomStringConvertible.self))
-  // CustomDebugStringConvertible conformance is a temporary hack.
-  expectTrue(iouString is CustomDebugStringConvertible)
-  expectTrue(canGenericCast(iouString, CustomDebugStringConvertible.self))
-  expectEqual(String(iouString), "AString")
-  // FIXME: Ideally the debug output would be "XString", but a reasonable
-  // implementation of that behavior requires conditional conformance.
-  // (directly invoking debugPrint(Any) already works correctly).
-  expectEqual(debugPrintStr(iouString), "AString")
 
   let optStream: TestStream? = TestStream()
   expectTrue(optStream is Streamable)

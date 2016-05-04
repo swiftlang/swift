@@ -90,7 +90,9 @@ Algorithm.test("sorted/strings")
 
 // A wrapper around Array<T> that disables any type-specific algorithm
 // optimizations and forces bounds checking on.
-struct A<T> : MutableCollection {
+struct A<T> : MutableCollection, RandomAccessCollection {
+  typealias Indices = CountableRange<Int>
+
   init(_ a: Array<T>) {
     impl = a
   }
@@ -120,13 +122,13 @@ struct A<T> : MutableCollection {
 
   subscript(r: Range<Int>) -> Array<T>.SubSequence {
     get {
-      expectTrue(r.startIndex >= 0 && r.startIndex <= impl.count)
-      expectTrue(r.endIndex >= 0 && r.endIndex <= impl.count)
+      expectTrue(r.lowerBound >= 0 && r.lowerBound <= impl.count)
+      expectTrue(r.upperBound >= 0 && r.upperBound <= impl.count)
       return impl[r]
     }
     set (x) {
-      expectTrue(r.startIndex >= 0 && r.startIndex <= impl.count)
-      expectTrue(r.endIndex >= 0 && r.endIndex <= impl.count)
+      expectTrue(r.lowerBound >= 0 && r.lowerBound <= impl.count)
+      expectTrue(r.upperBound >= 0 && r.upperBound <= impl.count)
       impl[r] = x
     }
   }
@@ -147,7 +149,7 @@ Algorithm.test("invalidOrderings") {
   withInvalidOrderings {
     var a: A<Int>
     a = randomArray()
-    a.partition(isOrderedBefore: $0)
+    _ = a.partition(isOrderedBefore: $0)
   }
   /*
   // FIXME: Disabled due to <rdar://problem/17734737> Unimplemented:

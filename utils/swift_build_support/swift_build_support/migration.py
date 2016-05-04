@@ -17,40 +17,39 @@
 #
 # ----------------------------------------------------------------------------
 
+import subprocess
 
-def migrate_impl_args(argv, migrate_args):
+
+def parse_args(parser, argv):
     """
-    Given a list of arguments of the form:
+    Parse given argument list with given argparse.ArgumentParser.
 
-        --foo --bar=baz -- --flim=flam
+    Return a processed arguments object. Any unknown arguments are stored in
+    `build_script_impl_args` attribute as a list.
+    Ignores '--' to be compatible with old style argument list.
 
-    And a list of arguments to migrate, return a list in which the arguments
-    to migrate come before the '--' separator. For example, were we to migrate
-    '--flim', we would return:
-
-        --foo --bar=baz --flim=flam --
-
-    Note that we do not attempt to remove the '--' separator if it is no longer
-    necessary, nor do we replace '--flim' if it already appears before the
-    separator. In these cases, argparse "does the right thing": it can handle
-    a trailing separator, and when options that are specified twice argparse
-    uses the second value.
+        build-script -RT -- --reconfigure
     """
-    try:
-        split_index = argv.index('--')
-    except ValueError:
-        # If there is no separator, then we have nothing to migrate.
-        return argv
+    args, unknown_args = parser.parse_known_args(
+        list(arg for arg in argv if arg != '--'))
+    args.build_script_impl_args = unknown_args
+    return args
 
-    args = argv[:split_index]
-    impl_args = argv[split_index:]
-    impl_args_to_remove = []
-    for impl_arg in impl_args:
-        if impl_arg.split('=')[0] in migrate_args:
-            args.append(impl_arg)
-            impl_args_to_remove.append(impl_arg)
 
-    for impl_arg_to_remove in impl_args_to_remove:
-        impl_args.remove(impl_arg_to_remove)
+def check_impl_args(build_script_impl, argv):
+    """
+    Check whether given argv are all known arguments for `build-script-impl`.
 
-    return args + impl_args
+    Raise ValueError with message if any invalid argument is found.
+    Return nothing if success.
+    """
+    pipe = subprocess.Popen(
+        [build_script_impl, '--check-args-only=1'] + argv,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+
+    (_, err) = pipe.communicate()
+
+    if pipe.returncode != 0:
+        msg = str(err.splitlines()[0].decode())
+        raise ValueError(msg)

@@ -28,11 +28,14 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 STATISTIC(NumSunk, "Number of instructions sunk");
 STATISTIC(NumRefCountOpsSimplified, "Number of enum ref count ops simplified");
 STATISTIC(NumHoisted, "Number of instructions hoisted");
+
+llvm::cl::opt<bool> DisableSILRRCodeMotion("disable-sil-cm-rr-cm", llvm::cl::init(true));
 
 using namespace swift;
 
@@ -1719,11 +1722,12 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     Changed |= State.process();
 
     // Finally we try to sink retain instructions from this BB to the next BB.
-    Changed |= sinkRefCountIncrement(State.getBB(), AA, RCIA);
+    if (!DisableSILRRCodeMotion)
+      Changed |= sinkRefCountIncrement(State.getBB(), AA, RCIA);
 
     // And hoist decrements to predecessors. This is beneficial if we can then
     // match them up with an increment in some of the predecessors.
-    if (HoistReleases)
+    if (!DisableSILRRCodeMotion && HoistReleases)
       Changed |= hoistDecrementsToPredecessors(State.getBB(), AA, RCIA);
   }
 

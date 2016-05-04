@@ -1097,9 +1097,7 @@ private:
 public:
   /// Get the metadata kind.
   MetadataKind getKind() const {
-    if (metadataKindIsClass(Kind))
-      return MetadataKind::Class;
-    return MetadataKind(Kind);
+    return getEnumeratedMetadataKind(Kind);
   }
   
   /// Set the metadata kind.
@@ -1563,6 +1561,10 @@ struct TargetClassMetadata : public TargetHeapMetadata<Runtime> {
   /// that the type metadata header is present.
   StoredPointer Data;
 
+  static constexpr StoredPointer offsetToData() {
+    return offsetof(TargetClassMetadata, Data);
+  }
+
   /// Is this object a valid swift type metadata?
   bool isTypeMetadata() const {
     return (Data & 1);
@@ -1657,7 +1659,7 @@ public:
     Flags = flags;
   }
 
-  StoredPointer getInstanceSize() const {
+  StoredSize getInstanceSize() const {
     assert(isTypeMetadata());
     return InstanceSize;
   }
@@ -1752,29 +1754,79 @@ public:
 };
 using ClassMetadata = TargetClassMetadata<InProcess>;
 
+  /// A key-value pair in a TypeRef -> MetadataSource map.
+  struct GenericMetadataSource {
+    using Key = RelativeDirectPointer<const char>;
+    using Value = Key;
+
+    const Key MangledTypeName;
+    const Value EncodedMetadataSource;
+  };
+
+/// Describes the layout of a heap closure.
+///
+/// For simplicity's sake and other reasons, this shouldn't contain
+/// architecture-specifically sized things like direct pointers, uintptr_t, etc.
+///
+/// Following the CaptureDescriptor are:
+/// - a list of direct relative offsets to the mangled type names of the
+///   captures (these aren't in the DATA segment, however).
+/// - a list of GenericMetadataSource objects - each element is a pair of:
+///   - MangledTypeName (for a GenericTypeParameterTypeRef)
+///   - EncodedMetadataSource (an encoded string like TypeRefs, but describe
+///     the method of crawling to the metadata for that generic type parameter.
+struct CaptureDescriptor {
+public:
+
+  /// The number of captures in the closure and the number of typerefs that
+  /// immediately follow this struct.
+  const uint32_t NumCaptures;
+
+  /// The number of sources of metadata available in the MetadataSourceMap
+  /// directly following the list of capture's typerefs.
+  const uint32_t NumMetadataSources;
+
+  /// The number of items in the NecessaryBindings structure at the head of
+  /// the closure.
+  const uint32_t NumBindings;
+
+  /// Get the key-value pair for the ith generic metadata source.
+  const GenericMetadataSource &getGenericMetadataSource(size_t i) const {
+    assert(i <= NumMetadataSources &&
+           "Generic metadata source index out of range");
+    auto Begin = getGenericMetadataSourceBuffer();
+    return Begin[i];
+  }
+
+  /// Get the typeref (encoded as a mangled type name) of the ith
+  /// closure capture.
+  const RelativeDirectPointer<const char> &
+  getCaptureMangledTypeName(size_t i) const {
+    assert(i <= NumCaptures && "Capture index out of range");
+    auto Begin = getCaptureTypeRefBuffer();
+    return Begin[i];
+  }
+
+private:
+  const GenericMetadataSource *getGenericMetadataSourceBuffer() const {
+    auto BeginTR = reinterpret_cast<const char *>(getCaptureTypeRefBuffer());
+    auto EndTR = BeginTR + NumCaptures * sizeof(GenericMetadataSource);
+    return reinterpret_cast<const GenericMetadataSource *>(EndTR);
+  }
+
+  const RelativeDirectPointer<const char> *getCaptureTypeRefBuffer() const {
+    return reinterpret_cast<const RelativeDirectPointer<const char> *>(this+1);
+  }
+};
+
 /// The structure of metadata for heap-allocated local variables.
 /// This is non-type metadata.
-///
-/// It would be nice for tools to be able to dynamically discover the
-/// type of a heap-allocated local variable.  This should not require
-/// us to aggressively produce metadata for the type, though.  The
-/// obvious solution is to simply place the mangling of the type after
-/// the variable metadata.
-///
-/// One complication is that, in generic code, we don't want something
-/// as low-priority (sorry!) as the convenience of tools to force us
-/// to generate per-instantiation metadata for capturing variables.
-/// In these cases, the heap-destructor function will be using
-/// information stored in the allocated object (rather than in
-/// metadata) to actually do the work of destruction, but even then,
-/// that information needn't be metadata for the actual variable type;
-/// consider the case of local variable of type (T, Int).
-///
-/// Anyway, that's all something to consider later.
 template <typename Runtime>
 struct TargetHeapLocalVariableMetadata
   : public TargetHeapMetadata<Runtime> {
-  // No extra fields for now.
+  using StoredPointer = typename Runtime::StoredPointer;
+  uint32_t OffsetToFirstCapture;
+  TargetPointer<Runtime, CaptureDescriptor> CaptureDescription;
 };
 using HeapLocalVariableMetadata
   = TargetHeapLocalVariableMetadata<InProcess>;
@@ -1845,6 +1897,9 @@ struct TargetForeignTypeMetadata : public TargetMetadata<Runtime> {
   };
 
   struct HeaderType : HeaderPrefix, TypeMetadataHeader {};
+
+  static constexpr int OffsetToName =
+    (int) offsetof(HeaderType, Name) - (int) sizeof(HeaderType);
 
   TargetPointer<Runtime, const char> getName() const {
     return reinterpret_cast<TargetPointer<Runtime, const char>>(
@@ -2048,7 +2103,7 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   // TODO: Make this target agnostic
   using Argument = FlaggedPointer<const TargetMetadata<Runtime> *, 0>;
 
-  TargetFunctionTypeFlags<Runtime> Flags;
+  TargetFunctionTypeFlags<StoredSize> Flags;
 
   /// The type metadata for the result type.
   ConstTargetMetadataPointer<Runtime, TargetMetadata> ResultType;
@@ -2119,12 +2174,12 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
     }
   };
 
-  TargetPointer<Runtime, Element> getElements() {
-    return reinterpret_cast<TargetPointer<Runtime, Element>>(this + 1);
+  Element *getElements() {
+    return reinterpret_cast<Element*>(this + 1);
   }
 
-  TargetPointer<Runtime, const Element> getElements() const {
-    return reinterpret_cast<TargetPointer<Runtime, const Element>>(this + 1);
+  const Element *getElements() const {
+    return reinterpret_cast<const Element*>(this + 1);
   }
 
   const Element &getElement(unsigned i) const {

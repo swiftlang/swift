@@ -34,24 +34,27 @@ public:
     assert(this->Impl.getPointerSize && "No getPointerSize implementation");
     assert(this->Impl.getStringLength && "No stringLength implementation");
     assert(this->Impl.readBytes && "No readBytes implementation");
-    assert(this->Impl.getPointerSize() != 0 && "Invalid target pointer size");
+    assert(this->Impl.getPointerSize(this->Impl.reader_context) != 0 &&
+           "Invalid target pointer size");
   }
 
   uint8_t getPointerSize() override {
-    return Impl.getPointerSize();
+    return Impl.getPointerSize(Impl.reader_context);
   }
 
   uint8_t getSizeSize() override {
-    return Impl.getSizeSize();
+    return Impl.getSizeSize(Impl.reader_context);
   }
 
   RemoteAddress getSymbolAddress(const std::string &name) override {
-    auto addressData = Impl.getSymbolAddress(name.c_str(), name.size());
+    auto addressData = Impl.getSymbolAddress(Impl.reader_context,
+                                             name.c_str(), name.size());
     return RemoteAddress(addressData);
   }
 
   uint64_t getStringLength(RemoteAddress address) {
-    return Impl.getStringLength(address.getAddressData());
+    return Impl.getStringLength(Impl.reader_context,
+                                address.getAddressData());
   }
 
   bool readString(RemoteAddress address, std::string &dest) override {
@@ -68,7 +71,8 @@ public:
   }
 
   bool readBytes(RemoteAddress address, uint8_t *dest, uint64_t size) override {
-    return Impl.readBytes(address.getAddressData(), dest, size);
+    return Impl.readBytes(Impl.reader_context,
+                          address.getAddressData(), dest, size) != 0;
   }
 };
 

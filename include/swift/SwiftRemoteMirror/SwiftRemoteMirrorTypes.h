@@ -18,57 +18,75 @@
 #ifndef SWIFT_REMOTE_MIRROR_TYPES_H
 #define SWIFT_REMOTE_MIRROR_TYPES_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef uintptr_t swift_typeref_t;
 
-/// \brief Represents the __swift{n}_reflect section of an image.
-///
-/// If this section is virtually mapped, the following corresponding sections
-/// should also be mapped into the current address space:
-///
-/// __swift{n}_typeref
-/// --swift{n}_reflstr
-///
-/// where {n} is SWIFT_REFLECTION_VERSION_MAJOR.
-typedef struct swift_reflection_section_t {
+/// \brief Represents one of the Swift reflection sections of an image.
+typedef struct swift_reflection_section {
   void *Begin;
   void *End;
 } swift_reflection_section_t;
 
-/// The kind of a Swift type.
-typedef enum swift_layout_kind_t {
-  SWIFT_STRONG_POINTER,
-  SWIFT_WEAK_POINTER,
-  SWIFT_UNOWNED_POINTER,
-  SWIFT_UNMANAGED_POINTER,
-  SWIFT_STRUCT,
+/// \brief Represents the set of Swift reflection sections of an image.
+/// Not all sections may be present.
+typedef struct swift_reflection_info {
+  swift_reflection_section_t fieldmd;
+  swift_reflection_section_t builtin;
+  swift_reflection_section_t assocty;
+  swift_reflection_section_t capture;
+  swift_reflection_section_t typeref;
+  swift_reflection_section_t reflstr;
+} swift_reflection_info_t;
+
+/// The layout kind of a Swift type.
+typedef enum swift_layout_kind {
+  // Nothing is known about the size or contents of this value.
+  SWIFT_UNKNOWN,
+
+  // An opaque value with known size and alignment but no specific
+  // interpretation.
+  SWIFT_BUILTIN,
+
+  // Record types consisting of zero or more fields.
   SWIFT_TUPLE,
+  SWIFT_STRUCT,
   SWIFT_THICK_FUNCTION,
-  SWIFT_THIN_FUNCTION,
-  OBJC_BLOCK,
-  SWIFT_CLOSURE_CONTEXT,
-  SWIFT_BOX,
-  SWIFT_UNKNOWN
+  SWIFT_EXISTENTIAL,
+  SWIFT_CLASS_EXISTENTIAL,
+  SWIFT_EXISTENTIAL_METATYPE,
+  SWIFT_CLASS_INSTANCE,
+
+  // References to other objects in the heap.
+  SWIFT_STRONG_REFERENCE,
+  SWIFT_UNOWNED_REFERENCE,
+  SWIFT_WEAK_REFERENCE,
+  SWIFT_UNMANAGED_REFERENCE,
 } swift_layout_kind_t;
 
-/// A basic description of a Swift type's.
-typedef struct swift_typeinfo_t {
-  swift_layout_kind_t LayoutKind;
+struct swift_childinfo;
 
-  const char *MangledTypeName;
+/// A description of the memory layout of a type or field of a type.
+typedef struct swift_typeinfo {
+  swift_layout_kind_t Kind;
 
-  size_t Size;
-  size_t InstanceSize;
-  size_t Alignment;
+  unsigned Size;
+  unsigned Alignment;
+  unsigned Stride;
+
+  unsigned NumFields;
 } swift_typeinfo_t;
 
-typedef struct swift_childinfo_t {
-  swift_typeref_t TypeRef;
+typedef struct swift_childinfo {
+  /// The memory for Name is owned by the reflection context.
   const char *Name;
-  size_t Offset;
+  unsigned Offset;
+  swift_layout_kind_t Kind;
+  swift_typeref_t TR;
 } swift_childinfo_t;
 
 /// \brief An opaque pointer to a context which maintains state and

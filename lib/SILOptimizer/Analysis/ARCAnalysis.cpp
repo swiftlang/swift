@@ -234,7 +234,7 @@ static bool canTerminatorUseValue(TermInst *TI, SILValue Ptr,
 }
 
 
-bool swift::mayUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
+bool swift::mayHaveSymmetricInterference(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
   // Check whether releasing this value can call deinit and interfere with User.
   if (AA->mayValueReleaseInterfereWithInstruction(User, Ptr))
     return true;
@@ -340,7 +340,7 @@ valueHasARCUsesInInstructionRange(SILValue Op,
   // Otherwise, until Start != End.
   while (Start != End) {
     // Check if Start can use Op in an ARC relevant way. If so, return true.
-    if (mayUseValue(&*Start, Op, AA))
+    if (mayHaveSymmetricInterference(&*Start, Op, AA))
       return Start;
 
     // Otherwise, increment our iterator.
@@ -371,7 +371,7 @@ swift::valueHasARCUsesInReverseInstructionRange(SILValue Op,
   // Otherwise, until End == Start.
   while (Start != End) {
     // Check if Start can use Op in an ARC relevant way. If so, return true.
-    if (mayUseValue(&*End, Op, AA))
+    if (mayHaveSymmetricInterference(&*End, Op, AA))
       return End;
 
     // Otherwise, decrement our iterator.
@@ -649,7 +649,7 @@ findMatchingRetains(SILBasicBlock *BB) {
 ConsumedArgToEpilogueReleaseMatcher::
 ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCFI,
                                     SILFunction *F, ExitKind Kind)
-   : F(F), RCFI(RCFI), Kind(Kind) {
+   : F(F), RCFI(RCFI), Kind(Kind), ProcessedBlock(nullptr) {
   recompute();
 }
 
@@ -668,10 +668,10 @@ void ConsumedArgToEpilogueReleaseMatcher::recompute() {
   }
 
   if (BB == F->end()) {
-    HasBlock = false;
+    ProcessedBlock = nullptr;
     return;
   }
-  HasBlock = true;
+  ProcessedBlock = &*BB;
   findMatchingReleases(&*BB);
 }
 

@@ -3167,10 +3167,10 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       // Determine whether or not we want to provide an optional chaining fixit or
       // a force unwrap fixit.
       bool optionalChain;
-      if (!contextualType)
+      if (!getContextualType())
         optionalChain = !(Options & ConstraintSystemFlags::PreferForceUnwrapToOptional);
       else
-        optionalChain = !contextualType->getOptionalObjectType().isNull();
+        optionalChain = !getContextualType()->getOptionalObjectType().isNull();
       auto fixKind = optionalChain ? FixKind::OptionalChaining : FixKind::ForceOptional;
 
       // Note the fix.
@@ -3200,10 +3200,10 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // Determine whether or not we want to provide an optional chaining fixit or
     // a force unwrap fixit.
     bool optionalChain;
-    if (!contextualType)
+    if (!getContextualType())
       optionalChain = !(Options & ConstraintSystemFlags::PreferForceUnwrapToOptional);
     else
-      optionalChain = !contextualType->getOptionalObjectType().isNull();
+      optionalChain = !getContextualType()->getOptionalObjectType().isNull();
     auto fixKind = optionalChain ? FixKind::OptionalChaining : FixKind::ForceOptional;
 
     // Note the fix.

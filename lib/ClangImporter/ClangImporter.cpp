@@ -367,7 +367,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=1",
 
       // Request new APIs from libdispatch.
-      "-DSWIFT_SDK_OVERLAY_DISPATCH_EPOCH=1",
+      "-DSWIFT_SDK_OVERLAY_DISPATCH_EPOCH=0",
     });
 
     // Get the version of this compiler and pass it to
@@ -391,18 +391,15 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     // and is not included in the resource directory with the other implicit
     // module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
     SmallString<128> GlibcModuleMapPath;
-    if (!importerOpts.OverrideResourceDir.empty()) {
-      GlibcModuleMapPath = importerOpts.OverrideResourceDir;
-    } else if (!searchPathOpts.RuntimeResourcePath.empty()) {
-      GlibcModuleMapPath = searchPathOpts.RuntimeResourcePath;
-    }
+    GlibcModuleMapPath = searchPathOpts.RuntimeResourcePath;
 
     // Running without a resource directory is not a supported configuration.
     assert(!GlibcModuleMapPath.empty());
 
     llvm::sys::path::append(
       GlibcModuleMapPath,
-      swift::getPlatformNameForTriple(triple), triple.getArchName(),
+      swift::getPlatformNameForTriple(triple),
+      swift::getMajorArchitectureName(triple),
       "glibc.modulemap");
 
     // Only specify the module map if that file actually exists.
@@ -1213,6 +1210,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
     ImportForwardDeclarations(opts.ImportForwardDeclarations),
     InferImportAsMember(opts.InferImportAsMember),
     DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
+    HonorSwiftNewtypeAttr(opts.HonorSwiftNewtypeAttr),
     BridgingHeaderLookupTable(nullptr)
 {
   // Add filters to determine if a Clang availability attribute
@@ -2034,6 +2032,20 @@ static bool moduleIsInferImportAsMember(const clang::NamedDecl *decl,
   return false;
 }
 
+// If this decl is associated with a swift_newtype typedef, return it, otherwise
+// null
+static clang::TypedefNameDecl *findSwiftNewtype(const clang::Decl *decl,
+                                                bool honorSwiftNewtypeAttr) {
+  if (!honorSwiftNewtypeAttr) return nullptr;
+
+  if (auto varDecl = dyn_cast<clang::VarDecl>(decl))
+    if (auto typedefTy = varDecl->getType()->getAs<clang::TypedefType>())
+      if (typedefTy->getDecl()->hasAttr<clang::SwiftNewtypeAttr>())
+        return typedefTy->getDecl();
+
+  return nullptr;
+}
+
 auto ClangImporter::Implementation::importFullName(
        const clang::NamedDecl *D,
        ImportNameOptions options,
@@ -2068,8 +2080,11 @@ auto ClangImporter::Implementation::importFullName(
       result.EffectiveContext = enumDecl->getRedeclContext();
       break;
     }
+  // Import onto a swift_newtype if present
+  } else if (auto newtypeDecl = findSwiftNewtype(D, HonorSwiftNewtypeAttr)) {
+    result.EffectiveContext = newtypeDecl;
+  // Everything else goes into its redeclaration context.
   } else {
-    // Everything else goes into its redeclaration context.
     result.EffectiveContext = dc->getRedeclContext();
   }
 
@@ -2146,7 +2161,7 @@ auto ClangImporter::Implementation::importFullName(
 
     // Parse the name.
     ParsedDeclName parsedName = parseDeclName(nameAttr->getName());
-    if (!parsedName) return result;
+    if (!parsedName || parsedName.isOperator()) return result;
 
     // If we have an Objective-C method that is being mapped to an
     // initializer (e.g., a factory method whose name doesn't fit the
@@ -2538,6 +2553,24 @@ auto ClangImporter::Implementation::importFullName(
 
   // Omit needless words.
   StringScratchSpace omitNeedlessWordsScratch;
+
+  // swift_newtype-ed declarations may have common words with the type name
+  // stripped.
+  if (auto newtypeDecl = findSwiftNewtype(D, HonorSwiftNewtypeAttr)) {
+    // Skip a leading 'k' in a 'kConstant' pattern
+    if (baseName.size() >= 2 && baseName[0] == 'k' &&
+        clang::isUppercase(baseName[1]))
+      baseName.drop_front(1);
+
+    bool nonIdentifier = false;
+    auto pre =
+        getCommonWordPrefix(newtypeDecl->getName(), baseName, nonIdentifier);
+    if (pre.size()) {
+      baseName = baseName.drop_front(pre.size());
+      strippedPrefix = true;
+    }
+  }
+
   if (!result.isSubscriptAccessor()) {
     // Check whether the module in which the declaration resides has a
     // module prefix and will map into Swift as a type. If so, strip

@@ -1804,9 +1804,18 @@ static bool isBindableTo(Type a, Type b, LazyResolver *resolver) {
                  == substSubs[subi].getConformances().size());
           for (unsigned conformancei :
                  indices(origSubs[subi].getConformances())) {
-            if (origSubs[subi].getConformances()[conformancei]
-                  != substSubs[subi].getConformances()[conformancei])
-              return false;
+            // An abstract conformance can be bound to a concrete one.
+            // A concrete conformance may be bindable to a different
+            // specialization of the same root conformance.
+            auto origConf = origSubs[subi].getConformances()[conformancei],
+                 substConf = substSubs[subi].getConformances()[conformancei];
+            if (origConf.isConcrete()) {
+              if (!substConf.isConcrete())
+                return false;
+              if (origConf.getConcrete()->getRootNormalConformance()
+                   != substConf.getConcrete()->getRootNormalConformance())
+                return false;
+            }
           }
         }
         

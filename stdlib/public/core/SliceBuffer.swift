@@ -12,7 +12,7 @@
 
 /// Buffer type for `ArraySlice<Element>`.
 public // @testable
-struct _SliceBuffer<Element> : _ArrayBufferProtocol {
+struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   internal typealias NativeStorage = _ContiguousArrayStorage<Element>
   public typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
@@ -22,9 +22,9 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   ) {
     self.owner = owner
     self.subscriptBaseAddress = subscriptBaseAddress
-    self.startIndex = indices.startIndex
+    self.startIndex = indices.lowerBound
     let bufferFlag = UInt(hasNativeBuffer ? 1 : 0)
-    self.endIndexAndFlags = (UInt(indices.endIndex) << 1) | bufferFlag
+    self.endIndexAndFlags = (UInt(indices.upperBound) << 1) | bufferFlag
     _invariantCheck()
   }
 
@@ -97,8 +97,8 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
 
     _sanityCheck(native.count + growth <= native.capacity)
 
-    let start = subRange.startIndex - startIndex + hiddenElementCount
-    let end = subRange.endIndex - startIndex + hiddenElementCount
+    let start = subRange.lowerBound - startIndex + hiddenElementCount
+    let end = subRange.upperBound - startIndex + hiddenElementCount
     native.replace(
       subRange: start..<end,
       with: insertCount,
@@ -190,11 +190,11 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
     _invariantCheck()
-    _sanityCheck(bounds.startIndex >= startIndex)
-    _sanityCheck(bounds.endIndex >= bounds.startIndex)
-    _sanityCheck(bounds.endIndex <= endIndex)
+    _sanityCheck(bounds.lowerBound >= startIndex)
+    _sanityCheck(bounds.upperBound >= bounds.lowerBound)
+    _sanityCheck(bounds.upperBound <= endIndex)
     let c = bounds.count
-    target.initializeFrom(subscriptBaseAddress + bounds.startIndex, count: c)
+    target.initializeFrom(subscriptBaseAddress + bounds.lowerBound, count: c)
     return target + c
   }
 
@@ -273,9 +273,9 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
 
   public subscript(bounds: Range<Int>) -> _SliceBuffer {
     get {
-      _sanityCheck(bounds.startIndex >= startIndex)
-      _sanityCheck(bounds.endIndex >= bounds.startIndex)
-      _sanityCheck(bounds.endIndex <= endIndex)
+      _sanityCheck(bounds.lowerBound >= startIndex)
+      _sanityCheck(bounds.upperBound >= bounds.lowerBound)
+      _sanityCheck(bounds.upperBound <= endIndex)
       return _SliceBuffer(
         owner: owner,
         subscriptBaseAddress: subscriptBaseAddress,
@@ -291,16 +291,14 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
-  public
-  var startIndex: Int
+  public var startIndex: Int
 
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
-  public
-  var endIndex: Int {
+  /// `index(after:)`.
+  public var endIndex: Int {
     get {
       return Int(endIndexAndFlags >> 1)
     }
@@ -308,6 +306,8 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
       endIndexAndFlags = (UInt(newValue) << 1) | (_hasNativeBuffer ? 1 : 0)
     }
   }
+
+  public typealias Indices = CountableRange<Int>
 
   //===--- misc -----------------------------------------------------------===//
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the

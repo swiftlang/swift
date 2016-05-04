@@ -73,6 +73,9 @@ def disable_objc_interop :
   Flag<["-"], "disable-objc-interop">,
   HelpText<"Disable Objective-C interop code generation and config directives">;
 
+def enable_swiftcall : Flag<["-"], "enable-swiftcall">,
+  HelpText<"Enable the use of LLVM swiftcall support">;
+
 def enable_objc_attr_requires_foundation_module :
   Flag<["-"], "enable-objc-attr-requires-foundation-module">,
   HelpText<"Enable requiring uses of @objc to require importing the "
@@ -193,12 +196,13 @@ def enable_llvm_value_names : Flag<["-"], "enable-llvm-value-names">,
 def enable_reflection_metadata : Flag<["-"], "enable-reflection-metadata">,
   HelpText<"Enable emission of reflection metadata for nominal types">;
 
-def strip_reflection_metadata : Flag<["-"], "strip-reflection-metadata">,
-  HelpText<"Strip all reflection metadata for nominal types">;
-
-def strip_reflection_names : Flag<["-"], "strip-reflection-names">,
-  HelpText<"Strip names of stored properties and enum cases from"
+def enable_reflection_names : Flag<["-"], "enable-reflection-names">,
+  HelpText<"Enable emission of names of stored properties and enum cases in"
            "reflection metadata">;
+
+def enable_reflection_builtins : Flag<["-"], "enable-reflection-builtins">,
+  HelpText<"Enable emission of reflection metadata for builtin types"
+           " (standard library only)">;
 
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
   HelpText<"Emit runtime checks for correct stack promotion of objects.">;
@@ -231,9 +235,9 @@ def enable_infer_import_as_member :
   Flag<["-"], "enable-infer-import-as-member">,
   HelpText<"Infer when a global could be imported as a member">;
 
-def enable_import_objc_generics :
-  Flag<["-"], "enable-import-objc-generics">,
-  HelpText<"Import Objective-C lightweight generic type params">;
+def enable_swift_newtype :
+  Flag<["-"], "enable-swift-newtype">,
+  HelpText<"Enable the swift_newtype attribute">;
 
 def enable_strip_ns_prefix :
   Flag<["-"], "enable-strip-ns-prefix">,
@@ -242,10 +246,6 @@ def enable_strip_ns_prefix :
 def swift3_migration :
   Flag<["-"], "swift3-migration">,
   HelpText<"Enable Fix-It based migration aids for Swift 3">;
-
-def disable_infer_iuos :
-  Flag<["-"], "disable-infer-iuos">,
-  HelpText<"Disable inferring IUO type for otherwise unconstrained variables">;
 
 def warn_omit_needless_words :
   Flag<["-"], "Womit-needless-words">,

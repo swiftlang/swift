@@ -2157,7 +2157,7 @@ private:
     auto Nothing = StringRef();
     CASE('a',   Nothing,                Nothing,         "@autoreleased")
     CASE('d',   "@callee_unowned",      "@unowned",      "@unowned")
-    CASE('d',   Nothing,                Nothing,         "@unowned_inner_pointer")
+    CASE('D',   Nothing,                Nothing,         "@unowned_inner_pointer")
     CASE('g',   "@callee_guaranteed",   "@guaranteed",   Nothing)
     CASE('e',   Nothing,                "@deallocating", Nothing)
     CASE('i',   Nothing,                "@in",           "@out")

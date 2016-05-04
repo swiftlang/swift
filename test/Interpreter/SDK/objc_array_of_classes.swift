@@ -11,7 +11,7 @@ var NSURLSessionConfigurationUsage = TestSuite("NSURLSessionConfigurationUsage")
 // NSArray<Class> * in Foundation. Make sure it works.
 NSURLSessionConfigurationUsage.test("protocolClasses") {
   if let protocols = NSURLSessionConfiguration
-    .defaultSessionConfiguration()
+    .`default`()
     .protocolClasses {
 
     for proto in protocols {

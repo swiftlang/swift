@@ -35,7 +35,12 @@ public struct UnsafeBufferPointerIterator<Element>
 ///
 /// The pointer should be aligned to `alignof(Element.self)`.
 public struct Unsafe${Mutable}BufferPointer<Element>
-  : ${Mutable}Collection {
+  : ${Mutable}Indexable, ${Mutable}Collection, RandomAccessCollection {
+
+  public typealias Index = Int
+  public typealias IndexDistance = Int
+  public typealias Iterator =
+    IndexingIterator<Unsafe${Mutable}BufferPointer<Element>>
 
   /// Always zero, which is the index of the first element in a
   /// non-empty buffer.
@@ -47,9 +52,15 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
+  /// `index(after:)`.
   public var endIndex: Int {
     return count
+  }
+
+  public typealias Indices = CountableRange<Int>
+
+  public var indices: Indices {
+    return startIndex..<endIndex
   }
 
   /// Access the `i`th element in the buffer.
@@ -66,6 +77,24 @@ public struct Unsafe${Mutable}BufferPointer<Element>
       _position![i] = newValue
     }
 %end
+  }
+
+  public subscript(bounds: Range<Int>)
+    -> ${Mutable}RandomAccessSlice<Unsafe${Mutable}BufferPointer<Element>>
+  {
+    get {
+      // FIXME: swift-3-indexing-model: range check.
+      // FIXME: swift-3-indexing-model: tests.
+      return ${Mutable}RandomAccessSlice(
+        base: self, bounds: bounds)
+    }
+%  if Mutable:
+    set {
+      // FIXME: swift-3-indexing-model: range check.
+      // FIXME: swift-3-indexing-model: tests.
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
+%  end
   }
 
   /// Construct an Unsafe${Mutable}Pointer over the `count` contiguous

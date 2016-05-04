@@ -1376,22 +1376,10 @@ class infer_instanceVar1 {
   @objc var var_ArrayType11_: [Any]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
-  var var_ArrayType12: [Any!]
-  // CHECK-LABEL: {{^}}  var var_ArrayType12: [Any!]
-
-  @objc var var_ArrayType12_: [Any!]
-  // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-
   var var_ArrayType13: [Any?]
   // CHECK-LABEL: {{^}}  var var_ArrayType13: [Any?]
 
   @objc var var_ArrayType13_: [Any?]
-  // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-
-  var var_ArrayType14: [AnyObject!]
-  // CHECK-LABEL: {{^}}  var var_ArrayType14: [AnyObject!]
-
-  @objc var var_ArrayType14_: [AnyObject!]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType15: [AnyObject?]
@@ -2028,8 +2016,12 @@ class ConformsToProtocolThrowsObjCName1 : ProtocolThrowsObjCName {
   @objc func doThing(_ x: String) throws -> String { return x } // okay
 }
 
-class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName { // expected-note{{class 'ConformsToProtocolThrowsObjCName2' declares conformance to protocol 'ProtocolThrowsObjCName' here}}
-  @objc func doThing(_ x: Int) throws -> String { return "" } // expected-error{{Objective-C method 'doThing:error:' provided by method 'doThing' conflicts with optional requirement method 'doThing' in protocol 'ProtocolThrowsObjCName'}}
+class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName {
+  @objc func doThing(_ x: Int) throws -> String { return "" }
+  // expected-warning@-1{{instance method 'doThing' nearly matches optional requirement 'doThing' of protocol 'ProtocolThrowsObjCName'}}
+  // expected-note@-2{{move 'doThing' to an extension to silence this warning}}
+  // expected-note@-3{{make 'doThing' private to silence this warning}}{{9-9=private }}
+  // expected-note@-4{{candidate has non-matching type '(Int) throws -> String'}}
 }
 
 @objc class DictionaryTest {

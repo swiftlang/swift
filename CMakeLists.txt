@@ -139,8 +139,8 @@ set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
   "Define the maximum number of linker jobs for swift.")
 set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android NDK tools that are executable on the build machine")
-set(SWIFT_ANDROID_NDK_TOOLCHAIN_VERSION "" CACHE STRING
-  "A version of the toolchain to use when building for Android. Use 4.8 for 32-bit builds, 4.9 for 64-bit builds")
+set(SWIFT_ANDROID_NDK_GCC_VERSION "" CACHE STRING
+  "The GCC version to use when building for Android. Currently only 4.9 is supported.")
 set(SWIFT_ANDROID_SDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android SDK tools that will be passed to the swiftc frontend")
 set(SWIFT_ANDROID_ICU_UC "" CACHE STRING
@@ -231,6 +231,10 @@ option(SWIFT_STDLIB_ENABLE_RESILIENCE
 
 option(SWIFT_STDLIB_ENABLE_REFLECTION_METADATA
     "Build the standard libraries and overlays with remote reflection metadata; see docs/proposals/RemoteMirrors.rst"
+    TRUE)
+
+option(SWIFT_STDLIB_ENABLE_REFLECTION_NAMES
+    "Build the standard libraries and overlays with remote reflection names; see docs/proposals/RemoteMirrors.rst"
     FALSE)
 
 option(SWIFT_STDLIB_SIL_SERIALIZE_ALL
@@ -297,7 +301,10 @@ else()
 endif()
 
 # lipo is used to create universal binaries.
-find_program(LIPO "lipo")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  include(SwiftDarwin)
+  find_toolchain_tool(LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
+endif()
 
 if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_CROSS_COMPILING FALSE)
@@ -746,8 +753,13 @@ if(SWIFT_BUILD_TOOLS)
   add_subdirectory(include)
   add_subdirectory(lib)
   add_subdirectory(tools)
+endif()
+
+is_sdk_requested("${SWIFT_HOST_VARIANT_SDK}" SWIFT_HOST_SDK_REQUESTED)
+if(SWIFT_BUILD_TOOLS AND SWIFT_BUILD_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
   add_subdirectory(tools/swift-reflection-dump)
 endif()
+
 add_subdirectory(utils)
 add_subdirectory(stdlib)
 

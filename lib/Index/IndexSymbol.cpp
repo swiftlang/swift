@@ -53,9 +53,8 @@ static SymbolKind getVarSymbolKind(const VarDecl *VD) {
     return SymbolKind::InstanceProperty;
   }
 
-  if (DC->isLocalContext())
-    return SymbolKind::LocalVariable;
-  return SymbolKind::GlobalVariable;
+  assert(!DC->isLocalContext() && "local variable seen while indexing");
+  return SymbolKind::Variable;
 }
 
 SymbolKind index::getSymbolKindForDecl(const Decl *D) {
@@ -72,7 +71,8 @@ SymbolKind index::getSymbolKindForDecl(const Decl *D) {
     case DeclKind::Subscript:        return SymbolKind::Subscript;
     case DeclKind::Constructor:      return SymbolKind::Constructor;
     case DeclKind::Destructor:       return SymbolKind::Destructor;
-    case DeclKind::Param:            return SymbolKind::ParamVariable;
+    case DeclKind::Param:
+      llvm_unreachable("unexpected parameter seen while indexing");
 
     case DeclKind::Func:
       return getFuncSymbolKind(cast<FuncDecl>(D));

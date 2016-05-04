@@ -120,11 +120,14 @@ public struct Mirror {
   /// might write:
   ///
   ///     if let b = AnyBidirectionalCollection(someMirror.children) {
-  ///       for i in b.endIndex.advanced(by: -20, limit: b.startIndex)..<b.endIndex {
+  ///       var i = xs.index(b.endIndex, offsetBy: -20,
+  ///         limitedBy: b.startIndex) ?? b.startIndex
+  ///       while i != xs.endIndex {
   ///          print(b[i])
+  ///          b.formIndex(after: &i)
   ///       }
   ///     }
-  public typealias Children = AnyForwardCollection<Child>
+  public typealias Children = AnyCollection<Child>
 
   /// A suggestion of how a `Mirror`'s is to be interpreted.
   ///
@@ -209,7 +212,25 @@ public struct Mirror {
   /// initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.
   public init<
-    Subject, C : Collection where C.Iterator.Element == Child
+    Subject,
+    C : Collection
+    where
+    C.Iterator.Element == Child,
+
+    // FIXME(ABI)(compiler limitation): these constraints should be applied to
+    // associated types of Collection.
+    C.SubSequence : Collection,
+    C.SubSequence.Iterator.Element == Child,
+    C.SubSequence.Index == C.Index,
+    C.SubSequence.Indices : Collection,
+    C.SubSequence.Indices.Iterator.Element == C.Index,
+    C.SubSequence.Indices.Index == C.Index,
+    C.SubSequence.Indices.SubSequence == C.SubSequence.Indices,
+    C.SubSequence.SubSequence == C.SubSequence,
+    C.Indices : Collection,
+    C.Indices.Iterator.Element == C.Index,
+    C.Indices.Index == C.Index,
+    C.Indices.SubSequence == C.Indices
   >(
     _ subject: Subject,
     children: C,
@@ -257,7 +278,18 @@ public struct Mirror {
   /// initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.
   public init<
-    Subject, C: Collection
+    Subject,
+    C : Collection
+    where
+
+    // FIXME(ABI)(compiler limitation): these constraints should be applied to
+    // associated types of Collection.
+    C.SubSequence : Collection,
+    C.SubSequence.SubSequence == C.SubSequence,
+    C.Indices : Collection,
+    C.Indices.Iterator.Element == C.Index,
+    C.Indices.Index == C.Index,
+    C.Indices.SubSequence == C.Indices
   >(
     _ subject: Subject,
     unlabeledChildren: C,
@@ -388,19 +420,21 @@ extension Mirror {
   ///
   ///     var d = nil
   ///     let children = Mirror(reflecting: x).children
-  ///     let p0 = children.startIndex.advanced(by: 1, limit: children.endIndex)
-  ///     if p0 != children.endIndex {
+  ///     if let p0 = children.index(children.startIndex,
+  ///       offsetBy: 1, limitedBy: children.endIndex) {
   ///       let grandChildren = Mirror(reflecting: children[p0].value).children
   ///       SeekTwo: for g in grandChildren {
   ///         if g.label == "two" {
   ///           let greatGrandChildren = Mirror(reflecting: g.value).children
-  ///           let p1 = greatGrandChildren.startIndex.advanced(
-  ///             by: 3,
-  ///             limit: greatGrandChildren.endIndex)
-  ///           if p1 != endIndex { d = greatGrandChildren[p1].value }
+  ///           if let p1 = greatGrandChildren.index(
+  ///             greatGrandChildren.startIndex,
+  ///             offsetBy: 3, limitedBy: greatGrandChildren.endIndex) {
+  ///             d = greatGrandChildren[p1].value
+  ///           }
   ///           break SeekTwo
   ///         }
   ///       }
+  ///     }
   ///
   /// As you can see, complexity for each element of the argument list
   /// depends on the argument type and capabilities of the collection
@@ -421,8 +455,9 @@ extension Mirror {
         position = children.index { $0.label == label } ?? children.endIndex
       }
       else if let offset = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
-        position = children.startIndex.advanced(
-          by: offset, limit: children.endIndex)
+        position = children.index(children.startIndex,
+          offsetBy: offset,
+          limitedBy: children.endIndex) ?? children.endIndex
       }
       else {
         _preconditionFailure(
@@ -490,7 +525,9 @@ internal extension Mirror {
   /// appropriate for random access!  To avoid this pitfall, convert
   /// mirrors to use the new style, which only present forward
   /// traversal in general.
-  internal struct LegacyChildren : Collection {
+  internal struct LegacyChildren : RandomAccessCollection {
+    typealias Indices = CountableRange<Int>
+    
     init(_ oldMirror: _Mirror) {
       self._oldMirror = oldMirror
     }
@@ -718,7 +755,9 @@ public struct DictionaryLiteral<Key, Value> : DictionaryLiteralConvertible {
 
 /// `Collection` conformance that allows `DictionaryLiteral` to
 /// interoperate with the rest of the standard library.
-extension DictionaryLiteral : Collection {
+extension DictionaryLiteral : RandomAccessCollection {
+  public typealias Indices = CountableRange<Int>
+  
   /// The position of the first element in a non-empty `DictionaryLiteral`.
   ///
   /// Identical to `endIndex` in an empty `DictionaryLiteral`.
@@ -730,7 +769,7 @@ extension DictionaryLiteral : Collection {
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
+  /// `index(after:)`.
   ///
   /// - Complexity: O(1).
   public var endIndex: Int { return _elements.endIndex }

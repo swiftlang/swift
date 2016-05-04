@@ -225,7 +225,11 @@ public func >= <T : Comparable>(lhs: T, rhs: T) -> Bool {
 }
 
 /// Instances of conforming types can be compared using relational
-/// operators, which define a [strict total order](http://en.wikipedia.org/wiki/Total_order#Strict_total_order).
+/// operators, which define a [strict total order](http://en.wikipedia.org/wiki/Total_order#Strict_total_order)
+/// on normal values. A conforming type may contain a subset of values which
+/// are treated as exceptional; i.e. outside the domain of meaningful arguments
+/// for the purposes of the Comparable protocol; such values need not take part
+/// in the strict total order. One example is NaN for floating-point types.
 ///
 /// A type conforming to `Comparable` need only supply the `<` and
 /// `==` operators; default implementations of `<=`, `>`, `>=`, and

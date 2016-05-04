@@ -12,6 +12,8 @@
 
 #import <Foundation/Foundation.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface BridgeTester : NSObject {
   NSString *myString;
   NSArray<NSString *> *myArrayOfStrings;
@@ -24,3 +26,5 @@
 - (NSArray<NSString *> *)testToArrayOfStrings;
 
 @end
+
+NS_ASSUME_NONNULL_END

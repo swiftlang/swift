@@ -149,6 +149,156 @@
   (set (make-local-variable 'font-lock-defaults) 
        '(swift-font-lock-keywords) ))
 
+(defconst swift-doc-comment-detail-re
+  (let ((just-space "[ \t\n]*")
+        (not-just-space ".*?[^ \t\n].*")
+        (eol "\\(?:$\\)")
+        (continue "\n\\1"))
+    
+    (concat "^\\([ \t]*///\\)" not-just-space eol
+            "\\(?:" continue not-just-space eol "\\)*"
+            "\\(" continue just-space eol
+            "\\(?:" continue ".*" eol "\\)*"
+            "\\)"))
+  "regexp that finds the non-summary part of a swift doc comment as subexpression 2")
+
+(defun swift-hide-doc-comment-detail ()
+  "Hide everything but the summary part of doc comments.
+
+Use `M-x hs-show-all' to show them again."
+    (interactive)
+  (hs-minor-mode)
+  (save-excursion
+    (save-match-data
+      (goto-char (point-min))
+      (while (search-forward-regexp swift-doc-comment-detail-re (point-max) :noerror)
+        (hs-hide-comment-region (match-beginning 2) (match-end 2))
+        (goto-char (match-end 2))))))
+
+(defvar swift-mode-generic-parameter-list-syntax-table
+  (let ((s (copy-syntax-table swift-mode-syntax-table)))
+    (modify-syntax-entry ?\< "(>" s)
+    (modify-syntax-entry ?\> ")<" s)
+    s))
+
+(defun swift-skip-comments-and-space ()
+  "Skip comments and whitespace, returning t"
+  (while (forward-comment 1))
+  t)
+
+(defconst swift-identifier-re "\\_<[[:alpha:]_].*?\\_>")
+
+(defun swift-skip-optionality ()
+  "Hop over any comments, whitespace, and strings
+of `!' or `?', returning t unconditionally."
+  (swift-skip-comments-and-space)
+  (while (not (zerop (skip-chars-forward "!?")))
+    (swift-skip-comments-and-space)))
+
+(defun swift-skip-generic-parameter-list ()
+  "Hop over any comments, whitespace, and, if present, a generic
+parameter list, returning t if the parameter list was found and
+nil otherwise."
+  (swift-skip-comments-and-space)
+  (when (looking-at "<")
+    (with-syntax-table swift-mode-generic-parameter-list-syntax-table
+      (ignore-errors (forward-sexp) t))))
+
+(defun swift-skip-re (pattern)
+  "Hop over any comments and whitespace; then if PATTERN matches
+the next characters skip over them, returning t if so and nil
+otherwise."
+  (swift-skip-comments-and-space)
+  (save-match-data
+    (when (looking-at pattern)
+      (goto-char (match-end 0))
+      t)))
+
+(defun swift-skip-identifier ()
+  "Hop over any comments, whitespace, and an identifier if one is
+present, returning t if so and nil otherwise."
+  (swift-skip-re swift-identifier-re))
+
+(defun swift-skip-simple-type-name ()
+  "Hop over a chain of the form identifier
+generic-parameter-list? ( `.' identifier generic-parameter-list?
+)*, returning t if the initial identifier was found and nil otherwise."
+  (when (swift-skip-identifier)
+    (swift-skip-generic-parameter-list)
+    (swift-skip-re "\\?+")
+    (when (swift-skip-re "\\.")
+      (swift-skip-simple-type-name))
+    t))
+
+(defun swift-skip-type-name ()
+    "Hop over any comments, whitespace, and the name of a type if
+one is present, returning t if so and nil otherwise"
+  (swift-skip-comments-and-space)
+  (let ((found nil))
+    ;; repeatedly
+    (while 
+        (and
+         ;; match a tuple or an identifier + optional generic param list
+         (cond
+          ((looking-at "[[(]")
+           (forward-sexp)
+           (setq found t))
+          
+          ((swift-skip-simple-type-name)
+           (setq found t)))
+         
+          ;; followed by "->"
+          (prog1 (swift-skip-re "throws\\|rethrows\\|->")
+            (swift-skip-re "->") ;; accounts for the throws/rethrows cases on the previous line
+            (swift-skip-comments-and-space))))
+    found))
+
+(defun swift-in-string-or-comment ()
+  "Return non-nil if point is in a string or comment."
+  (or (nth 3 (syntax-ppss)) (nth 4 (syntax-ppss))))
+
+(defconst swift-body-keyword-re
+  "\\_<\\(var\\|func\\|init\\|deinit\\|subscript\\)\\_>")
+
+(defun swift-hide-bodies ()
+  "Hide the bodies of methods, functions, and computed properties.
+
+Use `M-x hs-show-all' to show them again."
+    (interactive)
+  (hs-minor-mode)
+  (save-excursion
+    (save-match-data
+      (goto-char (point-min))
+      (while (search-forward-regexp swift-body-keyword-re (point-max) :noerror)
+        (when
+            (and
+             (not (swift-in-string-or-comment))
+             (let ((keyword (match-string 0)))
+               ;; parse up to the opening brace
+               (cond
+                ((equal keyword "deinit") t)
+                
+                ((equal keyword "var")
+                 (and (swift-skip-identifier)
+                      (swift-skip-re ":")
+                      (swift-skip-type-name)))
+                
+                ;; otherwise, there's a parameter list
+                (t
+                 (and
+                  ;; parse the function's base name or operator symbol
+                  (if (equal keyword "func") (forward-symbol 1) t)
+                  ;; advance to the beginning of the function
+                  ;; parameter list
+                  (progn
+                    (swift-skip-generic-parameter-list)
+                    (swift-skip-comments-and-space)
+                    (equal (char-after) ?\())
+                  ;; parse the parameter list and any return type
+                  (swift-skip-type-name)))))
+             (swift-skip-re "{"))
+          (hs-hide-block :reposition-at-end))))))
+
 (defun swift-indent-line ()
   (interactive)
   (let (indent-level target-column)

@@ -30,7 +30,10 @@ add_swift_library(${swift_platform_name} IS_SDK_OVERLAY
 
 set(glibc_modulemap_target_list)
 foreach(sdk ${SWIFT_SDKS})
-  if(${sdk} STREQUAL "LINUX" OR ${sdk} STREQUAL "FREEBSD" OR ${sdk} STREQUAL "ANDROID")
+  if("${sdk}" STREQUAL "LINUX" OR
+     "${sdk}" STREQUAL "FREEBSD" OR
+     "${sdk}" STREQUAL "ANDROID" OR
+     "${sdk}" STREQUAL "CYGWIN")
     foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
       set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
       set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
@@ -52,42 +55,25 @@ foreach(sdk ${SWIFT_SDKS})
         endif()
       endif()
 
+      set(glibc_modulemap_source "glibc.modulemap.gyb")
+      set(glibc_modulemap_out "${module_dir}/glibc.modulemap")
+
       # Configure the module map based on the target. Each platform needs to
       # reference different headers, based on what's available in their glibc.
-      set(glibc_modulemap_gyb_source "glibc.modulemap.in.gyb")
-      set(glibc_modulemap_gyb_configured
-          "${CMAKE_CURRENT_BINARY_DIR}/${arch_subdir}/glibc.modulemap.gyb")
-      configure_file(
-          ${glibc_modulemap_gyb_source}
-          ${glibc_modulemap_gyb_configured}
-          @ONLY)
+      handle_gyb_source_single(glibc_modulemap_target
+          SOURCE "${glibc_modulemap_source}"
+          OUTPUT "${glibc_modulemap_out}"
+          FLAGS
+              "-DCMAKE_SDK=${sdk}"
+              "-DGLIBC_INCLUDE_PATH=${GLIBC_INCLUDE_PATH}"
+              "-DGLIBC_ARCH_INCLUDE_PATH=${GLIBC_ARCH_INCLUDE_PATH}")
 
-      set(gyb_tool "${SWIFT_SOURCE_DIR}/utils/gyb")
-      set(glibc_modulemap_configured
-          "${CMAKE_CURRENT_BINARY_DIR}/${arch_subdir}/glibc.modulemap")
-      add_custom_command_target(glibc_modulemap_target
-          # We can't use handle_gyb_sources() here because we need to ensure
-          # gyb is invoked before we copy glibc.modulemap into the module dir.
-          # FIXME: Instead of using a combination of configure_file() and gyb,
-          #        we should use just gyb--it'd be simpler.
-          COMMAND
-              ${gyb_tool} "-DCMAKE_SDK=${sdk}" -o ${glibc_modulemap_configured} ${glibc_modulemap_gyb_configured}
-          COMMAND
-              ${CMAKE_COMMAND} -E make_directory ${module_dir}
-          COMMAND
-              ${CMAKE_COMMAND} -E copy_if_different
-              ${glibc_modulemap_configured}
-              "${module_dir}/glibc.modulemap"
-          OUTPUT "${module_dir}/glibc.modulemap"
-          DEPENDS ${glibc_modulemap_configured}
-          COMMENT "Copying Glibc module to ${module_dir}")
-
-      swift_install_in_component(stdlib
-          FILES "${module_dir}/glibc.modulemap"
+      swift_install_in_component(sdk-overlay
+          FILES "${glibc_modulemap_out}"
           DESTINATION "lib/swift/${arch_subdir}")
 
       list(APPEND glibc_modulemap_target_list ${glibc_modulemap_target})
     endforeach()
   endif()
 endforeach()
-add_custom_target(glibc_modulemap ALL DEPENDS ${glibc_modulemap_target_list})
+add_custom_target(glibc_modulemap DEPENDS ${glibc_modulemap_target_list})

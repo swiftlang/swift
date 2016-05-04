@@ -74,7 +74,7 @@ class Tracked : NSObject, Fooable {
   }
 
   func successor() -> Self {
-    return self.dynamicType.init(self.value.successor())
+    return self.dynamicType.init(self.value + 1)
   }
 
   var value: Int
@@ -148,7 +148,7 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
   }
   
   func successor() -> BridgedSwift {
-    return BridgedSwift(trak.value.successor())
+    return BridgedSwift(trak.value + 1)
   }
 
   static func printStats() {
