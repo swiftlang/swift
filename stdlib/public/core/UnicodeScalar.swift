@@ -267,14 +267,6 @@ extension UnicodeScalar.UTF16View : RandomAccessCollection {
   }
 }
 
-/// Returns c as a UTF8.CodeUnit.  Meant to be used as _ascii8("x").
-@warn_unused_result
-public // SPI(SwiftExperimental)
-func _ascii8(_ c: UnicodeScalar) -> UTF8.CodeUnit {
-  _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
-  return UTF8.CodeUnit(c.value)
-}
-
 /// Returns c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
 @warn_unused_result
 public // SPI(SwiftExperimental)
