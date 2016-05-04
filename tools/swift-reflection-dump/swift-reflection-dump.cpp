@@ -143,7 +143,7 @@ static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
   TypeRefBuilder builder;
 
   for (auto binaryFilename : binaryFilenames) {
-    auto binaryOwner = unwrap(createBinary(binaryFilename));
+    auto binaryOwner = unwrap(expectedToErrorOr(createBinary(binaryFilename)));
     Binary *binaryFile = binaryOwner.getBinary();
 
     // The object file we are doing lookups in -- either the binary itself, or

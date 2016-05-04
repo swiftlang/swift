@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
         llvm::MachO::nlist nlist = MachO->getSymbolTableEntry(RawSym);
         if (nlist.n_type == N_AST) {
           auto Path = MachO->getSymbolName(RawSym);
-          if (Path.getError()) {
+          if (!Path) {
             llvm::outs() << "Cannot get symbol name\n;";
             exit(1);
           }
