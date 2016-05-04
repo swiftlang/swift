@@ -1963,7 +1963,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     ( ! -z "${generator_output_path}" && ! -f "${generator_output_path}" ) ]] ; then
             set -x
             mkdir -p "${build_dir}"
-            rm -f "${cmake_cache_path}"
             (cd "${build_dir}" && "${CMAKE}" "${cmake_options[@]}" "${EXTRA_CMAKE_OPTIONS[@]}" "${source_dir}")
             { set +x; } 2>/dev/null
         fi
