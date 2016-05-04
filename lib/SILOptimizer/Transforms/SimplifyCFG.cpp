@@ -942,9 +942,9 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   }
 
   // Don't jump thread through a potential header - this can produce irreducible
-  // control flow.
-  if (!isa<SwitchEnumInst>(DestBB->getTerminator()) &&
-      LoopHeaders.count(DestBB))
+  // control flow. Still, we make an exception for switch_enum.
+  bool DestIsLoopHeader = (LoopHeaders.count(DestBB) != 0);
+  if (!isa<SwitchEnumInst>(DestBB->getTerminator()) && DestIsLoopHeader)
     return false;
 
   DEBUG(llvm::dbgs() << "jump thread from bb" << SrcBB->getDebugID() <<
@@ -969,6 +969,11 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
 
   // We may be able to simplify DestBB now that it has one fewer predecessor.
   simplifyAfterDroppingPredecessor(DestBB);
+
+  // If we jump-thread a switch_enum in the loop header, we have to recalculate
+  // the loop header info.
+  if (DestIsLoopHeader)
+    findLoopHeaders();
 
   ++NumJumpThreads;
   return true;
