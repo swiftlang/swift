@@ -3,5 +3,3 @@
 // RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension > %t/typeref_decoding.txt
 // RUN: diff -u %S/typeref_decoding_objc.result.txt %t/typeref_decoding.txt
 // REQUIRES: objc_interop
-
-// REQUIRES: OS=macosx
