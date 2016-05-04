@@ -12,6 +12,9 @@
 
 #import <Foundation/Foundation.h>
 
+#include "swift/Runtime/Config.h"
+
+SWIFT_CC(swift)
 extern "C" void
 NS_Swift_NSUndoManager_registerUndoWithTargetHandler(
     id NS_RELEASES_ARGUMENT __nonnull self_,
@@ -28,6 +31,7 @@ NS_Swift_NSUndoManager_registerUndoWithTargetHandler(
 
 
 // -- NSCoder
+SWIFT_CC(swift)
 extern "C" NS_RETURNS_RETAINED __nullable id
 NS_Swift_NSCoder_decodeObject(id NS_RELEASES_ARGUMENT __nonnull self_,
                               NSError *__nullable *__nullable error) {
@@ -42,6 +46,7 @@ NS_Swift_NSCoder_decodeObject(id NS_RELEASES_ARGUMENT __nonnull self_,
   return [result retain];
 }
 
+SWIFT_CC(swift)
 extern "C" NS_RETURNS_RETAINED __nullable id
 NS_Swift_NSCoder_decodeObjectForKey(id NS_RELEASES_ARGUMENT __nonnull self_,
                                     id NS_RELEASES_ARGUMENT __nonnull key,
@@ -58,6 +63,7 @@ NS_Swift_NSCoder_decodeObjectForKey(id NS_RELEASES_ARGUMENT __nonnull self_,
   return [result retain];
 }
 
+SWIFT_CC(swift)
 extern "C" NS_RETURNS_RETAINED __nullable id
 NS_Swift_NSCoder_decodeObjectOfClassForKey(
     id NS_RELEASES_ARGUMENT __nonnull self_,
@@ -76,6 +82,7 @@ NS_Swift_NSCoder_decodeObjectOfClassForKey(
   return [result retain];
 }
 
+SWIFT_CC(swift)
 extern "C" NS_RETURNS_RETAINED __nullable id
 NS_Swift_NSCoder_decodeObjectOfClassesForKey(
     id NS_RELEASES_ARGUMENT __nonnull self_,
@@ -96,6 +103,7 @@ NS_Swift_NSCoder_decodeObjectOfClassesForKey(
 }
 
 // -- NSKeyedUnarchiver
+SWIFT_CC(swift)
 extern "C" NS_RETURNS_RETAINED __nullable id
 NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(
     Class Self_, id NS_RELEASES_ARGUMENT __nonnull data,

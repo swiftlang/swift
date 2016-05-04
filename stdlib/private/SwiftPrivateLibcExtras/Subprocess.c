@@ -13,6 +13,8 @@
 // Spawn is not available on Android.
 #if !defined(__ANDROID__)
 
+#include "swift/Runtime/Config.h"
+
 // NOTE: preprocess away the availability information to allow use of
 // unsupported APIs on certain targets (i.e. tvOS)
 #define availability(...)
@@ -24,26 +26,31 @@
 extern char ***_NSGetEnviron(void);
 #endif // defined(__APPLE__)
 
+SWIFT_CC(swift)
 int swift_posix_spawn_file_actions_init(
     posix_spawn_file_actions_t *file_actions) {
   return posix_spawn_file_actions_init(file_actions);
 }
 
+SWIFT_CC(swift)
 int swift_posix_spawn_file_actions_destroy(
     posix_spawn_file_actions_t *file_actions) {
   return posix_spawn_file_actions_destroy(file_actions);
 }
 
+SWIFT_CC(swift)
 int swift_posix_spawn_file_actions_addclose(
     posix_spawn_file_actions_t *file_actions, int filedes) {
   return posix_spawn_file_actions_addclose(file_actions, filedes);
 }
 
+SWIFT_CC(swift)
 int swift_posix_spawn_file_actions_adddup2(
     posix_spawn_file_actions_t *file_actions, int filedes, int newfiledes) {
   return posix_spawn_file_actions_adddup2(file_actions, filedes, newfiledes);
 }
 
+SWIFT_CC(swift)
 int swift_posix_spawn(pid_t *__restrict pid, const char * __restrict path,
                       const posix_spawn_file_actions_t *file_actions,
                       const posix_spawnattr_t *__restrict attrp,
@@ -53,6 +60,7 @@ int swift_posix_spawn(pid_t *__restrict pid, const char * __restrict path,
 }
 
 #if defined(__APPLE__)
+SWIFT_CC(swift)
 char ***swift_SwiftPrivateLibcExtras_NSGetEnviron(void) {
   return _NSGetEnviron();
 }

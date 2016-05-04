@@ -148,12 +148,13 @@ extern "C" void swift_getSummary(String *out, OpaqueValue *value,
                                  const Metadata *T);
 
 static NSString *_getDescription(SwiftObject *obj) {
+  typedef SWIFT_CC(swift) NSString *ConversionFn(void *sx, void *sy, void *sz);
+
   // Cached lookup of swift_convertStringToNSString, which is in Foundation.
-  static NSString *(*convertStringToNSString)(void *sx, void *sy, void *sz)
-    = nullptr;
+  static ConversionFn *convertStringToNSString = nullptr;
   
   if (!convertStringToNSString) {
-    convertStringToNSString = (decltype(convertStringToNSString))(uintptr_t)
+    convertStringToNSString = (ConversionFn *)(uintptr_t)
       dlsym(RTLD_DEFAULT, "swift_convertStringToNSString");
     // If Foundation hasn't loaded yet, fall back to returning the static string
     // "SwiftObject". The likelihood of someone invoking -description without
@@ -169,11 +170,13 @@ static NSString *_getDescription(SwiftObject *obj) {
 }
 
 static NSString *_getClassDescription(Class cls) {
+  typedef SWIFT_CC(swift) NSString *ConversionFn(Class cls);
+
   // Cached lookup of NSStringFromClass, which is in Foundation.
-  static NSString *(*NSStringFromClass_fn)(Class cls) = nullptr;
+  static ConversionFn *NSStringFromClass_fn = nullptr;
   
   if (!NSStringFromClass_fn) {
-    NSStringFromClass_fn = (decltype(NSStringFromClass_fn))(uintptr_t)
+    NSStringFromClass_fn = (ConversionFn *)(uintptr_t)
       dlsym(RTLD_DEFAULT, "NSStringFromClass");
     // If Foundation hasn't loaded yet, fall back to returning the static string
     // "SwiftObject". The likelihood of someone invoking +description without

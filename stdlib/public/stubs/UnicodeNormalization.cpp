@@ -26,6 +26,8 @@
 #include <unicode/ucoleitr.h>
 #include <unicode/uiter.h>
 
+#include "../SwiftShims/UnicodeShims.h"
+
 /// Zero weight 0-8, 14-31, 127.
 const int8_t _swift_stdlib_unicode_ascii_collation_table_impl[128] = {
     0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  2,  3,  4,  5,  0,   0,  0,  0,  0,
@@ -127,12 +129,11 @@ private:
 ///  <0 the left string is less than the right string.
 /// ==0 the strings are equal according to their collation.
 ///  >0 the left string is greater than the right string.
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
-int32_t _swift_stdlib_unicode_compare_utf16_utf16(const uint16_t *LeftString,
-                                                  int32_t LeftLength,
-                                                  const uint16_t *RightString,
-                                                  int32_t RightLength) {
+int32_t
+swift::_swift_stdlib_unicode_compare_utf16_utf16(const uint16_t *LeftString,
+                                                 int32_t LeftLength,
+                                                 const uint16_t *RightString,
+                                                 int32_t RightLength) {
 #if defined(__CYGWIN__)
   // ICU UChar type is platform dependent. In Cygwin, it is defined
   // as wchar_t which size is 2. It seems that the underlying binary
@@ -152,12 +153,11 @@ int32_t _swift_stdlib_unicode_compare_utf16_utf16(const uint16_t *LeftString,
 ///  <0 the left string is less than the right string.
 /// ==0 the strings are equal according to their collation.
 ///  >0 the left string is greater than the right string.
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
-int32_t _swift_stdlib_unicode_compare_utf8_utf16(const char *LeftString,
-                                                 int32_t LeftLength,
-                                                 const uint16_t *RightString,
-                                                 int32_t RightLength) {
+int32_t
+swift::_swift_stdlib_unicode_compare_utf8_utf16(const char *LeftString,
+                                                int32_t LeftLength,
+                                                const uint16_t *RightString,
+                                                int32_t RightLength) {
   UCharIterator LeftIterator;
   UCharIterator RightIterator;
   UErrorCode ErrorCode = U_ZERO_ERROR;
@@ -183,12 +183,11 @@ int32_t _swift_stdlib_unicode_compare_utf8_utf16(const char *LeftString,
 ///  <0 the left string is less than the right string.
 /// ==0 the strings are equal according to their collation.
 ///  >0 the left string is greater than the right string.
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
-int32_t _swift_stdlib_unicode_compare_utf8_utf8(const char *LeftString,
-                                                int32_t LeftLength,
-                                                const char *RightString,
-                                                int32_t RightLength) {
+int32_t
+swift::_swift_stdlib_unicode_compare_utf8_utf8(const char *LeftString,
+                                               int32_t LeftLength,
+                                               const char *RightString,
+                                               int32_t RightLength) {
   UCharIterator LeftIterator;
   UCharIterator RightIterator;
   UErrorCode ErrorCode = U_ZERO_ERROR;
@@ -256,9 +255,8 @@ static intptr_t hashFinish(intptr_t HashState) {
   return HashState;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
-intptr_t _swift_stdlib_unicode_hash(const uint16_t *Str, int32_t Length) {
+intptr_t
+swift::_swift_stdlib_unicode_hash(const uint16_t *Str, int32_t Length) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
   intptr_t HashState = HASH_SEED;
   HashState = hashChunk(GetRootCollator(), HashState, Str, Length, &ErrorCode);
@@ -269,9 +267,8 @@ intptr_t _swift_stdlib_unicode_hash(const uint16_t *Str, int32_t Length) {
   return hashFinish(HashState);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" intptr_t _swift_stdlib_unicode_hash_ascii(const char *Str,
-                                                     int32_t Length) {
+intptr_t swift::_swift_stdlib_unicode_hash_ascii(const char *Str,
+                                                 int32_t Length) {
   const ASCIICollation *Table = ASCIICollation::getTable();
   intptr_t HashState = HASH_SEED;
   int32_t Pos = 0;
@@ -297,12 +294,11 @@ extern "C" intptr_t _swift_stdlib_unicode_hash_ascii(const char *Str,
 /// required buffer length as a result. If this length does not match the
 /// 'DestinationCapacity' this function must be called again with a buffer of
 /// the required length to get an uppercase version of the string.
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
-int32_t _swift_stdlib_unicode_strToUpper(uint16_t *Destination,
-                                         int32_t DestinationCapacity,
-                                         const uint16_t *Source,
-                                         int32_t SourceLength) {
+int32_t
+swift::_swift_stdlib_unicode_strToUpper(uint16_t *Destination,
+                                        int32_t DestinationCapacity,
+                                        const uint16_t *Source,
+                                        int32_t SourceLength) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
 #if defined(__CYGWIN__)
   uint32_t OutputLength = u_strToUpper(reinterpret_cast<UChar *>(Destination),
@@ -325,12 +321,11 @@ int32_t _swift_stdlib_unicode_strToUpper(uint16_t *Destination,
 /// required buffer length as a result. If this length does not match the
 /// 'DestinationCapacity' this function must be called again with a buffer of
 /// the required length to get a lowercase version of the string.
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
-int32_t _swift_stdlib_unicode_strToLower(uint16_t *Destination,
-                                         int32_t DestinationCapacity,
-                                         const uint16_t *Source,
-                                         int32_t SourceLength) {
+int32_t
+swift::_swift_stdlib_unicode_strToLower(uint16_t *Destination,
+                                        int32_t DestinationCapacity,
+                                        const uint16_t *Source,
+                                        int32_t SourceLength) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
 #if defined(__CYGWIN__)
   uint32_t OutputLength = u_strToLower(reinterpret_cast<UChar *>(Destination),

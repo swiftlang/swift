@@ -17,79 +17,98 @@
 //===----------------------------------------------------------------------===//
 
 #import <CoreFoundation/CoreFoundation.h>
-#include "swift/Runtime/Config.h"
+#include "../SwiftShims/CoreFoundationShims.h"
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
-void _swift_stdlib_CFStringGetCharacters(CFStringRef theString,
-                                         CFRange range,
-                                         UniChar *buffer) {
-  return CFStringGetCharacters(theString, range, buffer);
+using namespace swift;
+
+template <class FromTy> struct DestType;
+
+#define BRIDGE_TYPE(FROM, TO) \
+template <> struct DestType<FROM> { using type = TO; }
+
+BRIDGE_TYPE(_swift_shims_CFAllocatorRef, CFAllocatorRef);
+BRIDGE_TYPE(_swift_shims_CFStringRef, CFStringRef);
+BRIDGE_TYPE(_swift_shims_UniChar *, UniChar *);
+BRIDGE_TYPE(_swift_shims_CFStringEncoding, CFStringEncoding);
+BRIDGE_TYPE(_swift_shims_CFStringCompareFlags, CFStringCompareFlags);
+BRIDGE_TYPE(_swift_shims_CFRange *, CFRange *);
+BRIDGE_TYPE(CFComparisonResult, _swift_shims_CFComparisonResult);
+BRIDGE_TYPE(CFStringRef, _swift_shims_CFStringRef);
+
+template <class FromTy>
+static typename DestType<FromTy>::type cast(FromTy value) {
+  return (typename DestType<FromTy>::type) value;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
-const UniChar * _swift_stdlib_CFStringGetCharactersPtr(CFStringRef theString) {
-  return CFStringGetCharactersPtr(theString);
+static CFRange cast(_swift_shims_CFRange value) {
+  return { value.location, value.length };
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
-CFIndex _swift_stdlib_CFStringGetLength(CFStringRef theString) {
-  return CFStringGetLength(theString);
+void swift::_swift_stdlib_CFStringGetCharacters(
+                                         _swift_shims_CFStringRef theString,
+                                         _swift_shims_CFRange range,
+                                         _swift_shims_UniChar *buffer) {
+  return CFStringGetCharacters(cast(theString), cast(range), cast(buffer));
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
-CFStringRef _swift_stdlib_CFStringCreateWithSubstring(CFAllocatorRef alloc,
-                                                      CFStringRef str,
-                                                      CFRange range) {
-  return CFStringCreateWithSubstring(alloc, str, range);
+const _swift_shims_UniChar *
+swift::_swift_stdlib_CFStringGetCharactersPtr(
+                                         _swift_shims_CFStringRef theString) {
+  return CFStringGetCharactersPtr(cast(theString));
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
-UniChar _swift_stdlib_CFStringGetCharacterAtIndex(CFStringRef theString,
-                                                  CFIndex idx) {
-  return CFStringGetCharacterAtIndex(theString, idx);
+_swift_shims_CFIndex
+swift::_swift_stdlib_CFStringGetLength(_swift_shims_CFStringRef theString) {
+  return CFStringGetLength(cast(theString));
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
-CFStringRef
-_swift_stdlib_CFStringCreateCopy(CFAllocatorRef alloc,
-                                 CFStringRef theString) {
-  return CFStringCreateCopy(alloc, theString);
+_swift_shims_CFStringRef
+swift::_swift_stdlib_CFStringCreateWithSubstring(
+                                         _swift_shims_CFAllocatorRef alloc,
+                                         _swift_shims_CFStringRef str,
+                                         _swift_shims_CFRange range) {
+  return cast(CFStringCreateWithSubstring(cast(alloc), cast(str), cast(range)));
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C"
-const char *_swift_stdlib_CFStringGetCStringPtr(CFStringRef theString,
-                                                CFStringEncoding encoding) {
-  return CFStringGetCStringPtr(theString, encoding);
+_swift_shims_UniChar
+swift::_swift_stdlib_CFStringGetCharacterAtIndex(_swift_shims_CFStringRef theString,
+                                                 _swift_shims_CFIndex idx) {
+  return CFStringGetCharacterAtIndex(cast(theString), idx);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" CFComparisonResult
-_swift_stdlib_CFStringCompare(CFStringRef theString1,
-                              CFStringRef theString2,
-                              CFStringCompareFlags compareOptions) {
-  return CFStringCompare(theString1, theString2, compareOptions);
+_swift_shims_CFStringRef
+swift::_swift_stdlib_CFStringCreateCopy(_swift_shims_CFAllocatorRef alloc,
+                                        _swift_shims_CFStringRef theString) {
+  return cast(CFStringCreateCopy(cast(alloc), cast(theString)));
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" Boolean
-_swift_stdlib_CFStringFindWithOptions(CFStringRef theString,
-                                      CFStringRef stringToFind,
-                                      CFRange rangeToSearch,
-                                      CFStringCompareFlags searchOptions,
-                                      CFRange *result) {
-  return CFStringFindWithOptions(theString, stringToFind, rangeToSearch,
-                                 searchOptions, result);
+const char *
+swift::_swift_stdlib_CFStringGetCStringPtr(_swift_shims_CFStringRef theString,
+                            _swift_shims_CFStringEncoding encoding) {
+  return CFStringGetCStringPtr(cast(theString), cast(encoding));
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" CFStringRef
-_swift_stdlib_objcDebugDescription(id __nonnull nsObject) {
-  return (__bridge CFStringRef)[nsObject debugDescription];
+_swift_shims_CFComparisonResult
+swift::_swift_stdlib_CFStringCompare(_swift_shims_CFStringRef theString1,
+                                     _swift_shims_CFStringRef theString2,
+                            _swift_shims_CFStringCompareFlags compareOptions) {
+  return cast(CFStringCompare(cast(theString1), cast(theString2),
+                              cast(compareOptions)));
+}
+
+_swift_shims_Boolean
+swift::_swift_stdlib_CFStringFindWithOptions(
+                                      _swift_shims_CFStringRef theString,
+                                      _swift_shims_CFStringRef stringToFind,
+                                      _swift_shims_CFRange rangeToSearch,
+                                      _swift_shims_CFStringCompareFlags searchOptions,
+                                      _swift_shims_CFRange *result) {
+  return CFStringFindWithOptions(cast(theString), cast(stringToFind),
+                                 cast(rangeToSearch), cast(searchOptions),
+                                 cast(result));
+}
+
+_swift_shims_CFStringRef
+swift::_swift_stdlib_objcDebugDescription(id __nonnull nsObject) {
+  return [nsObject debugDescription];
 }
