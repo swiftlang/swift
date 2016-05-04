@@ -1,3 +1,4 @@
+// REQUIRES: rdar26099576
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/../IDE/Inputs/custom-modules %s -emit-sil | FileCheck %s
 
 // REQUIRES: objc_interop

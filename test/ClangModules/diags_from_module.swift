@@ -1,3 +1,4 @@
+// REQUIRES: rdar26099576
 // RUN: not %target-swift-frontend -parse %s -F %S/Inputs/frameworks -Xcc -D -Xcc FOO 2> %t.err.txt
 // RUN: FileCheck -input-file=%t.err.txt %s
 

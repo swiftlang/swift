@@ -1,3 +1,4 @@
+// REQUIRES: rdar26099576
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PA -code-completion-keywords=false -F %S/Inputs/mock-sdk > %t.txt
 // RUN: FileCheck %s -check-prefix=CHECK1 < %t.txt
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROPERTY -code-completion-keywords=false -F %S/Inputs/mock-sdk | FileCheck %s -check-prefix=PROPERTY

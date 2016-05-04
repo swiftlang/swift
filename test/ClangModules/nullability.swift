@@ -1,3 +1,4 @@
+// REQUIRES: rdar26099576
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -I %S/Inputs/custom-modules %s -import-underlying-module -verify
 
 // REQUIRES: objc_interop

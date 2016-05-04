@@ -1,3 +1,4 @@
+// REQUIRES: rdar26099576
 // RUN: %target-swift-frontend -parse -verify -import-cf-types -I %S/Inputs/custom-modules %s
 
 // REQUIRES: objc_interop

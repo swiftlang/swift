@@ -1,3 +1,4 @@
+// REQUIRES: rdar26099576
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: %target-build-swift -emit-module -module-name Foo -o %t -F %S/Inputs/mock-sdk %s

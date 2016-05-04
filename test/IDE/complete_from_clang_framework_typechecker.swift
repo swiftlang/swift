@@ -1,3 +1,4 @@
+// REQUIRES: rdar26099576
 // RUN: %target-parse-verify-swift -F %S/Inputs/mock-sdk
 
 // XFAIL: linux

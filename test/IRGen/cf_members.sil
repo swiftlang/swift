@@ -1,3 +1,4 @@
+// REQUIRES: rdar26099576
 // RUN: %target-swift-frontend -emit-ir -verify -I %S/../IDE/Inputs/custom-modules %s
 // REQUIRES: objc_interop
 

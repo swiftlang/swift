@@ -1,3 +1,4 @@
+// REQUIRES: rdar26099576
 // RUN: rm -rf %t && mkdir %t
 //
 // Build swift modules this test depends on.

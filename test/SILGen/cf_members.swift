@@ -1,3 +1,4 @@
+// REQUIRES: rdar26099576
 // RUN: %target-swift-frontend -emit-silgen -I %S/../IDE/Inputs/custom-modules %s | FileCheck %s
 
 // REQUIRES: objc_interop
