@@ -69,7 +69,7 @@ public struct CollectionOfOne<Element>
   @warn_unused_result
   public func index(before i: Int) -> Int {
     _precondition(i == endIndex)
-    return endIndex
+    return startIndex
   }
 
   public typealias Indices = CountableRange<Int>
