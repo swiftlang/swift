@@ -329,7 +329,9 @@ public:
     return ExistentialMetatypeType::get(instance);
   }
 
-  Type createMetatypeType(Type instance) {
+  Type createMetatypeType(Type instance, bool wasAbstract=false) {
+    // FIXME: Plumb through metatype representation and generalize silly
+    // 'wasAbstract' flag
     return MetatypeType::get(instance);
   }
 
