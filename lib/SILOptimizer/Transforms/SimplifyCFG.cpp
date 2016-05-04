@@ -443,6 +443,8 @@ static bool tryDominatorBasedSimplifications(
   auto DominatingCondition = getTerminatorCondition(DominatingTerminator);
   if (!DominatingCondition)
     return false;
+  if (isa<SILUndef>(DominatingCondition))
+    return false;
 
   bool Changed = false;
 
