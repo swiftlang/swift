@@ -1008,7 +1008,7 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
                                      const AvailableAttr *attr,
                                      const CallExpr *CE) {
   ParsedDeclName parsed = swift::parseDeclName(attr->Rename);
-  if (!parsed || parsed.isPropertyAccessor())
+  if (!parsed || parsed.IsSetter)
     return;
 
   if (parsed.isInstanceMember()) {
@@ -1018,8 +1018,7 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
     // FIXME: Should we be validating the ContextName in some way?
     if (!CE)
       return;
-    assert(parsed.IsFunctionName && "instance members use function syntax");
-    
+
     SourceManager &sourceMgr = TC.Context.SourceMgr;
 
     unsigned selfIndex = parsed.SelfIndex.getValue();
@@ -1030,7 +1029,8 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
     const Expr *argExpr = CE->getArg();
     if (auto args = dyn_cast<TupleExpr>(argExpr)) {
       if (selfIndex >= args->getNumElements() ||
-          parsed.ArgumentLabels.size() != args->getNumElements() - 1) {
+          parsed.ArgumentLabels.size() != args->getNumElements() - 1 ||
+          (parsed.IsGetter && args->getNumElements() != 1)) {
         return;
       }
 
@@ -1083,9 +1083,11 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
     selfReplace += parsed.BaseName;
     diag.fixItReplace(CE->getFn()->getSourceRange(), selfReplace);
 
-    diag.fixItRemoveChars(endOfPreviousArg,
-                          Lexer::getLocForEndOfToken(sourceMgr,
-                                                     selfArgRange.End));
+    if (!parsed.IsGetter) {
+      diag.fixItRemoveChars(endOfPreviousArg,
+                            Lexer::getLocForEndOfToken(sourceMgr,
+                                                       selfArgRange.End));
+    }
 
     // Continue on to diagnose any argument label renames.
 
@@ -1100,7 +1102,16 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
     diag.fixItReplace(referenceRange, baseReplace);
   }
 
-  if (!CE || !parsed.IsFunctionName)
+  if (!CE)
+    return;
+
+  const Expr *argExpr = CE->getArg();
+  if (parsed.IsGetter) {
+    diag.fixItRemove(argExpr->getSourceRange());
+    return;
+  }
+
+  if (!parsed.IsFunctionName)
     return;
 
   SmallVector<Identifier, 4> argumentLabelIDs;
@@ -1110,7 +1121,6 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
     return labelStr.empty() ? Identifier() : TC.Context.getIdentifier(labelStr);
   });
 
-  const Expr *argExpr = CE->getArg();
   if (auto args = dyn_cast<TupleExpr>(argExpr)) {
     if (argumentLabelIDs.size() != args->getNumElements()) {
       // Mismatched lengths; give up.

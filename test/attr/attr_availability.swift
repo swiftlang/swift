@@ -377,3 +377,21 @@ func testRenameInstanceArgMismatch() {
   unavailableInstanceTooManyUnnamed(0) // expected-error{{'unavailableInstanceTooManyUnnamed' has been renamed to 'Int.shinyLabeledArguments(self:b:)'}} {{none}}
   unavailableInstanceNoArgsTooMany() // expected-error{{'unavailableInstanceNoArgsTooMany()' has been renamed to 'Int.shinyLabeledArguments(self:)'}} {{none}}
 }
+
+@available(*, unavailable, renamed: "getter:Int.prop(self:)")
+func unavailableInstanceProperty(a: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "getter:Int.prop(self:)")
+func unavailableInstancePropertyUnlabeled(_ a: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "getter:Int.prop()")
+func unavailableClassProperty() {} // expected-note {{here}}
+@available(*, unavailable, renamed: "getter:global()")
+func unavailableGlobalProperty() {} // expected-note {{here}}
+
+func testRenameGetters() {
+  unavailableInstanceProperty(a: 1) // expected-error{{'unavailableInstanceProperty(a:)' has been renamed to 'getter:Int.prop(self:)'}} {{3-30=1.prop}} {{30-36=}}
+  unavailableInstancePropertyUnlabeled(1) // expected-error{{'unavailableInstancePropertyUnlabeled' has been renamed to 'getter:Int.prop(self:)'}} {{3-39=1.prop}} {{39-42=}}
+  unavailableInstanceProperty(a: 1 + 1) // expected-error{{'unavailableInstanceProperty(a:)' has been renamed to 'getter:Int.prop(self:)'}} {{3-30=(1 + 1).prop}} {{30-40=}}
+  unavailableInstancePropertyUnlabeled(1 + 1) // expected-error{{'unavailableInstancePropertyUnlabeled' has been renamed to 'getter:Int.prop(self:)'}} {{3-39=(1 + 1).prop}} {{39-46=}}
+  unavailableClassProperty() // expected-error{{'unavailableClassProperty()' has been renamed to 'getter:Int.prop()'}} {{3-27=Int.prop}} {{27-29=}}
+  unavailableGlobalProperty() // expected-error{{'unavailableGlobalProperty()' has been renamed to 'getter:global()'}} {{3-28=global}} {{28-30=}}
+}
