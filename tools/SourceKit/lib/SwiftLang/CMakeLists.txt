@@ -34,6 +34,7 @@ add_sourcekit_library(SourceKitSwiftLang
   COMPONENT_DEPENDS ${LLVM_TARGETS_TO_BUILD}
       bitreader
       bitwriter
+      coverage
       debuginfodwarf
       instrumentation
       ipo
