@@ -149,11 +149,11 @@ public:
     // container. If it doesn't, the first word is a pointer to a heap box.
     case RecordKind::Existential: {
       auto Fields = ExistentialRecordTI->getFields();
-      auto Metadata = std::find_if(Fields.begin(), Fields.end(),
+      auto ExistentialMetadataField = std::find_if(Fields.begin(), Fields.end(),
                                    [](const FieldInfo &FI) -> bool {
         return FI.Name.compare("metadata") == 0;
       });
-      if (Metadata == Fields.end())
+      if (ExistentialMetadataField == Fields.end())
         return false;
 
       // Get the metadata pointer for the contained instance type.
@@ -161,7 +161,7 @@ public:
       // auto PointerArray = reinterpret_cast<uintptr_t*>(ExistentialAddress);
       // uintptr_t MetadataAddress = PointerArray[Offset];
       auto MetadataAddressAddress
-        = RemoteAddress(ExistentialAddress + Metadata->Offset);
+        = RemoteAddress(ExistentialAddress + ExistentialMetadataField->Offset);
 
       StoredPointer MetadataAddress = 0;
       if (!getReader().readInteger(MetadataAddressAddress, &MetadataAddress))
@@ -177,7 +177,7 @@ public:
       if (!InstanceTI)
         return false;
 
-      if (InstanceTI->getSize() < ExistentialRecordTI->getSize()) {
+      if (InstanceTI->getSize() <= ExistentialMetadataField->Offset) {
         // The value fits in the existential container, so it starts at the
         // start of the container.
         *OutInstanceAddress = ExistentialAddress;
