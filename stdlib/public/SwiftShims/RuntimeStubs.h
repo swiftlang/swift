@@ -27,6 +27,7 @@ namespace swift { extern "C" {
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_ssize_t
 swift_stdlib_readLine_stdin(char * _Nullable * _Nonnull LinePtr);
 
