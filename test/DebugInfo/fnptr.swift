@@ -11,7 +11,7 @@ func barz(_ i: Float, _ j: Float) -> Int64 { return 0; }
 func main() -> Int64 {
 
     // CHECK-DAG: !DILocalVariable(name: "bar_function_pointer",{{.*}} line: [[@LINE+1]],{{.*}} type: !"[[BARPT:[^,]+]]"
-    var bar_function_pointer = bar
+    let bar_function_pointer = bar
     // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "[[BARPT]]",{{.*}} elements: ![[BARMEMBERS:[0-9]+]]
     // CHECK-DAG: ![[BARMEMBERS]] = !{![[BARMEMBER:.*]], {{.*}}}
     // CHECK-DAG: ![[BARMEMBER]] = !DIDerivedType(tag: DW_TAG_member,{{.*}} baseType: ![[BARPTR:[0-9]+]]
@@ -27,7 +27,7 @@ func main() -> Int64 {
     // CHECK-DAG: ![[BAZPTR]] = !DIDerivedType(tag: DW_TAG_pointer_type,{{.*}} baseType: ![[BAZT:[0-9]+]]
     // CHECK-DAG: ![[BAZT]] = !DISubroutineType(types: ![[BAZARGS:.*]])
     // CHECK-DAG: ![[BAZARGS]] = !{!"_TtVs5Int64", !"_TtSf"}
-    var baz_function_pointer = baz
+    let baz_function_pointer = baz
     baz_function_pointer(2.89)
 
     // CHECK-DAG: !DILocalVariable(name: "barz_function_pointer",{{.*}} type: !"[[BARZPT:[^,]+]]"
@@ -37,7 +37,7 @@ func main() -> Int64 {
     // CHECK-DAG: ![[BARZPTR]] = !DIDerivedType(tag: DW_TAG_pointer_type,{{.*}} baseType: ![[BARZT:[0-9]+]]
     // CHECK-DAG: ![[BARZT]] = !DISubroutineType(types: ![[BARZARGS:.*]])
     // CHECK-DAG: ![[BARZARGS]] = !{!"_TtVs5Int64", !"_TtSf", !"_TtSf"}
-    var barz_function_pointer = barz
+    let barz_function_pointer = barz
     return barz_function_pointer(2.89, -1.0)
 }
 
