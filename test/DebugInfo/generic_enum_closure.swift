@@ -1,4 +1,3 @@
-// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
 struct __CurrentErrno {}
@@ -10,7 +9,8 @@ struct CErrorOr<T>
     // CHECK-NOT: define
     // This is a SIL-level debug_value_addr instruction.
     // CHECK: call void @llvm.dbg.value({{.*}}, metadata ![[SELF:.*]], metadata !{{[0-9]+}})
-    // CHECK-DAG: ![[SELF]] = !DILocalVariable(name: "self", arg:{{.*}} type: !"_TtGV20generic_enum_closure8CErrorOrQq_S0__"
+    // CHECK-DAG: ![[SELF]] = !DILocalVariable(name: "self", arg: {{[0-9]+}}, {{.*}}, type: ![[SELFTY:[0-9]+]]
+    // CHECK-DAG: ![[SELFTY]] = !DICompositeType(tag: DW_TAG_structure_type, name: "CErrorOr", {{.*}}, identifier: "_TtGV20generic_enum_closure8CErrorOrQq_S0__")
     value = .none
   }
   func isError() -> Bool {

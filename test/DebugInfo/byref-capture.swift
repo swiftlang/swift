@@ -1,4 +1,3 @@
-// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
 func makeIncrementor(_ inc : Int64) -> () -> Int64
@@ -11,8 +10,10 @@ func makeIncrementor(_ inc : Int64) -> () -> Int64
     // CHECK-SAME:                        metadata ![[EMPTY:.*]])
     // CHECK: ![[EMPTY]] = !DIExpression()
     // CHECK: ![[SUM_CAPTURE]] = !DILocalVariable(name: "sum", arg: 1,
-    // CHECK-SAME:     line: [[@LINE-8]], type: !"_TtRVs5Int64"
-    //                                               ^ inout type.
+    // CHECK-SAME:                                line: [[@LINE-8]],
+    // CHECK-SAME:                                type: ![[TYPE:[0-9]+]]
+    //                                                  ^ inout type.
+    // CHECK: ![[TYPE]] = !DICompositeType(tag: DW_TAG_structure_type, name: "_TtRVs5Int64", {{.*}}
     sum += inc
     return sum
   }

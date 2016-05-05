@@ -1,6 +1,6 @@
-// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 // REQUIRES: objc_interop
+
 public struct Q<T> {
   let x: T
 }
@@ -10,8 +10,8 @@ public struct Q<T> {
   // CHECK-SAME:       metadata ![[ARG:.*]], metadata ![[EXPR:.*]])
   // No deref here: the array argument is passed by value.
   // CHECK: ![[EXPR]] = !DIExpression()
-  // CHECK: ![[ARG]] = !DILocalVariable(name: "arg", arg: 1,
-  // CHECK-SAME:                        line: [[@LINE+2]],
-  // CHECK-SAME:   type: !"_TtGSaGV12generic_arg41QQq_FS_3foourFGSaGS0_x__T___")
+  // CHECK: ![[ARG]] = !DILocalVariable(name: "arg", arg: 1, {{.*}}, line: [[@LINE+2]], type: ![[ARGTY:[0-9]+]])
+  // CHECK: ![[ARGTY]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Array", {{.*}}, identifier: "_TtGSaGV12generic_arg41QQq_FS_3foourFGSaGS0_x__T___")
 public func foo<T>(_ arg: [Q<T>]) {
 }
+

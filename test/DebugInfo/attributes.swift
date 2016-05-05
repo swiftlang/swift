@@ -1,9 +1,7 @@
-// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module %s -emit-ir -g -o - | FileCheck %s
 
 // REQUIRES: objc_interop
 
-// CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "ObjCClass",{{.*}} line: [[@LINE+1]],{{.*}} runtimeLang: DW_LANG_Swift,{{.*}} identifier: [[TY0:"[^"]*"]])
 @objc class ObjCClass {
       @IBAction func click(_: AnyObject?) -> () {}
 }
@@ -21,7 +19,8 @@ class SwiftClass {
 // an artificial variable.
 // DISABLED: [ DW_TAG_variable ] [OBJC_METACLASS_$__TtC10attributes9ObjCClass]
 
-// CHECK-DAG: !DIGlobalVariable(name: "strongRef0",{{.*}}line: [[@LINE+1]],{{.*}} type: ![[TY0]],{{.*}} isLocal: false, isDefinition: true
+// CHECK-DAG: !DIGlobalVariable(name: "strongRef0", {{.*}}, line: [[@LINE+3]], type: ![[TY0:[0-9]+]], isLocal: false, isDefinition: true
+// CHECK-DAG: ![[TY0]] = !DICompositeType(tag: DW_TAG_structure_type, name: "ObjCClass", {{.*}}, line: [[@LINE-18]], {{.*}}, runtimeLang: DW_LANG_Swift, identifier: "_TtC10attributes9ObjCClass")
 var strongRef0 : ObjCClass
 var strongRef1 : SwiftClass = SwiftClass()
 
