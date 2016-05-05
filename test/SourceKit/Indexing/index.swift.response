@@ -676,6 +676,11 @@
               key.line: 77,
               key.column: 31
             }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.override
+            }
           ]
         }
       ]
@@ -1052,6 +1057,11 @@
               key.column: 11,
               key.receiver_usr: "s:C5index2B1"
             }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.override
+            }
           ]
         }
       ]
@@ -1228,6 +1238,11 @@
               key.receiver_usr: "s:C5index3CC4",
               key.is_dynamic: 1
             }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.convenience
+            }
           ]
         }
       ]
@@ -1323,6 +1338,11 @@
                   key.line: 169,
                   key.column: 7
                 }
+              ],
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.final
+                }
               ]
             },
             {
@@ -1337,6 +1357,11 @@
                   key.usr: "s:F5index5test2FT_T_",
                   key.line: 172,
                   key.column: 7
+                }
+              ],
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.final
                 }
               ]
             }
@@ -1370,7 +1395,12 @@
               key.kind: source.lang.swift.decl.function.accessor.didset,
               key.usr: "s:FC5index12rdar18640140W2S1Si",
               key.line: 186,
-              key.column: 5
+              key.column: 5,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.final
+                }
+              ]
             }
           ]
         },
@@ -1427,14 +1457,24 @@
       key.name: "ConditionalUnavailableClass1",
       key.usr: "s:C5index28ConditionalUnavailableClass1",
       key.line: 204,
-      key.column: 7
+      key.column: 7,
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.available
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "ConditionalUnavailableClass2",
       key.usr: "s:C5index28ConditionalUnavailableClass2",
       key.line: 208,
-      key.column: 7
+      key.column: 7,
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.available
+        }
+      ]
     }
   ]
 }

@@ -761,6 +761,7 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc) {
 bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
                                           bool IsRef, IndexSymbol &Info) {
   assert(D);
+  Info.decl = D;
   Info.kind = getSymbolKindForDecl(D);
   if (Info.kind == SymbolKind::Unknown)
     return true;
