@@ -3,5 +3,5 @@ add_swift_library(swiftGameplayKit IS_SDK_OVERLAY
   GameplayKit.mm
 
   TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR
-  SWIFT_MODULE_DEPENDS Foundation simd
+  SWIFT_MODULE_DEPENDS Foundation simd GLKit
   FRAMEWORK_DEPENDS_WEAK GameplayKit)
