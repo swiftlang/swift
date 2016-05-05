@@ -990,19 +990,21 @@ fi
 if [[ ! "${SKIP_BUILD_LLBUILD}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" llbuild)
 fi
-if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" swiftpm)
-fi
 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" libdispatch)
 fi
-# XCTest has a dependency on Foundation, so Foundation must be added to the
-# list of build products first.
+# SwiftPM and XCTest are dependent on Foundation, so Foundation must be
+# added to the list of build products first.
 if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" foundation)
 fi
+# SwiftPM is dependent on XCTest, so XCTest must be added to the list of
+# build products first.
 if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" xctest)
+fi
+if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" swiftpm)
 fi
 
 SWIFT_STDLIB_TARGETS=()
@@ -1309,9 +1311,11 @@ function cmake_config_opt() {
 function set_swiftpm_bootstrap_command() {
     SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
     LLBUILD_BIN="$(build_directory_bin ${deployment_target} llbuild)/swift-build-tool"
-    if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! "${SKIP_BUILD_XCTEST}" ]] ; then
+    if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
         FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
-        XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
+        if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
+            XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
+        fi
     fi
     if [ ! -e "${LLBUILD_BIN}" ]; then
         echo "Error: Cannot build swiftpm without llbuild (swift-build-tool)."
@@ -1325,10 +1329,13 @@ function set_swiftpm_bootstrap_command() {
         --swiftc="${SWIFTC_BIN}"
         --sbt="${LLBUILD_BIN}"
         --build="${build_dir}")
-    if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! "${SKIP_BUILD_XCTEST}" ]] ; then
+    if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
         swiftpm_bootstrap_command+=(
-            --foundation="${FOUNDATION_BUILD_DIR}/Foundation"
-            --xctest="${XCTEST_BUILD_DIR}")
+            --foundation="${FOUNDATION_BUILD_DIR}/Foundation")
+        if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
+            swiftpm_bootstrap_command+=(
+                --xctest="${XCTEST_BUILD_DIR}")
+        fi
     fi
 }
 
