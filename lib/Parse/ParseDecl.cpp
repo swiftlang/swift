@@ -886,7 +886,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           Message = Value.getValue();
         } else {
           ParsedDeclName parsedName = parseDeclName(Value.getValue());
-          if (!parsedName || parsedName.IsSetter) {
+          if (!parsedName) {
             diagnose(Loc, diag::attr_availability_invalid_renamed, AttrName);
             DiscardAttribute = true;
             continue;

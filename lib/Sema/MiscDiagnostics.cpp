@@ -1008,8 +1008,10 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
                                      const AvailableAttr *attr,
                                      const CallExpr *CE) {
   ParsedDeclName parsed = swift::parseDeclName(attr->Rename);
-  if (!parsed || parsed.IsSetter)
+  if (!parsed)
     return;
+
+  SourceManager &sourceMgr = TC.Context.SourceMgr;
 
   if (parsed.isInstanceMember()) {
     // Replace the base of the call with the "self argument".
@@ -1019,8 +1021,6 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
     if (!CE)
       return;
 
-    SourceManager &sourceMgr = TC.Context.SourceMgr;
-
     unsigned selfIndex = parsed.SelfIndex.getValue();
     const Expr *selfExpr = nullptr;
     SourceLoc removeRangeStart;
@@ -1028,10 +1028,18 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
 
     const Expr *argExpr = CE->getArg();
     if (auto args = dyn_cast<TupleExpr>(argExpr)) {
-      if (selfIndex >= args->getNumElements() ||
-          parsed.ArgumentLabels.size() != args->getNumElements() - 1 ||
-          (parsed.IsGetter && args->getNumElements() != 1)) {
+      if (selfIndex >= args->getNumElements())
         return;
+
+      if (parsed.IsGetter) {
+        if (args->getNumElements() != 1)
+          return;
+      } else if (parsed.IsSetter) {
+        if (args->getNumElements() != 2)
+          return;
+      } else {
+        if (parsed.ArgumentLabels.size() != args->getNumElements() - 1)
+          return;
       }
 
       selfExpr = args->getElement(selfIndex);
@@ -1065,12 +1073,14 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
       }
 
       // Avoid later argument label fix-its for this argument.
-      Identifier oldLabel = args->getElementName(selfIndex);
-      StringRef oldLabelStr;
-      if (!oldLabel.empty())
-        oldLabelStr = oldLabel.str();
-      parsed.ArgumentLabels.insert(parsed.ArgumentLabels.begin() + selfIndex,
-                                   oldLabelStr);
+      if (!parsed.isPropertyAccessor()) {
+        Identifier oldLabel = args->getElementName(selfIndex);
+        StringRef oldLabelStr;
+        if (!oldLabel.empty())
+          oldLabelStr = oldLabel.str();
+        parsed.ArgumentLabels.insert(parsed.ArgumentLabels.begin() + selfIndex,
+                                     oldLabelStr);
+      }
 
     } else {
       if (selfIndex != 0 || !parsed.ArgumentLabels.empty())
@@ -1081,6 +1091,9 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
                                                     argExpr->getStartLoc());
       removeRangeEnd = argExpr->getEndLoc();
     }
+
+    if (auto *inoutSelf = dyn_cast<InOutExpr>(selfExpr))
+      selfExpr = inoutSelf->getSubExpr();
 
     CharSourceRange selfExprRange =
         Lexer::getCharSourceRangeFromSourceRange(sourceMgr,
@@ -1097,7 +1110,7 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
     selfReplace += parsed.BaseName;
     diag.fixItReplace(CE->getFn()->getSourceRange(), selfReplace);
 
-    if (!parsed.IsGetter)
+    if (!parsed.isPropertyAccessor())
       diag.fixItRemoveChars(removeRangeStart, removeRangeEnd);
 
     // Continue on to diagnose any argument label renames.
@@ -1119,6 +1132,30 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
   const Expr *argExpr = CE->getArg();
   if (parsed.IsGetter) {
     diag.fixItRemove(argExpr->getSourceRange());
+    return;
+  }
+
+  if (parsed.IsSetter) {
+    const Expr *newValueExpr = nullptr;
+
+    if (auto args = dyn_cast<TupleExpr>(argExpr)) {
+      size_t newValueIndex = 0;
+      if (parsed.isInstanceMember()) {
+        assert(parsed.SelfIndex.getValue() == 0 ||
+               parsed.SelfIndex.getValue() == 1);
+        newValueIndex = !parsed.SelfIndex.getValue();
+      }
+      newValueExpr = args->getElement(newValueIndex);
+    } else {
+      newValueExpr = cast<ParenExpr>(argExpr)->getSubExpr();
+    }
+
+    diag.fixItReplaceChars(argExpr->getStartLoc(), newValueExpr->getStartLoc(),
+                           " = ");
+    diag.fixItRemoveChars(Lexer::getLocForEndOfToken(sourceMgr,
+                                                     newValueExpr->getEndLoc()),
+                          Lexer::getLocForEndOfToken(sourceMgr,
+                                                     argExpr->getEndLoc()));
     return;
   }
 

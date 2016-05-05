@@ -395,3 +395,35 @@ func testRenameGetters() {
   unavailableClassProperty() // expected-error{{'unavailableClassProperty()' has been renamed to 'getter:Int.prop()'}} {{3-27=Int.prop}} {{27-29=}}
   unavailableGlobalProperty() // expected-error{{'unavailableGlobalProperty()' has been renamed to 'getter:global()'}} {{3-28=global}} {{28-30=}}
 }
+
+@available(*, unavailable, renamed: "setter:Int.prop(self:_:)")
+func unavailableSetInstanceProperty(a: Int, b: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "setter:Int.prop(_:self:)")
+func unavailableSetInstancePropertyReverse(a: Int, b: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "setter:Int.prop(self:newValue:)")
+func unavailableSetInstancePropertyUnlabeled(_ a: Int, _ b: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "setter:Int.prop(newValue:self:)")
+func unavailableSetInstancePropertyUnlabeledReverse(_ a: Int, _ b: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "setter:Int.prop(x:)")
+func unavailableSetClassProperty(a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "setter:global(_:)")
+func unavailableSetGlobalProperty(_ a: Int) {} // expected-note {{here}}
+
+@available(*, unavailable, renamed: "setter:Int.prop(self:_:)")
+func unavailableSetInstancePropertyInout(a: inout Int, b: Int) {} // expected-note {{here}}
+
+func testRenameSetters() {
+  unavailableSetInstanceProperty(a: 1, b: 2) // expected-error{{'unavailableSetInstanceProperty(a:b:)' has been renamed to 'setter:Int.prop(self:_:)'}} {{3-33=1.prop}} {{33-43= = }} {{44-45=}}
+  unavailableSetInstancePropertyUnlabeled(1, 2) // expected-error{{'unavailableSetInstancePropertyUnlabeled' has been renamed to 'setter:Int.prop(self:newValue:)'}} {{3-42=1.prop}} {{42-46= = }} {{47-48=}}
+  unavailableSetInstancePropertyReverse(a: 1, b: 2) // expected-error{{'unavailableSetInstancePropertyReverse(a:b:)' has been renamed to 'setter:Int.prop(_:self:)'}} {{3-40=2.prop}} {{40-44= = }} {{45-52=}}
+  unavailableSetInstancePropertyUnlabeledReverse(1, 2) // expected-error{{'unavailableSetInstancePropertyUnlabeledReverse' has been renamed to 'setter:Int.prop(newValue:self:)'}} {{3-49=2.prop}} {{49-50= = }} {{51-55=}}
+  unavailableSetInstanceProperty(a: 1 + 1, b: 2 + 2) // expected-error{{'unavailableSetInstanceProperty(a:b:)' has been renamed to 'setter:Int.prop(self:_:)'}} {{3-33=(1 + 1).prop}} {{33-47= = }} {{52-53=}}
+  unavailableSetInstancePropertyUnlabeled(1 + 1, 2 + 2) // expected-error{{'unavailableSetInstancePropertyUnlabeled' has been renamed to 'setter:Int.prop(self:newValue:)'}} {{3-42=(1 + 1).prop}} {{42-50= = }} {{55-56=}}
+  unavailableSetInstancePropertyReverse(a: 1 + 1, b: 2 + 2) // expected-error{{'unavailableSetInstancePropertyReverse(a:b:)' has been renamed to 'setter:Int.prop(_:self:)'}} {{3-40=(2 + 2).prop}} {{40-44= = }} {{49-60=}}
+  unavailableSetInstancePropertyUnlabeledReverse(1 + 1, 2 + 2) // expected-error{{'unavailableSetInstancePropertyUnlabeledReverse' has been renamed to 'setter:Int.prop(newValue:self:)'}} {{3-49=(2 + 2).prop}} {{49-50= = }} {{55-63=}}
+  unavailableSetClassProperty(a: 1) // expected-error{{'unavailableSetClassProperty(a:)' has been renamed to 'setter:Int.prop(x:)'}} {{3-30=Int.prop}} {{30-34= = }} {{35-36=}}
+  unavailableSetGlobalProperty(1) // expected-error{{'unavailableSetGlobalProperty' has been renamed to 'setter:global(_:)'}} {{3-31=global}} {{31-32= = }} {{33-34=}}
+
+  var x = 0
+  unavailableSetInstancePropertyInout(a: &x, b: 2) // expected-error{{'unavailableSetInstancePropertyInout(a:b:)' has been renamed to 'setter:Int.prop(self:_:)'}} {{3-38=x.prop}} {{38-49= = }} {{50-51=}}
+}
