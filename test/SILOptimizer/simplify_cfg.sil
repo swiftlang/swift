@@ -2604,4 +2604,28 @@ bb2:
   return %r : $Builtin.Int32
 }
 
+// CHECK-LABEL: sil @unpack_enum_arg
+// CHECK: bb1:
+// CHECK:   br bb3(%0 : $Int)
+// CHECK: bb2:
+// CHECK:   br bb3(%1 : $Int)
+// CHECK: bb3([[A:%[0-9]+]] : $Int):
+// CHECK:   return [[A]]
+sil @unpack_enum_arg : $@convention(thin) (Int, Int) -> Int {
+bb0(%0 : $Int, %1 : $Int):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = enum $Optional<Int>, #Optional.some!enumelt.1, %0 : $Int
+  br bb3(%2 : $Optional<Int>)
+
+bb2:
+  %3 = enum $Optional<Int>, #Optional.some!enumelt.1, %1 : $Int
+  br bb3(%3 : $Optional<Int>)
+
+bb3(%4 : $Optional<Int>):
+  %5 = unchecked_enum_data %4 : $Optional<Int>, #Optional.some!enumelt.1
+  return %5 : $Int
+}
+
 
