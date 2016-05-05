@@ -3,9 +3,11 @@
 func markUsed<T>(_ t: T) {}
 
 class DWARF {
-// CHECK-DAG: ![[DIEOFFSET:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_TtaC9typealias5DWARF9DIEOffset",{{.*}} line: [[@LINE+1]], baseType: !"_TtVs6UInt32")
+// CHECK-DAG: ![[BASE:.*]] = !DICompositeType({{.*}}identifier: "_TtVs6UInt32"
+// CHECK-DAG: ![[DIEOFFSET:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_TtaC9typealias5DWARF9DIEOffset",{{.*}} line: [[@LINE+1]], baseType: ![[BASE]])
   typealias DIEOffset = UInt32
-  // CHECK-DAG: ![[PRIVATETYPE:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_TtaC9typealias5DWARFP{{.+}}11PrivateType",{{.*}} line: [[@LINE+1]], baseType: !"_TtT_")
+  // CHECK-DAG: ![[VOID:.*]] = !DICompositeType({{.*}}identifier: "_TtT_"
+  // CHECK-DAG: ![[PRIVATETYPE:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_TtaC9typealias5DWARFP{{.+}}11PrivateType",{{.*}} line: [[@LINE+1]], baseType: ![[VOID]])
   private typealias PrivateType = ()
   private static func usePrivateType() -> PrivateType { return () }
 }

@@ -14,7 +14,8 @@ func foo<T>(_ x: T) -> () {
   // CHECK-SAME:                       flags: DIFlagArtificial)
   // CHECK: ![[EMPTY]] = !DIExpression()
   // CHECK: ![[X1]] = !DILocalVariable(name: "x", arg: 1,
-  // CHECK-SAME:          line: 3, type: !"_TtQq_F11generic_arg3foourFxT_")
+  // CHECK-SAME:          line: 3, type: ![[TY:.*]])
+  // CHECK: ![[TY]] = !DICompositeType({{.*}}identifier: "_TtQq_F11generic_arg3foourFxT_")
   _blackHole(x)
 }
 

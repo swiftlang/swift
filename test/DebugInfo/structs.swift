@@ -13,8 +13,7 @@ func test(_ x : A) {
 // CHECK: [[VX:%.*]] = alloca
 // CHECK: [[X_DBG:%.*]] = alloca
 // CHECK: call void @llvm.dbg.declare(metadata {{.*}}* [[X_DBG]], metadata [[X_MD:!.*]], metadata
-// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "A"
-// CHECK-SAME:             identifier: [[A_DI:"[^"]+"]]
+// CHECK: ![[A_DI:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "A",{{.*}}identifier
 
 
 class C {
@@ -22,12 +21,11 @@ class C {
   var member: C = C()
 }
 
+// CHECK: [[X_MD]] = !DILocalVariable(name: "x", arg: 1
+// CHECK-SAME:                         type: ![[A_DI]]
+
 // A class is represented by a pointer, so B's total size should be PTRSIZE.
-// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "B",
-// CHECK-SAME:             {{.*}}size: [[PTRSIZE]]
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "B",{{.*}}size: [[PTRSIZE]]
 struct B {
   var c : C
 }
-
-// CHECK: [[X_MD]] = !DILocalVariable(name: "x", arg: 1
-// CHECK-SAME:                         type: ![[A_DI]]
