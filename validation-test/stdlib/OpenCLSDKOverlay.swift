@@ -96,7 +96,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   //
   var count = DATA_SIZE
   for i in 0..<count {
-    data[i] = Float(rand()) / Float(RAND_MAX)
+    data[i] = 0.0
   }
   
   // Connect to a compute device
