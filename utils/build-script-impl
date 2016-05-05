@@ -2096,11 +2096,11 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 if [[ "${LLDB_TEST_WITH_CURSES}" ]]; then
                     # Setup the curses results formatter.
                     LLDB_FORMATTER_OPTS="\
-                                       --results-formatter lldbsuite.test.curses_results.Curses \
+                                       --results-formatter lldbsuite.test_event.formatter.curses.Curses \
                                        --results-file /dev/stdout"
                 else
                     LLDB_FORMATTER_OPTS="\
-                                       --results-formatter lldbsuite.test.xunit_formatter.XunitFormatter \
+                                       --results-formatter lldbsuite.test_event.formatter.xunit.XunitFormatter \
                                        --results-file ${results_dir}/results.xml \
                                        -O--xpass=ignore"
                     # Setup the xUnit results formatter.
