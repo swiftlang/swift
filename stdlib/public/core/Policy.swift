@@ -206,7 +206,7 @@ public typealias Any = protocol<>
 ///
 /// In the code samples that follow, the elements of the `NSArray` instance
 /// `numberObjects` have `AnyObject` as their type. The first example uses the
-/// `as?` (conditional downcast) operator to conditionally cast the first
+/// conditional downcast operator (`as?`) to conditionally cast the first
 /// object in the `numberObjects` array to an instance of Swift's `String`
 /// type.
 ///
@@ -219,7 +219,7 @@ public typealias Any = protocol<>
 ///     // Prints("The first object, 'one', is a String")
 ///
 /// If you have prior knowledge that an `AnyObject` instance has a particular
-/// type, you can use the `as!` (unconditional downcast) operator. Performing
+/// type, you can use the unconditional downcast operator (`as!`). Performing
 /// an invalid cast triggers a runtime error.
 ///
 ///     let second = numberObjects.object(at: 1) as! String

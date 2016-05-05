@@ -431,6 +431,10 @@ public protocol Sequence {
   ///   parameter.
   func forEach(_ body: @noescape (Iterator.Element) throws -> Void) rethrows
 
+  // Note: The complexity of Sequence.dropFirst(_:) requirement
+  // is documented as O(n) because Collection.dropFirst(_:) is
+  // implemented in O(n), even though the default
+  // implementation for Sequence.dropFirst(_:) is O(1).
   /// Returns a subsequence containing all but the given number of initial
   /// elements.
   ///
@@ -505,8 +509,8 @@ public protocol Sequence {
   ///     print(numbers.suffix(10))
   ///     // Prints "[1, 2, 3, 4, 5]"
   ///
-  /// - Parameter maxLength: The maximum number of elements to return. Must
-  ///   be greater than or equal to zero.
+  /// - Parameter maxLength: The maximum number of elements to return. The
+  ///   value of `maxLength` must be greater than or equal to zero.
   /// - Returns: A subsequence terminating at the end of this sequence with
   ///   at most `maxLength` elements.
   ///
@@ -787,8 +791,8 @@ extension Sequence {
   ///     print(numbers.suffix(10))
   ///     // Prints "[1, 2, 3, 4, 5]"
   ///
-  /// - Parameter maxLength: The maximum number of elements to return. Must be
-  ///   greater than or equal to zero.
+  /// - Parameter maxLength: The maximum number of elements to return. The
+  ///   value of `maxLength` must be greater than or equal to zero.
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @warn_unused_result
   public func suffix(_ maxLength: Int) -> AnySequence<Iterator.Element> {
@@ -1004,9 +1008,9 @@ extension Sequence where Iterator.Element : Equatable {
   /// split the sequence are not returned as part of any subsequence.
   ///
   /// The following examples show the effects of the `maxSplits` and
-  /// `omittingEmptySubsequences` parameters when splitting a string splitting
-  /// a string at each space character (" "). The first use of `split` returns
-  /// each word that was originally separated by one or more spaces.
+  /// `omittingEmptySubsequences` parameters when splitting a string at each
+  /// space character (" "). The first use of `split` returns each word that
+  /// was originally separated by one or more spaces.
   ///
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
   ///     print(line.characters.split(separator: " ")
@@ -1076,8 +1080,7 @@ extension Sequence where
   /// - Returns: A subsequence starting after the specified number of
   ///   elements.
   ///
-  /// - Complexity: O(*n*), where *n* is the number of elements to drop from
-  ///   the beginning of the sequence.
+  /// - Complexity: O(1).
   @warn_unused_result
   public func dropFirst(_ n: Int) -> AnySequence<Iterator.Element> {
     _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
@@ -1140,8 +1143,8 @@ extension Sequence where
   ///     print(numbers.prefix(10))
   ///     // Prints "[1, 2, 3, 4, 5]"
   ///
-  /// - Parameter maxLength: The maximum number of elements to return. Must
-  ///   be greater than or equal to zero.
+  /// - Parameter maxLength: The maximum number of elements to return. The
+  ///   value of `maxLength` must be greater than or equal to zero.
   /// - Returns: A subsequence starting at the beginning of this sequence
   ///   with at most `maxLength` elements.
   ///

@@ -482,11 +482,11 @@ public struct ${Self}<Element>
 %end
   }
 
-  /// The array's "past-the-end" position, or one greater than the last valid
+  /// The array's "past the end" position, or one greater than the last valid
   /// subscript argument.
   ///
   /// When you need a range that includes the last element of an array, use the
-  /// `..<` operator with `endIndex`. The half-open range operator (`..<`)
+  /// half-open range operator (`..<`) with `endIndex`. The `..<` operator
   /// creates a range that doesn't include the upper bound, so it's always
   /// safe to use with `endIndex`. For example:
   ///
@@ -543,6 +543,32 @@ public struct ${Self}<Element>
     i -= 1
   }
 
+  /// Returns an index that is the specified distance from the given index.
+  ///
+  /// The following example obtains an index advanced four positions from an
+  /// array's starting index and then prints the element at that position.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     let i = numbers.index(numbers.startIndex, offsetBy: 4)
+  ///     print(numbers[i])
+  ///     // Prints "50"
+  ///
+  /// Advancing an index beyond a collection's ending index or offsetting it
+  /// before a collection's starting index may trigger a runtime error. The
+  /// value passed as `n` must not result in such an operation.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the array.
+  ///   - n: The distance to offset `i`.
+  /// - Returns: An index offset by `n` from the index `i`. If `n` is positive,
+  ///   this is the same value as the result of `n` calls to `index(after:)`.
+  ///   If `n` is negative, this is the same value as the result of `-n` calls
+  ///   to `index(before:)`.
+  ///
+  /// - Precondition:
+  ///   - If `n > 0`, `n <= self.distance(from: i, to: self.endIndex)`
+  ///   - If `n < 0`, `n >= self.distance(from: i, to: self.startIndex)`
+  /// - Complexity: O(1)
   @warn_unused_result
   public func index(_ i: Int, offsetBy n: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -553,6 +579,47 @@ public struct ${Self}<Element>
     return i + n
   }
 
+  /// Returns an index that is the specified distance from the given index,
+  /// unless that distance is beyond a given limiting index.
+  ///
+  /// The following example obtains an index advanced four positions from an
+  /// array's starting index and then prints the element at that position. The
+  /// operation doesn't require going beyond the limiting `numbers.endIndex`
+  /// value, so it succeeds.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     let i = numbers.index(numbers.startIndex,
+  ///                           offsetBy: 4,
+  ///                           limitedBy: numbers.endIndex)
+  ///     print(numbers[i])
+  ///     // Prints "50"
+  ///
+  /// The next example attempts to retrieve an index ten positions from
+  /// `numbers.startIndex`, but fails, because that distance is beyond the
+  /// index passed as `limit`.
+  ///
+  ///     let j = numbers.index(numbers.startIndex,
+  ///                           offsetBy: 10,
+  ///                           limitedBy: numbers.endIndex)
+  ///     print(j)
+  ///     // Prints "nil"
+  ///
+  /// Advancing an index beyond a collection's ending index or offsetting it
+  /// before a collection's starting index may trigger a runtime error. The
+  /// value passed as `n` must not result in such an operation.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the array.
+  ///   - n: The distance to offset `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
+  ///     `limit` has no effect if it is less than `i`. Likewise, if `n < 0`,
+  ///     `limit` has no effect if it is greater than `i`.
+  /// - Returns: An index offset by `n` from the index `i`, unless that index
+  ///   would be beyond `limit` in the direction of movement. In that case,
+  ///   the method returns `nil`.
+  ///
+  /// - SeeAlso: `index(_:offsetBy:)`, `formIndex(_:offsetBy:limitedBy:)`
+  /// - Complexity: O(1)
   @warn_unused_result
   public func index(
     _ i: Int, offsetBy n: Int, limitedBy limit: Int
@@ -569,6 +636,13 @@ public struct ${Self}<Element>
     return i + n
   }
 
+  /// Returns the distance between two indices.
+  ///
+  /// - Parameters:
+  ///   - start: A valid index of the collection.
+  ///   - end: Another valid index of the collection. If `end` is equal to
+  ///     `start`, the result is zero.
+  /// - Returns: The distance between `start` and `end`.
   @warn_unused_result
   public func distance(from start: Int, to end: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -1013,7 +1087,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// value.
   ///
   /// Here's an example of creating an array initialized with five strings
-  /// containing the letter "Z".
+  /// containing the letter *Z*.
   ///
   ///     let fiveZs = Array(repeating: "Z", count: 5)
   ///     print(fiveZs)
@@ -1156,16 +1230,17 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
   /// Reserves enough space to store the specified number of elements.
   ///
-  /// Use this method to avoid multiple reallocations if you will be adding
-  /// a known number of elements to an array. This method ensures that the
-  /// array has unique, mutable, contiguous storage, with space allocated for
-  /// at least the requested number of elements.
+  /// If you are adding a known number of elements to an array, use this method
+  /// to avoid multiple reallocations. This method ensures that the array has
+  /// unique, mutable, contiguous storage, with space allocated for at least
+  /// the requested number of elements.
   ///
-  /// For performance reasons, the newly allocated storage may be larger
-  /// than the requested capacity. Use the array's `capacity` property to
-  /// determine the size of the new storage.
+  /// For performance reasons, the newly allocated storage may be larger than
+  /// the requested capacity. Use the array's `capacity` property to determine
+  /// the size of the new storage.
   ///
   /// - Parameter minimumCapacity: The requested number of elements to store.
+  ///
   /// - Complexity: O(*n*), where *n* is the count of the array.
   @_semantics("array.mutate_unknown")
   public mutating func reserveCapacity(_ minimumCapacity: Int) {
@@ -1652,10 +1727,10 @@ extension ${Self} {
   /// removed.
   ///
   /// In this example, three elements in the middle of an array of integers are
-  /// replaced by the five elements of a `Repeat<Int>` instance.
+  /// replaced by the five elements of a `Repeated<Int>` instance.
   ///
   ///      var nums = [10, 20, 30, 40, 50]
-  ///      nums.replaceSubrange(1...3, with: Repeat(count: 5, repeatedValue: 1)))
+  ///      nums.replaceSubrange(1...3, with: repeatElement(1, count: 5))
   ///      print(nums)
   ///      // Prints "[10, 1, 1, 1, 1, 1, 50]"
   ///

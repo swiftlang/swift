@@ -17,28 +17,54 @@
 // ambiguity indexing CountableRange<T> outside a generic context.
 public enum _DisabledRangeIndex_ {}
 
-/// A half-open range that forms a collection of consecutive `Strideable`
-/// values.
+/// A half-open range that forms a collection of consecutive values.
 ///
-/// A `CountableRange` instance contains its `lowerBound` but not its upper
-/// bound. Like other collections, a `CountableRange` containing one element
-/// has an `upperBound` that is the successor of its `lowerBound` and an empty
-/// `CountableRange` has `lowerBound == upperBound`.
+/// You create a `CountableRange` instance by using the half-open range
+/// operator (`..<`).
 ///
-/// The associated `Bound` type is both the element type and the index type of
+///     let upToFive = 0..<5
+///
+/// The associated `Bound` type is both the element and index type of
 /// `CountableRange`. Each element of the range is its own corresponding
-/// index, so for any countable range `r`, `r[i] == i`.
+/// index. The lower bound of a `CountableRange` instance is its start index,
+/// and the upper bound is its end index.
 ///
-/// Therefore, if `Bound` has a maximal value, it can serve as an `upperBound`,
-/// but can never be contained in a `CountableRange<Bound>`.
+///     print(upToFive.contains(3))         // Prints "true"
+///     print(upToFive.contains(10))        // Prints "false"
+///     print(upToFive.contains(5))         // Prints "false"
+///
+/// If the `Bound` type has a maximal value, it can serve as an upper bound but
+/// can never be contained in a `CountableRange<Bound>` instance. For example,
+/// a `CountableRange<Int8>` instance can use `Int8.max` as its upper bound,
+/// but it can't represent a range that includes `Int8.max`.
 ///
 ///     let maximumRange = Int8.min..<Int8.max
-///     maximumRange.contains(Int8.max)   // false
+///     print(maximumRange.contains(Int8.max))
+///     // Prints "false"
 ///
-/// It also follows from the requirement above that `(-99..<100)[0] == 0`. To
-/// prevent confusion (because some might expect the result to be `-99`), in a
-/// context where `Bound` is known to be an integer type, subscripting with
-/// `Bound` is a compile-time error:
+/// If you need to create a range that includes the maximal value of its
+/// `Bound` type, see the `CountableClosedRange` type.
+///
+/// You can create a countable range over any type that conforms to the
+/// `Strideable` protocol and uses an integer as its associated `Stride` type.
+/// By default, Swift's integer and pointer types are usable as the bounds of
+/// a countable range.
+///
+/// Because floating-point types such as `Float` and `Double` are their own
+/// `Stride` types, they cannot be used as the bounds of a countable range. If
+/// you need to test whether values are contained within an interval bound by
+/// floating-point values, see the `Range` type. If you need to iterate over
+/// consecutive floating-point values, see the `stride(from:to:by:)` function.
+///
+/// Integer Index Ambiguity
+/// -----------------------
+///
+/// Because each element of a `CountableRange` instance is its own index, for
+/// the range `(-99..<100)` the element at index `0` is `0`. This is an
+/// unexpected result for those accustomed to zero-based collection indices,
+/// who might expect the result to be `-99`. To prevent this confusion, in a
+/// context where `Bound` is known to be an integer type, subscripting
+/// directly is a compile-time error:
 ///
 ///     // error: ambiguous use of 'subscript'
 ///     print((-99..<100)[0])
@@ -48,7 +74,7 @@ public enum _DisabledRangeIndex_ {}
 ///     func brackets<T>(_ x: CountableRange<T>, _ i: T) -> T {
 ///         return x[i] // Just forward to subscript
 ///     }
-///     print(brackets((-99..<100), 0))
+///     print(brackets(-99..<100, 0))
 ///     // Prints "0"
 ///
 /// - SeeAlso: `CountableClosedRange`, `Range`, `ClosedRange`
@@ -61,18 +87,19 @@ public struct CountableRange<
 
   /// The range's lower bound.
   ///
-  /// Identical to `upperBound` in an empty range.
+  /// In an empty range, `lowerBound` is equal to `upperBound`.
   public let lowerBound: Bound
 
   /// The range's upper bound.
   ///
-  /// `upperBound` is not a valid argument to `subscript`, and is always
+  /// `upperBound` is not a valid subscript argument and is always
   /// reachable from `lowerBound` by zero or more applications of
   /// `index(after:)`.
   ///
-  /// Identical to `lowerBound` in an empty range.
+  /// In an empty range, `upperBound` is equal to `lowerBound`.
   public let upperBound: Bound
 
+  /// The bound type of the range.
   public typealias Element = Bound
 
   /// A type that represents a position in the range.
@@ -118,27 +145,38 @@ public struct CountableRange<
 
   public typealias SubSequence = CountableRange<Bound>
 
+  /// Accesses the subsequence bounded by the given range.
+  ///
+  /// - Parameter bounds: A range of the range's indices. The upper and lower
+  ///   bounds of the `bounds` range must be valid indices of the collection.
   public subscript(bounds: Range<Index>) -> CountableRange<Bound> {
     return CountableRange(bounds)
   }
 
+  /// Accesses the subsequence bounded by the given range.
+  ///
+  /// - Parameter bounds: A range of the range's indices. The upper and lower
+  ///   bounds of the `bounds` range must be valid indices of the collection.
   public subscript(bounds: CountableRange<Bound>) -> CountableRange<Bound> {
     return self[Range(bounds)]
   }
 
   public typealias Indices = CountableRange<Bound>
 
+  /// The indices that are valid for subscripting the range, in ascending
+  /// order.
   public var indices: Indices {
     return self
   }
 
   /// Creates an instance with the given bounds.
   ///
-  /// - Note: As this initializer does not check its precondition, it should be
-  ///   used as an optimization only, when one is absolutely certain that
-  ///   `lower <= upper`. Using the `..<` operator to form `CountableRange`
-  ///   instances is preferred.
-  /// - Precondition: `lower <= upper`
+  /// Because this initializer does not perform any checks, it should be used
+  /// as an optimization only when you are absolutely certain that `lower` is
+  /// less than or equal to `upper`. Using the half-open range operator
+  /// (`..<`) to form `CountableRange` instances is preferred.
+  ///
+  /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
@@ -149,7 +187,13 @@ public struct CountableRange<
     return lowerBound <= element && element < upperBound
   }
 
-  /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
+  /// A Boolean value indicating whether the range contains no elements.
+  ///
+  /// An empty range has equal lower and upper bounds.
+  ///
+  ///     let empty = 10..<10
+  ///     print(empty.isEmpty)
+  ///     // Prints "true"
   public var isEmpty: Bool {
     return lowerBound == upperBound
   }
@@ -165,10 +209,16 @@ public struct CountableRange<
 // FIXME(ABI)(compiler limitation): remove this code, it creates an ABI burden
 // on the library.
 extension CountableRange {
-  /// Accesses the element at `position`.
+  /// Accesses the element at specified position.
   ///
-  /// - Precondition: `position` is a valid position in `self` and
-  ///   `position != upperBound`.
+  /// You can subscript a collection with any valid index other than the
+  /// collection's end index. The end index refers to the position one past
+  /// the last element of a collection, so it doesn't correspond with an
+  /// element.
+  ///
+  /// - Parameter position: The position of the element to access. `position`
+  ///   must be a valid index of the range, and must not equal the range's end
+  ///   index.
   public subscript(position: Index) -> Element {
     // FIXME: swift-3-indexing-model: tests for the range check.
     _debugPrecondition(self.contains(position), "Index out of range")
@@ -209,20 +259,22 @@ extension CountableRange
     fatalError("uncallable")
   }
 
-  /// Accesses the subsequence bounded by `bounds`.
+  /// Accesses the subsequence bounded by the given range.
   ///
-  /// - Complexity: O(1)
-  /// - Precondition: `(startIndex...endIndex).contains(bounds.lowerBound)`
-  ///   and `(startIndex...endIndex).contains(bounds.upperBound)`
+  /// - Parameter bounds: A range of the collection's indices. The upper and
+  ///   lower bounds of the `bounds` range must be valid indices of the
+  ///   collection and `bounds.upperBound` must be less than the collection's
+  ///   end index.
   public subscript(bounds: ClosedRange<Bound>) -> CountableRange<Bound> {
     return self[bounds.lowerBound..<(bounds.upperBound.advanced(by: 1))]
   }
 
-  /// Accesses the subsequence bounded by `bounds`.
+  /// Accesses the subsequence bounded by the given range.
   ///
-  /// - Complexity: O(1)
-  /// - Precondition: `(startIndex...endIndex).contains(bounds.lowerBound)`
-  ///   and `(startIndex...endIndex).contains(bounds.upperBound)`
+  /// - Parameter bounds: A range of the collection's indices. The upper and
+  ///   lower bounds of the `bounds` range must be valid indices of the
+  ///   collection and `bounds.upperBound` must be less than the collection's
+  ///   end index.
   public subscript(
     bounds: CountableClosedRange<Bound>
   ) -> CountableRange<Bound> {
@@ -232,27 +284,39 @@ extension CountableRange
 
 //===--- End 0-based indexing protection ----------------------------------===//
 
-/// An interval over a `Comparable` type, from a lower bound up to, but not
-/// including, an upper bound. Can represent an empty interval.
+/// A half-open interval over a comparable type, from a lower bound up to, but
+/// not including, an upper bound.
 ///
-/// Use a `Range` to quickly check if a `Comparable` value is contained in a
-/// particular range of values. For example:
+/// You create `Range` instances by using the half-open range operator (`..<`).
 ///
-///     let underFive: Range = 0.0..<5.0
-///     underFive.contains(3.14)    // true
-///     underFive.contains(6.28)    // false
-///     underFive.contains(5.0)     // false
+///     let underFive = 0.0..<5.0
+///
+/// You can use a `Range` instance to quickly check if a value is contained in
+/// a particular range of values. For example:
+///
+///     print(underFive.contains(3.14))     // Prints "true"
+///     print(underFive.contains(6.28))     // Prints "false"
+///     print(underFive.contains(5.0))      // Prints "false"
+///
+/// `Range` instances can represent an empty interval, unlike `ClosedRange`.
+///
+///     let empty = 0.0..<0.0
+///     print(empty.contains(0.0))          // Prints "false"
+///     print(empty.isEmpty)                // Prints "true"
+///
+/// - SeeAlso: `CountableRange`, `ClosedRange`, `CountableClosedRange`
 @_fixed_layout
 public struct Range<
   Bound : Comparable
 > {
-  /// Creates a range with `lowerBound == lower` and `upperBound == upper`.
+  /// Creates an instance with the given bounds.
   ///
-  /// - Note: As this initializer does not check its precondition, it should be
-  ///   used as an optimization only, when one is absolutely certain that
-  ///   `lower <= upper`. Using the `..<` operator to form `Range` instances
-  ///   is preferred.
-  /// - Precondition: `lower <= upper`
+  /// Because this initializer does not perform any checks, it should be used
+  /// as an optimization only when you are absolutely certain that `lower` is
+  /// less than or equal to `upper`. Using the half-open range operator
+  /// (`..<`) to form `Range` instances is preferred.
+  ///
+  /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
   @inline(__always)
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
@@ -261,24 +325,37 @@ public struct Range<
 
   /// The range's lower bound.
   ///
-  /// Identical to `upperBound` in an empty range.
+  /// In an empty range, `lowerBound` is equal to `upperBound`.
   public let lowerBound: Bound
 
   /// The range's upper bound.
   ///
-  /// Identical to `lowerBound` in an empty range. A `Range` instance
-  /// does not contain its `upperBound`.
+  /// In an empty range, `upperBound` is equal to `lowerBound`. A `Range`
+  /// instance does not contain its upper bound.
   public let upperBound: Bound
 
-  /// Returns `true` iff `element` is between `lowerBound` and `upperBound` or
-  /// equal to `lowerBound`. A `Range` instance does not contain its
-  /// `upperBound`.
+  /// Returns a Boolean value indicating whether the given element is contained
+  /// within the range.
+  ///
+  /// Because `Range` represents a half-open range, a `Range` instance does not
+  /// contain its upper bound. `element` is contained in the range if it is
+  /// greater than or equal to the lower bound and less than the upper bound.
+  ///
+  /// - Parameter element: The element to check for containment.
+  /// - Returns: `true` if `element` is contained in the range; otherwise,
+  ///   `false`.
   @warn_unused_result
   public func contains(_ element: Bound) -> Bool {
     return lowerBound <= element && element < upperBound
   }
 
-  /// Returns `true` iff `self.contains(x)` is `false` for all values of `x`.
+  /// A Boolean value indicating whether the range contains no elements.
+  ///
+  /// An empty `Range` instance has equal lower and upper bounds.
+  ///
+  ///     let empty: Range = 10..<10
+  ///     print(empty.isEmpty)
+  ///     // Prints "true"
   public var isEmpty: Bool {
     return lowerBound == upperBound
   }
@@ -291,6 +368,26 @@ all_range_types = [
   ('ClosedRange', '...'),
   ('CountableClosedRange', '...')
 ]
+
+def get_init_warning(Self, OtherSelf):
+  if 'Closed' in Self and 'Closed' not in OtherSelf:
+    return """\
+  ///
+  /// An equivalent range must be representable as an instance of `%s`.
+  /// For example, passing an empty range as `other` triggers a runtime error,
+  /// because an empty range cannot be represented by a `%s` instance.\
+""" % (Self, Self)
+  elif 'Closed' not in Self and 'Closed' in OtherSelf:
+    return """\
+  ///
+  /// An equivalent range must be representable as an instance of `%s`.
+  /// For example, passing a closed range with an upper bound of `Int.max`
+  /// triggers a runtime error, because the resulting half-open range would
+  /// require an upper bound of `Int.max + 1`, which is not representable as
+  /// an `Int`.\
+""" % Self
+  else:
+    return ""
 }%
 
 % for (Self, op) in all_range_types:
@@ -301,13 +398,10 @@ extension ${Self}
   Bound : _Strideable, Bound.Stride : SignedInteger
 %   end
 {
-  /// Creates an instance equivalent to `other`.
+  /// Creates an instance equivalent to the given range.
+${get_init_warning(Self, OtherSelf)}
   ///
-  /// - Precondition: an equivalent range is representable as an
-  ///   instance of `Self`.  For example, `Range(0...Int.max)`
-  ///   violates this precondition because an equivalent `Range<Int>`
-  ///   would need an `upperBound` equal to `Int.max + 1`, which
-  ///   is unrepresentable as an `Int`.
+  /// - Parameter other: A range to convert to a `${Self}` instance.
   @inline(__always)
   public init(_ other: ${OtherSelf}<Bound>) {
 %   if 'Closed' not in Self and 'Closed' in OtherSelf:
@@ -330,7 +424,18 @@ extension ${Self}
   Bound : _Strideable, Bound.Stride : SignedInteger
 %   end
 {
-  /// Returns `true` iff `self` and `other` contain a value in common.
+  /// Returns a Boolean value indicating whether this range and the given range
+  /// contain an element in common.
+  ///
+  /// For example:
+  ///
+  ///     let x: ${Self} = 0${op}20
+  ///     print(x.overlaps(10${other_op}1000 as ${OtherSelf}))
+  ///     // Prints "true"
+  ///
+  /// - Parameter other: A range to check for elements in common.
+  /// - Returns: `true` if this range and `other` have at least one element in
+  ///   common; otherwise, `false`.
   @warn_unused_result
   @inline(__always)
   public func overlaps(_ other: ${OtherSelf}<Bound>) -> Bool {
@@ -341,10 +446,29 @@ extension ${Self}
 %   end
 
 extension ${Self} {
-  /// Returns `self` clamped to `limits`.
+  /// Returns a copy of this range clamped to the given limiting range.
   ///
-  /// The bounds of the result, even if it is empty, are always
-  /// limited to the bounds of `limits`.
+  /// The bounds of the result are always limited to the bounds of `limits`.
+  /// For example:
+  ///
+  ///     let x: ${Self} = 0${op}20
+  ///     print(x.clamped(to: 10${op}1000))
+  ///     // Prints "10${op}20"
+  ///
+% if 'Closed' in Self:
+  /// If the two ranges do not overlap, the result is a single-element range at
+  /// the upper or lower bound of `limits`.
+% else:
+  /// If the two ranges do not overlap, the result is an empty range within the
+  /// bounds of `limits`.
+% end
+  ///
+  ///     let y: ${Self} = 0${op}5
+  ///     print(y.clamped(to: 10${op}1000))
+  ///     // Prints "10${op}10"
+  ///
+  /// - Parameter limits: The range to clamp the bounds of this range.
+  /// - Returns: A new range clamped to the bounds of `limits`.
   @warn_unused_result
   @inline(__always)
   public func clamped(to limits: ${Self}) -> ${Self} {
@@ -364,14 +488,14 @@ extension ${Self} {
 }
 
 extension ${Self} : CustomStringConvertible {
-  /// A textual representation of `self`.
+  /// A textual representation of the range.
   public var description: String {
     return "\(lowerBound)${op}\(upperBound)"
   }
 }
 
 extension ${Self} : CustomDebugStringConvertible {
-  /// A textual representation of `self`, suitable for debugging.
+  /// A textual representation of the range, suitable for debugging.
   public var debugDescription: String {
     return "${Self}(\(String(reflecting: lowerBound))"
     + "${op}\(String(reflecting: upperBound)))"
@@ -427,8 +551,18 @@ extension ${Self} where Bound : _Strideable, Bound.Stride : SignedInteger {
 }
 % end
 
-/// Returns a half-open range that contains `minimum`, but not
-/// `maximum`.
+/// Returns a half-open range that contains its lower bound but not its upper
+/// bound.
+///
+/// For example:
+///
+///     let lessThanFive = 0.0..<5.0
+///     print(lessThanFive.contains(3.14))  // Prints "true"
+///     print(lessThanFive.contains(5.0))   // Prints "false"
+///
+/// - Parameters:
+///   - minimum: The lower bound for the range.
+///   - maximum: The upper bound for the range.
 @_transparent
 @warn_unused_result
 public func ..< <Bound : Comparable> (minimum: Bound, maximum: Bound)
@@ -438,9 +572,18 @@ public func ..< <Bound : Comparable> (minimum: Bound, maximum: Bound)
   return Range(uncheckedBounds: (lower: minimum, upper: maximum))
 }
 
-/// Returns a half-open range that contains `minimum`, but not `maximum`.
+/// Returns a countable half-open range that contains its lower bound but not
+/// its upper bound.
 ///
-/// - Precondition: `minimum <= maximum`.
+/// For example:
+///
+///     let upToFive = 0..<5
+///     print(upToFive.contains(3))         // Prints "true"
+///     print(upToFive.contains(5))         // Prints "false"
+///
+/// - Parameters:
+///   - minimum: The lower bound for the range.
+///   - maximum: The upper bound for the range.
 @_transparent
 @warn_unused_result
 // WORKAROUND rdar://25214598 - should be just Bound : Strideable

@@ -472,6 +472,7 @@ public protocol StringLiteralConvertible
 ///         }
 ///     }
 public protocol ArrayLiteralConvertible {
+  /// The type of the elements of an array literal.
   associatedtype Element
   /// Creates an instance initialized with the given elements.
   init(arrayLiteral elements: Element...)

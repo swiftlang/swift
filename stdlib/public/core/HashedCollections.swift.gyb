@@ -326,27 +326,28 @@ internal struct _UnmanagedAnyObjectArray {
 ///
 /// - Use the `contains(_:)` method to test whether a set contains a specific
 ///   element.
-/// - Use the `==` operator to test whether two sets contain the same elements.
+/// - Use the "equal to" operator (`==`) to test whether two sets contain the
+///   same elements.
 /// - Use the `isSubset(of:)` method to test whether a set contains all the
 ///   elements of another set or sequence.
 /// - Use the `isSuperset(of:)` method to test whether all elements of a set
 ///   are contained in another set or sequence.
-/// - Use the `isStrictSubset(of:)` and `isStrictSuperset(of:)` methods to
-///   test whether a set is a subset or superset of, but not equal to, another
-///   set.
-/// - Use the `isDisjoint(with:)` method to test whether a set has any
-///   elements in common with another set.
+/// - Use the `isStrictSubset(of:)` and `isStrictSuperset(of:)` methods to test
+///   whether a set is a subset or superset of, but not equal to, another set.
+/// - Use the `isDisjoint(with:)` method to test whether a set has any elements
+///   in common with another set.
 ///
 /// You can also combine, exclude, or subtract the elements of two sets:
 ///
 /// - Use the `union(_:)` method to create a new set with the elements of a set
 ///   and another set or sequence.
-/// - Use the `intersection(_:)` method to create a new set with only the elements
-///   common to a set and another set or sequence.
-/// - Use the `symmetricDifference(_:)` method to create a new set with the elements
-///   that are in either a set or another set or sequence, but not in both.
-/// - Use the `subtracting(_:)` method to create a new set with the elements of a
-///   set that are not also in another set or sequence.
+/// - Use the `intersection(_:)` method to create a new set with only the
+///   elements common to a set and another set or sequence.
+/// - Use the `symmetricDifference(_:)` method to create a new set with the
+///   elements that are in either a set or another set or sequence, but not in
+///   both.
+/// - Use the `subtracting(_:)` method to create a new set with the elements of
+///   a set that are not also in another set or sequence.
 ///
 /// You can modify a set in place by using these methods' mutating
 /// counterparts: `formUnion(_:)`, `formIntersection(_:)`,
@@ -502,7 +503,7 @@ public struct Set<Element : Hashable> :
     return _variantStorage.startIndex
   }
 
-  /// The "past-the-end" position for iterating members of the set.
+  /// The "past the end" position for iterating members of the set.
   ///
   /// The `endIndex` property is never a valid subscript argument. If the set
   /// is empty, `endIndex` is equal to `startIndex`.
@@ -550,12 +551,12 @@ public struct Set<Element : Hashable> :
     return _variantStorage.index(forKey: member)
   }
 
-  /// If `newMember` is not already contained in `self`, inserts it.
+  /// Inserts the given element in the set if it is not already present.
   ///
-  /// If the element is already contained in the set, this method has no
-  /// effect. In this example, a new element is inserted into `classDays`, a
-  /// set of days of the week. When an existing element is inserted, the
-  /// `classDays` set does not change.
+  /// If an element equal to `newMember` is already contained in the set, this
+  /// method has no effect. In the following example, a new element is
+  /// inserted into `classDays`, a set of days of the week. When an existing
+  /// element is inserted, the `classDays` set does not change.
   ///
   ///     enum DayOfTheWeek: Int {
   ///         case sunday, monday, tuesday, wednesday, thursday,
@@ -573,12 +574,13 @@ public struct Set<Element : Hashable> :
   ///     print(classDays)
   ///     // Prints "[.friday, .wednesday, .monday]"
   ///
-  /// - Returns: `(true, newMember)` if `newMember` was not contained in
-  ///   `self`. Otherwise, returns `(false, oldMember)`, where `oldMember` is
-  ///   the member of `self` equal to `newMember` (which may be
-  ///   distinguishable from `newMember`, e.g. via `===`).
-  ///
-  /// - Postcondition: `self.contains(newMember)`.
+  /// - Parameter newMember: An element to insert into the set.
+  /// - Returns: `(true, newMember)` if `newMember` was not contained in the
+  ///   set. If an element equal to `newMember` was already contained in the
+  ///   set, the method returns `(false, oldMember)`, where `oldMember` is the
+  ///   element that was equal to `newMember`. In some cases, `oldMember` may
+  ///   be distinguishable from `newMember` by identity comparison or some
+  ///   other means.
   @discardableResult
   public mutating func insert(
     _ newMember: Element
@@ -586,13 +588,26 @@ public struct Set<Element : Hashable> :
     return _variantStorage.insert(newMember, forKey: newMember)
   }
 
-  /// Inserts `newMember` unconditionally.
+  /// Inserts the given element into the set unconditionally.
   ///
-  /// - Returns: the former member of `self` equal to `newMember`
-  ///   (which may be distinguishable from `newMember`, e.g. via
-  ///   `===`), or `nil` if no such element existed.
+  /// If an element equal to `newMember` is already contained in the set,
+  /// `newMember` replaces the existing element. In this example, an existing
+  /// element is inserted into `classDays`, a set of days of the week.
   ///
-  /// - Postcondition: `self.contains(newMember)`
+  ///     enum DayOfTheWeek: Int {
+  ///         case sunday, monday, tuesday, wednesday, thursday,
+  ///             friday, saturday
+  ///     }
+  ///
+  ///     var classDays: Set<DayOfTheWeek> = [.monday, .wednesday, .friday]
+  ///     print(classDays.update(with: .monday))
+  ///     // Prints "Optional(.monday)"
+  ///
+  /// - Parameter newMember: An element to insert into the set.
+  /// - Returns: An element equal to `newMember` if the set already contained
+  ///   such a member; otherwise, `nil`. In some cases, the returned element
+  ///   may be distinguishable from `newMember` by identity comparison or some
+  ///   other means.
   @discardableResult
   public mutating func update(with newMember: Element) -> Element? {
     return _variantStorage.updateValue(newMember, forKey: newMember)
@@ -684,7 +699,7 @@ public struct Set<Element : Hashable> :
   /// strings.
   ///
   ///     let ingredients: Set = ["cocoa beans", "sugar", "cocoa butter", "salt"]
-  ///     if ingredients.isSupersetOf(["sugar", "salt"]) {
+  ///     if ingredients.isSuperset(of: ["sugar", "salt"]) {
   ///         print("Whatever it is, it's bound to be delicious!")
   ///     }
   ///     // Prints "Whatever it is, it's bound to be delicious!"
@@ -798,7 +813,7 @@ public struct Set<Element : Hashable> :
   ///     // Prints "true"
   ///
   ///     // A set is never a strict subset of itself:
-  ///     print(attendees.isStrictSubsetOf(attendees))
+  ///     print(attendees.isStrictSubset(of: attendees))
   ///     // Prints "false"
   ///
   /// - Parameter possibleStrictSuperset: A sequence of elements.
@@ -919,7 +934,19 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// Inserts the elements of `other` into `self`.
+  /// Inserts the elements of the given sequence into the set.
+  ///
+  /// If the set already contains one or more elements that are also in
+  /// `other`, the existing members are kept. If `other` contains multiple
+  /// instances of equivalent elements, only the first instance is kept.
+  ///
+  ///     var attendees: Set = ["Alicia", "Bethany", "Diana"]
+  ///     let visitors = ["Diana", ""Marcia", "Nathaniel"]
+  ///     attendees.formUnion(visitors)
+  ///     print(attendees)
+  ///     // Prints "["Diana", "Nathaniel", "Bethany", "Alicia", "Marcia"]"
+  ///
+  /// - Parameter other: A sequence of elements. `other` must be finite.
   public mutating func formUnion<
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) {
@@ -1054,8 +1081,8 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// Replace `self` with the elements contained in `self` or `other`,
-  /// but not both.
+  /// Replace this set with the elements contained in this set or the given
+  /// set, but not both.
   ///
   /// For example:
   ///
@@ -4846,7 +4873,7 @@ extension Set {
   ///
   ///     let employees = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let attendees: Set = ["Alicia", "Bethany", "Diana"]
-  ///     print(attendees.isSubsetOf(employees))
+  ///     print(attendees.isSubset(of: employees))
   ///     // Prints "true"
   ///
   /// - Parameter other: A sequence of elements. `possibleSuperset`
@@ -4867,7 +4894,7 @@ extension Set {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let attendees: Set = ["Alicia", "Bethany", "Diana"]
-  ///     print(employees.isSupersetOf(attendees))
+  ///     print(employees.isSuperset(of: attendees))
   ///     // Prints "true"
   ///
   /// - Parameter possibleSubset: Another set.

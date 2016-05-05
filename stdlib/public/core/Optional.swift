@@ -68,7 +68,7 @@
 /// -----------------
 ///
 /// To safely access the properties and methods of a wrapped instance, use the
-/// postfix `?` (optional chaining) operator. The following example uses
+/// postfix optional chaining operator (`?`). The following example uses
 /// optional chaining to access the `hasSuffix(_:)` method on a `String?`
 /// instance.
 ///
@@ -80,7 +80,7 @@
 /// Using the Nil-Coalescing Operator
 /// ---------------------------------
 ///
-/// Use the `??` (nil-coalescing) operator to supply a default value in case
+/// Use the nil-coalescing operator (`??`) to supply a default value in case
 /// the `Optional` instance is `nil`. Here a default path is supplied for an
 /// image that is missing from `imagePaths`.
 ///
@@ -101,8 +101,8 @@
 /// ------------------------
 ///
 /// When you're certain that an instance of `Optional` contains a value, you
-/// can unconditionally unwrap the value by using the postfix `!` (forced
-/// unwrap) operator. For example, the result of the failable `Int`
+/// can unconditionally unwrap the value by using the forced
+/// unwrap operator (postfix `!`). For example, the result of the failable `Int`
 /// initializer is unconditionally unwrapped in the example below.
 ///
 ///     let number = Int("42")!
@@ -211,8 +211,8 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
   /// The wrapped value of this instance, unwrapped without checking whether
   /// the instance is `nil`.
   ///
-  /// The `unsafelyUnwrapped` property provides the same value as the postfix
-  /// `!` (forced unwrap) operator. However, in optimized builds (`-O`), no
+  /// The `unsafelyUnwrapped` property provides the same value as the forced
+  /// unwrap operator (postfix `!`). However, in optimized builds (`-O`), no
   /// check is performed to ensure that the current instance actually has a
   /// value. Accessing this property in the case of a `nil` value is a serious
   /// programming error and could lead to undefined behavior or a runtime
