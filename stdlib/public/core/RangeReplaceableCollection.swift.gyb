@@ -16,6 +16,12 @@
 
 // FIXME: swift-3-indexing-model: synchronize Indexable with the actual
 // protocol.
+/// A type that supports replacement of an arbitrary subrange of elements with
+/// the elements of another collection.
+///
+/// In most cases, it's best to ignore this protocol and use the
+/// `RangeRepleaceableCollection` protocol instead, because it has a more
+/// complete interface.
 public protocol RangeReplaceableIndexable : Indexable {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
@@ -26,57 +32,164 @@ public protocol RangeReplaceableIndexable : Indexable {
   /// Creates an empty instance.
   init()
 
-  /// Creates an instance of `count` elements, each initialized to
-  /// `repeatedValue`.
+  /// Creates a new collection containing the specified number of a single,
+  /// repeated value.
+  ///
+  /// Here's an example of creating an array initialized with five strings
+  /// containing the letter *Z*.
+  ///
+  ///     let fiveZs = Array(repeating: "Z", count: 5)
+  ///     print(fiveZs)
+  ///     // Prints "["Z", "Z", "Z", "Z", "Z"]"
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The element to repeat.
+  ///   - count: The number of times to repeat the value passed in the
+  ///     `repeating` parameter. `count` must be zero or greater.
   init(repeating repeatedValue: _Element, count: Int)
 
-  /// Creates an instance containing `elements`.
+  /// Creates a new instance of a collection containing the elements of a
+  /// sequence.
+  ///
+  /// - Parameter elements: The sequence of elements for the new collection.
+  ///   `elements` must be finite.
   init<
     S : Sequence where S.Iterator.Element == _Element
   >(_ elements: S)
 
-  /// Replaces the given `subrange` of elements with `newElements`.
+  /// Replaces the specified subrange of elements with the given collection.
   ///
-  /// Invalidates all indices with respect to `self`.
+  /// This method has the effect of removing the specified range of elements
+  /// from the collection and inserting the new elements at the same location.
+  /// The number of new elements need not match the number of elements being
+  /// removed.
   ///
-  /// - Complexity: O(`subRange.count`) if
-  ///   `subRange.upperBound == self.endIndex` and `newElements.isEmpty`,
-  ///   O(`self.count` + `newElements.count`) otherwise.
+  /// In this example, three elements in the middle of an array of integers are
+  /// replaced by the five elements of a `Repeated<Int>` instance.
+  ///
+  ///      var nums = [10, 20, 30, 40, 50]
+  ///      nums.replaceSubrange(1...3, with: repeatElement(1, count: 5))
+  ///      print(nums)
+  ///      // Prints "[10, 1, 1, 1, 1, 1, 50]"
+  ///
+  /// If you pass a zero-length range as the `subrange` parameter, this method
+  /// inserts the elements of `newElements` at `subrange.startIndex`. Calling
+  /// the `insert(contentsOf:at:)` method instead is preferred.
+  ///
+  /// Likewise, if you pass a zero-length collection as the `newElements`
+  /// parameter, this method removes the elements in the given subrange
+  /// without replacement. Calling the `removeSubrange(_:)` method instead is
+  /// preferred.
+  ///
+  /// Calling this method may invalidate any existing indices for use with this
+  /// collection.
+  ///
+  /// - Parameters:
+  ///   - subrange: The subrange of the collection to replace. The bounds of
+  ///     the range must be valid indices of the collection.
+  ///   - newElements: The new elements to add to the collection.
+  ///
+  /// - Complexity: O(*m*), where *m* is the combined length of the collection
+  ///   and `newElements`. If the call to `replaceSubrange` simply appends the
+  ///   contents of `newElements` to the collection, the complexity is O(*n*),
+  ///   where *n* is the length of `newElements`.
   mutating func replaceSubrange<
     C : Collection where C.Iterator.Element == _Element
   >(
     _ subrange: Range<Index>, with newElements: C
   )
 
-  /// Inserts `newElement` at index `i`.
+  /// Inserts a new element into the collection at the specified position.
   ///
-  /// Invalidates all indices with respect to `self`.
+  /// The new element is inserted before the element currently at the
+  /// specified index. If you pass the collection's `endIndex` property as
+  /// the `index` parameter, the new element is appended to the
+  /// collection.
   ///
-  /// - Complexity: O(`self.count`).
+  ///     var numbers = [1, 2, 3, 4, 5]
+  ///     numbers.insert(100, at: 3)
+  ///     numbers.insert(200, at: numbers.endIndex)
+  ///
+  ///     print(numbers)
+  ///     // Prints "[1, 2, 3, 100, 4, 5, 200]"
+  ///
+  /// Calling this method may invalidate any existing indices for use with this
+  /// collection.
+  ///
+  /// - Parameter newElement: The new element to insert into the collection.
+  /// - Parameter i: The position at which to insert the new element.
+  ///   `index` must be a valid index into the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   mutating func insert(_ newElement: _Element, at i: Index)
 
-  /// Inserts `newElements` at index `i`.
+  /// Inserts the elements of a sequence into the collection at the specified
+  /// position.
   ///
-  /// Invalidates all indices with respect to `self`.
+  /// The new elements are inserted before the element currently at the
+  /// specified index. If you pass the collection's `endIndex` property as the
+  /// `index` parameter, the new elements are appended to the collection.
   ///
-  /// - Complexity: O(`self.count + newElements.count`).
+  /// Here's an example of inserting a range of integers into an array of the
+  /// same type:
+  ///
+  ///     var numbers = [1, 2, 3, 4, 5]
+  ///     numbers.insert(contentsOf: 100...103, at: 3)
+  ///     print(numbers)
+  ///     // Prints "[1, 2, 3, 100, 101, 102, 103, 4, 5]"
+  ///
+  /// Calling this method may invalidate any existing indices for use with this
+  /// collection.
+  ///
+  /// - Parameter newElements: The new elements to insert into the collection.
+  /// - Parameter i: The position at which to insert the new elements. `index`
+  ///   must be a valid index of the collection.
+  ///
+  /// - Complexity: O(*m*), where *m* is the combined length of the collection
+  ///   and `newElements`. If `i` is equal to the collection's `endIndex`
+  ///   property, the complexity is O(*n*), where *n* is the length of
+  ///   `newElements`.
   mutating func insert<
     S : Collection where S.Iterator.Element == _Element
   >(contentsOf newElements: S, at i: Index)
 
-  /// Removes the element at index `i`.
+  /// Removes and returns the element at the specified position.
   ///
-  /// Invalidates all indices with respect to `self`.
+  /// All the elements following the specified position are moved to close the
+  /// gap. This example removes the middle element from an array of
+  /// measurements.
   ///
-  /// - Complexity: O(`self.count`).
+  ///     var measurements = [1.2, 1.5, 2.9, 1.2, 1.6]
+  ///     let removed = measurements.remove(at: 2)
+  ///     print(measurements)
+  ///     // Prints "[1.2, 1.5, 1.2, 1.6]"
+  ///
+  /// Calling this method may invalidate any existing indices for use with this
+  /// collection.
+  ///
+  /// - Parameter i: The position of the element to remove. `index` must be
+  ///   a valid index of the collection that is not equal to the collection's
+  ///   end index.
+  /// - Returns: The removed element.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @discardableResult
   mutating func remove(at i: Index) -> _Element
 
-  /// Removes all elements within `bounds`.
+  /// Removes the specified subrange of elements from the collection.
   ///
-  /// Invalidates all indices with respect to `self`.
+  ///     var bugs = ["Aphid", "Bumblebee", "Cicada", "Damselfly", "Earwig"]
+  ///     bugs.removeSubrange(1...3)
+  ///     print(bugs)
+  ///     // Prints "["Aphid", "Earwig"]"
   ///
-  /// - Complexity: O(`self.count`).
+  /// Calling this method may invalidate any existing indices for use with this
+  /// collection.
+  ///
+  /// - Parameter bounds: The subrange of the collection to remove. The bounds
+  ///   of the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   mutating func removeSubrange(_ bounds: Range<Index>)
 }
 
@@ -109,10 +222,10 @@ public protocol RangeReplaceableIndexable : Indexable {
 /// Lastly, use the eponymous `replaceSubrange(_:with:)` method to replace
 /// a subrange of elements with the contents of another collection. Here,
 /// three elements in the middle of an array of integers are replaced by the
-/// five elements of a `Repeat<Int>` instance.
+/// five elements of a `Repeated<Int>` instance.
 ///
 ///      var nums = [10, 20, 30, 40, 50]
-///      nums.replaceSubrange(1...3, with: Repeat(count: 5, repeatedValue: 1)))
+///      nums.replaceSubrange(1...3, with: repeatElement(1, count: 5))
 ///      print(nums)
 ///      // Prints "[10, 1, 1, 1, 1, 1, 50]"
 ///
@@ -143,10 +256,10 @@ public protocol RangeReplaceableCollection
   /// removed.
   ///
   /// In this example, three elements in the middle of an array of integers are
-  /// replaced by the five elements of a `Repeat<Int>` instance.
+  /// replaced by the five elements of a `Repeated<Int>` instance.
   ///
   ///      var nums = [10, 20, 30, 40, 50]
-  ///      nums.replaceSubrange(1...3, with: Repeat(count: 5, repeatedValue: 1)))
+  ///      nums.replaceSubrange(1...3, with: repeatElement(1, count: 5))
   ///      print(nums)
   ///      // Prints "[10, 1, 1, 1, 1, 1, 50]"
   ///
@@ -208,11 +321,11 @@ public protocol RangeReplaceableCollection
   /// Prepares the collection to store the specified number of elements, when
   /// doing so is appropriate for the underlying type.
   ///
-  /// Use this method to avoid multiple reallocations if you will be adding a
-  /// known number of elements to a collection. A type that conforms to
+  /// If you are adding a known number of elements to a collection, use this
+  /// method to avoid multiple reallocations. A type that conforms to
   /// `RangeReplaceableCollection` can choose how to respond when this method
   /// is called. Depending on the type, it may make sense to allocate more or
-  /// less storage than requested or to take no action at all.
+  /// less storage than requested, or to take no action at all.
   ///
   /// - Parameter n: The requested number of elements to store.
   mutating func reserveCapacity(_ n: IndexDistance)
@@ -222,8 +335,8 @@ public protocol RangeReplaceableCollection
   /// Creates a new collection containing the specified number of a single,
   /// repeated value.
   ///
-  /// Here's an example of creating an array initialized with five strings
-  /// containing the letter "Z".
+  /// The following example creates an array initialized with five strings
+  /// containing the letter *Z*.
   ///
   ///     let fiveZs = Array(repeating: "Z", count: 5)
   ///     print(fiveZs)
@@ -239,6 +352,7 @@ public protocol RangeReplaceableCollection
   /// sequence.
   ///
   /// - Parameter elements: The sequence of elements for the new collection.
+  ///   `elements` must be finite.
   init<
     S : Sequence where S.Iterator.Element == Iterator.Element
   >(_ elements: S)
@@ -253,11 +367,11 @@ public protocol RangeReplaceableCollection
   ///     print(numbers)
   ///     // Prints "[1, 2, 3, 4, 5, 100]"
   ///
-  /// - Parameter x: The element to append to the collection.
+  /// - Parameter newElement: The element to append to the collection.
   ///
   /// - Complexity: O(1) on average, over many additions to the same
   ///   collection.
-  mutating func append(_ x: Iterator.Element)
+  mutating func append(_ newElement: Iterator.Element)
 
   /*
   The 'append(contentsOf:)' requirement should be an operator, but the compiler crashes:
@@ -442,7 +556,7 @@ extension RangeReplaceableCollection {
   /// repeated value.
   ///
   /// Here's an example of creating an array initialized with five strings
-  /// containing the letter "Z".
+  /// containing the letter *Z*.
   ///
   ///     let fiveZs = Array(repeating: "Z", count: 5)
   ///     print(fiveZs)
@@ -696,8 +810,8 @@ extension RangeReplaceableCollection {
   /// Prepares the collection to store the specified number of elements, when
   /// doing so is appropriate for the underlying type.
   ///
-  /// Use this method to avoid multiple reallocations if you will be adding a
-  /// known number of elements to a collection. A type that conforms to
+  /// If you will be adding a known number of elements to a collection, use
+  /// this method to avoid multiple reallocations. A type that conforms to
   /// `RangeReplaceableCollection` can choose how to respond when this method
   /// is called. Depending on the type, it may make sense to allocate more or
   /// less storage than requested or to take no action at all.
@@ -779,10 +893,10 @@ extension RangeReplaceableCollection
   /// removed.
   ///
   /// In this example, three elements in the middle of an array of integers are
-  /// replaced by the five elements of a `Repeat<Int>` instance.
+  /// replaced by the five elements of a `Repeated<Int>` instance.
   ///
   ///      var nums = [10, 20, 30, 40, 50]
-  ///      nums.replaceSubrange(1...3, with: Repeat(count: 5, repeatedValue: 1)))
+  ///      nums.replaceSubrange(1...3, with: repeatElement(1, count: 5))
   ///      print(nums)
   ///      // Prints "[10, 1, 1, 1, 1, 1, 50]"
   ///

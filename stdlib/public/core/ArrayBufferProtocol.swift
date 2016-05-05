@@ -27,7 +27,7 @@ public protocol _ArrayBufferProtocol
   init(_ buffer: _ContiguousArrayBuffer<Element>, shiftedToStartIndex: Int)
 
   /// Copy the elements in `bounds` from this buffer into uninitialized
-  /// memory starting at `target`.  Return a pointer past-the-end of the
+  /// memory starting at `target`.  Return a pointer "past the end" of the
   /// just-initialized memory.
   @discardableResult
   func _copyContents(

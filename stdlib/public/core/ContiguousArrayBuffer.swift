@@ -382,7 +382,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   }
 
   /// Copy the elements in `bounds` from this buffer into uninitialized
-  /// memory starting at `target`.  Return a pointer past-the-end of the
+  /// memory starting at `target`.  Return a pointer "past the end" of the
   /// just-initialized memory.
   @discardableResult
   public func _copyContents(
