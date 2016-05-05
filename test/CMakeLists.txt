@@ -41,7 +41,10 @@ function(get_test_dependencies SDK result_var_name)
 
   set(deps_binaries
       swift swift-ide-test sil-opt swift-llvm-opt swift-demangle sil-extract
-      lldb-moduleimport-test swift-reflection-dump swift-remoteast-test)
+      lldb-moduleimport-test swift-remoteast-test)
+  if(SWIFT_BUILD_DYNAMIC_STDLIB)
+    list(APPEND deps_binaries swift-reflection-dump)
+  endif()
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries llc)
   endif()

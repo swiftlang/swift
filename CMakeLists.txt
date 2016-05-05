@@ -44,17 +44,33 @@ option(SWIFT_BUILD_TOOLS
     "Build the Swift compiler and other tools"
     TRUE)
 
-option(SWIFT_BUILD_STDLIB
-    "Build the Swift standard library (independent of the SDK headers)"
-    TRUE)
-
-option(SWIFT_BUILD_SDK_OVERLAY
-    "Build Swift SDK overlay"
+option(SWIFT_BUILD_DYNAMIC_STDLIB
+    "Build dynamic variants of the Swift standard library"
     TRUE)
 
 option(SWIFT_BUILD_STATIC_STDLIB
-    "Build static variants of the Swift standard library and SDK overlay"
+    "Build static variants of the Swift standard library"
     FALSE)
+
+if(SWIFT_BUILD_DYNAMIC_STDLIB OR SWIFT_BUILD_STATIC_STDLIB)
+  set(SWIFT_BUILD_STDLIB TRUE)
+else()
+  set(SWIFT_BUILD_STDLIB FALSE)
+endif()
+
+option(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY
+    "Build dynamic variants of the Swift SDK overlays"
+    TRUE)
+
+option(SWIFT_BUILD_STATIC_SDK_OVERLAY
+    "Build static variants of the Swift SDK overlays"
+    FALSE)
+
+if(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY OR SWIFT_BUILD_STATIC_SDK_OVERLAY)
+  set(SWIFT_BUILD_SDK_OVERLAY TRUE)
+else()
+  set(SWIFT_BUILD_SDK_OVERLAY FALSE)
+endif()
 
 option(SWIFT_BUILD_PERF_TESTSUITE
     "Create targets for swift performance benchmarks."
@@ -795,14 +811,14 @@ if(SWIFT_BUILD_TOOLS)
 endif()
 
 is_sdk_requested("${SWIFT_HOST_VARIANT_SDK}" SWIFT_HOST_SDK_REQUESTED)
-if(SWIFT_BUILD_TOOLS AND SWIFT_BUILD_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
+if(SWIFT_BUILD_TOOLS AND SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
   add_subdirectory(tools/swift-reflection-dump)
 endif()
 
 add_subdirectory(utils)
 add_subdirectory(stdlib)
 
-if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
+if(SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_INCLUDE_TESTS)
   add_subdirectory(tools/swift-reflection-test)
 endif()
 
