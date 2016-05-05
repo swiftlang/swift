@@ -35,8 +35,7 @@ function(generate_revision_inc revision_inc_var name dir)
     # Create custom target to generate the VC revision include.
     set(revision_inc "${CMAKE_CURRENT_BINARY_DIR}/${name}Revision.inc")
     string(TOUPPER ${name} upper_name)
-    add_custom_command(OUTPUT "${revision_inc}"
-      DEPENDS "${dep_file}" "${get_svn_script}"
+    execute_process(
       COMMAND
       ${CMAKE_COMMAND} "-DFIRST_SOURCE_DIR=${dir}"
                        "-DFIRST_NAME=${upper_name}"
