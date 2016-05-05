@@ -351,10 +351,10 @@ func unavailableInstanceSecondOfThree(a: Int, b: Int, c: Int) {} // expected-not
 
 func testRenameInstance() {
   unavailableInstance(a: 0) // expected-error{{'unavailableInstance(a:)' has been renamed to 'Int.foo(self:)'}} {{3-22=0.foo}} {{23-27=}}
-  unavailableInstanceUnlabeled(0) // expected-error{{'unavailableInstanceUnlabeled' has been renamed to 'Int.foo(self:)'}} {{3-31=0.foo}} {{31-34=}}
-  unavailableInstanceFirst(a: 0, b: 1) // expected-error{{'unavailableInstanceFirst(a:b:)' has been renamed to 'Int.foo(self:other:)'}} {{3-27=0.foo}} {{28-32=}} {{34-35=other}}
+  unavailableInstanceUnlabeled(0) // expected-error{{'unavailableInstanceUnlabeled' has been renamed to 'Int.foo(self:)'}} {{3-31=0.foo}} {{32-33=}}
+  unavailableInstanceFirst(a: 0, b: 1) // expected-error{{'unavailableInstanceFirst(a:b:)' has been renamed to 'Int.foo(self:other:)'}} {{3-27=0.foo}} {{28-34=}} {{34-35=other}}
   unavailableInstanceSecond(a: 0, b: 1) // expected-error{{'unavailableInstanceSecond(a:b:)' has been renamed to 'Int.foo(other:self:)'}} {{3-28=1.foo}} {{29-30=other}} {{33-39=}}
-  unavailableInstanceSecondOfThree(a: 0, b: 1, c: 2) // expected-error{{'unavailableInstanceSecondOfThree(a:b:c:)' has been renamed to 'Int.foo(_:self:c:)'}} {{3-35=1.foo}} {{36-39=}} {{40-46=}}
+  unavailableInstanceSecondOfThree(a: 0, b: 1, c: 2) // expected-error{{'unavailableInstanceSecondOfThree(a:b:c:)' has been renamed to 'Int.foo(_:self:c:)'}} {{3-35=1.foo}} {{36-39=}} {{42-48=}}
 
   unavailableInstance(a: 0 + 0) // expected-error{{'unavailableInstance(a:)' has been renamed to 'Int.foo(self:)'}} {{3-22=(0 + 0).foo}} {{23-31=}}
 }

@@ -1023,8 +1023,8 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
 
     unsigned selfIndex = parsed.SelfIndex.getValue();
     const Expr *selfExpr = nullptr;
-    SourceRange selfArgRange;
-    SourceLoc endOfPreviousArg;
+    SourceLoc removeRangeStart;
+    SourceLoc removeRangeEnd;
 
     const Expr *argExpr = CE->getArg();
     if (auto args = dyn_cast<TupleExpr>(argExpr)) {
@@ -1035,16 +1035,33 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
       }
 
       selfExpr = args->getElement(selfIndex);
-      selfArgRange = selfExpr->getSourceRange();
 
-      SourceLoc labelLoc = args->getElementNameLoc(selfIndex);
-      if (labelLoc.isValid())
-        selfArgRange.Start = labelLoc;
+      if (selfIndex + 1 == args->getNumElements()) {
+        if (selfIndex > 0) {
+          // Remove from the previous comma to the close-paren (half-open).
+          removeRangeStart = args->getElement(selfIndex-1)->getEndLoc();
+          removeRangeStart = Lexer::getLocForEndOfToken(sourceMgr,
+                                                        removeRangeStart);
+        } else {
+          // Remove from after the open paren to the close paren (half-open).
+          removeRangeStart = Lexer::getLocForEndOfToken(sourceMgr,
+                                                        argExpr->getStartLoc());
+        }
+        removeRangeEnd = args->getEndLoc();
 
-      if (selfIndex > 0) {
-        endOfPreviousArg = args->getElement(selfIndex-1)->getEndLoc();
-        endOfPreviousArg = Lexer::getLocForEndOfToken(sourceMgr,
-                                                      endOfPreviousArg);
+      } else {
+        // Remove from the label to the start of the next argument (half-open).
+        SourceLoc labelLoc = args->getElementNameLoc(selfIndex);
+        if (labelLoc.isValid())
+          removeRangeStart = labelLoc;
+        else
+          removeRangeStart = selfExpr->getStartLoc();
+
+        SourceLoc nextLabelLoc = args->getElementNameLoc(selfIndex + 1);
+        if (nextLabelLoc.isValid())
+          removeRangeEnd = nextLabelLoc;
+        else
+          removeRangeEnd = args->getElement(selfIndex + 1)->getStartLoc();
       }
 
       // Avoid later argument label fix-its for this argument.
@@ -1059,14 +1076,11 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
       if (selfIndex != 0 || !parsed.ArgumentLabels.empty())
         return;
       selfExpr = cast<ParenExpr>(argExpr)->getSubExpr();
-      selfArgRange = argExpr->getSourceRange();
+      // Remove from after the open paren to the close paren (half-open).
+      removeRangeStart = Lexer::getLocForEndOfToken(sourceMgr,
+                                                    argExpr->getStartLoc());
+      removeRangeEnd = argExpr->getEndLoc();
     }
-
-    if (selfArgRange.Start.isInvalid() || selfArgRange.End.isInvalid())
-      return;
-
-    if (endOfPreviousArg.isInvalid())
-      endOfPreviousArg = selfArgRange.Start;
 
     CharSourceRange selfExprRange =
         Lexer::getCharSourceRangeFromSourceRange(sourceMgr,
@@ -1083,11 +1097,8 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
     selfReplace += parsed.BaseName;
     diag.fixItReplace(CE->getFn()->getSourceRange(), selfReplace);
 
-    if (!parsed.IsGetter) {
-      diag.fixItRemoveChars(endOfPreviousArg,
-                            Lexer::getLocForEndOfToken(sourceMgr,
-                                                       selfArgRange.End));
-    }
+    if (!parsed.IsGetter)
+      diag.fixItRemoveChars(removeRangeStart, removeRangeEnd);
 
     // Continue on to diagnose any argument label renames.
 
