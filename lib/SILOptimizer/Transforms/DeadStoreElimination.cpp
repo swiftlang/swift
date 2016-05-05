@@ -320,9 +320,6 @@ private:
   /// Alias Analysis.
   AliasAnalysis *AA;
 
-  /// Escape Analysis.
-  EscapeAnalysis *EA;
-
   /// Type Expansion Analysis.
   TypeExpansionAnalysis *TE;
 
@@ -432,10 +429,10 @@ private:
 public:
   /// Constructor.
   DSEContext(SILFunction *F, SILModule *M, SILPassManager *PM,
-             AliasAnalysis *AA, EscapeAnalysis *EA, TypeExpansionAnalysis *TE,
+             AliasAnalysis *AA, TypeExpansionAnalysis *TE,
              llvm::BumpPtrAllocator &BPA,
              ConsumedArgToEpilogueReleaseMatcher &ERM)
-    : Mod(M), F(F), PM(PM), AA(AA), EA(EA), TE(TE), BPA(BPA), ERM(ERM) {}
+    : Mod(M), F(F), PM(PM), AA(AA), TE(TE), BPA(BPA), ERM(ERM) {}
 
   /// Entry point for dead store elimination.
   bool run();
@@ -1234,7 +1231,6 @@ public:
     DEBUG(llvm::dbgs() << "*** DSE on function: " << F->getName() << " ***\n");
 
     auto *AA = PM->getAnalysis<AliasAnalysis>();
-    auto *EA = PM->getAnalysis<EscapeAnalysis>();
     auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();
     auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
 
@@ -1244,7 +1240,7 @@ public:
     // The epilogue release matcher we are using.
     ConsumedArgToEpilogueReleaseMatcher ERM(RCFI, F);
 
-    DSEContext DSE(F, &F->getModule(), PM, AA, EA, TE, BPA, ERM);
+    DSEContext DSE(F, &F->getModule(), PM, AA, TE, BPA, ERM);
     if (DSE.run()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
