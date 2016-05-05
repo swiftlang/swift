@@ -1,3 +1,4 @@
+// REQUIRES: rdar26121117
 import Foo
 
 // RUN: rm -rf %t.ccp

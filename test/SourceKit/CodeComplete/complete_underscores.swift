@@ -1,3 +1,4 @@
+// REQUIRES: rdar26121117
 import Foo
 class Foo {
   func foo() {}

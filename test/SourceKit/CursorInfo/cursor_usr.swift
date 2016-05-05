@@ -1,3 +1,4 @@
+// REQUIRES: rdar26121117
 // The RUN lines are at the bottom in case we ever need to rely on line:col info.
 import Foo
 import FooSwiftModule

@@ -1,3 +1,4 @@
+// REQUIRES: rdar26121117
 // The top of this file is very sensitive to modification as we're using raw
 // offsets for code-completion locations.
 
