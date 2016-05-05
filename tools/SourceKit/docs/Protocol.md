@@ -19,7 +19,7 @@ The protocol is documented in the following format:
 
 # Requests
 
-## Code-Completion
+## Code Completion
 
 SourceKit is capable of providing code completion suggestions. To do so, it
 must be given either the path to a file (`key.sourcefile`), or some text
@@ -70,7 +70,7 @@ $ sourcekitd-test -req=complete -offset=<offset> <file> [-- <compiler args>]
 ```
 
 For example, to get a code completion suggestion for the 58th character in an
-ASCII file at `path/to/file.swift`:
+ASCII file at `/path/to/file.swift`:
 
 ```
 $ sourcekitd-test -req=complete -offset=58 /path/to/file.swift -- /path/to/file.swift
@@ -92,7 +92,7 @@ Welcome to SourceKit.  Type ':help' for assistance.
 ## Indexing
 
 SourceKit is capable of "indexing" source code, responding with which ranges
-of text contain what kinds of source code. In other words, SourceKit is
+of text contain what kinds of source code. For example, SourceKit is
 capable of telling you that "the source code on line 2, column 9, is a
 reference to a struct".
 
@@ -162,7 +162,7 @@ dependency ::=
 $ sourcekitd-test -req=index <file> [-- <compiler args>]
 ```
 
-For example, to index a file at `path/to/file.swift`:
+For example, to index a file at `/path/to/file.swift`:
 
 ```
 $ sourcekitd-test -req=index /path/to/file.swift -- /path/to/file.swift
@@ -180,44 +180,115 @@ Welcome to SourceKit.  Type ':help' for assistance.
 }
 ```
 
-## DocInfo
+## Documentation
+
+SourceKit is capable of gathering symbols and their documentation, either
+from Swift source code or from a Swift module. SourceKit returns a list of
+symbols and, if they are documented, the documentation for those symbols.
+
+To gather documentation, SourceKit must be given either the name of a module
+(`key.modulename`), the path to a file (`key.sourcefile`), or some text
+(`key.sourcetext`). `key.sourcefile` is ignored when `key.sourcetext` is also
+provided, and both of those keys are ignored if `key.modulename` is provided.
+
+### Request
 
 ```
 {
-  "key.request": source.request.docinfo,
-  "key.modulename": "Foundation",
-  "key.compilerargs": ["-sdk", "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk"]
+    <key.request>:          (UID) <source.request.docinfo>
+    [opt] <key.modulename>: (string)   // The name of the Swift module.
+    [opt] <key.sourcetext>: (string)   // Source contents.
+    [opt] <key.sourcefile>: (string)   // Absolute path to the file.
+    [opt] <key.compilerargs> [string*] // Array of zero or more strings for the compiler arguments
+                                       // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
+                                       // these must include the path to that file.
 }
 ```
 
-This will return:
-
-- `key.sourcetext`: The pretty-printed module interface in swift source code
-- `key.annotations`: An array of annotations for the tokens of source text, they refer to the text via offset+length entries. This includes syntactic annotations (e.g. keywords) and semantic ones. The semantic ones include the name and USR of the referenced symbol.
-- `key.entities`: A structure of the symbols, similar to what the indexing request returns (a class has its methods as sub-entities, etc.). This includes the function parameters and their types as entities. Each entity refers to the range of the original text via offset+length entries.
-
-
-For source text (you can also pass a source filename with `key.sourcefile`):
+### Response
 
 ```
 {
-  "key.request": source.request.docinfo,
-  "key.sourcefile": "/whatever/virtual/path",
-  "key.sourcetext": "import Foundation\n var s: NSString\n",
-  "key.compilerargs": ["/whatever/virtual/path", "-sdk", "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.10.sdk"]
+    <key.sourcetext>:        (string)              // Source contents.
+    <key.annotations>:       (array) [annotation*] // An array of annotations for the tokens of
+                                                   // source text, they refer to the text via offset + length
+                                                   // entries. This includes syntactic annotations (e.g.
+                                                   // keywords) and semantic ones. The semantic ones include
+                                                   // the name and USR of the referenced symbol.
+    [opt] <key.entities>:    (array) [entity*]     // A structure of the symbols, similar to what the indexing
+                                                   // request returns (a class has its methods as sub-entities,
+                                                   // etc.). This includes the function parameters and their
+                                                   // types as entities. Each entity refers to the range of the
+                                                   // original text via offset + length entries.
+    [opt] <key.diagnostics>: (array) [diagnostic*] // Compiler diagnostics emitted during parsing of a source file.
+                                                   // This key is only present if a diagnostic was emitted (and thus
+                                                   // the length of the array is non-zero).
 }
 ```
 
-This will return
+```
+annotation ::=
+{
+    <key.kind>:   (UID)   // UID for the declaration kind (function, class, etc.).
+    <key.offset>: (int64) // Location of the annotated token.
+    <key.length>: (int64) // Length of the annotated token.
+}
+```
 
-- `key.annotations`
-- `key.entities`
+```
+entity ::=
+{
+    <key.kind>:                  (UID)             // UID for the declaration or reference kind (function, class, etc.).
+    <key.name>:                  (string)          // Displayed name for the entity.
+    <key.usr>:                   (string)          // USR string for the entity.
+    <key.offset>:                (int64)           // Location of the entity.
+    <key.length>:                (int64)           // Length of the entity.
+    <key.fully_annotated_decl>:  (string)          // XML representing the entity, its USR, etc.
+    [opt] <key.doc.full_as_xml>: (string)          // XML representing the entity and its documentation. Only present
+                                                   // when the entity is documented.
+    [opt] <key.entities>:        (array) [entity+] // One or more entities contained in the particular entity (sub-classes, references, etc.).
+}
+```
 
-...which will refer to the original text, and:
+```
+diagnostic ::=
+{
+    <key.line>:        (int64)  // The line upon which the diagnostic was emitted.
+    <key.column>:      (int64)  // The column upon which the diagnostic was emitted.
+    <key.filepath>:    (string) // The absolute path to the file that was being parsed
+                                // when the diagnostic was emitted.
+    <key.severity>:    (UID)    // The severity of the diagnostic. Can be one of:
+                                //   - source.diagnostic.severity.note
+                                //   - source.diagnostic.severity.warning
+                                //   - source.diagnostic.severity.error
+    <key.description>: (string) // A description of the diagnostic.
+}
+```
 
-- `key.diagnostics`
+### Testing
 
-...for any compiler diagnostics during parsing.
+```
+$ sourcekitd-test -req=doc-info <file> [-- <compiler args>]
+```
+
+For example, to gather documentation info for a file at `/path/to/file.swift`:
+
+```
+$ sourcekitd-test -req=doc-info /path/to/file.swift -- /path/to/file.swift
+```
+
+You could also issue the following request in the `sourcekitd-repl` to
+gather all the documentation info for Foundation (careful, it's a lot!):
+
+```
+$ sourcekitd-repl
+Welcome to SourceKit.  Type ':help' for assistance.
+(SourceKit) {
+    key.request: source.request.docinfo,
+    key.modulename: "Foundation",
+    key.compilerargs: ["-sdk", "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk"]
+}
+```
 
 ## Module interface generation
 
