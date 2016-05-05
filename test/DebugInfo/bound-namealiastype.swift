@@ -1,3 +1,4 @@
+// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend -emit-ir -g %s -o - | FileCheck %s
 
 public protocol OS_dispatch_queue {

@@ -1,3 +1,4 @@
+// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend %s -g -emit-ir -o - | FileCheck %s
 
 // Ensure that the debug info we're emitting passes the back end verifier.

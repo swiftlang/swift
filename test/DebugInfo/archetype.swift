@@ -1,3 +1,4 @@
+// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
 protocol IntegerArithmetic {

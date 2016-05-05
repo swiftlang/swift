@@ -1,3 +1,4 @@
+// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 // Capture the pointer size from type Int
 // CHECK: %Si = type <{ i[[PTRSIZE:[0-9]+]] }>

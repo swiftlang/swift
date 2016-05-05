@@ -1,3 +1,4 @@
+// REQUIRES: rdar26102242
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swift-frontend -emit-module-path %t/basic.swiftmodule %S/basic.swift
 

@@ -1,3 +1,4 @@
+// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
 func apply<Type>(_ T : Type, fn: (Type) -> Type) -> Type { return fn(T) }
