@@ -594,11 +594,12 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
 
   auto IndirectResultArgs = AI.getIndirectResults();
   auto IndirectResultInfos = SubstCalleeType->getIndirectResults();
-  for (unsigned i : indices(IndirectResultArgs))
+  for (unsigned i : indices(IndirectResultArgs)) {
     NewArgs.push_back(castValueToABICompatibleType(&B, AI.getLoc(),
                               IndirectResultArgs[i],
                               IndirectResultArgs[i]->getType(),
                               IndirectResultInfos[i].getSILType()).getValue());
+  }
 
   auto Args = AI.getArgumentsWithoutIndirectResults();
   auto ParamTypes = SubstCalleeType->getParameterSILTypes();
@@ -614,7 +615,6 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
                                                  ClassOrMetatype,
                                                  ClassOrMetatypeType,
                                                  SelfParamTy).getValue());
-
   SILType ResultTy = SubstCalleeType->getSILResult();
 
   SILType SubstCalleeSILType =

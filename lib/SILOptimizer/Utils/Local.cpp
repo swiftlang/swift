@@ -467,6 +467,14 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
 
   SILValue CastedValue;
 
+  if (SrcTy.isAddress() && DestTy.isAddress()) {
+    // Cast between two addresses and that's it.
+    if (CheckOnly)
+      return Value;
+    CastedValue = B->createUncheckedAddrCast(Loc, Value, DestTy);
+    return CastedValue;
+  }
+
   auto &M = B->getModule();
   OptionalTypeKind SrcOTK;
   OptionalTypeKind DestOTK;
@@ -1741,6 +1749,12 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
                           Dest->getType().getSwiftRValueType(),
                           isSourceTypeExact,
                           Mod.isWholeModule());
+
+  // THIS IS A HACK TO DEBUG SOME ERRORS IN THE SPECULATIVE DEVIRTUALIZER.
+#if 0
+  if (Inst->isExact())
+    Feasibility = DynamicCastFeasibility::WillFail;
+#endif
 
   if (Feasibility == DynamicCastFeasibility::MaySucceed) {
     return nullptr;

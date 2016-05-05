@@ -2110,7 +2110,7 @@ public:
     if (CCABI->isExact()) {
       // TODO: Restrict the target type. It cannot be an existential
       // (at least if the source is an existential).
-      require(CCABI->getDest()->getType().isAnyExistentialType(),
+      require(!CCABI->getDest()->getType().isAnyExistentialType(),
             "checked_cast_addr_br dest must not be an existential");
     }
   }

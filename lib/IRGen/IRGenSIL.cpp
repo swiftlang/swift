@@ -4130,6 +4130,14 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
 
 void IRGenSILFunction::visitCheckedCastAddrBranchInst(
                                           swift::CheckedCastAddrBranchInst *i) {
+#if 0
+  // THIS IS A HACK FOR DEBUG PURPOSES ONLY
+  if (i->isExact()) {
+    Builder.CreateBr(getLoweredBB(i->getFailureBB()).bb);
+    return;
+  }
+#endif
+
   Address dest = getLoweredAddress(i->getDest());
   Address src = getLoweredAddress(i->getSrc());
   llvm::Value *castSucceeded =
