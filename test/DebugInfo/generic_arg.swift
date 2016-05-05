@@ -1,5 +1,5 @@
-// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+
 import StdlibUnittest
 func foo<T>(_ x: T) -> () {
   // CHECK: define {{.*}} @_TF11generic_arg3foourFxT_
@@ -15,8 +15,10 @@ func foo<T>(_ x: T) -> () {
   // CHECK-SAME:                       flags: DIFlagArtificial)
   // CHECK: ![[EMPTY]] = !DIExpression()
   // CHECK: ![[X1]] = !DILocalVariable(name: "x", arg: 1,
-  // CHECK-SAME:          line: 3, type: !"_TtQq_F11generic_arg3foourFxT_")
+  // CHECK-SAME:                       line: 3, type: ![[XTY:[0-9]+]])
+  // CHECK: ![[XTY]] = !DICompositeType(tag: DW_TAG_structure_type, name: "_TtQq_F11generic_arg3foourFxT_", {{.*}}, identifier: "_TtQq_F11generic_arg3foourFxT_")
   _blackHole(x)
 }
 
 foo(42)
+

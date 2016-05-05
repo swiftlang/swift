@@ -1,4 +1,3 @@
-// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
 func apply<Type>(_ T : Type, fn: (Type) -> Type) -> Type { return fn(T) }
@@ -11,7 +10,9 @@ public func f<Type>(_ value : Type)
   // CHECK-SAME:       metadata ![[ARG:.*]], metadata ![[EXPR:.*]])
   // No deref here: The argument is an Archetype and this implicitly indirect.
   // CHECK: ![[EXPR]] = !DIExpression()
+  // CHECK: ![[ARGTY:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "_TtQq_F12generic_arg31furFxT_", {{.*}}, identifier: "_TtQq_F12generic_arg31furFxT_")
   // CHECK: ![[ARG]] = !DILocalVariable(name: "arg", arg: 1,
-  // CHECK-SAME:     line: [[@LINE+1]], type: !"_TtQq_F12generic_arg31furFxT_")
+  // CHECK-SAME:                        line: [[@LINE+1]], type: ![[ARGTY]])
   apply(value) { arg in return arg }
 }
+

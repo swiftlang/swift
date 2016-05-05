@@ -1,4 +1,3 @@
-// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend -emit-ir -g %s -o %t.ll
 // RUN: FileCheck %s --check-prefix CHECK-HIDDEN < %t.ll
 // RUN: FileCheck %s --check-prefix IMPORT-CHECK < %t.ll
@@ -21,12 +20,11 @@ class MyObject : NSObject {
   // LOC-CHECK: ret {{.*}}, !dbg ![[DBG:.*]]
   // LOC-CHECK: ret
   var MyArr = NSArray()
-// IMPORT-CHECK: filename: "test-foundation.swift"
-// IMPORT-CHECK: [[FOUNDATION:[0-9]+]] = !DIModule({{.*}} name: "Foundation",
-// IMPORT-CHECK-SAME:                              {{.*}} includePath:
-// IMPORT-CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray",
-// IMPORT-CHECK-SAME:             scope: ![[FOUNDATION]]
-// IMPORT-CHECK: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}entity: ![[FOUNDATION]]
+
+  // IMPORT-CHECK-DAG: !DIFile(filename: "test-foundation.swift"
+  // IMPORT-CHECK-DAG: ![[FOUNDATION:[0-9]+]] = !DIModule({{.*}}, name: "Foundation", includePath:
+  // IMPORT-CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray", scope: ![[FOUNDATION]]
+  // IMPORT-CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}, entity: ![[FOUNDATION]]
 
   func foo(_ obj: MyObject) {
     return obj.foo(obj)

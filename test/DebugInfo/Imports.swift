@@ -1,4 +1,3 @@
-// REQUIRES: rdar26102242
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swift-frontend -emit-module-path %t/basic.swiftmodule %S/basic.swift
 
@@ -22,10 +21,10 @@ markUsed(basic.foo(1, 2))
 
 // DWARF: .debug_info
 // DWARF: DW_TAG_module
-// DWARF:   DW_AT_name {{.*}}"Swift"
+// DWARF:   DW_AT_name {{.*}}"Foo"
 // DWARF:   DW_AT_LLVM_include_path
 // DWARF: DW_TAG_module
-// DWARF:   DW_AT_name {{.*}}"Foo"
+// DWARF:   DW_AT_name {{.*}}"Swift"
 // DWARF:   DW_AT_LLVM_include_path
 // DWARF: DW_TAG_module
 // DWARF:   DW_AT_name {{.*}}"basic"

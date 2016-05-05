@@ -1,4 +1,3 @@
-// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
 func markUsed<T>(_ t: T) {}
@@ -8,22 +7,20 @@ public protocol IGiveOutInts {
 }
 
 // CHECK: define {{.*}}@_TF11protocolarg16printSomeNumbersFPS_12IGiveOutInts_T_
-// CHECK: @llvm.dbg.declare(metadata %P11protocolarg12IGiveOutInts_* %
-// CHECK-SAME:              metadata ![[VAR:.*]], metadata ![[EMPTY:.*]])
 // CHECK: @llvm.dbg.declare(metadata %P11protocolarg12IGiveOutInts_** %
-// CHECK-SAME:              metadata ![[ARG:.*]], metadata ![[DEREF:.*]])
-
-// FIXME: Should be DW_TAG_interface_type
-// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "IGiveOutInts"
-// CHECK-SAME:             identifier: [[PT:"[^"]+"]]
+// CHECK-SAME:              metadata ![[ARG:[0-9]+]], metadata ![[DEREF:[0-9]+]])
+// CHECK: @llvm.dbg.declare(metadata %P11protocolarg12IGiveOutInts_* %
+// CHECK-SAME:              metadata ![[VAR:[0-9]+]], metadata ![[EMPTY:[0-9]+]])
 
 public func printSomeNumbers(_ gen: IGiveOutInts) {
   var gen = gen
-  // CHECK: ![[EMPTY]] = !DIExpression()
-  // CHECK: ![[VAR]] = !DILocalVariable(name: "gen", {{.*}} line: [[@LINE-2]]
-  // CHECK: ![[ARG]] = !DILocalVariable(name: "gen", arg: 1,
-  // CHECK-SAME:                        line: [[@LINE-5]], type: ![[PT]]
-  // CHECK: ![[DEREF]] = !DIExpression(DW_OP_deref)
+  // CHECK-DAG: ![[EMPTY]] = !DIExpression()
+  // CHECK-DAG: ![[ARG]] = !DILocalVariable(name: "gen", arg: 1, {{.*}}, line: [[@LINE-3]], type: ![[PT:[0-9]+]]
+  // CHECK-DAG: ![[VAR]] = !DILocalVariable(name: "gen", {{.*}} line: [[@LINE-3]]
+  // CHECK-DAG: ![[DEREF]] = !DIExpression(DW_OP_deref)
   markUsed(gen.callMe())
 }
+
+// FIXME: Should be DW_TAG_interface_type
+// CHECK-DAG: ![[PT]] = !DICompositeType(tag: DW_TAG_structure_type, name: "IGiveOutInts"
 

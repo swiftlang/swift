@@ -1,4 +1,3 @@
-// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
 // CHECK: ![[EMPTY:.*]] = !{}
@@ -13,6 +12,8 @@ enum Either {
 }
 let E : Either = .Neither;
 
+// CHECK: ![[MAYBE_INT_PAIR_BASE_TYPE:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int", {{.*}}, identifier: "_TtSi")
+
 // CHECK: !DICompositeType(tag: DW_TAG_union_type, name: "Color",
 // CHECK-SAME:             line: [[@LINE+3]]
 // CHECK-SAME:             size: 8, align: 8,
@@ -20,8 +21,9 @@ let E : Either = .Neither;
 enum Color : UInt64 {
 // This is effectively a 2-bit bitfield:
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "Red"
-// CHECK-SAME:           baseType: !"_TtVs6UInt64"
+// CHECK-SAME:           baseType: ![[COLOR_BASE_TYPE:[0-9]+]]
 // CHECK-SAME:           size: 8, align: 8{{[,)]}}
+// CHECK: ![[COLOR_BASE_TYPE]] = !DICompositeType(tag: DW_TAG_structure_type, name: "UInt64", {{.*}}, identifier: "_TtVs6UInt64")
   case Red, Green, Blue
 }
 
@@ -81,6 +83,8 @@ public enum List<T> {
        indirect case Tail(List, T)
        case End
 
-// CHECK: !DILocalVariable(name: "self", arg: 1, {{.*}} line: [[@LINE+1]], type: !"_TtGO4enum4ListQq_S0__", flags: DIFlagArtificial)
+// CHECK: ![[SELF_TYPE:[0-9]+]] = !DICompositeType(tag: DW_TAG_union_type, name: "List", {{.*}}, identifier: "_TtGO4enum4ListQq_S0__")
+// CHECK: !DILocalVariable(name: "self", arg: 1, {{.*}} line: [[@LINE+1]], type: ![[SELF_TYPE]], flags: DIFlagArtificial)
        func fooMyList() {}
 }
+
