@@ -195,7 +195,7 @@ func _bridgeToObjectiveCUnconditionalAutorelease<T>(_ x: T) -> AnyObject
 }
 
 @warn_unused_result
-@_silgen_name("swift_bridgeNonVerbatimToObjectiveC")
+@_silgen_name("_swift_bridgeNonVerbatimToObjectiveC")
 func _bridgeNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject?
 
 /// Convert `x` from its Objective-C representation to its Swift
@@ -272,7 +272,7 @@ public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeabl
   return result
 }
 
-@_silgen_name("swift_bridgeNonVerbatimFromObjectiveC")
+@_silgen_name("_swift_bridgeNonVerbatimFromObjectiveC")
 func _bridgeNonVerbatimFromObjectiveC<T>(
   _ x: AnyObject,
   _ nativeType: T.Type,
@@ -286,7 +286,7 @@ func _bridgeNonVerbatimFromObjectiveC<T>(
 ///   unchanged otherwise.
 ///
 /// - Returns: `true` to indicate success, `false` to indicate failure.
-@_silgen_name("swift_bridgeNonVerbatimFromObjectiveCConditional")
+@_silgen_name("_swift_bridgeNonVerbatimFromObjectiveCConditional")
 func _bridgeNonVerbatimFromObjectiveCConditional<T>(
   _ x: AnyObject,
   _ nativeType: T.Type,
@@ -308,7 +308,7 @@ public func _isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
 }
 
 @warn_unused_result
-@_silgen_name("swift_isBridgedNonVerbatimToObjectiveC")
+@_silgen_name("_swift_isBridgedNonVerbatimToObjectiveC")
 func _isBridgedNonVerbatimToObjectiveC<T>(_: T.Type) -> Bool
 
 /// A type that's bridged "verbatim" does not conform to
@@ -330,7 +330,7 @@ public func _getBridgedObjectiveCType<T>(_: T.Type) -> Any.Type? {
 }
 
 @warn_unused_result
-@_silgen_name("swift_getBridgedNonVerbatimObjectiveCType")
+@_silgen_name("_swift_getBridgedNonVerbatimObjectiveCType")
 func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 
 // -- Pointer argument bridging

@@ -8,7 +8,7 @@ enum TrivialGeneric<T, U> {
 
 func unwrapTrivialGeneric<T, U>(_ tg: TrivialGeneric<T, U>) -> (T, U) {
   switch tg {
-  case .x(var t, var u):
+  case .x(let t, let u):
     return (t, u)
   }
 }

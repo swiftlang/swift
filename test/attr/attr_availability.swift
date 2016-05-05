@@ -337,3 +337,43 @@ func testRenameArgMismatch() {
   unavailableTooManyUnnamed(0) // expected-error{{'unavailableTooManyUnnamed' has been renamed to 'shinyLabeledArguments(a:b:)'}} {{3-28=shinyLabeledArguments}}
   unavailableNoArgsTooMany() // expected-error{{'unavailableNoArgsTooMany()' has been renamed to 'shinyLabeledArguments(a:)'}} {{3-27=shinyLabeledArguments}}
 }
+
+@available(*, unavailable, renamed: "Int.foo(self:)")
+func unavailableInstance(a: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "Int.foo(self:)")
+func unavailableInstanceUnlabeled(_ a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.foo(self:other:)")
+func unavailableInstanceFirst(a: Int, b: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.foo(other:self:)")
+func unavailableInstanceSecond(a: Int, b: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.foo(_:self:c:)")
+func unavailableInstanceSecondOfThree(a: Int, b: Int, c: Int) {} // expected-note {{here}}
+
+func testRenameInstance() {
+  unavailableInstance(a: 0) // expected-error{{'unavailableInstance(a:)' has been renamed to 'Int.foo(self:)'}} {{3-22=0.foo}} {{23-27=}}
+  unavailableInstanceUnlabeled(0) // expected-error{{'unavailableInstanceUnlabeled' has been renamed to 'Int.foo(self:)'}} {{3-31=0.foo}} {{31-34=}}
+  unavailableInstanceFirst(a: 0, b: 1) // expected-error{{'unavailableInstanceFirst(a:b:)' has been renamed to 'Int.foo(self:other:)'}} {{3-27=0.foo}} {{28-32=}} {{34-35=other}}
+  unavailableInstanceSecond(a: 0, b: 1) // expected-error{{'unavailableInstanceSecond(a:b:)' has been renamed to 'Int.foo(other:self:)'}} {{3-28=1.foo}} {{29-30=other}} {{33-39=}}
+  unavailableInstanceSecondOfThree(a: 0, b: 1, c: 2) // expected-error{{'unavailableInstanceSecondOfThree(a:b:c:)' has been renamed to 'Int.foo(_:self:c:)'}} {{3-35=1.foo}} {{36-39=}} {{40-46=}}
+
+  unavailableInstance(a: 0 + 0) // expected-error{{'unavailableInstance(a:)' has been renamed to 'Int.foo(self:)'}} {{3-22=(0 + 0).foo}} {{23-31=}}
+}
+
+@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:)")
+func unavailableInstanceTooFew(a: Int, b: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:)")
+func unavailableInstanceTooFewUnnamed(_ a: Int, _ b: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:b:)")
+func unavailableInstanceTooMany(a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:b:)")
+func unavailableInstanceTooManyUnnamed(_ a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:)")
+func unavailableInstanceNoArgsTooMany() {} // expected-note {{here}}
+
+func testRenameInstanceArgMismatch() {
+  unavailableInstanceTooFew(a: 0, b: 1) // expected-error{{'unavailableInstanceTooFew(a:b:)' has been renamed to 'Int.shinyLabeledArguments(self:)'}} {{none}}
+  unavailableInstanceTooFewUnnamed(0, 1) // expected-error{{'unavailableInstanceTooFewUnnamed' has been renamed to 'Int.shinyLabeledArguments(self:)'}} {{none}}
+  unavailableInstanceTooMany(a: 0) // expected-error{{'unavailableInstanceTooMany(a:)' has been renamed to 'Int.shinyLabeledArguments(self:b:)'}} {{none}}
+  unavailableInstanceTooManyUnnamed(0) // expected-error{{'unavailableInstanceTooManyUnnamed' has been renamed to 'Int.shinyLabeledArguments(self:b:)'}} {{none}}
+  unavailableInstanceNoArgsTooMany() // expected-error{{'unavailableInstanceNoArgsTooMany()' has been renamed to 'Int.shinyLabeledArguments(self:)'}} {{none}}
+}

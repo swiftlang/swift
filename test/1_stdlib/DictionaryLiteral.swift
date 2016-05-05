@@ -28,6 +28,17 @@ extension DictionaryLiteral where Key : TestProtocol1, Value : TestProtocol1 {
   }
 }
 
+func checkAssociatedTypes() {
+  typealias Subject = DictionaryLiteral<MinimalHashableValue, OpaqueValue<Int>>
+  expectRandomAccessCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: IndexingIterator<Subject>.self,
+    subSequenceType: RandomAccessSlice<Subject>.self,
+    indexType: Int.self,
+    indexDistanceType: Int.self,
+    indicesType: CountableRange<Int>.self)
+}
+
 var strings: DictionaryLiteral = ["a": "1", "b": "Foo"]
 expectType(DictionaryLiteral<String, String>.self, &strings)
 

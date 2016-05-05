@@ -23,6 +23,8 @@
 #include "MemoryReaderInterface.h"
 #include "SwiftRemoteMirrorTypes.h"
 
+#include <stdlib.h>
+
 /// Major version changes when there are ABI or source incompatible changes.
 #define SWIFT_REFLECTION_VERSION_MAJOR 3
 
@@ -71,6 +73,12 @@ swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
 swift_typeref_t
 swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Object);
+
+/// Returns a typeref from a mangled type name string.
+swift_typeref_t
+swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
+                                           const char *MangledName,
+                                           uint64_t Length);
 
 /// Returns a structure describing the layout of a value of a typeref.
 /// For classes, this returns the reference value itself.
@@ -139,7 +147,7 @@ swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
 /// Returns true if InstanceTypeRef and StartOfInstanceData contain valid
 /// valid values.
 int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
-                                        addr_t InstanceAddress,
+                                        addr_t ExistentialAddress,
                                         swift_typeref_t ExistentialTypeRef,
                                         swift_typeref_t *OutInstanceTypeRef,
                                         addr_t *OutStartOfInstanceData);
@@ -158,6 +166,18 @@ void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
 /// Dump information about the layout of a class or closure context instance.
 void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
                                           uintptr_t Object);
+
+/// Demangle a type name.
+///
+/// Copies at most `MaxLength` bytes from the demangled name string into
+/// `OutDemangledName`.
+///
+/// Returns the length of the demangled string this function tried to copy
+/// into `OutDemangledName`.
+size_t swift_reflection_demangle(const char *MangledName,
+                                 size_t Length,
+                                 char *OutDemangledName,
+                                 size_t MaxLength);
 
 #ifdef __cplusplus
 } // extern "C"

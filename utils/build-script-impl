@@ -189,7 +189,7 @@ KNOWN_SETTINGS=(
     darwin-install-extract-symbols ""            "whether to extract symbols with dsymutil during installations"
     host-target                 ""               "The host target. LLVM, Clang, and Swift will be built for this target. The built LLVM and Clang will be used to compile Swift for the cross-compilation targets. **This argument is required**"
     stdlib-deployment-targets   ""               "space-separated list of targets to compile or cross-compile the Swift standard library for"
-    cross-compile-tools-deployment-targets ""    "space-separated list of targets to cross-compile host Swift tools for"
+    cross-compile-tools-deployment-targets ""    "space-separated list of targets to cross-compile host Swift tools for. We can't run the resulting binaries on the build machine"
     skip-merge-lipo-cross-compile-tools ""       "set to skip running merge-lipo after installing cross-compiled host Swift tools"
     darwin-deployment-version-osx     "10.9"     "minimum deployment target version for OS X"
     darwin-deployment-version-ios     "7.0"      "minimum deployment target version for iOS"
@@ -517,7 +517,7 @@ function set_deployment_target_based_options() {
                     )
                     ;;
                 *)
-                    echo "Unknown deployment target"
+                    echo "Unknown deployment target: ${deployment_target}"
                     exit 1
                     ;;
             esac
@@ -886,21 +886,14 @@ function make_relative_symlink() {
     ln -sf "${RELATIVE_SOURCE}" "${TARGET}"
 }
 
-# A list of deployment targets to cross-compile the Swift host tools for.
-# We can't run the resulting binaries on the build machine.
-CROSS_TOOLS_DEPLOYMENT_TARGETS=()
-
 # Sanitize the list of cross-compilation targets.
+CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS=($CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS)
 for t in ${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS} ; do
     case ${t} in
         iphonesimulator-i386 | iphonesimulator-x86_64 | \
         iphoneos-arm64 | iphoneos-armv7 | iphoneos-armv7s | \
         appletvos-arm64 | appletvsimulator-x86_64 | \
         watchos-armv7k | watchsimulator-i386)
-            CROSS_TOOLS_DEPLOYMENT_TARGETS=(
-                "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
-                "${t}"
-            )
             ;;
         *)
             echo "Unknown deployment target: ${t}"
@@ -911,7 +904,7 @@ done
 
 function is_cross_tools_deployment_target() {
     local deployment_target="$1"
-    for t in "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}" ; do
+    for t in "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS[@]}" ; do
         if [ "${deployment_target}" == "${t}" ] ; then
             echo 1
         fi
@@ -1373,7 +1366,7 @@ fi
 # Configure and build each product
 #
 # Start with native deployment targets because the resulting tools are used during cross-compilation.
-for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
+for deployment_target in "${HOST_TARGET}" "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
     set_deployment_target_based_options
 
     case "${COMPILER_VENDOR}" in
@@ -1963,7 +1956,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     ( ! -z "${generator_output_path}" && ! -f "${generator_output_path}" ) ]] ; then
             set -x
             mkdir -p "${build_dir}"
-            rm -f "${cmake_cache_path}"
             (cd "${build_dir}" && "${CMAKE}" "${cmake_options[@]}" "${EXTRA_CMAKE_OPTIONS[@]}" "${source_dir}")
             { set +x; } 2>/dev/null
         fi
@@ -2237,7 +2229,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     done
 done
 
-for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
+for deployment_target in "${HOST_TARGET}" "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
     set_deployment_target_based_options
 
     for product in "${PRODUCTS[@]}"; do
@@ -2406,9 +2398,9 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
 done
 
 if [[ "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS}" ]] && [[ ! "${SKIP_MERGE_LIPO_CROSS_COMPILE_TOOLS}" ]] ; then
-    echo "--- Merging and running lipo for ${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]} ---"
+    echo "--- Merging and running lipo for ${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS[@]} ---"
     lipo_src_dirs=()
-    for deployment_target in "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
+    for deployment_target in "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
         lipo_src_dirs=(
             "${lipo_src_dirs[@]}"
             "${BUILD_DIR}"/intermediate-install/"${deployment_target}"

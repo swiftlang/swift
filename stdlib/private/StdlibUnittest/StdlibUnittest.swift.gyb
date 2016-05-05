@@ -627,14 +627,17 @@ func _childProcess() {
 
 #if _runtime(_ObjC)
   objc_setUncaughtExceptionHandler {
+    let exception: AnyObject = $0!
     var stderr = _Stderr()
-    let maybeNSException = unsafeBitCast($0, to:_StdlibUnittestNSException.self)
+    let maybeNSException =
+        unsafeBitCast(exception, to: _StdlibUnittestNSException.self)
     if let name = maybeNSException.name {
       print("*** [StdlibUnittest] Terminating due to uncaught exception " +
-        "\(name): \($0)",
+        "\(name): \(exception)",
         to: &stderr)
     } else {
-      print("*** [StdlibUnittest] Terminating due to uncaught exception: \($0)",
+      print("*** [StdlibUnittest] Terminating due to uncaught exception: " +
+        "\(exception)",
         to: &stderr)      
     }
   }

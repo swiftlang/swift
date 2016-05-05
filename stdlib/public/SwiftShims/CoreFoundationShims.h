@@ -21,6 +21,10 @@
 
 #include "SwiftStdint.h"
 
+#ifdef __cplusplus
+namespace swift { extern "C" {
+#endif
+
 #ifdef __OBJC2__
 #if __LLP64__
 typedef unsigned long long _swift_shims_CFTypeID;
@@ -90,6 +94,10 @@ _swift_stdlib_CFStringFindWithOptions(_swift_shims_CFStringRef __nonnull theStri
 
 _swift_shims_CFStringRef __nonnull _swift_stdlib_objcDebugDescription(id __nonnull nsObject);
 #endif // __OBJC2__
+
+#ifdef __cplusplus
+}} // extern "C", namespace swift
+#endif
 
 #endif // SWIFT_STDLIB_SHIMS_COREFOUNDATIONSHIMS_H
 

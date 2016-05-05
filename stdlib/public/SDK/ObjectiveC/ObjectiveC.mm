@@ -12,16 +12,20 @@
 
 #include <objc/objc-api.h>
 
+#include "swift/Runtime/Config.h"
+
 OBJC_EXPORT
 void *objc_autoreleasePoolPush(void);
 
 OBJC_EXPORT
 void objc_autoreleasePoolPop(void *);
 
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" void *_swift_objc_autoreleasePoolPush(void) {
   return objc_autoreleasePoolPush();
 }
 
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" void _swift_objc_autoreleasePoolPop(void *context) {
   return objc_autoreleasePoolPop(context);
 }

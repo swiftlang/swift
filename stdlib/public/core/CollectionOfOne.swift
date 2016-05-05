@@ -35,21 +35,15 @@ public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
 }
 
 /// A collection containing a single element of type `Element`.
-public struct CollectionOfOne<Element> : RandomAccessCollection {
-
-  // FIXME: swift-3-indexing-model - compiler bug prevents this
-  // typealias from being sufficient.  Instead we need to define the
-  // var below.
-  //
-  // public typealias indices = CountableRange<Int>
-  public var indices: CountableRange<Int> {
-    return startIndex..<endIndex
-  }
+public struct CollectionOfOne<Element>
+  : MutableCollection, RandomAccessCollection {
 
   /// Construct an instance containing just `element`.
   public init(_ element: Element) {
     self._element = element
   }
+
+  public typealias Index = Int
 
   /// The position of the first element.
   public var startIndex: Int {
@@ -71,6 +65,15 @@ public struct CollectionOfOne<Element> : RandomAccessCollection {
     return endIndex
   }
 
+  /// Always returns `startIndex`.
+  @warn_unused_result
+  public func index(before i: Int) -> Int {
+    _precondition(i == endIndex)
+    return startIndex
+  }
+
+  public typealias Indices = CountableRange<Int>
+
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
@@ -82,8 +85,30 @@ public struct CollectionOfOne<Element> : RandomAccessCollection {
   ///
   /// - Precondition: `position == 0`.
   public subscript(position: Int) -> Element {
-    _precondition(position == 0, "Index out of range")
-    return _element
+    get {
+      _precondition(position == 0, "Index out of range")
+      return _element
+    }
+    set {
+      _precondition(position == 0, "Index out of range")
+      _element = newValue
+    }
+  }
+
+  public subscript(bounds: Range<Int>)
+    -> MutableRandomAccessSlice<CollectionOfOne<Element>> {
+    get {
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      return MutableRandomAccessSlice(base: self, bounds: bounds)
+    }
+    set {
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      precondition(bounds.count == newValue.count,
+        "CollectionOfOne can't be resized")
+      if let newElement = newValue.first {
+        _element = newElement
+      }
+    }
   }
 
   /// The number of elements (always one).
@@ -91,7 +116,14 @@ public struct CollectionOfOne<Element> : RandomAccessCollection {
     return 1
   }
 
-  internal let _element: Element
+  internal var _element: Element
+}
+
+extension CollectionOfOne : CustomDebugStringConvertible {
+  /// A textual representation of `self`, suitable for debugging.
+  public var debugDescription: String {
+    return "CollectionOfOne(\(String(reflecting: _element)))"
+  }
 }
 
 extension CollectionOfOne : CustomReflectable {

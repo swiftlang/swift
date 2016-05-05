@@ -20,7 +20,7 @@ func ExistentialTuple<T: RandomAccessIndex>(_ x: T, y: T) -> T.Distance {
   // CHECK: !DILocalVariable(name: "tmp"
   // CHECK-SAME:             line: [[@LINE+2]]
   // CHECK-SAME:             type: ![[TT]]
-  var tmp : (T.Distance, Bool) = T.uncheckedSubtract(x, rhs: y)
+  let tmp : (T.Distance, Bool) = T.uncheckedSubtract(x, rhs: y)
   return _overflowChecked((tmp.0, tmp.1))
 }
 

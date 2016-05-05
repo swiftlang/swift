@@ -170,7 +170,7 @@ func _conditionallyUnreachable() {
 
 @_versioned
 @warn_unused_result
-@_silgen_name("swift_isClassOrObjCExistentialType")
+@_silgen_name("_swift_isClassOrObjCExistentialType")
 func _swift_isClassOrObjCExistentialType<T>(_ x: T.Type) -> Bool
 
 /// Returns `true` iff `T` is a class type or an `@objc` existential such as
@@ -494,7 +494,7 @@ internal func _makeBridgeObject(
 public // @testable
 func _getSuperclass(_ t: AnyClass) -> AnyClass? {
   return unsafeBitCast(
-    swift_class_getSuperclass(unsafeBitCast(t, to: OpaquePointer.self)),
+    _swift_class_getSuperclass(unsafeBitCast(t, to: OpaquePointer.self)),
     to: AnyClass.self)
 }
 

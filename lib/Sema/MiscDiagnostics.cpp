@@ -1008,16 +1008,97 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
                                      const AvailableAttr *attr,
                                      const CallExpr *CE) {
   ParsedDeclName parsed = swift::parseDeclName(attr->Rename);
-  if (!parsed || parsed.isInstanceMember() || parsed.isPropertyAccessor())
+  if (!parsed || parsed.isPropertyAccessor())
     return;
 
-  SmallString<64> baseReplace;
-  if (!parsed.ContextName.empty()) {
-    baseReplace += parsed.ContextName;
-    baseReplace += '.';
+  if (parsed.isInstanceMember()) {
+    // Replace the base of the call with the "self argument".
+    // We can only do a good job with the fix-it if we have the whole call
+    // expression.
+    // FIXME: Should we be validating the ContextName in some way?
+    if (!CE)
+      return;
+    assert(parsed.IsFunctionName && "instance members use function syntax");
+    
+    SourceManager &sourceMgr = TC.Context.SourceMgr;
+
+    unsigned selfIndex = parsed.SelfIndex.getValue();
+    const Expr *selfExpr = nullptr;
+    SourceRange selfArgRange;
+    SourceLoc endOfPreviousArg;
+
+    const Expr *argExpr = CE->getArg();
+    if (auto args = dyn_cast<TupleExpr>(argExpr)) {
+      if (selfIndex >= args->getNumElements() ||
+          parsed.ArgumentLabels.size() != args->getNumElements() - 1) {
+        return;
+      }
+
+      selfExpr = args->getElement(selfIndex);
+      selfArgRange = selfExpr->getSourceRange();
+
+      SourceLoc labelLoc = args->getElementNameLoc(selfIndex);
+      if (labelLoc.isValid())
+        selfArgRange.Start = labelLoc;
+
+      if (selfIndex > 0) {
+        endOfPreviousArg = args->getElement(selfIndex-1)->getEndLoc();
+        endOfPreviousArg = Lexer::getLocForEndOfToken(sourceMgr,
+                                                      endOfPreviousArg);
+      }
+
+      // Avoid later argument label fix-its for this argument.
+      Identifier oldLabel = args->getElementName(selfIndex);
+      StringRef oldLabelStr;
+      if (!oldLabel.empty())
+        oldLabelStr = oldLabel.str();
+      parsed.ArgumentLabels.insert(parsed.ArgumentLabels.begin() + selfIndex,
+                                   oldLabelStr);
+
+    } else {
+      if (selfIndex != 0 || !parsed.ArgumentLabels.empty())
+        return;
+      selfExpr = cast<ParenExpr>(argExpr)->getSubExpr();
+      selfArgRange = argExpr->getSourceRange();
+    }
+
+    if (selfArgRange.Start.isInvalid() || selfArgRange.End.isInvalid())
+      return;
+
+    if (endOfPreviousArg.isInvalid())
+      endOfPreviousArg = selfArgRange.Start;
+
+    CharSourceRange selfExprRange =
+        Lexer::getCharSourceRangeFromSourceRange(sourceMgr,
+                                                 selfExpr->getSourceRange());
+    bool needsParens = !selfExpr->canAppendCallParentheses();
+
+    SmallString<64> selfReplace;
+    if (needsParens)
+      selfReplace.push_back('(');
+    selfReplace += sourceMgr.extractText(selfExprRange);
+    if (needsParens)
+      selfReplace.push_back(')');
+    selfReplace.push_back('.');
+    selfReplace += parsed.BaseName;
+    diag.fixItReplace(CE->getFn()->getSourceRange(), selfReplace);
+
+    diag.fixItRemoveChars(endOfPreviousArg,
+                          Lexer::getLocForEndOfToken(sourceMgr,
+                                                     selfArgRange.End));
+
+    // Continue on to diagnose any argument label renames.
+
+  } else {
+    // Just replace the base name.
+    SmallString<64> baseReplace;
+    if (!parsed.ContextName.empty()) {
+      baseReplace += parsed.ContextName;
+      baseReplace += '.';
+    }
+    baseReplace += parsed.BaseName;
+    diag.fixItReplace(referenceRange, baseReplace);
   }
-  baseReplace += parsed.BaseName;
-  diag.fixItReplace(referenceRange, baseReplace);
 
   if (!CE || !parsed.IsFunctionName)
     return;

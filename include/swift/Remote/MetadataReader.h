@@ -682,13 +682,20 @@ public:
     }
   }
 
+  BuiltType readTypeFromMangledName(const char *MangledTypeName,
+                                    size_t Length) {
+    auto Demangled = Demangle::demangleSymbolAsNode(MangledTypeName, Length);
+    return decodeMangledType(Demangled);
+  }
+
   /// Read the isa pointer of a class or closure context instance and apply
   /// the isa mask.
   std::pair<bool, StoredPointer> readMetadataFromInstance(
       StoredPointer ObjectAddress) {
+    StoredPointer isaMaskValue = ~0;
     auto isaMask = readIsaMask();
-    if (!isaMask.first)
-      return {false, 0};
+    if (isaMask.first)
+      isaMaskValue = isaMask.second;
 
     StoredPointer MetadataAddress;
     if (!Reader->readBytes(RemoteAddress(ObjectAddress),
@@ -696,7 +703,7 @@ public:
                            sizeof(StoredPointer)))
       return {false, 0};
 
-    return {true, MetadataAddress & isaMask.second};
+    return {true, MetadataAddress & isaMaskValue};
   }
 
   /// Given the address of a nominal type descriptor, attempt to resolve

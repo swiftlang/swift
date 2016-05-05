@@ -12,6 +12,9 @@
 
 #import <SceneKit/SceneKit.h>
 
+#include "swift/Runtime/Config.h"
+
+SWIFT_CC(swift)
 extern "C" NS_RETURNS_RETAINED __nullable id
 SCN_Swift_SCNSceneSource_entryWithIdentifier(
     id NS_RELEASES_ARGUMENT __nonnull self_,

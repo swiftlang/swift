@@ -1091,7 +1091,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         }
 
         auto foreignParam = foreignFnTy->getParameters()[foreignArgIndex++];
-        SILType foreignArgTy = foreignParam.getSILType();
+        SILType foreignArgTy = F.mapTypeIntoContext(foreignParam.getSILType());
         auto bridged = emitNativeToBridgedValue(fd, param,
                                 SILFunctionTypeRepresentation::CFunctionPointer,
                                 foreignArgTy.getSwiftRValueType());

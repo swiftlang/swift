@@ -634,8 +634,14 @@ static inline void swift_unownedTakeAssign(UnownedReference *dest,
 
 /// A weak reference value object.  This is ABI.
 struct WeakReference {
-  HeapObject *Value;
+  uintptr_t Value;
 };
+
+/// Return true if this is a native weak reference
+///
+/// \param ref - never null
+/// \return true if ref is a native weak reference
+bool isNativeSwiftWeakReference(WeakReference *ref);
 
 /// Initialize a weak reference.
 ///
