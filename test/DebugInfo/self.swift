@@ -6,7 +6,7 @@ public struct stuffStruct {
 }
 
 public func f() {
-    var thing: stuffStruct = stuffStruct()
+    var _: stuffStruct = stuffStruct()
 }
 
 // In the constructor, self has a type of "inout stuffStruct", but it

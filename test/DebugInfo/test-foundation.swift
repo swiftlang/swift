@@ -35,7 +35,7 @@ class MyObject : NSObject {
 // SANITY-DAG: !DISubprogram(name: "blah",{{.*}} line: [[@LINE+2]],{{.*}} isDefinition: true
 extension MyObject {
   func blah() {
-    MyObject()
+    var _ = MyObject()
   }
 }
 
@@ -50,8 +50,8 @@ MyObj.blah()
 public func err() {
   // DWARF-CHECK: DW_AT_name{{.*}}NSError
   // DWARF-CHECK: DW_AT_linkage_name{{.*}}_TtCSo7NSError
-  let error = NSError(domain: "myDomain", code: 4, 
-                      userInfo: ["a":1,"b":2,"c":3])
+  let _ = NSError(domain: "myDomain", code: 4, 
+                  userInfo: ["a":1,"b":2,"c":3])
 }
 
 // LOC-CHECK: define {{.*}}4date
