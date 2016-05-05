@@ -6,13 +6,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import SceneKit
 
@@ -20,7 +13,7 @@ import SceneKit
 
 var SceneKitTests = TestSuite("SceneKit")
 
-func bytesFromNSData(data: NSData) -> [UInt8] {
+func bytesFromNSData(_ data: NSData) -> [UInt8] {
   return Array(UnsafeBufferPointer(
     start: UnsafePointer<UInt8>(data.bytes),
     count: data.length))
@@ -306,7 +299,7 @@ if #available(iOS 8.0, *) {
       "</COLLADA>"
 
     let sceneData = sceneDescription.data(
-      usingEncoding: NSUTF8StringEncoding,
+      using: NSUTF8StringEncoding,
       allowLossyConversion: true)!
     let sceneSource = SCNSceneSource(data: sceneData, options: nil)!
 

@@ -57,7 +57,7 @@ enum class MethodDispatch {
 MethodDispatch getMethodDispatch(AbstractFunctionDecl *method);
 
 /// True if calling the given method or property should use ObjC dispatch.
-bool requiresObjCDispatch(ValueDecl *vd);
+bool requiresForeignEntryPoint(ValueDecl *vd);
 
 /// True if the entry point is natively foreign.
 bool requiresForeignToNativeThunk(ValueDecl *vd);
@@ -264,6 +264,8 @@ struct SILDeclRef {
   
   /// \brief True if the function should be treated as transparent.
   bool isTransparent() const;
+  /// \brief True if the function should have its body serialized.
+  bool isFragile() const;
   /// \brief True if the function has noinline attribute.
   bool isNoinline() const;
   /// \brief True if the function has __always inline attribute.

@@ -212,9 +212,34 @@ extern "C"
 void (*SWIFT_CC(RegisterPreservingCC) _swift_retain_n)(HeapObject *object,
                                                        uint32_t n);
 
+SWIFT_RT_ENTRY_VISIBILITY
+extern "C"
+void swift_nonatomic_retain(HeapObject *object)
+    SWIFT_CC(RegisterPreservingCC);
+
+SWIFT_RUNTIME_EXPORT
+extern "C"
+void (*SWIFT_CC(RegisterPreservingCC) _swift_nonatomic_retain)(HeapObject *object);
+
+SWIFT_RT_ENTRY_VISIBILITY
+extern "C"
+void swift_nonatomic_retain_n(HeapObject *object, uint32_t n)
+    SWIFT_CC(RegisterPreservingCC);
+
+SWIFT_RUNTIME_EXPORT
+extern "C"
+void (*SWIFT_CC(RegisterPreservingCC) _swift_nonatomic_retain_n)(HeapObject *object,
+                                                       uint32_t n);
+
 static inline void _swift_retain_inlined(HeapObject *object) {
   if (object) {
     object->refCount.increment();
+  }
+}
+
+static inline void _swift_nonatomic_retain_inlined(HeapObject *object) {
+  if (object) {
+    object->refCount.incrementNonAtomic();
   }
 }
 
@@ -249,12 +274,20 @@ SWIFT_RT_ENTRY_VISIBILITY
 extern "C" HeapObject *swift_tryPin(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC);
 
+SWIFT_RT_ENTRY_VISIBILITY
+extern "C" HeapObject *swift_nonatomic_tryPin(HeapObject *object)
+    SWIFT_CC(RegisterPreservingCC);
+
 /// Given that an object is pinned, atomically unpin it and decrement
 /// the reference count.
 ///
 /// The object reference may be nil (to simplify the protocol).
 SWIFT_RT_ENTRY_VISIBILITY
 extern "C" void swift_unpin(HeapObject *object)
+    SWIFT_CC(RegisterPreservingCC);
+
+SWIFT_RT_ENTRY_VISIBILITY
+extern "C" void swift_nonatomic_unpin(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC);
 
 /// Atomically decrements the retain count of an object.  If the
@@ -281,6 +314,15 @@ SWIFT_RUNTIME_EXPORT
 extern "C" void (*SWIFT_CC(RegisterPreservingCC)
                      _swift_release)(HeapObject *object);
 
+SWIFT_RT_ENTRY_VISIBILITY
+extern "C" void swift_nonatomic_release(HeapObject *object)
+    SWIFT_CC(RegisterPreservingCC);
+
+SWIFT_RUNTIME_EXPORT
+extern "C" void (*SWIFT_CC(RegisterPreservingCC)
+                     _swift_nonatomic_release)(HeapObject *object);
+
+
 /// Atomically decrements the retain count of an object n times. If the retain
 /// count reaches zero, the object is destroyed
 SWIFT_RT_ENTRY_VISIBILITY
@@ -297,6 +339,15 @@ extern "C" void (*SWIFT_CC(RegisterPreservingCC)
 /// retain the object during executing this function.
 SWIFT_RUNTIME_EXPORT
 extern "C" void swift_setDeallocating(HeapObject *object);
+
+SWIFT_RT_ENTRY_VISIBILITY
+extern "C"
+void swift_nonatomic_release_n(HeapObject *object, uint32_t n)
+    SWIFT_CC(RegisterPreservingCC);
+
+SWIFT_RUNTIME_EXPORT
+extern "C" void (*SWIFT_CC(RegisterPreservingCC)
+                     _swift_nonatomic_release_n)(HeapObject *object, uint32_t n);
 
 // Refcounting observation hooks for memory tools. Don't use these.
 SWIFT_RUNTIME_EXPORT
@@ -583,8 +634,14 @@ static inline void swift_unownedTakeAssign(UnownedReference *dest,
 
 /// A weak reference value object.  This is ABI.
 struct WeakReference {
-  HeapObject *Value;
+  uintptr_t Value;
 };
+
+/// Return true if this is a native weak reference
+///
+/// \param ref - never null
+/// \return true if ref is a native weak reference
+bool isNativeSwiftWeakReference(WeakReference *ref);
 
 /// Initialize a weak reference.
 ///
@@ -663,6 +720,15 @@ SWIFT_RUNTIME_EXPORT
     extern "C" void *swift_bridgeObjectRetain_n(void *value, int n)
     SWIFT_CC(DefaultCC);
 
+SWIFT_RUNTIME_EXPORT
+extern "C" void *swift_nonatomic_bridgeObjectRetain(void *value)
+    SWIFT_CC(DefaultCC);
+
+/// Increment the strong retain count of a bridged object by n.
+SWIFT_RUNTIME_EXPORT
+    extern "C" void *swift_nonatomic_bridgeObjectRetain_n(void *value, int n)
+    SWIFT_CC(DefaultCC);
+
 /*****************************************************************************/
 /************************ UNKNOWN REFERENCE-COUNTING *************************/
 /*****************************************************************************/
@@ -680,6 +746,18 @@ SWIFT_RUNTIME_EXPORT
 extern "C" void swift_unknownRetain_n(void *value, int n)
     SWIFT_CC(DefaultCC);
 
+/// Increment the strong retain count of an object which might not be a native
+/// Swift object.
+SWIFT_RUNTIME_EXPORT
+extern "C" void swift_nonatomic_unknownRetain(void *value)
+    SWIFT_CC(DefaultCC);
+/// Increment the strong retain count of an object which might not be a native
+/// Swift object by n.
+SWIFT_RUNTIME_EXPORT
+extern "C" void swift_nonatomic_unknownRetain_n(void *value, int n)
+    SWIFT_CC(DefaultCC);
+
+
 #else
 
 static inline void swift_unknownRetain(void *value)
@@ -692,6 +770,17 @@ static inline void swift_unknownRetain_n(void *value, int n)
   swift_retain_n(static_cast<HeapObject *>(value), n);
 }
 
+static inline void swift_nonatomic_unknownRetain(void *value)
+    SWIFT_CC(DefaultCC) {
+  swift_nonatomic_retain(static_cast<HeapObject *>(value));
+}
+
+static inline void swift_nonatomic_unknownRetain_n(void *value, int n)
+    SWIFT_CC(DefaultCC) {
+  swift_nonatomic_retain_n(static_cast<HeapObject *>(value), n);
+}
+
+
 #endif /* SWIFT_OBJC_INTEROP */
 
 SWIFT_RUNTIME_EXPORT
@@ -700,6 +789,14 @@ extern "C" void swift_bridgeObjectRelease(void *value)
 /// Decrement the strong retain count of a bridged object by n.
 SWIFT_RUNTIME_EXPORT
 extern "C" void swift_bridgeObjectRelease_n(void *value, int n)
+    SWIFT_CC(DefaultCC);
+
+SWIFT_RUNTIME_EXPORT
+extern "C" void swift_nonatomic_bridgeObjectRelease(void *value)
+    SWIFT_CC(DefaultCC);
+/// Decrement the strong retain count of a bridged object by n.
+SWIFT_RUNTIME_EXPORT
+extern "C" void swift_nonatomic_bridgeObjectRelease_n(void *value, int n)
     SWIFT_CC(DefaultCC);
 
 #if SWIFT_OBJC_INTEROP
@@ -715,6 +812,17 @@ SWIFT_RUNTIME_EXPORT
 extern "C" void swift_unknownRelease_n(void *value, int n)
     SWIFT_CC(DefaultCC);
 
+/// Decrement the strong retain count of an object which might not be a native
+/// Swift object.
+SWIFT_RUNTIME_EXPORT
+extern "C" void swift_nonatomic_unknownRelease(void *value)
+    SWIFT_CC(DefaultCC);
+/// Decrement the strong retain count of an object which might not be a native
+/// Swift object by n.
+SWIFT_RUNTIME_EXPORT
+extern "C" void swift_nonatomic_unknownRelease_n(void *value, int n)
+    SWIFT_CC(DefaultCC);
+
 #else
 
 static inline void swift_unknownRelease(void *value)
@@ -725,6 +833,16 @@ static inline void swift_unknownRelease(void *value)
 static inline void swift_unknownRelease_n(void *value, int n)
     SWIFT_CC(RegisterPreservingCC) {
   swift_release_n(static_cast<HeapObject *>(value), n);
+}
+
+static inline void swift_nonatomic_unknownRelease(void *value)
+    SWIFT_CC(RegisterPreservingCC) {
+  swift_nonatomic_release(static_cast<HeapObject *>(value));
+}
+
+static inline void swift_nonatomic_unknownRelease_n(void *value, int n)
+    SWIFT_CC(RegisterPreservingCC) {
+  swift_nonatomic_release_n(static_cast<HeapObject *>(value), n);
 }
 
 #endif /* SWIFT_OBJC_INTEROP */

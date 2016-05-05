@@ -396,7 +396,7 @@ Attributes for Objective-C Support
    Maybe eventually [objc] will take an optional argument specifying the
    Objective-C-equivalent name.
 
-__ http://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/LoadingResources/CocoaNibs/CocoaNibs.html#//apple_ref/doc/uid/10000051i-CH4-SW6
+__ https://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/LoadingResources/CocoaNibs/CocoaNibs.html#//apple_ref/doc/uid/10000051i-CH4-SW6
 
 
 Level 1: Message-passing

@@ -1,5 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-inline-test-threshold=1 | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -debug-only=sil-inliner 2>%t/log | FileCheck %s
+// RUN: FileCheck %s --check-prefix=CHECK-LOG <%t/log
 // REQUIRES: asserts
 
 // This test checks the inline heuristics based on the debug log output of
@@ -32,6 +33,9 @@ enum E {
 // CHECK: apply [[C]](
 // CHECK: return
 
+// CHECK-LOG-LABEL: Inline into caller: testDirectClosure
+// CHECK-LOG-NEXT: decision {{.*}}, b=70,
+
 sil @testDirectClosure : $@convention(thin) () -> Int32 {
 bb0:
   %0 = function_ref @takeDirectClosure : $@convention(thin) (@owned @callee_owned (Int32) -> Int32) -> Int32
@@ -43,7 +47,7 @@ bb0:
 
 sil @takeDirectClosure : $@convention(thin) (@owned @callee_owned (Int32) -> Int32) -> Int32 {
 bb0(%0 : $@callee_owned (Int32) -> Int32):
-  // make inline costs = 2
+  // increase the scope length
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
@@ -59,6 +63,9 @@ bb0(%0 : $@callee_owned (Int32) -> Int32):
 // CHECK: apply [[C]](
 // CHECK: return
 
+// CHECK-LOG-LABEL: Inline into caller: testStructClosure
+// CHECK-LOG-NEXT: decision {{.*}}, b=70,
+
 sil @testStructClosure : $@convention(thin) () -> Int32 {
 bb0:
   %0 = function_ref @takeStructClosure : $@convention(thin) (@owned Cont) -> Int32
@@ -71,7 +78,7 @@ bb0:
 
 sil @takeStructClosure : $@convention(thin) (@owned Cont) -> Int32 {
 bb0(%0 : $Cont):
-  // make inline costs = 2
+  // increase the scope length
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
@@ -87,6 +94,9 @@ bb0(%0 : $Cont):
 // CHECK: [[C:%[0-9]+]] = load
 // CHECK: apply [[C]](
 // CHECK: return
+
+// CHECK-LOG-LABEL: Inline into caller: testStructAddrClosure
+// CHECK-LOG-NEXT: decision {{.*}}, b=70,
 
 sil @testStructAddrClosure : $@convention(thin) () -> Int32 {
 bb0:
@@ -106,7 +116,7 @@ bb0:
 
 sil @takeStructAddrClosure : $@convention(thin) (@inout Cont) -> Int32 {
 bb0(%0 : $*Cont):
-  // make inline costs = 2
+  // increase the scope length
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
@@ -125,6 +135,9 @@ bb0(%0 : $*Cont):
 // CHECK: apply [[C]](
 // CHECK: return
 
+// CHECK-LOG-LABEL: Inline into caller: testTupleClosure
+// CHECK-LOG-NEXT: decision {{.*}}, b=70,
+
 sil @testTupleClosure : $@convention(thin) () -> Int32 {
 bb0:
   %0 = function_ref @takeTupleClosure : $@convention(thin) (@owned Cont2) -> Int32
@@ -141,7 +154,7 @@ bb0:
 
 sil @takeTupleClosure : $@convention(thin) (@owned Cont2) -> Int32 {
 bb0(%0 : $Cont2):
-  // make inline costs = 2
+  // increase the scope length
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
@@ -158,6 +171,9 @@ bb0(%0 : $Cont2):
 // CHECK: apply [[C]](
 // CHECK: return
 
+// CHECK-LOG-LABEL: Inline into caller: testEnumClosure
+// CHECK-LOG-NEXT: decision {{.*}}, b=70,
+
 sil @testEnumClosure : $@convention(thin) () -> Int32 {
 bb0:
   %0 = function_ref @takeEnumClosure : $@convention(thin) (@owned E) -> Int32
@@ -171,7 +187,7 @@ bb0:
 
 sil @takeEnumClosure : $@convention(thin) (@owned E) -> Int32 {
 bb0(%0 : $E):
-  // make inline costs = 2
+  // increase the scope length
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
@@ -203,6 +219,9 @@ bb0(%0 : $Int32):
 // CHECK-NOT: apply
 // CHECK: return %{{.*}} : $()
 
+// CHECK-LOG-LABEL: Inline into caller: testCondBr
+// CHECK-LOG-NEXT: decision {{.*}}, b=50,
+
 sil @testCondBr : $@convention(thin) () -> () {
 bb0:
 
@@ -225,7 +244,7 @@ bb1:
   br bb3(%0 : $Int32)
 
 bb2:
-  // make inline costs = 2
+  // increase the scope length
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
@@ -241,6 +260,9 @@ bb3(%8 : $Int32):
 // CHECK: builtin "assert_configuration"()
 // CHECK-NOT: apply
 // CHECK: return %{{.*}} : $()
+
+// CHECK-LOG-LABEL: Inline into caller: testSwitchValue
+// CHECK-LOG-NEXT: decision {{.*}}, b=50,
 
 sil @testSwitchValue : $@convention(thin) () -> () {
 bb0:
@@ -261,7 +283,7 @@ bb0(%0 : $Int32):
   switch_value %3 : $Builtin.Int32, case %1 : bb1, case %2 : bb2, default bb3
 
 bb1:
-  // make inline costs = 2
+  // increase the scope length
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
@@ -271,7 +293,7 @@ bb2:
   br bb4(%2 : $Builtin.Int32)
 
 bb3:
-  // make inline costs = 2
+  // increase the scope length
   %c3 = builtin "assert_configuration"() : $Builtin.Int32
   %c4 = builtin "assert_configuration"() : $Builtin.Int32
 
@@ -287,6 +309,9 @@ bb4(%8 : $Builtin.Int32):
 // CHECK: builtin "assert_configuration"()
 // CHECK-NOT: apply
 // CHECK: return %{{.*}} : $()
+
+// CHECK-LOG-LABEL: Inline into caller: testSwitchEnum
+// CHECK-LOG-NEXT: decision {{.*}}, b=50,
 
 sil @testSwitchEnum : $@convention(thin) () -> () {
 bb0:
@@ -308,7 +333,7 @@ bb1:
   br bb3(%2 : $Int32)
 
 bb2:
-  // make inline costs = 2
+  // increase the scope length
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 

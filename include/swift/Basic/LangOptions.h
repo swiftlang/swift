@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_LANGOPTIONS_H
-#define SWIFT_LANGOPTIONS_H
+#ifndef SWIFT_BASIC_LANGOPTIONS_H
+#define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Basic/LLVM.h"
 #include "clang/Basic/VersionTuple.h"
@@ -144,18 +144,14 @@ namespace swift {
     /// new enough?
     bool EnableTargetOSChecking = true;
 
-    /// Whether we're omitting needless words when importing Objective-C APIs.
+    /// Whether to use the import as member inference system
     ///
-    /// The vast majority of the logic for omitting needless words is
-    /// centralized in the Clang importer. However, there are a few
-    /// places elsewhere in the compiler that specifically reference
-    /// Objective-C entities whose names are affected by
-    /// omit-needless-words.
-    bool OmitNeedlessWords = true;
+    /// When importing a global, try to infer whether we can import it as a
+    /// member of some type instead. This includes inits, computed properties,
+    /// and methods.
+    bool InferImportAsMember = false;
 
     /// Whether we are stripping the "NS" prefix from Foundation et al.
-    ///
-    /// This is only queried when \c OmitNeedlessWords is true.
     bool StripNSPrefix = false;
 
     /// Enable the Swift 3 migration via Fix-Its.
@@ -181,7 +177,7 @@ namespace swift {
       } else if (Target.isWatchOS()) {
         Target.getOSVersion(major, minor, revision);
       } else if (Target.isOSLinux() || Target.isOSFreeBSD() ||
-                 Target.isOSWindows() ||
+                 Target.isAndroid() || Target.isOSWindows() ||
                  Target.getTriple().empty())
       {
         major = minor = revision = 0;
@@ -242,7 +238,6 @@ namespace swift {
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
   };
-}
+} // end namespace swift
 
-#endif // SWIFT_LANGOPTIONS_H
-
+#endif // SWIFT_BASIC_LANGOPTIONS_H

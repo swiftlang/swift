@@ -15,7 +15,7 @@ protocol mmExt : mmCollectionType {
  mutating func extend<
      S : mmSequenceType
      where S.Generator.Element == Self.Generator.Element
- > (seq: S)
+ > (_ seq: S)
 }
 
 // CHECK-LABEL:  @_TF28generic_signature_with_depth4testu0_RxS_5mmExt_S0_Wx9Generator7Element_zW_S1_S2__rFTxq__x : $@convention(thin) <EC1, EC2 where EC1 : mmExt, EC2 : mmExt, EC1.Generator : mmGeneratorType, EC2.Generator : mmGeneratorType, EC1.Generator.Element == EC2.Generator.Element> (@in EC1, @in EC2) -> @out EC1 {
@@ -27,7 +27,7 @@ func test<
    EC2 : mmExt
    where EC1.Generator.Element == EC2.Generator.Element
 >
-(lhs: EC1, _ rhs: EC2) -> EC1 {
+(_ lhs: EC1, _ rhs: EC2) -> EC1 {
  var lhs = lhs
  lhs.extend(rhs)
  return lhs

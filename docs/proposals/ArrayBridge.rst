@@ -34,7 +34,7 @@ Being "great for Cocoa" means this must work and be efficient::
   var a = [cocoaObject1, cocoaObject2]
   someCocoaObject.takesAnNSArray(a)
 
-  func processViews(views: [AnyObject]) { ... }
+  func processViews(_ views: [AnyObject]) { ... }
   var b = someNSWindow.views // views is an NSArray
   processViews(b)
 

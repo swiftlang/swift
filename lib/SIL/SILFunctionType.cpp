@@ -23,7 +23,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
-#include "swift/AST/SubstTypeVisitor.h"
 #include "swift/Basic/Fallthrough.h"
 #include "clang/Analysis/DomainSpecific/CocoaConventions.h"
 #include "clang/AST/Attr.h"
@@ -373,11 +372,58 @@ enum class ConventionsKind : uint8_t {
     }
 
   private:
+    bool isClangTypeMoreIndirectThanSubstType(const clang::Type *clangTy,
+                                              CanType substTy) {
+      // A const pointer argument might have been imported as
+      // UnsafePointer, COpaquePointer, or a CF foreign class.
+      // (An ObjC class type wouldn't be const-qualified.)
+      if (clangTy->isPointerType()
+          && clangTy->getPointeeType().isConstQualified()) {
+        // Peek through optionals.
+        if (auto substObjTy = substTy.getAnyOptionalObjectType())
+          substTy = substObjTy;
+
+        // Void pointers aren't usefully indirectable.
+        if (clangTy->isVoidPointerType())
+          return false;
+        
+        if (auto eltTy = substTy->getAnyPointerElementType())
+          return isClangTypeMoreIndirectThanSubstType(
+                        clangTy->getPointeeType().getTypePtr(), CanType(eltTy));
+        
+        if (substTy->getAnyNominal() ==
+              M.getASTContext().getOpaquePointerDecl())
+          // TODO: We could conceivably have an indirect opaque ** imported
+          // as COpaquePointer. That shouldn't ever happen today, though,
+          // since we only ever indirect the 'self' parameter of functions
+          // imported as methods.
+          return false;
+        
+        if (clangTy->getPointeeType()->getAs<clang::RecordType>()) {
+          // CF type as foreign class
+          if (substTy->getClassOrBoundGenericClass()
+              && substTy->getClassOrBoundGenericClass()->isForeign())
+            return false;
+        }
+        
+        return true;
+      }
+      return false;
+    }
+  
     /// Query whether the original type is address-only given complete
     /// lowering information about its substitution.
     bool isPassedIndirectly(AbstractionPattern origType, CanType substType,
                             const TypeLowering &substTL) {
       auto &mod = *M.getSwiftModule();
+
+      // If the C type of the argument is a const pointer, but the Swift type
+      // isn't, treat it as indirect.
+      if (origType.isClangType()
+          && isClangTypeMoreIndirectThanSubstType(origType.getClangType(),
+                                                  substType)) {
+        return true;
+      }
 
       // If the substituted type is passed indirectly, so must the
       // unsubstituted type.
@@ -944,8 +990,9 @@ static bool isCFTypedef(const TypeLowering &tl, clang::QualType type) {
 ///
 /// Generally, whether the parameter is +1 is handled before this.
 static ParameterConvention getIndirectCParameterConvention(clang::QualType type) {
-  // Non-trivial C++ types are Indirect_Inout (at least in Itanium).
-  llvm_unreachable("no address-only C types currently supported!");
+  // Non-trivial C++ types would be Indirect_Inout (at least in Itanium).
+  // A trivial const * parameter in C should be considered @in.
+  return ParameterConvention::Indirect_In;
 }
 
 /// Given a C parameter declaration whose type is passed indirectly,
@@ -1498,6 +1545,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
   // If this is a foreign thunk, it always has the foreign calling convention.
   if (c.isForeign)
     return c.hasDecl() &&
+      !c.getDecl()->isImportAsMember() &&
       (isClassOrProtocolMethod(c.getDecl()) ||
        c.kind == SILDeclRef::Kind::IVarInitializer ||
        c.kind == SILDeclRef::Kind::IVarDestroyer)
@@ -1516,21 +1564,21 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     return getProtocolWitnessRepresentation(proto);
 
   switch (c.kind) {
-    case SILDeclRef::Kind::Func:
-    case SILDeclRef::Kind::Allocator:
-    case SILDeclRef::Kind::EnumElement:
-    case SILDeclRef::Kind::Destroyer:
-    case SILDeclRef::Kind::Deallocator:
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::GlobalGetter:
-      if (c.getDecl()->isInstanceMember())
-        return SILFunctionTypeRepresentation::Method;
-      return SILFunctionTypeRepresentation::Thin;
-
     case SILDeclRef::Kind::DefaultArgGenerator:
       return SILFunctionTypeRepresentation::Thin;
 
+    case SILDeclRef::Kind::Func:
+      if (c.getDecl()->getDeclContext()->isTypeContext())
+        return SILFunctionTypeRepresentation::Method;
+      return SILFunctionTypeRepresentation::Thin;
+
+    case SILDeclRef::Kind::Destroyer:
+    case SILDeclRef::Kind::Deallocator:
+    case SILDeclRef::Kind::Allocator:
     case SILDeclRef::Kind::Initializer:
+    case SILDeclRef::Kind::EnumElement:
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer:
       return SILFunctionTypeRepresentation::Method;
@@ -1847,6 +1895,27 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
                               substituter.getSubstResults(),
                               substErrorResult,
                               Context);
+}
+
+/// Returns the SILParameterInfo for the given declaration's `self` parameter.
+/// `constant` must refer to a method.
+SILParameterInfo TypeConverter::getConstantSelfParameter(SILDeclRef constant) {
+  auto ty = getConstantFunctionType(constant);
+
+  // In most cases the "self" parameter is lowered as the back parameter.
+  // The exception is C functions imported as methods.
+  if (!constant.isForeign)
+    return ty->getParameters().back();
+  if (!constant.hasDecl())
+    return ty->getParameters().back();
+  auto fn = dyn_cast<AbstractFunctionDecl>(constant.getDecl());
+  if (!fn)
+    return ty->getParameters().back();
+  if (fn->isImportAsStaticMember())
+    return SILParameterInfo();
+  if (fn->isImportAsInstanceMember())
+    return ty->getParameters()[fn->getSelfIndex()];
+  return ty->getParameters().back();
 }
 
 /// Returns the ConstantInfo corresponding to the VTable thunk for overriding.
@@ -2198,6 +2267,7 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
       // currying.
       if (uncurryLevel == 1 &&
           isa<FuncDecl>(bridgedFn) &&
+          !cast<FuncDecl>(bridgedFn)->isImportAsMember() &&
           cast<FuncDecl>(bridgedFn)->isAccessor() &&
           extInfo.getSILRepresentation() == SILFunctionTypeRepresentation::CFunctionPointer) {
 
@@ -2227,8 +2297,16 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
           AbstractionPattern::getCurriedObjCMethod(fnType, method,
                                                    foreignError);
       } else if (auto value = dyn_cast<clang::ValueDecl>(clangDecl)) {
-        bridgingFnPattern =
-          AbstractionPattern(fnType, value->getType().getTypePtr());
+        if (uncurryLevel == 0) {
+          // C function imported as a function.
+          bridgingFnPattern =
+            AbstractionPattern(fnType, value->getType().getTypePtr());
+        } else {
+          // C function imported as a method.
+          assert(uncurryLevel == 1);
+          bridgingFnPattern =
+            AbstractionPattern::getCurriedCFunctionAsMethod(fnType, bridgedFn);
+        }
       }
     }
   }
@@ -2306,7 +2384,40 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
     break;
   }
 
-  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::CFunctionPointer: {
+    // A C function imported as a method.
+    assert(inputs.size() == 2);
+
+    // Bridge the parameters.
+    auto partialFnPattern = bridgingFnPattern.getFunctionResultType();
+    inputs[1] = inputs[1].getWithType(
+                getBridgedInputType(rep, partialFnPattern.getFunctionInputType(),
+                                    CanType(inputs[1].getType())));
+
+    // If the 'self' parameter is a metatype, we'll throw it away.
+    // Otherwise, splice it in to the parameters at the right position.
+    if (!inputs[0].getType()->is<AnyMetatypeType>()) {
+      auto memberStatus = bridgingFnPattern.getImportAsMemberStatus();
+      assert(memberStatus.isInstance() &&
+             "static method with non-metatype self?!");
+      SmallVector<TupleTypeElt, 4> fields;
+      if (auto tuple = inputs[1].getType()->getAs<TupleType>()) {
+        fields.append(tuple->getElements().begin(), tuple->getElements().end());
+      } else {
+        fields.push_back(inputs[1].getType());
+      }
+      fields.insert(fields.begin() + memberStatus.getSelfIndex(),
+                    inputs[0].getType());
+      inputs[1] = inputs[1].getWithType(TupleType::get(fields, Context));
+    }
+    inputs.erase(inputs.begin());
+    
+    resultType = getBridgedResultType(rep,
+                                      partialFnPattern.getFunctionResultType(),
+                                      resultType, suppressOptionalResult);
+    break;
+  }
+
   case SILFunctionTypeRepresentation::Block:
     llvm_unreachable("Cannot uncurry native representation");
   }
@@ -2315,7 +2426,7 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
   std::reverse(inputs.begin(), inputs.end());
 
   // Create the new function type.
-  CanType inputType = CanType(TupleType::get(inputs, Context));
+  CanType inputType = TupleType::get(inputs, Context)->getCanonicalType();
   if (genericSig) {
     return CanGenericFunctionType::get(genericSig,
                                        inputType, resultType, extInfo);

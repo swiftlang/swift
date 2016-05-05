@@ -7,18 +7,18 @@ var globalFloat80 : Float80 = 0.0
 #endif
 
 @inline(never)
-func acceptFloat32(a: Float32) {
+func acceptFloat32(_ a: Float32) {
   globalFloat32 = a
 }
 
 @inline(never)
-func acceptFloat64(a: Float64) {
+func acceptFloat64(_ a: Float64) {
   globalFloat64 = a
 }
 
 #if arch(i386) || arch(x86_64)
 @inline(never)
-func acceptFloat80(a: Float80) {
+func acceptFloat80(_ a: Float80) {
   globalFloat80 = a
 }
 #endif

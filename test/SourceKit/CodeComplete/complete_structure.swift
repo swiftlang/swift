@@ -10,13 +10,13 @@
 
 struct S1 {
   func method1() {}
-  func method2(a: Int, b: Int) -> Int { return 1 }
+  func method2(_ a: Int, b: Int) -> Int { return 1 }
   func method3(a a: Int, b: Int) {}
   func method4(_: Int, _: Int) {}
   func method5(_: inout Int, b: inout Int) {}
-  func method6(c: Int) throws {}
-  func method7(callback: () -> () throws) rethrows {}
-  func method8<T, U>(d: (T, U) -> T, e: T -> U) {}
+  func method6(_ c: Int) throws {}
+  func method7(_ callback: () -> () throws) rethrows {}
+  func method8<T, U>(_ d: (T, U) -> T, e: T -> U) {}
 
   let v1: Int = 1
   var v2: Int { return 1 }
@@ -30,7 +30,7 @@ struct S1 {
   init(c: Int)? {}
 }
 
-func test1(x: S1) {
+func test1(_ x: S1) {
   x.#^S1_DOT^#
 }
 // S1_DOT: {name:method1}()
@@ -46,7 +46,7 @@ func test1(x: S1) {
 // S1_DOT: {name:v1}
 // S1_DOT: {name:v2}
 
-func test2(x: S1) {
+func test2(_ x: S1) {
   x#^S1_POSTFIX^#
 }
 // Subscripts!
@@ -68,7 +68,7 @@ func test5() {
 // S1_INIT: ({params:{n:a:}{t: Int}, {n:b:}{t: Int}})
 // S1_INIT: ({params:{n:c:}{t: Int}})
 
-func test6(xyz: S1, fgh: (S1) -> S1) {
+func test6(_ xyz: S1, fgh: (S1) -> S1) {
   #^STMT_0^#
 }
 // STMT_0: {name:func}
@@ -84,7 +84,7 @@ enum E1 {
   case C3(l1: S1, l2: S1)
 }
 
-func test7(x: E1) {
+func test7(_ x: E1) {
   test7(.#^ENUM_0^#)
 }
 // ENUM_0: {name:C1}
@@ -110,12 +110,12 @@ func test8() {
 // FIXME: should the ( go inside the name here?
 // S1_INNER_0: {name:S1}(
 
-func test9(var x: Int) {
+func test9(_ x: inout Int) {
   #^INT_INNER_0,x^#
 }
-// INT_INNER_0: {name:x+}
-// INT_INNER_0: {name:x<}
-// INT_INNER_0: {name:x++}
 // INT_INNER_0: {name:x==}
+// INT_INNER_0: {name:x<}
+// INT_INNER_0: {name:x+}
+// INT_INNER_0: {name:x++}
 // INT_INNER_0: {name:x>>}
 // INT_INNER_0: {name:x..<}

@@ -44,7 +44,7 @@ internal enum _BridgeStyle {
 /// class type or ObjC existential.  May trap for other "valid" inputs when
 /// `TargetElement` is not bridged verbatim, if an element can't be converted.
 public func _arrayForceCast<SourceElement, TargetElement>(
-  source: Array<SourceElement>
+  _ source: Array<SourceElement>
 ) -> Array<TargetElement> {
   switch (
     _ValueOrReference(SourceElement.self), _BridgeStyle(TargetElement.self)
@@ -72,11 +72,15 @@ public func _arrayForceCast<SourceElement, TargetElement>(
     return result!
     
   case (.value, .verbatim):
+    if source.isEmpty {
+      return Array()
+    }
+
     var buf = _ContiguousArrayBuffer<TargetElement>(
       uninitializedCount: source.count, minimumCapacity: 0)
     
     let _: Void = buf.withUnsafeMutableBufferPointer {
-      var p = $0.baseAddress
+      var p = $0.baseAddress!
       for value in source {
         let bridged: AnyObject? = _bridgeToObjectiveC(value)
         _precondition(
@@ -107,7 +111,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
 /// TargetElement or a type derived from TargetElement.  O(N)
 /// otherwise.
 internal func _arrayConditionalDownCastElements<SourceElement, TargetElement>(
-  a: Array<SourceElement>
+  _ a: Array<SourceElement>
 ) -> [TargetElement]? {
   _sanityCheck(_isBridgedVerbatimToObjectiveC(SourceElement.self))
   _sanityCheck(_isBridgedVerbatimToObjectiveC(TargetElement.self))
@@ -144,7 +148,7 @@ internal func _arrayConditionalDownCastElements<SourceElement, TargetElement>(
 /// - Precondition: TargetElement is bridged non-verbatim to Objective-C.
 ///   O(n), because each element must be bridged separately.
 internal func _arrayConditionalBridgeElements<SourceElement, TargetElement>(
-       source: Array<SourceElement>
+       _ source: Array<SourceElement>
      ) -> Array<TargetElement>? {
   _sanityCheck(_isBridgedVerbatimToObjectiveC(SourceElement.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(TargetElement.self))
@@ -183,7 +187,7 @@ ElementwiseBridging:
 /// - Precondition: `SourceElement` is a class or ObjC existential type.
 /// O(n), because each element must be checked.
 public func _arrayConditionalCast<SourceElement, TargetElement>(
-  source: [SourceElement]
+  _ source: [SourceElement]
 ) -> [TargetElement]? {
   switch (_ValueOrReference(SourceElement.self), _BridgeStyle(TargetElement.self)) {
   case (.value, _):

@@ -20,13 +20,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import FakeUnavailableObjCFramework
 import Foundation
@@ -122,7 +115,7 @@ func useUnavailableObjCClass() {
     o.someMethod()
   }
 
-  for var i = 0; i < getInt(5); i += 1 {
+  for i in 0 ..< getInt(5) {
     if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
       let o: UnavailableObjCClass = printClassMetadataViaGeneric()
       _blackHole(o)
@@ -132,14 +125,14 @@ func useUnavailableObjCClass() {
   class SomeClass { }
   let someObject: AnyObject = _opaqueIdentity(SomeClass() as AnyObject)
 
-  for var i = 0; i < getInt(5); i += 1 {
+  for i in 0 ..< getInt(5) {
     if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
       let isUnavailable = someObject is UnavailableObjCClass
       _blackHole(isUnavailable)
     }
   }
 
-  for var i = 0; i < getInt(5); i += 1 {
+  for i in 0 ..< getInt(5) {
     if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
       let asUnavailable = someObject as? UnavailableObjCClass
       _blackHole(asUnavailable)

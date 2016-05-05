@@ -111,6 +111,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/Analysis/CFG.h"
+#include "clang/CodeGen/SwiftCallingConv.h"
 
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
@@ -263,7 +264,7 @@ namespace {
       assert(!ElementsWithPayload.empty());
       
       return T.getEnumElementType(ElementsWithPayload[0].decl,
-                                  *IGM.SILMod);
+                                  IGM.getSILModule());
     }
 
   public:
@@ -390,6 +391,12 @@ namespace {
                                       getSingleton()->getBestKnownAlignment()));
     }
 
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      if (auto singleton = getLoadableSingleton())
+        singleton->addToAggLowering(IGM, lowering, offset);
+    }
+
     unsigned getExplosionSize() const override {
       if (!getLoadableSingleton()) return 0;
       return getLoadableSingleton()->getExplosionSize();
@@ -398,7 +405,8 @@ namespace {
     void loadAsCopy(IRGenFunction &IGF, Address addr,
                     Explosion &e) const override {
       if (!getLoadableSingleton()) return;
-      getLoadableSingleton()->loadAsCopy(IGF, getSingletonAddress(IGF, addr),e);
+      getLoadableSingleton()->loadAsCopy(IGF, getSingletonAddress(IGF, addr),
+                                         e);
     }
 
     void loadForSwitch(IRGenFunction &IGF, Address addr, Explosion &e) const {
@@ -466,13 +474,16 @@ namespace {
       if (getLoadableSingleton()) getLoadableSingleton()->reexplode(IGF, src, dest);
     }
 
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest)
-    const override {
-      if (getLoadableSingleton()) getLoadableSingleton()->copy(IGF, src, dest);
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest,
+              Atomicity atomicity) const override {
+      if (getLoadableSingleton())
+        getLoadableSingleton()->copy(IGF, src, dest, atomicity);
     }
 
-    void consume(IRGenFunction &IGF, Explosion &src) const override {
-      if (getLoadableSingleton()) getLoadableSingleton()->consume(IGF, src);
+    void consume(IRGenFunction &IGF, Explosion &src,
+                 Atomicity atomicity) const override {
+      if (getLoadableSingleton())
+        getLoadableSingleton()->consume(IGF, src, atomicity);
     }
 
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
@@ -480,15 +491,14 @@ namespace {
     }
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
-      if (getSingleton() && !getSingleton()->isPOD(ResilienceExpansion::Maximal))
+      if (getSingleton() &&
+          !getSingleton()->isPOD(ResilienceExpansion::Maximal))
         getSingleton()->destroy(IGF, getSingletonAddress(IGF, addr),
                                 getSingletonType(IGF.IGM, T));
     }
 
-    void packIntoEnumPayload(IRGenFunction &IGF,
-                             EnumPayload &payload,
-                             Explosion &in,
-                             unsigned offset) const override {
+    void packIntoEnumPayload(IRGenFunction &IGF, EnumPayload &payload,
+                             Explosion &in, unsigned offset) const override {
       if (getLoadableSingleton())
         return getLoadableSingleton()->packIntoEnumPayload(IGF, payload,
                                                            in, offset);
@@ -514,7 +524,7 @@ namespace {
 
       // Get the value witness table for the element.
       SILType eltTy = T.getEnumElementType(ElementsWithPayload[0].decl,
-                                           *IGM.SILMod);
+                                           IGM.getSILModule());
       llvm::Value *eltLayout = IGF.emitTypeLayoutRef(eltTy);
 
       Address vwtAddr(vwtable, IGF.IGM.getPointerAlignment());
@@ -697,6 +707,10 @@ namespace {
 
     bool needsPayloadSizeInMetadata() const override { return false; }
 
+    Size getFixedSize() const {
+      return Size((getDiscriminatorType()->getBitWidth() + 7) / 8);
+    }
+
     llvm::Value *
     emitGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr)
     const override {
@@ -830,8 +844,16 @@ namespace {
       return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
     }
 
-    void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {}
-    void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {}
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      lowering.addOpaqueData(offset.asCharUnits(),
+                             getFixedSize().asCharUnits());
+    }
+
+    void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
+                          Atomicity atomicity) const {}
+    void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
+                           Atomicity atomicity) const {}
     void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {}
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
@@ -1154,6 +1176,23 @@ namespace {
         schema.add(ExplosionSchema::Element::forScalar(extraTagTy));
     }
 
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      for (auto &elt : ElementsWithPayload) {
+        // Elements are always stored at offset 0.
+        // This will only be called on strategies for loadable types.
+        cast<LoadableTypeInfo>(elt.ti)->addToAggLowering(IGM, lowering, offset);
+      }
+
+      // Add the extra tag bits.
+      if (ExtraTagBitCount > 0) {
+        auto tagStoreSize = IGM.DataLayout.getTypeStoreSize(extraTagTy);
+        auto tagOffset = offset + getOffsetOfExtraTagBits();
+        lowering.addOpaqueData(tagOffset.asCharUnits(),
+                               Size(tagStoreSize).asCharUnits());
+      }
+    }
+
     unsigned getExplosionSize() const override {
       return unsigned(ExtraTagBitCount > 0) + PayloadElementCount;
     }
@@ -1170,8 +1209,12 @@ namespace {
         return IGF.Builder.CreateBitCast(addr, extraTagTy->getPointerTo());
       }
 
-      addr = IGF.Builder.CreateStructGEP(addr, 1, Size(PayloadBitCount/8U));
-      return IGF.Builder.CreateBitCast(addr, extraTagTy->getPointerTo());
+      addr = IGF.Builder.CreateStructGEP(addr, 1, getOffsetOfExtraTagBits());
+      return IGF.Builder.CreateElementBitCast(addr, extraTagTy);
+    }
+
+    Size getOffsetOfExtraTagBits() const {
+      return Size(PayloadBitCount / 8U);
     }
 
     void loadForSwitch(IRGenFunction &IGF, Address addr, Explosion &e)
@@ -1190,12 +1233,12 @@ namespace {
       loadForSwitch(IGF, addr, e);
     }
 
-    void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e)
-    const override {
+    void loadAsCopy(IRGenFunction &IGF, Address addr,
+                    Explosion &e) const override {
       assert(TIK >= Loadable);
       Explosion tmp;
       loadAsTake(IGF, addr, tmp);
-      copy(IGF, tmp, e);
+      copy(IGF, tmp, e, Atomicity::Atomic);
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const override {
@@ -1205,7 +1248,7 @@ namespace {
         loadAsTake(IGF, addr, old);
       initialize(IGF, e, addr);
       if (!isPOD(ResilienceExpansion::Maximal))
-        consume(IGF, old);
+        consume(IGF, old, Atomicity::Atomic);
     }
 
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr)
@@ -1321,7 +1364,7 @@ namespace {
 
     SILType getPayloadType(IRGenModule &IGM, SILType T) const {
       return T.getEnumElementType(ElementsWithPayload[0].decl,
-                                  *IGM.SILMod);
+                                  IGM.getSILModule());
     }
 
     const TypeInfo &getPayloadTypeInfo() const {
@@ -2012,7 +2055,7 @@ namespace {
                                  llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
       case NullableRefcounted:
-        IGF.emitStrongRetain(ptr, Refcounting);
+        IGF.emitStrongRetain(ptr, Refcounting, Atomicity::Atomic);
         return;
       case POD:
       case Normal:
@@ -2036,7 +2079,7 @@ namespace {
                                   llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
       case NullableRefcounted:
-        IGF.emitStrongRelease(ptr, Refcounting);
+        IGF.emitStrongRelease(ptr, Refcounting, Atomicity::Atomic);
         return;
       case POD:
       case Normal:
@@ -2045,8 +2088,8 @@ namespace {
     }
 
   public:
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest)
-    const override {
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest,
+              Atomicity atomicity) const override {
       assert(TIK >= Loadable);
 
       switch (CopyDestroyKind) {
@@ -2068,7 +2111,7 @@ namespace {
           Explosion payloadCopy;
           auto &loadableTI = getLoadablePayloadTypeInfo();
           loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
-          loadableTI.copy(IGF, payloadValue, payloadCopy);
+          loadableTI.copy(IGF, payloadValue, payloadCopy, Atomicity::Atomic);
           payloadCopy.claimAll(); // FIXME: repack if not bit-identical
         }
 
@@ -2093,7 +2136,8 @@ namespace {
       }
     }
 
-    void consume(IRGenFunction &IGF, Explosion &src) const override {
+    void consume(IRGenFunction &IGF, Explosion &src,
+                 Atomicity atomicity) const override {
       assert(TIK >= Loadable);
 
       switch (CopyDestroyKind) {
@@ -2116,7 +2160,7 @@ namespace {
           Explosion payloadValue;
           auto &loadableTI = getLoadablePayloadTypeInfo();
           loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
-          loadableTI.consume(IGF, payloadValue);
+          loadableTI.consume(IGF, payloadValue, Atomicity::Atomic);
         }
 
         IGF.Builder.CreateBr(endBB);
@@ -2529,7 +2573,7 @@ namespace {
       // Ask the runtime to do our layout using the payload metadata and number
       // of empty cases.
       auto payloadTy = T.getEnumElementType(ElementsWithPayload[0].decl,
-                                            *IGM.SILMod);
+                                            IGM.getSILModule());
       auto payloadLayout = IGF.emitTypeLayoutRef(payloadTy);
       auto emptyCasesVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                                   ElementsWithNoPayload.size());
@@ -2883,7 +2927,7 @@ namespace {
                                  llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
       case TaggedRefcounted:
-        IGF.emitStrongRetain(ptr, Refcounting);
+        IGF.emitStrongRetain(ptr, Refcounting, Atomicity::Atomic);
         return;
       case POD:
       case BitwiseTakable:
@@ -2909,7 +2953,7 @@ namespace {
                                   llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
       case TaggedRefcounted:
-        IGF.emitStrongRelease(ptr, Refcounting);
+        IGF.emitStrongRelease(ptr, Refcounting, Atomicity::Atomic);
         return;
       case POD:
       case BitwiseTakable:
@@ -3618,8 +3662,8 @@ namespace {
       emitNoPayloadInjection(IGF, out, emptyI - ElementsWithNoPayload.begin());
     }
 
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest)
-    const override {
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest,
+              Atomicity atomicity) const override {
       assert(TIK >= Loadable);
 
       switch (CopyDestroyKind) {
@@ -3638,7 +3682,7 @@ namespace {
             projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
 
             Explosion tmp;
-            lti.copy(IGF, value, tmp);
+            lti.copy(IGF, value, tmp, Atomicity::Atomic);
             tmp.claimAll(); // FIXME: repack if not bit-identical
           });
 
@@ -3671,7 +3715,8 @@ namespace {
 
     }
 
-    void consume(IRGenFunction &IGF, Explosion &src) const override {
+    void consume(IRGenFunction &IGF, Explosion &src,
+                 Atomicity atomicity) const override {
       assert(TIK >= Loadable);
 
       switch (CopyDestroyKind) {
@@ -3689,7 +3734,7 @@ namespace {
             Explosion value;
             projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
 
-            lti.consume(IGF, value);
+            lti.consume(IGF, value, Atomicity::Atomic);
           });
         return;
       }
@@ -3770,7 +3815,7 @@ namespace {
 
           loadAsTake(IGF, dest, tmpOld);
           initialize(IGF, tmpSrc, dest);
-          consume(IGF, tmpOld);
+          consume(IGF, tmpOld, Atomicity::Atomic);
           return;
         }
 
@@ -3845,7 +3890,7 @@ namespace {
         unsigned tagIndex = 0;
         for (auto &payloadCasePair : ElementsWithPayload) {
           SILType PayloadT = T.getEnumElementType(payloadCasePair.decl,
-                                                  *IGF.IGM.SILMod);
+                                                  IGF.getSILModule());
           auto &payloadTI = *payloadCasePair.ti;
           // Trivial and, in the case of a take, bitwise-takable payloads,
           // can all share the default path.
@@ -3923,8 +3968,7 @@ namespace {
       emitIndirectInitialize(IGF, dest, src, T, IsTake);
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, SILType T)
-    const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       switch (CopyDestroyKind) {
       case POD:
         return;
@@ -3937,7 +3981,7 @@ namespace {
         if (TI->isLoadable()) {
           Explosion tmp;
           loadAsTake(IGF, addr, tmp);
-          consume(IGF, tmp);
+          consume(IGF, tmp, Atomicity::Atomic);
           return;
         }
 
@@ -3950,7 +3994,8 @@ namespace {
             // Destroy the data.
             Address dataAddr = IGF.Builder.CreateBitCast(addr,
                                       elt.ti->getStorageType()->getPointerTo());
-            SILType payloadT = T.getEnumElementType(elt.decl, *IGF.IGM.SILMod);
+            SILType payloadT =
+              T.getEnumElementType(elt.decl, IGF.getSILModule());
             elt.ti->destroy(IGF, dataAddr, payloadT);
           });
         return;
@@ -4192,7 +4237,7 @@ namespace {
                                                   IGF.IGM.getPointerSize() * i);
         if (i == 0) firstAddr = eltAddr.getAddress();
         
-        auto payloadTy = T.getEnumElementType(elt.decl, *IGF.IGM.SILMod);
+        auto payloadTy = T.getEnumElementType(elt.decl, IGF.getSILModule());
         
         auto metadata = IGF.emitTypeLayoutRef(payloadTy);
         
@@ -4440,11 +4485,10 @@ namespace {
                                  dest, src);
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, SILType T)
-    const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       emitDestroyCall(IGF, T, addr);
     }
-    
+
     void getSchema(ExplosionSchema &schema) const override {
       schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
                                                   TI->getBestKnownAlignment()));
@@ -4452,6 +4496,11 @@ namespace {
 
     // \group Operations for loadable enums
 
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      llvm_unreachable("resilient enums are never loadable");
+    }
+    
     ClusteredBitVector
     getTagBitsForPayloads() const override {
       llvm_unreachable("resilient enums are always indirect");
@@ -4506,7 +4555,7 @@ namespace {
     }
 
     void loadAsCopy(IRGenFunction &IGF, Address addr,
-                            Explosion &e) const override {
+                    Explosion &e) const override {
       llvm_unreachable("resilient enums are always indirect");
     }
 
@@ -4530,12 +4579,13 @@ namespace {
       llvm_unreachable("resilient enums are always indirect");
     }
 
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest)
-    const override {
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest,
+              Atomicity atomicity) const override {
       llvm_unreachable("resilient enums are always indirect");
     }
 
-    void consume(IRGenFunction &IGF, Explosion &src) const override {
+    void consume(IRGenFunction &IGF, Explosion &src,
+                 Atomicity atomicity) const override {
       llvm_unreachable("resilient enums are always indirect");
     }
 
@@ -4673,7 +4723,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       continue;
     }
 
-    auto origArgLoweredTy = TC.IGM.SILMod->Types.getLoweredType(origArgType);
+    auto origArgLoweredTy = TC.IGM.getLoweredType(origArgType);
     const TypeInfo *origArgTI
       = TC.tryGetCompleteTypeInfo(origArgLoweredTy.getSwiftRValueType());
     assert(origArgTI && "didn't complete type info?!");
@@ -4695,7 +4745,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       // *Now* apply the substitutions and get the type info for the instance's
       // payload type, since we know this case carries an apparent payload in
       // the generic case.
-      SILType fieldTy = type.getEnumElementType(elt, *TC.IGM.SILMod);
+      SILType fieldTy = type.getEnumElementType(elt, TC.IGM.getSILModule());
       auto *substArgTI = &TC.IGM.getTypeInfo(fieldTy);
 
       elementsWithPayload.push_back({elt, substArgTI, origArgTI});
@@ -4872,6 +4922,11 @@ namespace {
       : EnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD,
                          alwaysFixedSize) {}
 
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      Strategy.addToAggLowering(IGM, lowering, offset);
+    }
+
     unsigned getExplosionSize() const override {
       return Strategy.getExplosionSize();
     }
@@ -4896,11 +4951,12 @@ namespace {
       return Strategy.reexplode(IGF, src, dest);
     }
     void copy(IRGenFunction &IGF, Explosion &src,
-              Explosion &dest) const override {
-      return Strategy.copy(IGF, src, dest);
+              Explosion &dest, Atomicity atomicity) const override {
+      return Strategy.copy(IGF, src, dest, atomicity);
     }
-    void consume(IRGenFunction &IGF, Explosion &src) const override {
-      return Strategy.consume(IGF, src);
+    void consume(IRGenFunction &IGF, Explosion &src,
+                 Atomicity atomicity) const override {
+      return Strategy.consume(IGF, src, atomicity);
     }
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
       return Strategy.fixLifetime(IGF, src);
@@ -5438,7 +5494,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
   if (IGM.isResilient(theEnum, ResilienceExpansion::Maximal))
     storageType = cast<llvm::StructType>(IGM.OpaquePtrTy->getElementType());
   else
-    storageType = IGM.createNominalType(theEnum);
+    storageType = IGM.createNominalType(type);
 
   // Create a forward declaration for that type.
   addForwardDecl(key, storageType);
@@ -5506,7 +5562,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
 void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
   emitEnumMetadata(*this, theEnum);
   emitNestedTypeDecls(theEnum->getMembers());
-  addNominalTypeDecl(theEnum);
+  emitReflectionMetadata(theEnum);
 }
 
 void irgen::emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,

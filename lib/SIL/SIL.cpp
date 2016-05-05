@@ -63,10 +63,12 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   case Accessibility::Public:
     return FormalLinkage::PublicUnique;
   case Accessibility::Internal:
-    // FIXME: This ought to be "hidden" as well, but that causes problems when
-    // inlining code from the standard library, which may reference internal
-    // declarations.
-    return FormalLinkage::PublicUnique;
+    // If we're serializing all function bodies, type metadata for internal
+    // types needs to be public too.
+    if (D->getDeclContext()->getParentModule()->getResilienceStrategy()
+        == ResilienceStrategy::Fragile)
+      return FormalLinkage::PublicUnique;
+    return FormalLinkage::HiddenUnique;
   case Accessibility::Private:
     // Why "hidden" instead of "private"? Because the debugger may need to
     // access these symbols.
@@ -115,4 +117,40 @@ SILLinkage swift::getSILLinkage(FormalLinkage linkage,
     return SILLinkage::Private;
   }
   llvm_unreachable("bad formal linkage");
+}
+
+SILLinkage
+swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
+                                        ForDefinition_t definition) {
+  // Behavior conformances are always private.
+  if (C->isBehaviorConformance())
+    return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
+
+  ModuleDecl *conformanceModule = C->getDeclContext()->getParentModule();
+
+  // If the conformance was synthesized by the ClangImporter, give it
+  // shared linkage.
+  auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
+  auto typeUnit = typeDecl->getModuleScopeContext();
+  if (isa<ClangModuleUnit>(typeUnit)
+      && conformanceModule == typeUnit->getParentModule())
+    return SILLinkage::Shared;
+
+  // If we're building with -sil-serialize-all, give the conformance public
+  // linkage.
+  if (conformanceModule->getResilienceStrategy()
+      == ResilienceStrategy::Fragile)
+    return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
+
+  // FIXME: This should be using std::min(protocol's access, type's access).
+  switch (C->getProtocol()->getEffectiveAccess()) {
+    case Accessibility::Private:
+      return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
+
+    case Accessibility::Internal:
+      return (definition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
+
+    default:
+      return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
+  }
 }

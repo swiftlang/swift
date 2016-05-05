@@ -5,7 +5,7 @@
 
 import Swift
 
-func WhatShouldIDoImBored<T : P>(t : T) {
+func WhatShouldIDoImBored<T : P>(_ t : T) {
   t.doSomething()
 }
 

@@ -37,7 +37,7 @@ class C1<T> {
 
 var zero: Int { get { } }
 
-func exerciseBehavior<T>(inout _ sx: S1<T>, inout _ sy: S1<Int>,
+func exerciseBehavior<T>(_ sx: inout S1<T>, _ sy: inout S1<Int>,
                          _ cx: C1<T>, _ cy: C1<Int>,
                          _ z: T) {
   /* FIXME
@@ -101,7 +101,7 @@ class C2<T> {
   var instance: T __behavior withStorage
 }
 
-func exerciseStorage<T>(inout _ sx: S2<T>, inout _ sy: S2<Int>,
+func exerciseStorage<T>(_ sx: inout S2<T>, _ sy: inout S2<Int>,
                         _ cx: C2<T>, _ cy: C2<Int>,
                         _ z: T) {
   _ = sx.instance
@@ -141,7 +141,7 @@ class C3<T> {
   var instance: T __behavior withInit { any() }
 }
 
-func exerciseStorage<T>(inout _ sx: S3<T>, inout _ sy: S3<Int>,
+func exerciseStorage<T>(_ sx: inout S3<T>, _ sy: inout S3<Int>,
                         _ cx: C3<T>, _ cy: C3<Int>,
                         _ z: T) {
   _ = sx.instance

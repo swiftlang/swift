@@ -26,10 +26,10 @@ class Foo: Fooable {
   @objc func block(_: Int -> Int) {}
   @objc func block2(_: (Int,Int) -> Int) {}
 
-  @objc func takesString(x: String) -> String { return x }
-  @objc func takesArray(x: [AnyObject]) -> [AnyObject] { return x }
-  @objc func takesDict(x: [NSObject: AnyObject]) -> [NSObject: AnyObject] { return x }
-  @objc func takesSet(x: Set<NSObject>) -> Set<NSObject> { return x }
+  @objc func takesString(_ x: String) -> String { return x }
+  @objc func takesArray(_ x: [AnyObject]) -> [AnyObject] { return x }
+  @objc func takesDict(_ x: [NSObject: AnyObject]) -> [NSObject: AnyObject] { return x }
+  @objc func takesSet(_ x: Set<NSObject>) -> Set<NSObject> { return x }
 
   @objc func fail() throws {}
 }

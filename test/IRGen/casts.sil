@@ -221,7 +221,8 @@ nay:
 }
 
 // CHECK-LABEL: define{{( protected)?}} %C5casts1A* @checked_downcast_optional({{(i32|i64)}}) {{.*}} {
-// CHECK:         [[OBJ_PTR:%.*]] = inttoptr {{(i32|i64)}} %0 to i8*
+// CHECK:         [[T0:%.*]] = inttoptr {{(i32|i64)}} %0 to %C5casts1A*
+// CHECK:         [[OBJ_PTR:%.*]] = bitcast %C5casts1A* [[T0]] to i8*
 // CHECK:         [[METADATA:%.*]] = call %swift.type* @_TMaC5casts1A()
 // CHECK:         [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
 // CHECK:         [[RESULT_PTR:%.*]] = call i8* @rt_swift_dynamicCastClass(i8* [[OBJ_PTR]], i8* [[METADATA_PTR]])
@@ -233,6 +234,36 @@ entry(%a : $Optional<A>):
   checked_cast_br %a : $Optional<A> to $A, yea, nay
 yea(%aa : $A):
   return %aa : $A
+nay:
+  unreachable
+}
+
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @checked_downcast_optional_metatype({{(i32|i64)}}) {{.*}} {
+// CHECK:         [[VALUE:%.*]] = inttoptr {{(i32|i64)}} %0 to %swift.type*
+// CHECK:         [[METADATA:%.*]] = call %swift.type* @_TMaC5casts1B()
+// CHECK:         [[RESULT:%.*]] = call %swift.type* @swift_dynamicCastMetatype(%swift.type* [[VALUE]], %swift.type* [[METADATA]])
+// CHECK:         [[COND:%.*]] = icmp ne %swift.type* [[RESULT]], null
+// CHECK:         br i1 [[COND]]
+sil @checked_downcast_optional_metatype : $@convention(thin) (Optional<A.Type>) -> @thick B.Type {
+entry(%a : $Optional<A.Type>):
+  checked_cast_br %a : $Optional<A.Type> to $@thick B.Type, yea, nay
+yea(%b : $@thick B.Type):
+  return %b : $@thick B.Type
+nay:
+  unreachable
+}
+
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @checked_downcast_optional_exmetatype({{(i32, i32|i64, i64)}}) {{.*}} {
+// CHECK:         [[VALUE:%.*]] = inttoptr {{(i32|i64)}} %0 to %swift.type*
+// CHECK:         [[METADATA:%.*]] = call %swift.type* @_TMaC5casts1B()
+// CHECK:         [[RESULT:%.*]] = call %swift.type* @swift_dynamicCastMetatype(%swift.type* [[VALUE]], %swift.type* [[METADATA]])
+// CHECK:         [[COND:%.*]] = icmp ne %swift.type* [[RESULT]], null
+// CHECK:         br i1 [[COND]]
+sil @checked_downcast_optional_exmetatype : $@convention(thin) (Optional<CP.Type>) -> @thick B.Type {
+entry(%a : $Optional<CP.Type>):
+  checked_cast_br %a : $Optional<CP.Type> to $@thick B.Type, yea, nay
+yea(%b : $@thick B.Type):
+  return %b : $@thick B.Type
 nay:
   unreachable
 }

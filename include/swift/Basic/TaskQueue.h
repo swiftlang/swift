@@ -179,4 +179,4 @@ public:
 } // end namespace sys
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_TASKQUEUE_H

@@ -59,6 +59,7 @@ struct TestOptions {
   std::string JsonRequestPath;
   llvm::Optional<std::string> SourceText;
   std::string ModuleGroupName;
+  std::string InterestedUSR;
   unsigned Line = 0;
   unsigned Col = 0;
   unsigned Offset = 0;

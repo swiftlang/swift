@@ -124,41 +124,41 @@ struct FooStruct {
   func intGen() -> Int { return 1 }
 }
 
-func testIf1(fooObject: FooStruct) {
+func testIf1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   if #^COND_IF_1^#
 }
 
-func testIf2(fooObject: FooStruct) {
+func testIf2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   if #^COND_IF_2^# {
   }
 }
 
-func testIf3(fooObject: FooStruct) {
+func testIf3(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   if var z = #^COND_IF_3^# {
   }
 }
 
-func testIf4(fooObject: FooStruct) {
+func testIf4(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   if var z = #^COND_IF_4^# {
   }
 }
 
-func testIfElseIf1(fooObject: FooStruct) {
+func testIfElseIf1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   if true {
   } else if #^COND_IF_ELSE_IF_1^#
 }
 
-func testIfElseIf2(fooObject: FooStruct) {
+func testIfElseIf2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   if true {
@@ -166,7 +166,7 @@ func testIfElseIf2(fooObject: FooStruct) {
   }
 }
 
-func testIfElseIf3(fooObject: FooStruct) {
+func testIfElseIf3(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   if true {
@@ -174,7 +174,7 @@ func testIfElseIf3(fooObject: FooStruct) {
   } else if #^COND_IF_ELSE_IF_3^#
 }
 
-func testIfElseIf4(fooObject: FooStruct) {
+func testIfElseIf4(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   if true {
@@ -183,14 +183,14 @@ func testIfElseIf4(fooObject: FooStruct) {
   }
 }
 
-func testIfElseIf5(fooObject: FooStruct) {
+func testIfElseIf5(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   if true {
   } else if var z = #^COND_IF_ELSE_IF_5^#
 }
 
-func testIfElseIf6(fooObject: FooStruct) {
+func testIfElseIf6(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   if true {
@@ -199,143 +199,143 @@ func testIfElseIf6(fooObject: FooStruct) {
 }
 
 
-func testWhile1(fooObject: FooStruct) {
+func testWhile1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   while #^COND_WHILE_1^#
 }
 
-func testWhile2(fooObject: FooStruct) {
+func testWhile2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   while #^COND_WHILE_2^# {
   }
 }
 
-func testWhile3(fooObject: FooStruct) {
+func testWhile3(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   while var z = #^COND_WHILE_3^#
 }
 
-func testWhile4(fooObject: FooStruct) {
+func testWhile4(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   while let z = #^COND_WHILE_4^#
 }
 
-func testRepeatWhile1(fooObject: FooStruct) {
+func testRepeatWhile1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   repeat {
   } while #^COND_DO_WHILE_1^#
 }
 
-func testRepeatWhile2(fooObject: FooStruct) {
+func testRepeatWhile2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   repeat {
   } while localFooObject.#^COND_DO_WHILE_2^#
 }
 
-func testCStyleForInit1(fooObject: FooStruct) {
+func testCStyleForInit1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for #^C_STYLE_FOR_INIT_1^#
 }
 
-func testCStyleForInit2(fooObject: FooStruct) {
+func testCStyleForInit2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for #^C_STYLE_FOR_INIT_2^#;
 }
 
-func testCStyleForInit3(fooObject: FooStruct) {
+func testCStyleForInit3(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for #^C_STYLE_FOR_INIT_3^# ;
 }
 
-func testCStyleForCond1(fooObject: FooStruct) {
+func testCStyleForCond1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for ; #^C_STYLE_FOR_COND_1^#
 }
 
-func testCStyleForCond2(fooObject: FooStruct) {
+func testCStyleForCond2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for ; #^C_STYLE_FOR_COND_2^#;
 }
 
-func testCStyleForCond3(fooObject: FooStruct) {
+func testCStyleForCond3(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for ; #^C_STYLE_FOR_COND_3^# ;
 }
 
-func testCStyleForCondI1(fooObject: FooStruct) {
+func testCStyleForCondI1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for var i = 0; #^C_STYLE_FOR_COND_I_1^#
 }
 
-func testCStyleForCondI2(fooObject: FooStruct) {
+func testCStyleForCondI2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for var i = unknown_var; #^C_STYLE_FOR_COND_I_2^#
 }
 
-func testCStyleForCondIE1(fooObject: FooStruct) {
+func testCStyleForCondIE1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for var i = 0, e = 10; true; #^C_STYLE_FOR_COND_I_E_1^#
 }
 
-func testCStyleForIncr1(fooObject: FooStruct) {
+func testCStyleForIncr1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for ; ; #^C_STYLE_FOR_INCR_1^#
 }
 
-func testCStyleForIncr2(fooObject: FooStruct) {
+func testCStyleForIncr2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for ; ; #^C_STYLE_FOR_INCR_2^# {
   }
 }
 
-func testCStyleForIncrI1(fooObject: FooStruct) {
+func testCStyleForIncrI1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for var i = 0; true; #^C_STYLE_FOR_INCR_I_1^#
 }
 
-func testCStyleForIncrI2(fooObject: FooStruct) {
+func testCStyleForIncrI2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for var i = 0; i != 10; #^C_STYLE_FOR_INCR_I_2^#
 }
 
-func testCStyleForIncrI3(fooObject: FooStruct) {
+func testCStyleForIncrI3(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for var i = 0; unknown_var != 10; #^C_STYLE_FOR_INCR_I_3^#
 }
 
-func testCStyleForIncrI4(fooObject: FooStruct) {
+func testCStyleForIncrI4(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for var i = unknown_var; unknown_var != 10; #^C_STYLE_FOR_INCR_I_4^#
 }
 
-func testCStyleForIncrIE1(fooObject: FooStruct) {
+func testCStyleForIncrIE1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for var i = 0, e = 10; true; #^C_STYLE_FOR_INCR_I_E_1^#
 }
 
-func testCStyleForBodyI1(fooObject: FooStruct) {
+func testCStyleForBodyI1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for var i = 0 {
@@ -343,7 +343,7 @@ func testCStyleForBodyI1(fooObject: FooStruct) {
   }
 }
 
-func testCStyleForBodyI2(fooObject: FooStruct) {
+func testCStyleForBodyI2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for var i = 0; {
@@ -351,7 +351,7 @@ func testCStyleForBodyI2(fooObject: FooStruct) {
   }
 }
 
-func testCStyleForBodyI3(fooObject: FooStruct) {
+func testCStyleForBodyI3(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for var i = unknown_var; {
@@ -359,7 +359,7 @@ func testCStyleForBodyI3(fooObject: FooStruct) {
   }
 }
 
-func testCStyleForBodyI4(fooObject: FooStruct) {
+func testCStyleForBodyI4(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for var i = 0; ; {
@@ -367,7 +367,7 @@ func testCStyleForBodyI4(fooObject: FooStruct) {
   }
 }
 
-func testCStyleForBodyI5(fooObject: FooStruct) {
+func testCStyleForBodyI5(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for var i = 0; unknown_var != 10; {
@@ -375,7 +375,7 @@ func testCStyleForBodyI5(fooObject: FooStruct) {
   }
 }
 
-func testCStyleForBodyI6(fooObject: FooStruct) {
+func testCStyleForBodyI6(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for var i = 0; ; unknown_var++ {
@@ -383,33 +383,33 @@ func testCStyleForBodyI6(fooObject: FooStruct) {
   }
 }
 
-func testForEachExpr1(fooObject: FooStruct) {
+func testForEachExpr1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for i in #^FOR_EACH_EXPR_1^#
 }
 
-func testForEachExpr2(fooObject: FooStruct) {
+func testForEachExpr2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   for i in #^FOR_EACH_EXPR_2^# {
   }
 }
 
-func testSwitchExpr1(fooObject: FooStruct) {
+func testSwitchExpr1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch #^SWITCH_EXPR_1^#
 }
 
-func testSwitchExpr2(fooObject: FooStruct) {
+func testSwitchExpr2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch #^SWITCH_EXPR_2^# {
   }
 }
 
-func testSwitchCaseWhereExpr1(fooObject: FooStruct) {
+func testSwitchCaseWhereExpr1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch (0, 42) {
@@ -417,7 +417,7 @@ func testSwitchCaseWhereExpr1(fooObject: FooStruct) {
   }
 }
 
-func testSwitchCaseWhereExpr2(fooObject: FooStruct) {
+func testSwitchCaseWhereExpr2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch (0, 42) {
@@ -425,7 +425,7 @@ func testSwitchCaseWhereExpr2(fooObject: FooStruct) {
   }
 }
 
-func testSwitchCaseWhereExpr3(fooObject: FooStruct) {
+func testSwitchCaseWhereExpr3(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch (0, 42) {
@@ -433,7 +433,7 @@ func testSwitchCaseWhereExpr3(fooObject: FooStruct) {
   }
 }
 
-func testSwitchCaseWhereExprI1(fooObject: FooStruct) {
+func testSwitchCaseWhereExprI1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch (0, 42) {
@@ -441,7 +441,7 @@ func testSwitchCaseWhereExprI1(fooObject: FooStruct) {
   }
 }
 
-func testSwitchCaseWhereExprI2(fooObject: FooStruct) {
+func testSwitchCaseWhereExprI2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch (0, 42) {
@@ -449,7 +449,7 @@ func testSwitchCaseWhereExprI2(fooObject: FooStruct) {
   }
 }
 
-func testSwitchCaseWhereExprIJ1(fooObject: FooStruct) {
+func testSwitchCaseWhereExprIJ1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
   switch (0, 42) {
@@ -473,10 +473,10 @@ func testSwitchCaseWhereExprIJ1(fooObject: FooStruct) {
 // COND-WITH-RELATION-DAG: Decl[LocalVar]/Local:        localInt[#Int#]{{; name=.+$}}
 // COND-WITH-RELATION-DAG: Decl[LocalVar]/Local:        localFooObject[#FooStruct#]{{; name=.+$}}
 // COND-WITH-RELATION-DAG: Decl[Struct]/CurrModule:     FooStruct[#FooStruct#]{{; name=.+$}}
-// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testIf2({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
-// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testWhile3({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
-// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testIfElseIf5({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
-// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testCStyleForIncrIE1({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
+// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: testIf2({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
+// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: testWhile3({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
+// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: testIfElseIf5({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
+// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: testCStyleForIncrIE1({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
 
 // COND-WITH-RELATION1: Begin completions
 // COND-WITH-RELATION1-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#]{{; name=.+$}}

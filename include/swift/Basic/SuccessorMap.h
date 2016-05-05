@@ -457,4 +457,4 @@ private:
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_SUCCESSORMAP_H

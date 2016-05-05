@@ -14,7 +14,7 @@
 ///
 /// This is a simple reimplementation of opt that includes support for Swift-
 /// specific LLVM passes. It is meant to make it easier to handle issues related
-/// to transitioning to the new LLVM pass manager (which lacks the dynamicism of
+/// to transitioning to the new LLVM pass manager (which lacks the dynamism of
 /// the old pass manager) and also problems during the code base transition to
 /// that pass manager. Additionally it will enable a user to exactly simulate
 /// Swift's LLVM pass pipeline by using the same pass pipeline building

@@ -16,7 +16,7 @@
 # Byte compiled python modules.
 *.pyc
 # vim swap files
-.*.swp
+.*.sw[a-z]
 .sw?
 
 #==============================================================================#
@@ -39,3 +39,4 @@ docs/_build
 #==============================================================================#
 CMakeCache.txt
 CMakeFiles
+.atom-build.json

@@ -1,13 +1,6 @@
-add_swift_executable(swift-reflection-test
-  swift-reflection-test.cpp
-  LINK_LIBRARIES
-    swiftBasic
-    swiftReflection
-
-  COMPONENT_DEPENDS object support
-)
-
-swift_install_in_component(tools
-    TARGETS swift-reflection-test
-    RUNTIME DESTINATION bin)
+add_swift_target_executable(swift-reflection-test BUILD_WITH_STDLIB
+  swift-reflection-test.c
+  overrides.c
+  LINK_FAT_LIBRARIES
+    swiftRemoteMirror)
 

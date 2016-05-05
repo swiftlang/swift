@@ -12,13 +12,13 @@ class B: A {
   override class func foo() {}
 }
 
-// CHECK-LABEL: sil @_TF22devirt_value_metatypes17testValueMetatypeFCS_1AT_ 
+// CHECK-LABEL: sil [thunk] [always_inline] @_TF22devirt_value_metatypes17testValueMetatypeFCS_1AT_ 
 // CHECK: value_metatype $@thick A.Type
 // CHECK: checked_cast_br
 // CHECK: checked_cast_br
 // CHECK: class_method
 // CHECK: }
-public func testValueMetatype(x:A) {
+public func testValueMetatype(_ x:A) {
     x.dynamicType.foo()
 }
 
@@ -32,7 +32,7 @@ public class D : C {
   override class func foo() -> Int { return 1 }
 }
 
-// CHECK-LABEL: sil @_TF22devirt_value_metatypes5testDFCS_1DSi
+// CHECK-LABEL: sil [thunk] [always_inline] @_TF22devirt_value_metatypes5testDFCS_1DSi
 // CHECK-NOT: value_metatype %
 // D.foo is an internal method, D has no subclasses and it is a wmo compilation,
 // therefore D.foo method invocation can be devirtualized.
@@ -41,7 +41,7 @@ public class D : C {
 // CHECK-NOT: checked_cast_br
 // CHECK-NOT: class_method
 // CHECK: }
-public func testD(x: D) -> Int {
+public func testD(_ x: D) -> Int {
   return (x.dynamicType as C.Type).foo()
 }
 
@@ -51,12 +51,12 @@ public final class E : C {
   override class func foo() -> Int { return 1 }
 }
 
-// CHECK-LABEL: sil @_TF22devirt_value_metatypes5testEFCS_1ESi
+// CHECK-LABEL: sil [thunk] [always_inline] @_TF22devirt_value_metatypes5testEFCS_1ESi
 // CHECK-NOT: value_metatype $@thick E.Type
 // CHECK_NOT: checked_cast_br
 // CHECK: function_ref
 // CHECK: apply
 // CHECK: return
-public func testE(x: E) -> Int {
+public func testE(_ x: E) -> Int {
   return (x.dynamicType as C.Type).foo()
 }

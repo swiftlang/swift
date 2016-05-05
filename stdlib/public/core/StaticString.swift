@@ -27,6 +27,7 @@
 ///        case utf8(start: UnsafePointer<UInt8>, count: Int)
 ///        case scalar(UnicodeScalar)
 ///      }
+@_fixed_layout
 public struct StaticString
   : _BuiltinUnicodeScalarLiteralConvertible,
     _BuiltinExtendedGraphemeClusterLiteralConvertible,
@@ -38,9 +39,9 @@ public struct StaticString
     CustomDebugStringConvertible,
     CustomReflectable {
 
-  /// Either a pointer to the start of UTF-8 data, or an integer representation
-  /// of a single Unicode scalar.
-  internal var _startPtrOrData: Builtin.RawPointer
+  /// Either a pointer to the start of UTF-8 data, represented as an integer,
+  /// or an integer representation of a single Unicode scalar.
+  internal var _startPtrOrData: Builtin.Word
 
   /// If `_startPtrOrData` is a pointer, contains the length of the UTF-8 data
   /// in bytes.
@@ -64,7 +65,7 @@ public struct StaticString
     _precondition(
       hasPointerRepresentation,
       "StaticString should have pointer representation")
-    return UnsafePointer(_startPtrOrData)
+    return UnsafePointer(bitPattern: UInt(_startPtrOrData))!
   }
 
   /// The stored Unicode scalar value.
@@ -75,7 +76,7 @@ public struct StaticString
     _precondition(
       !hasPointerRepresentation,
       "StaticString should have Unicode scalar representation")
-    return UnicodeScalar(UInt32(unsafeBitCast(_startPtrOrData, to: UInt.self)))
+    return UnicodeScalar(UInt32(UInt(_startPtrOrData)))
   }
 
   /// If `self` stores a pointer to ASCII or UTF-8 code units, the
@@ -111,7 +112,7 @@ public struct StaticString
   ///
   /// This method works regardless of what `self` stores.
   public func withUTF8Buffer<R>(
-    @noescape invoke body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
+    invoke body: @noescape (UnsafeBufferPointer<UInt8>) -> R) -> R {
     if hasPointerRepresentation {
       return body(UnsafeBufferPointer(
         start: utf8Start, count: Int(utf8CodeUnitCount)))
@@ -135,26 +136,27 @@ public struct StaticString
     self = ""
   }
 
+  @_versioned
   @_transparent
   internal init(
     _start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) {
-    self._startPtrOrData = _start
+    // We don't go through UnsafePointer here to make things simpler for alias
+    // analysis. A higher-level algorithm may be trying to make sure an
+    // unrelated buffer is not accessed or freed.
+    self._startPtrOrData = Builtin.ptrtoint_Word(_start)
     self._utf8CodeUnitCount = utf8CodeUnitCount
     self._flags = Bool(isASCII) ? (0x2 as UInt8)._value : (0x0 as UInt8)._value
   }
 
+  @_versioned
   @_transparent
   internal init(
     unicodeScalar: Builtin.Int32
   ) {
-    self._startPtrOrData =
-      unsafeBitCast(
-        UInt(UInt32(unicodeScalar)),
-        to: OpaquePointer.self
-      )._rawValue
+    self._startPtrOrData = UInt(UInt32(unicodeScalar))._builtinWordValue
     self._utf8CodeUnitCount = 0._builtinWordValue
     self._flags = UnicodeScalar(_builtinUnicodeScalarLiteral: unicodeScalar).isASCII
       ? (0x3 as UInt8)._value
@@ -242,12 +244,12 @@ extension StaticString {
 extension StaticString {
   @available(*, unavailable, renamed: "utf8CodeUnitCount")
   public var byteSize: Int {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, message: "use the 'String(_:)' initializer")
   public var stringValue: String {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 

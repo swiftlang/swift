@@ -27,7 +27,7 @@ extension NSObject {
 
 var o = NSObject()
 
-func drop(x: NSObject?) {}
+func drop(_ x: NSObject?) {}
 
 // CHECK: true
 print(o.responds(to: "frob"))

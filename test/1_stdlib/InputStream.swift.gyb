@@ -16,23 +16,14 @@
 // RUN: %S/../../utils/line-directive %t/InputStream.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
-// XFAIL: interpret
-
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import Swift
 
 var ReadLineTestSuite = TestSuite("ReadLine")
 
-% for strip_newline in [ 'false', 'true' ]:
+% for strip_newline in ['false', 'true']:
 %   newline = '' if strip_newline == 'true' else '\\n'
 
 ReadLineTestSuite.test("EmptyLine/strippingNewline=${strip_newline}")

@@ -152,7 +152,7 @@ func callMethodInDeprecatedExtension() {
 func functionWithDeprecatedMethodInDeadElseBranch() {
   if #available(iOS 8.0, *) {
   } else {
-    // This branch is dead on OSX, so we shouldn't emit a deprecation warning in it.
+    // This branch is dead on OS X, so we shouldn't emit a deprecation warning in it.
     let _ = ClassDeprecatedIn10_9()  // no-warning
   }
 
@@ -163,7 +163,7 @@ func functionWithDeprecatedMethodInDeadElseBranch() {
   }
 
   guard #available(iOS 8.0, *) else {
-    // This branch is dead because our platform is OSX, so the wildcard always matches.
+    // This branch is dead because our platform is OS X, so the wildcard always matches.
     let _ = ClassDeprecatedIn10_9()  // no-warning
   }
 }

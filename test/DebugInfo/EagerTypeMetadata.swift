@@ -2,7 +2,7 @@
 
 public class C<T>
 {
-  func c(i : T)
+  func c(_ i : T)
   {
     // Ensure that the type metadata for T is eagerly loaded at -Onone.
     // CHECK: define {{.*}}17EagerTypeMetadata1C1c

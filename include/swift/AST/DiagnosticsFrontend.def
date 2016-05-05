@@ -55,6 +55,9 @@ ERROR(error_unsupported_target_arch, none,
 ERROR(error_unsupported_opt_for_target, none,
   "unsupported option '%0' for target '%1'", (StringRef, StringRef))
 
+ERROR(error_argument_not_allowed_with, none,
+  "argument '%0' is not allowed with '%1'", (StringRef, StringRef))
+
 ERROR(cannot_open_file,none,
   "cannot open file '%0' (%1)", (StringRef, StringRef))
 ERROR(cannot_open_serialized_file,none,
@@ -124,6 +127,10 @@ ERROR(error_no_output_filename_specified,none,
 ERROR(error_implicit_output_file_is_directory,none,
   "the implicit output file '%0' is a directory; explicitly specify a filename "
   "using -o", (StringRef))
+
+ERROR(error_primary_file_not_found,none,
+      "primary file '%0' was not found in file list '%1'",
+      (StringRef, StringRef))
 
 ERROR(repl_must_be_initialized,none,
       "variables currently must have an initial value when entered at the "

@@ -10,7 +10,7 @@
 // CHECK: [[TUPLE_TYPE:%swift.tuple_type]] = type { [[TYPE]], i64, i8*, [0 x %swift.tuple_element_type] }
 // CHECK: %swift.tuple_element_type = type { [[TYPE]]*, i64 }
 
-func dup<T>(x: T) -> (T, T) { var x = x; return (x,x) }
+func dup<T>(_ x: T) -> (T, T) { var x = x; return (x,x) }
 // CHECK:    define hidden void @_TF14generic_tuples3dup{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 // CHECK:    entry:
 //   Allocate a local variable for 'x'.
@@ -38,7 +38,7 @@ func dup<T>(x: T) -> (T, T) { var x = x; return (x,x) }
 struct S {}
 
 
-func callDup(let s: S) { _ = dup(s) }
+func callDup(_ s: S) { _ = dup(s) }
 // CHECK-LABEL: define hidden void @_TF14generic_tuples7callDupFVS_1ST_()
 // CHECK-NEXT: entry:
 // CHECK-NEXT: call void @_TF14generic_tuples3dupurFxTxx_({{.*}} undef, {{.*}} undef, %swift.type* {{.*}} @_TMfV14generic_tuples1S, {{.*}})
@@ -46,7 +46,7 @@ func callDup(let s: S) { _ = dup(s) }
 
 class C {}
 
-func dupC<T : C>(let x: T) -> (T, T) { return (x, x) }
+func dupC<T : C>(_ x: T) -> (T, T) { return (x, x) }
 // CHECK-LABEL: define hidden { %C14generic_tuples1C*, %C14generic_tuples1C* } @_TF14generic_tuples4dupCuRxCS_1CrFxTxx_(%C14generic_tuples1C*, %swift.type* %T)
 // CHECK-NEXT: entry:
 // CHECK:      [[REF:%.*]] = bitcast %C14generic_tuples1C* %0 to %swift.refcounted*
@@ -55,7 +55,7 @@ func dupC<T : C>(let x: T) -> (T, T) { return (x, x) }
 // CHECK-NEXT: [[TUP2:%.*]] = insertvalue { %C14generic_tuples1C*, %C14generic_tuples1C* } [[TUP1:%.*]], %C14generic_tuples1C* %0, 1
 // CHECK-NEXT: ret { %C14generic_tuples1C*, %C14generic_tuples1C* } [[TUP2]]
 
-func callDupC(let c: C) { _ = dupC(c) }
+func callDupC(_ c: C) { _ = dupC(c) }
 // CHECK-LABEL: define hidden void @_TF14generic_tuples8callDupCFCS_1CT_(%C14generic_tuples1C*)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[REF:%.*]] = bitcast %C14generic_tuples1C* %0 to %swift.refcounted*
@@ -70,22 +70,22 @@ func callDupC(let c: C) { _ = dupC(c) }
 // CHECK-NEXT: ret void
 
 // CHECK: define hidden i64 @_TF14generic_tuples4lump{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
-func lump<T>(x: T) -> (Int, T, T) { return (0,x,x) }
+func lump<T>(_ x: T) -> (Int, T, T) { return (0,x,x) }
 // CHECK: define hidden { i64, i64 } @_TF14generic_tuples5lump2{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
-func lump2<T>(x: T) -> (Int, Int, T) { return (0,0,x) }
+func lump2<T>(_ x: T) -> (Int, Int, T) { return (0,0,x) }
 // CHECK: define hidden void @_TF14generic_tuples5lump3{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
-func lump3<T>(x: T) -> (T, T, T) { return (x,x,x) }
+func lump3<T>(_ x: T) -> (T, T, T) { return (x,x,x) }
 // CHECK: define hidden i64 @_TF14generic_tuples5lump4{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
-func lump4<T>(x: T) -> (T, Int, T) { return (x,0,x) }
+func lump4<T>(_ x: T) -> (T, Int, T) { return (x,0,x) }
 
 // CHECK: define hidden i64 @_TF14generic_tuples6unlump{{.*}}(i64, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
-func unlump<T>(x: (Int, T, T)) -> Int { return x.0 }
+func unlump<T>(_ x: (Int, T, T)) -> Int { return x.0 }
 // CHECK: define hidden void @_TF14generic_tuples7unlump{{.*}}(%swift.opaque* noalias nocapture sret, i64, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
-func unlump1<T>(x: (Int, T, T)) -> T { return x.1 }
+func unlump1<T>(_ x: (Int, T, T)) -> T { return x.1 }
 // CHECK: define hidden void @_TF14generic_tuples7unlump2{{.*}}(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i64, %swift.opaque* noalias nocapture, %swift.type* %T)
-func unlump2<T>(x: (T, Int, T)) -> T { return x.0 }
+func unlump2<T>(_ x: (T, Int, T)) -> T { return x.0 }
 // CHECK: define hidden i64 @_TF14generic_tuples7unlump3{{.*}}(%swift.opaque* noalias nocapture, i64, %swift.opaque* noalias nocapture, %swift.type* %T)
-func unlump3<T>(x: (T, Int, T)) -> Int { return x.1 }
+func unlump3<T>(_ x: (T, Int, T)) -> Int { return x.1 }
 
 
 // CHECK: tuple_existentials

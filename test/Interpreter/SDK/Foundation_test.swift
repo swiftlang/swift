@@ -1,19 +1,11 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// XFAIL: interpret
 // REQUIRES: objc_interop
 
 import Foundation
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 // rdar://problem/18884272
 // Make sure that NSObject conforms to NSObjectProtocol. This
@@ -23,8 +15,8 @@ let objcProtocol: NSObjectProtocol = NSObject()
 
 var FoundationTestSuite = TestSuite("Foundation")
 
-func asNSString(s: String) -> NSString { return s as NSString }
-func asString(ns: NSString) -> String { return ns as String }
+func asNSString(_ s: String) -> NSString { return s as NSString }
+func asString(_ ns: NSString) -> String { return ns as String }
 
 //===----------------------------------------------------------------------===//
 // Strings
@@ -77,7 +69,7 @@ FoundationTestSuite.test("NSNumber") {
 
 FoundationTestSuite.test("NSArray") {
   // Literals
-  var nsArr: NSArray = [ 1, 2.5, "Hello" ]
+  var nsArr: NSArray = [1, 2.5, "Hello"]
   assert(nsArr.count == 3)
 
   // Subscripting
@@ -90,7 +82,7 @@ FoundationTestSuite.test("NSArray") {
   for x: AnyObject in nsArr {
     result.append((x as! NSObject).description)
   }
-  expectEqualSequence([ "1", "2.5", "Hello" ], result)
+  expectEqualSequence(["1", "2.5", "Hello"], result)
 }
 
 FoundationTestSuite.test("NSMutableArray") {
@@ -117,7 +109,7 @@ FoundationTestSuite.test("arrayConversions") {
 
   var nsaoa = aoa as NSArray
 
-  func nsArrayToAnyObjectArray(nsa: NSArray) -> [AnyObject] {
+  func nsArrayToAnyObjectArray(_ nsa: NSArray) -> [AnyObject] {
     return nsa as [AnyObject]
   }
 
@@ -161,7 +153,7 @@ FoundationTestSuite.test("NSURL") {
 // Pattern-matching
 //===----------------------------------------------------------------------===//
 
-func matchesEither(input: NSNumber, _ a: NSNumber, _ b: NSNumber) -> Bool {
+func matchesEither(_ input: NSNumber, _ a: NSNumber, _ b: NSNumber) -> Bool {
   switch input {
   case a, b:
     return true
@@ -172,10 +164,10 @@ func matchesEither(input: NSNumber, _ a: NSNumber, _ b: NSNumber) -> Bool {
 
 FoundationTestSuite.test("patternMatching") {
   var one, two, three, oneAgain : NSNumber
-  one = NSNumber(int: 1)
-  two = NSNumber(int: 2)
-  three = NSNumber(int: 3)
-  oneAgain = NSNumber(int: 1)
+  one = NSNumber(value: 1)
+  two = NSNumber(value: 2)
+  three = NSNumber(value: 3)
+  oneAgain = NSNumber(value: 1)
   expectFalse(matchesEither(one, two, three))
   expectTrue(matchesEither(one, oneAgain, three))
   expectTrue(matchesEither(one, two, oneAgain))
@@ -189,7 +181,7 @@ FoundationTestSuite.test("patternMatching") {
 // Type checker used to crash on this.
 class ClassWithDtor : NSObject {
   deinit {
-    let noteCenter = NSNotificationCenter.defaultCenter()
+    let noteCenter = NSNotificationCenter.`default`()
     noteCenter.removeObserver(self, name: "ReceivedContentNotification", object: nil)
   }
 }
@@ -197,7 +189,7 @@ class ClassWithDtor : NSObject {
 FoundationTestSuite.test("rdar://17584531") {
   // <rdar://problem/17584531>
   // Type checker used to be confused by this.
-  var dict: NSDictionary = [ "status": 200, "people": [ [ "id": 255, "name": [ "first": "John", "last": "Appleseed" ] ] ] ]
+  var dict: NSDictionary = ["status": 200, "people": [["id": 255, "name": ["first": "John", "last": "Appleseed"]]]]
   var dict2 = dict["people"]?[0] as! NSDictionary
   expectEqual("Optional(255)", String(dict2["id"]))
 }

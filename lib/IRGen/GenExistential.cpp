@@ -157,7 +157,7 @@ protected:
   ExistentialTypeInfoBase(ArrayRef<ProtocolEntry> protocols,
                           As &&...args)
       : Base(std::forward<As>(args)...),
-        NumStoredProtocols(protocols.size())  {
+        NumStoredProtocols(protocols.size()) {
     std::uninitialized_copy(protocols.begin(), protocols.end(),
                             this->template getTrailingObjects<ProtocolEntry>());
   }
@@ -679,6 +679,20 @@ public:
       schema.add(ExplosionSchema::Element::forScalar(ty->getElementType(i)));
   }
 
+  void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                        Size offset) const override {
+    auto ptrSize = IGM.getPointerSize();
+    LoadableTypeInfo::addScalarToAggLowering(IGM, lowering,
+                                             asDerived().getValueType(),
+                                             offset, ptrSize);
+
+    llvm::StructType *ty = getStorageType();
+    for (unsigned i = 1, e = getExplosionSize(); i != e; ++i)
+      LoadableTypeInfo::addScalarToAggLowering(IGM, lowering,
+                                               ty->getElementType(i),
+                                               offset + i * ptrSize, ptrSize);
+  }
+
   /// Given the address of a class existential container, returns
   /// the address of a witness table pointer.
   Address projectWitnessTable(IRGenFunction &IGF, Address address,
@@ -734,7 +748,7 @@ public:
                   Explosion &out) const override {
     // Load the instance pointer, which is unknown-refcounted.
     llvm::Value *instance = asDerived().loadValue(IGF, address);
-    asDerived().emitValueRetain(IGF, instance);
+    asDerived().emitValueRetain(IGF, instance, Atomicity::Atomic);
     out.add(instance);
 
     // Load the witness table pointers.
@@ -756,7 +770,7 @@ public:
     Address instanceAddr = asDerived().projectValue(IGF, address);
     llvm::Value *old = IGF.Builder.CreateLoad(instanceAddr);
     IGF.Builder.CreateStore(e.claimNext(), instanceAddr);
-    asDerived().emitValueRelease(IGF, old);
+    asDerived().emitValueRelease(IGF, old, Atomicity::Atomic);
 
     // Store the witness table pointers.
     asDerived().emitStoreOfTables(IGF, e, address);
@@ -772,22 +786,23 @@ public:
     asDerived().emitStoreOfTables(IGF, e, address);
   }
 
-  void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest)
+  void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest,
+            Atomicity atomicity)
   const override {
     // Copy the instance pointer.
     llvm::Value *value = src.claimNext();
     dest.add(value);
-    asDerived().emitValueRetain(IGF, value);
+    asDerived().emitValueRetain(IGF, value, atomicity);
 
     // Transfer the witness table pointers.
     src.transferInto(dest, getNumStoredProtocols());
   }
 
-  void consume(IRGenFunction &IGF, Explosion &src)
+  void consume(IRGenFunction &IGF, Explosion &src, Atomicity atomicity)
   const override {
     // Copy the instance pointer.
     llvm::Value *value = src.claimNext();
-    asDerived().emitValueRelease(IGF, value);
+    asDerived().emitValueRelease(IGF, value, atomicity);
 
     // Throw out the witness table pointers.
     src.claim(getNumStoredProtocols());
@@ -804,7 +819,7 @@ public:
 
   void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
     llvm::Value *value = asDerived().loadValue(IGF, addr);
-    asDerived().emitValueRelease(IGF, value);
+    asDerived().emitValueRelease(IGF, value, Atomicity::Atomic);
   }
 
   void packIntoEnumPayload(IRGenFunction &IGF,
@@ -918,11 +933,13 @@ public:
     return IGF.Builder.CreateBitCast(valueAddr, ValueType->getPointerTo());
   }
 
-  void emitValueRetain(IRGenFunction &IGF, llvm::Value *value) const {
+  void emitValueRetain(IRGenFunction &IGF, llvm::Value *value,
+                       Atomicity atomicity) const {
     IGF.emitUnownedRetain(value, Refcounting);
   }
 
-  void emitValueRelease(IRGenFunction &IGF, llvm::Value *value) const {
+  void emitValueRelease(IRGenFunction &IGF, llvm::Value *value,
+                        Atomicity atomicity) const {
     IGF.emitUnownedRelease(value, Refcounting);
   }
 
@@ -990,11 +1007,13 @@ public:
       return IGM.getUnknownObjectTypeInfo();
   }
 
-  void emitValueRetain(IRGenFunction &IGF, llvm::Value *value) const {
+  void emitValueRetain(IRGenFunction &IGF, llvm::Value *value,
+                       Atomicity atomicity) const {
     // do nothing
   }
 
-  void emitValueRelease(IRGenFunction &IGF, llvm::Value *value) const {
+  void emitValueRelease(IRGenFunction &IGF, llvm::Value *value,
+                        Atomicity atomicity) const {
     // do nothing
   }
 
@@ -1044,13 +1063,15 @@ public:
       return IGM.getUnknownObjectTypeInfo();
   }
 
-  void strongRetain(IRGenFunction &IGF, Explosion &e) const override {
-    IGF.emitStrongRetain(e.claimNext(), Refcounting);
+  void strongRetain(IRGenFunction &IGF, Explosion &e,
+                    Atomicity atomicity) const override {
+    IGF.emitStrongRetain(e.claimNext(), Refcounting, atomicity);
     e.claim(getNumStoredProtocols());
   }
 
-  void strongRelease(IRGenFunction &IGF, Explosion &e) const override {
-    IGF.emitStrongRelease(e.claimNext(), Refcounting);
+  void strongRelease(IRGenFunction &IGF, Explosion &e,
+                     Atomicity atomicity) const override {
+    IGF.emitStrongRelease(e.claimNext(), Refcounting, atomicity);
     e.claim(getNumStoredProtocols());
   }
 
@@ -1109,12 +1130,14 @@ public:
     IGF.emitUnownedAssign(value, valueAddr, Refcounting);
   }
 
-  void emitValueRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    IGF.emitStrongRetain(value, Refcounting);
+  void emitValueRetain(IRGenFunction &IGF, llvm::Value *value,
+                       Atomicity atomicity) const {
+    IGF.emitStrongRetain(value, Refcounting, atomicity);
   }
 
-  void emitValueRelease(IRGenFunction &IGF, llvm::Value *value) const {
-    IGF.emitStrongRelease(value, Refcounting);
+  void emitValueRelease(IRGenFunction &IGF, llvm::Value *value,
+                        Atomicity atomicity) const {
+    IGF.emitStrongRelease(value, Refcounting, atomicity);
   }
 
   void emitValueFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
@@ -1225,11 +1248,13 @@ public:
     return MetatypeTI;
   }
 
-  void emitValueRetain(IRGenFunction &IGF, llvm::Value *value) const {
+  void emitValueRetain(IRGenFunction &IGF, llvm::Value *value,
+                       Atomicity atomicity) const {
     // do nothing
   }
 
-  void emitValueRelease(IRGenFunction &IGF, llvm::Value *value) const {
+  void emitValueRelease(IRGenFunction &IGF, llvm::Value *value,
+                        Atomicity atomicity) const {
     // do nothing
   }
 
@@ -1256,7 +1281,7 @@ public:
       Refcounting(refcounting) {}
 
   ReferenceCounting getReferenceCounting() const {
-    // ErrorProtocol uses its own rc entry points.
+    // ErrorProtocol uses its own RC entry points.
     return Refcounting;
   }
   
@@ -1287,8 +1312,7 @@ static const TypeInfo *createErrorExistentialTypeInfo(IRGenModule &IGM,
                                       refcounting);
 }
 
-static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
-                                            TypeBase *T,
+static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T,
                                             ArrayRef<ProtocolDecl*> protocols) {
   SmallVector<llvm::Type*, 5> fields;
   SmallVector<ProtocolEntry, 4> entries;
@@ -1307,11 +1331,11 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
   }
 
   llvm::StructType *type;
-  if (auto *protoT = T->getAs<ProtocolType>())
-    type = IGM.createNominalType(protoT->getDecl());
-  else if (auto *compT = T->getAs<ProtocolCompositionType>())
+  if (isa<ProtocolType>(T))
+    type = IGM.createNominalType(T);
+  else if (auto compT = dyn_cast<ProtocolCompositionType>(T))
     // Protocol composition types are not nominal, but we name them anyway.
-    type = IGM.createNominalType(compT);
+    type = IGM.createNominalType(compT.getPointer());
   else
     llvm_unreachable("unknown existential type kind");
     
@@ -1404,7 +1428,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
 
 const TypeInfo *TypeConverter::convertProtocolType(ProtocolType *T) {
   // Protocol types are nominal.
-  return createExistentialTypeInfo(IGM, T, T->getDecl());
+  return createExistentialTypeInfo(IGM, CanType(T), T->getDecl());
 }
 
 const TypeInfo *
@@ -1413,7 +1437,7 @@ TypeConverter::convertProtocolCompositionType(ProtocolCompositionType *T) {
   SmallVector<ProtocolDecl*, 4> protocols;
   T->getAnyExistentialTypeProtocols(protocols);
 
-  return createExistentialTypeInfo(IGM, T, protocols);
+  return createExistentialTypeInfo(IGM, CanType(T), protocols);
 }
 
 const TypeInfo *

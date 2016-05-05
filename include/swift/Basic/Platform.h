@@ -57,7 +57,19 @@ namespace swift {
 
   /// Returns the platform Kind for Darwin triples.
   DarwinPlatformKind getDarwinPlatformKind(const llvm::Triple &triple);
-}
+
+  /// Returns the architecture component of the path for a given target triple.
+  ///
+  /// Typically this is used for mapping the architecture component of the
+  /// path.
+  ///
+  /// For example, on Linux "armv6l" and "armv7l" are mapped to "armv6" and
+  /// "armv7", respectively, within LLVM. Therefore the component path for the
+  /// architecture specific objects will be found in their "mapped" paths.
+  ///
+  /// This is a stop-gap until full Triple support (ala Clang) exists within swiftc.
+  StringRef getMajorArchitectureName(const llvm::Triple &triple);
+} // end namespace swift
 
 #endif // SWIFT_BASIC_PLATFORM_H
 

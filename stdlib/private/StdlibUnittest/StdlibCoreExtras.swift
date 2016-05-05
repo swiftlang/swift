@@ -14,7 +14,7 @@ import SwiftPrivate
 import SwiftPrivateLibcExtras
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD)
+#elseif os(Linux) || os(FreeBSD) || os(Android)
 import Glibc
 #endif
 
@@ -27,12 +27,12 @@ import Foundation
 // useful in tests, and stdlib does not have such facilities yet.
 //
 
-func findSubstring(string: String, _ substring: String) -> String.Index? {
+func findSubstring(_ string: String, _ substring: String) -> String.Index? {
   if substring.isEmpty {
     return string.startIndex
   }
 #if _runtime(_ObjC)
-  return string.range(of: substring)?.startIndex
+  return string.range(of: substring)?.lowerBound
 #else
   // FIXME(performance): This is a very non-optimal algorithm, with a worst
   // case of O((n-m)*m). When non-objc String has a match function that's better,
@@ -57,8 +57,8 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
       }
       if needle[needleIndex] == haystack[matchIndex] {
         // keep advancing through both the string and search string on match
-        matchIndex = matchIndex.successor()
-        needleIndex = needleIndex.successor()
+        matchIndex = haystack.index(after: matchIndex)
+        needleIndex = haystack.index(after: needleIndex)
       } else {
         // no match, go back to finding a starting match in the string.
         break
@@ -70,7 +70,7 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
 }
 
 public func createTemporaryFile(
-  fileNamePrefix: String, _ fileNameSuffix: String, _ contents: String
+  _ fileNamePrefix: String, _ fileNameSuffix: String, _ contents: String
 ) -> String {
 #if _runtime(_ObjC)
   let tempDir: NSString = NSTemporaryDirectory()
@@ -135,7 +135,7 @@ extension TypeIdentifier
 }
 
 func _forAllPermutationsImpl(
-  index: Int, _ size: Int,
+  _ index: Int, _ size: Int,
   _ perm: inout [Int], _ visited: inout [Bool],
   _ body: ([Int]) -> Void
 ) {
@@ -156,7 +156,7 @@ func _forAllPermutationsImpl(
 }
 
 /// Generate all permutations.
-public func forAllPermutations(size: Int, body: ([Int]) -> Void) {
+public func forAllPermutations(_ size: Int, body: ([Int]) -> Void) {
   if size == 0 {
     return
   }
@@ -168,7 +168,7 @@ public func forAllPermutations(size: Int, body: ([Int]) -> Void) {
 
 /// Generate all permutations.
 public func forAllPermutations<S : Sequence>(
-  sequence: S, body: ([S.Iterator.Element]) -> Void
+  _ sequence: S, body: ([S.Iterator.Element]) -> Void
 ) {
   let data = Array(sequence)
   forAllPermutations(data.count) {

@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IDE_CODE_COMPLETION_H
-#define SWIFT_IDE_CODE_COMPLETION_H
+#ifndef SWIFT_IDE_CODECOMPLETION_H
+#define SWIFT_IDE_CODECOMPLETION_H
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
@@ -46,11 +46,11 @@ struct RequestedCachedModule;
 ///     '#^' identifier '^#'
 /// \endcode
 ///
-/// \param Input test source code
-/// \param TokenName names the token which position should be returned in
+/// \param Input test source code.
+/// \param TokenName names the token whose position should be returned in
 /// \p CompletionOffset.
 /// \param CompletionOffset set to ~0U on error, or to a 0-based byte offset on
-/// success
+/// success.
 ///
 /// \returns test source code without any code completion tokens.
 std::string removeCodeCompletionTokens(StringRef Input,
@@ -66,10 +66,10 @@ public:
     /// "internal", "private" or "public".
     AccessControlKeyword,
 
-    /// such as @"availability"
+    /// such as @"availability".
     DeclAttrKeyword,
 
-    /// such as "unavailable" etc. for @available
+    /// such as "unavailable" etc. for @available.
     DeclAttrParamKeyword,
 
     /// The "override" keyword.
@@ -91,7 +91,7 @@ public:
     /// \c NestingLevel decreases.
     OptionalBegin,
 
-    // Punctuation.
+    /// Punctuation.
     LeftParen,
     RightParen,
     LeftBracket,
@@ -118,7 +118,7 @@ public:
     CallParameterBegin,
     /// Function call parameter name.
     CallParameterName,
-    /// Function call parameter internal / local name. If the parameter has no
+    /// Function call parameter internal / local name.  If the parameter has no
     /// formal API name, it can still have a local name which can be useful
     /// for display purposes.
     ///
@@ -161,11 +161,9 @@ public:
     /// position to put the cursor after the completion result is inserted
     /// into the editor buffer is between the braces.
     ///
-    /// The spelling as always "{}", but clients may choose to insert newline
+    /// The spelling is always "{}", but clients may choose to insert newline
     /// and indentation in between.
     BraceStmtWithCursor,
-
-    ///
   };
 
   static bool chunkStartsNestedGroup(ChunkKind Kind) {
@@ -308,7 +306,7 @@ public:
     return {getTrailingObjects<Chunk>(), NumChunks};
   }
 
-  StringRef getFirstTextChunk() const;
+  StringRef getFirstTextChunk(bool includeLeadingPunctuation = false) const;
   Optional<unsigned>
   getFirstTextChunkIndex(bool includeLeadingPunctuation = false) const;
 
@@ -352,12 +350,6 @@ enum class SemanticContextKind {
   ///              // bar() -- Super
   ///     }
   ///   }
-  /// \endcode
-  ///
-  /// In C-style for loop headers the iteration variable has ExpressionSpecific
-  /// context:
-  /// \code
-  ///   for var foo = 0; #^A^# // foo -- ExpressionSpecific
   /// \endcode
   ExpressionSpecific,
 
@@ -431,6 +423,52 @@ enum class CodeCompletionLiteralKind {
   Tuple,
 };
 
+enum class CodeCompletionOperatorKind {
+  None,
+  Unknown,
+  Bang,       // !
+  NotEq,      // !=
+  NotEqEq,    // !==
+  Modulo,     // %
+  ModuloEq,   // %=
+  Amp,        // &
+  AmpAmp,     // &&
+  AmpStar,    // &*
+  AmpPlus,    // &+
+  AmpMinus,   // &-
+  AmpEq,      // &=
+  LParen,     // ( -- not really an operator, but treated as one in some cases.
+  Star,       // *
+  StarEq,     // *=
+  Plus,       // +
+  PlusEq,     // +=
+  Minus,      // -
+  MinusEq,    // -=
+  Dot,        // .
+  DotDotDot,  // ...
+  DotDotLess, // ..<
+  Slash,      // /
+  SlashEq,    // /=
+  Less,       // <
+  LessLess,   // <<
+  LessLessEq, // <<=
+  LessEq,     // <=
+  Eq,         // =
+  EqEq,       // ==
+  EqEqEq,     // ===
+  Greater,    // >
+  GreaterEq,  // >=
+  GreaterGreater,   // >>
+  GreaterGreaterEq, // >>=
+  QuestionDot,      // ?.
+  Caret,            // ^
+  CaretEq,          // ^=
+  Pipe,             // |
+  PipeEq,           // |=
+  PipePipe,         // ||
+  TildeEq,          // ~=
+};
+
 enum class CodeCompletionKeywordKind {
   None,
 #define KEYWORD(X) kw_##X,
@@ -475,9 +513,10 @@ public:
     Keyword,
     Pattern,
     Literal,
+    BuiltinOperator,
   };
 
-  /// Describing the relationship between the type of the completion results and
+  /// Describes the relationship between the type of the completion results and
   /// the expected type at the code completion position.
   enum ExpectedTypeRelation {
 
@@ -495,11 +534,22 @@ public:
     Identical,
   };
 
+  enum NotRecommendedReason {
+
+    Redundant,
+
+    TypeMismatch,
+
+    NoReason,
+  };
+
 private:
-  unsigned Kind : 2;
+  unsigned Kind : 3;
   unsigned AssociatedKind : 8;
+  unsigned KnownOperatorKind : 6;
   unsigned SemanticContext : 3;
   unsigned NotRecommended : 1;
+  unsigned NotRecReason : 3;
 
   /// The number of bytes to the left of the code completion point that
   /// should be erased first if this completion string is inserted in the
@@ -518,19 +568,27 @@ private:
   unsigned TypeDistance : 3;
 
 public:
-  /// Constructs a \c Pattern or \c Keyword result.
+  /// Constructs a \c Pattern, \c Keyword or \c BuiltinOperator result.
   ///
   /// \note The caller must ensure \c CodeCompletionString outlives this result.
-  CodeCompletionResult(ResultKind Kind,
-                       SemanticContextKind SemanticContext,
+  CodeCompletionResult(ResultKind Kind, SemanticContextKind SemanticContext,
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
-                       ExpectedTypeRelation TypeDistance = Unrelated)
-      : Kind(Kind), SemanticContext(unsigned(SemanticContext)),
-        NotRecommended(false), NumBytesToErase(NumBytesToErase),
-        CompletionString(CompletionString), TypeDistance(TypeDistance) {
+                       ExpectedTypeRelation TypeDistance = Unrelated,
+                       CodeCompletionOperatorKind KnownOperatorKind =
+                           CodeCompletionOperatorKind::None)
+      : Kind(Kind), KnownOperatorKind(unsigned(KnownOperatorKind)),
+        SemanticContext(unsigned(SemanticContext)), NotRecommended(false),
+        NotRecReason(NotRecommendedReason::NoReason),
+        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
+        TypeDistance(TypeDistance) {
     assert(Kind != Declaration && "use the other constructor");
     assert(CompletionString);
+    if (isOperator() && KnownOperatorKind == CodeCompletionOperatorKind::None)
+      this->KnownOperatorKind =
+          (unsigned)getCodeCompletionOperatorKind(CompletionString);
+    assert(!isOperator() ||
+           getOperatorKind() != CodeCompletionOperatorKind::None);
     AssociatedKind = 0;
   }
 
@@ -542,9 +600,11 @@ public:
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance = Unrelated)
-      : Kind(Keyword), SemanticContext(unsigned(SemanticContext)),
-        NotRecommended(false), NumBytesToErase(NumBytesToErase),
-        CompletionString(CompletionString), TypeDistance(TypeDistance) {
+      : Kind(Keyword), KnownOperatorKind(0),
+        SemanticContext(unsigned(SemanticContext)), NotRecommended(false),
+        NotRecReason(NotRecommendedReason::NoReason),
+        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
+        TypeDistance(TypeDistance) {
     assert(CompletionString);
     AssociatedKind = static_cast<unsigned>(Kind);
   }
@@ -557,9 +617,11 @@ public:
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance)
-      : Kind(Literal), SemanticContext(unsigned(SemanticContext)),
-        NotRecommended(false), NumBytesToErase(NumBytesToErase),
-        CompletionString(CompletionString), TypeDistance(TypeDistance) {
+      : Kind(Literal), KnownOperatorKind(0),
+        SemanticContext(unsigned(SemanticContext)), NotRecommended(false),
+        NotRecReason(NotRecommendedReason::NoReason),
+        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
+        TypeDistance(TypeDistance) {
     AssociatedKind = static_cast<unsigned>(LiteralKind);
     assert(CompletionString);
   }
@@ -573,19 +635,27 @@ public:
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        const Decl *AssociatedDecl, StringRef ModuleName,
-                       bool NotRecommended, StringRef BriefDocComment,
+                       bool NotRecommended,
+                       CodeCompletionResult::NotRecommendedReason NotRecReason,
+                       StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
                        ArrayRef<std::pair<StringRef, StringRef>> DocWords,
                        enum ExpectedTypeRelation TypeDistance)
-      : Kind(ResultKind::Declaration),
+      : Kind(ResultKind::Declaration), KnownOperatorKind(0),
         SemanticContext(unsigned(SemanticContext)),
-        NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
-        CompletionString(CompletionString), ModuleName(ModuleName),
-        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        DocWords(DocWords), TypeDistance(TypeDistance) {
+        NotRecommended(NotRecommended), NotRecReason(NotRecReason),
+        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
+        ModuleName(ModuleName), BriefDocComment(BriefDocComment),
+        AssociatedUSRs(AssociatedUSRs), DocWords(DocWords),
+        TypeDistance(TypeDistance) {
     assert(AssociatedDecl && "should have a decl");
     AssociatedKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
     assert(CompletionString);
+    if (isOperator())
+      KnownOperatorKind =
+          (unsigned)getCodeCompletionOperatorKind(CompletionString);
+    assert(!isOperator() ||
+           getOperatorKind() != CodeCompletionOperatorKind::None);
   }
 
   // FIXME:
@@ -593,18 +663,24 @@ public:
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        CodeCompletionDeclKind DeclKind, StringRef ModuleName,
-                       bool NotRecommended, StringRef BriefDocComment,
+                       bool NotRecommended,
+                       CodeCompletionResult::NotRecommendedReason NotRecReason,
+                       StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
-                       ArrayRef<std::pair<StringRef, StringRef>> DocWords)
+                       ArrayRef<std::pair<StringRef, StringRef>> DocWords,
+                       CodeCompletionOperatorKind KnownOperatorKind)
       : Kind(ResultKind::Declaration),
+        KnownOperatorKind(unsigned(KnownOperatorKind)),
         SemanticContext(unsigned(SemanticContext)),
-        NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
-        CompletionString(CompletionString), ModuleName(ModuleName),
-        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        DocWords(DocWords) {
+        NotRecommended(NotRecommended), NotRecReason(NotRecReason),
+        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
+        ModuleName(ModuleName), BriefDocComment(BriefDocComment),
+        AssociatedUSRs(AssociatedUSRs), DocWords(DocWords) {
     AssociatedKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
     TypeDistance = ExpectedTypeRelation::Unrelated;
+    assert(!isOperator() ||
+           getOperatorKind() != CodeCompletionOperatorKind::None);
   }
 
   ResultKind getKind() const { return static_cast<ResultKind>(Kind); }
@@ -626,7 +702,7 @@ public:
 
   bool isOperator() const {
     if (getKind() != Declaration)
-      return false;
+      return getKind() == BuiltinOperator;
     switch (getAssociatedDeclKind()) {
     case CodeCompletionDeclKind::PrefixOperatorFunction:
     case CodeCompletionDeclKind::PostfixOperatorFunction:
@@ -637,8 +713,17 @@ public:
     }
   }
 
+  CodeCompletionOperatorKind getOperatorKind() const {
+    assert(isOperator());
+    return static_cast<CodeCompletionOperatorKind>(KnownOperatorKind);
+  }
+
   ExpectedTypeRelation getExpectedTypeRelation() const {
     return static_cast<ExpectedTypeRelation>(TypeDistance);
+  }
+
+  NotRecommendedReason getNotRecommendedReason() const {
+    return static_cast<NotRecommendedReason>(NotRecReason);
   }
 
   SemanticContextKind getSemanticContext() const {
@@ -676,6 +761,10 @@ public:
   void dump() const;
 
   static CodeCompletionDeclKind getCodeCompletionDeclKind(const Decl *D);
+  static CodeCompletionOperatorKind
+  getCodeCompletionOperatorKind(StringRef name);
+  static CodeCompletionOperatorKind
+  getCodeCompletionOperatorKind(CodeCompletionString *str);
 };
 
 struct CodeCompletionResultSink {
@@ -788,10 +877,12 @@ void lookupCodeCompletionResultsFromModule(CodeCompletionResultSink &targetSink,
 
 /// Copy code completion results from \p sourceSink to \p targetSink, possibly
 /// restricting by \p onlyTypes.
-void copyCodeCompletionResults(CodeCompletionResultSink &targetSink, CodeCompletionResultSink &sourceSink, bool onlyTypes);
+void copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
+                               CodeCompletionResultSink &sourceSink,
+                               bool onlyTypes);
 
-} // namespace ide
-} // namespace swift
+} // end namespace ide
+} // end namespace swift
 
 template <> struct llvm::DenseMapInfo<swift::ide::CodeCompletionKeywordKind> {
   using Kind = swift::ide::CodeCompletionKeywordKind;
@@ -815,5 +906,4 @@ template <> struct llvm::DenseMapInfo<swift::ide::CodeCompletionDeclKind> {
   static bool isEqual(const Kind &LHS, const Kind &RHS) { return LHS == RHS; }
 };
 
-#endif // SWIFT_IDE_CODE_COMPLETION_H
-
+#endif // SWIFT_IDE_CODECOMPLETION_H

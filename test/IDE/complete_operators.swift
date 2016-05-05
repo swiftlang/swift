@@ -55,6 +55,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=EXT_INFIX_4 | FileCheck %s -check-prefix=S4_EXT_INFIX_SIMPLE
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ASSIGN_TUPLE_1| FileCheck %s -check-prefix=ASSIGN_TUPLE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ASSIGN_TUPLE_2| FileCheck %s -check-prefix=ASSIGN_TUPLE_2
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ASSIGN_TUPLE_3| FileCheck %s -check-prefix=ASSIGN_TUPLE_1
 
 struct S {}
 postfix operator ++ {}
@@ -65,7 +66,7 @@ func testPostfix1(x: S) {
 }
 // POSTFIX_1-NOT: ++
 
-func testPostfix2(var x: S) {
+func testPostfix2(x: inout S) {
   x#^POSTFIX_2^#
 }
 // POSTFIX_2: Begin completions
@@ -84,7 +85,7 @@ func testPostfix3(x: S) {
 func testPostfix4(x: S?) {
   x#^POSTFIX_4^#
 }
-// POSTFIX_4: Pattern/None:  ![#S#]
+// POSTFIX_4: BuiltinOperator/None:  ![#S#]
 
 struct T {}
 postfix func +-<G>(x: [G]) -> G { return x! }
@@ -129,7 +130,7 @@ func testPostfix10<G: P where G.T : Fooable>(x: G) {
 }
 // POSTFIX_10: Decl[PostfixOperatorFunction]/CurrModule: ***[#G.T#]
 
-func testPostfixSpace(var x: S) {
+func testPostfixSpace(x: inout S) {
   x #^S_POSTFIX_SPACE^#
 }
 // S_POSTFIX_SPACE: Decl[PostfixOperatorFunction]/CurrModule/Erase[1]:  ++[#S#]
@@ -166,7 +167,7 @@ func testInfix1(x: S2) {
 // NEGATIVE_S2_INFIX-NOT: ~>
 // NEGATIVE_S2_INFIX-NOT: = {#
 
-func testInfix2(var x: S2) {
+func testInfix2(x: inout S2) {
   x#^INFIX_2^#
 }
 // S2_INFIX_LVALUE: Begin completions
@@ -174,7 +175,7 @@ func testInfix2(var x: S2) {
 // S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:   + {#S2#}[#S2#]
 // S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/CurrModule:   ** {#Int#}[#S2#]
 // S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/CurrModule:   **= {#Int#}[#Void#]
-// S2_INFIX_LVALUE-DAG: Pattern/None:                             = {#S2#}[#Void#]
+// S2_INFIX_LVALUE-DAG: BuiltinOperator/None:                             = {#S2#}[#Void#]
 // S2_INFIX_LVALUE: End completions
 // NEGATIVE_S2_INFIX_LVALUE-NOT: +=
 // NEGATIVE_S2_INFIX_LVALUE-NOT: \* {#Int#}
@@ -295,7 +296,7 @@ func testSpace(x: S2) {
 // S2_INFIX_SPACE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']+ {#S2#}[#S2#]
 // S2_INFIX_SPACE: End completions
 
-func testExtInfix1(var x: S2) {
+func testExtInfix1(x: inout S2) {
   x + S2() + x + S2() + x + S2() + x#^EXT_INFIX_1^#
 }
 
@@ -343,11 +344,18 @@ func testExtInfix4(x: S4) {
 func testAssignTuple1() {
   ()#^ASSIGN_TUPLE_1^#
 }
-// ASSIGN_TUPLE_1: Pattern/None:                        = {#()#}[#Void#];
+func testAssignTuple3() {
+  func void() {}
+  void()#^ASSIGN_TUPLE_3^#
+}
+// FIXME: technically this is sometimes legal, but we would need to
+// differentiate between cases like () = and print() =. Since it's not very
+// useful anyway, just omit the completion.
+// ASSIGN_TUPLE_1-NOT: BuiltinOperator/None:  = {
 
 func testAssignTuple2() {
   var x: S2
   var y: S2
   (x, y)#^ASSIGN_TUPLE_2^#
 }
-// ASSIGN_TUPLE_2: Pattern/None:                        = {#(S2, S2)#}[#Void#];
+// ASSIGN_TUPLE_2: BuiltinOperator/None:                        = {#(S2, S2)#}[#Void#];

@@ -615,9 +615,14 @@ public:
   /// on a suspicious top-level optional injection (because the caller already
   /// diagnosed it).
   ///
+  /// \param typeFromPattern Optionally, the caller can specify the pattern
+  /// from where the toType is derived, so that we can deliver better fixit.
+  ///
   /// \returns the coerced expression, which will have type \c ToType.
-  Expr *coerceToType(Expr *expr, Type toType, ConstraintLocator *locator,
-                     bool ignoreTopLevelInjection = false) const;
+  Expr *coerceToType(Expr *expr, Type toType,
+                     ConstraintLocator *locator,
+                     bool ignoreTopLevelInjection = false,
+                     Optional<Pattern*> typeFromPattern = None) const;
 
   /// \brief Convert the given expression to a logic value.
   ///
@@ -820,7 +825,7 @@ struct MemberLookupResult {
     /// Argument labels don't match.
     UR_LabelMismatch,
     
-    /// This uses a type like Self it its signature that cannot be used on an
+    /// This uses a type like Self in its signature that cannot be used on an
     /// existential box.
     UR_UnavailableInExistential,
     
@@ -828,7 +833,7 @@ struct MemberLookupResult {
     /// type.
     UR_InstanceMemberOnType,
     
-    /// This is a static/class member being access through an instance.
+    /// This is a static/class member being accessed through an instance.
     UR_TypeMemberOnInstance,
     
     /// This is a mutating member, being used on an rvalue.
@@ -933,7 +938,7 @@ private:
   /// There can only be a single contextual type on the root of the expression
   /// being checked.  If specified, this holds its type along with the base
   /// expression, and the purpose of it.
-  Type contextualType;
+  TypeLoc contextualType;
   Expr *contextualTypeNode = nullptr;
   ContextualTypePurpose contextualTypePurpose = CTP_Unused;
   
@@ -1033,11 +1038,16 @@ public:
   /// we're exploring. 
   SolverState *solverState = nullptr;
 
+  struct ArgumentLabelState {
+    ArrayRef<Identifier> Labels;
+    bool HasTrailingClosure;
+  };
+
   /// A mapping from the constraint locators for references to various
   /// names (e.g., member references, normal name references, possible
   /// constructions) to the argument labels provided in the call to
   /// that locator.
-  llvm::DenseMap<ConstraintLocator *, ArrayRef<Identifier>> ArgumentLabels;
+  llvm::DenseMap<ConstraintLocator *, ArgumentLabelState> ArgumentLabels;
 
   /// FIXME: This is a workaround for the way we perform protocol
   /// conformance checking for generic requirements, where we re-use
@@ -1213,16 +1223,20 @@ public:
     this->FavoredTypes[E] = T;
   }
  
-  void setContextualType(Expr *E, Type T, ContextualTypePurpose purpose) {
+  void setContextualType(Expr *E, TypeLoc T, ContextualTypePurpose purpose) {
     contextualTypeNode = E;
     contextualType = T;
     contextualTypePurpose = purpose;
   }
 
   Type getContextualType(Expr *E) const {
-    return E == contextualTypeNode ? contextualType : Type();
+    return E == contextualTypeNode ? contextualType.getType() : Type();
   }
   Type getContextualType() const {
+    return contextualType.getType();
+  }
+
+  TypeLoc getContextualTypeLoc() const {
     return contextualType;
   }
 
@@ -1547,6 +1561,12 @@ public:
   /// declaration's signature, but they do not have to, so they might not be
   /// substituted at all. Since the inner declaration inherits the context
   /// archetypes of the outer function we do not need to open them here.
+  void openGeneric(DeclContext *dc,
+                   GenericSignature *signature,
+                   bool skipProtocolSelfConstraint,
+                   unsigned minOpeningDepth,
+                   ConstraintLocatorBuilder locator,
+                   llvm::DenseMap<CanType, TypeVariableType *> &replacements);
   void openGeneric(DeclContext *dc,
                    ArrayRef<GenericTypeParamType *> params,
                    ArrayRef<Requirement> requirements,
@@ -2198,6 +2218,14 @@ bool matchCallArguments(ArrayRef<CallArgParam> argTuple,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,
                         SmallVectorImpl<ParamBinding> &parameterBindings);
+
+/// Attempt to prove that arguments with the given labels at the
+/// given parameter depth cannot be used with the given value.
+/// If this cannot be proven, conservatively returns true.
+bool areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
+                                               unsigned parameterDepth,
+                                               ArrayRef<Identifier> labels,
+                                               bool hasTrailingClosure);
 
 /// Simplify the given locator by zeroing in on the most specific
 /// subexpression described by the locator.

@@ -86,6 +86,8 @@ getMaterializeForSetCallbackName(ProtocolConformance *conformance,
 struct MaterializeForSetEmitter {
   SILGenModule &SGM;
 
+  SILLinkage Linkage;
+
   AbstractStorageDecl *RequirementStorage;
   AbstractionPattern RequirementStoragePattern;
   SILType RequirementStorageType;
@@ -97,8 +99,6 @@ struct MaterializeForSetEmitter {
 
   CanGenericSignature GenericSig;
   GenericParamList *GenericParams;
-
-  SILLinkage Linkage;
 
   // Assume that we don't need to reabstract 'self'.  Right now,
   // that's always true; if we ever reabstract Optional (or other
@@ -117,18 +117,17 @@ struct MaterializeForSetEmitter {
 
 private:
 
-  MaterializeForSetEmitter(SILGenModule &SGM,
-                           FuncDecl *witness,
-                           ArrayRef<Substitution> witnessSubs,
-                           Type selfInterfaceType,
-                           Type selfType)
+  MaterializeForSetEmitter(SILGenModule &SGM, SILLinkage linkage,
+                           FuncDecl *witness, ArrayRef<Substitution> subs,
+                           Type selfInterfaceType, Type selfType)
     : SGM(SGM),
+      Linkage(linkage),
       RequirementStorage(nullptr),
       RequirementStoragePattern(AbstractionPattern::getInvalid()),
       Witness(witness),
       WitnessStorage(witness->getAccessorStorageDecl()),
       WitnessStoragePattern(AbstractionPattern::getInvalid()),
-      WitnessSubs(witnessSubs),
+      WitnessSubs(subs),
       GenericParams(nullptr),
       SelfInterfaceType(selfInterfaceType->getCanonicalType()),
       SubstSelfType(selfType->getCanonicalType()),
@@ -160,6 +159,7 @@ public:
   static MaterializeForSetEmitter
   forWitnessThunk(SILGenModule &SGM,
                   ProtocolConformance *conformance,
+                  SILLinkage linkage,
                   FuncDecl *requirement, FuncDecl *witness,
                   ArrayRef<Substitution> witnessSubs) {
     Type selfInterfaceType, selfType;
@@ -172,23 +172,17 @@ public:
       selfType = proto->getProtocolSelf()->getArchetype();
     }
 
-    MaterializeForSetEmitter emitter(SGM, witness, witnessSubs,
-                                     selfInterfaceType,
-                                     selfType);
+    MaterializeForSetEmitter emitter(SGM, linkage, witness, witnessSubs,
+                                     selfInterfaceType, selfType);
 
     if (conformance) {
       if (auto signature = conformance->getGenericSignature())
         emitter.GenericSig = signature->getCanonicalSignature();
       emitter.GenericParams = conformance->getGenericParams();
-      emitter.Linkage = SGM.Types.getLinkageForProtocolConformance(
-                               conformance->getRootNormalConformance(),
-                               ForDefinition);
     } else {
       auto signature = requirement->getGenericSignatureOfContext();
       emitter.GenericSig = signature->getCanonicalSignature();
       emitter.GenericParams = requirement->getGenericParamsOfContext();
-      // FIXME: really should be the protocol's linkage
-      emitter.Linkage = SILLinkage::Public;
     }
 
     emitter.RequirementStorage = requirement->getAccessorStorageDecl();
@@ -222,16 +216,16 @@ public:
       selfType = dc->getDeclaredTypeInContext();
     }
 
-    MaterializeForSetEmitter emitter(SGM, witness, witnessSubs,
-                                     selfInterfaceType, selfType);
-
     SILDeclRef constant(witness);
     auto constantInfo = SGM.Types.getConstantInfo(constant);
+
+    MaterializeForSetEmitter emitter(SGM, constant.getLinkage(ForDefinition),
+                                     witness, witnessSubs,
+                                     selfInterfaceType, selfType);
 
     if (auto signature = witness->getGenericSignatureOfContext())
       emitter.GenericSig = signature->getCanonicalSignature();
     emitter.GenericParams = constantInfo.ContextGenericParams;
-    emitter.Linkage = constant.getLinkage(ForDefinition);
 
     emitter.RequirementStorage = emitter.WitnessStorage;
     emitter.RequirementStoragePattern = emitter.WitnessStoragePattern;
@@ -369,6 +363,7 @@ public:
         lv.getSubstFormalType()).getObjectType();
     SILType actualTy = lv.getTypeOfRValue().getObjectType();
     assert(expectedTy == actualTy);
+    (void) expectedTy;
 
     // Reabstract back to the requirement pattern.
     if (actualTy != RequirementStorageType) {
@@ -673,11 +668,11 @@ MaterializeForSetEmitter::createAddressorCallback(SILFunction &F,
 
     case AddressorKind::Owning:
     case AddressorKind::NativeOwning:
-      gen.B.createStrongRelease(loc, owner);
+      gen.B.createStrongRelease(loc, owner, Atomicity::Atomic);
       break;
 
     case AddressorKind::NativePinning:
-      gen.B.createStrongUnpin(loc, owner);
+      gen.B.createStrongUnpin(loc, owner, Atomicity::Atomic);
       break;
     }
 
@@ -821,12 +816,14 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
 /// \return true if special code was emitted
 bool SILGenFunction::
 maybeEmitMaterializeForSetThunk(ProtocolConformance *conformance,
-                                FuncDecl *requirement, FuncDecl *witness,
+                                SILLinkage linkage,
+                                FuncDecl *requirement,
+                                FuncDecl *witness,
                                 ArrayRef<Substitution> witnessSubs) {
 
   MaterializeForSetEmitter emitter
     = MaterializeForSetEmitter::forWitnessThunk(
-        SGM, conformance, requirement, witness,
+        SGM, conformance, linkage, requirement, witness,
         witnessSubs);
 
   if (!emitter.shouldOpenCode())

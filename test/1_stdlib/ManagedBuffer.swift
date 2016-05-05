@@ -17,13 +17,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import Foundation
 
@@ -73,7 +66,7 @@ struct CountAndCapacity {
 // elements, interleaved with garbage, as a simple way of catching
 // potential bugs.
 final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity, T> {
-  class func create(capacity: Int) -> TestManagedBuffer {
+  class func create(_ capacity: Int) -> TestManagedBuffer {
     let r = super.create(minimumCapacity: capacity) {
       CountAndCapacity(
         count: LifetimeTracked(0), capacity: $0.capacity)
@@ -111,7 +104,7 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity, T> {
     }
   }
   
-  func append(x: T) {
+  func append(_ x: T) {
     let count = self.count
     precondition(count + 2 <= myCapacity)
     
@@ -144,13 +137,13 @@ class MyBuffer<T> {
 var tests = TestSuite("ManagedBuffer")
 
 tests.test("basic") {
-  if true {
+  do {
     let s = TestManagedBuffer<LifetimeTracked>.create(0)
     expectEqual(1, LifetimeTracked.instances)
   }
   
   expectEqual(0, LifetimeTracked.instances)
-  if true {
+  do {
     let s = TestManagedBuffer<LifetimeTracked>.create(10)
     expectEqual(0, s.count)
     expectLE(10, s.myCapacity)
@@ -198,7 +191,7 @@ tests.test("ManagedBufferPointer/SizeValidation/MyBuffer") {
 tests.test("ManagedBufferPointer") {
   typealias Manager = ManagedBufferPointer<CountAndCapacity, LifetimeTracked>
 
-  if true {
+  do {
     var mgr = Manager(
       bufferClass: TestManagedBuffer<LifetimeTracked>.self,
       minimumCapacity: 10

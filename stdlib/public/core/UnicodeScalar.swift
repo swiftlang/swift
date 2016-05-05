@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A [Unicode scalar value](http://www.unicode.org/glossary/#unicode_scalar_value).
+@_fixed_layout
 public struct UnicodeScalar :
   _BuiltinUnicodeScalarLiteralConvertible,
   UnicodeScalarLiteralConvertible {
@@ -79,7 +80,7 @@ public struct UnicodeScalar :
   ///   representation.
   @warn_unused_result
   public func escaped(asASCII forceASCII: Bool) -> String {
-    func lowNibbleAsHex(v: UInt32) -> String {
+    func lowNibbleAsHex(_ v: UInt32) -> String {
       let nibble = v & 15
       if nibble < 10 {
         return String(UnicodeScalar(nibble+48))    // 48 = '0'
@@ -237,7 +238,10 @@ extension UnicodeScalar {
   }
 }
 
-extension UnicodeScalar.UTF16View : Collection {
+extension UnicodeScalar.UTF16View : RandomAccessCollection {
+
+  typealias Indices = CountableRange<Int>
+
   /// The position of the first code unit.
   var startIndex: Int {
     return 0
@@ -247,7 +251,7 @@ extension UnicodeScalar.UTF16View : Collection {
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
+  /// `index(after:)`.
   var endIndex: Int {
     return 0 + UTF16.width(value)
   }
@@ -263,18 +267,10 @@ extension UnicodeScalar.UTF16View : Collection {
   }
 }
 
-/// Returns c as a UTF8.CodeUnit.  Meant to be used as _ascii8("x").
-@warn_unused_result
-public // SPI(SwiftExperimental)
-func _ascii8(c: UnicodeScalar) -> UTF8.CodeUnit {
-  _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
-  return UTF8.CodeUnit(c.value)
-}
-
 /// Returns c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
 @warn_unused_result
 public // SPI(SwiftExperimental)
-func _ascii16(c: UnicodeScalar) -> UTF16.CodeUnit {
+func _ascii16(_ c: UnicodeScalar) -> UTF16.CodeUnit {
   _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
   return UTF16.CodeUnit(c.value)
 }
@@ -283,11 +279,11 @@ extension UnicodeScalar {
   /// Creates an instance of the NUL scalar value.
   @available(*, unavailable, message: "use the 'UnicodeScalar(\"\\0\")'")
   public init() {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "escaped")
   public func escape(asASCII forceASCII: Bool) -> String {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

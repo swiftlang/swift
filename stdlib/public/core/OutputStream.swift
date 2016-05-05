@@ -22,7 +22,7 @@ public protocol OutputStream {
   mutating func _unlock()
 
   /// Append the given `string` to this stream.
-  mutating func write(string: String)
+  mutating func write(_ string: String)
 }
 
 extension OutputStream {
@@ -83,17 +83,17 @@ public protocol CustomDebugStringConvertible {
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("swift_EnumCaseName")
-func _getEnumCaseName<T>(value: T) -> UnsafePointer<CChar>
+func _getEnumCaseName<T>(_ value: T) -> UnsafePointer<CChar>?
 
 @_silgen_name("swift_OpaqueSummary")
-func _opaqueSummary(metadata: Any.Type) -> UnsafePointer<CChar>
+func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>?
 
 /// Do our best to print a value that cannot be printed directly.
 internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
-    value: T, _ mirror: Mirror, _ target: inout TargetStream,
+    _ value: T, _ mirror: Mirror, _ target: inout TargetStream,
     isDebugPrint: Bool
 ) {
-  func printTypeName(type: Any.Type) {
+  func printTypeName(_ type: Any.Type) {
     // Print type names without qualification, unless we're debugPrint'ing.
     target.write(_typeName(type, qualified: isDebugPrint))
   }
@@ -136,8 +136,8 @@ internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
         }
         target.write(")")
       case .`enum`:
-        let cString = _getEnumCaseName(value)
-        if cString != nil, let caseName = String(validatingUTF8: cString) {
+        if let cString = _getEnumCaseName(value),
+            let caseName = String(validatingUTF8: cString) {
           // Write the qualified type name in debugPrint.
           if isDebugPrint {
             printTypeName(mirror.subjectType)
@@ -165,8 +165,8 @@ internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
     printTypeName(metatypeValue)
   } else {
     // Fall back to the type or an opaque summary of the kind
-    let cString = _opaqueSummary(mirror.subjectType)
-    if cString != nil, let opaqueSummary = String(validatingUTF8: cString) {
+    if let cString = _opaqueSummary(mirror.subjectType),
+        let opaqueSummary = String(validatingUTF8: cString) {
       target.write(opaqueSummary)
     } else {
       target.write(_typeName(mirror.subjectType, qualified: true))
@@ -177,7 +177,7 @@ internal func _adHocPrint_unlocked<T, TargetStream : OutputStream>(
 @inline(never)
 @_semantics("stdlib_binary_only")
 internal func _print_unlocked<T, TargetStream : OutputStream>(
-  value: T, _ target: inout TargetStream
+  _ value: T, _ target: inout TargetStream
 ) {
   // Optional has no representation suitable for display; therefore,
   // values of optional type should be printed as a debug
@@ -216,14 +216,14 @@ internal func _print_unlocked<T, TargetStream : OutputStream>(
 /// This function is forbidden from being inlined because when building the
 /// standard library inlining makes us drop the special semantics.
 @inline(never) @effects(readonly)
-func _toStringReadOnlyStreamable<T : Streamable>(x: T) -> String {
+func _toStringReadOnlyStreamable<T : Streamable>(_ x: T) -> String {
   var result = ""
   x.write(to: &result)
   return result
 }
 
 @inline(never) @effects(readonly)
-func _toStringReadOnlyPrintable<T : CustomStringConvertible>(x: T) -> String {
+func _toStringReadOnlyPrintable<T : CustomStringConvertible>(_ x: T) -> String {
   return x.description
 }
 
@@ -233,7 +233,7 @@ func _toStringReadOnlyPrintable<T : CustomStringConvertible>(x: T) -> String {
 
 @inline(never)
 public func _debugPrint_unlocked<T, TargetStream : OutputStream>(
-    value: T, _ target: inout TargetStream
+    _ value: T, _ target: inout TargetStream
 ) {
   if let debugPrintableObject = value as? CustomDebugStringConvertible {
     debugPrintableObject.debugDescription.write(to: &target)
@@ -255,7 +255,7 @@ public func _debugPrint_unlocked<T, TargetStream : OutputStream>(
 }
 
 internal func _dumpPrint_unlocked<T, TargetStream : OutputStream>(
-    value: T, _ mirror: Mirror, _ target: inout TargetStream
+    _ value: T, _ mirror: Mirror, _ target: inout TargetStream
 ) {
   if let displayStyle = mirror.displayStyle {
     // Containers and tuples are always displayed in terms of their element count
@@ -305,8 +305,8 @@ internal func _dumpPrint_unlocked<T, TargetStream : OutputStream>(
       return
     case .`enum`:
       target.write(_typeName(mirror.subjectType, qualified: true))
-      let cString = _getEnumCaseName(value)
-      if cString != nil, let caseName = String(validatingUTF8: cString) {
+      if let cString = _getEnumCaseName(value),
+          let caseName = String(validatingUTF8: cString) {
         target.write(".")
         target.write(caseName)
       }
@@ -332,7 +332,7 @@ internal struct _Stdout : OutputStream {
     _swift_stdlib_funlockfile_stdout()
   }
 
-  mutating func write(string: String) {
+  mutating func write(_ string: String) {
     if string.isEmpty { return }
 
     if string._core.isASCII {
@@ -351,7 +351,7 @@ internal struct _Stdout : OutputStream {
 
 extension String : OutputStream {
   /// Append `other` to this stream.
-  public mutating func write(other: String) {
+  public mutating func write(_ other: String) {
     self += other
   }
 }
@@ -392,7 +392,7 @@ internal struct _TeeStream<
   var right: R
   
   /// Append the given `string` to this stream.
-  mutating func write(string: String)
+  mutating func write(_ string: String)
   { left.write(string); right.write(string) }
 
   mutating func _lock() { left._lock(); right._lock() }

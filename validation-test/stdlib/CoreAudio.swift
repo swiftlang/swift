@@ -5,14 +5,8 @@
 // UNSUPPORTED: OS=watchos
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import CoreAudio
 
@@ -49,7 +43,7 @@ CoreAudioTestSuite.test("UnsafeBufferPointer.init(_: AudioBuffer)") {
       mData: UnsafeMutablePointer<Void>(bitPattern: 0x1234_5678))
     let result: UnsafeBufferPointer<Float> = UnsafeBufferPointer(audioBuffer)
     expectEqual(
-      UnsafePointer<Float>(audioBuffer.mData),
+      UnsafePointer<Float>(audioBuffer.mData!),
       result.baseAddress)
     expectEqual(256, result.count)
   }
@@ -72,7 +66,7 @@ CoreAudioTestSuite.test("UnsafeMutableBufferPointer.init(_: AudioBuffer)") {
     let result: UnsafeMutableBufferPointer<Float> =
       UnsafeMutableBufferPointer(audioBuffer)
     expectEqual(
-      UnsafeMutablePointer<Float>(audioBuffer.mData),
+      UnsafeMutablePointer<Float>(audioBuffer.mData!),
       result.baseAddress)
     expectEqual(256, result.count)
   }
@@ -112,7 +106,7 @@ CoreAudioTestSuite.test(
 
   expectCrashLater()
   // An overflow happens when we try to compute the value for mDataByteSize.
-  AudioBuffer(buffer, numberOfChannels: 2)
+  _ = AudioBuffer(buffer, numberOfChannels: 2)
 }
 
 CoreAudioTestSuite.test("AudioBufferList.sizeInBytes(maximumBuffers: Int)") {
@@ -165,6 +159,16 @@ CoreAudioTestSuite.test("AudioBufferList.allocate(maximumBuffers: Int)/trap/over
   AudioBufferList.allocate(maximumBuffers: Int.max)
 }
 
+CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer/AssociatedTypes") {
+  typealias Subject = UnsafeMutableAudioBufferListPointer
+  expectRandomAccessCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: IndexingIterator<Subject>.self,
+    subSequenceType: MutableRandomAccessSlice<Subject>.self,
+    indexType: Int.self,
+    indexDistanceType: Int.self,
+    indicesType: CountableRange<Int>.self)
+}
 
 CoreAudioTestSuite.test(
   "UnsafeMutableAudioBufferListPointer.init(_: UnsafeMutablePointer<AudioBufferList>)," +
@@ -172,19 +176,30 @@ CoreAudioTestSuite.test(
   "UnsafeMutableAudioBufferListPointer.unsafeMutablePointer") {
   do {
     let ablPtrWrapper = UnsafeMutableAudioBufferListPointer(nil)
-    expectEqual(nil, ablPtrWrapper.unsafePointer)
-    expectEqual(nil, ablPtrWrapper.unsafeMutablePointer)
+    expectEmpty(ablPtrWrapper)
   }
 
   do {
     let ablPtrWrapper = UnsafeMutableAudioBufferListPointer(
-      UnsafeMutablePointer<AudioBufferList>(bitPattern: 0x1234_5678))
+      UnsafeMutablePointer<AudioBufferList>(bitPattern: 0x1234_5678)!)
     expectEqual(
       UnsafePointer<AudioBufferList>(bitPattern: 0x1234_5678),
       ablPtrWrapper.unsafePointer)
     expectEqual(
       UnsafePointer<AudioBufferList>(bitPattern: 0x1234_5678),
       ablPtrWrapper.unsafeMutablePointer)
+  }
+
+  do {
+    let ablPtrWrapper = UnsafeMutableAudioBufferListPointer(
+      UnsafeMutablePointer<AudioBufferList>(bitPattern: 0x1234_5678))
+    expectNotEmpty(ablPtrWrapper)
+    expectEqual(
+      UnsafePointer<AudioBufferList>(bitPattern: 0x1234_5678),
+      ablPtrWrapper!.unsafePointer)
+    expectEqual(
+      UnsafePointer<AudioBufferList>(bitPattern: 0x1234_5678),
+      ablPtrWrapper!.unsafeMutablePointer)
   }
 }
 

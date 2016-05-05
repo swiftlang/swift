@@ -168,6 +168,27 @@ enum class SourceFileKind {
   SIL       ///< Came from a .sil file.
 };
 
+/// Discriminator for resilience strategy.
+enum class ResilienceStrategy : unsigned {
+  /// Public nominal types: fragile
+  /// Non-inlineable function bodies: resilient
+  ///
+  /// This is the default behavior without any flags.
+  Default,
+
+  /// Public nominal types: resilient
+  /// Non-inlineable function bodies: resilient
+  ///
+  /// This is the behavior with -enable-resilience.
+  Resilient,
+
+  /// Public nominal types: fragile
+  /// Non-inlineable function bodies: fragile
+  ///
+  /// This is the behavior with -sil-serialize-all.
+  Fragile
+};
+
 /// The minimum unit of compilation.
 ///
 /// A module is made up of several file-units, which are all part of the same
@@ -254,7 +275,7 @@ private:
   struct {
     unsigned TestingEnabled : 1;
     unsigned FailedToLoad : 1;
-    unsigned ResilienceEnabled : 1;
+    unsigned ResilienceStrategy : 2;
   } Flags;
 
   /// The magic __dso_handle variable.
@@ -314,14 +335,11 @@ public:
     Flags.FailedToLoad = failed;
   }
 
-  /// Returns true if this module is compiled for resilience enabled,
-  /// meaning the module is expected to evolve without recompiling
-  /// clients that link against it.
-  bool isResilienceEnabled() const {
-    return Flags.ResilienceEnabled;
+  ResilienceStrategy getResilienceStrategy() const {
+    return ResilienceStrategy(Flags.ResilienceStrategy);
   }
-  void setResilienceEnabled(bool enabled = true) {
-    Flags.ResilienceEnabled = enabled;
+  void setResilienceStrategy(ResilienceStrategy strategy) {
+    Flags.ResilienceStrategy = unsigned(strategy);
   }
 
   /// Look up a (possibly overloaded) value set at top-level scope
@@ -660,6 +678,11 @@ public:
 
   virtual Optional<unsigned>
   getSourceOrderForDecl(const Decl *D) const {
+    return None;
+  }
+
+  virtual Optional<StringRef>
+  getGroupNameByUSR(StringRef USR) const {
     return None;
   }
 
@@ -1234,6 +1257,7 @@ public:
 
   bool isSystemModule() const;
   bool isBuiltinModule() const;
+  const ModuleDecl *getAsSwiftModule() const;
 
   explicit operator bool() const { return !Mod.isNull(); }
 };

@@ -25,7 +25,6 @@
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
@@ -36,10 +35,14 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   // Mangle the constant with a _TTD header.
   auto name = constant.mangle("_TTD");
 
+  IsFragile_t isFragile = IsNotFragile;
+  if (makeModuleFragile)
+    isFragile = IsFragile;
+  if (constant.isFragile())
+    isFragile = IsFragile;
   auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Shared,
                             constantInfo.getSILType().castTo<SILFunctionType>(),
-                            IsBare, IsTransparent,
-                            makeModuleFragile ? IsFragile : IsNotFragile);
+                            IsBare, IsTransparent, isFragile, IsThunk);
 
   if (F->empty()) {
     // Emit the thunk if we haven't yet.
@@ -88,9 +91,12 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
   SILLocation loc(derivedDecl);
   auto thunk =
-      M.getOrCreateFunction(SILLinkage::Private, name, overrideInfo.SILFnType,
-                            derivedDecl->getGenericParams(), loc, IsBare,
-                            IsNotTransparent, IsNotFragile);
+      M.createFunction(makeModuleFragile
+                           ? SILLinkage::Public
+                           : SILLinkage::Private,
+                       name, overrideInfo.SILFnType,
+                       derivedDecl->getGenericParams(), loc, IsBare,
+                       IsNotTransparent, IsNotFragile);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
   SILGenFunction(*this, *thunk)
@@ -332,9 +338,8 @@ public:
     }
 
     if (auto protocol = dyn_cast<ProtocolDecl>(theType)) {
-      if (!protocol->hasFixedLayout())
+      if (!protocol->isObjC())
         SGM.emitDefaultWitnessTable(protocol);
-
       return;
     }
 

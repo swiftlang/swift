@@ -12,7 +12,11 @@
 
 /// The underlying buffer for an ArrayType conforms to
 /// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
-public protocol _ArrayBufferProtocol : MutableCollection {
+public protocol _ArrayBufferProtocol
+  : MutableCollection, RandomAccessCollection {
+
+  associatedtype Indices : RandomAccessCollection = CountableRange<Int>
+
   /// The type of elements stored in the buffer.
   associatedtype Element
 
@@ -46,7 +50,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   ///   unnecessary reallocation.
   @warn_unused_result
   mutating func requestUniqueMutableBackingBuffer(
-    minimumCapacity minimumCapacity: Int
+    minimumCapacity: Int
   ) -> _ContiguousArrayBuffer<Element>?
 
   /// Returns `true` iff this buffer is backed by a uniquely-referenced mutable
@@ -70,7 +74,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   /// - Precondition: This buffer is backed by a uniquely-referenced
   /// `_ContiguousArrayBuffer`.
   mutating func replace<C : Collection where C.Iterator.Element == Element>(
-    subRange subRange: Range<Int>,
+    subRange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
   )
@@ -82,7 +86,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
   func withUnsafeBufferPointer<R>(
-    @noescape body: (UnsafeBufferPointer<Element>) throws -> R
+    _ body: @noescape (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
@@ -90,7 +94,7 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   ///
   /// - Precondition: Such contiguous storage exists or the buffer is empty.
   mutating func withUnsafeMutableBufferPointer<R>(
-    @noescape body: (UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @noescape (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R
 
   /// The number of elements the buffer stores.
@@ -102,19 +106,18 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   /// An object that keeps the elements stored in this buffer alive.
   var owner: AnyObject { get }
 
+  /// A pointer to the first element.
+  ///
+  /// - Precondition: The elements are known to be stored contiguously.
+  var firstElementAddress: UnsafeMutablePointer<Element> { get }
+
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.
-  var firstElementAddress: UnsafeMutablePointer<Element> { get }
+  var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? { get }
 
   /// Returns a base address to which you can add an index `i` to get the
   /// address of the corresponding element at `i`.
   var subscriptBaseAddress: UnsafeMutablePointer<Element> { get }
-
-  /// Like `subscriptBaseAddress`, but can assume that `self` is a mutable,
-  /// uniquely referenced native representation.
-  /// - Precondition: `_isNative` is `true`.
-  var _unconditionalMutableSubscriptBaseAddress:
-    UnsafeMutablePointer<Element> { get }
 
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
@@ -124,20 +127,16 @@ public protocol _ArrayBufferProtocol : MutableCollection {
   var startIndex: Int { get }
 }
 
-extension _ArrayBufferProtocol {
+extension _ArrayBufferProtocol where Index == Int {
+
   public var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
-  }
-
-  public var _unconditionalMutableSubscriptBaseAddress:
-    UnsafeMutablePointer<Element> {
-    return subscriptBaseAddress
   }
 
   public mutating func replace<
     C : Collection where C.Iterator.Element == Element
   >(
-    subRange subRange: Range<Int>,
+    subRange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
   ) {
@@ -149,13 +148,11 @@ extension _ArrayBufferProtocol {
     self.count = oldCount + growth
 
     let elements = self.subscriptBaseAddress
-    _sanityCheck(elements != nil)
-
-    let oldTailIndex = subRange.endIndex
+    let oldTailIndex = subRange.upperBound
     let oldTailStart = elements + oldTailIndex
     let newTailIndex = oldTailIndex + growth
     let newTailStart = oldTailStart + growth
-    let tailCount = oldCount - subRange.endIndex
+    let tailCount = oldCount - subRange.upperBound
 
     if growth > 0 {
       // Slide the tail part of the buffer forwards, in reverse order
@@ -164,25 +161,25 @@ extension _ArrayBufferProtocol {
 
       // Assign over the original subRange
       var i = newValues.startIndex
-      for j in subRange {
+      for j in CountableRange(subRange) {
         elements[j] = newValues[i]
-        i._successorInPlace()
+        newValues.formIndex(after: &i)
       }
       // Initialize the hole left by sliding the tail forward
       for j in oldTailIndex..<newTailIndex {
         (elements + j).initialize(with: newValues[i])
-        i._successorInPlace()
+        newValues.formIndex(after: &i)
       }
       _expectEnd(i, newValues)
     }
     else { // We're not growing the buffer
       // Assign all the new elements into the start of the subRange
-      var i = subRange.startIndex
+      var i = subRange.lowerBound
       var j = newValues.startIndex
       for _ in 0..<newCount {
         elements[i] = newValues[j]
-        i._successorInPlace()
-        j._successorInPlace()
+        formIndex(after: &i)
+        newValues.formIndex(after: &j)
       }
       _expectEnd(j, newValues)
 

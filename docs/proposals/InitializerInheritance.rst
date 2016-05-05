@@ -203,7 +203,7 @@ examples::
   class B3 : A {
     var counter: Int 
 
-    init withInitialCount(initialCount: Int)  { // subobject initializer
+    init withInitialCount(initialCount: Int) { // subobject initializer
       counter = initialCount
       super.init(withTitle: "Unnamed")
     }
@@ -270,7 +270,7 @@ metatype of the class. For example::
     init() { }
   }
 
-  func f(meta: D.Type) {
+  func f(_ meta: D.Type) {
     meta() // error: no guarantee that an arbitrary of subclass D has an init()
   }
 
@@ -282,7 +282,7 @@ attribute, are guaranteed to be available in every subclass of
     @virtual init() { }
   }
 
-  func f(meta: D.Type) {
+  func f(_ meta: D.Type) {
     meta() // okay: every subclass of D guaranteed to have an init()
   }
 

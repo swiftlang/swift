@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func foo(f f: (()->())!) {
-  var f = f
+func foo(f f: (() -> ())!) {
+  var f: (() -> ())! = f
   f?()
 }
 // CHECK:    sil hidden @{{.*}}foo{{.*}} : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<() -> ()>) -> () {

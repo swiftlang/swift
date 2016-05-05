@@ -38,11 +38,11 @@ func testArithmeticOverflow() {
 }
 
 @_transparent 
-func myaddSigned(x: Int8, _ y: Int8, _ z: Int8) -> Int8 {
+func myaddSigned(_ x: Int8, _ y: Int8, _ z: Int8) -> Int8 {
   return x + y
 }
 @_transparent 
-func myaddUnsigned(x: UInt8, _ y: UInt8, _ z: UInt8) -> UInt8 {
+func myaddUnsigned(_ x: UInt8, _ y: UInt8, _ z: UInt8) -> UInt8 {
   return x + y
 }
 
@@ -208,7 +208,7 @@ func testConvertOverflow() {
 }
 
 @_transparent 
-func intConversionWrapperForUSCheckedConversion(x: UInt8, _ unused: UInt8) -> Int8 {
+func intConversionWrapperForUSCheckedConversion(_ x: UInt8, _ unused: UInt8) -> Int8 {
   return Int8(x)
 }
 @_transparent 
@@ -317,19 +317,19 @@ extension Int8 : Num {
 }
 
 @_transparent
-func Double<T : Num>(x: T) -> T { return x.Double() }
+func Double<T : Num>(_ x: T) -> T { return x.Double() }
 
 func tryDouble() -> Int8 {
   return Double(Int8.max) // expected-error {{arithmetic operation '127 * 2' (on signed 8-bit integer type) results in an overflow}}
 }
 
 @_transparent
-func add<T : SignedInteger>(left: T, _ right: T) -> T {
+func add<T : SignedInteger>(_ left: T, _ right: T) -> T {
   return left + right
 }
 
 @_transparent
-func applyBinary<T : SignedInteger>(fn: (T, T) -> (T), _ left: T, _ right: T) -> T {
+func applyBinary<T : SignedInteger>(_ fn: (T, T) -> (T), _ left: T, _ right: T) -> T {
   return fn(left, right)
 }
 

@@ -831,27 +831,31 @@ public:
 };
 
 // ObjectLiteralExpr - An expression of the form
-// '[#Color(red: 1, blue: 0, green: 0, alpha: 1)#]' with a name and a list
+// '#colorLiteral(red: 1, blue: 0, green: 0, alpha: 1)' with a name and a list
 // argument. The components of the list argument are meant to be themselves
 // constant.
 class ObjectLiteralExpr : public LiteralExpr {
-  Identifier Name;
+public:
+  /// The kind of object literal.
+  enum LiteralKind : unsigned {
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto) Name,
+#include "swift/Parse/Tokens.def"    
+  };
+
+private:
+  LiteralKind LitKind;
   Expr *Arg;
   Expr *SemanticExpr;
-
-  SourceLoc LLitLoc;
-  SourceLoc NameLoc;
-  SourceLoc RLitLoc;
+  SourceLoc PoundLoc;
 
 public:
-  ObjectLiteralExpr(SourceLoc LLitLoc, Identifier Name, SourceLoc NameLoc,
-                    Expr *Arg, SourceLoc RLitLoc, bool implicit = false)
+  ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
+                    Expr *Arg, bool implicit = false)
     : LiteralExpr(ExprKind::ObjectLiteral, implicit), 
-      Name(Name), Arg(Arg), SemanticExpr(nullptr),
-      LLitLoc(LLitLoc), NameLoc(NameLoc), RLitLoc(RLitLoc) {}
+      LitKind(LitKind), Arg(Arg), SemanticExpr(nullptr),
+      PoundLoc(PoundLoc) {}
 
-  Identifier getName() const { return Name; }
-  SourceLoc getNameLoc() const { return NameLoc; }
+  LiteralKind getLiteralKind() const { return LitKind; }
 
   Expr *getArg() const { return Arg; }
   void setArg(Expr *arg) { Arg = arg; }
@@ -859,8 +863,15 @@ public:
   Expr *getSemanticExpr() const { return SemanticExpr; }
   void setSemanticExpr(Expr *expr) { SemanticExpr = expr; }
 
-  SourceLoc getSourceLoc() const { return NameLoc; }
-  SourceRange getSourceRange() const { return SourceRange(LLitLoc, RLitLoc); }
+  SourceLoc getSourceLoc() const { return PoundLoc; }
+  SourceRange getSourceRange() const { 
+    return SourceRange(PoundLoc, Arg->getEndLoc());
+  }
+
+  /// Return the string form of the literal name.
+  StringRef getLiteralKindRawName() const;
+
+  StringRef getLiteralKindPlainName() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ObjectLiteral;
@@ -2972,7 +2983,8 @@ public:
 /// when a scalar expression is converted to @autoclosure function type.
 /// For example:
 /// \code
-///   @autoclosure var x : () -> Int = 4
+///   func f(x : @autoclosure () -> Int)
+///   f(42)  // AutoclosureExpr convert from Int to ()->Int
 /// \endcode
 class AutoClosureExpr : public AbstractClosureExpr {
   BraceStmt *Body;
@@ -3486,6 +3498,47 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Coerce;
+  }
+};
+
+/// \brief Represents two expressions joined by the arrow operator '->', which
+/// may be preceded by the 'throws' keyword. Currently this only exists to be
+/// transformed into a FunctionTypeRepr by simplifyTypeExpr() in Sema.
+class ArrowExpr : public Expr {
+  SourceLoc ThrowsLoc;
+  SourceLoc ArrowLoc;
+  Expr *Args;
+  Expr *Result;
+public:
+  ArrowExpr(Expr *Args, SourceLoc ThrowsLoc, SourceLoc ArrowLoc, Expr *Result)
+    : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
+      ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(Args), Result(Result)
+  { }
+
+  ArrowExpr(SourceLoc ThrowsLoc, SourceLoc ArrowLoc)
+    : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
+      ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(nullptr), Result(nullptr)
+  { }
+
+  Expr *getArgsExpr() const { return Args; }
+  void setArgsExpr(Expr *E) { Args = E; }
+  Expr *getResultExpr() const { return Result; }
+  void setResultExpr(Expr *E) { Result = E; }
+  SourceLoc getThrowsLoc() const { return ThrowsLoc; }
+  SourceLoc getArrowLoc() const { return ArrowLoc; }
+  bool isFolded() const { return Args != nullptr && Result != nullptr; }
+
+  SourceLoc getSourceLoc() const { return ArrowLoc; }
+  SourceLoc getStartLoc() const {
+    return isFolded() ? Args->getStartLoc() :
+           ThrowsLoc.isValid() ? ThrowsLoc : ArrowLoc;
+  }
+  SourceLoc getEndLoc() const {
+    return isFolded() ? Result->getEndLoc() : ArrowLoc;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Arrow;
   }
 };
 

@@ -31,7 +31,7 @@ cFuncSuffix2 = {32: 'f', 64: 'd', 80: 'ld'}
 /// Returns `true` iff isspace(u) would return nonzero when the current
 /// locale is the C locale.
 @warn_unused_result
-internal func _isspace_clocale(u: UTF16.CodeUnit) -> Bool {
+internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
   return "\t\n\u{b}\u{c}\r ".utf16.contains(u)
 }
 
@@ -39,7 +39,7 @@ internal func _isspace_clocale(u: UTF16.CodeUnit) -> Bool {
 %   Self = floatName(bits)
 
 % if bits == 80:
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 % end
 
 //===--- Parsing ----------------------------------------------------------===//
@@ -55,13 +55,13 @@ extension ${Self} {
   /// the exact format accepted.
   public init?(_ text: String) {
     let u16 = text.utf16
-    func parseNTBS(chars: UnsafePointer<CChar>) -> (${Self}, Int) {
+    func parseNTBS(_ chars: UnsafePointer<CChar>) -> (${Self}, Int) {
       var result: ${Self} = 0
       let endPtr = withUnsafeMutablePointer(&result) {
         _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(
           chars, UnsafeMutablePointer($0))
       }
-      return (result, endPtr == nil ? 0 : UnsafePointer(endPtr) - chars)
+      return (result, endPtr == nil ? 0 : UnsafePointer(endPtr!) - chars)
     }
 
     let (result, n) = text.withCString(parseNTBS)

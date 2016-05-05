@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opts %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -inline -function-signature-opts %s | FileCheck %s
 
 import Builtin
 
@@ -136,22 +136,44 @@ struct SingleFieldLvl3 {
 
 /// This checks the case where we have a single level hierarchy and the root is
 /// dead.
-// CHECK-LABEL: sil [fragile] [thunk] @single_level_dead_root_callee : $@convention(thin) (S1) -> Builtin.Int32 {
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @single_level_dead_root_callee : $@convention(thin) (S1) -> Builtin.Int32 {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $S1):
-// CHECK: [[FN:%[0-9]+]] = function_ref @_TTSf4s__single_level_dead_root_callee : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+// CHECK: [[FN:%[0-9]+]] = function_ref @_TTSfq4s__single_level_dead_root_callee : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
 // CHECK: [[ARG:%.*]] = struct_extract [[INPUT]] : $S1, #S1.f2
 // CHECK: apply [[FN]]([[ARG]])
 sil [fragile] @single_level_dead_root_callee : $@convention(thin) (S1) -> Builtin.Int32 {
 bb0(%0 : $S1):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
   %1 = struct_extract %0 : $S1, #S1.f2
   return %1 : $Builtin.Int32
 }
 
 // CHECK-LABEL: sil [fragile] @single_level_dead_root_caller : $@convention(thin) (S1) -> () {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $S1):
-// CHECK: [[FN:%[0-9]+]] = function_ref @_TTSf4s__single_level_dead_root_callee : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
-// CHECK: [[ARG:%.*]] = struct_extract [[INPUT]] : $S1, #S1.f2
-// CHECK: apply [[FN]]([[ARG]])
+// CHECK: [[FN:%[0-9]+]] = function_ref @_TTSfq4s__single_level_dead_root_callee
 sil [fragile] @single_level_dead_root_caller : $@convention(thin) (S1) -> () {
 bb0(%0 : $S1):
   %1 = function_ref @single_level_dead_root_callee : $@convention(thin) (S1) -> Builtin.Int32
@@ -160,14 +182,38 @@ bb0(%0 : $S1):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [fragile] [thunk] @single_level_live_root_callee : $@convention(thin) (S1) -> Builtin.Int32 {
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @single_level_live_root_callee : $@convention(thin) (S1) -> Builtin.Int32 {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $S1):
-// CHECK: [[FN:%[0-9]+]] = function_ref @_TTSf4s__single_level_live_root_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> Builtin.Int32
+// CHECK: [[FN:%[0-9]+]] = function_ref @_TTSfq4s__single_level_live_root_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> Builtin.Int32
 // CHECK: [[ARG2:%.*]] = struct_extract [[INPUT]] : $S1, #S1.f2
 // CHECK: [[ARG1:%.*]] = struct_extract [[INPUT]] : $S1, #S1.f1
 // CHECK: apply [[FN]]([[ARG1]], [[ARG2]])
 sil [fragile] @single_level_live_root_callee : $@convention(thin) (S1) -> Builtin.Int32 {
 bb0(%0 : $S1):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
   %1 = struct_extract %0 : $S1, #S1.f2
   %2 = function_ref @s1_user : $@convention(thin) (S1) -> ()
   apply %2(%0) : $@convention(thin) (S1) -> ()
@@ -176,10 +222,7 @@ bb0(%0 : $S1):
 
 // CHECK-LABEL: sil [fragile] @single_level_live_root_caller : $@convention(thin) (S1) -> () {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $S1):
-// CHECK: [[FN:%[0-9]+]] = function_ref @_TTSf4s__single_level_live_root_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> Builtin.Int32
-// CHECK: [[ARG2:%.*]] = struct_extract [[INPUT]] : $S1, #S1.f2
-// CHECK: [[ARG1:%.*]] = struct_extract [[INPUT]] : $S1, #S1.f1
-// CHECK: apply [[FN]]([[ARG1]], [[ARG2]])
+// CHECK: [[FN:%[0-9]+]] = function_ref @_TTSfq4s__single_level_live_root_callee
 sil [fragile] @single_level_live_root_caller : $@convention(thin) (S1) -> () {
 bb0(%0 : $S1):
   %1 = function_ref @single_level_live_root_callee : $@convention(thin) (S1) -> Builtin.Int32
@@ -191,15 +234,39 @@ bb0(%0 : $S1):
 // This test checks where we have a multiple level hierarchy, the root is dead,
 // but the root has all fields used. This means that we should extract
 // everything, but we should not "reform" the aggregate.
-// CHECK-LABEL: sil [fragile] [thunk] @multiple_level_all_root_fields_used_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @multiple_level_all_root_fields_used_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[INPUT:%.*]] : $S2):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4s__multiple_level_all_root_fields_used_callee : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4s__multiple_level_all_root_fields_used_callee : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[INPUT]] : $S2, #S2.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[INPUT]] : $S2, #S2.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S1, #S1.f1
 // CHECK: apply [[FN]]([[EXT3]], [[EXT1]])
 sil [fragile] @multiple_level_all_root_fields_used_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64) {
 bb0(%0 : $S2):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
   debug_value %0 : $S2 // debug_value should not prevent function signature optimization
   %1 = struct_extract %0 : $S2, #S2.f1
   debug_value %1 : $S1 // debug_value should not prevent function signature optimization
@@ -211,7 +278,7 @@ bb0(%0 : $S2):
 
 // CHECK-LABEL: sil [fragile] @multiple_level_all_root_fields_used_caller : $@convention(thin) (S2) -> () {
 // CHECK: bb0([[INPUT:%.*]] : $S2):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4s__multiple_level_all_root_fields_used_callee : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4s__multiple_level_all_root_fields_used_callee : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[INPUT]] : $S2, #S2.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[INPUT]] : $S2, #S2.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S1, #S1.f1
@@ -225,9 +292,9 @@ bb0(%0 : $S2):
 }
 
 /// This test checks a multiple level hierarchy where the root has no fields used.
-// CHECK-LABEL: sil [fragile] [thunk] @multiple_level_no_root_fields_have_direct_uses_callee : $@convention(thin) (S3) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @multiple_level_no_root_fields_have_direct_uses_callee : $@convention(thin) (S3) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN:%.*]] : $S3):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4s__multiple_level_no_root_fields_have_direct_uses_callee : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4s__multiple_level_no_root_fields_have_direct_uses_callee : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S3, #S3.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S3, #S3.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S2, #S2.f2
@@ -236,6 +303,30 @@ bb0(%0 : $S2):
 // CHECK: apply [[FN]]([[EXT5]], [[EXT3]])
 sil [fragile] @multiple_level_no_root_fields_have_direct_uses_callee : $@convention(thin) (S3) -> (Builtin.Int16, Builtin.Int64) {
 bb0(%0 : $S3):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
   debug_value %0 : $S3
   %1 = struct_extract %0 : $S3, #S3.f1
   %2 = struct_extract %1 : $S2, #S2.f1
@@ -247,7 +338,7 @@ bb0(%0 : $S3):
 
 // CHECK-LABEL: sil [fragile] @multiple_level_no_root_fields_have_direct_uses_caller : $@convention(thin) (S3) -> () {
 // CHECK: bb0([[IN:%.*]] : $S3):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4s__multiple_level_no_root_fields_have_direct_uses_callee : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4s__multiple_level_no_root_fields_have_direct_uses_callee : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S3, #S3.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S3, #S3.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S2, #S2.f2
@@ -264,9 +355,9 @@ bb0(%0 : $S3):
 
 // This test checks a multiple level hierarchy where the root has its own use
 // and needs to be reformed via a struct.
-// CHECK-LABEL: sil [fragile] [thunk] @multiple_level_root_must_be_reformed_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @multiple_level_root_must_be_reformed_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN:%.*]] : $S2):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4s__multiple_level_root_must_be_reformed_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4s__multiple_level_root_must_be_reformed_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S2, #S2.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S2, #S2.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S1, #S1.f2
@@ -274,6 +365,30 @@ bb0(%0 : $S3):
 // CHECK: apply [[FN]]([[EXT4]], [[EXT3]], [[EXT1]])
 sil [fragile] @multiple_level_root_must_be_reformed_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64) {
 bb0(%0 : $S2):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
   %2 = struct_extract %0 : $S2, #S2.f1
   %3 = struct_extract %2 : $S1, #S1.f1
   %4 = struct_extract %0 : $S2, #S2.f2
@@ -285,7 +400,7 @@ bb0(%0 : $S2):
 
 // CHECK-LABEL: sil [fragile] @multiple_level_root_must_be_reformed_caller : $@convention(thin) (S2) -> () {
 // CHECK: bb0([[IN:%.*]] : $S2):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4s__multiple_level_root_must_be_reformed_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4s__multiple_level_root_must_be_reformed_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S2, #S2.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S2, #S2.f1
 // CHECK: [[EXT3:%.*]] = struct_extract [[EXT2]] : $S1, #S1.f2
@@ -293,6 +408,30 @@ bb0(%0 : $S2):
 // CHECK: apply [[FN]]([[EXT4]], [[EXT3]], [[EXT1]])
 sil [fragile] @multiple_level_root_must_be_reformed_caller : $@convention(thin) (S2) -> () {
 bb0(%0 : $S2):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
   %1 = function_ref @multiple_level_root_must_be_reformed_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64)
   %2 = apply %1(%0) : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64)
   %9999 = tuple()
@@ -300,9 +439,9 @@ bb0(%0 : $S2):
 }
 
 // This test checks if we can handle @owned structs correctly
-// CHECK-LABEL: sil [fragile] [thunk] @owned_struct_1_callee : $@convention(thin) (@owned S5, @owned S5) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32) {
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @owned_struct_1_callee : $@convention(thin) (@owned S5, @owned S5) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32) {
 // CHECK: bb0([[IN1:%.*]] : $S5, [[IN2:%.*]] : $S5):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4dg_gs__owned_struct_1_callee : $@convention(thin) (@guaranteed S4, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4dg_gs__owned_struct_1_callee : $@convention(thin) (@guaranteed S4, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN2]] : $S5, #S5.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN2]] : $S5, #S5.f1
 // CHECK: [[EXT4:%.*]] = struct_extract [[EXT1]] : $S1, #S1.f2
@@ -311,6 +450,30 @@ bb0(%0 : $S2):
 // CHECK: release_value [[IN]] : $S5
 sil [fragile] @owned_struct_1_callee : $@convention(thin) (@owned S5, @owned S5) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32) {
 bb0(%0 : $S5, %1 : $S5):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
   %2 = struct_extract %0 : $S5, #S5.f2
   %3 = struct_extract %2 : $S1, #S1.f1
   %4 = struct_extract %2 : $S1, #S1.f2
@@ -326,7 +489,7 @@ bb0(%0 : $S5, %1 : $S5):
 
 // CHECK-LABEL: sil [fragile] @owned_struct_1_caller : $@convention(thin) (S5) -> () {
 // CHECK: bb0([[IN:%.*]] : $S5):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4dg_gs__owned_struct_1_callee : $@convention(thin) (@guaranteed S4, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4dg_gs__owned_struct_1_callee : $@convention(thin) (@guaranteed S4, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S5, #S5.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S5, #S5.f1
 // CHECK: [[EXT4:%.*]] = struct_extract [[EXT1]] : $S1, #S1.f2
@@ -342,9 +505,9 @@ bb0(%0 : $S5):
 }
 
 // This test checks if we can properly insert arguments in between dead arguments.
-// CHECK-LABEL: sil [fragile] [thunk] @owned_struct_2_callee : $@convention(thin) (Builtin.Int256, Builtin.Int256, @owned S5, Builtin.Int128, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128) {
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @owned_struct_2_callee : $@convention(thin) (Builtin.Int256, Builtin.Int256, @owned S5, Builtin.Int128, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int256, [[IN2:%.*]] : $Builtin.Int256, [[IN3:%.*]] : $S5, [[IN4:%.*]] : $Builtin.Int128, [[IN5:%.*]] : $Builtin.Int128):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4n_d_gs_d_n__owned_struct_2_callee : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4n_d_gs_d_n__owned_struct_2_callee : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN3]] : $S5, #S5.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN3]] : $S5, #S5.f1
 // CHECK: [[EXT4:%.*]] = struct_extract [[EXT1]] : $S1, #S1.f2
@@ -352,6 +515,30 @@ bb0(%0 : $S5):
 // CHECK: apply [[FN]]([[IN1]], [[EXT2]], [[EXT5]], [[EXT4]], [[IN5]]) : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128)
 sil [fragile] @owned_struct_2_callee : $@convention(thin) (Builtin.Int256, Builtin.Int256, @owned S5, Builtin.Int128, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128) {
 bb0(%0 : $Builtin.Int256, %1 : $Builtin.Int256, %2 : $S5, %3 : $Builtin.Int128, %4 : $Builtin.Int128):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
   %5 = struct_extract %2 : $S5, #S5.f2
   %6 = struct_extract %5 : $S1, #S1.f1
   %7 = struct_extract %5 : $S1, #S1.f2
@@ -365,7 +552,7 @@ bb0(%0 : $Builtin.Int256, %1 : $Builtin.Int256, %2 : $S5, %3 : $Builtin.Int128, 
 
 // CHECK-LABEL: sil [fragile] @owned_struct_2_caller : $@convention(thin) (Builtin.Int256, S5, Builtin.Int128) -> () {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int256, [[IN2:%.*]] : $S5, [[IN3:%.*]] : $Builtin.Int128):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4n_d_gs_d_n__owned_struct_2_callee : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4n_d_gs_d_n__owned_struct_2_callee : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN2]] : $S5, #S5.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN2]] : $S5, #S5.f1
 // CHECK: [[EXT4:%.*]] = struct_extract [[EXT1]] : $S1, #S1.f2
@@ -380,14 +567,38 @@ bb0(%0 : $Builtin.Int256, %1 : $S5, %2 : $Builtin.Int128):
 }
 
 /// This test makes sure that we ignore pointer arguments for now.
-// CHECK-LABEL: sil [fragile] [thunk] @ignore_ptrs_callee : $@convention(thin) (@in S1, S1, S1) -> (Builtin.Int16, Builtin.Int16) {
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @ignore_ptrs_callee : $@convention(thin) (@in S1, S1, S1) -> (Builtin.Int16, Builtin.Int16) {
 // CHECK: bb0([[IN1:%.*]] : $*S1, [[IN2:%.*]] : $S1, [[IN3:%.*]] : $S1):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4n_s_s__ignore_ptrs_callee : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4n_s_s__ignore_ptrs_callee : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN2]] : $S1, #S1.f1
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN3]] : $S1, #S1.f1
 // CHECK: apply [[FN]]([[IN1]], [[EXT1]], [[EXT2]]) : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
 sil [fragile] @ignore_ptrs_callee : $@convention(thin) (@in S1, S1, S1) -> (Builtin.Int16, Builtin.Int16) {
 bb0(%0 : $*S1, %1 : $S1, %2 : $S1):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
   debug_value %1 : $S1
   debug_value %2 : $S1
   %3 = function_ref @s1_ptr_user : $@convention(thin) (@in S1) -> ()
@@ -400,7 +611,7 @@ bb0(%0 : $*S1, %1 : $S1, %2 : $S1):
 
 // CHECK-LABEL: sil [fragile] @ignore_ptrs_caller : $@convention(thin) (@in S1, S1, S1) -> () {
 // CHECK: bb0([[IN1:%.*]] : $*S1, [[IN2:%.*]] : $S1, [[IN3:%.*]] : $S1):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4n_s_s__ignore_ptrs_callee : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4n_s_s__ignore_ptrs_callee : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN2]] : $S1, #S1.f1
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN3]] : $S1, #S1.f1
 // CHECK: apply [[FN]]([[IN1]], [[EXT1]], [[EXT2]]) : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
@@ -419,6 +630,30 @@ bb0(%0 : $*S1, %1 : $S1, %2 : $S1):
 // CHECK: apply [[FN]]([[IN1]]) : $@convention(thin) (FakeStaticString) -> ()
 sil [fragile] @multiple_sroa_callee : $@convention(thin) (FakeStaticString, @owned FakeString, FakeStaticString) -> () {
 bb0(%0 : $FakeStaticString, %1 : $FakeString, %2 : $FakeStaticString):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
   %3 = function_ref @fakestaticstring_user : $@convention(thin) (FakeStaticString) -> ()
   %4 = function_ref @fakestring_user : $@convention(thin) (FakeString) -> ()
   apply %3(%0) : $@convention(thin) (FakeStaticString) -> ()
@@ -442,14 +677,38 @@ bb0(%0 : $FakeStaticString, %1 : $FakeString, %2 : $FakeStaticString):
 // This test makes sure that we handle cases where the callee has field uses
 // that are processed in a different order than the fields are layed out in the
 // structure.
-// CHECK-LABEL: sil [fragile] [thunk] @check_out_of_order_uses_callee : $@convention(thin) (S1) -> () {
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @check_out_of_order_uses_callee : $@convention(thin) (S1) -> () {
 // CHECK: bb0([[IN:%.*]] : $S1):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4s__check_out_of_order_uses_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> ()
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4s__check_out_of_order_uses_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> ()
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S1, #S1.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S1, #S1.f1
 // CHECK: apply [[FN]]([[EXT2]], [[EXT1]]) : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> ()
 sil [fragile] @check_out_of_order_uses_callee : $@convention(thin) (S1) -> () {
 bb0(%0 : $S1):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
   debug_value %0 : $S1
   %1 = struct_extract %0 : $S1, #S1.f2
   %2 = function_ref @i32_user : $@convention(thin) (Builtin.Int32) -> ()
@@ -463,7 +722,7 @@ bb0(%0 : $S1):
 
 // CHECK-LABEL: sil [fragile] @check_out_of_order_uses_caller : $@convention(thin) (S1) -> () {
 // CHECK: bb0([[IN:%.*]] : $S1):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4s__check_out_of_order_uses_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> ()
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4s__check_out_of_order_uses_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> ()
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S1, #S1.f2
 // CHECK: [[EXT2:%.*]] = struct_extract [[IN]] : $S1, #S1.f1
 // CHECK: apply [[FN]]([[EXT2]], [[EXT1]]) : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> ()
@@ -476,13 +735,37 @@ bb0(%0 : $S1):
 }
 
 // Make sure that we do not SROA classes.
-// CHECK-LABEL: sil [fragile] [thunk] @class_callee_1 : $@convention(thin) (@owned C1, Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @class_callee_1 : $@convention(thin) (@owned C1, Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0([[IN1:%.*]] : $C1, [[IN2:%.*]] : $Builtin.Int32):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4g_n__class_callee_1 : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4g_n__class_callee_1 : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
 // CHECK: apply [[FN]]([[IN1]], [[IN2]]) : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
 // CHECK: release_value [[IN1]]
 sil [fragile] @class_callee_1 : $@convention(thin) (@owned C1, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $C1, %1 : $Builtin.Int32):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
   // This use is needed so that we do not perform dead arg + owned -> guaranteed.
   strong_retain %0 : $C1
   %2 = function_ref @c1_user : $@convention(thin) (C1) -> ()
@@ -491,9 +774,9 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
   return %1 : $Builtin.Int32
 }
 
-// CHECK-LABEL: sil [fragile] @class_caller_1 : $@convention(thin) (@owned C1, Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @class_caller_1 : $@convention(thin) (@owned C1, Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0([[IN1:%.*]] : $C1, [[IN2:%.*]] : $Builtin.Int32):
-// CHECK: [[FN:%.*]] = function_ref @_TTSf4g_n__class_callee_1 : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
+// CHECK: [[FN:%.*]] = function_ref @_TTSfq4g_n__class_callee_1 : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
 // CHECK: apply [[FN]]([[IN1]], [[IN2]]) : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
 // CHECK: release_value [[IN1]]
 sil [fragile] @class_caller_1 : $@convention(thin) (@owned C1, Builtin.Int32) -> Builtin.Int32 {
@@ -507,13 +790,37 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
 // explode S0 if it was a loadable value.
 // CHECK-LABEL: sil [fragile] @inarg_callee : $@convention(thin) (@in S1) -> () {
 // CHECK: bb0([[IN:%.*]] : $*S1):
-// CHECK-NEXT: function_ref s1_ptr_user
-// CHECK-NEXT: [[FN:%.*]] = function_ref @s1_ptr_user : $@convention(thin) (@in S1) -> ()
-// CHECK-NEXT: apply [[FN]]
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: function_ref s1_ptr_user
+// CHECK: [[FN:%.*]] = function_ref @s1_ptr_user : $@convention(thin) (@in S1) -> ()
+// CHECK: apply [[FN]]
+// CHECK: tuple
+// CHECK: return
 sil [fragile] @inarg_callee : $@convention(thin) (@in S1) -> () {
 bb0(%0 : $*S1):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
   %1 = function_ref @s1_ptr_user : $@convention(thin) (@in S1) -> ()
 	%2 = apply %1(%0) : $@convention(thin) (@in S1) -> ()
 	%9999 = tuple()
@@ -549,9 +856,33 @@ bb0(%0 : $ThirtySixFieldStruct):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [fragile] [thunk] @more_than_32_type_sized_callee : $@convention(thin) (ThirtySixFieldStruct) -> Builtin.Int32 {
+// CHECK-LABEL: sil [fragile] [thunk] [always_inline] @more_than_32_type_sized_callee : $@convention(thin) (ThirtySixFieldStruct) -> Builtin.Int32 {
 sil [fragile] @more_than_32_type_sized_callee : $@convention(thin) (ThirtySixFieldStruct) -> Builtin.Int32 {
 bb0(%0 : $ThirtySixFieldStruct):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
   %1 = struct_extract %0 : $ThirtySixFieldStruct, #ThirtySixFieldStruct.b1
   %2 = struct_extract %1 : $EightFieldStruct, #EightFieldStruct.a1
   return %2 : $Builtin.Int32
@@ -577,14 +908,14 @@ bb0(%0 : $SingleFieldLvl1):
 
 // Check Statements for generated code.
 
-// CHECK-LABEL: sil [fragile] @_TTSf4s__single_level_dead_root_callee : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil [fragile] @_TTSfq4s__single_level_dead_root_callee : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0([[IN:%.*]] : $Builtin.Int32):
-// CHECK-NEXT: [[UN:%.*]] = struct $S1 (undef : $Builtin.Int16, [[IN]] : $Builtin.Int32)
-// CHECK-NEXT: struct_extract [[UN]] : $S1, #S1.f2
-// CHECK-NEXT: return [[IN]] : $Builtin.Int32
+// CHECK: [[UN:%.*]] = struct $S1 (undef : $Builtin.Int16, [[IN]] : $Builtin.Int32)
+// CHECK: struct_extract [[UN]] : $S1, #S1.f2
+// CHECK: return [[IN]] : $Builtin.Int32
 
 
-// CHECK-LABEL: sil [fragile] @_TTSf4s__single_level_live_root_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil [fragile] @_TTSfq4s__single_level_live_root_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int32):
 // CHECK: [[STRUCT:%.*]] = struct $S1 ([[IN1]] : $Builtin.Int16, [[IN2]] : $Builtin.Int32)
 // CHECK: [[STRUCT2:%.*]] = struct $S1 ([[IN1]] : $Builtin.Int16, [[IN2]] : $Builtin.Int32)
@@ -594,7 +925,7 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: return [[IN2]]
 
 
-// CHECK-LABEL: sil [fragile] @_TTSf4s__multiple_level_all_root_fields_used_callee : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil [fragile] @_TTSfq4s__multiple_level_all_root_fields_used_callee : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int64):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN1]] : $Builtin.Int16, undef : $Builtin.Int32)
 // CHECK: [[STRUCT2:%.*]] = struct $S2 (%2 : $S1, [[IN2]] : $Builtin.Int64)
@@ -605,7 +936,7 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: return [[OUT]]
 
 
-// CHECK-LABEL: sil [fragile] @_TTSf4s__multiple_level_no_root_fields_have_direct_uses_callee : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil [fragile] @_TTSfq4s__multiple_level_no_root_fields_have_direct_uses_callee : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int64):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN1]] : $Builtin.Int16, undef : $Builtin.Int32)
 // CHECK: [[STRUCT2:%.*]] = struct $S2 ([[STRUCT1]] : $S1, [[IN2]] : $Builtin.Int64)
@@ -615,7 +946,7 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: return [[OUT]]
 
 
-// CHECK-LABEL: sil [fragile] @_TTSf4s__multiple_level_root_must_be_reformed_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil [fragile] @_TTSfq4s__multiple_level_root_must_be_reformed_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int32, [[IN3:%.*]] : $Builtin.Int64):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN1]] : $Builtin.Int16, [[IN2]] : $Builtin.Int32)
 // CHECK: [[STRUCT3:%.*]] = struct $S2 ([[STRUCT1]] : $S1, [[IN3]] : $Builtin.Int64)
@@ -629,7 +960,7 @@ bb0(%0 : $SingleFieldLvl1):
 
 
 
-// CHECK-LABEL: sil [fragile] @_TTSf4dg_gs__owned_struct_1_callee : $@convention(thin) (@guaranteed S4, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32) {
+// CHECK-LABEL: sil [fragile] @_TTSfq4dg_gs__owned_struct_1_callee : $@convention(thin) (@guaranteed S4, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32) {
 // CHECK: bb0([[IN1:%.*]] : $S4, [[IN2:%.*]] : $Builtin.Int16, [[IN3:%.*]] : $Builtin.Int32):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN2]] : $Builtin.Int16, [[IN3]] : $Builtin.Int32)
 // CHECK: [[STRUCT3:%.*]] = struct $S5 ([[IN1]] : $S4, [[STRUCT1]] : $S1)
@@ -639,7 +970,7 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: [[OUT:%.*]] = tuple ([[IN2]] : $Builtin.Int16, [[IN3]] : $Builtin.Int32, [[IN2]] : $Builtin.Int16, [[IN3]] : $Builtin.Int32)
 // CHECK: return [[OUT]] : $(Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32)
 
-// CHECK-LABEL: sil [fragile] @_TTSf4n_d_gs_d_n__owned_struct_2_callee : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128) {
+// CHECK-LABEL: sil [fragile] @_TTSfq4n_d_gs_d_n__owned_struct_2_callee : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int256, [[IN2:%.*]] : $S4, [[IN3:%.*]] : $Builtin.Int16, [[IN4:%.*]] : $Builtin.Int32, [[IN5:%.*]] : $Builtin.Int128):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN3]] : $Builtin.Int16, [[IN4]] : $Builtin.Int32)
 // CHECK: [[STRUCT3:%.*]] = struct $S5 ([[IN2]] : $S4, [[STRUCT1]] : $S1)
@@ -652,7 +983,7 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: [[OUT]] : $(Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128)
 
 
-// CHECK-LABEL: sil [fragile] @_TTSf4n_s_s__ignore_ptrs_callee : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16) {
+// CHECK-LABEL: sil [fragile] @_TTSfq4n_s_s__ignore_ptrs_callee : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16) {
 // CHECK: bb0([[IN1:%.*]] : $*S1, [[IN2:%.*]] : $Builtin.Int16, [[IN3:%.*]] : $Builtin.Int16):
 // CHECK: [[STRUCT1:%.*]] = struct $S1 ([[IN3]] : $Builtin.Int16, undef : $Builtin.Int32)
 // CHECK: [[STRUCT2:%.*]] = struct $S1 ([[IN2]] : $Builtin.Int16, undef : $Builtin.Int32)
@@ -665,7 +996,7 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: [[OUT:%.*]] = tuple ([[IN2]] : $Builtin.Int16, [[IN3]] : $Builtin.Int16)
 // CHECK: return [[OUT]] : $(Builtin.Int16, Builtin.Int16)
 
-// CHECK-LABEL: sil [fragile] @_TTSf4s__check_out_of_order_uses_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> () {
+// CHECK-LABEL: sil [fragile] @_TTSfq4s__check_out_of_order_uses_callee : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> () {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int16, [[IN2:%.*]] : $Builtin.Int32):
 // CHECK: [[STRUCT0:%.*]] = struct $S1 ([[IN1]] : $Builtin.Int16, [[IN2]] : $Builtin.Int32) 
 // CHECK: debug_value [[STRUCT0]]
@@ -677,6 +1008,6 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: apply [[FN2]]([[IN1]]) : $@convention(thin) (Builtin.Int16) -> ()
 
 
-// CHECK-LABEL: sil [fragile] @_TTSf4g_n__class_callee_1 : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil [fragile] @_TTSfq4g_n__class_callee_1 : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0({{%.*}} : $C1, [[IN:%.*]] : $Builtin.Int32):
 // CHECK: return [[IN]] : $Builtin.Int32

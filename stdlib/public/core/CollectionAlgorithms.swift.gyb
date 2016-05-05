@@ -22,9 +22,18 @@ IElement = "Iterator.Element"
 // last
 //===----------------------------------------------------------------------===//
 
-extension Collection where Index : BidirectionalIndex {
+extension BidirectionalCollection {
+  /// The last element of the collection.
+  ///
+  /// If the collection is empty, the value of this property is `nil`.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     if let lastNumber = numbers.last {
+  ///         print(lastNumber)
+  ///     }
+  ///     // Prints "50"
   public var last: Iterator.Element? {
-    return isEmpty ? nil : self[endIndex.predecessor()]
+    return isEmpty ? nil : self[index(before: endIndex)]
   }
 }
 
@@ -33,55 +42,78 @@ extension Collection where Index : BidirectionalIndex {
 //===----------------------------------------------------------------------===//
 
 extension Collection where ${IElement} : Equatable {
-  /// Returns the first index where `value` appears in `self` or `nil` if
-  /// `value` is not found.
+  /// Returns the first index where the specified value appears in the
+  /// collection.
   ///
-  /// - Complexity: O(`self.count`).
+  /// After using `index(of:)` to find the position of a particular element in
+  /// a collection, you can use it to access the element by subscripting. This
+  /// example shows how you can modify one of the names in an array of
+  /// students.
+  ///
+  ///     var students = ["Ben", "Ivy", "Jordell", "Maxime"]
+  ///     if let i = students.index(of: "Maxime") {
+  ///         students[i] = "Max"
+  ///     }
+  ///     print(students)
+  ///     // Prints "["Ben", "Ivy", "Jordell", "Max"]"
+  ///
+  /// - Parameter element: An element to search for in the collection.
+  /// - Returns: The first index where `element` is found. If `element` is not
+  ///   found in the collection, returns `nil`.
+  ///
+  /// - SeeAlso: `index(where:)`
   @warn_unused_result
   public func index(of element: ${IElement}) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
       return result
     }
 
-    for i in self.indices {
+    var i = self.startIndex
+    while i != self.endIndex {
       if self[i] == element {
         return i
       }
+      self.formIndex(after: &i)
     }
     return nil
   }
 }
 
 extension Collection {
-  /// Returns the first index where `predicate` returns `true` for the
-  /// corresponding value, or `nil` if such value is not found.
+  /// Returns the first index in which an element of the collection satisfies
+  /// the given predicate.
   ///
-  /// - Complexity: O(`self.count`).
+  /// You can use the predicate to find an element of a type that doesn't
+  /// conform to the `Equatable` protocol or to find an element that matches
+  /// particular criteria. Here's an example that finds a student name that
+  /// begins with the letter "A":
+  ///
+  ///     let students = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
+  ///     if let i = students.index(where: { $0.hasPrefix("A") }) {
+  ///         print("\(students[i]) starts with 'A'!")
+  ///     }
+  ///     // Prints "Abena starts with 'A'!"
+  ///
+  /// - Parameter predicate: A closure that takes an element as its argument
+  ///   and returns a Boolean value that indicates whether the passed element
+  ///   represents a match.
+  /// - Returns: The index of the first element for which `predicate` returns
+  ///   `true`. If no elements in the collection satisfy the given predicate,
+  ///   returns `nil`.
+  ///
+  /// - SeeAlso: `index(of:)`
   @warn_unused_result
   public func index(
-    @noescape where predicate: (${IElement}) throws -> Bool
+    where predicate: @noescape (${IElement}) throws -> Bool
   ) rethrows -> Index? {
-    for i in self.indices {
+    var i = self.startIndex
+    while i != self.endIndex {
       if try predicate(self[i]) {
         return i
       }
+      self.formIndex(after: &i)
     }
     return nil
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// indices
-//===----------------------------------------------------------------------===//
-
-extension Collection {
-  /// Returns the range of valid index values.
-  ///
-  /// The result's `endIndex` is the same as that of `self`.  Because
-  /// `Range` is half-open, iterating the values of the result produces
-  /// all valid subscript arguments for `self`, omitting its `endIndex`.
-  public var indices: Range<Index> {
-    return Range(_start: startIndex, end: endIndex)
   }
 }
 
@@ -89,65 +121,144 @@ extension Collection {
 // MutableCollection
 //===----------------------------------------------------------------------===//
 
+%{
+
+orderingExplanation = """\
+  /// The predicate must be a *strict weak ordering* over the elements. That
+  /// is, for any elements `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `isOrderedBefore(a, a)` is always `false`. (Irreflexivity)
+  /// - If `isOrderedBefore(a, b)` and `isOrderedBefore(b, c)` are both `true`,
+  ///   then `isOrderedBefore(a, c)` is also `true`. (Transitive
+  ///   comparability)
+  /// - Two elements are *incomparable* if neither is ordered before the other
+  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
+  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
+  ///   (Transitive incomparability)
+  ///"""
+
+}%
+
 //===----------------------------------------------------------------------===//
 // partition()
 //===----------------------------------------------------------------------===//
 
-%{
-
-partitionDocComment = """\
-  /// Re-order the given `range` of elements in `self` and return
-  /// a pivot index *p*.
-  ///
-  /// - Postcondition: For all *i* in `range.startIndex..<`\ *p*, and *j*
-  ///   in *p*\ `..<range.endIndex`, `less(self[`\ *i*\ `],
-  ///   self[`\ *j*\ `]) && !less(self[`\ *j*\ `], self[`\ *p*\ `])`.
-  ///   Only returns `range.endIndex` when `self` is empty."""
-
-orderingRequirementForPredicate = """\
-  /// - Precondition: `isOrderedBefore` is a
-  ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
-  ///   over the elements in `self`."""
-
-orderingRequirementForComparable = """\
-  /// - Precondition: The less-than operator (`func <`) defined in
-  ///   the `Comparable` conformance is a
-  ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
-  ///   over the elements in `self`."""
-
-}%
-
 % # Generate two versions: with explicit predicates and with
 % # a Comparable requirement.
-% for preds in [ True, False ]:
+% for preds in [True, False]:
 
 %   if preds:
-extension MutableCollection where Index : RandomAccessIndex {
 
-${partitionDocComment}
-  ///
-${orderingRequirementForPredicate}
-  @warn_unused_result
-  public mutating func partition(
-    @noescape isOrderedBefore isOrderedBefore:
-      (${IElement}, ${IElement}) -> Bool
-  ) -> Index {
+extension MutableCollection where Self : RandomAccessCollection
 
 %   else:
 
 extension MutableCollection
-  where Index : RandomAccessIndex, ${IElement} : Comparable {
-
-${partitionDocComment}
-  ///
-${orderingRequirementForComparable}
-  @warn_unused_result
-  public mutating func partition() -> Index {
+  where Self : RandomAccessCollection, ${IElement} : Comparable
 
 %   end
+{
 
-    let maybeResult = _withUnsafeMutableBufferPointerIfSupported {
-      (baseAddress, count) -> Index in
+%   if preds:
+  /// Reorders the elements in the collection and returns a pivot index, using
+  /// the given predicate as the comparison between elements.
+  ///
+  /// This method is typically one step of a sorting algorithm. A collection is
+  /// partitioned around a pivot index when each of the elements before the
+  /// pivot is correctly ordered before each of the elements at or after the
+  /// pivot. The `partition(isOrderedBefore:)` method reorders the elements of
+  /// the collection and returns a pivot index that satisfies this condition,
+  /// using the given predicate to determine the relative order of any two
+  /// elements.
+  ///
+${orderingExplanation}
+  /// Here's an example that uses a predicate that orders elements from largest
+  /// to smallest:
+  ///
+  ///     var numbers = [50, 30, 60, 50, 80, 10, 40, 30]
+  ///     let pivot = numbers.partition { a, b in a > b }
+  ///
+  ///     print(pivot)
+  ///     // Prints "2"
+  ///     print(numbers)
+  ///     // Prints "[60, 80, 50, 50, 30, 10, 40, 30]"
+  ///
+  /// The return value of the call to `numbers.partition()` is the pivot for
+  /// the rearranged `numbers` array. `pivot` divides the collection into two
+  /// subranges, `numbers[0..<pivot]` and `numbers[pivot..<8]`.
+  ///
+  ///     print(numbers[0..<pivot])
+  ///     // Prints "[60, 80]"
+  ///     print(numbers[pivot..<8])
+  ///     // Prints "[50, 50, 30, 10, 40, 30]"
+  ///
+  /// The elements of `numbers` are rearranged so that every element in the
+  /// subrange before `pivot` is ordered before every element in the subrange
+  /// after. Because the supplied predicate returns `true` when its first
+  /// argument is greater than its second argument, larger elements are
+  /// ordered before smaller elements.
+  ///
+  /// - Parameter isOrderedBefore: A predicate that returns `true` if its first
+  ///   argument should be ordered before its second argument; otherwise,
+  ///   `false`.
+  /// - Returns: A pivot index, such that every element before the pivot is
+  ///   ordered before every element at or above the pivot, using
+  ///   `isOrderedBefore` to determine the relative order of any two elements.
+  ///   The returned pivot is equal to the collection's end index only if the
+  ///   collection is empty.
+  ///
+  /// - SeeAlso: `partition()`
+  @warn_unused_result
+  public mutating func partition(
+    isOrderedBefore: @noescape (${IElement}, ${IElement}) -> Bool
+  ) -> Index
+
+%   else:
+
+  /// Reorders the elements in the collection and returns a pivot index.
+  ///
+  /// This method is typically one step of a sorting algorithm. A collection is
+  /// partitioned around a pivot index when each of the elements before the
+  /// pivot are less than each of the elements at or after the pivot. The
+  /// `partition()` method reorders the elements of the collection and returns
+  /// a pivot index that satisfies this condition.
+  ///
+  /// For example:
+  ///
+  ///     var numbers = [50, 30, 60, 50, 80, 10, 40, 30]
+  ///     let pivot = numbers.partition()
+  ///
+  ///     print(pivot)
+  ///     // Prints "4"
+  ///     print(numbers)
+  ///     // Prints "[10, 30, 30, 40, 50, 80, 50, 60]"
+  ///
+  /// The return value of the call to `numbers.partition()` is the pivot for
+  /// the rearranged `numbers` array. `pivot` divides the collection into two
+  /// subranges, `numbers[0..<pivot]` and `numbers[pivot..<8]`.
+  ///
+  ///     print(numbers[0..<pivot])
+  ///     // Prints "[10, 30, 30, 40]"
+  ///     print(numbers[pivot..<8])
+  ///     // Prints "[50, 80, 50, 60]"
+  ///
+  /// The elements of `numbers` are rearranged so that every element in the
+  /// subrange before `pivot` is less than every element in the subrange
+  /// after.
+  ///
+  /// - Returns: A pivot index, such that every element before the pivot is
+  ///   less than every element at or above the pivot. The returned pivot is
+  ///   equal to the collection's end index only if the collection is empty.
+  ///
+  /// - SeeAlso: `partition(isOrderedBefore:)`
+  @warn_unused_result
+  public mutating func partition() -> Index
+
+%   end
+  {
+    let maybeOffset = _withUnsafeMutableBufferPointerIfSupported {
+      (baseAddress, count) -> Int in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
       let unsafeBufferPivot = bufferPointer.partition(
@@ -155,11 +266,10 @@ ${orderingRequirementForComparable}
         isOrderedBefore: isOrderedBefore
 %   end
         )
-      return startIndex.advanced(
-        by: numericCast(unsafeBufferPivot - bufferPointer.startIndex))
+      return unsafeBufferPivot - bufferPointer.startIndex
     }
-    if let result = maybeResult {
-      return result
+    if let offset = maybeOffset {
+      return index(startIndex, offsetBy: numericCast(offset))
     }
 
 %   if preds:
@@ -168,9 +278,11 @@ ${orderingRequirementForComparable}
     var escapableIsOrderedBefore =
       unsafeBitCast(isOrderedBefore, to: EscapingBinaryPredicate.self)
     return _partition(
-      &self, subRange: indices, isOrderedBefore: &escapableIsOrderedBefore)
+      &self,
+      subRange: startIndex..<endIndex,
+      isOrderedBefore: &escapableIsOrderedBefore)
 %   else:
-    return _partition(&self, subRange: indices)
+    return _partition(&self, subRange: startIndex..<endIndex)
 %   end
   }
 }
@@ -181,39 +293,39 @@ ${orderingRequirementForComparable}
 // sorted()
 //===----------------------------------------------------------------------===//
 
-%{
+% for Self in ['Sequence', 'MutableCollection']:
 
-sortedDocCommentForPredicate = """\
-  /// Returns an `Array` containing the sorted elements of `source`
-  /// according to `isOrderedBefore`."""
-
-sortedDocCommentForComparable = """\
-  /// Returns an `Array` containing the sorted elements of `source`."""
-
-sortDocCommentForPredicate = """\
-  /// Sort `self` in-place according to `isOrderedBefore`."""
-
-sortDocCommentForComparable = """\
-  /// Sort `self` in-place."""
-
-sortIsUnstableForPredicate = """\
-  /// The sorting algorithm is not stable (can change the relative order of
-  /// elements for which `isOrderedBefore` does not establish an order)."""
-
-sortIsUnstableForComparable = """\
-  /// The sorting algorithm is not stable (can change the relative order of
-  /// elements that compare equal)."""
-
-}%
-
-% for Self in [ 'Sequence', 'MutableCollection' ]:
+% sequenceKind = 'sequence' if 'Sequence' in Self else 'collection'
 
 extension ${Self} where Self.Iterator.Element : Comparable {
-${sortedDocCommentForComparable}
+  /// Returns the elements of the ${sequenceKind}, sorted.
   ///
-${sortIsUnstableForComparable}
+  /// You can sort any ${sequenceKind} of elements that conform to the
+  /// `Comparable` protocol by calling this method. Elements are sorted in
+  /// ascending order.
   ///
-${orderingRequirementForComparable}
+  /// The sorting algorithm is not stable. A nonstable sort may change the
+  /// relative order of elements that compare equal.
+  ///
+  /// Here's an example of sorting a list of students' names. Strings in Swift
+  /// conform to the `Comparable` protocol, so the names are sorted in
+  /// ascending order according to the less-than operator (`<`).
+  ///
+  ///     let students: Set = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
+  ///     let sortedStudents = students.sorted()
+  ///     print(sortedStudents)
+  ///     // Prints "["Abena", "Akosua", "Kofi", "Kweku", "Peter"]"
+  ///
+  /// To sort the elements of your ${sequenceKind} in descending order, pass the
+  /// greater-than operator (`>`) to the `sorted(isOrderedBefore:)` method.
+  ///
+  ///     let descendingStudents = students.sorted(isOrderedBefore: >)
+  ///     print(descendingStudents)
+  ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
+  ///
+  /// - Returns: A sorted array of the ${sequenceKind}'s elements.
+  ///
+  /// - SeeAlso: `sorted(isOrderedBefore:)`
   @warn_unused_result(${'mutable_variant: "sort"' if Self == 'MutableCollection' else ''})
   public func sorted() -> [Iterator.Element] {
     var result = ContiguousArray(self)
@@ -223,15 +335,75 @@ ${orderingRequirementForComparable}
 }
 
 extension ${Self} {
-${sortedDocCommentForPredicate}
+  /// Returns the elements of the ${sequenceKind}, sorted using the given
+  /// predicate as the comparison between elements.
   ///
-${sortIsUnstableForPredicate}
+  /// When you want to sort a ${sequenceKind} of elements that don't conform to
+  /// the `Comparable` protocol, pass a predicate to this method that returns
+  /// `true` when the first element passed should be ordered before the
+  /// second. The elements of the resulting array are ordered according to the
+  /// given predicate.
   ///
-${orderingRequirementForPredicate}
+${orderingExplanation}
+  /// The sorting algorithm is not stable. A nonstable sort may change the
+  /// relative order of elements for which `isOrderedBefore` does not
+  /// establish an order.
+  ///
+  /// In the following example, the predicate provides an ordering for an array
+  /// of a custom `HTTPResponse` type. The predicate orders errors before
+  /// successes and sorts the error responses by their error code.
+  ///
+  ///     enum HTTPResponse {
+  ///         case ok
+  ///         case error(Int)
+  ///     }
+  ///
+  ///     let responses: [HTTPResponse] = [.error(500), .ok, .ok, .error(404), .error(403)]
+  ///     let sortedResponses = responses.sorted {
+  ///         switch ($0, $1) {
+  ///         // Order errors by code
+  ///         case let (.error(aCode), .error(bCode)):
+  ///             return aCode < bCode
+  ///
+  ///         // All successes are equivalent, so none is before any other
+  ///         case (.ok, .ok): return false
+  ///
+  ///         // Order errors before successes
+  ///         case (.error, .ok): return true
+  ///         case (.ok, .error): return false
+  ///         }
+  ///     }
+  ///     print(sortedResponses)
+  ///     // Prints "[.error(403), .error(404), .error(500), .ok, .ok]"
+  ///
+  /// You also use this method to sort elements that conform to the
+  /// `Comparable` protocol in descending order. To sort your ${sequenceKind}
+  /// in descending order, pass the greater-than operator (`>`) as the
+  /// `isOrderedBefore` parameter.
+  ///
+  ///     let students: Set = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
+  ///     let descendingStudents = students.sorted(isOrderedBefore: >)
+  ///     print(descendingStudents)
+  ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
+  ///
+  /// Calling the related `sorted()` method is equivalent to calling this
+  /// method and passing the less-than operator (`<`) as the predicate.
+  ///
+  ///     print(students.sorted())
+  ///     // Prints "["Abena", "Akosua", "Kofi", "Kweku", "Peter"]"
+  ///     print(students.sorted(isOrderedBefore: <))
+  ///     // Prints "["Abena", "Akosua", "Kofi", "Kweku", "Peter"]"
+  ///
+  /// - Parameter isOrderedBefore: A predicate that returns `true` if its first
+  ///   argument should be ordered before its second argument; otherwise,
+  ///   `false`.
+  /// - Returns: A sorted array of the ${sequenceKind}'s elements.
+  ///
+  /// - SeeAlso: `sorted()`
   @warn_unused_result(${'mutable_variant: "sort"' if Self == 'MutableCollection' else ''})
   public func sorted(
-    @noescape isOrderedBefore isOrderedBefore:
-      (${IElement}, ${IElement}) -> Bool
+    isOrderedBefore:
+      @noescape (${IElement}, ${IElement}) -> Bool
   ) -> [Iterator.Element] {
     var result = ContiguousArray(self)
     result.sort(isOrderedBefore: isOrderedBefore)
@@ -243,14 +415,33 @@ ${orderingRequirementForPredicate}
 
 extension MutableCollection
   where
-  Self.Index : RandomAccessIndex,
+  Self : RandomAccessCollection,
   Self.Iterator.Element : Comparable {
 
-${sortDocCommentForComparable}
+  /// Sorts the collection in place.
   ///
-${sortIsUnstableForComparable}
+  /// You can sort any mutable collection of elements that conform to the
+  /// `Comparable` protocol by calling this method. Elements are sorted in
+  /// ascending order.
   ///
-${orderingRequirementForComparable}
+  /// The sorting algorithm is not stable. A nonstable sort may change the
+  /// relative order of elements that compare equal.
+  ///
+  /// Here's an example of sorting a list of students' names. Strings in Swift
+  /// conform to the `Comparable` protocol, so the names are sorted in
+  /// ascending order according to the less-than operator (`<`).
+  ///
+  ///     var students = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
+  ///     students.sort()
+  ///     print(students)
+  ///     // Prints "["Abena", "Akosua", "Kofi", "Kweku", "Peter"]"
+  ///
+  /// To sort the elements of your collection in descending order, pass the
+  /// greater-than operator (`>`) to the `sort(isOrderedBefore:)` method.
+  ///
+  ///     students.sort(isOrderedBefore: >)
+  ///     print(students)
+  ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
   public mutating func sort() {
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
@@ -261,20 +452,69 @@ ${orderingRequirementForComparable}
       return ()
     }
     if didSortUnsafeBuffer == nil {
-      _introSort(&self, subRange: self.indices)
+      _introSort(&self, subRange: startIndex..<endIndex)
     }
   }
 }
 
-extension MutableCollection where Self.Index : RandomAccessIndex {
-${sortDocCommentForPredicate}
+extension MutableCollection where Self : RandomAccessCollection {
+  /// Sorts the collection in place, using the given predicate as the
+  /// comparison between elements.
   ///
-${sortIsUnstableForPredicate}
+  /// When you want to sort a collection of elements that doesn't conform to
+  /// the `Comparable` protocol, pass a closure to this method that returns
+  /// `true` when the first element passed should be ordered before the
+  /// second.
   ///
-${orderingRequirementForPredicate}
+${orderingExplanation}
+  /// The sorting algorithm is not stable. A nonstable sort may change the
+  /// relative order of elements for which `isOrderedBefore` does not
+  /// establish an order.
+  ///
+  /// In the following example, the closure provides an ordering for an array
+  /// of a custom enumeration that describes an HTTP response. The predicate
+  /// orders errors before successes and sorts the error responses by their
+  /// error code.
+  ///
+  ///     enum HTTPResponse {
+  ///         case ok
+  ///         case error(Int)
+  ///     }
+  ///
+  ///     var responses: [HTTPResponse] = [.error(500), .ok, .ok, .error(404), .error(403)]
+  ///     responses.sort {
+  ///         switch ($0, $1) {
+  ///         // Order errors by code
+  ///         case let (.error(aCode), .error(bCode)):
+  ///             return aCode < bCode
+  ///
+  ///         // All successes are equivalent, so none is before any other
+  ///         case (.ok, .ok): return false
+  ///
+  ///         // Order errors before successes
+  ///         case (.error, .ok): return true
+  ///         case (.ok, .error): return false
+  ///         }
+  ///     }
+  ///     print(responses)
+  ///     // Prints "[.error(403), .error(404), .error(500), .ok, .ok]"
+  ///
+  /// Alternatively, use this method to sort a collection of elements that do
+  /// conform to `Comparable` when you want the sort to be descending instead
+  /// of ascending. Pass the greater-than operator (`>`) operator as the
+  /// predicate.
+  ///
+  ///     var students = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
+  ///     students.sort(isOrderedBefore: >)
+  ///     print(students)
+  ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
+  ///
+  /// - Parameter isOrderedBefore: A predicate that returns `true` if its first
+  ///   argument should be ordered before its second argument; otherwise,
+  ///   `false`.
   public mutating func sort(
-    @noescape isOrderedBefore isOrderedBefore:
-      (${IElement}, ${IElement}) -> Bool
+    isOrderedBefore:
+      @noescape (${IElement}, ${IElement}) -> Bool
   ) {
     typealias EscapingBinaryPredicate =
       (Iterator.Element, Iterator.Element) -> Bool
@@ -292,74 +532,154 @@ ${orderingRequirementForPredicate}
     if didSortUnsafeBuffer == nil {
       _introSort(
         &self,
-        subRange: self.indices,
+        subRange: startIndex..<endIndex,
         isOrderedBefore: escapableIsOrderedBefore)
     }
   }
 }
 
-extension MutableCollection
-  where Index : RandomAccessIndex {
+% for Self in 'Indexable', 'MutableIndexable':
+%{
+
+subscriptCommentPre = """\
+  /// Accesses a contiguous subrange of the collection's elements.
+  ///
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original collection. Always use the slice's `startIndex` property
+  /// instead of assuming that its indices start at a particular value.
+  ///
+  /// This example demonstrates getting a slice of an array of strings, finding
+  /// the index of one of the strings in the slice, and then using that index
+  /// in the original array.
+  ///
+  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     let streetsSlice = streets[2 ..< streets.endIndex]
+  ///     print(streetsSlice)
+  ///     // Prints "["Channing", "Douglas", "Evarts"]"
+  ///
+  ///     let index = streetsSlice.index(of: "Evarts")    // 4"""
+
+if 'Mutable' in Self:
+  subscriptCommentMid = """\
+  ///     streets[index!] = "Eustace"
+  ///     print(streets[index!])
+  ///     // Prints "Eustace\""""
+else:
+  subscriptCommentMid = """\
+  ///     print(streets[index!])
+  ///     // Prints "Evarts\""""
+
+subscriptCommentPost = """\
+  ///
+  /// - Parameter bounds: A range of the collection's indices. The bounds of
+  ///   the range must be valid indices of the collection."""
+}%
+// WORKAROUND rdar://25214066 - should be on Collection
+extension ${Self} {
+${subscriptCommentPre}
+${subscriptCommentMid}
+${subscriptCommentPost}
+  public subscript(bounds: ClosedRange<Index>) -> SubSequence {
+    get {
+      return self[
+        Range(
+          uncheckedBounds: (
+            lower: bounds.lowerBound,
+            upper: index(after: bounds.upperBound)))
+      ]
+    }
+%   if 'Mutable' in Self:
+    set {
+      self[
+        Range(
+          uncheckedBounds: (
+            lower: bounds.lowerBound,
+            upper: index(after: bounds.upperBound)))
+      ] = newValue
+    }
+%   end
+  }
+}
+
+// WORKAROUND rdar://25214066 - should be on Collection
+extension ${Self} where Index : Strideable, Index.Stride : SignedInteger {
+${subscriptCommentPre}
+${subscriptCommentMid}
+${subscriptCommentPost}
+  public subscript(bounds: CountableRange<Index>) -> SubSequence {
+    get {
+      return self[Range(bounds)]
+    }
+%   if 'Mutable' in Self:
+    set {
+      self[Range(bounds)] = newValue
+    }
+%   end
+  }
+  
+${subscriptCommentPre}
+${subscriptCommentMid}
+${subscriptCommentPost}
+  public subscript(bounds: CountableClosedRange<Index>) -> SubSequence {
+    get {
+      return self[ClosedRange(bounds)]
+    }
+%   if 'Mutable' in Self:
+    set {
+      self[ClosedRange(bounds)] = newValue
+    }
+%   end
+  }
+}
+% end
+
+//===--- Unavailable stuff ------------------------------------------------===//
+    
+extension MutableCollection where Self : RandomAccessCollection {
 
   @available(*, unavailable, message: "slice the collection using the range, and call partition(isOrderedBefore:)")
   public mutating func partition(
-    range: Range<Index>,
+    _ range: Range<Index>,
     isOrderedBefore: (${IElement}, ${IElement}) -> Bool
   ) -> Index {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
 extension MutableCollection
-  where Index : RandomAccessIndex, ${IElement} : Comparable {
+  where Self : RandomAccessCollection, ${IElement} : Comparable {
 
   @available(*, unavailable, message: "slice the collection using the range, and call partition()")
-  public mutating func partition(range: Range<Index>) -> Index {
-    fatalError("unavailable function can't be called")
+  public mutating func partition(_ range: Range<Index>) -> Index {
+    Builtin.unreachable()
   }
 }
-
-% for Self in [ 'Sequence', 'MutableCollection' ]:
-extension ${Self} where Self.Iterator.Element : Comparable {
-  @available(*, unavailable, renamed: "sorted")
-  public func sort() -> [Iterator.Element] {
-    fatalError("unavailable function can't be called")
-  }
-
-  @available(*, unavailable, renamed: "sorted(isOrderedBefore:)")
-  public func sort(
-    @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
-  ) -> [Iterator.Element] {
-    fatalError("unavailable function can't be called")
-  }
-}
-%end
 
 extension MutableCollection
   where
-  Self.Index : RandomAccessIndex,
+  Self : RandomAccessCollection,
   Self.Iterator.Element : Comparable {
 
   @available(*, unavailable, renamed: "sort")
   public mutating func sortInPlace() {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
-extension MutableCollection where Self.Index : RandomAccessIndex {
+extension MutableCollection where Self : RandomAccessCollection {
   @available(*, unavailable, renamed: "sort(isOrderedBefore:)")
   public mutating func sortInPlace(
-    @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
+    _ isOrderedBefore: @noescape (Iterator.Element, Iterator.Element) -> Bool
   ) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
 extension Collection where ${IElement} : Equatable {
   @available(*, unavailable, renamed: "index(of:)")
   @warn_unused_result
-  public func indexOf(element: ${IElement}) -> Index? {
-    fatalError("unavailable function can't be called")
+  public func indexOf(_ element: ${IElement}) -> Index? {
+    Builtin.unreachable()
   }
 }
 
@@ -367,8 +687,8 @@ extension Collection {
   @available(*, unavailable, renamed: "index(where:)")
   @warn_unused_result
   public func indexOf(
-    @noescape predicate: (${IElement}) throws -> Bool
+    _ predicate: @noescape (${IElement}) throws -> Bool
   ) rethrows -> Index? {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

@@ -123,6 +123,8 @@ class CompletionBuilder {
   CompletionSink &sink;
   SwiftResult &current;
   bool modified = false;
+  bool isNotRecommended;
+  Completion::NotRecommendedReason notRecommendedReason;
   SemanticContextKind semanticContext;
   CodeCompletionString *completionString;
   llvm::SmallVector<char, 64> originalName;
@@ -143,6 +145,13 @@ public:
   void setModuleImportDepth(Optional<uint8_t> value) {
     assert(!value || *value <= Completion::maxModuleImportDepth);
     moduleImportDepth = value;
+  }
+
+  void setNotRecommended(Completion::NotRecommendedReason Reason) {
+    modified = true;
+    notRecommendedReason = Reason;
+    if (Reason != Completion::NoReason)
+      isNotRecommended = true;
   }
 
   void setSemanticContext(SemanticContextKind kind) {

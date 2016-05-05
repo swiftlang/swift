@@ -37,7 +37,7 @@ struct Number {
   var title : Int
 }
 
-func testPrintableCoercion(ip1: IsPrintable1,
+func testPrintableCoercion(_ ip1: IsPrintable1,
                            ip2: IsPrintable2,
                            inp1: IsNotPrintable1,
                            inp2: IsNotPrintable2,
@@ -51,7 +51,7 @@ func testPrintableCoercion(ip1: IsPrintable1,
   _ = p
 }
 
-func testTitledCoercion(ip1: IsPrintable1, book: Book, lackey: Lackey,
+func testTitledCoercion(_ ip1: IsPrintable1, book: Book, lackey: Lackey,
                         number: Number, ip2: IsPrintable2) {
   var t : Titled = ip1 // okay
   t = ip1
@@ -83,7 +83,7 @@ struct NotFormattedPrintable1 {
   func print(_: TestFormat) { }
 }
 
-func testFormattedPrintableCoercion(ip1: IsPrintable1,
+func testFormattedPrintableCoercion(_ ip1: IsPrintable1,
                                     ip2: IsPrintable2,
                                     fp: inout FormattedPrintable,
                                     p: inout MyPrintable,
@@ -100,20 +100,20 @@ func testFormattedPrintableCoercion(ip1: IsPrintable1,
 protocol Document : Titled, MyPrintable {
 }
 
-func testMethodsAndVars(fp: FormattedPrintable, f: TestFormat, doc: inout Document) {
+func testMethodsAndVars(_ fp: FormattedPrintable, f: TestFormat, doc: inout Document) {
   fp.print(f)
   fp.print()
   doc.title = "Gone with the Wind"
   doc.print()
 }
 
-func testDocumentCoercion(doc: inout Document, ip1: IsPrintable1, l: Lackey) {
+func testDocumentCoercion(_ doc: inout Document, ip1: IsPrintable1, l: Lackey) {
   doc = ip1
   doc = l // expected-error{{value of type 'Lackey' does not conform to 'Document' in assignment}}
 }
 
 // Check coercion of references.
-func refCoercion(p: inout MyPrintable) { }
+func refCoercion(_ p: inout MyPrintable) { }
 var p : MyPrintable = IsPrintable1()
 var fp : FormattedPrintable = IsPrintable1()
 var ip1 : IsPrintable1
@@ -161,7 +161,7 @@ extension String : MyREPLPrintable {
   func myReplPrint() {}
 }
 
-func doREPLPrint(p: MyREPLPrintable) {
+func doREPLPrint(_ p: MyREPLPrintable) {
   p.myReplPrint()
 }
 

@@ -7,15 +7,15 @@ protocol FooProtocol {
   var fooInstanceVar: Int { get }
   typealias FooTypeAlias1
   func fooInstanceFunc0() -> Double
-  func fooInstanceFunc1(a: Int) -> Double
+  func fooInstanceFunc1(_ a: Int) -> Double
   subscript(i: Int) -> Double { get }
 }
 
-func test1(a: FooProtocol) {
+func test1(_ a: FooProtocol) {
   a.
 }
 
-func testOptional1(a: FooProtocol?) {
+func testOptional1(_ a: FooProtocol?) {
   a.
 }
 
@@ -23,7 +23,7 @@ class C {
   @available(*, unavailable) func unavail() {}
 }
 
-func test_unavail(a: C) {
+func test_unavail(_ a: C) {
   a.
 }
 

@@ -21,7 +21,7 @@ struct GenericMetatype<T> {
 // CHECK:         [[META:%.*]] = load [[ADDR]] : $*@thick T.Type
 // CHECK:         return [[META]] : $@thick T.Type
 // CHECK:       }
-func genericMetatypeFromGeneric<T>(x: Generic<T.Type>) -> T.Type {
+func genericMetatypeFromGeneric<T>(_ x: Generic<T.Type>) -> T.Type {
   var x = x
   return x.value
 }
@@ -30,7 +30,7 @@ func genericMetatypeFromGeneric<T>(x: Generic<T.Type>) -> T.Type {
 // CHECK:         [[META:%.*]] = load [[ADDR]] : $*@thick C.Type
 // CHECK:         return [[META]] : $@thick C.Type
 // CHECK:       }
-func dynamicMetatypeFromGeneric(x: Generic<C.Type>) -> C.Type {
+func dynamicMetatypeFromGeneric(_ x: Generic<C.Type>) -> C.Type {
   var x = x
   return x.value
 }
@@ -38,7 +38,7 @@ func dynamicMetatypeFromGeneric(x: Generic<C.Type>) -> C.Type {
 // CHECK:         [[META:%.*]] = metatype $@thin S.Type
 // CHECK:         return [[META]] : $@thin S.Type
 // CHECK:       }
-func staticMetatypeFromGeneric(x: Generic<S.Type>) -> S.Type {
+func staticMetatypeFromGeneric(_ x: Generic<S.Type>) -> S.Type {
   return x.value
 }
 
@@ -47,7 +47,7 @@ func staticMetatypeFromGeneric(x: Generic<S.Type>) -> S.Type {
 // CHECK:         [[META:%.*]] = load [[ADDR]] : $*@thick T.Type
 // CHECK:         return [[META]] : $@thick T.Type
 // CHECK:       }
-func genericMetatypeFromGenericMetatype<T>(x: GenericMetatype<T>)-> T.Type {
+func genericMetatypeFromGenericMetatype<T>(_ x: GenericMetatype<T>)-> T.Type {
   var x = x
   return x.value
 }
@@ -58,32 +58,32 @@ func genericMetatypeFromGenericMetatype<T>(x: GenericMetatype<T>)-> T.Type {
 // CHECK:         [[META:%.*]] = load [[ADDR]] : $*@thick C.Type
 // CHECK:         return [[META]] : $@thick C.Type
 // CHECK:       }
-func dynamicMetatypeFromGenericMetatype(x: GenericMetatype<C>) -> C.Type {
+func dynamicMetatypeFromGenericMetatype(_ x: GenericMetatype<C>) -> C.Type {
   var x = x
   return x.value
 }
 
-func takeGeneric<T>(x: T) {}
-func takeGenericMetatype<T>(x: T.Type) {}
+func takeGeneric<T>(_ x: T) {}
+func takeGenericMetatype<T>(_ x: T.Type) {}
 
 // CHECK-LABEL: sil hidden @_TFs23staticMetatypeToGeneric
 // CHECK:         [[MAT:%.*]] = alloc_stack $@thick S.Type
 // CHECK:         [[META:%.*]] = metatype $@thick S.Type
 // CHECK:         store [[META]] to [[MAT]] : $*@thick S.Type
 // CHECK:         apply {{%.*}}<S.Type>([[MAT]])
-func staticMetatypeToGeneric(x: S.Type) {
+func staticMetatypeToGeneric(_ x: S.Type) {
   takeGeneric(x)
 }
 // CHECK-LABEL: sil hidden @_TFs31staticMetatypeToGenericMetatype
 // CHECK:         [[META:%.*]] = metatype $@thick S.Type
 // CHECK:         apply {{%.*}}<S>([[META]])
-func staticMetatypeToGenericMetatype(x: S.Type) {
+func staticMetatypeToGenericMetatype(_ x: S.Type) {
   takeGenericMetatype(x)
 }
 // CHECK-LABEL: sil hidden @_TFs24dynamicMetatypeToGeneric
 // CHECK:         [[MAT:%.*]] = alloc_stack $@thick C.Type
 // CHECK:         apply {{%.*}}<C.Type>([[MAT]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-func dynamicMetatypeToGeneric(x: C.Type) {
+func dynamicMetatypeToGeneric(_ x: C.Type) {
   var x = x
   takeGeneric(x)
 }
@@ -92,48 +92,48 @@ func dynamicMetatypeToGeneric(x: C.Type) {
 // CHECK:         [[PX:%[0-9]+]] = project_box [[XBOX]]
 // CHECK:         [[META:%.*]] = load [[PX]] : $*@thick C.Type
 // CHECK:         apply {{%.*}}<C>([[META]]) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> ()
-func dynamicMetatypeToGenericMetatype(x: C.Type) {
+func dynamicMetatypeToGenericMetatype(_ x: C.Type) {
   var x = x
   takeGenericMetatype(x)
 }
 // CHECK-LABEL: sil hidden @_TFs24genericMetatypeToGeneric
 // CHECK:         [[MAT:%.*]] = alloc_stack $@thick U.Type
 // CHECK:         apply {{%.*}}<U.Type>([[MAT]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-func genericMetatypeToGeneric<U>(x: U.Type) {
+func genericMetatypeToGeneric<U>(_ x: U.Type) {
   var x = x
   takeGeneric(x)
 }
-func genericMetatypeToGenericMetatype<U>(x: U.Type) {
+func genericMetatypeToGenericMetatype<U>(_ x: U.Type) {
   takeGenericMetatype(x)
 }
 
 // CHECK-LABEL: sil hidden @_TFs27static_metatype_of_metatypeFVs1SMMS_
 // CHECK:         metatype $@thin S.Type.Type
-func static_metatype_of_metatype(x: S) -> S.Type.Type {
+func static_metatype_of_metatype(_ x: S) -> S.Type.Type {
   return x.dynamicType.dynamicType
 }
 
 // CHECK-LABEL: sil hidden @_TFs26class_metatype_of_metatypeFCs1CMMS_
 // CHECK:         [[METATYPE:%.*]] = value_metatype $@thick C.Type
 // CHECK:         [[META_METATYPE:%.*]] = value_metatype $@thick C.Type.Type, [[METATYPE]]
-func class_metatype_of_metatype(x: C) -> C.Type.Type {
+func class_metatype_of_metatype(_ x: C) -> C.Type.Type {
   return x.dynamicType.dynamicType
 }
 
 // CHECK-LABEL: sil hidden @_TFs28generic_metatype_of_metatype
 // CHECK:         [[METATYPE:%.*]] = value_metatype $@thick T.Type
 // CHECK:         [[META_METATYPE:%.*]] = value_metatype $@thick T.Type.Type, [[METATYPE]]
-func generic_metatype_of_metatype<T>(x: T) -> T.Type.Type {
+func generic_metatype_of_metatype<T>(_ x: T) -> T.Type.Type {
   return x.dynamicType.dynamicType
 }
 
 // FIXME rdar://problem/18419772
 /*
-func existential_metatype_of_metatype(x: protocol<>) -> protocol<>.Type.Type {
+func existential_metatype_of_metatype(_ x: protocol<>) -> protocol<>.Type.Type {
   return x.dynamicType.dynamicType
 }
  */
 
-func function_metatype_of_metatype(x: () -> ()) -> (() -> ()).Type.Type {
+func function_metatype_of_metatype(_ x: () -> ()) -> (() -> ()).Type.Type {
   return x.dynamicType.dynamicType
 }

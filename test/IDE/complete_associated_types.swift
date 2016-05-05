@@ -209,7 +209,7 @@ func testStruct3(a: StructWithAssociatedTypes) {
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .BarBaseDeducedTypeC[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .BarBaseDeducedTypeD[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DefaultedTypeCommonB[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-FIXME-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDefaultedTypeB[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDefaultedTypeB[#Double#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DeducedTypeCommonB[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooDefaultedType[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooDeducedTypeB[#Int#]{{; name=.+$}}
@@ -220,7 +220,7 @@ func testStruct3(a: StructWithAssociatedTypes) {
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDeducedTypeB[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDeducedTypeC[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDeducedTypeD[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal: .FooBaseDefaultedTypeC[#Double#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDefaultedTypeC[#Double#]{{; name=.+$}}
 // STRUCT_TYPES: End completions
 
 class DerivedFromClassWithAssociatedTypes : ClassWithAssociatedTypes {
@@ -234,30 +234,30 @@ class MoreDerivedFromClassWithAssociatedTypes : DerivedFromClassWithAssociatedTy
   }
 }
 // ASSOCIATED_TYPES_UNQUAL: Begin completions
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: DefaultedTypeCommonA[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: DefaultedTypeCommonD[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: DeducedTypeCommonA[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: DeducedTypeCommonD[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: BarDefaultedTypeA[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: BarDeducedTypeD[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: DefaultedTypeCommonC[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: DeducedTypeCommonC[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: BarBaseDefaultedType[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: BarBaseDeducedTypeC[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: BarBaseDeducedTypeD[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: DefaultedTypeCommonB[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG-FIXME: Decl[AssociatedType]/Super: FooBaseDefaultedTypeB[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: DeducedTypeCommonB[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: FooDefaultedType[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: FooDeducedTypeB[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: FooDeducedTypeC[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: FooDeducedTypeD[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: FooBaseDefaultedTypeA[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: FooBaseDefaultedTypeB[#Double#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: FooBaseDeducedTypeA[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: FooBaseDeducedTypeB[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: FooBaseDeducedTypeC[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[AssociatedType]/Super: FooBaseDeducedTypeD[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: DefaultedTypeCommonA[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: DefaultedTypeCommonD[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: DeducedTypeCommonA[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: DeducedTypeCommonD[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: BarDefaultedTypeA[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: BarDeducedTypeD[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: DefaultedTypeCommonC[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: DeducedTypeCommonC[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: BarBaseDefaultedType[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: BarBaseDeducedTypeC[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: BarBaseDeducedTypeD[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: DefaultedTypeCommonB[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDefaultedTypeB[#Double#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: DeducedTypeCommonB[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooDefaultedType[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooDeducedTypeB[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooDeducedTypeC[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooDeducedTypeD[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDefaultedTypeA[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDefaultedTypeB[#Double#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDeducedTypeA[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDeducedTypeB[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDeducedTypeC[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDeducedTypeD[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL: End completions
 
 struct StructWithBrokenConformance : FooProtocolWithAssociatedTypes {
@@ -266,7 +266,7 @@ struct StructWithBrokenConformance : FooProtocolWithAssociatedTypes {
 func testBrokenConformances1() {
   StructWithBrokenConformance.#^BROKEN_CONFORMANCE_1^#
 }
-// BROKEN_CONFORMANCE_1: Begin completions, 53 items
+// BROKEN_CONFORMANCE_1: Begin completions, 34 items
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonA[#DefaultedTypeCommonA#]; name=DefaultedTypeCommonA
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonB[#DefaultedTypeCommonB#]; name=DefaultedTypeCommonB
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDefaultedTypeB[#FooBaseDefaultedTypeB#]; name=FooBaseDefaultedTypeB

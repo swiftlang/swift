@@ -503,6 +503,11 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
       // content nodes.
       if (DestReachable) {
         DestFrom = defer(DestFrom, DestReachable, Changed);
+      } else if (SourceReachable->getEscapeState() >= EscapeState::Global) {
+        // If we don't have a mapped node in the destination graph we still have
+        // to honor its escaping state. We do that simply by setting the source
+        // node of the defer-edge to escaping.
+        Changed |= DestFrom->mergeEscapeState(EscapeState::Global);
       }
 
       for (auto *Deferred : SourceReachable->defersTo) {
@@ -1171,6 +1176,36 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         break;
       default:
         break;
+    }
+
+    if (FAS.getReferencedFunction() &&
+        FAS.getReferencedFunction()->hasSemanticsAttr(
+            "self_no_escaping_closure") &&
+        ((FAS.hasIndirectResults() && FAS.getNumArguments() == 3) ||
+         (!FAS.hasIndirectResults() && FAS.getNumArguments() == 2)) &&
+        FAS.hasSelfArgument()) {
+      // The programmer has guaranteed that the closure will not capture the
+      // self pointer passed to it or anything that is transitively reachable
+      // from the pointer.
+      auto Args = FAS.getArgumentsWithoutIndirectResults();
+      // The first not indirect result argument is the closure.
+      setEscapesGlobal(ConGraph, Args[0]);
+      return;
+    }
+
+    if (FAS.getReferencedFunction() &&
+        FAS.getReferencedFunction()->hasSemanticsAttr(
+            "pair_no_escaping_closure") &&
+        ((FAS.hasIndirectResults() && FAS.getNumArguments() == 4) ||
+         (!FAS.hasIndirectResults() && FAS.getNumArguments() == 3)) &&
+        FAS.hasSelfArgument()) {
+      // The programmer has guaranteed that the closure will not capture the
+      // self pointer passed to it or anything that is transitively reachable
+      // from the pointer.
+      auto Args = FAS.getArgumentsWithoutIndirectResults();
+      // The second not indirect result argument is the closure.
+      setEscapesGlobal(ConGraph, Args[1]);
+      return;
     }
 
     if (RecursionDepth < MaxRecursionDepth) {

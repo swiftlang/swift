@@ -9,7 +9,7 @@
 
 import def_func
 
-func useEq<T: EqualOperator>(x: T, y: T) -> Bool {
+func useEq<T: EqualOperator>(_ x: T, y: T) -> Bool {
   return x == y
 }
 

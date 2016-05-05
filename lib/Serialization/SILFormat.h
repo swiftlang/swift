@@ -91,8 +91,10 @@ namespace sil_index_block {
     SIL_VTABLE_OFFSETS,
     SIL_GLOBALVAR_NAMES,
     SIL_GLOBALVAR_OFFSETS,
-    SIL_WITNESSTABLE_NAMES,
-    SIL_WITNESSTABLE_OFFSETS
+    SIL_WITNESS_TABLE_NAMES,
+    SIL_WITNESS_TABLE_OFFSETS,
+    SIL_DEFAULT_WITNESS_TABLE_NAMES,
+    SIL_DEFAULT_WITNESS_TABLE_OFFSETS
   };
 
   using ListLayout = BCGenericRecordLayout<
@@ -114,7 +116,8 @@ namespace sil_block {
   // These IDs must \em not be renumbered or reordered without incrementing
   // VERSION_MAJOR.
   enum RecordKind : uint8_t {
-    SIL_FUNCTION = 1,
+    // To avoid overlapping with BOUND_GENERIC_SUBSTITUTION, we start from +1.
+    SIL_FUNCTION = decls_block::BOUND_GENERIC_SUBSTITUTION + 1,
     SIL_BASIC_BLOCK,
     SIL_ONE_VALUE_ONE_OPERAND,
     SIL_ONE_TYPE,
@@ -129,15 +132,17 @@ namespace sil_block {
     SIL_GLOBALVAR,
     SIL_INST_CAST, // It has a cast kind instead of an attribute.
     SIL_INIT_EXISTENTIAL,
-    SIL_WITNESSTABLE,
+    SIL_WITNESS_TABLE,
     SIL_WITNESS_METHOD_ENTRY,
-    // To avoid overlapping with BOUND_GENERIC_SUBSTITUTION, we start from +1.
-    // FIXME: another option is to start SIL_FUNCTION at a large number.
-    SIL_WITNESS_BASE_ENTRY = decls_block::BOUND_GENERIC_SUBSTITUTION + 1,
+    SIL_WITNESS_BASE_ENTRY,
     SIL_WITNESS_ASSOC_PROTOCOL,
     SIL_WITNESS_ASSOC_ENTRY,
+    SIL_DEFAULT_WITNESS_TABLE,
+    SIL_DEFAULT_WITNESS_TABLE_ENTRY,
+    SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
     SIL_GENERIC_OUTER_PARAMS,
     SIL_INST_WITNESS_METHOD,
+    SIL_SPECIALIZE_ATTR,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -171,7 +176,7 @@ namespace sil_block {
   >;
 
   using WitnessTableLayout = BCRecordLayout<
-    SIL_WITNESSTABLE,
+    SIL_WITNESS_TABLE,
     SILLinkageField,     // Linkage
     BCFixed<1>,          // Is this a declaration. We represent this separately
                          // from whether or not we have entries since we can
@@ -206,6 +211,23 @@ namespace sil_block {
     TypeIDField
   >;
 
+  using DefaultWitnessTableLayout = BCRecordLayout<
+    SIL_DEFAULT_WITNESS_TABLE,
+    DeclIDField,  // ID of ProtocolDecl
+    SILLinkageField  // Linkage
+    // Default witness table entries will be serialized after.
+  >;
+
+  using DefaultWitnessTableEntryLayout = BCRecordLayout<
+    SIL_DEFAULT_WITNESS_TABLE_ENTRY,
+    DeclIDField,  // SILFunction name
+    BCArray<ValueIDField> // SILDeclRef
+  >;
+
+  using DefaultWitnessTableNoEntryLayout = BCRecordLayout<
+    SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY
+  >;
+
   using GlobalVarLayout = BCRecordLayout<
     SIL_GLOBALVAR,
     SILLinkageField,
@@ -224,9 +246,17 @@ namespace sil_block {
                      BCFixed<1>, // global_init
                      BCFixed<2>, // inlineStrategy
                      BCFixed<2>, // side effect info.
+                     BCFixed<2>, // number of specialize attributes
                      TypeIDField,
                      BCArray<IdentifierIDField> // Semantics Attribute
+                     // followed by specialize attributes
                      // followed by generic param list, if any
+                     >;
+
+  using SILSpecializeAttrLayout =
+      BCRecordLayout<SIL_SPECIALIZE_ATTR,
+                     BCFixed<5> // number of substitutions
+                     // followed by bound generic substitutions
                      >;
 
   // Has an optional argument list where each argument is a typed valueref.

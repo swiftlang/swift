@@ -10,5 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-extern "C" void *swift_stdlib_getPointer(void *x) { return x; }
+#include "swift/Runtime/Config.h"
+
+SWIFT_CC(swift)
+extern "C"
+void *swift_stdlib_getPointer(void *x) { return x; }
 

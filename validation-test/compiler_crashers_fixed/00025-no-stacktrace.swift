@@ -17,6 +17,6 @@ protocol A {
     func b(_: B)
 }
 struct X<Y> : A {
-    func b(b: X.Type) {
+    func b(_ b: X.Type) {
     }
 }

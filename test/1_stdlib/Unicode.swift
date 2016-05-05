@@ -15,13 +15,6 @@
 import Swift
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var UnicodeInternals = TestSuite("UnicodeInternals")
 
@@ -31,11 +24,11 @@ UnicodeInternals.test("copy") {
 
   u16.withUnsafeMutableBufferPointer {
     (u16) -> () in
-    let p16 = u16.baseAddress
+    let p16 = u16.baseAddress!
 
     u8.withUnsafeMutableBufferPointer {
       (u8) -> () in
-      let p8 = u8.baseAddress
+      let p8 = u8.baseAddress!
 
       UTF16._copy(source: p8, destination: p16, count: 3)
       expectEqual([ 0, 1, 2, 9, 10, 11 ], Array(u16))

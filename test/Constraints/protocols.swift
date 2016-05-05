@@ -13,7 +13,7 @@ extension Float32 : Barable {
 }
 
 func f0(_: Barable) {}
-func f1(x: protocol<Fooable, Barable>) {}
+func f1(_ x: protocol<Fooable, Barable>) {}
 func f2(_: Float) {}
 let nilFunc: Optional<(Barable) -> ()> = nil
 
@@ -67,7 +67,7 @@ func getAnyObject() -> AnyObject? {
   return SomeArbitraryClass()
 }
 
-func castToClass(object: Any) -> SomeArbitraryClass? {
+func castToClass(_ object: Any) -> SomeArbitraryClass? {
   return object as? SomeArbitraryClass
 }
 
@@ -106,7 +106,7 @@ protocol Clonable {
   func goodClonerFn() -> (() -> Self)
 }
 
-func testClonable(v : Clonable) { // expected-error {{protocol 'Clonable' can only be used as a generic constraint because it has Self or associated type requirements}}
+func testClonable(_ v : Clonable) { // expected-error {{protocol 'Clonable' can only be used as a generic constraint because it has Self or associated type requirements}}
   let v2 = v.maybeClone()
   let v3 = v.doubleMaybeClone()
   let v4 = v.subdivideClone()

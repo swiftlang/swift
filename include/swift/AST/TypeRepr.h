@@ -151,6 +151,7 @@ public:
   }
 
   const TypeAttributes &getAttrs() const { return Attrs; }
+  void setAttrs(const TypeAttributes &attrs) { Attrs = attrs; }
   TypeRepr *getTypeRepr() const { return Ty; }
 
   void printAttrs(llvm::raw_ostream &OS) const;

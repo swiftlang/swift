@@ -3,10 +3,10 @@
 struct MyMetatypeIsThin {}
 
 // CHECK-LABEL: sil hidden @_TF17reabstract_lvalue19consumeGenericInOut{{.*}} : $@convention(thin) <T> (@inout T) -> ()
-func consumeGenericInOut<T>(x: inout T) {}
+func consumeGenericInOut<T>(_ x: inout T) {}
 
 // CHECK-LABEL: sil hidden @_TF17reabstract_lvalue9transformFSiSd : $@convention(thin) (Int) -> Double
-func transform(i: Int) -> Double {
+func transform(_ i: Int) -> Double {
   return Double(i)
 }
 

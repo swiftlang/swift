@@ -24,10 +24,11 @@ using llvm::coverage::CounterExpression;
 
 SILCoverageMap *
 SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
-                       uint64_t Hash, ArrayRef<MappedRegion> MappedRegions,
+                       bool External, uint64_t Hash,
+                       ArrayRef<MappedRegion> MappedRegions,
                        ArrayRef<CounterExpression> Expressions) {
   void *Buf = M.allocate(sizeof(SILCoverageMap), alignof(SILCoverageMap));
-  SILCoverageMap *CM = ::new (Buf) SILCoverageMap(Hash);
+  SILCoverageMap *CM = ::new (Buf) SILCoverageMap(Hash, External);
 
   // Store a copy of the name so that we own the lifetime.
   char *AllocatedName = (char *)M.allocate(Filename.size(), alignof(char));
@@ -56,7 +57,8 @@ SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
   return CM;
 }
 
-SILCoverageMap::SILCoverageMap(uint64_t Hash) : Hash(Hash) {}
+SILCoverageMap::SILCoverageMap(uint64_t Hash, bool External)
+    : External(External), Hash(Hash) {}
 
 SILCoverageMap::~SILCoverageMap() {}
 

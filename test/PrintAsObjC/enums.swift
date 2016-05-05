@@ -5,7 +5,7 @@
 // RUN: FileCheck %s < %t/enums.h
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t/enums.h
 // RUN: %check-in-clang %t/enums.h
-// RUN: %check-in-clang -fno-modules %t/enums.h -include Foundation.h -include ctypes.h -include CoreFoundation.h
+// RUN: %check-in-clang -fno-modules -Qunused-arguments %t/enums.h -include Foundation.h -include ctypes.h -include CoreFoundation.h
 
 // REQUIRES: objc_interop
 
@@ -23,11 +23,11 @@ import Foundation
 // CHECK-NEXT: - (enum ObjcEnumNamed)takeAndReturnRenamedEnum:(enum ObjcEnumNamed)foo;
 // CHECK: @end
 @objc class AnEnumMethod {
-  @objc func takeAndReturnEnum(foo: FooComments) -> NegativeValues {
+  @objc func takeAndReturnEnum(_ foo: FooComments) -> NegativeValues {
     return .Zung
   }
   @objc func acceptPlainEnum(_: NSMalformedEnumMissingTypedef) {}
-  @objc func takeAndReturnRenamedEnum(foo: EnumNamed) -> EnumNamed {
+  @objc func takeAndReturnRenamedEnum(_ foo: EnumNamed) -> EnumNamed {
     return .A
   }
 }
@@ -69,16 +69,21 @@ import Foundation
   func methodNotExportedToObjC() {}
 }
 
-// CHECK-LABEL: /// Foo: A feer, a female feer.
+// CHECK: /**
+// CHECK-NEXT: Foo: A feer, a female feer.
+// CHECK-NEXT: */
+
 // CHECK-NEXT: typedef SWIFT_ENUM(NSInteger, FooComments) {
-// CHECK:   /// Zim: A zeer, a female zeer.
+// CHECK: /**
+// CHECK-NEXT: Zim: A zeer, a female zeer.
+// CHECK: */
 // CHECK-NEXT:   FooCommentsZim = 0,
 // CHECK-NEXT:   FooCommentsZang = 1,
 // CHECK-NEXT:   FooCommentsZung = 2,
 // CHECK-NEXT: };
 
 /// Foo: A feer, a female feer.
-@objc enum FooComments: Int {
+@objc public enum FooComments: Int {
   /// Zim: A zeer, a female zeer.
   case Zim
   case Zang, Zung
@@ -125,7 +130,7 @@ import Foundation
 // CHECK-NEXT: - (enum NegativeValues)takeAndReturnEnum:(enum FooComments)foo;
 // CHECK: @end
 @objc class ZEnumMethod {
-  @objc func takeAndReturnEnum(foo: FooComments) -> NegativeValues {
+  @objc func takeAndReturnEnum(_ foo: FooComments) -> NegativeValues {
     return .Zung
   }
 }

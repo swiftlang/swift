@@ -17,11 +17,11 @@ func freeFunc3(w w: Int...)(x x: Int...) { }
 
 class C {
   init(x: Int...) { }
-  func method1(x x: Int...) { }
-  func method2(x x: Int, y: Int...) { }
-  func method3(w w: Int...)(x x: Int...) { }
-  func method4(`do` `do` : Int...) {}
-  func method5(`class` : Int...) {}
+  func method1(x: Int...) { }
+  func method2(x: Int, y: Int...) { }
+  func method3(w: Int...)(x x: Int...) { }
+  func method4(`do` : Int...) {}
+  func method5(_ `class` : Int...) {}
   func method6(`class` `protocol`: Int...) {}
   func method7(`inout` value: Int...) {}
   subscript(i: Int...) -> Int { return 0 }

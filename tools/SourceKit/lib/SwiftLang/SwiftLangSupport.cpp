@@ -18,11 +18,12 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Fallthrough.h"
+#include "swift/Config.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
-#include "swift/Config.h"
 
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
@@ -36,6 +37,11 @@
 using namespace SourceKit;
 using namespace swift;
 using namespace swift::ide;
+using swift::index::SymbolKind;
+using swift::index::SymbolSubKind;
+using swift::index::SymbolSubKindSet;
+using swift::index::SymbolRole;
+using swift::index::SymbolRoleSet;
 
 static UIdent KindDeclFunctionFree("source.lang.swift.decl.function.free");
 static UIdent KindRefFunctionFree("source.lang.swift.ref.function.free");
@@ -155,7 +161,7 @@ namespace {
 
 class UIdentVisitor : public ASTVisitor<UIdentVisitor,
                                         UIdent, UIdent, UIdent, UIdent > {
-  bool IsRef;
+  const bool IsRef;
 
 public:
   explicit UIdentVisitor(bool IsRef) : IsRef(IsRef) { }
@@ -167,9 +173,6 @@ public:
   UIdent visitVarDecl(const VarDecl *D);
   UIdent visitParamDecl(const ParamDecl *D);
   UIdent visitExtensionDecl(const ExtensionDecl *D);
-  UIdent visitAssociatedTypeDecl(const AssociatedTypeDecl *D) {
-    return IsRef ? KindRefAssociatedType : KindDeclAssociatedType;
-  }
 
 #define UID_FOR(CLASS) \
   UIdent visit##CLASS##Decl(const CLASS##Decl *) { \
@@ -181,6 +184,7 @@ public:
   UID_FOR(EnumElement)
   UID_FOR(Protocol)
   UID_FOR(TypeAlias)
+  UID_FOR(AssociatedType)
   UID_FOR(GenericTypeParam)
   UID_FOR(Constructor)
   UID_FOR(Destructor)
@@ -197,8 +201,8 @@ UIdent UIdentVisitor::visitFuncDecl(const FuncDecl *D) {
                                                IsRef);
   }
 
-  if (D->isOperator()) {
-    switch (D->getOperatorDecl()->getKind()) {
+  if (auto *Op = D->getOperatorDecl()) {
+    switch (Op->getKind()) {
     case DeclKind::PrefixOperator:
       return IsRef ? KindRefFunctionPrefixOperator : KindDeclFunctionPrefixOperator;
     case DeclKind::PostfixOperator:
@@ -275,6 +279,21 @@ SwiftLangSupport::~SwiftLangSupport() {
 
 UIdent SwiftLangSupport::getUIDForDecl(const Decl *D, bool IsRef) {
   return UIdentVisitor(IsRef).visit(const_cast<Decl*>(D));
+}
+
+UIdent SwiftLangSupport::getUIDForExtensionOfDecl(const Decl *D) {
+  switch (D->getKind()) {
+    case swift::DeclKind::Struct:
+      return KindDeclExtensionStruct;
+    case swift::DeclKind::Enum:
+      return KindDeclExtensionEnum;
+    case swift::DeclKind::Class:
+      return KindDeclExtensionClass;
+    case swift::DeclKind::Protocol:
+      return KindDeclExtensionProtocol;
+    default:
+      llvm_unreachable("cannot have extension.");
+  }
 }
 
 UIdent SwiftLangSupport::getUIDForLocalVar(bool IsRef) {
@@ -502,6 +521,90 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureElementKind(
     case SyntaxStructureElementKind::Pattern: return KindStructureElemPattern;
     case SyntaxStructureElementKind::TypeRef: return KindStructureElemTypeRef;
   }
+}
+
+UIdent SwiftLangSupport::getUIDForSymbol(SymbolKind kind, SymbolSubKindSet subKinds,
+                                         bool isRef) {
+
+#define UID_FOR(CLASS) isRef ? KindRef##CLASS : KindDecl##CLASS;
+
+#define SIMPLE_CASE(KIND) \
+  case SymbolKind::KIND: \
+    return UID_FOR(KIND);
+
+  switch (kind) {
+  SIMPLE_CASE(Enum)
+  SIMPLE_CASE(Struct)
+  SIMPLE_CASE(Class)
+  SIMPLE_CASE(Protocol)
+  SIMPLE_CASE(TypeAlias)
+  SIMPLE_CASE(AssociatedType)
+  SIMPLE_CASE(GenericTypeParam)
+  SIMPLE_CASE(Subscript)
+  SIMPLE_CASE(EnumElement)
+  SIMPLE_CASE(Constructor)
+  SIMPLE_CASE(Destructor)
+
+  case SymbolKind::Function:
+    return UID_FOR(FunctionFree);
+  case SymbolKind::PrefixOperator:
+    return UID_FOR(FunctionPrefixOperator);
+  case SymbolKind::PostfixOperator:
+    return UID_FOR(FunctionPostfixOperator);
+  case SymbolKind::InfixOperator:
+    return UID_FOR(FunctionInfixOperator);
+  case SymbolKind::Variable:
+    return UID_FOR(VarGlobal);
+  case SymbolKind::InstanceMethod:
+    return UID_FOR(MethodInstance);
+  case SymbolKind::ClassMethod:
+    return UID_FOR(MethodClass);
+  case SymbolKind::StaticMethod:
+    return UID_FOR(MethodStatic);
+  case SymbolKind::InstanceProperty:
+    return UID_FOR(VarInstance);
+  case SymbolKind::ClassProperty:
+    return UID_FOR(VarClass);
+  case SymbolKind::StaticProperty:
+    return UID_FOR(VarStatic);
+
+  case SymbolKind::Extension:
+    assert(!isRef && "reference to extension decl?");
+    SWIFT_FALLTHROUGH;
+  case SymbolKind::Accessor:
+    if (subKinds & SymbolSubKind::AccessorGetter) {
+      return UID_FOR(AccessorGetter);
+    } else if (subKinds & SymbolSubKind::AccessorSetter) {
+      return UID_FOR(AccessorSetter);
+    } else if (subKinds & SymbolSubKind::AccessorWillSet) {
+      return UID_FOR(AccessorWillSet);
+    } else if (subKinds & SymbolSubKind::AccessorDidSet) {
+      return UID_FOR(AccessorDidSet);
+    } else if (subKinds & SymbolSubKind::AccessorAddressor) {
+      return UID_FOR(AccessorAddress);
+    } else if (subKinds & SymbolSubKind::AccessorMutableAddressor) {
+      return UID_FOR(AccessorMutableAddress);
+
+    } else if (subKinds & SymbolSubKind::ExtensionOfStruct) {
+      return KindDeclExtensionStruct;
+    } else if (subKinds & SymbolSubKind::ExtensionOfClass) {
+      return KindDeclExtensionClass;
+    } else if (subKinds & SymbolSubKind::ExtensionOfEnum) {
+      return KindDeclExtensionEnum;
+    } else if (subKinds & SymbolSubKind::ExtensionOfProtocol) {
+      return KindDeclExtensionProtocol;
+
+    } else {
+      llvm_unreachable("missing sub kind");
+    }
+
+  default:
+    // TODO: reconsider whether having a default case is a good idea.
+    return UIdent();
+  }
+
+#undef SIMPLE_CASE
+#undef UID_FOR
 }
 
 bool SwiftLangSupport::printDisplayName(const swift::ValueDecl *D,

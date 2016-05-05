@@ -30,7 +30,7 @@ To read the documentation, start by installing the
 More recent versions are currently **not supported.**
 
 Once complete, you can build the Swift documentation by changing directory into
-`docs` and typing `make`. This compiles the `.rst` files in the `docs` directory
+[docs](https://github.com/apple/swift/tree/master/docs) and typing `make`. This compiles the `.rst` files in the [docs](https://github.com/apple/swift/tree/master/docs) directory
 into HTML in the `docs/_build/html` directory.
 
 Many of the docs are out of date, but you can see some historical design
@@ -90,7 +90,7 @@ uploading SSH keys to GitHub):
 [CMake](http://cmake.org) is the core infrastructure used to configure builds of
 Swift and its companion projects; at least version 2.8.12.2 is required. Your
 favorite Linux distribution likely already has a CMake package you can install.
-On OS X, you can download the [CMake Binary Distribution](https://cmake.org/install),
+On OS X, you can download the [CMake Binary Distribution](https://cmake.org/download),
 bundled as an application, copy it to `/Applications`, and add the embedded
 command line tools to your `PATH`:
 
@@ -115,7 +115,7 @@ it next to the other projects and it will be bootstrapped automatically:
     git checkout release
     cat README
 
-#### Install via third-party packaging tool (OSX only)
+#### Install via third-party packaging tool (OS X only)
 
 **[Homebrew](http://brew.sh/)**
 
@@ -139,28 +139,20 @@ To find out more:
 Note: Arguments after "--" above are forwarded to `build-script-impl`, which is
 the ultimate shell script that invokes the actual build and test commands.
 
-A basic command to build Swift and run basic tests with Ninja:
+A basic command to build Swift with optimizations and run basic tests with
+Ninja:
 
-    utils/build-script -t
+    utils/build-script -r -t
 
 ## Developing Swift in Xcode
 
+`build-script` can also generate Xcode projects:
+
+    utils/build-script -x
+
 The Xcode IDE can be used to edit the Swift source code, but it is not currently
-fully supported as a build environment for SDKs other than OS X. If you'd like
-to build for other SDKs but still use Xcode, once you've built Swift using Ninja
-or one of the other supported CMake generators, you can set up an IDE-only Xcode
-environment using the build-script's `-X` flag:
-
-    utils/build-script -X --skip-build -- --reconfigure
-
-The `--skip-build` flag tells `build-script` to only generate the project,
-not build it in its entirety. A bare minimum of LLVM tools will build in order
-to configure the Xcode projects.
-
-The `--reconfigure` flag tells `build-script-impl` to run the CMake configuration
-step even if there is a cached configuration. As you develop in Xcode, you may
-need to rerun this from time to time to refresh your generated Xcode project,
-picking up new targets, file removals, or file additions.
+fully supported as a build environment for SDKs other than OS X. If you need to
+work with other SDKs, you'll need to create a second build using Ninja.
 
 ## Testing Swift
 
@@ -170,7 +162,7 @@ See [docs/Testing.rst](docs/Testing.rst).
 
 Contributions to Swift are welcomed and encouraged! Please see the [Contributing to Swift guide](https://swift.org/contributing/).
 
-To be a truly great community, Swift.org needs to welcome developers from all
+To be a truly great community, [Swift.org](https://swift.org/) needs to welcome developers from all
 walks of life, with different backgrounds, and with a wide range of experience.
 A diverse and friendly community will have more great ideas, more unique
 perspectives, and produce more great code. We will work diligently to make the
@@ -179,4 +171,4 @@ Swift community welcoming to everyone.
 To give clarity of what is expected of our members, Swift has adopted the
 code of conduct defined by the Contributor Covenant. This document is used
 across many open source communities, and we think it articulates our values
-well. For more, see [the website](https://swift.org/community/#code-of-conduct).
+well. For more, see the [Code of Conduct](https://swift.org/community/#code-of-conduct).

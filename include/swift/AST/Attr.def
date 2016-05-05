@@ -31,8 +31,10 @@
 #endif
 
 // Type attributes
+TYPE_ATTR(autoclosure)
 TYPE_ATTR(convention)
 TYPE_ATTR(noreturn)
+TYPE_ATTR(noescape)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -46,7 +48,6 @@ TYPE_ATTR(in)
 TYPE_ATTR(inout)
 TYPE_ATTR(inout_aliasable)
 TYPE_ATTR(in_guaranteed)
-TYPE_ATTR(noescape)
 TYPE_ATTR(owned)
 TYPE_ATTR(unowned_inner_pointer)
 TYPE_ATTR(guaranteed)
@@ -57,8 +58,7 @@ TYPE_ATTR(objc_metatype)
 TYPE_ATTR(opened)
 TYPE_ATTR(deallocating)
 
-// Deprecated type attributes
-TYPE_ATTR(objc_block)
+// SIL metatype attributes.
 TYPE_ATTR(thin)
 TYPE_ATTR(thick)
 
@@ -164,6 +164,10 @@ SIMPLE_DECL_ATTR(nonobjc, NonObjC,
 SIMPLE_DECL_ATTR(_fixed_layout, FixedLayout,
                  OnVar | OnClass | OnStruct | OnEnum | UserInaccessible, 31)
 
+DECL_ATTR(_specialize, Specialize,
+          OnConstructor | OnFunc | AllowMultipleAttributes | LongAttribute
+          | UserInaccessible, 32)
+
 // Non-serialized attributes.
 
 SIMPLE_DECL_ATTR(mutating, Mutating, OnFunc | DeclModifier | NotSerialized,
@@ -199,13 +203,12 @@ DECL_ATTR(__raw_doc_comment, RawDocComment, OnAnyDecl |
           NotSerialized | RejectByParser, /* Not serialized */48)
 
 // Also handles unowned and unowned(weak).
-DECL_ATTR(weak,    Ownership, OnVar | OnParam | DeclModifier | NotSerialized,
+DECL_ATTR(weak, Ownership, OnVar | OnParam | DeclModifier | NotSerialized,
           /* Not serialized */49)
+DECL_ATTR_ALIAS(unowned, Ownership)
 
 DECL_ATTR(effects, Effects, OnFunc | OnConstructor | OnDestructor |
           UserInaccessible, 50)
-
-DECL_ATTR_ALIAS(unowned, Ownership)
 
 DECL_ATTR(__objc_bridged, ObjCBridged, OnClass | NotSerialized | RejectByParser,
           /* Not serialized */51)
@@ -248,6 +251,16 @@ SIMPLE_DECL_ATTR(_show_in_interface, ShowInInterface,
 DECL_ATTR(_cdecl, CDecl,
           OnFunc | LongAttribute | UserInaccessible, 63)
 
+// A testing attribute for Library Evolution ("resilience").
+// FIXME: Replace with improved @available attribute.
+SIMPLE_DECL_ATTR(_versioned, Versioned,
+                 OnFunc | OnVar | OnSubscript | OnConstructor |
+                 OnStruct | OnEnum | OnClass | OnProtocol |
+                 LongAttribute | UserInaccessible,
+                 64)
+
+SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,
+                 OnFunc | OnConstructor | LongAttribute, 65)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

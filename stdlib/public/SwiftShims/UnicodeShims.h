@@ -17,7 +17,12 @@
 #ifndef SWIFT_STDLIB_SHIMS_UNICODESHIMS_H_
 #define SWIFT_STDLIB_SHIMS_UNICODESHIMS_H_
 
+#include "SwiftStdint.h"
 #include "Visibility.h"
+
+#ifdef __cplusplus
+namespace swift { extern "C" {
+#endif
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern const __swift_uint8_t *_swift_stdlib_GraphemeClusterBreakPropertyTrie;
@@ -90,5 +95,8 @@ __swift_int32_t _swift_stdlib_unicode_strToLower(
   __swift_uint16_t *Destination, __swift_int32_t DestinationCapacity,
   const __swift_uint16_t *Source, __swift_int32_t SourceLength);
 
+#ifdef __cplusplus
+}} // extern "C", namespace swift
+#endif
 
 #endif

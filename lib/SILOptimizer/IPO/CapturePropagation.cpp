@@ -65,11 +65,12 @@ static bool isConstant(SILValue V) {
   return V && isOptimizableConstant(V);
 }
 
-static std::string getClonedName(PartialApplyInst *PAI, SILFunction *F) {
+static std::string getClonedName(PartialApplyInst *PAI, IsFragile_t Fragile,
+                                 SILFunction *F) {
 
   Mangle::Mangler M;
   auto P = SpecializationPass::CapturePropagation;
-  FunctionSignatureSpecializationMangler Mangler(P, M, F);
+  FunctionSignatureSpecializationMangler Mangler(P, M, Fragile, F);
 
   // We know that all arguments are literal insts.
   auto Args = PAI->getArguments();
@@ -214,11 +215,16 @@ void CapturePropagationCloner::cloneBlocks(
 /// function body.
 SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
                                                         SILFunction *OrigF) {
-  std::string Name = getClonedName(PAI, OrigF);
+  IsFragile_t Fragile = IsNotFragile;
+  if (PAI->getFunction()->isFragile() && OrigF->isFragile())
+    Fragile = IsFragile;
+
+  std::string Name = getClonedName(PAI, Fragile, OrigF);
 
   // See if we already have a version of this function in the module. If so,
   // just return it.
   if (auto *NewF = OrigF->getModule().lookUpFunction(Name)) {
+    assert(NewF->isFragile() == Fragile);
     DEBUG(llvm::dbgs()
               << "  Found an already specialized version of the callee: ";
           NewF->printName(llvm::dbgs()); llvm::dbgs() << "\n");
@@ -231,10 +237,10 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   CanSILFunctionType NewFTy =
     Lowering::adjustFunctionType(PAI->getType().castTo<SILFunctionType>(),
                                  SILFunctionType::Representation::Thin);
-  SILFunction *NewF = getModule()->getOrCreateFunction(
+  SILFunction *NewF = getModule()->createFunction(
       SILLinkage::Shared, Name, NewFTy,
       /*contextGenericParams*/ nullptr, OrigF->getLocation(), OrigF->isBare(),
-      OrigF->isTransparent(), OrigF->isFragile(), OrigF->isThunk(),
+      OrigF->isTransparent(), Fragile, OrigF->isThunk(),
       OrigF->getClassVisibility(), OrigF->getInlineStrategy(),
       OrigF->getEffectsKind(),
       /*InsertBefore*/ OrigF, OrigF->getDebugScope(), OrigF->getDeclContext());

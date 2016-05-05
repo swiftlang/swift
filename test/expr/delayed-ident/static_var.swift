@@ -6,7 +6,7 @@ struct X1 {
   static var NotAnX1 = 42
 }
 
-func acceptInOutX1(x1: inout X1) { }
+func acceptInOutX1(_ x1: inout X1) { }
 
 var x1: X1 = .AnX1
 x1 = .AnX1

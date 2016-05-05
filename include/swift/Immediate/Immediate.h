@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IMMEDIATE_H
-#define SWIFT_IMMEDIATE_H
+#ifndef SWIFT_IMMEDIATE_IMMEDIATE_H
+#define SWIFT_IMMEDIATE_IMMEDIATE_H
 
 #include <string>
 #include <vector>
@@ -43,5 +43,4 @@ namespace swift {
                bool ParseStdlib);
 }  // end namespace swift
 
-#endif
-
+#endif // SWIFT_IMMEDIATE_IMMEDIATE_H

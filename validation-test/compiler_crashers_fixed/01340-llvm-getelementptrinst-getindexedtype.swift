@@ -20,7 +20,7 @@ class X {
     }
 }
 class Y {
-    func c(any: Any?) -> [String]? {
+    func c(_ any: Any?) -> [String]? {
         return []
     }
 }

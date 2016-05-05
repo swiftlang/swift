@@ -1,5 +1,5 @@
 
-func fooHelperSubFunc1(a: Int32) -> Int32
+func fooHelperSubFunc1(_ a: Int32) -> Int32
 struct FooHelperSubEnum1 : RawRepresentable, Equatable {
   init(_ rawValue: UInt32)
   init(rawValue: UInt32)

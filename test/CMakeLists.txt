@@ -41,7 +41,7 @@ function(get_test_dependencies SDK result_var_name)
 
   set(deps_binaries
       swift swift-ide-test sil-opt swift-llvm-opt swift-demangle sil-extract
-      lldb-moduleimport-test swift-reflection-test)
+      lldb-moduleimport-test swift-reflection-dump swift-remoteast-test)
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries llc)
   endif()
@@ -58,7 +58,8 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "WATCHOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "LINUX") OR
      ("${SDK}" STREQUAL "CYGWIN") OR
-     ("${SDK}" STREQUAL "FREEBSD"))
+     ("${SDK}" STREQUAL "FREEBSD") OR
+     ("${SDK}" STREQUAL "ANDROID"))
     # No extra dependencies.
   else()
     message(FATAL_ERROR "Unknown SDK: ${SDK}")
@@ -116,53 +117,109 @@ if(PYTHONINTERP_FOUND)
     set(SWIFT_ASAN_BUILD TRUE)
   endif()
 
-  set(TEST_MODES optimize_none optimize optimize_unchecked executable non_executable)
+  # Normalize spelling of boolean values.
+  normalize_boolean_spelling(LLVM_ENABLE_ASSERTIONS)
+  normalize_boolean_spelling(SWIFT_STDLIB_ASSERTIONS)
+  normalize_boolean_spelling(SWIFT_AST_VERIFIER)
+  normalize_boolean_spelling(SWIFT_ASAN_BUILD)
+  is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
+
+  if(SWIFT_ANALYZE_CODE_COVERAGE STREQUAL "MERGED")
+    set(profdata_merge_worker
+        "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge/main.py")
+    set(command_profdata_merge_start
+      COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}"
+          -l "${swift_test_results_dir}/profdata_merge.log"
+          start
+          -o "${swift_test_results_dir}")
+    set(command_profdata_merge_stop
+      COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}" stop)
+  else()
+    set(command_profdata_merge_start)
+    set(command_profdata_merge_stop)
+  endif()
+
+  set(TEST_MODES
+      optimize_none optimize optimize_unchecked
+      only_executable only_non_executable
+  )
+  set(TEST_SUBSETS
+      primary
+      validation
+      all
+      only_validation
+      only_long
+  )
 
   foreach(SDK ${SWIFT_SDKS})
     foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
-      foreach(TEST_MODE ${TEST_MODES})
-        # Configure variables for this subdirectory.
-        set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
-        set(VARIANT_TRIPLE "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_TRIPLE}")
-        set(VARIANT_SDK "${SWIFT_SDK_${SDK}_PATH}")
-        is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
+      # Configure variables for this subdirectory.
+      set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
+      set(VARIANT_TRIPLE "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_TRIPLE}")
+      set(VARIANT_SDK "${SWIFT_SDK_${SDK}_PATH}")
 
-        # Normalize spelling of boolean values.
-        normalize_boolean_spelling(LLVM_ENABLE_ASSERTIONS)
-        normalize_boolean_spelling(SWIFT_STDLIB_ASSERTIONS)
-        normalize_boolean_spelling(SWIFT_AST_VERIFIER)
-        normalize_boolean_spelling(SWIFT_ASAN_BUILD)
+      # A directory where to put the xUnit-style XML test results.
+      set(swift_test_results_dir
+          "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
 
-        # A directory where to put the xUnit-style XML test results.
-        set(swift_test_results_dir
-            "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+      set(command_clean_test_results_dir
+          COMMAND "${CMAKE_COMMAND}" -E remove_directory "${swift_test_results_dir}"
+          COMMAND "${CMAKE_COMMAND}" -E make_directory "${swift_test_results_dir}")
 
-        set(command_clean_test_results_dir
-            COMMAND "${CMAKE_COMMAND}" -E remove_directory "${swift_test_results_dir}"
-            COMMAND "${CMAKE_COMMAND}" -E make_directory "${swift_test_results_dir}")
+      set(test_bin_dir "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}")
+      set(validation_test_bin_dir
+          "${CMAKE_CURRENT_BINARY_DIR}/../validation-test${VARIANT_SUFFIX}")
 
+      swift_configure_lit_site_cfg(
+          "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
+          "${test_bin_dir}/lit.site.cfg"
+          "test${VARIANT_SUFFIX}.lit.site.cfg")
+
+      swift_configure_lit_site_cfg(
+          "${CMAKE_CURRENT_SOURCE_DIR}/Unit/lit.site.cfg.in"
+          "${test_bin_dir}/Unit/lit.site.cfg"
+          "")
+
+      swift_configure_lit_site_cfg(
+          "${CMAKE_CURRENT_SOURCE_DIR}/../validation-test/lit.site.cfg.in"
+          "${validation_test_bin_dir}/lit.site.cfg"
+          "validation-test${VARIANT_SUFFIX}.lit.site.cfg")
+
+      set(test_dependencies)
+      get_test_dependencies("${SDK}" test_dependencies)
+      list(APPEND test_dependencies
+          "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+
+      if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
+        list(APPEND test_dependencies
+            "swift-reflection-test${VARIANT_SUFFIX}")
+      endif()
+
+      set(validation_test_dependencies
+          "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+
+      foreach(test_mode ${TEST_MODES})
         set(LIT_ARGS "${SWIFT_TEST_EXTRA_ARGS} ${LLVM_LIT_ARGS}")
         separate_arguments(LIT_ARGS)
 
+        if(test_mode STREQUAL "optimize_none")
+          # No special arguments required.
+        elseif(test_mode STREQUAL "optimize")
+          list(APPEND LIT_ARGS "--param" "run_only_tests=executable_tests")
+        elseif(test_mode STREQUAL "optimize_unchecked")
+          list(APPEND LIT_ARGS "--param" "run_only_tests=executable_tests")
+        elseif(test_mode STREQUAL "only_executable")
+          list(APPEND LIT_ARGS "--param" "run_only_tests=executable_tests")
+        elseif(test_mode STREQUAL "only_non_executable")
+          list(APPEND LIT_ARGS "--param" "run_only_tests=non_executable_tests")
+        else()
+          message(FATAL_ERROR "Unknown test mode: ${test_mode}")
+        endif()
+
         set(test_mode_target_suffix "")
-        if(NOT TEST_MODE STREQUAL "optimize_none")
-          if(TEST_MODE STREQUAL "optimize")
-            set(test_mode_target_suffix "-optimize")
-            list(APPEND LIT_ARGS "--param" "run_only_tests=executable_tests")
-          endif()
-          if(TEST_MODE STREQUAL "optimize_unchecked")
-            set(test_mode_target_suffix "-optimize-unchecked")
-            list(APPEND LIT_ARGS "--param" "run_only_tests=executable_tests")
-          endif()
-          if(TEST_MODE STREQUAL "executable")
-            set(test_mode_target_suffix "-executable")
-            list(APPEND LIT_ARGS "--param" "run_only_tests=executable_tests")
-          endif()
-          if(TEST_MODE STREQUAL "non_executable")
-            set(test_mode_target_suffix "-non-executable")
-            list(APPEND LIT_ARGS "--param" "run_only_tests=non_executable_tests")
-          endif()
-          list(APPEND LIT_ARGS "--param" "swift_test_mode=${TEST_MODE}")
+        if(NOT test_mode STREQUAL "optimize_none")
+          list(APPEND LIT_ARGS "--param" "swift_test_mode=${test_mode}")
+          set(test_mode_target_suffix "-${test_mode}")
         endif()
 
         if(NOT SWIFT_BUILD_STDLIB)
@@ -172,118 +229,78 @@ if(PYTHONINTERP_FOUND)
 
         list(APPEND LIT_ARGS "--xunit-xml-output=${swift_test_results_dir}/lit-tests.xml")
 
-        set(lit_command ${PYTHON_EXECUTABLE} "${LIT}" ${LIT_ARGS})
-
         set(command_upload_stdlib)
         if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS")
           # These are supported testing SDKs.
         endif()
 
-        set(test_dependencies)
-        get_test_dependencies("${SDK}" test_dependencies)
-        list(APPEND test_dependencies
-            "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+        foreach(test_subset ${TEST_SUBSETS})
+          set(want_this_combination TRUE)
+          if(test_subset STREQUAL "only_long")
+            # Long tests are only run in 'optimize_none' mode.
+            if(NOT test_mode STREQUAL "optimize_none")
+              set(want_this_combination FALSE)
+            endif()
 
-        set(validation_test_dependencies
-            "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+            list(APPEND LIT_ARGS "--param" "run_only_tests=long_tests")
+          endif()
+          if(test_subset STREQUAL "all")
+            list(APPEND LIT_ARGS "--param" "run_only_tests=all")
+          endif()
 
-        set(test_bin_dir "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}")
-        set(validation_test_bin_dir
-            "${CMAKE_CURRENT_BINARY_DIR}/../validation-test${VARIANT_SUFFIX}")
+          set(directories)
+          set(dependencies ${test_dependencies})
 
-        swift_configure_lit_site_cfg(
-            "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
-            "${test_bin_dir}/lit.site.cfg"
-            "test${VARIANT_SUFFIX}.lit.site.cfg")
+          if((test_subset STREQUAL "primary") OR
+             (test_subset STREQUAL "validation") OR
+             (test_subset STREQUAL "only_long") OR
+             (test_subset STREQUAL "all"))
+            list(APPEND directories "${test_bin_dir}")
+          endif()
+          if((test_subset STREQUAL "validation") OR
+             (test_subset STREQUAL "only_validation") OR
+             (test_subset STREQUAL "only_long") OR
+             (test_subset STREQUAL "all"))
+            list(APPEND directories "${validation_test_bin_dir}")
+            list(APPEND dependencies ${validation_test_dependencies})
+          endif()
 
-        swift_configure_lit_site_cfg(
-            "${CMAKE_CURRENT_SOURCE_DIR}/Unit/lit.site.cfg.in"
-            "${test_bin_dir}/Unit/lit.site.cfg"
-            "")
+          set(test_subset_target_suffix "-${test_subset}")
+          if(test_subset STREQUAL "primary")
+            set(test_subset_target_suffix "")
+          endif()
 
-        swift_configure_lit_site_cfg(
-            "${CMAKE_CURRENT_SOURCE_DIR}/../validation-test/lit.site.cfg.in"
-            "${validation_test_bin_dir}/lit.site.cfg"
-            "validation-test${VARIANT_SUFFIX}.lit.site.cfg")
-        set(profdata_merge_worker
-            "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge/main.py")
-
-        if(SWIFT_ANALYZE_CODE_COVERAGE STREQUAL "MERGED")
-          set(command_profdata_merge_start
-            COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}"
-                -l "${swift_test_results_dir}/profdata_merge.log"
-                start
-                -o "${swift_test_results_dir}")
-          set(command_profdata_merge_stop
-            COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}" stop)
-        else()
-          set(command_profdata_merge_start)
-          set(command_profdata_merge_stop)
-        endif()
-
-        add_custom_target("check-swift${test_mode_target_suffix}${VARIANT_SUFFIX}"
-            ${command_upload_stdlib}
-            ${command_clean_test_results_dir}
-            ${command_profdata_merge_start}
-            COMMAND ${lit_command} "${test_bin_dir}"
-            ${command_profdata_merge_stop}
-            DEPENDS ${test_dependencies}
-            COMMENT "Running Swift tests for ${VARIANT_TRIPLE}"
-            ${cmake_3_2_USES_TERMINAL})
-
-        add_custom_target("check-swift-validation${test_mode_target_suffix}${VARIANT_SUFFIX}"
-            ${command_upload_stdlib}
-            ${command_clean_test_results_dir}
-            ${command_profdata_merge_start}
-            COMMAND ${lit_command} "${validation_test_bin_dir}"
-            ${command_profdata_merge_stop}
-            DEPENDS ${test_dependencies} ${validation_test_dependencies}
-            COMMENT "Running Swift validation tests for ${VARIANT_TRIPLE}"
-            ${cmake_3_2_USES_TERMINAL})
-
-        add_custom_target("check-swift-all${test_mode_target_suffix}${VARIANT_SUFFIX}"
-            ${command_upload_stdlib}
-            ${command_clean_test_results_dir}
-            ${command_profdata_merge_start}
-            COMMAND ${lit_command} "${validation_test_bin_dir}" "${test_bin_dir}"
-            ${command_profdata_merge_stop}
-            DEPENDS ${test_dependencies} ${validation_test_dependencies}
-            COMMENT "Running all Swift tests for ${VARIANT_TRIPLE}"
-            ${cmake_3_2_USES_TERMINAL})
-
-
+          if(want_this_combination)
+            add_custom_target("check-swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}"
+                ${command_upload_stdlib}
+                ${command_clean_test_results_dir}
+                ${command_profdata_merge_start}
+                COMMAND ${PYTHON_EXECUTABLE} "${LIT}" ${LIT_ARGS} ${directories}
+                ${command_profdata_merge_stop}
+                DEPENDS ${dependencies}
+                COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE}"
+                ${cmake_3_2_USES_TERMINAL})
+          endif()
+        endforeach()
       endforeach()
     endforeach()
   endforeach()
 
   # Add shortcuts for the default variant.
-  foreach(TEST_MODE ${TEST_MODES})
-    set(test_mode_target_suffix)
-    if(TEST_MODE STREQUAL "optimize_none")
+  foreach(test_mode ${TEST_MODES})
+    foreach(test_subset ${TEST_SUBSETS})
       set(test_mode_target_suffix "")
-    endif()
-    if(TEST_MODE STREQUAL "optimize")
-      set(test_mode_target_suffix "-optimize")
-    endif()
-    if(TEST_MODE STREQUAL "optimize_unchecked")
-      set(test_mode_target_suffix "-optimize-unchecked")
-    endif()
-    if(TEST_MODE STREQUAL "executable")
-      set(test_mode_target_suffix "-executable")
-    endif()
-    if(TEST_MODE STREQUAL "non_executable")
-      set(test_mode_target_suffix "-non-executable")
-    endif()
+      if(NOT test_mode STREQUAL "optimize_none")
+        set(test_mode_target_suffix "-${test_mode}")
+      endif()
+      set(test_subset_target_suffix "-${test_subset}")
+      if(test_subset STREQUAL "primary")
+        set(test_subset_target_suffix "")
+      endif()
 
-    add_custom_target(check-swift${test_mode_target_suffix}
-        DEPENDS "check-swift${test_mode_target_suffix}${SWIFT_PRIMARY_VARIANT_SUFFIX}")
-
-    add_custom_target(check-swift-validation${test_mode_target_suffix}
-        DEPENDS "check-swift-validation${test_mode_target_suffix}${SWIFT_PRIMARY_VARIANT_SUFFIX}")
-
-    add_custom_target(check-swift-all${test_mode_target_suffix}
-        DEPENDS "check-swift-all${test_mode_target_suffix}${SWIFT_PRIMARY_VARIANT_SUFFIX}")
-
+      add_custom_target(check-swift${test_subset_target_suffix}${test_mode_target_suffix}
+          DEPENDS "check-swift${test_subset_target_suffix}${test_mode_target_suffix}${SWIFT_PRIMARY_VARIANT_SUFFIX}")
+    endforeach()
   endforeach()
 
 endif()

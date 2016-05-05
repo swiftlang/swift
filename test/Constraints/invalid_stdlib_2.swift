@@ -6,7 +6,7 @@ class Dictionary<K, V> : DictionaryLiteralConvertible { // expected-error {{type
   init(dictionaryLiteral xs: (K)...){} // expected-note {{candidate has non-matching type '(dictionaryLiteral: (K)...)'}}
 }
 
-func useDict<K, V>(d: Dictionary<K,V>) {}
+func useDict<K, V>(_ d: Dictionary<K,V>) {}
 
 useDict(["Hello" : 1])
 useDict(["Hello" : 1, "World" : 2])

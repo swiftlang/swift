@@ -252,7 +252,7 @@ unless the method is attributed with ``mutating``:
 
 .. parsed-literal::
 
-  func f(x: Int, inout y: Int) {
+  func f(_ x: Int, y: inout Int) {
     y = x         // ok, y is an inout parameter
     x = y         // **Error:** function parameter 'x' is immutable
   }

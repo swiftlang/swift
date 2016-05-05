@@ -25,7 +25,7 @@ using namespace constraints;
 // Statistics
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "Constraint solver overall"
-STATISTIC(NumDiscardedSolutions, "# of solutions discarded");
+STATISTIC(NumDiscardedSolutions, "Number of solutions discarded");
 
 void ConstraintSystem::increaseScore(ScoreKind kind) {
   unsigned index = static_cast<unsigned>(kind);
@@ -450,8 +450,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   // the second protocol extension.
   ConstraintSystem cs(tc, dc1, None);
   llvm::DenseMap<CanType, TypeVariableType *> replacements;
-  cs.openGeneric(dc2, sig2->getGenericParams(), sig2->getRequirements(),
-                 false, dc2->getGenericTypeContextDepth(),
+  cs.openGeneric(dc2, sig2, false, dc2->getGenericTypeContextDepth(),
                  ConstraintLocatorBuilder(nullptr),
                  replacements);
 

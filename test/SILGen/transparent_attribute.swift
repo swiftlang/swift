@@ -181,22 +181,32 @@ struct testVarDeclShortenedSyntax {
 }
 // CHECK: sil hidden [transparent] @_TF21transparent_attributeg22transparentOnGlobalVarSi
 
-// Local functions in transparent context have public linkage.
-@_transparent func foo() {
-  // CHECK-LABEL: sil @_TFF21transparent_attribute3fooFT_T_L_3barFT_T_ : $@convention(thin) () -> ()
+// Local functions in transparent context are fragile.
+@_transparent public func foo() {
+  // CHECK-LABEL: sil shared [fragile] @_TFF21transparent_attribute3fooFT_T_L_3barFT_T_ : $@convention(thin) () -> ()
   func bar() {}
   bar()
 
-  // CHECK-LABEL: sil @_TFF21transparent_attribute3fooFT_T_U_FT_T_ : $@convention(thin) () -> () {
+  // CHECK-LABEL: sil shared [fragile] @_TFF21transparent_attribute3fooFT_T_U_FT_T_ : $@convention(thin) () -> () {
   let f: () -> () = {}
   f()
 
-  // CHECK-LABEL: sil @_TFF21transparent_attribute3fooFT_T_L_3zimFT_T_ : $@convention(thin) () -> () {
+  // CHECK-LABEL: sil shared [fragile] @_TFF21transparent_attribute3fooFT_T_L_3zimFT_T_ : $@convention(thin) () -> () {
   func zim() {
-    // CHECK-LABEL: sil @_TFFF21transparent_attribute3fooFT_T_L_3zimFT_T_L_4zangFT_T_ : $@convention(thin) () -> () {
+    // CHECK-LABEL: sil shared [fragile] @_TFFF21transparent_attribute3fooFT_T_L_3zimFT_T_L_4zangFT_T_ : $@convention(thin) () -> () {
     func zang() {
     }
     zang()
   }
   zim()
+}
+
+
+// Check that @_versioned entities have public linkage.
+// CHECK-LABEL: sil @_TF21transparent_attribute25referencedFromTransparentFT_T_ : $@convention(thin) () -> () {
+@_versioned func referencedFromTransparent() {}
+
+// CHECK-LABEL: sil [transparent] [fragile] @_TF21transparent_attribute23referencesVersionedFuncFT_FT_T_ : $@convention(thin) () -> @owned @callee_owned () -> () {
+@_transparent public func referencesVersionedFunc() -> () -> () {
+  return referencedFromTransparent
 }

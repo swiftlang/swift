@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func my_print<T>(t: T) {}
+func my_print<T>(_ t: T) {}
 
 class 你好 {
   class שלום {

@@ -10,7 +10,7 @@
 // REQUIRES: objc_interop
 
 // CHECK1: class NSMutableArray : NSArray
-// CHECK1:   func setArray(otherArray: [AnyObject])
+// CHECK1:   func setArray(_ otherArray: [AnyObject])
 
 // CHECK1-FAILABLE-INITS: class NSArray
 // init()CHECK1-FAILABLE-INITS: init()

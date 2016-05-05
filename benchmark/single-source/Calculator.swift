@@ -14,7 +14,7 @@ import TestsUtils
 import Foundation
 
 @inline(never)
-func my_atoi_impl(input : String) -> Int {
+func my_atoi_impl(_ input : String) -> Int {
   switch input {
     case "0": return 0
     case "1": return 1
@@ -31,7 +31,7 @@ func my_atoi_impl(input : String) -> Int {
 }
 
 @inline(never)
-public func run_Calculator(N: Int) {
+public func run_Calculator(_ N: Int) {
   var c = 0
   for _ in 1...N*5000 {
       c += my_atoi_impl("10")

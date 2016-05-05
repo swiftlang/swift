@@ -23,7 +23,7 @@ public prefix func !<T : Boolean>(a: T) -> Bool {
 @inline(__always)
 @warn_unused_result
 public func && <T : Boolean, U : Boolean>(
-  lhs: T, @autoclosure rhs: () throws -> U
+  lhs: T, rhs: @autoclosure () throws -> U
 ) rethrows -> Bool {
   return lhs.boolValue ? try rhs().boolValue : false
 }
@@ -33,18 +33,18 @@ public func && <T : Boolean, U : Boolean>(
 @inline(__always)
 @warn_unused_result
 public func || <T : Boolean, U : Boolean>(
-  lhs: T, @autoclosure rhs: () throws -> U
+  lhs: T, rhs: @autoclosure () throws -> U
 ) rethrows -> Bool {
   return lhs.boolValue ? true : try rhs().boolValue
 }
 
 // FIXME: We can't make the above @_transparent due to
 // rdar://problem/19418937, so here are some @_transparent overloads
-// for Bool.  We've done the same for ObjCBool
+// for Bool.  We've done the same for ObjCBool.
 @_transparent
 @warn_unused_result
 public func && <T : Boolean>(
-  lhs: T, @autoclosure rhs: () throws -> Bool
+  lhs: T, rhs: @autoclosure () throws -> Bool
 ) rethrows -> Bool {
   return lhs.boolValue ? try rhs().boolValue : false
 }
@@ -52,7 +52,7 @@ public func && <T : Boolean>(
 @_transparent
 @warn_unused_result
 public func || <T : Boolean>(
-  lhs: T, @autoclosure rhs: () throws -> Bool
+  lhs: T, rhs: @autoclosure () throws -> Bool
 ) rethrows -> Bool {
   return lhs.boolValue ? true : try rhs().boolValue
 }

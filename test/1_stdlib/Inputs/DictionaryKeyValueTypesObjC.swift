@@ -3,8 +3,33 @@ import Darwin
 import StdlibUnittest
 import Foundation
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
+
+func convertDictionaryToNSDictionary<Key, Value>(
+  _ d: [Key : Value]
+) -> NSDictionary {
+  return d._bridgeToObjectiveC()
+}
+
+public func convertNSDictionaryToDictionary<
+  Key : Hashable, Value
+>(_ d: NSDictionary?) -> [Key : Value] {
+  if _slowPath(d == nil) { return [:] }
+  var result: [Key : Value]?
+  Dictionary._forceBridgeFromObjectiveC(d!, result: &result)
+  return result!
+}
+
 func isNativeDictionary<KeyTy : Hashable, ValueTy>(
-  d: Dictionary<KeyTy, ValueTy>) -> Bool {
+  _ d: Dictionary<KeyTy, ValueTy>) -> Bool {
   switch d._variantStorage {
   case .native:
     return true
@@ -14,22 +39,22 @@ func isNativeDictionary<KeyTy : Hashable, ValueTy>(
 }
 
 func isCocoaDictionary<KeyTy : Hashable, ValueTy>(
-  d: Dictionary<KeyTy, ValueTy>) -> Bool {
+  _ d: Dictionary<KeyTy, ValueTy>) -> Bool {
   return !isNativeDictionary(d)
 }
 
-func isNativeNSDictionary(d: NSDictionary) -> Bool {
+ func isNativeNSDictionary(_ d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
   return className.range(of: "_NativeDictionaryStorageOwner").length > 0
 }
 
-func isCocoaNSDictionary(d: NSDictionary) -> Bool {
+ func isCocoaNSDictionary(_ d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
   return className.range(of: "NSDictionary").length > 0 ||
     className.range(of: "NSCFDictionary").length > 0
 }
 
-func isNativeNSArray(d: NSArray) -> Bool {
+ func isNativeNSArray(_ d: NSArray) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType)
   return className.range(of: "_SwiftDeferredNSArray").length > 0
 }
@@ -67,7 +92,7 @@ class TestObjCKeyTy : NSObject, NSCopying {
   }
 
   @objc(copyWithZone:)
-  func copy(with zone: NSZone) -> AnyObject {
+  func copy(with zone: NSZone?) -> AnyObject {
     return TestObjCKeyTy(value)
   }
 
@@ -76,7 +101,7 @@ class TestObjCKeyTy : NSObject, NSCopying {
     return value.description
   }
 
-  override func isEqual(object: AnyObject!) -> Bool {
+  override func isEqual(_ object: AnyObject!) -> Bool {
     if let other = object {
       if let otherObjcKey = other as? TestObjCKeyTy {
         return self.value == otherObjcKey.value
@@ -157,7 +182,7 @@ class TestObjCEquatableValueTy : NSObject {
     serial = -serial
   }
 
-  override func isEqual(object: AnyObject!) -> Bool {
+  override func isEqual(_ object: AnyObject!) -> Bool {
     if let other = object {
       if let otherObjcKey = other as? TestObjCEquatableValueTy {
         return self.value == otherObjcKey.value
@@ -212,17 +237,13 @@ struct TestBridgedKeyTy
     return true
   }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return TestObjCKeyTy.self
-  }
-
   func _bridgeToObjectiveC() -> TestObjCKeyTy {
     _bridgedKeyBridgeOperations.fetchAndAdd(1)
     return TestObjCKeyTy(value)
   }
 
   static func _forceBridgeFromObjectiveC(
-    x: TestObjCKeyTy,
+    _ x: TestObjCKeyTy,
     result: inout TestBridgedKeyTy?
   ) {
     _bridgedKeyBridgeOperations.fetchAndAdd(1)
@@ -230,7 +251,7 @@ struct TestBridgedKeyTy
   }
 
   static func _conditionallyBridgeFromObjectiveC(
-    x: TestObjCKeyTy,
+    _ x: TestObjCKeyTy,
     result: inout TestBridgedKeyTy?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
@@ -277,17 +298,13 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
     return true
   }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return TestObjCValueTy.self
-  }
-
   func _bridgeToObjectiveC() -> TestObjCValueTy {
     TestBridgedValueTy.bridgeOperations += 1
     return TestObjCValueTy(value)
   }
 
   static func _forceBridgeFromObjectiveC(
-    x: TestObjCValueTy,
+    _ x: TestObjCValueTy,
     result: inout TestBridgedValueTy?
   ) {
     TestBridgedValueTy.bridgeOperations += 1
@@ -295,7 +312,7 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
   }
 
   static func _conditionallyBridgeFromObjectiveC(
-    x: TestObjCValueTy,
+    _ x: TestObjCValueTy,
     result: inout TestBridgedValueTy?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
@@ -335,17 +352,13 @@ struct TestBridgedEquatableValueTy
     return true
   }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return TestObjCValueTy.self
-  }
-
   func _bridgeToObjectiveC() -> TestObjCEquatableValueTy {
     _bridgedEquatableValueBridgeOperations.fetchAndAdd(1)
     return TestObjCEquatableValueTy(value)
   }
 
   static func _forceBridgeFromObjectiveC(
-    x: TestObjCEquatableValueTy,
+    _ x: TestObjCEquatableValueTy,
     result: inout TestBridgedEquatableValueTy?
   ) {
     _bridgedEquatableValueBridgeOperations.fetchAndAdd(1)
@@ -353,7 +366,7 @@ struct TestBridgedEquatableValueTy
   }
 
   static func _conditionallyBridgeFromObjectiveC(
-    x: TestObjCEquatableValueTy,
+    _ x: TestObjCEquatableValueTy,
     result: inout TestBridgedEquatableValueTy?
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
@@ -377,7 +390,7 @@ func == (lhs: TestBridgedEquatableValueTy, rhs: TestBridgedEquatableValueTy) -> 
 ///
 /// FIXME: Some non-zero `opt` might be cases of missed return-autorelease.
 func expectAutoreleasedKeysAndValues(
-  opt opt: (Int, Int) = (0, 0), unopt: (Int, Int) = (0, 0)) {
+  opt: (Int, Int) = (0, 0), unopt: (Int, Int) = (0, 0)) {
   var expectedKeys = 0
   var expectedValues = 0
 #if arch(i386)
@@ -399,7 +412,7 @@ func expectAutoreleasedKeysAndValues(
 ///
 /// FIXME: Some non-zero `opt` might be cases of missed return-autorelease.
 func expectAutoreleasedValues(
-  opt opt: Int = 0, unopt: Int = 0) {
+  opt: Int = 0, unopt: Int = 0) {
   expectAutoreleasedKeysAndValues(opt: (0, opt), unopt: (0, unopt))
 }
 
@@ -426,7 +439,7 @@ func getBridgedNSDictionaryOfRefTypesBridgedVerbatim() -> NSDictionary {
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   let bridged =
-    unsafeBitCast(_convertDictionaryToNSDictionary(d), to: NSDictionary.self)
+    unsafeBitCast(convertDictionaryToNSDictionary(d), to: NSDictionary.self)
 
   assert(isNativeNSDictionary(bridged))
 
@@ -437,14 +450,14 @@ func getBridgedEmptyNSDictionary() -> NSDictionary {
   let d = Dictionary<TestObjCKeyTy, TestObjCValueTy>()
 
   let bridged =
-    unsafeBitCast(_convertDictionaryToNSDictionary(d), to: NSDictionary.self)
+    unsafeBitCast(convertDictionaryToNSDictionary(d), to: NSDictionary.self)
   assert(isNativeNSDictionary(bridged))
 
   return bridged
 }
 
 func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
-  numElements numElements: Int = 3
+  numElements: Int = 3
 ) -> NSDictionary {
   assert(!_isBridgedVerbatimToObjectiveC(TestBridgedKeyTy.self))
   assert(!_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
@@ -454,7 +467,7 @@ func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
     d[TestBridgedKeyTy(i * 10)] = TestBridgedValueTy(i * 10 + 1000)
   }
 
-  let bridged = _convertDictionaryToNSDictionary(d)
+  let bridged = convertDictionaryToNSDictionary(d)
   assert(isNativeNSDictionary(bridged))
 
   return bridged
@@ -462,8 +475,8 @@ func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
 
 import SlurpFastEnumeration
 
-func slurpFastEnumerationFromSwift(
-  a: NSArray, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> Void,
+ func slurpFastEnumerationFromSwift(
+  _ a: NSArray, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> Void,
   maxItems: Int? = nil
 ) {
   var state = NSFastEnumerationState()
@@ -478,12 +491,12 @@ func slurpFastEnumerationFromSwift(
       with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEqual(nil, state.mutationsPtr)
+    expectNotEmpty(state.mutationsPtr)
     if returnedCount == 0 {
       break
     }
     for i in 0..<returnedCount {
-      let value: AnyObject = state.itemsPtr[i]!
+      let value: AnyObject = state.itemsPtr![i]!
       sink(value)
       itemsReturned += 1
     }
@@ -497,15 +510,15 @@ func slurpFastEnumerationFromSwift(
       with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEqual(nil, state.mutationsPtr)
+    expectNotEmpty(state.mutationsPtr)
     expectEqual(0, returnedCount)
   }
 }
 
 typealias AnyObjectTuple2 = (AnyObject, AnyObject)
 
-func slurpFastEnumerationFromSwift(
-  d: NSDictionary, _ fe: NSFastEnumeration, _ sink: (AnyObjectTuple2) -> Void,
+ func slurpFastEnumerationFromSwift(
+  _ d: NSDictionary, _ fe: NSFastEnumeration, _ sink: (AnyObjectTuple2) -> Void,
   maxItems: Int? = nil
 ) {
   var state = NSFastEnumerationState()
@@ -520,12 +533,12 @@ func slurpFastEnumerationFromSwift(
       with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEqual(nil, state.mutationsPtr)
+    expectNotEmpty(state.mutationsPtr)
     if returnedCount == 0 {
       break
     }
     for i in 0..<returnedCount {
-      let key: AnyObject = state.itemsPtr[i]!
+      let key: AnyObject = state.itemsPtr![i]!
       let value: AnyObject = d.object(forKey: key)!
       let kv = (key, value)
       sink(kv)
@@ -544,8 +557,8 @@ func slurpFastEnumerationFromSwift(
   }
 }
 
-func slurpFastEnumerationOfNSEnumeratorFromSwift(
-  a: NSArray, _ enumerator: NSEnumerator, _ sink: (AnyObject) -> Void,
+ func slurpFastEnumerationOfNSEnumeratorFromSwift(
+  _ a: NSArray, _ enumerator: NSEnumerator, _ sink: (AnyObject) -> Void,
   maxFastEnumerationItems: Int
 ) {
   slurpFastEnumerationFromSwift(
@@ -555,8 +568,8 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift(
   }
 }
 
-func slurpFastEnumerationOfNSEnumeratorFromSwift(
-  d: NSDictionary, _ enumerator: NSEnumerator,
+ func slurpFastEnumerationOfNSEnumeratorFromSwift(
+  _ d: NSDictionary, _ enumerator: NSEnumerator,
   _ sink: (AnyObjectTuple2) -> Void,
   maxFastEnumerationItems: Int
 ) {
@@ -569,8 +582,8 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift(
   }
 }
 
-func slurpFastEnumerationFromObjC(
-  a: NSArray, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> Void
+ func slurpFastEnumerationFromObjC(
+  _ a: NSArray, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> Void
 ) {
   let objcValues = NSMutableArray()
   slurpFastEnumerationOfArrayFromObjCImpl(a, fe, objcValues)
@@ -579,8 +592,8 @@ func slurpFastEnumerationFromObjC(
   }
 }
 
-func _checkArrayFastEnumerationImpl(
-  expected: [Int],
+ func _checkArrayFastEnumerationImpl(
+  _ expected: [Int],
   _ a: NSArray,
   _ makeEnumerator: () -> NSFastEnumeration,
   _ useEnumerator: (NSArray, NSFastEnumeration, (AnyObject) -> ()) -> Void,
@@ -616,8 +629,8 @@ func _checkArrayFastEnumerationImpl(
   }
 }
 
-func checkArrayFastEnumerationFromSwift(
-  expected: [Int],
+ func checkArrayFastEnumerationFromSwift(
+  _ expected: [Int],
   _ a: NSArray, _ makeEnumerator: () -> NSFastEnumeration,
   _ convertValue: (AnyObject) -> Int
 ) {
@@ -629,8 +642,8 @@ func checkArrayFastEnumerationFromSwift(
     convertValue)
 }
 
-func checkArrayFastEnumerationFromObjC(
-  expected: [Int],
+ func checkArrayFastEnumerationFromObjC(
+  _ expected: [Int],
   _ a: NSArray, _ makeEnumerator: () -> NSFastEnumeration,
   _ convertValue: (AnyObject) -> Int
 ) {
@@ -642,8 +655,8 @@ func checkArrayFastEnumerationFromObjC(
     convertValue)
 }
 
-func checkArrayEnumeratorPartialFastEnumerationFromSwift(
-  expected: [Int],
+ func checkArrayEnumeratorPartialFastEnumerationFromSwift(
+  _ expected: [Int],
   _ a: NSArray,
   maxFastEnumerationItems: Int,
   _ convertValue: (AnyObject) -> Int
@@ -658,8 +671,8 @@ func checkArrayEnumeratorPartialFastEnumerationFromSwift(
     convertValue)
 }
 
-func _checkSetFastEnumerationImpl(
-  expected: [Int],
+ func _checkSetFastEnumerationImpl(
+  _ expected: [Int],
   _ s: NSSet,
   _ makeEnumerator: () -> NSFastEnumeration,
   _ useEnumerator: (NSSet, NSFastEnumeration, (AnyObject) -> ()) -> Void,
@@ -693,8 +706,8 @@ func _checkSetFastEnumerationImpl(
   }
 }
 
-func slurpFastEnumerationFromObjC(
-  s: NSSet, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> Void
+ func slurpFastEnumerationFromObjC(
+  _ s: NSSet, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> Void
 ) {
   let objcValues = NSMutableArray()
   slurpFastEnumerationOfArrayFromObjCImpl(s, fe, objcValues)
@@ -703,8 +716,8 @@ func slurpFastEnumerationFromObjC(
   }
 }
 
-func slurpFastEnumerationOfNSEnumeratorFromSwift(
-  s: NSSet, _ enumerator: NSEnumerator, _ sink: (AnyObject) -> Void,
+ func slurpFastEnumerationOfNSEnumeratorFromSwift(
+  _ s: NSSet, _ enumerator: NSEnumerator, _ sink: (AnyObject) -> Void,
   maxFastEnumerationItems: Int
 ) {
   slurpFastEnumerationFromSwift(
@@ -714,8 +727,8 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift(
   }
 }
 
-func slurpFastEnumerationFromSwift(
-  s: NSSet, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> Void,
+ func slurpFastEnumerationFromSwift(
+  _ s: NSSet, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> Void,
   maxItems: Int? = nil
 ) {
   var state = NSFastEnumerationState()
@@ -730,12 +743,12 @@ func slurpFastEnumerationFromSwift(
       with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEqual(nil, state.mutationsPtr)
+    expectNotEmpty(state.mutationsPtr)
     if returnedCount == 0 {
       break
     }
     for i in 0..<returnedCount {
-      let value: AnyObject = state.itemsPtr[i]!
+      let value: AnyObject = state.itemsPtr![i]!
       sink(value)
       itemsReturned += 1
     }
@@ -749,13 +762,13 @@ func slurpFastEnumerationFromSwift(
       with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEqual(nil, state.mutationsPtr)
+    expectNotEmpty(state.mutationsPtr)
     expectEqual(0, returnedCount)
   }
 }
 
-func checkSetFastEnumerationFromSwift(
-  expected: [Int],
+ func checkSetFastEnumerationFromSwift(
+  _ expected: [Int],
   _ s: NSSet, _ makeEnumerator: () -> NSFastEnumeration,
   _ convertMember: (AnyObject) -> Int
 ) {
@@ -767,8 +780,8 @@ func checkSetFastEnumerationFromSwift(
     convertMember)
 }
 
-func checkSetFastEnumerationFromObjC(
-  expected: [Int],
+ func checkSetFastEnumerationFromObjC(
+  _ expected: [Int],
   _ s: NSSet, _ makeEnumerator: () -> NSFastEnumeration,
   _ convertMember: (AnyObject) -> Int
 ) {
@@ -780,8 +793,8 @@ func checkSetFastEnumerationFromObjC(
     convertMember)
 }
 
-func checkSetEnumeratorPartialFastEnumerationFromSwift(
-  expected: [Int],
+ func checkSetEnumeratorPartialFastEnumerationFromSwift(
+  _ expected: [Int],
   _ s: NSSet,
   maxFastEnumerationItems: Int,
   _ convertMember: (AnyObject) -> Int
@@ -796,8 +809,8 @@ func checkSetEnumeratorPartialFastEnumerationFromSwift(
     convertMember)
 }
 
-func slurpFastEnumerationFromObjC(
-  d: NSDictionary, _ fe: NSFastEnumeration, _ sink: (AnyObjectTuple2) -> Void
+ func slurpFastEnumerationFromObjC(
+  _ d: NSDictionary, _ fe: NSFastEnumeration, _ sink: (AnyObjectTuple2) -> Void
 ) {
   let objcPairs = NSMutableArray()
   slurpFastEnumerationOfDictionaryFromObjCImpl(d, fe, objcPairs)
@@ -809,8 +822,8 @@ func slurpFastEnumerationFromObjC(
   }
 }
 
-func _checkDictionaryFastEnumerationImpl(
-  expected: [(Int, Int)],
+ func _checkDictionaryFastEnumerationImpl(
+  _ expected: [(Int, Int)],
   _ d: NSDictionary,
   _ makeEnumerator: () -> NSFastEnumeration,
   _ useEnumerator: (NSDictionary, NSFastEnumeration, (AnyObjectTuple2) -> ()) -> Void,
@@ -847,8 +860,8 @@ func _checkDictionaryFastEnumerationImpl(
   }
 }
 
-func checkDictionaryFastEnumerationFromSwift(
-  expected: [(Int, Int)],
+ func checkDictionaryFastEnumerationFromSwift(
+  _ expected: [(Int, Int)],
   _ d: NSDictionary, _ makeEnumerator: () -> NSFastEnumeration,
   _ convertKey: (AnyObject) -> Int,
   _ convertValue: (AnyObject) -> Int
@@ -861,8 +874,8 @@ func checkDictionaryFastEnumerationFromSwift(
     convertKey, convertValue)
 }
 
-func checkDictionaryFastEnumerationFromObjC(
-  expected: [(Int, Int)],
+ func checkDictionaryFastEnumerationFromObjC(
+  _ expected: [(Int, Int)],
   _ d: NSDictionary, _ makeEnumerator: () -> NSFastEnumeration,
   _ convertKey: (AnyObject) -> Int,
   _ convertValue: (AnyObject) -> Int
@@ -875,8 +888,8 @@ func checkDictionaryFastEnumerationFromObjC(
     convertKey, convertValue)
 }
 
-func checkDictionaryEnumeratorPartialFastEnumerationFromSwift(
-  expected: [(Int, Int)],
+ func checkDictionaryEnumeratorPartialFastEnumerationFromSwift(
+  _ expected: [(Int, Int)],
   _ d: NSDictionary,
   maxFastEnumerationItems: Int,
   _ convertKey: (AnyObject) -> Int,
@@ -893,7 +906,7 @@ func checkDictionaryEnumeratorPartialFastEnumerationFromSwift(
 }
 
 func getBridgedNSArrayOfRefTypeVerbatimBridged(
-  numElements numElements: Int = 3,
+  numElements: Int = 3,
   capacity: Int? = nil
 ) -> NSArray {
   assert(_isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
@@ -906,10 +919,21 @@ func getBridgedNSArrayOfRefTypeVerbatimBridged(
     a.append(TestObjCValueTy(i * 10))
   }
 
-  let bridged = _convertArrayToNSArray(a)
+  let bridged = convertArrayToNSArray(a)
   assert(isNativeNSArray(bridged))
 
   return bridged
+}
+
+func convertNSArrayToArray<T>(_ source: NSArray?) -> [T] {
+  if _slowPath(source == nil) { return [] }
+  var result: [T]?
+  Array._forceBridgeFromObjectiveC(source!, result: &result)
+  return result!
+}
+
+func convertArrayToNSArray<T>(_ array: [T]) -> NSArray {
+  return array._bridgeToObjectiveC()
 }
 
 func getBridgedNSArrayOfValueTypeCustomBridged(
@@ -926,7 +950,7 @@ func getBridgedNSArrayOfValueTypeCustomBridged(
     a.append(TestBridgedValueTy(i * 10))
   }
 
-  let bridged = _convertArrayToNSArray(a)
+  let bridged = convertArrayToNSArray(a)
   assert(isNativeNSArray(bridged))
 
   return bridged

@@ -12,7 +12,7 @@
 
 /// Buffer type for `ArraySlice<Element>`.
 public // @testable
-struct _SliceBuffer<Element> : _ArrayBufferProtocol {
+struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   internal typealias NativeStorage = _ContiguousArrayStorage<Element>
   public typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
@@ -22,9 +22,9 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   ) {
     self.owner = owner
     self.subscriptBaseAddress = subscriptBaseAddress
-    self.startIndex = indices.startIndex
+    self.startIndex = indices.lowerBound
     let bufferFlag = UInt(hasNativeBuffer ? 1 : 0)
-    self.endIndexAndFlags = (UInt(indices.endIndex) << 1) | bufferFlag
+    self.endIndexAndFlags = (UInt(indices.upperBound) << 1) | bufferFlag
     _invariantCheck()
   }
 
@@ -79,7 +79,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   public mutating func replace<
     C : Collection where C.Iterator.Element == Element
   >(
-    subRange subRange: Range<Int>,
+    subRange: Range<Int>,
     with insertCount: Int,
     elementsOf newValues: C
   ) {
@@ -97,8 +97,8 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
 
     _sanityCheck(native.count + growth <= native.capacity)
 
-    let start = subRange.startIndex - startIndex + hiddenElementCount
-    let end = subRange.endIndex - startIndex + hiddenElementCount
+    let start = subRange.lowerBound - startIndex + hiddenElementCount
+    let end = subRange.upperBound - startIndex + hiddenElementCount
     native.replace(
       subRange: start..<end,
       with: insertCount,
@@ -124,6 +124,10 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     return subscriptBaseAddress + startIndex
   }
 
+  public var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
+    return firstElementAddress
+  }
+
   /// [63:1: 63-bit index][0: has a native buffer]
   var endIndexAndFlags: UInt
 
@@ -131,7 +135,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
 
   @warn_unused_result
   public mutating func requestUniqueMutableBackingBuffer(
-    minimumCapacity minimumCapacity: Int
+    minimumCapacity: Int
   ) -> NativeBuffer? {
     _invariantCheck()
     if _fastPath(_hasNativeBuffer && isUniquelyReferenced()) {
@@ -186,11 +190,11 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
     _invariantCheck()
-    _sanityCheck(bounds.startIndex >= startIndex)
-    _sanityCheck(bounds.endIndex >= bounds.startIndex)
-    _sanityCheck(bounds.endIndex <= endIndex)
+    _sanityCheck(bounds.lowerBound >= startIndex)
+    _sanityCheck(bounds.upperBound >= bounds.lowerBound)
+    _sanityCheck(bounds.upperBound <= endIndex)
     let c = bounds.count
-    target.initializeFrom(subscriptBaseAddress + bounds.startIndex, count: c)
+    target.initializeFrom(subscriptBaseAddress + bounds.lowerBound, count: c)
     return target + c
   }
 
@@ -216,7 +220,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
 
   /// Traps unless the given `index` is valid for subscripting, i.e.
   /// `startIndex ≤ index < endIndex`
-  internal func _checkValidSubscript(index : Int) {
+  internal func _checkValidSubscript(_ index : Int) {
     _precondition(
       index >= startIndex && index < endIndex, "Index out of bounds")
   }
@@ -244,8 +248,9 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     return isUniquelyReferencedOrPinnedNonObjC(&owner)
   }
 
+  @_versioned
   @warn_unused_result
-  func getElement(i: Int) -> Element {
+  func getElement(_ i: Int) -> Element {
     _sanityCheck(i >= startIndex, "negative slice index is out of range")
     _sanityCheck(i < endIndex, "slice index out of range")
     return subscriptBaseAddress[i]
@@ -268,9 +273,9 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
 
   public subscript(bounds: Range<Int>) -> _SliceBuffer {
     get {
-      _sanityCheck(bounds.startIndex >= startIndex)
-      _sanityCheck(bounds.endIndex >= bounds.startIndex)
-      _sanityCheck(bounds.endIndex <= endIndex)
+      _sanityCheck(bounds.lowerBound >= startIndex)
+      _sanityCheck(bounds.upperBound >= bounds.lowerBound)
+      _sanityCheck(bounds.upperBound <= endIndex)
       return _SliceBuffer(
         owner: owner,
         subscriptBaseAddress: subscriptBaseAddress,
@@ -286,16 +291,14 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
-  public
-  var startIndex: Int
+  public var startIndex: Int
 
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
-  public
-  var endIndex: Int {
+  /// `index(after:)`.
+  public var endIndex: Int {
     get {
       return Int(endIndexAndFlags >> 1)
     }
@@ -304,12 +307,14 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
     }
   }
 
+  public typealias Indices = CountableRange<Int>
+
   //===--- misc -----------------------------------------------------------===//
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.
   public
   func withUnsafeBufferPointer<R>(
-    @noescape body: (UnsafeBufferPointer<Element>) throws -> R
+    _ body: @noescape (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
     return try body(UnsafeBufferPointer(start: firstElementAddress,
@@ -320,7 +325,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol {
   /// over the underlying contiguous storage.
   public
   mutating func withUnsafeMutableBufferPointer<R>(
-    @noescape body: (UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @noescape (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
     return try body(
@@ -340,7 +345,8 @@ extension _SliceBuffer {
     let result = _ContiguousArrayBuffer<Element>(
       uninitializedCount: count,
       minimumCapacity: 0)
-    result.firstElementAddress.initializeFrom(firstElementAddress, count: count)
+    result.firstElementAddress.initializeFrom(
+      firstElementAddress, count: count)
     return result
   }
 }

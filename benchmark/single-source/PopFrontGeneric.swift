@@ -21,14 +21,14 @@ let arrayCount = 1024
 func _arrayReplace<B: _ArrayBufferProtocol, C: Collection
   where C.Iterator.Element == B.Element, B.Index == Int
   >(
-  target: inout B, _ subRange: Range<Int>, _ newValues: C
+  _ target: inout B, _ subRange: Range<Int>, _ newValues: C
 ) {
   _precondition(
-    subRange.startIndex >= 0,
+    subRange.lowerBound >= 0,
     "Array replace: subRange start is negative")
 
   _precondition(
-    subRange.endIndex <= target.endIndex,
+    subRange.upperBound <= target.endIndex,
     "Array replace: subRange extends past the end")
 
   let oldCount = target.count
@@ -46,7 +46,7 @@ func _arrayReplace<B: _ArrayBufferProtocol, C: Collection
 
 
 @inline(never)
-public func run_PopFrontArrayGeneric(N: Int) {
+public func run_PopFrontArrayGeneric(_ N: Int) {
   let orig = Array(repeating: 1, count: arrayCount)
   var a = [Int]()
   for _ in 1...20*N {

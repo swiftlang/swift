@@ -32,6 +32,7 @@ REPOSITORIES = {
     'cmark': 'apple/swift-cmark',
     'llbuild': 'apple/swift-llbuild',
     'swiftpm': 'apple/swift-package-manager',
+    'compiler-rt': 'apple/swift-compiler-rt',
     'swift-corelibs-xctest': 'apple/swift-corelibs-xctest',
     'swift-corelibs-foundation': 'apple/swift-corelibs-foundation',
     'swift-corelibs-libdispatch': 'apple/swift-corelibs-libdispatch',
@@ -88,10 +89,11 @@ def obtain_additional_swift_sources(
                 else:
                     remote = "https://github.com/" + repo + '.git'
                 if skip_history:
-                    check_call(['git', 'clone', '--depth', '1', remote,
-                                dir_name])
+                    check_call(['git', 'clone', '--recursive', '--depth', '1',
+                                remote, dir_name])
                 else:
-                    check_call(['git', 'clone', remote, dir_name])
+                    check_call(['git', 'clone', '--recursive', remote,
+                                dir_name])
                 if branch:
                     if branch == "stable-next" or branch == "master-next":
                         repo_branch = NEXT_BRANCHES[dir_name]

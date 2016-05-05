@@ -12,7 +12,7 @@ struct S: P {
 
 // CHECK-LABEL: sil hidden @_TF21existential_metatypes19existentialMetatypeFPS_1P_T_
 // CHECK: bb0([[X:%.*]] : $*P):
-func existentialMetatype(x: P) {
+func existentialMetatype(_ x: P) {
   // CHECK: [[TYPE1:%.*]] = existential_metatype $@thick P.Type, [[X]]
   let type1 = x.dynamicType
   // CHECK: [[INSTANCE1:%.*]] = alloc_stack $P
@@ -40,7 +40,7 @@ protocol Q {}
 // CHECK:         [[OPENED:%.*]] = open_existential_metatype %0
 // CHECK:         [[NEW:%.*]] = init_existential_metatype [[OPENED]]
 // CHECK:         return [[NEW]]
-func existentialMetatypeUpcast1(x: PP.Type) -> P.Type {
+func existentialMetatypeUpcast1(_ x: PP.Type) -> P.Type {
   return x
 }
 
@@ -48,6 +48,6 @@ func existentialMetatypeUpcast1(x: PP.Type) -> P.Type {
 // CHECK:         [[OPENED:%.*]] = open_existential_metatype %0
 // CHECK:         [[NEW:%.*]] = init_existential_metatype [[OPENED]]
 // CHECK:         return [[NEW]]
-func existentialMetatypeUpcast2(x: protocol<P,Q>.Type) -> P.Type {
+func existentialMetatypeUpcast2(_ x: protocol<P,Q>.Type) -> P.Type {
   return x
 }

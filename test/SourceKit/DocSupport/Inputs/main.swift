@@ -6,7 +6,7 @@ class CC0 {
 class CC {
   var instV: CC0
   func meth() {}
-  func instanceFunc0(a: Int, b: Float) -> Int {
+  func instanceFunc0(_ a: Int, b: Float) -> Int {
     return 0
   }
   func instanceFunc1(a x: Int, b y: Float) -> Int {
@@ -32,10 +32,10 @@ enum E {
 }
 
 protocol Prot {
-  func protMeth(a: Prot)
+  func protMeth(_ a: Prot)
 }
 
-func foo(a: CC, b: E) {
+func foo(_ a: CC, b: E) {
   var b = b
   _ = b
   globV = 0
@@ -51,8 +51,8 @@ func foo(a: CC, b: E) {
 typealias CCAlias = CC
 
 extension CC : Prot {
-  func meth2(x: CCAlias) {}
-  func protMeth(a: Prot) {}
+  func meth2(_ x: CCAlias) {}
+  func protMeth(_ a: Prot) {}
   var extV : Int { return 0 }
 }
 
@@ -75,10 +75,10 @@ class ComputedProperty {
 }
 
 class BC2 {
-  func protMeth(a: Prot) {}
+  func protMeth(_ a: Prot) {}
 }
 class SubC2 : BC2, Prot {
-  override func protMeth(a: Prot) {}
+  override func protMeth(_ a: Prot) {}
 }
 
 class CC2 {
@@ -92,7 +92,7 @@ class CC2 {
   }
 }
 
-func test1(cp: ComputedProperty, sub: CC2) {
+func test1(_ cp: ComputedProperty, sub: CC2) {
   var x = cp.value
   x = cp.readOnly
   cp.value = x
@@ -128,13 +128,13 @@ class SB1 : B1 {
   }
 }
 
-func test3(c: SB1, s: S2) {
+func test3(_ c: SB1, s: S2) {
   test2()
   c.foo()
   s.sfoo()
 }
 
-func test4(a: inout Int) {}
+func test4(_ a: inout Int) {}
 
 protocol Prot2 {
   associatedtype Element
@@ -148,7 +148,7 @@ struct S1 : Prot2 {
   func foo() {}
 }
 
-func genfoo<T : Prot2 where T.Element == Int>(x: T) {}
+func genfoo<T : Prot2 where T.Element == Int>(_ x: T) {}
 
 protocol Prot3 {
   func +(x: Self, y: Self)

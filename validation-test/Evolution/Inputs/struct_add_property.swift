@@ -66,7 +66,7 @@ public struct ChangeEmptyToNonEmpty {
 
 #endif
 
-public func getProperty(c: ChangeEmptyToNonEmpty) -> Int {
+public func getProperty(_ c: ChangeEmptyToNonEmpty) -> Int {
   return c.property
 }
 

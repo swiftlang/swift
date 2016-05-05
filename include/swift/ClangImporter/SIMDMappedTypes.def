@@ -14,15 +14,16 @@
 // imported as swift SIMD types.
 //
 //
-// MAP_SIMD_TYPE(C_TYPE, BUILTIN_KIND)
+// MAP_SIMD_TYPE(C_TYPE, SCALAR_TYPE, BUILTIN_KIND)
 //
 //   maps vectors of the Clang builtin type identified by BUILTIN_KIND to
 //   Swift types in the SIMD module.
 //
 //===----------------------------------------------------------------------===//
 
-MAP_SIMD_TYPE(float, Float)
-MAP_SIMD_TYPE(double, Double)
-MAP_SIMD_TYPE(int, Int)
+MAP_SIMD_TYPE(float, float, Float)
+MAP_SIMD_TYPE(double, double, Double)
+MAP_SIMD_TYPE(int, int, Int)
+MAP_SIMD_TYPE(uint, unsigned int, UInt)
 
 #undef MAP_SIMD_TYPE

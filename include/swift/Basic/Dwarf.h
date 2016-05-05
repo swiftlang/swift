@@ -28,6 +28,6 @@ namespace swift {
   static const char MachOASTSectionName[] = "__ast";
   static const char ELFASTSectionName[] = ".swift_ast";
   static const char COFFASTSectionName[] = "swiftast";
-}
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_DWARF_H

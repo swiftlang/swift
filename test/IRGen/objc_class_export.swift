@@ -15,7 +15,7 @@
 // CHECK: [[NSSIZE:%VSC6NSSize]] = type <{ %Sd, %Sd }>
 // CHECK: [[OBJC:%objc_object]] = type opaque
 
-// CHECK: @"OBJC_METACLASS_$__TtC17objc_class_export3Foo" = {{(protected )?}}global %objc_class {
+// CHECK: @"OBJC_METACLASS_$__TtC17objc_class_export3Foo" = hidden global %objc_class {
 // CHECK:   %objc_class* @"OBJC_METACLASS_$_SwiftObject",
 // CHECK:   %objc_class* @"OBJC_METACLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
@@ -62,7 +62,7 @@
 // CHECK: }>, section "__DATA,__objc_data, regular"
 // -- TODO: The OBJC_CLASS symbol should reflect the qualified runtime name of
 //    Foo.
-// CHECK: @_TMC17objc_class_export3Foo = alias %swift.type, bitcast (i64* getelementptr inbounds ({{.*}} @_TMfC17objc_class_export3Foo, i32 0, i32 2) to %swift.type*)
+// CHECK: @_TMC17objc_class_export3Foo = hidden alias %swift.type, bitcast (i64* getelementptr inbounds ({{.*}} @_TMfC17objc_class_export3Foo, i32 0, i32 2) to %swift.type*)
 // CHECK: @"OBJC_CLASS_$__TtC17objc_class_export3Foo" = alias %swift.type, %swift.type* @_TMC17objc_class_export3Foo
 
 import gizmo

@@ -16,7 +16,7 @@ import TestsUtils
 
 class A
 {
-  func f(a : Int) -> Int
+  func f(_ a: Int) -> Int
   {
     return a + 1
   }
@@ -25,7 +25,7 @@ class A
 var x = 0
 var a = A()
 @inline(never)
-public func run_GlobalClass(N: Int) {
+public func run_GlobalClass(_ N: Int) {
   for _ in 0..<N
   {
     x = a.f(x)

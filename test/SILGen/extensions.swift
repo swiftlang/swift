@@ -24,7 +24,7 @@ extension Bar {
 }
 
 // CHECK-LABEL: sil hidden @_TF10extensions19extensionReferencesFCS_3FooT_
-func extensionReferences(x: Foo) {
+func extensionReferences(_ x: Foo) {
   // Non-objc extension methods are statically dispatched.
   // CHECK: function_ref @_TFC10extensions3Foo4zang
   x.zang()
@@ -33,9 +33,9 @@ func extensionReferences(x: Foo) {
 
 }
 
-func extensionMethodCurrying(x: Foo) {
+func extensionMethodCurrying(_ x: Foo) {
   _ = x.zang
 }
 
-// CHECK-LABEL: sil shared @_TFC10extensions3Foo4zang
+// CHECK-LABEL: sil shared [thunk] @_TFC10extensions3Foo4zang
 // CHECK:         function_ref @_TFC10extensions3Foo4zang

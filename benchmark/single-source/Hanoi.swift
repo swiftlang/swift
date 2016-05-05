@@ -28,7 +28,7 @@ class TowersOfHanoi {
   // Record all moves made.
   var moves : [Move] = [Move]()
 
-  func solve(n: Int,  start: String,  auxiliary: String,  end: String) {
+  func solve(_ n: Int, start: String, auxiliary: String, end: String) {
     if (n == 1) {
       moves.append(Move(from:start, to:end))
     } else {
@@ -40,7 +40,7 @@ class TowersOfHanoi {
 }
 
 @inline(never)
-public func run_Hanoi(N: Int) {
+public func run_Hanoi(_ N: Int) {
   for _ in 1...100*N {
     let hanoi: TowersOfHanoi = TowersOfHanoi()
     hanoi.solve(10, start: "A", auxiliary: "B", end: "C")

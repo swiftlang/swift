@@ -6,7 +6,7 @@ struct A {
   var fn : () -> ()
 }
 
-func test(x : A) {
+func test(_ x : A) {
   var vx = x
 }
 // CHECK:    define hidden void @_TF7structs4test

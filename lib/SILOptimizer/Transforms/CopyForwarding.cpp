@@ -72,9 +72,9 @@
 #include "llvm/Support/Debug.h"
 
 STATISTIC(NumCopyNRVO, "Number of copies removed via named return value opt.");
-STATISTIC(NumCopyForward, "Number of copies removed via forward propagation.");
+STATISTIC(NumCopyForward, "Number of copies removed via forward propagation");
 STATISTIC(NumCopyBackward,
-          "Number of copies removed via backward propagation.");
+          "Number of copies removed via backward propagation");
 
 using namespace swift;
 

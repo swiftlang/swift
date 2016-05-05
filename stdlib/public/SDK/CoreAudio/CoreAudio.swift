@@ -47,7 +47,7 @@ extension AudioBuffer {
 extension AudioBufferList {
   /// - Returns: the size in bytes of an `AudioBufferList` that can hold up to
   ///   `maximumBuffers` `AudioBuffer`s.
-  public static func sizeInBytes(maximumBuffers maximumBuffers: Int) -> Int {
+  public static func sizeInBytes(maximumBuffers: Int) -> Int {
     _precondition(maximumBuffers >= 1,
       "AudioBufferList should contain at least one AudioBuffer")
     return sizeof(AudioBufferList) +
@@ -61,7 +61,7 @@ extension AudioBufferList {
   /// `maximumBuffers`.
   ///
   /// The memory should be freed with `free()`.
-  public static func allocate(maximumBuffers maximumBuffers: Int)
+  public static func allocate(maximumBuffers: Int)
     -> UnsafeMutableAudioBufferListPointer {
     let byteSize = sizeInBytes(maximumBuffers: maximumBuffers)
     let ablMemory = calloc(byteSize, 1)
@@ -69,7 +69,7 @@ extension AudioBufferList {
       "failed to allocate memory for an AudioBufferList")
 
     let abl = UnsafeMutableAudioBufferListPointer(
-        UnsafeMutablePointer<AudioBufferList>(ablMemory))
+        UnsafeMutablePointer<AudioBufferList>(ablMemory!))
     abl.count = maximumBuffers
     return abl
   }
@@ -84,6 +84,12 @@ public struct UnsafeMutableAudioBufferListPointer {
   /// Construct from an `AudioBufferList` pointer.
   public init(_ p: UnsafeMutablePointer<AudioBufferList>) {
     unsafeMutablePointer = p
+  }
+
+  /// Construct from an `AudioBufferList` pointer.
+  public init?(_ p: UnsafeMutablePointer<AudioBufferList>?) {
+    guard let unwrapped = p else { return nil }
+    self.init(unwrapped)
   }
 
   /// The number of `AudioBuffer`s in the `AudioBufferList`
@@ -120,7 +126,11 @@ public struct UnsafeMutableAudioBufferListPointer {
   public var unsafeMutablePointer: UnsafeMutablePointer<AudioBufferList>
 }
 
-extension UnsafeMutableAudioBufferListPointer : MutableCollection {
+extension UnsafeMutableAudioBufferListPointer
+  : MutableCollection, RandomAccessCollection {
+
+  public typealias Index = Int
+
   /// Always zero, which is the index of the first `AudioBuffer`.
   public var startIndex: Int {
     return 0
@@ -144,5 +154,17 @@ extension UnsafeMutableAudioBufferListPointer : MutableCollection {
       (_audioBuffersPointer + index).pointee = newValue
     }
   }
+
+  public subscript(bounds: Range<Int>)
+    -> MutableRandomAccessSlice<UnsafeMutableAudioBufferListPointer> {
+    get {
+      return MutableRandomAccessSlice(base: self, bounds: bounds)
+    }
+    set {
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
+  }
+
+  public typealias Indices = CountableRange<Int>
 }
 

@@ -34,6 +34,16 @@ bool swift::canBeArgumentLabel(StringRef identifier) {
   return true;
 }
 
+bool swift::canBeMemberName(StringRef identifier) {
+  return llvm::StringSwitch<bool>(identifier)
+    .Case("dynamicType", false)
+    .Case("init", false)
+    .Case("Protocol", false)
+    .Case("self", false)
+    .Case("Type", false)
+    .Default(true);
+}
+
 PrepositionKind swift::getPrepositionKind(StringRef word) {
 #define DIRECTIONAL_PREPOSITION(Word)           \
   if (word.equals_lower(#Word))                 \
@@ -332,15 +342,6 @@ size_t camel_case::findWord(StringRef string, StringRef word) {
 
     return index;
   }
-}
-
-/// Determine whether the given identifier is a keyword.
-static bool isKeyword(StringRef identifier) {
-  return llvm::StringSwitch<bool>(identifier)
-#define KEYWORD(kw) .Case(#kw, true)
-#define SIL_KEYWORD(kw)
-#include "swift/Parse/Tokens.def"
-    .Default(false);
 }
 
 /// Skip a type suffix that can be dropped.
@@ -810,9 +811,9 @@ static StringRef omitNeedlessWords(StringRef name,
   case NameRole::BaseName:
   case NameRole::BaseNameSelf:
   case NameRole::Property:
-    // If we ended up with a keyword for a property name or base name,
+    // If we ended up with something that can't be a member name, do nothing.
     // do nothing.
-    if (isKeyword(name))
+    if (!canBeMemberName(name))
       return origName;
 
     // If we ended up with a vacuous name like "get" or "set", do nothing.
@@ -833,6 +834,17 @@ static StringRef omitNeedlessWords(StringRef name,
 
 StringRef camel_case::toLowercaseInitialisms(StringRef string,
                                              StringScratchSpace &scratch) {
+  llvm::SmallString<32> scratchStr;
+  StringRef result = toLowercaseInitialisms(string, scratchStr);
+  if (string == result)
+    return string;
+  return scratch.copyString(result);
+}
+
+StringRef
+camel_case::toLowercaseInitialisms(StringRef string,
+                                   SmallVectorImpl<char> &scratch) {
+
   if (string.empty())
     return string;
 
@@ -863,7 +875,8 @@ StringRef camel_case::toLowercaseInitialisms(StringRef string,
     scratchStr.push_back(clang::toLowercase(string[i]));
   }
 
-  return scratch.copyString(scratchStr);
+  scratch = scratchStr;
+  return {scratch.begin(), scratch.size()};
 }
 
 /// Determine whether the given word occurring before the given
@@ -934,6 +947,16 @@ static bool priorWordExtendsPreposition(StringRef preceding,
   // according to
   if (camel_case::sameWordIgnoreFirstCase(preceding, "according") &&
       camel_case::sameWordIgnoreFirstCase(preposition, "to"))
+    return true;
+
+  // bound by
+  if (camel_case::sameWordIgnoreFirstCase(preceding, "bound") &&
+      camel_case::sameWordIgnoreFirstCase(preposition, "by"))
+    return true;
+
+  // separated by
+  if (camel_case::sameWordIgnoreFirstCase(preceding, "separated") &&
+      camel_case::sameWordIgnoreFirstCase(preposition, "by"))
     return true;
 
   return false;
@@ -1071,7 +1094,7 @@ static bool splitBaseNameAfterLastPreposition(
   {
     auto newWords = camel_case::getWords(newBaseName);
     auto newWordsIter = newWords.begin();
-    bool isKeyword = ::isKeyword(*newWordsIter);
+    bool isKeyword = !canBeMemberName(*newWordsIter);
     bool isVacuous = isVacuousName(*newWordsIter);
     if (isKeyword || isVacuous) {
       // Just one word?
@@ -1195,6 +1218,19 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     }
 
     return lowercaseAcronymsForReturn();
+  }
+
+  if (camel_case::getFirstWord(baseName) == "set") {
+    StringRef newBaseName = ::omitNeedlessWords(
+                              baseName,
+                              contextType,
+                              NameRole::Property,
+                              allPropertyNames,
+                              scratch);
+    if (newBaseName != baseName) {
+      baseName = newBaseName;
+      anyChanges = true;
+    }
   }
 
   // If needed, split the base name.

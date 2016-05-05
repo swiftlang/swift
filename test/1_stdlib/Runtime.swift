@@ -8,13 +8,38 @@ import Swift
 import StdlibUnittest
 import SwiftShims
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
+@warn_unused_result
+@_silgen_name("swift_demangle")
+public
+func _stdlib_demangleImpl(
+  mangledName: UnsafePointer<UInt8>?,
+  mangledNameLength: UInt,
+  outputBuffer: UnsafeMutablePointer<UInt8>?,
+  outputBufferSize: UnsafeMutablePointer<UInt>?,
+  flags: UInt32
+) -> UnsafeMutablePointer<CChar>?
+
+@warn_unused_result
+func _stdlib_demangleName(_ mangledName: String) -> String {
+  return mangledName.nulTerminatedUTF8.withUnsafeBufferPointer {
+    (mangledNameUTF8) in
+
+    let demangledNamePtr = _stdlib_demangleImpl(
+      mangledName: mangledNameUTF8.baseAddress,
+      mangledNameLength: UInt(mangledNameUTF8.count - 1),
+      outputBuffer: nil,
+      outputBufferSize: nil,
+      flags: 0)
+
+    if let demangledNamePtr = demangledNamePtr {
+      let demangledName = String(cString: demangledNamePtr)
+      _swift_stdlib_free(demangledNamePtr)
+      return demangledName
+    }
+    return mangledName
+  }
+}
 
 var swiftObjectCanaryCount = 0
 class SwiftObjectCanary {
@@ -119,7 +144,7 @@ class ClassConformsToP1 : Boolean, Q1 {
 
 class Class2ConformsToP1<T : Boolean> : Boolean, Q1 {
   init(_ value: T) {
-    self.value = [ value ]
+    self.value = [value]
   }
   var boolValue: Bool {
     return value[0].boolValue
@@ -335,9 +360,9 @@ Runtime.test("demangleName") {
 
 Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
   typealias IntPtr = UnsafeMutablePointer<Int>
-  var origP1 = IntPtr(bitPattern: 0x10101010)
-  var origP2 = IntPtr(bitPattern: 0x20202020)
-  var origP3 = IntPtr(bitPattern: 0x30303030)
+  var origP1 = IntPtr(bitPattern: 0x10101010)!
+  var origP2 = IntPtr(bitPattern: 0x20202020)!
+  var origP3 = IntPtr(bitPattern: 0x30303030)!
 
   do {
     var object = origP1
@@ -425,7 +450,7 @@ struct GenericStructWithReferenceStorage<T> {
 }
 
 func exerciseReferenceStorageInGenericContext<T>(
-    x: GenericStructWithReferenceStorage<T>,
+    _ x: GenericStructWithReferenceStorage<T>,
     forceCopy y: GenericStructWithReferenceStorage<T>
 ) {
   expectEqual(x.unownedConcrete.malkovich, "malkovich")
@@ -468,11 +493,11 @@ Runtime.test("Struct layout with reference storage types") {
 
 var Reflection = TestSuite("Reflection")
 
-func wrap1   (x: Any) -> Any { return x }
-func wrap2<T>(x: T)   -> Any { return wrap1(x) }
-func wrap3   (x: Any) -> Any { return wrap2(x) }
-func wrap4<T>(x: T)   -> Any { return wrap3(x) }
-func wrap5   (x: Any) -> Any { return wrap4(x) }
+func wrap1   (_ x: Any) -> Any { return x }
+func wrap2<T>(_ x: T)   -> Any { return wrap1(x) }
+func wrap3   (_ x: Any) -> Any { return wrap2(x) }
+func wrap4<T>(_ x: T)   -> Any { return wrap3(x) }
+func wrap5   (_ x: Any) -> Any { return wrap4(x) }
 
 class JustNeedAMetatype {}
 
@@ -524,7 +549,7 @@ Reflection.test("Struct/Generic/DefaultMirror") {
   do {
     var value = GenericStructWithDefaultMirror<Int, [Any?]>(
       first: 123,
-      second: [ "abc", 456, 789.25 ])
+      second: ["abc", 456, 789.25])
     var output = ""
     dump(value, to: &output)
 
@@ -935,7 +960,7 @@ Reflection.test("CustomMirror") {
     checkEquatable(false, ObjectIdentifier(a), ObjectIdentifier(b))
 
     // Comparable
-    func isComparable<X : Comparable>(x: X) {}
+    func isComparable<X : Comparable>(_ x: X) {}
     isComparable(ObjectIdentifier(a))
     // Check the ObjectIdentifier created is stable
     expectTrue(
@@ -1366,10 +1391,9 @@ Reflection.test("MirrorMirror") {
 
 Reflection.test("OpaquePointer/null") {
   // Don't crash on null pointers. rdar://problem/19708338
-  var sequence: OpaquePointer = nil
-  var mirror = Mirror(reflecting: sequence)
-  var child = mirror.children.first!
-  expectEqual("(Opaque Value)", "\(child.1)")
+  let pointer: OpaquePointer? = nil
+  let mirror = Mirror(reflecting: pointer)
+  expectEqual(0, mirror.children.count)
 }
 
 Reflection.test("StaticString/Mirror") {
@@ -1425,7 +1449,7 @@ Reflection.test("SetIterator/Mirror") {
 
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
-func computeCountLeadingZeroes(x: Int64) -> Int64 {
+func computeCountLeadingZeroes(_ x: Int64) -> Int64 {
   var x = x
   var r: Int64 = 64
   while x != 0 {
@@ -1433,6 +1457,16 @@ func computeCountLeadingZeroes(x: Int64) -> Int64 {
     r -= 1
   }
   return r
+}
+
+BitTwiddlingTestSuite.test("_pointerSize") {
+#if arch(i386) || arch(arm)
+  expectEqual(4, sizeof(Optional<AnyObject>.self))
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+  expectEqual(8, sizeof(Optional<AnyObject>.self))
+#else
+  fatalError("implement")
+#endif
 }
 
 BitTwiddlingTestSuite.test("_countLeadingZeros") {
@@ -1443,7 +1477,7 @@ BitTwiddlingTestSuite.test("_countLeadingZeros") {
 }
 
 BitTwiddlingTestSuite.test("_isPowerOf2/Int") {
-  func asInt(a: Int) -> Int { return a }
+  func asInt(_ a: Int) -> Int { return a }
 
   expectFalse(_isPowerOf2(asInt(-1025)))
   expectFalse(_isPowerOf2(asInt(-1024)))
@@ -1469,7 +1503,7 @@ BitTwiddlingTestSuite.test("_isPowerOf2/Int") {
 }
 
 BitTwiddlingTestSuite.test("_isPowerOf2/UInt") {
-  func asUInt(a: UInt) -> UInt { return a }
+  func asUInt(_ a: UInt) -> UInt { return a }
 
   expectFalse(_isPowerOf2(asUInt(0)))
   expectTrue(_isPowerOf2(asUInt(1)))
@@ -1491,7 +1525,7 @@ var AvailabilityVersionsTestSuite = TestSuite("AvailabilityVersions")
 
 AvailabilityVersionsTestSuite.test("lexicographic_compare") {
   func version(
-    major: Int,
+    _ major: Int,
     _ minor: Int,
     _ patch: Int
   ) -> _SwiftNSOperatingSystemVersion {
@@ -1528,7 +1562,7 @@ AvailabilityVersionsTestSuite.test("lexicographic_compare") {
 }
 
 AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
-  func isAtLeastOS(major: Int, _ minor: Int, _ patch: Int) -> Bool {
+  func isAtLeastOS(_ major: Int, _ minor: Int, _ patch: Int) -> Bool {
     return _getBool(_stdlib_isOSVersionAtLeast(major._builtinWordValue,
                                                minor._builtinWordValue,
                                                patch._builtinWordValue))

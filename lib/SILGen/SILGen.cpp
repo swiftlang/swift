@@ -146,17 +146,9 @@ GET_BRIDGING_FN(ObjectiveC, REQUIRED, Bool, REQUIRED, ObjCBool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, ObjCBool, REQUIRED, Bool)
 GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, REQUIRED, ErrorProtocol)
 GET_BRIDGING_FN(Foundation, REQUIRED, ErrorProtocol, REQUIRED, NSError)
-GET_BRIDGING_FN(Foundation, REQUIRED, String, REQUIRED, NSString)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSString, REQUIRED, String)
-GET_BRIDGING_FN(Foundation, GENERIC, Array, REQUIRED, NSArray)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSArray, GENERIC, Array)
-GET_BRIDGING_FN(Foundation, GENERIC, Set, REQUIRED, NSSet)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSSet, GENERIC, Set)
-GET_BRIDGING_FN(Foundation, GENERIC, Dictionary, REQUIRED, NSDictionary)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSDictionary, GENERIC, Dictionary)
 
 #undef GET_BRIDGING_FN
-#undef REQURIED
+#undef REQUIRED
 #undef OPTIONAL
 #undef GENERIC
 
@@ -308,9 +300,10 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
       Type PointerInt8Ty = BoundGenericType::get(PointerDecl,
                                                  nullptr,
                                                  Int8Decl->getDeclaredType());
+      Type OptPointerInt8Ty = OptionalType::get(PointerInt8Ty);
       PtrPtrInt8Ty = BoundGenericType::get(PointerDecl,
                                            nullptr,
-                                           PointerInt8Ty)
+                                           OptPointerInt8Ty)
         ->getCanonicalType();
     }
   }
@@ -328,10 +321,10 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    None,
                                    C);
 
-  return M.getOrCreateFunction(SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION,
-                               topLevelType, nullptr, Loc, IsBare,
-                               IsNotTransparent, IsNotFragile, IsNotThunk,
-                               SILFunction::NotRelevant);
+  return M.createFunction(SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION,
+                          topLevelType, nullptr, Loc, IsBare,
+                          IsNotTransparent, IsNotFragile, IsNotThunk,
+                          SILFunction::NotRelevant);
 }
 
 SILType SILGenModule::getConstantType(SILDeclRef constant) {
@@ -520,6 +513,28 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
   F->verify();
 }
 
+void SILGenModule::
+emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
+                                             const CaptureInfo &captureInfo) {
+  assert(TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()
+         && "no valid code generator for top-level function?!");
+
+  SmallVector<SILValue, 4> Captures;
+  
+  for (auto capture : captureInfo.getCaptures()) {
+    // Decls captured by value don't escape.
+    auto It = TopLevelSGF->VarLocs.find(capture.getDecl());
+    if (It == TopLevelSGF->VarLocs.end() ||
+        !It->getSecond().value->getType().isAddress())
+      continue;
+    
+    Captures.push_back(It->second.value);
+  }
+  
+  if (!Captures.empty())
+    TopLevelSGF->B.createMarkFunctionEscape(loc, Captures);
+}
+
 void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // Emit any default argument generators.
   {
@@ -535,20 +550,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // reason about this escape point.
   if (!AFD->getDeclContext()->isLocalContext() &&
       TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()) {
-    SmallVector<SILValue, 4> Captures;
-
-    for (auto capture : AFD->getCaptureInfo().getCaptures()) {
-      // Decls captured by value don't escape.
-      auto It = TopLevelSGF->VarLocs.find(capture.getDecl());
-      if (It == TopLevelSGF->VarLocs.end() ||
-          !It->getSecond().value->getType().isAddress())
-        continue;
-
-      Captures.push_back(It->second.value);
-    }
-
-    if (!Captures.empty())
-      TopLevelSGF->B.createMarkFunctionEscape(AFD, Captures);
+    emitMarkFunctionEscapeForTopLevelCodeGlobals(AFD, AFD->getCaptureInfo());
   }
   
   // If the declaration is exported as a C function, emit its native-to-foreign
@@ -593,6 +595,8 @@ void SILGenModule::emitCurryThunk(ValueDecl *fd,
                                   SILDeclRef nextEntryPoint) {
   // Thunks are always emitted by need, so don't need delayed emission.
   SILFunction *f = getFunction(entryPoint, ForDefinition);
+  f->setThunk(IsThunk);
+
   preEmitFunction(entryPoint, fd, f, fd);
   PrettyStackTraceSILFunction X("silgen emitCurryThunk", f);
 
@@ -605,6 +609,9 @@ void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
   // Thunks are always emitted by need, so don't need delayed emission.
   assert(!thunk.isForeign && "foreign-to-native thunks only");
   SILFunction *f = getFunction(thunk, ForDefinition);
+  f->setThunk(IsThunk);
+  if (thunk.asForeign().isClangGenerated())
+    f->setFragile(IsFragile);
   preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
   PrettyStackTraceSILFunction X("silgen emitForeignToNativeThunk", f);
   SILGenFunction(*this, *f).emitForeignToNativeThunk(thunk);
@@ -623,6 +630,7 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
                     thunk.getAbstractClosureExpr());
   PrettyStackTraceSILFunction X("silgen emitNativeToForeignThunk", f);
   f->setBare(IsBare);
+  f->setThunk(IsThunk);
   SILGenFunction(*this, *f).emitNativeToForeignThunk(thunk);
   postEmitFunction(thunk, f);
 }
@@ -697,9 +705,18 @@ void SILGenModule::emitEnumConstructor(EnumElementDecl *decl) {
 }
 
 SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
-  // Closures are emitted by need, so don't required delayed emission.
   SILDeclRef constant(ce);
   SILFunction *f = getFunction(constant, ForDefinition);
+
+  // Generate the closure function, if we haven't already.
+  //
+  // We may visit the same closure expr multiple times in some cases,
+  // for instance, when closures appear as in-line initializers of stored
+  // properties. In these cases the closure will be emitted into every
+  // initializer of the containing type.
+  if (!f->isExternalDeclaration())
+    return f;
+
   preEmitFunction(constant, ce, f, ce);
   PrettyStackTraceSILFunction X("silgen closureexpr", f);
   SILGenFunction(*this, *f).emitClosure(ce);
@@ -858,9 +875,14 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
   auto *f =
-      M.getOrCreateFunction(SILLinkage::Private, funcName, initSILType, nullptr,
-                            SILLocation(binding), IsNotBare, IsNotTransparent,
-                            makeModuleFragile ? IsFragile : IsNotFragile);
+      M.createFunction(makeModuleFragile
+                           ? SILLinkage::Public
+                           : SILLinkage::Private,
+                       funcName, initSILType, nullptr,
+                       SILLocation(binding), IsNotBare, IsNotTransparent,
+                       makeModuleFragile
+                           ? IsFragile
+                           : IsNotFragile);
   f->setDebugScope(
       new (M) SILDebugScope(RegularLocation(binding->getInit(pbdEntry)), f));
   f->setLocation(binding);

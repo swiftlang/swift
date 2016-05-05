@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// An optional type that allows implicit member access.
+@_fixed_layout
 public enum ImplicitlyUnwrappedOptional<Wrapped> : NilLiteralConvertible {
   // The compiler has special knowledge of the existence of
   // `ImplicitlyUnwrappedOptional<Wrapped>`, but always interacts with it using
@@ -56,7 +57,7 @@ extension ImplicitlyUnwrappedOptional : CustomDebugStringConvertible {
 @warn_unused_result
 public // COMPILER_INTRINSIC
 func _stdlib_ImplicitlyUnwrappedOptional_isSome<Wrapped>
-  (`self`: Wrapped!) -> Bool {
+  (_ `self`: Wrapped!) -> Bool {
 
   return `self` != nil
 }
@@ -65,7 +66,7 @@ func _stdlib_ImplicitlyUnwrappedOptional_isSome<Wrapped>
 @warn_unused_result
 public // COMPILER_INTRINSIC
 func _stdlib_ImplicitlyUnwrappedOptional_unwrapped<Wrapped>
-  (`self`: Wrapped!) -> Wrapped {
+  (_ `self`: Wrapped!) -> Wrapped {
 
   switch `self` {
   case .some(let wrapped):
@@ -78,10 +79,6 @@ func _stdlib_ImplicitlyUnwrappedOptional_unwrapped<Wrapped>
 
 #if _runtime(_ObjC)
 extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return Swift._getBridgedObjectiveCType(Wrapped.self)!
-  }
-
   public func _bridgeToObjectiveC() -> AnyObject {
     switch self {
     case .none:
@@ -93,15 +90,15 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
   }
 
   public static func _forceBridgeFromObjectiveC(
-    x: AnyObject,
-    result: inout Wrapped!?
+    _ x: AnyObject,
+    result: inout ImplicitlyUnwrappedOptional<Wrapped>?
   ) {
     result = Swift._forceBridgeFromObjectiveC(x, Wrapped.self)
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
-    x: AnyObject,
-    result: inout Wrapped!?
+    _ x: AnyObject,
+    result: inout ImplicitlyUnwrappedOptional<Wrapped>?
   ) -> Bool {
     let bridged: Wrapped? =
       Swift._conditionallyBridgeFromObjectiveC(x, Wrapped.self)
@@ -115,26 +112,33 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return Swift._isBridgedToObjectiveC(Wrapped.self)
   }
+
+  public static func _unconditionallyBridgeFromObjectiveC(_ source: AnyObject?)
+      -> Wrapped! {
+    var result: ImplicitlyUnwrappedOptional<Wrapped>?
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
 }
 #endif
 
 extension ImplicitlyUnwrappedOptional {
   @available(*, unavailable, message: "Please use nil literal instead.")
   public init() {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, message: "Has been removed in Swift 3.")
   public func map<U>(
-    @noescape f: (Wrapped) throws -> U
+    _ f: @noescape (Wrapped) throws -> U
   ) rethrows -> ImplicitlyUnwrappedOptional<U> {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, message: "Has been removed in Swift 3.")
   public func flatMap<U>(
-      @noescape f: (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>
+      _ f: @noescape (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>
   ) rethrows -> ImplicitlyUnwrappedOptional<U> {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

@@ -34,7 +34,7 @@ func test1a() -> unionSearchFlags {
   return .backwards
 }
 
-func test1b(b : Bool) {
+func test1b(_ b : Bool) {
   _ = 123
   _ = .description == 1 // expected-error{{type of expression is ambiguous without more context}} 
 }
@@ -46,7 +46,7 @@ enum MaybeInt {
   init(_ i: Int) { self = MaybeInt.some(i) }
 }
 
-func test2(a: Int, _ b: Int, _ c: MaybeInt) {
+func test2(_ a: Int, _ b: Int, _ c: MaybeInt) {
   _ = MaybeInt.some(4)
   _ = MaybeInt.some
   _ = MaybeInt.some(b)
@@ -66,7 +66,7 @@ enum ZeroOneTwoThree {
   init (_ i: MaybeInt, _ j: MaybeInt, _ k: MaybeInt) { self = .Unknown(i, j, k) }
 }
 
-func test3(a: ZeroOneTwoThree) {
+func test3(_ a: ZeroOneTwoThree) {
   _ = ZeroOneTwoThree.Three(1,2,3)
   _ = ZeroOneTwoThree.Unknown(
     MaybeInt.none, MaybeInt.some(4), MaybeInt.some(32))
@@ -87,7 +87,7 @@ func test3(a: ZeroOneTwoThree) {
   var _ : Int = .Two // expected-error{{type 'Int' has no member 'Two'}}
 }
 
-func test3a(a: ZeroOneTwoThree) {
+func test3a(_ a: ZeroOneTwoThree) {
   var e : ZeroOneTwoThree = (.Three(1, 2, 3))
   var f = ZeroOneTwoThree.Unknown(.none, .some(4), .some(32))
 
@@ -105,7 +105,7 @@ func test3a(a: ZeroOneTwoThree) {
 
 
 struct CGPoint { var x : Int, y : Int }
-typealias OtherPoint = ( x : Int, y : Int)
+typealias OtherPoint = (x : Int, y : Int)
 
 func test4() {
   var a : CGPoint
@@ -141,16 +141,16 @@ struct CGRect {
   }
 }
 
-func area(r: CGRect) -> Int {
+func area(_ r: CGRect) -> Int {
   return r.size.area()
 }
 
 extension CGRect {
-  func search(x: Int) -> CGSize {}
+  func search(_ x: Int) -> CGSize {}
   func bad_search(_: Int) -> CGSize {}
 }
 
-func test5(myorigin: CGPoint) {
+func test5(_ myorigin: CGPoint) {
   let x1 = CGRect(origin: myorigin, size: CGSize(width: 42, height: 123))
   let x2 = x1
 
@@ -216,7 +216,7 @@ func f() {
   var _ : (UnionTest1) -> () -> () = UnionTest1.bar
 }
 
-func union_error(a: ZeroOneTwoThree) {
+func union_error(_ a: ZeroOneTwoThree) {
   var _ : ZeroOneTwoThree = .Zero(1) // expected-error {{contextual member 'Zero' has no associated value}}
   var _ : ZeroOneTwoThree = .One // expected-error {{contextual member 'One' expects argument of type 'Int'}}
   var _ : ZeroOneTwoThree = .foo // expected-error {{type 'ZeroOneTwoThree' has no member 'foo'}}
@@ -240,7 +240,7 @@ extension Int {
   func cm() -> enumtest.distance {}
 }
 
-func units(x: Int) -> distance {
+func units(_ x: Int) -> distance {
   x.km() - 4.cm() - 42.km()
 }
 

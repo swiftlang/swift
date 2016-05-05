@@ -15,7 +15,7 @@
 import TestsUtils
 
 @inline(never)
-public func run_ArrayAppend(N: Int) {
+public func run_ArrayAppend(_ N: Int) {
   for _ in 0..<N {
     for _ in 0..<10 {
        var nums = [Int]()
@@ -27,7 +27,7 @@ public func run_ArrayAppend(N: Int) {
 }
 
 @inline(never)
-public func run_ArrayAppendReserved(N: Int) {
+public func run_ArrayAppendReserved(_ N: Int) {
   for _ in 0..<N {
     for _ in 0..<10 {
        var nums = [Int]()

@@ -9,7 +9,7 @@
 import Dispatch
 import Foundation
 
-func test(queue: dispatch_queue_t) {
+func test(_ queue: dispatch_queue_t) {
   let base: NSObjectProtocol = queue
   let _: dispatch_object_t = queue
 
@@ -21,7 +21,7 @@ func test(queue: dispatch_queue_t) {
 
 // Make sure you can extend a dispatch type via its common name.
 extension dispatch_queue_t {
-  func async(block: () -> Void) {
+  func async(_ block: () -> Void) {
     dispatch_async(self, block)
   }
 }

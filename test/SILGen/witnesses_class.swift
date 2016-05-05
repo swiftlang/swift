@@ -32,7 +32,7 @@ class Foo: Fooable {
 // CHECK:         strong_release [[SELF]]
 // CHECK-NOT:         strong_release [[SELF]]
 // CHECK:         return
-func gen<T: Fooable>(foo: T) {
+func gen<T: Fooable>(_ foo: T) {
   foo.foo()
 }
 
@@ -45,6 +45,6 @@ func gen<T: Fooable>(foo: T) {
 // CHECK:         strong_release [[SELF]]
 // CHECK-NOT:     strong_release [[SELF]]
 // CHECK:         return
-func ex(foo: Fooable) {
+func ex(_ foo: Fooable) {
   foo.foo()
 }

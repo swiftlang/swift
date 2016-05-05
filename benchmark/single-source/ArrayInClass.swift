@@ -17,7 +17,7 @@ class ArrayContainer {
     arr = [Int] (repeating: 0, count: 100_000)
   }
 
-  func runLoop(N: Int) {
+  func runLoop(_ N: Int) {
     for _ in 0 ..< N {
       for i in 0 ..< arr.count {
         arr[i] = arr[i] + 1
@@ -32,7 +32,7 @@ func getArrayContainer() -> ArrayContainer {
 }
 
 @inline(never)
-public func run_ArrayInClass(N: Int) {
+public func run_ArrayInClass(_ N: Int) {
   let a = getArrayContainer()
   a.runLoop(N)
 }

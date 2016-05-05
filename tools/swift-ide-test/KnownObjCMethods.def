@@ -52,7 +52,7 @@
 //
 // OBJC_PROPERTY(ContextName, PropertyName, OptionalTypeKind)
 //
-//   Describes the optionality if the type of the Objective C property.
+//   Describes the optionality if the type of the Objective-C property.
 //
 
 #ifndef INSTANCE_METHOD

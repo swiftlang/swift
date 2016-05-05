@@ -58,11 +58,23 @@ WARNING(invalid_swift_name_method,none,
   "too %select{few|many}0 parameters in swift_name attribute (expected %1; "
   "got %2)", (bool, unsigned, unsigned))
 
+NOTE(note_while_importing, none, "while importing '%0'", (StringRef))
+ERROR(swift_name_protocol_static, none, "swift_name cannot be used to define "
+                                         "%select{static member|init}0 on "
+                                         "protocol",
+      (bool))
+ERROR(swift_name_no_prototype, none,
+      "swift_name cannot be used on a non-prototyped function declaration", ())
+
 WARNING(inconsistent_swift_name,none,
         "inconsistent Swift name for Objective-C %select{method|property}0 "
         "'%1' in '%2' (%3 in '%4' vs. %5 in '%6')",
         (bool, StringRef, StringRef, DeclName, StringRef, DeclName,
          StringRef))
+
+WARNING(unresolvable_clang_decl,none,
+        "imported declaration '%0' could not be mapped to '%1'",
+        (StringRef, StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

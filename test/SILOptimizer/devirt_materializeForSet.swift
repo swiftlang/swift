@@ -3,7 +3,7 @@
 // Check that compiler does not crash on the devirtualization of materializeForSet methods
 // and produces a correct code.
 
-// CHECK-LABEL: sil [transparent] [thunk] @_TTWC24devirt_materializeForSet7BaseFooS_3FooS_FS1_m3barSS
+// CHECK-LABEL: sil [transparent] [fragile] [thunk] @_TTWC24devirt_materializeForSet7BaseFooS_3FooS_FS1_m3barSS
 // CHECK: checked_cast_br [exact] %{{.*}} : $BaseFoo to $ChildFoo
 // CHECK: thin_function_to_pointer %{{.*}} : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout ChildFoo, @thick ChildFoo.Type) -> () to $Builtin.RawPointer
 // CHECK: enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, %{{.*}} : $Builtin.RawPointer

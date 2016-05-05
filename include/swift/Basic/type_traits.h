@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_TYPE_TRAITS_H
-#define SWIFT_BASIC_TYPE_TRAITS_H
+#ifndef SWIFT_BASIC_TYPETRAITS_H
+#define SWIFT_BASIC_TYPETRAITS_H
 
 #include <type_traits>
 
@@ -63,11 +63,10 @@ struct IsTriviallyDestructible {
 #endif
 };
 
-} // namespace swift
+} // end namespace swift
 
 #ifdef SWIFT_DEFINED_HAS_FEATURE
 #undef __has_feature
 #endif
 
-#endif // SWIFT_BASIC_TYPE_TRAITS_H
-
+#endif // SWIFT_BASIC_TYPETRAITS_H

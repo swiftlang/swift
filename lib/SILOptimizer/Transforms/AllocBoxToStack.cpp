@@ -472,15 +472,16 @@ class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
   friend class SILVisitor<PromotedParamCloner>;
   friend class SILCloner<PromotedParamCloner>;
 
-  PromotedParamCloner(SILFunction *Orig, ParamIndexList &PromotedParamIndices,
-                  llvm::StringRef ClonedName);
+  PromotedParamCloner(SILFunction *Orig, IsFragile_t Fragile,
+                      ParamIndexList &PromotedParamIndices,
+                      llvm::StringRef ClonedName);
 
   void populateCloned();
 
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
 
   private:
-  static SILFunction *initCloned(SILFunction *Orig,
+  static SILFunction *initCloned(SILFunction *Orig, IsFragile_t Fragile,
                                  ParamIndexList &PromotedParamIndices,
                                  llvm::StringRef ClonedName);
 
@@ -498,9 +499,10 @@ class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
 } // end anonymous namespace.
 
 PromotedParamCloner::PromotedParamCloner(SILFunction *Orig,
+                                 IsFragile_t Fragile,
                                  ParamIndexList &PromotedParamIndices,
                                  llvm::StringRef ClonedName)
-  : SILClonerWithScopes<PromotedParamCloner>(*initCloned(Orig,
+  : SILClonerWithScopes<PromotedParamCloner>(*initCloned(Orig, Fragile,
                                                      PromotedParamIndices,
                                                      ClonedName)),
     Orig(Orig), PromotedParamIndices(PromotedParamIndices) {
@@ -509,10 +511,11 @@ PromotedParamCloner::PromotedParamCloner(SILFunction *Orig,
 }
 
 static std::string getClonedName(SILFunction *F,
+                                 IsFragile_t Fragile,
                                  ParamIndexList &PromotedParamIndices) {
   Mangle::Mangler M;
   auto P = SpecializationPass::AllocBoxToStack;
-  FunctionSignatureSpecializationMangler FSSM(P, M, F);
+  FunctionSignatureSpecializationMangler FSSM(P, M, Fragile, F);
   for (unsigned i : PromotedParamIndices)
     FSSM.setArgumentBoxToStack(i);
   FSSM.mangle();
@@ -523,7 +526,7 @@ static std::string getClonedName(SILFunction *F,
 /// original closure with the signature modified to reflect promoted
 /// parameters (which are specified by PromotedParamIndices).
 SILFunction*
-PromotedParamCloner::initCloned(SILFunction *Orig,
+PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
                             ParamIndexList &PromotedParamIndices,
                             llvm::StringRef ClonedName) {
   SILModule &M = Orig->getModule();
@@ -562,9 +565,9 @@ PromotedParamCloner::initCloned(SILFunction *Orig,
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
-  auto *Fn = M.getOrCreateFunction(
+  auto *Fn = M.createFunction(
       SILLinkage::Shared, ClonedName, ClonedTy, Orig->getContextGenericParams(),
-      Orig->getLocation(), Orig->isBare(), IsNotTransparent, Orig->isFragile(),
+      Orig->getLocation(), Orig->isBare(), IsNotTransparent, Fragile,
       Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {
@@ -670,16 +673,21 @@ specializePartialApply(PartialApplyInst *PartialApply,
   auto *F = FRI->getReferencedFunction();
   assert(F && "Expected a referenced function!");
 
-  std::string ClonedName = getClonedName(F, PromotedParamIndices);
+  IsFragile_t Fragile = IsNotFragile;
+  if (PartialApply->getFunction()->isFragile() && F->isFragile())
+    Fragile = IsFragile;
+
+  std::string ClonedName = getClonedName(F, Fragile, PromotedParamIndices);
 
   auto &M = PartialApply->getModule();
 
   SILFunction *ClonedFn;
   if (auto *PrevFn = M.lookUpFunction(ClonedName)) {
+    assert(PrevFn->isFragile() == Fragile);
     ClonedFn = PrevFn;
   } else {
     // Clone the function the existing partial_apply references.
-    PromotedParamCloner Cloner(F, PromotedParamIndices, ClonedName);
+    PromotedParamCloner Cloner(F, Fragile, PromotedParamIndices, ClonedName);
     Cloner.populateCloned();
     ClonedFn = Cloner.getCloned();
   }
@@ -837,7 +845,7 @@ class AllocBoxToStack : public SILFunctionTransform {
 
     for (auto &BB : *getFunction()) {
       auto *Term = BB.getTerminator();
-      if (isa<ReturnInst>(Term) || isa<ThrowInst>(Term))
+      if (Term->isFunctionExiting())
         Returns.push_back(Term);
 
       for (auto &I : BB)

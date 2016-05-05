@@ -20,6 +20,7 @@
 #define SWIFT_DECLCONTEXT_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
@@ -374,6 +375,12 @@ public:
   /// parameters. If the current context is not a generic type context, returns
   /// the maximum depth of any generic parameter in this context.
   unsigned getGenericTypeContextDepth() const;
+
+  /// Get the most optimal resilience expansion for code in this context.
+  /// If the body is able to be inlined into functions in other resilience
+  /// domains, this ensures that only sufficiently-conservative access patterns
+  /// are used.
+  ResilienceExpansion getResilienceExpansion() const;
 
   /// Returns true if lookups within this context could affect downstream files.
   ///

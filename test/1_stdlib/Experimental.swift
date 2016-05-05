@@ -4,19 +4,12 @@
 import SwiftExperimental
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var ExperimentalTestSuite = TestSuite("Experimental")
 
 ExperimentalTestSuite.test("ComposeOperator/SmokeTest") {
-  func incr(x: Int) -> Int { return x + 1 }
-  func twice(x: Int) -> Int { return x * 2 }
+  func incr(_ x: Int) -> Int { return x + 1 }
+  func twice(_ x: Int) -> Int { return x * 2 }
 
   expectEqual(7, (incr ∘ twice)(3))
 }

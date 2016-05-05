@@ -12,11 +12,11 @@ extension String {
   func reallyAString() -> String { return self }
 }
 
-func printString(x: String) {
+func printString(_ x: String) {
   print(x)
 }
 
-func printDescription(o: AnyObject) {
+func printDescription(_ o: AnyObject) {
   print(o.description!.reallyAString())
 }
 
@@ -25,7 +25,7 @@ class Pootie : NSObject {
     return "cole me down on the panny sty"
   }
 
-  func sinePittyOnRunnyKine(x: String) -> String {
+  func sinePittyOnRunnyKine(_ x: String) -> String {
     return "\(x). sa-da-tay"
   }
 }

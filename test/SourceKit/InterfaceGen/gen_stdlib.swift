@@ -53,4 +53,27 @@ var x: Int
 // CHECK-BOOL-NOT: Zip2Iterator
 // CHECK-BOOL-NOT: Zip2Sequence
 // CHECK-BOOL-NOT: struct Int
+// CHECK-BOOL-NOT: struct Float
 // CHECK-BOOL-NOT: extension String
+
+// RUN: %sourcekitd-test -req=interface-gen -module Swift -interested-usr s:Sb > %t.Bool.response
+// RUN: FileCheck -check-prefix=CHECK-BOOL -input-file %t.Bool.response %s
+
+// RUN: %sourcekitd-test -req=interface-gen -module Swift -interested-usr s:Si > %t.Int.response
+// RUN: FileCheck -check-prefix=CHECK-INT -input-file %t.Int.response %s
+
+// CHECK-INT: struct Int
+// CHECK-INT: extension Int
+// CHECK-INT-NOT: Zip2Iterator
+// CHECK-INT-NOT: Zip2Sequence
+// CHECK-INT-NOT: struct Bool
+// CHECK-INT-NOT: struct Float
+
+// RUN: %sourcekitd-test -req=interface-gen -module Swift -interested-usr s:Sf > %t.Float.response
+// RUN: FileCheck -check-prefix=CHECK-FLOAT -input-file %t.Float.response %s
+
+// CHECK-FLOAT: struct Float
+// CHECK-FLOAT-NOT: Zip2Iterator
+// CHECK-FLOAT-NOT: Zip2Sequence
+// CHECK-FLOAT-NOT: struct Bool
+// CHECK-FLOAT-NOT: struct Int

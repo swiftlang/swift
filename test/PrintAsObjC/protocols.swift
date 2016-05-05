@@ -65,13 +65,13 @@ protocol CustomNameType2 {}
   func test()
   static func test2()
 
-  func testRawAnyTypes(any: AnyObject, other: AnyObject.Type)
+  func testRawAnyTypes(_ any: AnyObject, other: AnyObject.Type)
 
-  func testSingleProtocolTypes(a : A, aAgain a2: protocol<A>, b: B, bAgain b2: protocol<B>, both: protocol<A, B>)
-  func testSingleProtocolClassTypes(a : A.Type, aAgain a2: protocol<A>.Type, b: B.Type, bAgain b2: protocol<B>.Type, both: protocol<A, B>.Type)
-  func testComposition(x: protocol<A, ZZZ>, meta xClass: protocol<A, ZZZ>.Type)
+  func testSingleProtocolTypes(_ a : A, aAgain a2: protocol<A>, b: B, bAgain b2: protocol<B>, both: protocol<A, B>)
+  func testSingleProtocolClassTypes(_ a : A.Type, aAgain a2: protocol<A>.Type, b: B.Type, bAgain b2: protocol<B>.Type, both: protocol<A, B>.Type)
+  func testComposition(_ x: protocol<A, ZZZ>, meta xClass: protocol<A, ZZZ>.Type)
 
-  func testOptional(opt: A?, meta m: A.Type?)
+  func testOptional(_ opt: A?, meta m: A.Type?)
 }
 
 // CHECK-LABEL: @interface MyObject : NSObject <NSCoding>

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -primary-file %s  -parse-as-library -emit-sil -O | FileCheck %s
 
-private func recFunc(x: Int32) -> Int32 {
+private func recFunc(_ x: Int32) -> Int32 {
   if x > 0 {
     return recFunc(x - 1)
   }
@@ -19,7 +19,7 @@ func callit() -> Int32 {
   return recFunc(3)
 }
 
-private func recFuncManyCalls(x: Int32) -> Int32 {
+private func recFuncManyCalls(_ x: Int32) -> Int32 {
   if x > 4 {
     return recFuncManyCalls(x - 1)
     + recFuncManyCalls(x - 2)

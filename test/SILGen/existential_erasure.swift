@@ -1,13 +1,13 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 protocol P {
-  func downgrade(m68k: Bool) -> Self
+  func downgrade(_ m68k: Bool) -> Self
   func upgrade() throws -> Self
 }
 protocol Q {}
 
 struct X: P, Q {
-  func downgrade(m68k: Bool) -> X {
+  func downgrade(_ m68k: Bool) -> X {
     return self
   }
 
@@ -18,7 +18,7 @@ struct X: P, Q {
 
 func makePQ() -> protocol<P,Q> { return X() }
 
-func useP(x: P) { }
+func useP(_ x: P) { }
 
 func throwingFunc() throws -> Bool { return true }
 
@@ -39,7 +39,7 @@ func PQtoP() {
 // have an early return.
 
 // CHECK-LABEL: sil hidden @_TF19existential_erasure19openExistentialToP1FzPS_1P_T_
-func openExistentialToP1(p: P) throws {
+func openExistentialToP1(_ p: P) throws {
 // CHECK: bb0(%0 : $*P):
 // CHECK:   [[OPEN:%.*]] = open_existential_addr %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
 // CHECK:   [[RESULT:%.*]] = alloc_stack $P
@@ -64,7 +64,7 @@ func openExistentialToP1(p: P) throws {
 }
 
 // CHECK-LABEL: sil hidden @_TF19existential_erasure19openExistentialToP2FzPS_1P_T_
-func openExistentialToP2(p: P) throws {
+func openExistentialToP2(_ p: P) throws {
 // CHECK: bb0(%0 : $*P):
 // CHECK:   [[OPEN:%.*]] = open_existential_addr %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
 // CHECK:   [[RESULT:%.*]] = alloc_stack $P
@@ -95,7 +95,7 @@ extension ErrorProtocol {
 }
 
 // CHECK-LABEL: sil hidden @_TF19existential_erasure12errorHandlerFzPs13ErrorProtocol_PS0__
-func errorHandler(e: ErrorProtocol) throws -> ErrorProtocol {
+func errorHandler(_ e: ErrorProtocol) throws -> ErrorProtocol {
 // CHECK: bb0(%0 : $ErrorProtocol):
 // CHECK:  debug_value %0 : $ErrorProtocol
 // CHECK:  [[OPEN:%.*]] = open_existential_box %0 : $ErrorProtocol to $*[[OPEN_TYPE:@opened\(.*\) ErrorProtocol]]

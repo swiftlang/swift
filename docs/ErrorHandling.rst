@@ -148,7 +148,7 @@ grammar for function types and implicit ``()`` result types, e.g.::
 
   // Takes a 'callback' function that can throw.
   // 'fred' itself can also throw.
-  func fred(callback: (UInt8) throws -> ()) throws {
+  func fred(_ callback: (UInt8) throws -> ()) throws {
 
   // These are distinct types.
   let a : () -> () -> ()
@@ -159,7 +159,7 @@ grammar for function types and implicit ``()`` result types, e.g.::
 For curried functions, ``throws`` only applies to the innermost
 function.  This function has type ``(Int) -> (Int) throws -> Int``::
 
-  func jerry(i: Int)(j: Int) throws -> Int {
+  func jerry(_ i: Int)(j: Int) throws -> Int {
 
 ``throws`` is tracked as part of the type system: a function value
 must also declare whether it can throw.  Functions that cannot throw
@@ -167,7 +167,7 @@ are a subtype of functions that can, so you can use a function that
 can't throw anywhere you could use a function that can::
 
   func rachel() -> Int { return 12 }
-  func donna(generator: () throws -> Int) -> Int { ... }
+  func donna(_ generator: () throws -> Int) -> Int { ... }
 
   donna(rachel)
 
@@ -190,8 +190,8 @@ override a throwing method or satisfy a throwing protocol requirement.
 It is valuable to be able to overload higher-order functions based on
 whether an argument function throws, so this is allowed::
 
-  func foo(callback: () throws -> Bool) {
-  func foo(callback: () -> Bool) {
+  func foo(_ callback: () throws -> Bool) {
+  func foo(_ callback: () -> Bool) {
 
 ``rethrows``
 ~~~~~~~~~~~~
@@ -200,7 +200,7 @@ Functions which take a throwing function argument (including as an
 autoclosure) can be marked as ``rethrows``::
 
   extension Array {
-    func map<U>(fn: ElementType throws -> U) rethrows -> [U]
+    func map<U>(_ fn: ElementType throws -> U) rethrows -> [U]
   }
 
 It is an error if a function declared ``rethrows`` does not include a
@@ -507,7 +507,7 @@ like this one from ``NSAttributedString``::
 
 would be imported as::
 
-  func dataFromRange(range: NSRange,
+  func dataFromRange(_ range: NSRange,
                      documentAttributes dict: NSDictionary) throws -> NSData
 
 There are a number of cases to consider, but we expect that most can
@@ -637,7 +637,7 @@ can be done in a fairly simple way: a function can declare that it
 throws if any of a set of named arguments do.  As an example (using
 strawman syntax)::
 
-  func map<T,U>(array: [T], fn: T -> U) throwsIf(fn) -> [U] {
+  func map<T, U>(_ array: [T], fn: T -> U) throwsIf(fn) -> [U] {
     ...
   }
 
@@ -726,7 +726,7 @@ more likely, we'd need to wrap them all in an overlay.
 
 In both cases, it is possible to pull these into the Swift error
 handling model, but because this is likely to require massive SDK
-annotations it is considered out of scope for iOS 9/OSX 10.11 & Swift 2.0.
+annotations it is considered out of scope for iOS 9/OS X 10.11 & Swift 2.0.
 
 Unexpected and universal errors
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

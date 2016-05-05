@@ -38,7 +38,7 @@ typealias basicTypealias = Int
 typealias DSI = MyType<String, Int>
 typealias DS<T> = MyType<String, T>
 
-typealias BadA<T : Int> = MyType<String, T>  // expected-error {{type parameters may not be constrained in typealias argument list}}
+typealias BadA<T : Int> = MyType<String, T>  // expected-error {{inheritance from non-protocol, non-class type 'Int'}}
 
 typealias BadB<T where T == Int> = MyType<String, T>  // expected-error {{associated types may not have a generic parameter list}}
 // expected-error @-1 {{same-type requirement makes generic parameter 'T' non-generic}}
@@ -60,7 +60,6 @@ func f() {
 }
 
 
-
 typealias A<T1, T2> = MyType<T2, T1>  // expected-note {{generic type 'A' declared here}}
 
 typealias B<T1> = MyType<T1, T1>  // expected-note {{'T1' declared as parameter to type 'B'}}
@@ -72,7 +71,7 @@ typealias D<T1, T2, T3> = MyType<T2, T1>  // expected-note {{'T3' declared as pa
 
 typealias E<T1, T2> = Int  // expected-note {{generic type 'E' declared here}}
 
-typealias F<T1, T2> = T1->T2
+typealias F<T1, T2> = T1 -> T2
 
 // Type alias of type alias.
 typealias G<S1, S2> = A<S1, S2>
@@ -90,8 +89,6 @@ let _ : D = D<Int, Int, Float>(a: 1, b: 2)
 
 // expected-error @+1 {{generic parameter 'T3' could not be inferred}}
 let _ : D<Int, Int, Float> = D(a: 1, b: 2)
-
-
 
 let _ : F = { (a : Int) -> Int in a }  // Infer the types of F
 
@@ -114,6 +111,34 @@ _ = G(a: "foo", b: 42)
 _ = G<Int, String>(a: "foo", b: 42)
 
 
+struct MyTypeWithHashable<TyA, TyB : Hashable> {
+}
+
+typealias MTWHInt<HT : Hashable> = MyTypeWithHashable<Int, HT>
+typealias MTWHInt2<HT> = MyTypeWithHashable<Int, HT> // expected-error {{type 'HT' does not conform to protocol 'Hashable'}}
+
+func f(a : MyTypeWithHashable<Int, Int>) {
+  f(a: MyTypeWithHashable<Int, Int>())
+  f(a: MTWHInt<Int>())
+}
+
+
+
+
+// FIXME: Nested generic typealiases aren't working yet.
+struct GenericStruct<T> {
+  typealias TA<U> = MyType<T, U>
+  
+  func testCapture<S>(s : S, t : T) -> TA<S> {  // expected-error {{cannot specialize non-generic type 'MyType<T, U>'}}
+    return TA<S>(a: t, b : s)
+  }
+}
+
+let _ = GenericStruct<Int>.TA<Float>(a: 4.0, b: 1)  // expected-error {{'Int' is not convertible to 'Float'}}
+
+let _ : GenericStruct<Int>.TA<Float>  // expected-error {{cannot specialize non-generic type 'MyType<Int, U>'}}
+
+
 
 extension A {}  // expected-error {{non-nominal type 'A' cannot be extended}}
 extension A<T> {}  // expected-error {{generic type 'A' specialized with too few type parameters (got 1, but expected 2)}}
@@ -132,14 +157,64 @@ protocol CB {
   associatedtype C : Col
   typealias E = C.Elem
   
-  func setIt(element: E)
+  func setIt(_ element: E)
 }
 
-func go1<T : CB, U : Col where U.Elem == T.E>(col: U, builder: T) {
+func go1<T : CB, U : Col where U.Elem == T.E>(_ col: U, builder: T) { // OK
   builder.setIt(col.elem)
 }
-func go2<T : CB, U : Col where U.Elem == T.C.Elem>(col: U, builder: T) { // OK
+func go2<T : CB, U : Col where U.Elem == T.C.Elem>(_ col: U, builder: T) { // OK
   builder.setIt(col.elem)
+}
+
+// Test for same type requirement with typealias == concrete
+func go3<T : CB where T.E == Int>(_ builder: T) {
+  builder.setIt(1)
+}
+
+// Test for conformance to protocol with associatedtype and another with typealias with same name.
+protocol MyIterator {
+  associatedtype Elem
+  
+  func next() -> Elem?
+}
+
+protocol MySeq {
+  associatedtype I : MyIterator
+  typealias Elem = Self.I.Elem
+  
+  func makeIterator() -> I
+  func getIndex(_ i: Int) -> Elem
+  func first() -> Elem
+}
+
+extension MySeq where Self : MyIterator {
+  func makeIterator() -> Self {
+    return self
+  }
+}
+
+func plusOne<S: MySeq where S.Elem == Int>(_ s: S, i: Int) -> Int {
+  return s.getIndex(i) + 1
+}
+
+struct OneIntSeq: MySeq, MyIterator {
+  let e : Float
+  
+  func next() -> Float? {
+    return e
+  }
+  
+  func getIndex(_ i: Int) -> Float {
+    return e
+  }
+}
+
+// test for conformance correctness using typealias in extension
+extension MySeq {
+  func first() -> Elem {
+    return getIndex(0)
+  }
 }
 
 // Specific diagnosis for trying to use complex typealiases in generic constraints
@@ -152,7 +227,7 @@ protocol P2 {
     associatedtype B
 }
 
-func go3<T : P1, U : P2 where T.F == U.B>(x: T) -> U { // expected-error {{typealias 'F' is too complex to be used as a generic constraint; use an associatedtype instead}} expected-error {{'F' is not a member type of 'T'}}
+func go3<T : P1, U : P2 where T.F == U.B>(_ x: T) -> U { // expected-error {{typealias 'F' is too complex to be used as a generic constraint; use an associatedtype instead}} expected-error {{'F' is not a member type of 'T'}}
 }
 
 // Specific diagnosis for things that look like Swift 2.x typealiases
@@ -162,3 +237,13 @@ protocol P3 {
   
   associatedtype V : P2 = // expected-error {{expected type in associatedtype declaration}}
 }
+
+// Test for not crashing on self and recursive aliases
+protocol P4 {
+  typealias X = Self
+  typealias Y = Self.Y // expected-error {{type alias 'Y' circularly references itself}}
+  
+  func getSelf() -> X
+}
+
+

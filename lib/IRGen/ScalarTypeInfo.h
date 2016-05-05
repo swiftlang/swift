@@ -127,7 +127,7 @@ public:
                   Explosion &out) const override {
     addr = asDerived().projectScalar(IGF, addr);
     llvm::Value *value = IGF.Builder.CreateLoad(addr);
-    asDerived().emitScalarRetain(IGF, value);
+    asDerived().emitScalarRetain(IGF, value, Atomicity::Atomic);
     out.add(value);
   }
 
@@ -153,31 +153,33 @@ public:
 
     // Release the old value if we need to.
     if (!Derived::IsScalarPOD) {
-      asDerived().emitScalarRelease(IGF, oldValue);
+      asDerived().emitScalarRelease(IGF, oldValue, Atomicity::Atomic);
     }
   }
 
-  void copy(IRGenFunction &IGF, Explosion &in, Explosion &out) const override {
+  void copy(IRGenFunction &IGF, Explosion &in, Explosion &out,
+            Atomicity atomicity) const override {
     llvm::Value *value = in.claimNext();
-    asDerived().emitScalarRetain(IGF, value);
+    asDerived().emitScalarRetain(IGF, value, atomicity);
     out.add(value);
   }
-  
-  void consume(IRGenFunction &IGF, Explosion &in) const override {
+
+  void consume(IRGenFunction &IGF, Explosion &in,
+               Atomicity atomicity) const override {
     llvm::Value *value = in.claimNext();
-    asDerived().emitScalarRelease(IGF, value);
+    asDerived().emitScalarRelease(IGF, value, atomicity);
   }
 
   void fixLifetime(IRGenFunction &IGF, Explosion &in) const override {
     llvm::Value *value = in.claimNext();
     asDerived().emitScalarFixLifetime(IGF, value);
   }
-  
+
   void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
     if (!Derived::IsScalarPOD) {
       addr = asDerived().projectScalar(IGF, addr);
       llvm::Value *value = IGF.Builder.CreateLoad(addr, "toDestroy");
-      asDerived().emitScalarRelease(IGF, value);
+      asDerived().emitScalarRelease(IGF, value, Atomicity::Atomic);
     }
   }
   
@@ -193,6 +195,14 @@ public:
                              Explosion &dest,
                              unsigned offset) const override {
     dest.add(payload.extractValue(IGF, asDerived().getScalarType(), offset));
+  }
+
+  void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                        Size offset) const override {
+    LoadableTypeInfo::addScalarToAggLowering(IGM, lowering,
+                                             asDerived().getScalarType(),
+                                             offset,
+                                           asDerived().Derived::getFixedSize());
   }
 };
 
@@ -214,11 +224,11 @@ private:
   friend class SingleScalarTypeInfo<Derived, Base>;
   static const bool IsScalarPOD = true;
 
-  void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
-  }
+  void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
+                        Atomicity atomicity) const {}
 
-  void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
-  }
+  void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
+                         Atomicity atomicity) const {}
 
   void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
   }

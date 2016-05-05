@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Here's some fun facts about the target platforms we support!
+// Here are some fun facts about the target platforms we support!
 //
 //===----------------------------------------------------------------------===//
 
@@ -72,7 +72,6 @@
 #define SWIFT_ABI_DARWIN_X86_64_LEAST_VALID_POINTER (4ULL*1024*1024*1024)
 
 // Only the bottom 56 bits are used, and heap objects are eight-byte-aligned.
-// 
 #define SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK 0xFF00000000000007ULL
 
 // Objective-C reserves the high and low bits for tagged pointers.
@@ -93,7 +92,7 @@
 #define SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK 0x8000000000000000ULL
 #define SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS 0
 
-/*********************************** powerpc64 ************************************/
+/*********************************** powerpc64 ********************************/
 
 // Heap objects are pointer-aligned, so the low three bits are unused.
 #define SWIFT_ABI_POWERPC64_SWIFT_SPARE_BITS_MASK 0x0000000000000007ULL

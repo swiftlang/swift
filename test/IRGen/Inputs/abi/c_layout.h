@@ -65,6 +65,13 @@ struct HasRecursivePointers {
   void (*getNext)(struct HasRecursivePointers);
 };
 
+struct HasNestedUnion {
+  struct {
+    int x;
+    float f;
+  } s;
+};
+
 // Test sign extension behavior
 
 char chareth(char a);

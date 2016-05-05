@@ -17,10 +17,14 @@ import SwiftPrivateAttr
 // are available in that case and /not/ in the normal import case.
 
 // CHECK-LABEL: define{{( protected)?}} void @{{.+}}12testProperty
-public func testProperty(foo: Foo) {
+public func testProperty(_ foo: Foo) {
   // CHECK: @"\01L_selector(setPrivValue:)"
   _ = foo.__privValue
   foo.__privValue = foo
+
+  // CHECK: @"\01L_selector(setPrivClassValue:)"
+  _ = Foo.__privClassValue
+  Foo.__privClassValue = foo
   
 #if !IRGEN
   _ = foo.privValue // expected-error {{value of type 'Foo' has no member 'privValue'}}
@@ -28,7 +32,7 @@ public func testProperty(foo: Foo) {
 }
 
 // CHECK-LABEL: define{{( protected)?}} void @{{.+}}11testMethods
-public func testMethods(foo: Foo) {
+public func testMethods(_ foo: Foo) {
   // CHECK: @"\01L_selector(noArgs)"
   foo.__noArgs()
   // CHECK: @"\01L_selector(oneArg:)"
@@ -57,7 +61,7 @@ public func testFactoryMethods() {
 }
 
 #if !IRGEN
-public func testSubscript(foo: Foo) {
+public func testSubscript(_ foo: Foo) {
   _ = foo[foo] // expected-error {{type 'Foo' has no subscript members}}
   _ = foo[1] // expected-error {{type 'Foo' has no subscript members}}
 }
@@ -85,7 +89,7 @@ public func testTopLevel() {
 }
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMaCSo12__PrivFooSub{{.*}} {
-// CHECK: %objc_class* @"OBJC_CLASS_$_PrivFooSub"
+// CHECK: %objc_class** @"OBJC_CLASS_REF_$_PrivFooSub"
 // CHECK: }
 
 // CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfT2__Vs5Int32_GSQS__
@@ -114,7 +118,7 @@ func testUnavailableRefs() {
 }
 #endif
 
-func testCF(a: __PrivCFType, b: __PrivCFSub, c: __PrivInt) {
+func testCF(_ a: __PrivCFType, b: __PrivCFSub, c: __PrivInt) {
   makeSureAnyObject(a)
   makeSureAnyObject(b)
 #if !IRGEN

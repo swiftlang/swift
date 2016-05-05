@@ -20,7 +20,7 @@
 
 
 
-// CHECK-LABEL: sil hidden [fragile] @_TFVs1X4testfT_T_ : $@convention(method) (X) -> ()
+// CHECK-LABEL: sil [fragile] @_TFVs1X4testfT_T_ : $@convention(method) (X) -> ()
 // CHECK: bb0
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()

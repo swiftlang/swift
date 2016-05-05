@@ -28,11 +28,14 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-STATISTIC(NumSunk,   "Number of instructions sunk");
-STATISTIC(NumRefCountOpsSimplified, "number of enum ref count ops simplified.");
+STATISTIC(NumSunk, "Number of instructions sunk");
+STATISTIC(NumRefCountOpsSimplified, "Number of enum ref count ops simplified");
 STATISTIC(NumHoisted, "Number of instructions hoisted");
+
+llvm::cl::opt<bool> DisableSILRRCodeMotion("disable-sil-cm-rr-cm", llvm::cl::init(true));
 
 using namespace swift;
 
@@ -74,12 +77,12 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
     // And our payload is refcounted, insert a strong_retain onto the
     // payload.
     if (UEDITy.isReferenceCounted(Mod)) {
-      Builder.createStrongRetain(I->getLoc(), UEDI);
+      Builder.createStrongRetain(I->getLoc(), UEDI, Atomicity::Atomic);
       return;
     }
 
     // Otherwise, insert a retain_value on the payload.
-    Builder.createRetainValue(I->getLoc(), UEDI);
+    Builder.createRetainValue(I->getLoc(), UEDI, Atomicity::Atomic);
     return;
   }
 
@@ -90,13 +93,13 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
 
   // If our payload has reference semantics, insert the strong release.
   if (UEDITy.isReferenceCounted(Mod)) {
-    Builder.createStrongRelease(I->getLoc(), UEDI);
+    Builder.createStrongRelease(I->getLoc(), UEDI, Atomicity::Atomic);
     return;
   }
 
   // Otherwise if our payload is non-trivial but lacking reference semantics,
   // insert the release_value.
-  Builder.createReleaseValue(I->getLoc(), UEDI);
+  Builder.createReleaseValue(I->getLoc(), UEDI, Atomicity::Atomic);
 }
 
 //===----------------------------------------------------------------------===//
@@ -859,10 +862,10 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
 
     Builder.setInsertionPoint(&*SuccBB->begin());
     if (isa<StrongRetainInst>(I)) {
-      Builder.createStrongRetain(I->getLoc(), Ptr);
+      Builder.createStrongRetain(I->getLoc(), Ptr, Atomicity::Atomic);
     } else {
       assert(isa<RetainValueInst>(I) && "This can only be retain_value");
-      Builder.createRetainValue(I->getLoc(), Ptr);
+      Builder.createRetainValue(I->getLoc(), Ptr, Atomicity::Atomic);
     }
   }
 
@@ -963,10 +966,12 @@ static bool hoistDecrementsToPredecessors(SILBasicBlock *BB, AliasAnalysis *AA,
       Builder.setInsertionPoint(PredBB->getTerminator());
       SILInstruction *Release;
       if (isa<StrongReleaseInst>(Inst)) {
-        Release = Builder.createStrongRelease(Inst->getLoc(), Ptr);
+        Release =
+            Builder.createStrongRelease(Inst->getLoc(), Ptr, Atomicity::Atomic);
       } else {
         assert(isa<ReleaseValueInst>(Inst) && "This can only be retain_value");
-        Release = Builder.createReleaseValue(Inst->getLoc(), Ptr);
+        Release =
+            Builder.createReleaseValue(Inst->getLoc(), Ptr, Atomicity::Atomic);
       }
       // Update the last instruction to consider when looking for ARC uses or
       // decrements in predecessor blocks.
@@ -1648,7 +1653,8 @@ sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA,
     // TODO: Which debug loc should we use here? Using one of the locs from the
     // delete list seems reasonable for now...
     SILBuilder(getBB()->begin()).createRetainValue(DeleteList[0]->getLoc(),
-                                                   EnumValue);
+                                                   EnumValue,
+                                                   Atomicity::Atomic);
     for (auto *I : DeleteList)
       I->eraseFromParent();
     ++NumSunk;
@@ -1716,11 +1722,12 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     Changed |= State.process();
 
     // Finally we try to sink retain instructions from this BB to the next BB.
-    Changed |= sinkRefCountIncrement(State.getBB(), AA, RCIA);
+    if (!DisableSILRRCodeMotion)
+      Changed |= sinkRefCountIncrement(State.getBB(), AA, RCIA);
 
     // And hoist decrements to predecessors. This is beneficial if we can then
     // match them up with an increment in some of the predecessors.
-    if (HoistReleases)
+    if (!DisableSILRRCodeMotion && HoistReleases)
       Changed |= hoistDecrementsToPredecessors(State.getBB(), AA, RCIA);
   }
 

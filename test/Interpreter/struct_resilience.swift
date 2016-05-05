@@ -7,13 +7,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import resilient_struct
 
@@ -108,7 +101,7 @@ ResilientStructTestSuite.test("DynamicLayout") {
   }
 }
 
-@inline(never) func getB(p: MyResilientLayoutProtocol) -> Bool {
+@inline(never) func getB(_ p: MyResilientLayoutProtocol) -> Bool {
   return p.b1.b
 }
 
@@ -140,7 +133,7 @@ struct StructWithDependentAssociatedType : ProtocolWithAssociatedType {
   }
 }
 
-@inline(never) func getAssociatedType<T : ProtocolWithAssociatedType>(p: T)
+@inline(never) func getAssociatedType<T : ProtocolWithAssociatedType>(_ p: T)
     -> MyResilientLayoutProtocol.Type {
   return T.T.self
 }

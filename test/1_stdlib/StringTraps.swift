@@ -9,13 +9,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var StringTraps = TestSuite("StringTraps")
 
@@ -26,10 +19,10 @@ StringTraps.test("startIndex/predecessor")
   .code {
   var s = "abc"
   var i = s.startIndex
-  i = i.successor()
-  i = i.predecessor()
+  i = s.index(after: i)
+  i = s.index(before: i)
   expectCrashLater()
-  i = i.predecessor()
+  i = s.index(before: i)
 }
 
 StringTraps.test("endIndex/successor")
@@ -39,11 +32,11 @@ StringTraps.test("endIndex/successor")
   .code {
   var s = "abc"
   var i = s.startIndex
-  i = i.successor()
-  i = i.successor()
-  i = i.successor()
+  i = s.index(after: i)
+  i = s.index(after: i)
+  i = s.index(after: i)
   expectCrashLater()
-  i = i.successor()
+  i = s.index(after: i)
 }
 
 StringTraps.test("subscript(_:)/endIndex")
@@ -53,9 +46,9 @@ StringTraps.test("subscript(_:)/endIndex")
   .code {
   var s = "abc"
   var i = s.startIndex
-  i = i.successor()
-  i = i.successor()
-  i = i.successor()
+  i = s.index(after: i)
+  i = s.index(after: i)
+  i = s.index(after: i)
   expectCrashLater()
   s[i]
 }
@@ -67,11 +60,11 @@ StringTraps.test("UTF8ViewEndIndexSuccessor")
   .code {
   var s = "abc"
   var i = s.utf8.startIndex
-  i = i.successor()
-  i = i.successor()
-  i = i.successor()
+  i = s.utf8.index(after: i)
+  i = s.utf8.index(after: i)
+  i = s.utf8.index(after: i)
   expectCrashLater()
-  i = i.successor()
+  i = s.utf8.index(after: i)
 }
 
 StringTraps.test("UTF8ViewSubscript/endIndex")
@@ -81,9 +74,9 @@ StringTraps.test("UTF8ViewSubscript/endIndex")
   .code {
   var s = "abc"
   var i = s.utf8.startIndex
-  i = i.successor()
-  i = i.successor()
-  i = i.successor()
+  i = s.utf8.index(after: i)
+  i = s.utf8.index(after: i)
+  i = s.utf8.index(after: i)
   expectCrashLater()
   s.utf8[i]
 }
@@ -95,7 +88,7 @@ StringTraps.test("UTF16ViewSubscript/DecrementedStartIndex")
   .code {
   var s = "abc"
   var i = s.utf16.startIndex
-  i = i.predecessor()
+  i = s.utf16.index(before: i)
   expectCrashLater()
   s.utf16[i]
 }
@@ -107,9 +100,9 @@ StringTraps.test("UTF16ViewSubscript/endIndex")
   .code {
   var s = "abc"
   var i = s.utf16.startIndex
-  i = i.successor()
-  i = i.successor()
-  i = i.successor()
+  i = s.utf16.index(after: i)
+  i = s.utf16.index(after: i)
+  i = s.utf16.index(after: i)
   expectCrashLater()
   s.utf16[i]
 }

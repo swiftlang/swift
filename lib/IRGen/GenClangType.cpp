@@ -213,9 +213,9 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
 #undef CHECK_NAMED_TYPE
 
   // Map vector types to the corresponding C vectors.
-#define MAP_SIMD_TYPE(TYPE_NAME, CLANG_KIND)                           \
+#define MAP_SIMD_TYPE(TYPE_NAME, _, BUILTIN_KIND)                      \
   if (name.startswith(#TYPE_NAME)) {                                   \
-    return getClangVectorType(ctx, clang::BuiltinType::CLANG_KIND,     \
+    return getClangVectorType(ctx, clang::BuiltinType::BUILTIN_KIND,   \
                               clang::VectorType::GenericVector,        \
                               name.drop_front(sizeof(#TYPE_NAME)-1));  \
   }
@@ -223,6 +223,30 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
 
   // Everything else we see here ought to be a translation of a builtin.
   return Converter.reverseBuiltinTypeMapping(IGM, type);
+}
+
+static clang::CanQualType getClangBuiltinTypeFromTypedef(
+                      const clang::ASTContext &context, StringRef typedefName) {
+  auto identifier = &context.Idents.get(typedefName);
+  auto lookup = context.getTranslationUnitDecl()->lookup(identifier);
+  
+  clang::TypedefDecl *typedefDecl = nullptr;
+  for (auto found : lookup) {
+    auto foundTypedef = dyn_cast<clang::TypedefDecl>(found);
+    if (!foundTypedef)
+      continue;
+    typedefDecl = foundTypedef;
+    break;
+  }
+  if (!typedefDecl)
+    return {};
+  
+  auto underlyingTy =
+    context.getCanonicalType(typedefDecl->getUnderlyingType());
+  
+  if (underlyingTy->getAs<clang::BuiltinType>())
+    return underlyingTy;
+  return {};
 }
 
 clang::CanQualType
@@ -260,6 +284,22 @@ ClangTypeConverter::reverseBuiltinTypeMapping(IRGenModule &IGM,
                              clang::BuiltinType::Kind builtinKind) {
     CanType swiftType = getNamedSwiftType(stdlib, swiftName);
     if (!swiftType) return;
+    
+    // Handle Int and UInt specially. On Apple platforms, these correspond to
+    // the NSInteger and NSUInteger typedefs, so map them back to those typedefs
+    // if they're available, to ensure we get consistent ObjC @encode strings.
+    if (swiftType->getAnyNominal() == IGM.Context.getIntDecl()) {
+      if (auto NSIntegerTy = getClangBuiltinTypeFromTypedef(ctx, "NSInteger")) {
+        Cache.insert({swiftType, NSIntegerTy});
+        return;
+      }
+    } else if (swiftType->getAnyNominal() == IGM.Context.getUIntDecl()) {
+      if (auto NSUIntegerTy =
+            getClangBuiltinTypeFromTypedef(ctx, "NSUInteger")) {
+        Cache.insert({swiftType, NSUIntegerTy});
+        return;
+      }
+    }
 
     Cache.insert({swiftType, getClangBuiltinTypeFromKind(ctx, builtinKind)});
   };
@@ -381,7 +421,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   // The first two are structs; the last is an enum.
   OptionalTypeKind OTK;
   if (auto underlyingTy = SILType::getPrimitiveObjectType(type)
-        .getAnyOptionalObjectType(*IGM.SILMod, OTK)) {
+        .getAnyOptionalObjectType(IGM.getSILModule(), OTK)) {
     // The underlying type could be a bridged type, which makes any
     // sort of casual assertion here difficult.
     return Converter.convert(IGM, underlyingTy.getSwiftRValueType());
@@ -730,9 +770,15 @@ clang::CanQualType IRGenModule::getClangType(SILParameterInfo params) {
   auto clangType = getClangType(params.getSILType());
   // @block_storage types must be @inout_aliasable and have
   // special lowering
-  if (params.isIndirectMutating() &&
-      !params.getSILType().is<SILBlockStorageType>()) {
-    return getClangASTContext().getPointerType(clangType);
+  if (!params.getSILType().is<SILBlockStorageType>()) {
+    if (params.isIndirectMutating()) {
+      return getClangASTContext().getPointerType(clangType);
+    }
+    if (params.isIndirect()) {
+      auto constTy =
+        getClangASTContext().getCanonicalType(clangType.withConst());
+      return getClangASTContext().getPointerType(constTy);
+    }
   }
   return clangType;
 }

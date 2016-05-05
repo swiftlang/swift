@@ -3,9 +3,9 @@
 func foo() -> String? { return "" }
 func bar() -> String? { return "" }
 
-func a(x: String) {}
-func b(x: String) {}
-func c(x: String) {}
+func a(_ x: String) {}
+func b(_ x: String) {}
+func c(_ x: String) {}
 
 func marker_1() {}
 func marker_2() {}
@@ -112,7 +112,7 @@ func while_loop() {
 // CHECK:         br [[COND]]
 // CHECK:       [[DONE]]:
 // CHECK:         strong_release %0
-func while_loop_generic<T>(source: () -> T?) {
+func while_loop_generic<T>(_ source: () -> T?) {
   while let x = source() {
   }
 }
@@ -244,7 +244,7 @@ func if_multi_where() {
 
 // <rdar://problem/19797158> Swift 1.2's "if" has 2 behaviours. They could be unified.
 // CHECK-LABEL: sil hidden @_TF16if_while_binding18if_leading_booleanFSiT_
-func if_leading_boolean(a : Int) {
+func if_leading_boolean(_ a : Int) {
   // Test the boolean condition.
   
   // CHECK: debug_value %0 : $Int, let, name "a"
@@ -278,7 +278,7 @@ class BaseClass {}
 class DerivedClass : BaseClass {}
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding20testAsPatternInIfLetFGSqCS_9BaseClass_T_
-func testAsPatternInIfLet(a : BaseClass?) {
+func testAsPatternInIfLet(_ a : BaseClass?) {
   // CHECK: bb0(%0 : $Optional<BaseClass>):
   // CHECK-NEXT:   debug_value %0 : $Optional<BaseClass>, let, name "a"
   // CHECK-NEXT:   retain_value %0 : $Optional<BaseClass>
@@ -316,7 +316,7 @@ func testAsPatternInIfLet(a : BaseClass?) {
 
 // <rdar://problem/22312114> if case crashes swift - bools not supported in let/else yet
 // CHECK-LABEL: sil hidden @_TF16if_while_binding12testCaseBoolFGSqSb_T_
-func testCaseBool(value : Bool?) {
+func testCaseBool(_ value : Bool?) {
   // CHECK: bb0(%0 : $Optional<Bool>):
   // CHECK: switch_enum %0 : $Optional<Bool>, case #Optional.some!enumelt.1: bb1, default bb3
   // CHECK: bb1(%3 : $Bool):

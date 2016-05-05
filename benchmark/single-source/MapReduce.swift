@@ -14,7 +14,7 @@ import TestsUtils
 import Foundation
 
 @inline(never)
-public func run_MapReduce(N: Int) {
+public func run_MapReduce(_ N: Int) {
   var numbers = [Int](0..<1000)
 
   var c = 0

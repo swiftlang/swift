@@ -35,12 +35,12 @@ infix operator => {}
 
 func => <K, V>(k: K, v: V) -> (K,V) { return (k,v) }
 
-func useIntList(l: IntList) {}
-func useDoubleList(l: DoubleList) {}
-func useIntDict(l: IntDict) {}
-func useDoubleDict(l: DoubleDict) {}
-func useList<T>(l: List<T>) {}
-func useDict<K,V>(d: Dict<K,V>) {}
+func useIntList(_ l: IntList) {}
+func useDoubleList(_ l: DoubleList) {}
+func useIntDict(_ l: IntDict) {}
+func useDoubleDict(_ l: DoubleDict) {}
+func useList<T>(_ l: List<T>) {}
+func useDict<K,V>(_ d: Dict<K,V>) {}
 
 useIntList([1,2,3])
 useIntList([1.0,2,3]) // expected-error{{cannot convert value of type 'Double' to expected element type 'Int'}}

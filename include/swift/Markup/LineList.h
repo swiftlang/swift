@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_MARKUP_LINELIST_H
-#define LLVM_MARKUP_LINELIST_H
+#ifndef SWIFT_MARKUP_LINELIST_H
+#define SWIFT_MARKUP_LINELIST_H
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/SourceLoc.h"
 
-namespace llvm {
+namespace swift {
 namespace markup {
 
 class MarkupContext;
@@ -76,6 +76,6 @@ public:
 };
 
 } // namespace markup
-} // namespace llvm
+} // namespace swift
 
-#endif // LLVM_MARKUP_LINELIST_H
+#endif // SWIFT_MARKUP_LINELIST_H

@@ -180,6 +180,20 @@ public:
     auto wtable = IGF.tryGetLocalTypeData(archetype, localDataKind);
     if (wtable) return wtable;
 
+    // It can happen with class constraints that Sema will consider a
+    // constraint to be abstract, but the minimized signature will
+    // eliminate it as concrete.  Handle this by performing a concrete
+    // lookup.
+    // TODO: maybe Sema shouldn't ever do this?
+    if (Type classBound = archetype->getSuperclass()) {
+      auto conformance =
+        IGF.IGM.getSwiftModule()->lookupConformance(classBound, protocol,
+                                                    nullptr);
+      if (conformance && conformance->isConcrete()) {
+        return emitWitnessTableRef(IGF, archetype, *conformance);
+      }
+    }
+
     // If that's not present, this conformance must be implied by some
     // associated-type relationship.
     auto accessPath =

@@ -1342,12 +1342,17 @@ bool irgen::hasDependentValueWitnessTable(IRGenModule &IGM, CanType ty) {
 
 static void addValueWitnessesForAbstractType(IRGenModule &IGM,
                                  CanType abstractType,
-                                 SmallVectorImpl<llvm::Constant*> &witnesses) {
+                                 SmallVectorImpl<llvm::Constant*> &witnesses,
+                                 bool &canBeConstant) {
   CanType concreteFormalType = getFormalTypeInContext(abstractType);
 
-  auto concreteLoweredType = IGM.SILMod->Types.getLoweredType(concreteFormalType);
+  auto concreteLoweredType = IGM.getLoweredType(concreteFormalType);
   auto &concreteTI = IGM.getTypeInfo(concreteLoweredType);
   FixedPacking packing = concreteTI.getFixedPacking(IGM);
+
+  // For now, assume that we never have any interest in dynamically
+  // changing the value witnesses for something that's fixed-layout.
+  canBeConstant = concreteTI.isFixedSize();
 
   addValueWitnesses(IGM, packing, abstractType,
                     concreteLoweredType, concreteTI, witnesses);
@@ -1361,19 +1366,16 @@ llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
   assert(!isa<BoundGenericType>(abstractType) &&
          "emitting VWT for generic instance");
 
-  // We shouldn't emit global value witness tables for non-fixed-layout types.
-  assert(!hasDependentValueWitnessTable(IGM, abstractType) &&
-         "emitting global VWT for dynamic-layout type");
-
   SmallVector<llvm::Constant*, MaxNumValueWitnesses> witnesses;
-  addValueWitnessesForAbstractType(IGM, abstractType, witnesses);
+  bool canBeConstant = false;
+  addValueWitnessesForAbstractType(IGM, abstractType, witnesses, canBeConstant);
 
   auto tableTy = llvm::ArrayType::get(IGM.Int8PtrTy, witnesses.size());
   auto table = llvm::ConstantArray::get(tableTy, witnesses);
 
   auto addr = IGM.getAddrOfValueWitnessTable(abstractType, table->getType());
   auto global = cast<llvm::GlobalVariable>(addr);
-  global->setConstant(true);
+  global->setConstant(canBeConstant);
   global->setInitializer(table);
 
   return llvm::ConstantExpr::getBitCast(global, IGM.WitnessTablePtrTy);
@@ -1475,7 +1477,8 @@ void irgen::emitDependentValueWitnessTablePattern(IRGenModule &IGM,
   assert(hasDependentValueWitnessTable(IGM, abstractType) &&
          "emitting VWT pattern for fixed-layout type");
 
-  addValueWitnessesForAbstractType(IGM, abstractType, fields);
+  bool canBeConstant = false;
+  addValueWitnessesForAbstractType(IGM, abstractType, fields, canBeConstant);
 }
 
 FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {

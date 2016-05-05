@@ -38,7 +38,7 @@ public protocol FloatingPoint : Strideable {
   associatedtype _BitsType
 
   @warn_unused_result
-  static func _fromBitPattern(bits: _BitsType) -> Self
+  static func _fromBitPattern(_ bits: _BitsType) -> Self
 
   @warn_unused_result
   func _toBitPattern() -> _BitsType

@@ -32,7 +32,7 @@ func whileTrueSilent() {
   }
 }   // no warning!
 
-func whileTrueReachable(v: Int) -> () {
+func whileTrueReachable(_ v: Int) -> () {
   var x = 0
   while true {
     if v == 0 {
@@ -68,7 +68,7 @@ func unreachableBranch() -> Int {
 
 // We should not report unreachable user code inside inlined transparent function.
 @_transparent
-func ifTrueTransparent(b: Bool) -> Int {
+func ifTrueTransparent(_ b: Bool) -> Int {
   _ = 0
   if b {
     return 1
@@ -94,13 +94,13 @@ struct ReturnsOpaque : HavingGetCond {
   var b: Bool
   func getCond() -> Bool { return b }
 }
-func ifTrueGeneric<T : HavingGetCond>(x: T) -> Int {
+func ifTrueGeneric<T : HavingGetCond>(_ x: T) -> Int {
   if x.getCond() {
     return 1
   }
   return 0
 }
-func testIfTrueGeneric(b1: ReturnsOpaque, b2: ReturnsTrue) {
+func testIfTrueGeneric(_ b1: ReturnsOpaque, b2: ReturnsTrue) {
   ifTrueGeneric(b1)  // no-warning
   ifTrueGeneric(b2)  // no-warning
 }
@@ -112,7 +112,7 @@ enum X {
   case Three
 }
 
-func testSwitchEnum(xi: Int) -> Int {
+func testSwitchEnum(_ xi: Int) -> Int {
   var x = xi
   let cond: X = .Two
   switch cond { // expected-warning {{switch condition evaluates to a constant}}
@@ -166,7 +166,7 @@ func testSwitchEnum(xi: Int) -> Int {
 
 // Treat nil as .none and do not emit false 
 // non-exhaustive warning.
-func testSwitchEnumOptionalNil(x: Int?) -> Int {
+func testSwitchEnumOptionalNil(_ x: Int?) -> Int {
   switch x { // no warning
   case .some(_):
     return 1
@@ -177,7 +177,7 @@ func testSwitchEnumOptionalNil(x: Int?) -> Int {
 
 // Do not emit false non-exhaustive warnings if both
 // true and false are covered by the switch.
-func testSwitchEnumBool(b: Bool, xi: Int) -> Int {
+func testSwitchEnumBool(_ b: Bool, xi: Int) -> Int {
   var x = xi
   let Cond = b
   
@@ -206,7 +206,7 @@ func testSwitchEnumBool(b: Bool, xi: Int) -> Int {
   return x
 }
 
-func testSwitchOptionalBool(b: Bool?, xi: Int) -> Int {
+func testSwitchOptionalBool(_ b: Bool?, xi: Int) -> Int {
   var x = xi
   switch b { // No warning
   case .some(true):
@@ -229,7 +229,7 @@ func testSwitchOptionalBool(b: Bool?, xi: Int) -> Int {
 
 // Do not emit false non-exhaustive warnings if both 
 // true and false are covered for a boolean element of a tuple.
-func testSwitchEnumBoolTuple(b1: Bool, b2: Bool, xi: Int) -> Int {
+func testSwitchEnumBoolTuple(_ b1: Bool, b2: Bool, xi: Int) -> Int {
   var x = xi
   let Cond = (b1, b2)
   
@@ -268,7 +268,7 @@ func testSwitchEnumBoolTuple(b1: Bool, b2: Bool, xi: Int) -> Int {
 
 
 @noreturn @_silgen_name("exit") func exit() -> ()
-func reachableThroughNonFoldedPredecessor(@autoclosure fn: () -> Bool = false) {
+func reachableThroughNonFoldedPredecessor(fn: @autoclosure () -> Bool = false) {
   if !_fastPath(fn()) {
     exit()
   }
@@ -294,7 +294,7 @@ func intConstantTest2() -> Int{
   return 3
 }
 
-func test_single_statement_closure(fn:() -> ()) {}
+func test_single_statement_closure(_ fn:() -> ()) {}
 test_single_statement_closure() {
     exit() // no-warning
 }
@@ -321,7 +321,7 @@ enum r20097963Test {
 }
 
 class r20097963MyClass {
-  func testStr(t: r20097963Test) -> String {
+  func testStr(_ t: r20097963Test) -> String {
     let str: String
     switch t {
     case .A:
@@ -338,7 +338,7 @@ class r20097963MyClass {
 @noreturn
 func die() { die() }
 
-func testGuard(a : Int) {
+func testGuard(_ a : Int) {
   guard case 4 = a else {  }  // expected-error {{'guard' body may not fall through, consider using 'return' or 'break'}}
 
   guard case 4 = a else { return }  // ok
@@ -350,7 +350,7 @@ func testGuard(a : Int) {
   }
 }
 
-public func testFailingCast(s:String) -> Int {
+public func testFailingCast(_ s:String) -> Int {
    // There should be no notes or warnings about a call to a noreturn function, because we do not expose
    // how casts are lowered.
    return s as! Int // expected-warning {{cast from 'String' to unrelated type 'Int' always fails}}
@@ -385,7 +385,7 @@ class Lisp {
   @noreturn func fail() throws { throw MyError.A }
 }
 
-func transform<Scheme : Lisp>(s: Scheme) throws {
+func transform<Scheme : Lisp>(_ s: Scheme) throws {
   try s.fail() // no-warning
 }
 
@@ -416,3 +416,17 @@ func noReturnInDefer() {
 while true {
 }
  // no warning!
+
+
+// SR-1010 - rdar://25278336 - Spurious "will never be executed" warnings when building standard library
+public struct SR1010<T> {
+  var a : T
+}
+
+extension SR1010 {
+  @available(*, unavailable, message: "use the 'enumerated()' method on the sequence")
+  public init(_ base: Int) {
+    fatalError("unavailable function can't be called")
+  }
+}
+

@@ -52,5 +52,5 @@ bool decodePunycodeUTF8(StringRef InputPunycode, std::string &OutUTF8);
 } // end namespace Punycode
 } // end namespace swift
 
-#endif // LLVM_SWIFT_BASIC_PUNYCODE_H
+#endif // SWIFT_BASIC_PUNYCODE_H
 

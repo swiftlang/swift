@@ -10,15 +10,10 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
 #if _runtime(_ObjC)
-import ObjectiveC
 import Foundation
-import StdlibUnittestFoundationExtras
 #endif
+
 
 var StringTests = TestSuite("StringTests")
 
@@ -143,7 +138,7 @@ let comparisonTests = [
 ]
 
 func checkStringComparison(
-  expected: ExpectedComparisonResult,
+  _ expected: ExpectedComparisonResult,
   _ lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
 ) {
   // String / String
@@ -191,7 +186,7 @@ for test in comparisonTests {
 }
 
 func checkCharacterComparison(
-  expected: ExpectedComparisonResult,
+  _ expected: ExpectedComparisonResult,
   _ lhs: Character, _ rhs: Character, _ stackTrace: SourceLocStack
 ) {
   // Character / Character
@@ -225,7 +220,7 @@ for test in comparisonTests {
 }
 
 func checkHasPrefixHasSuffix(
-  lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
+  _ lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
 ) {
 #if _runtime(_ObjC)
   if lhs == "" {
@@ -249,9 +244,9 @@ func checkHasPrefixHasSuffix(
     }
   let expectHasPrefix = lhsNFDGraphemeClusters.starts(
     with: rhsNFDGraphemeClusters, isEquivalent: (==))
-  let expectHasSuffix =
-    lhsNFDGraphemeClusters.lazy.reversed().starts(
-      with: rhsNFDGraphemeClusters.lazy.reversed(), isEquivalent: (==))
+
+  let expectHasSuffix = lhsNFDGraphemeClusters.lazy.reversed()
+    .starts(with: rhsNFDGraphemeClusters.lazy.reversed(), isEquivalent: (==))
 
   expectEqual(expectHasPrefix, lhs.hasPrefix(rhs), stackTrace: stackTrace)
   expectEqual(
@@ -273,7 +268,6 @@ StringTests.test("hasPrefix,hasSuffix")
 }
 
 StringTests.test("Failures{hasPrefix,hasSuffix}-CF")
-  .xfail(.custom({ true }, reason: "rdar://problem/19034601"))
   .skip(.nativeRuntime(
     "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
   .code {
@@ -318,12 +312,16 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
   let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
 
   expectEqual("\u{fffd}\u{1f602}\u{fffd}",
-    acceptor[donor.startIndex.advanced(by: 1)..<donor.startIndex.advanced(by: 5)])
+    acceptor[
+      donor.index(donor.startIndex, offsetBy: 1) ..<
+      donor.index(donor.startIndex, offsetBy: 5)
+    ]
+  )
 }
 
 var CStringTests = TestSuite("CStringTests")
 
-func getNullCString() -> UnsafeMutablePointer<CChar> {
+func getNullCString() -> UnsafeMutablePointer<CChar>? {
   return nil
 }
 
@@ -370,7 +368,7 @@ func getIllFormedUTF8String2(
   return (UnsafeMutablePointer(up), { up.deallocateCapacity(100) })
 }
 
-func asCCharArray(a: [UInt8]) -> [CChar] {
+func asCCharArray(_ a: [UInt8]) -> [CChar] {
   return a.map { CChar(bitPattern: $0) }
 }
 

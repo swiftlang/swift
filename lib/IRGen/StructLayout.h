@@ -137,9 +137,13 @@ public:
     Index = other.Index;
   }
 
-  void completeEmpty(IsPOD_t isPOD) {
+  void completeEmpty(IsPOD_t isPOD, Size byteOffset) {
     TheKind = unsigned(Kind::Empty);
     IsPOD = unsigned(isPOD);
+    // We still want to give empty fields an offset for use by things like
+    // ObjC ivar emission. We use the first field in a class layout as the
+    // instanceStart.
+    ByteOffset = byteOffset.getValue();
     Index = 0; // make a complete write of the bitfield
   }
 
@@ -187,7 +191,8 @@ public:
 
   /// Given that this element has a fixed offset, return that offset in bytes.
   Size getByteOffset() const {
-    assert(isCompleted() && getKind() == Kind::Fixed);
+    assert(isCompleted() &&
+           (getKind() == Kind::Fixed || getKind() == Kind::Empty));
     return Size(ByteOffset);
   }
 
@@ -413,11 +418,8 @@ struct ClassLayout {
   ArrayRef<VarDecl*> InheritedStoredProperties;
   /// Lazily-initialized array of all field access methods.
   ArrayRef<FieldAccess> AllFieldAccesses;
-  /// Lazily-initialized metadata access method. See the comment in
-  /// ClassLayoutBuilder.
-  FieldAccess MetadataAccess;
-  /// Does the class require a metadata pattern.
-  bool HasMetadataPattern;
+  /// Does the class metadata require dynamic initialization.
+  bool MetadataRequiresDynamicInitialization;
 
   unsigned getFieldIndex(VarDecl *field) const {
     // FIXME: This is algorithmically terrible.

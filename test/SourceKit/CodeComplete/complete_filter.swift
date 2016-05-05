@@ -88,7 +88,7 @@ func foo() {
 struct A {}
 func over() {}
 func overload() {}
-func overload(x: A) {}
+func overload(_ x: A) {}
 
 func test() {
   #^OVER,over,overload,overloadp^#
@@ -108,7 +108,7 @@ func test() {
 // GROUP-NEXT: ]
 
 struct UnnamedArgs {
-  func dontMatchAgainst(unnamed: Int, arguments: Int, _ unnamed2:Int) {}
+  func dontMatchAgainst(_ unnamed: Int, arguments: Int, _ unnamed2:Int) {}
   func test() {
     self.#^UNNAMED_ARGS_0,dont,arguments,unnamed^#
   }

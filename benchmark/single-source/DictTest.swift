@@ -161,7 +161,7 @@ class Box<T : Hashable where T : Equatable> : Hashable {
 extension Box : Equatable {
 }
 
-func ==<T: Equatable>(lhs: Box<T>,  rhs: Box<T>) -> Bool {
+func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
   return lhs.value == rhs.value
 }
 

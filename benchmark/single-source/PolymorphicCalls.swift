@@ -244,7 +244,7 @@ public class F3 : B3 {
 // Test the cost of polymorphic method invocation
 // on a class without any subclasses
 @inline(never)
-func test(a:A, _ UPTO: Int) -> Int64 {
+func test(_ a:A, _ UPTO: Int) -> Int64 {
     var cnt : Int64 = 0
     for _ in 0..<UPTO {
         cnt += a.run2()
@@ -255,7 +255,7 @@ func test(a:A, _ UPTO: Int) -> Int64 {
 // Test the cost of polymorphic method invocation
 // on a class with 1 subclass
 @inline(never)
-func test(a:A1, _ UPTO: Int) -> Int64 {
+func test(_ a:A1, _ UPTO: Int) -> Int64 {
     var cnt : Int64 = 0
     for _ in 0..<UPTO {
         cnt += a.run2()
@@ -266,7 +266,7 @@ func test(a:A1, _ UPTO: Int) -> Int64 {
 // Test the cost of polymorphic method invocation
 // on a class with 2 subclasses
 @inline(never)
-func test(a:A2, _ UPTO: Int) -> Int64 {
+func test(_ a:A2, _ UPTO: Int) -> Int64 {
     var cnt : Int64 = 0
     for _ in 0..<UPTO {
         cnt += a.run2()
@@ -278,7 +278,7 @@ func test(a:A2, _ UPTO: Int) -> Int64 {
 // on a class with 2 subclasses on objects
 // of different subclasses
 @inline(never)
-func test(a2_c2:A2, _ a2_d2:A2,  _ UPTO: Int) -> Int64 {
+func test(_ a2_c2:A2, _ a2_d2:A2,  _ UPTO: Int) -> Int64 {
     var cnt : Int64 = 0
     for _ in 0..<UPTO/2 {
         cnt += a2_c2.run2()
@@ -291,7 +291,7 @@ func test(a2_c2:A2, _ a2_d2:A2,  _ UPTO: Int) -> Int64 {
 // on a class with 4 subclasses on objects
 // of different subclasses
 @inline(never)
-func test(a3_c3: A3, _ a3_d3: A3, _ a3_e3: A3, _ a3_f3: A3, _ UPTO: Int) -> Int64 {
+func test(_ a3_c3: A3, _ a3_d3: A3, _ a3_e3: A3, _ a3_f3: A3, _ UPTO: Int) -> Int64 {
     var cnt : Int64  = 0
     for _ in 0..<UPTO/4 {
         cnt += a3_c3.run2()
@@ -305,7 +305,7 @@ func test(a3_c3: A3, _ a3_d3: A3, _ a3_e3: A3, _ a3_f3: A3, _ UPTO: Int) -> Int6
 
 
 @inline(never)
-public func run_PolymorphicCalls(N:Int) {
+public func run_PolymorphicCalls(_ N:Int) {
     let UPTO = 10000 * N
 
     let a = A(b:B(x:1))

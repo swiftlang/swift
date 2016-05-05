@@ -201,6 +201,8 @@ public:
 
   FullApplySite getApplyInst() const { return AI; }
 
+  IsFragile_t isFragile() const;
+
   std::string createName() const;
 
   OperandValueArrayRef getArguments() const {
@@ -340,9 +342,9 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
       // Emit the retain that matches the captured argument by the partial_apply
       // in the callee that is consumed by the partial_apply.
       Builder.setInsertionPoint(AI.getInstruction());
-      Builder.createRetainValue(Closure->getLoc(), Arg);
+      Builder.createRetainValue(Closure->getLoc(), Arg, Atomicity::Atomic);
     } else {
-      Builder.createRetainValue(Closure->getLoc(), Arg);
+      Builder.createRetainValue(Closure->getLoc(), Arg, Atomicity::Atomic);
     }
   }
 
@@ -360,9 +362,9 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     // argument to AI.
     if (CSDesc.isClosureConsumed() && CSDesc.closureHasRefSemanticContext()) {
       Builder.setInsertionPoint(TAI->getNormalBB()->begin());
-      Builder.createReleaseValue(Closure->getLoc(), Closure);
+      Builder.createReleaseValue(Closure->getLoc(), Closure, Atomicity::Atomic);
       Builder.setInsertionPoint(TAI->getErrorBB()->begin());
-      Builder.createReleaseValue(Closure->getLoc(), Closure);
+      Builder.createReleaseValue(Closure->getLoc(), Closure, Atomicity::Atomic);
       Builder.setInsertionPoint(AI.getInstruction());
     }
   } else {
@@ -373,7 +375,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     // right after NewAI. This is to balance the +1 from being an @owned
     // argument to AI.
     if (CSDesc.isClosureConsumed() && CSDesc.closureHasRefSemanticContext())
-      Builder.createReleaseValue(Closure->getLoc(), Closure);
+      Builder.createReleaseValue(Closure->getLoc(), Closure, Atomicity::Atomic);
   }
 
   // Replace all uses of the old apply with the new apply.
@@ -386,10 +388,18 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   // AI from parent?
 }
 
+IsFragile_t CallSiteDescriptor::isFragile() const {
+  if (getClosure()->getFunction()->isFragile() &&
+      getApplyCallee()->isFragile())
+    return IsFragile;
+  return IsNotFragile;
+}
+
 std::string CallSiteDescriptor::createName() const {
   Mangle::Mangler M;
   auto P = SpecializationPass::ClosureSpecializer;
-  FunctionSignatureSpecializationMangler FSSM(P, M, getApplyCallee());
+  FunctionSignatureSpecializationMangler FSSM(P, M, isFragile(),
+                                              getApplyCallee());
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure())) {
     FSSM.setArgumentClosureProp(getClosureIndex(), PAI);
@@ -409,10 +419,10 @@ void CallSiteDescriptor::extendArgumentLifetime(SILValue Arg) const {
 
   // Extend the lifetime of a captured argument to cover the callee.
   SILBuilderWithScope Builder(getClosure());
-  Builder.createRetainValue(getClosure()->getLoc(), Arg);
+  Builder.createRetainValue(getClosure()->getLoc(), Arg, Atomicity::Atomic);
   for (auto *I : CInfo->LifetimeFrontier) {
     Builder.setInsertionPoint(I);
-    Builder.createReleaseValue(getClosure()->getLoc(), Arg);
+    Builder.createReleaseValue(getClosure()->getLoc(), Arg, Atomicity::Atomic);
   }
 }
 
@@ -551,7 +561,7 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
 
   // We make this function bare so we don't have to worry about decls in the
   // SILArgument.
-  auto *Fn = M.getOrCreateFunction(
+  auto *Fn = M.createFunction(
       // It's important to use a shared linkage for the specialized function
       // and not the original linkage.
       // Otherwise the new function could have an external linkage (in case the
@@ -559,7 +569,7 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       getSpecializedLinkage(ClosureUser, ClosureUser->getLinkage()),
       ClonedName, ClonedTy,
       ClosureUser->getContextGenericParams(), ClosureUser->getLocation(),
-      IsBare, ClosureUser->isTransparent(), ClosureUser->isFragile(),
+      IsBare, ClosureUser->isTransparent(), CallSiteDesc.isFragile(),
       ClosureUser->isThunk(), ClosureUser->getClassVisibility(),
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
@@ -651,7 +661,8 @@ void ClosureSpecCloner::populateCloned() {
       // that it will be executed at the end of the epilogue.
       if (isa<ReturnInst>(TI)) {
         Builder.setInsertionPoint(TI);
-        Builder.createReleaseValue(Loc, SILValue(NewClosure));
+        Builder.createReleaseValue(Loc, SILValue(NewClosure),
+                                   Atomicity::Atomic);
         continue;
       }
 
@@ -667,7 +678,7 @@ void ClosureSpecCloner::populateCloned() {
       // value, we will retain the partial apply before we release it and
       // potentially eliminate it.
       Builder.setInsertionPoint(NoReturnApply.getInstruction());
-      Builder.createReleaseValue(Loc, SILValue(NewClosure));
+      Builder.createReleaseValue(Loc, SILValue(NewClosure), Atomicity::Atomic);
     }
   }
 }

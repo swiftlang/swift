@@ -7,3 +7,13 @@
 func ftest1() {
   let myvar = 0
 }
+
+func foo() -> Int {
+  do {
+  } catch var err {
+    goo(err)
+  }
+}
+func goo(_ e: ErrorProtocol) {
+	
+}

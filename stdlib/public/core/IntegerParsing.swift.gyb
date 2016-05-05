@@ -31,7 +31,7 @@ UIntMax = 'UInt%s' % int_max_bits
 /// - Note: If `text` begins with `"+"` or `"-"`, even if the rest of
 ///   the characters are `"0"`, the result is `nil`.
 internal func _parseUnsignedAsciiAsUIntMax(
-  u16: String.UTF16View, _ radix: Int, _ maximum: UIntMax
+  _ u16: String.UTF16View, _ radix: Int, _ maximum: UIntMax
 ) -> UIntMax? {
   if u16.isEmpty { return nil }
 
@@ -49,9 +49,9 @@ internal func _parseUnsignedAsciiAsUIntMax(
   for c in u16 {
     let n: UIntMax
     switch c {
-    case digit: n = UIntMax(c - digit.startIndex)
-    case lower: n = UIntMax(c - lower.startIndex) + 10
-    case upper: n = UIntMax(c - upper.startIndex) + 10
+    case digit: n = UIntMax(c - digit.lowerBound)
+    case lower: n = UIntMax(c - lower.lowerBound) + 10
+    case upper: n = UIntMax(c - upper.lowerBound) + 10
     default: return nil
     }
     if n >= uRadix { return nil }
@@ -70,7 +70,7 @@ internal func _parseUnsignedAsciiAsUIntMax(
 /// - Note: For text matching the regular expression "-0+", the result
 ///   is `0`, not `nil`.
 internal func _parseAsciiAsUIntMax(
-  utf16: String.UTF16View, _ radix: Int, _ maximum: UIntMax
+  _ utf16: String.UTF16View, _ radix: Int, _ maximum: UIntMax
 ) -> UIntMax? {
   if utf16.isEmpty { return nil }
   // Parse (optional) sign.
@@ -91,7 +91,7 @@ internal func _parseAsciiAsUIntMax(
 /// - Note: For text matching the regular expression "-0+", the result
 ///   is `0`, not `nil`.
 internal func _parseAsciiAsIntMax(
-  utf16: String.UTF16View, _ radix: Int, _ maximum: IntMax
+  _ utf16: String.UTF16View, _ radix: Int, _ maximum: IntMax
 ) -> IntMax? {
   _sanityCheck(maximum >= 0, "maximum should be non-negative")
   if utf16.isEmpty { return nil }
@@ -108,7 +108,7 @@ internal func _parseAsciiAsIntMax(
 
 /// Strip an optional single leading ASCII plus/minus sign from `utf16`.
 private func _parseOptionalAsciiSign(
-  utf16: String.UTF16View
+  _ utf16: String.UTF16View
 ) -> (digitsUTF16: String.UTF16View, isMinus: Bool) {
   switch utf16.first {
   case _ascii16("-")?: return (utf16.dropFirst(), true)
@@ -132,7 +132,7 @@ extension ${Self} {
     if let value = _parseAsciiAs${'' if signed else 'U'}IntMax(
       text.utf16, radix, ${'' if signed else 'U'}IntMax(${Self}.max)) {
       self.init(
-        ${'' if Self in (IntMax,UIntMax) else 'truncatingBitPattern:'} value)
+        ${'' if Self in (IntMax, UIntMax) else 'truncatingBitPattern:'} value)
     }
     else {
       return nil

@@ -46,7 +46,6 @@ struct EditorPlaceholderData {
 Optional<EditorPlaceholderData>
   parseEditorPlaceholder(StringRef PlaceholderText);
 
-} // namespace swift
+} // end namespace swift
 
-#endif // LLVM_SWIFT_BASIC_EDITORPLACEHOLDER_H
-
+#endif // SWIFT_BASIC_EDITORPLACEHOLDER_H

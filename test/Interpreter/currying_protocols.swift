@@ -8,14 +8,14 @@ enum Medal {
 struct Steroids {}
 
 protocol Gymnast {
-  func backflip(angle: Double) -> Self
+  func backflip(_ angle: Double) -> Self
   func compete() -> Medal -> Self
   func scandal() -> (Steroids) -> ()
   static func currentYear() -> Int
 }
 
 final class Archimedes : Gymnast {
-  func backflip(angle: Double) -> Self {
+  func backflip(_ angle: Double) -> Self {
     print(angle >= 360 ? "Not in a thousand years" : "Ok")
     return self
   }
@@ -40,7 +40,7 @@ final class Archimedes : Gymnast {
 // Protocol-constrained archetype
 ////
 
-func genericOlympicGames<T: Gymnast>(g1: T) -> T {
+func genericOlympicGames<T: Gymnast>(_ g1: T) -> T {
   let f1: T -> Double -> T = T.backflip
   let f2: Double -> T = f1(g1)
   let g2: T = f2(180)
@@ -91,7 +91,7 @@ genericOlympicGames(Archimedes())
 // Existential
 ////
 
-func olympicGames(g1: Gymnast) -> Gymnast {
+func olympicGames(_ g1: Gymnast) -> Gymnast {
   // FIXME -- <rdar://problem/21391055>
 #if false
   let f1: Double -> Gymnast = g1.backflip

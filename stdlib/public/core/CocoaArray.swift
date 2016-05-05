@@ -25,7 +25,9 @@ import SwiftShims
 /// `Collection` conformance.  Why not make
 /// `_NSArrayCore` conform directly?  It's a class, and I
 /// don't want to pay for the dynamic dispatch overhead.
-internal struct _CocoaArrayWrapper : Collection {
+internal struct _CocoaArrayWrapper : RandomAccessCollection {
+  typealias Indices = CountableRange<Int>
+  
   var startIndex: Int {
     return 0
   }
@@ -38,32 +40,35 @@ internal struct _CocoaArrayWrapper : Collection {
     return buffer.objectAt(i)
   }
 
-  /// Returns a pointer to the first element in the given subRange if
-  /// the subRange is stored contiguously. Otherwise, return `nil`.
+  /// Returns a pointer to the first element in the given non-empty `subRange`
+  /// if the subRange is stored contiguously. Otherwise, return `nil`.
+  ///
+  /// The "non-empty" condition saves a branch within this method that can
+  /// likely be better handled in a caller.
   ///
   /// - Note: This method should only be used as an optimization; it
   ///   is sometimes conservative and may return `nil` even when
   ///   contiguous storage exists, e.g., if array doesn't have a smart
-  /// implementation of countByEnumeratingWith.
+  /// implementation of countByEnumerating.
   func contiguousStorage(
-    subRange: Range<Int>
-  ) -> UnsafeMutablePointer<AnyObject>
+    _ subRange: Range<Int>
+  ) -> UnsafeMutablePointer<AnyObject>?
   {
+    _sanityCheck(!subRange.isEmpty)
     var enumerationState = _makeSwiftNSFastEnumerationState()
 
     // This function currently returns nil unless the first
-    // subRange.endIndex items are stored contiguously.  This is an
+    // subRange.upperBound items are stored contiguously.  This is an
     // acceptable conservative behavior, but could potentially be
     // optimized for other cases.
     let contiguousCount = withUnsafeMutablePointer(&enumerationState) {
-      self.buffer.countByEnumeratingWith($0, objects: nil, count: 0)
+      self.buffer.countByEnumerating(with: $0, objects: nil, count: 0)
     }
     
-    return contiguousCount >= subRange.endIndex
-    ? unsafeBitCast(
-      enumerationState.itemsPtr, to: UnsafeMutablePointer<AnyObject>.self
-      ) + subRange.startIndex
-    : nil
+    return contiguousCount >= subRange.upperBound
+      ? UnsafeMutablePointer<AnyObject>(enumerationState.itemsPtr!)
+        + subRange.lowerBound
+      : nil
   }
 
   @_transparent

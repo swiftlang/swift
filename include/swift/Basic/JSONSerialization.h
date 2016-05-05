@@ -117,7 +117,7 @@ struct ScalarTraits {
 ///        return seq.size();
 ///      }
 ///      static MyType& element(Output &, std::vector<MyType> &seq, size_t index) {
-///        if ( index >= seq.size() )
+///        if (index >= seq.size())
 ///          seq.resize(index+1);
 ///        return seq[index];
 ///      }
@@ -339,14 +339,14 @@ public:
 
   template <typename T>
   void enumCase(T &Val, const char* Str, const T ConstVal) {
-    if ( matchEnumScalar(Str, Val == ConstVal) ) {
+    if (matchEnumScalar(Str, Val == ConstVal)) {
       Val = ConstVal;
     }
   }
 
   template <typename T>
   void bitSetCase(T &Val, const char* Str, const T ConstVal) {
-    if ( bitSetMatch(Str, (Val & ConstVal) == ConstVal) ) {
+    if (bitSetMatch(Str, (Val & ConstVal) == ConstVal)) {
       Val = Val | ConstVal;
     }
   }
@@ -373,7 +373,7 @@ public:
   typename std::enable_if<has_ArrayTraits<T>::value,void>::type
   mapOptional(const char* Key, T& Val) {
     // omit key/value instead of outputting empty array
-    if ( this->canElideEmptyArray() && !(Val.begin() != Val.end()) )
+    if (this->canElideEmptyArray() && !(Val.begin() != Val.end()))
       return;
     this->processKey(Key, Val, false);
   }
@@ -421,12 +421,12 @@ private:
     void *SaveInfo;
     bool UseDefault;
     const bool sameAsDefault = Val == DefaultValue;
-    if ( this->preflightKey(Key, Required, sameAsDefault, UseDefault,
-                            SaveInfo) ) {
+    if (this->preflightKey(Key, Required, sameAsDefault, UseDefault,
+                           SaveInfo)) {
       jsonize(*this, Val, Required);
       this->postflightKey(SaveInfo);
     } else {
-      if ( UseDefault )
+      if (UseDefault)
         Val = DefaultValue;
     }
   }
@@ -435,7 +435,7 @@ private:
   void processKey(const char *Key, T &Val, bool Required) {
     void *SaveInfo;
     bool UseDefault;
-    if ( this->preflightKey(Key, Required, false, UseDefault, SaveInfo) ) {
+    if (this->preflightKey(Key, Required, false, UseDefault, SaveInfo)) {
       jsonize(*this, Val, Required);
       this->postflightKey(SaveInfo);
     }
@@ -535,8 +535,8 @@ template<typename T>
 typename std::enable_if<has_ScalarBitSetTraits<T>::value,void>::type
 jsonize(Output &out, T &Val, bool) {
   bool DoClear;
-  if ( out.beginBitSetScalar(DoClear) ) {
-    if ( DoClear )
+  if (out.beginBitSetScalar(DoClear)) {
+    if (DoClear)
       Val = static_cast<T>(0);
     ScalarBitSetTraits<T>::bitset(out, Val);
     out.endBitSetScalar();
@@ -592,9 +592,9 @@ jsonize(Output &out, T &Seq, bool) {
   {
     out.beginArray();
     unsigned count = ArrayTraits<T>::size(out, Seq);
-    for(unsigned i=0; i < count; ++i) {
+    for (unsigned i=0; i < count; ++i) {
       void *SaveInfo;
-      if ( out.preflightElement(i, SaveInfo) ) {
+      if (out.preflightElement(i, SaveInfo)) {
         jsonize(out, ArrayTraits<T>::element(out, Seq, i), true);
         out.postflightElement(SaveInfo);
       }
@@ -626,4 +626,4 @@ operator<<(Output &yout, T &seq) {
 } // end namespace json
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_JSONSERIALIZATION_H

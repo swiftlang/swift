@@ -23,9 +23,9 @@ var raw = runcing.rawValue
 var eq = runcing == .quinceSliced
 var hash = runcing.hashValue
 
-func testEm<E: Equatable>(x: E, _ y: E) {}
-func hashEm<H: Hashable>(x: H) {}
-func rawEm<R: RawRepresentable>(x: R) {}
+func testEm<E: Equatable>(_ x: E, _ y: E) {}
+func hashEm<H: Hashable>(_ x: H) {}
+func rawEm<R: RawRepresentable>(_ x: R) {}
 
 testEm(NSRuncingOptions.mince, .quinceSliced)
 hashEm(NSRuncingOptions.mince)
@@ -40,10 +40,10 @@ extension NSRuncingOptions: Bub {}
 // CHECK-64-DAG: integer_literal $Builtin.Int2048, 2147483648
 _ = NSFungingMask.toTheMax
 
-// CHECK-DAG: sil_witness_table shared NSRuncingOptions: RawRepresentable module gizmo
-// CHECK-DAG: sil_witness_table shared NSRuncingOptions: Equatable module gizmo
-// CHECK-DAG: sil_witness_table shared NSRuncingOptions: Hashable module gizmo
-// CHECK-DAG: sil_witness_table shared NSFungingMask: RawRepresentable module gizmo
+// CHECK-DAG: sil_witness_table shared [fragile] NSRuncingOptions: RawRepresentable module gizmo
+// CHECK-DAG: sil_witness_table shared [fragile] NSRuncingOptions: Equatable module gizmo
+// CHECK-DAG: sil_witness_table shared [fragile] NSRuncingOptions: Hashable module gizmo
+// CHECK-DAG: sil_witness_table shared [fragile] NSFungingMask: RawRepresentable module gizmo
 
 // CHECK-DAG: sil shared [transparent] [thunk] @_TTWOSC16NSRuncingOptionss16RawRepresentable5gizmoFS0_C
 

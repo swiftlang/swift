@@ -4,7 +4,7 @@
 
 import CoreCooling
 
-func testSomeClass(sc: SomeClass, osc: SomeClass?) {
+func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
   var ao1: AnyObject = sc.methodA(osc)
   if sc.methodA(osc) == nil { } // expected-error{{value of type 'AnyObject' can never be nil, comparison isn't allowed}}
 
@@ -43,7 +43,7 @@ func testSomeClass(sc: SomeClass, osc: SomeClass?) {
 }
 
 // Nullability with CF types.
-func testCF(fridge: CCRefrigerator) {
+func testCF(_ fridge: CCRefrigerator) {
   CCRefrigeratorOpenDoSomething(fridge) // okay
   CCRefrigeratorOpenDoSomething(nil) // expected-error{{nil is not compatible with expected argument type 'CCRefrigerator'}}
 

@@ -74,9 +74,6 @@ public:
   /// This method unlinks 'self' from the containing SILFunction and deletes it.
   void eraseFromParent();
 
-  /// This method unlinks 'self' from the containing SILFunction.
-  void removeFromParent();
-
   /// Returns true if this BB is the entry BB of its parent.
   bool isEntry() const;
 

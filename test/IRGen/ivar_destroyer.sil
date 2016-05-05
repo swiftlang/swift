@@ -47,7 +47,7 @@ class NonTrivialDerived : TrivialBase {
 }
 
 sil public_external @init_NonTrivialDerived : $@convention(method) (@owned NonTrivialDerived) -> @owned NonTrivialDerived
-sil public_external @alloc_NonTrivialDerived : $@convention(thin) (@thick NonTrivialDerived.Type) -> @owned NonTrivialDerived
+sil public_external @alloc_NonTrivialDerived : $@convention(method) (@thick NonTrivialDerived.Type) -> @owned NonTrivialDerived
 sil public_external @_TFC14ivar_destroyer17NonTrivialDerivedE : $@convention(method) (@guaranteed NonTrivialDerived) -> ()
 
 sil_vtable NonTrivialDerived {

@@ -89,7 +89,7 @@ Polymorphism
 ------------
 
 Polymorphism allows one to use different data types with a uniform
-interface. Overloading already allows a form of polymorphism ( ad hoc
+interface. Overloading already allows a form of polymorphism (ad hoc
 polymorphism) in Swift. For example, given::
 
   func +(x : Int, y : Int) -> Int { add... }
@@ -156,7 +156,7 @@ Multiple inheritance is permitted, allowing us to form a directed acyclic graph
 of protocols::
 
   protocol PersistentDocument : VersionedDocument, Serializable {
-    func saveToFile(filename : path)
+    func saveToFile(_ filename : path)
   }
 
 .. @example.prepend('struct path {} ; protocol Serializable {}')
@@ -173,7 +173,7 @@ operations. For example, let's try to write a Comparable protocol that could be
 used to search for a generic find() operation::
 
   protocol Comparable {
-    func isEqual(other : ???) -> Bool
+    func isEqual(_ other : ???) -> Bool
   }
 
 Our options for filling in ??? are currently very poor. We could use the syntax
@@ -204,11 +204,11 @@ interface, e.g. (in Java)::
 
 .. @ignore()
 .. This test just doesn't compile at the moment, but that represents a
-   bug in swift
+   bug in Swift
 
 and then a class X that wants to be Comparable will inherit from
 Comparable<X>. This is ugly and has a number of pitfalls; see
-http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6479372 .
+http://bugs.java.com/bugdatabase/view_bug.do?bug_id=6479372.
 
 Scala and Strongtalk have the notion of the 'Self' type, which effectively
 allows one to refer to the eventual type of 'self' (which we call
@@ -216,7 +216,7 @@ allows one to refer to the eventual type of 'self' (which we call
 Comparable protocol in a natural way::
 
   protocol Comparable {
-    func isEqual(other : Self) -> Bool
+    func isEqual(_ other : Self) -> Bool
   }
 
 By expressing Comparable in this way, we know that if we have two objects of
@@ -242,8 +242,8 @@ us to cleanly describe a protocol for collections::
 
   protocol Collection {
     typealias Element
-    func forEach(callback : (value : Element) -> Void)
-    func add(value : Element)
+    func forEach(_ callback : (value : Element) -> Void)
+    func add(_ value : Element)
   }
 
 It is important here that a generic function that refers to a given type T,
@@ -330,8 +330,8 @@ type::
 
   struct EmployeeList : Collection { // EmployeeList is a collection
     typealias Element = T
-    func forEach(callback : (value : Element) -> Void) { /* Implement this */ }
-    func add(value : Element) { /* Implement this */ }
+    func forEach(_ callback : (value : Element) -> Void) { /* Implement this */ }
+    func add(_ value : Element) { /* Implement this */ }
   }
 
 This explicit protocol conformance declaration forces the compiler to check that
@@ -367,8 +367,8 @@ extensions, e.g.,::
 
   extension String : Collection {
     typealias Element = char
-    func forEach(callback : (value : Element) -> Void) { /* use existing String routines to enumerate characters */ }
-    func add(value : Element) { self += value /* append character */ }
+    func forEach(_ callback : (value : Element) -> Void) { /* use existing String routines to enumerate characters */ }
+    func add(_ value : Element) { self += value /* append character */ }
   }
 
 Once an extension is defined, the extension now conforms to the Collection
@@ -525,7 +525,7 @@ in Swift. For example, one could define a generic linked list as::
 This list works on any type T. One could then add a generic function that
 inserts at the beginning of the list::
 
-  func insertAtBeginning<T>(list : List<T>, value : T) {
+  func insertAtBeginning<T>(_ list : List<T>, value : T) {
     list.First = ListNode<T>(value, list.First)
   }
 
@@ -539,7 +539,7 @@ conform. Within the body of the generic type or function, any of the functions
 or types described by the constraints are available. For example, let's
 implement a find() operation on lists::
 
-  func find<T : Comparable>(list : List<T>, value : T) -> Int {
+  func find<T : Comparable>(_ list : List<T>, value : T) -> Int {
     var index = 0
     var current
     for (current = list.First; current is Node; current = current.Next) {
@@ -559,11 +559,11 @@ ordered collection::
   
   protocol OrderedCollection : Collection {
     func size() -> Int
-    func getAt(index : Int) -> Element // Element is an associated type
+    func getAt(_ index : Int) -> Element // Element is an associated type
   }
   
   func find<C : OrderedCollection where C.Element : Comparable>(
-         collection : C, value : C.Element) -> Int
+         _ collection : C, value : C.Element) -> Int
   {
     for index in 0...collection.size() {
       if (collection.getAt(index) == value) { // okay: we know that C.Element is Comparable
@@ -579,7 +579,7 @@ OrderedCollection>) are just sugar for a where clause.  For example, the
 above find() signature is equivalent to::
 
   func find<C where C : OrderedCollection, C.Element : Comparable>(
-         collection : C, value : C.Element) -> Int
+         _ collection : C, value : C.Element) -> Int
 
 Note that find<C> is shorthand for (and equivalent to) find<C : Any>, since
 every type conforms to the Any protocol composition.
@@ -626,7 +626,7 @@ Comparable::
 Naturally, one any generic operation on a SortedDictionary<K,V> would also require
 that K be Comparable, e.g.,::
 
-  func forEachKey<Key : Comparable, Value>(c : SortedDictionary<Key, Value>,
+  func forEachKey<Key : Comparable, Value>(_ c : SortedDictionary<Key, Value>,
                                            f : (Key) -> Void) { /* ... */ }
 
 However, explicitly requiring that Key conform to Comparable is redundant: one
@@ -636,7 +636,7 @@ itself could not be formed. Constraint inference infers these additional
 constraints within a generic function from the parameter and return types of the
 function, simplifying the specification of forEachKey::
 
-  func forEachKey<Key, Value>(c : SortedDictionary<Key, Value>,
+  func forEachKey<Key, Value>(_ c : SortedDictionary<Key, Value>,
                               f : (Key) -> Void) { /* ... */ }
 
 Type Parameter Deduction
@@ -651,7 +651,7 @@ generic function::
 Since Swift already has top-down type inference (as well as the C++-like
 bottom-up inference), we can also deduce type arguments from the result type::
 
-  func cast<T, U>(value : T) -> U { ... }
+  func cast<T, U>(_ value : T) -> U { ... }
   var x : Any
   var y : Int = cast(x) // deduces T = Any, U = Int
 
@@ -680,7 +680,7 @@ language (generic functions can be "virtual").
 The translation model is fairly simple. Consider the generic find() we
 implemented for lists, above::
   
-  func find<T : Comparable>(list : List<T>, value : T) -> Int {
+  func find<T : Comparable>(_ list : List<T>, value : T) -> Int {
     var index = 0
     var current = list.First
     while current is ListNode<T> { // now I'm just making stuff up
@@ -701,6 +701,8 @@ on Int), to an operation within a protocol (which requires indirection through
 the corresponding vtable), or to an operation on a generic type definition, all
 of which can be emitted as object code.
 
+.. _generics-specialization:
+
 Specialization
 --------------
 
@@ -712,6 +714,35 @@ or (if we have a JIT) run-time) for these types, we can eliminate the cost of
 the virtual dispatch, inline calls when appropriate, and eliminate the overhead
 of the generic system. Such optimizations can be performed based on heuristics,
 user direction, or profile-guided optimization.
+
+An internal @_specialize function attribute allows developers to force
+full specialization by listing concrete type names corresponding to the
+function's generic signature. A function's generic signature is a
+concatenation of its generic context and the function's own generic
+type parameters.::
+
+  struct S<T> {
+    var x: T
+    @_specialize(Int, Float)
+    mutating func exchangeSecond<U>(_ u: U, _ t: T) -> (U, T) {
+      x = t
+      return (u, x)
+    }
+  }
+
+  // Substitutes: <T, U> with <Int, Float> producing:
+  // S<Int>::exchangeSecond<Float>(u: Float, t: Int) -> (Float, Int)
+
+@_specialize currently acts as a hint to the optimizer, which
+generates type checks and code to dispatch to the specialized routine
+without affecting the signature of the generic function. The
+intention is to support efforts at evaluating the performance of
+specialized code. The performance impact is not guaranteed and is
+likely to change with the optimizer. This attribute should only be
+used in conjunction with rigorous performance analysis. Eventually,
+a similar attribute could be defined in the language, allowing it to be
+exposed as part of a function's API. That would allow direct dispatch
+to specialized code without type checks, even across modules.
 
 Existential Types and Generics
 ------------------------------
@@ -741,7 +772,7 @@ consider a binary search algorithm::
   
    func binarySearch<
       C : EnumerableCollection where C.Element : Comparable
-   >(collection : C, value : C.Element) 
+   >(_ collection : C, value : C.Element)
      -> C.EnumeratorType
    {
      // We can perform log(N) comparisons, but EnumerableCollection
@@ -757,7 +788,7 @@ consider a binary search algorithm::
       C : EnumerableCollection 
        where C.Element : Comparable, 
                  C.EnumeratorType: RandomAccessEnumerator
-   >(collection : C, value : C.Element) 
+   >(_ collection : C, value : C.Element)
      -> C.EnumeratorType
    {
      // We can perform log(N) comparisons and log(N) range splits, 
@@ -777,7 +808,7 @@ minimal requirements::
   func doSomethingWithSearch<
     C : EnumerableCollection where C.Element : Ordered
   >(
-    collection : C, value : C.Element
+    _ collection : C, value : C.Element
   ) -> C.EnumeratorType 
   {
     binarySearch(collection, value)

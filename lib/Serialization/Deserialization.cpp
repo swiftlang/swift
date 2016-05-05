@@ -544,7 +544,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, inheritedCount, defaultedCount;
+  unsigned valueCount, typeCount, inheritedCount;
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
 
@@ -556,7 +556,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, valueCount,
                                               typeCount, inheritedCount,
-                                              defaultedCount, rawIDs);
+                                              rawIDs);
 
   auto proto = cast<ProtocolDecl>(getDecl(protoID));
   ASTContext &ctx = getContext();
@@ -935,6 +935,44 @@ bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
   return false;
 }
 
+bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
+  using namespace decls_block;
+
+  auto entry = DeclTypeCursor.advance();
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    return true;
+
+  SmallVector<uint64_t, 16> witnessIDBuffer;
+
+  unsigned kind = DeclTypeCursor.readRecord(entry.ID, witnessIDBuffer);
+  assert(kind == DEFAULT_WITNESS_TABLE);
+  (void)kind;
+
+  ArrayRef<uint64_t> rawWitnessIDs;
+  decls_block::DefaultWitnessTableLayout::readRecord(
+      witnessIDBuffer, rawWitnessIDs);
+
+  if (rawWitnessIDs.empty())
+    return false;
+
+  unsigned e = rawWitnessIDs.size();
+  assert(e % 2 == 0 && "malformed default witness table");
+  (void) e;
+
+  for (unsigned i = 0, e = rawWitnessIDs.size(); i < e; i += 2) {
+    ValueDecl *requirement = cast<ValueDecl>(getDecl(rawWitnessIDs[i]));
+    assert(requirement && "unable to deserialize next requirement");
+    ValueDecl *witness = cast<ValueDecl>(getDecl(rawWitnessIDs[i + 1]));
+    assert(witness && "unable to deserialize next witness");
+    assert(requirement->getDeclContext() == proto);
+
+    // FIXME: substitutions
+    proto->setDefaultWitness(requirement, ConcreteDeclRef(witness));
+  }
+
+  return false;
+}
+
 static Optional<swift::CtorInitializerKind>
 getActualCtorInitializerKind(uint8_t raw) {
   switch (serialization::CtorInitializerKind(raw)) {
@@ -1059,13 +1097,9 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
     // HACK HACK HACK: Omit-needless-words hack to try to cope with
     // the "NS" prefix being added/removed. No "real" compiler mode
-    // has to go through this path: a Swift 2 compiler will have the
-    // prefix, while a Swift 3 compiler will not have the
-    // prefix. However, one can set OmitNeedlessWords in a Swift 2
-    // compiler to get API dumps and perform basic testing; this hack
-    // keeps that working.
+    // has to go through this path, but it's an option we toggle for
+    // testing.
     if (values.empty() && !retrying &&
-        getContext().LangOpts.OmitNeedlessWords &&
         getContext().LangOpts.StripNSPrefix &&
         (M->getName().str() == "ObjectiveC" ||
          M->getName().str() == "Foundation")) {
@@ -1073,7 +1107,6 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
         if (name.str().size() > 2 && name.str() != "NSCocoaError") {
           auto known = getKnownFoundationEntity(name.str());
           if (!known || !nameConflictsWithStandardLibrary(*known)) {
-            // FIXME: lowercasing magic for non-types.
             name = getContext().getIdentifier(name.str().substr(2));
             retrying = true;
             goto retry;
@@ -2055,6 +2088,20 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                               ctx.AllocateCopy(message),
                                               ctx.AllocateCopy(mutableVariant),
                                               SourceLoc(), isImplicit);
+        break;
+      }
+
+      case decls_block::Specialize_DECL_ATTR: {
+        ArrayRef<uint64_t> rawTypeIDs;
+        serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
+          scratch, rawTypeIDs);
+
+        SmallVector<TypeLoc, 8> typeLocs;
+        for (auto tid : rawTypeIDs)
+          typeLocs.push_back(TypeLoc::withoutLoc(getType(tid)));
+
+        Attr = SpecializeAttr::create(ctx, SourceLoc(), SourceRange(),
+                                      typeLocs);
         break;
       }
 
@@ -4047,13 +4094,19 @@ void ModuleFile::loadAllMembers(Decl *D, uint64_t contextData) {
   (void)Err;
 
   IterableDeclContext *IDC;
-  if (auto nominal = dyn_cast<NominalTypeDecl>(D))
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
     IDC = nominal;
   else
     IDC = cast<ExtensionDecl>(D);
 
   for (auto member : members)
     IDC->addMember(member);
+
+  if (auto *proto = dyn_cast<ProtocolDecl>(D)) {
+    bool Err = readDefaultWitnessTable(proto);
+    assert(!Err && "unable to read default witness table");
+    (void)Err;
+  }
 }
 
 void
@@ -4095,7 +4148,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, inheritedCount, defaultedCount;
+  unsigned valueCount, typeCount, inheritedCount;
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
 
@@ -4106,7 +4159,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, valueCount,
                                               typeCount, inheritedCount,
-                                              defaultedCount, rawIDs);
+                                              rawIDs);
 
   // Skip trailing inherited conformances.
   while (inheritedCount--)
@@ -4138,13 +4191,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
-  SmallVector<ValueDecl *, 4> defaultedDefinitions;
-  while (defaultedCount--) {
-    auto decl = cast<ValueDecl>(getDecl(*rawIDIter++));
-    defaultedDefinitions.push_back(decl);
-  }
-  assert(rawIDIter <= rawIDs.end() && "read too much");
-
   // Set type witnesses.
   for (auto typeWitness : typeWitnesses) {
     conformance->setTypeWitness(typeWitness.first, typeWitness.second.first,
@@ -4154,11 +4200,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   // Set witnesses.
   for (auto witness : witnesses) {
     conformance->setWitness(witness.first, witness.second);
-  }
-
-  // Note any defaulted definitions.
-  for (auto defaulted : defaultedDefinitions) {
-    conformance->addDefaultDefinition(defaulted);
   }
 }
 

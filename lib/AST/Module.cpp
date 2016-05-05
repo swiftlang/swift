@@ -1417,7 +1417,7 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
     // For a major decl, we print an empty line before it.
     if (MajorDeclKinds.find(decl->getKind()) != MajorDeclKinds.end())
       Printer << "\n";
-    if(decl->print(Printer, PO))
+    if (decl->print(Printer, PO))
       Printer << "\n";
   }
 }
@@ -1648,4 +1648,11 @@ bool ModuleEntity::isBuiltinModule() const {
   if (auto SwiftMod = Mod.dyn_cast<const Module*>())
     return SwiftMod->isBuiltinModule();
   return false;
+}
+
+const ModuleDecl* ModuleEntity::getAsSwiftModule() const {
+  assert(!Mod.isNull());
+  if (auto SwiftMod = Mod.dyn_cast<const Module*>())
+    return SwiftMod;
+  return nullptr;
 }

@@ -81,6 +81,10 @@ public:
     return Layout.getByteOffset();
   }
 
+  unsigned getNonFixedElementIndex() const {
+    return Layout.getNonFixedElementIndex();
+  }
+
   std::pair<unsigned, unsigned> getProjectionRange() const {
     return {Begin, End};
   }
@@ -419,6 +423,21 @@ private:
     }
   }
 
+  template <void (LoadableTypeInfo::*Op)(IRGenFunction &IGF, Address addr,
+                                         Explosion &out, Atomicity atomicity) const>
+  void forAllFields(IRGenFunction &IGF, Address addr, Explosion &out,
+                    Atomicity atomicity) const {
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
+    for (auto &field : getFields()) {
+      if (field.isEmpty()) continue;
+
+      Address fieldAddr = field.projectAddress(IGF, addr, offsets);
+      (cast<LoadableTypeInfo>(field.getTypeInfo()).*Op)(IGF, fieldAddr, out,
+                                                        atomicity);
+    }
+  }
+
+
   template <void (LoadableTypeInfo::*Op)(IRGenFunction &IGF,
                                          Explosion &in,
                                          Address addr) const>
@@ -465,14 +484,17 @@ public:
   }
 
   void copy(IRGenFunction &IGF, Explosion &src,
-            Explosion &dest) const override {
+            Explosion &dest, Atomicity atomicity) const override {
     for (auto &field : getFields())
-      cast<LoadableTypeInfo>(field.getTypeInfo()).copy(IGF, src, dest);
+      cast<LoadableTypeInfo>(field.getTypeInfo())
+          .copy(IGF, src, dest, Atomicity::Atomic);
   }
-      
-  void consume(IRGenFunction &IGF, Explosion &src) const override {
+
+  void consume(IRGenFunction &IGF, Explosion &src,
+               Atomicity atomicity) const override {
     for (auto &field : getFields())
-      cast<LoadableTypeInfo>(field.getTypeInfo()).consume(IGF, src);
+      cast<LoadableTypeInfo>(field.getTypeInfo())
+          .consume(IGF, src, Atomicity::Atomic);
   }
 
   void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {

@@ -1,11 +1,11 @@
 
 @inline(never)
-func incrementit(x: Int) -> Int {
+func incrementit(_ x: Int) -> Int {
 	return x + 1
 }
 
 class Derived : Base {
-	override func memberfunc(x: Int) -> Int {
+	override func memberfunc(_ x: Int) -> Int {
 		return x + 2
 	}
 }

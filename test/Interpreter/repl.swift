@@ -72,7 +72,7 @@ f1 +
 -1.75
 // CHECK: Double = -1.75{{$}}
 
-func r13792487(x: Float64) -> Float64 { return x }
+func r13792487(_ x: Float64) -> Float64 { return x }
 r13792487(1234.0)
 // CHECK: Float64 = 1234.0{{$}}
 r13792487(1234)

@@ -3,17 +3,22 @@
 
 import Swift
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
+      -> Self
+}
+
 @objc class NSCloud {}
 
 struct Butt: _ObjectiveCBridgeable {
   typealias _ObjectiveCType = NSCloud
   static func _isBridgedToObjectiveC() -> Bool
-  static func _getObjectiveCType() -> Any.Type
   func _bridgeToObjectiveC() -> NSCloud
-  static func _forceBridgeFromObjectiveC(source: NSCloud,
-                                         inout result: Butt?)
-  static func _conditionallyBridgeFromObjectiveC(source: NSCloud,
-                                         inout result: Butt?) -> Bool
+  static func _forceBridgeFromObjectiveC(_ source: NSCloud,
+                                         result: inout Butt?)
+  static func _conditionallyBridgeFromObjectiveC(_ source: NSCloud,
+                                         result: inout Butt?) -> Bool
 }
 
 sil @checked_cast_object_to_value : $@convention(thin) () -> () {

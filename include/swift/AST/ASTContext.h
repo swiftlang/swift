@@ -55,7 +55,9 @@ namespace swift {
   class DeclContext;
   class DefaultArgumentInitializer;
   class ExtensionDecl;
+  class ForeignRepresentationInfo;
   class FuncDecl;
+  class InFlightDiagnostic;
   class LazyResolver;
   class PatternBindingDecl;
   class PatternBindingInitializer;
@@ -420,6 +422,9 @@ public:
   /// Retrieve the declaration of Swift.OptionSet.
   NominalTypeDecl *getOptionSetDecl() const;
   
+  /// Retrieve the declaration of Swift.COpaquePointer.
+  NominalTypeDecl *getOpaquePointerDecl() const;
+  
   /// Retrieve the declaration of Swift.UnsafeMutablePointer<T>.
   NominalTypeDecl *getUnsafeMutablePointerDecl() const;
 
@@ -502,10 +507,22 @@ public:
   /// Retrieve a specific, known protocol.
   ProtocolDecl *getProtocol(KnownProtocolKind kind) const;
   
+  /// Determine whether the given nominal type is one of the standard
+  /// library types that is known a priori to be bridged to a
+  /// Foundation.
+  bool isStandardLibraryTypeBridgedInFoundation(NominalTypeDecl *nominal) const;
+
   /// Get the Objective-C type that a Swift type bridges to, if any.
   Optional<Type> getBridgedToObjC(const DeclContext *dc,
                                   Type type,
                                   LazyResolver *resolver) const;
+
+  /// Determine whether the given Swift type is representable in a
+  /// given foreign language.
+  ForeignRepresentationInfo
+  getForeignRepresentationInfo(NominalTypeDecl *nominal,
+                               ForeignLanguage language,
+                               DeclContext *dc);
 
   /// Add a declaration to a list of declarations that need to be emitted
   /// as part of the current module or source file, but are otherwise not
@@ -881,7 +898,26 @@ private:
 /// DiagnosticsSema.def.
 std::pair<unsigned, DeclName> getObjCMethodDiagInfo(
                                 AbstractFunctionDecl *method);
-  
+
+/// Attach Fix-Its to the given diagnostic that updates the name of the
+/// given declaration to the desired target name.
+///
+/// \returns false if the name could not be fixed.
+bool fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
+                        DeclName targetName);
+
+/// Fix the Objective-C name of the given declaration to match the provided
+/// Objective-C selector.
+///
+/// \param ignoreImpliedName When true, ignore the implied name of the
+/// given declaration, because it no longer applies.
+///
+/// For properties, the selector should be a zero-parameter selector of the
+/// given property's name.
+bool fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
+                            Optional<ObjCSelector> targetNameOpt,
+                            bool ignoreImpliedName = false);
+
 } // end namespace swift
 
 #endif

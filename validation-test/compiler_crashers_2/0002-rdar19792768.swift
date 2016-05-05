@@ -9,7 +9,7 @@ public func foo<
   where
   Expected.Iterator.Element == Actual.Iterator.Element,
   Expected.Iterator.Element == (T, T)
->(expected: Expected, _ actual: Actual) {}
+>(_ expected: Expected, _ actual: Actual) {}
 
 func f() {
   foo(

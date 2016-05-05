@@ -33,6 +33,8 @@ extern "C" void (*_swift_retain)(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 extern "C" void (*_swift_retain_n)(HeapObject *object, uint32_t n);
 SWIFT_RUNTIME_EXPORT
+extern "C" void (*_swift_nonatomic_retain)(HeapObject *object);
+SWIFT_RUNTIME_EXPORT
 extern "C" HeapObject *(*_swift_tryRetain)(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 extern "C" bool (*_swift_isDeallocating)(HeapObject *object);
@@ -40,6 +42,8 @@ SWIFT_RUNTIME_EXPORT
 extern "C" void (*_swift_release)(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 extern "C" void (*_swift_release_n)(HeapObject *object, uint32_t n);
+SWIFT_RUNTIME_EXPORT
+extern "C" void (*_swift_nonatomic_release)(HeapObject *object);
 
 // liboainject on iOS 8 patches the function pointers below if present. 
 // Do not reuse these names unless you do what oainject expects you to do.

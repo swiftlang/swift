@@ -1,5 +1,5 @@
 
 typedef struct {
-	long width;
-	long height;
+  long width;
+  long height;
 } NUPixelSize;

@@ -42,7 +42,7 @@ static inline void splitIntoLines(StringRef Text,
   trimLeadingWhitespaceFromLines(Text, 0, Lines);
 }
 
-} // namespace swift
+} // end namespace swift
 
-#endif // LLVM_SWIFT_BASIC_PRIMITIVEPARSING_H
+#endif // SWIFT_BASIC_PRIMITIVEPARSING_H
 

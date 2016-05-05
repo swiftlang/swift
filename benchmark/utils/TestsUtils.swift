@@ -45,7 +45,7 @@ public func Random() -> Int64 {
   return lfsrRandomGenerator.randInt()
 }
 
-public func CheckResults(res: Bool, _ message: String = "") {
+public func CheckResults(_ res: Bool, _ message: String = "") {
   if res {
     return
   }

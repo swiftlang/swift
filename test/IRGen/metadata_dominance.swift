@@ -1,9 +1,9 @@
 // RUN: %target-swift-frontend -emit-ir -primary-file %s | FileCheck %s
 
-func use_metadata<F>(f: F) {}
+func use_metadata<F>(_ f: F) {}
 
 func voidToVoid() {}
-func intToInt(x: Int) -> Int { return x }
+func intToInt(_ x: Int) -> Int { return x }
 
 func cond() -> Bool { return true }
 

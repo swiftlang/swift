@@ -14,7 +14,7 @@
 ///
 /// If `x == y`, returns `x`.
 @warn_unused_result
-public func min<T : Comparable>(x: T, _ y: T) -> T {
+public func min<T : Comparable>(_ x: T, _ y: T) -> T {
   // In case `x == y` we pick `x`.
   // This preserves any pre-existing order in case `T` has identity,
   // which is important for e.g. the stability of sorting algorithms.
@@ -26,7 +26,7 @@ public func min<T : Comparable>(x: T, _ y: T) -> T {
 ///
 /// If there are multiple equal least arguments, returns the first one.
 @warn_unused_result
-public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
+public func min<T : Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var minValue = min(min(x, y), z)
   // In case `value == minValue`, we pick `minValue`. See min(_:_:).
   for value in rest where value < minValue {
@@ -39,7 +39,7 @@ public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 ///
 /// If `x == y`, returns `y`.
 @warn_unused_result
-public func max<T : Comparable>(x: T, _ y: T) -> T {
+public func max<T : Comparable>(_ x: T, _ y: T) -> T {
   // In case `x == y`, we pick `y`. See min(_:_:).
   return y >= x ? y : x
 }
@@ -48,7 +48,7 @@ public func max<T : Comparable>(x: T, _ y: T) -> T {
 ///
 /// If there are multiple equal greatest arguments, returns the last one.
 @warn_unused_result
-public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
+public func max<T : Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var maxValue = max(max(x, y), z)
   // In case `value == maxValue`, we pick `value`. See min(_:_:).
   for value in rest where value >= maxValue {
@@ -68,7 +68,7 @@ public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 ///     iterator.next() // nil
 ///
 /// - Note: Idiomatic usage is to call `enumerate` instead of
-///   constructing an `EnumerateGenerator` directly.
+///   constructing an `EnumerateIterator` directly.
 public struct EnumeratedIterator<
   Base : IteratorProtocol
 > : IteratorProtocol, Sequence {
@@ -84,7 +84,7 @@ public struct EnumeratedIterator<
   /// The type of element returned by `next()`.
   public typealias Element = (offset: Int, element: Base.Element)
 
-  /// Advance to the next element and return it, or `nil` if no next element
+  /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Element? {
     guard let b = _base.next() else { return nil }
@@ -126,14 +126,14 @@ public struct EnumerateSequence<Base : Sequence> {}
 extension EnumeratedIterator {
   @available(*, unavailable, message: "use the 'enumerated()' method on the sequence")
   public init(_ base: Base) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
 extension EnumeratedSequence {
   @available(*, unavailable, message: "use the 'enumerated()' method on the sequence")
   public init(_ base: Base) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 

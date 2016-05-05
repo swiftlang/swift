@@ -44,7 +44,7 @@ bb0:
 // func used_by_inout(a : Int) -> (Int, Int) {
 //  var t = a
 //  takes_Int_inout(&a)
-//  return (t,a)
+//  return (t, a)
 //}
 // CHECK-LABEL: sil @used_by_inout
 sil @used_by_inout : $@convention(thin) (Int) -> (Int, Int) {

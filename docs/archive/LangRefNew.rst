@@ -1348,7 +1348,7 @@ otherwise empty cases in switch statements.
 
 ::
 
-  func classifyPoint(point: (Int, Int)) {
+  func classifyPoint(_ point: (Int, Int)) {
     switch point {
     case (0, 0):
       print("origin")

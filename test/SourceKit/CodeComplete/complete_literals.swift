@@ -26,7 +26,7 @@
 if true {
   #^STMT2^#
 }
-func foo(x: Int) {
+func foo(_ x: Int) {
   #^STMT3^#
 }
 

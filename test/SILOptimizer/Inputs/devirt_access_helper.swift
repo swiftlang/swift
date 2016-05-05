@@ -8,7 +8,7 @@ class InternalClass {
   return InternalClass()
 }
 
-@_transparent func invokeFoo(obj: InternalClass) {
+@_transparent func invokeFoo(_ obj: InternalClass) {
   obj.foo()
 }
 

@@ -4,20 +4,12 @@
 import StdlibUnittest
 import struct_static_stored_to_computed
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-import SwiftPrivatePthreadExtras
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var StructStaticChangeStoredToComputedTest = TestSuite("StructStaticChangeStoredToComputed")
 
 StructStaticChangeStoredToComputedTest.test("ChangeStoredToComputed") {
   do {
-    @inline(never) func twice(x: inout Int) {
+    @inline(never) func twice(_ x: inout Int) {
       x *= 2
     }
 

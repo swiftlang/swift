@@ -8,9 +8,9 @@
 // CHECK-NOT: dbg.value{{.*}}metadata ![[U]]
 class Class <T> {
 // CHECK: ![[U]] = !DILocalVariable(name: "y", arg: 2{{.*}} line: [[@LINE+1]],
-  func foo<U>(x: T, y: U) {}
+  func foo<U>(_ x: T, y: U) {}
 
-  func bar(x: String, y: Int64) {}
+  func bar(_ x: String, y: Int64) {}
 
   init() {}
 }

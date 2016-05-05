@@ -315,7 +315,7 @@ static void emitBlockID(unsigned ID, const char *Name,
 /// \brief Emits a record ID in the BLOCKINFO block.
 static void emitRecordID(unsigned ID, const char *Name,
                          llvm::BitstreamWriter &Stream,
-                         RecordDataImpl &Record){
+                         RecordDataImpl &Record) {
   Record.clear();
   Record.push_back(ID);
 

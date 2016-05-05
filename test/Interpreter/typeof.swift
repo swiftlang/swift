@@ -15,23 +15,23 @@ struct S : Fooable {
   static func foo() { print("Seeds?!") }
 }
 
-func classMetatype(b: B.Type) {
+func classMetatype(_ b: B.Type) {
   b.foo()
 }
 
-func structMetatype(s: S.Type) {
+func structMetatype(_ s: S.Type) {
   s.foo()
 }
 
-func archeMetatype<T : Fooable>(t: T.Type) {
+func archeMetatype<T : Fooable>(_ t: T.Type) {
   t.foo()
 }
 
-func archeMetatype2<T : Fooable>(t: T) {
+func archeMetatype2<T : Fooable>(_ t: T) {
   t.dynamicType.foo()
 }
 
-func boxedExistentialMetatype(e: ErrorProtocol) -> ErrorProtocol.Type {
+func boxedExistentialMetatype(_ e: ErrorProtocol) -> ErrorProtocol.Type {
   return e.dynamicType
 }
 

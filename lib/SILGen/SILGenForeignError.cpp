@@ -46,8 +46,6 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
 
   // If the pointer itself is optional, we need to branch based on
   // whether it's really there.
-  // FIXME: this code is written expecting pointer types to actually
-  // be optional, as opposed to simply having a null inhabitant.
   OptionalTypeKind errorPtrOptKind;
   if (SILType errorPtrObjectTy =
         foreignErrorSlot->getType()
@@ -57,7 +55,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
     SILBasicBlock *hasSlotBB = gen.createBasicBlock();
     gen.B.createSwitchEnum(loc, foreignErrorSlot, nullptr,
                  { { ctx.getOptionalSomeDecl(errorPtrOptKind), hasSlotBB },
-                   { ctx.getOptionalNoneDecl(errorPtrOptKind),  noSlotBB } });
+                   { ctx.getOptionalNoneDecl(errorPtrOptKind), noSlotBB } });
 
     // If we have the slot, emit a store to it.
     gen.B.emitBlock(hasSlotBB);

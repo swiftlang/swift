@@ -17,6 +17,9 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/CFG.h"
+#include "llvm/Support/GenericDomTree.h"
+#include "llvm/Support/GenericDomTreeConstruction.h"
 #include "llvm/ADT/Statistic.h"
 
 STATISTIC(NumStackPromoted, "Number of objects promoted to the stack");
@@ -48,8 +51,22 @@ class StackPromoter {
   SILFunction *F;
   EscapeAnalysis::ConnectionGraph *ConGraph;
   DominanceInfo *DT;
-  PostDominanceInfo *PDT;
   EscapeAnalysis *EA;
+
+  // We use our own post-dominator tree instead of PostDominatorAnalysis,
+  // because we ignore unreachable blocks (actually all unreachable sub-graphs).
+  // Example:
+  //              |
+  //             bb1
+  //            /   \
+  //   unreachable  bb2
+  //                  \
+  //
+  // We want to get bb2 as immediate post-dominator of bb1. This is not the case
+  // with the regular post-dominator tree.
+  llvm::DominatorTreeBase<SILBasicBlock> PostDomTree;
+
+  bool PostDomTreeValid;
 
   // Pseudo-functions for (de-)allocating array buffers on the stack.
 
@@ -63,6 +80,8 @@ class StackPromoter {
   class WorkListType {
     /// The nesting depth of stack allocation instructions for each block.
     /// A value of -1 means: not known yet.
+    /// A value of -2 means: not known and not visited yet.
+    /// All blocks in this map with a value >= -1 are already visited.
     llvm::DenseMap<SILBasicBlock *, int> Block2StackDepth;
 
     /// The work list of not yet handled blocks.
@@ -76,7 +95,7 @@ class StackPromoter {
     /// Insert a block into the worklist and set its stack depth.
     void insert(SILBasicBlock *BB, int StackDepth) {
       auto Iter = Block2StackDepth.find(BB);
-      if (Iter != Block2StackDepth.end()) {
+      if (Iter != Block2StackDepth.end() && Iter->second >= -1) {
         // We already handled the block.
         assert(StackDepth >= 0);
         if (Iter->second < 0) {
@@ -90,6 +109,10 @@ class StackPromoter {
         Block2StackDepth[BB] = StackDepth;
         ToHandle.push_back(BB);
       }
+    }
+
+    bool insertAsUnhandled(SILBasicBlock *Pred) {
+      return Block2StackDepth.insert({Pred, -2}).second;
     }
 
     int getStackDepth(SILBasicBlock *BB) {
@@ -120,16 +143,38 @@ class StackPromoter {
                        SILInstruction *&AllocInsertionPoint,
                        SILInstruction *&DeallocInsertionPoint);
 
+  /// Returns the place where to insert the deallocation.
+  /// Returns null if this doesn't succeed or, in case \p RestartPoint is set,
+  /// a new iteration should be triggered.
+  SILInstruction *findDeallocPoint(SILInstruction *StartInst,
+                               SILInstruction *&RestartPoint,
+                               EscapeAnalysis::CGNode *Node,
+                               int NumUsePointsToFind);
+
+  /// If \p CurrentBB is in a loop update the \p EndBlock so that it post-
+  /// dominates the loop.
+  /// Returns the new EndBlock or null if no one could be found.
+  SILBasicBlock *updateEndBlock(SILBasicBlock *CurrentBB,
+                                SILBasicBlock *EndBlock,
+                                WorkListType &WorkList);
+
   bool strictlyDominates(SILBasicBlock *A, SILBasicBlock *B) {
     return A != B && DT->dominates(A, B);
   }
 
   bool strictlyPostDominates(SILBasicBlock *A, SILBasicBlock *B) {
-    return A != B && PDT->dominates(A, B);
+    calculatePostDomTree();
+    return A != B && PostDomTree.dominates(A, B);
+  }
+
+  bool postDominates(SILBasicBlock *A, SILBasicBlock *B) {
+    calculatePostDomTree();
+    return PostDomTree.dominates(A, B);
   }
 
   SILBasicBlock *getImmediatePostDom(SILBasicBlock *BB) {
-    auto *Node = PDT->getNode(BB);
+    calculatePostDomTree();
+    auto *Node = PostDomTree.getNode(BB);
     if (!Node)
       return nullptr;
     auto *IDomNode = Node->getIDom();
@@ -137,13 +182,22 @@ class StackPromoter {
       return nullptr;
     return IDomNode->getBlock();
   }
+  
+  void calculatePostDomTree() {
+    if (!PostDomTreeValid) {
+      // The StackPromoter acts as a "graph" for which the post-dominator-tree
+      // is calculated.
+      PostDomTree.recalculate(*this);
+      PostDomTreeValid = true;
+    }
+  }
 
 public:
 
   StackPromoter(SILFunction *F, EscapeAnalysis::ConnectionGraph *ConGraph,
-                DominanceInfo *DT, PostDominanceInfo *PDT,
-                EscapeAnalysis *EA) :
-    F(F), ConGraph(ConGraph), DT(DT), PDT(PDT), EA(EA) { }
+                DominanceInfo *DT, EscapeAnalysis *EA) :
+    F(F), ConGraph(ConGraph), DT(DT), EA(EA), PostDomTree(true),
+    PostDomTreeValid(false) { }
 
   /// What did the optimization change?
   enum class ChangeState {
@@ -151,6 +205,8 @@ public:
     Insts,
     Calls
   };
+
+  SILFunction *getFunction() const { return F; }
 
   /// The main entry point for the optimization.
   ChangeState promote();
@@ -177,8 +233,35 @@ static bool isPromotableAllocInst(SILInstruction *I) {
 }
 
 StackPromoter::ChangeState StackPromoter::promote() {
+
+  llvm::SetVector<SILBasicBlock *> ReachableBlocks;
+
+  // First step: find blocks which end up in a no-return block (terminated by
+  // an unreachable instruction).
+  // Search for function-exiting blocks, i.e. return and throw.
+  for (SILBasicBlock &BB : *F) {
+    TermInst *TI = BB.getTerminator();
+    if (TI->isFunctionExiting())
+      ReachableBlocks.insert(&BB);
+  }
+  // Propagate the reachability up the control flow graph.
+  unsigned Idx = 0;
+  while (Idx < ReachableBlocks.size()) {
+    SILBasicBlock *BB = ReachableBlocks[Idx++];
+    for (SILBasicBlock *Pred : BB->getPreds())
+      ReachableBlocks.insert(Pred);
+  }
+
   // Search the whole function for stack promotable allocations.
   for (SILBasicBlock &BB : *F) {
+
+    // Don't stack promote any allocation inside a code region which ends up in
+    // a no-return block. Such allocations may missing their final release.
+    // We would insert the deallocation too early, which may result in a
+    // use-after-free problem.
+    if (ReachableBlocks.count(&BB) == 0)
+      continue;
+
     for (auto Iter = BB.begin(); Iter != BB.end();) {
       // The allocation instruction may be moved, so increment Iter prior to
       // doing the optimization.
@@ -284,6 +367,87 @@ SILFunction *StackPromoter::getBufferDeallocFunc(SILFunction *OrigFunc,
   return BufferDeallocFunc;
 }
 
+namespace {
+
+/// Iterator which iterates over all basic blocks of a function which are not
+/// terminated by an unreachable inst.
+class NonUnreachableBlockIter :
+public std::iterator<std::forward_iterator_tag, SILBasicBlock, ptrdiff_t> {
+
+  SILFunction::iterator BaseIterator;
+  SILFunction::iterator End;
+
+  void skipUnreachables() {
+    while (true) {
+      if (BaseIterator == End)
+        return;
+      if (!isa<UnreachableInst>(BaseIterator->getTerminator()))
+        return;
+      BaseIterator++;
+    }
+  }
+
+public:
+  NonUnreachableBlockIter(SILFunction::iterator BaseIterator,
+                          SILFunction::iterator End) :
+      BaseIterator(BaseIterator), End(End) {
+    skipUnreachables();
+  }
+
+  NonUnreachableBlockIter() = default;
+  
+  SILBasicBlock &operator*() const { return *BaseIterator; }
+  SILBasicBlock &operator->() const { return *BaseIterator; }
+  
+  NonUnreachableBlockIter &operator++() {
+    BaseIterator++;
+    skipUnreachables();
+    return *this;
+  }
+  
+  NonUnreachableBlockIter operator++(int unused) {
+    NonUnreachableBlockIter Copy = *this;
+    ++*this;
+    return Copy;
+  }
+
+  friend bool operator==(NonUnreachableBlockIter lhs,
+                         NonUnreachableBlockIter rhs) {
+    return lhs.BaseIterator == rhs.BaseIterator;
+  }
+  friend bool operator!=(NonUnreachableBlockIter lhs,
+                         NonUnreachableBlockIter rhs) {
+    return !(lhs == rhs);
+  }
+};
+}
+
+namespace llvm {
+
+/// Use the StackPromoter as a wrapper for the function. It holds the list of
+/// basic blocks excluding all unreachable blocks.
+template <> struct GraphTraits<StackPromoter *>
+    : public GraphTraits<swift::SILBasicBlock*> {
+  typedef StackPromoter *GraphType;
+
+  static NodeType *getEntryNode(GraphType SP) {
+    return &SP->getFunction()->front();
+  }
+
+  typedef NonUnreachableBlockIter nodes_iterator;
+  static nodes_iterator nodes_begin(GraphType SP) {
+    return nodes_iterator(SP->getFunction()->begin(), SP->getFunction()->end());
+  }
+  static nodes_iterator nodes_end(GraphType SP) {
+    return nodes_iterator(SP->getFunction()->end(), SP->getFunction()->end());
+  }
+  static unsigned size(GraphType SP) {
+    return std::distance(nodes_begin(SP), nodes_end(SP));
+  }
+};
+
+}
+
 bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
                                     SILInstruction *&AllocInsertionPoint,
                                     SILInstruction *&DeallocInsertionPoint) {
@@ -311,13 +475,42 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
     return false;
   }
 
+  // Try to find the point where to insert the deallocation.
+  // This might need more than one try in case we need to move the allocation
+  // out of a stack-alloc-dealloc pair. See findDeallocPoint().
+  SILInstruction *StartInst = AI;
+  for (;;) {
+    SILInstruction *RestartPoint = nullptr;
+    DeallocInsertionPoint = findDeallocPoint(StartInst, RestartPoint, Node,
+                                             NumUsePointsToFind);
+    if (DeallocInsertionPoint)
+      return true;
+
+    if (!RestartPoint)
+      return false;
+
+    // Moving a buffer allocation call is not trivial because we would need to
+    // move all the parameter calculations as well. So we just don't do it.
+    if (!isa<AllocRefInst>(AI))
+      return false;
+
+    // Retry with moving the allocation up.
+    AllocInsertionPoint = RestartPoint;
+    StartInst = RestartPoint;
+  }
+}
+
+SILInstruction *StackPromoter::findDeallocPoint(SILInstruction *StartInst,
+                                                SILInstruction *&RestartPoint,
+                                                EscapeAnalysis::CGNode *Node,
+                                                int NumUsePointsToFind) {
   // In the following we check two requirements for stack promotion:
   // 1) Are all uses in the same control region as the alloc? E.g. if the
   //    allocation is in a loop then there may not be any uses of the object
   //    outside the loop.
   // 2) We need to find an insertion place for the deallocation so that it
   //    preserves a properly nested stack allocation-deallocation structure.
-  SILBasicBlock *StartBlock = AI->getParent();
+  SILBasicBlock *StartBlock = StartInst->getParent();
 
   // The block where we assume we can insert the deallocation.
   SILBasicBlock *EndBlock = StartBlock;
@@ -336,7 +529,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
     if (BB == StartBlock) {
       // In the first block we start at the allocation instruction and not at
       // the begin of the block.
-      Iter = AI->getIterator();
+      Iter = StartInst->getIterator();
     } else {
       // Track all uses in the block arguments.
       for (SILArgument *BBArg : BB->getBBArgs()) {
@@ -353,15 +546,9 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
       //     cond_br ..., loop, exit
       //   exit:
       //     ... // this is the new EndBlock
-      for (SILBasicBlock *Pred : BB->getPreds()) {
-        // Extend the lifetime region until the EndBlock post dominates the
-        // StartBlock.
-        while (!strictlyPostDominates(EndBlock, Pred)) {
-          EndBlock = getImmediatePostDom(EndBlock);
-          if (!EndBlock)
-            return false;
-        }
-      }
+      EndBlock = updateEndBlock(BB, EndBlock, WorkList);
+      if (!EndBlock)
+        return nullptr;
       Iter = BB->begin();
       StackDepth = WorkList.getStackDepth(BB);
     }
@@ -370,8 +557,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
       SILInstruction &I = *Iter++;
       if (BB == EndBlock && StackDepth == 0 && NumUsePointsToFind == 0) {
         // We found a place to insert the stack deallocation.
-        DeallocInsertionPoint = &I;
-        return true;
+        return &I;
       }
       if (I.isAllocatingStack()) {
         StackDepth++;
@@ -388,16 +574,17 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
           //
           // In this case we can move the alloc_ref before the alloc_stack
           // to fix the nesting.
-          if (!isa<AllocRefInst>(AI))
-            return false;
           auto *Alloc = dyn_cast<SILInstruction>(I.getOperand(0));
           if (!Alloc)
-            return false;
+            return nullptr;
+
           // This should always be the case, but let's be on the safe side.
-          if (!PDT->dominates(StartBlock, Alloc->getParent()))
-            return false;
-          AllocInsertionPoint = Alloc;
-          StackDepth++;
+          if (!postDominates(StartBlock, Alloc->getParent()))
+            return nullptr;
+
+          // Trigger another iteration with a new start point;
+          RestartPoint = Alloc;
+          return nullptr;
         }
         StackDepth--;
       }
@@ -422,7 +609,7 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
         //     dealloc_stack %1 // this is the new EndBlock
         EndBlock = getImmediatePostDom(EndBlock);
         if (!EndBlock)
-          return false;
+          return nullptr;
       }
       // Again, it's important that the EndBlock is the first in the WorkList.
       WorkList.insert(EndBlock, -1);
@@ -441,11 +628,35 @@ bool StackPromoter::canPromoteAlloc(SILInstruction *AI,
         //     cond_br ..., loop, exit
         //   exit:
         //     use(%container)
-        return false;
+        return nullptr;
       }
       WorkList.insert(Succ, StackDepth);
     }
   }
+}
+
+SILBasicBlock *StackPromoter::updateEndBlock(SILBasicBlock *CurrentBB,
+                                             SILBasicBlock *EndBlock,
+                                             WorkListType &WorkList) {
+  llvm::SmallVector<SILBasicBlock *, 8> PredsToHandle;
+  PredsToHandle.push_back(CurrentBB);
+
+  // Starting from BB, go back the control flow graph until we reach already
+  // handled blocks.
+  while (!PredsToHandle.empty()) {
+    SILBasicBlock *BB = PredsToHandle.pop_back_val();
+    for (SILBasicBlock *Pred : BB->getPreds()) {
+      // Make sure that the EndBlock post-dominates all blocks we are visiting.
+      while (!strictlyPostDominates(EndBlock, Pred)) {
+        EndBlock = getImmediatePostDom(EndBlock);
+        if (!EndBlock)
+          return nullptr;
+      }
+      if (WorkList.insertAsUnhandled(Pred))
+        PredsToHandle.push_back(Pred);
+    }
+  }
+  return EndBlock;
 }
 
 //===----------------------------------------------------------------------===//
@@ -466,20 +677,18 @@ private:
 
     auto *EA = PM->getAnalysis<EscapeAnalysis>();
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
-    auto *PDA = PM->getAnalysis<PostDominanceAnalysis>();
 
     SILFunction *F = getFunction();
     if (auto *ConGraph = EA->getConnectionGraph(F)) {
-      StackPromoter promoter(F, ConGraph, DA->get(F), PDA->get(F), EA);
+      StackPromoter promoter(F, ConGraph, DA->get(F), EA);
       switch (promoter.promote()) {
         case StackPromoter::ChangeState::None:
           break;
         case StackPromoter::ChangeState::Insts:
           invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
           break;
-        case StackPromoter::ChangeState::Calls: {
+        case StackPromoter::ChangeState::Calls:
           invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
-        }
           break;
       }
     }

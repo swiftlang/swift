@@ -27,15 +27,15 @@ protocol Pingable {}
 
 struct Some1<T> {
   init() {}
-  func foo(x: T) {}
+  func foo(_ x: T) {}
 }
 struct Some0<T> {
   init() {}
-  func foo(x: T) {}
+  func foo(_ x: T) {}
 }
 
 @inline(never)
-func flood<T>(x : T) {
+func flood<T>(_ x: T) {
   Some1<Some1<Some1<Some1<T>>>>() is Pingable
   Some1<Some1<Some1<Some0<T>>>>() is Pingable
   Some1<Some1<Some0<Some1<T>>>>() is Pingable
@@ -55,7 +55,7 @@ func flood<T>(x : T) {
 }
 
 @inline(never)
-func flood3<T>(x : T) {
+func flood3<T>(_ x: T) {
  flood(Some1<Some1<Some1<Some1<T>>>>())
  flood(Some1<Some1<Some1<Some0<T>>>>())
  flood(Some1<Some1<Some0<Some1<T>>>>())
@@ -75,7 +75,7 @@ func flood3<T>(x : T) {
 }
 
 @inline(never)
-func flood2<T>(x : T) {
+func flood2<T>(_ x: T) {
  flood3(Some1<Some1<Some1<Some1<T>>>>())
  flood3(Some1<Some1<Some1<Some0<T>>>>())
  flood3(Some1<Some1<Some0<Some1<T>>>>())
@@ -95,7 +95,7 @@ func flood2<T>(x : T) {
 }
 
 @inline(never)
-public func run_TypeFlood(N: Int) {
+public func run_TypeFlood(_ N: Int) {
 
   for _ in 1...N {
     flood3(Some1<Some1<Some1<Int>>>())

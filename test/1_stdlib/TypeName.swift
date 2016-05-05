@@ -30,7 +30,7 @@ struct GS<T : AssociatedTypes> {}
 enum GE<T : AssociatedTypes> {}
 class GC2<T : AssociatedTypes, U : AssociatedTypes> {}
 
-func printTypeName(t: Any.Type) { print(_typeName(t)) }
+func printTypeName(_ t: Any.Type) { print(_typeName(t)) }
 
 printTypeName(Int.self) // CHECK: Swift.Int
 printTypeName(C.self) // CHECK-NEXT: [[THIS:.*]].C

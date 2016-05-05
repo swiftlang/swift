@@ -11,9 +11,9 @@ var mygg = 29
 
 // Check if we have three tokens: 2 from the imported modules, one from mygg.
 
-// CHECK: sil_global private{{.*}} @globalinit_[[T1:.*]]_token0
-// CHECK: sil_global private{{.*}} @globalinit_[[T2:.*]]_token0
-// CHECK: sil_global private{{.*}} @globalinit_[[T3:.*]]_token0
+// CHECK: sil_global private @globalinit_[[T1:.*]]_token0
+// CHECK: sil_global [fragile] @globalinit_[[T2:.*]]_token0
+// CHECK: sil_global [fragile] @globalinit_[[T3:.*]]_token0
 
 public func sum() -> Int {
   return mygg + get_gg_a() + get_gg_b()

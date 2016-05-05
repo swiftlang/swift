@@ -5,7 +5,7 @@
 // This used to crash <rdar://problem/17929944>.
 // To tickle the crash, SubProto must not be used elsewhere in this file.
 protocol SubProto : BaseProto {}
-// CHECK: @_TMp24objc_protocol_multi_file8SubProto = {{(protected )?}}constant %swift.protocol
+// CHECK: @_TMp24objc_protocol_multi_file8SubProto = hidden constant %swift.protocol
 
 protocol DoubleSubProto : IntermediateProto {}
-// CHECK: @_TMp24objc_protocol_multi_file14DoubleSubProto = {{(protected )?}}constant %swift.protocol
+// CHECK: @_TMp24objc_protocol_multi_file14DoubleSubProto = hidden constant %swift.protocol

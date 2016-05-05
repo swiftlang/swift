@@ -22,6 +22,8 @@
 namespace swift {
 namespace reflection {
 
+// Field records describe the type of a single stored property or case member
+// of a class, struct or enum.
 class FieldRecordFlags {
   using int_type = uint32_t;
   enum : int_type {
@@ -52,12 +54,19 @@ class FieldRecord {
 
 public:
   FieldRecord() = delete;
+
+  bool hasMangledTypeName() const {
+    return MangledTypeName;
+  }
+
   std::string getMangledTypeName() const {
     return MangledTypeName.get();
   }
 
   std::string getFieldName()  const {
-    return FieldName.get();
+    if (FieldName)
+      return FieldName.get();
+    return "";
   }
 
   bool isObjC() const {
@@ -76,6 +85,10 @@ struct FieldRecordIterator {
     return *Cur;
   }
 
+  const FieldRecord *operator->() const {
+    return Cur;
+  }
+
   FieldRecordIterator &operator++() {
     ++Cur;
     return *this;
@@ -90,7 +103,18 @@ struct FieldRecordIterator {
   }
 };
 
-struct FieldDescriptor {
+enum class FieldDescriptorKind : uint16_t {
+  Struct,
+  Class,
+  Enum,
+  Protocol,
+  ClassProtocol,
+  ObjCProtocol,
+};
+
+// Field descriptors contain a collection of field records for a single
+// class, struct or enum declaration.
+class FieldDescriptor {
   const FieldRecord *getFieldRecordBuffer() const {
     return reinterpret_cast<const FieldRecord *>(this + 1);
   }
@@ -98,8 +122,11 @@ struct FieldDescriptor {
   const RelativeDirectPointer<const char> MangledTypeName;
 
 public:
+  FieldDescriptor() = delete;
+
+  const FieldDescriptorKind Kind;
+  const uint16_t FieldRecordSize;
   const uint32_t NumFields;
-  const uint32_t FieldRecordSize;
 
   using const_iterator = FieldRecordIterator;
 
@@ -115,11 +142,50 @@ public:
     return const_iterator { End, End };
   }
 
+  bool hasMangledTypeName() const {
+    return MangledTypeName;
+  }
+
   std::string getMangledTypeName() const {
     return MangledTypeName.get();
   }
 };
 
+class FieldDescriptorIterator
+  : public std::iterator<std::forward_iterator_tag, FieldDescriptor> {
+public:
+  const void *Cur;
+  const void * const End;
+  FieldDescriptorIterator(const void *Cur, const void * const End)
+    : Cur(Cur), End(End) {}
+
+  const FieldDescriptor &operator*() const {
+    return *reinterpret_cast<const FieldDescriptor *>(Cur);
+  }
+
+  const FieldDescriptor *operator->() const {
+    return reinterpret_cast<const FieldDescriptor *>(Cur);
+  }
+
+  FieldDescriptorIterator &operator++() {
+    const auto &FR = this->operator*();
+    const void *Next = reinterpret_cast<const char *>(Cur)
+      + sizeof(FieldDescriptor) + FR.NumFields * FR.FieldRecordSize;
+    Cur = Next;
+    return *this;
+  }
+
+  bool operator==(FieldDescriptorIterator const &other) const {
+    return Cur == other.Cur && End == other.End;
+  }
+
+  bool operator!=(FieldDescriptorIterator const &other) const {
+    return !(*this == other);
+  }
+};
+
+// Associated type records describe the mapping from an associated
+// type to the type witness of a conformance.
 class AssociatedTypeRecord {
   const RelativeDirectPointer<const char> Name;
   const RelativeDirectPointer<const char> SubstitutedTypeName;
@@ -149,6 +215,10 @@ struct AssociatedTypeRecordIterator {
     return *Cur;
   }
 
+  const AssociatedTypeRecord *operator->() const {
+    return Cur;
+  }
+
   AssociatedTypeRecordIterator &operator++() {
     ++Cur;
     return *this;
@@ -172,6 +242,8 @@ struct AssociatedTypeRecordIterator {
   }
 };
 
+// An associated type descriptor contains a collection of associated
+// type records for a conformance.
 struct AssociatedTypeDescriptor {
   const RelativeDirectPointer<const char> ConformingTypeName;
   const RelativeDirectPointer<const char> ProtocolTypeName;
@@ -218,6 +290,10 @@ public:
     return *reinterpret_cast<const AssociatedTypeDescriptor *>(Cur);
   }
 
+  const AssociatedTypeDescriptor *operator->() const {
+    return reinterpret_cast<const AssociatedTypeDescriptor *>(Cur);
+  }
+
   AssociatedTypeIterator &operator++() {
     const auto &ATR = this->operator*();
     size_t Size = sizeof(AssociatedTypeDescriptor) +
@@ -236,35 +312,235 @@ public:
   }
 };
 
-class FieldDescriptorIterator
-  : public std::iterator<std::forward_iterator_tag, FieldDescriptor> {
+// Builtin type records describe basic layout information about
+// any builtin types referenced from the other sections.
+class BuiltinTypeDescriptor {
+  const RelativeDirectPointer<const char> TypeName;
+
+public:
+  uint32_t Size;
+  uint32_t Alignment;
+  uint32_t Stride;
+  uint32_t NumExtraInhabitants;
+
+  bool hasMangledTypeName() const {
+    return TypeName;
+  }
+
+  std::string getMangledTypeName() const {
+    return TypeName.get();
+  }
+};
+
+class BuiltinTypeDescriptorIterator
+  : public std::iterator<std::forward_iterator_tag, BuiltinTypeDescriptor> {
 public:
   const void *Cur;
   const void * const End;
-  FieldDescriptorIterator(const void *Cur, const void * const End)
+  BuiltinTypeDescriptorIterator(const void *Cur, const void * const End)
     : Cur(Cur), End(End) {}
 
-  const FieldDescriptor &operator*() const {
-    return *reinterpret_cast<const FieldDescriptor *>(Cur);
+  const BuiltinTypeDescriptor &operator*() const {
+    return *reinterpret_cast<const BuiltinTypeDescriptor *>(Cur);
   }
 
-  FieldDescriptorIterator &operator++() {
-    const auto &FR = this->operator*();
+  const BuiltinTypeDescriptor *operator->() const {
+    return reinterpret_cast<const BuiltinTypeDescriptor *>(Cur);;
+  }
+
+  BuiltinTypeDescriptorIterator &operator++() {
     const void *Next = reinterpret_cast<const char *>(Cur)
-      + sizeof(FieldDescriptor) + FR.NumFields * FR.FieldRecordSize;
+      + sizeof(BuiltinTypeDescriptor);
     Cur = Next;
     return *this;
   }
 
-  bool operator==(FieldDescriptorIterator const &other) const {
+  bool operator==(BuiltinTypeDescriptorIterator const &other) const {
     return Cur == other.Cur && End == other.End;
   }
 
-  bool operator!=(FieldDescriptorIterator const &other) const {
+  bool operator!=(BuiltinTypeDescriptorIterator const &other) const {
     return !(*this == other);
   }
 };
 
+class CaptureTypeRecord {
+  const RelativeDirectPointer<const char> MangledTypeName;
+
+public:
+  CaptureTypeRecord() = delete;
+
+  bool hasMangledTypeName() const {
+    return MangledTypeName;
+  }
+
+  std::string getMangledTypeName() const {
+    return MangledTypeName.get();
+  }
+};
+
+struct CaptureTypeRecordIterator {
+  const CaptureTypeRecord *Cur;
+  const CaptureTypeRecord * const End;
+
+  CaptureTypeRecordIterator(const CaptureTypeRecord *Cur,
+                            const CaptureTypeRecord * const End)
+    : Cur(Cur), End(End) {}
+
+  const CaptureTypeRecord &operator*() const {
+    return *Cur;
+  }
+
+  const CaptureTypeRecord *operator->() const {
+    return Cur;
+  }
+
+  CaptureTypeRecordIterator &operator++() {
+    ++Cur;
+    return *this;
+  }
+
+  bool operator==(const CaptureTypeRecordIterator &other) const {
+    return Cur == other.Cur && End == other.End;
+  }
+
+  bool operator!=(const CaptureTypeRecordIterator &other) const {
+    return !(*this == other);
+  }
+};
+
+class MetadataSourceRecord {
+  const RelativeDirectPointer<const char> MangledTypeName;
+  const RelativeDirectPointer<const char> MangledMetadataSource;
+
+public:
+  MetadataSourceRecord() = delete;
+
+  bool hasMangledTypeName() const {
+    return MangledTypeName;
+  }
+
+  std::string getMangledTypeName() const {
+    return MangledTypeName.get();
+  }
+
+  bool hasMangledMetadataSource() const {
+    return MangledMetadataSource;
+  }
+
+  std::string getMangledMetadataSource() const {
+    return MangledMetadataSource.get();
+  }
+};
+
+struct MetadataSourceRecordIterator {
+  const MetadataSourceRecord *Cur;
+  const MetadataSourceRecord * const End;
+
+  MetadataSourceRecordIterator(const MetadataSourceRecord *Cur,
+                            const MetadataSourceRecord * const End)
+    : Cur(Cur), End(End) {}
+
+  const MetadataSourceRecord &operator*() const {
+    return *Cur;
+  }
+
+  const MetadataSourceRecord *operator->() const {
+    return Cur;
+  }
+
+  MetadataSourceRecordIterator &operator++() {
+    ++Cur;
+    return *this;
+  }
+
+  bool operator==(const MetadataSourceRecordIterator &other) const {
+    return Cur == other.Cur && End == other.End;
+  }
+
+  bool operator!=(const MetadataSourceRecordIterator &other) const {
+    return !(*this == other);
+  }
+};
+
+// Capture descriptors describe the layout of a closure context
+// object. Unlike nominal types, the generic substitutions for a
+// closure context come from the object, and not the metadata.
+class CaptureDescriptor {
+  const CaptureTypeRecord *getCaptureTypeRecordBuffer() const {
+    return reinterpret_cast<const CaptureTypeRecord *>(this + 1);
+  }
+
+  const MetadataSourceRecord *getMetadataSourceRecordBuffer() const {
+    return reinterpret_cast<const MetadataSourceRecord *>(capture_end().End);
+  }
+
+public:
+  uint32_t NumCaptureTypes;
+  uint32_t NumMetadataSources;
+  uint32_t NumBindings;
+
+  using const_iterator = FieldRecordIterator;
+
+  CaptureTypeRecordIterator capture_begin() const {
+    auto Begin = getCaptureTypeRecordBuffer();
+    auto End = Begin + NumCaptureTypes;
+    return { Begin, End };
+  }
+
+  CaptureTypeRecordIterator capture_end() const {
+    auto Begin = getCaptureTypeRecordBuffer();
+    auto End = Begin + NumCaptureTypes;
+    return { End, End };
+  }
+
+  MetadataSourceRecordIterator source_begin() const {
+    auto Begin = getMetadataSourceRecordBuffer();
+    auto End = Begin + NumMetadataSources;
+    return { Begin, End };
+  }
+
+  MetadataSourceRecordIterator source_end() const {
+    auto Begin = getMetadataSourceRecordBuffer();
+    auto End = Begin + NumMetadataSources;
+    return { End, End };
+  }
+};
+
+class CaptureDescriptorIterator
+  : public std::iterator<std::forward_iterator_tag, CaptureDescriptor> {
+public:
+  const void *Cur;
+  const void * const End;
+  CaptureDescriptorIterator(const void *Cur, const void * const End)
+    : Cur(Cur), End(End) {}
+
+  const CaptureDescriptor &operator*() const {
+    return *reinterpret_cast<const CaptureDescriptor *>(Cur);
+  }
+
+  const CaptureDescriptor *operator->() const {
+    return reinterpret_cast<const CaptureDescriptor *>(Cur);
+  }
+
+  CaptureDescriptorIterator &operator++() {
+    const auto &CR = this->operator*();
+    const void *Next = reinterpret_cast<const char *>(Cur)
+      + sizeof(CaptureDescriptor)
+      + CR.NumCaptureTypes * sizeof(CaptureTypeRecord)
+      + CR.NumMetadataSources * sizeof(MetadataSourceRecord);
+    Cur = Next;
+    return *this;
+  }
+
+  bool operator==(CaptureDescriptorIterator const &other) const {
+    return Cur == other.Cur && End == other.End;
+  }
+
+  bool operator!=(CaptureDescriptorIterator const &other) const {
+    return !(*this == other);
+  }
+};
 
 } // end namespace reflection
 } // end namespace swift

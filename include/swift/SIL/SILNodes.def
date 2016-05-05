@@ -118,6 +118,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(StrongReleaseInst, RefCountingInst, MayHaveSideEffects, MayRelease)
     INST(StrongRetainUnownedInst, RefCountingInst, MayHaveSideEffects,
          DoesNotRelease)
+    INST(StrongPinInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
+    INST(StrongUnpinInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
     INST(UnownedRetainInst, RefCountingInst, MayHaveSideEffects, DoesNotRelease)
     INST(UnownedReleaseInst, RefCountingInst, MayHaveSideEffects,
          MayRelease)
@@ -132,8 +134,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(FixLifetimeInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
   INST(MarkDependenceInst, SILInstruction, None, DoesNotRelease)
   INST(CopyBlockInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
-  INST(StrongPinInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
-  INST(StrongUnpinInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
   // IsUnique does not actually write to memory but should be modeled
   // as such. Its operand is a pointer to an object reference. The

@@ -56,10 +56,10 @@ static SILInstruction *createIncrement(SILValue Ptr, SILInstruction *InsertPt) {
   // If Ptr is refcounted itself, create the strong_retain and
   // return.
   if (Ptr->getType().isReferenceCounted(B.getModule()))
-    return B.createStrongRetain(Loc, Ptr);
+    return B.createStrongRetain(Loc, Ptr, Atomicity::Atomic);
 
   // Otherwise, create the retain_value.
-  return B.createRetainValue(Loc, Ptr);
+  return B.createRetainValue(Loc, Ptr, Atomicity::Atomic);
 }
 
 /// Creates a decrement on \p Ptr at insertion point \p InsertPt that creates a
@@ -72,10 +72,10 @@ static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
 
   // If Ptr has reference semantics itself, create a strong_release.
   if (Ptr->getType().isReferenceCounted(B.getModule()))
-    return B.createStrongRelease(Loc, Ptr);
+    return B.createStrongRelease(Loc, Ptr, Atomicity::Atomic);
 
   // Otherwise create a release value.
-  return B.createReleaseValue(Loc, Ptr);
+  return B.createReleaseValue(Loc, Ptr, Atomicity::Atomic);
 }
 
 // This routine takes in the ARCMatchingSet \p MatchSet and inserts new

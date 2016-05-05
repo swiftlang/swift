@@ -1,7 +1,7 @@
 typealias MyFnTy = Int ->Int
 class C {
-  func foo(x: Int ->Int) {}
-  func foo2(x: MyFnTy) {}
+  func foo(_ x: Int ->Int) {}
+  func foo2(_ x: MyFnTy) {}
 }
 
 C().

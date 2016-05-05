@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
-public func f(s : String?)
+public func f(_ s : String?)
 {
   if var str = s {
     // CHECK: !DILocalVariable(name: "str", {{.*}}line: [[@LINE-1]]

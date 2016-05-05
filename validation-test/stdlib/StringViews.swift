@@ -15,13 +15,12 @@
 import Swift
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
 #if _runtime(_ObjC)
-import ObjectiveC
+// FIXME: Foundation leaks through StdlibUnittest.  It adds some conformances
+// that overload resolution picks up in this code.
+import Foundation
 #endif
+
 
 // CHECK: testing...
 print("testing...")
@@ -99,7 +98,9 @@ tests.test("index-mapping/character-to-utf8") {
 
     winter.characters.indices.map {
       i in (0..<3).map {
-        winter.utf8[i.samePosition(in: winter.utf8).advanced(by: $0)]
+        winter.utf8[
+          winter.utf8.index(
+            i.samePosition(in: winter.utf8), offsetBy: $0)]
       }
     }, sameValue: ==)
 
@@ -136,7 +137,8 @@ tests.test("index-mapping/unicode-scalar-to-utf8") {
     
     winter.unicodeScalars.indices.map {
       i in (0..<3).map {
-        winter.utf8[i.samePosition(in: winter.utf8).advanced(by: $0)]
+        winter.utf8[
+          winter.utf8.index(i.samePosition(in: winter.utf8), offsetBy: $0)]
       }
     }, sameValue: ==)
 
@@ -179,7 +181,9 @@ tests.test("index-mapping/utf16-to-utf8") {
     ] as [[UTF8.CodeUnit]],
     winter.utf16.indices.map {
       i16 in i16.samePosition(in: winter.utf8).map {
-        i8 in (0..<3).map { winter.utf8[i8.advanced(by: $0)] }
+        i8 in (0..<3).map {
+          winter.utf8[winter.utf8.index(i8, offsetBy: $0)]
+        }
       } ?? []
     }, sameValue: ==)
 
@@ -608,9 +612,12 @@ tests.test("UTF8 indexes") {
   // CHECK-NEXT: true
   let abc = "abcdefghijklmnop"
   
-  expectEqual(
-    String.UTF8Index(abc.startIndex, within: abc.utf8).successor(),
-    String.UTF8Index(abc.startIndex.successor(), within: abc.utf8))
+  do {
+    let start = String.UTF8Index(abc.startIndex, within: abc.utf8)
+    expectEqual(
+      abc.utf8.index(after: start),
+      String.UTF8Index(abc.index(after: abc.startIndex), within: abc.utf8))
+  }
 
   let diverseCharacters = summer + winter + winter + summer
   let s = diverseCharacters.unicodeScalars
@@ -621,7 +628,7 @@ tests.test("UTF8 indexes") {
   // Test all valid subranges si0..<si1 of positions in s.  ds is
   // always si0.distance(to: si1)
   for si0 in s.indices {
-    for (ds, si1) in (si0..<s.endIndex).enumerated() {
+    for (ds, si1) in s.indices[si0..<s.endIndex].enumerated() {
       
       // Map those unicode scalar indices into utf8 indices
       let u8i1 = si1.samePosition(in: u8)
@@ -651,7 +658,7 @@ tests.test("UTF8 indexes") {
             // We only have well-formed UTF16 in this string, so the
             // successor points to a trailing surrogate of a pair and
             // thus shouldn't convert to a UTF8 position
-            expectEmpty(u16i0a.successor().samePosition(in: u8))
+            expectEmpty(u16.index(after: u16i0a).samePosition(in: u8))
           }
           
           dsa = dsa.advanced(by: 1) // we're moving off the beginning of a new Unicode scalar
@@ -659,7 +666,7 @@ tests.test("UTF8 indexes") {
         else {
           expectEmpty(u8i0a.samePosition(in: u16))
         }
-        u8i0a = u8i0a.advanced(by: 1)
+        u8i0a = u8.index(u8i0a, offsetBy: 1)
       }
 
       expectEqual(u8i0a, u8i1) // We should be there now
@@ -671,10 +678,10 @@ tests.test("UTF8 indexes") {
         for n1 in 0..<8 {
           expectEqual(u8i0b, u8i1b, sameValue: n0 == n1 ? (==) : (!=))
           if u8i1b == u8.endIndex { break }
-          u8i1b = u8i1b.advanced(by: 1)
+          u8i1b = u8.index(u8i1b, offsetBy: 1)
         }
         if u8i0b == u8.endIndex { break }
-        u8i0b = u8i0b.advanced(by: 1)
+        u8i0b = u8.index(u8i0b, offsetBy: 1)
       }
     }
   }
@@ -684,7 +691,7 @@ tests.test("UTF16->String") {
   let s = summer + winter + winter + summer
   let v = s.utf16
   for i in v.indices {
-    for j in i..<v.endIndex {      
+    for j in v.indices[i..<v.endIndex] {
       if let si = i.samePosition(in: s) {
         if let sj = j.samePosition(in: s) {
           expectEqual(s[si..<sj], String(v[i..<j])!)
@@ -700,7 +707,7 @@ tests.test("UTF8->String") {
   let s = summer + winter + winter + summer
   let v = s.utf8
   for i in v.indices {
-    for j in i..<v.endIndex {      
+    for j in v.indices[i..<v.endIndex] {
       if let si = i.samePosition(in: s) {
         if let sj = j.samePosition(in: s) {
           expectEqual(s[si..<sj], String(v[i..<j])!)
@@ -716,7 +723,7 @@ tests.test("UnicodeScalars->String") {
   let s = summer + winter + winter + summer
   let v = s.unicodeScalars
   for i in s.characters.indices {
-    for j in i..<s.endIndex {
+    for j in s.characters.indices[i..<s.endIndex] {
       expectEqual(
         s[i..<j],
         String(v[i.samePosition(in: v)..<j.samePosition(in: v)])

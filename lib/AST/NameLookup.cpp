@@ -843,33 +843,6 @@ void MemberLookupTable::destroy() {
   this->~MemberLookupTable();
 }
 
-void NominalTypeDecl::forceDelayedMemberDecls() {
-  if (!hasDelayedMemberDecls())
-    return;
-
-  // Grab the delayed members and then empty the list so we don't recurse.
-  std::unique_ptr<DelayedDecl> DelayedDeclCreator;
-  DelayedMembers.swap(DelayedDeclCreator);
-
-  SmallVector<Decl *, 4> NewDecls;
-  (*DelayedDeclCreator)(NewDecls);
-  for (auto *D : NewDecls) {
-    addMember(D);
-  }
-}
-
-void NominalTypeDecl::setDelayedMemberDecls(const DelayedDecl &delayedMembers) {
-  // FIXME: This method should only be called once so that we only register one
-  // destructor cleanup, but the assert doesn't catch all cases of that.
-  assert(!hasDelayedMemberDecls());
-
-  // Make sure the std::unique_ptr gets destroyed properly so we don't leak.
-  getASTContext().addDestructorCleanup(DelayedMembers);
-
-  DelayedMembers = llvm::make_unique<DelayedDecl>(delayedMembers);
-  setHasDelayedMembers();
-}
-
 void NominalTypeDecl::addedMember(Decl *member) {
   // If we have a lookup table, add the new member to it.
   if (LookupTable.getPointer()) {
@@ -1351,7 +1324,8 @@ bool DeclContext::lookupQualified(Type type,
 
       // If we didn't visit this nominal type above, add this
       // declaration to the list.
-      if (!visited.count(nominal) && knownDecls.insert(decl).second)
+      if (!visited.count(nominal) && knownDecls.insert(decl).second &&
+          isAcceptableDecl(nominal, decl))
         decls.push_back(decl);
     }
   }

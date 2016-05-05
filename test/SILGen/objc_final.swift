@@ -14,7 +14,7 @@ final class Foo {
 }
 
 // CHECK-LABEL: sil hidden @_TF10objc_final7callFooFCS_3FooT_
-func callFoo(x: Foo) {
+func callFoo(_ x: Foo) {
   // Calls to the final @objc method statically reference the native entry
   // point.
   // CHECK: function_ref @_TFC10objc_final3Foo3foo

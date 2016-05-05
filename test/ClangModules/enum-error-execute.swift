@@ -8,7 +8,7 @@
 
 import Foundation
 
-func printError(err: TestError) {
+func printError(_ err: TestError) {
   switch (err) {
     case .TENone:
     print("TestError: TENone")

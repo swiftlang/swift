@@ -290,6 +290,33 @@ void swift::swift_retain(HeapObject *object)
   SWIFT_RT_ENTRY_REF(swift_retain)(object);
 }
 
+SWIFT_RT_ENTRY_VISIBILITY
+extern "C"
+void swift::swift_nonatomic_retain(HeapObject *object) {
+  SWIFT_RT_ENTRY_REF(swift_nonatomic_retain)(object);
+}
+
+SWIFT_RT_ENTRY_IMPL_VISIBILITY
+extern "C"
+void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_retain)(HeapObject *object) {
+  _swift_nonatomic_retain_inlined(object);
+}
+
+SWIFT_RT_ENTRY_VISIBILITY
+extern "C"
+void swift::swift_nonatomic_release(HeapObject *object) {
+  return SWIFT_RT_ENTRY_REF(swift_nonatomic_release)(object);
+}
+
+SWIFT_RT_ENTRY_IMPL_VISIBILITY
+extern "C"
+void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_release)(HeapObject *object) {
+  if (object  &&  object->refCount.decrementShouldDeallocateNonAtomic()) {
+    // TODO: Use non-atomic _swift_release_dealloc?
+    _swift_release_dealloc(object);
+  }
+}
+
 SWIFT_RT_ENTRY_IMPL_VISIBILITY
 extern "C"
 void SWIFT_RT_ENTRY_IMPL(swift_retain)(HeapObject *object)
@@ -310,6 +337,22 @@ void SWIFT_RT_ENTRY_IMPL(swift_retain_n)(HeapObject *object, uint32_t n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   if (object) {
     object->refCount.increment(n);
+  }
+}
+
+SWIFT_RT_ENTRY_VISIBILITY
+extern "C"
+void swift::swift_nonatomic_retain_n(HeapObject *object, uint32_t n)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  SWIFT_RT_ENTRY_REF(swift_nonatomic_retain_n)(object, n);
+}
+
+SWIFT_RT_ENTRY_IMPL_VISIBILITY
+extern "C"
+void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_retain_n)(HeapObject *object, uint32_t n)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  if (object) {
+    object->refCount.incrementNonAtomic(n);
   }
 }
 
@@ -346,6 +389,21 @@ void SWIFT_RT_ENTRY_IMPL(swift_release_n)(HeapObject *object, uint32_t n)
 
 void swift::swift_setDeallocating(HeapObject *object) {
   object->refCount.decrementFromOneAndDeallocateNonAtomic();
+}
+
+SWIFT_RT_ENTRY_VISIBILITY
+void swift::swift_nonatomic_release_n(HeapObject *object, uint32_t n)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  return SWIFT_RT_ENTRY_REF(swift_nonatomic_release_n)(object, n);
+}
+
+SWIFT_RT_ENTRY_IMPL_VISIBILITY
+extern "C"
+void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_release_n)(HeapObject *object, uint32_t n)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  if (object && object->refCount.decrementShouldDeallocateNNonAtomic(n)) {
+    _swift_release_dealloc(object);
+  }
 }
 
 size_t swift::swift_retainCount(HeapObject *object) {
@@ -440,6 +498,30 @@ SWIFT_RT_ENTRY_VISIBILITY
 HeapObject *swift::swift_tryRetain(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   return SWIFT_RT_ENTRY_REF(swift_tryRetain)(object);
+}
+
+SWIFT_RT_ENTRY_VISIBILITY
+HeapObject *swift::swift_nonatomic_tryPin(HeapObject *object)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  assert(object);
+
+  // Try to set the flag.  If this succeeds, the caller will be
+  // responsible for clearing it.
+  if (object->refCount.tryIncrementAndPinNonAtomic()) {
+    return object;
+  }
+
+  // If setting the flag failed, it's because it was already set.
+  // Return nil so that the object will be deallocated later.
+  return nullptr;
+}
+
+SWIFT_RT_ENTRY_VISIBILITY
+void swift::swift_nonatomic_unpin(HeapObject *object)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  if (object && object->refCount.decrementAndUnpinShouldDeallocateNonAtomic()) {
+    _swift_release_dealloc(object);
+  }
 }
 
 SWIFT_RT_ENTRY_IMPL_VISIBILITY
@@ -697,73 +779,142 @@ void swift::swift_deallocObject(HeapObject *object,
   }
 }
 
+enum: uintptr_t {
+  WR_NATIVE = 1<<(swift::heap_object_abi::ObjCReservedLowBits),
+  WR_READING = 1<<(swift::heap_object_abi::ObjCReservedLowBits+1),
+
+  WR_NATIVEMASK = WR_NATIVE | swift::heap_object_abi::ObjCReservedBitsMask,
+};
+
+static_assert(WR_READING < alignof(void*),
+              "weakref lock bit mustn't interfere with real pointer bits");
+
+enum: short {
+  WR_SPINLIMIT = 64,
+};
+
+bool swift::isNativeSwiftWeakReference(WeakReference *ref) {
+  return (ref->Value & WR_NATIVEMASK) == WR_NATIVE;
+}
+
 void swift::swift_weakInit(WeakReference *ref, HeapObject *value) {
-  ref->Value = value;
+  ref->Value = (uintptr_t)value | WR_NATIVE;
   SWIFT_RT_ENTRY_CALL(swift_unownedRetain)(value);
 }
 
 void swift::swift_weakAssign(WeakReference *ref, HeapObject *newValue) {
   SWIFT_RT_ENTRY_CALL(swift_unownedRetain)(newValue);
-  auto oldValue = ref->Value;
-  ref->Value = newValue;
+  auto oldValue = (HeapObject*) (ref->Value & ~WR_NATIVE);
+  ref->Value = (uintptr_t)newValue | WR_NATIVE;
   SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(oldValue);
 }
 
 HeapObject *swift::swift_weakLoadStrong(WeakReference *ref) {
-  auto object = ref->Value;
-  if (object == nullptr) return nullptr;
-  if (object->refCount.isDeallocating()) {
-    SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(object);
-    ref->Value = nullptr;
+  if (ref->Value == (uintptr_t)nullptr) {
     return nullptr;
   }
-  return swift_tryRetain(object);
+
+  // ref might be visible to other threads
+  auto ptr = __atomic_fetch_or(&ref->Value, WR_READING, __ATOMIC_RELAXED);
+  while (ptr & WR_READING) {
+    short c = 0;
+    while (__atomic_load_n(&ref->Value, __ATOMIC_RELAXED) & WR_READING) {
+      if (++c == WR_SPINLIMIT) {
+        sched_yield();
+        c -= 1;
+      }
+    }
+    ptr = __atomic_fetch_or(&ref->Value, WR_READING, __ATOMIC_RELAXED);
+  }
+
+  auto object = (HeapObject*)(ptr & ~WR_NATIVE);
+  if (object == nullptr) {
+    __atomic_store_n(&ref->Value, (uintptr_t)nullptr, __ATOMIC_RELAXED);
+    return nullptr;
+  }
+  if (object->refCount.isDeallocating()) {
+    __atomic_store_n(&ref->Value, (uintptr_t)nullptr, __ATOMIC_RELAXED);
+    SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(object);
+    return nullptr;
+  }
+  auto result = swift_tryRetain(object);
+  __atomic_store_n(&ref->Value, ptr, __ATOMIC_RELAXED);
+  return result;
 }
 
 HeapObject *swift::swift_weakTakeStrong(WeakReference *ref) {
-  auto result = swift_weakLoadStrong(ref);
-  swift_weakDestroy(ref);
+  auto object = (HeapObject*) (ref->Value & ~WR_NATIVE);
+  if (object == nullptr) return nullptr;
+  auto result = swift_tryRetain(object);
+  ref->Value = (uintptr_t)nullptr;
+  swift_unownedRelease(object);
   return result;
 }
 
 void swift::swift_weakDestroy(WeakReference *ref) {
-  auto tmp = ref->Value;
-  ref->Value = nullptr;
+  auto tmp = (HeapObject*) (ref->Value & ~WR_NATIVE);
+  ref->Value = (uintptr_t)nullptr;
   SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(tmp);
 }
 
 void swift::swift_weakCopyInit(WeakReference *dest, WeakReference *src) {
-  auto object = src->Value;
+  if (src->Value == (uintptr_t)nullptr) {
+    dest->Value = (uintptr_t)nullptr;
+    return;
+  }
+
+  // src might be visible to other threads
+  auto ptr = __atomic_fetch_or(&src->Value, WR_READING, __ATOMIC_RELAXED);
+  while (ptr & WR_READING) {
+    short c = 0;
+    while (__atomic_load_n(&src->Value, __ATOMIC_RELAXED) & WR_READING) {
+      if (++c == WR_SPINLIMIT) {
+        sched_yield();
+        c -= 1;
+      }
+    }
+    ptr = __atomic_fetch_or(&src->Value, WR_READING, __ATOMIC_RELAXED);
+  }
+
+  auto object = (HeapObject*)(ptr & ~WR_NATIVE);
   if (object == nullptr) {
-    dest->Value = nullptr;
+    __atomic_store_n(&src->Value, (uintptr_t)nullptr, __ATOMIC_RELAXED);
+    dest->Value = (uintptr_t)nullptr;
   } else if (object->refCount.isDeallocating()) {
-    src->Value = nullptr;
-    dest->Value = nullptr;
+    __atomic_store_n(&src->Value, (uintptr_t)nullptr, __ATOMIC_RELAXED);
     SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(object);
+    dest->Value = (uintptr_t)nullptr;
   } else {
-    dest->Value = object;
     SWIFT_RT_ENTRY_CALL(swift_unownedRetain)(object);
+    __atomic_store_n(&src->Value, ptr, __ATOMIC_RELAXED);
+    dest->Value = (uintptr_t)object | WR_NATIVE;
   }
 }
 
 void swift::swift_weakTakeInit(WeakReference *dest, WeakReference *src) {
-  auto object = src->Value;
-  dest->Value = object;
-  if (object != nullptr && object->refCount.isDeallocating()) {
-    dest->Value = nullptr;
+  auto object = (HeapObject*) (src->Value & ~WR_NATIVE);
+  if (object == nullptr) {
+    dest->Value = (uintptr_t)nullptr;
+  } else if (object->refCount.isDeallocating()) {
+    dest->Value = (uintptr_t)nullptr;
     SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(object);
+  } else {
+    dest->Value = (uintptr_t)object | WR_NATIVE;
   }
+  src->Value = (uintptr_t)nullptr;
 }
 
 void swift::swift_weakCopyAssign(WeakReference *dest, WeakReference *src) {
-  if (auto object = dest->Value) {
+  if (dest->Value) {
+    auto object = (HeapObject*) (dest->Value & ~WR_NATIVE);
     SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(object);
   }
   swift_weakCopyInit(dest, src);
 }
 
 void swift::swift_weakTakeAssign(WeakReference *dest, WeakReference *src) {
-  if (auto object = dest->Value) {
+  if (dest->Value) {
+    auto object = (HeapObject*) (dest->Value & ~WR_NATIVE);
     SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(object);
   }
   swift_weakTakeInit(dest, src);

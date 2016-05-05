@@ -1,11 +1,11 @@
 // RUN: %target-parse-verify-swift
 
 // The first function argument does not have a label; the others do.
-func f1(a: Int, b: Int) { }
-func f1(a: Int, d: Int) { } // okay: names differ
+func f1(_ a: Int, b: Int) { }
+func f1(_ a: Int, d: Int) { } // okay: names differ
 
-func f2(a: Int, b: Int) { } // expected-note{{'f2(_:b:)' previously declared here}}
-func f2(z: Int, b: Int) { } // expected-error{{invalid redeclaration of 'f2(_:b:)'}}
+func f2(_ a: Int, b: Int) { } // expected-note{{'f2(_:b:)' previously declared here}}
+func f2(_ z: Int, b: Int) { } // expected-error{{invalid redeclaration of 'f2(_:b:)'}}
 
 class X {
   // Initializer arguments are API by default.
@@ -13,37 +13,37 @@ class X {
   init(y: Int) { } // okay
 
   // Method arguments after the first are API by default
-  func f1(a: Int, b: Int) { }
-  func f1(a: Int, c: Int) { } // okay
+  func f1(_ a: Int, b: Int) { }
+  func f1(_ a: Int, c: Int) { } // okay
 
-  func f2(a: Int, b: Int) { } // expected-note{{'f2(_:b:)' previously declared here}}
-  func f2(A: Int, b: Int) { } // expected-error{{invalid redeclaration of 'f2(_:b:)'}}
+  func f2(_ a: Int, b: Int) { } // expected-note{{'f2(_:b:)' previously declared here}}
+  func f2(_ A: Int, b: Int) { } // expected-error{{invalid redeclaration of 'f2(_:b:)'}}
 }
 
 protocol P {
-  func g1(value: Int)
-  func g2(value: Int, other: Int)
-  func g3(value: Int, other: Int, third: Int) // expected-note{{requirement 'g3(_:other:third:)' declared here}}
-  static func g4(value: Int)
+  func g1(_ value: Int)
+  func g2(_ value: Int, other: Int)
+  func g3(_ value: Int, other: Int, third: Int) // expected-note{{requirement 'g3(_:other:third:)' declared here}}
+  static func g4(_ value: Int)
 }
 
 class PX : P {
-  func g1(x: Int) { } // okay
-  func g2(x: Int, other: Int) { } // okay
-  func g3(x: Int, y: Int, third: Int) { } // expected-error{{method 'g3(_:y:third:)' has different argument names from those required by protocol 'P' ('g3(_:other:third:)')}} {{19-19=other }}
+  func g1(_ x: Int) { } // okay
+  func g2(_ x: Int, other: Int) { } // okay
+  func g3(_ x: Int, y: Int, third: Int) { } // expected-error{{method 'g3(_:y:third:)' has different argument names from those required by protocol 'P' ('g3(_:other:third:)')}} {{21-21=other }}
 
-  class func g4(x: Int) { }
+  class func g4(_ x: Int) { }
 }
 
 // Default arguments have no effect on argument labels.
-func f3(a: Int, b: Int = 5, c: Int = 6) { }
+func f3(_ a: Int, b: Int = 5, c: Int = 6) { }
 // expected-note@-1{{'f3(_:b:c:)' previously declared here}}
-func f3(a: Int, b: Int, c: Int) { }
+func f3(_ a: Int, b: Int, c: Int) { }
 // expected-error@-1{{invalid redeclaration of 'f3(_:b:c:)'}}
 
 class DefArg {
-  func f(a: Int = 17) { } // okay: no label implied
-  func f(a a: Int) { }
+  func f(_ a: Int = 17) { } // okay: no label implied
+  func f(a a: Int) { } // expected-warning{{extraneous duplicate parameter name; 'a' already has an argument label}} {{10-12=}}
 }
 
 struct Subscripts1 {
@@ -67,10 +67,10 @@ struct Subscripts2 {
 }
 
 
-func f4(a: Int) -> (Int) -> () { return { b in () } }
-func f5(a: Int) -> (b: Int) -> () { return { b in () } }
+func f4(_ a: Int) -> (Int) -> () { return { b in () } }
+func f5(_ a: Int) -> (b: Int) -> () { return { b in () } }
 
-func testFunctions(i: Int, x: X) {
+func testFunctions(_ i: Int, x: X) {
   f4(i)(i)
   f4(i)(b: i) // expected-error{{extraneous argument label 'b:' in call}} {{9-12=}}
   f5(i)(i) // expected-error{{missing argument label 'b:' in call}} {{9-9=b: }}
@@ -78,11 +78,11 @@ func testFunctions(i: Int, x: X) {
 }
 
 struct Y {
-  func m0(a: Int) -> (Int) -> () { return { b in () } }
-  func m1(a: Int) -> (b: Int) -> () { return { b in () } }
+  func m0(_ a: Int) -> (Int) -> () { return { b in () } }
+  func m1(_ a: Int) -> (b: Int) -> () { return { b in () } }
 
-  func m2(a: Int) -> (Int, Int) -> () { return { b, c in () } }
-  func m3(a: Int) -> (b: Int, c2: Int) -> () { return { b, c in () } }
+  func m2(_ a: Int) -> (Int, Int) -> () { return { b, c in () } }
+  func m3(_ a: Int) -> (b: Int, c2: Int) -> () { return { b, c in () } }
 
   subscript (x: Int) -> Int {
     get { return x }
@@ -93,7 +93,7 @@ struct Y {
   }
 }
 
-func testMethods(i: Int, x: Y) {
+func testMethods(_ i: Int, x: Y) {
   x.m0(i)(i)
   x.m0(i)(b: i) // expected-error{{extraneous argument label 'b:' in call}} {{11-14=}}
   x.m1(i)(i) // expected-error{{missing argument label 'b:' in call}} {{11-11=b: }}
@@ -104,7 +104,7 @@ func testMethods(i: Int, x: Y) {
   x.m3(i)(b: i, c2: i)
 }
 
-func testSubscripts(i: Int, s: String, x: Y) {
+func testSubscripts(_ i: Int, s: String, x: Y) {
   var i2 = x[i]
   var i3 = x[x: i] // expected-error{{cannot subscript a value of type 'Y' with an index of type '(x: Int)'}}
   // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Int), (y: String)}}
@@ -113,7 +113,7 @@ func testSubscripts(i: Int, s: String, x: Y) {
 }
 
 // Operators
-func +(_ a: String,  // expected-warning{{extraneous '_' in parameter: 'a' has no keyword argument name}}{{8-10=}}
+func +(_ a: String,
        b b: Double) { } // expected-error{{operator cannot have keyword arguments}} {{8-10=}}
 
 func +(a: Double, b: String) -> (Int) -> (d: Int) -> () {

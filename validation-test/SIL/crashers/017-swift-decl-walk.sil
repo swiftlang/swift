@@ -1,4 +1,0 @@
-// RUN: not --crash %target-sil-opt %s
-// REQUIRES: asserts
-// REQUIRES: swift_ast_verifier
-import Swift func g(@opened(Any

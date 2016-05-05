@@ -22,9 +22,12 @@
 #include <pthread.h>
 #include <stdarg.h>
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Mutex.h"
 #include "swift/Basic/Demangle.h"
 #include <cxxabi.h>
-#if !defined(__CYGWIN__)
+#if !defined(__CYGWIN__) && !defined(__ANDROID__)
+// execinfo.h is not available on Android. Checks in this file ensure that
+// fatalError behaves as expected, but without stack traces.
 #include <execinfo.h>
 #endif
 
@@ -38,7 +41,7 @@ enum: uint32_t {
 };
 } // end namespace FatalErrorFlags
 
-#if !defined(__CYGWIN__)
+#if !defined(__CYGWIN__) && !defined(__ANDROID__)
 LLVM_ATTRIBUTE_ALWAYS_INLINE
 static bool
 isIdentifier(char c)
@@ -165,11 +168,15 @@ struct crashreporter_annotations_t gCRAnnotations
 static void
 reportOnCrash(uint32_t flags, const char *message)
 {
-  static pthread_mutex_t crashlogLock = PTHREAD_MUTEX_INITIALIZER;
-  pthread_mutex_lock(&crashlogLock);
-  
-  char *oldMessage = (char *)CRGetCrashLogMessage();
+  // We must use an "unsafe" mutex in this pathway since the normal "safe"
+  // mutex calls fatalError when an error is detected and fatalError ends up
+  // calling us. In other words we could get infinite recursion if the
+  // mutex errors.
+  static swift::StaticUnsafeMutex crashlogLock();
 
+  crashlogLock.lock();
+
+  char *oldMessage = (char *)CRGetCrashLogMessage();
   char *newMessage;
   if (oldMessage) {
     asprintf(&newMessage, "%s%s", oldMessage, message);
@@ -177,10 +184,10 @@ reportOnCrash(uint32_t flags, const char *message)
   } else {
     newMessage = strdup(message);
   }
-
+  
   CRSetCrashLogMessage(newMessage);
 
-  pthread_mutex_unlock(&crashlogLock);
+  crashlogLock.unlock();
 }
 
 #else
@@ -202,7 +209,7 @@ reportNow(uint32_t flags, const char *message)
 #ifdef __APPLE__
   asl_log(NULL, NULL, ASL_LEVEL_ERR, "%s", message);
 #endif
-#if !defined(__CYGWIN__)
+#if !defined(__CYGWIN__) && !defined(__ANDROID__)
   if (flags & FatalErrorFlags::ReportBacktrace) {
     fputs("Current stack trace:\n", stderr);
     int count = 0;

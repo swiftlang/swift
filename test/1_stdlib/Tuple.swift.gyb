@@ -7,12 +7,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var TupleTestSuite = TestSuite("Tuple")
 
@@ -24,9 +18,9 @@ var TupleTestSuite = TestSuite("Tuple")
 % maxArity = 6 # the highest arity the operators are defined for
 
 func testEquality<A : Equatable, B : Equatable, C : Equatable>(
-  lhs: (A,B,C), equal: Bool, to rhs: (A,B,C),
+  _ lhs: (A, B, C), equal: Bool, to rhs: (A, B, C),
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: ()->String = "",
+  _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = #file, line: UInt = #line
@@ -98,9 +92,9 @@ enum Ordering : Equatable {
 }
 
 func testOrdering<A : Comparable, B : Comparable, C : Comparable>(
-  lhs: (A,B,C), _ ordering: Ordering, _ rhs: (A, B, C),
+  _ lhs: (A, B, C), _ ordering: Ordering, _ rhs: (A, B, C),
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: ()->String = "",
+  _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = #file, line: UInt = #line

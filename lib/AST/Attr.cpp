@@ -43,6 +43,16 @@ TypeAttrKind TypeAttributes::getAttrKindFromString(StringRef Str) {
   .Default(TAK_Count);
 }
 
+/// Return the name (like "autoclosure") for an attribute ID.
+const char *TypeAttributes::getAttrName(TypeAttrKind kind) {
+  switch (kind) {
+  default: assert(0 && "Invalid attribute ID");
+#define TYPE_ATTR(X) case TAK_##X: return #X;
+#include "swift/AST/Attr.def"
+  }
+}
+
+
 
 /// Given a name like "inline", return the decl attribute ID that corresponds
 /// to it.  Note that this is a many-to-one mapping, and that the identifier
@@ -442,11 +452,21 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
     break;
   }
 
-  default:
-    llvm_unreachable("handled before this switch");
+  case DAK_Specialize: {
+    Printer << "@" << getAttrName() << "(";
+    auto *attr = cast<SpecializeAttr>(this);
+    interleave(attr->getTypeLocs(),
+               [&](TypeLoc tyLoc){ tyLoc.getType().print(Printer, Options); },
+               [&]{ Printer << ", "; });
+    Printer << ")";
+    break;
+  }
 
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
+
+  default:
+    llvm_unreachable("handled before this switch");
   }
 
   return true;
@@ -552,6 +572,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "swift3_migration";
   case DAK_WarnUnusedResult:
     return "warn_unused_result";
+  case DAK_Specialize:
+    return "_specialize";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -722,4 +744,26 @@ const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {
   return D->getAttrs().getUnavailable(ctx);
 }
 
+SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
+                               ArrayRef<TypeLoc> typeLocs)
+    : DeclAttribute(DAK_Specialize, atLoc, range, /*Implicit=*/false),
+      numTypes(typeLocs.size())
+{
+  std::copy(typeLocs.begin(), typeLocs.end(), getTypeLocData());
+}
 
+ArrayRef<TypeLoc> SpecializeAttr::getTypeLocs() const {
+  return const_cast<SpecializeAttr*>(this)->getTypeLocs();
+}
+
+MutableArrayRef<TypeLoc> SpecializeAttr::getTypeLocs() {
+  return { this->getTypeLocData(), numTypes };
+}
+
+SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
+                                       SourceRange range,
+                                       ArrayRef<TypeLoc> typeLocs) {
+  unsigned size = sizeof(SpecializeAttr) + (typeLocs.size() * sizeof(TypeLoc));
+  void *mem = Ctx.Allocate(size, alignof(SpecializeAttr));
+  return new (mem) SpecializeAttr(atLoc, range, typeLocs);
+}

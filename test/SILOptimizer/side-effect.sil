@@ -107,7 +107,7 @@ bb0(%0 : $X, %1 : $*Int32):
 // CHECK-LABEL: sil @partial_apply_load_store_to_args
 // The apply may call deinit of the callee_owned thick function. Therefore the
 // function effects are conservative.
-// CHECK: <func=rw+-,param0=,param1=,param2=;alloc;trap;readrc>
+// CHECK: <func=rw+-,param0=,param1=r,param2=;alloc;trap;readrc>
 sil @partial_apply_load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> () {
 bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
   %f = function_ref @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
@@ -472,3 +472,15 @@ bb0(%0 : $X):
   %3 = tuple()
   return %3 : $()
 }
+
+// CHECK-LABEL: sil @indirect_parameter_to_partial_apply
+// CHECK-NEXT: <func=,param0=r;alloc>
+
+sil @indirect_parameter_to_partial_apply : $@convention(thin) (@in Int32) ->  @owned @callee_owned (Bool) -> Int32 {
+bb0(%0 : $*Int32):
+  %2 = function_ref @closure : $@convention(thin) (Bool, @in Int32) -> Int32
+  %3 = partial_apply %2(%0) : $@convention(thin) (Bool, @in Int32) -> Int32
+  return %3 : $@callee_owned (Bool) -> Int32
+}
+
+sil @closure : $@convention(thin) (Bool, @in Int32) -> Int32

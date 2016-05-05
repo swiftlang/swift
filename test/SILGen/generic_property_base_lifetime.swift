@@ -19,7 +19,7 @@ protocol ProtocolB {
 // CHECK:         apply {{%.*}}<@opened{{.*}}>([[PROJECTION]])
 // CHECK:         strong_release %0
 // CHECK-NOT:     strong_release
-func getIntPropExistential(a: ProtocolA) -> Int {
+func getIntPropExistential(_ a: ProtocolA) -> Int {
   return a.intProp
 }
 
@@ -29,7 +29,7 @@ func getIntPropExistential(a: ProtocolA) -> Int {
 // CHECK:         apply {{%.*}}<@opened{{.*}}>({{%.*}}, [[PROJECTION]])
 // CHECK:         strong_release %0
 // CHECK_NOT:     strong_release
-func setIntPropExistential(a: ProtocolA) {
+func setIntPropExistential(_ a: ProtocolA) {
   a.intProp = 0
 }
 
@@ -37,7 +37,7 @@ func setIntPropExistential(a: ProtocolA) {
 // CHECK-NOT:     strong_retain %0
 // CHECK:         apply {{%.*}}<T>(%0)
 // CHECK:         strong_release %0
-func getIntPropGeneric<T: ProtocolA>(a: T) -> Int {
+func getIntPropGeneric<T: ProtocolA>(_ a: T) -> Int {
   return a.intProp
 }
 
@@ -45,7 +45,7 @@ func getIntPropGeneric<T: ProtocolA>(a: T) -> Int {
 // CHECK-NOT:     strong_retain %0
 // CHECK:         apply {{%.*}}<T>({{%.*}}, %0)
 // CHECK:         strong_release %0
-func setIntPropGeneric<T: ProtocolA>(a: T) {
+func setIntPropGeneric<T: ProtocolA>(_ a: T) {
   a.intProp = 0
 }
 
@@ -57,7 +57,7 @@ func setIntPropGeneric<T: ProtocolA>(a: T) {
 // CHECK:         destroy_addr [[STACK]]
 // CHECK:         dealloc_stack [[STACK]]
 // CHECK:         destroy_addr %0
-func getIntPropExistential(a: ProtocolB) -> Int {
+func getIntPropExistential(_ a: ProtocolB) -> Int {
   return a.intProp
 }
 
@@ -68,7 +68,7 @@ func getIntPropExistential(a: ProtocolB) -> Int {
 // CHECK:         destroy_addr [[STACK]]
 // CHECK:         dealloc_stack [[STACK]]
 // CHECK:         destroy_addr %0
-func getIntPropGeneric<T: ProtocolB>(a: T) -> Int {
+func getIntPropGeneric<T: ProtocolB>(_ a: T) -> Int {
   return a.intProp
 }
 
@@ -81,7 +81,7 @@ func getIntPropGeneric<T: ProtocolB>(a: T) -> Int {
 // CHECK-NEXT:    strong_release [[PROJECTION]]
 // CHECK-NEXT:    strong_release %0
 // CHECK-NEXT:    return
-func getIntPropExistential(a: ProtocolO) -> Int {
+func getIntPropExistential(_ a: ProtocolO) -> Int {
   return a.intProp
 }
 
@@ -94,7 +94,7 @@ func getIntPropExistential(a: ProtocolO) -> Int {
 // CHECK-NEXT:    strong_release %0
 // CHECK-NEXT:    tuple ()
 // CHECK-NEXT:    return
-func setIntPropExistential(a: ProtocolO) {
+func setIntPropExistential(_ a: ProtocolO) {
   a.intProp = 0
 }
 
@@ -103,7 +103,7 @@ func setIntPropExistential(a: ProtocolO) {
 // CHECK:         apply {{%.*}}<T>(%0)
 // CHECK:         strong_release %0
 // CHECK-NOT:     strong_release %0
-func getIntPropGeneric<T: ProtocolO>(a: T) -> Int {
+func getIntPropGeneric<T: ProtocolO>(_ a: T) -> Int {
   return a.intProp
 }
 
@@ -112,6 +112,6 @@ func getIntPropGeneric<T: ProtocolO>(a: T) -> Int {
 // CHECK:         apply {{%.*}}<T>({{%.*}}, %0)
 // CHECK:         strong_release %0
 // CHECK-NOT:     strong_release %0
-func setIntPropGeneric<T: ProtocolO>(a: T) {
+func setIntPropGeneric<T: ProtocolO>(_ a: T) {
   a.intProp = 0
 }

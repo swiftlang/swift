@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -emit-ir %s -disable-access-control -parse-stdlib -o - | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -o - | FileCheck %s
 
-import Swift
+func someValidPointer<T>() -> UnsafeMutablePointer<T> { fatalError() }
 
 class HeapStorage<Value, Element> {
   public final func withUnsafeMutablePointerToElements<R>(
     body: (UnsafeMutablePointer<Element>) -> R
-  ) -> R { return body(nil) }
+  ) -> R { return body(someValidPointer()) }
 }
 struct CountAndCapacity {}
 class TestHeapStorage<T> : HeapStorage<CountAndCapacity,T> {

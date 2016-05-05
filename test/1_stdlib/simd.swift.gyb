@@ -11,24 +11,17 @@
 import simd
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
-% scalar_types = ['Float', 'Double', 'Int32']
+% scalar_types = ['Float', 'Double', 'Int32', 'UInt32']
 % float_types = ['Float', 'Double']
-% ctype = { 'Float':'float', 'Double':'double', 'Int32':'int' }
+% ctype = { 'Float':'float', 'Double':'double', 'Int32':'int', 'UInt32':'uint'}
 % component = ['.x','.y','.z','.w']
 
 % for type in scalar_types:
 %   for cols in [2,3,4]:
 //    Workaround <rdar://problem/18900352>
 %     vectype = ctype[type] + str(cols)
-func same(x: ${vectype}, _ y: ${vectype}) -> Bool {
+func same(_ x: ${vectype}, _ y: ${vectype}) -> Bool {
   for i in 0..<${cols} {
 //    Workaround <rdar://problem/18900352>
 %   if type in float_types:
@@ -44,7 +37,7 @@ func same(x: ${vectype}, _ y: ${vectype}) -> Bool {
 %       for rows in [2,3,4]:
 //        Workaround <rdar://problem/18900352>
 %         mattype = ctype[type] + str(cols) + 'x' + str(rows)
-func same(x: ${mattype}, _ y: ${mattype}) -> Bool {
+func same(_ x: ${mattype}, _ y: ${mattype}) -> Bool {
   for i in 0..<${cols} {
     if !same(x[i], y[i]) { return false }
   }
@@ -58,7 +51,7 @@ func same(x: ${mattype}, _ y: ${mattype}) -> Bool {
 
 
 /*
-func same<M: SIMDMatrixType>(x:M, _ y:M) -> Bool {
+func same<M: SIMDMatrixType>(_ x:M, _ y:M) -> Bool {
   for i in 0 ..< x.columns {
     if (!same(x[i], y[i])) { return false }
   }
@@ -70,10 +63,10 @@ var simdTestSuite = TestSuite("simd")
 
 simdTestSuite.test("sizes") {
 //  C interop requires that vector be the right size.
-  expectEqual(8,  sizeof(float2.self))
+  expectEqual(8, sizeof(float2.self))
   expectEqual(16, sizeof(float3.self))
   expectEqual(16, sizeof(float4.self))
-  expectEqual(8,  sizeof(int2.self))
+  expectEqual(8, sizeof(int2.self))
   expectEqual(16, sizeof(int3.self))
   expectEqual(16, sizeof(int4.self))
   expectEqual(16, sizeof(double2.self))
@@ -146,12 +139,12 @@ simdTestSuite.test("vector elements") {
 
   //  Check getting and setting .xyzw
 % for i in range(size):
-  ${vec + component[i]} = ${-i}
-  expectEqual(${vec + component[i]}, ${-i})
+  ${vec + component[i]} = ${2*i}
+  expectEqual(${vec + component[i]}, ${2*i})
 % end
 
   //  Check getting and setting [i]
-  for i in 0..<${size} { ${vec}[i] = -${vec}[i] }
+  for i in 0..<${size} { ${vec}[i] = ${vec}[i]/2 }
   expectEqual(${vec}, ${range(size)}, sameValue: same)
 
 %   end # for size in [2,3,4]
@@ -323,9 +316,9 @@ simdTestSuite.test("matrix elements") {
     ${mat}[i] = ${type}(i+1)*${basis}[i]
   }
   expectEqual(
-    ${mat}, ${mattype}(diagonal:${range(1,diagsize+1)}), sameValue: same)
+    ${mat}, ${mattype}(diagonal:${range(1, diagsize + 1)}), sameValue: same)
   for i in 0..<${cols} {
-    expectEqual(${mat}[i], ${type}(i+1)*${basis}[i], sameValue: same)
+    expectEqual(${mat}[i], ${type}(i + 1)*${basis}[i], sameValue: same)
   }
 
   //  Check getting and setting elements (and transpose).

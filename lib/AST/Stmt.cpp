@@ -91,7 +91,6 @@ template <class T> static SourceRange getSourceRangeImpl(const T *S) {
                 "or getStartLoc()/getEndLoc()");
   return Dispatch<isOverriddenFromStmt(&T::getSourceRange)>::getSourceRange(S);
 }
-
 SourceRange Stmt::getSourceRange() const {
   switch (getKind()) {
 #define STMT(ID, PARENT)                                           \

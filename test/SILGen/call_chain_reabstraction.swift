@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 struct A {
-        func g<U>(recur: (A, U) -> U) -> (A, U) -> U {
+        func g<U>(_ recur: (A, U) -> U) -> (A, U) -> U {
                 return { _, x in return x }
         }
         // CHECK-LABEL: sil hidden @_TFV24call_chain_reabstraction1A1f

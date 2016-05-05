@@ -11,12 +11,6 @@ import StdlibUnittest
 import StdlibCollectionUnittest
 import SwiftPrivate
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 // Extend LoggingSequence to shadow the new operation.  When
 // requirements are added to a protocol 'P', there should be an
@@ -64,7 +58,7 @@ var SequenceTypeTests = TestSuite("Sequence")
 // min(), max()
 //===----------------------------------------------------------------------===//
 
-% for algorithmKind in [ 'min', 'max' ]:
+% for algorithmKind in ['min', 'max']:
 %   AlgorithmKind = algorithmKind.capitalize()
 
 SequenceTypeTests.test("${algorithmKind}/WhereElementIsComparable") {
@@ -260,7 +254,7 @@ extension EnumeratedSequence where Base : TestProtocol1 {
 
 SequenceTypeTests.test("enumerated()") {
   typealias Element = (offset: Int, element: OpaqueValue<Int>)
-  func compareElements(lhs: Element, rhs: Element) -> Bool {
+  func compareElements(_ lhs: Element, rhs: Element) -> Bool {
     return lhs.0 == rhs.0 && lhs.1.value == rhs.1.value
   }
 
@@ -307,7 +301,7 @@ SequenceTypeTests.test("starts(with:)/WhereElementIsEquatable") {
 
     // Use different types for the sequence and prefix.
     do {
-      let s = MinimalForwardCollection<MinimalEquatableValue>(
+      let s = MinimalCollection<MinimalEquatableValue>(
         elements: test.sequence.map(MinimalEquatableValue.init))
       let prefix = MinimalSequence<MinimalEquatableValue>(
         elements: test.prefix.map(MinimalEquatableValue.init))
@@ -362,7 +356,7 @@ SequenceTypeTests.test("starts(with:)/Predicate") {
 
     // Use different types for the sequence and prefix.
     do {
-      let s = MinimalForwardCollection<OpaqueValue<Int>>(
+      let s = MinimalCollection<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
       let prefix = MinimalSequence<OpaqueValue<Int>>(
         elements: test.prefix.map(OpaqueValue.init))
@@ -405,7 +399,7 @@ SequenceTypeTests.test("elementsEqual/WhereElementIsEquatable") {
 
     // Use different types for the sequence and other.
     do {
-      let s = MinimalForwardCollection<MinimalEquatableValue>(
+      let s = MinimalCollection<MinimalEquatableValue>(
         elements: test.sequence.map(MinimalEquatableValue.init))
       let other = MinimalSequence<MinimalEquatableValue>(
         elements: test.other.map(MinimalEquatableValue.init))
@@ -444,7 +438,7 @@ SequenceTypeTests.test("elementsEqual/Predicate") {
 
     // Use different types for the sequence and other.
     do {
-      let s = MinimalForwardCollection<OpaqueValue<Int>>(
+      let s = MinimalCollection<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
       let other = MinimalSequence<OpaqueValue<Int>>(
         elements: test.other.map(OpaqueValue.init))
@@ -487,7 +481,7 @@ SequenceTypeTests.test("lexicographicallyPrecedes(_:)/WhereElementIsComparable")
 
     // Use different types for the sequence and other.
     do {
-      let s = MinimalForwardCollection<MinimalComparableValue>(
+      let s = MinimalCollection<MinimalComparableValue>(
         elements: test.sequence.map(MinimalComparableValue.init))
       let other = MinimalSequence<MinimalComparableValue>(
         elements: test.other.map(MinimalComparableValue.init))
@@ -526,7 +520,7 @@ SequenceTypeTests.test("lexicographicallyPrecedes(_:)/Predicate") {
 
     // Use different types for the sequence and other.
     do {
-      let s = MinimalForwardCollection<OpaqueValue<Int>>(
+      let s = MinimalCollection<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
       let other = MinimalSequence<OpaqueValue<Int>>(
         elements: test.other.map(OpaqueValue.init))
@@ -560,7 +554,7 @@ SequenceTypeTests.test("contains/WhereElementIsEquatable/dispatch") {
 }
 
 func callStaticContains(
-  set: Set<MinimalHashableValue>,
+  _ set: Set<MinimalHashableValue>,
   _ element: MinimalHashableValue
 ) -> Bool {
   return set.contains(element)
@@ -568,11 +562,11 @@ func callStaticContains(
 
 func callGenericContains<
   S : Sequence where S.Iterator.Element : Equatable
->(sequence: S, _ element: S.Iterator.Element) -> Bool {
+>(_ sequence: S, _ element: S.Iterator.Element) -> Bool {
   return sequence.contains(element)
 }
 
-% for dispatch in [ 'Static', 'Generic' ]:
+% for dispatch in ['Static', 'Generic']:
 
 // FIXME: implement the same optimization for Dictionary.
 // FIXME: move to the file where other Set tests live.
@@ -608,42 +602,6 @@ SequenceTypeTests.test("Set<T>.contains/CustomImplementation/${dispatch}") {
 
 % end
 
-SequenceTypeTests.test("Range<Element>.contains/WhereElementIsComparable/staticDispatch") {
-  let start = 10
-  let end = 20
-  let range: Range<MinimalComparableIndexValue> =
-    MinimalComparableIndexValue(start)..<MinimalComparableIndexValue(end)
-  expectEqual(
-    1, MinimalComparableIndexValue.timesLessWasCalled.value)
-  let count = 30
-  for test in 0..<count {
-    expectEqual(
-      test >= start && test < end,
-      range.contains(MinimalComparableIndexValue(test)))
-  }
-  expectEqual(
-    51, MinimalComparableIndexValue.timesLessWasCalled.value)
-}
-
-SequenceTypeTests.test("Range<Element>.contains/WhereElementIsComparable/dispatch") {
-  let start = 10
-  let end = 20
-  let range: Range<MinimalComparableIndexValue> =
-    MinimalComparableIndexValue(start)..<MinimalComparableIndexValue(end)
-  expectEqual(
-    1, MinimalComparableIndexValue.timesLessWasCalled.value)
-  let count = 30
-  for test in 0..<count {
-    expectEqual(
-      test >= start && test < end,
-      LoggingCollection(range).contains(MinimalComparableIndexValue(test)))
-  }
-  // Dispatch through a protocol does not get the optimization because the
-  // custom contains method is not getting into the witness table.
-  expectEqual(
-    1, MinimalComparableIndexValue.timesLessWasCalled.value)
-}
-
 SequenceTypeTests.test("contains/Predicate") {
   for test in findTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
@@ -671,7 +629,7 @@ SequenceTypeTests.test("reduce") {
       (partialResult: OpaqueValue<[Int]>, element: OpaqueValue<Int>)
         -> OpaqueValue<[Int]> in
       timesClosureWasCalled += 1
-      return OpaqueValue<[Int]>(partialResult.value + [ element.value ])
+      return OpaqueValue<[Int]>(partialResult.value + [element.value])
     }
     expectEqual(test.sequence, result.value)
     expectEqual([], s.map { $0.value }, "sequence should be consumed")
@@ -705,13 +663,13 @@ SequenceTypeTests.test("reverse/WhereIndexIsBidirectional,BidirectionalReverseVi
       elements: test.sequence.map(OpaqueValue.init))
     var result = s.reversed()
     expectType(
-      ReverseCollection<MinimalBidirectionalCollection<OpaqueValue<Int>>>.self,
+      ReversedCollection<MinimalBidirectionalCollection<OpaqueValue<Int>>>.self,
       &result)
     expectEqual(
       test.expected, result.map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
 
-    // Check ReverseCollection's Collection conformance.
+    // Check ReversedCollection's Collection conformance.
     checkBidirectionalCollection(
       test.expected.map(OpaqueValue.init) as [OpaqueValue<Int>],
       result) { $0.value == $1.value }
@@ -724,17 +682,15 @@ SequenceTypeTests.test("reverse/WhereIndexIsRandomAccess,RandomAccessReverseView
       elements: test.sequence.map(OpaqueValue.init))
     var result = s.reversed()
     expectType(
-      ReverseRandomAccessCollection<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self,
+      ReversedRandomAccessCollection<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self,
       &result)
     expectEqual(
       test.expected, result.map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
 
-    // Check ReverseRandomAccessCollection Collection conformance.
-    checkRandomAccessCollection(
-      test.expected.map(OpaqueValue.init) as [OpaqueValue<Int>],
-      result) { $0.value == $1.value }
-
+    // Check ReversedRandomAccessCollection Collection conformance.
+    let expected = test.expected.map(OpaqueValue.init) as [OpaqueValue<Int>]
+    checkRandomAccessCollection(expected, result) { $0.value == $1.value }
   }
 }
 
@@ -790,7 +746,7 @@ SequenceTypeTests.test("filter/Sequence/Semantics") {
 
 var MinimalSequenceWithCustomMap_timesMapWasCalled: Int = 0
 
-% for Implementation in [ 'Default', 'Custom' ]:
+% for Implementation in ['Default', 'Custom']:
 
 struct MinimalSequenceWith${Implementation}Map<Element> : Sequence {
   init(_ data: [Element], underestimatedCount: UnderestimatedCountBehavior) {
@@ -817,7 +773,7 @@ struct MinimalSequenceWith${Implementation}Map<Element> : Sequence {
   }
 
   func map<T>(
-    @noescape transform: (Element) throws -> T
+    @noescape _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     MinimalSequenceWithCustomMap.timesMapWasCalled += 1
     return try _data.map(transform)
@@ -829,7 +785,7 @@ struct MinimalSequenceWith${Implementation}Map<Element> : Sequence {
 % end
 
 func callStaticSequenceMap<T>(
-  sequence: MinimalSequenceWithDefaultMap<OpaqueValue<Int>>,
+  _ sequence: MinimalSequenceWithDefaultMap<OpaqueValue<Int>>,
   @noescape transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = sequence.map(transform)
@@ -838,7 +794,7 @@ func callStaticSequenceMap<T>(
 }
 
 func callStaticSequenceMap<T>(
-  sequence: MinimalSequenceWithCustomMap<OpaqueValue<Int>>,
+  _ sequence: MinimalSequenceWithCustomMap<OpaqueValue<Int>>,
   @noescape transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = sequence.map(transform)
@@ -847,7 +803,7 @@ func callStaticSequenceMap<T>(
 }
 
 func callGenericSequenceMap<S : Sequence, T>(
-  sequence: S,
+  _ sequence: S,
   @noescape transform: (S.Iterator.Element) -> T
 ) -> [T] {
   var result = sequence.map(transform)
@@ -855,9 +811,9 @@ func callGenericSequenceMap<S : Sequence, T>(
   return result
 }
 
-% for Implementation in [ 'Default', 'Custom' ]:
+% for Implementation in ['Default', 'Custom']:
 
-%   for dispatch in [ 'Static', 'Generic' ]:
+%   for dispatch in ['Static', 'Generic']:
 
 SequenceTypeTests.test(
   "map/Sequence/${Implementation}Implementation/${dispatch}"
@@ -1015,7 +971,7 @@ SequenceTypeTests.test("dropLast/dispatch") {
 SequenceTypeTests.test("prefix/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   tester.prefix(1)
-  expectCustomizable(tester, tester.log.prefix)
+  expectCustomizable(tester, tester.log.prefixMaxLength)
 }
 
 //===----------------------------------------------------------------------===//
@@ -1025,7 +981,7 @@ SequenceTypeTests.test("prefix/dispatch") {
 SequenceTypeTests.test("suffix/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   tester.suffix(1)
-  expectCustomizable(tester, tester.log.suffix)
+  expectCustomizable(tester, tester.log.suffixMaxLength)
 }
 
 //===----------------------------------------------------------------------===//
@@ -1062,7 +1018,7 @@ extension Zip2Sequence
 
 SequenceTypeTests.test("zip") {
   typealias Element = (OpaqueValue<Int>, OpaqueValue<Int32>)
-  func compareElements(lhs: Element, rhs: Element) -> Bool {
+  func compareElements(_ lhs: Element, rhs: Element) -> Bool {
     return lhs.0.value == rhs.0.value && lhs.1.value == rhs.1.value
   }
 
@@ -1164,9 +1120,8 @@ SequenceTypeTests.test("_copyToNativeArrayBuffer/OverestimatedCount")
 // Standard sequence tests
 //===----------------------------------------------------------------------===//
 
-% for Base in [ 'DefaultedSequence', 'MinimalSequence' ]:
+% for Base in ['DefaultedSequence', 'MinimalSequence']:
 do {
-  let checksAdded: Box<Set<String>> = Box([])
   let resiliencyChecks = CollectionMisuseResiliencyChecks.all
 
   SequenceTypeTests.addSequenceTests(
@@ -1180,7 +1135,6 @@ do {
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
-    checksAdded: checksAdded,
     resiliencyChecks: resiliencyChecks)
 }
 % end

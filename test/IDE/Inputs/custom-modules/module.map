@@ -2,3 +2,54 @@ module OmitNeedlessWords {
   export *
   header "OmitNeedlessWords.h"
 }
+
+module ImportedProtocols {
+  export *
+  module SubModule {
+    requires objc
+    header "ImportedProtocols.h"
+  }
+}
+
+module Newtype {
+  export *
+  header "Newtype.h"
+}
+
+module ImportAsMember {
+  export *
+
+  module A {
+    header "ImportAsMember.h"
+  }
+
+  module B {
+    header "ImportAsMemberB.h"
+  }
+
+  module C {
+    requires objc
+    header "ImportAsMemberC.h"
+  }
+
+  module Proto {
+    requires objc
+    header "ImportAsMemberProto.h"
+  }
+
+  module Class {
+    requires objc
+    header "ImportAsMemberClass.h"
+  }
+}
+
+module IAMError {
+  export *
+  requires objc
+  header "ImportAsMemberError.h"
+}
+
+module InferImportAsMember {
+  export *
+  header "InferImportAsMember.h"
+}

@@ -36,7 +36,7 @@ class B : A {}
 // CHECK:    [[NOT_PRESENT]]:
 // CHECK-NEXT: inject_enum_addr [[PB]] {{.*}}none
 // CHECK-NEXT: br [[CONT2]]
-func foo(y : A?) {
+func foo(_ y : A?) {
   var x = (y as? B)
 }
 
@@ -100,7 +100,7 @@ func foo(y : A?) {
 // CHECK-NEXT: inject_enum_addr [[PB]] {{.*}}none
 // CHECK-NEXT: br [[DONE_DEPTH2]]
 //   Done.
-func bar(y : A????) {
+func bar(_ y : A????) {
   var x = (y as? B??)
 }
 
@@ -112,7 +112,7 @@ func bar(y : A????) {
 // CHECK: [[VAL:%.*]] = unchecked_enum_data %0
 // CHECK-NEXT: [[X_VALUE:%.*]] = init_enum_data_addr [[PB]] : $*Optional<B>, #Optional.some
 // CHECK-NEXT: checked_cast_br [[VAL]] : $AnyObject to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
-func baz(y : AnyObject?) {
+func baz(_ y : AnyObject?) {
   var x = (y as? B)
 }
 
@@ -125,7 +125,7 @@ func baz(y : AnyObject?) {
 // CHECK-NEXT:  %2 = unchecked_trivial_bit_cast %0 : $Optional<Int> to $ImplicitlyUnwrappedOptional<Int>
 // CHECK-NEXT:  return %2 : $ImplicitlyUnwrappedOptional<Int>
 // CHECK-NEXT:}
-func opt_to_opt_trivial(x: Int?) -> Int! {
+func opt_to_opt_trivial(_ x: Int?) -> Int! {
   return x
 }
 
@@ -135,19 +135,19 @@ func opt_to_opt_trivial(x: Int?) -> Int! {
 // CHECK-NEXT:  %2 = unchecked_ref_cast %0 : $ImplicitlyUnwrappedOptional<C> to $Optional<C>
 // CHECK-NEXT:  return %2 : $Optional<C>
 // CHECK-NEXT:}
-func opt_to_opt_reference(x : C!) -> C? { return x }
+func opt_to_opt_reference(_ x : C!) -> C? { return x }
 
 // CHECK-LABEL: sil hidden @_TF4main22opt_to_opt_addressOnly
 // CHECK:       bb0(%0 : $*Optional<T>, %1 : $*ImplicitlyUnwrappedOptional<T>):
 // CHECK-NEXT:  debug_value_addr %1 : $*ImplicitlyUnwrappedOptional<T>, let, name "x"
 // CHECK-NEXT:  %3 = unchecked_addr_cast %0 : $*Optional<T> to $*ImplicitlyUnwrappedOptional<T>
 // CHECK-NEXT:  copy_addr [take] %1 to [initialization] %3
-func opt_to_opt_addressOnly<T>(x : T!) -> T? { return x }
+func opt_to_opt_addressOnly<T>(_ x : T!) -> T? { return x }
 
 class C {}
 
-public struct TestAddressOnlyStruct<T>  {
-  func f(a : T?) {}
+public struct TestAddressOnlyStruct<T> {
+  func f(_ a : T?) {}
   
   // CHECK-LABEL: sil hidden @_TFV4main21TestAddressOnlyStruct8testCall
   // CHECK: bb0(%0 : $*ImplicitlyUnwrappedOptional<T>, %1 : $TestAddressOnlyStruct<T>):
@@ -155,7 +155,7 @@ public struct TestAddressOnlyStruct<T>  {
   // CHECK: [[TMPCAST:%.*]] = unchecked_addr_cast [[TMPBUF]]
   // CHECK-NEXT: copy_addr %0 to [initialization] [[TMPCAST]]
   // CHECK-NEXT: apply {{.*}}<T>([[TMPBUF]], %1)
-  func testCall(a : T!) {
+  func testCall(_ a : T!) {
     f(a)
   }
 }
@@ -168,6 +168,6 @@ public struct TestAddressOnlyStruct<T>  {
 // CHECK-NEXT: [[CAST:%.*]] = unchecked_addr_cast [[PB]] : $*ImplicitlyUnwrappedOptional<Int> to $*Optional<Int>
 // CHECK-NEXT: store %0 to [[CAST]] : $*Optional<Int>
 // CHECK-NEXT: strong_release [[X]] : $@box ImplicitlyUnwrappedOptional<Int>
-func testContextualInitOfNonAddrOnlyType(a : Int?) {
-  var x = a as Int!
+func testContextualInitOfNonAddrOnlyType(_ a : Int?) {
+  var x: Int! = a
 }

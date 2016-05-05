@@ -572,8 +572,7 @@ namespace {
       if (auto genericFn = type->getAs<GenericFunctionType>()) {
         // Open up the generic parameters and requirements.
         cs.openGeneric(dc,
-                       genericFn->getGenericParams(),
-                       genericFn->getRequirements(),
+                       genericFn->getGenericSignature(),
                        skipProtocolSelfConstraint,
                        minOpeningDepth,
                        locator,
@@ -892,6 +891,27 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
 void ConstraintSystem::openGeneric(
        DeclContext *dc,
+       GenericSignature *signature,
+       bool skipProtocolSelfConstraint,
+       unsigned minOpeningDepth,
+       ConstraintLocatorBuilder locator,
+       llvm::DenseMap<CanType, TypeVariableType *> &replacements) {
+  // Use the minimized constraints; we can re-derive solutions for all the
+  // implied constraints.
+  auto minimized =
+    signature->getCanonicalManglingSignature(*DC->getParentModule());
+
+  openGeneric(dc,
+              minimized->getGenericParams(),
+              minimized->getRequirements(),
+              skipProtocolSelfConstraint,
+              minOpeningDepth,
+              locator,
+              replacements);
+}
+
+void ConstraintSystem::openGeneric(
+       DeclContext *dc,
        ArrayRef<GenericTypeParamType *> params,
        ArrayRef<Requirement> requirements,
        bool skipProtocolSelfConstraint,
@@ -1019,6 +1039,16 @@ Type ConstraintSystem::replaceSelfTypeInArchetype(ArchetypeType *archetype) {
   return archetype;
 }
 
+/// Determine whether the given locator is for a witness or requirement.
+static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
+  if (auto last = locator.last()) {
+    return last->getKind() == ConstraintLocator::Requirement ||
+    last->getKind() == ConstraintLocator::Witness;
+  }
+
+  return false;
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(
   Type baseTy, ValueDecl *value,
@@ -1111,8 +1141,7 @@ ConstraintSystem::getTypeOfMemberReference(
     if (auto sig = dc->getGenericSignatureOfContext()) {
 
       // Open up the generic parameter list for the container.
-      openGeneric(dc, sig->getGenericParams(), sig->getRequirements(),
-                  /*skipProtocolSelfConstraint=*/true, minOpeningDepth,
+      openGeneric(dc, sig, /*skipProtocolSelfConstraint=*/true, minOpeningDepth,
                   locator, replacements);
 
       // Open up the type of the member.
@@ -1218,10 +1247,14 @@ ConstraintSystem::getTypeOfMemberReference(
     // optional/dynamic, is settable, or is not.
     auto fnType = openedFnType->getResult()->castTo<FunctionType>();
     auto elementTy = fnType->getResult();
-    if (subscript->getAttrs().hasAttribute<OptionalAttr>())
-      elementTy = OptionalType::get(elementTy->getRValueType());
-    else if (isDynamicResult)
-      elementTy = ImplicitlyUnwrappedOptionalType::get(elementTy->getRValueType());
+    if (!isRequirementOrWitness(locator)) {
+      if (subscript->getAttrs().hasAttribute<OptionalAttr>())
+        elementTy = OptionalType::get(elementTy->getRValueType());
+      else if (isDynamicResult) {
+        elementTy = ImplicitlyUnwrappedOptionalType::get(
+                      elementTy->getRValueType());
+      }
+    }
 
     type = FunctionType::get(fnType->getInput(), elementTy);
   } else if (isa<ProtocolDecl>(value->getDeclContext()) &&
@@ -1353,8 +1386,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         = getTypeOfReference(choice.getDecl(), isTypeReference,
                              choice.isSpecialized(), locator);
     }
-    
-    if (choice.getDecl()->getAttrs().hasAttribute<OptionalAttr>() &&
+
+    if (!isRequirementOrWitness(locator) &&
+        choice.getDecl()->getAttrs().hasAttribute<OptionalAttr>() &&
         !isa<SubscriptDecl>(choice.getDecl())) {
       // For a non-subscript declaration that is an optional
       // requirement in a protocol, strip off the lvalue-ness (FIXME:

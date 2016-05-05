@@ -23,6 +23,7 @@ func test001() {
 // TOP_LEVEL_0: ]
 
 // TOP_LEVEL_0-LABEL: Results for filterText: foo [
+// TOP_LEVEL_0-NEXT:   Foo
 // TOP_LEVEL_0-NEXT:   Foo(
 // TOP_LEVEL_0-NEXT:   FooBar
 // TOP_LEVEL_0-NEXT:   Foo()
@@ -33,6 +34,7 @@ func test001() {
 // TOP_LEVEL_0-NEXT: ]
 
 // TOP_LEVEL_0-LABEL: Results for filterText: foobar [
+// TOP_LEVEL_0-NEXT:   FooBar
 // TOP_LEVEL_0-NEXT:   FooBar.
 // TOP_LEVEL_0-NEXT:   FooBar(
 // TOP_LEVEL_0-NEXT:   FooBar()
@@ -51,17 +53,19 @@ func test002(abc: FooBar, abd: Base) {
 // TOP_LEVEL_1: ]
 
 // TOP_LEVEL_1-LABEL: Results for filterText: abc [
+// TOP_LEVEL_1-NEXT:   abc
 // TOP_LEVEL_1-NEXT:   abc.
-// TOP_LEVEL_1-NEXT:   abc!==
 // TOP_LEVEL_1-NEXT:   abc===
+// TOP_LEVEL_1-NEXT:   abc!==
 // TOP_LEVEL_1-NEXT:   abc.method()
 // TOP_LEVEL_1-NEXT:   abc.prop
 // TOP_LEVEL_1-NEXT: ]
 
 // TOP_LEVEL_1-LABEL: Results for filterText: abd [
+// TOP_LEVEL_1-NEXT:   abd
 // TOP_LEVEL_1-NEXT:   abd.
-// TOP_LEVEL_1-NEXT:   abd!==
 // TOP_LEVEL_1-NEXT:   abd===
+// TOP_LEVEL_1-NEXT:   abd!==
 // TOP_LEVEL_1-NEXT:   abd.base()
 // TOP_LEVEL_1-NEXT: ]
 
@@ -74,6 +78,7 @@ func test003(x: FooBar) {
 // FOOBAR_QUALIFIED-NEXT: ]
 
 // FOOBAR_QUALIFIED-LABEL: Results for filterText: prop [
+// FOOBAR_QUALIFIED-NEXT:   prop
 // FOOBAR_QUALIFIED-NEXT:   prop.
 // FOOBAR_QUALIFIED:   prop.method()
 // FOOBAR_QUALIFIED-NEXT:   prop.prop
@@ -88,6 +93,7 @@ func test003(x: FooBar) {
 // FOOBAR_QUALIFIED_OP-NEXT:   prop
 // FOOBAR_QUALIFIED_OP-NEXT: ]
 // FOOBAR_QUALIFIED_OP-LABEL: Results for filterText: prop [
+// FOOBAR_QUALIFIED_OP-NEXT:   prop
 // FOOBAR_QUALIFIED_OP-NEXT:   prop.
 // FOOBAR_QUALIFIED_OP: ]
 
@@ -96,9 +102,16 @@ func test003(x: FooBar) {
 // FOOBAR_QUALIFIED_NOOP-NEXT:   prop
 // FOOBAR_QUALIFIED_NOOP-NEXT: ]
 // FOOBAR_QUALIFIED_NOOP-LABEL: Results for filterText: prop [
+// FOOBAR_QUALIFIED_NOOP-NEXT:   prop
 // FOOBAR_QUALIFIED_NOOP-NEXT:   prop.method()
 // FOOBAR_QUALIFIED_NOOP-NEXT:   prop.prop
 // FOOBAR_QUALIFIED_NOOP-NEXT: ]
+
+// RUN: %complete-test %s -group=none -no-include-exact-match -add-inner-results -no-inner-operators -tok=FOOBAR_QUALIFIED | FileCheck %s -check-prefix=FOOBAR_QUALIFIED_NOEXACT
+// FOOBAR_QUALIFIED_NOEXACT-LABEL: Results for filterText: prop [
+// FOOBAR_QUALIFIED_NOEXACT-NEXT:   prop.method()
+// FOOBAR_QUALIFIED_NOEXACT-NEXT:   prop.prop
+// FOOBAR_QUALIFIED_NOEXACT-NEXT: ]
 
 func test004() {
   FooBar#^FOOBAR_POSTFIX^#

@@ -36,7 +36,8 @@
       key.name: "Float",
       key.usr: "s:Sf",
       key.line: 1,
-      key.column: 23
+      key.column: 23,
+      key.groupname: "Math/Floating"
     }
   ]
 }

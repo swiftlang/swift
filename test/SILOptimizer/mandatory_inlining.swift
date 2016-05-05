@@ -4,7 +4,7 @@
 // specifics of SIL generation, which might change for reasons unrelated to this
 // pass
 
-func foo(x: Float) -> Float {
+func foo(_ x: Float) -> Float {
   return bar(x);
 }
 
@@ -13,7 +13,7 @@ func foo(x: Float) -> Float {
 // CHECK-NEXT: debug_value %0 : $Float, let, name "x"
 // CHECK-NEXT: return %0
 
-@_transparent func bar(x: Float) -> Float {
+@_transparent func bar(_ x: Float) -> Float {
   return baz(x)
 }
 
@@ -22,20 +22,20 @@ func foo(x: Float) -> Float {
   // CHECK-NOT: apply
   // CHECK: return
 
-@_transparent func baz(x: Float) -> Float {
+@_transparent func baz(_ x: Float) -> Float {
   return x
 }
 
 // CHECK-LABEL: sil hidden [transparent] @_TF18mandatory_inlining3baz
 // CHECK: return
 
-func spam(x: Int) -> Int {
+func spam(_ x: Int) -> Int {
   return x
 }
 
 // CHECK-LABEL: sil hidden @_TF18mandatory_inlining4spam
 
-@_transparent func ham(x: Int) -> Int {
+@_transparent func ham(_ x: Int) -> Int {
   return spam(x)
 }
 
@@ -44,7 +44,7 @@ func spam(x: Int) -> Int {
   // CHECK: apply
   // CHECK: return
 
-func eggs(x: Int) -> Int {
+func eggs(_ x: Int) -> Int {
   return ham(x)
 }
 
@@ -53,11 +53,11 @@ func eggs(x: Int) -> Int {
   // CHECK: apply
   // CHECK: return
 
-@_transparent func call_auto_closure(@autoclosure x: () -> Bool) -> Bool {
+@_transparent func call_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
   return x()
 }
 
-func test_auto_closure_with_capture(x: Bool) -> Bool {
+func test_auto_closure_with_capture(_ x: Bool) -> Bool {
   return call_auto_closure(x)
 }
 
@@ -90,7 +90,7 @@ infix operator ||| {
   precedence 110
 }
 
-@_transparent func &&& (lhs: Bool, @autoclosure rhs: () -> Bool) -> Bool {
+@_transparent func &&& (lhs: Bool, rhs: @autoclosure () -> Bool) -> Bool {
   if lhs {
     return rhs()
   }
@@ -98,7 +98,7 @@ infix operator ||| {
   return false
 }
 
-@_transparent func ||| (lhs: Bool, @autoclosure rhs: () -> Bool) -> Bool {
+@_transparent func ||| (lhs: Bool, rhs: @autoclosure () -> Bool) -> Bool {
   if lhs {
     return true
   }
@@ -106,7 +106,7 @@ infix operator ||| {
   return rhs()
 }
 
-func test_chained_short_circuit(x: Bool, y: Bool, z: Bool) -> Bool {
+func test_chained_short_circuit(_ x: Bool, y: Bool, z: Bool) -> Bool {
   return x &&& (y ||| z)
 }
 
@@ -136,7 +136,7 @@ func testInlineUnionElement() -> X {
 
 
 @_transparent
-func call_let_auto_closure(@autoclosure x: () -> Bool) -> Bool {
+func call_let_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
   return x()
 }
 
@@ -145,7 +145,7 @@ func call_let_auto_closure(@autoclosure x: () -> Bool) -> Bool {
 // CHECK-NEXT: debug_value %0 : $Bool
 // CHECK-NEXT: return %0 : $Bool
 
-func test_let_auto_closure_with_value_capture(x: Bool) -> Bool {
+func test_let_auto_closure_with_value_capture(_ x: Bool) -> Bool {
   return call_let_auto_closure(x)
 }
 
@@ -154,13 +154,13 @@ class C {}
 
 // CHECK-LABEL: sil hidden [transparent] @_TF18mandatory_inlining25class_constrained_generic
 @_transparent
-func class_constrained_generic<T : C>(o: T) -> AnyClass? {
+func class_constrained_generic<T : C>(_ o: T) -> AnyClass? {
   // CHECK: return
   return T.self
 }
 
 // CHECK-LABEL: sil hidden @_TF18mandatory_inlining6invokeFCS_1CT_ : $@convention(thin) (@owned C) -> () {
-func invoke(c: C) {
+func invoke(_ c: C) {
   // CHECK-NOT: function_ref @_TF18mandatory_inlining25class_constrained_generic
   // CHECK-NOT: apply
   // CHECK: init_existential_metatype

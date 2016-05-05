@@ -13,7 +13,7 @@
 import SwiftShims
 
 /// Convert the given numeric value to a hexadecimal string.
-public func asHex<T : Integer>(x: T) -> String {
+public func asHex<T : Integer>(_ x: T) -> String {
   return "0x" + String(x.toIntMax(), radix: 16)
 }
 
@@ -23,14 +23,14 @@ public func asHex<
   S: Sequence
 where
   S.Iterator.Element : Integer
->(x: S) -> String {
+>(_ x: S) -> String {
   return "[ " + x.lazy.map { asHex($0) }.joined(separator: ", ") + " ]"
 }
 
 /// Compute the prefix sum of `seq`.
 public func scan<
   S : Sequence, U
->(seq: S, _ initial: U, _ combine: (U, S.Iterator.Element) -> U) -> [U] {
+>(_ seq: S, _ initial: U, _ combine: (U, S.Iterator.Element) -> U) -> [U] {
   var result: [U] = []
   result.reserveCapacity(seq.underestimatedCount)
   var runningResult = initial
@@ -41,7 +41,7 @@ public func scan<
   return result
 }
 
-public func randomShuffle<T>(a: [T]) -> [T] {
+public func randomShuffle<T>(_ a: [T]) -> [T] {
   var result = a
   for i in (1..<a.count).reversed() {
     // FIXME: 32 bits are not enough in general case!
@@ -59,12 +59,12 @@ public func gather<
   where
   IndicesSequence.Iterator.Element == C.Index
 >(
-  collection: C, _ indices: IndicesSequence
+  _ collection: C, _ indices: IndicesSequence
 ) -> [C.Iterator.Element] {
   return Array(indices.map { collection[$0] })
 }
 
-public func scatter<T>(a: [T], _ idx: [Int]) -> [T] {
+public func scatter<T>(_ a: [T], _ idx: [Int]) -> [T] {
   var result = a
   for i in 0..<a.count {
     result[idx[i]] = a[i]
@@ -73,9 +73,8 @@ public func scatter<T>(a: [T], _ idx: [Int]) -> [T] {
 }
 
 public func withArrayOfCStrings<R>(
-  args: [String], _ body: ([UnsafeMutablePointer<CChar>]) -> R
+  _ args: [String], _ body: ([UnsafeMutablePointer<CChar>?]) -> R
 ) -> R {
-
   let argsCounts = Array(args.map { $0.utf8.count + 1 })
   let argsOffsets = [ 0 ] + scan(argsCounts, 0, +)
   let argsBufferSize = argsOffsets.last!
@@ -87,10 +86,10 @@ public func withArrayOfCStrings<R>(
     argsBuffer.append(0)
   }
 
-  return argsBuffer.withUnsafeBufferPointer {
+  return argsBuffer.withUnsafeMutableBufferPointer {
     (argsBuffer) in
-    let ptr = UnsafeMutablePointer<CChar>(argsBuffer.baseAddress)
-    var cStrings = argsOffsets.map { ptr + $0 }
+    let ptr = UnsafeMutablePointer<CChar>(argsBuffer.baseAddress!)
+    var cStrings: [UnsafeMutablePointer<CChar>?] = argsOffsets.map { ptr + $0 }
     cStrings[cStrings.count - 1] = nil
     return body(cStrings)
   }

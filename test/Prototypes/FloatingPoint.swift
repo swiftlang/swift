@@ -27,7 +27,7 @@ extension UInt32 : FloatingPointRepresentation {
 //  Ewwww? <rdar://problem/20060017>
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   import Darwin
-#elseif os(Linux)
+#elseif os(Linux) || os(FreeBSD) || os(Android)
   import Glibc
 #endif
 
@@ -274,7 +274,7 @@ FloatLiteralConvertible {
   ///
   /// If `remainder(x,y)` is zero, it has the same sign as `x`.  If `y` is
   /// infinite, then `remainder(x,y)` is `x`.
-  static func remainder(x: Self, _ y: Self) -> Self
+  static func remainder(_ x: Self, _ y: Self) -> Self
   
   //  TODO: The IEEE-754 "minNumber" and "maxNumber" operations should
   //  probably be provided by the min and max generic free functions, but
@@ -288,14 +288,14 @@ FloatLiteralConvertible {
   /// Returns `x` if `x < y`, `y` if `y < x`, and whichever of `x` or `y`
   /// is a number if the other is NaN.  The result is NaN only if both
   /// arguments are NaN.
-  static func min(x: Self, _ y: Self) -> Self
+  static func min(_ x: Self, _ y: Self) -> Self
   
   /// The maximum of `x` and `y`.
   ///
   /// Returns `x` if `x > y`, `y` if `y > x`, and whichever of `x` or `y`
   /// is a number if the other is NaN.  The result is NaN only if both
   /// arguments are NaN.
-  static func max(x: Self, _ y: Self) -> Self
+  static func max(_ x: Self, _ y: Self) -> Self
   
   //  Note: IEEE-754 calls these "minNumMag" and "maxNumMag".  C (n1778)
   //  uses "fminmag" and "fmaxmag".  Neither of these strike me as very
@@ -306,14 +306,14 @@ FloatLiteralConvertible {
   /// Returns `x` if `|x| < |y|`, `y` if `|y| < |x|`, and whichever of
   /// `x` or `y` is a number if the other is NaN.  The result is NaN
   /// only if both arguments are NaN.
-  static func minMagnitude(left: Self, _ right: Self) -> Self
+  static func minMagnitude(_ left: Self, _ right: Self) -> Self
   
   /// Whichever of `x` or `y` has greater magnitude.
   ///
   /// Returns `x` if `|x| > |y|`, `y` if `|y| > |x|`, and whichever of
   /// `x` or `y` is a number if the other is NaN.  The result is NaN
   /// only if both arguments are NaN.
-  static func maxMagnitude(left: Self, _ right: Self) -> Self
+  static func maxMagnitude(_ left: Self, _ right: Self) -> Self
   
   func +(x: Self, y: Self) -> Self
   func -(x: Self, y: Self) -> Self
@@ -321,11 +321,11 @@ FloatLiteralConvertible {
   func /(x: Self, y: Self) -> Self
   
   //  Implementation details of formatOf operations.
-  static func _addStickyRounding(x: Self, _ y: Self) -> Self
-  static func _mulStickyRounding(x: Self, _ y: Self) -> Self
-  static func _divStickyRounding(x: Self, _ y: Self) -> Self
-  static func _sqrtStickyRounding(x: Self) -> Self
-  static func _mulAddStickyRounding(x: Self, _ y: Self, _ z: Self) -> Self
+  static func _addStickyRounding(_ x: Self, _ y: Self) -> Self
+  static func _mulStickyRounding(_ x: Self, _ y: Self) -> Self
+  static func _divStickyRounding(_ x: Self, _ y: Self) -> Self
+  static func _sqrtStickyRounding(_ x: Self) -> Self
+  static func _mulAddStickyRounding(_ x: Self, _ y: Self, _ z: Self) -> Self
   
   //  TODO: do we actually want to provide remainder as an operator?  It's
   //  definitely not obvious to me that we should, but we have until now.
@@ -370,7 +370,7 @@ FloatLiteralConvertible {
   /// Returns datum with magnitude of `self` and sign of `from`.
   ///
   /// Implements the IEEE-754 copysign operation.
-  func copysign(from: Self) -> Self
+  func copysign(_ from: Self) -> Self
   
   //  TODO: "signaling/quiet" comparison predicates if/when we have a model for
   //  floating-point flags and exceptions in Swift.
@@ -423,10 +423,10 @@ FloatLiteralConvertible {
   var isCanonical: Bool { get }
   
   /// A total order relation on all values of type Self (including NaN).
-  func totalOrder(other: Self) -> Bool
+  func totalOrder(_ other: Self) -> Bool
   
   /// A total order relation that compares magnitudes.
-  func totalOrderMagnitude(other: Self) -> Bool
+  func totalOrderMagnitude(_ other: Self) -> Bool
   
   //  Note: this operation is *not* required by IEEE-754, but it is an oft-
   //  requested feature.  TBD: should +0 and -0 be equivalent?  Substitution
@@ -452,7 +452,7 @@ FloatLiteralConvertible {
   /// Unlike `==`, this relation is a formal equivalence relation.  In
   /// particular, it is reflexive.  All NaNs compare equal to each other
   /// under this relation.
-  func equivalent(other: Self) -> Bool
+  func equivalent(_ other: Self) -> Bool
 }
 
 //  Features of FloatingPoint that can be implemented without any
@@ -467,31 +467,31 @@ extension FloatingPoint {
     fatalError("TODO once roundeven functions are provided in math.h")
   }
   
-  public static func minMagnitude(left: Self, _ right: Self) -> Self {
+  public static func minMagnitude(_ left: Self, _ right: Self) -> Self {
     fatalError("TODO once fminmag functions are available in libm")
   }
   
-  public static func maxMagnitude(left: Self, _ right: Self) -> Self {
+  public static func maxMagnitude(_ left: Self, _ right: Self) -> Self {
     fatalError("TODO once fmaxmag functions are available in libm")
   }
   
-  public static func _addStickyRounding(x: Self, _ y: Self) -> Self {
+  public static func _addStickyRounding(_ x: Self, _ y: Self) -> Self {
     fatalError("TODO: Unimplemented")
   }
   
-  public static func _mulStickyRounding(x: Self, _ y: Self) -> Self {
+  public static func _mulStickyRounding(_ x: Self, _ y: Self) -> Self {
     fatalError("TODO: Unimplemented")
   }
   
-  public static func _divStickyRounding(x: Self, _ y: Self) -> Self {
+  public static func _divStickyRounding(_ x: Self, _ y: Self) -> Self {
     fatalError("TODO: Unimplemented")
   }
   
-  public static func _sqrtStickyRounding(x: Self) -> Self {
+  public static func _sqrtStickyRounding(_ x: Self) -> Self {
     fatalError("TODO: Unimplemented")
   }
   
-  public static func _mulAddStickyRounding(x: Self, _ y: Self, _ z: Self) -> Self {
+  public static func _mulAddStickyRounding(_ x: Self, _ y: Self, _ z: Self) -> Self {
     fatalError("TODO: Unimplemented")
   }
   
@@ -504,11 +504,11 @@ extension FloatingPoint {
     return signbit ? .negativeZero : .positiveZero
   }
   
-  public func totalOrderMagnitude(other: Self) -> Bool {
+  public func totalOrderMagnitude(_ other: Self) -> Bool {
     return abs(self).totalOrder(abs(other))
   }
   
-  public func equivalent(other: Self) -> Bool {
+  public func equivalent(_ other: Self) -> Bool {
     if self.isNaN && other.isNaN { return true }
     if self.isZero && other.isZero { return self.signbit == other.signbit }
     return self == other
@@ -560,22 +560,22 @@ public protocol BinaryFloatingPoint: FloatingPoint {
   //  of the base FloatingPoint protocol in Swift, because they are
   //  IEEE-754 required operations, like + or *.
   /// The sum of `x` and `y`, correctly rounded to `Self`.
-  static func add<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self
+  static func add<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(_ x: X, _ y: Y) -> Self
   
   /// The difference of `x` and `y`, correctly rounded to `Self`.
-  static func sub<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self
+  static func sub<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(_ x: X, _ y: Y) -> Self
   
   /// The product of `x` and `y`, correctly rounded to `Self`.
-  static func mul<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self
+  static func mul<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(_ x: X, _ y: Y) -> Self
   
   /// The quotient of `x` and `y`, correctly rounded to `Self`.
-  static func div<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self
+  static func div<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(_ x: X, _ y: Y) -> Self
   
   /// The square root of `x`, correctly rounded to `Self`.
-  static func sqrt<X: BinaryFloatingPoint>(x: X) -> Self
+  static func sqrt<X: BinaryFloatingPoint>(_ x: X) -> Self
   
   /// (x*y) + z correctly rounded to `Self`.
-  static func mulAdd<X: BinaryFloatingPoint, Y: BinaryFloatingPoint, Z: BinaryFloatingPoint>(x: X, _ y: Y, _ z: Z) -> Self
+  static func mulAdd<X: BinaryFloatingPoint, Y: BinaryFloatingPoint, Z: BinaryFloatingPoint>(_ x: X, _ y: Y, _ z: Z) -> Self
 }
 
 extension BinaryFloatingPoint {
@@ -746,35 +746,35 @@ extension BinaryFloatingPoint {
       significandBitPattern: significand)
   }
   
-  public static func add<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self {
+  public static func add<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(_ x: X, _ y: Y) -> Self {
     if X._fractionalBitCount < Y._fractionalBitCount { return add(y, x) }
     if X._fractionalBitCount <= Self._fractionalBitCount { return Self(x) + Self(y) }
     return Self(X._addStickyRounding(x, X(y)))
   }
   
-  public static func sub<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self {
+  public static func sub<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(_ x: X, _ y: Y) -> Self {
     return Self.add(x, -y)
   }
   
-  public static func mul<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self {
+  public static func mul<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(_ x: X, _ y: Y) -> Self {
     if X._fractionalBitCount < Y._fractionalBitCount { return mul(y, x) }
     if X._fractionalBitCount <= Self._fractionalBitCount { return Self(x) * Self(y) }
     return Self(X._mulStickyRounding(x, X(y)))
   }
   
-  public static func div<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(x: X, _ y: Y) -> Self {
+  public static func div<X: BinaryFloatingPoint, Y: BinaryFloatingPoint>(_ x: X, _ y: Y) -> Self {
     if X._fractionalBitCount <= Self._fractionalBitCount &&
       Y._fractionalBitCount <= Self._fractionalBitCount { return Self(x) / Self(y) }
     if X._fractionalBitCount < Y._fractionalBitCount { return Self(Y._divStickyRounding(Y(x), y)) }
     return Self(X._divStickyRounding(x, X(y)))
   }
   
-  public static func sqrt<X: BinaryFloatingPoint>(x: X) -> Self {
+  public static func sqrt<X: BinaryFloatingPoint>(_ x: X) -> Self {
     if X._fractionalBitCount <= Self._fractionalBitCount { return sqrt(Self(x)) }
     return Self(X._sqrtStickyRounding(x))
   }
   
-  public static func mulAdd<X: BinaryFloatingPoint, Y: BinaryFloatingPoint, Z: BinaryFloatingPoint>(x: X, _ y: Y, _ z: Z) -> Self {
+  public static func mulAdd<X: BinaryFloatingPoint, Y: BinaryFloatingPoint, Z: BinaryFloatingPoint>(_ x: X, _ y: Y, _ z: Z) -> Self {
     if X._fractionalBitCount < Y._fractionalBitCount { return mulAdd(y, x, z) }
     if X._fractionalBitCount <= Self._fractionalBitCount &&
       Z._fractionalBitCount <= Self._fractionalBitCount { return mulAdd(Self(x), Self(y), Self(z)) }
@@ -787,7 +787,7 @@ extension BinaryFloatingPoint {
       significandBitPattern: significandBitPattern)
   }
   
-  public func copysign(from: Self) -> Self {
+  public func copysign(_ from: Self) -> Self {
     return Self(signbit: from.signbit, exponentBitPattern: exponentBitPattern,
       significandBitPattern: significandBitPattern)
   }
@@ -823,7 +823,7 @@ extension BinaryFloatingPoint {
   
   public var isCanonical: Bool { return true }
   
-  public func totalOrder(other: Self) -> Bool {
+  public func totalOrder(_ other: Self) -> Bool {
     //  Every negative-signed value (even NaN) is less than every positive-
     //  signed value, so if the signs do not match, we simply return the
     //  signbit of self.
@@ -922,10 +922,10 @@ extension Float : BinaryFloatingPoint, FloatingPointInterchange {
   public func roundToIntegralTowardZero() -> Float { return truncf(self) }
   public func roundToIntegralTowardPositive() -> Float { return ceilf(self) }
   public func roundToIntegralTowardNegative() -> Float { return floorf(self) }
-  public static func remainder(left: Float, _ right: Float) -> Float { return remainderf(left, right) }
-  public static func min(left: Float, _ right: Float) -> Float { return fminf(left, right) }
-  public static func max(left: Float, _ right: Float) -> Float { return fmaxf(left, right) }
-  public static func sqrt(x: Float) -> Float { return sqrtf(x) }
+  public static func remainder(_ left: Float, _ right: Float) -> Float { return remainderf(left, right) }
+  public static func min(_ left: Float, _ right: Float) -> Float { return fminf(left, right) }
+  public static func max(_ left: Float, _ right: Float) -> Float { return fmaxf(left, right) }
+  public static func sqrt(_ x: Float) -> Float { return sqrtf(x) }
 }
 
 extension Double : BinaryFloatingPoint {
@@ -970,9 +970,9 @@ extension Double : BinaryFloatingPoint {
   public func roundToIntegralTowardZero() -> Double { return trunc(self) }
   public func roundToIntegralTowardPositive() -> Double { return ceil(self) }
   public func roundToIntegralTowardNegative() -> Double { return floor(self) }
-  public static func remainder(left: Double, _ right: Double) -> Double { return remainder(left, right) }
-  public static func min(left: Double, _ right: Double) -> Double { return fmin(left, right) }
-  public static func max(left: Double, _ right: Double) -> Double { return fmax(left, right) }
+  public static func remainder(_ left: Double, _ right: Double) -> Double { return remainder(left, right) }
+  public static func min(_ left: Double, _ right: Double) -> Double { return fmin(left, right) }
+  public static func max(_ left: Double, _ right: Double) -> Double { return fmax(left, right) }
 }
 
 #if arch(i386) || arch(x86_64)
@@ -1066,9 +1066,9 @@ extension Float80 : BinaryFloatingPoint {
   public func roundToIntegralTowardZero() -> Float80 { fatalError("TODO: nead truncl( )") }
   public func roundToIntegralTowardPositive() -> Float80 { fatalError("TODO: nead ceill( )") }
   public func roundToIntegralTowardNegative() -> Float80 { fatalError("TODO: nead floorl( )") }
-  public static func remainder(left: Float80, _ right: Float80) -> Float80 { fatalError("TODO: nead remainderl( )") }
-  public static func min(left: Float80, _ right: Float80) -> Float80 { fatalError("TODO: nead fminl( )") }
-  public static func max(left: Float80, _ right: Float80) -> Float80 { fatalError("TODO: nead fmaxl( )") }
+  public static func remainder(_ left: Float80, _ right: Float80) -> Float80 { fatalError("TODO: nead remainderl( )") }
+  public static func min(_ left: Float80, _ right: Float80) -> Float80 { fatalError("TODO: nead fminl( )") }
+  public static func max(_ left: Float80, _ right: Float80) -> Float80 { fatalError("TODO: nead fmaxl( )") }
   
   public var isCanonical: Bool {
     if exponentBitPattern == 0 {
@@ -1118,13 +1118,6 @@ public func ==(lhs: FloatingPointClassification, rhs: FloatingPointClassificatio
 //===--- tests ------------------------------------------------------------===//
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var tests = TestSuite("Floating Point")
 

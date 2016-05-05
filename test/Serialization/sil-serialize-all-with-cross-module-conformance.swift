@@ -29,7 +29,7 @@ import ModelModule
 
 struct OtherStruct {}
 
-func test<T: Proto>(x: T) {
+func test<T: Proto>(_ x: T) {
   x.method(OtherStruct())
 }
 

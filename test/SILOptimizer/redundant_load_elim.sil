@@ -1095,3 +1095,36 @@ bb2:
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil hidden @redundant_load_over_intermediate_release_with_epilogue_release : $@convention(thin) (@owned AB) -> () {
+// CHECK: [[AD:%.*]] = ref_element_addr
+// CHECK: [[AD2:%.*]] = load [[AD]]
+// CHECK: release_value
+// CHECK-NOT: [[AD3:%.*]] = load [[AD]]
+// CHECK: return
+sil hidden @redundant_load_over_intermediate_release_with_epilogue_release : $@convention(thin) (@owned AB) -> () {
+bb0(%0 : $AB):
+  %1 = ref_element_addr %0 : $AB, #AB.value
+  %2 = load %1 : $*Int
+  release_value %0 : $AB
+  %3 = load %1 : $*Int
+  release_value %0 : $AB
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil hidden @redundant_load_over_intermediate_release_without_epilogue_release : $@convention(thin) (@owned AB) -> () {
+// CHECK: [[AD:%.*]] = ref_element_addr
+// CHECK: [[AD2:%.*]] = load [[AD]]
+// CHECK: [[AD3:%.*]] = load [[AD]]
+// CHECK: return
+sil hidden @redundant_load_over_intermediate_release_without_epilogue_release : $@convention(thin) (@owned AB) -> () {
+bb0(%0 : $AB):
+  %1 = ref_element_addr %0 : $AB, #AB.value
+  %2 = load %1 : $*Int
+  release_value %0 : $AB
+  %3 = load %1 : $*Int
+  retain_value %0 : $AB
+  %4 = tuple ()
+  return %4 : $()
+}

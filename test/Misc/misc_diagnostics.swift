@@ -38,9 +38,9 @@ func f() -> Bool {
 }
 
 // Test that nested diagnostics are properly surfaced.
-func takesInt(i: Int) {}
+func takesInt(_ i: Int) {}
 func noParams() -> Int { return 0 }
-func takesAndReturnsInt(i: Int) -> Int { return 0 }
+func takesAndReturnsInt(_ i: Int) -> Int { return 0 }
 
 takesInt(noParams(1)) // expected-error{{argument passed to call that takes no arguments}}
 
@@ -51,8 +51,7 @@ struct MyArray<Element> {}
 class A {
     var a: MyArray<Int>
     init() {
-        a = MyArray<Int // expected-error{{no '<' candidates produce the expected contextual result type 'MyArray<Int>'}}
-      // expected-note @-1 {{produces result of type 'Bool'}}
+        a = MyArray<Int // expected-error{{'<' produces 'Bool', not the expected contextual result type 'MyArray<Int>'}}
     }
 }
 
@@ -74,8 +73,7 @@ func bad_return2() -> (Int, Int) {
 
 // <rdar://problem/14096697> QoI: Diagnostics for trying to return values from void functions
 func bad_return3(lhs:Int, rhs:Int) {
-  return lhs != 0  // expected-error {{no '!=' candidates produce the expected contextual result type '()'}}
-  // expected-note @-1 {{produces result of type 'Bool'}}
+  return lhs != 0  // expected-error {{'!=' produces 'Bool', not the expected contextual result type '()'}}
 }
 
 class MyBadReturnClass {
@@ -101,14 +99,11 @@ func test17875634() {
   var col = 2
   var coord = (row, col)
 
-  match += (1, 2) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
-  // expected-note @-1 {{overloads for '+=' exist with these partially matching parameter lists:}}
-  
-  match += (row, col) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
-  // expected-note @-1 {{overloads for '+=' exist with these partially matching parameter lists:}}
+  match += (1, 2) // expected-error{{argument type '(Int, Int)' does not conform to expected type 'Sequence'}}
 
-  match += coord // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
-  // expected-note @-1 {{overloads for '+=' exist with these partially matching parameter lists:}}
+  match += (row, col) // expected-error{{argument type '(@lvalue Int, @lvalue Int)' does not conform to expected type 'Sequence'}}
+
+  match += coord // expected-error{{argument type '@lvalue (Int, Int)' does not conform to expected type 'Sequence'}}
 
   match.append(row, col) // expected-error{{extra argument in call}}
 
@@ -119,7 +114,7 @@ func test17875634() {
 
   // Make sure the behavior matches the non-generic case.
   struct FakeNonGenericArray {
-    func append(p: (Int, Int)) {}
+    func append(_ p: (Int, Int)) {}
   }
   let a2 = FakeNonGenericArray()
   a2.append(row, col) // expected-error{{extra argument in call}}
@@ -130,21 +125,21 @@ func test17875634() {
 
 // <rdar://problem/20770032> Pattern matching ranges against tuples crashes the compiler
 func test20770032() {
-  if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}} expected-error{{expression pattern of type 'Range<Int>' cannot match values of type '(Int, Int)'}}
+  if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}} expected-error{{expression pattern of type 'CountableClosedRange<Int>' cannot match values of type '(Int, Int)'}}
   }
 }
 
 
 
-func tuple_splat1(a : Int, _ b : Int) {
+func tuple_splat1(_ a : Int, _ b : Int) {
   let x = (1,2)
-  tuple_splat1(x)          // expected-warning {{passing 2 arguments to a callee as a single tuple value is deprecated}}
+  tuple_splat1(x)          // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
   tuple_splat1(1, 2)       // Ok.
   tuple_splat1((1, 2))     // expected-error {{missing argument for parameter #2 in call}}
 }
 
 // This take a tuple as a value, so it isn't a tuple splat.
-func tuple_splat2(q : (a : Int, b : Int)) {
+func tuple_splat2(_ q : (a : Int, b : Int)) {
   let x = (1,2)
   tuple_splat2(x)          // Ok
   let y = (1, b: 2)

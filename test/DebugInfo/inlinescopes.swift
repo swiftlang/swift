@@ -11,10 +11,10 @@
 
 import FooBar
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 @inline(__always)
-func square(x: Int64) -> Int64 {
+func square(_ x: Int64) -> Int64 {
 // CHECK-DAG: ![[MULSCOPE]] = !DILocation(line: [[@LINE+2]], column: {{.*}}, scope: ![[MUL:.*]], inlinedAt: ![[INLINED:.*]])
 // CHECK-DAG: ![[MUL:.*]] = distinct !DILexicalBlock(
   let res = x * x

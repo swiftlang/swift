@@ -9,7 +9,7 @@ struct XBuffer {
 
 class Q {}
 
-func hexAddr(x: AnyObject) -> Q {
+func hexAddr(_ x: AnyObject) -> Q {
  return Q()
 }
 

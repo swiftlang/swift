@@ -175,7 +175,7 @@ private:
   }
 
   void printDocumentationComment(Decl *D) {
-    llvm::markup::MarkupContext MC;
+    swift::markup::MarkupContext MC;
     auto DC = getDocComment(MC, D);
     if (DC.hasValue())
       ide::getDocumentationCommentAsDoxygen(DC.getValue(), os);
@@ -430,7 +430,7 @@ private:
       // parameter, print it.
       if (errorConvention && i == errorConvention->getErrorParameterIndex()) {
         os << piece << ":(";
-        print(errorConvention->getErrorParameterType(), OTK_None);
+        print(errorConvention->getErrorParameterType(), None);
         os << ")error";
         continue;
       }
@@ -566,16 +566,11 @@ private:
 
     printDocumentationComment(VD);
 
-    if (VD->isStatic()) {
-      // Objective-C doesn't have class properties. Just print the accessors.
-      printAbstractFunctionAsMethod(VD->getGetter(), true);
-      if (auto setter = VD->getSetter())
-        printAbstractFunctionAsMethod(setter, true);
-      return;
-    }
-
     // For now, never promise atomicity.
     os << "@property (nonatomic";
+
+    if (!VD->isInstanceMember())
+      os << ", class";
 
     ASTContext &ctx = M.getASTContext();
     bool isSettable = VD->isSettable(nullptr);
@@ -905,7 +900,7 @@ private:
         = { "CGFloat", false };
 
       // Use typedefs we set up for SIMD vector types.
-#define MAP_SIMD_TYPE(BASENAME, __) \
+#define MAP_SIMD_TYPE(BASENAME, _, __) \
       specialNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "2")}] \
         = { "swift_" #BASENAME "2", false };                        \
       specialNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "3")}] \
@@ -923,25 +918,16 @@ private:
       return false;
 
     os << iter->second.first;
-    if (iter->second.second) {
-      // FIXME: Selectors and pointers should be nullable.
-      printNullability(OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional);
-    }
+    if (iter->second.second)
+      printNullability(optionalKind);
     return true;
   }
-
+  
   void visitType(TypeBase *Ty, Optional<OptionalTypeKind> optionalKind) {
     assert(Ty->getDesugaredType() == Ty && "unhandled sugared type");
     os << "/* ";
     Ty->print(os);
     os << " */";
-  }
-
-  bool isClangObjectPointerType(const clang::TypeDecl *clangTypeDecl) const {
-    ASTContext &ctx = M.getASTContext();
-    auto &clangASTContext = ctx.getClangModuleLoader()->getClangASTContext();
-    clang::QualType clangTy = clangASTContext.getTypeDeclType(clangTypeDecl);
-    return clangTy->isObjCRetainableType();
   }
 
   bool isClangPointerType(const clang::TypeDecl *clangTypeDecl) const {
@@ -963,13 +949,9 @@ private:
       auto *clangTypeDecl = cast<clang::TypeDecl>(alias->getClangDecl());
       os << clangTypeDecl->getName();
 
-      // Print proper nullability for CF types, but _Null_unspecified for
-      // all other non-object Clang pointer types.
       if (aliasTy->hasReferenceSemantics() ||
-          isClangObjectPointerType(clangTypeDecl)) {
+          isClangPointerType(clangTypeDecl)) {
         printNullability(optionalKind);
-      } else if (isClangPointerType(clangTypeDecl)) {
-        printNullability(OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional);
       }
       return;
     }
@@ -1074,8 +1056,7 @@ private:
     if (isConst)
       os << " const";
     os << " *";
-    // FIXME: Pointer types should be nullable.
-    printNullability(OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional);
+    printNullability(optionalKind);
     return true;
   }
 
@@ -1090,6 +1071,34 @@ private:
       return;
 
     visitBoundGenericType(BGT, optionalKind);
+  }
+  
+  void visitBoundGenericClassType(BoundGenericClassType *BGT,
+                                  Optional<OptionalTypeKind> optionalKind) {
+    // Only handle imported ObjC generics.
+    auto CD = BGT->getClassOrBoundGenericClass();
+    if (!CD->isObjC())
+      return visitType(BGT, optionalKind);
+    
+    assert(CD->getClangDecl() && "objc generic class w/o clang node?!");
+    auto clangDecl = cast<clang::NamedDecl>(CD->getClangDecl());
+    if (isa<clang::ObjCInterfaceDecl>(clangDecl)) {
+      os << clangDecl->getName();
+    } else {
+      maybePrintTagKeyword(CD);
+      os << clangDecl->getName();
+    }
+    os << '<';
+    print(BGT->getGenericArgs()[0], None);
+    for (auto arg : BGT->getGenericArgs().slice(1)) {
+      os << ", ";
+      print(arg, None);
+    }
+    os << '>';
+    if (isa<clang::ObjCInterfaceDecl>(clangDecl)) {
+      os << " *";
+    }
+    printNullability(optionalKind);
   }
 
   void visitBoundGenericType(BoundGenericType *BGT,
@@ -1724,12 +1733,12 @@ public:
            "typedef uint_least16_t char16_t;\n"
            "typedef uint_least32_t char32_t;\n"
            "# endif\n"
-#define MAP_SIMD_TYPE(C_TYPE, _) \
-           "typedef " #C_TYPE " swift_" #C_TYPE "2"       \
+#define MAP_SIMD_TYPE(C_TYPE, SCALAR_TYPE, _) \
+           "typedef " #SCALAR_TYPE " swift_" #C_TYPE "2"       \
            "  __attribute__((__ext_vector_type__(2)));\n" \
-           "typedef " #C_TYPE " swift_" #C_TYPE "3"       \
+           "typedef " #SCALAR_TYPE " swift_" #C_TYPE "3"       \
            "  __attribute__((__ext_vector_type__(3)));\n" \
-           "typedef " #C_TYPE " swift_" #C_TYPE "4"       \
+           "typedef " #SCALAR_TYPE " swift_" #C_TYPE "4"       \
            "  __attribute__((__ext_vector_type__(4)));\n"
 #include "swift/ClangImporter/SIMDMappedTypes.def"
            "#endif\n"

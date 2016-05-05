@@ -22,9 +22,9 @@ import SwiftShims
 /// Standard input is interpreted as `UTF-8`.  Invalid bytes
 /// will be replaced by Unicode [replacement characters](http://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character).
 @warn_unused_result
-public func readLine(strippingNewline strippingNewline: Bool = true) -> String? {
-  var linePtr: UnsafeMutablePointer<CChar> = nil
-  var readBytes = swift_stdlib_readLine_stdin(&linePtr)
+public func readLine(strippingNewline: Bool = true) -> String? {
+  var linePtrVar: UnsafeMutablePointer<CChar>? = nil
+  var readBytes = swift_stdlib_readLine_stdin(&linePtrVar)
   if readBytes == -1 {
     return nil
   }
@@ -33,6 +33,8 @@ public func readLine(strippingNewline strippingNewline: Bool = true) -> String? 
   if readBytes == 0 {
     return ""
   }
+
+  let linePtr = linePtrVar!
   if strippingNewline {
     // FIXME: Unicode conformance.  To fix this, we need to reimplement the
     // code we call above to get a line, since it will only stop on LF.
@@ -40,8 +42,8 @@ public func readLine(strippingNewline strippingNewline: Bool = true) -> String? 
     // <rdar://problem/20013999> Recognize Unicode newlines in readLine()
     //
     // Recognize only LF and CR+LF combinations for now.
-    let cr = CChar(_ascii8("\r"))
-    let lf = CChar(_ascii8("\n"))
+    let cr = CChar(UInt8(ascii: "\r"))
+    let lf = CChar(UInt8(ascii: "\n"))
     if readBytes == 1 && linePtr[0] == lf {
       return ""
     }

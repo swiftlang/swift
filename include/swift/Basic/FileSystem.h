@@ -24,6 +24,6 @@ namespace swift {
   /// the file at \p source will still be present at \p source.
   std::error_code moveFileIfDifferent(const llvm::Twine &source,
                                       const llvm::Twine &destination);
-}
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_FILESYSTEM_H

@@ -63,10 +63,11 @@ public:
   StringRef str() const { return Pointer; }
   
   unsigned getLength() const {
+    assert(Pointer != nullptr && "Tried getting length of empty identifier");
     return ::strlen(Pointer);
   }
   
-  bool empty() const { return Pointer == 0; }
+  bool empty() const { return Pointer == nullptr; }
   
   /// isOperator - Return true if this identifier is an operator, false if it is
   /// a normal identifier.
@@ -127,7 +128,9 @@ public:
     return !empty() && isEditorPlaceholder(str());
   }
   
-  void *getAsOpaquePointer() const { return (void *)Pointer; }
+  const void *getAsOpaquePointer() const {
+      return static_cast<const void *>(Pointer);
+  }
   
   static Identifier getFromOpaquePointer(void *P) {
     return Identifier((const char*)P);
@@ -140,7 +143,7 @@ public:
   int compare(Identifier other) const;
 
   bool operator==(Identifier RHS) const { return Pointer == RHS.Pointer; }
-  bool operator!=(Identifier RHS) const { return Pointer != RHS.Pointer; }
+  bool operator!=(Identifier RHS) const { return !(*this==RHS); }
 
   bool operator<(Identifier RHS) const { return Pointer < RHS.Pointer; }
   
@@ -205,7 +208,7 @@ namespace swift {
 class DeclName {
   friend class ASTContext;
 
-  /// Represents a compound
+  /// Represents a compound declaration name.
   struct alignas(Identifier) CompoundDeclName final : llvm::FoldingSetNode,
       private llvm::TrailingObjects<CompoundDeclName, Identifier> {
     friend TrailingObjects;
@@ -364,7 +367,7 @@ public:
   }
 
   friend bool operator!=(DeclName lhs, DeclName rhs) {
-    return lhs.getOpaqueValue() != rhs.getOpaqueValue();
+    return !(lhs == rhs);
   }
 
   friend bool operator<(DeclName lhs, DeclName rhs) {
@@ -385,6 +388,12 @@ public:
 
   void *getOpaqueValue() const { return SimpleOrCompound.getOpaqueValue(); }
   static DeclName getFromOpaqueValue(void *p) { return DeclName(p); }
+
+  /// Get a string representation of the name,
+  ///
+  /// \param scratch Scratch space to use.
+  StringRef getString(llvm::SmallVectorImpl<char> &scratch,
+                      bool skipEmptyArgumentNames = false) const;
 
   /// Print the representation of this declaration name to the given
   /// stream.
@@ -478,7 +487,7 @@ public:
   }
 
   friend bool operator!=(ObjCSelector lhs, ObjCSelector rhs) {
-    return lhs.getOpaqueValue() != rhs.getOpaqueValue();
+    return !(lhs == rhs);
   }
 
   friend bool operator<(ObjCSelector lhs, ObjCSelector rhs) {

@@ -29,13 +29,14 @@ grapheme_cluster_break_property_table = \
 
 import SwiftPrivate
 import StdlibUnittest
+import StdlibCollectionUnittest
 import Darwin
 import Foundation
 
 var graphemeBreakPropertyTable = [
 // 'as Int' annotations are needed to help prevent the type-checker from
 // blowing the stack. <rdar://problem/17539704>
-% for start_code_point,end_code_point,value in grapheme_cluster_break_property_table.property_value_ranges:
+% for start_code_point, end_code_point, value in grapheme_cluster_break_property_table.property_value_ranges:
   (${start_code_point} as Int, ${end_code_point} as Int, _GraphemeClusterBreakPropertyValue.${value}),
 % end
 ]
@@ -93,7 +94,7 @@ class NonContiguousNSString : NSString {
 
   convenience init(_ scalars: [UInt32]) {
     var encoded: [UInt16] = []
-    var iter = scalars.makeIterator()
+    let iter = scalars.makeIterator()
     let output: (UInt16) -> Void = { encoded.append($0) }
     let hadError = transcode(
       iter,
@@ -106,8 +107,7 @@ class NonContiguousNSString : NSString {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone) -> AnyObject {
-
+  override func copy(with zone: NSZone?) -> AnyObject {
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self
@@ -127,14 +127,14 @@ class NonContiguousNSString : NSString {
 /// Verify that extended grapheme cluster boundaries in `subject` occur at
 /// positions specified in `expectedBoundaries`.
 func checkGraphemeClusterSegmentation(
-    expectedBoundaries: [Int], _ subject: String, _ stackTrace: SourceLocStack
+    _ expectedBoundaries: [Int], _ subject: String, _ stackTrace: SourceLocStack
 ) {
   var actualBoundaries: [Int] = [ 0 ]
   var unicodeScalarCount = 0
   for c in subject.characters {
     let currentClusterSize = String(c).unicodeScalars.count
     unicodeScalarCount += currentClusterSize
-    actualBoundaries += [ unicodeScalarCount ]
+    actualBoundaries += [unicodeScalarCount]
   }
   expectEqual(
     expectedBoundaries, actualBoundaries,
@@ -146,7 +146,7 @@ func checkGraphemeClusterSegmentation(
 }
 
 func checkGraphemeClusterSegmentation(
-    expectedBoundaries: [Int], scalars: [UInt32], _ stackTrace: SourceLocStack
+    _ expectedBoundaries: [Int], scalars: [UInt32], _ stackTrace: SourceLocStack
 ) {
   let subject = NonContiguousNSString(scalars) as String
   checkGraphemeClusterSegmentation(expectedBoundaries, subject,
@@ -154,7 +154,7 @@ func checkGraphemeClusterSegmentation(
 }
 
 func checkGraphemeClusterSegmentation(
-    expectedBoundaries: [Int], codeUnits: [UInt16], _ stackTrace: SourceLocStack
+    _ expectedBoundaries: [Int], codeUnits: [UInt16], _ stackTrace: SourceLocStack
 ) {
   let subject = NonContiguousNSString(codeUnits) as String
   checkGraphemeClusterSegmentation(expectedBoundaries, subject,
@@ -165,12 +165,12 @@ UnicodeTrie.test("GraphemeClusterSegmentation/UnicodeSpec") {
   // Test segmentation algorithm using test data from the Unicode
   // specification.
 
-% for code_points,expected_boundaries in grapheme_cluster_break_tests:
+% for code_points, expected_boundaries in grapheme_cluster_break_tests:
   do {
     let scalars: [UInt32] =
-        [ ${", ".join([ str(cp) for cp in code_points ])} ]
+        [ ${", ".join([str(cp) for cp in code_points])} ]
     let expectedBoundaries: [Int] =
-        [ ${", ".join([ str(x) for x in expected_boundaries ])} ]
+        [ ${", ".join([str(x) for x in expected_boundaries])} ]
     checkGraphemeClusterSegmentation(expectedBoundaries, scalars: scalars,
         SourceLocStack().withCurrentLoc())
   }

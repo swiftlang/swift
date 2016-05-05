@@ -7,12 +7,12 @@
 :Authors: John McCall
 
 I propose some elementary semantics and limitations when exposing
-Swift code to Objective C and vice-versa.
+Swift code to Objective-C and vice-versa.
 
 Dynamism in Objective-C
 =======================
 
-Objective C intentionally defines its semantics almost entirely around
+Objective-C intentionally defines its semantics almost entirely around
 its implementation model.  The implementation supports two basic
 operations that you can perform on any object:
 
@@ -142,13 +142,13 @@ Method devirtualization [2]_ is likely to be a critically important
 optimization in Swift.
 
 .. [2] In contrast to generic or existential devirtualization, which
-       are also important, but which aren't affected by the Objective C
+       are also important, but which aren't affected by the Objective-C
        interoperation model.
 
 A Missing Optimization
 ----------------------
 
-For one, it is an important missing optimization even in Objective C.
+For one, it is an important missing optimization even in Objective-C.
 Any program that tries to separate its concerns will usually introduce
 some extra abstraction in its formal model.  For example:
 
@@ -165,7 +165,7 @@ some extra abstraction in its formal model.  For example:
 
 In each of the examples, the user has made a totally reasonable
 decision about code organization and reserved flexibility, and
-Objective C proceeds to introduce unnecessary runtime costs which
+Objective-C proceeds to introduce unnecessary runtime costs which
 might force a performance-sensitive programmer to choose a different
 path.
 
@@ -173,7 +173,7 @@ Swift-Specific Concerns
 -----------------------
 
 The lack of devirtualization would hit Swift much harder because of
-its property model.  With a synthesized property, Objective C provides
+its property model.  With a synthesized property, Objective-C provides
 a way to either call the getter/setter (with dot syntax) or directly
 access the underlying ivar (with arrow syntax).  By design, Swift
 hides that difference, and the abstract language model is that all
@@ -195,9 +195,9 @@ for now) and determine whether we can access the property directly.
 But for properties of a class type, polymorphism requires us to
 defensively handle the possibility that a subclass might add arbitrary
 logic to either the getter or setter.  If our implementation model
-is as unrestricted as Objective C's, that's a serious problem.
+is as unrestricted as Objective-C's, that's a serious problem.
 
-I think that this is such a massive regression from Objective C that
+I think that this is such a massive regression from Objective-C that
 we have to address it.
 
 Requirements for Devirtualization
@@ -211,13 +211,13 @@ add and replace method implementations.
 Restricting Method Replacement
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-There are two supported ways to add or replace methods in Objective C.
+There are two supported ways to add or replace methods in Objective-C.
 
 The first is via the runtime API.  If we do have to support doing this
 to replace Swift methods --- and we should try to avoid that --- then
 I think restricting it to require a ``@dynamic`` annotation on the
 replaceable method (or its lexical context) is reasonable.  We should
-try to get the Objective C runtime to complain about attempts to
+try to get the Objective-C runtime to complain about attempts to
 replace non-dynamic methods.
 
 The second is via categories.  It's generally understood that a
@@ -289,7 +289,7 @@ We can reason forward from the point of allocation.
 Access Control
 --------------
 
-Swift does give us one big tool for devirtualization that Objective C
+Swift does give us one big tool for devirtualization that Objective-C
 lacks: access control.  In Swift, access control determines
 visibility, and it doesn't make sense to override something that you
 can't see.  Therefore:
@@ -309,13 +309,13 @@ can't see.  Therefore:
 This means that a private stored property can always be
 "devirtualized" into a direct access [4]_.  Unfortunately, ``private``
 is not the default access control: module-private is.  And if the
-current module can contain Objective C code, then even that raises the
+current module can contain Objective-C code, then even that raises the
 question of what ObjC interop actually means.
 
 .. [4] Assuming we don't introduce a supported way of dynamically
        replacing the implementation of a private Swift method!
 
-Using Swift Classes from Objective C
+Using Swift Classes from Objective-C
 ====================================
 
 
@@ -331,7 +331,7 @@ For another example, code
 class might access 
 
 In both cases, t makes sense to organize the code that way,
-but Objective C punishes the performance of that code in order to
+but Objective-C punishes the performance of that code in order to
 reserve the language's 
 
 

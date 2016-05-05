@@ -21,7 +21,8 @@ ARCHIVE="${TOOLCHAIN_VERSION}-osx.tar.gz"
 SYM_ARCHIVE="${TOOLCHAIN_VERSION}-osx-symbols.tar.gz"
 BUNDLE_PREFIX=${1:?Please specify bundle prefix e.g. $0 local.swift}
 BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.${YEAR}${MONTH}${DAY}"
-DISPLAY_NAME="Local Swift Development Snapshot ${YEAR}-${MONTH}-${DAY}"
+DISPLAY_NAME_SHORT="Local Swift Development Snapshot"
+DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
 TOOLCHAIN_NAME="${TOOLCHAIN_VERSION}"
 
 SWIFT_INSTALLABLE_PACKAGE="${SRC_DIR}/${ARCHIVE}"
@@ -44,6 +45,7 @@ fi
         symbols_package="${SYMBOLS_PACKAGE}" \
         darwin_toolchain_bundle_identifier="${BUNDLE_IDENTIFIER}" \
         darwin_toolchain_display_name="${DISPLAY_NAME}" \
+        darwin_toolchain_display_name_short="${DISPLAY_NAME_SHORT}" \
         darwin_toolchain_xctoolchain_name="${TOOLCHAIN_NAME}" \
         darwin_toolchain_version="${TOOLCHAIN_VERSION}" \
         darwin_toolchain_alias="Local"

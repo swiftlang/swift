@@ -23,6 +23,7 @@ public typealias Boolean = Swift.Boolean
 /// On 64-bit iOS, the Objective-C BOOL type is a typedef of C/C++
 /// bool. Elsewhere, it is "signed char". The Clang importer imports it as
 /// ObjCBool.
+@_fixed_layout
 public struct ObjCBool : Boolean, BooleanLiteralConvertible {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
   // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
@@ -79,13 +80,13 @@ extension ObjCBool : CustomStringConvertible {
 
 @warn_unused_result
 public // COMPILER_INTRINSIC
-func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
+func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool {
   return ObjCBool(x)
 }
 
 @warn_unused_result
 public // COMPILER_INTRINSIC
-func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
+func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
   return Bool(x)
 }
 
@@ -96,7 +97,8 @@ func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
 /// convert between C strings and selectors.
 ///
 /// The compiler has special knowledge of this type.
-public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
+@_fixed_layout
+public struct Selector : StringLiteralConvertible {
   var ptr : OpaquePointer
 
   /// Create a selector from a string.
@@ -119,12 +121,6 @@ public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
   /// Create an instance initialized to `value`.
   public init(stringLiteral value: String) {
     self = sel_registerName(value)
-  }
-
-  /// Create an instance initialized with `nil`.
-  @_transparent
-  public init(nilLiteral: ()) {
-    ptr = nil
   }
 }
 
@@ -153,7 +149,7 @@ extension Selector : CustomStringConvertible {
     if name == nil {
       return "<NULL>"
     }
-    return String(cString: name)
+    return String(cString: name!)
   }
 }
 
@@ -176,16 +172,9 @@ extension Selector : CustomReflectable {
 // NSZone
 //===----------------------------------------------------------------------===//
 
-public struct NSZone : NilLiteralConvertible {
+@_fixed_layout
+public struct NSZone {
   var pointer : OpaquePointer
-
-  public init() { pointer = nil }
-
-  /// Create an instance initialized with `nil`.
-  @_transparent
-  public init(nilLiteral: ()) {
-    pointer = nil
-  }
 }
 
 // Note: NSZone becomes Zone in Swift 3.
@@ -196,13 +185,13 @@ typealias Zone = NSZone
 //===----------------------------------------------------------------------===//
 
 @warn_unused_result
-@_silgen_name("objc_autoreleasePoolPush")
+@_silgen_name("_swift_objc_autoreleasePoolPush")
 func __pushAutoreleasePool() -> OpaquePointer
 
-@_silgen_name("objc_autoreleasePoolPop")
-func __popAutoreleasePool(pool: OpaquePointer)
+@_silgen_name("_swift_objc_autoreleasePoolPop")
+func __popAutoreleasePool(_ pool: OpaquePointer)
 
-public func autoreleasepool(@noescape code: () -> Void) {
+public func autoreleasepool(_ code: @noescape () -> Void) {
   let pool = __pushAutoreleasePool()
   code()
   __popAutoreleasePool(pool)
@@ -227,7 +216,7 @@ public var NO: ObjCBool {
 @_transparent
 @warn_unused_result
 public func && <T : Boolean>(
-  lhs: T, @autoclosure rhs: () -> ObjCBool
+  lhs: T, rhs: @autoclosure () -> ObjCBool
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
@@ -235,7 +224,7 @@ public func && <T : Boolean>(
 @_transparent
 @warn_unused_result
 public func || <T : Boolean>(
-  lhs: T, @autoclosure rhs: () -> ObjCBool
+  lhs: T, rhs: @autoclosure () -> ObjCBool
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue
 }

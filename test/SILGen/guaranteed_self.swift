@@ -2,7 +2,7 @@
 
 protocol Fooable {
   init()
-  func foo(x: Int)
+  func foo(_ x: Int)
   mutating func bar()
   mutating func bas()
 
@@ -13,7 +13,7 @@ protocol Fooable {
 
 protocol Barrable: class {
   init()
-  func foo(x: Int)
+  func foo(_ x: Int)
   func bar()
   func bas()
 
@@ -25,18 +25,18 @@ protocol Barrable: class {
 struct S: Fooable {
   var x: C? // Make the type nontrivial, so +0/+1 is observable.
 
-  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1SC{{.*}} : $@convention(thin) (@thin S.Type) -> @owned S
+  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1SC{{.*}} : $@convention(method) (@thin S.Type) -> @owned S
   init() {}
   // TODO: Way too many redundant r/r pairs here. Should use +0 rvalues.
   // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1S3foo{{.*}} : $@convention(method) (Int, @guaranteed S) -> () {
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $S):
   // CHECK-NOT:     retain_value [[SELF]]
   // CHECK-NOT:     release_value [[SELF]]
-  func foo(x: Int) {
+  func foo(_ x: Int) {
     self.foo(x)
   }
 
-  func foooo(x: (Int, Bool)) {
+  func foooo(_ x: (Int, Bool)) {
     self.foooo(x)
   }
 
@@ -211,7 +211,7 @@ struct AO<T>: Fooable {
   // CHECK:         apply {{.*}} [[SELF_ADDR]]
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
   // CHECK:       }
-  func foo(x: Int) {
+  func foo(_ x: Int) {
     self.foo(x)
   }
   mutating func bar() {
@@ -270,7 +270,7 @@ struct AO<T>: Fooable {
 
 class C: Fooable, Barrable {
   // Allocating initializer
-  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1CC{{.*}} : $@convention(thin) (@thick C.Type) -> @owned C
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1CC{{.*}} : $@convention(method) (@thick C.Type) -> @owned C
   // CHECK:         [[SELF1:%.*]] = alloc_ref $C
   // CHECK-NOT:     [[SELF1]]
   // CHECK:         [[SELF2:%.*]] = apply {{.*}}([[SELF1]])
@@ -308,7 +308,7 @@ class C: Fooable, Barrable {
   // CHECK:         apply {{.*}} [[SELF]]
   // CHECK:         release{{.*}} [[SELF]]
   // CHECK-NOT:     release{{.*}} [[SELF]]
-  @objc func foo(x: Int) {
+  @objc func foo(_ x: Int) {
     self.foo(x)
   }
   @objc func bar() {
@@ -345,7 +345,7 @@ class C: Fooable, Barrable {
 }
 
 class D: C {
-  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1DC{{.*}} : $@convention(thin) (@thick D.Type) -> @owned D
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1DC{{.*}} : $@convention(method) (@thick D.Type) -> @owned D
   // CHECK:         [[SELF1:%.*]] = alloc_ref $D
   // CHECK-NOT:     [[SELF1]]
   // CHECK:         [[SELF2:%.*]] = apply {{.*}}([[SELF1]])
@@ -379,22 +379,22 @@ class D: C {
     super.init()
   }
 
-  // CHECK-LABEL: sil shared [transparent] @_TTDFC15guaranteed_self1D3foo{{.*}} : $@convention(method) (Int, @guaranteed D) -> ()
+  // CHECK-LABEL: sil shared [transparent] [thunk] @_TTDFC15guaranteed_self1D3foo{{.*}} : $@convention(method) (Int, @guaranteed D) -> ()
   // CHECK:       bb0({{.*}} [[SELF:%.*]]):
   // CHECK:         retain{{.*}} [[SELF]]
   // CHECK:         release{{.*}} [[SELF]]
   // CHECK-NOT:     release{{.*}} [[SELF]]
   // CHECK:       }
-  dynamic override func foo(x: Int) {
+  dynamic override func foo(_ x: Int) {
     self.foo(x)
   }
 }
 
-func S_curryThunk(s: S) -> (S -> Int -> ()/*, Int -> ()*/) {
+func S_curryThunk(_ s: S) -> (S -> Int -> ()/*, Int -> ()*/) {
   return (S.foo /*, s.foo*/)
 }
 
-func AO_curryThunk<T>(ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
+func AO_curryThunk<T>(_ ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
   return (AO.foo /*, ao.foo*/)
 }
 
@@ -459,7 +459,7 @@ class Kraken {
   func enrage() {}
 }
 
-func destroyShip(k: Kraken) {}
+func destroyShip(_ k: Kraken) {}
 
 class LetFieldClass {
   let letk = Kraken()
@@ -549,7 +549,7 @@ class ClassIntTreeNode {
   // CHECK-NOT: strong_retain
   // CHECK-NOT: strong_release
   // CHECK: return
-  func find(v : Int) -> ClassIntTreeNode {
+  func find(_ v : Int) -> ClassIntTreeNode {
     if v == value { return self }
     if v < value { return left.find(v) }
     return right.find(v)

@@ -31,10 +31,10 @@ integerBinaryOps = [
 /// be satisfied by types conforming to that protocol.
 @_show_in_interface
 public protocol _IntegerArithmetic {
-% for name,_,Action,result in integerBinaryOps:
+% for name, _, Action, result in integerBinaryOps:
   /// ${Action} `lhs` and `rhs`, returning ${result} and a `Bool` that is
   /// `true` iff the operation caused an arithmetic overflow.
-  static func ${name}WithOverflow(lhs: Self, _ rhs: Self) -> (Self, overflow: Bool)
+  static func ${name}WithOverflow(_ lhs: Self, _ rhs: Self) -> (Self, overflow: Bool)
 % end
 }
 
@@ -42,7 +42,7 @@ public protocol _IntegerArithmetic {
 public protocol IntegerArithmetic : _IntegerArithmetic, Comparable {
   // Checked arithmetic functions.  Specific implementations in
   // FixedPoint.swift.gyb support static checking for integer types.
-% for name,op,Action,result in integerBinaryOps:
+% for name, op, Action, result in integerBinaryOps:
   /// ${Action} `lhs` and `rhs`, returning ${result} and trapping in case of
   /// arithmetic overflow (except in -Ounchecked builds).
   @warn_unused_result
@@ -55,7 +55,7 @@ public protocol IntegerArithmetic : _IntegerArithmetic, Comparable {
   func toIntMax() -> IntMax
 }
 
-% for name,op,Action,result in integerBinaryOps:
+% for name, op, Action, result in integerBinaryOps:
 /// ${Action} `lhs` and `rhs`, returning ${result} and trapping in case of
 /// arithmetic overflow (except in -Ounchecked builds).
 @_transparent
@@ -124,7 +124,9 @@ public prefix func + <T : SignedNumber>(x: T) -> T {
 
 //===--- abs(x) -----------------------------------------------------------===//
 public struct _Abs {}
-internal func _abs<Args>(args: Args) -> (_Abs, Args) {
+
+@_versioned
+internal func _abs<Args>(_ args: Args) -> (_Abs, Args) {
   return (_Abs(), args)
 }
 
@@ -139,7 +141,7 @@ public func ~> <T : SignedNumber>(x:T,_:(_Abs, ())) -> T {
 public protocol AbsoluteValuable : SignedNumber {
   /// Returns the absolute value of `x`.
   @warn_unused_result
-  static func abs(x: Self) -> Self
+  static func abs(_ x: Self) -> Self
 }
 
 // Do not use this operator directly; call abs(x) instead
@@ -153,7 +155,7 @@ public func ~> <T : AbsoluteValuable>(x:T,_:(_Abs, ())) -> T {
 /// Concrete instances of `SignedNumber` can specialize this
 /// function by conforming to `AbsoluteValuable`.
 @_transparent
-public func abs<T : SignedNumber>(x: T) -> T {
+public func abs<T : SignedNumber>(_ x: T) -> T {
   return x~>_abs()
 }
 

@@ -43,13 +43,29 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   auto extInfo = SILFunctionType::ExtInfo(
                                         SILFunctionType::Representation::Thick,
                                         /*noreturn*/ FTI->isNoReturn());
-  
+
+  // If the original method has an @unowned_inner_pointer return, the partial
+  // application thunk will lifetime-extend 'self' for us, converting the
+  // return value to @unowned.
+  //
+  // If the original method has an @autoreleased return, the partial application
+  // thunk will retain it for us, converting the return value to @owned.
+  SmallVector<SILResultInfo, 4> results;
+  results.append(FTI->getAllResults().begin(), FTI->getAllResults().end());
+  for (auto &result : results) {
+    if (result.getConvention() == ResultConvention::UnownedInnerPointer)
+      result = SILResultInfo(result.getType(), ResultConvention::Unowned);
+    else if (result.getConvention() == ResultConvention::Autoreleased)
+      result = SILResultInfo(result.getType(), ResultConvention::Owned);
+  }
+
   auto appliedFnType = SILFunctionType::get(nullptr, extInfo,
                                             ParameterConvention::Direct_Owned,
                                             newParams,
-                                            FTI->getAllResults(),
+                                            results,
                                             FTI->getOptionalErrorResult(),
                                             M.getASTContext());
+
   return SILType::getPrimitiveObjectType(appliedFnType);
 }
 
@@ -229,7 +245,7 @@ SILBuilder::emitStrongRelease(SILLocation Loc, SILValue Operand) {
   }
 
   // If we didn't find a retain to fold this into, emit the release.
-  return createStrongRelease(Loc, Operand);
+  return createStrongRelease(Loc, Operand, Atomicity::Atomic);
 }
 
 /// Emit a release_value instruction at the current location, attempting to
@@ -256,7 +272,7 @@ SILBuilder::emitReleaseValue(SILLocation Loc, SILValue Operand) {
   }
 
   // If we didn't find a retain to fold this into, emit the release.
-  return createReleaseValue(Loc, Operand);
+  return createReleaseValue(Loc, Operand, Atomicity::Atomic);
 }
 
 

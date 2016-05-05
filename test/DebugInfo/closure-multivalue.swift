@@ -14,14 +14,14 @@ import StdlibUnittest
 // CHECK-DAG: ![[P1]] = !DIExpression(DW_OP_bit_piece, 0, {{(32|64)}})
 // CHECK-DAG: ![[P2]] = !DIExpression(DW_OP_bit_piece, {{(32, 32|64, 64)}})
 // CHECK-DAG: ![[P3]] = !DIExpression(DW_OP_bit_piece, {{(64, 32|128, 64)}})
-public func sort(a: String, b: String) -> Bool {
+public func sort(_ a: String, b: String) -> Bool {
   _blackHole("Sorting..\(a) & \(b)")
   return (a < b)
 }
 
 public func demo() {
-    var names = ["Sean", "Barry", "Kate"]
-    var sortedNames = names.sorted(isOrderedBefore: sort)
+    let names = ["Sean", "Barry", "Kate"]
+    let sortedNames = names.sorted(isOrderedBefore: sort)
     var sortedNamesAsString : String = String()
     for name in sortedNames {
         sortedNamesAsString += ("\(name), ")

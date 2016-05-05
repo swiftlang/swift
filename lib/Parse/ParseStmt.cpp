@@ -295,7 +295,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         && Tok.isNot(tok::pound_if, tok::pound_setline,
                      tok::pound_sourceLocation)) {
       ParserStatus Status =
-          parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default);
+          parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
+                    [&](Decl *D) {TmpDecls.push_back(D);});
       if (Status.isError()) {
         NeedParseErrorRecovery = true;
         if (Status.hasCodeCompletion() && IsTopLevel &&
@@ -1734,7 +1735,7 @@ Parser::evaluateConditionalCompilationExpr(Expr *condition) {
                  "string literal");
         return ConditionalCompilationExprState::error();
       }
-    } else if(fnName.equals("swift")) {
+    } else if (fnName.equals("swift")) {
       auto PUE = dyn_cast<PrefixUnaryExpr>(PE->getSubExpr());
       if (!PUE) {
         diagnose(PE->getSubExpr()->getLoc(),
@@ -1948,8 +1949,6 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
   ParserResult<BraceStmt> body =
       parseBraceItemList(diag::expected_lbrace_after_repeat);
   status |= body;
-  if (status.hasCodeCompletion())
-    return makeParserResult<Stmt>(status, nullptr);
   if (body.isNull())
     body = makeParserResult(
         body, BraceStmt::create(Context, repeatLoc, {}, PreviousLoc, true));
@@ -1971,7 +1970,7 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
     condition = parseExpr(diag::expected_expr_repeat_while);
     status |= condition;
     if (condition.isNull()) {
-      return makeParserResult<Stmt>(status, nullptr); // FIXME: better recovery
+      condition = makeParserErrorResult(new (Context) ErrorExpr(whileLoc));
     }
   }
 

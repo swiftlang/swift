@@ -17,8 +17,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __SWIFT_FALLTHROUGH_H__
-#define __SWIFT_FALLTHROUGH_H__
+#ifndef SWIFT_BASIC_FALLTHROUGH_H
+#define SWIFT_BASIC_FALLTHROUGH_H
 
 #ifndef __has_attribute
 # define __has_attribute(x) 0
@@ -36,4 +36,4 @@
 # define SWIFT_FALLTHROUGH
 #endif
 
-#endif
+#endif // SWIFT_BASIC_FALLTHROUGH_H

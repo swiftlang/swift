@@ -53,8 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-/// describe what change you made.
-const uint16_t VERSION_MINOR = 241; // Last change: set_deallocating instruction
+const uint16_t VERSION_MINOR = 248; // Last change: [nonatomic] attribute
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -416,6 +415,7 @@ namespace control_block {
     METADATA, // ID
     BCFixed<16>, // Module format major version
     BCFixed<16>, // Module format minor version
+    BCVBR<8>, // length of "short version string" in the blob
     BCBlob // misc. version information
   >;
 
@@ -442,7 +442,7 @@ namespace options_block {
     XCC,
     IS_SIB,
     IS_TESTABLE,
-    IS_RESILIENT
+    RESILIENCE_STRATEGY
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -464,8 +464,9 @@ namespace options_block {
     IS_TESTABLE
   >;
 
-  using IsResilientLayout = BCRecordLayout<
-    IS_RESILIENT
+  using ResilienceStrategyLayout = BCRecordLayout<
+    RESILIENCE_STRATEGY,
+    BCFixed<2>
   >;
 }
 
@@ -832,7 +833,15 @@ namespace decls_block {
     AccessibilityKindField, // accessibility
     BCVBR<4>,               // number of protocols
     BCArray<DeclIDField>    // protocols and inherited types
-    // Trailed by the generic parameters (if any) and the members record
+    // Trailed by the generic parameters (if any), the members record, and
+    // the default witness table record
+  >;
+
+  /// A default witness table for a protocol.
+  using DefaultWitnessTableLayout = BCRecordLayout<
+    DEFAULT_WITNESS_TABLE,
+    BCArray<DeclIDField>
+    // An array of requirement / witness pairs
   >;
 
   using ConstructorLayout = BCRecordLayout<
@@ -1135,10 +1144,8 @@ namespace decls_block {
     BCVBR<5>, // value mapping count
     BCVBR<5>, // type mapping count
     BCVBR<5>, // inherited conformances count
-    BCVBR<5>, // defaulted definitions count
     BCArray<DeclIDField>
-    // The array contains archetype-value pairs,
-    // then type declarations, then defaulted definitions.
+    // The array contains archetype-value pairs, then type declarations.
     // Inherited conformances follow, then the substitution records for the
     // associated types.
   >;
@@ -1372,6 +1379,11 @@ namespace decls_block {
     BCVBR<6>,  // index at the end of the message,
     BCBlob     // blob contains the message and mutating-version
                // strings, separated by the prior index
+  >;
+
+  using SpecializeDeclAttrLayout = BCRecordLayout<
+    Specialize_DECL_ATTR,
+    BCArray<TypeIDField> // concrete types
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) \

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func takeClosure(fn: () -> Int) {}
+func takeClosure(_ fn: () -> Int) {}
 
 class C {
   func f() -> Int { return 42 }
@@ -37,7 +37,7 @@ _ = AddressOnly(x: C(), p: X())
 // CHECK: }
 
 // CHECK-LABEL:    sil hidden @_TF7unowned5test0FT1cCS_1C_T_ : $@convention(thin) (@owned C) -> () {
-func test0(let c c: C) {
+func test0(c c: C) {
 // CHECK:    bb0(%0 : $C):
 
   var a: A
@@ -92,7 +92,7 @@ func unowned_local() -> C {
 }
 
 // <rdar://problem/16877510> capturing an unowned let crashes in silgen
-func test_unowned_let_capture(aC : C) {
+func test_unowned_let_capture(_ aC : C) {
   unowned let bC = aC
   takeClosure { bC.f() }
 }
@@ -133,5 +133,5 @@ class TestUnownedMember {
 struct Unowned<T: AnyObject> {
   unowned var object: T
 }
-func takesUnownedStruct(z: Unowned<C>) {}
+func takesUnownedStruct(_ z: Unowned<C>) {}
 // CHECK-LABEL: sil hidden @_TF7unowned18takesUnownedStructFGVS_7UnownedCS_1C_T_ : $@convention(thin) (@owned Unowned<C>) -> ()

@@ -275,7 +275,8 @@ struct ArgumentInitHelper {
 
       // Set up a cleanup to write back to the inout.
       gen.Cleanups.pushCleanup<CleanupWriteBackToInOut>(vd, address);
-    } else if (vd->isLet()) {
+    } else {
+      assert(vd->isLet() && "expected parameter to be immutable!");
       // If the variable is immutable, we can bind the value as is.
       // Leave the cleanup on the argument, if any, in place to consume the
       // argument if we're responsible for it.
@@ -284,20 +285,6 @@ struct ArgumentInitHelper {
         gen.B.createDebugValueAddr(loc, argrv.getValue(), {vd->isLet(), ArgNo});
       else
         gen.B.createDebugValue(loc, argrv.getValue(), {vd->isLet(), ArgNo});
-    } else {
-      // If the variable is mutable, we need to copy or move the argument
-      // value to local mutable memory.
-
-      auto initVar = gen.emitLocalVariableWithCleanup(vd, false, ArgNo);
-
-      // If we have a cleanup on the value, we can move it into the variable.
-      if (argrv.hasCleanup())
-        argrv.forwardInto(gen, loc, initVar->getAddress());
-      // Otherwise, we need an independently-owned copy.
-      else
-        argrv.copyInto(gen, initVar->getAddress(), loc);
-
-      initVar->finishInitialization(gen);
     }
   }
 
@@ -307,8 +294,32 @@ struct ArgumentInitHelper {
       makeArgumentIntoBinding(PD->getType(), &*f.begin(), PD);
       return;
     }
-    
-    ManagedValue argrv = makeArgument(PD->getType(), &*f.begin(), PD);
+
+    emitAnonymousParam(PD->getType(), PD, PD);
+  }
+
+  void emitAnonymousParam(Type type, SILLocation paramLoc, ParamDecl *PD) {
+    assert(!PD || PD->getType()->isEqual(type));
+
+    // Allow non-materializable tuples to be bound to anonymous parameters.
+    if (!type->isMaterializable()) {
+      if (auto tupleType = type->getAs<TupleType>()) {
+        for (auto eltType : tupleType->getElementTypes()) {
+          emitAnonymousParam(eltType, paramLoc, nullptr);
+        }
+        return;
+      }
+    }
+
+    // A value bound to _ is unused and can be immediately released.
+    Scope discardScope(gen.Cleanups, CleanupLocation(PD));
+
+    // Manage the parameter.
+    ManagedValue argrv = makeArgument(type, &*f.begin(), paramLoc);
+
+    // Don't do anything else if we don't have a parameter.
+    if (!PD) return;
+
     // Emit debug information for the argument.
     SILLocation loc(PD);
     loc.markAsPrologue();
@@ -316,10 +327,6 @@ struct ArgumentInitHelper {
       gen.B.createDebugValueAddr(loc, argrv.getValue(), {PD->isLet(), ArgNo});
     else
       gen.B.createDebugValue(loc, argrv.getValue(), {PD->isLet(), ArgNo});
-
-    // A value bound to _ is unused and can be immediately released.
-    Scope discardScope(gen.Cleanups, CleanupLocation(PD));
-    // Popping the scope destroys the value.
   }
 };
 } // end anonymous namespace

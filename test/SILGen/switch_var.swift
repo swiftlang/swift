@@ -48,7 +48,7 @@ func test_var_1() {
   switch foo() {
   // CHECK:   [[XADDR:%.*]] = alloc_box $Int
   // CHECK:   [[X:%.*]] = project_box [[XADDR]]
-  // CHECK-NOT: br
+  // CHECK-NOT: br bb
   case var x:
   // CHECK:   function_ref @_TF10switch_var1aFT1xSi_T_
   // CHECK:   load [[X]]
@@ -466,7 +466,7 @@ func test_mixed_let_var() {
 func test_multiple_patterns1() {
   // CHECK:   function_ref @_TF10switch_var6foobarFT_TSiSi_
   switch foobar() {
-  // CHECK-NOT: br
+  // CHECK-NOT: br bb
   case (0, let x), (let x, 0):
     // CHECK:   cond_br {{%.*}}, [[FIRST_MATCH_CASE:bb[0-9]+]], [[FIRST_FAIL:bb[0-9]+]]
     // CHECK:   [[FIRST_MATCH_CASE]]:
@@ -495,7 +495,7 @@ func test_multiple_patterns2() {
   // CHECK:   debug_value [[T1:%.*]] :
   // CHECK:   debug_value [[T2:%.*]] :
   switch (0,0) {
-    // CHECK-NOT: br
+    // CHECK-NOT: br bb
   case (_, let x) where x > t1, (let x, _) where x > t2:
     // CHECK:   [[FIRST_X:%.*]] = tuple_extract {{%.*}} : $(Int, Int), 1
     // CHECK:   debug_value [[FIRST_X]] :

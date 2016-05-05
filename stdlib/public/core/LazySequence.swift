@@ -46,8 +46,8 @@
 ///       ///
 ///       /// - Complexity: O(N)
 ///       func scan<ResultElement>(
-///         initial: ResultElement,
-///         @noescape combine: (ResultElement, Iterator.Element) -> ResultElement
+///         _ initial: ResultElement,
+///         combine: @noescape (ResultElement, Iterator.Element) -> ResultElement
 ///       ) -> [ResultElement] {
 ///         var result = [initial]
 ///         for x in self {
@@ -100,7 +100,7 @@
 ///       ///
 ///       /// - Complexity: O(1)
 ///       func scan<ResultElement>(
-///         initial: ResultElement,
+///         _ initial: ResultElement,
 ///         combine: (ResultElement, Iterator.Element) -> ResultElement
 ///       ) -> LazyScanSequence<Self, ResultElement> {
 ///         return LazyScanSequence(
@@ -178,11 +178,11 @@ public struct LazySequence<Base : Sequence>
 }
 
 extension Sequence {
-  /// A sequence containing the same elements as a `Base` sequence,
-  /// but on which some operations such as `map` and `filter` are
+  /// A sequence containing the same elements as this sequence,
+  /// but on which some operations, such as `map` and `filter`, are
   /// implemented lazily.
   ///
-  /// - See also: `LazySequenceProtocol`, `LazySequence`
+  /// - SeeAlso: `LazySequenceProtocol`, `LazySequence`
   public var lazy: LazySequence<Self> {
     return LazySequence(_base: self)
   }
@@ -203,6 +203,6 @@ public typealias LazySequenceType = LazySequenceProtocol
 extension LazySequenceProtocol {
   @available(*, unavailable, message: "Please use Array initializer instead.")
   public var array: [Iterator.Element] {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

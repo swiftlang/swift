@@ -45,25 +45,22 @@ extension String : _ObjectiveCBridgeable {
     return true
   }
   
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSString.self
-  }
   public func _bridgeToObjectiveC() -> NSString {
     return NSString()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSString,
+    _ x: NSString,
     result: inout String?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSString,
+    _ x: NSString,
     result: inout String?
   ) -> Bool {
     return true
   }
   public static func _unconditionallyBridgeFromObjectiveC(
-    x: NSString?
+    _ x: NSString?
   ) -> String {
     return String()
   }
@@ -74,50 +71,44 @@ extension Int : _ObjectiveCBridgeable {
     return true
   }
   
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSNumber,
+    _ x: NSNumber,
     result: inout Int?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSNumber,
+    _ x: NSNumber,
     result: inout Int?
   ) -> Bool {
     return true
   }
   public static func _unconditionallyBridgeFromObjectiveC(
-    x: NSNumber?
+    _ x: NSNumber?
   ) -> Int {
     return 0
   }
 }
 
 extension Array : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSArray.self
-  }
   public func _bridgeToObjectiveC() -> NSArray {
     return NSArray()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSArray,
+    _ x: NSArray,
     result: inout Array?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSArray,
+    _ x: NSArray,
     result: inout Array?
   ) -> Bool {
     return true
   }
   public static func _unconditionallyBridgeFromObjectiveC(
-    x: NSArray?
+    _ x: NSArray?
   ) -> Array {
     return Array()
   }
@@ -127,25 +118,22 @@ extension Array : _ObjectiveCBridgeable {
 }
 
 extension Dictionary : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSDictionary.self
-  }
   public func _bridgeToObjectiveC() -> NSDictionary {
     return NSDictionary()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSDictionary,
+    _ x: NSDictionary,
   result: inout Dictionary?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSDictionary,
+    _ x: NSDictionary,
     result: inout Dictionary?
   ) -> Bool {
     return true
   }
   public static func _unconditionallyBridgeFromObjectiveC(
-    x: NSDictionary?
+    _ x: NSDictionary?
   ) -> Dictionary {
     return Dictionary()
   }
@@ -155,25 +143,22 @@ extension Dictionary : _ObjectiveCBridgeable {
 }
 
 extension Set : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSSet.self
-  }
   public func _bridgeToObjectiveC() -> NSSet {
     return NSSet()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSSet,
+    _ x: NSSet,
     result: inout Set?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSSet,
+    _ x: NSSet,
     result: inout Set?
   ) -> Bool {
     return true
   }
   public static func _unconditionallyBridgeFromObjectiveC(
-    x: NSSet?
+    _ x: NSSet?
   ) -> Set {
     return Set()
   }

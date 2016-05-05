@@ -14,7 +14,7 @@
 /// the elements of the `i`th pair are the `i`th elements of each
 /// underlying sequence.
 public func zip<Sequence1 : Sequence, Sequence2 : Sequence>(
-  sequence1: Sequence1, _ sequence2: Sequence2
+  _ sequence1: Sequence1, _ sequence2: Sequence2
 ) -> Zip2Sequence<Sequence1, Sequence2> {
   return Zip2Sequence(_sequence1: sequence1, _sequence2: sequence2)
 }
@@ -31,7 +31,7 @@ public struct Zip2Iterator<
     (_baseStream1, _baseStream2) = (iterator1, iterator2)
   }
 
-  /// Advance to the next element and return it, or `nil` if no next element
+  /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`

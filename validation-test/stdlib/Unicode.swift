@@ -6,14 +6,8 @@
 
 import SwiftPrivate
 import StdlibUnittest
+import StdlibCollectionUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import Foundation
 
@@ -66,37 +60,37 @@ UTF16APIs.test("leadSurrogate,trailSurrogate") {
 UTF16APIs.test("leadSurrogate/trap/U+0000") {
   let us: UnicodeScalar = "\u{00}"
   expectCrashLater()
-  UTF16.leadSurrogate(us)
+  _ = UTF16.leadSurrogate(us)
 }
 
 UTF16APIs.test("leadSurrogate/trap/U+005A") {
   let us: UnicodeScalar = "\u{5A}"
   expectCrashLater()
-  UTF16.leadSurrogate(us)
+  _ = UTF16.leadSurrogate(us)
 }
 
 UTF16APIs.test("leadSurrogate/trap/U+FFFF") {
   let us: UnicodeScalar = "\u{FFFF}"
   expectCrashLater()
-  UTF16.leadSurrogate(us)
+  _ = UTF16.leadSurrogate(us)
 }
 
 UTF16APIs.test("trailSurrogate/trap/U+0000") {
   let us: UnicodeScalar = "\u{00}"
   expectCrashLater()
-  UTF16.trailSurrogate(us)
+  _ = UTF16.trailSurrogate(us)
 }
 
 UTF16APIs.test("trailSurrogate/trap/U+005A") {
   let us: UnicodeScalar = "\u{5A}"
   expectCrashLater()
-  UTF16.trailSurrogate(us)
+  _ = UTF16.trailSurrogate(us)
 }
 
 UTF16APIs.test("trailSurrogate/trap/U+FFFF") {
   let us: UnicodeScalar = "\u{FFFF}"
   expectCrashLater()
-  UTF16.trailSurrogate(us)
+  _ = UTF16.trailSurrogate(us)
 }
 
 class EOFCountingIterator<T> : IteratorProtocol {
@@ -119,7 +113,7 @@ class EOFCountingIterator<T> : IteratorProtocol {
 }
 
 func checkDecodeUTF<Codec : UnicodeCodec>(
-    codec: Codec.Type, _ expectedHead: [UInt32],
+    _ codec: Codec.Type, _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utfStr: [Codec.CodeUnit]
 ) -> AssertionResult {
   do {
@@ -167,14 +161,14 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
 }
 
 func checkDecodeUTF8(
-    expectedHead: [UInt32],
+    _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utf8Str: [UInt8]
 ) -> AssertionResult {
   return checkDecodeUTF(UTF8.self, expectedHead, expectedRepairedTail, utf8Str)
 }
 
 func checkDecodeUTF16(
-    expectedHead: [UInt32],
+    _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utf16Str: [UInt16]
 ) -> AssertionResult {
   return checkDecodeUTF(UTF16.self, expectedHead, expectedRepairedTail,
@@ -182,14 +176,14 @@ func checkDecodeUTF16(
 }
 
 func checkDecodeUTF32(
-    expectedHead: [UInt32],
+    _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utf32Str: [UInt32]
 ) -> AssertionResult {
   return checkDecodeUTF(UTF32.self, expectedHead, expectedRepairedTail,
       utf32Str)
 }
 
-func checkEncodeUTF8(expected: [UInt8],
+func checkEncodeUTF8(_ expected: [UInt8],
                      _ scalars: [UInt32]) -> AssertionResult {
   var encoded = [UInt8]()
   let output: (UInt8) -> Void = { encoded.append($0) }
@@ -801,29 +795,38 @@ UnicodeScalarTests.test("init") {
 
 var UTF8Decoder = TestSuite("UTF8Decoder")
 
-UTF8Decoder.test("Internal/_isValidUTF8") {
+UTF8Decoder.test("Internal/_decodeOne") {
 
   // Ensure we accept all valid scalars
-  func ensureValid(scalar: UnicodeScalar) {
+  func ensureValid(_ scalar: UnicodeScalar) {
     var data: UInt32 = 0
     var i: UInt32 = 0
     Swift.UTF8.encode(scalar) { cp in
       data |= UInt32(cp) << (i*8)
       i += 1
     }
-    expectEqual(UTF8._isValidUTF8(data), true, "data=\(asHex(data))")
+    let (codePoint, _) = UTF8._decodeOne(data)
+    expectOptionalEqual(scalar.value, codePoint, "data=\(asHex(data))")
   }
 
   for i in 0..<0xd800 { ensureValid(UnicodeScalar(i)) }
   for i in 0xe000...0x10ffff { ensureValid(UnicodeScalar(i)) }
 
-  // Ensure we have no false positives
-  var n = 0
-  func countValidSequences(head head: Range<UInt32>, tail: Range<UInt32>) {
+  // Check number of valid/invalid sequences of different lengths
+  var validLengthCounts = [ 0, 0, 0, 0, 0 ]
+  var maximalSubpartCounts = [ 0, 0, 0, 0, 0 ]
+  func countValidSequences(
+    head head: CountableClosedRange<UInt32>, tail: CountableClosedRange<UInt32>
+  ) {
     for cu0 in head {
       for rest in tail {
         let data = rest << 8 | cu0
-        if UTF8._isValidUTF8(data) { n += 1 }
+        let (codePoint, length) = UTF8._decodeOne(data)
+        if codePoint != nil {
+          validLengthCounts[Int(length)] += 1
+        } else {
+          maximalSubpartCounts[Int(length)] += 1
+        }
       }
     }
   }
@@ -831,8 +834,16 @@ UTF8Decoder.test("Internal/_isValidUTF8") {
   countValidSequences(head: 0x00...0x7f, tail: 0...0)
   countValidSequences(head: 0xc0...0xdf, tail: 0...0xff)
   countValidSequences(head: 0xe0...0xef, tail: 0...0xffff)
-  countValidSequences(head: 0xf0...0xf7, tail: 0...0xffffff)
-  expectEqual(n, 0x10f800, "n=\(asHex(n))") // 0x10ffff minus surrogates
+  countValidSequences(head: 0xf0...0xff, tail: 0...0xffffff)
+
+  // Valid sequences
+  expectEqualSequence(validLengthCounts,
+    [ 0, 0x80, 0x780, 0xf000, 0x100000 ],
+    "validLengthCounts=\(validLengthCounts.map { asHex($0) })")
+  // Maximal subparts of ill-formed sequences
+  expectEqualSequence(maximalSubpartCounts,
+    [ 0, 0xf0c5880, 0xc2d000, 0x300000, 0 ],
+    "maximalSubpartCounts=\(maximalSubpartCounts.map { asHex($0) })")
 }
 
 
@@ -2192,7 +2203,7 @@ class NonContiguousNSString : NSString {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone) -> AnyObject {
+  override func copy(with zone: NSZone?) -> AnyObject {
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self
@@ -2209,17 +2220,17 @@ class NonContiguousNSString : NSString {
   var _value: [UInt16]
 }
 
-func checkUTF8View(expected: [UInt8], _ subject: String,
+func checkUTF8View(_ expected: [UInt8], _ subject: String,
     _ stackTrace: SourceLocStack) {
   checkForwardCollection(expected, subject.utf8)
 }
 
-func checkUTF16View(expected: [UInt16], _ subject: String,
+func checkUTF16View(_ expected: [UInt16], _ subject: String,
     _ stackTrace: SourceLocStack) {
   checkSliceableWithBidirectionalIndex(expected, subject.utf16)
 }
 
-func forStringsWithUnpairedSurrogates(checkClosure: (UTF16Test, String) -> Void) {
+func forStringsWithUnpairedSurrogates(_ checkClosure: (UTF16Test, String) -> Void) {
   for (name, batch) in UTF16Tests {
     print("Batch: \(name)")
     for test in batch {
@@ -2252,7 +2263,7 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
     backingStorage.withUnsafeBufferPointer {
       (ptr) -> Void in
       let cfstring = CFStringCreateWithCharactersNoCopy(kCFAllocatorDefault,
-          ptr.baseAddress, backingStorage.count, kCFAllocatorNull)
+          ptr.baseAddress, backingStorage.count, kCFAllocatorNull)!
       expectFalse(CFStringGetCStringPtr(cfstring,
           CFStringBuiltInEncodings.ASCII.rawValue) != nil)
       expectTrue(CFStringGetCharactersPtr(cfstring) != nil)
@@ -2279,7 +2290,7 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
   }
 }
 
-func verifyThatStringIsOpaqueForCoreFoundation(nss: NSString) {
+func verifyThatStringIsOpaqueForCoreFoundation(_ nss: NSString) {
   // Sanity checks to make sure we are testing the code path that does UTF-8
   // encoding itself, instead of dispatching to CF.  Both the original string
   // itself and its copies should be resilient to CF's fast path functions,

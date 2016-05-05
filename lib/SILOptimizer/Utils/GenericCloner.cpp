@@ -26,8 +26,11 @@ using namespace swift;
 
 /// Create a new empty function with the correct arguments and a unique name.
 SILFunction *GenericCloner::initCloned(SILFunction *Orig,
+                                       IsFragile_t Fragile,
                                        const ReabstractionInfo &ReInfo,
                                        StringRef NewName) {
+  assert((!Fragile || Orig->isFragile())
+         && "Specialization cannot make body more resilient");
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
@@ -35,11 +38,11 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
   // Create a new empty function.
-  SILFunction *NewF = Orig->getModule().getOrCreateFunction(
+  SILFunction *NewF = Orig->getModule().createFunction(
       getSpecializedLinkage(Orig, Orig->getLinkage()), NewName,
       ReInfo.getSpecializedType(), nullptr,
       Orig->getLocation(), Orig->isBare(), Orig->isTransparent(),
-      Orig->isFragile(), Orig->isThunk(), Orig->getClassVisibility(),
+      Fragile, Orig->isThunk(), Orig->getClassVisibility(),
       Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
       Orig->getDebugScope(), Orig->getDeclContext());
   NewF->setDeclCtx(Orig->getDeclContext());

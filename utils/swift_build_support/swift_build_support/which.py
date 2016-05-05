@@ -31,6 +31,6 @@ def which(cmd):
     been backported to Python 2.7, which we support.
     """
     try:
-        return subprocess.check_output(['which', cmd]).rstrip()
+        return subprocess.check_output(['which', cmd]).rstrip().decode()
     except subprocess.CalledProcessError:
         return None

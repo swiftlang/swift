@@ -1428,8 +1428,8 @@ public:
   SILGenConformance(SILGenModule &SGM, NormalProtocolConformance *C)
     // We only need to emit witness tables for base NormalProtocolConformances.
     : SGM(SGM), Conformance(C->getRootNormalConformance()),
-      Linkage(SGM.Types.getLinkageForProtocolConformance(Conformance,
-                                                         ForDefinition))
+      Linkage(getLinkageForProtocolConformance(Conformance,
+                                               ForDefinition))
   {
     // Not all protocols use witness tables.
     if (!Lowering::TypeConverter::protocolRequiresWitnessTable(
@@ -1442,7 +1442,21 @@ public:
     if (!Conformance)
       return nullptr;
 
-    visitProtocolDecl(Conformance->getProtocol());
+    auto *proto = Conformance->getProtocol();
+    visitProtocolDecl(proto);
+
+    // Serialize the witness table in two cases:
+    // 1) We're serializing everything
+    // 2) The type has a fixed layout in all resilience domains, and the
+    //    conformance is externally visible
+    IsFragile_t isFragile = IsNotFragile;
+    if (SGM.makeModuleFragile)
+      isFragile = IsFragile;
+    if (auto nominal = Conformance->getInterfaceType()->getAnyNominal())
+      if (nominal->hasFixedLayout() &&
+          proto->getEffectiveAccess() == Accessibility::Public &&
+          nominal->getEffectiveAccess() == Accessibility::Public)
+        isFragile = IsFragile;
 
     // Check if we already have a declaration or definition for this witness
     // table.
@@ -1456,7 +1470,7 @@ public:
 
       // If we have a declaration, convert the witness table to a definition.
       if (wt->isDeclaration()) {
-        wt->convertToDefinition(Entries, SGM.makeModuleFragile);
+        wt->convertToDefinition(Entries, isFragile);
 
         // Since we had a declaration before, its linkage should be external,
         // ensure that we have a compatible linkage for sanity. *NOTE* we are ok
@@ -1473,7 +1487,7 @@ public:
     }
 
     // Otherwise if we have no witness table yet, create it.
-    return SILWitnessTable::create(SGM.M, Linkage, SGM.makeModuleFragile,
+    return SILWitnessTable::create(SGM.M, Linkage, isFragile,
                                    Conformance, Entries);
   }
 
@@ -1493,7 +1507,7 @@ public:
     });
 
     // Emit the witness table for the base conformance if it is shared.
-    if (SGM.Types.getLinkageForProtocolConformance(
+    if (getLinkageForProtocolConformance(
                                         conformance->getRootNormalConformance(),
                                         NotForDefinition)
           == SILLinkage::Shared)
@@ -1646,6 +1660,7 @@ SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
 
 static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
                                          ProtocolConformance *conformance,
+                                         SILLinkage linkage,
                                          SILDeclRef requirement,
                                          SILDeclRef witness,
                                          ArrayRef<Substitution> witnessSubs) {
@@ -1653,7 +1668,8 @@ static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
     if (witnessFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
       auto reqFn = cast<FuncDecl>(requirement.getDecl());
       assert(reqFn->getAccessorKind() == AccessorKind::IsMaterializeForSet);
-      return gen.maybeEmitMaterializeForSetThunk(conformance, reqFn, witnessFn,
+      return gen.maybeEmitMaterializeForSetThunk(conformance, linkage,
+                                                 reqFn, witnessFn,
                                                  witnessSubs);
     }
   }
@@ -1793,10 +1809,16 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   if (witness.isAlwaysInline())
     InlineStrategy = AlwaysInline;
 
-  auto *f = M.getOrCreateFunction(
+  IsFragile_t isFragile = IsNotFragile;
+  if (makeModuleFragile)
+    isFragile = IsFragile;
+  if (witness.isFragile())
+    isFragile = IsFragile;
+
+  auto *f = M.createFunction(
       linkage, nameBuffer, witnessSILFnType,
-      witnessContextParams, SILLocation(witness.getDecl()), IsNotBare,
-      IsTransparent, makeModuleFragile ? IsFragile : IsNotFragile, IsThunk,
+      witnessContextParams, SILLocation(witness.getDecl()),
+      IsNotBare, IsTransparent, isFragile, IsThunk,
       SILFunction::NotRelevant, InlineStrategy);
 
   f->setDebugScope(new (M)
@@ -1824,7 +1846,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   SILGenFunction gen(*this, *f);
 
   // Open-code certain protocol witness "thunks".
-  if (maybeOpenCodeProtocolWitness(gen, conformance, requirement,
+  if (maybeOpenCodeProtocolWitness(gen, conformance, linkage, requirement,
                                    witness, witnessSubs)) {
     assert(!isFree);
     return f;
@@ -1853,8 +1875,9 @@ public:
 
   SmallVector<SILDefaultWitnessTable::Entry, 8> DefaultWitnesses;
 
-  SILGenDefaultWitnessTable(SILGenModule &SGM, ProtocolDecl *proto)
-      : SGM(SGM), Proto(proto), Linkage(SILLinkage::Public) { }
+  SILGenDefaultWitnessTable(SILGenModule &SGM, ProtocolDecl *proto,
+                            SILLinkage linkage)
+      : SGM(SGM), Proto(proto), Linkage(linkage) { }
 
   void addMissingDefault() {
     DefaultWitnesses.push_back(SILDefaultWitnessTable::Entry());
@@ -1927,12 +1950,14 @@ public:
 }
 
 void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
-  SILDefaultWitnessTable *defaultWitnesses =
-      M.createDefaultWitnessTableDeclaration(protocol);
+  SILLinkage linkage =
+      getSILLinkage(getDeclLinkage(protocol), ForDefinition);
 
-  SILGenDefaultWitnessTable builder(*this, protocol);
+  SILGenDefaultWitnessTable builder(*this, protocol, linkage);
   builder.visitProtocolDecl(protocol);
 
+  SILDefaultWitnessTable *defaultWitnesses =
+      M.createDefaultWitnessTableDeclaration(protocol, linkage);
   defaultWitnesses->convertToDefinition(builder.DefaultWitnesses);
 }
 
@@ -1943,7 +1968,7 @@ getOrCreateReabstractionThunk(GenericParamList *thunkContextParams,
                               CanSILFunctionType toType,
                               IsFragile_t Fragile) {
   // Mangle the reabstraction thunk.
-  std::string name ;
+  std::string name;
   {
     Mangler mangler;
 

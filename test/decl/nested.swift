@@ -10,7 +10,7 @@ struct OuterNonGeneric { // ok
     struct InnerNonGeneric {} // expected-error{{type 'InnerNonGeneric' nested in generic type 'OuterNonGeneric.MidGeneric'}}
     struct InnerGeneric<C> {} // expected-error{{generic type 'InnerGeneric' nested in type 'OuterNonGeneric.MidGeneric'}}
 
-    func flock(b: B) {}
+    func flock(_ b: B) {}
   }
 }
 
@@ -19,25 +19,25 @@ struct OuterGeneric<D> {
     struct InnerNonGeneric {} // expected-error{{type 'InnerNonGeneric' nested in generic type 'OuterGeneric<D>.MidNonGeneric'}}
     struct InnerGeneric<E> {} // expected-error{{generic type 'InnerGeneric' nested in type 'OuterGeneric<D>.MidNonGeneric'}}
 
-    func roost(d: D) {}
+    func roost(_ d: D) {}
   }
 
   struct MidGeneric<F> { // expected-error{{generic type 'MidGeneric' nested in type 'OuterGeneric'}}
     struct InnerNonGeneric {} // expected-error{{type 'InnerNonGeneric' nested in generic type 'OuterGeneric<D>.MidGeneric'}}
     struct InnerGeneric<G> {} // expected-error{{generic type 'InnerGeneric' nested in type 'OuterGeneric<D>.MidGeneric'}}
 
-    func nest(d: D, f: F) {}
+    func nest(_ d: D, f: F) {}
   }
 
   protocol InnerProtocol { // expected-error{{declaration is only valid at file scope}}
     associatedtype Rooster
-    func flip(r: Rooster)
-    func flop(t: D)
+    func flip(_ r: Rooster)
+    func flop(_ t: D)
   }
 
-  func nonGenericMethod(d: D) {
+  func nonGenericMethod(_ d: D) {
     // FIXME: local generic functions can't capture generic parameters yet
-    func genericFunction<E>(d: D, e: E) {}
+    func genericFunction<E>(_ d: D, e: E) {}
 
     genericFunction(d, e: ())
   }
@@ -71,7 +71,7 @@ class OuterNonGenericClass {
     }
   }
 
-  func genericFunction<T>(t: T) {
+  func genericFunction<T>(_ t: T) {
     class InnerNonGenericClass : OuterNonGenericClass { // expected-error {{type 'InnerNonGenericClass' nested in generic function}}
       let t: T
 
@@ -94,8 +94,8 @@ class OuterGenericClass<T> {
 
   protocol InnerProtocol { // expected-error{{declaration is only valid at file scope}}
     associatedtype Rooster
-    func flip(r: Rooster)
-    func flop(t: T)
+    func flip(_ r: Rooster)
+    func flop(_ t: T)
   }
 
   class InnerNonGenericBase { // expected-error {{type 'InnerNonGenericBase' nested in generic type 'OuterGenericClass' is not allowed}}
@@ -132,7 +132,7 @@ class OuterGenericClass<T> {
     }
   }
 
-  func genericFunction<U>(t: U) {
+  func genericFunction<U>(_ t: U) {
     class InnerNonGenericClass1 : OuterGenericClass { // expected-error {{type 'InnerNonGenericClass1' nested in generic function}}
       let t: T
 
@@ -163,18 +163,18 @@ protocol OuterProtocol {
   associatedtype Hen
   protocol InnerProtocol { // expected-error{{type not allowed here}}
     associatedtype Rooster
-    func flip(r: Rooster)
-    func flop(h: Hen)
+    func flip(_ r: Rooster)
+    func flop(_ h: Hen)
   }
 }
 
 protocol Racoon {
   associatedtype Stripes
   class Claw<T> { // expected-error{{type not allowed here}}
-    func mangle(s: Stripes) {}
+    func mangle(_ s: Stripes) {}
   }
   struct Fang<T> { // expected-error{{type not allowed here}}
-    func gnaw(s: Stripes) {}
+    func gnaw(_ s: Stripes) {}
   }
 }
 
@@ -183,15 +183,15 @@ enum OuterEnum {
   case C(C)
 }
 
-func outerGenericFunction<T>(t: T) {
+func outerGenericFunction<T>(_ t: T) {
   struct InnerNonGeneric { // expected-error{{type 'InnerNonGeneric' nested in generic function 'outerGenericFunction' }}
-    func nonGenericMethod(t: T) {}
-    func genericMethod<V where V : Racoon, V.Stripes == T>(t: T) -> V {}
+    func nonGenericMethod(_ t: T) {}
+    func genericMethod<V where V : Racoon, V.Stripes == T>(_ t: T) -> V {}
   }
 
   struct InnerGeneric<U> { // expected-error{{type 'InnerGeneric' nested in generic function 'outerGenericFunction' }}
-    func nonGenericMethod(t: T, u: U) {}
-    func genericMethod<V where V : Racoon, V.Stripes == T>(t: T, u: U) -> V {}
+    func nonGenericMethod(_ t: T, u: U) {}
+    func genericMethod<V where V : Racoon, V.Stripes == T>(_ t: T, u: U) -> V {}
   }
 }
 

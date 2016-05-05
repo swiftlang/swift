@@ -14,6 +14,7 @@
 #define SWIFT_SILOPTIMIZER_UTILS_LOCAL_H
 
 #include "swift/Basic/ArrayRefView.h"
+#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBuilder.h"
@@ -38,6 +39,8 @@ inline ValueBaseUserRange makeUserRange(
   return makeTransformRange(makeIteratorRange(R.begin(), R.end()),
                             UserTransform(toUser));
 }
+
+using DeadInstructionSet = llvm::SmallSetVector<SILInstruction *, 8>;
 
 /// \brief For each of the given instructions, if they are dead delete them
 /// along with their dead operands.
@@ -69,13 +72,18 @@ recursivelyDeleteTriviallyDeadInstructions(
 /// This routine only examines the state of the instruction at hand.
 bool isInstructionTriviallyDead(SILInstruction *I);
 
-/// \brief Return true if this is a release instruction and the released value
-/// is a part of a guaranteed parameter, false otherwise.
-bool isGuaranteedParamRelease(SILInstruction *I); 
+/// \brief Return true if this is a release instruction that's not going to
+/// free the object.
+bool isIntermediateRelease(SILInstruction *I,
+                           ConsumedArgToEpilogueReleaseMatcher &ERM); 
+
+/// \brief Recursively collect all the uses and transitive uses of the
+/// instruction.
+void
+collectUsesOfValue(SILValue V, llvm::SmallPtrSetImpl<SILInstruction *> &Insts);
 
 /// \brief Recursively erase all of the uses of the instruction (but not the
-/// instruction itself) and delete instructions that will become trivially
-/// dead when this instruction is removed.
+/// instruction itself)
 void eraseUsesOfInstruction(
     SILInstruction *Inst,
     std::function<void(SILInstruction *)> C = [](SILInstruction *){});
@@ -174,10 +182,6 @@ bool tryCheckedCastBrJumpThreading(SILFunction *Fn, DominanceInfo *DT,
 
 void recalcDomTreeForCCBOpt(DominanceInfo *DT, SILFunction &F);
 
-/// Checks if a symbol with a given linkage can be referenced from fragile
-/// functions.
-bool isValidLinkageForFragileRef(SILLinkage linkage);
-
 /// A structure containing callbacks that are called when an instruction is
 /// removed or added.
 struct InstModCallbacks {
@@ -269,6 +273,9 @@ public:
   /// lifetime.
   /// It is assumed that \p Inst is located after the value's definition.
   bool isWithinLifetime(SILInstruction *Inst);
+
+  /// For debug dumping.
+  void dump() const;
 
 private:
 

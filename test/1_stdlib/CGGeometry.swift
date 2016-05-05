@@ -5,18 +5,18 @@
 
 import CoreGraphics
 
-func print_(r: CGPoint, _ prefix: String) {
+func print_(_ r: CGPoint, _ prefix: String) {
   print("\(prefix) \(r.x) \(r.y)")
 }
-func print_(r: CGSize, _ prefix: String) {
+func print_(_ r: CGSize, _ prefix: String) {
   print("\(prefix) \(r.width) \(r.height)")
 }
 
-func print_(r: CGVector, _ prefix: String) {
+func print_(_ r: CGVector, _ prefix: String) {
   print("\(prefix) \(r.dx) \(r.dy)")
 }
 
-func print_(r: CGRect, _ prefix: String) {
+func print_(_ r: CGRect, _ prefix: String) {
   print("\(prefix) \(r.origin.x) \(r.origin.y) \(r.size.width) \(r.size.height)")
 }
 
@@ -203,27 +203,27 @@ print_(rect.union(distantRect), "union distant")
 // CHECK-NEXT: union small 10.0 20.0 34.5 46.5
 // CHECK-NEXT: union big 1.0 2.0 101.0 102.0
 // CHECK-NEXT: union distant 11.25 22.25 989.75 1978.75
-rect.unionInPlace(smallRect)
-rect.unionInPlace(bigRect)
-rect.unionInPlace(distantRect)
-print_(rect, "unionInPlace")
-// CHECK-NEXT: unionInPlace 1.0 2.0 1000.0 1999.0
+rect.formUnion(smallRect)
+rect.formUnion(bigRect)
+rect.formUnion(distantRect)
+print_(rect, "formUnion")
+// CHECK-NEXT: formUnion 1.0 2.0 1000.0 1999.0
 
 rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
-print_(rect.intersect(smallRect), "intersect small")
-print_(rect.intersect(bigRect), "intersect big")
-print_(rect.intersect(distantRect), "intersect distant")
+print_(rect.intersection(smallRect), "intersect small")
+print_(rect.intersection(bigRect), "intersect big")
+print_(rect.intersection(distantRect), "intersect distant")
 // CHECK-NEXT: intersect small 11.25 22.25 3.75 2.75
 // CHECK-NEXT: intersect big 11.25 22.25 33.25 44.25
 // CHECK-NEXT: intersect distant inf inf 0.0 0.0
 assert(rect.intersects(smallRect))
-rect.intersectInPlace(smallRect)
+rect.formIntersection(smallRect)
 assert(!rect.isEmpty)
 assert(rect.intersects(bigRect))
-rect.intersectInPlace(bigRect)
+rect.formIntersection(bigRect)
 assert(!rect.isEmpty)
 assert(!rect.intersects(distantRect))
-rect.intersectInPlace(distantRect)
+rect.formIntersection(distantRect)
 assert(rect.isEmpty)
 
 

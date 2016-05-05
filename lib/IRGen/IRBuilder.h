@@ -177,12 +177,18 @@ public:
   llvm::StoreInst *CreateStore(llvm::Value *value, llvm::Value *addr) = delete;
   
   using IRBuilderBase::CreateStructGEP;
-  Address CreateStructGEP(Address address, unsigned index, Size size,
+  Address CreateStructGEP(Address address, unsigned index, Size offset,
                           const llvm::Twine &name = "") {
     llvm::Value *addr = CreateStructGEP(
         address.getType()->getElementType(), address.getAddress(),
         index, name);
-    return Address(addr, address.getAlignment().alignmentAtOffset(size));
+    return Address(addr, address.getAlignment().alignmentAtOffset(offset));
+  }
+  Address CreateStructGEP(Address address, unsigned index,
+                          const llvm::StructLayout *layout,
+                          const llvm::Twine &name = "") {
+    Size offset = Size(layout->getElementOffset(index));
+    return CreateStructGEP(address, index, offset, name);
   }
 
   /// Given a pointer to an array element, GEP to the array element

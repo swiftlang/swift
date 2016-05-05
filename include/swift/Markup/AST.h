@@ -10,18 +10,47 @@
 //
 //===----------------------------------------------------------------------===//
 //
-#ifndef LLVM_MARKUP_AST_H
-#define LLVM_MARKUP_AST_H
+#ifndef SWIFT_MARKUP_AST_H
+#define SWIFT_MARKUP_AST_H
 
 #include "swift/Markup/LineList.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 
-namespace llvm {
+namespace swift {
 namespace markup {
 
 class MarkupContext;
+class MarkupASTNode;
+class Paragraph;
+class ParamField;
+class ReturnsField;
+class ThrowsField;
+
+/// The basic structure of a doc comment attached to a Swift
+/// declaration.
+struct CommentParts {
+  Optional<const Paragraph *> Brief;
+  ArrayRef<const MarkupASTNode *> BodyNodes;
+  ArrayRef<ParamField *> ParamFields;
+  Optional<const ReturnsField *> ReturnsField;
+  Optional<const ThrowsField *> ThrowsField;
+
+  bool isEmpty() const {
+    return !Brief.hasValue() &&
+           !ReturnsField.hasValue() &&
+           !ThrowsField.hasValue() &&
+           BodyNodes.empty() &&
+           ParamFields.empty();
+  }
+
+  bool hasFunctionDocumentation() const {
+    return !ParamFields.empty() ||
+             ReturnsField.hasValue() ||
+             ThrowsField.hasValue();
+  }
+};
 
 #define MARKUP_AST_NODE(Id, Parent) class Id;
 #define ABSTRACT_MARKUP_AST_NODE(Id, Parent) class Id;
@@ -585,6 +614,10 @@ class ParamField final : public PrivateExtension,
 
   StringRef Name;
 
+  // Parameter fields can contain a substructure describing a
+  // function or closure parameter.
+  llvm::Optional<CommentParts> Parts;
+
   ParamField(StringRef Name, ArrayRef<MarkupASTNode *> Children);
 
 public:
@@ -594,6 +627,21 @@ public:
 
   StringRef getName() const {
     return Name;
+  }
+
+  llvm::Optional<CommentParts> getParts() const {
+    return Parts;
+  }
+
+  void setParts(CommentParts P) {
+    Parts = P;
+  }
+
+  bool isClosureParameter() const {
+    if (!Parts.hasValue())
+      return false;
+
+    return Parts.getValue().hasFunctionDocumentation();
   }
 
   ArrayRef<MarkupASTNode *> getChildren() {
@@ -681,7 +729,28 @@ bool isAFieldTag(StringRef Tag);
 void dump(const MarkupASTNode *Node, llvm::raw_ostream &OS, unsigned indent = 0);
 void printInlinesUnder(const MarkupASTNode *Node, llvm::raw_ostream &OS,
                        bool PrintDecorators = false);
-} // namespace markup
-} // namespace llvm
 
-#endif // LLVM_MARKUP_AST_H
+
+template <typename ImplClass, typename RetTy = void, typename... Args>
+class MarkupASTVisitor {
+public:
+  RetTy visit(const MarkupASTNode *Node, Args... args) {
+    switch (Node->getKind()) {
+#define MARKUP_AST_NODE(Id, Parent) \
+    case ASTNodeKind::Id: \
+      return static_cast<ImplClass*>(this) \
+        ->visit##Id(cast<const Id>(Node), \
+                    ::std::forward<Args>(args)...);
+#define ABSTRACT_MARKUP_AST_NODE(Id, Parent)
+#define MARKUP_AST_NODE_RANGE(Id, FirstId, LastId)
+#include "swift/Markup/ASTNodes.def"
+    }
+  }
+
+  virtual ~MarkupASTVisitor() {}
+};
+
+} // namespace markup
+} // namespace swift
+
+#endif // SWIFT_MARKUP_AST_H

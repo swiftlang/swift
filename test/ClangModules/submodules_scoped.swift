@@ -16,7 +16,7 @@ public var y : CInt = x
 
 let _: ctypes.DWORD = 0
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 #if CHECK_SCOPING
 markUsed(MY_INT) // expected-error {{use of unresolved identifier 'MY_INT'}}

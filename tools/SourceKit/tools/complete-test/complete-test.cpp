@@ -39,6 +39,7 @@ struct TestOptions {
   Optional<bool> useImportDepth;
   Optional<bool> groupOverloads;
   Optional<bool> groupStems;
+  Optional<bool> includeExactMatch;
   Optional<bool> addInnerResults;
   Optional<bool> addInnerOperators;
   Optional<bool> addInitsToTopLevel;
@@ -86,6 +87,7 @@ static sourcekitd_uid_t KeyRequestLimit;
 static sourcekitd_uid_t KeyHideUnderscores;
 static sourcekitd_uid_t KeyHideLowPriority;
 static sourcekitd_uid_t KeyHideByName;
+static sourcekitd_uid_t KeyIncludeExactMatch;
 static sourcekitd_uid_t KeyAddInnerResults;
 static sourcekitd_uid_t KeyAddInnerOperators;
 static sourcekitd_uid_t KeyAddInitsToTopLevel;
@@ -133,6 +135,10 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
       }
     } else if (opt == "add-inits-to-top-level") {
       options.addInitsToTopLevel = true;
+    } else if (opt == "include-exact-match") {
+      options.includeExactMatch = true;
+    } else if (opt == "no-include-exact-match") {
+      options.includeExactMatch = false;
     } else if (opt == "add-inner-results") {
       options.addInnerResults = true;
     } else if (opt == "no-inner-results") {
@@ -299,6 +305,8 @@ static int skt_main(int argc, const char **argv) {
   KeyHideLowPriority =
       sourcekitd_uid_get_from_cstr("key.codecomplete.hidelowpriority");
   KeyHideByName = sourcekitd_uid_get_from_cstr("key.codecomplete.hidebyname");
+  KeyIncludeExactMatch =
+      sourcekitd_uid_get_from_cstr("key.codecomplete.includeexactmatch");
   KeyAddInnerResults =
       sourcekitd_uid_get_from_cstr("key.codecomplete.addinnerresults");
   KeyAddInnerOperators =
@@ -604,6 +612,7 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
     addBoolOption(KeyUseImportDepth, options.useImportDepth);
     addBoolOption(KeyGroupOverloads, options.groupOverloads);
     addBoolOption(KeyGroupStems, options.groupStems);
+    addBoolOption(KeyIncludeExactMatch, options.includeExactMatch);
     addBoolOption(KeyAddInnerResults, options.addInnerResults);
     addBoolOption(KeyAddInnerOperators, options.addInnerOperators);
     addBoolOption(KeyAddInitsToTopLevel, options.addInitsToTopLevel);

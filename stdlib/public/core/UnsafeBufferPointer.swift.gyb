@@ -15,17 +15,17 @@
 public struct UnsafeBufferPointerIterator<Element>
   : IteratorProtocol, Sequence {
 
-  /// Advance to the next element and return it, or `nil` if no next element
+  /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Element? {
     if _position == _end { return nil }
 
-    let result = _position.pointee
-    _position += 1
+    let result = _position!.pointee
+    _position! += 1
     return result
   }
 
-  internal var _position, _end: UnsafePointer<Element>
+  internal var _position, _end: UnsafePointer<Element>?
 }
 
 %for Mutable in ('Mutable', ''):
@@ -35,7 +35,12 @@ public struct UnsafeBufferPointerIterator<Element>
 ///
 /// The pointer should be aligned to `alignof(Element.self)`.
 public struct Unsafe${Mutable}BufferPointer<Element>
-  : ${Mutable}Collection {
+  : ${Mutable}Indexable, ${Mutable}Collection, RandomAccessCollection {
+
+  public typealias Index = Int
+  public typealias IndexDistance = Int
+  public typealias Iterator =
+    IndexingIterator<Unsafe${Mutable}BufferPointer<Element>>
 
   /// Always zero, which is the index of the first element in a
   /// non-empty buffer.
@@ -47,34 +52,64 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
+  /// `index(after:)`.
   public var endIndex: Int {
-    return _end - _position
+    return count
+  }
+
+  public typealias Indices = CountableRange<Int>
+
+  public var indices: Indices {
+    return startIndex..<endIndex
   }
 
   /// Access the `i`th element in the buffer.
   public subscript(i: Int) -> Element {
     get {
-      _stdlibAssert(i >= 0)
-      _stdlibAssert(i < endIndex)
-      return _position[i]
+      _debugPrecondition(i >= 0)
+      _debugPrecondition(i < endIndex)
+      return _position![i]
     }
 %if Mutable:
     nonmutating set {
-      _stdlibAssert(i >= 0)
-      _stdlibAssert(i < endIndex)
-      _position[i] = newValue
+      _debugPrecondition(i >= 0)
+      _debugPrecondition(i < endIndex)
+      _position![i] = newValue
     }
 %end
   }
 
+  public subscript(bounds: Range<Int>)
+    -> ${Mutable}RandomAccessSlice<Unsafe${Mutable}BufferPointer<Element>>
+  {
+    get {
+      // FIXME: swift-3-indexing-model: range check.
+      // FIXME: swift-3-indexing-model: tests.
+      return ${Mutable}RandomAccessSlice(
+        base: self, bounds: bounds)
+    }
+%  if Mutable:
+    set {
+      // FIXME: swift-3-indexing-model: range check.
+      // FIXME: swift-3-indexing-model: tests.
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
+%  end
+  }
+
   /// Construct an Unsafe${Mutable}Pointer over the `count` contiguous
   /// `Element` instances beginning at `start`.
-  public init(start: Unsafe${Mutable}Pointer<Element>, count: Int) {
+  ///
+  /// If `start` is nil, `count` must be 0. However, `count` may be 0 even for
+  /// a nonzero `start`.
+  public init(start: Unsafe${Mutable}Pointer<Element>?, count: Int) {
     _precondition(
       count >= 0, "Unsafe${Mutable}BufferPointer with negative count")
+    _precondition(
+      count == 0 || start != nil,
+      "Unsafe${Mutable}BufferPointer has a nil start and nonzero count")
     _position = start
-    _end = start + count
+    _end = start.map { $0 + count }
   }
 
   /// Returns an iterator over the elements of this sequence.
@@ -85,23 +120,27 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   }
 
   /// A pointer to the first element of the buffer.
-  public var baseAddress: Unsafe${Mutable}Pointer<Element> {
+  public var baseAddress: Unsafe${Mutable}Pointer<Element>? {
     return _position
   }
 
   /// The number of elements in the buffer.
   public var count: Int {
-    return _end - _position
+    if _position == nil {
+      _sanityCheck(_end == nil)
+      return 0
+    }
+    return _end! - _position!
   }
 
-  let _position, _end: Unsafe${Mutable}Pointer<Element>
+  let _position, _end: Unsafe${Mutable}Pointer<Element>?
 }
 
 extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return "Unsafe${Mutable}BufferPointer"
-    + "(start: \(_position), count: \(_end - _position))"
+      + "(start: \(_position.map(String.init(_:)) ?? "nil"), count: \(count))"
   }
 }
 %end

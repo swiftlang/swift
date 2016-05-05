@@ -29,6 +29,11 @@ extension _SequenceWrapper where
   Self : Sequence,
   Self.Iterator == Self.Base.Iterator {
 
+  /// Returns a value less than or equal to the number of elements in
+  /// the sequence, nondestructively.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence if the
+  ///   sequence is a collection or wraps a collection; otherwise, O(1).
   public var underestimatedCount: Int {
     return _base.underestimatedCount
   }
@@ -39,29 +44,59 @@ extension Sequence
   Self : _SequenceWrapper,
   Self.Iterator == Self.Base.Iterator {
 
-  /// Return an iterator over the elements of this sequence.
-  ///
-  /// - Complexity: O(1).
+  /// Returns an iterator over the elements of this sequence.
   public func makeIterator() -> Base.Iterator {
     return self._base.makeIterator()
   }
 
+  /// Returns an array containing the results of mapping the given closure
+  /// over the sequence's elements.
+  ///
+  /// In this example, `map` is used first to convert the names in the array to
+  /// lowercase strings and then to count their characters.
+  ///
+  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
+  ///     let lowercaseNames = cast.map { $0.lowercaseString }
+  ///     // 'lowercaseNames' == ["vivien", "marlon", "kim", "karl"]
+  ///     let letterCounts = cast.map { $0.characters.count }
+  ///     // 'letterCounts' == [6, 6, 3, 4]
+  ///
+  /// - Parameter transform: A mapping closure. `transform` accepts an
+  ///   element of this sequence as its parameter and returns a transformed
+  ///   value of the same or of a different type.
+  /// - Returns: An array containing the transformed elements of this
+  ///   sequence.
   @warn_unused_result
   public func map<T>(
-    @noescape transform: (Base.Iterator.Element) throws -> T
+    _ transform: @noescape (Base.Iterator.Element) throws -> T
   ) rethrows -> [T] {
     return try _base.map(transform)
   }
 
+  /// Returns an array containing, in order, the elements of the sequence
+  /// that satisfy the given predicate.
+  ///
+  /// In this example, `filter` is used to include only names shorter than five
+  /// characters.
+  ///
+  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
+  ///     let shortNames = cast.filter { $0.characters.count < 5 }
+  ///     print(shortNames)
+  ///     // Prints "["Kim", "Karl"]"
+  ///
+  /// - Parameter includeElement: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element should be included in the returned array.
+  /// - Returns: An array of the elements that `includeElement` allowed.
   @warn_unused_result
   public func filter(
-    @noescape includeElement: (Base.Iterator.Element) throws -> Bool
+    _ includeElement: @noescape (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.Iterator.Element] {
     return try _base.filter(includeElement)
   }
   
   public func _customContainsEquatableElement(
-    element: Base.Iterator.Element
+    _ element: Base.Iterator.Element
   ) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
@@ -69,8 +104,10 @@ extension Sequence
   /// If `self` is multi-pass (i.e., a `Collection`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
-  public func _preprocessingPass<R>(@noescape preprocess: () -> R) -> R? {
-    return _base._preprocessingPass(preprocess)
+  public func _preprocessingPass<R>(
+    _ preprocess: @noescape () throws -> R
+  ) rethrows -> R? {
+    return try _base._preprocessingPass(preprocess)
   }
 
   /// Create a native array buffer containing the elements of `self`,

@@ -48,6 +48,9 @@ class SwiftGizmo : A {
   @NSManaged func mutableArrayValueForB() {} // expected-error {{NSManaged method cannot have a body; it must be provided at runtime}}
   @NSManaged class func mutableArrayValueForA() {} // expected-error {{@NSManaged only allowed on an instance property or method}}
 
+  // SR-1050: don't assert
+  @NSManaged var multiA, multiB, multiC : NSNumber?
+
   override init() {}
 }
 

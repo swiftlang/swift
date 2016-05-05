@@ -153,7 +153,7 @@ func lookUpManyTopLevelNames() {
   // "CInt" is not used as a top-level name here.
   // CHECK-DAG: !private "StringLiteralType"
   // NEGATIVE-NOT: "CInt"
-  let CInt = "abc"
+  _ = "abc"
 
   // NEGATIVE-NOT: - "max"
   print(Int.max)
@@ -223,7 +223,7 @@ func lookUpMembers() {
   TopLevelForMemberLookup.m1()
   TopLevelForMemberLookup.m3()
 }
-public let publicUseOfMember = TopLevelForMemberLookup.m2()
+public let publicUseOfMember: () = TopLevelForMemberLookup.m2()
 
 struct Outer {
   struct Inner {
@@ -264,7 +264,7 @@ var use9 = { () -> Int in return topLevel9() }
 
 
 // CHECK-DAG: - "TopLevelTy1"
-func useTy1(x: TopLevelTy1) {}
+func useTy1(_ x: TopLevelTy1) {}
 // CHECK-DAG: - "TopLevelTy2"
 func useTy2() -> TopLevelTy2 {}
 // CHECK-DAG: - "TopLevelTy3"
@@ -289,7 +289,7 @@ struct StructForDeclaringProperties {
 }
 
 // CHECK-DAG: !private "privateTopLevel1"
-func private1(a: Int = privateTopLevel1()) {}
+func private1(_ a: Int = privateTopLevel1()) {}
 // CHECK-DAG: !private "privateTopLevel2"
 // CHECK-DAG: !private "PrivateProto1"
 private struct Private2 : PrivateProto1 {
@@ -297,7 +297,7 @@ private struct Private2 : PrivateProto1 {
 }
 // CHECK-DAG: !private "privateTopLevel3"
 func outerPrivate3() {
-  let private3 = { privateTopLevel3() }
+  let _ = { privateTopLevel3() }
 }
 
 // CHECK-DAG: !private "PrivateTopLevelTy1"
@@ -311,13 +311,13 @@ extension Private2 : PrivateProto2 {
 }
 // CHECK-DAG: !private "PrivateTopLevelTy3"
 func outerPrivateTy3() {
-  func inner(a: PrivateTopLevelTy3?) {}
+  func inner(_ a: PrivateTopLevelTy3?) {}
   inner(nil)
 }
 // CHECK-DAG: !private "PrivateTopLevelStruct3"
 private typealias PrivateTy4 = PrivateTopLevelStruct3.ValueType
 // CHECK-DAG: !private "PrivateTopLevelStruct4"
-private func privateTy5(x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelStruct4.ValueType {
+private func privateTy5(_ x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelStruct4.ValueType {
   return x
 }
 
@@ -358,10 +358,6 @@ struct Sentinel2 {}
 // CHECK-DAG: - ["V4main10IntWrapper", "deinit"]
 // CHECK-DAG: - ["Ps10Comparable", ""]
 // CHECK-DAG: - ["C4main18ClassFromOtherFile", ""]
-// CHECK-DAG: - !private ["Si", "Distance"]
-// CHECK-DAG: - !private ["Si", "IntegerLiteralType"]
-// CHECK-DAG: - !private ["Si", "Stride"]
-// CHECK-DAG: - !private ["Si", "deinit"]
 // CHECK-DAG: - !private ["Si", "max"]
 // CHECK-DAG: - ["Ps23FloatLiteralConvertible", ""]
 // CHECK-DAG: - !private ["Ps31UnicodeScalarLiteralConvertible", ""]

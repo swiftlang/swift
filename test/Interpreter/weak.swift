@@ -21,7 +21,7 @@ class SwiftClass : SwiftClassBase {
   }
 }
 
-func printState(x : SwiftClassBase?) {
+func printState(_ x : SwiftClassBase?) {
   print((x != nil) ? "is present" : "is nil")
 }
 
@@ -81,7 +81,7 @@ testWeakInLet()
 
 
   
-func printState(x : Protocol?) {
+func printState(_ x : Protocol?) {
   print((x != nil) ? "is present" : "is nil")
 }
 

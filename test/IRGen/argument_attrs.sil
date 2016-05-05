@@ -2,7 +2,7 @@
 
 import Builtin
 
-struct Huge { var x,y,z,w,a,b,c,d: Builtin.Int32 }
+struct Huge { var x, y, z, w, a, b, c, d: Builtin.Int32 }
 
 // CHECK-LABEL: define{{( protected)?}} void @arguments_in_def(i32* nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), i32* noalias nocapture dereferenceable(4), %V14argument_attrs4Huge* noalias nocapture dereferenceable(32), %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 sil @arguments_in_def : $@convention(thin) <T> (@inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> () {

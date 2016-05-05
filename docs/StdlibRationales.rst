@@ -89,7 +89,7 @@ For example::
 
   // Public API that uses CVaListPointer, so CVarArgType has to be public, too.
   public func withVaList<R>(
-    args: [CVarArgType],
+    _ args: [CVarArgType],
     @noescape invoke body: (CVaListPointer) -> R
   ) -> R
 
@@ -101,7 +101,7 @@ We can't make ``map()``, ``filter()``, etc. all return ``Self``:
 - ``map()`` takes a function ``(T) -> U`` and therefore can't return Self
   literally.  The required language feature for making ``map()`` return
   something like ``Self`` in generic code (higher-kinded types) doesn't exist
-  in Swift.  You can't write a method like ``func map(f: (T) -> U) -> Self<U>``
+  in Swift.  You can't write a method like ``func map(_ f: (T) -> U) -> Self<U>``
   today.
 
 - There are lots of sequences that don't have an appropriate form for the
@@ -118,7 +118,7 @@ We can't make ``map()``, ``filter()``, etc. all return ``Self``:
 
     func countFlattenedElements<
       S : SequenceType where S.Generator.Element == Set<Double>
-    >(sequence: S) -> Int {
+    >(_ sequence: S) -> Int {
       return sequence.map { $0.count }.reduce(0) { $0 + $1 }
     }
 

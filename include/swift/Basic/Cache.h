@@ -226,7 +226,7 @@ struct CacheValueInfo<llvm::IntrusiveRefCntPtr<T>>{
   }
 };
 
-} // namespace sys
-} // namespace swift
+} // end namespace sys
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_CACHE_H

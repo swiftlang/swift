@@ -186,27 +186,31 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         status |= makeParserCodeCompletionStatus();
       }
     }
+    
     // ('inout' | 'let' | 'var')?
-    if (Tok.is(tok::kw_inout)) {
-      param.LetVarInOutLoc = consumeToken();
-      param.SpecifierKind = ParsedParameter::InOut;
-    } else if (Tok.is(tok::kw_let)) {
-      param.LetVarInOutLoc = consumeToken();
-      param.SpecifierKind = ParsedParameter::Let;
-    } else if (Tok.is(tok::kw_var)) {
-      diagnose(Tok.getLoc(), diag::var_parameter_not_allowed)
+    bool hasSpecifier = false;
+    while (Tok.isAny(tok::kw_inout, tok::kw_let, tok::kw_var)) {
+      if (!hasSpecifier) {
+        if (Tok.is(tok::kw_let)) {
+          diagnose(Tok, diag::parameter_let_as_attr)
+          .fixItRemove(Tok.getLoc());
+          param.isInvalid = true;
+        } else {
+          // We handle the var error in sema for a better fixit and inout is
+          // handled later in this function for better fixits.
+          param.SpecifierKind = Tok.is(tok::kw_inout) ? ParsedParameter::InOut :
+                                                        ParsedParameter::Var;
+        }
+        param.LetVarInOutLoc = consumeToken();
+        hasSpecifier = true;
+      } else {
+        // Redundant specifiers are fairly common, recognize, reject, and recover
+        // from this gracefully.
+        diagnose(Tok, diag::parameter_inout_var_let_repeated)
         .fixItRemove(Tok.getLoc());
-      param.LetVarInOutLoc = consumeToken();
-      param.SpecifierKind = ParsedParameter::Var;
-    }
-
-    // Redundant specifiers are fairly common, recognize, reject, and recover
-    // from this gracefully.
-    if (Tok.isAny(tok::kw_inout, tok::kw_let, tok::kw_var)) {
-      diagnose(Tok, diag::parameter_inout_var_let)
-        .fixItRemove(Tok.getLoc());
-      consumeToken();
-      param.isInvalid = true;
+        consumeToken();
+        param.isInvalid = true;
+      }
     }
 
     if (startsParameterName(*this, isClosure)) {
@@ -248,20 +252,28 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
         bool hasDeprecatedInOut =
           param.SpecifierKind == ParsedParameter::InOut;
-
-        if (Tok.is(tok::kw_inout)) {
-          param.LetVarInOutLoc = consumeToken();
-          param.SpecifierKind = ParsedParameter::InOut;
-          if (hasDeprecatedInOut) {
-            diagnose(param.LetVarInOutLoc, diag::inout_as_attr_deprecated)
-              .fixItRemove(param.LetVarInOutLoc);
+        bool hasValidInOut = false;
+        
+        while (Tok.is(tok::kw_inout)) {
+          hasValidInOut = true;
+          if (hasSpecifier) {
+            diagnose(Tok.getLoc(), diag::parameter_inout_var_let_repeated)
+            .fixItRemove(param.LetVarInOutLoc);
+            consumeToken(tok::kw_inout);
+            param.isInvalid = true;
+          } else {
+            hasSpecifier = true;
+            param.LetVarInOutLoc = consumeToken(tok::kw_inout);
+            param.SpecifierKind = ParsedParameter::InOut;
           }
-        } else if (hasDeprecatedInOut) {
-          diagnose(param.LetVarInOutLoc, diag::inout_as_attr_deprecated)
-            .fixItRemove(param.LetVarInOutLoc)
-            .fixItInsert(postColonLoc, "inout ");
         }
-
+        if (!hasValidInOut && hasDeprecatedInOut) {
+          diagnose(Tok.getLoc(), diag::inout_as_attr_disallowed)
+          .fixItRemove(param.LetVarInOutLoc)
+          .fixItInsert(postColonLoc, "inout ");
+          param.isInvalid = true;
+        }
+        
         auto type = parseType(diag::expected_parameter_type);
         status |= type;
         param.Type = type.getPtrOrNull();
@@ -398,7 +410,7 @@ mapParsedParameters(Parser &parser,
   // parameters.
   SmallVector<ParamDecl*, 4> elements;
   SourceLoc ellipsisLoc;
-  bool isFirstParameter = true;
+
   for (auto &param : params) {
     // Whether the provided name is API by default depends on the parameter
     // context.
@@ -409,16 +421,11 @@ mapParsedParameters(Parser &parser,
     case Parser::ParameterContextKind::Operator:
       isKeywordArgumentByDefault = !isFirstParameterClause;
       break;
-
+    case Parser::ParameterContextKind::Curried:
     case Parser::ParameterContextKind::Initializer:
       isKeywordArgumentByDefault = true;
       break;
-
     case Parser::ParameterContextKind::Function:
-      isKeywordArgumentByDefault = !isFirstParameterClause || !isFirstParameter;
-      break;
-
-    case Parser::ParameterContextKind::Curried:
       isKeywordArgumentByDefault = true;
       break;
     }
@@ -434,17 +441,6 @@ mapParsedParameters(Parser &parser,
       // Both names were provided, so pass them in directly.
       result = createParam(param, argName, param.FirstNameLoc,
                            paramName, param.SecondNameLoc);
-
-      // If the first name is empty and this parameter would not have been
-      // an API name by default, complain.
-      if (param.FirstName.empty() && !isKeywordArgumentByDefault) {
-        parser.diagnose(param.FirstNameLoc,
-                        diag::parameter_extraneous_empty_name,
-                        param.SecondName)
-          .fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
-
-        param.FirstNameLoc = SourceLoc();
-      }
 
       // If the first and second names are equivalent and non-empty, and we
       // would have an argument label by default, complain.
@@ -494,8 +490,6 @@ mapParsedParameters(Parser &parser,
 
     if (argNames)
       argNames->push_back(argName);
-
-    isFirstParameter = false;
   }
 
   return ParameterList::create(ctx, leftParenLoc, elements, rightParenLoc);

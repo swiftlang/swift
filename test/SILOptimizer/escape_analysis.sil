@@ -541,9 +541,8 @@ sil_global @global_ln : $LinkedNode
 // CHECK-LABEL: CG of load_next_recursive
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
 // CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: G, Succ: (%4.1)
-// CHECK-NEXT:    Val %4 Esc: R, Succ: %0.2
-// CHECK-NEXT:    Con %4.1 Esc: G, Succ:
+// CHECK-NEXT:    Con %0.2 Esc: G, Succ:
+// CHECK-NEXT:    Val %4 Esc: G, Succ: %0.2
 // CHECK-NEXT:    Ret Esc: R, Succ: %4
 // CHECK-NEXT:  End
 sil @load_next_recursive : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
@@ -560,7 +559,7 @@ bb0(%0 : $LinkedNode):
 // CHECK-NEXT:    Con %0.1 Esc: G, Succ: 
 // CHECK-NEXT:    Val %1 Esc: G, Succ: (%1.1)
 // CHECK-NEXT:    Con %1.1 Esc: G, Succ: %0
-// CHECK-NEXT:    Val %4 Esc: R, Succ: %0
+// CHECK-NEXT:    Val %4 Esc: G, Succ: %0
 // CHECK-NEXT:    Ret Esc: R, Succ: %4
 // CHECK-NEXT:  End
 sil @let_escape : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
@@ -576,7 +575,7 @@ bb0(%0 : $LinkedNode):
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
 // CHECK-NEXT:    Con %0.1 Esc: G, Succ: (%0.2)
 // CHECK-NEXT:    Con %0.2 Esc: G, Succ: (%0.1)
-// CHECK-NEXT:    Val %3 Esc: R, Succ: (%0.1), %0.2
+// CHECK-NEXT:    Val %3 Esc: G, Succ: (%0.1), %0.2
 // CHECK-NEXT:    Val %5 Esc: R, Succ: %0, %3
 // CHECK-NEXT:    Ret Esc: R, Succ: %5
 // CHECK-NEXT:  End
@@ -759,7 +758,7 @@ sil @take_y_box : $@convention(thin) (@owned @box Y) -> ()
 
 // CHECK-LABEL: CG of store_to_unknown_reference
 // CHECK-NEXT:    Arg %0 Esc: G, Succ: 
-// CHECK-NEXT:    Val %2 Esc: , Succ: (%2.1)
+// CHECK-NEXT:    Val %2 Esc: G, Succ: (%2.1)
 // CHECK-NEXT:    Con %2.1 Esc: G, Succ: (%2.2)
 // CHECK-NEXT:    Con %2.2 Esc: G, Succ: %0
 // CHECK-NEXT:  End
@@ -786,6 +785,42 @@ bb0:
 }
 
 sil @unknown_get_reference : $@convention(thin) () -> @owned Y
+
+// A test for a specific case of callee->caller graph merging.
+
+sil @unknown_set_y : $@convention(thin) () -> @out Y
+
+// CHECK-LABEL: CG of get_y
+// CHECK-NEXT:    Val %0 Esc: G, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: G, Succ: 
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0.1
+// CHECK-NEXT:  End
+sil @get_y : $@convention(thin) () -> @owned Y {
+bb0:
+  %0 = alloc_stack $Y
+  %f = function_ref @unknown_set_y : $@convention(thin) () -> @out Y
+  %a = apply %f(%0) : $@convention(thin) () -> @out Y
+  %r = load %0 : $*Y
+  %5 = dealloc_stack %0 : $*Y
+  return %r : $Y
+}
+
+// CHECK-LABEL: CG of create_and_store_x
+// CHECK-NEXT:    Val %0 Esc: G, Succ: 
+// CHECK-NEXT:    Val %2 Esc: G, Succ: (%2.1)
+// CHECK-NEXT:    Con %2.1 Esc: G, Succ: (%2.2)
+// CHECK-NEXT:    Con %2.2 Esc: G, Succ: %0
+// CHECK-NEXT:  End
+sil @create_and_store_x : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %f = function_ref @get_y : $@convention(thin) () -> @owned Y
+  %y = apply %f() : $@convention(thin) () -> @owned Y
+  %x = ref_element_addr %y : $Y, #Y.x
+  store %0 to %x : $*X
+  %r = tuple()
+  return %r : $()
+}
 
 // Test types which are considered as pointers.
 
@@ -849,16 +884,16 @@ bb0:
 }
 
 // CHECK-LABEL: CG of pass_c_func
-// CHECK-NEXT:    Val %2 Esc: , Succ: (%2.1)
+// CHECK-NEXT:    Val %2 Esc: G, Succ: (%2.1)
 // CHECK-NEXT:    Con %2.1 Esc: G, Succ: 
 // CHECK-NEXT:  End
 sil @pass_c_func : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @take_c_func : $@convention(thin) (@convention(c) () -> ()) -> @convention(c) () -> ()
   %1 = function_ref @c_func : $@convention(c) () -> ()
-  %3 = apply %0(%1) : $@convention(thin) (@convention(c) () -> ()) -> @convention(c) () -> ()
-  %4 = tuple ()
-  return %4 : $()
+  %2 = apply %0(%1) : $@convention(thin) (@convention(c) () -> ()) -> @convention(c) () -> ()
+  %3 = tuple ()
+  return %3 : $()
 }
 
 
@@ -1214,3 +1249,38 @@ sil [_semantics "array.get_element_address"] @get_element_address : $@convention
 sil [_semantics "array.get_count"] @get_count : $@convention(method) (@guaranteed Array<X>) -> Int32
 sil [_semantics "array.get_capacity"] @get_capacity : $@convention(method) (@guaranteed Array<X>) -> Int32
 
+sil [_semantics "pair_no_escaping_closure"] @unsafeWithNotEscapedSelfPointerPair : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+sil [_semantics "self_no_escaping_closure"] @unsafeWithNotEscapedSelfPointer: $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+
+// CHECK-LABEL: CG of semantics_pair_no_escaping_closure
+// CHECK-NEXT:   Arg %0 Esc: A, Succ:
+// CHECK-NEXT:   Arg %1 Esc: A, Succ:
+// CHECK-NEXT:   Arg %2 Esc: G, Succ: (%2.1)
+// CHECK-NEXT:   Con %2.1 Esc: G, Succ:
+// CHECK-NEXT:   Val %4 Esc: %5, Succ:
+// CHECK-NEXT: End
+sil @semantics_pair_no_escaping_closure : $@convention(thin) (@owned X, @guaranteed X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType)) -> () {
+bb(%0 : $X, %1 : $X, %2: $@callee_owned (X, X) -> (@out X, @error ErrorType)):
+  %3 = function_ref @unsafeWithNotEscapedSelfPointerPair : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+  %4 = alloc_stack $X
+  %6 = apply [nothrow] %3(%4, %0, %2, %1) : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+  dealloc_stack %4 : $*X
+  %7 = tuple()
+	return %7 : $()
+}
+
+// CHECK-LABEL: CG of semantics_self_no_escaping_closure
+// CHECK-NEXT:   Arg %0 Esc: A, Succ:
+// CHECK-NEXT:   Arg %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:   Con %1.1 Esc: G, Succ:
+// CHECK-NEXT:   Val %3 Esc: %4, Succ:
+// CHECK-NEXT: End
+sil @semantics_self_no_escaping_closure : $@convention(thin) (@guaranteed X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType)) -> () {
+bb(%0 : $X, %1: $@callee_owned (X, X) -> (@out X, @error ErrorType)):
+  %2 = function_ref @unsafeWithNotEscapedSelfPointer : $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+  %3 = alloc_stack $X
+  %6 = apply [nothrow] %2(%3, %1, %0) : $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+  dealloc_stack %3 : $*X
+  %7 = tuple()
+	return %7 : $()
+}

@@ -6,8 +6,8 @@ struct MyLogicValue : Boolean {
   }
 }
 
-func useInt(x: Int) {}
-func useDouble(x: Double) {}
+func useInt(_ x: Int) {}
+func useDouble(_ x: Double) {}
 
 class B {
   init() {} 
@@ -19,9 +19,9 @@ class D2 : B {
   override init() { super.init() } 
 }
 
-func useB(x: B) {}
-func useD1(x: D1) {}
-func useD2(x: D2) {}
+func useB(_ x: B) {}
+func useD1(_ x: D1) {}
+func useD2(_ x: D2) {}
 
 var a = true ? 1 : 0 // should infer Int
 var b : Double = true ? 1 : 0 // should infer Double

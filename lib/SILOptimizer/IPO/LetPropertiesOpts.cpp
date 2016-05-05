@@ -11,12 +11,18 @@
 //===----------------------------------------------------------------------===//
 // Promote values of non-static let properties initialized by means
 // of constant values of simple types into their uses.
+//
+// For any given non-static let property this optimization is only possible
+// if this pass can prove that it has analyzed all assignments of an initial
+// value to this property and all those assignments assign the same value
+// to this property.
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "let-properties-opt"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/SILLinkage.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -40,6 +46,7 @@ class LetPropertiesOpt {
   bool HasChanged = false;
 
   typedef SmallVector<SILInstruction *, 8> Instructions;
+  typedef SmallVector<VarDecl *, 4> Properties;
 
   // Map each let property to a set of instructions accessing it.
   llvm::MapVector<VarDecl *, Instructions> AccessMap;
@@ -48,8 +55,16 @@ class LetPropertiesOpt {
   // Properties in this set should not be processed by this pass
   // anymore.
   llvm::SmallPtrSet<VarDecl *, 16> SkipProcessing;
+  // Types in this set should not be processed by this pass
+  // anymore.
+  llvm::SmallPtrSet<NominalTypeDecl *, 16> SkipTypeProcessing;
   // Properties in this set cannot be removed.
   llvm::SmallPtrSet<VarDecl *, 16> CannotRemove;
+  // Set of let properties in a given nominal type.
+  llvm::MapVector<NominalTypeDecl *, Properties> NominalTypeLetProperties;
+  // Set of properties which already fulfill all conditions, except
+  // the available of constant, statically known initializer.
+  llvm::SmallPtrSet<VarDecl *, 16> PotentialConstantLetProperty;
 
 public:
   LetPropertiesOpt(SILModule *M): Module(M) {}
@@ -59,10 +74,10 @@ public:
 protected:
   bool isConstantLetProperty(VarDecl *Property);
   void collectPropertyAccess(SILInstruction *I, VarDecl *Property, bool NonRemovable);
+  void collectStructPropertiesAccess(StructInst *SI, bool NonRemovable);
   void optimizeLetPropertyAccess(VarDecl *SILG,
                                  SmallVectorImpl<SILInstruction *> &Init);
-  bool getInitializer(NominalTypeDecl *NTD, VarDecl *Property,
-                      SmallVectorImpl<SILInstruction *> &Init);
+  bool analyzeInitValue(SILInstruction *I, VarDecl *Prop);
 };
 
 /// Helper class to copy only a set of SIL instructions providing in the
@@ -110,6 +125,17 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
 
 } // namespace
 
+#ifndef NDEBUG
+// For debugging only.
+static raw_ostream &operator<<(raw_ostream &OS, const VarDecl &decl) {
+  auto *Ty = dyn_cast<NominalTypeDecl>(decl.getDeclContext());
+  if (Ty)
+    OS << Ty->getName() << "::";
+  OS << decl.getName();
+  return OS;
+}
+#endif
+
 /// Optimize access to the let property, which is known
 /// to have a constant value. Replace all loads from the
 /// property by its constant value.
@@ -119,10 +145,15 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
   if (SkipProcessing.count(Property))
     return;
 
+  if (Init.empty())
+    return;
+
   auto *Ty = dyn_cast<NominalTypeDecl>(Property->getDeclContext());
-  DEBUG(llvm::dbgs() << "Replacing access to property "
-                     << Ty->getName() << "::" << Property->getName()
-                     << " by its constant initializer\n");
+  if (SkipTypeProcessing.count(Ty))
+    return;
+
+  DEBUG(llvm::dbgs() << "Replacing access to property '" << *Property
+                     << "' by its constant initializer\n");
 
   auto PropertyAccess = Property->getEffectiveAccess();
   auto TypeAccess = Ty->getEffectiveAccess();
@@ -137,15 +168,15 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
           PropertyAccess == Accessibility::Internal) &&
           Module->isWholeModule())) {
     CanRemove = true;
-    DEBUG(llvm::dbgs() << "Storage for property "
-                       << Ty->getName() << "::" << Property->getName()
-                       << " can be eliminated\n");
+    DEBUG(llvm::dbgs() << "Storage for property '" << *Property
+                       << "' can be eliminated\n");
   }
 
   if (CannotRemove.count(Property))
     CanRemove = false;
 
   if (!AccessMap.count(Property)) {
+    DEBUG(llvm::dbgs() << "Property '" << *Property << "' is never read\n");
     if (CanRemove) {
       // TODO: Remove the let property, because it is never accessed.
     }
@@ -186,6 +217,9 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
       Cloner.clone();
       SILInstruction *I = &*std::prev(Load->getIterator());
       Load->replaceAllUsesWith(I);
+      DEBUG(llvm::dbgs() << "Access to " << *Property << " was replaced:\n";
+            I->dumpInContext());
+
       Load->eraseFromParent();
       ++NumReplaced;
       HasChanged = true;
@@ -211,9 +245,8 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
     }
   }
 
-  DEBUG(llvm::dbgs() << "Access to "
-                     << Ty->getName() << "::" << Property->getName()
-                     << " was replaced " << NumReplaced << " time(s)\n");
+  DEBUG(llvm::dbgs() << "Access to " << *Property << " was replaced "
+                     << NumReplaced << " time(s)\n");
 
   if (CanRemove) {
     // TODO: Remove the let property, because it is never accessed.
@@ -241,113 +274,88 @@ static bool compareInsnSequences(SmallVectorImpl<SILInstruction *> &LHS,
   return true;
 }
 
-/// Find a set of instructions computing the constant value
-/// initializing a given property.
-SILValue findStoredValue(SILFunction *Init, VarDecl *Property,
-                         SmallVectorImpl<SILInstruction *> &Insns) {
-  SILValue ResultValue;
-  for (auto &BB : *Init) {
-    for (auto &I : BB) {
-      if (auto *RI = dyn_cast<ReturnInst>(&I)) {
-        if (auto *SI = dyn_cast<StructInst>(RI->getOperand())) {
-          auto Value = SI->getFieldValue(Property);
-          SmallVector<SILInstruction *, 8> ReverseInsns;
-          if (!analyzeStaticInitializer(Value, ReverseInsns))
-            return SILValue();
-          // Produce a correct order of instructions.
-          while (!ReverseInsns.empty()) {
-            Insns.push_back(ReverseInsns.pop_back_val());
-          }
-          return Value;
-        }
-      }
-
-      if (auto *SI = dyn_cast<StoreInst>(&I)) {
-        auto Dest = SI->getDest();
-
-        auto REAI = dyn_cast<RefElementAddrInst>(Dest);
-        if (!REAI || REAI->getField() != Property)
-            continue;
-        // Bail, if it is not the only assignment to the
-        // required property.
-        if (ResultValue)
-          return SILValue();
-        auto Value = SI->getSrc();
-        SmallVector<SILInstruction *, 8> ReverseInsns;
-        if (!analyzeStaticInitializer(Value, ReverseInsns))
-          return SILValue();
-        // Produce a correct order of instructions.
-        while (!ReverseInsns.empty()) {
-          Insns.push_back(ReverseInsns.pop_back_val());
-        }
-        ResultValue = Value;
-      }
-    }
+/// Check if a given let property can be assigned externally.
+static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
+  Accessibility accessibility = Property->getEffectiveAccess();
+  SILLinkage linkage;
+  switch (accessibility) {
+  case Accessibility::Private:
+    linkage = SILLinkage::Private;
+    DEBUG(llvm::dbgs() << "Property " << *Property << " has private access\n");
+    break;
+  case Accessibility::Internal:
+    linkage = SILLinkage::Hidden;
+    DEBUG(llvm::dbgs() << "Property " << *Property << " has internal access\n");
+    break;
+  case Accessibility::Public:
+    linkage = SILLinkage::Public;
+    DEBUG(llvm::dbgs() << "Property " << *Property << " has public access\n");
+    break;
   }
 
-  return ResultValue;
-}
+  DEBUG(llvm::dbgs() << "Module of " << *Property << " WMO mode is: " << Module->isWholeModule() << "\n");
 
-/// Try to find a sequence of instructions which initializes
-/// a given property \p Property with a constant value.
-/// If all initializers of a type enclosing this property
-/// initialize it with the same constant value, then this
-/// functions returns true and copies this sequence of
-/// instructions into \p Insns.
-/// Otherwise, false is returned, indicating a failure.
-bool
-LetPropertiesOpt::getInitializer(NominalTypeDecl *NTD, VarDecl *Property,
-                                 SmallVectorImpl<SILInstruction *> &Insns) {
-  // Iterate over all initializers of this struct and check
-  // if a given property is initialized in the same way.
+  if (isPossiblyUsedExternally(linkage, Module->isWholeModule())) {
+    // If at least one of the properties of the enclosing type cannot be
+    // used externally, then no initializer can be implemented externally as
+    // it wouldn't be able to initialize such a property.
+    // More over, for classes, only the class itself can initialize its
+    // let properties. Subclasses and extensions cannot do it.
+    // For structs, external extensions may initialize let properties. But to do
+    // that they need to be able to initialize all properties, i.e. all
+    // properties should be accessible by the extension.
 
-  SmallVector<SmallVector<SILInstruction *, 8>, 4> ConstrPropertyInit;
+    auto *Ty = dyn_cast<NominalTypeDecl>(Property->getDeclContext());
 
-  SILFunction *Init = nullptr;
-
-  SILDeclRef::Kind InitializerKind = isa<StructDecl>(NTD) ?
-                                       SILDeclRef::Kind::Allocator:
-                                       SILDeclRef::Kind::Initializer;
-
-  for (auto *Member: NTD->getMembers()) {
-    if (auto *FD = dyn_cast<ConstructorDecl>(Member)) {
-        // Find the SIL body of this initializer.
-        auto SDR = SILDeclRef(FD, InitializerKind);
-        Init = Module->lookUpFunction(SDR);
-        if (!Init)
-          continue;
-        // Analyze the body of the constructor.
-        SmallVector<SILInstruction *, 8> Insns;
-        if (!findStoredValue(Init, Property, Insns))
-          return false;
-        // Remember the set of instructions initializing
-        // this Property inside this constructor.
-        DEBUG(llvm::dbgs() << "Found initializer insns: \n";
-              for (auto I: Insns) {
-                I->dump();
-              });
-        ConstrPropertyInit.push_back(Insns);
-    }
-  }
-
-  // Check that all collected instruction sequences are equivalent.
-  for(int i = 1, e = ConstrPropertyInit.size(); i < e; i++) {
-    if (!compareInsnSequences(ConstrPropertyInit[i-1], ConstrPropertyInit[i])) {
-      DEBUG(llvm::dbgs() << "Not all initializers are the same for "
-                         << Property->getNameStr() << "\n");
+    // Initializer for a let property of a class cannot exist externally.
+    // It cannot be defined by an extension or a derived class.
+    if (isa<ClassDecl>(Ty))
       return false;
+
+    // Check if there are any private properties or any internal properties and
+    // it is a whole module compilation. In this case, no external initializer
+    // may exist.
+    for (auto SP : Ty->getStoredProperties()) {
+      auto storedPropertyAccessibility = SP->getEffectiveAccess();
+      if (storedPropertyAccessibility == Accessibility::Private ||
+          (storedPropertyAccessibility == Accessibility::Internal &&
+           Module->isWholeModule())) {
+       DEBUG(llvm::dbgs() << "Property " << *Property
+                       << " cannot be set externally\n");
+       return false;
+      }
     }
+
+    DEBUG(llvm::dbgs() << "Property " << *Property
+                       << " can be used externally\n");
+    return true;
   }
 
-  if (ConstrPropertyInit.empty())
-    return false;
-
-  DEBUG(llvm::dbgs() << "All initializers are the same for "
-                     << Property->getNameStr() << "\n");
-  Insns = ConstrPropertyInit[0];
-
-  return true;
+  return false;
 }
+
+// Checks if a given property may have any unknown uses which cannot
+// be analyzed by this pass.
+static bool mayHaveUnknownUses(VarDecl *Property, SILModule *Module) {
+  if (Property->getDeclContext()->getParentModule() !=
+      Module->getAssociatedContext()->getParentModule()) {
+    DEBUG(llvm::dbgs() << "Property " << *Property
+                       << " is defined in a different module\n");
+    // We don't see the bodies of initializers from a different module
+    // unless all of them are fragile.
+    // TODO: Support fragile initializers.
+    return true;
+  }
+
+  // If let properties can be assigned externally, we don't know
+  // the values they may get.
+  if (isAssignableExternally(Property, Module)) {
+    return true;
+  }
+
+  return false;
+}
+
 
 /// Check if a given property is a non-static let property
 /// with known constant value.
@@ -357,45 +365,194 @@ bool LetPropertiesOpt::isConstantLetProperty(VarDecl *Property) {
     return false;
 
   // Do not re-process already known properties.
-  if (InitMap.count(Property))
-    return true;
-
   if (SkipProcessing.count(Property))
     return false;
 
+  // If these checks were performed already, no need to
+  // repeat them.
+  if (PotentialConstantLetProperty.count(Property))
+    return true;
+
+  // Check the visibility of this property. If its visibility
+  // implies that this optimization pass cannot analyze all uses,
+  // don't process it.
+  if (mayHaveUnknownUses(Property, Module)) {
+    DEBUG(llvm::dbgs() << "Property '" << *Property
+                       << "' may have unknown uses\n");
+    SkipProcessing.insert(Property);
+    return false;
+  }
+
+  DEBUG(llvm::dbgs() << "Property '" << *Property
+                      << "' has no unknown uses\n");
+
   // Only properties of simple types can be optimized.
-  if(!isSimpleType(Module->Types.getLoweredType(Property->getType()), *Module)) {
+  if (!isSimpleType(Module->Types.getLoweredType(Property->getType()), *Module)) {
+     DEBUG(llvm::dbgs() << "Property '" << *Property
+                       << "' is not of trivial type\n");
     SkipProcessing.insert(Property);
     return false;
   }
 
-  auto Ty = dyn_cast<NominalTypeDecl>(Property->getDeclContext());
-
-  bool Init = false;
-
-  if (Ty) {
-    if (StructDecl *SD = dyn_cast<StructDecl>(Ty)) {
-      Init = getInitializer(SD, Property, InitMap[Property]);
-    }
-
-    if (auto *CD = dyn_cast<ClassDecl>(Ty)) {
-      Init = getInitializer(CD, Property, InitMap[Property]);
-    }
-  }
-
-  if (!Init) {
-    // Remember that this property does not have a constant initializer.
-    SkipProcessing.insert(Property);
-    return false;
-  }
+  PotentialConstantLetProperty.insert(Property);
 
   return true;
 }
+
+// Analyze the init value being stored by the instruction into a property.
+bool
+LetPropertiesOpt::analyzeInitValue(SILInstruction *I, VarDecl *Property) {
+  SmallVector<SILInstruction *, 8> Insns;
+  SmallVector<SILInstruction *, 8> ReverseInsns;
+  SILValue ValueOfProperty;
+  if (auto SI = dyn_cast<StructInst>(I)) {
+    ValueOfProperty = SI->getFieldValue(Property);
+  } else if (auto SI = dyn_cast<StoreInst>(I)) {
+    auto Dest = SI->getDest();
+
+    assert(((isa<RefElementAddrInst>(Dest) &&
+             cast<RefElementAddrInst>(Dest)->getField() == Property) ||
+            (isa<StructElementAddrInst>(Dest) &&
+             cast<StructElementAddrInst>(Dest)->getField() == Property)) &&
+           "Store instruction should store into a proper let property");
+    (void) Dest;
+    ValueOfProperty = SI->getSrc();
+  }
+
+  // Bail if a value of a property is not a statically known constant init.
+  if (!analyzeStaticInitializer(ValueOfProperty, ReverseInsns))
+    return false;
+
+  // Produce a correct order of instructions.
+  while (!ReverseInsns.empty()) {
+    Insns.push_back(ReverseInsns.pop_back_val());
+  }
+
+  auto &InitInsns = InitMap[Property];
+  if (!InitInsns.empty() && !compareInsnSequences(InitInsns, Insns)) {
+    // The found init value is different from the already seen init value.
+    return false;
+  } else {
+    DEBUG(llvm::dbgs() << "The value of property '" << *Property
+                       << "' is statically known so far\n");
+    // Remember the statically known value.
+    InitInsns = Insns;
+    return true;
+  }
+}
+
+// Analyze the 'struct' instruction and check if it initializes
+// any let properties by statically known constant initializers.
+void LetPropertiesOpt::collectStructPropertiesAccess(StructInst *SI,
+                                                     bool NonRemovable) {
+  auto structDecl = SI->getStructDecl();
+  // Check if this struct has any let properties.
+
+  // Bail, if this struct is known to contain nothing interesting.
+  if (SkipTypeProcessing.count(structDecl))
+    return;
+
+  // Get the set of let properties defined by this struct.
+  if (!NominalTypeLetProperties.count(structDecl)) {
+    // Compute the let properties of this struct.
+    SmallVector<VarDecl *, 4> LetProps;
+
+    for (auto Prop : structDecl->getStoredProperties()) {
+      if (!isConstantLetProperty(Prop))
+        continue;
+      LetProps.push_back(Prop);
+    }
+
+    if (LetProps.empty()) {
+      // No interesting let properties in this struct.
+      SkipTypeProcessing.insert(structDecl);
+      return;
+    }
+
+    NominalTypeLetProperties[structDecl] = LetProps;
+    DEBUG(llvm::dbgs() << "Computed set of let properties for struct '"
+                       << structDecl->getName() << "'\n");
+  }
+
+  auto &Props = NominalTypeLetProperties[structDecl];
+
+  DEBUG(llvm::dbgs()
+            << "Found a struct instruction initializing some let properties: ";
+        SI->dumpInContext());
+  // Figure out the initializing sequence for each
+  // of the properties.
+  for (auto Prop : Props) {
+    if (SkipProcessing.count(Prop))
+      continue;
+    SILValue PropValue = SI->getOperandForField(Prop)->get();
+    DEBUG(llvm::dbgs() << "Check the value of property '" << *Prop
+                       << "' :" << PropValue << "\n");
+    if (!analyzeInitValue(SI, Prop)) {
+      SkipProcessing.insert(Prop);
+      DEBUG(llvm::dbgs() << "The value of a let property '" << *Prop
+                         << "' is not statically known\n");
+    }
+    (void) PropValue;
+  }
+}
+
+/// Check if I is a sequence of projections followed by a load.
+/// Since it is supposed to be a load from a let property with
+/// statically known constant initializer, only struct_element_addr
+/// and tuple_element_addr projections are considered.
+static bool isValidPropertyLoad(SILInstruction *I) {
+  if (isa<LoadInst>(I))
+    return true;
+
+  if (isa<StructElementAddrInst>(I) || isa<TupleElementAddrInst>(I)) {
+    for (auto Use : getNonDebugUses(I))
+      if (!isValidPropertyLoad(Use->getUser()))
+        return false;
+    return true;
+  }
+
+  return false;
+}
+
 
 /// Remember where this property is accessed.
 void LetPropertiesOpt::collectPropertyAccess(SILInstruction *I,
                                              VarDecl *Property,
                                              bool NonRemovable) {
+  if (!isConstantLetProperty(Property))
+    return;
+
+  DEBUG(llvm::dbgs() << "Collecting property access for property '" << *Property
+                     << "':\n";
+        llvm::dbgs() << "The instructions are:\n"; I->dumpInContext());
+
+  if (isa<RefElementAddrInst>(I) || isa<StructElementAddrInst>(I)) {
+    // Check if there is a store to this property.
+    for (auto Use : getNonDebugUses(I)) {
+      auto *User = Use->getUser();
+
+      if (auto *SI = dyn_cast<StoreInst>(User)) {
+        // There is a store into this property.
+        // Analyze the assigned value and check if it is a constant
+        // statically known initializer.
+        if (SI->getDest() != I || !analyzeInitValue(SI, Property)) {
+          SkipProcessing.insert(Property);
+          return;
+        }
+        continue;
+      }
+
+      // Follow the chain of projections and check if it ends up with a load.
+      // If this is not the case, it is potentially a store into sub-property
+      // of a property.
+      // We cannot handle such cases yet, so bail.
+      if (!isValidPropertyLoad(User)) {
+        SkipProcessing.insert(Property);
+        return;
+      }
+    }
+  }
+
   AccessMap[Property].push_back(I);
   // If any property is marked as non-removable, their initialization
   // and storage cannot be completely removed. But their constant
@@ -415,18 +572,17 @@ bool LetPropertiesOpt::run() {
     for (auto &BB : F) {
       for (auto &I : BB)
         // Look for any instructions accessing let properties.
+        // It includes referencing this specific property (both reads and
+        // stores), as well as implicit stores by means of e.g.
+        // a struct instruction.
         if (auto *REAI = dyn_cast<RefElementAddrInst>(&I)) {
-          if (!isConstantLetProperty(REAI->getField()))
-            continue;
           collectPropertyAccess(REAI, REAI->getField(), NonRemovable);
         } else if (auto *SEI = dyn_cast<StructExtractInst>(&I)) {
-          if (!isConstantLetProperty(SEI->getField()))
-            continue;
           collectPropertyAccess(SEI, SEI->getField(), NonRemovable);
         }  else if (auto *SEAI = dyn_cast<StructElementAddrInst>(&I)) {
-          if (!isConstantLetProperty(SEAI->getField()))
-            continue;
           collectPropertyAccess(SEAI, SEAI->getField(), NonRemovable);
+        } else if (auto *SI = dyn_cast<StructInst>(&I)) {
+          collectStructPropertiesAccess(SI, NonRemovable);
         }
     }
   }

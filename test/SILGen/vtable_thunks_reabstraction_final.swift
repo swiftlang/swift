@@ -1,22 +1,22 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 protocol Fooable {
-  func foo(x: Int) -> Int?
+  func foo(_ x: Int) -> Int?
 }
 
 protocol Barrable {
   associatedtype Bar
-  func foo(x: Bar) -> Bar?
+  func foo(_ x: Bar) -> Bar?
 }
 
 class GenericSuper<T> {
-  func foo(x: T) -> T? {
+  func foo(_ x: T) -> T? {
     return nil
   }
 }
 
 class NongenericSub: GenericSuper<Int>, Fooable {
-  override func foo(x: Int) -> Int? {
+  override func foo(_ x: Int) -> Int? {
     return 6502
   }
 }
@@ -25,7 +25,7 @@ class NongenericSub: GenericSuper<Int>, Fooable {
 // CHECK:         class_method {{%.*}} : $NongenericSub, #NongenericSub.foo!1 {{.*}}, $@convention(method) (@in Int, @guaranteed NongenericSub) -> @out Optional<Int>
 
 class GenericSub<U: AnyObject>: GenericSuper<U>, Barrable {
-  override func foo(x: U) -> U? {
+  override func foo(_ x: U) -> U? {
     return x
   }
 }

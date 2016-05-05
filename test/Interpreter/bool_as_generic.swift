@@ -10,7 +10,7 @@ prefix func !!<T : Boolean>(x: T) -> Bool {
   return x.boolValue
 }
 
-func &&&(x: Boolean, @autoclosure y: () -> Boolean) -> Bool {
+func &&&(x: Boolean, y: @autoclosure () -> Boolean) -> Bool {
   return x.boolValue ? y().boolValue : false
 }
 

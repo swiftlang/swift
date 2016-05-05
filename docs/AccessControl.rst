@@ -6,7 +6,7 @@ The general guiding principle of Swift access control:
 
   **No entity can be defined in terms of another entity that has a lower
   access level.**
-	
+
 There are three levels of access: "private", "internal", and "public".
 Private entities can only be accessed from within the source file where they
 are defined. Internal entities can be accessed anywhere within the module they

@@ -6,7 +6,7 @@
 
 // REQUIRES: OS=macosx
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 @available(OSX, introduced: 10.9)
 func globalFuncAvailableOn10_9() -> Int { return 9 }
@@ -114,7 +114,7 @@ globalFuncAvailableOn10_51() // expected-error {{'globalFuncAvailableOn10_51()' 
 func overloadedFunction() {}
 
 @available(OSX, introduced: 10.51)
-func overloadedFunction(on1010: Int) {}
+func overloadedFunction(_ on1010: Int) {}
 
 overloadedFunction()
 overloadedFunction(0) // expected-error {{'overloadedFunction' is only available on OS X 10.51 or newer}}
@@ -141,7 +141,7 @@ class ClassWithUnavailableMethod {
   }
 }
 
-func callUnavailableMethods(o: ClassWithUnavailableMethod) {
+func callUnavailableMethods(_ o: ClassWithUnavailableMethod) {
   let m10_9 = o.methAvailableOn10_9
   m10_9()
   
@@ -157,7 +157,7 @@ func callUnavailableMethods(o: ClassWithUnavailableMethod) {
       // expected-note@-2 {{add 'if #available' version check}}
 }
 
-func callUnavailableMethodsViaIUO(o: ClassWithUnavailableMethod!) {
+func callUnavailableMethodsViaIUO(_ o: ClassWithUnavailableMethod!) {
   let m10_9 = o.methAvailableOn10_9
   m10_9()
   
@@ -226,10 +226,10 @@ class ClassWithUnavailableOverloadedMethod {
   func overloadedMethod() {}
 
   @available(OSX, introduced: 10.51)
-  func overloadedMethod(on1010: Int) {}
+  func overloadedMethod(_ on1010: Int) {}
 }
 
-func callUnavailableOverloadedMethod(o: ClassWithUnavailableOverloadedMethod) {
+func callUnavailableOverloadedMethod(_ o: ClassWithUnavailableOverloadedMethod) {
   o.overloadedMethod()
   o.overloadedMethod(0) // expected-error {{'overloadedMethod' is only available on OS X 10.51 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing global function}}
@@ -418,7 +418,7 @@ class ClassWithReferencesInInitializers {
       // expected-note@-1 {{add @available attribute to enclosing var}}
 }
 
-func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
+func accessUnavailableProperties(_ o: ClassWithUnavailableProperties) {
   // Stored properties
   let _: Int = o.availableOn10_9Stored
   let _: Int = o.availableOn10_51Stored // expected-error {{'availableOn10_51Stored' is only available on OS X 10.51 or newer}}
@@ -497,7 +497,7 @@ func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
   
   // Inout requires access to both getter and setter
   
-  func takesInout(i : inout Int) { }
+  func takesInout(_ i : inout Int) { }
   
   takesInout(&o.propWithGetterOnlyAvailableOn10_51) // expected-error {{cannot pass as inout because getter for 'propWithGetterOnlyAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing global function}}
@@ -521,7 +521,7 @@ func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
 
 @_silgen_name("SomeName")
 @available(OSX, introduced: 10.51)
-func funcWith_silgen_nameAvailableOn10_51(p: ClassAvailableOn10_51?) -> ClassAvailableOn10_51
+func funcWith_silgen_nameAvailableOn10_51(_ p: ClassAvailableOn10_51?) -> ClassAvailableOn10_51
 
 // Enums
 
@@ -560,7 +560,7 @@ enum CompassPoint {
 }
 
 @available(OSX, introduced: 10.52)
-func functionTakingEnumIntroducedOn10_52(e: EnumIntroducedOn10_52) { }
+func functionTakingEnumIntroducedOn10_52(_ e: EnumIntroducedOn10_52) { }
 
 func useEnums() {
   let _: CompassPoint = .North // expected-error {{'CompassPoint' is only available on OS X 10.51 or newer}}
@@ -651,7 +651,7 @@ func classAvailability() {
   let _ = o10_51.someProp 
 }
 
-func castingUnavailableClass(o : AnyObject) {
+func castingUnavailableClass(_ o : AnyObject) {
   let _ = o as! ClassAvailableOn10_51 // expected-error {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing global function}}
       // expected-note@-2 {{add 'if #available' version check}}
@@ -747,14 +747,14 @@ class ClassWithDeclarationsOfUnavailableClasses {
   @available(OSX, introduced: 10.51)
   static var unavailableStaticPropertyOfOptionalUnavailableType: ClassAvailableOn10_51?
 
-  func methodWithUnavailableParameterType(o : ClassAvailableOn10_51) { // expected-error {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
+  func methodWithUnavailableParameterType(_ o : ClassAvailableOn10_51) { // expected-error {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing class}}
       // expected-note@-2 {{add @available attribute to enclosing instance method}}
 
   }
   
   @available(OSX, introduced: 10.51)
-  func unavailableMethodWithUnavailableParameterType(o : ClassAvailableOn10_51) {
+  func unavailableMethodWithUnavailableParameterType(_ o : ClassAvailableOn10_51) {
   }
   
   func methodWithUnavailableReturnType() -> ClassAvailableOn10_51 { // expected-error {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
@@ -937,11 +937,11 @@ class SomeGenericClass<T> { }
 class SubclassAvailableOn10_9OfSomeGenericClassOfProtocolAvailableOn10_51 : SomeGenericClass<ProtocolAvailableOn10_51> { // expected-error {{'ProtocolAvailableOn10_51' is only available on OS X 10.51 or newer}}
 }
 
-func GenericWhereClause<T where T: ProtocolAvailableOn10_51>(t: T) { // expected-error * {{'ProtocolAvailableOn10_51' is only available on OS X 10.51 or newer}}
+func GenericWhereClause<T where T: ProtocolAvailableOn10_51>(_ t: T) { // expected-error * {{'ProtocolAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-1 * {{add @available attribute to enclosing global function}}
 }
 
-func GenericSignature<T : ProtocolAvailableOn10_51>(t: T) { // expected-error * {{'ProtocolAvailableOn10_51' is only available on OS X 10.51 or newer}}
+func GenericSignature<T : ProtocolAvailableOn10_51>(_ t: T) { // expected-error * {{'ProtocolAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-1 * {{add @available attribute to enclosing global function}}
 }
 
@@ -1008,7 +1008,7 @@ func useUnavailableExtension() {
 
 // Useless #available(...) checks
 
-func functionWithDefaultAvailabilityAndUselessCheck(p: Bool) {
+func functionWithDefaultAvailabilityAndUselessCheck(_ p: Bool) {
 // Default availability reflects minimum deployment: 10.9 and up
 
   if #available(OSX 10.9, *) { // expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
@@ -1094,7 +1094,7 @@ func functionWithSpecifiedAvailabilityAndUselessCheck() { // expected-note 2{{en
 
 // #available(...) outside if statement guards
 
-func injectToOptional<T>(v: T) -> T? {
+func injectToOptional<T>(_ v: T) -> T? {
   return v
 }
 
@@ -1168,7 +1168,7 @@ func useGuardAvailable() {
 
 }
 
-func twoGuardsInSameBlock(p: Int) {
+func twoGuardsInSameBlock(_ p: Int) {
   if (p > 0) {
     guard #available(OSX 10.51, *) else { return }
 
@@ -1243,7 +1243,7 @@ func fixitForReferenceInGlobalFunctionWithAttribute() {
     // expected-note@-3 {{add @available attribute to enclosing global function}} {{1-1=@available(OSX 10.51, *)\n}}
 }
 
-func takesAutoclosure(@autoclosure c : () -> ()) {
+func takesAutoclosure(_ c : @autoclosure () -> ()) {
 }
 
 class ClassForFixit {
@@ -1382,7 +1382,7 @@ func testForFixitWithNestedMemberRefExpr() {
 // Protocol Conformances
 
 protocol ProtocolWithRequirementMentioningUnavailable {
-  func hasUnavailableParameter(p: ClassAvailableOn10_51) // expected-error * {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
+  func hasUnavailableParameter(_ p: ClassAvailableOn10_51) // expected-error * {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-1 * {{add @available attribute to enclosing instance method}}
       // expected-note@-2 * {{add @available attribute to enclosing protocol}}
 
@@ -1391,17 +1391,17 @@ protocol ProtocolWithRequirementMentioningUnavailable {
       // expected-note@-2 * {{add @available attribute to enclosing protocol}}
 
   @available(OSX 10.51, *)
-  func hasUnavailableWithAnnotation(p: ClassAvailableOn10_51) -> ClassAvailableOn10_51
+  func hasUnavailableWithAnnotation(_ p: ClassAvailableOn10_51) -> ClassAvailableOn10_51
 }
 
 protocol HasMethodF {
   associatedtype T
-  func f(p: T) // expected-note 5{{protocol requirement here}}
+  func f(_ p: T) // expected-note 5{{protocol requirement here}}
 }
 
 class TriesToConformWithFunctionIntroducedOn10_51 : HasMethodF { // expected-note {{conformance introduced here}}
   @available(OSX, introduced: 10.51)
-  func f(p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available on OS X 10.50.0 and newer}}
+  func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available on OS X 10.50.0 and newer}}
 }
 
 
@@ -1409,12 +1409,12 @@ class ConformsWithFunctionIntroducedOnMinimumDeploymentTarget : HasMethodF {
   // Even though this function is less available than its requirement,
   // it is available on a deployment targets, so the conformance is safe.
   @available(OSX, introduced: 10.9)
-  func f(p: Int) { }
+  func f(_ p: Int) { }
 }
 
 class SuperHasMethodF {
   @available(OSX, introduced: 10.51)
-    func f(p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available on OS X 10.50.0 and newer}}
+    func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available on OS X 10.50.0 and newer}}
 }
 
 class TriesToConformWithUnavailableFunctionInSuperClass : SuperHasMethodF, HasMethodF { // expected-note {{conformance introduced here}}
@@ -1432,7 +1432,7 @@ class ConformsWithUnavailableFunctionInSuperClass : SuperHasMethodF, HasMethodF 
 class ConformsByOverridingFunctionInSuperClass : SuperHasMethodF, HasMethodF {
   // Now the witness is this f() (which is always available) and not the f()
   // from the super class, so conformance is safe.
-  override func f(p: Int) { }
+  override func f(_ p: Int) { }
 }
 
 
@@ -1441,13 +1441,13 @@ class ConformsByOverridingFunctionInSuperClass : SuperHasMethodF, HasMethodF {
 class HasNoMethodF1 { }
 extension HasNoMethodF1 : HasMethodF { // expected-note {{conformance introduced here}}
   @available(OSX, introduced: 10.51)
-  func f(p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available on OS X 10.50.0 and newer}}
+  func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available on OS X 10.50.0 and newer}}
 }
 
 class HasNoMethodF2 { }
 @available(OSX, introduced: 10.51)
 extension HasNoMethodF2 : HasMethodF { // expected-note {{conformance introduced here}}
-  func f(p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available on OS X 10.50.0 and newer}}
+  func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available on OS X 10.50.0 and newer}}
 }
 
 @available(OSX, introduced: 10.51)
@@ -1456,54 +1456,54 @@ class HasNoMethodF3 { }
 extension HasNoMethodF3 : HasMethodF {
   // We expect this conformance to succeed because on every version where HasNoMethodF3
   // is available, HasNoMethodF3's f() is as available as the protocol requirement
-  func f(p: Int) { }
+  func f(_ p: Int) { }
 }
 
 @available(OSX, introduced: 10.51)
 protocol HasMethodFOn10_51 {
-  func f(p: Int) // expected-note {{protocol requirement here}}
+  func f(_ p: Int) // expected-note {{protocol requirement here}}
 }
 
 class ConformsToUnavailableProtocolWithUnavailableWitness : HasMethodFOn10_51 {
   @available(OSX, introduced: 10.51)
-  func f(p: Int) { }
+  func f(_ p: Int) { }
 }
 
 @available(OSX, introduced: 10.51)
 class HasNoMethodF4 { }
 @available(OSX, introduced: 10.52)
 extension HasNoMethodF4 : HasMethodFOn10_51 { // expected-note {{conformance introduced here}}
-  func f(p: Int) { } // expected-error {{protocol 'HasMethodFOn10_51' requires 'f' to be available on OS X 10.51 and newer}}
+  func f(_ p: Int) { } // expected-error {{protocol 'HasMethodFOn10_51' requires 'f' to be available on OS X 10.51 and newer}}
 }
 
 @available(OSX, introduced: 10.51)
 protocol HasTakesClassAvailableOn10_51 {
-  func takesClassAvailableOn10_51(o: ClassAvailableOn10_51) // expected-note 2{{protocol requirement here}}
+  func takesClassAvailableOn10_51(_ o: ClassAvailableOn10_51) // expected-note 2{{protocol requirement here}}
 }
 
 class AttemptsToConformToHasTakesClassAvailableOn10_51 : HasTakesClassAvailableOn10_51 { // expected-note {{conformance introduced here}}
   @available(OSX, introduced: 10.52)
-  func takesClassAvailableOn10_51(o: ClassAvailableOn10_51) { // expected-error {{protocol 'HasTakesClassAvailableOn10_51' requires 'takesClassAvailableOn10_51' to be available on OS X 10.51 and newer}}
+  func takesClassAvailableOn10_51(_ o: ClassAvailableOn10_51) { // expected-error {{protocol 'HasTakesClassAvailableOn10_51' requires 'takesClassAvailableOn10_51' to be available on OS X 10.51 and newer}}
   }
 }
 
 class ConformsToHasTakesClassAvailableOn10_51 : HasTakesClassAvailableOn10_51 {
   @available(OSX, introduced: 10.51)
-  func takesClassAvailableOn10_51(o: ClassAvailableOn10_51) {
+  func takesClassAvailableOn10_51(_ o: ClassAvailableOn10_51) {
   }
 }
 
 class TakesClassAvailableOn10_51_A { }
 extension TakesClassAvailableOn10_51_A : HasTakesClassAvailableOn10_51 { // expected-note {{conformance introduced here}}
   @available(OSX, introduced: 10.52)
-  func takesClassAvailableOn10_51(o: ClassAvailableOn10_51) { // expected-error {{protocol 'HasTakesClassAvailableOn10_51' requires 'takesClassAvailableOn10_51' to be available on OS X 10.51 and newer}}
+  func takesClassAvailableOn10_51(_ o: ClassAvailableOn10_51) { // expected-error {{protocol 'HasTakesClassAvailableOn10_51' requires 'takesClassAvailableOn10_51' to be available on OS X 10.51 and newer}}
   }
 }
 
 class TakesClassAvailableOn10_51_B { }
 extension TakesClassAvailableOn10_51_B : HasTakesClassAvailableOn10_51 {
   @available(OSX, introduced: 10.51)
-  func takesClassAvailableOn10_51(o: ClassAvailableOn10_51) {
+  func takesClassAvailableOn10_51(_ o: ClassAvailableOn10_51) {
   }
 }
 
@@ -1518,28 +1518,28 @@ class TestAvailabilityDoesNotAffectWitnessCandidacy : HasMethodF { // expected-n
   // witness that has suitable availability.
 
   @available(OSX, introduced: 10.51)
-  func f(p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available on OS X 10.50.0 and newer}}
+  func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available on OS X 10.50.0 and newer}}
 
-  func f<T>(p: T) { }
+  func f<T>(_ p: T) { }
 }
 
 protocol HasUnavailableMethodF {
   @available(OSX, introduced: 10.51)
-  func f(p: String)
+  func f(_ p: String)
 }
 
 class ConformsWithUnavailableFunction : HasUnavailableMethodF {
   @available(OSX, introduced: 10.9)
-  func f(p: String) { }
+  func f(_ p: String) { }
 }
 
-func useUnavailableProtocolMethod(h: HasUnavailableMethodF) {
+func useUnavailableProtocolMethod(_ h: HasUnavailableMethodF) {
   h.f("Foo") // expected-error {{'f' is only available on OS X 10.51 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing global function}}
       // expected-note@-2 {{add 'if #available' version check}}
 }
 
-func useUnavailableProtocolMethod<H : HasUnavailableMethodF> (h: H) {
+func useUnavailableProtocolMethod<H : HasUnavailableMethodF> (_ h: H) {
   h.f("Foo") // expected-error {{'f' is only available on OS X 10.51 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing global function}}
       // expected-note@-2 {{add 'if #available' version check}}

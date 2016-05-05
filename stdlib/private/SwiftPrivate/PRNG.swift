@@ -12,21 +12,18 @@
 
 import SwiftShims
 
-@inline(never) @_semantics("stdlib_binary_only") // Hide the libbsd dependency
 public func rand32() -> UInt32 {
-  return _swift_stdlib_arc4random()
+  return _swift_stdlib_cxx11_mt19937()
 }
 
-@inline(never) @_semantics("stdlib_binary_only") // Hide the libbsd dependency
 public func rand32(exclusiveUpperBound limit: UInt32) -> UInt32 {
-  return _swift_stdlib_arc4random_uniform(limit)
+  return _swift_stdlib_cxx11_mt19937_uniform(limit)
 }
 
-@inline(never) @_semantics("stdlib_binary_only") // Hide the libbsd dependency
 public func rand64() -> UInt64 {
   return
-    (UInt64(_swift_stdlib_arc4random()) << 32) |
-    UInt64(_swift_stdlib_arc4random())
+    (UInt64(_swift_stdlib_cxx11_mt19937()) << 32) |
+    UInt64(_swift_stdlib_cxx11_mt19937())
 }
 
 public func randInt() -> Int {
@@ -39,7 +36,7 @@ public func randInt() -> Int {
 #endif
 }
 
-public func randArray64(count: Int) -> [UInt64] {
+public func randArray64(_ count: Int) -> [UInt64] {
   var result = [UInt64](repeating: 0, count: count)
   for i in result.indices {
     result[i] = rand64()
@@ -47,7 +44,7 @@ public func randArray64(count: Int) -> [UInt64] {
   return result
 }
 
-public func randArray(count: Int) -> [Int] {
+public func randArray(_ count: Int) -> [Int] {
   var result = [Int](repeating: 0, count: count)
   for i in result.indices {
     result[i] = randInt()
@@ -56,8 +53,8 @@ public func randArray(count: Int) -> [Int] {
 }
 
 public func pickRandom<
-  C : Collection where C.Index : RandomAccessIndex
->(c: C) -> C.Iterator.Element {
+  C : RandomAccessCollection
+>(_ c: C) -> C.Iterator.Element {
   let i = Int(rand32(exclusiveUpperBound: numericCast(c.count)))
-  return c[c.startIndex.advanced(by: numericCast(i))]
+  return c[c.index(c.startIndex, offsetBy: numericCast(i))]
 }

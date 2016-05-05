@@ -33,6 +33,8 @@
 
 using namespace swift;
 
+llvm::cl::opt<bool> DisableARCRRMotion("disable-code-motion-arc", llvm::cl::init(true));
+
 //===----------------------------------------------------------------------===//
 //                          ARC Matching Set Builder
 //===----------------------------------------------------------------------===//
@@ -292,6 +294,12 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
   // releases do not have to be bottomup, or vice-versa.
   assert(HaveIncInsertPts == HaveDecInsertPts &&
          "Asymmetric insertion points for retains and releases");
+
+  bool CodeMotionBlocked = HaveIncInsertPts || HaveDecInsertPts;
+  if (DisableARCRRMotion && CodeMotionBlocked && !UnconditionallySafe) {
+    DEBUG(llvm::dbgs() << "Code motion blocked. Bailing!\n");
+    return false;
+  }
 
   // If we have insertion points and partial merges, return false to avoid
   // control dependency issues.

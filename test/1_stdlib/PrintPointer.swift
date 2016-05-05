@@ -3,45 +3,38 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 let PrintTests = TestSuite("PrintPointer")
 PrintTests.test("Printable") {
-  let nullUP: UnsafeMutablePointer<Float> = nil
-  let fourByteUP = UnsafeMutablePointer<Float>(bitPattern: 0xabcd1234 as UInt)
+  let lowUP = UnsafeMutablePointer<Float>(bitPattern: 0x1)!
+  let fourByteUP = UnsafeMutablePointer<Float>(bitPattern: 0xabcd1234 as UInt)!
   
 #if !(arch(i386) || arch(arm))
   let eightByteAddr: UInt = 0xabcddcba12344321
-  let eightByteUP = UnsafeMutablePointer<Float>(bitPattern: eightByteAddr)
+  let eightByteUP = UnsafeMutablePointer<Float>(bitPattern: eightByteAddr)!
 #endif
   
 #if arch(i386) || arch(arm)
-  let expectedNull = "0x00000000"
+  let expectedLow = "0x00000001"
   expectPrinted("0xabcd1234", fourByteUP)
 #else
-  let expectedNull = "0x0000000000000000"
+  let expectedLow = "0x0000000000000001"
   expectPrinted("0x00000000abcd1234", fourByteUP)
   expectPrinted("0xabcddcba12344321", eightByteUP)
 #endif
   
-  expectPrinted(expectedNull, nullUP)
+  expectPrinted(expectedLow, lowUP)
   
-  expectPrinted("UnsafeBufferPointer(start: \(expectedNull), count: 0)",
-    UnsafeBufferPointer(start: nullUP, count: 0))
-  expectPrinted("UnsafeMutableBufferPointer(start: \(expectedNull), count: 0)",
-    UnsafeMutableBufferPointer(start: nullUP, count: 0))
+  expectPrinted("UnsafeBufferPointer(start: \(fourByteUP), count: 0)",
+    UnsafeBufferPointer(start: fourByteUP, count: 0))
+  expectPrinted("UnsafeMutableBufferPointer(start: \(fourByteUP), count: 0)",
+    UnsafeMutableBufferPointer(start: fourByteUP, count: 0))
   
-  let nullOpaque: OpaquePointer = nil
-  expectPrinted(expectedNull, nullOpaque)
-  expectPrinted(expectedNull, CVaListPointer(_fromUnsafeMutablePointer: nullUP))
+  let lowOpaque = OpaquePointer(lowUP)
+  expectPrinted(expectedLow, lowOpaque)
 #if _runtime(_ObjC)
-  let nullAutoUP: AutoreleasingUnsafeMutablePointer<Int> = nil
-  expectPrinted(expectedNull, nullAutoUP)
+  let lowAutoUP = AutoreleasingUnsafeMutablePointer<Int>(lowUP)
+  expectPrinted(expectedLow, lowAutoUP)
 #endif
 }
 

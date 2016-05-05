@@ -116,14 +116,14 @@ extension Zang : Frungible {
 
 // -- Force generation of witness for Zim.
 // CHECK: define hidden { %objc_object*, i8** } @_TF14objc_protocols22mixed_heritage_erasure{{.*}}
-func mixed_heritage_erasure(x: Zim) -> Frungible {
+func mixed_heritage_erasure(_ x: Zim) -> Frungible {
   return x
   // CHECK: [[T0:%.*]] = insertvalue { %objc_object*, i8** } undef, %objc_object* {{%.*}}, 0
   // CHECK: insertvalue { %objc_object*, i8** } [[T0]], i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* [[ZIM_FRUNGIBLE_WITNESS]], i32 0, i32 0), 1
 }
 
 // CHECK-LABEL: define hidden void @_TF14objc_protocols12objc_generic{{.*}}(%objc_object*, %swift.type* %T) {{.*}} {
-func objc_generic<T : NSRuncing>(x: T) {
+func objc_generic<T : NSRuncing>(_ x: T) {
   x.runce()
   // CHECK: [[SELECTOR:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
   // CHECK: bitcast %objc_object* %0 to [[OBJTYPE:.*]]*
@@ -132,12 +132,12 @@ func objc_generic<T : NSRuncing>(x: T) {
 
 // CHECK-LABEL: define hidden void @_TF14objc_protocols17call_objc_generic{{.*}}(%objc_object*, %swift.type* %T) {{.*}} {
 // CHECK:         call void @_TF14objc_protocols12objc_generic{{.*}}(%objc_object* %0, %swift.type* %T)
-func call_objc_generic<T : NSRuncing>(x: T) {
+func call_objc_generic<T : NSRuncing>(_ x: T) {
   objc_generic(x)
 }
 
 // CHECK-LABEL: define hidden void @_TF14objc_protocols13objc_protocol{{.*}}(%objc_object*) {{.*}} {
-func objc_protocol(x: NSRuncing) {
+func objc_protocol(_ x: NSRuncing) {
   x.runce()
   // CHECK: [[SELECTOR:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
   // CHECK: bitcast %objc_object* %0 to [[OBJTYPE:.*]]*
@@ -145,14 +145,14 @@ func objc_protocol(x: NSRuncing) {
 }
 
 // CHECK: define hidden %objc_object* @_TF14objc_protocols12objc_erasure{{.*}}(%CSo7NSSpoon*) {{.*}} {
-func objc_erasure(x: NSSpoon) -> NSRuncing {
+func objc_erasure(_ x: NSSpoon) -> NSRuncing {
   return x
   // CHECK: [[RES:%.*]] = bitcast %CSo7NSSpoon* {{%.*}} to %objc_object*
   // CHECK: ret %objc_object* [[RES]]
 }
 
 // CHECK: define hidden void @_TF14objc_protocols25objc_protocol_composition{{.*}}(%objc_object*)
-func objc_protocol_composition(x: protocol<NSRuncing, NSFunging>) {
+func objc_protocol_composition(_ x: protocol<NSRuncing, NSFunging>) {
   x.runce()
   // CHECK: [[RUNCE:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
   // CHECK: bitcast %objc_object* %0 to [[OBJTYPE:.*]]*
@@ -164,7 +164,7 @@ func objc_protocol_composition(x: protocol<NSRuncing, NSFunging>) {
 
 // CHECK: define hidden void @_TF14objc_protocols31objc_swift_protocol_composition{{.*}}(%objc_object*, i8**)
 func objc_swift_protocol_composition
-(x:protocol<NSRuncing, Ansible, NSFunging>) {
+(_ x:protocol<NSRuncing, Ansible, NSFunging>) {
   x.runce()
   // CHECK: [[RUNCE:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
   // CHECK: bitcast %objc_object* %0 to [[OBJTYPE:.*]]*
@@ -184,7 +184,7 @@ func objc_swift_protocol_composition
   var reqt: NSRuncing { get set }
 }
 
-func instantiateArchetype<T: SettableProperty>(x: T) {
+func instantiateArchetype<T: SettableProperty>(_ x: T) {
   let y = x.reqt
   x.reqt = y
 }
@@ -198,8 +198,8 @@ protocol Vanner : Palomino, Appaloosa { }
 
 struct Stirrup<T : Palomino> { }
 
-func canter<T : Palomino>(t: Stirrup<T>) {}
+func canter<T : Palomino>(_ t: Stirrup<T>) {}
 
-func gallop<T : Vanner>(t: Stirrup<T>) {
+func gallop<T : Vanner>(_ t: Stirrup<T>) {
   canter(t)
 }

@@ -84,10 +84,15 @@ public:
     DebugInfoKind = 1 << 3 | 1 << 4
   };
 
-  typedef struct {
-    unsigned Line = 0, Column = 0;
-    const char *Filename = nullptr;
-  } DebugLoc;
+  struct DebugLoc {
+    unsigned Line;
+    unsigned Column;
+    const char *Filename;
+
+    DebugLoc(unsigned Line = 0, unsigned Column = 0,
+             const char *Filename = nullptr) : Line(Line), Column(Column),
+                                               Filename(Filename) { }
+  };
 
 protected:
   union UnderlyingLocation {

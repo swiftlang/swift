@@ -198,6 +198,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
   while (cursor != resultEnd) {
     auto kind = static_cast<CodeCompletionResult::ResultKind>(*cursor++);
     auto declKind = static_cast<CodeCompletionDeclKind>(*cursor++);
+    auto opKind = static_cast<CodeCompletionOperatorKind>(*cursor++);
     auto context = static_cast<SemanticContextKind>(*cursor++);
     auto notRecommended = static_cast<bool>(*cursor++);
     auto numBytesToErase = static_cast<unsigned>(*cursor++);
@@ -232,14 +233,15 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
 
     CodeCompletionResult *result = nullptr;
     if (kind == CodeCompletionResult::Declaration) {
-      result = new (*V.Sink.Allocator)
-          CodeCompletionResult(context, numBytesToErase, string, declKind,
-                               moduleName, notRecommended, briefDocComment,
-                               copyStringArray(*V.Sink.Allocator, assocUSRs),
-                               copyStringPairArray(*V.Sink.Allocator, declKeywords));
+      result = new (*V.Sink.Allocator) CodeCompletionResult(
+          context, numBytesToErase, string, declKind, moduleName,
+          notRecommended, CodeCompletionResult::NotRecommendedReason::NoReason,
+          briefDocComment, copyStringArray(*V.Sink.Allocator, assocUSRs),
+          copyStringPairArray(*V.Sink.Allocator, declKeywords), opKind);
     } else {
       result = new (*V.Sink.Allocator)
-          CodeCompletionResult(kind, context, numBytesToErase, string);
+          CodeCompletionResult(kind, context, numBytesToErase, string,
+                               CodeCompletionResult::Unrelated, opKind);
     }
 
     V.Sink.Results.push_back(result);
@@ -344,6 +346,10 @@ static void writeCachedModule(llvm::raw_ostream &out,
         LE.write(static_cast<uint8_t>(R->getAssociatedDeclKind()));
       else
         LE.write(static_cast<uint8_t>(~0u));
+      if (R->isOperator())
+        LE.write(static_cast<uint8_t>(R->getOperatorKind()));
+      else
+        LE.write(static_cast<uint8_t>(CodeCompletionOperatorKind::None));
       LE.write(static_cast<uint8_t>(R->getSemanticContext()));
       LE.write(static_cast<uint8_t>(R->isNotRecommended()));
       LE.write(static_cast<uint8_t>(R->getNumBytesToErase()));

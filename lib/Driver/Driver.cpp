@@ -848,7 +848,7 @@ static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
     // Includes both iOS and TVOS.
     return isSDKTooOld(sdkPath, clang::VersionTuple(9, 0), "Simulator", "OS");
 
-  } else if(target.isWatchOS()) {
+  } else if (target.isWatchOS()) {
     return isSDKTooOld(sdkPath, clang::VersionTuple(2, 0), "Simulator", "OS");
 
   } else {
@@ -2031,11 +2031,17 @@ const ToolChain *Driver::getToolChain(const ArgList &Args) const {
       TC = new toolchains::Darwin(*this, Target);
       break;
     case llvm::Triple::Linux:
+      if (Target.isAndroid()) {
+        TC = new toolchains::Android(*this, Target);
+      } else {
+        TC = new toolchains::GenericUnix(*this, Target);
+      }
+      break;
     case llvm::Triple::FreeBSD:
       TC = new toolchains::GenericUnix(*this, Target);
       break;
     case llvm::Triple::Win32:
-      TC = new toolchains::Windows(*this, Target);
+      TC = new toolchains::Cygwin(*this, Target);
       break;
     default:
       TC = nullptr;

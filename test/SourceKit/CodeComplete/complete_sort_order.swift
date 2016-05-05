@@ -40,8 +40,8 @@ func test() {
 // CONTEXT: key.name: "foo(b:)"
 // CONTEXT-NOT: key.name:
 // CONTEXT: key.name: "test()"
-// CONTEXT: key.name: "AbsoluteValuable"
 // CONTEXT: key.name: "#column"
+// CONTEXT: key.name: "AbsoluteValuable"
 
 // RUN: %complete-test -tok=STMT_0 %s | FileCheck %s -check-prefix=STMT
 func test1() {
@@ -55,6 +55,29 @@ func test1() {
 // STMT: func
 // STMT: foo(a: Int)
 
+// RUN: %complete-test -tok=STMT_1 %s | FileCheck %s -check-prefix=STMT_1
+func test5() {
+  var retLocal: Int
+  #^STMT_1,r,ret,retur,return^#
+}
+// STMT_1-LABEL: Results for filterText: r [
+// STMT_1-NEXT:    retLocal
+// STMT_1-NEXT:    repeat
+// STMT_1-NEXT:    return
+// STMT_1-NEXT:    required
+// STMT_1: ]
+// STMT_1-LABEL: Results for filterText: ret [
+// STMT_1-NEXT:    retLocal
+// STMT_1-NEXT:    return
+// STMT_1-NEXT:    repeat
+// STMT_1: ]
+// STMT_1-LABEL: Results for filterText: retur [
+// STMT_1-NEXT:    return
+// STMT_1: ]
+// STMT_1-LABEL: Results for filterText: return [
+// STMT_1-NEXT:    return
+// STMT_1: ]
+
 // RUN: %complete-test -top=0 -tok=EXPR_0 %s | FileCheck %s -check-prefix=EXPR
 func test2() {
   (#^EXPR_0^#)
@@ -63,8 +86,8 @@ func test2() {
 // EXPR: "abc"
 // EXPR: true
 // EXPR: false
-// EXPR: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
-// EXPR: [#Image(imageLiteral: String)#]
+// EXPR: #colorLiteral(red: Float, green: Float, blue: Float, alpha: Float)
+// EXPR: #imageLiteral(resourceName: String)
 // EXPR: [values]
 // EXPR: [key: value]
 // EXPR: (values)
@@ -84,8 +107,8 @@ func test3(x: Int) {
 // EXPR_TOP_1: "abc"
 // EXPR_TOP_1: true
 // EXPR_TOP_1: false
-// EXPR_TOP_1: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
-// EXPR_TOP_1: [#Image(imageLiteral: String)#]
+// EXPR_TOP_1: #colorLiteral(red: Float, green: Float, blue: Float, alpha: Float)
+// EXPR_TOP_1: #imageLiteral(resourceName: String)
 // EXPR_TOP_1: [values]
 // EXPR_TOP_1: [key: value]
 // EXPR_TOP_1: (values)
@@ -109,8 +132,8 @@ func test4(x: Int) {
 // EXPR_TOP_3: "abc"
 // EXPR_TOP_3: true
 // EXPR_TOP_3: false
-// EXPR_TOP_3: [#Color(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)#]
-// EXPR_TOP_3: [#Image(imageLiteral: String)#]
+// EXPR_TOP_3: #colorLiteral(red: Float, green: Float, blue: Float, alpha: Float)
+// EXPR_TOP_3: #imageLiteral(resourceName: String)
 // EXPR_TOP_3: [values]
 // EXPR_TOP_3: [key: value]
 // EXPR_TOP_3: (values)
@@ -130,3 +153,54 @@ func test4(x: Int) {
 // EXPR_TOP_3_TYPE_MATCH: 0
 // EXPR_TOP_3_TYPE_MATCH: y
 // EXPR_TOP_3_TYPE_MATCH: z
+
+// RUN: %complete-test -tok=VOID_1 %s | FileCheck %s -check-prefix=VOID_1
+// RUN: %complete-test -tok=VOID_1 %s -raw | FileCheck %s -check-prefix=VOID_1_RAW
+func test6() {
+  func foo1() {}
+  func foo2() -> Int {}
+  func foo3() -> String {}
+  let x: Int
+  x = #^VOID_1,,foo^#
+}
+// VOID_1-LABEL: Results for filterText:  [
+// VOID_1-NOT: foo1
+// VOID_1: foo2()
+// VOID_1-NOT: foo1
+// VOID_1: foo3()
+// VOID_1-NOT: foo1
+// VOID_1: ]
+// VOID_1-LABEL: Results for filterText: foo [
+// VOID_1: foo2()
+// VOID_1: foo3()
+// VOID_1: foo1()
+// VOID_1: ]
+
+// VOID_1_RAW: key.name: "foo1()",
+// VOID_1_RAW-NEXT: key.sourcetext: "foo1()",
+// VOID_1_RAW-NEXT: key.description: "foo1()",
+// VOID_1_RAW-NEXT: key.typename: "Void",
+// VOID_1_RAW-NEXT: key.context: source.codecompletion.context.thismodule,
+// VOID_1_RAW-NEXT: key.num_bytes_to_erase: 0,
+// VOID_1_RAW-NEXT: key.not_recommended: 1,
+
+
+
+// RUN: %complete-test -tok=CASE_0 %s | FileCheck %s -check-prefix=CASE_0
+func test7() {
+  struct CaseSensitiveCheck {
+    var member: Int = 0
+  }
+  let caseSensitiveCheck = CaseSensitiveCheck()
+  #^CASE_0,caseSensitiveCheck,CaseSensitiveCheck^#
+}
+// CASE_0: Results for filterText: caseSensitiveCheck [
+// CASE_0: caseSensitiveCheck
+// CASE_0: CaseSensitiveCheck
+// CASE_0: caseSensitiveCheck.
+// CASE_0: ]
+// CASE_0: Results for filterText: CaseSensitiveCheck [
+// CASE_0: caseSensitiveCheck
+// CASE_0: CaseSensitiveCheck
+// CASE_0: CaseSensitiveCheck(
+// CASE_0: ]

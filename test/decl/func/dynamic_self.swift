@@ -12,27 +12,27 @@ func inFunction() {
 struct S0 {
   func f() -> Self { } // expected-error{{struct method cannot return 'Self'; did you mean to use the struct type 'S0'?}}{{15-19=S0}}
 
-  func g(ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'S0'?}}{{14-18=S0}}
+  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'S0'?}}{{16-20=S0}}
 }
 
 enum E0 {
   func f() -> Self { } // expected-error{{enum method cannot return 'Self'; did you mean to use the enum type 'E0'?}}{{15-19=E0}}
 
-  func g(ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'E0'?}}{{14-18=E0}}
+  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'E0'?}}{{16-20=E0}}
 }
 
 class C0 {
   func f() -> Self { } // okay
 
-  func g(ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{14-18=C0}}
+  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{16-20=C0}}
 
-  func h(ds: Self) -> Self { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{14-18=C0}}
+  func h(_ ds: Self) -> Self { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{16-20=C0}}
 }
 
 protocol P0 {
   func f() -> Self // okay
 
-  func g(ds: Self) // okay
+  func g(_ ds: Self) // okay
 }
 
 // ----------------------------------------------------------------------------
@@ -41,7 +41,7 @@ class C1 {
   required init(int i: Int) {}
 
   // Instance methods have a self of type Self.
-  func f(b: Bool) -> Self {
+  func f(_ b: Bool) -> Self {
     // FIXME: below diagnostic should complain about C1 -> Self conversion
     if b { return C1(int: 5) } // expected-error{{cannot convert return expression of type 'C1' to return type 'Self'}}
 
@@ -56,7 +56,7 @@ class C1 {
   }
 
   // Type methods have a self of type Self.Type.
-  class func factory(b: Bool) -> Self {
+  class func factory(_ b: Bool) -> Self {
     // Check directly.
     var x: Int = self // expected-error{{cannot convert value of type 'Self.Type' to specified type 'Int'}}
 
@@ -211,7 +211,7 @@ protocol P {
   func f() -> Self
 }
 
-func testGenericCall<T: P>(t: T) {
+func testGenericCall<T: P>(_ t: T) {
   var t = t
   var t2 = t.f()
   t2 = t
@@ -220,7 +220,7 @@ func testGenericCall<T: P>(t: T) {
 
 // ----------------------------------------------------------------------------
 // Existential uses of Self methods.
-func testExistentialCall(p: P) {
+func testExistentialCall(_ p: P) {
   _ = p.f()
 }
 
@@ -230,7 +230,7 @@ func testExistentialCall(p: P) {
   @objc func method() -> Self { return self }
 }
 
-func testAnyObject(ao: AnyObject) {
+func testAnyObject(_ ao: AnyObject) {
   var ao = ao
   var result : AnyObject = ao.method!()
   result = ao
@@ -262,7 +262,7 @@ extension X {
 extension Y {
   func operationThatOnlyExistsOnY() {}
 }
-func testOptionalSelf(y : Y) {
+func testOptionalSelf(_ y : Y) {
   if let clone = y.tryToClone() {
     clone.operationThatOnlyExistsOnY()
   }

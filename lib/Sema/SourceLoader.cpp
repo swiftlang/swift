@@ -107,7 +107,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
 
   auto *importMod = Module::create(moduleID.first, Ctx);
   if (EnableResilience)
-    importMod->setResilienceEnabled(true);
+    importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
   Ctx.LoadedModules[moduleID.first] = importMod;
 
   auto implicitImportKind = SourceFile::ImplicitModuleImportKind::Stdlib;

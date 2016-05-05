@@ -13,7 +13,7 @@
 import TestsUtils
 
 @inline(never)
-public func run_ProtocolDispatch(N: Int) {
+public func run_ProtocolDispatch(_ N: Int) {
 
   let x = someProtocolFactory()
 

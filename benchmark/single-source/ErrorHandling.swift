@@ -29,7 +29,7 @@ func doSomething() throws -> String {
 }
 
 @inline(never)
-public func run_ErrorHandling(N: Int) {
+public func run_ErrorHandling(_ N: Int) {
   for _ in 1...5000*N {
     do {
       try doSomething()

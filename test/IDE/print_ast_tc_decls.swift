@@ -126,7 +126,7 @@ struct d0100_FooStruct {
   func instanceFunc2(a: Int, b: inout Double) {}
 // PASS_COMMON-NEXT: {{^}}  func instanceFunc2(a: Int, b: inout Double){{$}}
 
-  func instanceFunc3(a: Int, let b: Double) { var a = a; a = 1; _ = a }
+  func instanceFunc3(a: Int, b: Double) { var a = a; a = 1; _ = a }
 // PASS_COMMON-NEXT: {{^}}  func instanceFunc3(a: Int, b: Double){{$}}
 
   func instanceFuncWithDefaultArg1(a: Int = 0) {}
@@ -1311,23 +1311,36 @@ public struct ArrayThingy {
     public func mineCopper() -> Int { return 0 }
 }
 
+// @discardableResult attribute
+public struct DiscardableThingy {
+    // PASS_PRINT_AST: @discardableResult
+    // PASS_PRINT_AST-NEXT: public init()
+    @discardableResult
+    public init() {}
+
+    // PASS_PRINT_AST: @discardableResult
+    // PASS_PRINT_AST-NEXT: public func useless() -> Int
+    @discardableResult
+    public func useless() -> Int { return 0 }
+}
+
 
 // Parameter Attributes.
 
 
 // <rdar://problem/19775868> Swift 1.2b1: Header gen puts @autoclosure in the wrong place
-// PASS_PRINT_AST: public func ParamAttrs1(@autoclosure a: () -> ())
-public func ParamAttrs1(@autoclosure a : () -> ()) {
+// PASS_PRINT_AST: public func ParamAttrs1(a: @autoclosure () -> ())
+public func ParamAttrs1(a : @autoclosure () -> ()) {
   a()
 }
 
-// PASS_PRINT_AST: public func ParamAttrs2(@autoclosure(escaping) a: () -> ())
-public func ParamAttrs2(@autoclosure(escaping) a : () -> ()) {
+// PASS_PRINT_AST: public func ParamAttrs2(a: @autoclosure(escaping) () -> ())
+public func ParamAttrs2(a : @autoclosure(escaping) () -> ()) {
   a()
 }
 
-// PASS_PRINT_AST: public func ParamAttrs3(@noescape a: () -> ())
-public func ParamAttrs3(@noescape a : () -> ()) {
+// PASS_PRINT_AST: public func ParamAttrs3(a: @noescape () -> ())
+public func ParamAttrs3(a : @noescape () -> ()) {
   a()
 }
 

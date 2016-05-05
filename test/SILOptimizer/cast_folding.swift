@@ -35,171 +35,171 @@ private final class F: CP1 {}
 // Class E implements both class protocols at once
 class E: CP1, CP2 {}
 
-func cast0<T>(a:T) -> Bool {
+func cast0<T>(_ a:T) -> Bool {
   // Succeeds if T is A
   return A().dynamicType is T.Type
 }
 
 
-func cast1<T>(a:T) -> Bool {
+func cast1<T>(_ a:T) -> Bool {
   // Succeeds if T is A
   return (A() as AnyObject).dynamicType is T.Type
 }
 
-func cast2<T>(a:T) -> Bool {
+func cast2<T>(_ a:T) -> Bool {
   // Succeeds if T is A
   let ao:AnyObject = A() as AnyObject
   return ao.dynamicType is T.Type
 }
 
 
-func cast3(p:AnyObject) -> Bool {
+func cast3(_ p:AnyObject) -> Bool {
   // Always fails
   return p.dynamicType is AnyObject.Protocol
 }
 
-func cast4(p:AnyObject) -> Bool {
+func cast4(_ p:AnyObject) -> Bool {
   return p.dynamicType is A.Type
 }
 
-func cast5(t:AnyObject.Type) -> Bool {
+func cast5(_ t:AnyObject.Type) -> Bool {
   // Succeeds if t is B.self
   return t is B.Type
 }
 
-func cast6<T>(t:T) -> Bool {
+func cast6<T>(_ t:T) -> Bool {
   // Always fails
   return AnyObject.self is T.Type
 }
 
-func cast7<T>(t:T.Type) -> Bool {
+func cast7<T>(_ t:T.Type) -> Bool {
   // Succeeds if t is AnyObject.self
   return t is AnyObject.Protocol
 }
 
 
-func cast8<T>(a:T) -> Bool {
+func cast8<T>(_ a:T) -> Bool {
   // Succeeds if T is A
   return (A() as P).dynamicType is T.Type
 }
 
-func cast9<T>(a:T) -> Bool {
+func cast9<T>(_ a:T) -> Bool {
   // Succeeds if T is A
   let ao:P = A() as P
   return ao.dynamicType is T.Type
 }
 
 
-func cast10(p:P) -> Bool {
+func cast10(_ p:P) -> Bool {
   return p.dynamicType is P.Protocol
 }
 
-func cast11(p:P) -> Bool {
+func cast11(_ p:P) -> Bool {
   // Succeeds if p is of type A
   return p.dynamicType is A.Type
 }
 
-func cast12(t:P.Type) -> Bool {
+func cast12(_ t:P.Type) -> Bool {
   return t is B.Type
 }
 
 
-func cast13<T>(t:T) -> Bool {
+func cast13<T>(_ t:T) -> Bool {
   // Succeeds if T is P
   return P.self is T.Type
 }
 
 
-func cast14<T>(t:T.Type) -> Bool {
+func cast14<T>(_ t:T.Type) -> Bool {
   // Succeeds if p is P.self
   return t is P.Protocol
 }
 
-func cast15<T>(t:T) -> Bool {
+func cast15<T>(_ t:T) -> Bool {
   // Succeeds if T is P
   return P.self is T.Type
 }
 
-func cast16<T>(t:T) -> Bool {
+func cast16<T>(_ t:T) -> Bool {
   // Succeeds if T is P
   return T.self is P.Protocol
 }
 
 
-func cast17<T>(t:T) -> Bool {
+func cast17<T>(_ t:T) -> Bool {
   // Succeeds if T is AnyObject
   return AnyObject.self is T.Type
 }
 
-func cast18<T>(t:T) -> Bool {
+func cast18<T>(_ t:T) -> Bool {
   // Succeeds if T is AnyObject
   return T.self is AnyObject.Protocol
 }
 
-func cast20<T>(t:T) -> Bool {
+func cast20<T>(_ t:T) -> Bool {
   // Succeeds if T is P
   return T.self is P.Type
 }
 
-func cast21<T>(t:T) -> Bool {
+func cast21<T>(_ t:T) -> Bool {
   // Succeeds if T is P
   return T.self is P.Protocol
 }
 
-func cast22(existential: P.Type) -> Bool {
+func cast22(_ existential: P.Type) -> Bool {
   // Succeeds if existential is S.self
   return existential is S.Type
 }
 
-func cast23(concrete: P.Protocol) -> Bool {
+func cast23(_ concrete: P.Protocol) -> Bool {
   // Always fails
   return concrete is S.Type
 }
 
 
-func cast24(existential: P.Type) -> Bool {
+func cast24(_ existential: P.Type) -> Bool {
   // Succeeds if existential is Q.self
   return existential is Q.Type
 }
 
 
-func cast25(concrete: P.Protocol) -> Bool {
+func cast25(_ concrete: P.Protocol) -> Bool {
   // Always fails, because P != Q
   return concrete is Q.Type
 }
 
-func cast26(existential: Q.Type) -> Bool {
+func cast26(_ existential: Q.Type) -> Bool {
   // Succeeds always, because Q:P
   return existential is P.Type
 }
 
-func cast27(existential: CP1.Type) -> Bool {
+func cast27(_ existential: CP1.Type) -> Bool {
   // Fails always, because existential is a class
   // and it cannot be struct
   return existential is S.Type
 }
 
-func cast28(existential: CP1.Type) -> Bool {
+func cast28(_ existential: CP1.Type) -> Bool {
   // Succeeds if existential conforms to CP1 and CP2
   return existential is CP2.Type
 }
 
-func cast29(o: Any) -> Bool {
+func cast29(_ o: Any) -> Bool {
   // Succeeds if o is P.Type
   return o is P.Type
 }
 
-func cast30(o: AnyObject) -> Bool {
+func cast30(_ o: AnyObject) -> Bool {
   // Succeeds if o is P.Type
   return o is P.Type
 }
 
-func cast32(p: P) -> Bool {
+func cast32(_ p: P) -> Bool {
   // Fails always, because a metatype cannot conform to a protocol
   return p is P.Type
 }
 
-func cast33(p: P) -> Bool {
+func cast33(_ p: P) -> Bool {
   // Same as above, but non-existential metatype
   return p is X.Type
 }
@@ -719,7 +719,7 @@ public class DD : PP {
 // CHECK: builtin "int_trap"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
-public func getAsDD(c: CC) -> DD {
+public func getAsDD(_ c: CC) -> DD {
   return c as! DD
 }
 
@@ -730,13 +730,13 @@ public func getAsDD(c: CC) -> DD {
 // CHECK: builtin "int_trap"
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
-public func callFoo(c: CC) -> Int {
+public func callFoo(_ c: CC) -> Int {
   return (c as! DD).foo()
 }
 
 
 @inline(never)
-func callFooGeneric<T : PP>(c: T) -> Int {
+func callFooGeneric<T : PP>(_ c: T) -> Int {
   return (c as! DD).foo()
 }
 
@@ -747,7 +747,7 @@ func callFooGeneric<T : PP>(c: T) -> Int {
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
 @inline(never)
-public func callForGenericCC(c: CC) {
+public func callForGenericCC(_ c: CC) {
   callFoo(c)
 }
 

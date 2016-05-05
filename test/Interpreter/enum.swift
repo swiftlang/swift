@@ -34,7 +34,7 @@ case .x(var int, var char):
   print(char)
 }
 
-func printNoPayload(v: NoPayload) {
+func printNoPayload(_ v: NoPayload) {
   switch v {
   case .x:
     print("NoPayload.x")
@@ -52,7 +52,7 @@ printNoPayload(.y)
 // CHECK: NoPayload.z
 printNoPayload(.z)
 
-func printSinglePayloadTrivial(v: SinglePayloadTrivial) {
+func printSinglePayloadTrivial(_ v: SinglePayloadTrivial) {
   switch v {
   case .x(let char, let int):
     print("SinglePayloadTrivial.x(\(char), \(int))")
@@ -70,7 +70,7 @@ printSinglePayloadTrivial(.y)
 // CHECK: SinglePayloadTrivial.z
 printSinglePayloadTrivial(.z)
 
-func printMultiPayloadTrivial(v: MultiPayloadTrivial) {
+func printMultiPayloadTrivial(_ v: MultiPayloadTrivial) {
   switch v {
   case .x(let char, let int):
     print("MultiPayloadTrivial.x(\(char), \(int))")
@@ -107,7 +107,7 @@ enum SinglePayloadAddressOnly {
   case y
 }
 
-func printSinglePayloadAddressOnly(v: SinglePayloadAddressOnly) {
+func printSinglePayloadAddressOnly(_ v: SinglePayloadAddressOnly) {
   switch v {
   case .x(let runcible):
     runcible.runce()
@@ -129,7 +129,7 @@ enum MultiPayloadAddressOnly {
   case z
 }
 
-func printMultiPayloadAddressOnly(v: MultiPayloadAddressOnly) {
+func printMultiPayloadAddressOnly(_ v: MultiPayloadAddressOnly) {
   switch v {
   case .x(let runcible):
     runcible.runce()
@@ -152,14 +152,14 @@ enum TrivialGeneric<T, U> {
   case x(T, U)
 }
 
-func unwrapTrivialGeneric<T, U>(tg: TrivialGeneric<T, U>) -> (T, U) {
+func unwrapTrivialGeneric<T, U>(_ tg: TrivialGeneric<T, U>) -> (T, U) {
   switch tg {
   case .x(let t, let u):
     return (t, u)
   }
 }
 
-func wrapTrivialGeneric<T, U>(t: T, _ u: U) -> TrivialGeneric<T, U> {
+func wrapTrivialGeneric<T, U>(_ t: T, _ u: U) -> TrivialGeneric<T, U> {
   return .x(t, u)
 }
 
@@ -186,7 +186,7 @@ enum Ensemble<S : Runcible, H : Runcible> {
   case x(S, H)
 }
 
-func concreteEnsemble(e: Ensemble<Spoon, Hat>) {
+func concreteEnsemble(_ e: Ensemble<Spoon, Hat>) {
   switch e {
   case .x(let spoon, let hat):
     spoon.runce()
@@ -194,7 +194,7 @@ func concreteEnsemble(e: Ensemble<Spoon, Hat>) {
   }
 }
 
-func genericEnsemble<T : Runcible, U : Runcible>(e: Ensemble<T, U>) {
+func genericEnsemble<T : Runcible, U : Runcible>(_ e: Ensemble<T, U>) {
   switch e {
   case .x(let t, let u):
     t.runce()
@@ -223,7 +223,7 @@ enum Optionable<T> {
   init(_ x:T) { self = .Mere(x) }
 }
 
-func tryRunce<T : Runcible>(x: Optionable<T>) {
+func tryRunce<T : Runcible>(_ x: Optionable<T>) {
   switch x {
   case .Mere(let r):
     r.runce()
@@ -272,7 +272,7 @@ optionableInts()
 
 enum Suit { case Spades, Hearts, Diamonds, Clubs }
 
-func print(suit: Suit) {
+func print(_ suit: Suit) {
   switch suit {
   case .Spades:
     print("♠")
@@ -309,7 +309,7 @@ func optionableSuits() {
 // CHECK: ♡
 optionableSuits()
 
-func optionableRuncibles<T : Runcible>(x: T) {
+func optionableRuncibles<T : Runcible>(_ x: T) {
   let optionables: [Optionable<T>] = [
     .Mere(x),
     .Nought,
@@ -356,9 +356,9 @@ class Rdar15383966 : ClassProtocol
 }
 
 
-func generic<T>(x: T?) { }
-func generic_over_classes<T : ClassProtocol>(x: T?) { }
-func nongeneric(x: Rdar15383966?) { }
+func generic<T>(_ x: T?) { }
+func generic_over_classes<T : ClassProtocol>(_ x: T?) { }
+func nongeneric(_ x: Rdar15383966?) { }
 
 func test_generic()
 {
@@ -408,7 +408,7 @@ enum MultiPayloadSpareBitAggregates {
   case z(S)
 }
 
-func test_spare_bit_aggregate(x: MultiPayloadSpareBitAggregates) {
+func test_spare_bit_aggregate(_ x: MultiPayloadSpareBitAggregates) {
   switch x {
   case .x(let i32, let i64):
     print(".x(\(i32), \(i64))")
@@ -439,7 +439,7 @@ struct OptionalTuple<T> {
     self.value = value
   }
 }
-func test_optional_generic_tuple<T>(a: OptionalTuple<T>) -> T {
+func test_optional_generic_tuple<T>(_ a: OptionalTuple<T>) -> T {
   print("optional pair is same size as pair: \(sizeofValue(a) == sizeof(T)*2)")
   return a.value!.0
 }
@@ -499,7 +499,7 @@ enum EitherOr<T, U> {
 }
 
 @inline(never)
-func presentEitherOr<T, U>(e: EitherOr<T, U>) {
+func presentEitherOr<T, U>(_ e: EitherOr<T, U>) {
   switch e {
   case .Left(let l):
     print("Left(\(l))")

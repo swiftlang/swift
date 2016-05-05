@@ -126,7 +126,7 @@ enum class ValueWitnessKind {
   StoreExtraInhabitant,
   GetExtraInhabitantIndex,
   GetEnumTag,
-  DestructiveProjectEnumData
+  DestructiveProjectEnumData,
 };
 
 enum class Directness {
@@ -319,7 +319,7 @@ enum class OperatorKind {
   NotOperator,
   Prefix,
   Postfix,
-  Infix
+  Infix,
 };
 
 /// \brief Mangle an identifier using Swift's mangling rules.
@@ -332,7 +332,7 @@ void mangleIdentifier(const char *data, size_t length,
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
 
-/// \brief Transform the node structure in a string.
+/// \brief Transform the node structure to a string.
 ///
 /// Typical usage:
 /// \code
@@ -370,8 +370,7 @@ struct NodeFactory {
   /// A class for printing to a std::string.
 class DemanglerPrinter {
 public:
-  DemanglerPrinter(std::string &out) : Stream(out) {}
-  DemanglerPrinter(std::string &&out) : Stream(out) {}
+  DemanglerPrinter() = default;
 
   DemanglerPrinter &operator<<(llvm::StringRef Value) & {
     Stream.append(Value.data(), Value.size());
@@ -405,7 +404,7 @@ public:
   std::string &&str() && { return std::move(Stream); }
   
 private:
-  std::string &Stream;
+  std::string Stream;
 };
 
 /// Is a character considered a digit by the demangling grammar?
@@ -419,5 +418,4 @@ static inline bool isDigit(int c) {
 } // end namespace Demangle
 } // end namespace swift
 
-#endif
-
+#endif // SWIFT_BASIC_DEMANGLE_H

@@ -32,6 +32,10 @@ option(SWIFT_SERIALIZE_STDLIB_UNITTEST
     "Compile the StdlibUnittest module with -sil-serialize-all to increase the test coverage for the optimizer"
     FALSE)
 
+option(SWIFT_STDLIB_SIL_DEBUGGING
+    "Compile the Swift standard library with -gsil to enable debugging and profiling on SIL level"
+    FALSE)
+
 option(SWIFT_BUILD_TOOLS
     "Build the Swift compiler and other tools"
     TRUE)
@@ -58,6 +62,10 @@ option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
 
+option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
+       "Use the host compiler and not the internal clang to build the swift runtime"
+       FALSE)
+
 set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
     "Build Swift with code coverage instrumenting enabled [FALSE, NOT-MERGED, MERGED]")
 set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
@@ -78,7 +86,7 @@ set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
     "Enable using the gold linker when available")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
-    "compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc")
+    "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror-headers")
 
 # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
 set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
@@ -87,6 +95,7 @@ set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
 # components would approximately correspond to packages in a Debian-style Linux
 # packaging.  The following components are defined:
 #
+# * autolink-driver -- the Swift driver support tools
 # * compiler -- the Swift compiler and (on supported platforms) the REPL.
 # * clang-builtin-headers -- install a copy of Clang builtin headers under
 #   'lib/swift/clang'.  This is useful when Swift compiler is installed in
@@ -103,6 +112,7 @@ set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
 # * tools -- tools (other than the compiler) useful for developers writing
 #   Swift code.
 # * testsuite-tools -- extra tools required to run the Swift testsuite.
+# * toolchain-dev-tools -- install development tools useful in a shared toolchain
 # * dev -- headers and libraries required to use Swift compiler as a library.
 
 set(SWIFT_SDKS "" CACHE STRING
@@ -128,6 +138,20 @@ option(SWIFT_ENABLE_LTO
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
   "Define the maximum number of linker jobs for swift.")
+set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
+  "Path to the directory that contains the Android NDK tools that are executable on the build machine")
+set(SWIFT_ANDROID_NDK_GCC_VERSION "" CACHE STRING
+  "The GCC version to use when building for Android. Currently only 4.9 is supported.")
+set(SWIFT_ANDROID_SDK_PATH "" CACHE STRING
+  "Path to the directory that contains the Android SDK tools that will be passed to the swiftc frontend")
+set(SWIFT_ANDROID_ICU_UC "" CACHE STRING
+  "Path to a directory containing libicuuc.so")
+set(SWIFT_ANDROID_ICU_UC_INCLUDE "" CACHE STRING
+  "Path to a directory containing headers for libicuuc")
+set(SWIFT_ANDROID_ICU_I18N "" CACHE STRING
+  "Path to a directory containing libicui18n.so")
+set(SWIFT_ANDROID_ICU_I18N_INCLUDE "" CACHE STRING
+  "Path to a directory containing headers libicui18n")
 
 #
 # User-configurable Darwin-specific options.
@@ -206,14 +230,27 @@ option(SWIFT_STDLIB_ENABLE_RESILIENCE
     "Build the standard libraries and overlays with resilience enabled; see docs/LibraryEvolution.rst"
     FALSE)
 
+option(SWIFT_STDLIB_ENABLE_REFLECTION_METADATA
+    "Build the standard libraries and overlays with remote reflection metadata; see docs/proposals/RemoteMirrors.rst"
+    TRUE)
+
+option(SWIFT_STDLIB_ENABLE_REFLECTION_NAMES
+    "Build the standard libraries and overlays with remote reflection names; see docs/proposals/RemoteMirrors.rst"
+    FALSE)
+
+option(SWIFT_STDLIB_SIL_SERIALIZE_ALL
+    "Build the standard libraries and overlays serializing all method bodies"
+    TRUE)
+
 if(SWIFT_SERIALIZE_STDLIB_UNITTEST AND SWIFT_STDLIB_ENABLE_RESILIENCE)
   message(WARNING "Ignoring SWIFT_SERIALIZE_STDLIB_UNITTEST because SWIFT_STDLIB_ENABLE_RESILIENCE is set")
   set(SWIFT_SERIALIZE_STDLIB_UNITTEST FALSE)
 endif()
 
-option(SWIFT_XCODE_GENERATE_FOR_IDE_ONLY
-    "Generate an Xcode project suitable for IDE use, but which cannot build"
-    FALSE)
+if(SWIFT_STDLIB_SIL_SERIALIZE_ALL AND SWIFT_STDLIB_ENABLE_RESILIENCE)
+  message(WARNING "Ignoring SWIFT_STDLIB_SIL_SERIALIZE_ALL because SWIFT_STDLIB_ENABLE_RESILIENCE is set")
+  set(SWIFT_STDLIB_SIL_SERIALIZE_ALL FALSE)
+endif()
 
 #
 # End of user-configurable options.
@@ -265,7 +302,10 @@ else()
 endif()
 
 # lipo is used to create universal binaries.
-find_program(LIPO "lipo")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  include(SwiftDarwin)
+  find_toolchain_tool(LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
+endif()
 
 if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_CROSS_COMPILING FALSE)
@@ -333,7 +373,7 @@ set(SWIFT_GYB_FLAGS
 
 # Directory to use as the Clang module cache when building Swift source files.
 set(SWIFT_MODULE_CACHE_PATH
-    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/clang-module-cache")
+    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/module-cache")
 
 # Xcode: use libc++ and c++11 using proper build settings.
 if(XCODE)
@@ -407,9 +447,33 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
 
   # FIXME: This will not work while trying to cross-compile.
   if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
-    configure_sdk_unix(LINUX "Linux" "linux" "linux" "x86_64" "x86_64-unknown-linux-gnu")
     set(SWIFT_HOST_VARIANT_ARCH "x86_64")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+
+    if("${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+      set(swift_can_crosscompile_stdlib FALSE)
+    else()
+      set(swift_can_crosscompile_stdlib TRUE)
+    endif()
+
+    is_sdk_requested(LINUX swift_build_linux)
+    if(swift_build_linux)
+      configure_sdk_unix(LINUX "Linux" "linux" "linux" "x86_64" "x86_64-unknown-linux-gnu")
+      set(SWIFT_PRIMARY_VARIANT_SDK_default "LINUX")
+      set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+    endif()
+
+    is_sdk_requested(ANDROID swift_build_android)
+    if(swift_build_android AND ${swift_can_crosscompile_stdlib})
+      configure_sdk_unix(ANDROID "Android" "android" "android" "armv7" "armv7-none-linux-androideabi")
+      # This must be set, as variables such as "${SWIFT_SDK_${sdk}_PATH}" are
+      # referenced in several other locations.
+      set(SWIFT_SDK_ANDROID_PATH "${SWIFT_ANDROID_SDK_PATH}")
+
+      set(SWIFT_PRIMARY_VARIANT_SDK_default "ANDROID")
+      set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")
+    endif()
+
   # FIXME: This only matches ARMv6l (by far the most common variant).
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv6l")
     configure_sdk_unix(LINUX "Linux" "linux" "linux" "armv6" "armv6-unknown-linux-gnueabihf")
@@ -636,6 +700,13 @@ if(SWIFT_PARALLEL_LINK_JOBS)
   endif()
 endif()
 
+# Set the CMAKE_OSX_* variables in a way that minimizes conflicts.
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  set(CMAKE_OSX_SYSROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_PATH}")
+  set(CMAKE_OSX_ARCHITECTURES "")
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "")
+endif()
+
 message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
@@ -669,7 +740,11 @@ endif()
 #
 # Set up global CMake variables for API notes.
 #
-
+# API notes version 1.0.0
+#
+# Change the above comment to 'touch' this file and keep incremental builds
+# working when adding a new apinotes file.
+#
 set(SWIFT_API_NOTES_PATH "${SWIFT_SOURCE_DIR}/apinotes")
 if(NOT EXISTS "${SWIFT_API_NOTES_PATH}/Foundation.apinotes")
   message(FATAL_ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
@@ -687,8 +762,19 @@ if(SWIFT_BUILD_TOOLS)
   add_subdirectory(lib)
   add_subdirectory(tools)
 endif()
+
+is_sdk_requested("${SWIFT_HOST_VARIANT_SDK}" SWIFT_HOST_SDK_REQUESTED)
+if(SWIFT_BUILD_TOOLS AND SWIFT_BUILD_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
+  add_subdirectory(tools/swift-reflection-dump)
+endif()
+
 add_subdirectory(utils)
 add_subdirectory(stdlib)
+
+if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
+  add_subdirectory(tools/swift-reflection-test)
+endif()
+
 if(SWIFT_BUILD_PERF_TESTSUITE AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   add_subdirectory(benchmark)
 endif()

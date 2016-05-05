@@ -9,7 +9,7 @@
 
 import complex
 
-func printDensity(d: Int) {
+func printDensity(_ d: Int) {
   if (d > 40) {
      print(" ", terminator: "")
   } else if d > 6 {
@@ -30,7 +30,7 @@ extension Double {
   }
 }
 
-func getMandelbrotIterations(c: Complex, maxIterations: Int) -> Int {
+func getMandelbrotIterations(_ c: Complex, maxIterations: Int) -> Int {
   var n = 0
   var z = Complex()
   while (n < maxIterations && z.magnitude() < 4.0) {
@@ -40,7 +40,7 @@ func getMandelbrotIterations(c: Complex, maxIterations: Int) -> Int {
   return n
 }
 
-func fractal (densityFunc:(c: Complex, maxIterations: Int) -> Int,
+func fractal (_ densityFunc:(c: Complex, maxIterations: Int) -> Int,
               xMin:Double, xMax:Double,
               yMin:Double, yMax:Double,
               rows:Int, cols:Int,
@@ -50,8 +50,8 @@ func fractal (densityFunc:(c: Complex, maxIterations: Int) -> Int,
   var dY = (yMax - yMin) / Double(cols)
   // Iterate over the points an determine if they are in the
   // Mandelbrot set.
-  for var row = xMin; row < xMax ; row += dX {
-    for var col = yMin; col < yMax; col += dY {
+  for row in stride(from: xMin, to: xMax, by: dX) {
+    for col in stride(from: yMin, to: yMax, by: dY) {
       var c = Complex(real: col, imag: row)
       printDensity(densityFunc(c: c, maxIterations: maxIterations))
     }
@@ -105,7 +105,7 @@ fractal(getMandelbrotIterations,
 // CHECK: ################################################################################
 
 
-func getBurningShipIterations(c: Complex, maxIterations: Int) -> Int {
+func getBurningShipIterations(_ c: Complex, maxIterations: Int) -> Int {
   var n = 0
   var z = Complex()
   while (n < maxIterations && z.magnitude() < 4.0) {

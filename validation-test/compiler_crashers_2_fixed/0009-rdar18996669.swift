@@ -22,6 +22,6 @@ let cls:P.Type = A.self
 
 let p:P = cls.init(i:1)
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 markUsed(p)
 

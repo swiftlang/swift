@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="utf-8" />
-	<title>Swift containers and value types</title>
+  <meta charset="utf-8" />
+  <title>Swift containers and value types</title>
 </head>
 <body>
 
@@ -65,7 +65,7 @@ simpler (default) syntax is by value:
 </p>
 
 <blockquote><pre>
-func foo(c : Character, i : Int)  <font color="#C80000">// define foo</font>
+func foo(_ c : Character, i : Int)  <font color="#C80000">// define foo</font>
 
 // ...
 
@@ -79,7 +79,7 @@ individual parameter:
 </p>
 
 <blockquote><pre>
-func foo(c : Character, i : [inout] Int)  <font color="#C80000">// define foo</font>
+func foo(_ c : Character, i : [inout] Int)  <font color="#C80000">// define foo</font>
 
 // ...
 
@@ -118,7 +118,7 @@ to modify its last argument:
 </p>
 
 <blockquote><pre>
-func foo(c : Character, i : <b>[inout]</b> Int)
+func foo(_ c : Character, i : <b>[inout]</b> Int)
 </pre></blockquote>
 
 <p>
@@ -135,7 +135,7 @@ reference:
 </p>
 
 <blockquote><pre>
-func foo(c : Character, i : Int)
+func foo(_ c : Character, i : Int)
 </pre></blockquote>
 
 <p>
@@ -212,7 +212,7 @@ will compile this code:
 </p>
 
 <blockquote><pre>
-func foo(v : Array, i : Int)  <font color="#C80000">// define foo</font>
+func foo(_ v : Array, i : Int)  <font color="#C80000">// define foo</font>
 
 func doWork() {
   <font color="#C80000">// ...</font>
@@ -386,7 +386,7 @@ passed, semantically, <i>by-value</i>.
 </p>
 
 <blockquote><pre>
-func _backgroundSortNewFilteredMessages(messages : Array) -&gt; _FilteredListInfo {
+func _backgroundSortNewFilteredMessages(_ messages : Array) -&gt; _FilteredListInfo {
     // ...
     res.filteredMessages = messages;  <font color="#C80000">// copy here!</font>
     // ...

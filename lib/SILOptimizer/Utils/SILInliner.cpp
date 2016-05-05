@@ -37,10 +37,6 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     return false;
 
   SILFunction &F = getBuilder().getFunction();
-  if (CalleeFunction->getName() == "_TTSg5Vs4Int8___TFVs12_ArrayBufferg9_isNativeSb"
-      && F.getName() == "_TTSg5Vs4Int8___TFVs12_ArrayBufferg8endIndexSi")
-    llvm::errs();
-
   assert(AI.getFunction() && AI.getFunction() == &F &&
          "Inliner called on apply instruction in wrong function?");
   assert(((CalleeFunction->getRepresentation()
@@ -392,12 +388,16 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::SelectValueInst:
       return InlineCost::Expensive;
 
-    case ValueKind::BuiltinInst:
+    case ValueKind::BuiltinInst: {
+      auto *BI = cast<BuiltinInst>(&I);
       // Expect intrinsics are 'free' instructions.
-      if (cast<BuiltinInst>(I).getIntrinsicInfo().ID == llvm::Intrinsic::expect)
+      if (BI->getIntrinsicInfo().ID == llvm::Intrinsic::expect)
         return InlineCost::Free;
-      return InlineCost::Expensive;
+      if (BI->getBuiltinInfo().ID == BuiltinValueKind::OnFastPath)
+        return InlineCost::Free;
 
+      return InlineCost::Expensive;
+    }
     case ValueKind::SILArgument:
     case ValueKind::SILUndef:
       llvm_unreachable("Only instructions should be passed into this "

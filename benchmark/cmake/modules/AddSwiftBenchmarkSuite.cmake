@@ -49,7 +49,8 @@ function (swift_benchmark_compile_archopts)
       "-${BENCH_COMPILE_ARCHOPTS_OPT}"
       "-D" "INTERNAL_CHECKS_ENABLED"
       "-D" "SWIFT_ENABLE_OBJECT_LITERALS"
-      "-no-link-objc-runtime")
+      "-no-link-objc-runtime"
+      "-I" "${srcdir}/utils/ObjectiveCTests")
 
   # Always optimize the driver modules.
   # Note that we compile the driver for Ounchecked also with -Ounchecked
@@ -156,6 +157,12 @@ function (swift_benchmark_compile_archopts)
     get_filename_component(module_name "${module_name_path}" NAME)
 
     if(module_name)
+      set(extra_options "")
+      # For this file we disable automatic bridging between Foundation and swift.
+      if("${module_name}" STREQUAL "ObjectiveCNoBridgingStubs")
+        set(extra_options "-Xfrontend"
+                          "-disable-swift-bridge-attr")
+      endif()
       set(objfile "${objdir}/${module_name}.o")
       set(swiftmodule "${objdir}/${module_name}.swiftmodule")
       set(source "${srcdir}/${module_name_path}.swift")
@@ -167,6 +174,7 @@ function (swift_benchmark_compile_archopts)
             "${srcdir}/${module_name_path}.swift"
           COMMAND "${SWIFT_EXEC}"
           ${common_options}
+          ${extra_options}
           "-parse-as-library"
           ${bench_flags}
           "-module-name" "${module_name}"
@@ -281,10 +289,34 @@ function (swift_benchmark_compile_archopts)
     set(OUTPUT_EXEC "${benchmark-bin-dir}/Benchmark_${BENCH_COMPILE_ARCHOPTS_OPT}-${target}")
   endif()
 
+  set(objcfile "${objdir}/ObjectiveCTests.o")
+  add_custom_command(
+      OUTPUT "${objcfile}"
+      DEPENDS "${srcdir}/utils/ObjectiveCTests/ObjectiveCTests.m"
+        "${srcdir}/utils/ObjectiveCTests/ObjectiveCTests.h"
+      COMMAND
+        "${CLANG_EXEC}"
+        "-fno-stack-protector"
+        "-fPIC"
+        "-Werror=date-time"
+        "-fcolor-diagnostics"
+        "-O3"
+        "-target" "${target}"
+        "-isysroot" "${sdk}"
+        "-fobjc-arc"
+        "-arch" "${BENCH_COMPILE_ARCHOPTS_ARCH}"
+        "-F" "${sdk}/../../../Developer/Library/Frameworks"
+        "-m${triple_platform}-version-min=${ver}"
+        "-I" "${srcdir}/utils/ObjectiveCTests"
+        "${srcdir}/utils/ObjectiveCTests/ObjectiveCTests.m"
+        "-c"
+        "-o" "${objcfile}")
+
   add_custom_command(
       OUTPUT "${OUTPUT_EXEC}"
       DEPENDS
         ${bench_library_objects} ${SWIFT_BENCH_OBJFILES}
+        "${objcfile}"
         "adhoc-sign-swift-stdlib-${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
       COMMAND
         "${CLANG_EXEC}"
@@ -306,6 +338,7 @@ function (swift_benchmark_compile_archopts)
         "-Xlinker" "@executable_path/../lib/swift/${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
         ${bench_library_objects}
         ${SWIFT_BENCH_OBJFILES}
+        ${objcfile}
         "-o" "${OUTPUT_EXEC}"
       COMMAND
         "codesign" "-f" "-s" "-" "${OUTPUT_EXEC}")

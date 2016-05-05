@@ -22,11 +22,11 @@ struct X2 : P { // expected-error{{'P' requires that 'E' inherit from 'C'}}
   func getAssoc() -> E { return E() }
 }
 
-func testP<T:P>(t: T) {
+func testP<T:P>(_ t: T) {
   _ = t.getAssoc() as C
   t.getAssoc().f()
 }
 
-func callTestP(x1: X1) {
+func callTestP(_ x1: X1) {
   testP(x1)
 }

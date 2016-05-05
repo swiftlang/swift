@@ -18,6 +18,24 @@
 #ifndef SWIFT_STDLIB_SHIMS_VISIBILITY_H
 #define SWIFT_STDLIB_SHIMS_VISIBILITY_H
 
+#if defined(__has_feature) && __has_feature(nullability)
+// Provide macros to temporarily suppress warning about the use of
+// _Nullable and _Nonnull.
+# define SWIFT_BEGIN_NULLABILITY_ANNOTATIONS                        \
+  _Pragma("clang diagnostic push")                                  \
+  _Pragma("clang diagnostic ignored \"-Wnullability-extension\"")
+# define SWIFT_END_NULLABILITY_ANNOTATIONS                          \
+  _Pragma("clang diagnostic pop")
+
+#else
+// #define _Nullable and _Nonnull to nothing if we're not being built
+// with a compiler that supports them.
+# define _Nullable
+# define _Nonnull
+# define SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
+# define SWIFT_END_NULLABILITY_ANNOTATIONS
+#endif
+
 /// Attribute used to export symbols from the runtime.
 #if __MACH__
 # define SWIFT_RUNTIME_EXPORT __attribute__((visibility("default")))
@@ -38,7 +56,7 @@
 ///
 /// Since the stdlib is currently fully fragile, runtime-stdlib SPI currently
 /// needs to be exported from the core dylib. When the stdlib admits more
-//resilience we may be able to make this hidden.
+/// resilience we may be able to make this hidden.
 #define SWIFT_RUNTIME_STDLIB_INTERFACE SWIFT_RUNTIME_EXPORT
 
 #endif

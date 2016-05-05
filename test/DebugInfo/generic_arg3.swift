@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
-func apply<Type>(T : Type, fn: (Type) -> Type) -> Type { return fn(T) }
+func apply<Type>(_ T : Type, fn: (Type) -> Type) -> Type { return fn(T) }
 
-public func f<Type>(value : Type)
+public func f<Type>(_ value : Type)
 {
   // CHECK: define {{.*}}_TFF12generic_arg31furFxT_U_FQ_Q_
   // CHECK: store %swift.opaque* %1, %swift.opaque** %[[ALLOCA:.*]], align

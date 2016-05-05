@@ -58,6 +58,10 @@ public:
   /// this Name.
   SILFunction *lookupFunction(StringRef Name, SILLinkage Linkage);
 
+  /// Process Name, try to check if there is a declaration of a function
+  /// with this Name.
+  bool hasFunction(StringRef Name, SILLinkage Linkage);
+
   /// Process Decl, recursively deserializing any thing that
   /// the SILFunction corresponding to Decl may reference.
   bool processDeclRef(SILDeclRef Decl);

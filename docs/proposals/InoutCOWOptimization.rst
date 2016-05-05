@@ -51,8 +51,8 @@ could be written as follows:
   protocol Sliceable {
     ...
     @mutating
-    func quickSort(compare: (StreamType.Element, StreamType.Element) -> Bool) {
-      let (start,end) = (startIndex, endIndex)
+    func quickSort(_ compare: (StreamType.Element, StreamType.Element) -> Bool) {
+      let (start, end) = (startIndex, endIndex)
       if start != end && start.succ() != end {
         let pivot = self[start]
         let mid = partition({compare($0, pivot)})
@@ -118,7 +118,7 @@ for the following reasons:
   unspecified::
 
     var arr = [1,2,3]
-    func mutate(x: inout Int[]) -> Int[] {
+    func mutate(_ x: inout Int[]) -> Int[] {
       x = [3...4]
       return arr[0...2]
     }

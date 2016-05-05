@@ -11,13 +11,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var Reflection = TestSuite("Reflection")
 
@@ -33,7 +26,7 @@ Reflection.test("Dictionary/Empty") {
 }
 
 Reflection.test("Dictionary") {
-  let dict = [ "One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5 ]
+  let dict = ["One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5]
 
   var output = ""
   dump(dict, to: &output)

@@ -17,9 +17,11 @@
 
 import SwiftShims
 
+@_versioned
 internal struct _ArrayBody {
   var _storage: _SwiftArrayBodyStorage
-  
+
+  @_versioned
   init(count: Int, capacity: Int, elementTypeIsBridgedVerbatim: Bool = false) {
     _sanityCheck(count >= 0)
     _sanityCheck(capacity >= 0)
@@ -30,7 +32,7 @@ internal struct _ArrayBody {
         (UInt(capacity) << 1) | (elementTypeIsBridgedVerbatim ? 1 : 0))
   }
 
-  /// In principle CountAndCapacity shouldn't need to be default
+  /// In principle ArrayBody shouldn't need to be default
   /// constructed, but since we want to claim all the allocated
   /// capacity after a new buffer is allocated, it's typical to want
   /// to update it immediately after construction.

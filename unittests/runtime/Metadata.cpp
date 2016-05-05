@@ -249,23 +249,6 @@ TEST(Concurrent, ConcurrentMap) {
 }
 
 
-TEST(MetadataAllocator, alloc_firstAllocationMoreThanPageSized) {
-  using swift::MetadataAllocator;
-  MetadataAllocator allocator;
-
-  // rdar://problem/21659505 -- if the first allocation from a metadata
-  // allocator was greater than page sized, a typo caused us to incorrectly
-  // flag an error.
-  uintptr_t pagesize = sysconf(_SC_PAGESIZE);
-  void *page = allocator.alloc(pagesize);
-  EXPECT_NE(page, nullptr);
-  EXPECT_NE(page, MAP_FAILED);
-  EXPECT_EQ(uintptr_t(page) & uintptr_t(pagesize-1), uintptr_t(0));
-
-  // Don't leak the page the allocator allocates.
-  munmap(page, pagesize);
-}
-
 TEST(MetadataTest, getGenericMetadata) {
   auto metadataTemplate = (GenericMetadata*) &MetadataTest1;
 

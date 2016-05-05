@@ -14,7 +14,7 @@
 // REQUIRES: X86
 
 // CHECK: define hidden %swift.type* [[GENERIC_TYPEOF:@_TF17generic_metatypes13genericTypeof.*]](%swift.opaque* noalias nocapture, %swift.type* [[TYPE:%.*]])
-func genericTypeof<T>(x: T) -> T.Type {
+func genericTypeof<T>(_ x: T) -> T.Type {
   // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* {{.*}}, %swift.type* [[TYPE]])
   // CHECK: ret %swift.type* [[METATYPE]]
   return x.dynamicType
@@ -24,7 +24,7 @@ struct Foo {}
 class Bar {}
 
 // CHECK: define hidden %swift.type* @_TF17generic_metatypes27remapToSubstitutedMetatypes{{.*}}(%C17generic_metatypes3Bar*) {{.*}} {
-func remapToSubstitutedMetatypes(x: Foo, y: Bar)
+func remapToSubstitutedMetatypes(_ x: Foo, y: Bar)
   -> (Foo.Type, Bar.Type)
 {
   // CHECK: call %swift.type* [[GENERIC_TYPEOF]](%swift.opaque* noalias nocapture undef, %swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}})
@@ -42,12 +42,12 @@ func remapToGenericMetatypes() {
   genericMetatypes(Foo.self, Bar.self)
 }
 
-func genericMetatypes<T, U>(t: T.Type, _ u: U.Type) {}
+func genericMetatypes<T, U>(_ t: T.Type, _ u: U.Type) {}
 
 protocol Bas {}
 
 // CHECK: define hidden { %swift.type*, i8** } @_TF17generic_metatypes14protocolTypeof{{.*}}(%P17generic_metatypes3Bas_* noalias nocapture dereferenceable({{.*}}))
-func protocolTypeof(x: Bas) -> Bas.Type {
+func protocolTypeof(_ x: Bas) -> Bas.Type {
   // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_, %P17generic_metatypes3Bas_* [[X:%.*]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
   // CHECK: [[BUFFER:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_, %P17generic_metatypes3Bas_* [[X]], i32 0, i32 0
@@ -76,13 +76,13 @@ struct Zim : Bas {}
 class Zang : Bas {}
 
 // CHECK-LABEL: define hidden { %swift.type*, i8** } @_TF17generic_metatypes15metatypeErasureFMVS_3ZimPMPS_3Bas_() #0
-func metatypeErasure(z: Zim.Type) -> Bas.Type {
+func metatypeErasure(_ z: Zim.Type) -> Bas.Type {
   // CHECK: ret { %swift.type*, i8** } {{.*}} @_TMfV17generic_metatypes3Zim, {{.*}} @_TWPV17generic_metatypes3ZimS_3BasS_
   return z
 }
 
 // CHECK-LABEL: define hidden { %swift.type*, i8** } @_TF17generic_metatypes15metatypeErasureFMCS_4ZangPMPS_3Bas_(%swift.type*) #0
-func metatypeErasure(z: Zang.Type) -> Bas.Type {
+func metatypeErasure(_ z: Zang.Type) -> Bas.Type {
   // CHECK: [[RET:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* %0, 0
   // CHECK: [[RET2:%.*]] = insertvalue { %swift.type*, i8** } [[RET]], i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @_TWPC17generic_metatypes4ZangS_3BasS_, i32 0, i32 0), 1
   // CHECK: ret { %swift.type*, i8** } [[RET2]]
@@ -95,7 +95,7 @@ struct ThreeArgs<T, U, V> {}
 struct FourArgs<T, U, V, W> {}
 struct FiveArgs<T, U, V, W, X> {}
 
-func genericMetatype<A>(x: A.Type) {}
+func genericMetatype<A>(_ x: A.Type) {}
 
 // CHECK-LABEL: define hidden void @_TF17generic_metatypes20makeGenericMetatypesFT_T_() {{.*}} {
 func makeGenericMetatypes() {
@@ -118,7 +118,7 @@ func makeGenericMetatypes() {
 // CHECK: define linkonce_odr hidden %swift.type* @_TMaGV17generic_metatypes6OneArgVS_3Foo_() [[NOUNWIND_READNONE_OPT:#[0-9]+]]
 // CHECK:   call %swift.type* @_TMaV17generic_metatypes6OneArg(%swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaV17generic_metatypes6OneArg(%swift.type*)
+// CHECK-LABEL: define hidden %swift.type* @_TMaV17generic_metatypes6OneArg(%swift.type*)
 // CHECK:   [[BUFFER:%.*]] = alloca { %swift.type* }
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type* }* [[BUFFER]] to i8*
 // CHECK:   call void @llvm.lifetime.start
@@ -134,7 +134,7 @@ func makeGenericMetatypes() {
 // CHECK:   [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
 // CHECK:   call %swift.type* @_TMaV17generic_metatypes7TwoArgs(%swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, %swift.type* [[T0]])
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaV17generic_metatypes7TwoArgs(%swift.type*, %swift.type*)
+// CHECK-LABEL: define hidden %swift.type* @_TMaV17generic_metatypes7TwoArgs(%swift.type*, %swift.type*)
 // CHECK:   [[BUFFER:%.*]] = alloca { %swift.type*, %swift.type* }
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type* }* [[BUFFER]] to i8*
 // CHECK:   call void @llvm.lifetime.start
@@ -152,7 +152,7 @@ func makeGenericMetatypes() {
 // CHECK:   [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
 // CHECK:   call %swift.type* @_TMaV17generic_metatypes9ThreeArgs(%swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}) [[NOUNWIND_READNONE]]
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaV17generic_metatypes9ThreeArgs(%swift.type*, %swift.type*, %swift.type*)
+// CHECK-LABEL: define hidden %swift.type* @_TMaV17generic_metatypes9ThreeArgs(%swift.type*, %swift.type*, %swift.type*)
 // CHECK:   [[BUFFER:%.*]] = alloca { %swift.type*, %swift.type*, %swift.type* }
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
 // CHECK:   call void @llvm.lifetime.start
@@ -172,7 +172,7 @@ func makeGenericMetatypes() {
 // CHECK:   [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
 // CHECK:   call %swift.type* @_TMaV17generic_metatypes8FourArgs(%swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, %swift.type* [[T0]]) [[NOUNWIND_READNONE]]
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaV17generic_metatypes8FourArgs(%swift.type*, %swift.type*, %swift.type*, %swift.type*)
+// CHECK-LABEL: define hidden %swift.type* @_TMaV17generic_metatypes8FourArgs(%swift.type*, %swift.type*, %swift.type*, %swift.type*)
 // CHECK:   [[BUFFER:%.*]] = alloca { %swift.type*, %swift.type*, %swift.type*, %swift.type* }
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
 // CHECK:   call void @llvm.lifetime.start
@@ -194,7 +194,7 @@ func makeGenericMetatypes() {
 // CHECK:   [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
 // CHECK:   call %swift.type* @_TMaV17generic_metatypes8FiveArgs(%swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}) [[NOUNWIND_READNONE]]
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaV17generic_metatypes8FiveArgs(%swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type*)
+// CHECK-LABEL: define hidden %swift.type* @_TMaV17generic_metatypes8FiveArgs(%swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type*)
 // CHECK:   [[BUFFER:%.*]] = alloca { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }
 // CHECK:   [[BUFFER_PTR:%.*]] = bitcast { %swift.type*, %swift.type*, %swift.type*, %swift.type*, %swift.type* }* [[BUFFER]] to i8*
 // CHECK:   call void @llvm.lifetime.start

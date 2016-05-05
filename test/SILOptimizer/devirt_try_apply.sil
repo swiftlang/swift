@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -devirtualizer -redundant-load-elim -inline  | FileCheck %s --check-prefix=CHECK-DEVIRT
+// RUN: %target-sil-opt -enable-sil-verify-all %s -devirtualizer -inline  | FileCheck %s --check-prefix=CHECK-DEVIRT
 // RUN: %target-sil-opt -enable-sil-verify-all %s -specdevirt  | FileCheck %s --check-prefix=CHECK-SPECDEVIRT
 // RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining  | FileCheck %s --check-prefix=CHECK-MANDATORY-INLINING
 

@@ -232,7 +232,7 @@ ConcreteToArchetypeConvertC(t: c, t2: e)
 // CHECK-LABEL: sil shared [noinline] @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ConcreteToArchetypeConvertC{{.*}} : $@convention(thin) (@owned C, @owned C) -> @owned C {
 // CHECK: bb0(%0 : $C, %1 : $C):
 // CHECK: strong_release %1
-// CHECK-NEXT: return %0
+// CHECK: return %0
 
 // x -> y where x is a class but y is not.
 // CHECK-LABEL: sil shared [noinline] @_TTSg5Vs5UInt8___TF37specialize_unconditional_checked_cast27ConcreteToArchetypeConvertC{{.*}} : $@convention(thin) (@owned C, UInt8) -> UInt8 {
@@ -294,7 +294,7 @@ SuperToArchetypeC(c: c, t: b)
 // CHECK-LABEL: sil shared [noinline] @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast17SuperToArchetypeC{{.*}} : $@convention(thin) (@owned C, @owned C) -> @owned C {
 // CHECK: bb0(%0 : $C, %1 : $C):
 // CHECK: strong_release %1
-// CHECK-NEXT: return %0
+// CHECK: return %0
 
 // x -> y where x is a super class of y.
 // CHECK-LABEL: sil shared [noinline] @_TTSg5C37specialize_unconditional_checked_cast1D___TF37specialize_unconditional_checked_cast17SuperToArchetypeC{{.*}} : $@convention(thin) (@owned C, @owned D) -> @owned D {
@@ -326,7 +326,7 @@ SuperToArchetypeD(d: d, t: d)
 // CHECK-LABEL: sil shared [noinline] @_TTSg5C37specialize_unconditional_checked_cast1D___TF37specialize_unconditional_checked_cast17SuperToArchetypeD{{.*}} : $@convention(thin) (@owned D, @owned D) -> @owned D {
 // CHECK: bb0(%0 : $D, %1 : $D):
 // CHECK: strong_release %1
-// CHECK-NEXT: return %0
+// CHECK: return %0
 
 //////////////////////////////
 // Existential To Archetype //
@@ -351,7 +351,7 @@ public func ExistentialToArchetype<T>(o o : AnyObject, t : T) -> T {
 // CHECK-LABEL: sil shared [noinline] @_TTSg5Ps9AnyObject____TF37specialize_unconditional_checked_cast22ExistentialToArchetype{{.*}} : $@convention(thin) (@owned AnyObject, @owned AnyObject) -> @owned AnyObject {
 // CHECK: bb0(%0 : $AnyObject, %1 : $AnyObject):
 // CHECK: strong_release %1
-// CHECK-NEXT: return %0
+// CHECK: return %0
 
 ExistentialToArchetype(o: o, t: c)
 ExistentialToArchetype(o: o, t: b)
@@ -371,11 +371,11 @@ ExistentialToArchetype(o: o, t: o)
 // CHECK-DAG: [[LOAD:%[0-9]+]] = load [[STACK_D]]
 // CHECK: return [[LOAD]]
 @inline(never)
-public func genericDownCast<T, U>(a: T, _ : U.Type) -> U {
+public func genericDownCast<T, U>(_ a: T, _ : U.Type) -> U {
   return a as! U
 }
 
-public func callGenericDownCast(c: C?) -> D {
+public func callGenericDownCast(_ c: C?) -> D {
   return genericDownCast(c, D.self)
 }
 

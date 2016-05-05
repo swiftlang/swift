@@ -122,7 +122,7 @@ func testFunctionOverload() -> () {
   exit()
 }
 
-func testRvalue(lhs: (), rhs: @noreturn () -> ()) -> () {
+func testRvalue(_ lhs: (), rhs: @noreturn () -> ()) -> () {
   return rhs()
 }
 
@@ -131,6 +131,6 @@ var fnr: @noreturn (_: Int) -> () = exit
 @noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{1-11=}}
 var fpr: (_: Int) -> () = exit
 
-func testWitnessMethod<T: TestProtocol>(t: T) {
+func testWitnessMethod<T: TestProtocol>(_ t: T) {
   _ = T.neverReturnsStatic
 }

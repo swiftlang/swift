@@ -56,13 +56,13 @@ protocol P4 {
 // ----------------------------------------------------------------------------
 // Using generics from inside protocol extensions
 // ----------------------------------------------------------------------------
-func acceptsP1<T : P1>(t: T) { }
+func acceptsP1<T : P1>(_ t: T) { }
 
 extension P1 {
   final func extP1d() { acceptsP1(self) }
 }
 
-func acceptsP2<T : P2>(t: T) { }
+func acceptsP2<T : P2>(_ t: T) { }
 
 extension P2 {
   final func extP2acceptsP1() { acceptsP1(reqP2a()) }
@@ -77,12 +77,12 @@ protocol SelfP1 {
 protocol SelfP2 {
 }
 
-func acceptSelfP1<T, U : SelfP1 where U.AssocType == T>(t: T, _ u: U) -> T {
+func acceptSelfP1<T, U : SelfP1 where U.AssocType == T>(_ t: T, _ u: U) -> T {
   return t
 }
 
 extension SelfP1 {
-  final func tryAcceptSelfP1<Z : SelfP1 where Z.AssocType == Self>(z: Z) -> Self {
+  final func tryAcceptSelfP1<Z : SelfP1 where Z.AssocType == Self>(_ z: Z) -> Self {
     return acceptSelfP1(self, z)
   }
 }
@@ -120,8 +120,8 @@ func testInitP1() {
 // Subscript in protocol extensions
 // ----------------------------------------------------------------------------
 protocol SubscriptP1 {
-  func readAt(i: Int) -> String
-  func writeAt(i: Int, string: String)
+  func readAt(_ i: Int) -> String
+  func writeAt(_ i: Int, string: String)
 }
 
 extension SubscriptP1 {
@@ -132,16 +132,16 @@ extension SubscriptP1 {
 }
 
 struct SubscriptS1 : SubscriptP1 {
-  func readAt(i: Int) -> String { return "hello" }
-  func writeAt(i: Int, string: String) { }
+  func readAt(_ i: Int) -> String { return "hello" }
+  func writeAt(_ i: Int, string: String) { }
 }
 
 struct SubscriptC1 : SubscriptP1 {
-  func readAt(i: Int) -> String { return "hello" }
-  func writeAt(i: Int, string: String) { }
+  func readAt(_ i: Int) -> String { return "hello" }
+  func writeAt(_ i: Int, string: String) { }
 }
 
-func testSubscriptP1(ss1: SubscriptS1, sc1: SubscriptC1,
+func testSubscriptP1(_ ss1: SubscriptS1, sc1: SubscriptC1,
                      i: Int, s: String) {
   var ss1 = ss1
   var sc1 = sc1
@@ -163,7 +163,7 @@ struct S1 : P1 {
   }
 }
 
-func useS1(s1: S1) -> Bool {
+func useS1(_ s1: S1) -> Bool {
   s1.reqP1a()
   return s1.extP1a() && s1.extP1b
 }
@@ -212,7 +212,7 @@ extension P4 where Self.AssocP4 == Bool {
   final func extP4a() -> Bool { return reqP4a() } // expected-note 2 {{found this candidate}}
 }
 
-func testP4(s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
+func testP4(_ s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
   s4a.extP4a() // expected-error{{ambiguous reference to member 'extP4a()'}}
   s4b.extP4a() // ok
   s4c.extP4a() // expected-error{{ambiguous reference to member 'extP4a()'}}
@@ -291,7 +291,7 @@ struct P8a : P8, P7 {
   func getP8Assoc() -> Bool { return true }
 }
 
-func testP8a(p8a: P8a) {
+func testP8a(_ p8a: P8a) {
   var p7 = p8a.getP7Assoc()
   p7 = P7FromP8<Bool>() // okay, check type of above
   _ = p7
@@ -303,7 +303,7 @@ struct P8b : P8, P7 {
   func getP8Assoc() -> Bool { return true }
 }
 
-func testP8b(p8b: P8b) {
+func testP8b(_ p8b: P8b) {
   var p7 = p8b.getP7Assoc()
   p7 = 17 // check type of above
   _ = p7
@@ -342,7 +342,7 @@ protocol MySeq : _MySeq {
 }
 
 protocol _MyCollection : _MySeq {
-  associatedtype Index : ForwardIndex
+  associatedtype Index : Strideable
 
   var myStartIndex : Index { get }
   var myEndIndex : Index { get }
@@ -361,7 +361,7 @@ struct MyIndexedIterator<C : _MyCollection> : IteratorProtocol {
   mutating func next() -> C._Element? {
     if index == container.myEndIndex { return nil }
     let result = container[index]
-    index = index.successor()
+    index = index.advanced(by: 1)
     return result
   }
 }
@@ -373,7 +373,7 @@ struct OtherIndexedIterator<C : _MyCollection> : IteratorProtocol {
   mutating func next() -> C._Element? {
     if index == container.myEndIndex { return nil }
     let result = container[index]
-    index = index.successor()
+    index = index.advanced(by: 1)
     return result
   }
 }
@@ -406,7 +406,7 @@ struct SomeCollection2 : MyCollection {
   }
 }
 
-func testSomeCollections(sc1: SomeCollection1, sc2: SomeCollection2) {
+func testSomeCollections(_ sc1: SomeCollection1, sc2: SomeCollection2) {
   var mig = sc1.myGenerate()
   mig = MyIndexedIterator(container: sc1, index: sc1.myStartIndex)
   _ = mig
@@ -442,7 +442,7 @@ extension PConforms6 {
   final func f() -> Int { return 42 }
 }
 
-func test<T: PConforms6>(x: T) -> Int { return x.f() }
+func test<T: PConforms6>(_ x: T) -> Int { return x.f() }
 
 struct PConforms6Impl : PConforms6 { }
 
@@ -530,7 +530,7 @@ struct SConforms9b : PConforms9 {
   typealias Assoc = Int
 }
 
-func testSConforms9b(s9b: SConforms9b) {
+func testSConforms9b(_ s9b: SConforms9b) {
   var p = s9b.property
   p = 5
   _ = p
@@ -540,7 +540,7 @@ struct SConforms9c : PConforms9 {
   typealias Assoc = String
 }
 
-func testSConforms9c(s9c: SConforms9c) {
+func testSConforms9c(_ s9c: SConforms9c) {
   var p = s9c.property
   p = "hello"
   _ = p
@@ -550,7 +550,7 @@ struct SConforms9d : PConforms9 {
   func method() -> Int { return 5 }
 }
 
-func testSConforms9d(s9d: SConforms9d) {
+func testSConforms9d(_ s9d: SConforms9d) {
   var p = s9d.property
   p = 6
   _ = p
@@ -629,7 +629,7 @@ struct S1b : P1 {
   func extP1a() -> Int { return 0 }
 }
 
-func useS1b(s1b: S1b) {
+func useS1b(_ s1b: S1b) {
   var x = s1b.extP1a() // uses S1b.extP1a due to partial ordering
   x = 5 // checks that "x" deduced to "Int" above
   _ = x
@@ -667,7 +667,7 @@ struct SInherit2 : PInherit2 { }
 struct SInherit3 : PInherit3 { }
 struct SInherit4 : PInherit4 { }
 
-func testPInherit(si2 : SInherit2, si3: SInherit3, si4: SInherit4) {
+func testPInherit(_ si2 : SInherit2, si3: SInherit3, si4: SInherit4) {
   var b1 = si2.order1() // PInherit2.order1
   b1 = true // check that the above returned Bool
   _ = b1
@@ -715,7 +715,7 @@ struct SConstrained3 : PConstrained1 {
   typealias AssocTypePC1 = SInherit3
 }
 
-func testPConstrained1(sc1: SConstrained1, sc2: SConstrained2,
+func testPConstrained1(_ sc1: SConstrained1, sc2: SConstrained2,
                        sc3: SConstrained3) {
   var i = sc1.pc1() // PConstrained1.pc1
   i = 17 // checks type of above
@@ -753,7 +753,7 @@ struct SConstrained3b : PConstrained3 {
   typealias AssocTypePC2 = SInherit3
 }
 
-func testSConstrained3(sc3a: SConstrained3a, sc3b: SConstrained3b) {
+func testSConstrained3(_ sc3a: SConstrained3a, sc3b: SConstrained3b) {
   var s = sc3a.pc2() // PConstrained3.pc2
   s = "hello"
   _ = s

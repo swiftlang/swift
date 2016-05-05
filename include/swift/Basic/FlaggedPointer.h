@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-#ifndef SWIFT_RUNTIME_FLAGGEDPOINTER_H
-#define SWIFT_RUNTIME_FLAGGEDPOINTER_H
+#ifndef SWIFT_BASIC_FLAGGEDPOINTER_H
+#define SWIFT_BASIC_FLAGGEDPOINTER_H
 
 #include <cassert>
 
@@ -148,7 +148,7 @@ public:
   }
 };
 
-};
+} // end namespace swift
 
 // Teach SmallPtrSet that FlaggedPointer is "basically a pointer".
 template <typename PointerTy, unsigned BitPosition, typename PtrTraits>
@@ -175,4 +175,4 @@ public:
   };
 };
 
-#endif
+#endif // SWIFT_BASIC_FLAGGEDPOINTER_H

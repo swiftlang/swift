@@ -21,6 +21,8 @@
 
 namespace swift {
 
+using Atomicity = RefCountingInst::Atomicity;
+
 class SILDebugScope;
 
 class SILBuilder {
@@ -658,26 +660,30 @@ public:
         targetType));
   }
 
-  RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand) {
-    return insert(new (F.getModule())
-                      RetainValueInst(getSILDebugLocation(Loc), operand));
+  RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
+                                     Atomicity atomicity) {
+    return insert(new (F.getModule()) RetainValueInst(getSILDebugLocation(Loc),
+                                                      operand, atomicity));
   }
 
-  ReleaseValueInst *createReleaseValue(SILLocation Loc, SILValue operand) {
-    return insert(new (F.getModule())
-                      ReleaseValueInst(getSILDebugLocation(Loc), operand));
+  ReleaseValueInst *createReleaseValue(SILLocation Loc, SILValue operand,
+                                       Atomicity atomicity) {
+    return insert(new (F.getModule()) ReleaseValueInst(getSILDebugLocation(Loc),
+                                                       operand, atomicity));
   }
 
   AutoreleaseValueInst *createAutoreleaseValue(SILLocation Loc,
-                                               SILValue operand) {
+                                               SILValue operand,
+                                               Atomicity atomicity) {
     return insert(new (F.getModule()) AutoreleaseValueInst(
-        getSILDebugLocation(Loc), operand));
+        getSILDebugLocation(Loc), operand, atomicity));
   }
 
   SetDeallocatingInst *createSetDeallocating(SILLocation Loc,
-                                            SILValue operand) {
+                                            SILValue operand,
+                                            Atomicity atomicity) {
     return insert(new (F.getModule()) SetDeallocatingInst(
-        getSILDebugLocation(Loc), operand));
+        getSILDebugLocation(Loc), operand, atomicity));
   }
 
   StructInst *createStruct(SILLocation Loc, SILType Ty,
@@ -1018,35 +1024,43 @@ public:
     return insert(new (F.getModule())
                       CopyBlockInst(getSILDebugLocation(Loc), Operand));
   }
-  StrongRetainInst *createStrongRetain(SILLocation Loc, SILValue Operand) {
-    return insert(new (F.getModule())
-                      StrongRetainInst(getSILDebugLocation(Loc), Operand));
+  StrongRetainInst *createStrongRetain(SILLocation Loc, SILValue Operand,
+                                       Atomicity atomicity) {
+    return insert(new (F.getModule()) StrongRetainInst(getSILDebugLocation(Loc),
+                                                       Operand, atomicity));
   }
-  StrongReleaseInst *createStrongRelease(SILLocation Loc, SILValue Operand) {
-    return insert(new (F.getModule())
-                      StrongReleaseInst(getSILDebugLocation(Loc), Operand));
+  StrongReleaseInst *createStrongRelease(SILLocation Loc, SILValue Operand,
+                                         Atomicity atomicity) {
+    return insert(new (F.getModule()) StrongReleaseInst(
+        getSILDebugLocation(Loc), Operand, atomicity));
   }
-  StrongPinInst *createStrongPin(SILLocation Loc, SILValue Operand) {
-    return insert(new (F.getModule())
-                      StrongPinInst(getSILDebugLocation(Loc), Operand));
+  StrongPinInst *createStrongPin(SILLocation Loc, SILValue Operand,
+                                 Atomicity atomicity) {
+    return insert(new (F.getModule()) StrongPinInst(getSILDebugLocation(Loc),
+                                                    Operand, atomicity));
   }
-  StrongUnpinInst *createStrongUnpin(SILLocation Loc, SILValue Operand) {
-    return insert(new (F.getModule())
-                      StrongUnpinInst(getSILDebugLocation(Loc), Operand));
+  StrongUnpinInst *createStrongUnpin(SILLocation Loc, SILValue Operand,
+                                     Atomicity atomicity) {
+    return insert(new (F.getModule()) StrongUnpinInst(getSILDebugLocation(Loc),
+                                                      Operand, atomicity));
   }
   StrongRetainUnownedInst *createStrongRetainUnowned(SILLocation Loc,
-                                                     SILValue Operand) {
+                                                     SILValue Operand,
+                                                     Atomicity atomicity) {
     return insert(new (F.getModule()) StrongRetainUnownedInst(
-        getSILDebugLocation(Loc), Operand));
+        getSILDebugLocation(Loc), Operand, atomicity));
   }
-  UnownedRetainInst *createUnownedRetain(SILLocation Loc, SILValue Operand) {
-    return insert(new (F.getModule())
-                      UnownedRetainInst(getSILDebugLocation(Loc), Operand));
+  UnownedRetainInst *createUnownedRetain(SILLocation Loc, SILValue Operand,
+                                         Atomicity atomicity) {
+    return insert(new (F.getModule()) UnownedRetainInst(
+        getSILDebugLocation(Loc), Operand, atomicity));
   }
-  UnownedReleaseInst *createUnownedRelease(SILLocation Loc, SILValue Operand) {
-    return insert(new (F.getModule())
-                      UnownedReleaseInst(getSILDebugLocation(Loc), Operand));
+  UnownedReleaseInst *createUnownedRelease(SILLocation Loc, SILValue Operand,
+                                           Atomicity atomicity) {
+    return insert(new (F.getModule()) UnownedReleaseInst(
+        getSILDebugLocation(Loc), Operand, atomicity));
   }
+
   FixLifetimeInst *createFixLifetime(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule())
                       FixLifetimeInst(getSILDebugLocation(Loc), Operand));

@@ -41,7 +41,7 @@ enum State : MyPrintable {
   }
 }
 
-func printPair<A : MyPrintable, B : MyPrintable>(p: BufferedPair<A,B>) {
+func printPair<A : MyPrintable, B : MyPrintable>(_ p: BufferedPair<A,B>) {
   print("\(p.front) ", terminator: "")
   p.first.myPrint()
   print(" ", terminator: "")

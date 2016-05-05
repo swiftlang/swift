@@ -32,7 +32,7 @@ class D : C {
 }
 
 @_silgen_name("TestSwiftObjectNSObject") 
-func TestSwiftObjectNSObject(c: C, _ d: D)
+func TestSwiftObjectNSObject(_ c: C, _ d: D)
 
 TestSwiftObjectNSObject(C(), D())
 // does not return

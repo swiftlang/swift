@@ -11,7 +11,7 @@ import gizmo
 @objc class Foo : NSObject {
   // Bridging set parameters
   // CHECK-LABEL: sil hidden [thunk] @_TToFC17objc_set_bridging3Foo16bridge_Set_param{{.*}} : $@convention(objc_method) (NSSet, Foo) -> ()
-  func bridge_Set_param(s: Set<Foo>) {
+  func bridge_Set_param(_ s: Set<Foo>) {
     // CHECK: bb0([[NSSET:%[0-9]+]] : $NSSet, [[SELF:%[0-9]+]] : $Foo):
     // CHECK:   strong_retain [[NSSET]] : $NSSet
     // CHECK:   strong_retain [[SELF]] : $Foo

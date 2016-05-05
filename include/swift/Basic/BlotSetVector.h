@@ -145,4 +145,4 @@ public:
 
 } // end swift namespace
 
-#endif
+#endif // SWIFT_BASIC_BLOTSETVECTOR_H

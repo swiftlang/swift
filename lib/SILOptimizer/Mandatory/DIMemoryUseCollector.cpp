@@ -311,7 +311,7 @@ bool DIMemoryUse::
 onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
   auto &Module = Inst->getModule();
   
-  for (unsigned i = FirstElement, e = i+NumElements; i != e; ++i){
+  for (unsigned i = FirstElement, e = i+NumElements; i != e; ++i) {
     // Skip 'super.init' bit
     if (i == MI.getNumMemoryElements())
       return false;
@@ -1279,11 +1279,23 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
     if (isa<StoreInst>(User) && UI->getOperandNumber() == 1)
       continue;
 
-    // For class initializers, the assign into the self box is captured as
-    // a SelfInit or SuperInit elsewhere.
+    // For class initializers, the assign into the self box may be
+    // captured as SelfInit or SuperInit elsewhere.
     if (TheMemory.isClassInitSelf() &&
-        isa<AssignInst>(User) && UI->getOperandNumber() == 1)
+        isa<AssignInst>(User) && UI->getOperandNumber() == 1) {
+      // If the source of the assignment is an application of a C
+      // function, there is no metatype argument, so treat the
+      // assignment to the self box as the initialization.
+      if (auto apply = dyn_cast<ApplyInst>(cast<AssignInst>(User)->getSrc())) {
+        if (auto fn = apply->getCalleeFunction()) {
+          if (fn->getRepresentation()
+                == SILFunctionTypeRepresentation::CFunctionPointer)
+            Uses.push_back(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
+        }
+      }
+
       continue;
+    }
 
     // Stores *to* the allocation are writes.  If the value being stored is a
     // call to self.init()... then we have a self.init call.

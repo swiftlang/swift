@@ -1,6 +1,6 @@
 public class Empty {}
 
-@swift3_migration(renamed="DosInts", message="because I can")
+@swift3_migration(renamed: "DosInts", message: "because I can")
 public class TwoInts {
   public var x, y : Int
   
@@ -11,7 +11,7 @@ public class TwoInts {
 }
 
 public class ComputedProperty {
-  @swift3_migration(renamed="theValue", message="because I can")
+  @swift3_migration(renamed: "theValue", message: "because I can")
   public var value : Int {
     get {
       var result = 0
@@ -22,7 +22,7 @@ public class ComputedProperty {
     }
   }
 
-  @swift3_migration(message="something else")
+  @swift3_migration(message: "something else")
   public var readOnly : Int {
     return 42
   }
@@ -45,7 +45,7 @@ public class Pair<A, B> {
 public class GenericCtor<U> {
   public init<T>(_ t : T) {}
   
-  public func doSomething<T>(t : T) {}
+  public func doSomething<T>(_ t : T) {}
 }
 
 

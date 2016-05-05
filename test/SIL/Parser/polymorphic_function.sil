@@ -8,7 +8,7 @@ public protocol mmOutputStreamType {
 }
 
 public protocol mmStreamable {
-  func writeTo<Target : mmOutputStreamType>(inout target: Target)
+  func writeTo<Target : mmOutputStreamType>(target: inout Target)
 }
 
 // CHECK-LABEL: sil @test : $@convention(thin) () -> () {

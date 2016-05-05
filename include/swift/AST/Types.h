@@ -76,7 +76,6 @@ namespace swift {
 #include "swift/AST/TypeNodes.def"
   };
 
-
 /// Various properties of types that are primarily defined recursively
 /// on structural types.
 class RecursiveTypeProperties {
@@ -220,6 +219,22 @@ enum class TypeTraitResult {
   CanBe,
   /// The type has the trait irrespective of generic substitutions.
   Is,
+};
+
+/// Specifies which normally-unsafe type mismatches should be accepted when
+/// checking overrides.
+enum class OverrideMatchMode {
+  /// Only accept overrides that are properly covariant.
+  Strict,
+  /// Allow a parameter with IUO type to be overridden by a parameter with non-
+  /// optional type.
+  AllowNonOptionalForIUOParam,
+  /// Allow any mismatches of Optional or ImplicitlyUnwrappedOptional at the
+  /// top level of a type.
+  ///
+  /// This includes function parameters and result types as well as tuple
+  /// elements, but excludes generic parameters.
+  AllowTopLevelOptionalMismatch
 };
 
 /// TypeBase - Base class for all types in Swift.
@@ -654,7 +669,7 @@ public:
 
   /// \brief Determines whether this type is permitted as a method override
   /// of the \p other.
-  bool canOverride(Type other, bool allowUnsafeParameterOverride,
+  bool canOverride(Type other, OverrideMatchMode matchMode,
                    LazyResolver *resolver);
 
   /// \brief Determines whether this type has a retainable pointer
@@ -693,6 +708,31 @@ public:
   /// unbound generic nominal type, return the (possibly generic) nominal type
   /// declaration.
   NominalTypeDecl *getAnyNominal();
+
+  /// Determine whether the given type is representable in the given
+  /// foreign language.
+  std::pair<ForeignRepresentableKind, ProtocolConformance *>
+  getForeignRepresentableIn(ForeignLanguage language, DeclContext *dc);
+
+  /// Determines whether the given Swift type is representable within
+  /// the given foreign language.
+  ///
+  /// A given Swift type is representable in the given foreign
+  /// language if the Swift type can be used from source code written
+  /// in that language.
+  bool isRepresentableIn(ForeignLanguage language, DeclContext *dc);
+
+  /// Determines whether the type is trivially representable within
+  /// the foreign language, meaning that it is both representable in
+  /// that language and that the runtime representations are
+  /// equivalent.
+  bool isTriviallyRepresentableIn(ForeignLanguage language,
+                                  DeclContext *dc);
+
+  /// \brief Given that this is a nominal type or bound generic nominal
+  /// type, return its parent type; this will be a null type if the type
+  /// is not a nested type.
+  Type getNominalParent();
 
   /// \brief If this is a GenericType, bound generic nominal type, or
   /// unbound generic nominal type, return the (possibly generic) nominal type
@@ -2328,13 +2368,10 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getResult)
 END_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
 
-/// FunctionType - A monomorphic function type.
+/// FunctionType - A monomorphic function type, specified with an arrow.
 ///
-/// If the AutoClosure bit is set to true, then the input type is known to be ()
-/// and a value of this function type is only assignable (in source code) from
-/// the destination type of the function. Sema inserts an ImplicitClosure to
-/// close over the value.  For example:
-///   @autoclosure var x : () -> Int = 4
+/// For example:
+///   let x : (Float, Int) -> Int
 class FunctionType : public AnyFunctionType {
 public:
   /// 'Constructor' Factory Function
@@ -4316,6 +4353,14 @@ inline NominalTypeDecl *TypeBase::getAnyNominal() {
   return getCanonicalType().getAnyNominal();
 }
 
+inline Type TypeBase::getNominalParent() {
+  if (auto classType = getAs<NominalType>()) {
+    return classType->getParent();
+  } else {
+    return castTo<BoundGenericType>()->getParent();
+  }
+}
+
 inline GenericTypeDecl *TypeBase::getAnyGeneric() {
   return getCanonicalType().getAnyGeneric();
 }
@@ -4383,6 +4428,14 @@ inline CanType CanType::getLValueOrInOutObjectTypeImpl(CanType type) {
   if (auto refType = dyn_cast<LValueType>(type))
     return refType.getObjectType();
   return type;
+}
+
+inline CanType CanType::getNominalParent() const {
+  if (auto classType = dyn_cast<NominalType>(*this)) {
+    return classType.getParent();
+  } else {
+    return cast<BoundGenericType>(*this).getParent();
+  }
 }
 
 inline bool TypeBase::mayHaveSuperclass() {

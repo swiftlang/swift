@@ -1,9 +1,9 @@
 // RUN: %target-parse-verify-swift
 
-func f0(x: Int, y: Int, z: Int) { }
-func f1(x: Int, while: Int) { }
-func f2(x: Int, `let` _: Int) { }
-func f3(x: Int, _ y: Int, z: Int) { }
+func f0(_ x: Int, y: Int, z: Int) { }
+func f1(_ x: Int, while: Int) { }
+func f2(_ x: Int, `let` _: Int) { }
+func f3(_ x: Int, _ y: Int, z: Int) { }
 
 func test01() {
   _ = f0(_:y:z:)
@@ -14,9 +14,9 @@ func test01() {
 }
 
 struct S0 {
-  func f0(x: Int, y: Int, z: Int) { }
-  func f1(x: Int, while: Int) { }
-  func f2(x: Int, `let` _: Int) { }
+  func f0(_ x: Int, y: Int, z: Int) { }
+  func f1(_ x: Int, while: Int) { }
+  func f2(_ x: Int, `let` _: Int) { }
 
   func testS0() {
     _ = f0(_:y:z:)
@@ -30,7 +30,7 @@ struct S0 {
     _ = self.f2(_:`let`:)
   }
 
-  static func f3(x: Int, y: Int, z: Int) -> S0 { return S0() }
+  static func f3(_ x: Int, y: Int, z: Int) -> S0 { return S0() }
 }
 
 // Determine context from type.
@@ -43,9 +43,9 @@ class C0 {
     self.init(x:y:z:)(x: all, y: all, z: all)
   }
 
-  func f0(x: Int, y: Int, z: Int) { }
-  func f1(x: Int, while: Int) { }
-  func f2(x: Int, `let` _: Int) { }
+  func f0(_ x: Int, y: Int, z: Int) { }
+  func f1(_ x: Int, while: Int) { }
+  func f2(_ x: Int, `let` _: Int) { }
 }
 
 class C1 : C0 {

@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func myMap<T1, T2>(array: [T1], _ fn: (T1) -> T2) -> [T2] {}
+func myMap<T1, T2>(_ array: [T1], _ fn: (T1) -> T2) -> [T2] {}
 
 var intArray : [Int]
 
@@ -8,17 +8,17 @@ myMap(intArray, { String($0) })
 myMap(intArray, { x -> String in String(x) } )
 
 // Closures with too few parameters.
-func foo(x: (Int, Int) -> Int) {}
+func foo(_ x: (Int, Int) -> Int) {}
 foo({$0}) // expected-error{{cannot convert value of type '(Int, Int)' to closure result type 'Int'}}
 
 struct X {}
-func mySort(array: [String], _ predicate: (String, String) -> Bool) -> [String] {}
-func mySort(array: [X], _ predicate: (X, X) -> Bool) -> [X] {}
+func mySort(_ array: [String], _ predicate: (String, String) -> Bool) -> [String] {}
+func mySort(_ array: [X], _ predicate: (X, X) -> Bool) -> [X] {}
 var strings : [String]
 mySort(strings, { x, y in x < y })
 
 // Closures with inout arguments.
-func f0<T, U>(t: T, _ f: (inout T) -> U) -> U {
+func f0<T, U>(_ t: T, _ f: (inout T) -> U) -> U {
   var t2 = t
   return f(&t2)
 }
@@ -30,7 +30,7 @@ struct X2 {
 f0(X2(), {$0.g()})
 
 // Autoclosure
-func f1(@autoclosure f f: () -> Int) { }
+func f1(f: @autoclosure () -> Int) { }
 func f2() -> Int { }
 f1(f: f2) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}{{9-9=()}}
 f1(f: 5)
@@ -48,7 +48,7 @@ struct X3<T> {
   init(_: (T) -> ()) {}
 }
 
-func testX3(x: Int) {
+func testX3(_ x: Int) {
   var x = x
   _ = X3({ x = $0 })
   _ = x
@@ -85,7 +85,7 @@ func r21544303() {
 
 
 // <rdar://problem/22162441> Crash from failing to diagnose nonexistent method access inside closure
-func r22162441(lines: [String]) {
+func r22162441(_ lines: [String]) {
   _ = lines.map { line in line.fooBar() }  // expected-error {{value of type 'String' has no member 'fooBar'}}
   _ = lines.map { $0.fooBar() }  // expected-error {{value of type 'String' has no member 'fooBar'}}
 }
@@ -137,7 +137,7 @@ var _: (Int, Int, Int) -> Int = {a, b in a+b}
 
 // <rdar://problem/15998821> Fail to infer types for closure that takes an inout argument
 func r15998821() {
-  func take_closure(x : (inout Int) -> ()) { }
+  func take_closure(_ x : (inout Int) -> ()) { }
 
   func test1() {
     take_closure { (a : inout Int) in
@@ -151,7 +151,7 @@ func r15998821() {
     }
   }
 
-  func withPtr(body: (inout Int) -> Int) {}
+  func withPtr(_ body: (inout Int) -> Int) {}
   func f() { withPtr { p in return p } }
 
   let g = { x in x = 3 }
@@ -166,7 +166,7 @@ var _: (Int,Int) -> Int = {$0+$1+$2}  // expected-error {{contextual closure typ
 
 struct CC {}
 // expected-note @+1 {{in call to function 'callCC'}}
-func callCC<U>(f: CC -> U) -> () {}
+func callCC<U>(_ f: CC -> U) -> () {}
 
 func typeCheckMultiStmtClosureCrash() {
   callCC { // expected-error {{generic parameter 'U' could not be inferred}}
@@ -176,7 +176,24 @@ func typeCheckMultiStmtClosureCrash() {
 }
 
 // SR-832 - both these should be ok
-func someFunc(foo: (String -> String)?, bar: String -> String) {
+func someFunc(_ foo: (String -> String)?, bar: String -> String) {
     let _: String -> String = foo != nil ? foo! : bar
     let _: String -> String = foo ?? bar
 }
+
+
+// SR-1069 - Error diagnostic refers to wrong argument
+class SR1069_W<T> {
+  func append<Key: AnyObject where Key: Hashable>(value: T, forKey key: Key) {}
+}
+class SR1069_C<T> { let w: SR1069_W<(AnyObject, T) -> ()> = SR1069_W() }
+struct S<T> {
+  let cs: [SR1069_C<T>] = []
+
+  func subscribe<Object: AnyObject where Object: Hashable>(object: Object?, method: (Object, T) -> ()) {
+    let wrappedMethod = { (object: AnyObject, value: T) in }
+    // expected-error @+1 {{cannot convert value of type '(AnyObject, T) -> ()' to expected argument type '(AnyObject, _) -> ()'}}
+    cs.forEach { $0.w.append(value: wrappedMethod, forKey: object) }
+  }
+}
+

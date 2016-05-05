@@ -2,18 +2,10 @@ add_swift_executable(swift
   api_notes.cpp
   driver.cpp
   autolink_extract_main.cpp
-  frontend_main.cpp
   modulewrap_main.cpp
   LINK_LIBRARIES
-    swiftIDE
-    swiftDriver swiftIRGen swiftSIL swiftSILGen swiftSILOptimizer
-    swiftImmediate
-    swiftSerialization
-    swiftPrintAsObjC
-    swiftFrontend
-    swiftClangImporter
-    swiftOption
-    clangAPINotes
+    swiftDriver
+    swiftFrontendTool
 )
 
 target_link_libraries(swift edit)
@@ -52,10 +44,6 @@ swift_install_in_component(compiler
 swift_install_in_component(compiler
     FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc"
     DESTINATION "bin")
-
-if(SWIFT_HOST_VARIANT STREQUAL "linux")
-# No need for this on other platforms.
-  swift_install_in_component(compiler
-      FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract"
-      DESTINATION "bin")
-endif()
+swift_install_in_component(autolink-driver
+    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract"
+    DESTINATION "bin")

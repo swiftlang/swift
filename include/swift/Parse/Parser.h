@@ -697,7 +697,9 @@ public:
     return AlreadyHandledDecls.erase(D);
   }
 
-  ParserStatus parseDecl(SmallVectorImpl<Decl*> &Entries, ParseDeclOptions Flags);
+  ParserStatus parseDecl(ParseDeclOptions Flags,
+                         llvm::function_ref<void(Decl*)> Handler);
+
   void parseDeclDelayed();
 
   ParserResult<TypeDecl> parseDeclTypeAlias(ParseDeclOptions Flags,
@@ -750,9 +752,9 @@ public:
                                        DeclAttributes &Attributes);
   ParserStatus parseDeclEnumCase(ParseDeclOptions Flags, DeclAttributes &Attributes,
                                  SmallVectorImpl<Decl *> &decls);
-  bool parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
-                               SourceLoc LBLoc, SourceLoc &RBLoc,
-                               Diag<> ErrorDiag, ParseDeclOptions flags);
+  bool parseNominalDeclMembers(SourceLoc LBLoc, SourceLoc &RBLoc,
+                               Diag<> ErrorDiag, ParseDeclOptions flags,
+                               llvm::function_ref<void(Decl*)> handler);
   ParserResult<StructDecl>
   parseDeclStruct(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<ClassDecl>
@@ -933,7 +935,6 @@ public:
     DeclAttributes Attrs;
 
     /// The location of the 'let', 'var', or 'inout' keyword, if present.
-    ///
     SourceLoc LetVarInOutLoc;
 
     enum SpecifierKindTy {
@@ -1100,6 +1101,7 @@ public:
   ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic = false);
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprAs();
+  ParserResult<Expr> parseExprArrow();
   ParserResult<Expr> parseExprSequence(Diag<> ID,
                                        bool isExprBasic,
                                        bool isForConditionalDirective = false);
@@ -1122,11 +1124,11 @@ public:
   ///     identifier
   ///     identifier '(' ((identifier | '_') ':') + ')'
   ///
-  ///
-  /// \param allowInit Whether to allow 'init' for initializers.
+  /// \param afterDot Whether this identifier is coming after a period, which
+  /// enables '.init' and '.default' like expressions.
   /// \param loc Will be populated with the location of the name.
   /// \param diag The diagnostic to emit if this is not a name.
-  DeclName parseUnqualifiedDeclName(bool allowInit, DeclNameLoc &loc,
+  DeclName parseUnqualifiedDeclName(bool afterDot, DeclNameLoc &loc,
                                     const Diagnostic &diag);
 
   Expr *parseExprIdentifier();
@@ -1175,8 +1177,17 @@ public:
 
   Expr *parseExprAnonClosureArg();
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
+
+  // NOTE: used only for legacy support for old object literal syntax.
+  // Will be removed in the future.
   bool isCollectionLiteralStartingWithLSquareLit();
-  ParserResult<Expr> parseExprObjectLiteral();
+
+  /// Parse an object literal.
+  ///
+  /// \param LK The literal kind as determined by the first token.
+  /// \param NewName New name for a legacy literal.
+  ParserResult<Expr> parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LK,
+                                            StringRef NewName = StringRef());
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          Identifier firstSelectorPiece
                                            = Identifier(),
@@ -1287,6 +1298,11 @@ struct ParsedDeclName {
 
   /// Whether this is a property accessor.
   bool isPropertyAccessor() const { return IsGetter || IsSetter; }
+
+  /// Whether this is an operator.
+  bool isOperator() const {
+    return Lexer::isOperator(BaseName);
+  }
 
   /// Form a declaration name from this parsed declaration name.
   DeclName formDeclName(ASTContext &ctx) const;

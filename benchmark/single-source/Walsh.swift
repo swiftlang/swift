@@ -13,10 +13,10 @@
 import TestsUtils
 import Darwin
 
-func IsPowerOfTwo(x: Int) -> Bool { return (x & (x - 1)) == 0 }
+func IsPowerOfTwo(_ x: Int) -> Bool { return (x & (x - 1)) == 0 }
 
-//Fast Walsh Hadamard Transform
-func WalshTransform(data: inout [Double]) {
+// Fast Walsh Hadamard Transform
+func WalshTransform(_ data: inout [Double]) {
   assert(IsPowerOfTwo(data.count), "Not a power of two")
   var temp = [Double](repeating: 0, count: data.count)
   var ret = WalshImpl(&data, &temp, 0, data.count)
@@ -25,18 +25,18 @@ func WalshTransform(data: inout [Double]) {
   }
 }
 
-func Scale(data: inout [Double], _ scalar : Double) {
+func Scale(_ data: inout [Double], _ scalar : Double) {
   for i in 0..<data.count {
     data[i] = data[i] * scalar
   }
 }
 
-func InverseWalshTransform(data: inout [Double]) {
+func InverseWalshTransform(_ data: inout [Double]) {
   WalshTransform(&data)
   Scale(&data, Double(1)/Double(data.count))
 }
 
-func WalshImpl(data: inout [Double], _ temp: inout [Double], _ start: Int, _ size: Int) -> [Double] {
+func WalshImpl(_ data: inout [Double], _ temp: inout [Double], _ start: Int, _ size: Int) -> [Double] {
   if (size == 1) { return data }
 
   let stride = size/2
@@ -65,7 +65,7 @@ func checkCorrectness() {
 }
 
 @inline(never)
-public func run_Walsh(N : Int) {
+public func run_Walsh(_ N: Int) {
   checkCorrectness()
 
   // Generate data.

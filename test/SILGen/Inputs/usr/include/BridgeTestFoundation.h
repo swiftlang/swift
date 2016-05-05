@@ -5,8 +5,8 @@
 
 @interface NSString : NSObject<NSCopying>
 
-- (__null_unspecified NSString*)uppercaseString;
-- (id) copyWithZone: (nullable NSZone*)zone;
+- (null_unspecified NSString*)uppercaseString;
+- (id) copyWithZone: (nullable void*)zone;
 
 @end
 
@@ -15,11 +15,11 @@
 - (instancetype)initWithObjects:(const ObjectType *)objects count:(int)count;
 - (instancetype)initWithArray:(NSArray<ObjectType>*)array;
 
-- (id)objectAtIndexedSubscript:(NSInteger)i;
+- (nonnull ObjectType)objectAtIndexedSubscript:(NSInteger)i;
 
 @end
 
-@interface NSDictionary<KeyType, ObjectType> : NSObject
+@interface NSDictionary<KeyType, ValueType> : NSObject
 @end
 
 @interface NSSet<ObjectType> : NSObject

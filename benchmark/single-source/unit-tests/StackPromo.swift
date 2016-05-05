@@ -3,7 +3,7 @@ protocol Proto {
 }
 
 @inline(never)
-func testStackAllocation(p: Proto) -> Int {
+func testStackAllocation(_ p: Proto) -> Int {
   var a = [p, p, p]
   var b = 0
   a.withUnsafeMutableBufferPointer {
@@ -23,7 +23,7 @@ class Foo : Proto {
 }
 
 @inline(never)
-func work(f: Foo) -> Int {
+func work(_ f: Foo) -> Int {
   var r = 0
   for _ in 0..<100_000 {
     r += testStackAllocation(f)
@@ -32,13 +32,13 @@ func work(f: Foo) -> Int {
 }
 
 @inline(never)
-func hole(use: Int, _ N: Int) {
+func hole(_ use: Int, _ N: Int) {
   if (N == 0) {
     print("use: \(use)")
   }
 }
 
-public func run_StackPromo(N: Int) {
+public func run_StackPromo(_ N: Int) {
   let foo = Foo()
   var r = 0
   for i in 0..<N {

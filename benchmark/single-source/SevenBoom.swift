@@ -14,14 +14,14 @@ import TestsUtils
 import Foundation
 
 @inline(never)
-func filter_seven(input : Int) throws {
+func filter_seven(_ input : Int) throws {
   guard case 7 = input else {
     throw NSError(domain: "AnDomain", code: 42, userInfo: nil)
   }
 }
 
 @inline(never)
-public func run_SevenBoom(N: Int) {
+public func run_SevenBoom(_ N: Int) {
   var c = 0
   for i in 1...N*5000 {
     do {

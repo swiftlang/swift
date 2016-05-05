@@ -8,6 +8,12 @@ import Builtin
 import Swift
 import Foundation
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
+      -> Self
+}
+
 class AnNSArray {
 }
 
@@ -17,21 +23,18 @@ struct AnArray<T> : _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  static func _getObjectiveCType() -> Any.Type {
-    return AnNSArray.self
-  }
   func _bridgeToObjectiveC() -> AnNSArray {
     return AnNSArray()
   }
   static func _forceBridgeFromObjectiveC(
-    x: AnNSArray,
-    inout result: AnArray?
+    _ x: AnNSArray,
+    result: inout AnArray?
   ) {
     _preconditionFailure("implement")
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: AnNSArray,
-    inout result: AnArray?
+    _ x: AnNSArray,
+    result: inout AnArray?
   ) -> Bool {
     _preconditionFailure("implement")
   }

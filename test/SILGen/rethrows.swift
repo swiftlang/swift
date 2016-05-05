@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s | FileCheck %s
 
-func rethrower(fn: () throws -> Int) rethrows -> Int {
+func rethrower(_ fn: () throws -> Int) rethrows -> Int {
   return try fn()
 }
 func thrower() throws -> Int { return 0 }

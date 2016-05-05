@@ -16,7 +16,7 @@ func return_local_generic_function_without_captures<A, R>() -> A -> R {
   return f
 }
 
-func return_local_generic_function_with_captures<A, R>(a: A) -> A -> R {
+func return_local_generic_function_with_captures<A, R>(_ a: A) -> A -> R {
   func f(_: A) -> R {
     _ = a
   }
@@ -25,7 +25,7 @@ func return_local_generic_function_with_captures<A, R>(a: A) -> A -> R {
 }
 
 // CHECK-LABEL: sil hidden @_TF8closures17read_only_capture
-func read_only_capture(x: Int) -> Int {
+func read_only_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
@@ -49,7 +49,7 @@ func read_only_capture(x: Int) -> Int {
 // CHECK: return [[X]]
 
 // CHECK-LABEL: sil hidden @_TF8closures16write_to_capture
-func write_to_capture(x: Int) -> Int {
+func write_to_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
@@ -79,7 +79,7 @@ func write_to_capture(x: Int) -> Int {
 // CHECK: return
 
 // CHECK-LABEL: sil hidden @_TF8closures21multiple_closure_refs
-func multiple_closure_refs(x: Int) -> (() -> Int, () -> Int) {
+func multiple_closure_refs(_ x: Int) -> (() -> Int, () -> Int) {
   var x = x
   func cap() -> Int {
     return x
@@ -95,7 +95,7 @@ func multiple_closure_refs(x: Int) -> (() -> Int, () -> Int) {
 }
 
 // CHECK-LABEL: sil hidden @_TF8closures18capture_local_func
-func capture_local_func(x: Int) -> () -> () -> Int {
+func capture_local_func(_ x: Int) -> () -> () -> Int {
   var x = x
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
 
@@ -119,7 +119,7 @@ func capture_local_func(x: Int) -> () -> () -> Int {
 // CHECK: return [[ALEPH_CLOSURE]]
 
 // CHECK-LABEL: sil hidden @_TF8closures22anon_read_only_capture
-func anon_read_only_capture(x: Int) -> Int {
+func anon_read_only_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
@@ -140,7 +140,7 @@ func anon_read_only_capture(x: Int) -> Int {
 // CHECK: return [[X]]
 
 // CHECK-LABEL: sil hidden @_TF8closures21small_closure_capture
-func small_closure_capture(x: Int) -> Int {
+func small_closure_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
@@ -162,7 +162,7 @@ func small_closure_capture(x: Int) -> Int {
 
 
 // CHECK-LABEL: sil hidden @_TF8closures35small_closure_capture_with_argument
-func small_closure_capture_with_argument(x: Int) -> (y: Int) -> Int {
+func small_closure_capture_with_argument(_ x: Int) -> (y: Int) -> Int {
   var x = x
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
 
@@ -195,7 +195,7 @@ func small_closure_no_capture() -> (y: Int) -> Int {
 // CHECK: bb0([[YARG:%[0-9]+]] : $Int):
 
 // CHECK-LABEL: sil hidden @_TF8closures17uncaptured_locals{{.*}} :
-func uncaptured_locals(x: Int) -> (Int, Int) {
+func uncaptured_locals(_ x: Int) -> (Int, Int) {
   var x = x
   // -- locals without captures are stack-allocated
   // CHECK: bb0([[XARG:%[0-9]+]] : $Int):
@@ -245,8 +245,8 @@ class SomeGenericClass<T> {
 // function conversions as worse than others, and therefore performs
 // the conversion within closures when possible.
 class SomeSpecificClass : SomeClass {}
-func takesSomeClassGenerator(fn : () -> SomeClass) {}
-func generateWithConstant(x : SomeSpecificClass) {
+func takesSomeClassGenerator(_ fn : () -> SomeClass) {}
+func generateWithConstant(_ x : SomeSpecificClass) {
   takesSomeClassGenerator({ x })
 }
 // CHECK-LABEL: sil shared @_TFF8closures20generateWithConstant
@@ -277,7 +277,7 @@ class SelfCapturedInInit : Base {
   }
 }
 
-func takeClosure(fn: () -> Int) -> Int { return fn() }
+func takeClosure(_ fn: () -> Int) -> Int { return fn() }
 
 class TestCaptureList {
   var x = zero
@@ -328,7 +328,7 @@ func closeOverLetLValue() {
 
 // Use an external function so inout deshadowing cannot see its body.
 @_silgen_name("takesNoEscapeClosure")
-func takesNoEscapeClosure(@noescape fn : () -> Int)
+func takesNoEscapeClosure(fn : @noescape () -> Int)
 
 struct StructWithMutatingMethod {
   var x = 42
@@ -563,4 +563,32 @@ class UnownedSelfNestedCapture {
   func nestedCapture() {
     {[unowned self] in { self } }()()
   }
+}
+
+// Check that capturing 'self' via a 'super' call also captures the generic
+// signature if the base class is concrete and the derived class is generic
+
+class ConcreteBase {
+  func swim() {}
+}
+
+// CHECK-LABEL: sil shared @_TFFC8closures14GenericDerived4swimFT_T_U_FT_T_ : $@convention(thin) <Ocean> (@owned GenericDerived<Ocean>) -> ()
+// CHECK:         [[SUPER:%.*]] = upcast %0 : $GenericDerived<Ocean> to $ConcreteBase
+// CHECK:         [[METHOD:%.*]] = function_ref @_TFC8closures12ConcreteBase4swimfT_T_
+// CHECK:         apply [[METHOD]]([[SUPER]]) : $@convention(method) (@guaranteed ConcreteBase) -> ()
+
+class GenericDerived<Ocean> : ConcreteBase {
+  override func swim() {
+    withFlotationAid {
+      super.swim()
+    }
+  }
+
+  func withFlotationAid(_ fn: () -> ()) {}
+}
+
+// Don't crash on this
+func r25993258_helper(_ fn: (inout Int, Int) -> ()) {}
+func r25993258() {
+  r25993258_helper { _ in () }
 }

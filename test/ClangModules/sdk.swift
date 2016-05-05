@@ -6,15 +6,14 @@ import Foundation
 
 // Swift and Foundation types should work.
 
-func available_Int(a: Int) {}
-func available_NSDateFormatter(a: NSDateFormatter) {}
+func available_Int(_ a: Int) {}
+func available_NSDateFormatter(_ a: NSDateFormatter) {}
 
 
 // Some traditional Objective-C types should fail with fixits.
 
-func unavailable_id(a: id) {} // expected-error {{use of undeclared type 'id'; did you mean to use 'AnyObject'?}} {{24-26=AnyObject}}
-func unavailable_Class(a: Class) {} // expected-error {{use of undeclared type 'Class'; did you mean to use 'AnyClass'?}} {{27-32=AnyClass}}
-func unavailable_BOOL(a: BOOL) {} // expected-error {{use of undeclared type 'BOOL'; did you mean to use 'ObjCBool'?}} {{26-30=ObjCBool}}
-func unavailable_SEL(a: SEL) {} // expected-error {{use of undeclared type 'SEL'; did you mean to use 'Selector'?}} {{25-28=Selector}}
-func unavailable_NSUInteger(a: NSUInteger) {} // expected-error {{use of undeclared type 'NSUInteger'; did you mean to use 'Int'?}} {{32-42=Int}} expected-note {{did you mean to use 'UInt'?}} {{32-42=UInt}}
-
+func unavailable_id(_ a: id) {} // expected-error {{use of undeclared type 'id'; did you mean to use 'AnyObject'?}} {{26-28=AnyObject}}
+func unavailable_Class(_ a: Class) {} // expected-error {{use of undeclared type 'Class'; did you mean to use 'AnyClass'?}} {{29-34=AnyClass}}
+func unavailable_BOOL(_ a: BOOL) {} // expected-error {{use of undeclared type 'BOOL'; did you mean to use 'ObjCBool'?}} {{28-32=ObjCBool}}
+func unavailable_SEL(_ a: SEL) {} // expected-error {{use of undeclared type 'SEL'; did you mean to use 'Selector'?}} {{27-30=Selector}}
+func unavailable_NSUInteger(_ a: NSUInteger) {} // expected-error {{use of undeclared type 'NSUInteger'; did you mean to use 'Int'?}} {{34-44=Int}} expected-note {{did you mean to use 'UInt'?}} {{34-44=UInt}}

@@ -39,6 +39,7 @@ bb0(%0 : $YY):
   return %t : $()
 }
 
+sil @consume_int : $@convention(thin) (Int32) -> ()
 
 // CHECK-LABEL: sil @simple_promote
 // CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
@@ -68,6 +69,29 @@ bb0:
   return %n1 : $XX
 }
 
+// CHECK-LABEL: sil @dont_promote_in_unreachable
+// CHECK: bb1:
+// CHECK-NEXT: alloc_ref $XX
+sil @dont_promote_in_unreachable : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> XX
+  %l1 = ref_element_addr %n1 : $XX, #XX.x
+  %l2 = load %l1 : $*Int32
+  %f2 = function_ref @consume_int : $@convention(thin) (Int32) -> ()
+  %a = apply %f2(%l2) : $@convention(thin) (Int32) -> ()
+  // An unreachable block may missing the final release.
+  unreachable
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil @promote_nested
 // CHECK: [[X:%[0-9]+]] = alloc_ref [stack] $XX
 // CHECK: [[Y:%[0-9]+]] = alloc_ref [stack] $YY
@@ -86,6 +110,49 @@ bb0:
   %a = apply %f1(%y) : $@convention(thin) (@owned YY) -> ()
   %t = tuple ()
   return %t : $()
+}
+
+// CHECK-LABEL: sil @promote_with_unreachable_block
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
+// CHECK: bb1:
+// CHECK-NEXT: unreachable
+// CHECK: bb2:
+// CHECK: strong_release
+// CHECK: dealloc_ref [stack] [[O]] : $XX
+// CHECK: return
+sil @promote_with_unreachable_block : $@convention(thin) () -> Int32 {
+bb0:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> XX
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  %l1 = ref_element_addr %n1 : $XX, #XX.x
+  %l2 = load %l1 : $*Int32
+  strong_release %n1 : $XX
+  return %l2 : $Int32
+}
+
+// CHECK-LABEL: sil @no_return_function
+// Just check that we don't crash on this.
+// It's a corner case, so we don't care if stack promotion is done or not.
+// CHECK: unreachable
+sil @no_return_function : $@convention(thin) () -> Int32 {
+bb0:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> XX
+  br bb1
+
+bb1:
+  %l1 = ref_element_addr %n1 : $XX, #XX.x
+  %l2 = load %l1 : $*Int32
+  strong_release %n1 : $XX
+  unreachable
 }
 
 // CHECK-LABEL: sil @promote_in_loop_with_if
@@ -211,6 +278,34 @@ bb2:
   return %l2 : $Int32
 }
 
+// CHECK-LABEL: sil @promote_with_use_in_multi_block_backedge_loop
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
+// CHECK: {{^}}bb4:
+// CHECK-NEXT: dealloc_ref [stack] [[O]] : $XX
+// CHECK-NEXT: return
+sil @promote_with_use_in_multi_block_backedge_loop : $@convention(thin) () -> Int32 {
+bb0:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> XX
+  br bb1
+
+bb1:
+  %l1 = ref_element_addr %n1 : $XX, #XX.x
+  %l2 = load %l1 : $*Int32
+  strong_release %n1 : $XX
+  cond_br undef, bb2, bb4
+
+bb2:
+  br bb3
+
+bb3:
+  br bb1
+
+bb4:
+  return %l2 : $Int32
+}
+
 // CHECK-LABEL: sil @promote_with_other_stack_allocs
 // CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
 // CHECK: {{^}}bb5:
@@ -247,7 +342,7 @@ bb5:
   return %a1 : $Int32
 }
 
-// CHECK-LABEL: sil @promote_and_move_alloc_before_alloc_stack
+// CHECK-LABEL: sil @promote_and_move_alloc_before_alloc_stack1
 // CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
 // CHECK: alloc_stack
 // CHECK: {{^}}bb2:
@@ -255,7 +350,7 @@ bb5:
 // CHECK: strong_release
 // CHECK: dealloc_ref [stack] [[O]] : $XX
 // CHECK: return
-sil @promote_and_move_alloc_before_alloc_stack : $@convention(thin) () -> Int32 {
+sil @promote_and_move_alloc_before_alloc_stack1 : $@convention(thin) () -> Int32 {
 bb0:
   %s1 = alloc_stack $Int32
   cond_br undef, bb1, bb2
@@ -267,6 +362,36 @@ bb2:
   %o1 = alloc_ref $XX
   %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
   %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> XX
+  dealloc_stack %s1 : $*Int32
+  %l1 = ref_element_addr %n1 : $XX, #XX.x
+  %l2 = load %l1 : $*Int32
+  strong_release %n1 : $XX
+  return %l2 : $Int32
+}
+
+// CHECK-LABEL: sil @promote_and_move_alloc_before_alloc_stack2
+// CHECK: alloc_ref [stack] $XX
+// CHECK-NEXT: alloc_stack
+// CHECK: {{^}}bb3:
+// CHECK: strong_release
+// CHECK-NEXT: dealloc_ref [stack]
+// CHECK-NEXT: return
+sil @promote_and_move_alloc_before_alloc_stack2 : $@convention(thin) () -> Int32 {
+bb0:
+  %s1 = alloc_stack $Int32
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> XX
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+ 
+bb2:
+  dealloc_stack %s1 : $*Int32
+  unreachable
+
+bb3:
   dealloc_stack %s1 : $*Int32
   %l1 = ref_element_addr %n1 : $XX, #XX.x
   %l2 = load %l1 : $*Int32

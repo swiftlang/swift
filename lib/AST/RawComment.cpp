@@ -67,13 +67,6 @@ SingleRawComment::SingleRawComment(StringRef RawText, unsigned StartColumn)
     : RawText(RawText), Kind(static_cast<unsigned>(getCommentKind(RawText))),
       StartColumn(StartColumn), StartLine(0), EndLine(0) {}
 
-static bool canHaveComment(const Decl *D) {
-  return !D->hasClangNode() &&
-         (isa<ValueDecl>(D) || isa<ExtensionDecl>(D)) &&
-         !isa<ParamDecl>(D) &&
-         (!isa<AbstractTypeParamDecl>(D) || isa<AssociatedTypeDecl>(D));
-}
-
 static void addCommentToList(SmallVectorImpl<SingleRawComment> &Comments,
                              const SingleRawComment &SRC) {
   // TODO: consider producing warnings when we decide not to merge comments.
@@ -131,7 +124,7 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
 }
 
 RawComment Decl::getRawComment() const {
-  if (!canHaveComment(this))
+  if (!this->canHaveComment())
     return RawComment();
 
   // Check the cache in ASTContext.
@@ -150,7 +143,7 @@ RawComment Decl::getRawComment() const {
   if (auto *Unit =
           dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
     if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
-      llvm::markup::MarkupContext MC;
+      swift::markup::MarkupContext MC;
       Context.setBriefComment(this, C->Brief);
       Context.setRawComment(this, C->Raw);
       return C->Raw;
@@ -162,7 +155,8 @@ RawComment Decl::getRawComment() const {
 }
 
 Optional<StringRef> Decl::getGroupName() const {
-
+  if (hasClangNode())
+    return None;
   // We can only get group information from deserialized module files.
   if (auto *Unit =
       dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
@@ -172,7 +166,8 @@ Optional<StringRef> Decl::getGroupName() const {
 }
 
 Optional<StringRef> Decl::getSourceFileName() const {
-
+  if (hasClangNode())
+    return None;
   // We can only get group information from deserialized module files.
   if (auto *Unit =
       dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
@@ -182,7 +177,8 @@ Optional<StringRef> Decl::getSourceFileName() const {
 }
 
 Optional<unsigned> Decl::getSourceOrder() const {
-
+  if (hasClangNode())
+    return None;
   // We can only get source orders from deserialized module files.
   if (auto *Unit =
       dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
@@ -195,10 +191,10 @@ static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
                                      const Decl *D) {
   PrettyStackTraceDecl StackTrace("extracting brief comment for", D);
 
-  if (!canHaveComment(D))
+  if (!D->canHaveComment())
     return StringRef();
 
-  llvm::markup::MarkupContext MC;
+  swift::markup::MarkupContext MC;
   auto DC = getDocComment(MC, D);
   if (!DC.hasValue())
     return StringRef();
@@ -209,7 +205,7 @@ static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
 
   SmallString<256> BriefStr("");
   llvm::raw_svector_ostream OS(BriefStr);
-  llvm::markup::printInlinesUnder(Brief.getValue(), OS);
+  swift::markup::printInlinesUnder(Brief.getValue(), OS);
   if (OS.str().empty())
     return StringRef();
 
@@ -217,7 +213,7 @@ static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
 }
 
 StringRef Decl::getBriefComment() const {
-  if (!canHaveComment(this))
+  if (!this->canHaveComment())
     return StringRef();
 
   auto &Context = getASTContext();

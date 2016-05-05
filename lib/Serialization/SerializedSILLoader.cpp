@@ -104,6 +104,18 @@ SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
   return retVal;
 }
 
+bool SerializedSILLoader::hasSILFunction(StringRef Name, SILLinkage Linkage) {
+  // It is possible that one module has a declaration of a SILFunction, while
+  // another has the full definition.
+  SILFunction *retVal = nullptr;
+  for (auto &Des : LoadedSILSections) {
+    if (Des->hasSILFunction(Name, Linkage))
+      return true;
+  }
+  return retVal;
+}
+
+
 SILVTable *SerializedSILLoader::lookupVTable(Identifier Name) {
   for (auto &Des : LoadedSILSections) {
     if (auto VT = Des->lookupVTable(Name))
@@ -115,6 +127,14 @@ SILVTable *SerializedSILLoader::lookupVTable(Identifier Name) {
 SILWitnessTable *SerializedSILLoader::lookupWitnessTable(SILWitnessTable *WT) {
   for (auto &Des : LoadedSILSections)
     if (auto wT = Des->lookupWitnessTable(WT))
+      return wT;
+  return nullptr;
+}
+
+SILDefaultWitnessTable *SerializedSILLoader::
+lookupDefaultWitnessTable(SILDefaultWitnessTable *WT) {
+  for (auto &Des : LoadedSILSections)
+    if (auto wT = Des->lookupDefaultWitnessTable(WT))
       return wT;
   return nullptr;
 }
@@ -163,6 +183,12 @@ void SerializedSILLoader::getAllVTables() {
 void SerializedSILLoader::getAllWitnessTables() {
   for (auto &Des : LoadedSILSections)
     Des->getAllWitnessTables();
+}
+
+/// Deserialize all DefaultWitnessTables in all SILModules.
+void SerializedSILLoader::getAllDefaultWitnessTables() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllDefaultWitnessTables();
 }
 
 // Anchor the SerializedSILLoader v-table.

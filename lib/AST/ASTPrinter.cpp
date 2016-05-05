@@ -40,12 +40,14 @@
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
+#include <queue>
 
 using namespace swift;
 namespace swift {
@@ -66,7 +68,7 @@ collectNameTypeMap(Type Ty, const DeclContext *DC) {
     assert(ParamDecls.size() == Args.size());
 
     // Map type parameter names with their instantiating arguments.
-    for(unsigned I = 0, N = ParamDecls.size(); I < N; I ++) {
+    for (unsigned I = 0, N = ParamDecls.size(); I < N; I ++) {
       (*IdMap)[ParamDecls[I]->getName().str()] = Args[I];
     }
   } while ((BaseTy = BaseTy->getSuperclass(nullptr)));
@@ -152,7 +154,7 @@ class ArchetypeSelfTransformer : public PrinterArchetypeTransformer {
     auto ATT = cast<ArchetypeType>(Ty.getPointer());
     ArchetypeType *Self = ATT;
     std::vector<Identifier> Names;
-    for(; Self->getParent(); Self = Self->getParent()) {
+    for (; Self->getParent(); Self = Self->getParent()) {
       Names.insert(Names.begin(), Self->getName());
     }
     if (!Self->getSelfProtocol() || Names.empty())
@@ -206,31 +208,155 @@ public:
 };
 
 struct SynthesizedExtensionAnalyzer::Implementation {
+  static bool isMemberFavored(const NominalTypeDecl* Target, const Decl* D) {
+    DeclContext* DC = Target->getDeclContext();
+    Type BaseTy = Target->getDeclaredTypeInContext();
+    const FuncDecl *FD = dyn_cast<FuncDecl>(D);
+    if (!FD)
+      return true;
+    ResolveMemberResult Result = resolveValueMember(*DC, BaseTy,
+                                                    FD->getEffectiveFullName());
+    return !(Result && Result.Favored != D);
+  }
+
+  static bool isExtensionFavored(const NominalTypeDecl* Target,
+                                 const ExtensionDecl *ED) {
+    return std::find_if(ED->getMembers().begin(), ED->getMembers().end(),
+      [&](DeclIterator It) { return isMemberFavored(Target, *It);}) !=
+        ED->getMembers().end();
+  }
+
   struct SynthesizedExtensionInfo {
     ExtensionDecl *Ext = nullptr;
     std::vector<StringRef> KnownSatisfiedRequirements;
-    unsigned MergeGroup;
+    bool IsSynthesized;
     operator bool() const { return Ext; }
+    SynthesizedExtensionInfo(bool IsSynthesized = true) :
+      IsSynthesized(IsSynthesized) {}
+    bool operator< (const SynthesizedExtensionInfo& Rhs) const {
+
+      // Synthesized are always after actual ones.
+       if (IsSynthesized != Rhs.IsSynthesized)
+         return !IsSynthesized;
+
+      // If not from the same file, sort by file name.
+      if (auto LFile = Ext->getSourceFileName()) {
+        if (auto RFile = Rhs.Ext->getSourceFileName()) {
+          int Result = LFile.getValue().compare(RFile.getValue());
+          if (Result != 0)
+            return Result < 0;
+        }
+      }
+
+      // Otherwise, sort by source order.
+      if (auto LeftOrder = Ext->getSourceOrder()) {
+        if (auto RightOrder = Rhs.Ext->getSourceOrder()) {
+          return LeftOrder.getValue() < RightOrder.getValue();
+        }
+      }
+      return false;
+    }
   };
 
-  typedef llvm::MapVector<ExtensionDecl*, SynthesizedExtensionInfo> ExtMap;
+  struct ExtensionMergeInfo {
+    struct Requirement {
+      Type First;
+      Type Second;
+      RequirementReprKind Kind;
+      bool operator< (const Requirement& Rhs) const {
+        if (Kind != Rhs.Kind)
+          return Kind < Rhs.Kind;
+        else if (First.getPointer() != Rhs.First.getPointer())
+          return First.getPointer() < Rhs.First.getPointer();
+        else
+          return Second.getPointer() < Rhs.Second.getPointer();
+      }
+      bool operator== (const Requirement& Rhs) const {
+        return (!(*this < Rhs)) && (!(Rhs < *this));
+      }
+    };
+
+    bool HasDocComment;
+    unsigned InheritsCount;
+    std::set<Requirement> Requirements;
+    void addRequirement(Type First, Type Second, RequirementReprKind Kind) {
+      Requirements.insert({First, Second, Kind});
+    }
+    bool operator== (const ExtensionMergeInfo& Another) const {
+      // Trivially unmergeable.
+      if (HasDocComment || Another.HasDocComment)
+        return false;
+      if (InheritsCount != 0 || Another.InheritsCount != 0)
+        return false;
+      return Requirements == Another.Requirements;
+    }
+    bool isMergeableWithTypeDef() {
+      return !HasDocComment && InheritsCount == 0 && Requirements.empty();
+    }
+  };
+
+  typedef llvm::MapVector<ExtensionDecl*, SynthesizedExtensionInfo> ExtensionInfoMap;
+  typedef llvm::MapVector<ExtensionDecl*, ExtensionMergeInfo> ExtensionMergeInfoMap;
+
+  struct ExtensionMergeGroup {
+
+    unsigned RequirementsCount;
+    unsigned InheritanceCount;
+    MergeGroupKind Kind;
+    std::vector<SynthesizedExtensionInfo*> Members;
+
+    ExtensionMergeGroup(SynthesizedExtensionInfo *Info,
+                        unsigned RequirementsCount,
+                        unsigned InheritanceCount,
+                        bool MergeableWithType) :
+      RequirementsCount(RequirementsCount),
+      InheritanceCount(InheritanceCount),
+      Kind(MergeableWithType ? MergeGroupKind::MergeableWithTypeDef :
+                               MergeGroupKind::UnmergeableWithTypeDef) {
+      Members.push_back(Info);
+    }
+
+    void removeUnfavored(const NominalTypeDecl *Target) {
+      Members.erase(std::remove_if(Members.begin(), Members.end(),
+        [&](SynthesizedExtensionInfo *Info){
+          return !isExtensionFavored(Target, Info->Ext);}), Members.end());
+    }
+
+    void sortMembers() {
+      std::sort(Members.begin(), Members.end(),
+                [](SynthesizedExtensionInfo *LHS, SynthesizedExtensionInfo *RHS) {
+                  return (*LHS) < (*RHS);
+                });
+    }
+
+    bool operator< (const ExtensionMergeGroup& Rhs) const {
+      if (RequirementsCount == Rhs.RequirementsCount)
+        return InheritanceCount < Rhs.InheritanceCount;
+      return RequirementsCount < Rhs.RequirementsCount;
+    }
+  };
+
+  typedef std::vector<ExtensionMergeGroup> MergeGroupVector;
+
   NominalTypeDecl *Target;
   Type BaseType;
   DeclContext *DC;
   std::unique_ptr<ArchetypeSelfTransformer> pTransform;
   bool IncludeUnconditional;
   PrintOptions Options;
-  std::unique_ptr<ExtMap> Results;
+  MergeGroupVector AllGroups;
+  std::unique_ptr<ExtensionInfoMap> InfoMap;
 
-  Implementation(NominalTypeDecl *Target, bool IncludeUnconditional,
+  Implementation(NominalTypeDecl *Target,
+                 bool IncludeUnconditional,
                  PrintOptions Options):
     Target(Target),
     BaseType(Target->getDeclaredTypeInContext()),
     DC(Target),
     pTransform(new ArchetypeSelfTransformer(Target)),
     IncludeUnconditional(IncludeUnconditional),
-    Options(Options),
-    Results(collectSynthesizedExtensionInfo()) {}
+    Options(Options), AllGroups(MergeGroupVector()),
+    InfoMap(collectSynthesizedExtensionInfo(AllGroups)) {}
 
   Type checkElementType(StringRef Text) {
     assert(Text.find('<') == StringRef::npos && "Not element type.");
@@ -245,7 +371,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     Text = Text.trim();
     auto ParamStart = Text.find_first_of('<');
     auto ParamEnd = Text.find_last_of('>');
-    if(StringRef::npos == ParamStart) {
+    if (StringRef::npos == ParamStart) {
       return checkElementType(Text);
     }
     Type GenericType = checkElementType(StringRef(Text.data(), ParamStart));
@@ -294,49 +420,29 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     return MType->getAs<AnyMetatypeType>()->getInstanceType();
   }
 
-  struct ExtensionMergeInfo {
-    struct Requirement {
-      Type First;
-      Type Second;
-      RequirementReprKind Kind;
-      bool operator< (const Requirement& Rhs) const {
-        if (Kind != Rhs.Kind)
-          return Kind < Rhs.Kind;
-        else if (First.getPointer() != Rhs.First.getPointer())
-          return First.getPointer() < Rhs.First.getPointer();
-        else
-          return Second.getPointer() < Rhs.Second.getPointer();
-      }
-      bool operator== (const Requirement& Rhs) const {
-        return (!(*this < Rhs)) && (!(Rhs < *this));
-      }
-    };
 
-    bool HasDocComment;
-    std::set<Requirement> Requirements;
-    void addRequirement(Type First, Type Second, RequirementReprKind Kind) {
-      Requirements.insert({First, Second, Kind});
+  unsigned countInherits(ExtensionDecl *ED) {
+    unsigned Count = 0;
+    for (auto TL : ED->getInherited()) {
+      if (shouldPrint(TL.getType()->getAnyNominal(), Options))
+        Count ++;
     }
-     bool operator== (const ExtensionMergeInfo& Another) const {
-      // Trivially unmergable.
-      if (HasDocComment || Another.HasDocComment)
-        return false;
-      return Requirements == Another.Requirements;
-    }
-  };
+    return Count;
+  }
 
-  std::pair<SynthesizedExtensionInfo, std::unique_ptr<ExtensionMergeInfo>>
-  isApplicable(ExtensionDecl *Ext) {
-    SynthesizedExtensionInfo Result;
-    std::unique_ptr<ExtensionMergeInfo> MergeInfo(new ExtensionMergeInfo());
-    MergeInfo->HasDocComment = !Ext->getRawComment().isEmpty();
+  std::pair<SynthesizedExtensionInfo, ExtensionMergeInfo>
+  isApplicable(ExtensionDecl *Ext, bool IsSynthesized) {
+    SynthesizedExtensionInfo Result(IsSynthesized);
+    ExtensionMergeInfo MergeInfo;
+    MergeInfo.HasDocComment = !Ext->getRawComment().isEmpty();
+    MergeInfo.InheritsCount = countInherits(Ext);
     if (!Ext->isConstrainedExtension()) {
       if (IncludeUnconditional)
         Result.Ext = Ext;
-      return {Result, std::move(MergeInfo)};
+      return {Result, MergeInfo};
     }
     assert(Ext->getGenericParams() && "No generic params.");
-    for (auto Req : Ext->getGenericParams()->getRequirements()){
+    for (auto Req : Ext->getGenericParams()->getRequirements()) {
       auto TupleOp = Req.getAsAnalyzedWrittenString();
       if (!TupleOp)
         continue;
@@ -355,60 +461,90 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         auto Written = Req.getAsWrittenString();
         switch (Kind) {
           case RequirementReprKind::TypeConstraint:
-            if(!canPossiblyConvertTo(First, Second, *DC))
-              return {Result, std::move(MergeInfo)};
+            if (!canPossiblyConvertTo(First, Second, *DC))
+              return {Result, MergeInfo};
             else if (isConvertibleTo(First, Second, *DC))
               Result.KnownSatisfiedRequirements.push_back(Written);
             else
-              MergeInfo->addRequirement(First, Second, Kind);
+              MergeInfo.addRequirement(First, Second, Kind);
             break;
           case RequirementReprKind::SameType:
             if (!canPossiblyEqual(First, Second, *DC))
-              return {Result, std::move(MergeInfo)};
+              return {Result, MergeInfo};
             else if (isEqual(First, Second, *DC))
               Result.KnownSatisfiedRequirements.push_back(Written);
             else
-              MergeInfo->addRequirement(First, Second, Kind);
+              MergeInfo.addRequirement(First, Second, Kind);
             break;
         }
       }
     }
     Result.Ext = Ext;
-    return {Result, std::move(MergeInfo)};
+    return {Result, MergeInfo};
   }
 
-  typedef llvm::MapVector<ExtensionDecl*, std::unique_ptr<ExtensionMergeInfo>>
-    ExtensionMergeInfoMap;
-
-  typedef llvm::MapVector<ExtensionDecl*, unsigned> ExtensionMergeGroupMap;
-
-  void calculateMergeGroup(ExtensionMergeInfoMap &MergeInfoMap,
-                           ExtensionMergeGroupMap &MergeGroupMap) {
-    std::vector<std::pair<ExtensionMergeInfo*, unsigned>> KnownGroups;
-    unsigned NewGroupNum = 0;
-    for (auto &Pair : MergeInfoMap) {
-      auto Key = Pair.first;
-      auto Found = std::find_if(KnownGroups.begin(), KnownGroups.end(),
-        [&](std::pair<ExtensionMergeInfo*, unsigned> LHS) {
-          return (*LHS.first) == (*Pair.second);
+  void populateMergeGroup(ExtensionInfoMap &InfoMap,
+                          ExtensionMergeInfoMap &MergeInfoMap,
+                          MergeGroupVector &Results,
+                          bool AllowMergeWithDefBody) {
+    for (auto &Pair : InfoMap) {
+      ExtensionDecl *ED = Pair.first;
+      ExtensionMergeInfo &MergeInfo = MergeInfoMap[ED];
+      SynthesizedExtensionInfo &ExtInfo = InfoMap[ED];
+      auto Found = std::find_if(Results.begin(), Results.end(),
+                                [&](ExtensionMergeGroup &Group) {
+        return MergeInfo == MergeInfoMap[Group.Members.front()->Ext];
       });
-      if (Found != KnownGroups.end()) {
-        MergeGroupMap[Key] = (*Found).second;
-        continue;
+      if (Found == Results.end()) {
+        Results.push_back({&ExtInfo,
+                          (unsigned)MergeInfo.Requirements.size(),
+                          MergeInfo.InheritsCount,
+                  AllowMergeWithDefBody && MergeInfo.isMergeableWithTypeDef()});
+      } else {
+        Found->Members.push_back(&ExtInfo);
       }
-      MergeGroupMap[Key] = NewGroupNum;
-      KnownGroups.push_back({Pair.second.get(), NewGroupNum});
-      NewGroupNum ++;
     }
   }
 
-  std::unique_ptr<ExtMap> collectSynthesizedExtensionInfo() {
-    std::unique_ptr<ExtMap> pMap(new ExtMap());
-    if (Target->getKind() == DeclKind::Protocol)
-      return pMap;
+  std::unique_ptr<ExtensionInfoMap>
+  collectSynthesizedExtensionInfoForProtocol(MergeGroupVector &AllGroups) {
+    std::unique_ptr<ExtensionInfoMap> InfoMap(new ExtensionInfoMap());
+    ExtensionMergeInfoMap MergeInfoMap;
+    for (auto *E : Target->getExtensions()) {
+      if (!shouldPrint(E, Options))
+        continue;
+      auto Pair = isApplicable(E, /*Synthesized*/false);
+      if (Pair.first) {
+        InfoMap->insert({E, Pair.first});
+        MergeInfoMap.insert({E, Pair.second});
+      }
+    }
+    populateMergeGroup(*InfoMap, MergeInfoMap, AllGroups,
+                       /*AllowMergeWithDefBody*/false);
+    std::sort(AllGroups.begin(), AllGroups.end());
+    for (auto &Group : AllGroups) {
+      Group.sortMembers();
+    }
+    return InfoMap;
+  }
+
+  static bool isEnumRawType(const Decl* D, TypeLoc TL) {
+    assert (TL.getType());
+    if (auto ED = dyn_cast<EnumDecl>(D)) {
+      return ED->hasRawType() && ED->getRawType()->isEqual(TL.getType());
+    }
+    return false;
+  }
+
+  std::unique_ptr<ExtensionInfoMap>
+  collectSynthesizedExtensionInfo(MergeGroupVector &AllGroups) {
+    if (Target->getKind() == DeclKind::Protocol) {
+      return collectSynthesizedExtensionInfoForProtocol(AllGroups);
+    }
+    std::unique_ptr<ExtensionInfoMap> InfoMap(new ExtensionInfoMap());
     ExtensionMergeInfoMap MergeInfoMap;
     std::vector<NominalTypeDecl*> Unhandled;
-    auto addTypeLocNominal = [&](TypeLoc TL){
+    auto addTypeLocNominal = [&](TypeLoc TL) {
       if (TL.getType()) {
         if (auto D = TL.getType()->getAnyNominal()) {
           Unhandled.push_back(D);
@@ -416,30 +552,51 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       }
     };
     for (auto TL : Target->getInherited()) {
-      addTypeLocNominal(TL);
+      if (!isEnumRawType(Target, TL))
+        addTypeLocNominal(TL);
     }
-    while(!Unhandled.empty()) {
+    while (!Unhandled.empty()) {
       NominalTypeDecl* Back = Unhandled.back();
       Unhandled.pop_back();
       for (ExtensionDecl *E : Back->getExtensions()) {
         if (!shouldPrint(E, Options))
           continue;
-        auto Pair = isApplicable(E);
+        auto Pair = isApplicable(E, /*Synthesized*/true);
         if (Pair.first) {
-          (*pMap)[E] = Pair.first;
-          MergeInfoMap[E] = std::move(Pair.second);
+          InfoMap->insert({E, Pair.first});
+          MergeInfoMap.insert({E, Pair.second});
         }
         for (auto TL : Back->getInherited()) {
-          addTypeLocNominal(TL);
+          if (!isEnumRawType(Target, TL))
+            addTypeLocNominal(TL);
         }
       }
     }
-    ExtensionMergeGroupMap GroupMap;
-    calculateMergeGroup(MergeInfoMap, GroupMap);
-    for(auto It : *pMap) {
-      (*pMap)[It.first].MergeGroup = GroupMap[It.first];
+
+    // Merge with actual extensions.
+    for (auto *E : Target->getExtensions()) {
+      if (!shouldPrint(E, Options))
+        continue;
+      auto Pair = isApplicable(E, /*Synthesized*/false);
+      if (Pair.first) {
+        InfoMap->insert({E, Pair.first});
+        MergeInfoMap.insert({E, Pair.second});
+      }
     }
-    return pMap;
+
+    populateMergeGroup(*InfoMap, MergeInfoMap, AllGroups,
+                      /*AllowMergeWithDefBody*/true);
+
+    std::sort(AllGroups.begin(), AllGroups.end());
+    for (auto &Group : AllGroups) {
+      Group.removeUnfavored(Target);
+      Group.sortMembers();
+    }
+    AllGroups.erase(std::remove_if(AllGroups.begin(), AllGroups.end(),
+      [](ExtensionMergeGroup &Group) { return Group.Members.empty(); }),
+      AllGroups.end());
+
+    return InfoMap;
   }
 };
 
@@ -453,43 +610,48 @@ SynthesizedExtensionAnalyzer::~SynthesizedExtensionAnalyzer() {delete &Impl;}
 
 bool SynthesizedExtensionAnalyzer::
 isInSynthesizedExtension(const ValueDecl *VD) {
-  if(auto Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext()->
-                                                getInnermostTypeContext())) {
-    return Impl.Results->count(Ext) != 0;
+  if (auto Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext()->
+                                                 getInnermostTypeContext())) {
+    return Impl.InfoMap->count(Ext) != 0 &&
+           Impl.InfoMap->find(Ext)->second.IsSynthesized;
   }
   return false;
 }
 
 void SynthesizedExtensionAnalyzer::
-forEachSynthesizedExtension(llvm::function_ref<void(ExtensionDecl*)> Fn) {
-  for (auto It = Impl.Results->begin(); It != Impl.Results->end(); ++ It) {
-    Fn(It->first);
-  }
-}
-
-void SynthesizedExtensionAnalyzer::
-forEachSynthesizedExtensionMergeGroup(
-    llvm::function_ref<void(ArrayRef<ExtensionDecl*>)> Fn) {
-  llvm::DenseMap<unsigned, std::vector<ExtensionDecl*>> GroupBags;
-  for (auto It : *Impl.Results) {
-    unsigned Group = It.second.MergeGroup;
-    if (GroupBags.find(Group) == GroupBags.end())
-      GroupBags[Group] = std::vector<ExtensionDecl*>();
-    GroupBags[Group].push_back(It.first);
-  }
-  for (auto It : GroupBags) {
-    Fn(llvm::makeArrayRef(It.second));
+forEachExtensionMergeGroup(MergeGroupKind Kind, ExtensionGroupOperation Fn) {
+  for (auto &Group : Impl.AllGroups) {
+    if (Kind != MergeGroupKind::All) {
+      if (Kind != Group.Kind)
+        continue;
+    }
+    std::vector<ExtensionAndIsSynthesized> GroupContent;
+    for (auto &Member : Group.Members) {
+      GroupContent.push_back({Member->Ext, Member->IsSynthesized});
+    }
+    Fn(llvm::makeArrayRef(GroupContent));
   }
 }
 
 bool SynthesizedExtensionAnalyzer::
 shouldPrintRequirement(ExtensionDecl *ED, StringRef Req) {
-  auto Found = Impl.Results->find(ED);
-  if (Found != Impl.Results->end()) {
+  auto Found = Impl.InfoMap->find(ED);
+  if (Found != Impl.InfoMap->end()) {
     std::vector<StringRef> &KnownReqs = Found->second.KnownSatisfiedRequirements;
     return KnownReqs.end() == std::find(KnownReqs.begin(), KnownReqs.end(), Req);
   }
   return true;
+}
+
+bool SynthesizedExtensionAnalyzer::
+hasMergeGroup(MergeGroupKind Kind) {
+  for (auto &Group : Impl.AllGroups) {
+    if (Kind == MergeGroupKind::All)
+      return true;
+    if (Kind == Group.Kind)
+      return true;
+  }
+  return false;
 }
 }
 PrintOptions PrintOptions::printTypeInterface(Type T, const DeclContext *DC) {
@@ -615,6 +777,24 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
   return Builder.str();
 }
 
+ValueDecl* ASTPrinter::findConformancesWithDocComment(ValueDecl *VD) {
+  assert(VD->getRawComment().isEmpty());
+  std::queue<ValueDecl*> AllConformances;
+  AllConformances.push(VD);
+  while (!AllConformances.empty()) {
+    auto *VD = AllConformances.front();
+    AllConformances.pop();
+    if (VD->getRawComment().isEmpty()) {
+      for (auto *Req : VD->getSatisfiedProtocolRequirements()) {
+        AllConformances.push(Req);
+      }
+    } else {
+      return VD;
+    }
+  }
+  return nullptr;
+}
+
 bool ASTPrinter::printTypeInterface(Type Ty, DeclContext *DC,
                                     llvm::raw_ostream &OS) {
   if (!Ty)
@@ -698,13 +878,14 @@ void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
   printName(Name);
 }
 
-void ASTPrinter::callPrintDeclPre(const Decl *D) {
+void ASTPrinter::callPrintDeclPre(const Decl *D,
+                                  Optional<BracketOptions> Bracket) {
   forceNewlines();
 
   if (SynthesizeTarget && D->getKind() == DeclKind::Extension)
-    printSynthesizedExtensionPre(cast<ExtensionDecl>(D), SynthesizeTarget);
+    printSynthesizedExtensionPre(cast<ExtensionDecl>(D), SynthesizeTarget, Bracket);
   else
-    printDeclPre(D);
+    printDeclPre(D, Bracket);
 }
 
 ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
@@ -876,11 +1057,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   }
 
-  void printSwiftDocumentationComment(const Decl *D) {
-    auto RC = D->getRawComment();
-    if (RC.isEmpty())
-      return;
-
+  void printRawComment(RawComment RC) {
     indent();
 
     SmallVector<StringRef, 8> Lines;
@@ -895,6 +1072,23 @@ class PrintAST : public ASTVisitor<PrintAST> {
         Printer << Line;
         Printer.printNewline();
       }
+    }
+  }
+
+  void printSwiftDocumentationComment(const Decl *D) {
+    auto RC = D->getRawComment();
+    if (RC.isEmpty() && !Options.ElevateDocCommentFromConformance)
+      return;
+
+    if (RC.isEmpty()) {
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        if (auto *Req = ASTPrinter::findConformancesWithDocComment(
+            const_cast<ValueDecl*>(VD))) {
+          printRawComment(Req->getRawComment());
+        }
+      }
+    } else {
+      printRawComment(RC);
     }
   }
 
@@ -1021,7 +1215,7 @@ private:
                          bool ArgNameIsAPIByDefault);
 
   void printParameterList(ParameterList *PL, bool isCurried,
-                          std::function<bool(unsigned)> isAPINameByDefault);
+                          std::function<bool()> isAPINameByDefault);
 
   /// \brief Print the function parameters in curried or selector style,
   /// to match the original function declaration.
@@ -1073,14 +1267,15 @@ public:
       }
     }
 
-    Printer.callPrintDeclPre(D);
+    Printer.callPrintDeclPre(D, Options.BracketOptions);
     ASTVisitor::visit(D);
     if (Synthesize) {
       Printer.setSynthesizedTarget(nullptr);
       Printer.printSynthesizedExtensionPost(
-          cast<ExtensionDecl>(D), Options.TransformContext->getNominal());
+          cast<ExtensionDecl>(D), Options.TransformContext->getNominal(),
+          Options.BracketOptions);
     } else {
-      Printer.callPrintDeclPost(D);
+      Printer.callPrintDeclPost(D, Options.BracketOptions);
     }
     return true;
   }
@@ -1357,7 +1552,23 @@ void PrintAST::printPatternType(const Pattern *P) {
   }
 }
 
+static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
+  if (!Options.TransformContext || !D->getDeclContext()->isExtensionContext() ||
+      !Options.TransformContext->isPrintingSynthesizedExtension())
+    return true;
+  NominalTypeDecl *Target = Options.TransformContext->getNominal();
+  Type BaseTy = Target->getDeclaredTypeInContext();
+  const FuncDecl *FD = dyn_cast<FuncDecl>(D);
+  if (!FD)
+    return true;
+  ResolveMemberResult Result = resolveValueMember(*Target->getDeclContext(),
+                                                  BaseTy, FD->getEffectiveFullName());
+  return !(Result && Result.Favored != D);
+}
+
 bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
+  if (!shouldPrintAsFavorable(D, Options))
+    return false;
   if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
@@ -1424,6 +1635,28 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (VD->getOverriddenDecl()) return false;
       if (!VD->getSatisfiedProtocolRequirements().empty()) return false;
+
+      if (auto clangDecl = VD->getClangDecl()) {
+        // If the Clang declaration is from a protocol but was mirrored into
+        // class or extension thereof, treat it as an override.
+        if (isa<clang::ObjCProtocolDecl>(clangDecl->getDeclContext()) &&
+            VD->getDeclContext()->getAsClassOrClassExtensionContext())
+          return false;
+
+        // Check whether Clang considers it an override.
+        if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+          SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
+          objcMethod->getOverriddenMethods(overriddenMethods);
+          if (!overriddenMethods.empty()) return false;
+        } else if (auto objcProperty
+                     = dyn_cast<clang::ObjCPropertyDecl>(clangDecl)) {
+          if (auto getter = objcProperty->getGetterMethodDecl()) {
+            SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
+            getter->getOverriddenMethods(overriddenMethods);
+            if (!overriddenMethods.empty()) return false;
+          }
+        }
+      }
     }
   }
 
@@ -1932,7 +2165,7 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
 
 void PrintAST::
 printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl *ExtDecl) {
-  if (Options.TransformContext->shouldOpenExtension) {
+  if (Options.BracketOptions.shouldOpenExtension(ExtDecl)) {
     printDocumentationComment(ExtDecl);
     printAttributes(ExtDecl);
     Printer << tok::kw_extension << " ";
@@ -1952,32 +2185,36 @@ printSynthesizedExtension(NominalTypeDecl* Decl, ExtensionDecl *ExtDecl) {
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(ExtDecl, false,
-                       Options.TransformContext->shouldOpenExtension,
-                       Options.TransformContext->shouldCloseExtension);
+                       Options.BracketOptions.shouldOpenExtension(ExtDecl),
+                       Options.BracketOptions.shouldCloseExtension(ExtDecl));
   }
 }
 
 void PrintAST::printExtension(ExtensionDecl* decl) {
-  printDocumentationComment(decl);
-  printAttributes(decl);
-  Printer << "extension ";
-  recordDeclLoc(decl, [&]{
-    // We cannot extend sugared types.
-    Type extendedType = decl->getExtendedType();
-    NominalTypeDecl *nominal = extendedType ? extendedType->getAnyNominal() : nullptr;
-    if (!nominal) {
-      // Fallback to TypeRepr.
-      printTypeLoc(decl->getExtendedTypeLoc());
-      return;
+  if (Options.BracketOptions.shouldOpenExtension(decl)) {
+    printDocumentationComment(decl);
+    printAttributes(decl);
+    Printer << "extension ";
+    recordDeclLoc(decl, [&]{
+      // We cannot extend sugared types.
+      Type extendedType = decl->getExtendedType();
+      NominalTypeDecl *nominal = extendedType ? extendedType->getAnyNominal() : nullptr;
+      if (!nominal) {
+        // Fallback to TypeRepr.
+        printTypeLoc(decl->getExtendedTypeLoc());
+        return;
+      }
+      printExtendedTypeName(extendedType, Printer, Options);
+    });
+    printInherited(decl);
+    if (auto *GPs = decl->getGenericParams()) {
+      printWhereClause(GPs->getRequirements());
     }
-    printExtendedTypeName(extendedType, Printer, Options);
-  });
-  printInherited(decl);
-  if (auto *GPs = decl->getGenericParams()) {
-    printWhereClause(GPs->getRequirements());
   }
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl);
+    printMembersOfDecl(decl, false,
+                       Options.BracketOptions.shouldOpenExtension(decl),
+                       Options.BracketOptions.shouldCloseExtension(decl));
   }
 }
 
@@ -2123,7 +2360,8 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
     printInherited(decl);
   }
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl);
+    printMembersOfDecl(decl, false, true,
+                       Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
 
@@ -2148,7 +2386,8 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
     printInherited(decl);
   }
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl);
+    printMembersOfDecl(decl, false, true,
+                       Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
 
@@ -2175,7 +2414,8 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
   }
 
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl);
+    printMembersOfDecl(decl, false, true,
+                       Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
 
@@ -2217,7 +2457,8 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
     printInherited(decl, explicitClass);
   }
   if (Options.TypeDefinitions) {
-    printMembersOfDecl(decl);
+    printMembersOfDecl(decl, false, true,
+                       Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
 
@@ -2299,56 +2540,10 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
 
   auto TheTypeLoc = param->getTypeLoc();
 
-  // If the parameter is autoclosure, or noescape, print it.  This is stored
-  // on the type of the decl, not on the typerepr.
-  if (param->hasType()) {
-    auto bodyCanType = param->getType()->getCanonicalType();
-    if (auto patternType = dyn_cast<AnyFunctionType>(bodyCanType)) {
-      if (patternType->isAutoClosure() || patternType->isNoEscape()) {
-        Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-        switch (patternType->isAutoClosure()*2 + patternType->isNoEscape()) {
-        case 1:
-          Printer.printAttrName("@noescape");
-          break;
-        case 2:
-          Printer.printAttrName("@autoclosure");
-          Printer << "(escaping)";
-          break;
-        case 3: Printer.printAttrName("@autoclosure");
-          break;
-        default:
-          llvm_unreachable("impossible autoclosure/noescape");
-        }
-        Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
-        Printer << " ";
-      }
-    }
-  }
-
   printArgName();
 
   if (!TheTypeLoc.getTypeRepr() && param->hasType())
     TheTypeLoc = TypeLoc::withoutLoc(param->getType());
-
-  auto ContainsFunc = [&] (DeclAttrKind Kind) {
-    return Options.ExcludeAttrList.end() != std::find(Options.ExcludeAttrList.
-      begin(), Options.ExcludeAttrList.end(), Kind);
-  };
-
-  auto RemoveFunc = [&] (DeclAttrKind Kind) {
-    Options.ExcludeAttrList.erase(std::find(Options.ExcludeAttrList.begin(),
-                                            Options.ExcludeAttrList.end(), Kind));
-  };
-
-  // Since we have already printed @noescape and @autoclosure, we exclude them
-  // when printing the type.
-  auto hasNoEscape = ContainsFunc(DAK_NoEscape);
-  auto hasAutoClosure = ContainsFunc(DAK_AutoClosure);
-  if (!hasNoEscape)
-    Options.ExcludeAttrList.push_back(DAK_NoEscape);
-  if (!hasAutoClosure)
-    Options.ExcludeAttrList.push_back(DAK_AutoClosure);
-
 
   // If the parameter is variadic, we will print the "..." after it, but we have
   // to strip off the added array type.
@@ -2362,21 +2557,15 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
   if (param->isVariadic())
     Printer << "...";
 
-  // After printing the type, we need to restore what the option used to be.
-  if (!hasNoEscape)
-    RemoveFunc(DAK_NoEscape);
-  if (!hasAutoClosure)
-    RemoveFunc(DAK_AutoClosure);
-
-
-  if (Options.PrintDefaultParameterPlaceholder &&
-      param->isDefaultArgument()) {
-    Printer << " = ";
+  if (param->isDefaultArgument()) {
     auto defaultArgStr
       = getDefaultArgumentSpelling(param->getDefaultArgumentKind());
     if (defaultArgStr.empty()) {
-      Printer << tok::kw_default;
+      if (Options.PrintDefaultParameterPlaceholder)
+        Printer << " = " << tok::kw_default;
     } else {
+      Printer << " = ";
+
       switch (param->getDefaultArgumentKind()) {
       case DefaultArgumentKind::File:
       case DefaultArgumentKind::Line:
@@ -2389,19 +2578,18 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
         Printer << defaultArgStr;
         break;
       }
-
     }
   }
 }
 
 void PrintAST::printParameterList(ParameterList *PL, bool isCurried,
-                            std::function<bool(unsigned)> isAPINameByDefault) {
+                            std::function<bool()> isAPINameByDefault) {
   Printer << "(";
   for (unsigned i = 0, e = PL->size(); i != e; ++i) {
     if (i > 0)
       Printer << ", ";
 
-    printOneParameter(PL->get(i), isCurried, isAPINameByDefault(i));
+    printOneParameter(PL->get(i), isCurried, isAPINameByDefault());
   }
   Printer << ")";
 }
@@ -2416,8 +2604,8 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   for (unsigned CurrPattern = 0, NumPatterns = BodyParams.size();
        CurrPattern != NumPatterns; ++CurrPattern) {
     printParameterList(BodyParams[CurrPattern], /*Curried=*/CurrPattern > 0,
-                       [&](unsigned argNo)->bool {
-      return CurrPattern > 0 || AFD->argumentNameIsAPIByDefault(argNo);
+                       [&]()->bool {
+      return CurrPattern > 0 || AFD->argumentNameIsAPIByDefault();
     });
   }
 
@@ -2642,7 +2830,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer << "subscript";
   }, [&] { // Parameters
     printParameterList(decl->getIndices(), /*Curried=*/false,
-                       /*isAPINameByDefault*/[](unsigned)->bool{return false;});
+                       /*isAPINameByDefault*/[]()->bool{return false;});
   });
   Printer << " -> ";
 
@@ -3312,6 +3500,9 @@ public:
   }
 
   void visitTupleType(TupleType *T) {
+    Printer.callPrintStructurePre(PrintStructureKind::TupleType);
+    defer { Printer.printStructurePost(PrintStructureKind::TupleType); };
+
     Printer << "(";
 
     auto Fields = T->getElements();
@@ -3455,15 +3646,14 @@ public:
   }
 
   void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
-    if(Options.SkipAttributes)
+    if (Options.SkipAttributes)
       return;
-    auto IsAttrExcluded = [&](DeclAttrKind Kind) {
-      return Options.ExcludeAttrList.end() != std::find(Options.ExcludeAttrList.
-        begin(), Options.ExcludeAttrList.end(), Kind);
-    };
-    if (info.isAutoClosure() && !IsAttrExcluded(DAK_AutoClosure))
-      Printer << "@autoclosure ";
-    else if (info.isNoEscape() && !IsAttrExcluded(DAK_NoEscape))
+    if (info.isAutoClosure()) {
+      if (info.isNoEscape())
+        Printer << "@autoclosure ";
+      else
+        Printer << "@autoclosure(escaping) ";
+    } else if (info.isNoEscape())
       // autoclosure implies noescape.
       Printer << "@noescape ";
 
@@ -3498,7 +3688,7 @@ public:
   }
 
   void printFunctionExtInfo(SILFunctionType::ExtInfo info) {
-    if(Options.SkipAttributes)
+    if (Options.SkipAttributes)
       return;
 
     if (Options.PrintFunctionRepresentationAttrs) {

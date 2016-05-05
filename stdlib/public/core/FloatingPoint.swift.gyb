@@ -33,7 +33,7 @@ builtinIntLiteralBits = 2048
 def allInts():
     for bits in allIntBits:
         for signed in False, True:
-            yield bits,signed
+            yield bits, signed
 
 def baseIntName(name):
     return 'Int' if name == 'Int' else 'Int' + str(name)
@@ -158,10 +158,11 @@ else:
     raise ValueError('Unhandled float type.')
 }%
 % if bits == 80:
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 % end
 
 ${SelfDocComment}
+@_fixed_layout
 public struct ${Self} {
   public // @testable
   var _value: Builtin.FPIEEE${bits}
@@ -204,7 +205,7 @@ extension ${Self} : CustomDebugStringConvertible {
 extension ${Self} : FloatingPoint {
   public typealias _BitsType = UInt${bits}
 
-  public static func _fromBitPattern(bits: _BitsType) -> ${Self} {
+  public static func _fromBitPattern(_ bits: _BitsType) -> ${Self} {
     return ${Self}(_bits: Builtin.bitcast_Int${bits}_FPIEEE${bits}(bits._value))
   }
 
@@ -369,7 +370,7 @@ extension ${Self} : _BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible
   }
 }
 
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 
 % builtinFloatLiteralBits = 80
 @_transparent
@@ -496,7 +497,7 @@ extension ${Self} : AbsoluteValuable {
   /// Returns the absolute value of `x`.
   @_transparent
   @warn_unused_result
-  public static func abs(x: ${Self}) -> ${Self} {
+  public static func abs(_ x: ${Self}) -> ${Self} {
     return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(x._value))
   }
 }
@@ -538,7 +539,7 @@ extension ${Self} {
 %   if Self != That:
 
 %     if srcBits == 80:
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 %     end
 
   /// Construct an instance that approximates `other`.
@@ -563,16 +564,16 @@ extension ${Self} {
 //===----------------------------------------------------------------------===//
 
 @_transparent
-@available(*, deprecated, message: "it will be removed in Swift 3")
+@available(*, unavailable, message: "it has been removed in Swift 3")
 public prefix func ++ (rhs: inout ${Self}) -> ${Self} { rhs += 1.0; return rhs }
 @_transparent
-@available(*, deprecated, message: "it will be removed in Swift 3")
+@available(*, unavailable, message: "it has been removed in Swift 3")
 public prefix func -- (rhs: inout ${Self}) -> ${Self} { rhs -= 1.0; return rhs }
 @_transparent
-@available(*, deprecated, message: "it will be removed in Swift 3")
+@available(*, unavailable, message: "it has been removed in Swift 3")
 public postfix func ++ (lhs: inout ${Self}) -> ${Self} { let tmp = lhs; lhs += 1.0; return tmp }
 @_transparent
-@available(*, deprecated, message: "it will be removed in Swift 3")
+@available(*, unavailable, message: "it has been removed in Swift 3")
 public postfix func -- (lhs: inout ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp }
 
 
@@ -645,7 +646,7 @@ extension ${Self} {
 %     That = floatName(srcBits)
 
 %     if srcBits == 80:
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 %     end
 
   /// Construct an instance that approximates `other`.

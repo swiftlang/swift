@@ -13,10 +13,10 @@ public struct ObjCBool : Boolean {
 }
 
 @_silgen_name("swift_BoolToObjCBool")
-func _convertBoolToObjCBool(x: Bool) -> ObjCBool
+func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool
 
 @_silgen_name("swift_ObjCBoolToBool")
-func _convertObjCBoolToBool(x: ObjCBool) -> Bool
+func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool
 
 
 public struct Selector : StringLiteralConvertible {

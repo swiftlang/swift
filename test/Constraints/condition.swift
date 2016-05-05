@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 // Basic support for Bool
-func simpleIf(b: Bool) {
+func simpleIf(_ b: Bool) {
   if b { }
 }
 
@@ -10,12 +10,12 @@ struct OtherLogicValue : Boolean {
   var boolValue: Bool { return true }
 }
 
-func otherIf(b : OtherLogicValue) {
+func otherIf(_ b : OtherLogicValue) {
   if b { }
 }
 
 // Support for arbitrary logic values in generics
-func doIf<T : Boolean>(t: T) {
+func doIf<T : Boolean>(_ t: T) {
   if t { }
 }
 doIf(true)

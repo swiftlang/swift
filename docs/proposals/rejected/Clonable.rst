@@ -39,7 +39,7 @@ one has to engage in some kind of wrapping and forwarding::
        value = new MyClass(x, y)
     }
 
-    func someFunction(z : C) -> D {
+    func someFunction(_ z : C) -> D {
       return value.someFunction(z)
     }
 

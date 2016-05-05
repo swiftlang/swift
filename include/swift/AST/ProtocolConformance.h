@@ -252,12 +252,13 @@ public:
                ->getRootNormalConformance());
   }
 
+  /// Determine whether this protocol conformance is visible from the
+  /// given declaration context.
+  bool isVisibleFrom(DeclContext *dc) const;
+
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
-  ///
-  /// FIXME: This is a crummy API. This information should be recorded in the
-  /// witnesses themselves.
-  bool usesDefaultDefinition(ValueDecl *requirement) const;
+  bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const;
   
   // Make vanilla new/delete illegal for protocol conformances.
   void *operator new(size_t bytes) = delete;
@@ -285,6 +286,7 @@ public:
   AbstractStorageDecl *getBehaviorDecl() const;
   
   void dump() const;
+  void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 
 private:
   friend class Substitution;
@@ -342,10 +344,6 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// protocol conformance structures that indicate how the given type meets
   /// the requirements of those protocols.
   InheritedConformanceMap InheritedMapping;
-
-  /// The set of requirements for which we have used default definitions or
-  /// otherwise deduced the result.
-  llvm::SmallPtrSet<ValueDecl *, 4> DefaultedDefinitions;
 
   LazyMemberLoader *Resolver = nullptr;
   uint64_t ResolverContextData;
@@ -487,24 +485,12 @@ public:
     assert(!isComplete() && "Conformance already complete?");
     InheritedMapping[proto] = conformance;
   }
-  /// Determine whether the witness for the given requirement
-  /// is either the default definition or was otherwise deduced.
-  bool usesDefaultDefinition(ValueDecl *requirement) const {
-    if (Resolver)
-      resolveLazyInfo();
-    return DefaultedDefinitions.count(requirement) > 0;
-  }
 
-  /// Retrieve the complete set of defaulted definitions.
-  const llvm::SmallPtrSet<ValueDecl *, 4> &getDefaultedDefinitions() const {
-    if (Resolver)
-      resolveLazyInfo();
-    return DefaultedDefinitions;
-  }
-
-  /// Note that the given requirement was a default definition.
-  void addDefaultDefinition(ValueDecl *requirement) {
-    DefaultedDefinitions.insert(requirement);
+  /// Determine whether the witness for the given type requirement
+  /// is the default definition.
+  bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
+    return getTypeWitnessSubstAndDecl(requirement, nullptr)
+        .second->isImplicit();
   }
 
   void setLazyLoader(LazyMemberLoader *resolver, uint64_t contextData);
@@ -611,7 +597,7 @@ public:
 
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
-  bool usesDefaultDefinition(ValueDecl *requirement) const {
+  bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
     return GenericConformance->usesDefaultDefinition(requirement);
   }
 
@@ -676,7 +662,11 @@ public:
   /// Get the declaration context that contains the conforming extension or
   /// nominal type declaration.
   DeclContext *getDeclContext() const {
-    return InheritedConformance->getDeclContext();
+    auto bgc = getType()->getClassOrBoundGenericClass();
+
+    // In some cases, we may not have a BGC handy, in which case we should
+    // delegate to the inherited conformance for the decl context.
+    return bgc ? bgc : InheritedConformance->getDeclContext();
   }
 
   /// Retrieve the state of this conformance.
@@ -710,7 +700,7 @@ public:
 
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
-  bool usesDefaultDefinition(ValueDecl *requirement) const {
+  bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
     return InheritedConformance->usesDefaultDefinition(requirement);
   }
 

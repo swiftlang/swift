@@ -578,9 +578,11 @@ void Lexer::lexIdentifier() {
 /// lexHash - Handle #], #! for shebangs, and the family of #identifiers.
 void Lexer::lexHash() {
   const char *TokStart = CurPtr-1;
+
+  // NOTE: legacy punctuator.  Remove in the future.
   if (*CurPtr == ']') { // #]
-    CurPtr++;
-    return formToken(tok::r_square_lit, TokStart);
+     CurPtr++;
+     return formToken(tok::r_square_lit, TokStart);
   }
   
   // Allow a hashbang #! line at the beginning of the file.
@@ -629,6 +631,12 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
   case '\0':                                 // whitespace / last char in file
     return false;
 
+  case '/':
+    if (tokBegin - 1 != bufferBegin && tokBegin[-2] == '*')
+      return false; // End of a slash-star comment, so whitespace.
+    else
+      return true;
+
   default:
     return true;
   }
@@ -655,6 +663,13 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound,
     // Prefer the '^' in "x^.y" to be a postfix op, not binary, but the '^' in
     // "^.y" to be a prefix op, not binary.
     return !isLeftBound;
+
+  case '/':
+    // A following comment counts as whitespace, so this token is not right bound.
+    if (tokEnd[1] == '/' || tokEnd[1] == '*')
+      return false;
+    else
+      return true;
 
   default:
     return true;
@@ -760,14 +775,20 @@ void Lexer::lexOperatorIdentifier() {
     // If there is a "//" in the middle of an identifier token, it starts
     // a single-line comment.
     auto Pos = StringRef(TokStart, CurPtr-TokStart).find("//");
-    if (Pos != StringRef::npos)
+    if (Pos != StringRef::npos) {
       CurPtr = TokStart+Pos;
+      // Next token is a comment, which counts as whitespace.
+      rightBound = false;
+    }
 
     // If there is a "/*" in the middle of an identifier token, it starts
     // a multi-line comment.
     Pos = StringRef(TokStart, CurPtr-TokStart).find("/*");
-    if (Pos != StringRef::npos)
+    if (Pos != StringRef::npos) {
       CurPtr = TokStart+Pos;
+      // Next token is a comment, which counts as whitespace.
+      rightBound = false;
+    }
 
     // Verify there is no "*/" in the middle of the identifier token, we reject
     // it as potentially ending a block comment.
@@ -837,11 +858,6 @@ void Lexer::lexHexNumber() {
     
   while (isHexDigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
-  if (CurPtr - TokStart == 2) {
-    diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
-    while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
-    return formToken(tok::unknown, TokStart);
-  }
   
   if (*CurPtr != '.' && *CurPtr != 'p' && *CurPtr != 'P')
     return formToken(tok::integer_literal, TokStart);
@@ -914,8 +930,6 @@ void Lexer::lexNumber() {
       
     while ((*CurPtr >= '0' && *CurPtr <= '7') || *CurPtr == '_')
       ++CurPtr;
-    if (CurPtr - TokStart == 2)
-      return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
     return formToken(tok::integer_literal, TokStart);
   }
   
@@ -926,8 +940,6 @@ void Lexer::lexNumber() {
       return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
     while (*CurPtr == '0' || *CurPtr == '1' || *CurPtr == '_')
       ++CurPtr;
-    if (CurPtr - TokStart == 2)
-      return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
     return formToken(tok::integer_literal, TokStart);
   }
 
@@ -1610,21 +1622,26 @@ Restart:
   case '@': return formToken(tok::at_sign, TokStart);
   case '{': return formToken(tok::l_brace, TokStart);
   case '[': {
-    if (*CurPtr == '#') { // [#
-      CurPtr++;
-      return formToken(tok::l_square_lit, TokStart);
-    }
-    return formToken(tok::l_square, TokStart);
+     // NOTE: Legacy punctuator for old object literal syntax.
+     // Remove in the future.
+     if (*CurPtr == '#') { // [#
+       // NOTE: Do NOT include the '#' in the token, unlike in earlier
+       // versions of Swift that supported the old object literal syntax
+       // directly.  The '#' will be lexed as part of the object literal
+       // keyword token itself.
+       return formToken(tok::l_square_lit, TokStart);
+     }
+     return formToken(tok::l_square, TokStart);
   }
   case '(': return formToken(tok::l_paren, TokStart);
-  case '}': return formToken(tok::r_brace,  TokStart);
+  case '}': return formToken(tok::r_brace, TokStart);
   case ']': return formToken(tok::r_square, TokStart);
   case ')':
-    return formToken(tok::r_paren,  TokStart);
+    return formToken(tok::r_paren, TokStart);
 
-  case ',': return formToken(tok::comma,    TokStart);
-  case ';': return formToken(tok::semi,     TokStart);
-  case ':': return formToken(tok::colon,    TokStart);
+  case ',': return formToken(tok::comma, TokStart);
+  case ';': return formToken(tok::semi, TokStart);
+  case ':': return formToken(tok::colon, TokStart);
 
   case '#':
     return lexHash();
@@ -1896,6 +1913,3 @@ StringRef Lexer::getIndentationForLine(SourceManager &SM, SourceLoc Loc) {
 
   return StringRef(StartOfLine, EndOfIndentation - StartOfLine);
 }
-
-
-

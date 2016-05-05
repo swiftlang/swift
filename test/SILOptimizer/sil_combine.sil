@@ -6,7 +6,7 @@ import Builtin
 import Swift
 
 class RawBuffer {}
-class HeapBufferStorage<T,U> : RawBuffer {}
+class HeapBufferStorage<T, U> : RawBuffer {}
 
 enum FakeOptional<T> {
   case none
@@ -198,10 +198,10 @@ bb0(%0 : $Int64):
 // CHECK: cond_br
 // CHECK: {{^bb}}
 // CHECK-NEXT: integer_literal
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: {{^bb}}
 // CHECK-NEXT: integer_literal
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 sil @do_not_fold_integer_literal : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb3
@@ -225,10 +225,10 @@ enum BoolLike { case true_, false_ }
 // CHECK: switch_enum
 // CHECK: {{^bb}}
 // CHECK-NOT: enum
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: {{^bb}}
 // CHECK-NOT: enum
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 sil @fold_enum : $@convention(thin) (BoolLike) -> BoolLike {
 bb0(%0 : $BoolLike):
   switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
@@ -250,10 +250,10 @@ bb3(%3 : $BoolLike):
 // CHECK: switch_enum
 // CHECK: {{^bb}}
 // CHECK-NEXT: enum
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: {{^bb}}
 // CHECK-NEXT: enum
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 sil @do_not_fold_enum : $@convention(thin) (BoolLike) -> BoolLike {
 bb0(%0 : $BoolLike):
   switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
@@ -2604,7 +2604,7 @@ class CC4 {
 // Function that takes different kinds of arguments: @in, @guaranteed, @owned, 
 sil @closure_with_in_guaranteed_owned_in_args : $@convention(method) (@in CC2, @guaranteed CC1, @owned CC3, @in CC4) -> Optional<Int>
 
-// Test the peephole performing apply{partial_apply(x,y,z)}(a) -> apply(a,x,y,z)
+// Test the peephole performing apply{partial_apply(x, y, z)}(a) -> apply(a, x, y, z)
 // We need to check the following:
 // - all arguments of a partial_apply, which are either results of a stack_alloc or consumed indirect arguments
 //  should be copied into temporaries. This should happen just before that partial_apply instruction.
@@ -2728,6 +2728,47 @@ bb3:
   dealloc_stack %16 : $*Optional<Int>
   return %36 : $Optional<Int>
 }
+
+// Test if we insert the right stack/dealloc-stack when converting apply{partial_apply}.
+
+// CHECK-LABEL: sil @test_stack_insertion_for_partial_apply_apply
+// CHECK:     bb0({{.*}}):
+// CHECK-NEXT:  [[T:%[0-9]+]] = alloc_stack $Int
+// CHECK-NEXT:  alloc_stack $Bool
+// CHECK-NEXT:  [[S2:%[0-9]+]] = alloc_stack $Int
+// CHECK:       copy_addr [[S2]] to [initialization] [[T]]
+// CHECK:       dealloc_stack [[S2]] : $*Int
+// CHECK:       apply
+// CHECK:     bb1:
+// CHECK-NOT:   dealloc_stack
+// CHECK:     bb2:
+// CHECK:       dealloc_stack {{.*}} : $*Bool
+// CHECK:       dealloc_stack [[T]] : $*Int
+// CHECK:       return
+sil @test_stack_insertion_for_partial_apply_apply : $@convention(thin) (Int, Double) -> () {
+bb0(%0 : $Int, %1 : $Double):
+  %s1 = alloc_stack $Bool
+  %s2 = alloc_stack $Int
+  store %0 to %s2 : $*Int
+  %f1 = function_ref @callee : $@convention(thin) (Double, @in_guaranteed Int) -> ()
+  %pa = partial_apply %f1(%s2) : $@convention(thin) (Double, @in_guaranteed Int) -> ()
+  dealloc_stack %s2 : $*Int
+  %a1 = apply %pa(%1) : $@callee_owned (Double) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %f2 = function_ref @noreturn_func : $@convention(thin) @noreturn () -> ()
+  %a2 = apply %f2() : $@convention(thin) @noreturn () -> ()
+  unreachable
+
+bb2:
+  dealloc_stack %s1 : $*Bool
+  %r = tuple()
+  return %r : $()
+}
+
+sil @callee : $@convention(thin) (Double, @in_guaranteed Int) -> ()
+sil @noreturn_func : $@convention(thin) @noreturn () -> ()
 
 // CHECK-LABEL: sil @remove_destroy_array
 // CHECK-NOT: destroyArray

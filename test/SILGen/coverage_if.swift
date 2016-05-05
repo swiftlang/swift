@@ -13,5 +13,5 @@ func foo(x : Bool) { // CHECK: [[@LINE]]:20 -> {{[0-9]+}}:2 : 0
   else   { } // CHECK: [[@LINE]]:10 -> [[@LINE]]:13 : (0 - 3)
 }
 
-foo(true);
-foo(false);
+foo(x: true);
+foo(x: false);

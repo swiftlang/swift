@@ -24,31 +24,17 @@ def cmp(a, b, p):
 // need such a predicate.
 % preds = [True, False]
 % for p in preds:
-%{
-if p:
-  orderingRequirement = """\
-/// - Precondition: `isOrderedBefore` is a
-///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
-///   over `elements`."""
-  according = " according to `isOrderedBefore`"
-else:
-  orderingRequirement = """\
-/// - Precondition: The less-than operator (`func <`) defined in the `Comparable`
-///   conformance is a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
-///   over `elements`."""
-  according = ""
-}%
 
 func _insertionSort<
-  C: MutableCollection where C.Index: BidirectionalIndex
-  ${"" if p else ", C.Iterator.Element : Comparable"}
+  C : protocol<MutableCollection, BidirectionalCollection>
+  ${"" if p else "where C.Iterator.Element : Comparable"}
 >(
-  elements: inout C,
+  _ elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
   if !range.isEmpty {
-    let start = range.startIndex
+    let start = range.lowerBound
 
     // Keep track of the end of the initial sequence of sorted
     // elements.
@@ -56,8 +42,8 @@ func _insertionSort<
 
     // One element is trivially already-sorted, thus pre-increment
     // Continue until the sorted elements cover the whole sequence
-    sortedEnd._successorInPlace()
-    while sortedEnd != range.endIndex {
+    elements.formIndex(after: &sortedEnd)
+    while sortedEnd != range.upperBound {
       // get the first unsorted element
       let x: C.Iterator.Element = elements[sortedEnd]
 
@@ -65,7 +51,7 @@ func _insertionSort<
       // moving elements forward to make room.
       var i = sortedEnd
       repeat {
-        let predecessor: C.Iterator.Element = elements[i.predecessor()]
+        let predecessor: C.Iterator.Element = elements[elements.index(before: i)]
 
         // if x doesn't belong before y, we've found its position
         if !${cmp("x", "predecessor", p)} {
@@ -74,56 +60,56 @@ func _insertionSort<
 
         // Move y forward
         elements[i] = predecessor
-        i._predecessorInPlace()
+        elements.formIndex(before: &i)
       } while i != start
 
       if i != sortedEnd {
         // Plop x into position
         elements[i] = x
       }
-      sortedEnd._successorInPlace()
+      elements.formIndex(after: &sortedEnd)
     }
   }
 }
 
 func _partition<
-  C: MutableCollection where C.Index: RandomAccessIndex
-  ${"" if p else ", C.Iterator.Element : Comparable"}
+  C : protocol<MutableCollection, RandomAccessCollection>
+  ${"" if p else "where C.Iterator.Element : Comparable"}
 >(
-  elements: inout C,
+  _ elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) -> C.Index {
-  var lo = range.startIndex
-  var hi = range.endIndex
+  var lo = range.lowerBound
+  var hi = range.upperBound
 
   if lo == hi {
     return lo
   }
 
   // The first element is the pivot.
-  let pivot = elements[range.startIndex]
+  let pivot = elements[range.lowerBound]
 
   // Loop invariants:
   // * lo < hi
-  // * elements[i] < pivot, for i in range.startIndex+1..lo
-  // * pivot <= elements[i] for i in hi..range.endIndex
+  // * elements[i] < pivot, for i in range.lowerBound+1..lo
+  // * pivot <= elements[i] for i in hi..range.upperBound
 
 Loop: while true {
   FindLo: repeat {
-      lo._successorInPlace()
+      elements.formIndex(after: &lo)
       while lo != hi {
         if !${cmp("elements[lo]", "pivot", p)} { break FindLo }
-        lo._successorInPlace()
+        elements.formIndex(after: &lo)
       }
       break Loop
     } while false
 
   FindHi: repeat {
-      hi._predecessorInPlace()
+      elements.formIndex(before: &hi)
       while hi != lo {
         if ${cmp("elements[hi]", "pivot", p)} { break FindHi }
-        hi._predecessorInPlace()
+        elements.formIndex(before: &hi)
       }
       break Loop
     } while false
@@ -131,10 +117,10 @@ Loop: while true {
     swap(&elements[lo], &elements[hi])
   }
 
-  lo._predecessorInPlace()
-  if lo != range.startIndex {
+  elements.formIndex(before: &lo)
+  if lo != range.lowerBound {
     // swap the pivot into place
-    swap(&elements[lo], &elements[range.startIndex])
+    swap(&elements[lo], &elements[range.lowerBound])
   }
 
   return lo
@@ -142,23 +128,24 @@ Loop: while true {
 
 public // @testable
 func _introSort<
-  C : MutableCollection where C.Index : RandomAccessIndex
-  ${"" if p else ", C.Iterator.Element : Comparable"}
+  C : protocol<MutableCollection, RandomAccessCollection>
+  ${"" if p else "where C.Iterator.Element : Comparable"}
 >(
-  elements: inout C,
+  _ elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
 %   if p:
   var isOrderedBeforeVar = isOrderedBefore
 %   end
-  let len = range.count.toIntMax()
-  if len < 2 {
+  let count =
+    elements.distance(from: range.lowerBound, to: range.upperBound).toIntMax()
+  if count < 2 {
     return
   }
   // Set max recursion depth to 2*floor(log(N)), as suggested in the introsort
   // paper: http://www.cs.rpi.edu/~musser/gp/introsort.ps
-  let depthLimit = 2 * _floorLog2(Int64(len))
+  let depthLimit = 2 * _floorLog2(Int64(count))
   _introSortImpl(
     &elements,
     subRange: range,
@@ -167,17 +154,16 @@ func _introSort<
 }
 
 func _introSortImpl<
-  C : MutableCollection where C.Index : RandomAccessIndex
-  ${"" if p else ", C.Iterator.Element : Comparable"}
+  C : protocol<MutableCollection, RandomAccessCollection>
+  ${"" if p else "where C.Iterator.Element : Comparable"}
 >(
-  elements: inout C,
+  _ elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""},
   depthLimit: Int
 ) {
-
   // Insertion sort is better at handling smaller regions.
-  if range.count < 20 {
+  if elements.distance(from: range.lowerBound, to: range.upperBound) < 20 {
     _insertionSort(
       &elements,
       subRange: range
@@ -201,40 +187,40 @@ func _introSortImpl<
     ${", isOrderedBefore: &isOrderedBefore" if p else ""})
   _introSortImpl(
     &elements,
-    subRange: range.startIndex..<partIdx,
+    subRange: range.lowerBound..<partIdx,
     ${"isOrderedBefore: &isOrderedBefore, " if p else ""}
     depthLimit: depthLimit &- 1)
   _introSortImpl(
     &elements,
-    subRange: (partIdx.successor())..<range.endIndex,
+    subRange: (elements.index(after: partIdx))..<range.upperBound,
     ${"isOrderedBefore: &isOrderedBefore, " if p else ""}
     depthLimit: depthLimit &- 1)
 }
 
 func _siftDown<
-  C : MutableCollection where C.Index : RandomAccessIndex
-  ${"" if p else ", C.Iterator.Element : Comparable"}
+  C : protocol<MutableCollection, RandomAccessCollection>
+  ${"" if p else "where C.Iterator.Element : Comparable"}
 >(
-  elements: inout C,
+  _ elements: inout C,
   index: C.Index,
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
-  let countToIndex = (range.startIndex..<index).count
-  let countFromIndex = (index..<range.endIndex).count
+  let countToIndex = elements.distance(from: range.lowerBound, to: index)
+  let countFromIndex = elements.distance(from: index, to: range.upperBound)
   // Check if left child is within bounds. If not, return, because there are
   // no children of the given node in the heap.
   if countToIndex + 1 >= countFromIndex {
     return
   }
-  let left = index.advanced(by: countToIndex + 1)
+  let left = elements.index(index, offsetBy: countToIndex + 1)
   var largest = index
   if ${cmp("elements[largest]", "elements[left]", p)} {
     largest = left
   }
   // Check if right child is also within bounds before trying to examine it.
   if countToIndex + 2 < countFromIndex {
-    let right = left + 1
+    let right = elements.index(after: left)
     if ${cmp("elements[largest]", "elements[right]", p)} {
       largest = right
     }
@@ -251,10 +237,10 @@ func _siftDown<
   }
 }
 func _heapify<
-  C : MutableCollection where C.Index : RandomAccessIndex
-  ${"" if p else ", C.Iterator.Element : Comparable"}
+  C : protocol<MutableCollection, RandomAccessCollection>
+  ${"" if p else "where C.Iterator.Element : Comparable"}
 >(
-  elements: inout C,
+  _ elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
@@ -264,10 +250,14 @@ func _heapify<
   //
   // We skip the rightmost half of the array, because these nodes don't have
   // any children.
-  let root = range.startIndex
-  var node = root.advanced(by: C.Index.Distance(range.count.toIntMax()/2))
+  let root = range.lowerBound
+  var node = elements.index(
+    root,
+    offsetBy: elements.distance(
+      from: range.lowerBound, to: range.upperBound) / 2)
+  
   while node != root {
-    node._predecessorInPlace()
+    elements.formIndex(before: &node)
     _siftDown(
       &elements,
       index: node,
@@ -276,20 +266,20 @@ func _heapify<
   }
 }
 func _heapSort<
-  C : MutableCollection where C.Index : RandomAccessIndex
-  ${"" if p else ", C.Iterator.Element : Comparable"}
+  C : protocol<MutableCollection, RandomAccessCollection>
+  ${"" if p else "where C.Iterator.Element : Comparable"}
 >(
-  elements: inout C,
+  _ elements: inout C,
   subRange range: Range<C.Index> ${"," if p else ""}
   ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) {
-  var hi = range.endIndex
-  let lo = range.startIndex
+  var hi = range.upperBound
+  let lo = range.lowerBound
   _heapify(
     &elements,
     subRange: range
     ${", isOrderedBefore: &isOrderedBefore" if p else ""})
-  hi._predecessorInPlace()
+  elements.formIndex(before: &hi)
   while hi != lo {
     swap(&elements[lo], &elements[hi])
     _siftDown(
@@ -297,7 +287,7 @@ func _heapSort<
       index: lo,
       subRange: lo..<hi
       ${", isOrderedBefore: &isOrderedBefore" if p else ""})
-    hi._predecessorInPlace()
+    elements.formIndex(before: &hi)
   }
 }
 
@@ -307,12 +297,12 @@ func _heapSort<
 /// Exchange the values of `a` and `b`.
 ///
 /// - Precondition: `a` and `b` do not alias each other.
-public func swap<T>(a: inout T, _ b: inout T) {
+public func swap<T>(_ a: inout T, _ b: inout T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.
   let p1 = Builtin.addressof(&a)
   let p2 = Builtin.addressof(&b)
-  _stdlibAssert(
+  _debugPrecondition(
     p1 != p2,
     "swapping a location with itself is not supported")
 

@@ -12,7 +12,7 @@ func bar() throws {
 } // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.baz
-func baz(fn: () throws -> ()) rethrows {
+func baz(_ fn: () throws -> ()) rethrows {
   do {
     try fn()
   } catch SomeErr.Err1 { // CHECK: [[@LINE]]:24 -> {{[0-9]+}}:4 : 2

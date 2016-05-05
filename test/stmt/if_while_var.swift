@@ -2,8 +2,8 @@
 
 func foo() -> Int? { return .none }
 func nonOptional() -> Int { return 0 }
-func use(x: Int) {}
-func modify(x: inout Int) {}
+func use(_ x: Int) {}
+func modify(_ x: inout Int) {}
 
 if let x = foo() {
   use(x)
@@ -82,7 +82,7 @@ if a == 0, where b == 0 {}  // expected-error {{expected 'let' or 'var' in condi
 
 
 
-func testIfCase(a : Int?) {
+func testIfCase(_ a : Int?) {
   if case nil = a where a != nil {}
   if case let (b?) = a where b != 42 {}
   
@@ -108,7 +108,7 @@ func testTypeAnnotations() {
   if case _ : Int8 = 19 {}  // expected-warning {{'if' condition is always true}}
 }
 
-func testShadowing(a: Int?, b: Int?, c: Int?, d: Int?) {
+func testShadowing(_ a: Int?, b: Int?, c: Int?, d: Int?) {
   guard let a = a, let b = a > 0 ? b : nil else { return }
   _ = b
 
@@ -117,9 +117,9 @@ func testShadowing(a: Int?, b: Int?, c: Int?, d: Int?) {
   }
 }
 
-func useInt(x: Int) {}
+func useInt(_ x: Int) {}
 
-func testWhileScoping(a: Int?) {
+func testWhileScoping(_ a: Int?) {
   while let x = a { }
   useInt(x) // expected-error{{use of unresolved identifier 'x'}}
 }

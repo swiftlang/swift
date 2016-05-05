@@ -17,7 +17,7 @@ func gen<R>() -> R {
 
 extension C {
   @inline(__always)
-  class func factory(z: Int) -> Self {
+  class func factory(_ z: Int) -> Self {
     return gen()
   }
 }
@@ -27,8 +27,8 @@ extension C {
 //
 // CHECK-LABEL: sil @main : $@convention(c)
 // CHECK: function_ref static inline_self.C.factory (Swift.Int) -> Self
-// CHECK: [[F:%[0-9]+]] = function_ref @_TZFC11inline_self1C7factory{{.*}} : $@convention(thin) (Int, @thick C.Type) -> @owned C
-// CHECK: apply [[F]](%{{.+}}, %{{.+}}) : $@convention(thin) (Int, @thick C.Type) -> @owned C
+// CHECK: [[F:%[0-9]+]] = function_ref @_TZFC11inline_self1C7factory{{.*}} : $@convention(method) (Int, @thick C.Type) -> @owned C
+// CHECK: apply [[F]](%{{.+}}, %{{.+}}) : $@convention(method) (Int, @thick C.Type) -> @owned C
 
 // Call the function so it can be inlined.
 var x = C()

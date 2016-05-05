@@ -100,6 +100,18 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, AliasResult R) {
   }
 }
 
+SILValue getAccessedMemory(SILInstruction *User) {
+  if (auto *LI = dyn_cast<LoadInst>(User)) {
+    return LI->getOperand();
+  }
+
+  if (auto *SI = dyn_cast<StoreInst>(User)) {
+    return SI->getDest();
+  }
+
+  return SILValue();
+}
+
 //===----------------------------------------------------------------------===//
 //                           Unequal Base Object AA
 //===----------------------------------------------------------------------===//
@@ -413,7 +425,7 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
   // Typed access based TBAA only occurs on pointers. If we reach this point and
   // do not have a pointer, be conservative and return that the two types may
   // alias.
-  if(!LTy.isAddress() || !RTy.isAddress())
+  if (!LTy.isAddress() || !RTy.isAddress())
     return true;
 
   // If the types have unbound generic arguments then we don't know
@@ -670,6 +682,43 @@ bool AliasAnalysis::canBuiltinDecrementRefCount(BuiltinInst *BI, SILValue Ptr) {
       return true;
   }
   return false;
+}
+
+
+bool AliasAnalysis::mayValueReleaseInterfereWithInstruction(SILInstruction *User,
+                                                            SILValue Ptr) {
+  // TODO: Its important to make this as precise as possible.
+  //
+  // TODO: Eventually we can plug in some analysis on the what the release of
+  // the Ptr can do, i.e. be more precise about Ptr's deinit.
+  //
+  // TODO: If we know the specific release instruction, we can potentially do
+  // more.
+  //
+  // If this instruction can not read or write any memory. Its OK.
+  if (!User->mayReadOrWriteMemory())
+    return false;
+
+  // These instructions do read or write memory, get memory accessed.
+  SILValue V = getAccessedMemory(User);
+  if (!V)
+    return true;
+
+  // Is this a local allocation ?
+  if (!pointsToLocalObject(V))
+    return true;
+
+  // This is a local allocation.
+  // The most important check: does the object escape the current function?
+  auto LO = getUnderlyingObject(V);
+  auto *ConGraph = EA->getConnectionGraph(User->getFunction());
+  auto *Node = ConGraph->getNodeOrNull(LO, EA);
+  if (Node && !Node->escapes())
+    return false;
+
+  // This is either a non-local allocation or a local allocation that escapes.
+  // We failed to prove anything, it could be read or written by the deinit.
+  return true;
 }
 
 bool swift::isLetPointer(SILValue V) {

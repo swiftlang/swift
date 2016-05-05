@@ -36,8 +36,8 @@ TYPEREPR(Attributed, TypeRepr)
 
 ABSTRACT_TYPEREPR(Ident, TypeRepr)
   ABSTRACT_TYPEREPR(ComponentIdent, IdentTypeRepr)
-	TYPEREPR(SimpleIdent, ComponentIdentTypeRepr)
-	TYPEREPR(GenericIdent, ComponentIdentTypeRepr)
+  TYPEREPR(SimpleIdent, ComponentIdentTypeRepr)
+  TYPEREPR(GenericIdent, ComponentIdentTypeRepr)
   TYPEREPR(CompoundIdent, IdentTypeRepr)
 
 TYPEREPR(Function, TypeRepr)

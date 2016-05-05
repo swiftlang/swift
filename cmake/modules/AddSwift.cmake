@@ -73,6 +73,14 @@ function(_add_variant_c_compile_link_flags)
   list(APPEND result
     "-isysroot" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
 
+  if("${CFLAGS_SDK}" STREQUAL "ANDROID")
+    list(APPEND result
+      "--sysroot=${SWIFT_ANDROID_SDK_PATH}"
+      # Use the linker included in the Android NDK.
+      "-B" "${SWIFT_ANDROID_NDK_PATH}/toolchains/arm-linux-androideabi-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/linux-x86_64/arm-linux-androideabi/bin/")
+  endif()
+
+
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     
     # Check if there's a specific iOS deployment version needed for this invocation
@@ -156,6 +164,13 @@ function(_add_variant_c_compile_flags)
                        "-fcoverage-mapping")
   endif()
 
+  if("${CFLAGS_SDK}" STREQUAL "ANDROID")
+    list(APPEND result
+        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libcxx/include"
+        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++abi/libcxxabi/include"
+        "-I${SWIFT_ANDROID_NDK_PATH}/sources/android/support/include")
+  endif()
+
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -224,7 +239,13 @@ function(_add_variant_link_flags)
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
     list(APPEND result "-lpthread")
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
-    # NO extra libraries required.
+    # No extra libraries required.
+  elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
+    list(APPEND result
+        "-ldl"
+        "-L${SWIFT_ANDROID_NDK_PATH}/toolchains/arm-linux-androideabi-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/${SWIFT_ANDROID_NDK_GCC_VERSION}"
+        "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so"
+        "-L${SWIFT_ANDROID_ICU_UC}" "-L${SWIFT_ANDROID_ICU_I18N}")
   else()
     list(APPEND result "-lobjc")
   endif()
@@ -369,6 +390,14 @@ function(_compile_swift_files dependency_target_out_var_name)
     list(APPEND swift_flags "-Xfrontend" "-enable-resilience")
   endif()
 
+  if(SWIFT_STDLIB_ENABLE_REFLECTION_METADATA AND SWIFTFILE_IS_STDLIB)
+    list(APPEND swift_flags "-Xfrontend" "-enable-reflection-metadata")
+  endif()
+
+  if(SWIFT_STDLIB_ENABLE_REFLECTION_NAMES AND SWIFTFILE_IS_STDLIB)
+    list(APPEND swift_flags "-Xfrontend" "-enable-reflection-names")
+  endif()
+
   if(SWIFT_EMIT_SORTED_SIL_OUTPUT)
     list(APPEND swift_flags "-Xfrontend" "-emit-sorted-sil")
   endif()
@@ -377,10 +406,14 @@ function(_compile_swift_files dependency_target_out_var_name)
   if(SWIFTFILE_IS_STDLIB_CORE)
     list(APPEND swift_flags
         "-nostdimport" "-parse-stdlib" "-module-name" "Swift")
+    list(APPEND swift_flags
+        "-Xfrontend" "-enable-reflection-builtins")
     list(APPEND swift_flags "-Xfrontend" "-group-info-path"
                             "-Xfrontend" "${GROUP_INFO_JSON_FILE}")
     if (NOT SWIFT_STDLIB_ENABLE_RESILIENCE)
-      list(APPEND swift_flags "-Xfrontend" "-sil-serialize-all")
+      if (SWIFT_STDLIB_SIL_SERIALIZE_ALL)
+        list(APPEND swift_flags "-Xfrontend" "-sil-serialize-all")
+      endif()
     endif()
   endif()
 
@@ -995,7 +1028,7 @@ function(_add_swift_library_single target name)
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_NAME_DIR "${install_name_dir}")
-  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" AND NOT "${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
@@ -1096,7 +1129,7 @@ function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_LINK_LIBRARIES_WITHOUT_ICU)
   foreach(item ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
     if(NOT "${item}" STREQUAL "icucore")
-      list(APPEND SWIFTLIB_SINGLE_LINK_LIBRARIES_WITHOUT_ICU "{$item}")
+      list(APPEND SWIFTLIB_SINGLE_LINK_LIBRARIES_WITHOUT_ICU "${item}")
     endif()
   endforeach()
 
@@ -1345,7 +1378,7 @@ endfunction()
 #   Sources to add into this library.
 function(add_swift_library name)
   set(SWIFTLIB_options
-      SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY TARGET_LIBRARY
+      SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY TARGET_LIBRARY IS_HOST
       API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
   cmake_parse_arguments(SWIFTLIB
     "${SWIFTLIB_options}"
@@ -1424,6 +1457,9 @@ function(add_swift_library name)
     # SDKs building the variants of this library.
     list_intersect(
         "${SWIFTLIB_TARGET_SDKS}" "${SWIFT_SDKS}" SWIFTLIB_TARGET_SDKS)
+    if(SWIFTLIB_IS_HOST)
+      list_union("${SWIFTLIB_TARGET_SDKS}" "${SWIFT_HOST_VARIANT_SDK}" SWIFTLIB_TARGET_SDKS)
+    endif()
     foreach(sdk ${SWIFTLIB_TARGET_SDKS})
       set(THIN_INPUT_TARGETS)
 
@@ -1453,7 +1489,7 @@ function(add_swift_library name)
         elseif("${sdk}" STREQUAL "TVOS" OR "${sdk}" STREQUAL "TVOS_SIMULATOR")
           list(APPEND swiftlib_module_depends_flattened
               ${SWIFTLIB_SWIFT_MODULE_DEPENDS_TVOS})
-        elseif("${SDK}" STREQUAL "WATCHOS" OR "${sdk}" STREQUAL "WATCHOS_SIMULATOR")
+        elseif("${sdk}" STREQUAL "WATCHOS" OR "${sdk}" STREQUAL "WATCHOS_SIMULATOR")
           list(APPEND swiftlib_module_depends_flattened
               ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WATCHOS})
         endif()
@@ -1524,8 +1560,8 @@ function(add_swift_library name)
           ${SWIFTLIB_IS_STDLIB_CORE_keyword}
           ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
           INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
-	  DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
-	  )
+          DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
+        )
 
         # Add dependencies on the (not-yet-created) custom lipo target.
         foreach(DEP ${SWIFTLIB_LINK_LIBRARIES})
@@ -1630,13 +1666,15 @@ function(add_swift_library name)
       if(SWIFTLIB_IS_STDLIB)
         foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
           set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-          add_dependencies("swift-stdlib${VARIANT_SUFFIX}"
-              ${lipo_target}
-              ${lipo_target_static})
-          if(NOT "${name}" STREQUAL "swiftStdlibCollectionUnittest")
-            add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}"
+          if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
+            add_dependencies("swift-stdlib${VARIANT_SUFFIX}"
                 ${lipo_target}
                 ${lipo_target_static})
+            if(NOT "${name}" STREQUAL "swiftStdlibCollectionUnittest")
+              add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}"
+                  ${lipo_target}
+                  ${lipo_target_static})
+            endif()
           endif()
         endforeach()
       endif()
@@ -1752,10 +1790,6 @@ function(_add_swift_executable_single name)
   list(APPEND link_flags
       "-L${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
 
-  foreach(FAT_LIBRARY ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES})
-    list(APPEND link_flags "-l${FAT_LIBRARY}")
-  endforeach()
-
   if(SWIFTEXE_SINGLE_DISABLE_ASLR)
     list(APPEND link_flags "-Wl,-no_pie")
   endif()
@@ -1828,14 +1862,15 @@ function(_add_swift_executable_single name)
       PROPERTIES
       HEADER_FILE_ONLY true)
 
-  target_link_libraries("${name}" ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
+  target_link_libraries("${name}" ${SWIFTEXE_SINGLE_LINK_LIBRARIES} ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES})
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_COMPONENT_DEPENDS})
 
   set_target_properties(${name}
       PROPERTIES FOLDER "Swift executables")
 endfunction()
 
-# Add an executable for the target machine.
+# Add an executable for each target variant. Executables are given suffixes
+# with the variant SDK and ARCH.
 #
 # See add_swift_executable for detailed documentation.
 #
@@ -1845,7 +1880,7 @@ endfunction()
 function(add_swift_target_executable name)
   # Parse the arguments we were given.
   cmake_parse_arguments(SWIFTEXE_TARGET
-    "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
+    "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR;BUILD_WITH_STDLIB"
     ""
     "DEPENDS;COMPONENT_DEPENDS;LINK_FAT_LIBRARIES"
     ${ARGN})
@@ -1883,6 +1918,10 @@ function(add_swift_target_executable name)
         # By default, don't build executables for target SDKs to avoid building
         # target stdlibs.
         set(SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG_CURRENT "EXCLUDE_FROM_ALL")
+      endif()
+
+      if(SWIFTEXE_TARGET_BUILD_WITH_STDLIB)
+        add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}" ${VARIANT_NAME})
       endif()
 
       # Don't add the ${arch} to the suffix.  We want to link against fat
@@ -1945,6 +1984,10 @@ endfunction()
 #
 #   source1 ...
 #     Sources to add into this executable.
+#
+# Note:
+#   Host executables are not given a variant suffix. To build an executable for
+#   each SDK and ARCH variant, use add_swift_target_executable.
 function(add_swift_executable name)
   # Parse the arguments we were given.
   cmake_parse_arguments(SWIFTEXE
@@ -1965,7 +2008,6 @@ function(add_swift_executable name)
 
   set(SWIFTEXE_SOURCES ${SWIFTEXE_UNPARSED_ARGUMENTS})
 
-  # Note: host tools don't get a variant suffix.
   _add_swift_executable_single(
       ${name}
       ${SWIFTEXE_SOURCES}

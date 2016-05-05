@@ -77,8 +77,8 @@ struct SwiftToSourceKitCompletionAdapter {
 
 struct SwiftCodeCompletionConsumer
     : public ide::SimpleCachingCodeCompletionConsumer {
-  using HandlerFunc = std::function<void(ArrayRef<CodeCompletionResult *>,
-                                         SwiftCompletionInfo &)>;
+  using HandlerFunc = std::function<void(
+      MutableArrayRef<CodeCompletionResult *>, SwiftCompletionInfo &)>;
   HandlerFunc handleResultsImpl;
   SwiftCompletionInfo swiftContext;
 
@@ -218,7 +218,8 @@ void SwiftLangSupport::codeComplete(llvm::MemoryBuffer *UnresolvedInputFile,
                                     SourceKit::CodeCompletionConsumer &SKConsumer,
                                     ArrayRef<const char *> Args) {
   SwiftCodeCompletionConsumer SwiftConsumer([&](
-      ArrayRef<CodeCompletionResult *> Results, SwiftCompletionInfo &) {
+      MutableArrayRef<CodeCompletionResult *> Results, SwiftCompletionInfo &) {
+    CodeCompletionContext::sortCompletionResults(Results);
     for (auto *Result : Results) {
       if (!SwiftToSourceKitCompletionAdapter::handleResult(SKConsumer, Result))
         break;
@@ -420,6 +421,8 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
     Info.Kind = KeywordUID;
   } else if (Result->getKind() == CodeCompletionResult::Pattern) {
     Info.Kind = PatternUID;
+  } else if (Result->getKind() == CodeCompletionResult::BuiltinOperator) {
+    Info.Kind = PatternUID; // FIXME: add a UID for operators
   } else if (Result->getKind() == CodeCompletionResult::Declaration) {
     Info.Kind = SwiftLangSupport::getUIDForCodeCompletionDeclKind(
         Result->getAssociatedDeclKind());
@@ -521,6 +524,7 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   Info.ModuleName = Result->getModuleName();
   Info.DocBrief = Result->getBriefDocComment();
   Info.NotRecommended = Result->isNotRecommended();
+
   Info.NumBytesToErase = Result->getNumBytesToErase();
 
   // Extended result values.
@@ -782,6 +786,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyHideUnderscores("key.codecomplete.hideunderscores");
   static UIdent KeyHideLowPriority("key.codecomplete.hidelowpriority");
   static UIdent KeyHideByName("key.codecomplete.hidebyname");
+  static UIdent KeyIncludeExactMatch("key.codecomplete.includeexactmatch");
   static UIdent KeyAddInnerResults("key.codecomplete.addinnerresults");
   static UIdent KeyAddInnerOperators("key.codecomplete.addinneroperators");
   static UIdent KeyAddInitsToTopLevel("key.codecomplete.addinitstotoplevel");
@@ -802,6 +807,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   to.hideUnderscores = howMuchHiding;
   to.reallyHideAllUnderscores = howMuchHiding > 1;
   from.valueForOption(KeyHideLowPriority, to.hideLowPriority);
+  from.valueForOption(KeyIncludeExactMatch, to.includeExactMatch);
   from.valueForOption(KeyAddInnerResults, to.addInnerResults);
   from.valueForOption(KeyAddInnerOperators, to.addInnerOperators);
   from.valueForOption(KeyAddInitsToTopLevel, to.addInitsToTopLevel);
@@ -912,7 +918,7 @@ static void transformAndForwardResults(
     auto *completionString =
         CodeCompletionString::create(innerSink.allocator, chunks);
     CodeCompletion::SwiftResult paren(
-        CodeCompletion::SwiftResult::ResultKind::Pattern,
+        CodeCompletion::SwiftResult::ResultKind::BuiltinOperator,
         SemanticContextKind::ExpressionSpecific,
         exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString);
 
@@ -984,7 +990,8 @@ static void transformAndForwardResults(
     bool hasQDot = false;
     bool hasInit = false;
     SwiftCodeCompletionConsumer swiftConsumer([&](
-        ArrayRef<CodeCompletionResult *> results, SwiftCompletionInfo &info) {
+        MutableArrayRef<CodeCompletionResult *> results,
+        SwiftCompletionInfo &info) {
       auto topResults = filterInnerResults(results, options.addInnerResults,
                                            options.addInnerOperators, hasDot,
                                            hasQDot, hasInit);
@@ -992,7 +999,7 @@ static void transformAndForwardResults(
       // won't overwhelm other results that also match the filter text.
       innerResults = extendCompletions(
           topResults, innerSink, info, nameToPopularity, options, exactMatch,
-          SemanticContextKind::None, SemanticContextKind::ExpressionSpecific);
+          SemanticContextKind::None, SemanticContextKind::None);
     });
 
     auto *inputBuf = session->getBuffer();
@@ -1077,7 +1084,8 @@ void SwiftLangSupport::codeCompleteOpen(
   bool hasExpectedTypes = false;
 
   SwiftCodeCompletionConsumer swiftConsumer(
-      [&](ArrayRef<CodeCompletionResult *> results, SwiftCompletionInfo &info) {
+      [&](MutableArrayRef<CodeCompletionResult *> results,
+          SwiftCompletionInfo &info) {
         completionKind = info.completionContext->CodeCompletionKind;
         hasExpectedTypes = info.completionContext->HasExpectedTypeRelation;
         completions =

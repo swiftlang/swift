@@ -9,14 +9,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
-
 
 var CharacterTraps = TestSuite("CharacterTraps")
 
@@ -27,7 +19,7 @@ CharacterTraps.test("CharacterFromEmptyString")
   .code {
   var s = ""
   expectCrashLater()
-  Character(s)
+  _ = Character(s)
 }
 
 CharacterTraps.test("CharacterFromMoreThanOneGraphemeCluster")
@@ -37,7 +29,7 @@ CharacterTraps.test("CharacterFromMoreThanOneGraphemeCluster")
   .code {
   var s = "ab"
   expectCrashLater()
-  Character(s)
+  _ = Character(s)
 }
 
 runAllTests()

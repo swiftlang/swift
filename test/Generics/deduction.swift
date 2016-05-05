@@ -4,15 +4,15 @@
 // Deduction of generic arguments
 //===----------------------------------------------------------------------===//
 
-func identity<T>(value: T) -> T { return value }
+func identity<T>(_ value: T) -> T { return value }
 
-func identity2<T>(value: T) -> T { return value }
-func identity2<T>(value: T) -> Int { return 0 }
+func identity2<T>(_ value: T) -> T { return value }
+func identity2<T>(_ value: T) -> Int { return 0 }
 
 struct X { }
 struct Y { }
 
-func useIdentity(x: Int, y: Float, i32: Int32) {
+func useIdentity(_ x: Int, y: Float, i32: Int32) {
   var x2 = identity(x)
   var y2 = identity(y)
 
@@ -27,9 +27,9 @@ func useIdentity(x: Int, y: Float, i32: Int32) {
 }
 
 // FIXME: Crummy diagnostic!
-func twoIdentical<T>(x: T, _ y: T) -> T {}
+func twoIdentical<T>(_ x: T, _ y: T) -> T {}
 
-func useTwoIdentical(xi: Int, yi: Float) {
+func useTwoIdentical(_ xi: Int, yi: Float) {
   var x = xi, y = yi
   x = twoIdentical(x, x)
   y = twoIdentical(y, y)
@@ -41,14 +41,14 @@ func useTwoIdentical(xi: Int, yi: Float) {
   twoIdentical(x, y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
-func mySwap<T>(x: inout T,
+func mySwap<T>(_ x: inout T,
                _ y: inout T) {
   let tmp = x
   x = y
   y = tmp
 }
 
-func useSwap(xi: Int, yi: Float) {
+func useSwap(_ xi: Int, yi: Float) {
   var x = xi, y = yi
   mySwap(&x, &x)
   mySwap(&y, &y)
@@ -62,7 +62,7 @@ func useSwap(xi: Int, yi: Float) {
 func takeTuples<T, U>(_: (T, U), _: (U, T)) {
 }
 
-func useTuples(x: Int, y: Float, z: (Float, Int)) {
+func useTuples(_ x: Int, y: Float, z: (Float, Int)) {
   takeTuples((x, y), (y, x))
 
   takeTuples((x, y), (x, y)) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Float'}}
@@ -71,16 +71,16 @@ func useTuples(x: Int, y: Float, z: (Float, Int)) {
   // representation.
 }
 
-func acceptFunction<T, U>(f: (T) -> U, _ t: T, _ u: U) {}
+func acceptFunction<T, U>(_ f: (T) -> U, _ t: T, _ u: U) {}
 
-func passFunction(f: (Int) -> Float, x: Int, y: Float) {
+func passFunction(_ f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, x, y)
    acceptFunction(f, y, y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
 func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note {{in call to function 'returnTuple'}}
 
-func testReturnTuple(x: Int, y: Float) {
+func testReturnTuple(_ x: Int, y: Float) {
   returnTuple(x) // expected-error{{generic parameter 'T' could not be inferred}}
   
   var _ : (Int, Float) = returnTuple(x)
@@ -91,16 +91,16 @@ func testReturnTuple(x: Int, y: Float) {
 }
 
 
-func confusingArgAndParam<T, U>(f: (T) -> U, _ g: (U) -> T) {
+func confusingArgAndParam<T, U>(_ f: (T) -> U, _ g: (U) -> T) {
   confusingArgAndParam(g, f)
   confusingArgAndParam(f, g)
 }
 
-func acceptUnaryFn<T, U>(f: (T) -> U) { }
-func acceptUnaryFnSame<T>(f: (T) -> T) { }
+func acceptUnaryFn<T, U>(_ f: (T) -> U) { }
+func acceptUnaryFnSame<T>(_ f: (T) -> T) { }
 
-func acceptUnaryFnRef<T, U>(f: inout (T) -> U) { }
-func acceptUnaryFnSameRef<T>(f: inout (T) -> T) { }
+func acceptUnaryFnRef<T, U>(_ f: inout (T) -> U) { }
+func acceptUnaryFnSameRef<T>(_ f: inout (T) -> T) { }
 
 func unaryFnIntInt(_: Int) -> Int {}
 
@@ -131,8 +131,8 @@ func passOverloadSet() {
   acceptUnaryFnRef(unaryFnIntIntVar) // expected-error{{passing value of type '(Int) -> Int' to an inout parameter requires explicit '&'}} {{20-20=&}}
 }
 
-func acceptFnFloatFloat(f: (Float) -> Float) {}
-func acceptFnDoubleDouble(f: (Double) -> Double) {}
+func acceptFnFloatFloat(_ f: (Float) -> Float) {}
+func acceptFnDoubleDouble(_ f: (Double) -> Double) {}
 
 func passGeneric() {
   acceptFnFloatFloat(identity)
@@ -143,15 +143,15 @@ func passGeneric() {
 // Simple deduction for generic member functions
 //===----------------------------------------------------------------------===//
 struct SomeType {
-  func identity<T>(x: T) -> T { return x }
+  func identity<T>(_ x: T) -> T { return x }
 
-  func identity2<T>(x: T) -> T { return x } // expected-note 2{{found this candidate}}
-  func identity2<T>(x: T) -> Float { } // expected-note 2{{found this candidate}}
+  func identity2<T>(_ x: T) -> T { return x } // expected-note 2{{found this candidate}}
+  func identity2<T>(_ x: T) -> Float { } // expected-note 2{{found this candidate}}
 
   func returnAs<T>() -> T {}
 }
 
-func testMemberDeduction(sti: SomeType, ii: Int, fi: Float) {
+func testMemberDeduction(_ sti: SomeType, ii: Int, fi: Float) {
   var st = sti, i = ii, f = fi
   i = st.identity(i)
   f = st.identity(f)
@@ -176,7 +176,7 @@ struct StaticFuncsGeneric<U> {
 
 func chameleon<T>() -> T {}
 
-func testStatic(sf: StaticFuncs, sfi: StaticFuncsGeneric<Int>) {
+func testStatic(_ sf: StaticFuncs, sfi: StaticFuncsGeneric<Int>) {
   var x: Int16
   x = StaticFuncs.chameleon()
   x = sf.chameleon2()
@@ -191,28 +191,28 @@ func testStatic(sf: StaticFuncs, sfi: StaticFuncsGeneric<Int>) {
 // Deduction checking for constraints
 //===----------------------------------------------------------------------===//
 protocol IsBefore {
-  func isBefore(other: Self) -> Bool
+  func isBefore(_ other: Self) -> Bool
 }
 
-func min2<T : IsBefore>(x: T, _ y: T) -> T {
+func min2<T : IsBefore>(_ x: T, _ y: T) -> T {
   if y.isBefore(x) { return y }
   return x
 }
 
 extension Int : IsBefore {
-  func isBefore(other: Int) -> Bool { return self < other }
+  func isBefore(_ other: Int) -> Bool { return self < other }
 }
 
-func callMin(x: Int, y: Int, a: Float, b: Float) {
+func callMin(_ x: Int, y: Int, a: Float, b: Float) {
   min2(x, y)
   min2(a, b) // expected-error{{argument type 'Float' does not conform to expected type 'IsBefore'}}
 }
 
 func rangeOfIsBefore<
   R : IteratorProtocol where R.Element : IsBefore
->(range: R) { }
+>(_ range: R) { }
 
-func callRangeOfIsBefore(ia: [Int], da: [Double]) {
+func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.makeIterator())
   rangeOfIsBefore(da.makeIterator()) // expected-error{{ambiguous reference to member 'makeIterator()'}}
 }
@@ -223,7 +223,7 @@ func callRangeOfIsBefore(ia: [Int], da: [Double]) {
 protocol Addable {
   func +(x: Self, y: Self) -> Self
 }
-func addAddables<T : Addable, U>(x: T, y: T, u: U) -> T {
+func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
   u + u // expected-error{{binary operator '+' cannot be applied to two 'U' operands}}
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: }}
   return x+y
@@ -234,14 +234,14 @@ func addAddables<T : Addable, U>(x: T, y: T, u: U) -> T {
 //===----------------------------------------------------------------------===//
 struct MyVector<T> { func size() -> Int {} }
 
-func getVectorSize<T>(v: MyVector<T>) -> Int {
+func getVectorSize<T>(_ v: MyVector<T>) -> Int {
   return v.size()
 }
 
-func ovlVector<T>(v: MyVector<T>) -> X {}
-func ovlVector<T>(v: MyVector<MyVector<T>>) -> Y {}
+func ovlVector<T>(_ v: MyVector<T>) -> X {}
+func ovlVector<T>(_ v: MyVector<MyVector<T>>) -> Y {}
 
-func testGetVectorSize(vi: MyVector<Int>, vf: MyVector<Float>) {
+func testGetVectorSize(_ vi: MyVector<Int>, vf: MyVector<Float>) {
   var i : Int
   i = getVectorSize(vi)
   i = getVectorSize(vf)

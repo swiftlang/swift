@@ -53,7 +53,7 @@ extension CMTime {
 
   public var isNumeric: Bool {
     return
-      self.flags.intersect([.valid, .impliedValueFlagsMask]) == .valid
+      self.flags.intersection([.valid, .impliedValueFlagsMask]) == .valid
   }
 
   public var hasBeenRounded: Bool {
@@ -65,44 +65,44 @@ extension CMTime {
     return CMTimeGetSeconds(self) as Double
   }
 
-  public func convertScale(newTimescale: Int32, method: CMTimeRoundingMethod)
+  public func convertScale(_ newTimescale: Int32, method: CMTimeRoundingMethod)
     -> CMTime {
     return CMTimeConvertScale(self, newTimescale, method)
   }
 }
 
 @warn_unused_result
-public func CMTIME_IS_VALID(time: CMTime) -> Bool {
+public func CMTIME_IS_VALID(_ time: CMTime) -> Bool {
   return time.isValid
 }
 
 @warn_unused_result
-public func CMTIME_IS_INVALID(time: CMTime) -> Bool {
+public func CMTIME_IS_INVALID(_ time: CMTime) -> Bool {
   return !time.isValid
 }
 
 @warn_unused_result
-public func CMTIME_IS_POSITIVEINFINITY(time: CMTime) -> Bool {
+public func CMTIME_IS_POSITIVEINFINITY(_ time: CMTime) -> Bool {
   return time.isPositiveInfinity
 }
 
 @warn_unused_result
-public func CMTIME_IS_NEGATIVEINFINITY(time: CMTime) -> Bool {
+public func CMTIME_IS_NEGATIVEINFINITY(_ time: CMTime) -> Bool {
   return time.isNegativeInfinity
 }
 
 @warn_unused_result
-public func CMTIME_IS_INDEFINITE(time: CMTime) -> Bool {
+public func CMTIME_IS_INDEFINITE(_ time: CMTime) -> Bool {
   return time.isIndefinite
 }
 
 @warn_unused_result
-public func CMTIME_IS_NUMERIC(time: CMTime) -> Bool {
+public func CMTIME_IS_NUMERIC(_ time: CMTime) -> Bool {
   return time.isNumeric
 }
 
 @warn_unused_result
-public func CMTIME_HAS_BEEN_ROUNDED(time: CMTime) -> Bool {
+public func CMTIME_HAS_BEEN_ROUNDED(_ time: CMTime) -> Bool {
   return time.hasBeenRounded
 }
 

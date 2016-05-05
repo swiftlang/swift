@@ -18,13 +18,6 @@ import SwiftExperimental
 import Foundation
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 // Check that the generic parameters are called 'Key' and 'Value'.
 protocol TestProtocol1 {}
@@ -33,6 +26,17 @@ extension DictionaryLiteral where Key : TestProtocol1, Value : TestProtocol1 {
   var _keyAndValueAreTestProtocol1: Bool {
     fatalError("not implemented")
   }
+}
+
+func checkAssociatedTypes() {
+  typealias Subject = DictionaryLiteral<MinimalHashableValue, OpaqueValue<Int>>
+  expectRandomAccessCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: IndexingIterator<Subject>.self,
+    subSequenceType: RandomAccessSlice<Subject>.self,
+    indexType: Int.self,
+    indexDistanceType: Int.self,
+    indicesType: CountableRange<Int>.self)
 }
 
 var strings: DictionaryLiteral = ["a": "1", "b": "Foo"]
@@ -44,7 +48,7 @@ expectType(DictionaryLiteral<String, NSString>.self, &stringNSStringLiteral)
 
 let aString = "1"
 let anNSString = "Foo" as NSString
-var stringNSStringLet: DictionaryLiteral = [ "a": aString, "b": anNSString]
+var stringNSStringLet: DictionaryLiteral = ["a": aString, "b": anNSString]
 expectType(DictionaryLiteral<String, NSString>.self, &stringNSStringLet)
 
 var hetero1: DictionaryLiteral = ["a": 1, "b": "Foo" as NSString]

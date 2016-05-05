@@ -7,7 +7,7 @@
 import Foundation
 import gizmo
 
-func curry_pod(x: CurryTest) -> Int -> Int {
+func curry_pod(_ x: CurryTest) -> Int -> Int {
   return x.pod
 }
 // CHECK-LABEL: sil hidden @_TF13objc_currying9curry_podFCSo9CurryTestFSiSi : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
@@ -18,12 +18,12 @@ func curry_pod(x: CurryTest) -> Int -> Int {
 // CHECK:         strong_release [[ARG1]]
 // CHECK:         return [[FN]]
 
-// CHECK: sil shared [[THUNK_FOO_1]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
+// CHECK: sil shared [thunk] [[THUNK_FOO_1]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
 // CHECK:   [[THUNK:%.*]] = function_ref [[THUNK_FOO_2:@_TTOFCSo9CurryTest3podfSiSi]]
 // CHECK:   [[FN:%.*]] = partial_apply [[THUNK]](%0)
 // CHECK:   return [[FN]]
 
-// CHECK: sil shared [[THUNK_FOO_2]] : $@convention(method) (Int, @guaranteed CurryTest) -> Int
+// CHECK: sil shared [thunk] [[THUNK_FOO_2]] : $@convention(method) (Int, @guaranteed CurryTest) -> Int
 // CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $CurryTest):
 // CHECK:   strong_retain [[ARG2]]
 // CHECK:   [[METHOD:%.*]] = class_method [volatile] %1 : $CurryTest, #CurryTest.pod!1.foreign
@@ -31,7 +31,7 @@ func curry_pod(x: CurryTest) -> Int -> Int {
 // CHECK:   strong_release [[ARG2]]
 // CHECK:   return [[RESULT]]
 
-func curry_bridged(x: CurryTest) -> String! -> String! {
+func curry_bridged(_ x: CurryTest) -> String! -> String! {
   return x.bridged
 }
 // CHECK-LABEL: sil hidden @_TF13objc_currying13curry_bridgedFCSo9CurryTestFGSQSS_GSQSS_ : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (@owned ImplicitlyUnwrappedOptional<String>) -> @owned ImplicitlyUnwrappedOptional<String>
@@ -39,12 +39,12 @@ func curry_bridged(x: CurryTest) -> String! -> String! {
 // CHECK:         [[FN:%.*]] = apply [[THUNK]](%0)
 // CHECK:         return [[FN]]
 
-// CHECK: sil shared [[THUNK_BAR_1]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (@owned ImplicitlyUnwrappedOptional<String>) -> @owned ImplicitlyUnwrappedOptional<String>
+// CHECK: sil shared [thunk] [[THUNK_BAR_1]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (@owned ImplicitlyUnwrappedOptional<String>) -> @owned ImplicitlyUnwrappedOptional<String>
 // CHECK:   [[THUNK:%.*]] = function_ref [[THUNK_BAR_2:@_TTOFCSo9CurryTest7bridgedfGSQSS_GSQSS_]]
 // CHECK:   [[FN:%.*]] = partial_apply [[THUNK]](%0)
 // CHECK:   return [[FN]]
 
-// CHECK: sil shared [[THUNK_BAR_2]] : $@convention(method) (@owned ImplicitlyUnwrappedOptional<String>, @guaranteed CurryTest) -> @owned ImplicitlyUnwrappedOptional<String>
+// CHECK: sil shared [thunk] [[THUNK_BAR_2]] : $@convention(method) (@owned ImplicitlyUnwrappedOptional<String>, @guaranteed CurryTest) -> @owned ImplicitlyUnwrappedOptional<String>
 // CHECK:   function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK:   [[METHOD:%.*]] = class_method [volatile] %1 : $CurryTest, #CurryTest.bridged!1.foreign
 // CHECK:   [[RES:%.*]] = apply [[METHOD]]({{%.*}}, %1) : $@convention(objc_method) (ImplicitlyUnwrappedOptional<NSString>, CurryTest) -> @autoreleased ImplicitlyUnwrappedOptional<NSString>
@@ -52,24 +52,24 @@ func curry_bridged(x: CurryTest) -> String! -> String! {
 // CHECK:   strong_release %1
 // CHECK:   return {{%.*}} : $ImplicitlyUnwrappedOptional<String>
 
-func curry_returnsInnerPointer(x: CurryTest) -> () -> UnsafeMutablePointer<Void> {
+func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutablePointer<Void>! {
   return x.returnsInnerPointer
 }
-// CHECK-LABEL: sil hidden @_TF13objc_currying25curry_returnsInnerPointerFCSo9CurryTestFT_GSpT__ : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned () -> UnsafeMutablePointer<()> {
-// CHECK:         [[THUNK:%.*]] = function_ref [[THUNK_RETURNSINNERPOINTER:@_TTOFCSo9CurryTest19returnsInnerPointerFT_GSpT__]]
+// CHECK-LABEL: sil hidden @_TF13objc_currying25curry_returnsInnerPointerFCSo9CurryTestFT_GSQGSpT___ : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned () -> ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>> {
+// CHECK:         [[THUNK:%.*]] = function_ref [[THUNK_RETURNSINNERPOINTER:@_TTOFCSo9CurryTest19returnsInnerPointerFT_GSQGSpT___]]
 // CHECK:         [[FN:%.*]] = apply [[THUNK]](%0)
 // CHECK:         return [[FN]]
 
-// CHECK: sil shared [[THUNK_RETURNSINNERPOINTER]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned () -> UnsafeMutablePointer<()>
-// CHECK:   [[THUNK:%.*]] = function_ref [[THUNK_RETURNSINNERPOINTER_2:@_TTOFCSo9CurryTest19returnsInnerPointerfT_GSpT__]]
+// CHECK: sil shared [thunk] [[THUNK_RETURNSINNERPOINTER]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned () -> ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>>
+// CHECK:   [[THUNK:%.*]] = function_ref [[THUNK_RETURNSINNERPOINTER_2:@_TTOFCSo9CurryTest19returnsInnerPointerfT_GSQGSpT___]]
 // CHECK:   [[FN:%.*]] = partial_apply [[THUNK]](%0)
 // CHECK:   return [[FN]]
 
-// CHECK: sil shared @_TTOFCSo9CurryTest19returnsInnerPointerfT_GSpT__ : $@convention(method) (@guaranteed CurryTest) -> UnsafeMutablePointer<()>
+// CHECK: sil shared [thunk] @_TTOFCSo9CurryTest19returnsInnerPointerfT_GSQGSpT___ : $@convention(method) (@guaranteed CurryTest) -> ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>>
 // CHECK:  bb0([[ARG1:%.*]] : 
 // CHECK:   strong_retain [[ARG1]]
 // CHECK:   [[METHOD:%.*]] = class_method [volatile] %0 : $CurryTest, #CurryTest.returnsInnerPointer!1.foreign
-// CHECK:   [[RES:%.*]] = apply [[METHOD]](%0) : $@convention(objc_method) (CurryTest) -> @unowned_inner_pointer UnsafeMutablePointer<()>
+// CHECK:   [[RES:%.*]] = apply [[METHOD]](%0) : $@convention(objc_method) (CurryTest) -> @unowned_inner_pointer ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>>
 // CHECK:   autorelease_value %0
 // CHECK:   return [[RES]]
 
@@ -77,7 +77,7 @@ func curry_returnsInnerPointer(x: CurryTest) -> () -> UnsafeMutablePointer<Void>
 // CHECK:         dynamic_method_br [[SELF:%.*]] : $@opened({{.*}}) AnyObject, #CurryTest.pod!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK:       [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
 // CHECK:         partial_apply [[METHOD]]([[SELF]])
-func curry_pod_AnyObject(x: AnyObject) -> Int -> Int {
+func curry_pod_AnyObject(_ x: AnyObject) -> Int -> Int {
   return x.pod!
 }
 
@@ -88,7 +88,7 @@ func curry_pod_AnyObject(x: AnyObject) -> Int -> Int {
 // CHECK:         [[PA:%.*]] = partial_apply [[METHOD]]([[SELF]])
 // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFo_dGSQCSo9CurryTest__oGSQS___XFo_oGSQS___oGSQS___
 // CHECK:         partial_apply [[THUNK]]([[PA]])
-func curry_normalOwnership_AnyObject(x: AnyObject) -> CurryTest! -> CurryTest! {
+func curry_normalOwnership_AnyObject(_ x: AnyObject) -> CurryTest! -> CurryTest! {
   return x.normalOwnership!
 }
 
@@ -98,7 +98,7 @@ func curry_normalOwnership_AnyObject(x: AnyObject) -> CurryTest! -> CurryTest! {
 // CHECK:         dynamic_method_br [[SELF:%.*]] : $@opened({{.*}}) AnyObject, #CurryTest.weirdOwnership!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK:       bb1([[METHOD:%.*]] : $@convention(objc_method) (@owned ImplicitlyUnwrappedOptional<CurryTest>, @owned @opened({{.*}}) AnyObject) -> @owned ImplicitlyUnwrappedOptional<CurryTest>):
 // CHECK:         partial_apply [[METHOD]]([[SELF]])
-func curry_weirdOwnership_AnyObject(x: AnyObject) -> CurryTest! -> CurryTest! {
+func curry_weirdOwnership_AnyObject(_ x: AnyObject) -> CurryTest! -> CurryTest! {
   return x.weirdOwnership!
 }
 
@@ -109,7 +109,7 @@ func curry_weirdOwnership_AnyObject(x: AnyObject) -> CurryTest! -> CurryTest! {
 // CHECK:         [[PA:%.*]] = partial_apply [[METHOD]]([[SELF]])
 // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFo_dGSQCSo8NSString__oGSQS___XFo_oGSQSS__oGSQSS__
 // CHECK:         partial_apply [[THUNK]]([[PA]])
-func curry_bridged_AnyObject(x: AnyObject) -> String! -> String! {
+func curry_bridged_AnyObject(_ x: AnyObject) -> String! -> String! {
   return x.bridged!
 }
 
@@ -121,16 +121,16 @@ func curry_bridged_AnyObject(x: AnyObject) -> String! -> String! {
 // CHECK:         [[PA:%.*]] = partial_apply [[METHOD]]([[SELF]])
 // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFo__oGSQPs9AnyObject___XFo_iT__iGSQPS____
 // CHECK:         partial_apply [[THUNK]]([[PA]])
-func curry_returnsSelf_AnyObject(x: AnyObject) -> () -> AnyObject! {
+func curry_returnsSelf_AnyObject(_ x: AnyObject) -> () -> AnyObject! {
   return x.returnsSelf!
 }
 
-// CHECK-LABEL: sil hidden @_TF13objc_currying35curry_returnsInnerPointer_AnyObjectFPs9AnyObject_FT_GSpT__
+// CHECK-LABEL: sil hidden @_TF13objc_currying35curry_returnsInnerPointer_AnyObjectFPs9AnyObject_FT_GSQGSpT___
 // CHECK:         dynamic_method_br [[SELF:%.*]] : $@opened({{.*}}) AnyObject, #CurryTest.returnsInnerPointer!1.foreign, [[HAS_METHOD:bb[0-9]+]]
-// CHECK:       [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @unowned_inner_pointer UnsafeMutablePointer<()>):
+// CHECK:       [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @unowned_inner_pointer ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>>):
 // CHECK:         [[PA:%.*]] = partial_apply [[METHOD]]([[SELF]])
-// CHECK:         [[PA]]{{.*}}@owned @callee_owned () -> UnsafeMutablePointer<()>
+// CHECK:         [[PA]]{{.*}}@owned @callee_owned () -> ImplicitlyUnwrappedOptional<UnsafeMutablePointer<()>>
 
-func curry_returnsInnerPointer_AnyObject(x: AnyObject) -> () -> UnsafeMutablePointer<Void> {
+func curry_returnsInnerPointer_AnyObject(_ x: AnyObject) -> () -> UnsafeMutablePointer<Void>! {
   return x.returnsInnerPointer!
 }

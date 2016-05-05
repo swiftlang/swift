@@ -77,6 +77,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
@@ -439,6 +440,9 @@ private:
   /// order of the given function.
   PostOrderFunctionInfo *PO;
 
+  /// The epilogue release matcher we are using.
+  ConsumedArgToEpilogueReleaseMatcher& ERM;
+
   /// Keeps all the locations for the current function. The BitVector in each
   /// BlockState is then laid on top of it to keep track of which LSLocation
   /// has a downward available value.
@@ -475,7 +479,8 @@ private:
 
 public:
   RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
-             TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO);
+             TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
+             ConsumedArgToEpilogueReleaseMatcher &ERM);
 
   RLEContext(const RLEContext &) = delete;
   RLEContext(RLEContext &&) = default;
@@ -483,6 +488,8 @@ public:
 
   /// Entry point to redundant load elimination.
   bool run();
+
+  ConsumedArgToEpilogueReleaseMatcher &getERM() const { return ERM; };
 
   /// Use a set of ad hoc rules to tell whether we should run a pessimistic
   /// one iteration data flow on the function.
@@ -961,7 +968,7 @@ void BlockState::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I,
                                          RLEKind Kind) {
   // If this is a release on a guaranteed parameter, it can not call deinit,
   // which might read or write memory.
-  if (isGuaranteedParamRelease(I))
+  if (isIntermediateRelease(I, Ctx.getERM()))
     return;
 
   // Are we computing the genset and killset ?
@@ -1118,8 +1125,9 @@ getProcessFunctionKind(unsigned LoadCount, unsigned StoreCount) {
 //===----------------------------------------------------------------------===//
 
 RLEContext::RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
-                       TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO)
-    : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO) {
+                       TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
+                       ConsumedArgToEpilogueReleaseMatcher &ERM)
+    : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO), ERM(ERM) {
 }
 
 LSLocation &RLEContext::getLocation(const unsigned index) {
@@ -1522,8 +1530,11 @@ class RedundantLoadElimination : public SILFunctionTransform {
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();
     auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
+    auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
 
-    RLEContext RLE(F, PM, AA, TE, PO);
+    ConsumedArgToEpilogueReleaseMatcher ERM(RCFI, F);
+
+    RLEContext RLE(F, PM, AA, TE, PO, ERM);
     if (RLE.run()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }

@@ -40,10 +40,12 @@ protected:
 
 public:
   /// Strongly retains a value.
-  virtual void strongRetain(IRGenFunction &IGF, Explosion &in) const = 0;
-  
+  virtual void strongRetain(IRGenFunction &IGF, Explosion &in,
+                            Atomicity atomicity) const = 0;
+
   /// Strongly releases a value.
-  virtual void strongRelease(IRGenFunction &IGF, Explosion &in) const = 0;
+  virtual void strongRelease(IRGenFunction &IGF, Explosion &in,
+                             Atomicity atomicity) const = 0;
 
   /// Strongly retains a value that has come from a safe [unowned] reference.
   /// This operation is not supported for all reference types.

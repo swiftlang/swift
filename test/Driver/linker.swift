@@ -23,6 +23,13 @@
 // RUN: %swiftc_driver -driver-print-jobs -target thumbv7-unknown-linux-gnueabihf -Ffoo -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
 // RUN: FileCheck -check-prefix LINUX-thumbv7 %s < %t.linux.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -target armv7-none-linux-androideabi -Ffoo -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.android.txt
+// RUN: FileCheck -check-prefix ANDROID-armv7 %s < %t.android.txt
+// RUN: FileCheck -check-prefix ANDROID-armv7-NEGATIVE %s < %t.android.txt
+
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-cygnus -Ffoo -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.cygwin.txt
+// RUN: FileCheck -check-prefix CYGWIN-x86_64 %s < %t.cygwin.txt
+
 // RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-apple-macosx10.9.1 %s -sdk %S/../Inputs/clang-importer-sdk -lfoo -framework bar -Lbaz -Fgarply -Xlinker -undefined -Xlinker dynamic_lookup -o sdk.out 2>&1 > %t.complex.txt
 // RUN: FileCheck %s < %t.complex.txt
 // RUN: FileCheck -check-prefix COMPLEX %s < %t.complex.txt
@@ -125,7 +132,7 @@
 // LINUX-armv6-DAG: [[OBJECTFILE]]
 // LINUX-armv6-DAG: -lswiftCore
 // LINUX-armv6-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
-// LINUX-armv6-DAG: --target=armv6-unknown-linux-gnueabihf
+// LINUX-armv6-DAG: -target armv6-unknown-linux-gnueabihf
 // LINUX-armv6-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
 // LINUX-armv6-DAG: -F foo
 // LINUX-armv6-DAG: -framework bar
@@ -141,7 +148,7 @@
 // LINUX-armv7-DAG: [[OBJECTFILE]]
 // LINUX-armv7-DAG: -lswiftCore
 // LINUX-armv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
-// LINUX-armv7-DAG: --target=armv7-unknown-linux-gnueabihf
+// LINUX-armv7-DAG: -target armv7-unknown-linux-gnueabihf
 // LINUX-armv7-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
 // LINUX-armv7-DAG: -F foo
 // LINUX-armv7-DAG: -framework bar
@@ -157,7 +164,7 @@
 // LINUX-thumbv7-DAG: [[OBJECTFILE]]
 // LINUX-thumbv7-DAG: -lswiftCore
 // LINUX-thumbv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
-// LINUX-thumbv7-DAG: --target=thumbv7-unknown-linux-gnueabihf
+// LINUX-thumbv7-DAG: -target thumbv7-unknown-linux-gnueabihf
 // LINUX-thumbv7-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
 // LINUX-thumbv7-DAG: -F foo
 // LINUX-thumbv7-DAG: -framework bar
@@ -165,6 +172,37 @@
 // LINUX-thumbv7-DAG: -lboo
 // LINUX-thumbv7-DAG: -Xlinker -undefined
 // LINUX-thumbv7: -o linker
+
+// ANDROID-armv7: swift
+// ANDROID-armv7: -o [[OBJECTFILE:.*]]
+
+// ANDROID-armv7: clang++{{"? }}
+// ANDROID-armv7-DAG: [[OBJECTFILE]]
+// ANDROID-armv7-DAG: -lswiftCore
+// ANDROID-armv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
+// ANDROID-armv7-DAG: -target armv7-none-linux-androideabi
+// ANDROID-armv7-DAG: -F foo
+// ANDROID-armv7-DAG: -framework bar
+// ANDROID-armv7-DAG: -L baz
+// ANDROID-armv7-DAG: -lboo
+// ANDROID-armv7-DAG: -Xlinker -undefined
+// ANDROID-armv7: -o linker
+// ANDROID-armv7-NEGATIVE-NOT: -Xlinker -rpath
+
+// CYGWIN-x86_64: swift
+// CYGWIN-x86_64: -o [[OBJECTFILE:.*]]
+
+// CYGWIN-x86_64: clang++{{"? }}
+// CYGWIN-x86_64-DAG: [[OBJECTFILE]]
+// CYGWIN-x86_64-DAG: -lswiftCore
+// CYGWIN-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
+// CYGWIN-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
+// CYGWIN-x86_64-DAG: -F foo
+// CYGWIN-x86_64-DAG: -framework bar
+// CYGWIN-x86_64-DAG: -L baz
+// CYGWIN-x86_64-DAG: -lboo
+// CYGWIN-x86_64-DAG: -Xlinker -undefined
+// CYGWIN-x86_64: -o linker
 
 // COMPLEX: bin/ld{{"? }}
 // COMPLEX-DAG: -dylib

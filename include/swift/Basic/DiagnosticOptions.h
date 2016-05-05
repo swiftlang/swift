@@ -43,6 +43,6 @@ public:
   bool WarningsAsErrors = false;
 };
 
-}
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_DIAGNOSTICOPTIONS_H

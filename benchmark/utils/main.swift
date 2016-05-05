@@ -63,6 +63,9 @@ import NSError
 import NSStringConversion
 import NopDeinit
 import ObjectAllocation
+import ObjectiveCBridging
+import ObjectiveCBridgingStubs
+import ObjectiveCNoBridgingStubs
 import OpenClose
 import Phonebook
 import PolymorphicCalls
@@ -147,6 +150,29 @@ precommitTests = [
   "NSStringConversion": run_NSStringConversion,
   "NopDeinit": run_NopDeinit,
   "ObjectAllocation": run_ObjectAllocation,
+  "ObjectiveCBridgeFromNSString": run_ObjectiveCBridgeFromNSString,
+  "ObjectiveCBridgeFromNSStringForced": run_ObjectiveCBridgeFromNSStringForced,
+  "ObjectiveCBridgeToNSString": run_ObjectiveCBridgeToNSString,
+  "ObjectiveCBridgeFromNSArrayAnyObject": run_ObjectiveCBridgeFromNSArrayAnyObject,
+  "ObjectiveCBridgeFromNSArrayAnyObjectForced": run_ObjectiveCBridgeFromNSArrayAnyObjectForced,
+  "ObjectiveCBridgeToNSArray": run_ObjectiveCBridgeToNSArray,
+  "ObjectiveCBridgeFromNSArrayAnyObjectToString": run_ObjectiveCBridgeFromNSArrayAnyObjectToString,
+  "ObjectiveCBridgeFromNSArrayAnyObjectToStringForced": run_ObjectiveCBridgeFromNSArrayAnyObjectToStringForced,
+  "ObjectiveCBridgeFromNSDictionaryAnyObject": run_ObjectiveCBridgeFromNSDictionaryAnyObject,
+  "ObjectiveCBridgeFromNSDictionaryAnyObjectForced": run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced,
+  "ObjectiveCBridgeFromNSDictionaryAnyObjectToString": run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString,
+  "ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced": run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced,
+  "ObjectiveCBridgeToNSDictionary": run_ObjectiveCBridgeToNSDictionary,
+  "ObjectiveCBridgeFromNSSetAnyObject": run_ObjectiveCBridgeFromNSSetAnyObject,
+  "ObjectiveCBridgeFromNSSetAnyObjectForced": run_ObjectiveCBridgeFromNSSetAnyObjectForced,
+  "ObjectiveCBridgeFromNSSetAnyObjectToString": run_ObjectiveCBridgeFromNSSetAnyObjectToString,
+  "ObjectiveCBridgeFromNSSetAnyObjectToStringForced": run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced,
+  "ObjectiveCBridgeToNSSet": run_ObjectiveCBridgeToNSSet,
+  "ObjectiveCBridgeStubFromNSString": run_ObjectiveCBridgeStubFromNSString,
+  "ObjectiveCBridgeStubToNSString": run_ObjectiveCBridgeStubToNSString,
+  "ObjectiveCBridgeStubFromArrayOfNSString": run_ObjectiveCBridgeStubFromArrayOfNSString,
+  "ObjectiveCBridgeStubToArrayOfNSString": run_ObjectiveCBridgeStubToArrayOfNSString,
+  "ObjectiveCBridgeStubFromNSStringRef": run_ObjectiveCBridgeStubFromNSStringRef,
   "OpenClose": run_OpenClose,
   "Phonebook": run_Phonebook,
   "PolymorphicCalls": run_PolymorphicCalls,
@@ -173,12 +199,18 @@ precommitTests = [
   "Sim2DArray": run_Sim2DArray,
   "SortLettersInPlace": run_SortLettersInPlace,
   "SortStrings": run_SortStrings,
+  "SortStringsUnicode": run_SortStringsUnicode,
   "StackPromo": run_StackPromo,
   "StaticArray": run_StaticArray,
   "StrComplexWalk": run_StrComplexWalk,
   "StrToInt": run_StrToInt,
   "StringBuilder": run_StringBuilder,
+  "StringEqualPointerComparison": run_StringEqualPointerComparison,
   "StringInterpolation": run_StringInterpolation,
+  "StringHasPrefix": run_StringHasPrefix,
+  "StringHasPrefixUnicode": run_StringHasPrefixUnicode,
+  "StringHasSuffix": run_StringHasSuffix,
+  "StringHasSuffixUnicode": run_StringHasSuffixUnicode,
   "StringWalk": run_StringWalk,
   "StringWithCString": run_StringWithCString,
   "SuperChars": run_SuperChars,

@@ -137,6 +137,37 @@ public:
     return CE->getType()->castTo<FunctionType>()->isNoEscape();
   }
 
+  bool isObjC() const {
+    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      return afd->isObjC();
+    }
+    if (TheFunction.dyn_cast<AbstractClosureExpr *>()) {
+      // Closures are never @objc.
+      return false;
+    }
+    llvm_unreachable("unexpected AnyFunctionRef representation");
+  }
+  
+  SourceLoc getLoc() const {
+    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      return afd->getLoc();
+    }
+    if (auto ce = TheFunction.dyn_cast<AbstractClosureExpr *>()) {
+      return ce->getLoc();
+    }
+    llvm_unreachable("unexpected AnyFunctionRef representation");
+  }
+  
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger") {
+    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      return afd->dump();
+    }
+    if (auto ce = TheFunction.dyn_cast<AbstractClosureExpr *>()) {
+      return ce->dump();
+    }
+    llvm_unreachable("unexpected AnyFunctionRef representation");
+  }
 };
 
 } // namespace swift

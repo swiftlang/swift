@@ -100,7 +100,14 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       // Create the retainN call right by the first retain.
       B.setInsertPoint(RetainList[0]);
       O = RetainList[0]->getArgOperand(0);
-      B.createRetainN(RC->getSwiftRCIdentityRoot(O), RetainList.size());
+      auto *RI = RetainList[0];
+      for (auto R : RetainList) {
+        if (B.isAtomic(R)) {
+          RI = R;
+          break;
+        }
+      }
+      B.createRetainN(RC->getSwiftRCIdentityRoot(O), RetainList.size(), RI);
 
       // Replace all uses of the retain instructions with our new retainN and
       // then delete them.
@@ -119,7 +126,14 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       auto *OldCI = ReleaseList[ReleaseList.size() - 1];
       B.setInsertPoint(OldCI);
       O = OldCI->getArgOperand(0);
-      B.createReleaseN(RC->getSwiftRCIdentityRoot(O), ReleaseList.size());
+      auto *RI = OldCI;
+      for (auto R : ReleaseList) {
+        if (B.isAtomic(R)) {
+          RI = R;
+          break;
+        }
+      }
+      B.createReleaseN(RC->getSwiftRCIdentityRoot(O), ReleaseList.size(), RI);
 
       // Remove all old release instructions.
       for (auto *Inst : ReleaseList) {
@@ -136,8 +150,15 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       // Create the retainN call right by the first retain.
       B.setInsertPoint(UnknownRetainList[0]);
       O = UnknownRetainList[0]->getArgOperand(0);
+      auto *RI = UnknownRetainList[0];
+      for (auto R : UnknownRetainList) {
+        if (B.isAtomic(R)) {
+          RI = R;
+          break;
+        }
+      }
       B.createUnknownRetainN(RC->getSwiftRCIdentityRoot(O),
-                             UnknownRetainList.size());
+                             UnknownRetainList.size(), RI);
 
       // Replace all uses of the retain instructions with our new retainN and
       // then delete them.
@@ -156,8 +177,15 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       auto *OldCI = UnknownReleaseList[UnknownReleaseList.size() - 1];
       B.setInsertPoint(OldCI);
       O = OldCI->getArgOperand(0);
+      auto *RI = OldCI;
+      for (auto R : UnknownReleaseList) {
+        if (B.isAtomic(R)) {
+          RI = R;
+          break;
+        }
+      }
       B.createUnknownReleaseN(RC->getSwiftRCIdentityRoot(O),
-                              UnknownReleaseList.size());
+                              UnknownReleaseList.size(), RI);
 
       // Remove all old release instructions.
       for (auto *Inst : UnknownReleaseList) {
@@ -175,9 +203,16 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       auto *OldCI = BridgeRetainList[0];
       B.setInsertPoint(OldCI);
       O = OldCI->getArgOperand(0);
+      auto *RI = OldCI;
+      for (auto R : BridgeRetainList) {
+        if (B.isAtomic(R)) {
+          RI = R;
+          break;
+        }
+      }
       // Bridge retain may modify the input reference before forwarding it.
       auto *I = B.createBridgeRetainN(RC->getSwiftRCIdentityRoot(O),
-                                      BridgeRetainList.size());
+                                      BridgeRetainList.size(), RI);
 
       // Remove all old retain instructions.
       for (auto *Inst : BridgeRetainList) {
@@ -196,8 +231,15 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       auto *OldCI = BridgeReleaseList[BridgeReleaseList.size() - 1];
       B.setInsertPoint(OldCI);
       O = OldCI->getArgOperand(0);
+      auto *RI = OldCI;
+      for (auto R : BridgeReleaseList) {
+        if (B.isAtomic(R)) {
+          RI = R;
+          break;
+        }
+      }
       B.createBridgeReleaseN(RC->getSwiftRCIdentityRoot(O),
-                              BridgeReleaseList.size());
+                              BridgeReleaseList.size(), RI);
 
       // Remove all old release instructions.
       for (auto *Inst : BridgeReleaseList) {

@@ -24,14 +24,14 @@
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func print(
-  items: Any...,
+  _ items: Any...,
   separator: String = " ",
   terminator: String = "\n"
 ) {
 #if os(Windows)
   // FIXME: This fix is for 'crash at hook(output.left)' in cygwin.
   //        Proper fix is needed. see: https://bugs.swift.org/browse/SR-612
-  let _playgroundPrintHook: ((String)->Void)? = nil
+  let _playgroundPrintHook: ((String) -> Void)? = nil
 #endif
   if let hook = _playgroundPrintHook {
     var output = _TeeStream(left: "", right: _Stdout())
@@ -60,7 +60,7 @@ public func print(
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func debugPrint(
-  items: Any...,
+  _ items: Any...,
   separator: String = " ",
   terminator: String = "\n") {
   if let hook = _playgroundPrintHook {
@@ -88,7 +88,7 @@ public func debugPrint(
 ///   `CustomDebugStringConvertible`
 @inline(__always)
 public func print<Target : OutputStream>(
-  items: Any...,
+  _ items: Any...,
   separator: String = " ",
   terminator: String = "\n",
   to output: inout Target
@@ -109,7 +109,7 @@ public func print<Target : OutputStream>(
 ///   `CustomDebugStringConvertible`
 @inline(__always)
 public func debugPrint<Target : OutputStream>(
-  items: Any...,
+  _ items: Any...,
   separator: String = " ",
   terminator: String = "\n",
   to output: inout Target
@@ -118,10 +118,11 @@ public func debugPrint<Target : OutputStream>(
     items, separator: separator, terminator: terminator, to: &output)
 }
 
+@_versioned
 @inline(never)
 @_semantics("stdlib_binary_only")
 internal func _print<Target : OutputStream>(
-  items: [Any],
+  _ items: [Any],
   separator: String = " ",
   terminator: String = "\n",
   to output: inout Target
@@ -137,10 +138,11 @@ internal func _print<Target : OutputStream>(
   output.write(terminator)
 }
 
+@_versioned
 @inline(never)
 @_semantics("stdlib_binary_only")
 internal func _debugPrint<Target : OutputStream>(
-  items: [Any],
+  _ items: [Any],
   separator: String = " ",
   terminator: String = "\n",
   to output: inout Target

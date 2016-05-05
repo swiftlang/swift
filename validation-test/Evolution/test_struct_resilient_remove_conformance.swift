@@ -4,14 +4,6 @@
 import StdlibUnittest
 import struct_resilient_remove_conformance
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-import SwiftPrivatePthreadExtras
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var StructResilientRemoveConformanceTest = TestSuite("StructResilientRemoveConformance")
 
@@ -39,7 +31,7 @@ protocol MyPoint3DLike {
 extension RemoveConformance : MyPointLike {}
 extension RemoveConformance : MyPoint3DLike {}
 
-@inline(never) func workWithMyPointLike<T>(t: T) {
+@inline(never) func workWithMyPointLike<T>(_ t: T) {
   var p = t as! MyPointLike
   p.x = 50
   p.y = 60

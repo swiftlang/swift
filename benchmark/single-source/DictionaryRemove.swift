@@ -15,7 +15,7 @@
 import TestsUtils
 
 @inline(never)
-public func run_DictionaryRemove(N: Int) {
+public func run_DictionaryRemove(_ N: Int) {
     let size = 100
     var dict = [Int: Int](minimumCapacity: size)
 
@@ -57,12 +57,12 @@ class Box<T : Hashable where T : Equatable> : Hashable {
 extension Box : Equatable {
 }
 
-func ==<T: Equatable>(lhs: Box<T>,  rhs: Box<T>) -> Bool {
+func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
   return lhs.value == rhs.value
 }
 
 @inline(never)
-public func run_DictionaryRemoveOfObjects(N: Int) {
+public func run_DictionaryRemoveOfObjects(_ N: Int) {
     let size = 100
     var dict = Dictionary<Box<Int>, Box<Int>>(minimumCapacity: size)
 

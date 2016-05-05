@@ -5,13 +5,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import Foundation
 
@@ -22,7 +15,7 @@ NSSetAPI.test("Sequence") {
   expectSequenceType(result)
 }
 
-private func compareAnythingAtAll(x: AnyObject, y: AnyObject)
+private func compareAnythingAtAll(_ x: AnyObject, y: AnyObject)
   -> ExpectedComparisonResult {
   switch (x.description < y.description, x.description == y.description) {
   case (true, _): return .lt

@@ -18,18 +18,18 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Mutex.h"
 #include "Private.h"
 
 #if defined(__APPLE__) && defined(__MACH__)
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
-#elif defined(__ELF__)
+#elif defined(__ELF__) || defined(__ANDROID__)
 #include <elf.h>
 #include <link.h>
 #endif
 
 #include <dlfcn.h>
-#include <mutex>
 
 using namespace swift;
 
@@ -242,11 +242,10 @@ static void _addImageProtocolConformancesBlock(const uint8_t *conformances,
 struct ConformanceState {
   ConcurrentMap<ConformanceCacheEntry> Cache;
   std::vector<ConformanceSection> SectionsToScan;
-  pthread_mutex_t SectionsToScanLock;
+  Mutex SectionsToScanLock;
   
   ConformanceState() {
     SectionsToScan.reserve(16);
-    pthread_mutex_init(&SectionsToScanLock, nullptr);
 #if defined(__APPLE__) && defined(__MACH__)
     _initializeCallbacksToInspectDylib();
 #else
@@ -291,9 +290,8 @@ static void
 _registerProtocolConformances(ConformanceState &C,
                               const ProtocolConformanceRecord *begin,
                               const ProtocolConformanceRecord *end) {
-  pthread_mutex_lock(&C.SectionsToScanLock);
+  ScopedLock guard(C.SectionsToScanLock);
   C.SectionsToScan.push_back(ConformanceSection{begin, end});
-  pthread_mutex_unlock(&C.SectionsToScanLock);
 }
 
 static void _addImageProtocolConformancesBlock(const uint8_t *conformances,
@@ -351,7 +349,7 @@ static void _initializeCallbacksToInspectDylib() {
   _dyld_register_func_for_add_image(_addImageProtocolConformances);
 }
 
-#elif defined(__ELF__)
+#elif defined(__ELF__) || defined(__ANDROID__)
 static int _addImageProtocolConformances(struct dl_phdr_info *info,
                                           size_t size, void *data) {
   // inspectArgs contains addImage*Block function and the section name
@@ -362,6 +360,12 @@ static int _addImageProtocolConformances(struct dl_phdr_info *info,
     handle = dlopen(nullptr, RTLD_LAZY);
   } else
     handle = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
+
+  if (!handle) {
+    // Not a shared library.
+    return 0;
+  }
+
   auto conformances = reinterpret_cast<const uint8_t*>(
       dlsym(handle, inspectArgs->sectionName));
 
@@ -562,10 +566,9 @@ recur:
       return FoundConformance.first;
   }
 
-  unsigned failedGeneration = ConformanceCacheGeneration;
-
   // If we didn't have an up-to-date cache entry, scan the conformance records.
-  pthread_mutex_lock(&C.SectionsToScanLock);
+  C.SectionsToScanLock.lock();
+  unsigned failedGeneration = ConformanceCacheGeneration;
 
   // If we have no new information to pull in (and nobody else pulled in
   // new information while we waited on the lock), we're done.
@@ -573,7 +576,7 @@ recur:
     if (failedGeneration != ConformanceCacheGeneration) {
       // Someone else pulled in new conformances while we were waiting.
       // Start over with our newly-populated cache.
-      pthread_mutex_unlock(&C.SectionsToScanLock);
+      C.SectionsToScanLock.unlock();
       type = origType;
       goto recur;
     }
@@ -582,7 +585,7 @@ recur:
     // Save the failure for this type-protocol pair in the cache.
     C.cacheFailure(type, protocol);
 
-    pthread_mutex_unlock(&C.SectionsToScanLock);
+    C.SectionsToScanLock.unlock();
     return nullptr;
   }
 
@@ -643,7 +646,7 @@ recur:
   }
   ++ConformanceCacheGeneration;
 
-  pthread_mutex_unlock(&C.SectionsToScanLock);
+  C.SectionsToScanLock.unlock();
   // Start over with our newly-populated cache.
   type = origType;
   goto recur;
@@ -654,7 +657,7 @@ swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
   auto &C = Conformances.get();
   const Metadata *foundMetadata = nullptr;
 
-  pthread_mutex_lock(&C.SectionsToScanLock);
+  ScopedLock guard(C.SectionsToScanLock);
 
   unsigned sectionIdx = 0;
   unsigned endSectionIdx = C.SectionsToScan.size();
@@ -673,8 +676,6 @@ swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
     if (foundMetadata != nullptr)
       break;
   }
-
-  pthread_mutex_unlock(&C.SectionsToScanLock);
 
   return foundMetadata;
 }

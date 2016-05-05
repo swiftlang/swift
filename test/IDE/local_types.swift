@@ -22,7 +22,7 @@ public func singleFunc() {
   }
 }
 
-public func singleFuncWithDuplicates(fake: Bool) {
+public func singleFuncWithDuplicates(_ fake: Bool) {
   if fake {
     // CHECK-DAG: VF10LocalTypes24singleFuncWithDuplicatesFSbT_L_16SingleFuncStruct
     struct SingleFuncStruct {

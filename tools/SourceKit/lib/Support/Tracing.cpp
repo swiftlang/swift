@@ -87,7 +87,7 @@ void trace::registerConsumer(trace::TraceConsumer *Consumer) {
   TraceConsumerListNode *Node = new TraceConsumerListNode {Consumer, nullptr};
   do {
     Node->Next = consumers.load(std::memory_order_relaxed);
-  } while(!consumers.compare_exchange_weak(Node->Next, Node,
-                                           std::memory_order_release,
-                                           std::memory_order_relaxed));
+  } while (!consumers.compare_exchange_weak(Node->Next, Node,
+                                            std::memory_order_release,
+                                            std::memory_order_relaxed));
 }

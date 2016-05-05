@@ -741,12 +741,14 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
 
   // Create the getter.
   auto *getter = createGetterPrototype(storage, TC);
+  if (storage->hasAccessorFunctions()) return;
 
   // Create the setter.
   FuncDecl *setter = nullptr;
   ParamDecl *setterValueParam = nullptr;
   if (doesStorageNeedSetter(storage)) {
     setter = createSetterPrototype(storage, setterValueParam, TC);
+    if (storage->hasAccessorFunctions()) return;
   }
   
   // Okay, we have both the getter and setter.  Set them in VD.
@@ -964,10 +966,12 @@ static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
 
   // Create the getter.
   auto *Get = createGetterPrototype(VD, TC);
+  if (VD->hasAccessorFunctions()) return;
 
   // Create the setter.
   ParamDecl *SetValueDecl = nullptr;
   auto *Set = createSetterPrototype(VD, SetValueDecl, TC);
+  if (VD->hasAccessorFunctions()) return;
 
   // Okay, we have both the getter and setter.  Set them in VD.
   VD->makeComputed(VD->getLoc(), Get, Set, nullptr, VD->getLoc());
@@ -1576,15 +1580,19 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
          "variable not validated yet");
   assert(!VD->isStatic() && "Static vars are already lazy on their own");
 
+  maybeAddMaterializeForSet(VD, *this);
+
   // Create the storage property as an optional of VD's type.
   SmallString<64> NameBuf = VD->getName().str();
   NameBuf += ".storage";
   auto StorageName = Context.getIdentifier(NameBuf);
   auto StorageTy = OptionalType::get(VD->getType());
+  auto StorageInterfaceTy = OptionalType::get(VD->getInterfaceType());
 
   auto *Storage = new (Context) VarDecl(/*isStatic*/false, /*isLet*/false,
                                         VD->getLoc(), StorageName, StorageTy,
                                         VD->getDeclContext());
+  Storage->setInterfaceType(StorageInterfaceTy);
   Storage->setUserAccessible(false);
   addMemberToContextIfNeeded(Storage, VD->getDeclContext(), VD);
 
@@ -2060,9 +2068,6 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   configureConstructorType(ctor, selfType, bodyParams->getType(ctx),
                            superclassCtor->isBodyThrowing());
   if (superclassCtor->isObjC()) {
-    auto errorConvention = superclassCtor->getForeignErrorConvention();
-    markAsObjC(tc, ctor, ObjCReason::ImplicitlyObjC, errorConvention);
-
     // Inherit the @objc name from the superclass initializer, if it
     // has one.
     if (auto objcAttr = superclassCtor->getAttrs().getAttribute<ObjCAttr>()) {
@@ -2073,6 +2078,9 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
         ctor->getAttrs().add(clonedAttr);
       }
     }
+
+    auto errorConvention = superclassCtor->getForeignErrorConvention();
+    markAsObjC(tc, ctor, ObjCReason::ImplicitlyObjC, errorConvention);
   }
   if (superclassCtor->isRequired())
     ctor->getAttrs().add(new (tc.Context) RequiredAttr(/*implicit=*/true));
@@ -2140,7 +2148,7 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   typeCheckDecl(DD, /*isFirstPass=*/true);
 
   // Create an empty body for the destructor.
-  DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc(),true));
+  DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc(), true));
   CD->addMember(DD);
   CD->setHasDestructor();
 }

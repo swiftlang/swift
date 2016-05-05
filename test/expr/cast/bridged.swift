@@ -4,6 +4,16 @@
 
 // Test casting through a class type to a bridged value type.
 
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
+
 class NSObject { }
 
 class BridgedClass : NSObject { 
@@ -16,28 +26,24 @@ struct BridgedStruct : _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return BridgedClass.self
-  }
-
   func _bridgeToObjectiveC() -> BridgedClass {
     return BridgedClass()
   }
 
   static func _forceBridgeFromObjectiveC(
-    x: BridgedClass,
+    _ x: BridgedClass,
     result: inout BridgedStruct?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: BridgedClass,
+    _ x: BridgedClass,
     result: inout BridgedStruct?
   ) -> Bool {
     return true
   }
 }
 
-func testBridgeDowncast(obj: AnyObject, objOpt: AnyObject?, 
+func testBridgeDowncast(_ obj: AnyObject, objOpt: AnyObject?, 
                         objImplicitOpt: AnyObject!) -> BridgedStruct? {
   let s1Opt = obj as? BridgedStruct
   var s2Opt = objOpt as? BridgedStruct
@@ -53,14 +59,14 @@ func testBridgeDowncast(obj: AnyObject, objOpt: AnyObject?,
   return s1Opt
 }
 
-func testBridgeIsa(obj: AnyObject, objOpt: AnyObject?, 
+func testBridgeIsa(_ obj: AnyObject, objOpt: AnyObject?, 
                    objImplicitOpt: AnyObject!) {
   if obj is BridgedStruct { }
   if objOpt is BridgedStruct { }
   if objImplicitOpt is BridgedStruct { }
 }
 
-func testBridgeDowncastSuperclass(obj: NSObject, objOpt: NSObject?,
+func testBridgeDowncastSuperclass(_ obj: NSObject, objOpt: NSObject?,
                                   objImplicitOpt: NSObject!) 
        -> BridgedStruct? {
   _ = obj as? BridgedStruct
@@ -68,21 +74,21 @@ func testBridgeDowncastSuperclass(obj: NSObject, objOpt: NSObject?,
   _ = objImplicitOpt as? BridgedStruct
 }
 
-func testBridgeDowncastExact(obj: BridgedClass, objOpt: BridgedClass?,
+func testBridgeDowncastExact(_ obj: BridgedClass, objOpt: BridgedClass?,
                              objImplicitOpt: BridgedClass!) -> BridgedStruct? {
   _ = obj as? BridgedStruct // expected-warning{{conditional cast from 'BridgedClass' to 'BridgedStruct' always succeeds}}
   _ = objOpt as? BridgedStruct
   _ = objImplicitOpt as? BridgedStruct // expected-warning{{conditional cast from 'BridgedClass!' to 'BridgedStruct' always succeeds}}
 }
 
-func testExplicitBridging(object: BridgedClass, value: BridgedStruct) {
+func testExplicitBridging(_ object: BridgedClass, value: BridgedStruct) {
   var object = object
   var value = value
   object = value as BridgedClass
   value = object as BridgedStruct
 }
 
-func testBridgingFromSubclass(obj: SubclassOfBridgedClass) {
+func testBridgingFromSubclass(_ obj: SubclassOfBridgedClass) {
   _ = obj as! BridgedStruct // expected-warning{{forced cast from 'SubclassOfBridgedClass' to 'BridgedStruct' always succeeds; did you mean to use 'as'?}} {{11-14=as}}
   _ = obj as BridgedStruct
 }

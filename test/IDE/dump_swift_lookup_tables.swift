@@ -1,7 +1,20 @@
-// RUN: %target-swift-ide-test -dump-importer-lookup-table -source-filename %s -import-objc-header %S/Inputs/swift_name.h > %t.log 2>&1
+// RUN: %target-swift-ide-test -dump-importer-lookup-table -source-filename %s -import-objc-header %S/Inputs/swift_name.h -I %S/Inputs/custom-modules > %t.log 2>&1
 // RUN: FileCheck %s < %t.log
 
 // REQUIRES: objc_interop
+import ImportAsMember
+
+// CHECK-LABEL: <<ImportAsMember lookup table>>
+// CHECK-NEXT: Base name -> entry mappings:
+// CHECK:        Struct1:
+// CHECK-NEXT:     TU: IAMStruct1
+// CHECK:        init:
+// CHECK-NEXT:     IAMStruct1: IAMStruct1CreateSimple
+// CHECK:        radius:
+// CHECK-NEXT:     IAMStruct1: IAMStruct1GetRadius, IAMStruct1SetRadius
+
+// CHECK: Globals-as-members mapping:
+// CHECK-NEXT: IAMStruct1: IAMStruct1GlobalVar, IAMStruct1CreateSimple, IAMStruct1CreateSpecialLabel, IAMStruct1Invert, IAMStruct1InvertInPlace, IAMStruct1Rotate, IAMStruct1Scale, IAMStruct1GetRadius, IAMStruct1SetRadius, IAMStruct1GetAltitude, IAMStruct1SetAltitude, IAMStruct1GetMagnitude, IAMStruct1StaticMethod, IAMStruct1StaticGetProperty, IAMStruct1StaticSetProperty, IAMStruct1StaticGetOnlyProperty, IAMStruct1SelfComesLast, IAMStruct1SelfComesThird, IAMStruct1StaticVar1, IAMStruct1StaticVar2, IAMStruct1CreateFloat, IAMStruct1GetZeroStruct1
 
 // CHECK-LABEL: <<Bridging header lookup table>>
 // CHECK-NEXT:      Base name -> entry mappings:
@@ -44,3 +57,7 @@
 // CHECK-NEXT:      SNPoint: y
 // CHECK-NEXT:    z:
 // CHECK-NEXT:      SNPoint: z
+
+
+// CHECK-NEXT: Globals-as-members mapping:
+// CHECK-NEXT:   SNSomeStruct: DefaultXValue, SNAdding, SNCreate, SNSomeStructGetDefault, SNSomeStructSetDefault, SNSomeStructGetFoo, SNSomeStructSetFoo

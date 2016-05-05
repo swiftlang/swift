@@ -13,7 +13,7 @@ class Interval {
     print("[\(lo), \(hi)]")
   }
   
-  class func like(lo: Int, _ hi: Int) -> Interval {
+  class func like(_ lo: Int, _ hi: Int) -> Interval {
     return Interval(lo, hi)
   }
 }
@@ -27,7 +27,7 @@ class OpenInterval : Interval {
     print("(\(lo), \(hi))")
   }
 
-  override class func like(lo:Int, _ hi:Int) -> Interval {
+  override class func like(_ lo:Int, _ hi:Int) -> Interval {
     return OpenInterval(lo, hi)
   }
 }
@@ -92,7 +92,7 @@ class ReturnOfCompilerCrasher: CompilerCrasher {
   }
 }
 
-func testCrash(c: Base) -> String? {
+func testCrash(_ c: Base) -> String? {
   let s = c.makePossibleString()
   return s
 }
@@ -118,11 +118,11 @@ struct Account {
 }
 
 class Bank {
-  func transferMoney(from: Account?, to: Account!) -> Account! {
+  func transferMoney(_ from: Account?, to: Account!) -> Account! {
     return nil
   }
 
-  func deposit(to: Account) -> Account? {
+  func deposit(_ to: Account) -> Account? {
     return nil
   }
 }
@@ -130,7 +130,7 @@ class Bank {
 class DodgyBank : Bank {
   // Parameters: swap ? and !
   // Result: less optional
-  override func transferMoney(from: Account!, to: Account?) -> Account {
+  override func transferMoney(_ from: Account!, to: Account?) -> Account {
     if let fromAccount = from {
       return fromAccount
     } else {
@@ -140,7 +140,7 @@ class DodgyBank : Bank {
 
   // Parameter: more optional
   // Result: swap ? and !
-  override func deposit(to: Account?) -> Account! {
+  override func deposit(_ to: Account?) -> Account! {
     if let toAccount = to {
       if (toAccount.owner == "Cyberdyne Systems") {
         return nil
@@ -170,3 +170,23 @@ print((b as Bank).transferMoney(Account(owner: "A"), to: Account(owner: "B")))
 print((b as Bank).transferMoney(nil, to: nil))
 print((b as Bank).deposit(Account(owner: "Cyberdyne Systems")))
 print((b as Bank).deposit(Account(owner: "A")))
+
+// rdar://25412647
+
+private class Parent <T> {
+    func doSomething() {
+        overriddenMethod()
+    }
+
+    func overriddenMethod() {
+        fatalError("You should override this method in child class")
+    }
+}
+
+private class Child: Parent<String> {
+    override func overriddenMethod() {
+        print("Heaven!")
+    }
+}
+
+Child().doSomething() // CHECK: Heaven!

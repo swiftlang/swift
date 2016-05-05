@@ -730,8 +730,8 @@ namespace {
     AccessKind getBaseAccessKind(SILGenFunction &gen,
                                  AccessKind kind) const override {
       SILDeclRef accessor = getAccessor(gen, kind);
-      auto accessorType = gen.SGM.Types.getConstantFunctionType(accessor);
-      if (accessorType->getSelfParameter().isIndirectMutating()) {
+      auto accessorSelf = gen.SGM.Types.getConstantSelfParameter(accessor);
+      if (accessorSelf.getType() && accessorSelf.isIndirectMutating()) {
         return AccessKind::ReadWrite;
       } else {
         return AccessKind::Read;
@@ -830,8 +830,8 @@ namespace {
 
       // If the declaration is dynamically dispatched through a class,
       // we have to use materializeForSet.
-      if (isa<ClassDecl>(decl->getDeclContext())) {
-        if (decl->isFinal())
+      if (auto *classDecl = dyn_cast<ClassDecl>(decl->getDeclContext())) {
+        if (decl->isFinal() || classDecl->isFinal())
           return false;
 
         return true;
@@ -1175,9 +1175,9 @@ namespace {
       // 'base').  If it isn't, we actually need to retain it, because
       // we've still got a release active.
       SILValue baseValue = (isFinal ? base.forward(gen) : base.getValue());
-      if (!isFinal) gen.B.createRetainValue(loc, baseValue);
+      if (!isFinal) gen.B.createRetainValue(loc, baseValue, Atomicity::Atomic);
 
-      gen.B.createStrongUnpin(loc, baseValue);
+      gen.B.createStrongUnpin(loc, baseValue, Atomicity::Atomic);
     }
 
     void print(raw_ostream &OS) const override {
@@ -2133,7 +2133,7 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
     assert(unownedType->isLoadable(ResilienceExpansion::Maximal));
     (void) unownedType;
 
-    B.createStrongRetainUnowned(loc, src);
+    B.createStrongRetainUnowned(loc, src, Atomicity::Atomic);
     return B.createUnownedToRef(loc, src,
                 SILType::getPrimitiveObjectType(unownedType.getReferentType()));
   }
@@ -2143,7 +2143,7 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
   if (auto unmanagedType = src->getType().getAs<UnmanagedStorageType>()) {
     auto result = B.createUnmanagedToRef(loc, src,
               SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
-    B.createStrongRetain(loc, result);
+    B.createStrongRetain(loc, result, Atomicity::Atomic);
     return result;
   }
 
@@ -2172,10 +2172,12 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
     }
 
     auto unownedValue = gen.B.createLoad(loc, src);
-    gen.B.createStrongRetainUnowned(loc, unownedValue);
-    if (isTake) gen.B.createUnownedRelease(loc, unownedValue);
-    return gen.B.createUnownedToRef(loc, unownedValue,
-              SILType::getPrimitiveObjectType(unownedType.getReferentType()));
+    gen.B.createStrongRetainUnowned(loc, unownedValue, Atomicity::Atomic);
+    if (isTake)
+      gen.B.createUnownedRelease(loc, unownedValue, Atomicity::Atomic);
+    return gen.B.createUnownedToRef(
+        loc, unownedValue,
+        SILType::getPrimitiveObjectType(unownedType.getReferentType()));
   }
 
   // For @unowned(unsafe) types, we need to strip the unmanaged box.
@@ -2183,7 +2185,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
     auto value = gen.B.createLoad(loc, src);
     auto result = gen.B.createUnmanagedToRef(loc, value,
             SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
-    gen.B.createStrongRetain(loc, result);
+    gen.B.createStrongRetain(loc, result, Atomicity::Atomic);
     return result;
   }
 
@@ -2235,7 +2237,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
 
     auto unownedValue =
       gen.B.createRefToUnowned(loc, value, storageType.getObjectType());
-    gen.B.createUnownedRetain(loc, unownedValue);
+    gen.B.createUnownedRetain(loc, unownedValue, Atomicity::Atomic);
     emitUnloweredStoreOfCopy(gen.B, loc, unownedValue, dest, isInit);
     gen.B.emitStrongReleaseAndFold(loc, value);
     return;
@@ -2336,7 +2338,7 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
     (void) unownedType;
 
     SILValue unowned = B.createRefToUnowned(loc, semanticValue, storageType);
-    B.createUnownedRetain(loc, unowned);
+    B.createUnownedRetain(loc, unowned, Atomicity::Atomic);
     B.emitStrongReleaseAndFold(loc, semanticValue);
     return unowned;
   }

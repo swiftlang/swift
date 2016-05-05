@@ -22,12 +22,12 @@ extension CGColorSpace {
 extension CGColor {
   class func create(colorSpace colorSpace: CGColorSpace, components: [CGFloat])
       -> CGColor {
-    return CGColorCreate(colorSpace, components)!
+    return CGColor(withColorSpace: colorSpace, components: components)!
   }
 
-  var r: CGFloat { return CGColorGetComponents(self)[0] }
-  var g: CGFloat { return CGColorGetComponents(self)[1] }
-  var b: CGFloat { return CGColorGetComponents(self)[2] }
+  var r: CGFloat { return components![0] }
+  var g: CGFloat { return components![1] }
+  var b: CGFloat { return components![2] }
 }
 
 let pink = CGColor.create(colorSpace: .deviceRGB(),

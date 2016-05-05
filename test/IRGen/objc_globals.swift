@@ -7,7 +7,7 @@ import gadget
 import Foundation
 
 @inline(never)
-func blackHole<T>(t: T) { }
+func blackHole<T>(_ t: T) { }
 
 // CHECK-LABEL: @"OBJC_CLASS_$_NSNumber" = external global %objc_class
 // CHECK: @"OBJC_CLASSLIST_REFERENCES_$_{{.*}}" = private global %struct._class_t* bitcast (%objc_class* @"OBJC_CLASS_$_NSNumber" to %struct._class_t*), section "__DATA, __objc_classrefs, regular, no_dead_strip"

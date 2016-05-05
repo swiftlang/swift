@@ -103,7 +103,6 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
     M(M),
     DBuilder(M),
     IGM(IGM),
-    EntryPointFn(nullptr),
     MetadataTypeDecl(nullptr),
     InternalType(nullptr),
     LastDebugLoc({}),
@@ -141,20 +140,6 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
           ? llvm::DIBuilder::LineTablesOnly
           : llvm::DIBuilder::FullDebug);
   MainFile = getOrCreateFile(BumpAllocatedString(AbsMainFile).data());
-
-  if (auto *MainFunc = IGM.SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)) {
-    IsLibrary = false;
-    auto *MainIGM = IGM.dispatcher.getGenModule(MainFunc->getDeclContext());
-    
-    // Don't create the function type if we are in a different llvm module than
-    // the module where @main is defined. This is the case for non-primary
-    // modules when doing multi-threaded whole-module compilation.
-    if (MainIGM == &IGM) {
-      EntryPointFn = DBuilder.createReplaceableCompositeType(
-          llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
-          MainFile, MainFile, 0);
-    }
-  }
 
   // Because the swift compiler relies on Clang to setup the Module,
   // the clang CU is always created first.  Several dwarf-reading
@@ -239,21 +224,6 @@ static SILLocation::DebugLoc getDebugLocation(Optional<SILLocation> OptLoc,
 }
 
 
-/// Extract the start location from a SILLocation.
-///
-/// This returns a FullLocation, which contains the location that
-/// should be used for the linetable and the "true" AST location (used
-/// for, e.g., variable declarations).
-static FullLocation getFullLocation(Optional<SILLocation> OptLoc,
-                                    SourceManager &SM) {
-  if (!OptLoc)
-    return {};
-
-  SILLocation Loc = OptLoc.getValue();
-  return { Loc.decodeDebugLoc(SM),
-           SILLocation::decode(Loc.getSourceLoc(), SM) };
-}
-
 /// Determine whether this debug scope belongs to an explicit closure.
 static bool isExplicitClosure(const SILDebugScope *DS) {
   if (DS) {
@@ -303,7 +273,7 @@ static bool parentScopesAreSane(const SILDebugScope *DS) {
 }
 
 bool IRGenDebugInfo::lineNumberIsSane(IRBuilder &Builder, unsigned Line) {
-  if (IGM.Opts.Optimize)
+  if (IGM.IRGen.Opts.Optimize)
     return true;
 
   // Assert monotonically increasing line numbers within the same basic block;
@@ -521,7 +491,7 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     return TheCU;
 
   if (isa<FuncDecl>(DC))
-    if (auto *Decl = IGM.SILMod->lookUpFunction(
+    if (auto *Decl = IGM.getSILModule().lookUpFunction(
           SILDeclRef(cast<AbstractFunctionDecl>(DC), SILDeclRef::Kind::Func)))
       return getOrCreateScope(Decl->getDebugScope());
 
@@ -538,7 +508,18 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     return getOrCreateContext(DC->getParent());
 
   case DeclContextKind::TopLevelCodeDecl:
+    // Lazily create EntryPointFn.
+    if (!EntryPointFn) {
+      auto main = IGM.getSILModule().lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
+      assert(main && "emitting TopLevelCodeDecl in module without "
+                     SWIFT_ENTRY_POINT_FUNCTION "?");
+      EntryPointFn = DBuilder.createReplaceableCompositeType(
+            llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
+            MainFile, MainFile, 0);
+    }
+
     return cast<llvm::DIScope>(EntryPointFn);
+
   case DeclContextKind::Module:
     return getOrCreateModule({Module::AccessPathTy(), cast<ModuleDecl>(DC)});
   case DeclContextKind::FileUnit:
@@ -626,7 +607,7 @@ static bool isAllocatingConstructor(SILFunctionTypeRepresentation Rep,
 }
 
 llvm::DISubprogram *IRGenDebugInfo::emitFunction(
-    SILModule &SILMod, const SILDebugScope *DS, llvm::Function *Fn,
+    const SILDebugScope *DS, llvm::Function *Fn,
     SILFunctionTypeRepresentation Rep, SILType SILTy, DeclContext *DeclCtx) {
   auto Cached = ScopeCache.find(DS);
   if (Cached != ScopeCache.end()) {
@@ -661,12 +642,13 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
   unsigned ScopeLine = 0; /// The source line used for the function prologue.
   // Bare functions and thunks should not have any line numbers. This
   // is especially important for shared functions like reabstraction
-  // thunk helpers, where getFullLocation() returns an arbitrary location
-  // of whichever use was emitted first.
+  // thunk helpers, where DS->Loc is an arbitrary location of whichever use
+  // was emitted first.
   if (DS && (!SILFn || (!SILFn->isBare() && !SILFn->isThunk()))) {
-    auto FL = getFullLocation(DS->Loc, SM);
-    L = FL.Loc;
-    ScopeLine = FL.LocForLinetable.Line;
+    L = DS->Loc.decodeDebugLoc(SM);
+    ScopeLine = L.Line;
+    if (!DS->Loc.isDebugInfoLoc())
+      L = SILLocation::decode(DS->Loc.getSourceLoc(), SM);
   }
 
   auto Line = L.Line;
@@ -725,10 +707,12 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
 
   // RAUW the entry point function forward declaration with the real thing.
   if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
-    assert(EntryPointFn->isTemporary() &&
-           "more than one entry point function");
-    EntryPointFn->replaceAllUsesWith(SP);
-    llvm::MDNode::deleteTemporary(EntryPointFn);
+    if (EntryPointFn) {
+      assert(EntryPointFn->isTemporary() &&
+             "more than one entry point function");
+      EntryPointFn->replaceAllUsesWith(SP);
+      llvm::MDNode::deleteTemporary(EntryPointFn);
+    }
     EntryPointFn = SP;
   }
 
@@ -801,17 +785,16 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(SILFunction &SILFn,
   auto *DS = SILFn.getDebugScope();
   assert(DS && "SIL function has no debug scope");
   (void) DS;
-  return emitFunction(SILFn.getModule(), SILFn.getDebugScope(), Fn,
+  return emitFunction(SILFn.getDebugScope(), Fn,
                       SILFn.getRepresentation(), SILFn.getLoweredType(),
                       SILFn.getDeclContext());
 }
 
-void IRGenDebugInfo::emitArtificialFunction(SILModule &SILMod,
-                                            IRBuilder &Builder,
+void IRGenDebugInfo::emitArtificialFunction(IRBuilder &Builder,
                                             llvm::Function *Fn, SILType SILTy) {
   RegularLocation ALoc = RegularLocation::getAutoGeneratedLocation();
-  const SILDebugScope *Scope = new (SILMod) SILDebugScope(ALoc);
-  emitFunction(SILMod, Scope, Fn, SILFunctionTypeRepresentation::Thin, SILTy);
+  const SILDebugScope *Scope = new (IGM.getSILModule()) SILDebugScope(ALoc);
+  emitFunction(Scope, Fn, SILFunctionTypeRepresentation::Thin, SILTy);
   setCurrentLoc(Builder, Scope);
 }
 
@@ -954,6 +937,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
       assert(SizeInBits && "zero-sized piece");
       assert(SizeInBits < VarSizeInBits && "piece covers entire var");
       assert(OffsetInBits+SizeInBits <= VarSizeInBits && "pars > totum");
+      (void) VarSizeInBits;
 
       // Add the piece DWARF expression.
       Operands.push_back(llvm::dwarf::DW_OP_bit_piece);
@@ -1008,8 +992,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
     return;
 
   llvm::DIType *Ty = getOrCreateType(DbgTy);
-  if (Ty->isArtificial() || Ty == InternalType ||
-      Var->getVisibility() == llvm::GlobalValue::HiddenVisibility)
+  if (Ty->isArtificial() || Ty == InternalType || !Loc)
     // FIXME: Really these should be marked as artificial, but LLVM
     // currently has no support for flags to be put on global
     // variables. In the mean time, elide these variables, they
@@ -1053,7 +1036,7 @@ llvm::DINodeArray IRGenDebugInfo::getTupleElements(
     unsigned Flags, DeclContext *DeclContext, unsigned &SizeInBits) {
   SmallVector<llvm::Metadata *, 16> Elements;
   unsigned OffsetInBits = 0;
-  auto genericSig = IGM.SILMod->Types.getCurGenericContext();
+  auto genericSig = IGM.getSILTypes().getCurGenericContext();
   for (auto ElemTy : TupleTy->getElementTypes()) {
     auto &elemTI =
       IGM.getTypeInfoForUnlowered(AbstractionPattern(genericSig,
@@ -1075,9 +1058,9 @@ IRGenDebugInfo::getStructMembers(NominalTypeDecl *D, Type BaseTy,
   unsigned OffsetInBits = 0;
   for (VarDecl *VD : D->getStoredProperties()) {
     auto memberTy =
-        BaseTy->getTypeOfMember(IGM.SILMod->getSwiftModule(), VD, nullptr);
+        BaseTy->getTypeOfMember(IGM.getSwiftModule(), VD, nullptr);
     DebugTypeInfo DbgTy(VD, IGM.getTypeInfoForUnlowered(
-                                IGM.SILMod->Types.getAbstractionPattern(VD),
+                                IGM.getSILTypes().getAbstractionPattern(VD),
                                 memberTy));
     Elements.push_back(createMemberType(DbgTy, VD->getName().str(),
                                         OffsetInBits, Scope, File, Flags));
@@ -1375,7 +1358,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::Class: {
     // Classes are represented as DW_TAG_structure_type. This way the
-    // DW_AT_APPLE_runtime_class( DW_LANG_Swift ) attribute can be
+    // DW_AT_APPLE_runtime_class(DW_LANG_Swift) attribute can be
     // used to differentiate them from C++ and ObjC classes.
     auto *ClassTy = BaseTy->castTo<ClassType>();
     auto *Decl = ClassTy->getDecl();
@@ -1520,7 +1503,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // Emit the protocols the archetypes conform to.
     SmallVector<llvm::Metadata *, 4> Protocols;
     for (auto *ProtocolDecl : Archetype->getConformsTo()) {
-      auto PTy = IGM.SILMod->Types.getLoweredType(ProtocolDecl->getType())
+      auto PTy = IGM.getLoweredType(ProtocolDecl->getType())
                      .getSwiftRValueType();
       auto PDbgTy = DebugTypeInfo(ProtocolDecl, IGM.getTypeInfoForLowered(PTy));
       auto PDITy = getOrCreateType(PDbgTy);
@@ -1573,11 +1556,10 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       auto *nongenericTy = FunctionType::get(fTy->getInput(), fTy->getResult(),
                                              fTy->getExtInfo());
 
-      FunTy = IGM.SILMod->Types.getLoweredType(nongenericTy)
-                  .castTo<SILFunctionType>();
+      FunTy = IGM.getLoweredType(nongenericTy).castTo<SILFunctionType>();
     } else
       FunTy =
-          IGM.SILMod->Types.getLoweredType(BaseTy).castTo<SILFunctionType>();
+          IGM.getLoweredType(BaseTy).castTo<SILFunctionType>();
     auto Params = createParameterTypes(FunTy, DbgTy.getDeclContext());
 
     auto FnTy = DBuilder.createSubroutineType(Params, Flags);

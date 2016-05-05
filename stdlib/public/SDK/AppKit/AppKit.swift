@@ -64,11 +64,11 @@ public extension NSGradient {
 // argv as a const char**.
 @_silgen_name("NSApplicationMain")
 public func NSApplicationMain(
-  argc: Int32, _ argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>>
+  _ argc: Int32, _ argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
 ) -> Int32
 
 extension NSColor : _ColorLiteralConvertible {
-  public required convenience init(colorLiteralRed red: Float, green: Float,
+  public required convenience init(red: Float, green: Float,
                                    blue: Float, alpha: Float) {
     self.init(srgbRed: CGFloat(red), green: CGFloat(green),
               blue: CGFloat(blue), alpha: CGFloat(alpha))
@@ -82,7 +82,7 @@ extension NSImage : _ImageLiteralConvertible {
     self.init(named: name)
   }
 
-  public required convenience init(imageLiteral name: String) {
+  public required convenience init(resourceName name: String) {
     self.init(failableImageLiteral: name)
   }
 }

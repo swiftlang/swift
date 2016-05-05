@@ -2,6 +2,7 @@ public protocol Prot {
   associatedtype Element
   var p : Int { get }
   func foo()
+  func foo1()
 }
 
 public class C1 : Prot {
@@ -28,3 +29,26 @@ protocol Prot1 {}
 typealias C1Alias = C1
 
 extension C1Alias : Prot1 {}
+
+public extension Prot {
+  public func foo1() {}
+}
+
+public struct S1 {
+  public enum SE {
+  case a
+  case b
+  case c
+  }
+}
+public extension S1 {
+  public func foo1() {}
+  public struct S2 {
+    public let b = 1
+  }
+}
+
+@objc
+public protocol P2 {
+  optional func foo1()
+}

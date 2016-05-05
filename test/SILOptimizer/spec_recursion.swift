@@ -3,7 +3,7 @@
 // Make sure we are not looping forever.
 
 extension Array {
-  mutating func new_method(predicate: (Element, Element) -> Bool, left : Int, right : Int) {
+  mutating func new_method(_ predicate: (Element, Element) -> Bool, left : Int, right : Int) {
       new_method(predicate, left: left, right: right);
   }
 }
@@ -13,7 +13,7 @@ x1.new_method(<, left: 0, right: 1)
 
 struct Test<T> {
   init() {}
-  func recursive(x x : T)  {
+  func recursive(x x : T) {
     return recursive(x: x)
   }
 }

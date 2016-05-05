@@ -6,7 +6,7 @@
 
 // Comment.  With unicode characters: ¡ç®åz¥!
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_: T) {}
 
 // Various function types.
 var func1 : () -> ()    // No input, no output.
@@ -91,22 +91,22 @@ var infixtest : () = 4 % 2 + 27 %% 123
 
 
 // The 'func' keyword gives a nice simplification for function definitions.
-func funcdecl1(a: Int, _ y: Int) {}
+func funcdecl1(_ a: Int, _ y: Int) {}
 func funcdecl2() {
   return funcdecl1(4, 2)
 }
 func funcdecl3() -> Int {
   return 12
 }
-func funcdecl4(a: ((Int) -> Int), b: Int) {}
-func signal(sig: Int, f: (Int) -> Void) -> (Int) -> Void {}
+func funcdecl4(_ a: ((Int) -> Int), b: Int) {}
+func signal(_ sig: Int, f: (Int) -> Void) -> (Int) -> Void {}
 
 // Doing fun things with named arguments.  Basic stuff first.
-func funcdecl6(a: Int, b: Int) -> Int { a+b }
+func funcdecl6(_ a: Int, b: Int) -> Int { a+b }
 
 // Can dive into tuples, 'b' is a reference to a whole tuple, c and d are
 // fields in one.  Cannot dive into functions or through aliases.
-func funcdecl7(a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
+func funcdecl7(_ a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
   a + b.0 + b.c + third.0 + third.1
   b.foo // expected-error {{value of tuple type '(c: Int, d: Int)' has no member 'foo'}}
 }
@@ -131,7 +131,7 @@ func errorRecovery() {
   var (g1, g2, g3) = (1, 2) // expected-error {{'(Int, Int)' is not convertible to '(_, _, _)', tuples have a different number of elements}}
 }
 
-func acceptsInt(x: Int) {}
+func acceptsInt(_ x: Int) {}
 acceptsInt(unknown_var) // expected-error {{use of unresolved identifier 'unknown_var'}}
 
 
@@ -141,14 +141,14 @@ var test1b = { 42 }
 var test1c = { { 42 } }
 var test1d = { { { 42 } } }
 
-func test2(a: Int, b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}} {{32-35=}}
+func test2(_ a: Int, b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}} {{34-37=}}
  a+b
  a+b+c // expected-error{{use of unresolved identifier 'c'}}
  return a+b
 }
 
 
-func test3(arg1: Int, arg2: Int) -> Int {
+func test3(_ arg1: Int, arg2: Int) -> Int {
   return 4
 }
 
@@ -168,16 +168,16 @@ func test5() {
 
 
 // Functions can obviously take and return values.
-func w3(a: Int) -> Int { return a }
+func w3(_ a: Int) -> Int { return a }
 func w4(_: Int) -> Int { return 4 }
 
 
 
 func b1() {}
 
-func foo1(a: Int, b: Int) -> Int {}
-func foo2(a: Int) -> (b: Int) -> Int {}
-func foo3(a: Int = 2, b: Int = 3) {}
+func foo1(_ a: Int, b: Int) -> Int {}
+func foo2(_ a: Int) -> (b: Int) -> Int {}
+func foo3(_ a: Int = 2, b: Int = 3) {}
 
 prefix operator ^^ {}
 
@@ -241,14 +241,14 @@ func test_floating_point() {
   var _: Double = 0.0
 }
 
-func test_nonassoc(x: Int, y: Int) -> Bool {
+func test_nonassoc(_ x: Int, y: Int) -> Bool {
   // FIXME: the second error and note here should arguably disappear
   return x == y == x // expected-error {{non-associative operator is adjacent to operator of same precedence}}  expected-error {{binary operator '==' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{overloads for '==' exist with these partially matching parameter lists:}}
 }
 
 // More realistic examples.
 
-func fib(n: Int) -> Int {
+func fib(_ n: Int) -> Int {
   if (n < 2) {
     return n
   }
@@ -316,7 +316,7 @@ func int_literals() {
 }
 
 // <rdar://problem/12830375>
-func tuple_of_rvalues(a:Int, b:Int) -> Int {
+func tuple_of_rvalues(_ a:Int, b:Int) -> Int {
   return (a, b).1
 }
 
@@ -402,7 +402,7 @@ var st_u8 = " \u{DFFF} "  // expected-error {{invalid unicode scalar}}
 var st_u10 = " \u{0010FFFD} "  // Last valid codepoint, 0xFFFE and 0xFFFF are reserved in each plane
 var st_u11 = " \u{00110000} "  // expected-error {{invalid unicode scalar}}
 
-func stringliterals(d: [String: Int]) {
+func stringliterals(_ d: [String: Int]) {
 
   // rdar://11385385
   let x = 4
@@ -464,10 +464,10 @@ s.append(contentsOf: ["x"])
 // InOut arguments
 //===----------------------------------------------------------------------===//
 
-func takesInt(x: Int) {}
-func takesExplicitInt(x: inout Int) { }
+func takesInt(_ x: Int) {}
+func takesExplicitInt(_ x: inout Int) { }
 
-func testInOut(arg: inout Int) {
+func testInOut(_ arg: inout Int) {
   var x: Int
   takesExplicitInt(x) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{20-20=&}}
   takesExplicitInt(&x)
@@ -477,7 +477,7 @@ func testInOut(arg: inout Int) {
   var z = &arg // expected-error{{'&' can only appear immediately in a call argument list}} \
              // expected-error {{type 'inout Int' of variable is not materializable}}
 
-  takesExplicitInt(5) // expected-error {{cannot convert value of type 'Int' to expected argument type 'inout Int'}}
+  takesExplicitInt(5) // expected-error {{cannot pass immutable value as inout argument: literals are not mutable}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -501,7 +501,7 @@ extension Empty {
   init(_ f: Float) { }
 }
 
-func conversionTest(a: inout Double, b: inout Int) {
+func conversionTest(_ a: inout Double, b: inout Int) {
   var f: Float
   var d: Double
   a = Double(b)
@@ -550,7 +550,7 @@ _ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expect
 // Unary Operators
 //===----------------------------------------------------------------------===//
 
-func unaryOps(i8: inout Int8, i64: inout Int64) {
+func unaryOps(_ i8: inout Int8, i64: inout Int64) {
   i8 = ~i8
   i64 += 1
   i8 -= 1
@@ -583,10 +583,10 @@ func iterators() {
 //===----------------------------------------------------------------------===//
 
 func magic_literals() {
-  _ = __FILE__  // expected-warning {{__FILE__ is deprecated and will be removed in Swift 3, please use #file}}
-  _ = __LINE__  // expected-warning {{__LINE__ is deprecated and will be removed in Swift 3, please use #line}}
-  _ = __COLUMN__  // expected-warning {{__COLUMN__ is deprecated and will be removed in Swift 3, please use #column}}
-  _ = __DSO_HANDLE__  // expected-warning {{__DSO_HANDLE__ is deprecated and will be removed in Swift 3, please use #dsohandle}}
+  _ = __FILE__  // expected-error {{__FILE__ has been replaced with #file in Swift 3}}
+  _ = __LINE__  // expected-error {{__LINE__ has been replaced with #line in Swift 3}}
+  _ = __COLUMN__  // expected-error {{__COLUMN__ has been replaced with #column in Swift 3}}
+  _ = __DSO_HANDLE__  // expected-error {{__DSO_HANDLE__ has been replaced with #dsohandle in Swift 3}}
 
   _ = #file
   _ = #line + #column
@@ -689,7 +689,7 @@ nil != Int.self // expected-error {{binary operator '!=' cannot be applied to op
 
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
-func testOptionalChaining(a : Int?, b : Int!, c : Int??) {
+func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
   a?    // expected-error {{optional chain has no effect, expression already produces 'Int?'}} {{4-5=}}
   a?.customMirror
 
@@ -701,7 +701,7 @@ func testOptionalChaining(a : Int?, b : Int!, c : Int??) {
 
 
 // <rdar://problem/19657458> Nil Coalescing operator (??) should have a higher precedence
-func testNilCoalescePrecedence(cond: Bool, a: Int?, r: Range<Int>?) {
+func testNilCoalescePrecedence(cond: Bool, a: Int?, r: CountableClosedRange<Int>?) {
   // ?? should have higher precedence than logical operators like || and comparisons.
   if cond || (a ?? 42 > 0) {}  // Ok.
   if (cond || a) ?? 42 > 0 {}  // Not ok: expected-error {{cannot be used as a boolean}} {{6-6=(}} {{17-17= != nil)}}
@@ -712,13 +712,13 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: Range<Int>?) {
 
   // ?? should have lower precedence than range and arithmetic operators.
   let r1 = r ?? (0...42) // ok
-  let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'Range<Int>?' and 'Int'}}
+  let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'CountableClosedRange<Int>?' and 'Int'}}
   // expected-note @-1 {{overloads for '??' exist with these partially matching parameter lists:}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
 }
 
 // <rdar://problem/19772570> Parsing of as and ?? regressed
-func testOptionalTypeParsing(a : AnyObject) -> String {
+func testOptionalTypeParsing(_ a : AnyObject) -> String {
   return a as? String ?? "default name string here"
 }
 
@@ -739,14 +739,14 @@ func testParenExprInTheWay() {
 public struct TestPropMethodOverloadGroup {
     public typealias Hello = String
     public let apply:(Hello) -> Int
-    public func apply(input:Hello) -> Int {
+    public func apply(_ input:Hello) -> Int {
         return apply(input)
     }
 }
 
 
 // <rdar://problem/18496742> Passing ternary operator expression as inout crashes Swift compiler
-func inoutTests(arr: inout Int) {
+func inoutTests(_ arr: inout Int) {
   var x = 1, y = 2
   (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
   let a = (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
@@ -763,19 +763,19 @@ func inoutTests(arr: inout Int) {
   &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}
 
   // <rdar://problem/23249098>
-  func takeAny(x: Any) {}
+  func takeAny(_ x: Any) {}
   takeAny(&x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
-  func takeManyAny(x: Any...) {}
+  func takeManyAny(_ x: Any...) {}
   takeManyAny(&x) // expected-error{{'&' used with non-inout argument of type 'Any' (aka 'protocol<>')}}
   takeManyAny(1, &x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
-  func takeIntAndAny(x: Int, _ y: Any) {}
+  func takeIntAndAny(_ x: Int, _ y: Any) {}
   takeIntAndAny(1, &x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
 }
 
 
 // <rdar://problem/20802757> Compiler crash in default argument & inout expr
 var g20802757 = 2
-func r20802757(z: inout Int = &g20802757) { // expected-error {{'&' can only appear immediately in a call argument list}}
+func r20802757(_ z: inout Int = &g20802757) { // expected-error {{'&' can only appear immediately in a call argument list}}
   print(z)
 }
 
@@ -783,8 +783,8 @@ _ = _.foo // expected-error {{type of expression is ambiguous without more conte
 
 // <rdar://problem/22211854> wrong arg list crashing sourcekit
 func r22211854() {
-    func f(x: Int, _ y: Int, _ z: String = "") {}
-    func g<T>(x: T, _ y: T, _ z: String = "") {}
+    func f(_ x: Int, _ y: Int, _ z: String = "") {}
+    func g<T>(_ x: T, _ y: T, _ z: String = "") {}
 
     f(1) // expected-error{{missing argument for parameter #2 in call}}
     g(1) // expected-error{{missing argument for parameter #2 in call}}
@@ -795,19 +795,19 @@ func r22211854() {
 
 // <rdar://problem/22348394> Compiler crash on invoking function with labeled defaulted param with non-labeled argument
 func r22348394() {
-  func f(x x: Int = 0) { }
+  func f(x: Int = 0) { }
   f(Int(3)) // expected-error{{missing argument label 'x:' in call}}
 }
 
 // <rdar://problem/23185177> Compiler crashes in Assertion failed: ((AllowOverwrite || !E->hasLValueAccessKind()) && "l-value access kind has already been set"), function visit
 protocol P { var y: String? { get } }
-func r23185177(x: P?) -> [String] {
+func r23185177(_ x: P?) -> [String] {
   return x?.y // expected-error{{cannot convert return expression of type 'String?' to return type '[String]'}}
 }
 
 // <rdar://problem/22913570> Miscompile: wrong argument parsing when calling a function in swift2.0
 func r22913570() {
-  func f(from: Int = 0, to: Int) {}
+  func f(_ from: Int = 0, to: Int) {}
   f(1 + 1) // expected-error{{missing argument for parameter 'to' in call}}
 }
 
@@ -816,31 +816,28 @@ func r22913570() {
 func swift22_deprecation_increment_decrement() {
   var i = 0
   var f = 1.0
-  var si = "foo".startIndex
 
-  i++     // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{4-6= += 1}}
-  --i     // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{6-6= -= 1}}
-  _ = i++ // expected-warning {{'++' is deprecated: it will be removed in Swift 3}}
+  i++     // expected-error {{'++' is unavailable}} {{4-6= += 1}}
+  --i     // expected-error {{'--' is unavailable}} {{3-5=}} {{6-6= -= 1}}
+  _ = i++ // expected-error {{'++' is unavailable}}
 
-  ++f     // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{6-6= += 1}}
-  f--     // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{4-6= -= 1}}
-  _ = f-- // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
+  ++f     // expected-error {{'++' is unavailable}} {{3-5=}} {{6-6= += 1}}
+  f--     // expected-error {{'--' is unavailable}} {{4-6= -= 1}}
+  _ = f-- // expected-error {{'--' is unavailable}} {{none}}
 
-
-  ++si      // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{7-7= = si.successor()}}
-  --si      // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{3-5=}} {{7-7= = si.predecessor()}}
-  si++      // expected-warning {{'++' is deprecated: it will be removed in Swift 3}} {{5-7= = si.successor()}}
-  si--      // expected-warning {{'--' is deprecated: it will be removed in Swift 3}} {{5-7= = si.predecessor()}}
-  _ = --si  // expected-warning {{'--' is deprecated: it will be removed in Swift 3}}
+  // <rdar://problem/24530312> Swift ++fix-it produces bad code in nested expressions
+  // This should not get a fixit hint.
+  var j = 2
+  i = ++j   // expected-error {{'++' is unavailable}} {{none}}
 }
 
 // SR-628 mixing lvalues and rvalues in tuple expression
 var x = 0
 var y = 1
-let _ = (x, x.successor()).0
+let _ = (x, x + 1).0
 let _ = (x, 3).1
 (x,y) = (2,3)
-(x,4) = (1,2) // expected-error {{cannot assign to value: function call returns immutable value}}
+(x,4) = (1,2) // expected-error {{cannot assign to value: literals are not mutable}}
 (x,y).1 = 7 // expected-error {{cannot assign to immutable expression of type 'Int'}}
 x = (x,(3,y)).1.1
 

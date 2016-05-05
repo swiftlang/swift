@@ -103,7 +103,7 @@ class SuperUnnamed {
 
 class SubUnnamed : SuperUnnamed { }
 
-func testSubUnnamed(i: Int, d: Double, s: String, f: Float) {
+func testSubUnnamed(_ i: Int, d: Double, s: String, f: Float) {
   _ = SubUnnamed(int: i)
   _ = SubUnnamed(d)
   _ = SubUnnamed(string: s)

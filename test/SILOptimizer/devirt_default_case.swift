@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -O -module-name devirt_default_case -emit-sil -enable-testing %s | FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
 
 @_silgen_name("action")
-func action(n:Int) -> ()
+func action(_ n:Int) -> ()
 
 // public class
 public class Base1 {
@@ -45,7 +45,7 @@ private class Derived2 : Base2 {
 // CHECK: function_ref @{{.*}}TFC19devirt_default_caseP33_77424841540E67CC820F5E5F7940DCB08Derived26middle
 // CHECK-NOT: class_method
 // CHECK: return
-public func callOuter(x: Int) -> Int {
+public func callOuter(_ x: Int) -> Int {
 
   var o:Base2
   
@@ -91,31 +91,18 @@ class C2 : A2 {}
 class D2: B2 {}
 class E2 :C2 {}
 
-
-public func testfoo1() -> Int {
-  return foo(E2())
-}
-
 class A3 { @inline(never) func f() -> Int { return 0 } }
 class B3 : A3 { @inline(never) override func f() -> Int { return 1 }}
 class C3 : A3 {}
 class D3: C3 {}
 class E3 :C3 {}
 
-// A, C,D,E all use the same implementation. 
-// B has its own implementation.
-@inline(never)
-func foo(a: A3) -> Int {
-// Check that call to A3.f() can be devirtualized.
-//
-// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case3fooFCS_2A3Si
-// CHECK: function_ref @{{.*}}TFC19devirt_default_case2B31f
-// CHECK: function_ref @{{.*}}TFC19devirt_default_case2A31f
-// CHECK-NORMAL-NOT: class_method
-// CHECK-TESTABLE: class_method %0 : $A3, #A3.f!1
-// CHECK: }
-  return a.f()
+// CHECK-TESTABLE: sil{{( hidden)?}} [thunk] [always_inline] @_TF19devirt_default_case3fooFCS_2A3Si
+
+public func testfoo1() -> Int {
+  return foo(E2())
 }
+
 
 public func testfoo3() -> Int {
   return foo(E3())
@@ -136,6 +123,21 @@ class Base4 {
   }
   
   @inline(never) func foo() { }
+}
+
+
+// A, C,D,E all use the same implementation. 
+// B has its own implementation.
+@inline(never)
+func foo(_ a: A3) -> Int {
+// Check that call to A3.f() can be devirtualized.
+//
+// CHECK-NORMAL: sil{{( hidden)?}} [noinline] @_TTSf4g___TF19devirt_default_case3fooFCS_2A3Si
+// CHECK-NORMAL: function_ref @{{.*}}TFC19devirt_default_case2B31f
+// CHECK-NORMAL: function_ref @{{.*}}TFC19devirt_default_case2A31f
+// CHECK-NORMAL-NOT: class_method
+// CHECK: }
+  return a.f()
 }
 
 class Derived4 : Base4 {
@@ -163,10 +165,10 @@ class D6 : C6 {
 }
 
 @inline(never)
-func check_static_class_devirt(c: C6) -> Int { 
+func check_static_class_devirt(_ c: C6) -> Int { 
 // Check that C.bar() and D.bar() are devirtualized.
 //
-// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case25check_static_class_devirtFCS_2C6Si
+// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TTSf4g___TF19devirt_default_case25check_static_class_devirtFCS_2C6Si
 // CHECK: checked_cast_br [exact] %0 : $C6 to $C6
 // CHECK: checked_cast_br [exact] %0 : $C6 to $D6
 // CHECK: class_method
@@ -187,7 +189,7 @@ public func test_check_call_on_downcasted_instance() -> Bool {
 }
 
 @inline(never)
-func callIt(b3: Base3, _ b4: Base4, _ b5: Base5) {
+func callIt(_ b3: Base3, _ b4: Base4, _ b5: Base5) {
   b3.outer()
   b4.test()
   b5.test()
@@ -253,18 +255,18 @@ internal class M33: M3 {
 // the static type of the instance.
 
 @inline(never)
-public func testSpeculativeDevirtualizationWithTooManyAlternatives(c:M1) -> Int32{
+public func testSpeculativeDevirtualizationWithTooManyAlternatives(_ c:M1) -> Int32{
   return c.foo()
 }
 
 
 @inline(never)
-func foo(a: A2) -> Int {
+func foo(_ a: A2) -> Int {
   return a.f()
 }
 
 @inline(never)
-func check_call_on_downcasted_instance(a: A7) -> Bool {
+func check_call_on_downcasted_instance(_ a: A7) -> Bool {
   if a is B7 {
     return (a as! B7).foo()
   }

@@ -7,19 +7,19 @@
 @interface NSMutableString : NSString
 @end
 
-@interface NSArray : NSObject
+@interface NSArray<ObjectType> : NSObject
 @end
 
-@interface NSMutableArray : NSObject
+@interface NSMutableArray<ObjectType> : NSArray<ObjectType>
 @end
 
-@interface NSDictionary : NSObject
+@interface NSDictionary<KeyType, ValueType> : NSObject
 @end
 
-@interface NSSet : NSObject
+@interface NSSet<ObjectType> : NSObject
 @end
 
-@interface NSMutableSet : NSObject
+@interface NSMutableSet<ObjectType> : NSSet<ObjectType>
 @end
 
 @interface NSNumber : NSObject

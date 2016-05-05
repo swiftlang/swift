@@ -27,7 +27,7 @@ class MyObject : NSObject {
 // IMPORT-CHECK-SAME:             scope: ![[FOUNDATION]]
 // IMPORT-CHECK: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}entity: ![[FOUNDATION]]
 
-  func foo(obj: MyObject) {
+  func foo(_ obj: MyObject) {
     return obj.foo(obj)
   }
 }
@@ -67,7 +67,7 @@ public func date() {
 }
 
 // Make sure we build some witness tables for enums.
-func useOptions(opt: NSURLBookmarkCreationOptions)
+func useOptions(_ opt: NSURLBookmarkCreationOptions)
        -> NSURLBookmarkCreationOptions {
   return [opt, opt]
 }

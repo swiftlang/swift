@@ -4,6 +4,6 @@
 
 import Foundation
 
-func useAnyObject(obj: AnyObject) {
+func useAnyObject(_ obj: AnyObject) {
   _ = obj.isMakingHoney
 }

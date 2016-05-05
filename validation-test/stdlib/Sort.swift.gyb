@@ -9,12 +9,6 @@ import StdlibUnittest
 import StdlibCollectionUnittest
 import SwiftPrivate
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 // FIXME(prext): fold this test into Algorithm.swift.gyb.
 
@@ -23,7 +17,7 @@ var Algorithm = TestSuite("Algorithm")
 // Check if one array is a correctly sorted version of another array.
 // We can't simply sort both arrays and compare them, because it is needed to
 // check correctness of sorting itself.
-func expectSortedCollection(sortedAry: [Int], _ originalAry: [Int]) {
+func expectSortedCollection(_ sortedAry: [Int], _ originalAry: [Int]) {
   expectEqual(sortedAry.count, originalAry.count)
   var sortedVals = [Int:Int]()
   var originalVals = [Int:Int]()
@@ -56,17 +50,19 @@ func expectSortedCollection(sortedAry: [Int], _ originalAry: [Int]) {
 }
 
 func expectSortedCollection(
-  sortedAry: [Int],
+  _ sortedAry: [Int],
   _ originalAry: ContiguousArray<Int>
 ) {
   expectSortedCollection(sortedAry, Array(originalAry))
 }
 
-func expectSortedCollection(sortedAry: ArraySlice<Int>, _ originalAry: ArraySlice<Int>) {
+func expectSortedCollection(_ sortedAry: ArraySlice<Int>, _ originalAry: ArraySlice<Int>) {
   expectSortedCollection([Int](sortedAry), [Int](originalAry))
 }
 
-class OffsetCollection : MutableCollection {
+class OffsetCollection : MutableCollection, RandomAccessCollection {
+  typealias Indices = CountableRange<Int>
+  
   let offset: Int
   var data: [Int] = []
   let forward: Bool
@@ -85,8 +81,18 @@ class OffsetCollection : MutableCollection {
     self.offset = offset
     self.forward = forward
   }
+  typealias Index = Int
+  subscript(bounds: Range<Int>) -> MutableRandomAccessSlice<OffsetCollection> {
+    get {
+      return MutableRandomAccessSlice(base: self, bounds: bounds)
+    }
+    set {
+      for i in CountableRange(bounds) {
+        self[i] = newValue[i]
+      }
+    }
+  }
 }
-
 
 // Generate two versions of tests: one for sort with explicitly passed
 // predicate and the other using default comparison operator.
@@ -150,7 +156,7 @@ Algorithm.test("sort/CollectionsWithUnusualIndices") {
 }
 
 Algorithm.test("partition/CrashOnSingleElement") {
-  var a = DefaultedRandomAccessMutableCollection([10])
+  var a = DefaultedMutableRandomAccessCollection([10])
   expectEqual(a.startIndex, a.partition())
 }
 

@@ -41,9 +41,7 @@ class Inspect {
 @IBInspectable var ibinspectable_global : Int // expected-error {{only instance properties can be declared @IBInspectable}} {{1-16=}}
 
 
-@objc_block  // expected-error {{attribute can only be applied to types, not declarations}}
-func foo() {}
-func foo(x: @convention(block) Int) {} // expected-error {{attribute only applies to syntactic function types}}
+func foo(x: @convention(block) Int) {} // expected-error {{@convention attribute only applies to function types}}
 func foo(x: @convention(block) (Int) -> Int) {}
 
 @_transparent

@@ -5,13 +5,6 @@
 import SwiftPrivate
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import Foundation
 
@@ -52,22 +45,22 @@ extension UTF32 : TestableUnicodeCodec {
 }
 
 // The valid ranges of Unicode scalar values
-var unicodeScalarRanges: [Range<UInt32>] = [UInt32(0)...0xd7ff, 0xe000...0x10ffff]
+var unicodeScalarRanges: [CountableClosedRange<UInt32>] = [UInt32(0)...0xd7ff, 0xe000...0x10ffff]
 
 var unicodeScalarCount: Int {
   var count = 0
   for r in unicodeScalarRanges {
-    count += Int(r.endIndex - r.startIndex)
+    count += Int(r.upperBound - r.lowerBound)
   }
   return count
 }
 
-func nthUnicodeScalar(n: UInt32) -> UnicodeScalar {
+func nthUnicodeScalar(_ n: UInt32) -> UnicodeScalar {
   var count: UInt32 = 0
   for r in unicodeScalarRanges {
-    count += r.endIndex - r.startIndex
+    count += r.upperBound - r.lowerBound
     if count > n {
-      return UnicodeScalar(r.endIndex - (count - n))
+      return UnicodeScalar(r.upperBound - (count - n))
     }
   }
   _preconditionFailure("Index out of range")
@@ -75,7 +68,7 @@ func nthUnicodeScalar(n: UInt32) -> UnicodeScalar {
 
 // `buffer` should have a length >= 4
 func nsEncode<CodeUnit>(
-  c: UInt32,
+  _ c: UInt32,
   _ encoding: NSStringEncoding,
   _ buffer: inout [CodeUnit],
   _ used: inout Int
@@ -104,7 +97,7 @@ class CodecTest<Codec : TestableUnicodeCodec> {
   var nsEncodeBuffer: [CodeUnit] = Array(repeating: 0, count: 4)
   var encodeBuffer: [CodeUnit] = Array(repeating: 0, count: 4)
 
-  func testOne(scalar: UnicodeScalar) {
+  func testOne(_ scalar: UnicodeScalar) {
     /* Progress reporter
     if (scalar.value % 0x1000) == 0 {
       print("\(asHex(scalar.value))")
@@ -144,7 +137,7 @@ class CodecTest<Codec : TestableUnicodeCodec> {
     )
   }
 
-  func run(minScalarOrd: Int, _ maxScalarOrd: Int) {
+  func run(_ minScalarOrd: Int, _ maxScalarOrd: Int) {
     print("testing \(Codec.name())")
     for i in minScalarOrd..<maxScalarOrd {
       testOne(nthUnicodeScalar(UInt32(i)))

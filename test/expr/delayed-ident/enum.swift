@@ -5,11 +5,14 @@ enum E1 {
   case First
   case Second(Int)
   case Third(Int, Double)
+  case `default`
 }
 
 var e1: E1 = .First
 e1 = .Second(5)
 e1 = .Third(5, 3.14159)
+
+e1 = .default  // SE-0071
 
 // Generic enumeration type
 enum E2<T> {

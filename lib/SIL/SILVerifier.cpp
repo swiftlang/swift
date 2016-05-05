@@ -101,6 +101,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   Lowering::TypeConverter &TC;
   const SILInstruction *CurInstruction = nullptr;
   DominanceInfo *Dominance = nullptr;
+  bool SingleFunction = true;
 
   SILVerifier(const SILVerifier&) = delete;
   void operator=(const SILVerifier&) = delete;
@@ -410,9 +411,9 @@ public:
     }
   }
 
-  SILVerifier(const SILFunction &F)
+  SILVerifier(const SILFunction &F, bool SingleFunction=true)
     : M(F.getModule().getSwiftModule()), F(F), TC(F.getModule().Types),
-      Dominance(nullptr) {
+      Dominance(nullptr), SingleFunction(SingleFunction) {
     if (F.isExternalDeclaration())
       return;
       
@@ -902,28 +903,6 @@ public:
       verifyLLVMIntrinsic(BI, BI->getIntrinsicInfo().ID);
   }
   
-  bool isValidLinkageForFragileRef(SILLinkage linkage) {
-    switch (linkage) {
-    case SILLinkage::Private:
-    case SILLinkage::PrivateExternal:
-    case SILLinkage::Hidden:
-    case SILLinkage::HiddenExternal:
-      return false;
-
-    case SILLinkage::Shared:
-    case SILLinkage::SharedExternal:
-        // This handles some kind of generated functions, like constructors
-        // of clang imported types.
-        // TODO: check why those functions are not fragile anyway and make
-        // a less conservative check here.
-        return true;
-
-    case SILLinkage::Public:
-    case SILLinkage::PublicExternal:
-      return true;
-    }
-  }
-
   void checkFunctionRefInst(FunctionRefInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");
@@ -931,9 +910,8 @@ public:
             "function_ref should have a context-free function result");
     if (F.isFragile()) {
       SILFunction *RefF = FRI->getReferencedFunction();
-      require(RefF->isFragile()
-                || isValidLinkageForFragileRef(RefF->getLinkage())
-                || RefF->isExternalDeclaration(),
+      require((SingleFunction && RefF->isExternalDeclaration()) ||
+              RefF->hasValidLinkageForFragileRef(),
               "function_ref inside fragile function cannot "
               "reference a private or hidden symbol");
     }
@@ -944,7 +922,7 @@ public:
     if (F.isFragile()) {
       SILGlobalVariable *RefG = AGI->getReferencedGlobal();
       require(RefG->isFragile()
-                || isValidLinkageForFragileRef(RefG->getLinkage()),
+                || hasPublicVisibility(RefG->getLinkage()),
               "alloc_global inside fragile function cannot "
               "reference a private or hidden symbol");
     }
@@ -960,7 +938,7 @@ public:
     if (F.isFragile()) {
       SILGlobalVariable *RefG = GAI->getReferencedGlobal();
       require(RefG->isFragile()
-                || isValidLinkageForFragileRef(RefG->getLinkage()),
+                || hasPublicVisibility(RefG->getLinkage()),
               "global_addr inside fragile function cannot "
               "reference a private or hidden symbol");
     }
@@ -1456,7 +1434,8 @@ public:
             "unowned_release requires unowned type to be loadable");
   }
   void checkDeallocStackInst(DeallocStackInst *DI) {
-    require(isa<AllocStackInst>(DI->getOperand()),
+    require(isa<SILUndef>(DI->getOperand()) ||
+                isa<AllocStackInst>(DI->getOperand()),
             "Operand of dealloc_stack must be an alloc_stack");
   }
   void checkDeallocRefInst(DeallocRefInst *DI) {
@@ -2648,7 +2627,7 @@ public:
               "switch_enum default destination must take no arguments");
   }
 
-  void checkSwitchEnumAddrInst(SwitchEnumAddrInst *SOI){
+  void checkSwitchEnumAddrInst(SwitchEnumAddrInst *SOI) {
     require(SOI->getOperand()->getType().isAddress(),
             "switch_enum_addr operand must be an address");
 
@@ -2982,11 +2961,11 @@ public:
                   "stack dealloc does not match most recent stack alloc");
           stack.pop_back();
         }
-        if (isa<ReturnInst>(&i) || isa<ThrowInst>(&i)) {
-          require(stack.empty(),
-                  "return with stack allocs that haven't been deallocated");
-        }
         if (auto term = dyn_cast<TermInst>(&i)) {
+          if (term->isFunctionExiting()) {
+            require(stack.empty(),
+                    "return with stack allocs that haven't been deallocated");
+          }
           for (auto &successor : term->getSuccessors()) {
             SILBasicBlock *SuccBB = successor.getBB();
             auto found = visitedBBs.find(SuccBB);
@@ -3135,12 +3114,12 @@ public:
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
-void SILFunction::verify() const {
+void SILFunction::verify(bool SingleFunction) const {
 #ifndef NDEBUG
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
-  SILVerifier(*this).verify();
+  SILVerifier(*this, SingleFunction).verify();
 #endif
 }
 
@@ -3207,6 +3186,8 @@ void SILWitnessTable::verify(const SILModule &M) const {
     assert(getEntries().size() == 0 &&
            "A witness table declaration should not have any entries.");
 
+  auto *protocol = getConformance()->getProtocol();
+
   // Currently all witness tables have public conformances, thus witness tables
   // should not reference SILFunctions without public/public_external linkage.
   // FIXME: Once we support private conformances, update this.
@@ -3216,6 +3197,16 @@ void SILWitnessTable::verify(const SILModule &M) const {
       if (F) {
         assert(!isLessVisibleThan(F->getLinkage(), getLinkage()) &&
                "Witness tables should not reference less visible functions.");
+        assert(F->getLoweredFunctionType()->getRepresentation() ==
+               SILFunctionTypeRepresentation::WitnessMethod &&
+               "Witnesses must have witness_method representation.");
+        auto *witnessSelfProtocol = F->getLoweredFunctionType()
+            ->getDefaultWitnessMethodProtocol(*M.getSwiftModule());
+        assert((witnessSelfProtocol == nullptr ||
+                witnessSelfProtocol == protocol) &&
+               "Witnesses must either have a concrete Self, or an "
+               "an abstract Self that is constrained to their "
+               "protocol.");
       }
     }
 #endif
@@ -3224,29 +3215,22 @@ void SILWitnessTable::verify(const SILModule &M) const {
 /// Verify that a default witness table follows invariants.
 void SILDefaultWitnessTable::verify(const SILModule &M) const {
 #ifndef NDEBUG
-  assert(!isDeclaration() &&
-         "Default witness table declarations should not exist.");
-  assert(!getProtocol()->hasFixedLayout() &&
-         "Default witness table declarations for fixed-layout protocols should "
-         "not exist.");
-  assert(getProtocol()->getParentModule() == M.getSwiftModule() &&
-         "Default witness table declarations must appear in the same "
-         "module as their protocol.");
-
-  // All default witness tables have public conformances, thus default
-  // witness tables should not reference SILFunctions without
-  // public/public_external linkage.
   for (const Entry &E : getEntries()) {
     if (!E.isValid())
       continue;
 
     SILFunction *F = E.getWitness();
-    assert(!isLessVisibleThan(F->getLinkage(), SILLinkage::Public) &&
-           "Default witness tables should not reference internal "
-           "or private functions.");
+    assert(!isLessVisibleThan(F->getLinkage(), getLinkage()) &&
+           "Default witness tables should not reference "
+           "less visible functions.");
     assert(F->getLoweredFunctionType()->getRepresentation() ==
            SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");
+    auto *witnessSelfProtocol = F->getLoweredFunctionType()
+        ->getDefaultWitnessMethodProtocol(*M.getSwiftModule());
+    assert(witnessSelfProtocol == getProtocol() &&
+           "Default witnesses must have an abstract Self parameter "
+           "constrained to their protocol.");
   }
 #endif
 }
@@ -3276,7 +3260,7 @@ void SILModule::verify() const {
       llvm::errs() << "Symbol redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    f.verify();
+    f.verify(/*SingleFunction=*/ false);
   }
 
   // Check all globals.

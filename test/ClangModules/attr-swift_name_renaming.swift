@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -Xcc -w -parse -verify %s
 
+// XFAIL: linux
+
 import SwiftName
 
 func test() {
@@ -9,7 +11,14 @@ func test() {
 
   // Enum name remapping.
   var color: ColorKind = CT_red
-  var colo2: ColorType = CT_Red // FIXME: should provide Fix-It expected-error{{use of undeclared type 'ColorType'}}
+  var color2: ColorType = CT_Red // FIXME: should provide Fix-It expected-error{{use of undeclared type 'ColorType'}}
+
+  // Enumerator remapping.
+  var excuse: HomeworkExcuse = .dogAteIt
+  excuse = .overslept // FIXME: should provide Fix-It  expected-error{{type 'HomeworkExcuse' has no member 'overslept'}}
+  excuse = .tired
+  excuse = .tooHard // FIXME: should provide Fix-It expected-error{{type 'HomeworkExcuse' has no member 'tooHard'}}
+  excuse = .challenging
 
   // Typedef-of-anonymous-type-name renaming
   var p = Point()

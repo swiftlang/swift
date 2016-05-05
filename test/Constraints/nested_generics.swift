@@ -4,12 +4,12 @@ struct G<T> {
   init() {}
   init<U>(x:G<U>) { }
 
-  func foo<U>(x: G<U>) { }
+  func foo<U>(_ x: G<U>) { }
 
-  func bar<U>(x: U) { }
+  func bar<U>(_ x: U) { }
 
-  static func static_foo<U>(x: G<U>) { }
-  static func static_bar<U>(x: U) { }
+  static func static_foo<U>(_ x: G<U>) { }
+  static func static_bar<U>(_ x: U) { }
 }
 
 typealias GInt = G<Int>
@@ -48,6 +48,6 @@ struct AnyStream<T : Sequence> {
   }
 }
 
-func enumerate<T : Sequence>(arg: T) -> AnyStream<T> {
+func enumerate<T : Sequence>(_ arg: T) -> AnyStream<T> {
   return AnyStream<T>(input: arg)
 }

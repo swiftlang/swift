@@ -907,8 +907,8 @@ Types
   type ::= 'BB'                              // Builtin.UnsafeValueBuffer
   type ::= 'Bf' natural '_'                  // Builtin.Float<n>
   type ::= 'Bi' natural '_'                  // Builtin.Int<n>
-  type ::= 'BO'                              // Builtin.ObjCPointer
-  type ::= 'Bo'                              // Builtin.ObjectPointer
+  type ::= 'BO'                              // Builtin.UnknownObject
+  type ::= 'Bo'                              // Builtin.NativeObject
   type ::= 'Bp'                              // Builtin.RawPointer
   type ::= 'Bv' natural type                 // Builtin.Vec<n>x<type>
   type ::= 'Bw'                              // Builtin.Word
@@ -935,6 +935,7 @@ Types
   type ::= 'Xw' type                         // @weak type
   type ::= 'XF' impl-function-type           // function implementation type
   type ::= 'Xf' type type                    // @thin function type
+  type ::= 'Xb' type                         // SIL @box type
   nominal-type ::= known-nominal-type
   nominal-type ::= substitution
   nominal-type ::= nominal-type-kind declaration-name
@@ -1177,7 +1178,7 @@ associated substitution index. Otherwise, the entity is mangled normally, and
 it is then added to the substitution map and associated with the next
 available substitution index.
 
-For example,  in mangling a function type
+For example, in mangling a function type
 ``(zim.zang.zung, zim.zang.zung, zim.zippity) -> zim.zang.zoo`` (with module
 ``zim`` and class ``zim.zang``),
 the recurring contexts ``zim``, ``zim.zang``, and ``zim.zang.zung``

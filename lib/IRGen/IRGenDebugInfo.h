@@ -43,8 +43,6 @@ namespace irgen {
 
 class IRGenFunction;
 
-typedef struct { SILLocation::DebugLoc LocForLinetable, Loc; } FullLocation;
-
 typedef llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>
     TrackingDIRefMap;
 
@@ -75,13 +73,12 @@ class IRGenDebugInfo {
   llvm::DICompileUnit *TheCU = nullptr; /// The current compilation unit.
   llvm::DIFile *MainFile = nullptr;     /// The main file.
   llvm::DIModule *MainModule = nullptr; /// The current module.
-  llvm::MDNode *EntryPointFn;           /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
+  llvm::MDNode *EntryPointFn = nullptr; /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
   TypeAliasDecl *MetadataTypeDecl;      /// The type decl for swift.type.
   llvm::DIType *InternalType; /// Catch-all type for opaque internal types.
 
   SILLocation::DebugLoc LastDebugLoc; /// The last location that was emitted.
   const SILDebugScope *LastScope;     /// The scope of that last location.
-  bool IsLibrary; /// Whether this is a library or a top level module.
 #ifndef NDEBUG
   /// The basic block where the location was last changed.
   llvm::BasicBlock *LastBasicBlock;
@@ -149,7 +146,7 @@ public:
   /// \param Fn The IR representation of the function.
   /// \param Rep The calling convention of the function.
   /// \param Ty The signature of the function.
-  llvm::DISubprogram *emitFunction(SILModule &SILMod, const SILDebugScope *DS,
+  llvm::DISubprogram *emitFunction(const SILDebugScope *DS,
                                    llvm::Function *Fn,
                                    SILFunctionTypeRepresentation Rep,
                                    SILType Ty, DeclContext *DeclCtx = nullptr);
@@ -162,10 +159,10 @@ public:
   /// scope, and finally sets it using setCurrentLoc.
   inline void emitArtificialFunction(IRGenFunction &IGF, llvm::Function *Fn,
                                      SILType SILTy = SILType()) {
-    emitArtificialFunction(*IGF.IGM.SILMod, IGF.Builder, Fn, SILTy);
+    emitArtificialFunction(IGF.Builder, Fn, SILTy);
   }
 
-  void emitArtificialFunction(SILModule &SILMod, IRBuilder &Builder,
+  void emitArtificialFunction(IRBuilder &Builder,
                               llvm::Function *Fn, SILType SILTy = SILType());
 
   /// Emit a dbg.declare intrinsic at the current insertion point and

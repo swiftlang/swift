@@ -307,7 +307,8 @@ void StructLayoutBuilder::addNonFixedSizeElement(ElementLayout &elt) {
 
 /// Add an empty element to the aggregate.
 void StructLayoutBuilder::addEmptyElement(ElementLayout &elt) {
-  elt.completeEmpty(elt.getType().isPOD(ResilienceExpansion::Maximal));
+  elt.completeEmpty(elt.getType().isPOD(ResilienceExpansion::Maximal),
+                    CurSize);
 }
 
 /// Add an element at the fixed offset of the current end of the

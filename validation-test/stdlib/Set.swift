@@ -13,14 +13,8 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
+// For rand32
 import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
-
 import Foundation
 
 // For experimental Set operators
@@ -64,7 +58,7 @@ SetTestSuite.tearDown {
   expectNoLeaksOfObjCDictionaryKeysValues()
 }
 
-func getCOWFastSet(members: [Int] = [1010, 2020, 3030]) -> Set<Int> {
+func getCOWFastSet(_ members: [Int] = [1010, 2020, 3030]) -> Set<Int> {
   var s = Set<Int>(minimumCapacity: 10)
   for member in members {
     s.insert(member)
@@ -73,7 +67,7 @@ func getCOWFastSet(members: [Int] = [1010, 2020, 3030]) -> Set<Int> {
   return s
 }
 
-func getCOWSlowSet(members: [Int] = [1010, 2020, 3030]) -> Set<TestKeyTy> {
+func getCOWSlowSet(_ members: [Int] = [1010, 2020, 3030]) -> Set<TestKeyTy> {
   var s = Set<TestKeyTy>(minimumCapacity: 10)
   for member in members {
     s.insert(TestKeyTy(member))
@@ -82,7 +76,7 @@ func getCOWSlowSet(members: [Int] = [1010, 2020, 3030]) -> Set<TestKeyTy> {
   return s
 }
 
-func helperDeleteThree(k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
+func helperDeleteThree(_ k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
   var s1 = Set<TestKeyTy>(minimumCapacity: 10)
 
   s1.insert(k1)
@@ -104,15 +98,15 @@ func helperDeleteThree(k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
   expectEqual(0, s1.count)
 }
 
-func uniformRandom(max: Int) -> Int {
-  return Int(arc4random_uniform(UInt32(max)))
+func uniformRandom(_ max: Int) -> Int {
+  return Int(rand32(exclusiveUpperBound: UInt32(max)))
 }
 
-func pickRandom<T>(a: [T]) -> T {
+func pickRandom<T>(_ a: [T]) -> T {
   return a[uniformRandom(a.count)]
 }
 
-func isNativeSet<T : Hashable>(s: Set<T>) -> Bool {
+func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
   switch s._variantStorage {
   case .native:
     return true
@@ -121,12 +115,12 @@ func isNativeSet<T : Hashable>(s: Set<T>) -> Bool {
   }
 }
 
-func isNativeNSSet(s: NSSet) -> Bool {
+func isNativeNSSet(_ s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(s.dynamicType)
   return className.range(of: "NativeSetStorage").length > 0
 }
 
-func isCocoaNSSet(s: NSSet) -> Bool {
+func isCocoaNSSet(_ s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(s.dynamicType)
   return className.range(of: "NSSet").length > 0 ||
     className.range(of: "NSCFSet").length > 0
@@ -135,25 +129,25 @@ func isCocoaNSSet(s: NSSet) -> Bool {
 func getBridgedEmptyNSSet() -> NSSet {
   let s = Set<TestObjCKeyTy>()
 
-  let bridged = unsafeBitCast(_convertSetToNSSet(s), to: NSSet.self)
+  let bridged = unsafeBitCast(convertSetToNSSet(s), to: NSSet.self)
   expectTrue(isNativeNSSet(bridged))
 
   return bridged
 }
 
 
-func isCocoaSet<T : Hashable>(s: Set<T>) -> Bool {
+func isCocoaSet<T : Hashable>(_ s: Set<T>) -> Bool {
   return !isNativeSet(s)
 }
 
-func equalsUnordered(lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
+func equalsUnordered(_ lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
   return lhs.sorted().elementsEqual(rhs.sorted()) {
     $0 == $1
   }
 }
 
 /// Get an NSSet of TestObjCKeyTy values
-func getAsNSSet(members: [Int] = [1010, 2020, 3030]) -> NSSet {
+func getAsNSSet(_ members: [Int] = [1010, 2020, 3030]) -> NSSet {
   let nsArray = NSMutableArray()
   for member in members {
     nsArray.add(TestObjCKeyTy(member))
@@ -162,7 +156,7 @@ func getAsNSSet(members: [Int] = [1010, 2020, 3030]) -> NSSet {
 }
 
 /// Get an NSMutableSet of TestObjCKeyTy values
-func getAsNSMutableSet(members: [Int] = [1010, 2020, 3030]) -> NSMutableSet {
+func getAsNSMutableSet(_ members: [Int] = [1010, 2020, 3030]) -> NSMutableSet {
   let nsArray = NSMutableArray()
   for member in members {
     nsArray.add(TestObjCKeyTy(member))
@@ -170,17 +164,28 @@ func getAsNSMutableSet(members: [Int] = [1010, 2020, 3030]) -> NSMutableSet {
   return NSMutableSet(array: nsArray as [AnyObject])
 }
 
+public func convertSetToNSSet<T>(_ s: Set<T>) -> NSSet {
+  return s._bridgeToObjectiveC()
+}
+
+public func convertNSSetToSet<T : Hashable>(_ s: NSSet?) -> Set<T> {
+  if _slowPath(s == nil) { return [] }
+  var result: Set<T>?
+  Set._forceBridgeFromObjectiveC(s!, result: &result)
+  return result!
+}
+
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by Cocoa storage
-func getBridgedVerbatimSet(members: [Int] = [1010, 2020, 3030])
+func getBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030])
   -> Set<NSObject> {
   let nss = getAsNSSet(members)
-  let result: Set<NSObject> = _convertNSSetToSet(nss)
+  let result: Set<NSObject> = convertNSSetToSet(nss)
   expectTrue(isCocoaSet(result))
   return result
 }
 
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by native storage
-func getNativeBridgedVerbatimSet(members: [Int] = [1010, 2020, 3030]) ->
+func getNativeBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030]) ->
   Set<NSObject> {
   let result: Set<NSObject> = Set(members.map({ TestObjCKeyTy($0) }))
   expectTrue(isNativeSet(result))
@@ -190,13 +195,13 @@ func getNativeBridgedVerbatimSet(members: [Int] = [1010, 2020, 3030]) ->
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by Cocoa storage
 func getHugeBridgedVerbatimSet() -> Set<NSObject> {
   let nss = getAsNSSet(hugeNumberArray)
-  let result: Set<NSObject> = _convertNSSetToSet(nss)
+  let result: Set<NSObject> = convertNSSetToSet(nss)
   expectTrue(isCocoaSet(result))
   return result
 }
 
 /// Get a Set<TestBridgedKeyTy> backed by native storage
-func getBridgedNonverbatimSet(members: [Int] = [1010, 2020, 3030]) ->
+func getBridgedNonverbatimSet(_ members: [Int] = [1010, 2020, 3030]) ->
   Set<TestBridgedKeyTy> {
   let nss = getAsNSSet(members)
   let _ = unsafeBitCast(nss, to: Int.self)
@@ -218,7 +223,7 @@ func getHugeBridgedNonverbatimSet() -> Set<TestBridgedKeyTy> {
 
 func getBridgedVerbatimSetAndNSMutableSet() -> (Set<NSObject>, NSMutableSet) {
   let nss = getAsNSMutableSet()
-  return (_convertNSSetToSet(nss), nss)
+  return (convertNSSetToSet(nss), nss)
 }
 
 func getBridgedNonverbatimSetAndNSMutableSet()
@@ -236,7 +241,7 @@ func getBridgedNSSetOfRefTypesBridgedVerbatim() -> NSSet {
   s.insert(TestObjCKeyTy(3030))
 
   let bridged =
-    unsafeBitCast(_convertSetToNSSet(s), to: NSSet.self)
+    unsafeBitCast(convertSetToNSSet(s), to: NSSet.self)
 
   expectTrue(isNativeNSSet(bridged))
 
@@ -253,7 +258,7 @@ func getBridgedNSSet_ValueTypesCustomBridged(
     s.insert(TestBridgedKeyTy(i * 1000 + i * 10))
   }
 
-  let bridged = _convertSetToNSSet(s)
+  let bridged = convertSetToNSSet(s)
   expectTrue(isNativeNSSet(bridged))
 
   return bridged
@@ -267,9 +272,9 @@ func getRoundtripBridgedNSSet() -> NSSet {
 
   let nss = NSSet(array: items as [AnyObject])
 
-  let s: Set<NSObject> = _convertNSSetToSet(nss)
+  let s: Set<NSObject> = convertNSSetToSet(nss)
 
-  let bridgedBack = _convertSetToNSSet(s)
+  let bridgedBack = convertSetToNSSet(s)
   expectTrue(isCocoaNSSet(bridgedBack))
   // FIXME: this should be true.
   //expectTrue(unsafeBitCast(nsd, to: Int.self) == unsafeBitCast(bridgedBack, to: Int.self))
@@ -285,10 +290,21 @@ func getBridgedNSSet_MemberTypesCustomBridged() -> NSSet {
   s.insert(TestBridgedKeyTy(2020))
   s.insert(TestBridgedKeyTy(3030))
 
-  let bridged = _convertSetToNSSet(s)
+  let bridged = convertSetToNSSet(s)
   expectTrue(isNativeNSSet(bridged))
 
   return bridged
+}
+
+SetTestSuite.test("AssociatedTypes") {
+  typealias Collection = Set<MinimalHashableValue>
+  expectCollectionAssociatedTypes(
+    collectionType: Collection.self,
+    iteratorType: SetIterator<MinimalHashableValue>.self,
+    subSequenceType: Slice<Collection>.self,
+    indexType: SetIndex<MinimalHashableValue>.self,
+    indexDistanceType: Int.self,
+    indicesType: DefaultIndices<Collection>.self)
 }
 
 SetTestSuite.test("sizeof") {
@@ -534,8 +550,8 @@ SetTestSuite.test("COW.Slow.InsertDoesNotReallocate") {
     expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
     expectEqual(identity1, unsafeBitCast(s2, to: Int.self))
 
-    // Insert a redundant element.
-    s2.insert(TestKeyTy(2020))
+    // Replace a redundant element.
+    s2.update(with: TestKeyTy(2020))
     expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
     expectNotEqual(identity1, unsafeBitCast(s2, to: Int.self))
 
@@ -789,11 +805,11 @@ SetTestSuite.test("COW.Fast.UnionInPlaceSmallSetDoesNotReallocate") {
   let identity1 = unsafeBitCast(s1, to: Int.self)
 
   // Adding the empty set should obviously not allocate
-  s1.unionInPlace(Set<Int>())
+  s1.formUnion(Set<Int>())
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
 
   // adding a small set shouldn't cause a reallocation
-  s1.unionInPlace(s2)
+  s1.formUnion(s2)
   expectEqual(s1, s3)
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
 }
@@ -1104,7 +1120,7 @@ SetTestSuite.test("deleteChainCollisionRandomized") {
   print("time is \(timeNow)")
   srandom(timeNow)
 
-  func check(s: Set<TestKeyTy>) {
+  func check(_ s: Set<TestKeyTy>) {
     var keys = Array(s)
     for i in 0..<keys.count {
       for j in 0..<i {
@@ -1127,7 +1143,7 @@ SetTestSuite.test("deleteChainCollisionRandomized") {
   let chainLength = 7
 
   var knownKeys: [TestKeyTy] = []
-  func getKey(value: Int) -> TestKeyTy {
+  func getKey(_ value: Int) -> TestKeyTy {
     for k in knownKeys {
       if k.value == value {
         return k
@@ -1162,7 +1178,7 @@ class CustomImmutableNSSet : NSSet {
     super.init()
   }
 
-  override init(objects: UnsafePointer<AnyObject?>, count: Int) {
+  override init(objects: UnsafePointer<AnyObject>, count: Int) {
     expectUnreachable()
     super.init(objects: objects, count: count)
   }
@@ -1172,12 +1188,12 @@ class CustomImmutableNSSet : NSSet {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone) -> AnyObject {
+  override func copy(with zone: NSZone?) -> AnyObject {
     CustomImmutableNSSet.timesCopyWithZoneWasCalled += 1
     return self
   }
 
-  override func member(object: AnyObject) -> AnyObject? {
+  override func member(_ object: AnyObject) -> AnyObject? {
     CustomImmutableNSSet.timesMemberWasCalled += 1
     return getAsNSSet([ 1010, 1020, 1030 ]).member(object)
   }
@@ -1231,9 +1247,9 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SetIsCopied") {
 SetTestSuite.test("BridgedFromObjC.Verbatim.NSSetIsRetained") {
   var nss: NSSet = NSSet(set: getAsNSSet([ 1010, 1020, 1030 ]))
 
-  var s: Set<NSObject> = _convertNSSetToSet(nss)
+  var s: Set<NSObject> = convertNSSetToSet(nss)
 
-  var bridgedBack: NSSet = _convertSetToNSSet(s)
+  var bridgedBack: NSSet = convertSetToNSSet(s)
 
   expectEqual(
     unsafeBitCast(nss, to: Int.self),
@@ -1247,9 +1263,9 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.NSSetIsRetained") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.NSSetIsCopied") {
   var nss: NSSet = NSSet(set: getAsNSSet([ 1010, 1020, 1030 ]))
 
-  var s: Set<TestBridgedKeyTy> = _convertNSSetToSet(nss)
+  var s: Set<TestBridgedKeyTy> = convertNSSetToSet(nss)
 
-  var bridgedBack: NSSet = _convertSetToNSSet(s)
+  var bridgedBack: NSSet = convertSetToNSSet(s)
 
   expectNotEqual(
     unsafeBitCast(nss, to: Int.self),
@@ -1268,13 +1284,13 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ImmutableSetIsRetained") {
   CustomImmutableNSSet.timesMemberWasCalled = 0
   CustomImmutableNSSet.timesObjectEnumeratorWasCalled = 0
   CustomImmutableNSSet.timesCountWasCalled = 0
-  var s: Set<NSObject> = _convertNSSetToSet(nss)
+  var s: Set<NSObject> = convertNSSetToSet(nss)
   expectEqual(1, CustomImmutableNSSet.timesCopyWithZoneWasCalled)
   expectEqual(0, CustomImmutableNSSet.timesMemberWasCalled)
   expectEqual(0, CustomImmutableNSSet.timesObjectEnumeratorWasCalled)
   expectEqual(0, CustomImmutableNSSet.timesCountWasCalled)
 
-  var bridgedBack: NSSet = _convertSetToNSSet(s)
+  var bridgedBack: NSSet = convertSetToNSSet(s)
   expectEqual(
     unsafeBitCast(nss, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
@@ -1291,13 +1307,13 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableSetIsCopied") {
   CustomImmutableNSSet.timesMemberWasCalled = 0
   CustomImmutableNSSet.timesObjectEnumeratorWasCalled = 0
   CustomImmutableNSSet.timesCountWasCalled = 0
-  var s: Set<TestBridgedKeyTy> = _convertNSSetToSet(nss)
+  var s: Set<TestBridgedKeyTy> = convertNSSetToSet(nss)
   expectEqual(0, CustomImmutableNSSet.timesCopyWithZoneWasCalled)
   expectEqual(0, CustomImmutableNSSet.timesMemberWasCalled)
   expectEqual(1, CustomImmutableNSSet.timesObjectEnumeratorWasCalled)
   expectNotEqual(0, CustomImmutableNSSet.timesCountWasCalled)
 
-  var bridgedBack: NSSet = _convertSetToNSSet(s)
+  var bridgedBack: NSSet = convertSetToNSSet(s)
   expectNotEqual(
     unsafeBitCast(nss, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
@@ -1404,7 +1420,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
   expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 
   var members = [Int]()
-  for i in startIndex..<endIndex {
+  for i in s.indices {
     var foundMember: AnyObject = s[i]
     let member = foundMember as! TestObjCKeyTy
     members.append(member.value)
@@ -1432,7 +1448,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
   expectEqual(identity1, unsafeBitCast(s, to: Int.self))
 
   var members = [Int]()
-  for i in startIndex..<endIndex {
+  for i in s.indices {
     var foundMember: AnyObject = s[i]
     let member = foundMember as! TestObjCKeyTy
     members.append(member.value)
@@ -2087,7 +2103,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfSets") {
   var nsa = NSMutableArray()
   for i in 0..<3 {
     nsa.add(
-        getAsNSSet([ 1 + i,  2 + i, 3 + i ]))
+        getAsNSSet([1 + i,  2 + i, 3 + i]))
   }
 
   var a = nsa as [AnyObject] as! [Set<NSObject>]
@@ -2099,7 +2115,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfSets") {
       let v = (value as! TestObjCKeyTy).value
       items.append(v)
     }
-    var expectedItems = [ 1 + i, 2 + i, 3 + i ]
+    var expectedItems = [1 + i, 2 + i, 3 + i]
     expectTrue(equalsUnordered(items, expectedItems))
   }
 }
@@ -2108,7 +2124,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfSets") {
   var nsa = NSMutableArray()
   for i in 0..<3 {
     nsa.add(
-        getAsNSSet([ 1 + i, 2 + i, 3 + i ]))
+        getAsNSSet([1 + i, 2 + i, 3 + i]))
   }
 
   var a = nsa as [AnyObject] as! [Set<TestBridgedKeyTy>]
@@ -2119,7 +2135,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfSets") {
     while let value = iter.next() {
       items.append(value.value)
     }
-    var expectedItems = [ 1 + i, 2 + i, 3 + i ]
+    var expectedItems = [1 + i, 2 + i, 3 + i]
     expectTrue(equalsUnordered(items, expectedItems))
   }
 }
@@ -2157,7 +2173,7 @@ SetTestSuite.test("BridgingRoundtrip") {
     let v = (value as! TestObjCKeyTy).value
     items.append(v)
   }
-  expectTrue(equalsUnordered([ 1010, 2020, 3030 ], items))
+  expectTrue(equalsUnordered([1010, 2020, 3030], items))
 }
 
 SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFromSwift") {
@@ -2320,7 +2336,7 @@ SetTestSuite.test("BridgedToObjC.MemberTypesCustomBridged") {
   while let nextObject = enumerator.nextObject() {
     members.append((nextObject as! TestObjCKeyTy).value)
   }
-  expectTrue(equalsUnordered([ 1010, 2020, 3030 ], members))
+  expectTrue(equalsUnordered([1010, 2020, 3030], members))
 
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
@@ -2607,7 +2623,7 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditional") {
   }
 
   // Successful downcast.
-  if let sCV = s as? Set<TestObjCKeyTy>  {
+  if let sCV = s as? Set<TestObjCKeyTy> {
     expectEqual(3, sCV.count)
     expectTrue(sCV.contains(TestObjCKeyTy(1010)))
     expectTrue(sCV.contains(TestObjCKeyTy(2020)))
@@ -2672,16 +2688,16 @@ SetTestSuite.test("init(arrayLiteral:)") {
 SetTestSuite.test("isSubsetOf.Set.Set") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = Set([1010, 2020, 3030])
-  expectTrue(Set<Int>().isSubsetOf(s1))
-  expectFalse(s1.isSubsetOf(Set<Int>()))
-  expectTrue(s1.isSubsetOf(s1))
-  expectTrue(s2.isSubsetOf(s1))
+  expectTrue(Set<Int>().isSubset(of: s1))
+  expectFalse(s1.isSubset(of: Set<Int>()))
+  expectTrue(s1.isSubset(of: s1))
+  expectTrue(s2.isSubset(of: s1))
 }
 
 SetTestSuite.test("⊆.Set.Set") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = Set([1010, 2020, 3030])
-  expectTrue(Set<Int>().isSubsetOf(s1))
+  expectTrue(Set<Int>().isSubset(of: s1))
   expectFalse(s1 ⊆ Set<Int>())
   expectTrue(s1 ⊆ s1)
   expectTrue(s2 ⊆ s1)
@@ -2699,15 +2715,15 @@ SetTestSuite.test("⊈.Set.Set") {
 SetTestSuite.test("isSubsetOf.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = AnySequence([1010, 2020, 3030])
-  expectTrue(Set<Int>().isSubsetOf(s1))
-  expectFalse(s1.isSubsetOf(Set<Int>()))
-  expectTrue(s1.isSubsetOf(s1))
+  expectTrue(Set<Int>().isSubset(of: s1))
+  expectFalse(s1.isSubset(of: Set<Int>()))
+  expectTrue(s1.isSubset(of: s1))
 }
 
 SetTestSuite.test("⊆.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = AnySequence([1010, 2020, 3030])
-  expectTrue(Set<Int>().isSubsetOf(s1))
+  expectTrue(Set<Int>().isSubset(of: s1))
   expectFalse(s1 ⊆ Set<Int>())
   expectTrue(s1 ⊆ s1)
 }
@@ -2723,9 +2739,9 @@ SetTestSuite.test("⊈.Set.Sequence") {
 SetTestSuite.test("isStrictSubsetOf.Set.Set") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = Set([1010, 2020, 3030])
-  expectTrue(Set<Int>().isStrictSubsetOf(s1))
-  expectFalse(s1.isStrictSubsetOf(Set<Int>()))
-  expectFalse(s1.isStrictSubsetOf(s1))
+  expectTrue(Set<Int>().isStrictSubset(of: s1))
+  expectFalse(s1.isStrictSubset(of: Set<Int>()))
+  expectFalse(s1.isStrictSubset(of: s1))
 }
 
 SetTestSuite.test("⊂.Set.Set") {
@@ -2747,9 +2763,9 @@ SetTestSuite.test("⊄.Set.Set") {
 SetTestSuite.test("isStrictSubsetOf.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = AnySequence([1010, 2020, 3030])
-  expectTrue(Set<Int>().isStrictSubsetOf(s1))
-  expectFalse(s1.isStrictSubsetOf(Set<Int>()))
-  expectFalse(s1.isStrictSubsetOf(s1))
+  expectTrue(Set<Int>().isStrictSubset(of: s1))
+  expectFalse(s1.isStrictSubset(of: Set<Int>()))
+  expectFalse(s1.isStrictSubset(of: s1))
 }
 
 SetTestSuite.test("⊂.Set.Sequence") {
@@ -2771,11 +2787,11 @@ SetTestSuite.test("⊄.Set.Sequence") {
 SetTestSuite.test("isSupersetOf.Set.Set") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = Set([1010, 2020, 3030])
-  expectTrue(s1.isSupersetOf(Set<Int>()))
-  expectFalse(Set<Int>().isSupersetOf(s1))
-  expectTrue(s1.isSupersetOf(s1))
-  expectTrue(s1.isSupersetOf(s2))
-  expectFalse(Set<Int>().isSupersetOf(s1))
+  expectTrue(s1.isSuperset(of: Set<Int>()))
+  expectFalse(Set<Int>().isSuperset(of: s1))
+  expectTrue(s1.isSuperset(of: s1))
+  expectTrue(s1.isSuperset(of: s2))
+  expectFalse(Set<Int>().isSuperset(of: s1))
 }
 
 SetTestSuite.test("⊇.Set.Set") {
@@ -2801,11 +2817,11 @@ SetTestSuite.test("⊉.Set.Set") {
 SetTestSuite.test("isSupersetOf.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = AnySequence([1010, 2020, 3030])
-  expectTrue(s1.isSupersetOf(Set<Int>()))
-  expectFalse(Set<Int>().isSupersetOf(s1))
-  expectTrue(s1.isSupersetOf(s1))
-  expectTrue(s1.isSupersetOf(s2))
-  expectFalse(Set<Int>().isSupersetOf(s1))
+  expectTrue(s1.isSuperset(of: Set<Int>()))
+  expectFalse(Set<Int>().isSuperset(of: s1))
+  expectTrue(s1.isSuperset(of: s1))
+  expectTrue(s1.isSuperset(of: s2))
+  expectFalse(Set<Int>().isSuperset(of: s1))
 }
 
 SetTestSuite.test("⊇.Set.Sequence") {
@@ -2831,10 +2847,10 @@ SetTestSuite.test("⊉.Set.Sequence") {
 SetTestSuite.test("strictSuperset.Set.Set") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = Set([1010, 2020, 3030])
-  expectTrue(s1.isStrictSupersetOf(Set<Int>()))
-  expectFalse(Set<Int>().isStrictSupersetOf(s1))
-  expectFalse(s1.isStrictSupersetOf(s1))
-  expectTrue(s1.isStrictSupersetOf(s2))
+  expectTrue(s1.isStrictSuperset(of: Set<Int>()))
+  expectFalse(Set<Int>().isStrictSuperset(of: s1))
+  expectFalse(s1.isStrictSuperset(of: s1))
+  expectTrue(s1.isStrictSuperset(of: s2))
 }
 
 SetTestSuite.test("⊃.Set.Set") {
@@ -2858,10 +2874,10 @@ SetTestSuite.test("⊅.Set.Set") {
 SetTestSuite.test("strictSuperset.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = AnySequence([1010, 2020, 3030])
-  expectTrue(s1.isStrictSupersetOf(Set<Int>()))
-  expectFalse(Set<Int>().isStrictSupersetOf(s1))
-  expectFalse(s1.isStrictSupersetOf(s1))
-  expectTrue(s1.isStrictSupersetOf(s2))
+  expectTrue(s1.isStrictSuperset(of: Set<Int>()))
+  expectFalse(Set<Int>().isStrictSuperset(of: s1))
+  expectFalse(s1.isStrictSuperset(of: s1))
+  expectTrue(s1.isStrictSuperset(of: s2))
 }
 
 SetTestSuite.test("⊃.Set.Sequence") {
@@ -2928,29 +2944,65 @@ SetTestSuite.test("isDisjointWith.Set.Set") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = Set([1010, 2020, 3030])
   let s3 = Set([7070, 8080, 9090])
-  expectTrue(s1.isDisjointWith(s3))
-  expectFalse(s1.isDisjointWith(s2))
-  expectTrue(Set<Int>().isDisjointWith(s1))
-  expectTrue(Set<Int>().isDisjointWith(Set<Int>()))
+  expectTrue(s1.isDisjoint(with: s3))
+  expectFalse(s1.isDisjoint(with: s2))
+  expectTrue(Set<Int>().isDisjoint(with: s1))
+  expectTrue(Set<Int>().isDisjoint(with: Set<Int>()))
 }
 
 SetTestSuite.test("isDisjointWith.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = AnySequence([1010, 2020, 3030])
   let s3 = AnySequence([7070, 8080, 9090])
-  expectTrue(s1.isDisjointWith(s3))
-  expectFalse(s1.isDisjointWith(s2))
-  expectTrue(Set<Int>().isDisjointWith(s1))
-  expectTrue(Set<Int>().isDisjointWith(Set<Int>()))
+  expectTrue(s1.isDisjoint(with: s3))
+  expectFalse(s1.isDisjoint(with: s2))
+  expectTrue(Set<Int>().isDisjoint(with: s1))
+  expectTrue(Set<Int>().isDisjoint(with: Set<Int>()))
 }
 
 SetTestSuite.test("insert") {
   // These are anagrams - they should amount to the same sets.
-  var s1 = Set([1010, 2020, 3030])
+  var s1 = Set<TestKeyTy>([1010, 2020, 3030])
 
-  let identity1 = unsafeBitCast(s1, to: Int.self)
+  let fortyForty: TestKeyTy = 4040
+  do {
+    // Inserting an element that isn't present
+    let (inserted, currentMember) = s1.insert(fortyForty)
+    expectTrue(inserted)
+    expectTrue(currentMember === fortyForty)
+  }
+  
+  do {
+    // Inserting an element that is already present
+    let (inserted, currentMember) = s1.insert(4040)
+    expectFalse(inserted)
+    expectTrue(currentMember === fortyForty)
+  }
+  
+  expectEqual(4, s1.count)
+  expectTrue(s1.contains(1010))
+  expectTrue(s1.contains(2020))
+  expectTrue(s1.contains(3030))
+  expectTrue(s1.contains(4040))
+}
 
-  s1.insert(4040)
+SetTestSuite.test("replace") {
+  // These are anagrams - they should amount to the same sets.
+  var s1 = Set<TestKeyTy>([1010, 2020, 3030])
+
+  let fortyForty: TestKeyTy = 4040
+  do {
+    // Replacing an element that isn't present
+    let oldMember = s1.update(with: fortyForty)
+    expectEmpty(oldMember)
+  }
+  
+  do {
+    // Replacing an element that is already present
+    let oldMember = s1.update(with: 4040)
+    expectTrue(oldMember === fortyForty)
+  }
+  
   expectEqual(4, s1.count)
   expectTrue(s1.contains(1010))
   expectTrue(s1.contains(2020))
@@ -3010,7 +3062,7 @@ SetTestSuite.test("∪") {
   expectEqual(s1, Set<Int>() ∪ s1)
 }
 
-SetTestSuite.test("unionInPlace") {
+SetTestSuite.test("formUnion") {
   // These are anagrams - they should amount to the same sets.
   var s1 = Set("the morse code".characters)
   let s2 = Set("here come dots".characters)
@@ -3018,15 +3070,15 @@ SetTestSuite.test("unionInPlace") {
 
   let identity1 = unsafeBitCast(s1, to: Int.self)
 
-  s1.unionInPlace("".characters)
+  s1.formUnion("".characters)
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
 
   expectEqual(s1, s2)
-  s1.unionInPlace(s2)
+  s1.formUnion(s2)
   expectEqual(s1, s2)
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
 
-  s1.unionInPlace(s3)
+  s1.formUnion(s3)
   expectNotEqual(s1, s2)
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
 }
@@ -3061,20 +3113,20 @@ SetTestSuite.test("subtract") {
 
   // Subtracting a disjoint set should not create a
   // unique reference
-  let s4 = s1.subtract(s2)
+  let s4 = s1.subtracting(s2)
   expectEqual(s1, s4)
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
   expectEqual(identity1, unsafeBitCast(s4, to: Int.self))
 
   // Subtracting a superset will leave the set empty
-  let s5 = s1.subtract(s3)
+  let s5 = s1.subtracting(s3)
   expectTrue(s5.isEmpty)
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
   expectNotEqual(identity1, unsafeBitCast(s5, to: Int.self))
 
   // Subtracting the empty set does nothing
-  expectEqual(s1, s1.subtract(Set<Int>()))
-  expectEqual(Set<Int>(), Set<Int>().subtract(s1))
+  expectEqual(s1, s1.subtracting(Set<Int>()))
+  expectEqual(Set<Int>(), Set<Int>().subtracting(s1))
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
 }
 
@@ -3104,17 +3156,17 @@ SetTestSuite.test("∖") {
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
 }
 
-SetTestSuite.test("subtractInPlace") {
+SetTestSuite.test("subtract") {
   var s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = Set([1010, 2020, 3030])
   let s3 = Set([4040, 5050, 6060])
 
   let identity1 = unsafeBitCast(s1, to: Int.self)
 
-  s1.subtractInPlace(Set<Int>())
+  s1.subtract(Set<Int>())
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
 
-  s1.subtractInPlace(s3)
+  s1.subtract(s3)
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
 
   expectEqual(s1, s2)
@@ -3146,15 +3198,15 @@ SetTestSuite.test("intersect") {
 
   let identity1 = unsafeBitCast(s1, to: Int.self)
   expectEqual(Set([1010, 2020, 3030]),
-    Set([1010, 2020, 3030]).intersect(Set([1010, 2020, 3030])) as Set<Int>)
+    Set([1010, 2020, 3030]).intersection(Set([1010, 2020, 3030])) as Set<Int>)
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
 
-  expectEqual(s1, s1.intersect(s3))
+  expectEqual(s1, s1.intersection(s3))
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
 
-  expectEqual(Set<Int>(), Set<Int>().intersect(Set<Int>()))
-  expectEqual(Set<Int>(), s1.intersect(Set<Int>()))
-  expectEqual(Set<Int>(), Set<Int>().intersect(s1))
+  expectEqual(Set<Int>(), Set<Int>().intersection(Set<Int>()))
+  expectEqual(Set<Int>(), s1.intersection(Set<Int>()))
+  expectEqual(Set<Int>(), Set<Int>().intersection(s1))
 }
 
 SetTestSuite.test("∩") {
@@ -3176,30 +3228,30 @@ SetTestSuite.test("∩") {
   expectEqual(Set<Int>(), Set<Int>() ∩ s1)
 }
 
-SetTestSuite.test("intersectInPlace") {
+SetTestSuite.test("formIntersection") {
   var s1 = Set([1010, 2020, 3030])
   let s2 = Set([4040, 5050, 6060])
   var s3 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   var s4 = Set([1010, 2020, 3030])
 
   let identity1 = unsafeBitCast(s1, to: Int.self)
-  s1.intersectInPlace(s4)
+  s1.formIntersection(s4)
   expectEqual(s1, s4)
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
 
-  s4.intersectInPlace(s2)
+  s4.formIntersection(s2)
   expectEqual(Set<Int>(), s4)
 
   let identity2 = unsafeBitCast(s3, to: Int.self)
-  s3.intersectInPlace(s2)
+  s3.formIntersection(s2)
   expectEqual(s3, s2)
-  expectTrue(s1.isDisjointWith(s3))
+  expectTrue(s1.isDisjoint(with: s3))
   expectNotEqual(identity1, unsafeBitCast(s3, to: Int.self))
 
   var s5 = Set<Int>()
-  s5.intersectInPlace(s5)
+  s5.formIntersection(s5)
   expectEqual(s5, Set<Int>())
-  s5.intersectInPlace(s1)
+  s5.formIntersection(s1)
   expectEqual(s5, Set<Int>())
 }
 
@@ -3220,7 +3272,7 @@ SetTestSuite.test("∩=") {
   let identity2 = unsafeBitCast(s3, to: Int.self)
   s3 ∩= s2
   expectEqual(s3, s2)
-  expectTrue(s1.isDisjointWith(s3))
+  expectTrue(s1.isDisjoint(with: s3))
   expectNotEqual(identity1, unsafeBitCast(s3, to: Int.self))
 
   var s5 = Set<Int>()
@@ -3230,7 +3282,7 @@ SetTestSuite.test("∩=") {
   expectEqual(s5, Set<Int>())
 }
 
-SetTestSuite.test("exclusiveOr") {
+SetTestSuite.test("symmetricDifference") {
 
   // Overlap with 4040, 5050, 6060
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
@@ -3241,19 +3293,19 @@ SetTestSuite.test("exclusiveOr") {
 
   let identity1 = unsafeBitCast(s1, to: Int.self)
 
-  let s3 = s1.exclusiveOr(s2)
+  let s3 = s1.symmetricDifference(s2)
 
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
 
   expectEqual(s3, result)
 
-  expectEqual(s1.exclusiveOr(s2),
-    s1.union(s2).intersect(universe.subtract(s1.intersect(s2))))
+  expectEqual(s1.symmetricDifference(s2),
+    s1.union(s2).intersection(universe.subtracting(s1.intersection(s2))))
 
-  expectEqual(s1.exclusiveOr(s2),
-    s1.intersect(universe.subtract(s2)).union(universe.subtract(s1).intersect(s2)))
+  expectEqual(s1.symmetricDifference(s2),
+    s1.intersection(universe.subtracting(s2)).union(universe.subtracting(s1).intersection(s2)))
 
-  expectTrue(s1.exclusiveOr(s1).isEmpty)
+  expectTrue(s1.symmetricDifference(s1).isEmpty)
 }
 
 SetTestSuite.test("⨁") {
@@ -3282,7 +3334,7 @@ SetTestSuite.test("⨁") {
   expectTrue((s1 ⨁ s1).isEmpty)
 }
 
-SetTestSuite.test("exclusiveOrInPlace") {
+SetTestSuite.test("formSymmetricDifference") {
   // Overlap with 4040, 5050, 6060
   var s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = Set([1010])
@@ -3290,7 +3342,7 @@ SetTestSuite.test("exclusiveOrInPlace") {
 
   // s1 ⨁ s2 == result
   let identity1 = unsafeBitCast(s1, to: Int.self)
-  s1.exclusiveOrInPlace(s2)
+  s1.formSymmetricDifference(s2)
 
   // Removing just one element shouldn't cause an identity change
   expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
@@ -3298,7 +3350,7 @@ SetTestSuite.test("exclusiveOrInPlace") {
   expectEqual(s1, result)
 
   // A ⨁ A == {}
-  s1.exclusiveOrInPlace(s1)
+  s1.formSymmetricDifference(s1)
   expectTrue(s1.isEmpty)
 
   // Removing all elements should cause an identity change
@@ -3336,23 +3388,27 @@ SetTestSuite.test("removeFirst") {
   expectFalse(s1.contains(a1))
   expectTrue(s2.contains(a1))
   expectNotEqual(unsafeBitCast(s1, to: Int.self), unsafeBitCast(s2, to: Int.self))
-  expectTrue(s1.isSubsetOf(s2))
+  expectTrue(s1.isSubset(of: s2))
   expectEmpty(empty.first)
 }
 
 SetTestSuite.test("remove(member)") {
-  let s1 = Set([1010, 2020, 3030])
-  var s2 = Set<Int>(minimumCapacity: 10)
+  let s1 : Set<TestKeyTy> = [1010, 2020, 3030]
+  var s2 = Set<TestKeyTy>(minimumCapacity: 10)
   for i in [1010, 2020, 3030] {
-    s2.insert(i)
+    s2.insert(TestKeyTy(i))
   }
-
   let identity1 = unsafeBitCast(s2, to: Int.self)
-  s2.remove(4040)
+  
+  // remove something that's not there.
+  let fortyForty = s2.remove(4040)
   expectEqual(s2, s1)
+  expectEmpty(fortyForty)
   expectEqual(identity1, unsafeBitCast(s2, to: Int.self))
 
-  s2.remove(3030)
+  // Remove things that are there.
+  let thirtyThirty = s2.remove(3030)
+  expectEqual(3030, thirtyThirty)
   expectEqual(identity1, unsafeBitCast(s2, to: Int.self))
 
   s2.remove(2020)
@@ -3360,7 +3416,7 @@ SetTestSuite.test("remove(member)") {
 
   s2.remove(1010)
   expectEqual(identity1, unsafeBitCast(s2, to: Int.self))
-  expectEqual(Set<Int>(), s2)
+  expectEqual(Set(), s2)
   expectTrue(s2.isEmpty)
 }
 
@@ -3409,7 +3465,7 @@ class MockSetWithCustomCount : NSSet {
     super.init()
   }
 
-  override init( objects: UnsafePointer<AnyObject?>, count: Int) {
+  override init(objects: UnsafePointer<AnyObject>, count: Int) {
     expectUnreachable()
     super.init(objects: objects, count: count)
   }
@@ -3419,20 +3475,20 @@ class MockSetWithCustomCount : NSSet {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone) -> AnyObject {
+  override func copy(with zone: NSZone?) -> AnyObject {
     // Ensure that copying this set produces an object of the same
     // dynamic type.
     return self
   }
 
-  override func member(object: AnyObject) -> AnyObject? {
+  override func member(_ object: AnyObject) -> AnyObject? {
     expectUnreachable()
     return object
   }
 
   override func objectEnumerator() -> NSEnumerator {
     expectUnreachable()
-    return getAsNSSet([ 1010, 1020, 1030 ]).objectEnumerator()
+    return getAsNSSet([1010, 1020, 1030]).objectEnumerator()
   }
 
   override var count: Int {
@@ -3451,7 +3507,7 @@ func getMockSetWithCustomCount(count count: Int)
   return MockSetWithCustomCount(count: count) as Set
 }
 
-func callGenericIsEmpty<C : Collection>(collection: C) -> Bool {
+func callGenericIsEmpty<C : Collection>(_ collection: C) -> Bool {
   return collection.isEmpty
 }
 
@@ -3565,7 +3621,7 @@ SetTestSuite.test("_customIndexOfEquatableElement") {
 SetTestSuite.test("commutative") {
   let s1 = Set([1010, 2020, 3030])
   let s2 = Set([2020, 3030])
-  expectTrue(equalsUnordered(s1.intersect(s2), s2.intersect(s1)))
+  expectTrue(equalsUnordered(s1.intersection(s2), s2.intersection(s1)))
   expectTrue(equalsUnordered(s1.union(s2), s2.union(s1)))
 }
 
@@ -3576,8 +3632,8 @@ SetTestSuite.test("associative") {
   let s4 = Set([2020, 3030])
   let s5 = Set([7070, 8080, 9090])
 
-  expectTrue(equalsUnordered(s1.intersect(s2).intersect(s3),
-    s1.intersect(s2.intersect(s3))))
+  expectTrue(equalsUnordered(s1.intersection(s2).intersection(s3),
+    s1.intersection(s2.intersection(s3))))
   expectTrue(equalsUnordered(s3.union(s4).union(s5), s3.union(s4.union(s5))))
 }
 
@@ -3585,17 +3641,17 @@ SetTestSuite.test("distributive") {
   let s1 = Set([1010])
   let s2 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s3 = Set([2020, 3030])
-  expectTrue(equalsUnordered(s1.union(s2.intersect(s3)),
-    s1.union(s2).intersect(s1.union(s3))))
+  expectTrue(equalsUnordered(s1.union(s2.intersection(s3)),
+    s1.union(s2).intersection(s1.union(s3))))
 
   let s4 = Set([2020, 3030])
-  expectTrue(equalsUnordered(s4.intersect(s1.union(s3)),
-    s4.intersect(s1).union(s4.intersect(s3))))
+  expectTrue(equalsUnordered(s4.intersection(s1.union(s3)),
+    s4.intersection(s1).union(s4.intersection(s3))))
 }
 
 SetTestSuite.test("idempotent") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  expectTrue(equalsUnordered(s1, s1.intersect(s1)))
+  expectTrue(equalsUnordered(s1, s1.intersection(s1)))
   expectTrue(equalsUnordered(s1, s1.union(s1)))
 }
 
@@ -3603,8 +3659,8 @@ SetTestSuite.test("absorption") {
   let s1 = Set([1010, 2020, 3030])
   let s2 = Set([4040, 5050, 6060])
   let s3 = Set([2020, 3030])
-  expectTrue(equalsUnordered(s1, s1.union(s1.intersect(s2))))
-  expectTrue(equalsUnordered(s1, s1.intersect(s1.union(s3))))
+  expectTrue(equalsUnordered(s1, s1.union(s1.intersection(s2))))
+  expectTrue(equalsUnordered(s1, s1.intersection(s1.union(s3))))
 }
 
 SetTestSuite.test("misc") {
@@ -3681,37 +3737,37 @@ SetTestSuite.test("Operator.Precedence") {
 //===---
 
 SetTestSuite.test("mutationDoesNotAffectIterator/remove,1") {
-  var set = Set([ 1010, 1020, 1030 ])
+  var set = Set([1010, 1020, 1030])
   var iter = set.makeIterator()
   expectOptionalEqual(1010, set.remove(1010))
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
+  expectEqualsUnordered([1010, 1020, 1030], Array(IteratorSequence(iter)))
 }
 
 SetTestSuite.test("mutationDoesNotAffectIterator/remove,all") {
-  var set = Set([ 1010, 1020, 1030 ])
+  var set = Set([1010, 1020, 1030])
   var iter = set.makeIterator()
   expectOptionalEqual(1010, set.remove(1010))
   expectOptionalEqual(1020, set.remove(1020))
   expectOptionalEqual(1030, set.remove(1030))
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
+  expectEqualsUnordered([1010, 1020, 1030], Array(IteratorSequence(iter)))
 }
 
 SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepingCapacity=false") {
-  var set = Set([ 1010, 1020, 1030 ])
+  var set = Set([1010, 1020, 1030])
   var iter = set.makeIterator()
   set.removeAll(keepingCapacity: false)
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
+  expectEqualsUnordered([1010, 1020, 1030], Array(IteratorSequence(iter)))
 }
 
 SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepingCapacity=true") {
-  var set = Set([ 1010, 1020, 1030 ])
+  var set = Set([1010, 1020, 1030])
   var iter = set.makeIterator()
   set.removeAll(keepingCapacity: true)
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
+  expectEqualsUnordered([1010, 1020, 1030], Array(IteratorSequence(iter)))
 }
 
 runAllTests()

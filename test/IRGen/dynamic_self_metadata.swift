@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -parse-as-library | FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -7,7 +7,7 @@
 
 // CHECK: [[TYPE:%.+]] = type <{ [8 x i8] }>
 
-@inline(never) func id<T>(t: T) -> T {
+@inline(never) func id<T>(_ t: T) -> T {
   return t
 }
 // CHECK-LABEL: define hidden void @_TF21dynamic_self_metadata2idurFxx

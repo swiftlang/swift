@@ -19,10 +19,10 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SourceEntityWalker.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/Utils.h"
@@ -78,6 +78,8 @@ static StringRef getTagForParameter(PrintStructureKind context) {
     return "decl.function.returntype";
   case PrintStructureKind::FunctionType:
     return "";
+  case PrintStructureKind::TupleType:
+    return "tuple";
   case PrintStructureKind::TupleElement:
     return "tuple.element";
   case PrintStructureKind::GenericParameter:
@@ -181,11 +183,11 @@ private:
 
   // MARK: The ASTPrinter callback interface.
 
-  void printDeclPre(const Decl *D) override {
+  void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) override {
     contextStack.emplace_back(PrintContext(D));
     openTag(getTagForDecl(D, /*isRef=*/false));
   }
-  void printDeclPost(const Decl *D) override {
+  void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) override {
     assert(contextStack.back().getDecl() == D && "unmatched printDeclPre");
     contextStack.pop_back();
     closeTag(getTagForDecl(D, /*isRef=*/false));
@@ -217,8 +219,9 @@ private:
   }
 
   void printStructurePre(PrintStructureKind kind, const Decl *D) override {
-    if (kind == PrintStructureKind::TupleElement)
-      fixupTupleElement(kind);
+    if (kind == PrintStructureKind::TupleElement ||
+        kind == PrintStructureKind::TupleType)
+      fixupTuple(kind);
 
     contextStack.emplace_back(PrintContext(kind));
     auto tag = getTagForParameter(kind);
@@ -233,10 +236,11 @@ private:
     }
   }
   void printStructurePost(PrintStructureKind kind, const Decl *D) override {
-    if (kind == PrintStructureKind::TupleElement) {
+    if (kind == PrintStructureKind::TupleElement ||
+        kind == PrintStructureKind::TupleType) {
       auto prev = contextStack.pop_back_val();
       (void)prev;
-      fixupTupleElement(kind);
+      fixupTuple(kind);
       assert(prev.is(kind) && "unmatched printStructurePre");
     } else {
       assert(contextStack.back().is(kind) && "unmatched printStructurePre");
@@ -341,15 +345,20 @@ private:
     }
   }
 
-  /// 'Fix' a tuple element structure kind to be a function parameter if we are
-  /// currently inside a function type. This simplifies functions that need to
-  /// differentiate a tuple from the input part of a function type.
-  void fixupTupleElement(PrintStructureKind &kind) {
-    assert(kind == PrintStructureKind::TupleElement);
+  /// 'Fix' a tuple or tuple element structure kind to be a function parameter
+  /// or function type if we are currently inside a function type. This
+  /// simplifies functions that need to differentiate a tuple from the input
+  /// part of a function type.
+  void fixupTuple(PrintStructureKind &kind) {
+    assert(kind == PrintStructureKind::TupleElement ||
+           kind == PrintStructureKind::TupleType);
     // Skip over 'type's in the context stack.
     for (auto I = contextStack.rbegin(), E = contextStack.rend(); I != E; ++I) {
       if (I->is(PrintStructureKind::FunctionType)) {
-        kind = PrintStructureKind::FunctionParameter;
+        if (kind == PrintStructureKind::TupleElement)
+          kind = PrintStructureKind::FunctionParameter;
+        else
+          kind = PrintStructureKind::FunctionType;
         break;
       } else if (!I->isType()) {
         break;
@@ -388,7 +397,7 @@ static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty
   return Result;
 }
 
-static void printAnnotatedDeclaration(const ValueDecl *VD, const Type Ty,
+static void printAnnotatedDeclaration(const ValueDecl *VD,
                                       const Type BaseTy,
                                       raw_ostream &OS) {
   AnnotatedDeclarationPrinter Printer(OS);
@@ -422,6 +431,24 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
   while (VD->isImplicit() && VD->getOverriddenDecl())
     VD = VD->getOverriddenDecl();
 
+  VD->print(Printer, PO);
+}
+
+void SwiftLangSupport::
+printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
+                                          swift::NominalTypeDecl *Target,
+                                          llvm::raw_ostream &OS) {
+  static llvm::SmallDenseMap<swift::ValueDecl*,
+    std::unique_ptr<swift::SynthesizedExtensionAnalyzer>> TargetToAnalyzerMap;
+  FullyAnnotatedDeclarationPrinter Printer(OS);
+  PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
+  if (TargetToAnalyzerMap.count(Target) == 0) {
+    std::unique_ptr<SynthesizedExtensionAnalyzer> Analyzer(
+      new SynthesizedExtensionAnalyzer(Target, PO));
+    TargetToAnalyzerMap.insert({Target, std::move(Analyzer)});
+  }
+  auto *Analyzer = TargetToAnalyzerMap.find(Target)->getSecond().get();
+  PO.initArchetypeTransformerForSynthesizedExtensions(Target, Analyzer);
   VD->print(Printer, PO);
 }
 
@@ -572,6 +599,11 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   if (auto IFaceGenRef = IFaceGenContexts.find(Info.ModuleName, Invok))
     Info.ModuleInterfaceName = IFaceGenRef->getDocumentName();
   Info.IsSystem = Mod.isSystemModule();
+  std::vector<StringRef> Groups;
+  if (auto MD = Mod.getAsSwiftModule()) {
+    Info.ModuleGroupArray = ide::collectModuleGroups(const_cast<ModuleDecl*>(MD),
+                                                     Groups);
+  }
   Receiver(Info);
   return false;
 }
@@ -593,7 +625,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   auto BaseType = findBaseTypeForReplacingArchetype(VD, Ty);
   bool InSynthesizedExtension = false;
   if (BaseType) {
-    if(auto Target = BaseType->getAnyNominal()) {
+    if (auto Target = BaseType->getAnyNominal()) {
       SynthesizedExtensionAnalyzer Analyzer(Target,
                                             PrintOptions::printInterface());
       InSynthesizedExtension = Analyzer.isInSynthesizedExtension(VD);
@@ -632,10 +664,19 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   }
   unsigned DocCommentEnd = SS.size();
 
+  if (DocCommentEnd == DocCommentBegin) {
+    if (auto *Req = ASTPrinter::findConformancesWithDocComment(
+        const_cast<ValueDecl*>(VD))) {
+      llvm::raw_svector_ostream OS(SS);
+      ide::getDocumentationCommentAsXML(Req, OS);
+    }
+    DocCommentEnd = SS.size();
+  }
+
   unsigned DeclBegin = SS.size();
   {
     llvm::raw_svector_ostream OS(SS);
-    printAnnotatedDeclaration(VD, Ty, BaseType, OS);
+    printAnnotatedDeclaration(VD, BaseType, OS);
   }
   unsigned DeclEnd = SS.size();
 
@@ -702,7 +743,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
           llvm::raw_svector_ostream OSBuf(Buf);
           SwiftLangSupport::printDisplayName(RelatedDecl, OSBuf);
         }
-        llvm::markup::appendWithXMLEscaping(OS, Buf);
+        swift::markup::appendWithXMLEscaping(OS, Buf);
       }
       OS<<"</RelatedName>";
     }
@@ -994,6 +1035,144 @@ void SwiftLangSupport::getCursorInfo(
                 Receiver);
 }
 
+static void
+resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
+                     SwiftInvocationRef Invok, bool TryExistingAST,
+                     std::function<void(const CursorInfo &)> Receiver) {
+  assert(Invok);
+
+  class CursorInfoConsumer : public SwiftASTConsumer {
+    std::string InputFile;
+    StringRef USR;
+    SwiftLangSupport &Lang;
+    SwiftInvocationRef ASTInvok;
+    const bool TryExistingAST;
+    std::function<void(const CursorInfo &)> Receiver;
+    SmallVector<ImmutableTextSnapshotRef, 4> PreviousASTSnaps;
+
+  public:
+    CursorInfoConsumer(StringRef InputFile, StringRef USR,
+                       SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
+                       bool TryExistingAST,
+                       std::function<void(const CursorInfo &)> Receiver)
+        : InputFile(InputFile), USR(USR), Lang(Lang),
+          ASTInvok(std::move(ASTInvok)), TryExistingAST(TryExistingAST),
+          Receiver(std::move(Receiver)) {}
+
+    bool canUseASTWithSnapshots(
+        ArrayRef<ImmutableTextSnapshotRef> Snapshots) override {
+      if (!TryExistingAST) {
+        LOG_INFO_FUNC(High, "will resolve using up-to-date AST");
+        return false;
+      }
+
+      if (!Snapshots.empty()) {
+        PreviousASTSnaps.append(Snapshots.begin(), Snapshots.end());
+        LOG_INFO_FUNC(High, "will try existing AST");
+        return true;
+      }
+
+      LOG_INFO_FUNC(High, "will resolve using up-to-date AST");
+      return false;
+    }
+
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      auto &CompIns = AstUnit->getCompilerInstance();
+      Module *MainModule = CompIns.getMainModule();
+
+      unsigned BufferID =
+          AstUnit->getPrimarySourceFile().getBufferID().getValue();
+
+      trace::TracedOperation TracedOp;
+      if (trace::enabled()) {
+        trace::SwiftInvocation SwiftArgs;
+        ASTInvok->raw(SwiftArgs.Args.Args, SwiftArgs.Args.PrimaryFile);
+        trace::initTraceFiles(SwiftArgs, CompIns);
+        TracedOp.start(trace::OperationKind::CursorInfoForSource, SwiftArgs,
+                       {std::make_pair("USR", USR)});
+      }
+
+      if (USR.startswith("c:")) {
+        LOG_WARN_FUNC("lookup for C/C++/ObjC USRs not implemented");
+        Receiver({});
+        return;
+      }
+
+      auto &context = CompIns.getASTContext();
+      std::string error;
+      Decl *D = ide::getDeclFromUSR(context, USR, error);
+
+      if (!D) {
+        Receiver({});
+        return;
+      }
+
+      CompilerInvocation CompInvok;
+      ASTInvok->applyTo(CompInvok);
+
+      if (auto *M = dyn_cast<ModuleDecl>(D)) {
+        passCursorInfoForModule(M, Lang.getIFaceGenContexts(), CompInvok,
+                                Receiver);
+      } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        bool Failed =
+            passCursorInfoForDecl(VD, MainModule, VD->getType(),
+                                  /*isRef=*/false, BufferID, Lang, CompInvok,
+                                  PreviousASTSnaps, Receiver);
+        if (Failed) {
+          if (!PreviousASTSnaps.empty()) {
+            // Attempt again using the up-to-date AST.
+            resolveCursorFromUSR(Lang, InputFile, USR, ASTInvok,
+                                 /*TryExistingAST=*/false, Receiver);
+          } else {
+            Receiver({});
+          }
+        }
+      }
+    }
+
+    void cancelled() override {
+      CursorInfo Info;
+      Info.IsCancelled = true;
+      Receiver(Info);
+    }
+
+    void failed(StringRef Error) override {
+      LOG_WARN_FUNC("cursor info failed: " << Error);
+      Receiver({});
+    }
+  };
+
+  auto Consumer = std::make_shared<CursorInfoConsumer>(
+      InputFile, USR, Lang, Invok, TryExistingAST, Receiver);
+  /// FIXME: When request cancellation is implemented and Xcode adopts it,
+  /// don't use 'OncePerASTToken'.
+  static const char OncePerASTToken = 0;
+  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer),
+                                       &OncePerASTToken);
+}
+
+void SwiftLangSupport::getCursorInfoFromUSR(
+    StringRef filename, StringRef USR, ArrayRef<const char *> args,
+    std::function<void(const CursorInfo &)> receiver) {
+  if (auto IFaceGenRef = IFaceGenContexts.get(filename)) {
+    LOG_WARN_FUNC("info from usr for generated interface not implemented yet");
+    receiver({});
+    return;
+  }
+
+  std::string error;
+  SwiftInvocationRef invok = ASTMgr->getInvocation(args, filename, error);
+  if (!invok) {
+    // FIXME: Report it as failed request.
+    LOG_WARN_FUNC("failed to create an ASTInvocation: " << error);
+    receiver({});
+    return;
+  }
+
+  resolveCursorFromUSR(*this, filename, USR, invok, /*TryExistingAST=*/true,
+                       receiver);
+}
+
 //===----------------------------------------------------------------------===//
 // SwiftLangSupport::findUSRRange
 //===----------------------------------------------------------------------===//
@@ -1013,7 +1192,7 @@ SwiftLangSupport::findUSRRange(StringRef DocumentName, StringRef USR) {
 //===----------------------------------------------------------------------===//
 
 namespace {
-class RelatedIdScanner : public ide::SourceEntityWalker {
+class RelatedIdScanner : public SourceEntityWalker {
   ValueDecl *Dcl;
   llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> &Ranges;
   SourceManager &SourceMgr;

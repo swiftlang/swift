@@ -36,7 +36,8 @@
       key.name: "Int",
       key.usr: "s:Si",
       key.line: 4,
-      key.column: 12
+      key.column: 12,
+      key.groupname: "Math/Integers"
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -85,21 +86,24 @@
               key.name: "Int",
               key.usr: "s:Si",
               key.line: 10,
-              key.column: 25
+              key.column: 27,
+              key.groupname: "Math/Integers"
             },
             {
               key.kind: source.lang.swift.ref.struct,
               key.name: "Float",
               key.usr: "s:Sf",
               key.line: 10,
-              key.column: 33
+              key.column: 35,
+              key.groupname: "Math/Floating"
             },
             {
               key.kind: source.lang.swift.ref.struct,
               key.name: "Int",
               key.usr: "s:Si",
               key.line: 10,
-              key.column: 43
+              key.column: 45,
+              key.groupname: "Math/Integers"
             }
           ]
         },
@@ -115,21 +119,24 @@
               key.name: "Int",
               key.usr: "s:Si",
               key.line: 13,
-              key.column: 27
+              key.column: 27,
+              key.groupname: "Math/Integers"
             },
             {
               key.kind: source.lang.swift.ref.struct,
               key.name: "Float",
               key.usr: "s:Sf",
               key.line: 13,
-              key.column: 37
+              key.column: 37,
+              key.groupname: "Math/Floating"
             },
             {
               key.kind: source.lang.swift.ref.struct,
               key.name: "Int",
               key.usr: "s:Si",
               key.line: 13,
-              key.column: 47
+              key.column: 47,
+              key.groupname: "Math/Integers"
             }
           ]
         },
@@ -230,7 +237,7 @@
               key.name: "Prot",
               key.usr: "s:P5index4Prot",
               key.line: 33,
-              key.column: 20
+              key.column: 22
             }
           ]
         }
@@ -239,7 +246,7 @@
     {
       key.kind: source.lang.swift.decl.function.free,
       key.name: "foo(_:b:)",
-      key.usr: "s:F5index3fooFTCS_2CC1bOS_1E_T_",
+      key.usr: "s:F5index3fooFTCS_2CC1bROS_1E_T_",
       key.line: 36,
       key.column: 6,
       key.entities: [
@@ -248,14 +255,14 @@
           key.name: "CC",
           key.usr: "s:C5index2CC",
           key.line: 36,
-          key.column: 13
+          key.column: 15
         },
         {
           key.kind: source.lang.swift.ref.enum,
           key.name: "E",
           key.usr: "s:O5index1E",
           key.line: 36,
-          key.column: 24
+          key.column: 28
         },
         {
           key.kind: source.lang.swift.ref.var.global,
@@ -401,7 +408,7 @@
               key.name: "CCAlias",
               key.usr: "s:5index7CCAlias",
               key.line: 50,
-              key.column: 17
+              key.column: 19
             }
           ]
         },
@@ -424,7 +431,7 @@
               key.name: "Prot",
               key.usr: "s:P5index4Prot",
               key.line: 51,
-              key.column: 20
+              key.column: 22
             }
           ]
         },
@@ -448,7 +455,8 @@
           key.name: "Int",
           key.usr: "s:Si",
           key.line: 52,
-          key.column: 14
+          key.column: 14,
+          key.groupname: "Math/Integers"
         }
       ]
     },
@@ -552,7 +560,8 @@
           key.name: "Int",
           key.usr: "s:Si",
           key.line: 60,
-          key.column: 15
+          key.column: 15,
+          key.groupname: "Math/Integers"
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -574,7 +583,8 @@
           key.name: "Int",
           key.usr: "s:Si",
           key.line: 70,
-          key.column: 18
+          key.column: 18,
+          key.groupname: "Math/Integers"
         }
       ]
     },
@@ -597,7 +607,7 @@
               key.name: "Prot",
               key.usr: "s:P5index4Prot",
               key.line: 74,
-              key.column: 20
+              key.column: 22
             }
           ]
         }
@@ -664,7 +674,7 @@
               key.name: "Prot",
               key.usr: "s:P5index4Prot",
               key.line: 77,
-              key.column: 29
+              key.column: 31
             }
           ]
         }
@@ -701,7 +711,8 @@
                   key.name: "+(_:_:)",
                   key.usr: "s:ZFsoi1pFTSiSi_Si",
                   key.line: 86,
-                  key.column: 8
+                  key.column: 8,
+                  key.groupname: "Math/Integers"
                 }
               ]
             }
@@ -721,14 +732,14 @@
           key.name: "ComputedProperty",
           key.usr: "s:C5index16ComputedProperty",
           key.line: 91,
-          key.column: 16
+          key.column: 18
         },
         {
           key.kind: source.lang.swift.ref.class,
           key.name: "CC2",
           key.usr: "s:C5index3CC2",
           key.line: 91,
-          key.column: 39
+          key.column: 41
         },
         {
           key.kind: source.lang.swift.ref.var.instance,
@@ -786,7 +797,8 @@
           key.name: "++(_:)",
           key.usr: "s:ZFsop2ppFRSiSi",
           key.line: 95,
-          key.column: 3
+          key.column: 3,
+          key.groupname: "Math/Integers"
         },
         {
           key.kind: source.lang.swift.ref.var.instance,
@@ -852,7 +864,8 @@
           key.name: "++(_:)",
           key.usr: "s:ZFsop2ppFRSiSi",
           key.line: 98,
-          key.column: 3
+          key.column: 3,
+          key.groupname: "Math/Integers"
         },
         {
           key.kind: source.lang.swift.ref.function.subscript,
@@ -1055,14 +1068,14 @@
           key.name: "SB1",
           key.usr: "s:C5index3SB1",
           key.line: 127,
-          key.column: 15
+          key.column: 17
         },
         {
           key.kind: source.lang.swift.ref.struct,
           key.name: "S2",
           key.usr: "s:V5index2S2",
           key.line: 127,
-          key.column: 23
+          key.column: 25
         },
         {
           key.kind: source.lang.swift.ref.function.free,
@@ -1203,7 +1216,8 @@
               key.name: "Int",
               key.usr: "s:Si",
               key.line: 154,
-              key.column: 23
+              key.column: 23,
+              key.groupname: "Math/Integers"
             },
             {
               key.kind: source.lang.swift.ref.function.constructor,
@@ -1260,7 +1274,8 @@
               key.name: "Int",
               key.usr: "s:Si",
               key.line: 160,
-              key.column: 11
+              key.column: 11,
+              key.groupname: "Math/Integers"
             },
             {
               key.kind: source.lang.swift.ref.function.constructor,
@@ -1332,7 +1347,8 @@
           key.name: "Int",
           key.usr: "s:Si",
           key.line: 167,
-          key.column: 23
+          key.column: 23,
+          key.groupname: "Math/Integers"
         }
       ]
     },
@@ -1363,7 +1379,8 @@
           key.name: "Int",
           key.usr: "s:Si",
           key.line: 180,
-          key.column: 11
+          key.column: 11,
+          key.groupname: "Math/Integers"
         }
       ]
     },
@@ -1400,7 +1417,8 @@
           key.name: "Int",
           key.usr: "s:Si",
           key.line: 192,
-          key.column: 11
+          key.column: 11,
+          key.groupname: "Math/Integers"
         }
       ]
     },

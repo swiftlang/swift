@@ -8,8 +8,8 @@ class B : A {
   override func printA() { print("B", terminator: "") }
 }
 
-func printA(v: A) { v.printA() }
-func printOpt<T>(subprint: T -> ()) -> (T?) -> () {
+func printA(_ v: A) { v.printA() }
+func printOpt<T>(_ subprint: T -> ()) -> (T?) -> () {
   return { x in
     switch (x) {
     case .some(let y): print(".some(", terminator: ""); subprint(y); print(")", terminator: "")
@@ -18,7 +18,7 @@ func printOpt<T>(subprint: T -> ()) -> (T?) -> () {
   }
 }
 
-func test(v: A????, _ cast: (A????) -> B?) {
+func test(_ v: A????, _ cast: (A????) -> B?) {
   printOpt(printOpt(printOpt(printOpt(printA))))(v)
   print(" as? B: ", terminator: "")
   printOpt(printA)(cast(v))
@@ -37,7 +37,7 @@ test(.none, { $0 as? B })
 // CHECK: .some(.none) as? B: .none
 // CHECK: .none as? B: .none
 
-func test(v: A????, _ cast: (A????) -> B??) {
+func test(_ v: A????, _ cast: (A????) -> B??) {
   printOpt(printOpt(printOpt(printOpt(printA))))(v)
   print(" as? B?: ", terminator: "")
   printOpt(printOpt(printA))(cast(v))
@@ -56,7 +56,7 @@ test(.none, { $0 as? B? })
 // CHECK: .some(.none) as? B?: .none
 // CHECK: .none as? B?: .none
 
-func test(v: A????, _ cast: (A????) -> B???) {
+func test(_ v: A????, _ cast: (A????) -> B???) {
   printOpt(printOpt(printOpt(printOpt(printA))))(v)
   print(" as? B??: ", terminator: "")
   printOpt(printOpt(printOpt(printA)))(cast(v))

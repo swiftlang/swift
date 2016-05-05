@@ -4,14 +4,14 @@ struct X { }
 struct Y { }
 struct Z { }
 
-func f0(x1: X, x2: X) -> X {} // expected-note{{found this candidate}}
-func f0(y1: Y, y2: Y) -> Y {} // expected-note{{found this candidate}}
+func f0(_ x1: X, x2: X) -> X {} // expected-note{{found this candidate}}
+func f0(_ y1: Y, y2: Y) -> Y {} // expected-note{{found this candidate}}
 var f0 : X // expected-note {{found this candidate}} expected-note {{'f0' previously declared here}}
-func f0_init(x: X, y: Y) -> X {}
+func f0_init(_ x: X, y: Y) -> X {}
 var f0 : (x : X, y : Y) -> X = f0_init // expected-error{{invalid redeclaration}}
-func f1(x: X) -> X {}
+func f1(_ x: X) -> X {}
 
-func f2(g: (x: X) -> X) -> ((y: Y) -> Y) { }
+func f2(_ g: (x: X) -> X) -> ((y: Y) -> Y) { }
 
 func test_conv() {
   var _ : (x1 : X, x2 : X) -> X = f0
@@ -37,10 +37,10 @@ func test_conv() {
 var xy : X // expected-note {{previously declared here}}
 var xy : Y // expected-error {{invalid redeclaration of 'xy'}}
 
-func accept_X(x: inout X) { }
-func accept_XY(x: inout X) -> X { }
-func accept_XY(y: inout Y) -> Y { }
-func accept_Z(z: inout Z) -> Z { }
+func accept_X(_ x: inout X) { }
+func accept_XY(_ x: inout X) -> X { }
+func accept_XY(_ y: inout Y) -> Y { }
+func accept_Z(_ z: inout Z) -> Z { }
 
 func test_inout() {
   var x : X
@@ -56,8 +56,8 @@ func test_inout() {
   accept_Z(&xy); // expected-error{{cannot convert value of type 'X' to expected argument type 'Z'}}
 }
 
-func lvalue_or_rvalue(x: inout X) -> X { }
-func lvalue_or_rvalue(x: X) -> Y { }
+func lvalue_or_rvalue(_ x: inout X) -> X { }
+func lvalue_or_rvalue(_ x: X) -> Y { }
 
 func test_lvalue_or_rvalue() {
   var x : X

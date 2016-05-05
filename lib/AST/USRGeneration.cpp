@@ -122,8 +122,20 @@ bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
   // and the USR of the first value member of the extension.
   for (auto D : ED->getMembers()) {
     if (auto VD = dyn_cast<ValueDecl>(D)) {
-      OS << "ext:";
+      OS << getUSRSpacePrefix() << "e:";
       return printDeclUSR(VD, OS);
+    }
+  }
+  if (ED->getExtendedType() && ED->getExtendedType()->getAnyNominal()) {
+    OS << getUSRSpacePrefix() << "e:";
+    printDeclUSR(ED->getExtendedType()->getAnyNominal(), OS);
+  } else {
+    return true;
+  }
+  for (auto Inherit : ED->getInherited()) {
+    if (auto T = Inherit.getType()) {
+      if (T->getAnyNominal())
+        return printDeclUSR(T->getAnyNominal(), OS);
     }
   }
   return true;

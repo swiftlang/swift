@@ -97,6 +97,7 @@ public:
   ///
   /// \return true if any fulfillments were added by this search.
   bool searchTypeMetadata(IRGenModule &IGM, CanType type, IsExact_t isExact,
+                          bool isSelfParameter,
                           unsigned sourceIndex, MetadataPath &&path,
                           const InterestingKeysCallback &interestingKeys);
 
@@ -140,7 +141,8 @@ public:
   }
 
 private:
-  bool searchParentTypeMetadata(IRGenModule &IGM, CanType parent,
+  bool searchParentTypeMetadata(IRGenModule &IGM, NominalTypeDecl *typeDecl,
+                                CanType parent,
                                 unsigned source, MetadataPath &&path,
                                 const InterestingKeysCallback &keys);
 
@@ -149,7 +151,8 @@ private:
                                  const InterestingKeysCallback &keys);
 
   bool searchBoundGenericTypeMetadata(IRGenModule &IGM, CanBoundGenericType type,
-                                      unsigned source, MetadataPath &&path,
+                                      unsigned source, bool isSelfParameter,
+                                      MetadataPath &&path,
                                       const InterestingKeysCallback &keys);
 
   /// Search the given witness table for useful fulfillments.

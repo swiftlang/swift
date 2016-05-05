@@ -5,7 +5,7 @@ struct Q<T: Collection> : Sequence {
     return base.makeIterator()
   }
   
-  func _adopt(newBuffer: Array<Q<T>.Iterator.Element>) {
+  func _adopt(_ newBuffer: Array<Q<T>.Iterator.Element>) {
   }
   var base: T
 }

@@ -41,6 +41,6 @@ namespace swift {
       return out;
     }
   };
-}
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_QUOTEDSTRING_H

@@ -22,7 +22,7 @@ class X {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup15direct_to_class
-func direct_to_class(obj: AnyObject) {
+func direct_to_class(_ obj: AnyObject) {
   // CHECK: [[OBJ_SELF:%[0-9]+]] = open_existential_ref [[EX:%[0-9]+]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign : (X) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK: apply [[METHOD]]([[OBJ_SELF]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
@@ -30,7 +30,7 @@ func direct_to_class(obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup18direct_to_protocol
-func direct_to_protocol(obj: AnyObject) {
+func direct_to_protocol(_ obj: AnyObject) {
   // CHECK: [[OBJ_SELF:%[0-9]+]] = open_existential_ref [[EX:%[0-9]+]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #P.g!1.foreign : <Self where Self : P> Self -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK: apply [[METHOD]]([[OBJ_SELF]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
@@ -38,7 +38,7 @@ func direct_to_protocol(obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup23direct_to_static_method
-func direct_to_static_method(obj: AnyObject) {
+func direct_to_static_method(_ obj: AnyObject) {
   var obj = obj
   // CHECK: [[START:[A-Za-z0-9_]+]]([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box $AnyObject
@@ -53,7 +53,7 @@ func direct_to_static_method(obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup12opt_to_class
-func opt_to_class(obj: AnyObject) {
+func opt_to_class(_ obj: AnyObject) {
   var obj = obj
   // CHECK: [[ENTRY:[A-Za-z0-9]+]]([[PARAM:%[0-9]+]] : $AnyObject)
   // CHECK: [[EXISTBOX:%[0-9]+]] = alloc_box $AnyObject 
@@ -88,7 +88,7 @@ func opt_to_class(obj: AnyObject) {
   // CHECK-NEXT: [[OPT:%.*]] = load [[OPTTEMP]]
   // CHECK-NEXT: store [[OPT]] to [[PBOPT]] : $*ImplicitlyUnwrappedOptional<() -> ()>
   // CHECK-NEXT: dealloc_stack [[OPTTEMP]]
-  var of = obj.f
+  var of: (() -> ())! = obj.f
 
   // Exit
   // CHECK-NEXT: strong_release [[OBJ_SELF]] : $@opened({{".*"}}) AnyObject
@@ -100,13 +100,13 @@ func opt_to_class(obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup20forced_without_outer
-func forced_without_outer(obj: AnyObject) {
+func forced_without_outer(_ obj: AnyObject) {
   // CHECK: dynamic_method_br
   var f = obj.f!
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup20opt_to_static_method
-func opt_to_static_method(obj: AnyObject) {
+func opt_to_static_method(_ obj: AnyObject) {
   var obj = obj
   // CHECK: [[ENTRY:[A-Za-z0-9]+]]([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box $AnyObject
@@ -120,11 +120,11 @@ func opt_to_static_method(obj: AnyObject) {
   // CHECK-NEXT: [[OBJCMETA:%[0-9]+]] = thick_to_objc_metatype [[OPENMETA]]
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<() -> ()>
   // CHECK-NEXT: dynamic_method_br [[OBJCMETA]] : $@objc_metatype (@opened({{".*"}}) AnyObject).Type, #X.staticF!1.foreign, [[HASMETHOD:[A-Za-z0-9_]+]], [[NOMETHOD:[A-Za-z0-9_]+]]
-  var optF = obj.dynamicType.staticF
+  var optF: (() -> ())! = obj.dynamicType.staticF
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup15opt_to_property
-func opt_to_property(obj: AnyObject) {
+func opt_to_property(_ obj: AnyObject) {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
@@ -150,7 +150,7 @@ func opt_to_property(obj: AnyObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup19direct_to_subscript
-func direct_to_subscript(obj: AnyObject, i: Int) {
+func direct_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
@@ -182,7 +182,7 @@ func direct_to_subscript(obj: AnyObject, i: Int) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup16opt_to_subscript
-func opt_to_subscript(obj: AnyObject, i: Int) {
+func opt_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
@@ -211,7 +211,7 @@ func opt_to_subscript(obj: AnyObject, i: Int) {
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup8downcast
-func downcast(obj: AnyObject) -> X {
+func downcast(_ obj: AnyObject) -> X {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
@@ -224,4 +224,34 @@ func downcast(obj: AnyObject) -> X {
   // CHECK-NEXT: strong_release %0
   // CHECK-NEXT: return [[X]] : $X
   return obj as! X
+}
+
+@objc class Juice { }
+
+@objc protocol Fruit {
+  optional var juice: Juice { get }
+}
+
+// CHECK-LABEL: sil hidden @_TF14dynamic_lookup7consumeFPS_5Fruit_T_
+// CHECK: bb0(%0 : $Fruit):
+// CHECK:        [[BOX:%.*]] = alloc_stack $Optional<Juice>
+// CHECK:        dynamic_method_br [[SELF:%.*]] : $@opened("{{.*}}") Fruit, #Fruit.juice!getter.1.foreign, bb1, bb2
+
+// CHECK: bb1([[FN:%.*]] : $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice):
+// CHECK:        [[METHOD:%.*]] = partial_apply [[FN]]([[SELF]]) : $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice
+// CHECK:        [[RESULT:%.*]] = apply [[METHOD]]() : $@callee_owned () -> @owned Juice
+// CHECK:        [[PAYLOAD:%.*]] = init_enum_data_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt.1
+// CHECK:        store [[RESULT]] to [[PAYLOAD]]
+// CHECK:        inject_enum_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt.1
+// CHECK:        br bb3
+
+// CHECK: bb2:
+// CHECK:        inject_enum_addr [[BOX]] : $*Optional<Juice>, #Optional.none!enumelt
+// CHECK:        br bb3
+
+// CHECK: bb3:
+// CHECK:        return
+
+func consume(_ fruit: Fruit) {
+  _ = fruit.juice
 }

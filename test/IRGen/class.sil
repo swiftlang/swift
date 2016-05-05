@@ -133,7 +133,7 @@ class RequiredBase: NonRequiredBase {
 }
 
 sil public_external @init_NonRequiredBase : $@convention(method) (@owned NonRequiredBase) -> @owned NonRequiredBase
-sil public_external @alloc_RequiredBase : $@convention(thin) (@thick RequiredBase.Type) -> @owned RequiredBase
+sil public_external @alloc_RequiredBase : $@convention(method) (@thick RequiredBase.Type) -> @owned RequiredBase
 sil public_external @init_RequiredBase : $@convention(method) (@owned RequiredBase) -> @owned RequiredBase
 
 sil_vtable NonRequiredBase {
@@ -163,8 +163,7 @@ entry(%x : $ClassConstrainedGenericField<ClassConstraintConformance>):
   %b = load %a : $*ClassConstraintConformance
   return %b : $ClassConstraintConformance
 }
-// CHECK-LABEL: define{{( protected)?}} %C5class26ClassConstraintConformance* @fixed_class_generic_field(%C5class28ClassConstrainedGenericField*)
-// CHECK:         [[FIELD_ADDR_GENERIC:%.*]] = getelementptr inbounds %C5class28ClassConstrainedGenericField, %C5class28ClassConstrainedGenericField* %0, i32 0, i32 1
-// CHECK:         [[FIELD_ADDR_CONCRETE:%.*]] = bitcast %objc_object** [[FIELD_ADDR_GENERIC]] to %C5class26ClassConstraintConformance**
-// CHECK:         load %C5class26ClassConstraintConformance*, %C5class26ClassConstraintConformance** [[FIELD_ADDR_CONCRETE]]
+// CHECK-LABEL: define{{( protected)?}} %C5class26ClassConstraintConformance* @fixed_class_generic_field(%GC5class28ClassConstrainedGenericFieldCS_26ClassConstraintConformance_*)
+// CHECK:         [[FIELD_ADDR_GENERIC:%.*]] = getelementptr inbounds %GC5class28ClassConstrainedGenericFieldCS_26ClassConstraintConformance_, %GC5class28ClassConstrainedGenericFieldCS_26ClassConstraintConformance_* %0, i32 0, i32 1
+// CHECK:         load %C5class26ClassConstraintConformance*, %C5class26ClassConstraintConformance** [[FIELD_ADDR_GENERIC]]
 

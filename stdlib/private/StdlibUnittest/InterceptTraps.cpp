@@ -15,6 +15,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "swift/Runtime/Config.h"
+
 static void CrashCatcher(int Sig) {
   const char *Msg;
   switch (Sig) {
@@ -31,6 +33,7 @@ static void CrashCatcher(int Sig) {
   _exit(0);
 }
 
+SWIFT_CC(swift)
 extern "C" void swift_stdlib_installTrapInterceptor() {
   // Disable buffering on stdout so that everything is printed before crashing.
   setbuf(stdout, 0);

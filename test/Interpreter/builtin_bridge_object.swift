@@ -39,11 +39,11 @@ let OBJC_TAGGED_POINTER_BITS: UInt = 0
 
 #endif
 
-func bitPattern(x: Builtin.BridgeObject) -> UInt {
+func bitPattern(_ x: Builtin.BridgeObject) -> UInt {
   return UInt(Builtin.castBitPatternFromBridgeObject(x))
 }
 
-func nonPointerBits(x: Builtin.BridgeObject) -> UInt {
+func nonPointerBits(_ x: Builtin.BridgeObject) -> UInt {
   return bitPattern(x) & NATIVE_SPARE_BITS
 }
 
@@ -105,7 +105,7 @@ if true {
 
 import Foundation
 
-func nonNativeBridgeObject(o: AnyObject) -> Builtin.BridgeObject {
+func nonNativeBridgeObject(_ o: AnyObject) -> Builtin.BridgeObject {
   let tagged = ((Builtin.reinterpretCast(o) as UInt) & OBJC_TAGGED_POINTER_BITS) != 0
   return Builtin.castToBridgeObject(
     o, tagged ? 0._builtinWordValue : NATIVE_SPARE_BITS._builtinWordValue)
@@ -114,7 +114,7 @@ func nonNativeBridgeObject(o: AnyObject) -> Builtin.BridgeObject {
 // Try with a (probably) tagged pointer. No bits may be masked into a
 // non-native object.
 if true {
-  let x = NSNumber(integer: 22)
+  let x = NSNumber(value: 22)
   let bo = nonNativeBridgeObject(x)
   let bo2 = bo
   let x1: NSNumber = Builtin.castReferenceFromBridgeObject(bo)
@@ -124,7 +124,7 @@ if true {
   // CHECK-NEXT: true
   print(x === x2)
 
-  var bo3 = nonNativeBridgeObject(NSNumber(integer: 22))
+  var bo3 = nonNativeBridgeObject(NSNumber(value: 22))
   print(_getBool(Builtin.isUnique(&bo3)))
   // CHECK-NEXT: false
   _fixLifetime(bo3)
@@ -153,7 +153,7 @@ if true {
 }
 
 
-func hitOptionalGenerically<T>(x: T?) {
+func hitOptionalGenerically<T>(_ x: T?) {
   switch x {
   case .some:
     print("some")
@@ -162,7 +162,7 @@ func hitOptionalGenerically<T>(x: T?) {
   }
 }
 
-func hitOptionalSpecifically(x: Builtin.BridgeObject?) {
+func hitOptionalSpecifically(_ x: Builtin.BridgeObject?) {
   switch x {
   case .some:
     print("some")

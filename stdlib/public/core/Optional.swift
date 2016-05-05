@@ -12,6 +12,7 @@
 
 /// A type that can represent either a `Wrapped` value or `nil`, the absence 
 /// of a value.
+@_fixed_layout
 public enum Optional<Wrapped> : NilLiteralConvertible {
   // The compiler has special knowledge of Optional<Wrapped>, including the fact
   // that it is an `enum` with cases named `none` and `some`.
@@ -25,7 +26,7 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
 
   /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
   @warn_unused_result
-  public func map<U>(@noescape f: (Wrapped) throws -> U) rethrows -> U? {
+  public func map<U>(_ f: @noescape (Wrapped) throws -> U) rethrows -> U? {
     switch self {
     case .some(let y):
       return .some(try f(y))
@@ -36,7 +37,7 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
 
   /// Returns `nil` if `self` is `nil`, `f(self!)` otherwise.
   @warn_unused_result
-  public func flatMap<U>(@noescape f: (Wrapped) throws -> U?) rethrows -> U? {
+  public func flatMap<U>(_ f: @noescape (Wrapped) throws -> U?) rethrows -> U? {
     switch self {
     case .some(let y):
       return try f(y)
@@ -67,7 +68,7 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
       if let x = self {
         return x
       }
-      _stdlibAssertionFailure("unsafelyUnwrapped of nil optional")
+      _debugPreconditionFailure("unsafelyUnwrapped of nil optional")
     }
   }
 
@@ -102,17 +103,31 @@ extension Optional : CustomDebugStringConvertible {
   }
 }
 
+extension Optional : CustomReflectable {
+  public var customMirror: Mirror {
+    switch self {
+    case .some(let value):
+      return Mirror(
+        self,
+        children: [ "some": value ],
+        displayStyle: .optional)
+    case .none:
+      return Mirror(self, children: [:], displayStyle: .optional)
+    }
+  }
+}
+
 @_transparent
 @warn_unused_result
 public // COMPILER_INTRINSIC
-func _stdlib_Optional_isSome<Wrapped>(`self`: Wrapped?) -> Bool {
+func _stdlib_Optional_isSome<Wrapped>(_ `self`: Wrapped?) -> Bool {
   return `self` != nil
 }
 
 @_transparent
 @warn_unused_result
 public // COMPILER_INTRINSIC
-func _stdlib_Optional_unwrapped<Wrapped>(`self`: Wrapped?) -> Wrapped {
+func _stdlib_Optional_unwrapped<Wrapped>(_ `self`: Wrapped?) -> Wrapped {
   switch `self` {
   case let wrapped?:
     return wrapped
@@ -148,6 +163,7 @@ public func != <T : Equatable> (lhs: T?, rhs: T?) -> Bool {
 
 // Enable pattern matching against the nil literal, even if the element type
 // isn't equatable.
+@_fixed_layout
 public struct _OptionalNilComparisonType : NilLiteralConvertible {
   /// Create an instance initialized with `nil`.
   @_transparent
@@ -251,7 +267,7 @@ public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
 
 @_transparent
 @warn_unused_result
-public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T)
+public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T)
     rethrows -> T {
   switch optional {
   case .some(let value):
@@ -263,7 +279,7 @@ public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T)
 
 @_transparent
 @warn_unused_result
-public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T?)
+public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T?)
     rethrows -> T? {
   switch optional {
   case .some(let value):

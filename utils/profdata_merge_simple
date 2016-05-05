@@ -8,7 +8,7 @@ OUTPUT_FILENAME=$2
 
 # Reads the paths to prof data files from INPUT_FILENAME and then merges them
 # into OUTPUT_FILENAME.
-TARGETS=( $(find ${PROFRAW_DIR} -name '*.profraw') )
+TARGETS=($(find ${PROFRAW_DIR} -name '*.profraw'))
 
 if [[ ${#TARGETS[@]} -eq 0 ]]; then
     echo "Error! No *.profraw targets to merge!"

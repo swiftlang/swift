@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend %s -parse-sil -sil-serialize-all -emit-module -o - -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib | %target-sil-opt -module-name Swift | FileCheck %s
-// RUN: %target-swift-frontend %s -parse-sil -sil-serialize-all -emit-module -o - -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib | %target-sil-opt -module-name Swift | FileCheck --check-prefix=NEG-CHECK %s
+// RUN: %target-swift-frontend %s -parse-sil -sil-serialize-all -emit-module -o - -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib | %target-sil-opt -module-name Swift > %t.sil
+// RUN: FileCheck %s < %t.sil
+// RUN: FileCheck -check-prefix=NEG-CHECK %s < %t.sil
 
 import Builtin
 
@@ -13,28 +14,28 @@ import Builtin
 // NEG-CHECK-NOT: sil private @private_function_test : $@convention(thin) () -> ()
 
 // Check Global Variables.
-// CHECK: sil_global shared [fragile] @shared_global : $Builtin.Word
-// CHECK: sil_global [fragile] @public_global : $Builtin.Word
-// CHECK: sil_global hidden [fragile] @hidden_global : $Builtin.Word
+// CHECK-DAG: sil_global shared [fragile] @shared_global : $Builtin.Word
+// CHECK-DAG: sil_global [fragile] @public_global : $Builtin.Word
+// CHECK-DAG: sil_global hidden [fragile] @hidden_global : $Builtin.Word
 
 // Check that all functions are defined/declared appropriately.
-// CHECK-NOT: sil [fragile] @public_external_function_test : $@convention(thin) () -> () {
-// CHECK: sil [fragile] @public_external_function_test : $@convention(thin) () -> ()
-// CHECK: sil hidden [fragile] @hidden_function_test : $@convention(thin) () -> () {
-// CHECK: sil [fragile] @references_public_function : $@convention(thin) () -> () {
-// CHECK: sil [fragile] @references_shared_function : $@convention(thin) () -> () {
-// CHECK: sil [fragile] @references_hidden_function : $@convention(thin) () -> () {
-// CHECK: sil [fragile] @references_private_function : $@convention(thin) () -> ()
-// CHECK: sil [fragile] @references_public_global : $@convention(thin) () -> () {
-// CHECK: sil [fragile] @references_shared_global : $@convention(thin) () -> () {
-// CHECK: sil [fragile] @references_hidden_global : $@convention(thin) () -> () {
-// CHECK: sil [fragile] @references_private_global : $@convention(thin) () -> ()
-// CHECK: sil hidden_external [fragile] @hidden_external_function_test : $@convention(thin) () -> ()
-// CHECK: sil [fragile] @public_function_test : $@convention(thin) () -> () {
-// CHECK: sil [fragile] @public_function : $@convention(thin) () -> () {
-// CHECK: sil hidden [fragile] @hidden_function : $@convention(thin) () -> () {
-// CHECK-NOT: sil shared_external [fragile] @shared_external_function_test : $@convention(thin) () -> ()
-// CHECK: sil shared [fragile] @shared_external_function_test : $@convention(thin) () -> ()
+// NEG-CHECK-NOT: sil [fragile] @public_external_function_test : $@convention(thin) () -> () {
+// CHECK-DAG: sil [fragile] @public_external_function_test : $@convention(thin) () -> ()
+// CHECK-DAG: sil hidden [fragile] @hidden_function_test : $@convention(thin) () -> () {
+// CHECK-DAG: sil [fragile] @references_public_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil [fragile] @references_shared_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil [fragile] @references_hidden_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil [fragile] @references_private_function : $@convention(thin) () -> ()
+// CHECK-DAG: sil [fragile] @references_public_global : $@convention(thin) () -> () {
+// CHECK-DAG: sil [fragile] @references_shared_global : $@convention(thin) () -> () {
+// CHECK-DAG: sil [fragile] @references_hidden_global : $@convention(thin) () -> () {
+// CHECK-DAG: sil [fragile] @references_private_global : $@convention(thin) () -> ()
+// CHECK-DAG: sil hidden_external [fragile] @hidden_external_function_test : $@convention(thin) () -> ()
+// CHECK-DAG: sil [fragile] @public_function_test : $@convention(thin) () -> () {
+// CHECK-DAG: sil [fragile] @public_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil hidden [fragile] @hidden_function : $@convention(thin) () -> () {
+// NEG-CHECK-NOT: sil shared_external [fragile] @shared_external_function_test : $@convention(thin) () -> ()
+// CHECK-DAG: sil shared [fragile] @shared_external_function_test : $@convention(thin) () -> ()
 
 sil_global private [fragile] @private_global : $Builtin.Word
 sil_global [fragile] @public_global : $Builtin.Word

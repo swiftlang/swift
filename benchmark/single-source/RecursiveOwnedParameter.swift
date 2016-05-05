@@ -27,7 +27,7 @@ class ArrayWrapper {
     data = [Int](repeating: initialValue, count: count)
   }
 
-  func compare(b: ArrayWrapper, _ iteration: Int, _ stopIteration: Int) -> Bool {
+  func compare(_ b: ArrayWrapper, _ iteration: Int, _ stopIteration: Int) -> Bool {
     // We will never return true here by design. We want to test the full effect
     // every time of retaining, releasing.
     if iteration == stopIteration || data[iteration] == b.data[iteration] {
@@ -39,7 +39,7 @@ class ArrayWrapper {
 }
 
 @inline(never)
-public func run_RecursiveOwnedParameter(N: Int) {
+public func run_RecursiveOwnedParameter(_ N: Int) {
   let numElts = 1_000
 
   let a = ArrayWrapper(numElts, 0)

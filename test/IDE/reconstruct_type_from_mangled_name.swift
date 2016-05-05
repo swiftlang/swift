@@ -1,113 +1,131 @@
-// RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | FileCheck %s -implicit-check-not="cannot reconstruct"
+// RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | FileCheck %s -implicit-check-not="FAILURE"
 
 struct Mystruct1 {
-// CHECK: reconstructed decl from usr for 'Mystruct1' is 'struct Mystruct1'
+// CHECK: decl: struct Mystruct1
   func s1f1() -> Int { return 0 }
-// CHECK: reconstructed decl from usr for 's1f1' is 'func s1f1() -> Int'
+// CHECK: decl: func s1f1() -> Int
   var intField = 3
-// CHECK: reconstructed decl from usr for 'intField' is 'var intField: Int'
+// CHECK: decl: var intField: Int
+}
+struct MyStruct2 {
+// CHECK: decl: struct MyStruct2
+  init() {}
+// CHECK: decl: init()
+  init(x: Int) {}
+// CHECK: decl: init(x: Int)
+  init(x: Int, y: Int) {}
+// CHECK: decl: init(x: Int, y: Int)
 }
 
 class Myclass1 {
-// CHECK: reconstructed decl from usr for 'Myclass1' is 'class Myclass1'
+// CHECK: decl: class Myclass1
   var intField = 4
-// CHECK: reconstructed decl from usr for 'intField' is 'var intField: Int'
+// CHECK: decl: var intField: Int
 }
 
 func f1() {
-// CHECK: reconstructed decl from usr for 'f1' is 'func f1()'
-  var s1ins = Mystruct1()
-// CHECK: reconstructed decl from usr for 's1ins' is 'var s1ins: Mystruct1'
-// CHECK: reconstructed type from usr for 's1ins' is 'Mystruct1'
+// CHECK: decl: func f1()
+  var s1ins = Mystruct1() // Implicit ctor
+// CHECK: decl: var s1ins: Mystruct1
+// CHECK: dref: init() for 'Mystruct1'
+  _ = Mystruct1(intField: 1) // Implicit ctor
+// CHECK: dref: init(intField: Int)	for 'Mystruct1'
 
   s1ins.intField = 34
-// CHECK: reconstructed type from usr for 'intField' is 'Int'
+// CHECK: type: Mystruct1
+// CHECK: type: Int
 
   var c1ins = Myclass1()
-// CHECK: reconstructed decl from usr for 'c1ins' is 'var c1ins: Myclass1'
-// CHECK: reconstructed type from usr for 'c1ins' is 'Myclass1'
+// CHECK: decl: var c1ins: Myclass1
+// CHECK: dref: init()	for 'Myclass1'
+// CHECK: type: Myclass1
 
   c1ins.intField = 3
-// CHECK: reconstructed type from usr for 'intField' is 'Int'
+// CHECK: type: Int
 
   s1ins.s1f1()
-// CHECK: reconstructed type from usr for 's1ins' is 'Mystruct1'
-// CHECK: reconstructed type from usr for 's1f1' is 'Mystruct1 -> () -> Int'
+// CHECK: type: Mystruct1
+// CHECK: type: Mystruct1 -> () -> Int
 
   if let ifletf1 = Int?(1) {
 // FIXME: lookup incorrect for if let binding.
-// CHECK: reconstructed decl from usr for 'ifletf1' is 'struct Int : SignedInteger, Comparable, Equatable'
+// CHECK: decl: struct Int : {{.*}} for 'ifletf1' usr=s:vF14swift_ide_test2f1FT_T_L_7ifletf1Si
   }
 }
 
 class Myclass2 {
-// CHECK: reconstructed decl from usr for 'Myclass2' is 'class Myclass2'
+// CHECK: decl: class Myclass2
   func f1() {
-// CHECK: reconstructed decl from usr for 'f1' is 'func f1()'
+// CHECK: decl: func f1()
 
     var arr1 = [1, 2]
-// CHECK: reconstructed decl from usr for 'arr1' is 'var arr1: [Int]'
-// CHECK: reconstructed type from usr for 'arr1' is 'Array<Int>'
+// CHECK: decl: var arr1: [Int]
+// CHECK: type: Array<Int>
 
     arr1.append(1)
-// CHECK: reconstructed type from usr for 'append' is '@lvalue Array<Int> -> Int -> ()'
+// FIXME: missing append()
+// CHECK: dref: FAILURE	for 'append' usr=s:FSa6appendFxT_
+// CHECK: type: @lvalue Array<Int> -> Int -> ()
 
     var arr2 : [Mystruct1]
-// CHECK: reconstructed decl from usr for 'arr2' is 'var arr2: [Mystruct1]'
-// CHECK: reconstructed type from usr for 'arr2' is 'Array<Mystruct1>'
+// CHECK: decl: var arr2: [Mystruct1]
+// CHECK: type: Array<Mystruct1>
 
     arr2.append(Mystruct1())
-// CHECK: reconstructed type from usr for 'append' is '@lvalue Array<Mystruct1> -> Mystruct1 -> ()'
+// CHECK: type: @lvalue Array<Mystruct1> -> Mystruct1 -> ()
 
     var arr3 : [Myclass1]
-// CHECK: reconstructed decl from usr for 'arr3' is 'var arr3: [Myclass1]'
-// CHECK: reconstructed type from usr for 'arr3' is 'Array<Myclass1>'
+// CHECK: decl: var arr3: [Myclass1]
+// CHECK: type: Array<Myclass1>
 
     arr3.append(Myclass1())
-// CHECK: reconstructed type from usr for 'append' is '@lvalue Array<Myclass1> -> Myclass1 -> ()'
+// CHECK: type: @lvalue Array<Myclass1> -> Myclass1 -> ()
+
+    _ = Myclass2.init()
+// CHECK: dref: init()
   }
 }
 
 struct MyGenStruct1<T, U: StringLiteralConvertible, V: Sequence> {
-// CHECK: reconstructed decl from usr for 'MyGenStruct1' is 'struct MyGenStruct1<T, U : StringLiteralConvertible, V : Sequence>'
+// CHECK: decl: struct MyGenStruct1<T, U : StringLiteralConvertible, V : Sequence>
 // FIXME: why are these references to the base type?
-// CHECK: reconstructed decl from usr for 'T' is 'struct MyGenStruct1
-// CHECK: reconstructed decl from usr for 'U' is 'struct MyGenStruct1
-// CHECK: reconstructed decl from usr for 'V' is 'struct MyGenStruct1
+// CHECK: decl: struct MyGenStruct1<{{.*}}> for 'T' usr=s:tV14swift_ide_test12MyGenStruct11TMx
+// CHECK: decl: struct MyGenStruct1<{{.*}}> for 'U' usr=s:tV14swift_ide_test12MyGenStruct11UMq_
+// CHECK: decl: struct MyGenStruct1<{{.*}}> for 'V' usr=s:tV14swift_ide_test12MyGenStruct11VMq0_
 
   let x: T
-// CHECK: reconstructed decl from usr for 'x' is 'let x: T'
+// CHECK: decl: let x: T
   let y: U
-// CHECK: reconstructed decl from usr for 'y' is 'let y: U'
+// CHECK: decl: let y: U
   let z: V
-// CHECK: reconstructed decl from usr for 'z' is 'let z: V'
+// CHECK: decl: let z: V
 
   func test000() {
     _ = x
-// CHECK: reconstructed type from usr for 'x' is 'T'
+// CHECK: type: T
     _ = y
-// CHECK: reconstructed type from usr for 'y' is 'U'
+// CHECK: type: U
     _ = z
-// CHECK: reconstructed type from usr for 'z' is 'V'
+// CHECK: type: V
   }
 }
 
 let genstruct1 = MyGenStruct1<Int, String, [Float]>(x: 1, y: "", z: [1.0])
-// CHECK: reconstructed decl from usr for 'genstruct1' is 'let genstruct1: MyGenStruct1<Int, String, [Float]>'
+// CHECK: decl: let genstruct1: MyGenStruct1<Int, String, [Float]>
 
 func test001() {
-// CHECK: reconstructed decl from usr for 'test001' is 'func test001()'
+// CHECK: decl: func test001()
   _ = genstruct1
-// CHECK: reconstructed type from usr for 'genstruct1' is 'MyGenStruct1<Int, String, Array<Float>>'
+// CHECK: type: MyGenStruct1<Int, String, Array<Float>>
 
   var genstruct2: MyGenStruct1<Int, String, [Int: Int]>
-// CHECK: reconstructed decl from usr for 'genstruct2' is 'var genstruct2: MyGenStruct1<Int, String, [Int : Int]>'
+// CHECK: decl: var genstruct2: MyGenStruct1<Int, String, [Int : Int]>
   _ = genstruct2
-// CHECK: reconstructed type from usr for 'genstruct2' is 'MyGenStruct1<Int, String, Dictionary<Int, Int>>'
+// CHECK: type: MyGenStruct1<Int, String, Dictionary<Int, Int>>
   _ = genstruct2.x
-// CHECK: reconstructed type from usr for 'x' is 'Int'
+// CHECK: type: Int
   _ = genstruct2.y
-// CHECK: reconstructed type from usr for 'y' is 'String'
+// CHECK: type: String
   _ = genstruct2.z
-// CHECK: reconstructed type from usr for 'z' is 'Dictionary<Int, Int>'
+// CHECK: type: Dictionary<Int, Int>
 }

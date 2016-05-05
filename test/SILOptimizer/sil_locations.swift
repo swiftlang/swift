@@ -1,14 +1,14 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-sil -emit-verbose-sil | FileCheck %s
 
-func searchForMe(x: Float) -> Float {
+func searchForMe(_ x: Float) -> Float {
   return x
 }
 
-@_transparent func baz(x: Float) -> Float {
+@_transparent func baz(_ x: Float) -> Float {
   return searchForMe(x);
 }
 
-@_transparent func bar(x: Float, _ b: Bool) -> Float {
+@_transparent func bar(_ x: Float, _ b: Bool) -> Float {
   if b {
     return baz(x)
   }
@@ -18,7 +18,7 @@ func searchForMe(x: Float) -> Float {
   // CHECK: apply {{.*}} line:13:12:minlined
 }
 
-func testMandatoryInlining(x: Float, b: Bool) -> Float {
+func testMandatoryInlining(_ x: Float, b: Bool) -> Float {
   return bar(x, b)
 // CHECK-LABEL: _TF13sil_locations21testMandatoryInlining
 // CHECK: function_ref @_TF13sil_locations11searchFor{{.*}} line:22:10:minlined

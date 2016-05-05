@@ -9,30 +9,30 @@ import AvailabilityExtras
 
 // Test if an instance method marked __attribute__((unavailable)) on
 // the *class* NSObject can be used.
-func test_unavailable_instance_method(x : NSObject) -> Bool {
+func test_unavailable_instance_method(_ x : NSObject) -> Bool {
   return x.allowsWeakReference() // expected-error {{'allowsWeakReference()' is unavailable}}
 }
 
-func test_unavailable_method_in_protocol(x : NSObjectProtocol) {
+func test_unavailable_method_in_protocol(_ x : NSObjectProtocol) {
   x.retain() // expected-error {{'retain()' is unavailable}}
 }
-func test_unavailable_method_in_protocol_use_class_instance(x : NSObject) {
+func test_unavailable_method_in_protocol_use_class_instance(_ x : NSObject) {
   x.retain() // expected-error {{'retain()' is unavailable}}
 }
 
-func test_unavailable_func(x : NSObject) {
+func test_unavailable_func(_ x : NSObject) {
   NSDeallocateObject(x) // expected-error {{'NSDeallocateObject' is unavailable}}
 }
 
-func test_deprecated_imported_as_unavailable(s:UnsafeMutablePointer<CChar>) {
+func test_deprecated_imported_as_unavailable(_ s:UnsafeMutablePointer<CChar>) {
   _ = tmpnam(s) // expected-warning {{'tmpnam' is deprecated: Due to security concerns inherent in the design of tmpnam(3), it is highly recommended that you use mkstemp(3) instead.}}
 }
 
-func test_NSInvocation(x: NSInvocation,         // expected-error {{'NSInvocation' is unavailable}}
+func test_NSInvocation(_ x: NSInvocation,         // expected-error {{'NSInvocation' is unavailable}}
                        y: NSInvocationOperation,// expected-error {{'NSInvocationOperation' is unavailable}}
                        z: NSMethodSignature) {} // expected-error {{'NSMethodSignature' is unavailable}}
 
-func test_class_avail(x:NSObject, obj: AnyObject) {
+func test_class_avail(_ x:NSObject, obj: AnyObject) {
   x.`class`() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}}
   NSObject.`class`() // expected-error {{'class()' is unavailable in Swift: use 'self' instead}}
   obj.`class`!() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}}
@@ -52,7 +52,7 @@ func test_swift_unavailable() {
   let x: NSSwiftUnavailableStruct? = nil // expected-error {{'NSSwiftUnavailableStruct' is unavailable in Swift}}
 }
 
-func test_CFReleaseRetainAutorelease(x : CFTypeRef, color : CGColor ) {
+func test_CFReleaseRetainAutorelease(_ x: CFTypeRef, color: CGColor) {
   CFRelease(x)              // expected-error {{'CFRelease' is unavailable: Core Foundation objects are automatically memory managed}}
   CGColorRelease(color)     // expected-error {{'CGColorRelease' is unavailable: Core Foundation objects are automatically memory managed}}
   CFRetain(x)               // expected-error {{'CFRetain' is unavailable: Core Foundation objects are automatically memory managed}}
@@ -81,13 +81,13 @@ func testRedeclarations() {
   let _: UnavailProto3 // expected-error {{is unavailable: last}}
 }
 
-func test_NSZone(z : NSZone) { 
+func test_NSZone(_ z : NSZone) { 
   NSCreateZone(1, 1, true)  // expected-error {{'NSCreateZone' is unavailable}}
   NSSetZoneName(z, "name")  // expected-error {{'NSSetZoneName' is unavailable}}
   NSZoneName(z)             // expected-error {{'NSZoneName' is unavailable}}
 }
 
-func test_DistributedObjects(o: NSObject,
+func test_DistributedObjects(_ o: NSObject,
                              a: NSConnection,           // expected-error {{'NSConnection' is unavailable in Swift: Use NSXPCConnection instead}}
                              b: NSConnectionDelegate,   // expected-error {{'NSConnectionDelegate' is unavailable in Swift: Use NSXPCConnection instead}}
                              c: NSDistantObjectRequest, // expected-error {{'NSDistantObjectRequest' is unavailable in Swift: Use NSXPCConnection instead}}
@@ -103,9 +103,9 @@ func test_DistributedObjects(o: NSObject,
   o.classForPortCoder // expected-error {{'classForPortCoder' is unavailable in Swift: Use NSXPCConnection instead}}
 }
 
-func test_NSCalendarDate(o: NSCalendarDate) {} // expected-error {{'NSCalendarDate' is unavailable in Swift: Use NSCalendar and NSDateComponents and NSDateFormatter instead}}
+func test_NSCalendarDate(_ o: NSCalendarDate) {} // expected-error {{'NSCalendarDate' is unavailable in Swift: Use NSCalendar and NSDateComponents and NSDateFormatter instead}}
 
-func test_dispatch(object: dispatch_object_t) {
+func test_dispatch(_ object: dispatch_object_t) {
   dispatch_retain(object);  // expected-error {{'dispatch_retain' is unavailable}}
   dispatch_release(object); // expected-error {{'dispatch_release' is unavailable}}
 }

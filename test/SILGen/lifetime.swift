@@ -22,7 +22,7 @@ func local_valtype() {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime20local_valtype_branch
-func local_valtype_branch(a: Bool) {
+func local_valtype_branch(_ a: Bool) {
     var a = a
     // CHECK: [[A:%[0-9]+]] = alloc_box $Bool
 
@@ -113,7 +113,7 @@ func local_valtype_branch(a: Bool) {
 }
 
 func reftype_func() -> Ref {}
-func reftype_func_with_arg(x: Ref) -> Ref {}
+func reftype_func_with_arg(_ x: Ref) -> Ref {}
 
 // CHECK-LABEL: sil hidden @_TF8lifetime14reftype_returnFT_CS_3Ref
 func reftype_return() -> Ref {
@@ -126,7 +126,7 @@ func reftype_return() -> Ref {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime11reftype_arg
-func reftype_arg(a: Ref) {
+func reftype_arg(_ a: Ref) {
     var a = a
     // CHECK: bb0([[A:%[0-9]+]] : $Ref):
     // CHECK: [[AADDR:%[0-9]+]] = alloc_box $Ref
@@ -137,7 +137,7 @@ func reftype_arg(a: Ref) {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime17reftype_inout_arg
-func reftype_inout_arg(a: inout Ref) {
+func reftype_inout_arg(_ a: inout Ref) {
     // CHECK: bb0([[A:%[0-9]+]] : $*Ref):
     // -- initialize local box for inout
     // CHECK: [[A_LOCAL:%.*]] = alloc_box $Ref
@@ -185,7 +185,7 @@ func reftype_call_arg() {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime21reftype_call_with_arg
-func reftype_call_with_arg(a: Ref) {
+func reftype_call_with_arg(_ a: Ref) {
     var a = a
     // CHECK: bb0([[A1:%[0-9]+]] : $Ref):
     // CHECK: [[AADDR:%[0-9]+]] = alloc_box $Ref
@@ -202,7 +202,7 @@ func reftype_call_with_arg(a: Ref) {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime16reftype_reassign
-func reftype_reassign(a: inout Ref, b: Ref) {
+func reftype_reassign(_ a: inout Ref, b: Ref) {
     var b = b
     // CHECK: bb0([[AADDR:%[0-9]+]] : $*Ref, [[B1:%[0-9]+]] : $Ref):
     // CHECK: [[A_LOCAL:%[0-9]+]] = alloc_box $Ref
@@ -238,7 +238,7 @@ struct Aleph {
   var b:Val
 
   // -- loadable value constructor:
-  // CHECK-LABEL: sil hidden @_TFV8lifetime5AlephC{{.*}} : $@convention(thin) (@owned Ref, Val, @thin Aleph.Type) -> @owned Aleph
+  // CHECK-LABEL: sil hidden @_TFV8lifetime5AlephC{{.*}} : $@convention(method) (@owned Ref, Val, @thin Aleph.Type) -> @owned Aleph
   // CHECK: bb0([[A:%.*]] : $Ref, [[B:%.*]] : $Val, {{%.*}} : $@thin Aleph.Type):
   // CHECK-NEXT:   [[RET:%.*]] = struct $Aleph ([[A]] : {{.*}}, [[B]] : {{.*}})
   // CHECK-NEXT:   return [[RET]]
@@ -260,7 +260,7 @@ struct Daleth {
   var c:Unloadable
 
   // -- address-only value constructor:
-  // CHECK-LABEL: sil hidden @_TFV8lifetime6DalethC{{.*}} : $@convention(thin) (@owned Aleph, @owned Beth, @in Unloadable, @thin Daleth.Type) -> @out Daleth {
+  // CHECK-LABEL: sil hidden @_TFV8lifetime6DalethC{{.*}} : $@convention(method) (@owned Aleph, @owned Beth, @in Unloadable, @thin Daleth.Type) -> @out Daleth {
   // CHECK: bb0([[THIS:%.*]] : $*Daleth, [[A:%.*]] : $Aleph, [[B:%.*]] : $Beth, [[C:%.*]] : $*Unloadable, {{%.*}} : $@thin Daleth.Type):
   // CHECK-NEXT:   [[A_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Daleth, #Daleth.a
   // CHECK-NEXT:   store [[A]] to [[A_ADDR]]
@@ -282,7 +282,7 @@ class He {
   // CHECK: }
 
   // -- default allocator:
-  // CHECK-LABEL: sil hidden @_TFC8lifetime2HeC{{.*}} : $@convention(thin) (@thick He.Type) -> @owned He {
+  // CHECK-LABEL: sil hidden @_TFC8lifetime2HeC{{.*}} : $@convention(method) (@thick He.Type) -> @owned He {
   // CHECK: bb0({{%.*}} : $@thick He.Type):
   // CHECK-NEXT:   [[THIS:%.*]] = alloc_ref $He
   // CHECK-NEXT:   // function_ref lifetime.He.init
@@ -298,7 +298,7 @@ struct Waw {
   var b:Val
 
   // -- loadable value initializer with tuple destructuring:
-  // CHECK-LABEL: sil hidden @_TFV8lifetime3WawC{{.*}} : $@convention(thin) (@owned Ref, Val, Val, @thin Waw.Type) -> @owned Waw 
+  // CHECK-LABEL: sil hidden @_TFV8lifetime3WawC{{.*}} : $@convention(method) (@owned Ref, Val, Val, @thin Waw.Type) -> @owned Waw 
   // CHECK: bb0([[A0:%.*]] : $Ref, [[A1:%.*]] : $Val, [[B:%.*]] : $Val, {{%.*}} : $@thin Waw.Type):
   // CHECK-NEXT:   [[A:%.*]] = tuple ([[A0]] : {{.*}}, [[A1]] : {{.*}})
   // CHECK-NEXT:   [[RET:%.*]] = struct $Waw ([[A]] : {{.*}}, [[B]] : {{.*}})
@@ -310,7 +310,7 @@ struct Zayin {
   var b:Unloadable
 
   // -- address-only value initializer with tuple destructuring:
-  // CHECK-LABEL: sil hidden @_TFV8lifetime5ZayinC{{.*}} : $@convention(thin) (@in Unloadable, Val, @in Unloadable, @thin Zayin.Type) -> @out Zayin
+  // CHECK-LABEL: sil hidden @_TFV8lifetime5ZayinC{{.*}} : $@convention(method) (@in Unloadable, Val, @in Unloadable, @thin Zayin.Type) -> @out Zayin
   // CHECK: bb0([[THIS:%.*]] : $*Zayin, [[A0:%.*]] : $*Unloadable, [[A1:%.*]] : $Val, [[B:%.*]] : $*Unloadable, {{%.*}} : $@thin Zayin.Type):
   // CHECK-NEXT:   [[THIS_A_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Zayin, #Zayin.a
   // CHECK-NEXT:   [[THIS_A0_ADDR:%.*]] = tuple_element_addr [[THIS_A_ADDR]] : {{.*}}, 0
@@ -349,7 +349,7 @@ class RefWithProp {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime23logical_lvalue_lifetimeFTCS_11RefWithPropSiVS_3Val_T_ : $@convention(thin) (@owned RefWithProp, Int, Val) -> () {
-func logical_lvalue_lifetime(r: RefWithProp, _ i: Int, _ v: Val) {
+func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   var r = r
   var i = i
   var v = v
@@ -406,7 +406,7 @@ class Foo<T> {
     // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized
 
     // initialization for y
-    // CHECK: [[INTCTOR:%[0-9]+]] = function_ref @_TFSiC{{.*}} : $@convention(thin) (@thin Int.Type) -> Int
+    // CHECK: [[INTCTOR:%[0-9]+]] = function_ref @_TFSiC{{.*}} : $@convention(method) (@thin Int.Type) -> Int
     // CHECK: [[INTMETA:%[0-9]+]] = metatype $@thin Int.Type
     // CHECK: [[INTVAL:%[0-9]+]] = apply [[INTCTOR]]([[INTMETA]])
 
@@ -656,7 +656,7 @@ class D : B {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime8downcast
-func downcast(b: B) {
+func downcast(_ b: B) {
   var b = b
   // CHECK: [[BADDR:%[0-9]+]] = alloc_box $B
   // CHECK: [[PB:%[0-9]+]] = project_box [[BADDR]]
@@ -671,8 +671,8 @@ func downcast(b: B) {
   // CHECK: return
 }
 
-func int(x: Int) {}
-func ref(x: Ref) {}
+func int(_ x: Int) {}
+func ref(_ x: Ref) {}
 
 func tuple() -> (Int, Ref) { return (1, Ref()) }
 

@@ -19,8 +19,7 @@ struct GS {
 }
 GS(a: 5, b: 7) // expected-warning{{unused}}
 
-// Using the hash to make a name API.
-func f1(a a: Int, b: Int) { }
+func f1(a: Int, b: Int) { }
 f1(a: 1, b: 2)
 
 func f2(class cls: Int) { }
@@ -28,18 +27,16 @@ f2(class: 5)
 
 
 
-func g2(a a: Int) { }
+func g2(a a: Int) { } // expected-warning{{extraneous duplicate parameter name; 'a' already has an argument label}}{{9-11=}}
 
 func g5(_ a: Int) { }
-  // expected-warning@-1{{extraneous '_' in parameter: 'a' has no keyword argument name}}{{9-11=}}
 
 class X {
   init(a a: Int) { } // expected-warning{{extraneous duplicate parameter name; 'a' already has an argument label}}{{8-10=}}
-  func f1(a a: Int, b: Int) { }
+  func f1(a a: Int, b: Int) { } // expected-warning{{extraneous duplicate parameter name; 'a' already has an argument label}}{{11-13=}}
   func f2(a: Int, b b: Int) { } // expected-warning{{extraneous duplicate parameter name; 'b' already has an argument label}}{{19-21=}}
 
   func f3(_ a: Int, b: Int) { }
-  // expected-warning@-1{{extraneous '_' in parameter: 'a' has no keyword argument name}}{{11-13=}}
 }
 
 // Operators never have keyword arguments.

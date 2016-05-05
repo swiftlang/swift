@@ -22,11 +22,22 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 namespace swift {
+
+/// Tries to specialize an \p Apply of a generic function. It can be a full
+/// apply site or a partial apply.
+/// Replaced and now dead instructions are returned in \p DeadApplies.
+/// New created functions, like the specialized callee and thunks, are returned
+/// in \p NewFunctions.
+///
+/// This is the top-level entry point for specializing an existing call site.
+void trySpecializeApplyOfGeneric(
+    ApplySite Apply, DeadInstructionSet &DeadApplies,
+    llvm::SmallVectorImpl<SILFunction *> &NewFunctions);
 
 /// Helper class to describe re-abstraction of function parameters done during
 /// specialization.
@@ -34,12 +45,27 @@ namespace swift {
 /// Specifically, it contains information which parameters and returns are
 /// changed from indirect values to direct values.
 class ReabstractionInfo {
+  /// A 1-bit means that this parameter/return value is converted from indirect
+  /// to direct.
+  llvm::SmallBitVector Conversions;
+
+  /// The first NumResults bits in Conversions refer to indirect out-parameters.
+  unsigned NumResults;
+
+  /// The function type after applying the substitutions of the original
+  /// apply site.
+  CanSILFunctionType SubstitutedType;
+
+  /// The function type after applying the re-abstractions on the
+  /// SubstitutedType.
+  CanSILFunctionType SpecializedType;
+
 public:
-  /// Constructs the ReabstractionInfo for an apply site \p AI calling the
-  /// generic function \p Orig.
+  /// Constructs the ReabstractionInfo for generic function \p Orig with
+  /// substitutions \p ParamSubs.
   /// If specialization is not possible getSpecializedType() will return an
   /// invalid type.
-  ReabstractionInfo(SILFunction *Orig, ApplySite AI);
+  ReabstractionInfo(SILFunction *Orig, ArrayRef<Substitution> ParamSubs);
 
   /// Does the \p ArgIdx refer to an indirect out-parameter?
   bool isResultIndex(unsigned ArgIdx) const {
@@ -88,8 +114,8 @@ public:
     return Conversions.size() - numArgs;
   }
 
-  /// Get the function type after applying the substitutions of the original
-  /// apply site.
+  /// Get the function type after applying the substitutions to the original
+  /// generic function.
   CanSILFunctionType getSubstitutedType() const { return SubstitutedType; }
 
   /// Get the function type after applying the re-abstractions on the
@@ -101,33 +127,51 @@ public:
   /// SubstFTy by applying the re-abstractions.
   CanSILFunctionType createSpecializedType(CanSILFunctionType SubstFTy,
                                            SILModule &M) const;
-private:
-  /// A 1-bit means that this parameter/return value is converted from indirect
-  /// to direct.
-  llvm::BitVector Conversions;
-
-  /// The first NumResults bits in Conversions refer to indirect out-parameters.
-  unsigned NumResults;
-
-  /// The function type after applying the substitutions of the original
-  /// apply site.
-  CanSILFunctionType SubstitutedType;
-
-  /// The function type after applying the re-abstractions on the
-  /// SubstitutedType.
-  CanSILFunctionType SpecializedType;
 };
 
-/// Tries to specialize an \p Apply of a generic function. It can be a full
-/// apply site or a partial apply.
-/// Replaced and now dead instructions are returned in \p DeadApplies.
-/// New created functions, like the specialized callee and thunks, are returned
-/// in \p NewFunctions.
-void trySpecializeApplyOfGeneric(ApplySite Apply,
-                        llvm::SmallVectorImpl<SILInstruction *> &DeadApplies,
-                        llvm::SmallVectorImpl<SILFunction *> &NewFunctions);
+/// Helper class for specializing a generic function given a list of
+/// substitutions.
+class GenericFuncSpecializer {
+  SILModule &M;
+  SILFunction *GenericFunc;
+  ArrayRef<Substitution> ParamSubs;
+  IsFragile_t Fragile;
+  const ReabstractionInfo &ReInfo;
 
-/// Checks if a given mangled name could be a name of a whitelisted specialization.
+  TypeSubstitutionMap ContextSubs;
+  std::string ClonedName;
+public:
+  GenericFuncSpecializer(SILFunction *GenericFunc,
+                         ArrayRef<Substitution> ParamSubs,
+                         IsFragile_t Fragile,
+                         const ReabstractionInfo &ReInfo);
+
+  /// If we already have this specialization, reuse it.
+  SILFunction *lookupSpecialization();
+
+  /// Return a newly created specialized function.
+  SILFunction *tryCreateSpecialization();
+  
+  /// Try to specialize GenericFunc given a list of ParamSubs.
+  /// Returns either a new or existing specialized function, or nullptr.
+  SILFunction *trySpecialization() {
+    if (!ReInfo.getSpecializedType())
+      return nullptr;
+
+    SILFunction *SpecializedF = lookupSpecialization();
+    if (!SpecializedF)
+      SpecializedF = tryCreateSpecialization();
+
+    return SpecializedF;
+  }
+};
+
+// =============================================================================
+// Prespecialized symbol lookup.
+// =============================================================================
+
+/// Checks if a given mangled name could be a name of a whitelisted
+/// specialization.
 bool isWhitelistedSpecialization(StringRef SpecName);
 
 /// Create a new apply based on an old one, but with a different
@@ -135,7 +179,11 @@ bool isWhitelistedSpecialization(StringRef SpecName);
 ApplySite replaceWithSpecializedFunction(ApplySite AI, SILFunction *NewF,
                                          const ReabstractionInfo &ReInfo);
 
-SILFunction *getExistingSpecialization(SILModule &M, StringRef FunctionName);
+/// Returns a SILFunction for the symbol specified by FunctioName if it is
+/// visible to the current SILModule. This is used to link call sites to
+/// externally defined specialization and should only be used when the function
+/// body is not required for further optimization or inlining (-Onone).
+SILFunction *lookupPrespecializedSymbol(SILModule &M, StringRef FunctionName);
 
 } // end namespace swift
 

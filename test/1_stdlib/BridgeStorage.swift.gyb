@@ -61,11 +61,11 @@ class C {
 }
 import Foundation
 
-func isOSAtLeast(major: Int, _ minor: Int, patch: Int = 0) -> Bool {
+func isOSAtLeast(_ major: Int, _ minor: Int, patch: Int = 0) -> Bool {
   // isOperatingSystemAtLeastVersion() is unavailable on some OS versions.
   if #available(iOS 8.0, OSX 10.10, *) {
     let procInfo: AnyObject = NSProcessInfo.processInfo()
-    return procInfo.isOperatingSystem(atLeastVersion:
+    return procInfo.isOperatingSystemAtLeast(
             NSOperatingSystemVersion(majorVersion: major, minorVersion: minor,
                                      patchVersion: patch))
   }
@@ -73,7 +73,7 @@ func isOSAtLeast(major: Int, _ minor: Int, patch: Int = 0) -> Bool {
   return false
 }
 
-func expectTagged(s: NSString, _ expected: Bool) -> NSString {
+func expectTagged(_ s: NSString, _ expected: Bool) -> NSString {
 #if arch(x86_64)
   let mask: UInt = 0x8000000000000001
 #elseif arch(arm64)
@@ -120,13 +120,13 @@ var unTaggedNSString : NSString {
 
 % for Self in ['_BridgeStorage']:
 allTests.test("${Self}") {
-  typealias B = ${Self}<C,NSString>
+  typealias B = ${Self}<C, NSString>
   
   let oy: NSString = "oy"
   expectTrue(B(objC: oy).objCInstance == oy)
   
   for i in 0..<2 {
-    if true {
+    do {
       var b = B(native: C(), bits: i)
       expectFalse(b.isObjC)
       expectTrue(b.isNative)
@@ -137,7 +137,7 @@ allTests.test("${Self}") {
       expectEqual(i, b.spareBits)
     }
     
-    if true {
+    do {
       let c = C()
       var b = B(native: c, bits: i)
       expectFalse(b.isObjC)

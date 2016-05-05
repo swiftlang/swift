@@ -52,7 +52,7 @@ let array = [
 ]
 
 @inline(never)
-public func run_TwoSum(N: Int) {
+public func run_TwoSum(_ N: Int) {
   var i1: Int?
   var i2: Int?
   var Dict: Dictionary<Int, Int> = [:]

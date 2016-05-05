@@ -124,7 +124,7 @@ storage objects referenced by this struct. The set of storage objects can
 further provide storage for subobjects.::
 
   class ArrayStorage<T> {
-    func getElement(index: Int) -> T {} // Return a 'subobject'.
+    func getElement(_ index: Int) -> T {} // Return a 'subobject'.
   }
 
   struct Array<T> {
@@ -188,14 +188,14 @@ state.
       mutating func replaceSubrange<
         C : CollectionType where C.Iterator.Element == T
       >(
-        subRange: Range<Int>, with newElements: C
+        _ subRange: Range<Int>, with newElements: C
       ) { ... }
 
       // We could also mark the following function as @preserve_unique
       // but we have an attribute for this function that better describes it
       // allowing for more optimization. (See @get_subobject)
       @preserve_unique
-      func getElement(index: Int) -> T {
+      func getElement(_ index: Int) -> T {
         return storage.elementAt(index)
       }
     }
@@ -203,7 +203,7 @@ state.
   Note: In terms of low-level SIL attributes such a method will be marked:::
 
     @self_effects(preserve_unique, nocapture, norelease)
-    func replaceSubrange<> {}
+    func replace<> {}
 
 ``@get_subobject``
 
@@ -219,7 +219,7 @@ state.
       var size : Int
 
       @get_subobject
-      func getElement(index: Int) -> T {
+      func getElement(_ index: Int) -> T {
         return storage.elementAt(index)
       }
 
@@ -233,7 +233,7 @@ state.
     @effects(argonly)
     @selfeffects(preserve_unique, nowrite, nocapture, norelease,
                  projects_subobject)
-    func getElement(index: Int) -> T {}
+    func getElement(_ index: Int) -> T {}
 
 .. note::
 
@@ -261,7 +261,7 @@ state.
       var size : Int
 
       @get_subobject_non_bridged
-      func getElement(index: Int) -> T {
+      func getElement(_ index: Int) -> T {
         return storage.elementAt(index)
       }
 
@@ -275,7 +275,7 @@ state.
     @nonbridged_effects(argonly)
     @selfeffects(preserve_unique, nowrite, nocapture, norelease,
                  projects_subobject)
-    func getElement(index: Int) -> T {}
+    func getElement(_ index: Int) -> T {}
 
 
 ``@get_subobject_addr``
@@ -291,7 +291,7 @@ state.
       var storage: ArrayStorage
 
       @get_subobject_addr
-      func getElementAddr(index: Int) -> UnsafeMutablePointer<T> {
+      func getElementAddr(_ index: Int) -> UnsafeMutablePointer<T> {
         return storage.elementAddrAt(index)
       }
 
@@ -300,7 +300,7 @@ state.
     @effects(argonly)
     @selfeffects(preserve_unique, nowrite, nocapture, norelease,
                  projects_subobject_addr)
-    func getElementAddr(index: Int) -> T {}
+    func getElementAddr(_ index: Int) -> T {}
 
 ``@initialize_subobject``
 
@@ -313,7 +313,7 @@ state.
       var storage: ArrayStorage
 
       @initialize_subobject
-      func appendAssumingUniqueStorage(elt: T) {
+      func appendAssumingUniqueStorage(_ elt: T) {
         storage.append(elt)
       }
     }
@@ -342,7 +342,7 @@ state.
       var storage: ArrayStorage
 
       @set_subobject
-      func setElement(elt: T, at index: Int) {
+      func setElement(_ elt: T, at index: Int) {
         storage.set(elt, index)
       }
     }
@@ -386,7 +386,7 @@ Example:::
     }
 
     @preserveunique
-    func getElementAddr(index: Int) -> UnsafeMutablePointer<T> {
+    func getElementAddr(_ index: Int) -> UnsafeMutablePointer<T> {
       return storage.elementAddrAt(index)
     }
 
@@ -400,7 +400,7 @@ Example:::
 
 When the optimizer optimizes a loop:::
 
-  func memset(inout A: [Int], value: Int) {
+  func memset(A: inout [Int], value: Int) {
     for i in 0 .. A.size {
       A[i] = value
       f()
@@ -409,7 +409,7 @@ When the optimizer optimizes a loop:::
 
 It will see the following calls because methods with attributes are not inlined.::
 
-  func memset(inout A: [Int], value: Int) {
+  func memset(A: inout [Int], value: Int) {
     for i in 0 .. A.size {
       makeUnique(&A)
       addr = getElementAddr(i, &A)
@@ -434,7 +434,7 @@ by a unique name.::
     var array: [Int]
   }
 
-  func copy(a : AClass, b : AClass) {
+  func copy(_ a : AClass, b : AClass) {
     for i in min(a.size, b.size) {
        a.array.append(b.array[i])
     }
@@ -473,7 +473,7 @@ and further releases an element of type T - these are the only side-effects
 according to ``@set_subobject``::
 
  @set_subobject
- func setElement(e: T, index: Int) {
+ func setElement(_ e: T, index: Int) {
    storage->setElement(e, index)
  }
 
@@ -512,7 +512,7 @@ Furthermore, methods marked with ``@get_subobject`` will allow us to remove
 redundant calls to read-only like methods on COW type instances assuming we can
 prove that the instance is not changed in between them.::
 
-  func f(a: [Int]) {
+  func f(_ a: [Int]) {
    @get_subobject
    count(a)
    @get_subobject
@@ -559,7 +559,7 @@ generic arguments::
 
   struct MyContainer<T> {
     var t: T
-    func setElt(elt: T) { t = elt }
+    func setElt(_ elt: T) { t = elt }
   }
 
 With no knowledge of T.deinit() we must assume the worst case. SIL effects
@@ -700,7 +700,7 @@ the need of sophisticated alias or escape analysis.
 
 Consider this example.::
 
-    func add(arr: Array<Int>, i: Int) -> Int {
+    func add(_ arr: Array<Int>, i: Int) -> Int {
       let e1 = arr[i]
       unknownFunction()
       let e2 = arr[i]
@@ -708,7 +708,7 @@ Consider this example.::
 
 This code is generated to something like::
 
-    func add(arr: Array<Int>, i: Int) -> Int {
+    func add(_ arr: Array<Int>, i: Int) -> Int {
       let e1 = getElement(i, arr)
       unknownFunction()
       let e2 = getElement(i, arr)
@@ -757,7 +757,7 @@ struct but only the referenced storage.
 
 Let's assume we have a setElement function in Array.::
 
-    mutating func setElement(i: Int, e: Element) {
+    mutating func setElement(_ i: Int, e: Element) {
       storage[i] = e
     }
 
@@ -768,7 +768,8 @@ after the mutating function. This lets the second ``getElement`` function get
 another array parameter which prevents CSE of the two ``getElement`` calls.
 Shown in this swift-SIL pseudo code::
 
-    func add(var arr: Array<Int>, i: Int) -> Int {
+    func add(arr: Array<Int>, i: Int) -> Int {
+      var arr = arr
       let e1 = getElement(i, arr)
       store arr to stack_array
       setElement(i, 0, &stack_array)
@@ -782,7 +783,8 @@ which directly access the storage, are not inlined during high-level SIL.
 Optimizations like code motion could move a store to the storage over a
 ``readnone getElement``.::
 
-    func add(var arr: Array<Int>, i: Int) -> Int {
+    func add(arr: Array<Int>, i: Int) -> Int {
+      var arr = arr
       let e1 = getElement(i, arr)
       store arr to stack_array
       stack_array.storage[i] = 0          // (1)

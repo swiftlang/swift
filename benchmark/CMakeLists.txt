@@ -15,6 +15,9 @@ list(APPEND CMAKE_MODULE_PATH
 include(AddSwiftBenchmarkSuite)
 
 set(SWIFT_BENCH_MODULES
+    single-source/unit-tests/ObjectiveCBridging
+    single-source/unit-tests/ObjectiveCBridgingStubs
+    single-source/unit-tests/ObjectiveCNoBridgingStubs
     single-source/unit-tests/StackPromo
     single-source/Ackermann
     single-source/AngryPhonebook
@@ -127,7 +130,7 @@ if(NOT SWIFT_LIBRARY_PATH)
   set(SWIFT_LIBRARY_PATH "${tmp_dir}/lib/swift")
 endif()
 
-runcmd(COMMAND "xcrun" "-f" "clang"
+runcmd(COMMAND "xcrun" "-toolchain" "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" "-f" "clang"
        VARIABLE CLANG_EXEC
        ERROR "Unable to find Clang driver")
 

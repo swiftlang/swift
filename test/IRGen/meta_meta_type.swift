@@ -16,7 +16,7 @@ struct Mystruct : Proto {
 // CHECKIR: [[R1:%[0-9]+]] = insertvalue {{.*}} [[M2]]
 // CHECKIR: [[R2:%[0-9]+]] = insertvalue {{.*}} [[R1]]
 // CHECKIR: ret { %swift.type*, i8** } [[R2]]
-func testit(p: Proto) -> Proto.Type.Type {
+func testit(_ p: Proto) -> Proto.Type.Type {
   return p.dynamicType.dynamicType
 }
 
@@ -27,7 +27,7 @@ func testit(p: Proto) -> Proto.Type.Type {
 // CHECKIR: [[R1:%[0-9]+]] = insertvalue {{.*}} [[M3]]
 // CHECKIR: [[R2:%[0-9]+]] = insertvalue {{.*}} [[R1]]
 // CHECKIR: ret { %swift.type*, i8** } [[R2]]
-func testit2(p: Proto) -> Proto.Type.Type.Type {
+func testit2(_ p: Proto) -> Proto.Type.Type.Type {
   return p.dynamicType.dynamicType.dynamicType
 }
 

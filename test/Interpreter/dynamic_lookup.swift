@@ -30,7 +30,7 @@ extension Z {
 }
 
 
-func test_dynamic_lookup_f(obj: AnyObject) {
+func test_dynamic_lookup_f(_ obj: AnyObject) {
   var of = obj.f
   if of != nil {
     of!()
@@ -39,7 +39,7 @@ func test_dynamic_lookup_f(obj: AnyObject) {
   }
 }
 
-func test_dynamic_lookup_g(obj: AnyObject) {
+func test_dynamic_lookup_g(_ obj: AnyObject) {
   var og = obj.dynamicType.g
   if og != nil {
     og!()
@@ -48,7 +48,7 @@ func test_dynamic_lookup_g(obj: AnyObject) {
   }
 }
 
-func test_dynamic_lookup_myValue(obj: AnyObject) {
+func test_dynamic_lookup_myValue(_ obj: AnyObject) {
   var ov = obj.myValue
   if ov != nil {
     print("myValue = \(ov!)")

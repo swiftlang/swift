@@ -9,7 +9,7 @@
 import Foundation
 import CoreData
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 // Inferred @requires_stored_property_inits.
 class MyManagedObject : NSManagedObject {
@@ -45,15 +45,15 @@ func getOtherManagedObject() -> OtherManagedObject {
   return OtherManagedObject()
 }
 
-func accessOther(om: OtherManagedObject) -> String {
+func accessOther(_ om: OtherManagedObject) -> String {
   return om.managed
 }
 
 // rdar://problem/20821582
-func accessMine(obj: MyManagedObject) -> String {
+func accessMine(_ obj: MyManagedObject) -> String {
   return obj.anotherManaged
 }
 
-func accessMyMethod(obj: MyManagedObject) {
+func accessMyMethod(_ obj: MyManagedObject) {
   obj.managedMethod()
 }

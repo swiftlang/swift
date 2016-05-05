@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 
-#ifndef LLVM_REST_SOURCELOC_H
-#define LLVM_REST_SOURCELOC_H
+#ifndef SWIFT_MARKUP_SOURCELOC_H
+#define SWIFT_MARKUP_SOURCELOC_H
 
 #include "llvm/ADT/StringRef.h"
 #include <algorithm>
@@ -20,7 +20,7 @@
 #include <utility>
 #include <vector>
 
-namespace llvm {
+namespace swift {
 namespace markup {
 
 class SourceLoc {
@@ -147,7 +147,7 @@ SourceManager<ExternalSourceLocTy>::toExternalSourceLoc(SourceLoc Loc) const {
 }
 
 } // namespace markup
-} // namespace llvm
+} // namespace swift
 
-#endif // LLVM_REST_SOURCELOC_H
+#endif // SWIFT_MARKUP_SOURCELOC_H
 

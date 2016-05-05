@@ -52,7 +52,7 @@ class Stuff {
 }
 
 @inline(never)
-public func run_DictionaryBridge(N: Int) {
+public func run_DictionaryBridge(_ N: Int) {
     for _ in 1...100*N {
         _ = Stuff()
     }

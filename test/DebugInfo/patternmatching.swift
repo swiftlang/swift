@@ -3,10 +3,10 @@
 // RUN: FileCheck --check-prefix=CHECK-SCOPES %s < %t.ll
 // RUN: %target-swift-frontend -emit-sil -emit-verbose-sil -primary-file %s -o - | FileCheck %s --check-prefix=SIL-CHECK
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
-func classifyPoint2(p: (Double, Double)) {
-    func return_same (input : Double) -> Double
+func classifyPoint2(_ p: (Double, Double)) {
+    func return_same (_ input : Double) -> Double
     {
         return input; // return_same gets called in both where statements
     }

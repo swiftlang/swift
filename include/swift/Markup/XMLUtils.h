@@ -10,13 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_MARKUP_XML_UTILS_H
-#define LLVM_MARKUP_XML_UTILS_H
+#ifndef SWIFT_MARKUP_XML_UTILS_H
+#define SWIFT_MARKUP_XML_UTILS_H
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
-namespace llvm {
+namespace swift {
 namespace markup {
 
 // FIXME: copied from Clang's
@@ -71,7 +71,7 @@ static inline void appendWithCDATAEscaping(raw_ostream &OS, StringRef S) {
 }
 
 } // namespace markup
-} // namespace llvm
+} // namespace swift
 
-#endif // LLVM_MARKUP_XML_UTILS_H
+#endif // SWIFT_MARKUP_XML_UTILS_H
 

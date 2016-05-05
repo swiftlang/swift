@@ -3,8 +3,11 @@
 
 import Swift
 
+func someValidPointer<T>() -> UnsafePointer<T> { fatalError() }
+func someValidPointer<T>() -> UnsafeMutablePointer<T> { fatalError() }
+
 struct A {
-  var base: UnsafeMutablePointer<Int32> = nil
+  var base: UnsafeMutablePointer<Int32> = someValidPointer()
 
   subscript(index: Int32) -> Int32 {
     unsafeAddress {
@@ -66,7 +69,7 @@ func test0() {
 func test1() -> Int32 {
 // CHECK: [[CTOR:%.*]] = function_ref @_TFV10addressors1AC
 // CHECK: [[T0:%.*]] = metatype $@thin A.Type
-// CHECK: [[A:%.*]] = apply [[CTOR]]([[T0]]) : $@convention(thin) (@thin A.Type) -> A
+// CHECK: [[A:%.*]] = apply [[CTOR]]([[T0]]) : $@convention(method) (@thin A.Type) -> A
 // CHECK: [[ACCESSOR:%.*]] = function_ref @_TFV10addressors1Alu9subscriptFVs5Int32S1_ : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
 // CHECK: [[PTR:%.*]] = apply [[ACCESSOR]]({{%.*}}, [[A]]) : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
 // CHECK: [[T0:%.*]] = struct_extract [[PTR]] : $UnsafePointer<Int32>, #UnsafePointer._rawValue
@@ -108,8 +111,8 @@ protocol Subscriptable {
 
 struct B : Subscriptable {
   subscript(i: Int32) -> Int32 {
-    unsafeAddress { return nil }
-    unsafeMutableAddress { return nil }
+    unsafeAddress { return someValidPointer() }
+    unsafeMutableAddress { return someValidPointer() }
   }
 }
 
@@ -127,24 +130,24 @@ struct B : Subscriptable {
 // CHECK:   [[T1:%.*]] = builtin "or_Int32"
 // CHECK:   [[T2:%.*]] = struct $Int32 ([[T1]] : $Builtin.Int32)
 // CHECK:   store [[T2]] to [[ADDR]] : $*Int32
-func test_B(b: inout B) {
+func test_B(_ b: inout B) {
   b[0] |= 7
 }
 
 // Test that we handle abstraction difference.
 struct CArray<T> {
-  var storage: UnsafeMutablePointer<T> = nil
+  var storage: UnsafeMutablePointer<T>
   subscript(index: Int) -> T {
     unsafeAddress { return UnsafePointer(storage) + index }
     unsafeMutableAddress { return storage + index }
   }
 }
 
-func id_int(i: Int32) -> Int32 { return i }
+func id_int(_ i: Int32) -> Int32 { return i }
 
 // CHECK-LABEL: sil hidden @_TF10addressors11test_carrayFRGVS_6CArrayFVs5Int32S1__S1_ : $@convention(thin) (@inout CArray<Int32 -> Int32>) -> Int32 {
 // CHECK: bb0([[ARRAY:%.*]] : $*CArray<Int32 -> Int32>):
-func test_carray(array: inout CArray<Int32 -> Int32>) -> Int32 {
+func test_carray(_ array: inout CArray<Int32 -> Int32>) -> Int32 {
 // CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors6CArrayau9subscriptFSix :
 // CHECK:   [[T1:%.*]] = apply [[T0]]<Int32 -> Int32>({{%.*}}, [[ARRAY]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32 -> Int32>, #UnsafeMutablePointer._rawValue
@@ -165,7 +168,7 @@ func test_carray(array: inout CArray<Int32 -> Int32>) -> Int32 {
 struct D : Subscriptable {
   subscript(i: Int32) -> Int32 {
     get { return i }
-    unsafeMutableAddress { return nil }
+    unsafeMutableAddress { return someValidPointer() }
   }
 }
 // Setter.
@@ -195,11 +198,11 @@ struct D : Subscriptable {
 // SILGEN:   return [[T2]] :
 
 func make_int() -> Int32 { return 0 }
-func take_int_inout(value: inout Int32) {}
+func take_int_inout(_ value: inout Int32) {}
 
 // CHECK-LABEL: sil hidden @_TF10addressors6test_dFRVS_1DVs5Int32 : $@convention(thin) (@inout D) -> Int32
 // CHECK: bb0([[ARRAY:%.*]] : $*D):
-func test_d(array: inout D) -> Int32 {
+func test_d(_ array: inout D) -> Int32 {
 // CHECK:   [[T0:%.*]] = function_ref @_TF10addressors8make_intFT_Vs5Int32
 // CHECK:   [[V:%.*]] = apply [[T0]]()
 // CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVs5Int32S1_
@@ -226,8 +229,8 @@ func test_d(array: inout D) -> Int32 {
 
 struct E {
   var value: Int32 {
-    unsafeAddress { return nil }
-    nonmutating unsafeMutableAddress { return nil }
+    unsafeAddress { return someValidPointer() }
+    nonmutating unsafeMutableAddress { return someValidPointer() }
   }
 }
 
@@ -238,7 +241,7 @@ struct E {
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]]
 // CHECK:   [[T3:%.*]] = pointer_to_address [[T2]]
 // CHECK:   store {{%.*}} to [[T3]] : $*Int32
-func test_e(e: E) {
+func test_e(_ e: E) {
   e.value = 0
 }
 
@@ -258,7 +261,7 @@ class F {
 // CHECK: sil hidden @_TFC10addressors1Flo5valueVs5Int32 : $@convention(method) (@guaranteed F) -> (UnsafePointer<Int32>, @owned Builtin.NativeObject) {
 // CHECK: sil hidden @_TFC10addressors1Fao5valueVs5Int32 : $@convention(method) (@guaranteed F) -> (UnsafeMutablePointer<Int32>, @owned Builtin.NativeObject) {
 
-func test_f0(f: F) -> Int32 {
+func test_f0(_ f: F) -> Int32 {
   return f.value
 }
 // CHECK: sil hidden @_TF10addressors7test_f0FCS_1FVs5Int32 : $@convention(thin) (@owned F) -> Int32 {
@@ -275,7 +278,7 @@ func test_f0(f: F) -> Int32 {
 // CHECK:   strong_release [[SELF]] : $F
 // CHECK:   return [[VALUE]] : $Int32
 
-func test_f1(f: F) {
+func test_f1(_ f: F) {
   f.value = 14
 }
 // CHECK: sil hidden @_TF10addressors7test_f1FCS_1FT_ : $@convention(thin) (@owned F) -> () {
@@ -378,7 +381,7 @@ class H {
 // CHECK-LABEL: sil hidden @_TFC10addressors1Hlp5valueVs5Int32 : $@convention(method) (@guaranteed H) -> (UnsafePointer<Int32>, @owned Optional<Builtin.NativeObject>) {
 // CHECK-LABEL: sil hidden @_TFC10addressors1Hap5valueVs5Int32 : $@convention(method) (@guaranteed H) -> (UnsafeMutablePointer<Int32>, @owned Optional<Builtin.NativeObject>) {
 
-func test_h0(f: H) -> Int32 {
+func test_h0(_ f: H) -> Int32 {
   return f.value
 }
 // CHECK-LABEL: sil hidden @_TF10addressors7test_h0FCS_1HVs5Int32 : $@convention(thin) (@owned H) -> Int32 {
@@ -395,7 +398,7 @@ func test_h0(f: H) -> Int32 {
 // CHECK:   strong_release [[SELF]] : $H
 // CHECK:   return [[VALUE]] : $Int32
 
-func test_h1(f: H) {
+func test_h1(_ f: H) {
   f.value = 14
 }
 // CHECK: sil hidden @_TF10addressors7test_h1FCS_1HT_ : $@convention(thin) (@owned H) -> () {
@@ -500,7 +503,7 @@ class RecOuter {
     }
   }
 }
-func test_rec(outer: RecOuter) -> Int32 {
+func test_rec(_ outer: RecOuter) -> Int32 {
   return outer.middle.inner[0]
 }
 // This uses the mutable addressor.

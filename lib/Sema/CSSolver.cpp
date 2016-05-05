@@ -290,7 +290,7 @@ enumerateDirectSupertypes(TypeChecker &tc, Type type) {
     // FIXME: Can weaken input type, but we really don't want to get in the
     // business of strengthening the result type.
 
-    // An [autoclosure] function type can be viewed as scalar of the result
+    // An @autoclosure function type can be viewed as scalar of the result
     // type.
     if (functionTy->isAutoClosure())
       result.push_back(functionTy->getResult());
@@ -875,6 +875,18 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       }
     }
 
+    // Don't deduce IUO types.
+    Type alternateType;
+    if (kind == AllowedBindingKind::Supertypes &&
+        constraint->getKind() >= ConstraintKind::Conversion &&
+        constraint->getKind() <= ConstraintKind::OperatorArgumentConversion) {
+      if (auto objectType =
+          cs.lookThroughImplicitlyUnwrappedOptionalType(type)) {
+        type = OptionalType::get(objectType);
+        alternateType = objectType;
+      }
+    }
+
     // Make sure we aren't trying to equate type variables with different
     // lvalue-binding rules.
     if (auto otherTypeVar = type->getAs<TypeVariableType>()) {
@@ -899,6 +911,9 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
     if (exactTypes.insert(type->getCanonicalType()).second)
       result.Bindings.push_back({type, kind, None});
+    if (alternateType &&
+        exactTypes.insert(alternateType->getCanonicalType()).second)
+      result.Bindings.push_back({alternateType, kind, None});
   }
 
   // If we have any literal constraints, check whether there is already a

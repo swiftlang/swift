@@ -45,7 +45,7 @@ static StringRef getProfNamesSection(IRGenModule &IGM) {
 }
 
 void IRGenModule::emitCoverageMapping() {
-  const auto &Mappings = SILMod->getCoverageMapList();
+  const auto &Mappings = getSILModule().getCoverageMapList();
   // If there aren't any coverage maps, there's nothing to emit.
   if (Mappings.empty())
     return;
@@ -104,7 +104,10 @@ void IRGenModule::emitCoverageMapping() {
     W.write(OS);
 
     std::string NameValue = llvm::getPGOFuncName(
-        M.getName(), llvm::GlobalValue::LinkOnceAnyLinkage, M.getFile());
+        M.getName(),
+        M.isPossiblyUsedExternally() ? llvm::GlobalValue::ExternalLinkage
+                                     : llvm::GlobalValue::PrivateLinkage,
+        M.getFile());
     llvm::GlobalVariable *NamePtr = llvm::createPGOFuncNameVar(
         *getModule(), llvm::GlobalValue::LinkOnceAnyLinkage, NameValue);
 

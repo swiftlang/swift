@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s
 
-func takeClosure(a : () -> Int) {}
+func takeClosure(_ a : () -> Int) {}
 
 // Let decls don't get boxes for trivial types.
 //
 // CHECK-LABEL: sil hidden @{{.*}}test1
-func test1(let a : Int) -> Int {
+func test1(_ a : Int) -> Int {
   // CHECK-NOT: alloc_box
   // CHECK-NOT: alloc_stack
 
@@ -58,7 +58,7 @@ func testTupleLetCapture() {
 
 
 func getAString() -> String { return "" }
-func useAString(a : String) {}
+func useAString(_ a : String) {}
 
 // rdar://15689514 - Verify that the cleanup for the let decl runs at the end of
 // the 'let' lifetime, not at the end of the initializing expression.
@@ -86,10 +86,10 @@ struct AddressOnlyStruct<T> {
   var str : String
 }
 
-func produceAddressOnlyStruct<T>(x : T) -> AddressOnlyStruct<T> {}
+func produceAddressOnlyStruct<T>(_ x : T) -> AddressOnlyStruct<T> {}
 
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyStructString
-func testAddressOnlyStructString<T>(a : T) -> String {
+func testAddressOnlyStructString<T>(_ a : T) -> String {
   return produceAddressOnlyStruct(a).str
   
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
@@ -104,7 +104,7 @@ func testAddressOnlyStructString<T>(a : T) -> String {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyStructElt
-func testAddressOnlyStructElt<T>(a : T) -> T {
+func testAddressOnlyStructElt<T>(_ a : T) -> T {
   return produceAddressOnlyStruct(a).elt
   
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
@@ -120,7 +120,7 @@ func testAddressOnlyStructElt<T>(a : T) -> T {
 // rdar://15717123 - let decls of address-only type.
 
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyLet
-func testAddressOnlyLet<T>(a : T) {
+func testAddressOnlyLet<T>(_ a : T) {
   let x = produceAddressOnlyStruct(a)
 }
 
@@ -140,7 +140,7 @@ struct GetOnlySubscriptStruct {
 
 
 // CHECK-LABEL: sil hidden @{{.*}}testGetOnlySubscript
-func testGetOnlySubscript(x : GetOnlySubscriptStruct, idx : Int) -> Int {
+func testGetOnlySubscript(_ x : GetOnlySubscriptStruct, idx : Int) -> Int {
   return x[idx]
   
   // CHECK: [[SUBFN:%[0-9]+]] = function_ref @{{.*}}g9subscript
@@ -161,7 +161,7 @@ struct CloseOverAddressOnlyConstant<T> {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}callThroughLet
-func callThroughLet(predicate: (Int, Int) -> Bool) {
+func callThroughLet(_ predicate: (Int, Int) -> Bool) {
   let p = predicate
   if p(1, 2) {
   }
@@ -171,7 +171,7 @@ func callThroughLet(predicate: (Int, Int) -> Bool) {
 // Verify that we can emit address-only rvalues directly into the result slot in
 // chained calls.
 struct GenericTestStruct<T> {
-   func pass_address_only_rvalue_result(i: Int) -> T {
+   func pass_address_only_rvalue_result(_ i: Int) -> T {
      return self[i]
    }
    subscript (i : Int) -> T {
@@ -204,7 +204,7 @@ func produceNMSubscriptableRValue() -> NonMutableSubscriptable {}
 // CHECK: [[GETFN:%[0-9]+]] = function_ref @_TFV9let_decls23NonMutableSubscriptableg9subscript
 // CHECK-NEXT: [[RES2:%[0-9]+]] = apply [[GETFN]](%0, [[RES]])
 // CHECK-NEXT: return [[RES2]]
-func test_nm_subscript_get(let a : Int) -> Int {
+func test_nm_subscript_get(_ a : Int) -> Int {
   return produceNMSubscriptableRValue()[a]
 }
 
@@ -214,7 +214,7 @@ func test_nm_subscript_get(let a : Int) -> Int {
 // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[FR1]]()
 // CHECK: [[SETFN:%[0-9]+]] = function_ref @_TFV9let_decls23NonMutableSubscriptables9subscript
 // CHECK-NEXT: [[RES2:%[0-9]+]] = apply [[SETFN]](%0, %0, [[RES]])
-func test_nm_subscript_set(let a : Int) {
+func test_nm_subscript_set(_ a : Int) {
   produceNMSubscriptableRValue()[a] = a
 }
 
@@ -229,7 +229,7 @@ struct WeirdPropertyTest {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}test_weird_property
-func test_weird_property(v : WeirdPropertyTest, let i : Int) -> Int {
+func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
   var v = v
   // CHECK: [[VBOX:%[0-9]+]] = alloc_box $WeirdPropertyTest
   // CHECK: [[PB:%.*]] = project_box [[VBOX]]
@@ -255,7 +255,7 @@ func test_weird_property(v : WeirdPropertyTest, let i : Int) -> Int {
 // CHECK-NEXT: copy_addr [take] %1 to [initialization] %0 : $*T
 // CHECK-NEXT: %4 = tuple ()
 // CHECK-NEXT: return %4
-func generic_identity<T>(let a : T) -> T {
+func generic_identity<T>(_ a : T) -> T {
   // Should be a single copy_addr, with no temporary.
   return a
 }
@@ -282,7 +282,7 @@ protocol SimpleProtocol {
 
 // CHECK-LABEL: sil hidden @{{.*}}testLetProtocolBases
 // CHECK: bb0(%0 : $*SimpleProtocol):
-func testLetProtocolBases(let p : SimpleProtocol) {
+func testLetProtocolBases(_ p : SimpleProtocol) {
   // CHECK-NEXT: debug_value_addr
   // CHECK-NEXT: open_existential_addr
   // CHECK-NEXT: witness_method
@@ -301,7 +301,7 @@ func testLetProtocolBases(let p : SimpleProtocol) {
 
 // CHECK-LABEL: sil hidden @{{.*}}testLetArchetypeBases
 // CHECK: bb0(%0 : $*T):
-func testLetArchetypeBases<T : SimpleProtocol>(let p : T) {
+func testLetArchetypeBases<T : SimpleProtocol>(_ p : T) {
   // CHECK-NEXT: debug_value_addr
   // CHECK-NEXT: witness_method $T
   // CHECK-NEXT: apply
@@ -319,7 +319,7 @@ func testLetArchetypeBases<T : SimpleProtocol>(let p : T) {
 // CHECK: bb0(%0 : $Int, %1 : $*SimpleProtocol):
 // CHECK-NEXT: debug_value %0 : $Int, let, name "a"
 // CHECK-NEXT: debug_value_addr %1 : $*SimpleProtocol, let, name "b"
-func testDebugValue(let a : Int, let b : SimpleProtocol) -> Int {
+func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 
   // CHECK-NEXT: debug_value %0 : $Int, let, name "x"
   let x = a
@@ -335,7 +335,7 @@ func testDebugValue(let a : Int, let b : SimpleProtocol) -> Int {
 
 
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyTupleArgument
-func testAddressOnlyTupleArgument(let bounds: (start: SimpleProtocol, pastEnd: Int)) {
+func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int)) {
 // CHECK:       bb0(%0 : $*SimpleProtocol, %1 : $Int):
 // CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int), let, name "bounds"
 // CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 0
@@ -348,7 +348,7 @@ func testAddressOnlyTupleArgument(let bounds: (start: SimpleProtocol, pastEnd: I
 }
 
 
-func address_only_let_closure<T>(let x:T) -> T {
+func address_only_let_closure<T>(_ x:T) -> T {
   return { { x }() }()
 }
 
@@ -360,13 +360,13 @@ struct GenericFunctionStruct<T, U> {
 // CHECK-LABEL: sil hidden @{{.*}}member_ref_abstraction_change
 // CHECK: function_ref reabstraction thunk helper
 // CHECK: return
-func member_ref_abstraction_change(let x: GenericFunctionStruct<Int, Int>) -> Int -> Int {
+func member_ref_abstraction_change(_ x: GenericFunctionStruct<Int, Int>) -> Int -> Int {
   return x.f
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}call_auto_closure
 // CHECK: apply %0()
-func call_auto_closure(@autoclosure let x: () -> Bool) -> Bool {
+func call_auto_closure(x: @autoclosure () -> Bool) -> Bool {
   return x()  // Calls of autoclosures should be marked transparent.
 }
 
@@ -465,7 +465,7 @@ struct LetPropertyStruct {
 // CHECK:   [[PROP:%[0-9]+]] = struct_extract [[STRUCT]] : $LetPropertyStruct, #LetPropertyStruct.lp
 // CHECK:   strong_release [[ABOX]] : $@box LetPropertyStruct
 // CHECK:   return [[PROP]] : $Int
-func testLetPropertyAccessOnLValueBase(a : LetPropertyStruct) -> Int {
+func testLetPropertyAccessOnLValueBase(_ a : LetPropertyStruct) -> Int {
   var a = a
   return a.lp
 }

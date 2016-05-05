@@ -66,7 +66,7 @@ As a special case, when a function is declared as taking an
 
 So if you have a function declared::
 
-  func foo(x: UnsafeMutablePointer<Float>)
+  func foo(_ x: UnsafeMutablePointer<Float>)
 
 You can call it as any of::
 
@@ -80,7 +80,7 @@ You can call it as any of::
 
 And if you have a function declared::
 
-  func bar(x: UnsafeMutablePointer<Void>)
+  func bar(_ x: UnsafeMutablePointer<Void>)
 
 You can call it as any of::
 
@@ -112,7 +112,7 @@ Note that the above list does not include arrays, since implicit autoreleasing-t
 
 So if you have a function declared::
 
-  func bas(x: AutoreleasingUnsafeMutablePointer<NSBas?>)
+  func bas(_ x: AutoreleasingUnsafeMutablePointer<NSBas?>)
 
 You can call it as any of::
 
@@ -145,7 +145,7 @@ types can furthermore interoperate with strings; see `Strings`_ below.
 
 So if you have a function declared::
 
-  func zim(x: UnsafePointer<Float>)
+  func zim(_ x: UnsafePointer<Float>)
 
 You can call it as any of::
 
@@ -158,7 +158,7 @@ You can call it as any of::
 
 And if you have a function declared::
 
-  func zang(x: UnsafePointer<Void>)
+  func zang(_ x: UnsafePointer<Void>)
 
 You can call it as any of::
 

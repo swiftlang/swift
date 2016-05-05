@@ -30,13 +30,6 @@ struct PackagingOptions : OptionSet {
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var tests = TestSuite("OptionSet")
 
@@ -48,46 +41,49 @@ tests.test("basics") {
   expectNotEqual(P.Box, .Carton)
   expectNotEqual(P.Box, .BoxOrBag)
 
-  expectEqual(.Box, P.Box.intersect(.BoxOrBag))
-  expectEqual(.Bag, P.Bag.intersect(.BoxOrBag))
-  expectEqual(P(), P.Bag.intersect(.Box))
-  expectEqual(P(), P.Box.intersect(.Satchel))
+  expectEqual(.Box, P.Box.intersection(.BoxOrBag))
+  expectEqual(.Bag, P.Bag.intersection(.BoxOrBag))
+  expectEqual(P(), P.Bag.intersection(.Box))
+  expectEqual(P(), P.Box.intersection(.Satchel))
   expectEqual(.BoxOrBag, P.Bag.union(.Box))
   expectEqual(.BoxOrBag, P.Box.union(.Bag))
   expectEqual(.BoxOrCartonOrBag, P.BoxOrBag.union(.Carton))
-  expectEqual([.Satchel, .Box], P.SatchelOrBag.exclusiveOr(.BoxOrBag))
+  expectEqual([.Satchel, .Box], P.SatchelOrBag.symmetricDifference(.BoxOrBag))
 
   var p = P.Box
-  p.intersectInPlace(.BoxOrBag)
+  p.formIntersection(.BoxOrBag)
   expectEqual(.Box, p)
   
   p = .Bag
-  p.intersectInPlace(.BoxOrBag)
+  p.formIntersection(.BoxOrBag)
   expectEqual(.Bag, p)
   
   p = .Bag
-  p.intersectInPlace(.Box)
+  p.formIntersection(.Box)
   expectEqual(P(), p)
   
   p = .Box
-  p.intersectInPlace(.Satchel)
+  p.formIntersection(.Satchel)
   expectEqual(P(), p)
   
   p = .Bag
-  p.unionInPlace(.Box)
+  p.formUnion(.Box)
   expectEqual(.BoxOrBag, p)
   
   p = .Box
-  p.unionInPlace(.Bag)
+  p.formUnion(.Bag)
   expectEqual(.BoxOrBag, p)
   
   p = .BoxOrBag
-  p.unionInPlace(.Carton)
+  p.formUnion(.Carton)
   expectEqual(.BoxOrCartonOrBag, p)
 
   p = .SatchelOrBag
-  p.exclusiveOrInPlace(.BoxOrBag)
+  p.formSymmetricDifference(.BoxOrBag)
   expectEqual([.Satchel, .Box], p)
 }
+
+// FIXME: add tests for all of SetAlgebra, in particular
+// insert/remove/replace.
 
 runAllTests()

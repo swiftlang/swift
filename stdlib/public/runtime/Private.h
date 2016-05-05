@@ -160,6 +160,18 @@ namespace swift {
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type);
 #endif
 
+  /// A helper function which avoids performing a store if the destination
+  /// address already contains the source value.  This is useful when
+  /// "initializing" memory that might have been initialized to the correct
+  /// value statically.  In such a case, the compiler might have gone so far
+  /// as to map the entire object readonly, or we might just want to avoid
+  /// dirtying memory unnecessarily.
+  template <class T>
+  static void assignUnlessEqual(T &dest, T newValue) {
+    if (dest != newValue)
+      dest = newValue;
+  }
+
 #if defined(__CYGWIN__)
   struct dl_phdr_info {
     void *dlpi_addr;

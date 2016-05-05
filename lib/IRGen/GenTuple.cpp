@@ -113,6 +113,22 @@ namespace {
       return field.projectAddress(IGF, tuple, offsets);
     }
 
+    /// Return the statically-known offset of the given element.
+    Optional<Size> getFixedElementOffset(IRGenModule &IGM,
+                                         unsigned fieldNo) const {
+      const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
+      switch (field.getKind()) {
+      case ElementLayout::Kind::Empty:
+      case ElementLayout::Kind::Fixed:
+        return field.getFixedByteOffset();
+      case ElementLayout::Kind::InitialNonFixedSize:
+        return Size(0);
+      case ElementLayout::Kind::NonFixed:
+        return None;
+      }
+      llvm_unreachable("bad element layout kind");
+    }
+
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address src, SILType T) const override {
       llvm_unreachable("unexploded tuple as argument?");
@@ -193,6 +209,15 @@ namespace {
                           ty, size, std::move(spareBits), align, isPOD,
                           alwaysFixedSize)
       {}
+
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      for (auto &field : getFields()) {
+        auto fieldOffset = offset + field.getFixedByteOffset();
+        cast<LoadableTypeInfo>(field.getTypeInfo())
+          .addToAggLowering(IGM, lowering, fieldOffset);
+      }
+    }
 
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
       return None;
@@ -356,7 +381,7 @@ const TypeInfo *TypeConverter::convertTupleType(TupleType *tuple) {
   } else {                                                           \
     return tupleTI.as<NonFixedTupleTypeInfo>().op(IGF, __VA_ARGS__); \
   }                                                                  \
-} while(0)
+} while (0)
 
 void irgen::projectTupleElementFromExplosion(IRGenFunction &IGF,
                                              SILType tupleType,
@@ -373,4 +398,11 @@ Address irgen::projectTupleElementAddress(IRGenFunction &IGF,
                                           unsigned fieldNo) {
   FOR_TUPLE_IMPL(IGF, tupleType, projectElementAddress, tuple,
                  tupleType, fieldNo);
+}
+
+Optional<Size> irgen::getFixedTupleElementOffset(IRGenModule &IGM,
+                                                 SILType tupleType,
+                                                 unsigned fieldNo) {
+  // Macro happens to work with IGM, too.
+  FOR_TUPLE_IMPL(IGM, tupleType, getFixedElementOffset, fieldNo);
 }

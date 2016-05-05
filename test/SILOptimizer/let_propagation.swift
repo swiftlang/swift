@@ -174,12 +174,12 @@ public func testUseGlobalLet() -> Int32 {
 */
 
 struct A1 {
-  let x: Int32
+  private let x: Int32
   
   // Propagate the value of the initializer into all instructions
   // that use it, which in turn would allow for better constant
   // propagation.
-  let y: Int32 = 100
+  private let y: Int32 = 100
   
   init(v: Int32) {
     if v > 0 {

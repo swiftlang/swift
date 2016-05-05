@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
 
 extension String {
   /// Construct an instance that is the concatenation of `count` copies
@@ -38,7 +39,7 @@ extension String {
   }
   
   @warn_unused_result
-  public func _split(separator separator: UnicodeScalar) -> [String] {
+  public func _split(separator: UnicodeScalar) -> [String] {
     let scalarSlices = unicodeScalars.split { $0 == separator }
     return scalarSlices.map { String($0) }
   }
@@ -59,22 +60,65 @@ extension String {
 /// Determines if `theString` starts with `prefix` comparing the strings under
 /// canonical equivalence.
 @_silgen_name("swift_stdlib_NSStringHasPrefixNFD")
-func _stdlib_NSStringHasPrefixNFD(theString: AnyObject, _ prefix: AnyObject) -> Bool
+func _stdlib_NSStringHasPrefixNFD(_ theString: AnyObject, _ prefix: AnyObject) -> Bool
+
+@_silgen_name("swift_stdlib_NSStringHasPrefixNFDPointer")
+func _stdlib_NSStringHasPrefixNFDPointer(_ theString: OpaquePointer, _ prefix: OpaquePointer) -> Bool
 
 /// Determines if `theString` ends with `suffix` comparing the strings under
 /// canonical equivalence.
 @_silgen_name("swift_stdlib_NSStringHasSuffixNFD")
-func _stdlib_NSStringHasSuffixNFD(theString: AnyObject, _ suffix: AnyObject) -> Bool
+func _stdlib_NSStringHasSuffixNFD(_ theString: AnyObject, _ suffix: AnyObject) -> Bool
+@_silgen_name("swift_stdlib_NSStringHasSuffixNFDPointer")
+func _stdlib_NSStringHasSuffixNFDPointer(_ theString: OpaquePointer, _ suffix: OpaquePointer) -> Bool
 
 extension String {
   /// Returns `true` iff `self` begins with `prefix`.
-  public func hasPrefix(prefix: String) -> Bool {
+  public func hasPrefix(_ prefix: String) -> Bool {
+    let selfCore = self._core
+    let prefixCore = prefix._core
+    if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
+      if selfCore.isASCII && prefixCore.isASCII {
+        // Prefix longer than self.
+        let prefixCount = prefixCore.count
+        if prefixCount > selfCore.count || prefixCount == 0 {
+          return false
+        }
+        return Int(_swift_stdlib_memcmp(
+          selfCore.startASCII, prefixCore.startASCII, prefixCount)) == 0
+      }
+      let lhsStr = _NSContiguousString(selfCore)
+      let rhsStr = _NSContiguousString(prefixCore)
+      return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+        return _stdlib_NSStringHasPrefixNFDPointer($0, $1)
+      }
+    }
     return _stdlib_NSStringHasPrefixNFD(
       self._bridgeToObjectiveCImpl(), prefix._bridgeToObjectiveCImpl())
   }
 
   /// Returns `true` iff `self` ends with `suffix`.
-  public func hasSuffix(suffix: String) -> Bool {
+  public func hasSuffix(_ suffix: String) -> Bool {
+    let selfCore = self._core
+    let suffixCore = suffix._core
+    if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {
+      if selfCore.isASCII && suffixCore.isASCII {
+        // Prefix longer than self.
+        let suffixCount = suffixCore.count
+        let selfCount = selfCore.count
+        if suffixCount > selfCount || suffixCount == 0 {
+          return false
+        }
+        return Int(_swift_stdlib_memcmp(
+                   selfCore.startASCII + (selfCount - suffixCount),
+                   suffixCore.startASCII, suffixCount)) == 0
+      }
+      let lhsStr = _NSContiguousString(selfCore)
+      let rhsStr = _NSContiguousString(suffixCore)
+      return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+        return _stdlib_NSStringHasSuffixNFDPointer($0, $1)
+      }
+    }
     return _stdlib_NSStringHasSuffixNFD(
       self._bridgeToObjectiveCImpl(), suffix._bridgeToObjectiveCImpl())
   }
@@ -136,7 +180,7 @@ extension String {
     for i in rng.indices {
       if rng[i] == delim {
         return (String(rng[rng.startIndex..<i]), 
-                String(rng[i.successor()..<rng.endIndex]), 
+                String(rng[rng.index(after: i)..<rng.endIndex]),
                 true)
       }
     }
@@ -147,7 +191,7 @@ extension String {
   /// predicate returns true. Returns the string before that character, the 
   /// character that matches, the string after that character,
   /// and a boolean value indicating whether any character was found.
-  public func _splitFirstIf(@noescape predicate: (UnicodeScalar) -> Bool)
+  public func _splitFirstIf(_ predicate: @noescape (UnicodeScalar) -> Bool)
     -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
   {
     let rng = unicodeScalars
@@ -155,7 +199,7 @@ extension String {
       if predicate(rng[i]) {
         return (String(rng[rng.startIndex..<i]),
                 rng[i], 
-                String(rng[i.successor()..<rng.endIndex]), 
+                String(rng[rng.index(after: i)..<rng.endIndex]),
                 true)
       }
     }
@@ -166,11 +210,11 @@ extension String {
 extension String {
   @available(*, unavailable, message: "Renamed to init(repeating:count:) and reordered parameters")
   public init(count: Int, repeatedValue c: Character) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, message: "Renamed to init(repeating:count:) and reordered parameters")
   public init(count: Int, repeatedValue c: UnicodeScalar) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

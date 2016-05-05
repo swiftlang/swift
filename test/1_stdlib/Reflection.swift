@@ -101,12 +101,6 @@ dump(any)
 print("Character:")
 dump(Character("a"))
 
-let range = 3...9
-// CHECK-NEXT: Range(3..<10)
-// CHECK-NEXT:  startIndex: 3
-// CHECK-NEXT:  endIndex: 10
-dump(range)
-
 protocol Fooable {}
 extension Int : Fooable {}
 extension Double : Fooable {}
@@ -154,13 +148,6 @@ switch true.customPlaygroundQuickLook {
   default: print("wrong quicklook type")
 }
 
-// CHECK-NEXT: Optional("Hello world")
-// CHECK-NEXT:   some: "Hello world"
-dump(Optional<String>("Hello world"))
-// CHECK-NEXT: - nil
-let noneString: String? = nil
-dump(noneString)
-
 let intArray = [1,2,3,4,5]
 // CHECK-NEXT: 5 elements
 // CHECK-NEXT: 1
@@ -177,29 +164,20 @@ dump(justSomeFunction as Any)
 // CHECK-NEXT: Swift.String
 dump(String.self)
 
-// CHECK-NEXT: Swift.CollectionOfOne<Swift.String>
-// CHECK-NEXT:   element: "Howdy Swift!"
-dump(CollectionOfOne("Howdy Swift!"))
-
-// CHECK-NEXT: EmptyCollection
-var emptyCollectionOfInt: EmptyCollection<Int> = EmptyCollection()
-dump(emptyCollectionOfInt)
-
 // CHECK-NEXT: ▿
 // CHECK-NEXT: from: 1.0
 // CHECK-NEXT: through: 12.15
 // CHECK-NEXT: by: 3.14
 dump(stride(from: 1.0, through: 12.15, by: 3.14))
 
-// CHECK-NEXT: 0x0000
-// CHECK-NEXT: - pointerValue: 0
-var nilUnsafeMutablePointerString: UnsafeMutablePointer<String> = nil
+// CHECK-NEXT: nil
+var nilUnsafeMutablePointerString: UnsafeMutablePointer<String>? = nil
 dump(nilUnsafeMutablePointerString)
 
 // CHECK-NEXT: 123456
 // CHECK-NEXT: - pointerValue: 1193046
 var randomUnsafeMutablePointerString = UnsafeMutablePointer<String>(
-  bitPattern: 0x123456)
+  bitPattern: 0x123456)!
 dump(randomUnsafeMutablePointerString)
 
 // CHECK-NEXT: Hello panda

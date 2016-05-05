@@ -53,12 +53,12 @@ struct S<T> {
 }
 @inline(never)
 func genStructArray() {
-  _ = RefArray<S<Int>>(S(x:3,y:4))
+  _ = RefArray<S<Int>>(S(x:3, y:4))
   // should be a nop
 }
 
 @inline(never)
-public func run_ArrayOfGenericPOD(N: Int) {
+public func run_ArrayOfGenericPOD(_ N: Int) {
   for _ in 0...N {
     genEnumArray()
     genIOUArray()

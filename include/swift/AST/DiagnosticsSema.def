@@ -93,6 +93,9 @@ ERROR(could_not_use_type_member,none,
 ERROR(could_not_use_type_member_on_instance,none,
       "static member %1 cannot be used on instance of type %0",
       (Type, DeclName))
+ERROR(could_not_use_type_member_on_existential,none,
+      "static member %1 cannot be used on protocol metatype %0",
+      (Type, DeclName))
 ERROR(could_not_use_instance_member_on_type,none,
       "instance member %1 cannot be used on type %0",
       (Type, DeclName))
@@ -392,6 +395,8 @@ WARNING(selector_literal_deprecated_suggest,none,
         "use '#selector' instead", ())
 WARNING(selector_construction_suggest,none,
         "use '#selector' instead of explicitly constructing a 'Selector'", ())
+NOTE(selector_construction_suppress_warning,none,
+     "wrap the selector name in parentheses to suppress this warning", ())
 
 ERROR(cannot_return_value_from_void_func,none,
       "unexpected non-void return value in void function", ())
@@ -424,6 +429,9 @@ ERROR(serialization_malformed_module,Fatal,
 ERROR(serialization_module_too_new,Fatal,
       "module file was created by a newer version of the compiler: %0",
       (StringRef))
+ERROR(serialization_module_language_version_mismatch,Fatal,
+      "module compiled with Swift %0 cannot be imported in Swift %1: %2",
+      (StringRef, StringRef, StringRef))
 ERROR(serialization_module_too_old,Fatal,
       "module file was created by an older version of the compiler; "
       "rebuild %0 and try again: %1",
@@ -509,8 +517,8 @@ ERROR(pattern_used_in_type,none,
 NOTE(note_module_as_type,none,
      "cannot use module %0 as a type", (Identifier))
 
-ERROR(use_unknown_object_literal,none,
-     "use of unknown object literal name %0", (Identifier))
+ERROR(use_unknown_object_literal_protocol,none,
+     "cannot deduce protocol for %0 literal", (StringRef))
 ERROR(object_literal_default_type_missing,none,
      "could not infer type of %0 literal", (StringRef))
 NOTE(object_literal_resolve_import,none,
@@ -754,6 +762,9 @@ NOTE(c_function_pointer_captures_here,none,
 
 ERROR(var_type_not_materializable,none,
       "type %0 of variable is not materializable", (Type))
+ERROR(param_type_non_materializable_tuple,none,
+      "named parameter has type %0 which includes nested inout parameters",
+      (Type))
 ERROR(enum_element_not_materializable,none,
       "type of enum case is not materializable", ())
 
@@ -761,6 +772,10 @@ ERROR(missing_initializer_def,PointsToFirstBadToken,
       "initializer requires a body", ())
 
 // Attributes
+WARNING(attr_decl_attr_now_on_type,none,
+      "%0 is now an attribute on a parameter type, "
+      "instead of on the parameter itself", (StringRef))
+
 ERROR(operator_not_func,none,
       "operators must be declared with 'func'", ())
 ERROR(redefining_builtin_operator,none,
@@ -776,6 +791,9 @@ ERROR(inout_cant_be_variadic,none,
       "inout arguments cannot be variadic", ())
 ERROR(inout_only_parameter,none,
       "'inout' is only valid in parameter lists", ())
+ERROR(var_parameter_not_allowed,none,
+      "parameters may not have the 'var' specifier", ())
+
 
 ERROR(mutating_invalid_global_scope,none,
       "'mutating' is only valid on methods", ())
@@ -1048,6 +1066,11 @@ ERROR(extension_protocol_via_typealias,none,
       "typealias", (Type))
 ERROR(extension_anyobject,none,
       "'AnyObject' protocol cannot be extended", ())
+ERROR(objc_generic_extension_using_type_parameter,none,
+      "extension of a generic Objective-C class cannot access the class's "
+      "generic parameters at runtime", ())
+NOTE(objc_generic_extension_using_type_parameter_here,none,
+     "generic parameter used here", ())
 
 // Protocols
 ERROR(type_does_not_conform,none,
@@ -1187,7 +1210,7 @@ NOTE(ambiguous_witnesses_type,none,
 NOTE(protocol_witness_exact_match,none,
      "candidate exactly matches%0", (StringRef))
 NOTE(protocol_witness_renamed,none,
-     "candidate matches (with renaming)%0", (StringRef))
+     "rename to %0 to satisfy this requirement%1", (DeclName, StringRef))
 NOTE(protocol_witness_kind_conflict,none,
      "candidate is not %select{an initializer|a function|a variable|"
      "a subscript}0", (RequirementKind))
@@ -1227,7 +1250,7 @@ NOTE(protocol_witness_rethrows_conflict,none,
 NOTE(protocol_witness_throws_conflict,none,
      "candidate throws, but protocol does not allow it", ())
 NOTE(protocol_witness_not_objc,none,
-     "candidate is not '@objc', but protocol requires it", ())
+     "candidate is explicitly '@nonobjc'", ())
 
 NOTE(protocol_witness_type,none,
      "possibly intended match", ())
@@ -1250,10 +1273,24 @@ ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
 NOTE(protocol_conformance_implied_here,none,
      "implied protocol conformance %0 here can be made explicit", (Identifier))
-WARNING(optional_req_nonobjc_near_match,none,
-        "non-@objc %select{initializer %1|method %1|property %1|subscript}0 "
-        "cannot satisfy optional requirement of @objc protocol %2",
-        (RequirementKind, DeclName, DeclName))
+
+// "Near matches"
+WARNING(optional_req_near_match,none,
+        "%0 %1 nearly matches optional requirement %2 of protocol %3",
+        (DescriptiveDeclKind, DeclName, DeclName, DeclName))
+NOTE(optional_req_nonobjc_near_match_add_objc,none,
+     "add '@objc' to provide an Objective-C entrypoint", ())
+NOTE(optional_req_nonobjc_to_objc,none,
+     "rename to %0 to satisfy this requirement",
+     (DeclName))
+NOTE(optional_req_near_match_move,none,
+     "move %0 to %select{an|another}1 extension to silence this warning",
+     (DeclName, unsigned))
+NOTE(optional_req_near_match_nonobjc,none,
+     "add '@nonobjc' to silence this %select{warning|error}0", (bool))
+NOTE(optional_req_near_match_accessibility,none,
+     "make %0 %select{ERROR|private|private or internal}1 to silence this "
+     "warning", (DeclName, Accessibility))
 
 // Protocols and existentials
 ERROR(assoc_type_outside_of_protocol,none,
@@ -1314,8 +1351,8 @@ ERROR(override_multiple_decls_arg_mismatch,none,
       "declaration %0 has different argument names from any potential "
       "overrides", (DeclName))
 NOTE(overridden_near_match_here,none,
-     "potential overridden %select{method|initializer}0 %1 here",
-      (bool, DeclName))
+     "potential overridden %0 %1 here",
+      (DescriptiveDeclKind, DeclName))
 ERROR(override_decl_extension,none,
       "declarations %select{in extensions|from extensions}0 cannot "
       "%select{override|be overridden}0 yet", (bool))
@@ -1401,6 +1438,14 @@ ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
       "a non-throwing %select{method|initializer}0 is not supported", (bool))
 
+ERROR(override_optional_mismatch,none,
+      "cannot override %0 %select{parameter|index}1 of type %2 with "
+      "non-optional type %3",
+      (DescriptiveDeclKind, bool, Type, Type))
+ERROR(override_optional_result_mismatch,none,
+      "cannot override %0 %select{result|element}1 type %2 with "
+      "optional type %3",
+      (DescriptiveDeclKind, bool, Type, Type))
 WARNING(override_unnecessary_IUO,none,
       "overriding %0 parameter of type %1 with implicitly unwrapped optional "
       "type %2",
@@ -1415,6 +1460,10 @@ NOTE(override_unnecessary_IUO_use_strict,none,
      "use '?' to make the result optional", ())
 NOTE(override_unnecessary_IUO_silence,none,
      "add parentheses to silence this warning", ())
+
+ERROR(iuo_in_illegal_position,none,
+      "implicitly unwrapped optionals are only allowed at top level and as "
+      "function results", ())
 
 ERROR(override_mutable_covariant_property,none,
       "cannot override mutable property %0 of type %1 with covariant type %2",
@@ -1448,7 +1497,12 @@ ERROR(circular_class_inheritance,none,
 NOTE(class_here,none,
      "class %0 declared here", (Identifier))
 ERROR(inheritance_from_final_class,none,
-"inheritance from a final class %0", (Identifier))
+      "inheritance from a final class %0", (Identifier))
+ERROR(inheritance_from_unspecialized_objc_generic_class,none,
+      "inheritance from a generic Objective-C class %0 must bind "
+      "type parameters of %0 to specific concrete types", (Identifier))
+ERROR(inheritance_from_objc_runtime_visible_class,none,
+      "inheritance from an Objective-C class %0 only visible via the runtime", (Identifier))
 
 
 // Enums
@@ -1600,6 +1654,8 @@ ERROR(property_behavior_invalid_parameter,none,
 
 ERROR(attr_only_only_one_decl_kind,none,
       "%0 may only be used on '%1' declarations", (DeclAttribute,StringRef))
+ERROR(attr_only_only_on_parameters,none,
+      "%0 may only be used on parameters", (StringRef))
 
 
 ERROR(override_final,none,
@@ -1976,6 +2032,8 @@ ERROR(generic_type_requires_arguments,none,
       "reference to generic type %0 requires arguments in <...>", (Type))
 NOTE(generic_type_declared_here,none,
      "generic type %0 declared here", (Identifier))
+ERROR(cannot_partially_specialize_generic_function,none,
+     "cannot partially specialize a generic function", ())
 
 // Ambiguities
 ERROR(ambiguous_decl_ref,none,
@@ -2025,8 +2083,8 @@ WARNING(store_in_willset,none,
         "attempting to store to property %0 within its own willSet, which is "
         "about to be overwritten by the new value", (Identifier))
 
-WARNING(tuple_splat_use,none,
-        "passing %0 arguments to a callee as a single tuple value is deprecated",
+ERROR(tuple_splat_use,none,
+      "passing %0 arguments to a callee as a single tuple value has been removed in Swift 3",
         (unsigned))
 
 
@@ -2118,6 +2176,8 @@ WARNING(expression_unused_result_nonmutating,none,
         "use %1 to mutate in-place", (DeclName, DeclName))
 WARNING(expression_unused_optional_try,none,
         "result of 'try?' is unused", ())
+WARNING(expression_unused_selector_result, none,
+        "result of '#selector' is unused", ())
 
 ERROR(assignment_lhs_not_lvalue,none,
       "cannot assign to immutable expression of type %0", (Type))
@@ -2135,10 +2195,8 @@ NOTE(change_to_mutating,none,
      (bool))
 
 // For Stmt
-WARNING(deprecated_c_style_for_stmt,none,
-"C-style for statement is deprecated and will be removed in a future version of Swift", ())
-NOTE(cant_fix_c_style_for_stmt,none,
-"C-style for statement can't be automatically fixed to for-in, because the loop variable is modified inside the loop", ())
+ERROR(deprecated_c_style_for_stmt,none,
+      "C-style for statement has been removed in Swift 3", ())
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,none,
@@ -2175,6 +2233,15 @@ ERROR(unnecessary_cast_over_optionset,none,
 
 ERROR(type_mismatch_multiple_pattern_list,none,
       "pattern variable bound to type %0, expected type %1", (Type, Type))
+
+WARNING(where_on_one_item, none,
+        "'where' only applies to the second pattern match in this case", ())
+
+NOTE(add_where_newline, none,
+     "disambiguate by adding a line break between them if this is desired", ())
+
+NOTE(duplicate_where, none,
+     "duplicate the 'where' on both patterns to check both patterns",())
 
 //------------------------------------------------------------------------------
 // Type Check Patterns
@@ -2398,21 +2465,13 @@ NOTE(overridden_required_initializer_here,none,
 
 // Functions
 ERROR(attribute_requires_function_type,none,
-      "attribute only applies to syntactic function types", ())
-ERROR(objc_block_cannot_be_thin,none,
-      "@objc_block function type cannot be @thin", ())
+      "@%0 attribute only applies to function types", (StringRef))
 ERROR(attribute_not_supported,none,
       "this attribute is not supported", ())
-ERROR(convention_with_deprecated_representation_attribute,none,
-      "@convention attribute cannot be used with deprecated @%0 attribute",
-      (StringRef))
 ERROR(unsupported_convention,none,
       "convention '%0' not supported", (StringRef))
 ERROR(unreferenced_generic_parameter,none,
       "generic parameter '%0' is not used in function signature", (StringRef))
-WARNING(deprecated_convention_attribute,none,
-        "'@%0' attribute is deprecated; '@convention(%1)' should be used "
-        "instead", (StringRef, StringRef))
 
 // SIL
 ERROR(opened_non_protocol,none,
@@ -2430,9 +2489,6 @@ ERROR(sil_function_multiple_error_results,PointsToFirstBadToken,
       "SIL function types cannot have multiple @error results", ())
 ERROR(unsupported_sil_convention,none,
       "convention '%0' not supported in SIL", (StringRef))
-ERROR(sil_deprecated_convention_attribute,none,
-      "'@%0' attribute is deprecated; '@convention(%1)' must be used instead",
-      (StringRef, StringRef))
 
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,none,
@@ -2465,6 +2521,9 @@ ERROR(objc_in_extension_context,none,
       "members of constrained extensions cannot be declared @objc", ())
 ERROR(objc_in_generic_extension,none,
       "@objc is not supported within extensions of generic classes", ())
+ERROR(objc_in_objc_runtime_visible,none,
+      "@objc is not supported within extensions of classes only visible via the Objective-C runtime", ())
+
 ERROR(objc_for_generic_class,none,
       "generic subclasses of '@objc' classes cannot have an explicit '@objc' "
       "attribute because they are not directly visible from Objective-C", ())
@@ -2498,7 +2557,7 @@ ERROR(objc_enum_case_multi,none,
       "'@objc' enum case declaration defines multiple enum cases with the same Objective-C name", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement}"
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
@@ -2543,6 +2602,9 @@ NOTE(objc_inferring_on_objc_protocol_member,none,
 NOTE(objc_overriding_objc_decl,none,
      "overriding '@objc' %select{property|subscript|initializer|method}0 %1 "
      "here", (unsigned, DeclName))
+NOTE(objc_witness_objc_requirement,none,
+     "satisfying requirement for %0 %1 in protocol %2",
+     (DescriptiveDeclKind, DeclName, DeclName))
 
 ERROR(objc_invalid_on_func_curried,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because curried functions "
@@ -2587,6 +2649,10 @@ ERROR(objc_override_property_name_mismatch,none,
       "Objective-C property has a different name from the "
       "property it overrides (%0 vs. %1)", (Identifier, Identifier))
 
+ERROR(nonlocal_bridged_to_objc,none,
+      "conformance of %0 to %1 can only be written in module %2",
+      (Identifier, Identifier, Identifier))
+
 ERROR(broken_bridged_to_objc_protocol,none,
       "_BridgedToObjectiveC protocol is broken", ())
 
@@ -2623,7 +2689,7 @@ ERROR(objc_class_method_not_permitted,none,
       OBJC_DIAG_SELECT " defines Objective-C class method %2, which is "
       "not permitted by Swift", (unsigned, DeclName, ObjCSelector))
 
-NOTE(objc_witness_selector_mismatch,none,
+ERROR(objc_witness_selector_mismatch,none,
       "Objective-C method %2 provided by " OBJC_DIAG_SELECT
       " does not match the requirement's selector (%3)",
       (unsigned, DeclName, ObjCSelector, ObjCSelector))
@@ -2633,6 +2699,30 @@ ERROR(objc_optional_requirement_conflict,none,
       " conflicts with optional requirement " OBJC_DIAG_SELECT_2
       " in protocol %5",
       (unsigned, DeclName, unsigned, DeclName, ObjCSelector, DeclName))
+
+NOTE(objc_optional_requirement_swift_rename,none,
+     "rename %select{method|initializer|property|subscript}0 to match "
+     "requirement %1", (bool, DeclName))
+
+ERROR(witness_non_objc,none,
+      "non-'@objc' " OBJC_DIAG_SELECT " does not satisfy requirement "
+      "of '@objc' protocol %2",
+      (unsigned, DeclName, DeclName))
+
+WARNING(witness_non_objc_optional,none,
+        "non-'@objc' " OBJC_DIAG_SELECT " does not satisfy optional "
+        "requirement of '@objc' protocol %2",
+        (unsigned, DeclName, DeclName))
+
+ERROR(witness_non_objc_storage,none,
+      "non-'@objc' %select{property %1|subscript}0 does not satisfy "
+      "requirement of '@objc' protocol %2",
+      (bool, DeclName, DeclName))
+
+WARNING(witness_non_objc_storage_optional,none,
+      "non-'@objc' %select{property %1|subscript}0 does not satisfy "
+      "optional requirement of '@objc' protocol %2",
+      (bool, DeclName, DeclName))
 
 ERROR(nonobjc_not_allowed,none,
       "declaration is %" OBJC_ATTR_SELECT "0, and cannot be marked @nonobjc",

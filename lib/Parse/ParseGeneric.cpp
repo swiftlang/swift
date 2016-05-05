@@ -161,7 +161,7 @@ ParserResult<GenericParamList> Parser::maybeParseGenericParams() {
     if (outer_gpl)
       gpl->setOuterParameters(outer_gpl);
     outer_gpl = gpl;
-  } while(startsWithLess(Tok));
+  } while (startsWithLess(Tok));
   return makeParserResult(gpl);
 }
 

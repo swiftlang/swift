@@ -84,10 +84,6 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       Length = Tok.getLength();
 
       if (LiteralStartLoc.hasValue() && Length.hasValue()) {
-        // We are still inside an object literal until we hit a r_square_lit.
-        if (Tok.getKind() != tok::r_square_lit) {
-          continue;
-        }
         Kind = SyntaxNodeKind::ObjectLiteral;
         Nodes.emplace_back(Kind, CharSourceRange(SM, LiteralStartLoc.getValue(),
           Tok.getRange().getEnd()));
@@ -99,19 +95,22 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 #define KEYWORD(X) case tok::kw_##X: Kind = SyntaxNodeKind::Keyword; break;
 #include "swift/Parse/Tokens.def"
 #undef KEYWORD
-      case tok::pound_selector:
-      case tok::pound_file:
-      case tok::pound_column:
-      case tok::pound_function:
-      case tok::pound_dsohandle:
+
+#define POUND_NORMAL_KEYWORD(Name) case tok::pound_##Name:
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:
+#define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) case tok::pound_##Name:
+#include "swift/Parse/Tokens.def"    
         Kind = SyntaxNodeKind::Keyword;
         break;
+
+#define POUND_CONFIG(Name) case tok::pound_##Name:
+#include "swift/Parse/Tokens.def"    
+        Kind = SyntaxNodeKind::BuildConfigKeyword;
+        break;
+
       case tok::pound_line:
         Kind = Tok.isAtStartOfLine() ? SyntaxNodeKind::BuildConfigKeyword :
                                        SyntaxNodeKind::Keyword;
-        break;
-      case tok::pound_available:
-        Kind = SyntaxNodeKind::BuildConfigKeyword;
         break;
       case tok::identifier:
         if (Tok.getText().startswith("<#"))
@@ -187,11 +186,6 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
           continue;
         Kind = SyntaxNodeKind::StringInterpolationAnchor;
         break;
-      }
-
-      case tok::l_square_lit: {
-        LiteralStartLoc = Loc;
-        continue;
       }
 
       default:
@@ -490,11 +484,13 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   } else if (auto *ObjectE = dyn_cast<ObjectLiteralExpr>(E)) {
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::ObjectLiteralExpression;
-    SN.Range = charSourceRangeFromSourceRange(SM, E->getSourceRange());
-    SourceLoc NRStart = ObjectE->getNameLoc();
-    SourceLoc NREnd = NRStart.getAdvancedLoc(ObjectE->getName().getLength());
+    SN.Range = charSourceRangeFromSourceRange(SM, ObjectE->getSourceRange());
+    SourceLoc NRStart = ObjectE->getSourceLoc().getAdvancedLoc(1);    
+    SourceLoc NREnd =
+      NRStart.getAdvancedLoc(ObjectE->getLiteralKindRawName().size());
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
-    SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
+    SN.BodyRange =
+      innerCharSourceRangeFromSourceRange(SM, ObjectE->getSourceRange());
     pushStructureNode(SN, E);
 
   } else if (auto *ArrayE = dyn_cast<ArrayExpr>(E)) {
@@ -707,7 +703,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
       if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
         return { false, nullptr };
 
-      for(auto &Element : Clause.Elements) {
+      for (auto &Element : Clause.Elements) {
         if (Expr *E = Element.dyn_cast<Expr*>()) {
           E->walk(*this);
         } else if (Stmt *S = Element.dyn_cast<Stmt*>()) {

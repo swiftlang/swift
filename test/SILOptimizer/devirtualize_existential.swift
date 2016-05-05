@@ -4,10 +4,10 @@
 // open_existential_addr instructions. rdar://problem/18506660
 
 protocol Pingable {
- func ping(x : Int);
+ func ping(_ x : Int);
 }
 class Foo : Pingable {
-  func ping(x : Int) { var t : Int }
+  func ping(_ x : Int) { var t : Int }
 }
 
 // Everything gets devirtualized, inlined, and promoted to the stack.

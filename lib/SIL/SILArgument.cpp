@@ -31,7 +31,7 @@ SILArgument::SILArgument(SILBasicBlock *ParentBB, SILType Ty,
     !ParentBB->getParent()->isBare() &&
     ParentBB->getParent()->size() == 1
           ? D != nullptr
-          : true );
+          : true);
   ParentBB->insertArgument(ParentBB->bbarg_end(), this);
 }
 
@@ -44,7 +44,7 @@ SILArgument::SILArgument(SILBasicBlock *ParentBB,
     !ParentBB->getParent()->isBare() &&
     ParentBB->getParent()->size() == 1
           ? D != nullptr
-          : true );
+          : true);
   ParentBB->insertArgument(Pos, this);
 }
 

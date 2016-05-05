@@ -172,10 +172,10 @@ bb0(%0 : $Int64):
 // CHECK: cond_br
 // CHECK: {{^bb}}
 // CHECK-NEXT: integer_literal
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: {{^bb}}
 // CHECK-NEXT: integer_literal
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 sil @do_not_fold_integer_literal : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb3
@@ -199,10 +199,10 @@ enum BoolLike { case true_, false_ }
 // CHECK: switch_enum
 // CHECK: {{^bb}}
 // CHECK-NOT: enum
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: {{^bb}}
 // CHECK-NOT: enum
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 sil @fold_enum : $@convention(thin) (BoolLike) -> BoolLike {
 bb0(%0 : $BoolLike):
   switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
@@ -224,10 +224,10 @@ bb3(%3 : $BoolLike):
 // CHECK: switch_enum
 // CHECK: {{^bb}}
 // CHECK-NEXT: enum
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: {{^bb}}
 // CHECK-NEXT: enum
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 sil @do_not_fold_enum : $@convention(thin) (BoolLike) -> BoolLike {
 bb0(%0 : $BoolLike):
   switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
@@ -727,7 +727,7 @@ bb2:
 // CHECK-NOT: value_metatype $@objc_metatype
 // CHECK: strong_release
 // CHECK: return
-sil @cse_value_metatype : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned (AnyObject,AnyObject) {
+sil @cse_value_metatype : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned (AnyObject, AnyObject) {
 bb0(%0 : $T):
   %2 = value_metatype $@objc_metatype T.Type, %0 : $T
   %4 = objc_metatype_to_object %2 : $@objc_metatype T.Type to $AnyObject
@@ -788,7 +788,7 @@ bb0(%0 : $B, %1 : $B):
 // CHECK-NOT: objc_metatype_to_object
 // CHECK: strong_release
 // CHECK: return
-sil @cse_objc_metatype_to_object : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned (AnyObject,AnyObject) {
+sil @cse_objc_metatype_to_object : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned (AnyObject, AnyObject) {
 bb0(%0 : $T):
   %2 = value_metatype $@objc_metatype T.Type, %0 : $T
   %4 = objc_metatype_to_object %2 : $@objc_metatype T.Type to $AnyObject
@@ -824,7 +824,7 @@ bb0(%0 : $XX):
 // CHECK-NOT: raw_pointer_to_ref
 // CHECK: tuple
 // CHECK: return
-sil @cse_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> @owned(C,C) {
+sil @cse_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> @owned(C, C) {
 bb0(%0 : $Builtin.RawPointer):
   %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
   %2 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C

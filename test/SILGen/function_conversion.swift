@@ -8,7 +8,7 @@
 // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFtCc_dSi_dSi_XFo_dSi_dSi_
 // CHECK:         [[FUNC:%.*]] = partial_apply [[THUNK]](%0)
 // CHECK:         return [[FUNC]]
-func cToFunc(arg: @convention(c) Int -> Int) -> Int -> Int {
+func cToFunc(_ arg: @convention(c) Int -> Int) -> Int -> Int {
   return arg
 }
 
@@ -17,7 +17,7 @@ func cToFunc(arg: @convention(c) Int -> Int) -> Int -> Int {
 // CHECK:         [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]]
 // CHECK:         [[COPY:%.*]] = copy_block [[BLOCK]] : $@convention(block) (Int) -> Int
 // CHECK:         return [[COPY]]
-func cToBlock(arg: @convention(c) Int -> Int) -> @convention(block) Int -> Int {
+func cToBlock(_ arg: @convention(c) Int -> Int) -> @convention(block) Int -> Int {
   return arg
 }
 
@@ -26,14 +26,14 @@ func cToBlock(arg: @convention(c) Int -> Int) -> @convention(block) Int -> Int {
 // CHECK-LABEL: sil hidden @_TF19function_conversion12funcToThrowsFFT_T_FzT_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> @owned @callee_owned () -> @error ErrorProtocol
 // CHECK:         [[FUNC:%.*]] = convert_function %0 : $@callee_owned () -> () to $@callee_owned () -> @error ErrorProtocol
 // CHECK:         return [[FUNC]]
-func funcToThrows(x: () -> ()) -> () throws -> () {
+func funcToThrows(_ x: () -> ()) -> () throws -> () {
   return x
 }
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion12thinToThrowsFXfT_T_XfzT_T_ : $@convention(thin) (@convention(thin) () -> ()) -> @convention(thin) () -> @error ErrorProtocol
 // CHECK:         [[FUNC:%.*]] = convert_function %0 : $@convention(thin) () -> () to $@convention(thin) () -> @error ErrorProtocol
 // CHECK:         return [[FUNC]] : $@convention(thin) () -> @error ErrorProtocol
-func thinToThrows(x: @convention(thin) () -> ()) -> @convention(thin) () throws -> () {
+func thinToThrows(_ x: @convention(thin) () -> ()) -> @convention(thin) () throws -> () {
   return x
 }
 
@@ -54,14 +54,14 @@ class Domesticated : Feral {}
 // CHECK-LABEL: sil hidden @_TF19function_conversion12funcToUpcastFFT_CS_12DomesticatedFT_CS_5Feral : $@convention(thin) (@owned @callee_owned () -> @owned Domesticated) -> @owned @callee_owned () -> @owned Feral
 // CHECK:         [[FUNC:%.*]] = convert_function %0 : $@callee_owned () -> @owned Domesticated to $@callee_owned () -> @owned Feral
 // CHECK:         return [[FUNC]]
-func funcToUpcast(x: () -> Domesticated) -> () -> Feral {
+func funcToUpcast(_ x: () -> Domesticated) -> () -> Feral {
   return x
 }
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion12funcToUpcastFFCS_5FeralT_FCS_12DomesticatedT_ : $@convention(thin) (@owned @callee_owned (@owned Feral) -> ()) -> @owned @callee_owned (@owned Domesticated) -> ()
 // CHECK:         [[FUNC:%.*]] = convert_function %0 : $@callee_owned (@owned Feral) -> () to $@callee_owned (@owned Domesticated) -> (){{.*}} // user: %3
 // CHECK:         return [[FUNC]]
-func funcToUpcast(x: Feral -> ()) -> Domesticated -> () {
+func funcToUpcast(_ x: Feral -> ()) -> Domesticated -> () {
   return x
 }
 
@@ -104,7 +104,7 @@ struct AddrOnly {
 }
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion19convOptionalTrivialFFGSqVS_7Trivial_S0_T_
-func convOptionalTrivial(t1: Trivial? -> Trivial) {
+func convOptionalTrivial(_ t1: Trivial? -> Trivial) {
 // CHECK:         function_ref @_TTRXFo_dGSqV19function_conversion7Trivial__dS0__XFo_dS0__dGSqS0___
 // CHECK:         partial_apply
   let _: Trivial -> Trivial? = t1
@@ -127,7 +127,7 @@ func convOptionalTrivial(t1: Trivial? -> Trivial) {
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion20convOptionalLoadableFFGSqVS_8Loadable_S0_T_
-func convOptionalLoadable(l1: Loadable? -> Loadable) {
+func convOptionalLoadable(_ l1: Loadable? -> Loadable) {
 // CHECK:         function_ref @_TTRXFo_oGSqV19function_conversion8Loadable__oS0__XFo_oS0__oGSqS0___
 // CHECK:         partial_apply
   let _: Loadable -> Loadable? = l1
@@ -144,7 +144,7 @@ func convOptionalLoadable(l1: Loadable? -> Loadable) {
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion20convOptionalAddrOnlyFFGSqVS_8AddrOnly_S0_T_
-func convOptionalAddrOnly(a1: AddrOnly? -> AddrOnly) {
+func convOptionalAddrOnly(_ a1: AddrOnly? -> AddrOnly) {
 // CHECK:         function_ref @_TTRXFo_iGSqV19function_conversion8AddrOnly__iS0__XFo_iGSqS0___iGSqS0___
 // CHECK:         partial_apply
   let _: AddrOnly? -> AddrOnly? = a1
@@ -191,7 +191,7 @@ extension Loadable : P {}
 extension AddrOnly : P {}
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion22convExistentialTrivialFTFPS_1Q_VS_7Trivial2t3FGSqPS0___S1__T_
-func convExistentialTrivial(t2: Q -> Trivial, t3: Q? -> Trivial) {
+func convExistentialTrivial(_ t2: Q -> Trivial, t3: Q? -> Trivial) {
 // CHECK:         function_ref @_TTRXFo_iP19function_conversion1Q__dVS_7Trivial_XFo_dS1__iPS_1P__
 // CHECK:         partial_apply
   let _: Trivial -> P = t2
@@ -245,7 +245,7 @@ func convExistentialTrivial(t2: Q -> Trivial, t3: Q? -> Trivial) {
 // ==== Existential metatypes
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion23convExistentialMetatypeFFGSqPMPS_1Q__MVS_7TrivialT_
-func convExistentialMetatype(em: Q.Type? -> Trivial.Type) {
+func convExistentialMetatype(_ em: Q.Type? -> Trivial.Type) {
 // CHECK:         function_ref @_TTRXFo_dGSqPMP19function_conversion1Q___dXMtVS_7Trivial_XFo_dXMtS1__dXPMTPS_1P__
 // CHECK:         partial_apply
   let _: Trivial.Type -> P.Type = em
@@ -303,7 +303,7 @@ class Child : Parent {}
 // to be generated
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion18convUpcastMetatypeFTFTMCS_6ParentGSqVS_7Trivial__MCS_5Child2c5FTGSqMS0__GSqS1___MS2__T_
-func convUpcastMetatype(c4: (Parent.Type, Trivial?) -> Child.Type,
+func convUpcastMetatype(_ c4: (Parent.Type, Trivial?) -> Child.Type,
                         c5: (Parent.Type?, Trivial?) -> Child.Type) {
 // CHECK:         function_ref @_TTRXFo_dXMTC19function_conversion6ParentdGSqVS_7Trivial__dXMTCS_5Child_XFo_dXMTS2_dS1__dXMTS0__
 // CHECK:         partial_apply
@@ -341,7 +341,7 @@ func convUpcastMetatype(c4: (Parent.Type, Trivial?) -> Child.Type,
 // ==== Function to existential -- make sure we maximally abstract it
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion19convFuncExistentialFFP_FSiSiT_ : $@convention(thin) (@owned @callee_owned (@in protocol<>) -> @owned @callee_owned (Int) -> Int) -> ()
-func convFuncExistential(f1: Any -> Int -> Int) {
+func convFuncExistential(_ f1: Any -> Int -> Int) {
 // CHECK:         function_ref @_TTRXFo_iP__oXFo_dSi_dSi__XFo_oXFo_dSi_dSi__iP__
 // CHECK:         partial_apply %3(%0)
   let _: (Int -> Int) -> Any = f1
@@ -369,7 +369,7 @@ func convFuncExistential(f1: Any -> Int -> Int) {
 // ==== Class-bound archetype upcast
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion29convClassBoundArchetypeUpcast
-func convClassBoundArchetypeUpcast<T : Parent>(f1: Parent -> (T, Trivial)) {
+func convClassBoundArchetypeUpcast<T : Parent>(_ f1: Parent -> (T, Trivial)) {
 // CHECK:         function_ref @_TTRGRxC19function_conversion6ParentrXFo_oS0__oxdVS_7Trivial_XFo_ox_oS0_dGSqS1___
 // CHECK:         partial_apply
   let _: T -> (Parent, Trivial?) = f1
@@ -386,7 +386,7 @@ func convClassBoundArchetypeUpcast<T : Parent>(f1: Parent -> (T, Trivial)) {
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion37convClassBoundMetatypeArchetypeUpcast
-func convClassBoundMetatypeArchetypeUpcast<T : Parent>(f1: Parent.Type -> (T.Type, Trivial)) {
+func convClassBoundMetatypeArchetypeUpcast<T : Parent>(_ f1: Parent.Type -> (T.Type, Trivial)) {
 // CHECK:         function_ref @_TTRGRxC19function_conversion6ParentrXFo_dXMTS0__dXMTxdVS_7Trivial_XFo_dXMTx_dXMTS0_dGSqS1___
 // CHECK:         partial_apply
   let _: T.Type -> (Parent.Type, Trivial?) = f1
@@ -413,7 +413,7 @@ func convClassBoundMetatypeArchetypeUpcast<T : Parent>(f1: Parent.Type -> (T.Typ
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqTSiSi____XFo_dSidSi__ : $@convention(thin) (Int, Int, @owned @callee_owned (Optional<(Int, Int)>) -> ()) -> ()
 
-func convTupleScalar(f1: Q -> (),
+func convTupleScalar(_ f1: Q -> (),
                      f2: (parent: Q) -> (),
                      f3: (tuple: (Int, Int)?) -> ()) {
   let _: (parent: P) -> () = f1
@@ -426,6 +426,6 @@ func convTupleScalar(f1: Q -> (),
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGrXFo_oGSax___XFo_it4argsGSax___iT__ : $@convention(thin) <T> (@in (args: T...), @owned @callee_owned (@owned Array<T>) -> ()) -> @out ()
 
-func convTupleScalarOpaque<T>(f: (args: T...) -> ()) -> ((args: T...) -> ())? {
+func convTupleScalarOpaque<T>(_ f: (args: T...) -> ()) -> ((args: T...) -> ())? {
   return f
 }

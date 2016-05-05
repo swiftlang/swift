@@ -57,6 +57,7 @@ public:
   void print(llvm::raw_ostream &os,
              const PrintOptions &PO = PrintOptions()) const;
   void dump() const;
+  void dump(llvm::raw_ostream &os, unsigned indent = 0) const;
   
   /// Substitute the replacement and conformance types with the given
   /// substitution vector.

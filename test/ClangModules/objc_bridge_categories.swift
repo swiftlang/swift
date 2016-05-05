@@ -7,10 +7,10 @@
 import Foundation
 import AppKit
 
-func testStringBridge(str: String) {
-  var str2 = str.nsStringMethod()
+func testStringBridge(_ str: String) {
+  var str2 = str.nsStringMethod()!
   var int = String.nsStringClassMethod()
-  var str3 = str.nsStringProperty
+  var str3 = str.nsStringProperty!
 
   // Make sure the types worked out as expected
   var str: String = str2
@@ -25,7 +25,7 @@ func testStringBridge(str: String) {
   str.notBridgedMethod() // expected-error{{value of type 'String' has no member 'notBridgedMethod'}}
 }
 
-func testDictionaryBridge(dict: Dictionary<String, String>) {
+func testDictionaryBridge(_ dict: Dictionary<String, String>) {
   var d2 = dict.nsDictionaryMethod() // expected-error{{value of type 'Dictionary<String, String>' has no member 'nsDictionaryMethod'}}
   var int = Dictionary<String, String>.nsDictionaryClassMethod() // expected-error{{type 'Dictionary<String, String>' has no member 'nsDictionaryClassMethod'}}
   var d3 = dict.nsDictionaryProperty  // expected-error{{value of type 'Dictionary<String, String>' has no member 'nsDictionaryProperty'}}

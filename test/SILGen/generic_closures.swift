@@ -5,7 +5,7 @@ import Swift
 var zero: Int
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures28generic_nondependent_context{{.*}}
-func generic_nondependent_context<T>(x: T, y: Int) -> Int {
+func generic_nondependent_context<T>(_ x: T, y: Int) -> Int {
   func foo() -> Int { return y }
   // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures28generic_nondependent_context{{.*}} : $@convention(thin) (Int) -> Int
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]
@@ -13,7 +13,7 @@ func generic_nondependent_context<T>(x: T, y: Int) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures15generic_capture{{.*}}
-func generic_capture<T>(x: T) -> Any.Type {
+func generic_capture<T>(_ x: T) -> Any.Type {
   func foo() -> Any.Type { return T.self }
   // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures15generic_capture{{.*}} : $@convention(thin) <τ_0_0> () -> @thick protocol<>.Type
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]
@@ -21,8 +21,8 @@ func generic_capture<T>(x: T) -> Any.Type {
 }
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures20generic_capture_cast{{.*}}
-func generic_capture_cast<T>(x: T, y: Any) -> Bool {
-  func foo(a: Any) -> Bool { return a is T }
+func generic_capture_cast<T>(_ x: T, y: Any) -> Bool {
+  func foo(_ a: Any) -> Bool { return a is T }
   // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures20generic_capture_cast{{.*}} : $@convention(thin) <τ_0_0> (@in protocol<>) -> Bool
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]
   return foo(y)
@@ -33,15 +33,15 @@ protocol Concept {
 }
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures29generic_nocapture_existential{{.*}}
-func generic_nocapture_existential<T>(x: T, y: Concept) -> Bool {
-  func foo(a: Concept) -> Bool { return a.sensical }
+func generic_nocapture_existential<T>(_ x: T, y: Concept) -> Bool {
+  func foo(_ a: Concept) -> Bool { return a.sensical }
   // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures29generic_nocapture_existential{{.*}} : $@convention(thin) (@in Concept) -> Bool
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]
   return foo(y)
 }
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures25generic_dependent_context{{.*}}
-func generic_dependent_context<T>(x: T, y: Int) -> T {
+func generic_dependent_context<T>(_ x: T, y: Int) -> T {
   func foo() -> T { return x }
   // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures25generic_dependent_context{{.*}} : $@convention(thin) <τ_0_0> (@owned @box τ_0_0) -> @out τ_0_0
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]<T>
@@ -54,22 +54,22 @@ enum Optionable<Wrapped> {
 }
 
 class NestedGeneric<U> {
-  class func generic_nondependent_context<T>(x: T, y: Int, z: U) -> Int {
+  class func generic_nondependent_context<T>(_ x: T, y: Int, z: U) -> Int {
     func foo() -> Int { return y }
     return foo()
   }
 
-  class func generic_dependent_inner_context<T>(x: T, y: Int, z: U) -> T {
+  class func generic_dependent_inner_context<T>(_ x: T, y: Int, z: U) -> T {
     func foo() -> T { return x }
     return foo()
   }
 
-  class func generic_dependent_outer_context<T>(x: T, y: Int, z: U) -> U {
+  class func generic_dependent_outer_context<T>(_ x: T, y: Int, z: U) -> U {
     func foo() -> U { return z }
     return foo()
   }
 
-  class func generic_dependent_both_contexts<T>(x: T, y: Int, z: U) -> (T, U) {
+  class func generic_dependent_both_contexts<T>(_ x: T, y: Int, z: U) -> (T, U) {
     func foo() -> (T, U) { return (x, z) }
     return foo()
   }
@@ -77,7 +77,7 @@ class NestedGeneric<U> {
   // CHECK-LABEL: sil hidden @_TFC16generic_closures13NestedGeneric20nested_reabstraction{{.*}}
   //   CHECK:       [[REABSTRACT:%.*]] = function_ref @_TTRG__rXFo___XFo_iT__iT__
   //   CHECK:       partial_apply [[REABSTRACT]]<U, T>
-  func nested_reabstraction<T>(x: T) -> Optionable<() -> ()> {
+  func nested_reabstraction<T>(_ x: T) -> Optionable<() -> ()> {
     return .some({})
   }
 }
@@ -91,12 +91,12 @@ class NestedGeneric<U> {
   // CHECK: sil shared [[OUTER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T
   // CHECK:   function_ref [[INNER_CLOSURE:@_TFFF16generic_closures25nested_closure_in_genericurFxxU_FT_Q_U_FT_Q_]]
   // CHECK: sil shared [[INNER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T {
-  func nested_closure_in_generic<T>(x:T) -> T {
+  func nested_closure_in_generic<T>(_ x:T) -> T {
     return { { x }() }()
   }
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures16local_properties
-func local_properties<T>(t: inout T) {
+func local_properties<T>(_ t: inout T) {
   // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
   var prop: T {
     get {
@@ -138,10 +138,10 @@ protocol Fooable {
 }
 
 // <rdar://problem/16399018>
-func shmassert(@autoclosure f: () -> Bool) {}
+func shmassert(_ f: @autoclosure () -> Bool) {}
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures21capture_generic_param
-func capture_generic_param<A: Fooable>(x: A) {
+func capture_generic_param<A: Fooable>(_ x: A) {
   shmassert(A.foo())
 }
 
@@ -156,6 +156,6 @@ protocol HasClassAssoc { associatedtype Assoc : Class }
 // CHECK: [[GENERIC_FN:%.*]] = function_ref @_TFF16generic_closures34captures_class_constrained_genericuRxS_13HasClassAssocrFTx1fFwx5AssocwxS1__T_U_FT_FQQ_5AssocS2_
 // CHECK: [[CONCRETE_FN:%.*]] = partial_apply [[GENERIC_FN]]<T, T.Assoc>(%1)
 
-func captures_class_constrained_generic<T : HasClassAssoc>(x: T, f: T.Assoc -> T.Assoc) {
+func captures_class_constrained_generic<T : HasClassAssoc>(_ x: T, f: T.Assoc -> T.Assoc) {
   let _: () -> T.Assoc -> T.Assoc = { f }
 }

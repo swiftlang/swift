@@ -40,7 +40,7 @@ of its subclasses.  This leads to a soundness problem:
   - (void)print { printf(\ **name**\ ); } // oops
   @end
 
-  mySubclassInstance = [ [Subclass alloc] initSuperClass ]
+  mySubclassInstance = [[Subclass alloc] initSuperClass]
 
 Because there is no way to hide a superclass' ``init`` method from
 clients, ensuring that subclass instances are properly initialized
@@ -78,7 +78,7 @@ Exceptions to the Rule
 
 I exaggerated a little in the previous section: because overriding
 *every* superclass initializer in *every* subclass is so tedious, the
-Objective C community has identified some situations where you don't
+Objective-C community has identified some situations where you don't
 really need to override every ``init`` method:
 
 1. When you know the default zero-initialization of a class' instance

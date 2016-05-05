@@ -131,6 +131,6 @@ private:
                 "operator| should produce an OptionSet");
 };
 
-}
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_OPTIONSET_H

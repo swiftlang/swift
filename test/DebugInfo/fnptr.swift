@@ -6,8 +6,8 @@
 func bar() {
     print("bar()", terminator: "")
 }
-func baz(i: Float) -> Int64 { return 0; }
-func barz(i: Float, _ j: Float) -> Int64 { return 0; }
+func baz(_ i: Float) -> Int64 { return 0; }
+func barz(_ i: Float, _ j: Float) -> Int64 { return 0; }
 func main() -> Int64 {
 
     // CHECK-DAG: !DILocalVariable(name: "bar_function_pointer",{{.*}} line: [[@LINE+1]],{{.*}} type: !"[[BARPT:[^,]+]]"

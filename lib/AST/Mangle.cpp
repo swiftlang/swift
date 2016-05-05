@@ -847,7 +847,6 @@ void Mangler::mangleAssociatedTypeName(DependentMemberType *dmt,
   if (tryMangleSubstitution(assocTy))
     return;
 
-
   // If the base type is known to have a single protocol conformance
   // in the current generic context, then we don't need to disambiguate the
   // associated type name by protocol.
@@ -1356,7 +1355,7 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     if (auto gpBase = dyn_cast<GenericTypeParamType>(base)) {
       Buffer << 'w';
       mangleGenericParamIndex(gpBase);
-      mangleAssociatedTypeName(memTy, /*canAbbreviate*/ true);
+      mangleAssociatedTypeName(memTy, OptimizeProtocolNames);
       return;
     }
 
@@ -1372,7 +1371,7 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
       Buffer << 'W';
       mangleGenericParamIndex(gpRoot);
       for (auto *member : reversed(path)) {
-        mangleAssociatedTypeName(member, /*canAbbreviate*/ true);
+        mangleAssociatedTypeName(member, OptimizeProtocolNames);
       }
       Buffer << '_';
       return;
@@ -1383,7 +1382,7 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     // we may still want to mangle them for debugging or indexing purposes.
     Buffer << 'q';
     mangleType(memTy->getBase(), 0);
-    mangleAssociatedTypeName(memTy, /*canAbbreviate*/false);
+    mangleAssociatedTypeName(memTy, OptimizeProtocolNames);
     return;
   }
 

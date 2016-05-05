@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir -primary-file %s | FileCheck %s
 
-func arch<F>(f: F) {}
+func arch<F>(_ f: F) {}
 
 // CHECK: define hidden void @_TF17function_metadata9test_archFT_T_()
 func test_arch() {

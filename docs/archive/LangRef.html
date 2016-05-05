@@ -277,14 +277,14 @@
     var a4 = func {}
 
     <i>// Really simple function</i>
-    func c(arg : Int) -&gt; Int { return arg+4 }
+    func c(_ arg : Int) -&gt; Int { return arg+4 }
 
     <i>// Simple operators.</i>
     func [infix_left=190] +  (lhs : Int, rhs : Int) -&gt; Int
     func [infix_left=160] == (lhs : Int, rhs : Int) -&gt; Bool
 
     <i>// Curried function with multiple return values:</i>
-    func d(a : Int) (b : Int) -&gt; (res1 : Int, res2 : Int) {
+    func d(_ a : Int) (b : Int) -&gt; (res1 : Int, res2 : Int) {
       return (a,b)
     }
     
@@ -295,7 +295,7 @@
      static func bankaccount() -> bankaccount {
         // Custom 'constructor' logic goes here.
       }
-      func deposit(arg : Int) {
+      func deposit(_ arg : Int) {
         amount = amount + arg
       }
     
@@ -320,7 +320,7 @@
       case LeadPipe
     }
 
-    func accuseSuspect(suspect:PersonOfInterest)
+    func accuseSuspect(_ suspect:PersonOfInterest)
         inRoom(room:Room)
         withWeapon(weapon:Weapon) {
       print("It was \(suspect) in the \(room) with the \(weapon)")
@@ -393,7 +393,7 @@
       case Two(Int, Int)
     }
     
-    func f1(searchpolicy : DataSearchFlags)  <i>// DataSearchFlags is a valid type name</i>
+    func f1(_ searchpolicy : DataSearchFlags)  <i>// DataSearchFlags is a valid type name</i>
     func test1() {
       f1(DataSearchFlags.None)  <i>// Use of constructor with qualified identifier</i>
       f1(.None)                 <i>// Use of constructor with context sensitive type inference</i>
@@ -408,7 +408,7 @@
       case Two(Int, Int)
     }
     
-    func f2(a : SomeMoreInts)
+    func f2(_ a : SomeMoreInts)
     
     func test2() {
       <i>// Constructors for enum element can be used in the obvious way.</i>
@@ -803,7 +803,7 @@
     For example, the following code:
 
   <pre class=example>
-    func foo(inout x: Int) -> () -> Int {
+    func foo(x: inout Int) -> () -> Int {
       func bar() -> Int {
         x += 1
         return x
@@ -872,7 +872,7 @@
   
   <i>// Definition of an 'assert' function.  Assertions and logging routines</i>
   <i>// often want to conditionally evaluate their argument.</i>
-  func assert(condition : @autoclosure () -> Bool)
+  func assert(_ condition : @autoclosure () -> Bool)
     
   <i>// Definition of the || operator - it captures its right hand side as</i>
   <i>// an autoclosure so it can short-circuit evaluate it.</i>
@@ -891,19 +891,19 @@
   </pre>
 
   <p>Attribute <tt>noreturn</tt> is only valid in the attribute list of a 
-	function declaration or in the attribute list of a <tt>type</tt> 
-	that describes a syntactic function type.
+  function declaration or in the attribute list of a <tt>type</tt>
+  that describes a syntactic function type.
   </p>
 
-  <p><tt>noreturn</tt> indicates to the compiler that the function will not 
-	return to the caller. This attribute should be used to suppress the 
-	uninitialized variable, missing return warnings and errors. The compiler is
-	also allowed to more aggressively optimize the code in presence of this 
-	attribute.
+  <p><tt>noreturn</tt> indicates to the compiler that the function will not
+  return to the caller. This attribute should be used to suppress the
+  uninitialized variable, missing return warnings and errors. The compiler is
+  also allowed to more aggressively optimize the code in presence of this
+  attribute.
   </p>
 
   <p>If a function with no a <tt>noreturn</tt> attribute contains a 
-	<tt>return</tt> statement, an error will be raised. 
+  <tt>return</tt> statement, an error will be raised.
   </p>
 
   
@@ -1063,7 +1063,7 @@
   var o = (1, 2, 3)              <i>// Type = (Int, Int, Int)</i>
 
   <i>// Function argument and result is a tuple type.</i>
-  func foo(x : Int, y : Int) -&gt; (val : Int, err : Int)
+  func foo(_ x : Int, y : Int) -&gt; (val : Int, err : Int)
 
   <i>// enum and struct declarations with tuple values.</i>
   struct S {
@@ -1387,7 +1387,7 @@ ill-formed if the type does not conform to the protocol.</p>
       func bumpVersion()
     }
 
-    func print(doc : Document) { <i>/* ... */</i> }
+    func print(_ doc : Document) { <i>/* ... */</i> }
 
     var myDocument : VersionedDocument;
     print(myDocument) <i>// okay: a VersionedDocument is a Document</i>
@@ -1728,7 +1728,7 @@ ill-formed if the type does not conform to the protocol.</p>
     instantiates the default argument.</p>
 
   <pre class="example">
-    func log(message:String,
+    func log(_ message:String,
              file:String = __FILE__,
              line:Int = __LINE__) {
       print("\(file):\(line): \(message)")
@@ -1762,7 +1762,7 @@ ill-formed if the type does not conform to the protocol.</p>
     <i>// A generic struct.</i>
     struct Dict&lt;K,V&gt; {
       init() {}
-      static func fromKeysAndValues(keys:K[], values:T[]) -&gt; Dict&lt;K,V&gt; {}
+      static func fromKeysAndValues(_ keys:K[], values:T[]) -&gt; Dict&lt;K,V&gt; {}
     }
 
     <i>// Construct an instance of the generic struct.</i>
@@ -1815,7 +1815,7 @@ ill-formed if the type does not conform to the protocol.</p>
   can also be corrected by adding or removing parentheses.
 
   <pre class="example">
-    func foo(x:Bool, y:Bool)
+    func foo(_ x:Bool, y:Bool)
     var a,b,c,d,e : Int
 
     foo(a &lt; b, c &gt; (d + e)) // ERROR: Misparses as (a&lt;b,c&gt;)(d + e)
@@ -1891,7 +1891,7 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <pre class="example">
     <i>// Takes a closure that it calls to determine an ordering relation.</i>
-    func magic(val : Int, predicate : (a : Int, b : Int) -> Bool)
+    func magic(_ val : Int, predicate : (a : Int, b : Int) -> Bool)
     
     func f() {
       <i>// Compare one way.  Closure is inferred to return Bool and take two ints</i>
@@ -1960,7 +1960,7 @@ ill-formed if the type does not conform to the protocol.</p>
   
   <pre class="example">
     enum Direction { case Up, Down }
-    func search(val : Int, direction : Direction)
+    func search(_ val : Int, direction : Direction)
     
     func f() {
       search(42, .Up)
@@ -2008,7 +2008,7 @@ ill-formed if the type does not conform to the protocol.</p>
     var g = (4, y : 5, 6)    <i>// Type = (Int, y : Int, Int)</i>
     
     <i>// Named arguments to functions.</i>
-    func foo(a : Int, b : Int)
+    func foo(_ a : Int, b : Int)
     foo(b = 4, a = 1)
   </pre>
 
@@ -2157,7 +2157,7 @@ ill-formed if the type does not conform to the protocol.</p>
     <a href="#expr-call">expr-call</a>, if functions meant to be used
     with trailing closures are written as curried functions, e.g.,
     <pre>
-func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
+func map<T, U>(_ array : T[])(fn : (T) -> U) -> U[] { ... }
     </pre>
     There are two problems with this (admittedly simpler) design.
     First, functions imported from C, C++, and Objective-C won't ever
@@ -2290,7 +2290,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
 
   <pre class="example">
     <i>// A function with some statements.</i> 
-    func fib(v : Int) -&gt; Int {
+    func fib(_ v : Int) -&gt; Int {
       if v &lt; 2 {
         return v
       }

@@ -1,6 +1,10 @@
-// RUN: %target-parse-verify-swift
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %target-swift-frontend -emit-module %S/Inputs/PrivateObjC.swift -o %t
+// RUN: %target-parse-verify-swift -I %t
 
 // REQUIRES: objc_interop
+import Foundation
+import PrivateObjC
 
 @objc
 class A {
@@ -18,7 +22,7 @@ class C {
 class X {
   init() {} 
 
-  @objc func foo(i: Int) { }
+  @objc func foo(_ i: Int) { }
   @objc func bar() { }
 
   @objc func ovl2() -> A { } // expected-note{{found this candidate}}
@@ -26,7 +30,7 @@ class X {
   @objc func ovl4() -> B { }
   @objc func ovl5() -> B { } // expected-note{{found this candidate}}
 
-  @objc class func staticFoo(i : Int) { }
+  @objc class func staticFoo(_ i : Int) { }
 
   @objc func prop3() -> Int { return 5 }
 }
@@ -34,7 +38,7 @@ class X {
 class Y : P {
   init() {} 
 
-  @objc func foo(s: String) { }
+  @objc func foo(_ s: String) { }
   @objc func wibble() { }
 
   @objc func ovl1() -> A { }
@@ -78,7 +82,7 @@ class Z : Y {
   @objc func ovl2() -> C { } // expected-note{{found this candidate}}
   @objc(ovl3_A) func ovl3() -> A { }
   @objc func ovl3() -> B { }
-  func generic4<T>(x : T) { }
+  func generic4<T>(_ x : T) { }
 }
 
 @objc protocol P {
@@ -98,7 +102,7 @@ struct S {
 }
 
 class D<T> {
-  func generic1(x : T) { }
+  func generic1(_ x : T) { }
 }
 
 extension Z {
@@ -211,3 +215,7 @@ var obj3 : AnyObject = (p as! AnyObject)! // expected-error{{cannot force unwrap
 // Implicit force of an implicitly unwrapped optional
 let uopt : AnyObject! = nil
 uopt.wibble!()
+
+// Should not be able to see private or internal @objc methods.
+uopt.privateFoo!() // expected-error{{'privateFoo' is inaccessible due to 'private' protection level}}
+uopt.internalFoo!() // expected-error{{'internalFoo' is inaccessible due to 'internal' protection level}}

@@ -1,8 +1,17 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
-// XFAIL: interpret
 // REQUIRES: objc_interop
+
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
+      -> Self {
+    var result: Self? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
 
 // CHECK: testing...
 print("testing...")
@@ -20,7 +29,7 @@ func bridgedStatus<T>(_: T.Type) -> String {
     : "is unbridged"
 }
 
-func testBridging<T>(x: T, _ name: String) {
+func testBridging<T>(_ x: T, _ name: String) {
   print("\(name) \(bridgedStatus(T.self))")
   var b : String
   if let result = _bridgeToObjectiveC(x) {
@@ -39,20 +48,17 @@ struct BridgedValueType : _ObjectiveCBridgeable {
     return true
   }
   
-  static func _getObjectiveCType() -> Any.Type {
-    return C.self
-  }
   func _bridgeToObjectiveC() -> C {
     return C()
   }
   static func _forceBridgeFromObjectiveC(
-    x: C,
+    _ x: C,
     result: inout BridgedValueType?
   ) {
     _preconditionFailure("implement")
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: C,
+    _ x: C,
     result: inout BridgedValueType?
   ) -> Bool {
     _preconditionFailure("implement")
@@ -79,20 +85,17 @@ testBridging(PlainClass(), "PlainClass")
 
 //===----------------------------------------------------------------------===//
 struct ConditionallyBridged<T> : _ObjectiveCBridgeable {
-  static func _getObjectiveCType() -> Any.Type {
-    return C.self
-  }
   func _bridgeToObjectiveC() -> C {
     return C()
   }
   static func _forceBridgeFromObjectiveC(
-    x: C,
+    _ x: C,
     result: inout ConditionallyBridged<T>?
   ) {
     _preconditionFailure("implement")
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: C,
+    _ x: C,
     result: inout ConditionallyBridged<T>?
   ) -> Bool {
     _preconditionFailure("implement")

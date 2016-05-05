@@ -39,6 +39,8 @@ extern struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
 
 extern __swift_uint64_t _swift_stdlib_HashingDetail_fixedSeedOverride;
 
+extern void *_swift_stdlib_ProcessArguments;
+
 #ifdef __cplusplus
 }} // extern "C", namespace swift
 #endif

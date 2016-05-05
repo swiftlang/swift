@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "ForeignRepresentationInfo.h"
 #include "swift/Strings.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
@@ -29,8 +30,11 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Parse/Lexer.h" // bad dependency
+#include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
@@ -139,6 +143,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.UnsafePointer<T>.
   NominalTypeDecl *UnsafePointerDecl = nullptr;
   VarDecl *UnsafePointerMemoryDecl = nullptr;
+  
+  /// The declaration of Swift.OpaquePointer.
+  NominalTypeDecl *OpaquePointerDecl = nullptr;
   
   /// The declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.
   NominalTypeDecl *AutoreleasingUnsafeMutablePointerDecl = nullptr;
@@ -329,6 +336,11 @@ struct ASTContext::Implementation {
   /// checking unintended Objective-C overrides.
   std::vector<AbstractFunctionDecl *> ObjCMethods;
 
+  /// A cache of information about whether particular nominal types
+  /// are representable in a foreign language.
+  llvm::DenseMap<NominalTypeDecl *, ForeignRepresentationInfo>
+    ForeignRepresentableCache;
+
   llvm::StringMap<OptionSet<SearchPathKind>> SearchPathsSet;
 
   /// \brief The permanent arena.
@@ -474,6 +486,10 @@ void ASTContext::setLazyResolver(LazyResolver *resolver) {
   } else {
     assert(Impl.Resolver != nullptr && "no resolver to remove");
     Impl.Resolver = resolver;
+
+    // DelayedConformanceDiags callbacks contain pointers to the TypeChecker, so
+    // they must be removed when the TypeChecker goes away.
+    Impl.DelayedConformanceDiags.clear();
   }
 }
 
@@ -689,6 +705,14 @@ NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
       *this, "UnsafeMutablePointer", 1);
   
   return Impl.UnsafeMutablePointerDecl;
+}
+
+NominalTypeDecl *ASTContext::getOpaquePointerDecl() const {
+  if (!Impl.OpaquePointerDecl)
+    Impl.OpaquePointerDecl
+    = findStdlibType(*this, "OpaquePointer", 0);
+  
+  return Impl.OpaquePointerDecl;
 }
 
 NominalTypeDecl *ASTContext::getUnsafePointerDecl() const {
@@ -1804,6 +1828,148 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
   }
 }
 
+bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
+                               DeclName targetName) {
+  if (decl->isImplicit()) return false;
+  if (decl->getFullName() == targetName) return false;
+
+  // Handle properties directly.
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    // Replace the name.
+    SmallString<64> scratch;
+    diag.fixItReplace(var->getNameLoc(), targetName.getString(scratch));
+    return false;
+  }
+
+  // We only handle functions from here on.
+  auto func = dyn_cast<AbstractFunctionDecl>(decl);
+  if (!func) return true;
+
+  auto name = func->getFullName();
+
+  // Fix the name of the function itself.
+  if (name.getBaseName() != targetName.getBaseName()) {
+    diag.fixItReplace(func->getLoc(), targetName.getBaseName().str());
+  }
+
+  // Fix the argument names that need fixing.
+  assert(name.getArgumentNames().size()
+          == targetName.getArgumentNames().size());
+  auto params = func->getParameterList(func->getDeclContext()->isTypeContext());
+  for (unsigned i = 0, n = name.getArgumentNames().size(); i != n; ++i) {
+    auto origArg = name.getArgumentNames()[i];
+    auto targetArg = targetName.getArgumentNames()[i];
+
+    if (origArg == targetArg)
+      continue;
+
+    auto *param = params->get(i);
+
+    // The parameter has an explicitly-specified API name, and it's wrong.
+    if (param->getArgumentNameLoc() != param->getLoc() &&
+        param->getArgumentNameLoc().isValid()) {
+      // ... but the internal parameter name was right. Just zap the
+      // incorrect explicit specialization.
+      if (param->getName() == targetArg) {
+        diag.fixItRemoveChars(param->getArgumentNameLoc(),
+                              param->getLoc());
+        continue;
+      }
+
+      // Fix the API name.
+      StringRef targetArgStr = targetArg.empty()? "_" : targetArg.str();
+      diag.fixItReplace(param->getArgumentNameLoc(), targetArgStr);
+      continue;
+    }
+
+    // The parameter did not specify a separate API name. Insert one.
+    if (targetArg.empty())
+      diag.fixItInsert(param->getLoc(), "_ ");
+    else {
+      llvm::SmallString<8> targetArgStr;
+      targetArgStr += targetArg.str();
+      targetArgStr += ' ';
+      diag.fixItInsert(param->getLoc(), targetArgStr);
+    }
+  }
+
+  return false;
+}
+
+bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
+                                   Optional<ObjCSelector> targetNameOpt,
+                                   bool ignoreImpliedName) {
+  // Subscripts cannot be renamed, so handle them directly.
+  if (isa<SubscriptDecl>(decl)) {
+    diag.fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/false),
+                     "@objc ");
+    return false;
+  }
+
+  // Determine the Objective-C name of the declaration.
+  ObjCSelector name = *decl->getObjCRuntimeName();
+  auto targetName = *targetNameOpt;
+
+  // Dig out the existing '@objc' attribute on the witness. We don't care
+  // about implicit ones because they don't have useful source location
+  // information.
+  auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
+  if (attr && attr->isImplicit())
+    attr = nullptr;
+
+  // If there is an @objc attribute with an explicit, incorrect witness
+  // name, go fix the witness name.
+  if (attr && name != targetName &&
+      attr->hasName() && !attr->isNameImplicit()) {
+    // Find the source range covering the full name.
+    SourceLoc startLoc;
+    if (attr->getNameLocs().empty())
+      startLoc = attr->getRParenLoc();
+    else
+      startLoc = attr->getNameLocs().front();
+
+    // Replace the name with the name of the requirement.
+    SmallString<64> scratch;
+    diag.fixItReplaceChars(startLoc, attr->getRParenLoc(),
+                           targetName.getString(scratch));
+    return false;
+  }
+
+  // We need to create or amend an @objc attribute with the appropriate name.
+
+  // Form the Fix-It text.
+  SourceLoc startLoc;
+  SmallString<64> fixItText;
+  {
+    assert((!attr || !attr->hasName() || attr->isNameImplicit() ||
+            name == targetName) && "Nothing to diagnose!");
+    llvm::raw_svector_ostream out(fixItText);
+
+    // If there is no @objc attribute, we need to add our own '@objc'.
+    if (!attr) {
+      startLoc = decl->getAttributeInsertionLoc(/*forModifier=*/false);
+      out << "@objc";
+    } else {
+      startLoc = Lexer::getLocForEndOfToken(decl->getASTContext().SourceMgr,
+                                            attr->getRange().End);
+    }
+
+    // If the names of the witness and requirement differ, we need to
+    // specify the name.
+    if (name != targetName || ignoreImpliedName) {
+      out << "(";
+      out << targetName;
+      out << ")";
+    }
+
+    if (!attr)
+      out << " ";
+  }
+
+  diag.fixItInsert(startLoc, fixItText);
+  return false;
+}
+
 void ASTContext::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
   bool ImportsFoundationModule = false;
 
@@ -2278,6 +2444,54 @@ bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
                    reqDiagInfo.second,
                    selector,
                    protocolName);
+
+    /// Local function to determine if the given declaration is an accessor.
+    auto isAccessor = [](ValueDecl *decl) -> bool {
+      if (auto func = dyn_cast<FuncDecl>(decl))
+        return func->isAccessor();
+
+      return false;
+    };
+
+    // Fix the name of the witness, if we can.
+    if (req->getFullName() != conflicts[0]->getFullName() &&
+        req->getKind() == conflicts[0]->getKind() &&
+        isAccessor(req) == isAccessor(conflicts[0])) {
+      // They're of the same kind: fix the name.
+      unsigned kind;
+      if (isa<ConstructorDecl>(req))
+        kind = 1;
+      else if (auto func = dyn_cast<FuncDecl>(req)) {
+        if (func->isAccessor())
+          kind = isa<SubscriptDecl>(func->getAccessorStorageDecl()) ? 3 : 2;
+        else
+          kind = 0;
+      } else {
+        llvm_unreachable("unhandled @objc declaration kind");
+      }
+
+      auto diag = Diags.diagnose(conflicts[0],
+                                 diag::objc_optional_requirement_swift_rename,
+                                 kind, req->getFullName());
+
+      // Fix the Swift name.
+      fixDeclarationName(diag, conflicts[0], req->getFullName());
+
+      // Fix the '@objc' attribute, if needed.
+      fixDeclarationObjCName(diag, conflicts[0], req->getObjCRuntimeName(),
+                             /*ignoreImpliedName=*/true);
+    }
+
+    // @nonobjc will silence this warning.
+    bool hasExplicitObjCAttribute = false;
+    if (auto objcAttr = conflicts[0]->getAttrs().getAttribute<ObjCAttr>())
+      hasExplicitObjCAttribute = !objcAttr->isImplicit();
+    if (!hasExplicitObjCAttribute)
+      Diags.diagnose(conflicts[0], diag::optional_req_near_match_nonobjc, true)
+        .fixItInsert(
+          conflicts[0]->getAttributeInsertionLoc(/*forModifier=*/false),
+          "@nonobjc ");
+
     Diags.diagnose(getDeclContextLoc(unsatisfied.first),
                    diag::protocol_conformance_here,
                    true,
@@ -2338,7 +2552,7 @@ StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
   // If we're omitting needless words and the name won't conflict with
   // something in the standard library, strip the prefix off the Swift
   // name.
-  if (LangOpts.OmitNeedlessWords && LangOpts.StripNSPrefix &&
+  if (LangOpts.StripNSPrefix &&
       !nameConflictsWithStandardLibrary(kind))
     return objcName.substr(2);
 
@@ -3556,6 +3770,167 @@ DeclName::DeclName(ASTContext &C, Identifier baseName,
   initialize(C, baseName, names);
 }
 
+/// Find the implementation of the named type in the given module.
+static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx, 
+                                                   Identifier name,
+                                                   Module *module) {
+  // Find all of the declarations with this name in the Swift module.
+  SmallVector<ValueDecl *, 1> results;
+  module->lookupValue({ }, name, NLKind::UnqualifiedLookup, results);
+  for (auto result : results) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(result))
+      return nominal;
+
+    // Look through typealiases.
+    if (auto typealias = dyn_cast<TypeAliasDecl>(result)) {
+      if (auto resolver = ctx.getLazyResolver())
+        resolver->resolveDeclSignature(typealias);
+      return typealias->getUnderlyingType()->getAnyNominal();
+    }
+  }
+
+  return nullptr;
+}
+
+ForeignRepresentationInfo
+ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
+                                         ForeignLanguage language,
+                                         DeclContext *dc) {
+  if (Impl.ForeignRepresentableCache.empty()) {
+    // Local function to add a type with the given name and module as
+    // trivially-representable.
+    auto addTrivial = [&](Identifier name, Module *module,
+                          bool allowOptional = false) {
+      if (auto type = findUnderlyingTypeInModule(*this, name, module)) {
+        auto info = ForeignRepresentationInfo::forTrivial();
+        if (allowOptional)
+          info = ForeignRepresentationInfo::forTrivialWithOptional();
+        Impl.ForeignRepresentableCache.insert({type, info});
+      }
+    };
+
+    // Pre-populate the foreign-representable cache with known types.
+    if (auto stdlib = getStdlibModule()) {
+      addTrivial(getIdentifier("OpaquePointer"), stdlib, true);
+
+      // Builtin types
+      // FIXME: Layering violation to use the ClangImporter's define.
+#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
+      addTrivial(getIdentifier(#SWIFT_TYPE_NAME), stdlib);
+#include "swift/ClangImporter/BuiltinMappedTypes.def"
+    }
+
+    if (auto darwin = getLoadedModule(Id_Darwin)) {
+      // Note: DarwinBoolean is odd because it's bridged to Bool in APIs,
+      // but can also be trivially bridged.
+      addTrivial(getIdentifier("DarwinBoolean"), darwin);
+    }
+
+    if (auto objectiveC = getLoadedModule(Id_ObjectiveC)) {
+      addTrivial(Id_Selector, objectiveC, true);
+
+      // Note: ObjCBool is odd because it's bridged to Bool in APIs,
+      // but can also be trivially bridged.
+      addTrivial(getIdentifier("ObjCBool"), objectiveC);
+
+      addTrivial(getSwiftId(KnownFoundationEntity::NSZone), objectiveC, true);
+    }
+
+    if (auto coreGraphics = getLoadedModule(getIdentifier("CoreGraphics"))) {
+      addTrivial(Id_CGFloat, coreGraphics);
+    }
+
+    // Pull SIMD types of size 2...4 from the SIMD module, if it exists.
+    // FIXME: Layering violation to use the ClangImporter's define.
+    const unsigned SWIFT_MAX_IMPORTED_SIMD_ELEMENTS = 4;
+    if (auto simd = getLoadedModule(Id_simd)) {
+#define MAP_SIMD_TYPE(BASENAME, _, __)                                  \
+      {                                                                 \
+        char name[] = #BASENAME "0";                                    \
+        for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) { \
+          *(std::end(name) - 2) = '0' + i;                              \
+          addTrivial(getIdentifier(name), simd);                        \
+        }                                                               \
+      }
+#include "swift/ClangImporter/SIMDMappedTypes.def"      
+    }
+  }
+
+  // Determine whether we know anything about this nominal type
+  // yet. If we've never seen this nominal type before, or if we have
+  // an out-of-date negative cached value, we'll have to go looking.
+  auto known = Impl.ForeignRepresentableCache.find(nominal);
+  if (known == Impl.ForeignRepresentableCache.end() ||
+      (known->second.getKind() == ForeignRepresentableKind::None &&
+       known->second.getGeneration() < CurrentGeneration)) {
+    Optional<ForeignRepresentationInfo> result;
+
+    // Look for a conformance to _ObjectiveCBridgeable.
+    //
+    // FIXME: We're implicitly depending on the fact that lookupConformance
+    // is global, ignoring the module we provide for it.
+    if (auto objcBridgeable
+          = getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
+      if (auto conformance
+            = dc->getParentModule()->lookupConformance(
+                nominal->getDeclaredType(), objcBridgeable,
+                getLazyResolver())) {
+        result =
+            ForeignRepresentationInfo::forBridged(conformance->getConcrete());
+      }
+    }
+
+    // If we didn't find anything, mark the result as "None".
+    if (!result)
+      result = ForeignRepresentationInfo::forNone(CurrentGeneration);
+    
+    // Cache the result.
+    known = Impl.ForeignRepresentableCache.insert({ nominal, *result }).first;
+  }
+
+  // Map a cache entry to a result for this specific 
+  auto entry = known->second;
+  if (entry.getKind() == ForeignRepresentableKind::None)
+    return entry;
+
+  // Extract the protocol conformance.
+  auto conformance = entry.getConformance();
+
+  // If the conformance is not visible, fail.
+  if (conformance && !conformance->isVisibleFrom(dc))
+    return ForeignRepresentationInfo::forNone();
+
+  // Language-specific filtering.
+  switch (language) {
+  case ForeignLanguage::C:
+    // Ignore _ObjectiveCBridgeable conformances in C.
+    if (conformance &&
+        conformance->getProtocol()->isSpecificProtocol(
+          KnownProtocolKind::ObjectiveCBridgeable))
+      return ForeignRepresentationInfo::forNone();
+
+    SWIFT_FALLTHROUGH;
+
+  case ForeignLanguage::ObjectiveC:
+    return entry;
+  }
+}
+
+bool ASTContext::isStandardLibraryTypeBridgedInFoundation(
+     NominalTypeDecl *nominal) const {
+  return (nominal == getBoolDecl() ||
+          nominal == getIntDecl() ||
+          nominal == getUIntDecl() ||
+          nominal == getFloatDecl() ||
+          nominal == getDoubleDecl() ||
+          nominal == getArrayDecl() ||
+          nominal == getDictionaryDecl() ||
+          nominal == getSetDecl() ||
+          nominal == getStringDecl() ||
+          // Weird one-off case where CGFloat is bridged to NSNumber.
+          nominal->getName() == Id_CGFloat);
+}
+
 Optional<Type>
 ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
                              LazyResolver *resolver) const {
@@ -3564,18 +3939,14 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
 
   // Whitelist certain types even if Foundation is not imported, to ensure
   // that casts from AnyObject to one of these types are not optimized away.
+  //
+  // Outside of these standard library types to which Foundation
+  // bridges, an _ObjectiveCBridgeable conformance can only be added
+  // in the same module where the Swift type itself is defined, so the
+  // optimizer will be guaranteed to see the conformance if it exists.
   bool knownBridgedToObjC = false;
-  if (auto ntd = type->getAnyNominal()) {
-    knownBridgedToObjC = (ntd == getBoolDecl() ||
-                          ntd == getIntDecl() ||
-                          ntd == getUIntDecl() ||
-                          ntd == getFloatDecl() ||
-                          ntd == getDoubleDecl() ||
-                          ntd == getArrayDecl() ||
-                          ntd == getDictionaryDecl() ||
-                          ntd == getSetDecl() ||
-                          ntd == getStringDecl());
-  }
+  if (auto ntd = type->getAnyNominal())
+    knownBridgedToObjC = isStandardLibraryTypeBridgedInFoundation(ntd);
 
   // If the type is generic, check whether its generic arguments are also
   // bridged to Objective-C.

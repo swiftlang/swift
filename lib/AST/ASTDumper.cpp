@@ -91,7 +91,7 @@ void RequirementRepr::dump() const {
 
 Optional<std::tuple<StringRef, StringRef, RequirementReprKind>>
 RequirementRepr::getAsAnalyzedWrittenString() const {
-  if(AsWrittenString.empty())
+  if (AsWrittenString.empty())
     return None;
   auto Pair = AsWrittenString.split("==");
   auto Kind = RequirementReprKind::SameType;
@@ -1504,6 +1504,9 @@ public:
     PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P));
   }
   void printRec(TypeRepr *T);
+  void printRec(ProtocolConformanceRef conf) {
+    conf.dump(OS, Indent + 2);
+  }
 
   static const char *getAccessKindString(AccessKind kind) {
     switch (kind) {
@@ -1620,9 +1623,8 @@ public:
   }
 
   void visitObjectLiteralExpr(ObjectLiteralExpr *E) {
-    printCommon(E, "object_literal")
-      << " name=" << E->getName();
-    OS << '\n';
+    printCommon(E, "object_literal") 
+      << " kind='" << E->getLiteralKindPlainName() << "'\n";
     printRec(E->getArg());
   }
 
@@ -1868,6 +1870,10 @@ public:
   }
   void visitErasureExpr(ErasureExpr *E) {
     printCommon(E, "erasure_expr") << '\n';
+    for (auto conf : E->getConformances()) {
+      printRec(conf);
+      OS << '\n';
+    }
     printRec(E->getSubExpr());
     OS << ')';
   }
@@ -2115,6 +2121,13 @@ public:
   }
   void visitCoerceExpr(CoerceExpr *E) {
     printExplicitCastExpr(E, "coerce_expr");
+  }
+  void visitArrowExpr(ArrowExpr *E) {
+    printCommon(E, "arrow") << '\n';
+    printRec(E->getArgsExpr());
+    OS << '\n';
+    printRec(E->getResultExpr());
+    OS << ')';
   }
   void visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
     printCommon(E, "rebind_self_in_constructor_expr") << '\n';
@@ -2385,32 +2398,30 @@ void TypeRepr::dump() const {
 }
 
 void Substitution::dump() const {
-  llvm::raw_ostream &os = llvm::errs();
+  dump(llvm::errs());
+}
 
-  print(os);
-  os << '\n';
+void Substitution::dump(llvm::raw_ostream &out, unsigned indent) const {
+  out.indent(indent);
+  print(out);
+  out << '\n';
 
-  if (!Conformance.size()) return;
-
-  os << '[';
-  bool first = true;
   for (auto &c : Conformance) {
-    if (first) {
-      first = false;
-    } else {
-      os << ' ';
-    }
-    c.dump();
+    c.dump(out, indent + 2);
   }
-  os << " ]";
 }
 
 void ProtocolConformanceRef::dump() const {
-  llvm::raw_ostream &os = llvm::errs();
+  dump(llvm::errs());
+}
+
+void ProtocolConformanceRef::dump(llvm::raw_ostream &out,
+                                  unsigned indent) const {
   if (isConcrete()) {
-    getConcrete()->printName(os);
+    getConcrete()->dump(out, indent);
   } else {
-    os << "abstract:" << getAbstract()->getName();
+    out.indent(indent) << "(abstract_conformance protocol="
+                       << getAbstract()->getName() << ')';
   }
 }
 
@@ -2423,10 +2434,45 @@ void swift::dump(const ArrayRef<Substitution> &subs) {
 }
 
 void ProtocolConformance::dump() const {
-  // FIXME: If we ever write a full print() method for ProtocolConformance, use
-  // that.
-  printName(llvm::errs());
-  llvm::errs() << '\n';
+  auto &out = llvm::errs();
+  dump(out);
+  out << '\n';
+}
+
+void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
+  auto printCommon = [&](StringRef kind) {
+    out.indent(indent) << '(' << kind << "_conformance type=" << getType()
+                       << " protocol=" << getProtocol()->getName();
+  };
+
+  switch (getKind()) {
+  case ProtocolConformanceKind::Normal:
+    printCommon("normal");
+    // Maybe print information about the conforming context?
+    break;
+
+  case ProtocolConformanceKind::Inherited: {
+    auto conf = cast<InheritedProtocolConformance>(this);
+    printCommon("inherited");
+    out << '\n';
+    conf->getInheritedConformance()->dump(out, indent + 2);
+    break;
+  }
+
+  case ProtocolConformanceKind::Specialized: {
+    auto conf = cast<SpecializedProtocolConformance>(this);
+    printCommon("specialized");
+    out << '\n';
+    for (auto sub : conf->getGenericSubstitutions()) {
+      sub.dump(out, indent + 2);
+      out << '\n';
+    }
+    conf->getGenericConformance()->dump(out, indent + 2);
+    break;
+  }
+  }
+
+  out << ')';
 }
 
 //===----------------------------------------------------------------------===//

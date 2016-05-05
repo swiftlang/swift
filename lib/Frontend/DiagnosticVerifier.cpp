@@ -465,18 +465,17 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
     if (IncorrectFixit) {
       if (FoundDiagnostic.getFixIts().empty()) {
         addError(IncorrectFixit, "expected fix-it not seen");
-        continue;
+      } else {
+        // If we had an incorrect expected fixit, render it and produce a fixit
+        // of our own.
+        auto actual = renderFixits(FoundDiagnostic.getFixIts(), InputFile);
+        auto replStartLoc = SMLoc::getFromPointer(expected.Fixits[0].StartLoc);
+        auto replEndLoc = SMLoc::getFromPointer(expected.Fixits.back().EndLoc);
+        
+        llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
+        addError(IncorrectFixit,
+                 "expected fix-it not seen; actual fix-its: " + actual, fix);
       }
-      
-      // If we had an incorrect expected fixit, render it and produce a fixit
-      // of our own.
-      auto actual = renderFixits(FoundDiagnostic.getFixIts(), InputFile);
-      auto replStartLoc = SMLoc::getFromPointer(expected.Fixits[0].StartLoc);
-      auto replEndLoc = SMLoc::getFromPointer(expected.Fixits.back().EndLoc);
-      
-      llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
-      addError(IncorrectFixit,
-               "expected fix-it not seen; actual fix-its: " + actual, fix);
     } else if (expected.noFixitsMayAppear &&
                !FoundDiagnostic.getFixIts().empty() &&
                !expected.mayAppear) {

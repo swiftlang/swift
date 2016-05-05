@@ -5,25 +5,18 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import Foundation
 
 var NSArrayAPI = TestSuite("NSArrayAPI")
 
 NSArrayAPI.test("mixed types with AnyObject") {
-  if true {
+  do {
     let result: AnyObject = [1, "two"]
     let expect: NSArray = [1, "two"]
     expectEqual(expect, result as! NSArray)
   }
-  if true {
+  do {
     let result: AnyObject = [1, 2]
     let expect: NSArray = [1, 2]
     expectEqual(expect, result as! NSArray)

@@ -11,7 +11,7 @@ func createNil() -> MyClass? {
 }
 
 @inline(never)
-func genericCaller<B>(f: () -> B) -> B {
+func genericCaller<B>(_ f: () -> B) -> B {
         return f()
 }
 

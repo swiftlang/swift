@@ -5,13 +5,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 protocol TestProtocol1 {}
 
@@ -65,51 +58,89 @@ var OpaquePointerTestSuite = TestSuite("OpaquePointer")
 %         ('OpaquePointer', 'OpaquePointer')]:
 
 ${SelfName}TestSuite.test("convertFromNil") {
-  let ptr: ${SelfType} = nil
-  expectEqual(0, unsafeBitCast(ptr, to: Int.self))
-}
-
-${SelfName}TestSuite.test("initNoArgs") {
-  let ptr: ${SelfType} = nil
+  let ptr: ${SelfType}? = nil
   expectEqual(0, unsafeBitCast(ptr, to: Int.self))
 }
 
 ${SelfName}TestSuite.test("initFromOpaquePointer") {
-  let other = OpaquePointer(bitPattern: 0x12345678)
+  let other = OpaquePointer(bitPattern: 0x12345678)!
   let ptr = UnsafePointer<Float>(other)
   expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
+
+  let optionalOther: Optional = other
+  let optionalPointer = UnsafePointer<Float>(optionalOther)
+  expectNotEmpty(optionalPointer)
+  expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
+
+  let nilOther: Optional<OpaquePointer> = nil
+  let nilPointer = UnsafePointer<Float>(nilOther)
+  expectEmpty(nilPointer)
 }
 
 ${SelfName}TestSuite.test("initFromUnsafePointer") {
-  let other = UnsafePointer<Double>(bitPattern: 0x12345678)
+  let other = UnsafePointer<Double>(bitPattern: 0x12345678)!
   let ptr = ${SelfType}(other)
   expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
+
+  let optionalOther: Optional = other
+  let optionalPointer = ${SelfType}(optionalOther)
+  expectNotEmpty(optionalPointer)
+  expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
+
+  let nilOther: Optional<UnsafePointer<Double>> = nil
+  let nilPointer = ${SelfType}(nilOther)
+  expectEmpty(nilPointer)
 }
 
 ${SelfName}TestSuite.test("initFromUnsafeMutablePointer") {
-  let other = UnsafeMutablePointer<Double>(bitPattern: 0x12345678)
+  let other = UnsafeMutablePointer<Double>(bitPattern: 0x12345678)!
   let ptr = ${SelfType}(other)
   expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
+
+  let optionalOther: Optional = other
+  let optionalPointer = ${SelfType}(optionalOther)
+  expectNotEmpty(optionalPointer)
+  expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
+
+  let nilOther: Optional<UnsafeMutablePointer<Double>> = nil
+  let nilPointer = ${SelfType}(nilOther)
+  expectEmpty(nilPointer)
 }
 
 ${SelfName}TestSuite.test("initFromInteger") {
-  if true {
+  do {
     let word: Int = 0x12345678
     let ptr = ${SelfType}(bitPattern: word)
+    expectNotEmpty(ptr)
     expectEqual(word, unsafeBitCast(ptr, to: Int.self))
   }
-  if true {
+  do {
     let uword: UInt = 0x12345678
     let ptr = ${SelfType}(bitPattern: uword)
+    expectNotEmpty(ptr)
+    expectEqual(uword, unsafeBitCast(ptr, to: UInt.self))
+  }
+}
+
+${SelfName}TestSuite.test("initFromNilBitPattern") {
+  do {
+    let word = unsafeBitCast(nil as ${SelfType}?, to: Int.self)
+    let ptr = ${SelfType}(bitPattern: word)
+    expectEmpty(ptr)
+    expectEqual(word, unsafeBitCast(ptr, to: Int.self))
+  }
+  do {
+    let uword = unsafeBitCast(nil as ${SelfType}?, to: UInt.self)
+    let ptr = ${SelfType}(bitPattern: uword)
+    expectEmpty(ptr)
     expectEqual(uword, unsafeBitCast(ptr, to: UInt.self))
   }
 }
 
 ${SelfName}TestSuite.test("Hashable") {
   let ptrs = [
-    ${SelfType}(bitPattern: 0x0),
-    ${SelfType}(bitPattern: 0x12345678),
-    ${SelfType}(bitPattern: 0x87654321 as UInt),
+    ${SelfType}(bitPattern: 0x12345678)!,
+    ${SelfType}(bitPattern: 0x87654321 as UInt)!,
   ]
   for i in ptrs.indices {
     for j in ptrs.indices {
@@ -117,6 +148,27 @@ ${SelfName}TestSuite.test("Hashable") {
       var pj = ptrs[j]
       checkHashable(i == j, pi, pj, "i=\(i), j=\(j)")
     }
+  }
+}
+
+${SelfName}TestSuite.test("toInteger") {
+  do {
+    let word: Int = 0x12345678
+    let ptr = ${SelfType}(bitPattern: word)
+    expectEqual(word, Int(bitPattern: ptr))
+  }
+  do {
+    let ptr: ${SelfType}? = nil
+    expectEqual(Int(0), Int(bitPattern: ptr))
+  }
+  do {
+    let uword: UInt = 0x12345678
+    let ptr = ${SelfType}(bitPattern: uword)
+    expectEqual(uword, UInt(bitPattern: ptr))
+  }
+  do {
+    let ptr: ${SelfType}? = nil
+    expectEqual(UInt(0), UInt(bitPattern: ptr))
   }
 }
 
@@ -135,7 +187,7 @@ class Missile {
   deinit { Missile.missilesLaunched += 1 }
 }
 
-func checkPointerCorrectness(check: Check,
+func checkPointerCorrectness(_ check: Check,
   _ f: (UnsafeMutablePointer<Missile>) ->
     (UnsafeMutablePointer<Missile>, count: Int) -> Void,
   _ withMissiles: Bool = false) {
@@ -192,7 +244,7 @@ UnsafeMutablePointerTestSuite.test("moveInitializeBackwardFrom") {
   check(Check.RightOverlap)
   check(Check.Disjoint)
 
-  // This check relies on _stdlibAssert() so will only trigger in -Onone mode.
+  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.LeftOverlap)
@@ -202,7 +254,7 @@ UnsafeMutablePointerTestSuite.test("moveInitializeBackwardFrom") {
 UnsafeMutablePointerTestSuite.test("moveAssignFrom") {
   let check = checkPtr(UnsafeMutablePointer.moveAssignFrom, true)
   check(Check.Disjoint)
-  // This check relies on _stdlibAssert() so will only trigger in -Onone mode.
+  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.LeftOverlap)
@@ -211,7 +263,7 @@ UnsafeMutablePointerTestSuite.test("moveAssignFrom") {
 
 UnsafeMutablePointerTestSuite.test("moveAssignFrom.Right") {
   let check = checkPtr(UnsafeMutablePointer.moveAssignFrom, true)
-  // This check relies on _stdlibAssert() so will only trigger in -Onone mode.
+  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.RightOverlap)
@@ -222,7 +274,7 @@ UnsafeMutablePointerTestSuite.test("assignFrom") {
   let check = checkPtr(UnsafeMutablePointer.assignFrom, true)
   check(Check.LeftOverlap)
   check(Check.Disjoint)
-  // This check relies on _stdlibAssert() so will only trigger in -Onone mode.
+  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.RightOverlap)
@@ -233,7 +285,7 @@ UnsafeMutablePointerTestSuite.test("assignBackwardFrom") {
   let check = checkPtr(UnsafeMutablePointer.assignBackwardFrom, true)
   check(Check.RightOverlap)
   check(Check.Disjoint)
-  // This check relies on _stdlibAssert() so will only trigger in -Onone mode.
+  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.LeftOverlap)
@@ -244,7 +296,7 @@ UnsafeMutablePointerTestSuite.test("moveInitializeFrom") {
   let check = checkPtr(UnsafeMutablePointer.moveInitializeFrom, false)
   check(Check.LeftOverlap)
   check(Check.Disjoint)
-  // This check relies on _stdlibAssert() so will only trigger in -Onone mode.
+  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.RightOverlap)
@@ -254,7 +306,7 @@ UnsafeMutablePointerTestSuite.test("moveInitializeFrom") {
 UnsafeMutablePointerTestSuite.test("initializeFrom") {
   let check = checkPtr(UnsafeMutablePointer.initializeFrom, false)
   check(Check.Disjoint)
-  // This check relies on _stdlibAssert() so will only trigger in -Onone mode.
+  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.LeftOverlap)
@@ -263,7 +315,7 @@ UnsafeMutablePointerTestSuite.test("initializeFrom") {
 
 UnsafeMutablePointerTestSuite.test("initializeFrom.Right") {
   let check = checkPtr(UnsafeMutablePointer.initializeFrom, false)
-  // This check relies on _stdlibAssert() so will only trigger in -Onone mode.
+  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
   if _isDebugAssertConfiguration() {
     expectCrashLater()
     check(Check.RightOverlap)
@@ -274,7 +326,7 @@ UnsafePointerTestSuite.test("customMirror") {
   // Ensure that the custom mirror works properly, including when the raw value
   // is greater than Int.max
   let reallyBigInt: UInt = UInt(Int.max) + 1
-  let ptr = UnsafePointer<Float>(bitPattern: reallyBigInt)
+  let ptr = UnsafePointer<Float>(bitPattern: reallyBigInt)!
   let mirror = ptr.customMirror
   expectEqual(1, mirror.children.count)
 #if arch(i386) || arch(arm)
@@ -290,7 +342,7 @@ UnsafePointerTestSuite.test("customPlaygroundQuickLook") {
   // Ensure that the custom playground quicklook works properly, including when
   // the raw value is greater than Int.max
   let reallyBigInt: UInt = UInt(Int.max) + 1
-  let ptr = UnsafePointer<Float>(bitPattern: reallyBigInt)
+  let ptr = UnsafePointer<Float>(bitPattern: reallyBigInt)!
   if case let .text(desc) = ptr.customPlaygroundQuickLook {
 #if arch(i386) || arch(arm)
     expectEqual("UnsafePointer(0xFFFFFFFF80000000)", desc)
@@ -306,7 +358,7 @@ UnsafePointerTestSuite.test("customPlaygroundQuickLook") {
 
 UnsafeMutablePointerTestSuite.test("customMirror") {
   let reallyBigInt: UInt = UInt(Int.max) + 1
-  let ptr = UnsafeMutablePointer<Float>(bitPattern: reallyBigInt)
+  let ptr = UnsafeMutablePointer<Float>(bitPattern: reallyBigInt)!
   let mirror = ptr.customMirror
   expectEqual(1, mirror.children.count)
 #if arch(i386) || arch(arm)
@@ -320,7 +372,7 @@ UnsafeMutablePointerTestSuite.test("customMirror") {
 
 UnsafeMutablePointerTestSuite.test("customPlaygroundQuickLook") {
   let reallyBigInt: UInt = UInt(Int.max) + 1
-  let ptr = UnsafeMutablePointer<Float>(bitPattern: reallyBigInt)
+  let ptr = UnsafeMutablePointer<Float>(bitPattern: reallyBigInt)!
   let isProperDisposition : Bool
   if case let .text(desc) = ptr.customPlaygroundQuickLook {
 #if arch(i386) || arch(arm)
@@ -335,5 +387,35 @@ UnsafeMutablePointerTestSuite.test("customPlaygroundQuickLook") {
   }
 }
 
-runAllTests()
+% for (SelfName, SelfType) in [
+%         ('UnsafePointer', 'UnsafePointer<Int>'),
+%         ('UnsafeMutablePointer', 'UnsafeMutablePointer<Int>')]:
 
+${SelfName}TestSuite.test("Comparable") {
+  var addresses: [UInt] = [
+    0x00000001,
+    0xFF00FF00,
+    0x00001111,
+    0x00000002,
+    0xFFFFFFFF,
+    0x00001111
+  ]
+
+  #if arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+  addresses += [
+    0xFFFFFFFF80000000,
+    0x8000000000000000
+  ]
+  #endif
+
+  let instances = addresses.map { ($0, ${SelfType}(bitPattern: $0)!) }
+
+  func comparisonOracle(i: Int, j: Int) -> ExpectedComparisonResult {
+    return instances[i].0 <=> instances[j].0
+  }
+  checkComparable(instances.map { $0.1 }, oracle: comparisonOracle)
+}
+
+% end
+
+runAllTests()

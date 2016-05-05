@@ -148,11 +148,8 @@ WARNING(lex_editor_placeholder_in_playground,none,
 
 NOTE(note_in_decl_extension,none,
      "in %select{declaration|extension}0 of %1", (bool, Identifier))
-WARNING(inout_as_attr_deprecated,none,
-        "'inout' before a parameter name is deprecated, place it before the parameter type instead",
-        ())
-WARNING(line_directive_style_deprecated,none,
-        "#line directive is deprecated, please use #sourceLocation instead",
+ERROR(line_directive_style_deprecated,none,
+        "#line directive was renamed to #sourceLocation",
         ())
 
 ERROR(declaration_same_line_without_semi,none,
@@ -183,6 +180,9 @@ ERROR(disallowed_init,none,
       "initial value is not allowed here", ())
 ERROR(var_init_self_referential,none,
       "variable used within its own initial value", ())
+ERROR(expected_self_before_reference,none,
+      "variable used within its own initial value; use 'self.' to refer to the %0", (DescriptiveDeclKind))
+
 ERROR(disallowed_enum_element,none,
       "enum 'case' is not allowed outside of an enum", ())
 ERROR(decl_inner_scope,none,
@@ -287,8 +287,6 @@ ERROR(expected_type_in_associatedtype,PointsToFirstBadToken,
       "expected type in associatedtype declaration", ())
 ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
       "associated types may not have a generic parameter list", ())
-ERROR(typealias_generic_list_constraint,PointsToFirstBadToken,
-      "type parameters may not be constrained in typealias argument list", ())
 
 
 // Func
@@ -613,6 +611,10 @@ ERROR(rethrows_after_function_result,none,
       "'rethrows' may only occur before '->'", ())
 ERROR(throw_in_function_type,none,
       "expected throwing specifier; did you mean 'throws'?", ())
+ERROR(expected_type_before_arrow,none,
+      "expected type before '->'", ())
+ERROR(expected_type_after_arrow,none,
+      "expected type after '->'", ())
 
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,PointsToFirstBadToken,
@@ -692,12 +694,15 @@ ERROR(multiple_parameter_ellipsis,none,
       "only a single variadic parameter '...' is permitted", ())
 ERROR(parameter_vararg_default,none,
       "variadic parameter cannot have a default value", ())
-ERROR(parameter_inout_var_let,none,
+ERROR(inout_as_attr_disallowed,none,
+      "'inout' before a parameter name is not allowed, place it before the parameter type instead",
+      ())
+ERROR(parameter_inout_var_let_repeated,none,
       "parameter may not have multiple 'inout', 'var', or 'let' specifiers",
       ())
+ERROR(parameter_let_as_attr,none,
+      "'let' as a parameter attribute is not allowed", ())
 
-ERROR(var_parameter_not_allowed,none,
-        "parameters may not have the 'var' specifier", ())
 
 ERROR(expected_behavior_name,none,
       "expected behavior name after '[' in property declaration", ())
@@ -706,9 +711,6 @@ ERROR(expected_behavior_name,none,
 WARNING(parameter_extraneous_double_up,none,
         "extraneous duplicate parameter name; %0 already has an argument "
         "label", (Identifier))
-WARNING(parameter_extraneous_empty_name,none,
-        "extraneous '_' in parameter: %0 has no keyword argument name",
-        (Identifier))
 ERROR(parameter_operator_keyword_argument,none,
       "%select{operator|closure}0 cannot have keyword arguments", (bool))
 
@@ -741,9 +743,9 @@ ERROR(invalid_label_on_stmt,none,
 NOTE(discard_result_of_closure,none,
      "explicitly discard the result of the closure by assigning to '_'", ())
 
-WARNING(snake_case_deprecated,none,
-        "%0 is deprecated and will be removed in Swift 3, please use %1",
-        (StringRef, StringRef))
+ERROR(snake_case_deprecated,none,
+      "%0 has been replaced with %1 in Swift 3",
+      (StringRef, StringRef))
 
 
 // Assignment statement
@@ -987,6 +989,10 @@ ERROR(unexpected_tokens_before_closure_in,none,
 ERROR(expected_closure_rbrace,none,
       "expected '}' at end of closure", ())
 
+ERROR(trailing_closure_requires_parens,none,
+      "trailing closure requires parentheses for disambiguation in this"
+      " context", ())
+
 WARNING(trailing_closure_excess_newlines,none,
         "trailing closure is separated from call site by multiple newlines", ())
 NOTE(trailing_closure_call_here,none,
@@ -1040,12 +1046,14 @@ ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
       "expected ']' in container literal expression", ())
 
 // Object literal expressions
-ERROR(expected_identifier_after_l_square_lit,none,
-      "expected identifier after '[#' in object literal expression", ())
+ERROR(expected_object_literal_identifier,none,
+      "expected identifier after '#' in object literal expression", ())
 ERROR(expected_arg_list_in_object_literal,none,
       "expected argument list in object literal", ())
-ERROR(expected_r_square_lit_after_object_literal,none,
-      "expected '#]' at end of object literal expression", ())
+ERROR(object_literal_legacy_name,none,
+      "'%0' has been renamed to '%1", (StringRef, StringRef))
+ERROR(legacy_object_literal_syntax,none,
+       "object literal syntax no longer uses '[# ... #]'", ())
 
 // If expressions
 ERROR(expected_expr_after_if_question,none,
@@ -1077,8 +1085,8 @@ ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
 // Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
 
-WARNING(replace_equal_with_colon_for_value,none,
-        "'=' is deprecated in favor of ':' before an attribute argument", ())
+ERROR(replace_equal_with_colon_for_value,none,
+      "'=' has been replaced with ':' in attribute arguments", ())
 ERROR(expected_attribute_name,none,
       "expected an attribute name", ())
 ERROR(unknown_attribute,none,
@@ -1146,6 +1154,9 @@ ERROR(attr_availability_unavailable_deprecated,none,
 
 WARNING(attr_availability_unknown_platform,none,
 "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
+ERROR(attr_availability_invalid_renamed,none,
+      "'renamed' argument of '%0' attribute must be an operator, identifier, "
+      "or full function name, optionally prefixed by a type name", (StringRef))
 
 ERROR(attr_availability_expected_option,none,
       "expected '%0' option such as 'unavailable', 'introduced', 'deprecated', "
@@ -1163,6 +1174,11 @@ ERROR(attr_availability_renamed, none,
 // autoclosure
 ERROR(attr_autoclosure_expected_r_paren,PointsToFirstBadToken,
       "expected ')' in @autoclosure", ())
+ERROR(attr_noescape_conflicts_escaping_autoclosure,none,
+      "@noescape conflicts with @autoclosure(escaping)", ())
+ERROR(attr_noescape_implied_by_autoclosure,none,
+      "@noescape is implied by @autoclosure and should not be "
+      "redundantly specified", ())
 
 // convention
 ERROR(convention_attribute_expected_lparen,none,
@@ -1283,11 +1299,11 @@ ERROR(unsupported_conditional_compilation_integer,none,
 ERROR(version_component_not_number,none,
       "version component contains non-numeric characters", ())
 ERROR(compiler_version_too_many_components,none,
-			"compiler version must not have more than five components", ())
+      "compiler version must not have more than five components", ())
 WARNING(unused_compiler_version_component,none,
-			"the second version component is not used for comparison", ())
+      "the second version component is not used for comparison", ())
 ERROR(empty_version_component,none,
-			"found empty version component", ())
+      "found empty version component", ())
 ERROR(compiler_version_component_out_of_range,none,
       "compiler version component out of range: must be in [0, %0]",
       (unsigned))

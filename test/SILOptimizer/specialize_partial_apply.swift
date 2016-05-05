@@ -22,10 +22,10 @@ struct MyError : ErrorProtocol {
 // CHECK: [[PA:%[0-9]+]] = partial_apply [[F]](%1, %{{[0-9]+}}) : $@convention(thin) (@in Int, Bool, @owned @box Int) -> @out Int
 // CHECK: return [[PA]] : $@callee_owned (@in Int) -> @out Int
 @inline(never)
-func generic_get_func<T>(t1: T, _ b: Bool) -> (T) -> T {
+func generic_get_func<T>(_ t1: T, _ b: Bool) -> (T) -> T {
 
 	@inline(never)
-	func generic(t2: T) -> T {
+	func generic(_ t2: T) -> T {
 		return b ? t1 : t2
 	}
 
@@ -39,13 +39,13 @@ func generic_get_func<T>(t1: T, _ b: Bool) -> (T) -> T {
 // CHECK: [[RET:%[0-9]+]] = partial_apply [[TH]]([[CL]]) : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> @out Int) -> Int
 // CHECK: return [[RET]] : $@callee_owned (Int) -> Int
 @inline(never)
-func testit1(b: Bool) -> (Int) -> Int {
+func testit1(_ b: Bool) -> (Int) -> Int {
 	return generic_get_func(27, b)
 }
 
 
 @inline(never)
-func generic2<T>(t1: T, t2: T, b: Bool) -> T {
+func generic2<T>(_ t1: T, t2: T, b: Bool) -> T {
 	return b ? t1 : t2
 }
 
@@ -68,7 +68,7 @@ func testit2() -> (Int, Int, Bool) -> Int {
 
 
 @inline(never)
-func generic3<T>(t1: T, _ t2: T, _ b: Bool) -> T {
+func generic3<T>(_ t1: T, _ t2: T, _ b: Bool) -> T {
 	return b ? t1 : t2
 }
 
@@ -79,7 +79,7 @@ func generic3<T>(t1: T, _ t2: T, _ b: Bool) -> T {
 // CHECK: [[RET:%[0-9]+]] = apply [[F]]({{.*}}) : $@convention(thin) (Int, Int, Bool) -> Int
 // CHECK: return [[RET]] : $Int
 @inline(never)
-func testit3(b: Bool) -> Int {
+func testit3(_ b: Bool) -> Int {
 	return generic3(270, 28, b)
 }
 
@@ -93,10 +93,10 @@ func testit3(b: Bool) -> Int {
 // CHECK: [[PA:%[0-9]+]] = partial_apply [[F]](%0) : $@convention(thin) (@in Int, Bool) -> (@out Int, @error ErrorProtocol)
 // CHECK: return [[PA]] : $@callee_owned (@in Int) -> (@out Int, @error ErrorProtocol)
 @inline(never)
-func generic_get_func_throwing<T>(b: Bool) -> (T) throws -> T {
+func generic_get_func_throwing<T>(_ b: Bool) -> (T) throws -> T {
 
 	@inline(never)
-	func generic(t2: T) throws -> T {
+	func generic(_ t2: T) throws -> T {
 		if b {
 			throw MyError(123)
 		}
@@ -113,13 +113,13 @@ func generic_get_func_throwing<T>(b: Bool) -> (T) throws -> T {
 // CHECK: [[RET:%[0-9]+]] = partial_apply [[TH]]([[CL]]) : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> (@out Int, @error ErrorProtocol)) -> (Int, @error ErrorProtocol)
 // CHECK: return [[RET]] : $@callee_owned (Int) -> (Int, @error ErrorProtocol)
 @inline(never)
-func testit1_throwing(b: Bool) -> (Int) throws -> Int {
+func testit1_throwing(_ b: Bool) -> (Int) throws -> Int {
 	return generic_get_func_throwing(b)
 }
 
 
 @inline(never)
-func generic2_throwing<T>(t1: T, b: Bool) throws -> T {
+func generic2_throwing<T>(_ t1: T, b: Bool) throws -> T {
 	if b {
 		throw MyError(124)
 	}
@@ -146,7 +146,7 @@ func testit2_throwing() -> (Int, Bool) throws -> Int {
 
 
 @inline(never)
-func generic3_throwing<T>(t1: T, _ b: Bool) throws -> T {
+func generic3_throwing<T>(_ t1: T, _ b: Bool) throws -> T {
 	if b {
 		throw MyError(125)
 	}
@@ -160,7 +160,7 @@ func generic3_throwing<T>(t1: T, _ b: Bool) throws -> T {
 // CHECK: try_apply [[F]](%{{[0-9]+}}, %0) : $@convention(thin) (Int, Bool) -> (Int, @error ErrorProtocol), normal bb{{[0-9]+}}, error bb{{[0-9]+}}
 // CHECK: }
 @inline(never)
-func testit3_throwing(b: Bool) -> Int {
+func testit3_throwing(_ b: Bool) -> Int {
 	do {
 		return try generic3_throwing(271, b)
 	} catch {

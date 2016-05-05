@@ -12,6 +12,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     add_subdirectory(StdlibUnittestFoundationExtras)
     add_subdirectory(SwiftPrivateLibcExtras)
     add_subdirectory(SwiftPrivatePthreadExtras)
+    add_subdirectory(SwiftReflectionTest)
   endif()
 endif()
 

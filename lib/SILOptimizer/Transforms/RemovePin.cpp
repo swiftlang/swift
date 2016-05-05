@@ -33,7 +33,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-STATISTIC(NumPinPairsRemoved, "Num pin pairs removed");
+STATISTIC(NumPinPairsRemoved, "Number of pin pairs removed");
 
 using namespace swift;
 
@@ -103,7 +103,7 @@ public:
           SILValue RCId = RCIA->getRCIdentityRoot(Unpin->getOperand());
           DEBUG(llvm::dbgs() << "        RCID Source: " << *RCId);
           auto *PinDef = dyn_cast<StrongPinInst>(RCId);
-          if (PinDef && AvailablePins.count(PinDef)){
+          if (PinDef && AvailablePins.count(PinDef)) {
             DEBUG(llvm::dbgs() << "        Found matching pin: " << *PinDef);
             SmallVector<MarkDependenceInst *, 8> MarkDependentInsts;
             if (areSafePinUsers(PinDef, Unpin, MarkDependentInsts)) {

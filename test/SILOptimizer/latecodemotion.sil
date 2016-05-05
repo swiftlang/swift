@@ -1,10 +1,14 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -late-codemotion | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -late-codemotion -disable-sil-cm-rr-cm=0 | FileCheck %s
 
 import Builtin
 import Swift
 
 class B { }
 class E : B { }
+
+struct A {
+  var i : Builtin.Int32
+}
 
 enum FakeOptional<T> {
   case none
@@ -13,6 +17,11 @@ enum FakeOptional<T> {
 
 
 class C {}
+
+class C2  {
+ var current: A
+ init()
+}
 
 enum Either {
   case First(Builtin.NativeObject)
@@ -36,6 +45,7 @@ enum ThreeCaseAbstractionDifference {
 }
 
 sil @user : $@convention(thin) (Builtin.NativeObject) -> ()
+sil @use_C2 : $@convention(thin) (C2) -> ()
 sil @optional_user : $@convention(thin) (FakeOptional<Builtin.Int32>) -> ()
 sil @blocker : $@convention(thin) () -> ()
 sil @get_object : $@convention(thin) () -> Builtin.NativeObject
@@ -1703,6 +1713,111 @@ bb2:
 bb3:
   strong_release %0: $Builtin.NativeObject
   strong_release %1: $Builtin.NativeObject
+  %5 = tuple()
+  return %5 : $()
+}
+
+// Make sure release can be hoisted across memory that do not escape.
+// CHECK-LABEL: sil @hoist_release_across_local_memory_use
+// CHECK: bb1:
+// CHECK: strong_release
+// CHECK: br bb3
+// CHECK: bb2:
+// CHECK: strong_release
+// CHECK: br bb3
+// CHECK: bb3:
+// CHECK-NOT: strong_release
+// CHECK: return 
+sil @hoist_release_across_local_memory_use : $@convention(thin) (Builtin.NativeObject) ->() {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = alloc_stack $A
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $A (%2 : $Builtin.Int32)
+  store %3 to %1 : $*A
+  strong_release %0 : $Builtin.NativeObject
+  dealloc_stack %1 : $*A
+  %5 = tuple()
+  return %5 : $()
+}
+
+// Make sure release can not be hoisted across memory that do escape. i.e. the release
+// deinit can read or write to the memory.
+// CHECK-LABEL: sil @hoist_release_across_escaping_param_memory_use
+// CHECK: bb1:
+// CHECK-NOT: strong_release
+// CHECK: br bb3
+// CHECK: bb2:
+// CHECK-NOT: strong_release
+// CHECK: br bb3
+// CHECK: bb3:
+// CHECK: store
+// CHECK: strong_release
+// CHECK: return
+sil @hoist_release_across_escaping_param_memory_use : $@convention(thin) (Builtin.NativeObject, C2) ->() {
+bb0(%0 : $Builtin.NativeObject, %1 : $C2):
+  %2 = ref_element_addr %1 : $C2, #C2.current
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %3 = integer_literal $Builtin.Int32, 0
+  %4 = struct $A (%3 : $Builtin.Int32)
+  store %4 to %2 : $*A
+  strong_release %0 : $Builtin.NativeObject
+  %5 = tuple()
+  return %5 : $()
+}
+
+// Make sure release can not be hoisted across memory that do escape, even though its allocated locally.
+// i.e. the release
+// deinit can read or write to the memory.
+// CHECK-LABEL: sil @hoist_release_across_escaping_local_alloc_memory_use
+// CHECK: bb1:
+// CHECK-NOT: strong_release
+// CHECK: br bb3
+// CHECK: bb2:
+// CHECK-NOT: strong_release
+// CHECK: br bb3
+// CHECK: bb3:
+// CHECK: store
+// CHECK: strong_release
+// CHECK: return
+sil @hoist_release_across_escaping_local_alloc_memory_use : $@convention(thin) (Builtin.NativeObject) ->() {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = alloc_ref $C2
+  %2 = ref_element_addr %1 : $C2, #C2.current
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %22 = function_ref @use_C2 : $@convention(thin) (C2) -> ()
+  %23 = apply %22(%1) : $@convention(thin) (C2) -> ()
+  %3 = integer_literal $Builtin.Int32, 0
+  %4 = struct $A (%3 : $Builtin.Int32)
+  store %4 to %2 : $*A
+  strong_release %0 : $Builtin.NativeObject
   %5 = tuple()
   return %5 : $()
 }

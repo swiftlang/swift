@@ -142,7 +142,7 @@ bb0:
 // Now check that a native object address may:
 //
 // 1. May alias raw pointer addresses.
-// 2. Not alias an unknown object. Objective C objects are allocated differently
+// 2. Not alias an unknown object. Objective-C objects are allocated differently
 // than Swift objects and may not alias.
 // 3. Does not alias scalar addresses. This can only occur via inttoptr and the
 // like. Since we are using type oracles we are allowed to make the assumption

@@ -41,17 +41,6 @@ class LazyResolver {
 public:
   virtual ~LazyResolver();
 
-  /// Completely check the given normal protocol conformance.
-  ///
-  /// \param conformance The normal protocol conformance.
-  ///
-  /// FIXME: We shouldn't need this as an entry to the lazy resolver, because
-  /// completely checking of conformances is only interesting when we're doing
-  /// complete checking of the declaration context. However, it is needed now
-  /// to maintain the order of checking, because resolveTypeWitness/
-  /// resolveWitness aren't lazy enough.
-  virtual void checkConformance(NormalProtocolConformance *conformance) = 0;
-
   /// Resolve the type witnesses for the given associated type within the given
   /// protocol conformance.
   virtual void resolveTypeWitness(const NormalProtocolConformance *conformance,

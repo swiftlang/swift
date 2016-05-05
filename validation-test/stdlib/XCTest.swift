@@ -10,13 +10,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import XCTest
 
@@ -28,7 +21,7 @@ var XCTestTestSuite = TestSuite("XCTest")
 //       instantiate an NSInvocation with the given selector.
 
 
-func execute(run: () -> ()) {
+func execute(_ run: () -> ()) {
   run()
 }
 
@@ -235,8 +228,6 @@ XCTestTestSuite.test("XCTAsserts with throwing expressions") {
     
 }
 
-/* Disabling these tests for now: <rdar://problem/25034414> Enable unit tests for test methods that throw once the open source CI is on 7.3
-
 XCTestTestSuite.test("Test methods that wind up throwing") {
     class ErrorTestCase: XCTestCase {
         var doThrow = true
@@ -283,7 +274,6 @@ XCTestTestSuite.test("Test methods that wind up throwing") {
     }
     
 }
-*/
 
 runAllTests()
 

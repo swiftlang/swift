@@ -12,13 +12,13 @@
 
 import TestsUtils
 
-func fibonacci(n: Int) -> Int {
+func fibonacci(_ n: Int) -> Int {
   if (n < 2) { return 1 }
   return fibonacci(n - 2) + fibonacci(n - 1)
 }
 
 @inline(never)
-func Fibonacci(n: Int) -> Int {
+func Fibonacci(_ n: Int) -> Int {
   // This if prevents optimizer from computing return value of Fibonacci(32)
   // at compile time.
   if False() { return 0 }
@@ -28,7 +28,7 @@ func Fibonacci(n: Int) -> Int {
 }
 
 @inline(never)
-public func run_Fibonacci(N: Int) {
+public func run_Fibonacci(_ N: Int) {
   let n = 32
   let ref_result = 3524578
   var result = 0

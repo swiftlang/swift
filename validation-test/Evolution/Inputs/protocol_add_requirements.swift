@@ -35,7 +35,7 @@ extension AddMethodsProtocol {
 #endif
 }
 
-public func doSomething<T : AddMethodsProtocol>(t: T) -> [T.Element] {
+public func doSomething<T : AddMethodsProtocol>(_ t: T) -> [T.Element] {
 #if BEFORE
   return [
       t.importantOperation(),
@@ -69,7 +69,7 @@ extension AddConstructorsProtocol {
   }
 }
 
-public func testConstructorProtocol<T : AddConstructorsProtocol>(t: T.Type) -> [T?] {
+public func testConstructorProtocol<T : AddConstructorsProtocol>(_ t: T.Type) -> [T?] {
 #if BEFORE
   return [t.init(name: "Puff")]
 #else
@@ -122,7 +122,7 @@ extension AddPropertiesProtocol {
 #endif
 }
 
-public func getProperties<T : AddPropertiesProtocol>(t: inout T) -> [Int] {
+public func getProperties<T : AddPropertiesProtocol>(_ t: inout T) -> [Int] {
 #if BEFORE
   return [t.topSpeed, t.maxRPM]
 #else
@@ -130,11 +130,11 @@ public func getProperties<T : AddPropertiesProtocol>(t: inout T) -> [Int] {
 #endif
 }
 
-func increment(x: inout Int, by: Int) {
+func increment(_ x: inout Int, by: Int) {
   x += by
 }
 
-public func setProperties<T : AddPropertiesProtocol>(t: inout T) {
+public func setProperties<T : AddPropertiesProtocol>(_ t: inout T) {
 #if AFTER
   t.minSafeSpeed = t.maxSafeSpeed
   increment(&t.redLine, by: 7000)
@@ -168,7 +168,7 @@ extension AddSubscriptProtocol {
   }
 }
 
-public func doSomething<T : AddSubscriptProtocol>(t: inout T, k1: T.Key, k2: T.Key) {
+public func doSomething<T : AddSubscriptProtocol>(_ t: inout T, k1: T.Key, k2: T.Key) {
 #if BEFORE
   t.set(key: k1, value: t.get(key: k2))
 #else

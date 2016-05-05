@@ -15,7 +15,7 @@
 import TestsUtils
 
 @inline(never)
-public func run_DictionarySwap(N: Int) {
+public func run_DictionarySwap(_ N: Int) {
     let size = 100
     var dict = [Int: Int](minimumCapacity: size)
 
@@ -40,7 +40,7 @@ public func run_DictionarySwap(N: Int) {
 }
 
 // Return true if correctly swapped, false otherwise
-func swappedCorrectly(swapped: Bool, _ p25: Int, _ p75: Int) -> Bool {
+func swappedCorrectly(_ swapped: Bool, _ p25: Int, _ p75: Int) -> Bool {
     return swapped && (p25 == 75 && p75 == 25) ||
           !swapped && (p25 == 25 && p75 == 75)
 }
@@ -60,12 +60,12 @@ class Box<T : Hashable where T : Equatable> : Hashable {
 extension Box : Equatable {
 }
 
-func ==<T: Equatable>(lhs: Box<T>,  rhs: Box<T>) -> Bool {
+func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
   return lhs.value == rhs.value
 }
 
 @inline(never)
-public func run_DictionarySwapOfObjects(N: Int) {
+public func run_DictionarySwapOfObjects(_ N: Int) {
     let size = 100
     var dict = Dictionary<Box<Int>, Box<Int>>(minimumCapacity: size)
 

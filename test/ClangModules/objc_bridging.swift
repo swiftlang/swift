@@ -43,19 +43,19 @@ func foo() {
   DummyClass().setProperty.onlyOnSet()
 }
 
-func allocateMagic(zone: NSZone) -> UnsafeMutablePointer<Void> {
+func allocateMagic(_ zone: NSZone) -> UnsafeMutablePointer<Void> {
   return allocate(zone)
 }
 
-func constPointerToObjC(objects: [AnyObject?]) -> NSArray {
+func constPointerToObjC(_ objects: [AnyObject]) -> NSArray {
   return NSArray(objects: objects, count: objects.count)
 }
 
-func mutablePointerToObjC(path: String) throws -> NSString {
+func mutablePointerToObjC(_ path: String) throws -> NSString {
   return try NSString(contentsOfFile: path)
 }
 
-func objcStructs(s: StructOfNSStrings, sb: StructOfBlocks) {
+func objcStructs(_ s: StructOfNSStrings, sb: StructOfBlocks) {
   // Struct fields must not be bridged.
   _ = s.nsstr! as Bool // expected-error {{cannot convert value of type 'Unmanaged<NSString>' to type 'Bool' in coercion}}
 

@@ -14,12 +14,6 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 struct BasicSequenceWrapper<
   Base_: Sequence
@@ -29,13 +23,13 @@ struct BasicSequenceWrapper<
 
 var sequenceWrapperTests = TestSuite("SequenceWrapper")
 
-let base = LoggingSequence([OpaqueValue(1)])
+let base = LoggingSequence(wrapping: [OpaqueValue(1)])
 let direct = BasicSequenceWrapper(_base: base)
-let indirect = LoggingSequence(direct)
+let indirect = LoggingSequence(wrapping: direct)
 let dispatchLog = base.log
 
 func expectWrapperDispatch<R1, R2>(
-  @autoclosure directOperation: () -> R1,
+  @autoclosure _ directOperation: () -> R1,
   @autoclosure _ indirectOperation: () -> R2,
   _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//

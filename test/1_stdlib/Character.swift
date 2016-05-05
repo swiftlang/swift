@@ -1,18 +1,10 @@
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
-// XFAIL: interpret
-
 import StdlibUnittest
 import Swift
 import SwiftPrivate
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 //===---
 // Utilities.
@@ -100,7 +92,7 @@ let testCharacters = [
   "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 10 bytes
 ]
 
-func randomGraphemeCluster(minSize: Int, _ maxSize: Int) -> String {
+func randomGraphemeCluster(_ minSize: Int, _ maxSize: Int) -> String {
   let n = pickRandom((minSize + 1)..<maxSize)
   var result = pickRandom(baseScalars)
   for _ in 0..<n {
@@ -116,25 +108,25 @@ func randomGraphemeCluster(minSize: Int, _ maxSize: Int) -> String {
 var CharacterTests = TestSuite("Character")
 
 CharacterTests.test("literal") {
-  if true {
+  do {
     // U+0041 LATIN CAPITAL LETTER A
     let ch: Character = "A"
     expectEqual("\u{0041}", String(ch))
   }
 
-  if true {
+  do {
     // U+3042 HIRAGANA LETTER A
     let ch: Character = "あ"
     expectEqual("\u{3042}", String(ch))
   }
 
-  if true {
+  do {
     // U+4F8B CJK UNIFIED IDEOGRAPH-4F8B
     let ch: Character = "例"
     expectEqual("\u{4F8B}", String(ch))
   }
 
-  if true {
+  do {
     // U+304B HIRAGANA LETTER KA
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
     let ch: Character = "\u{304b}\u{3099}"
@@ -174,7 +166,7 @@ CharacterTests.test("Hashable") {
 
 /// Test that a given `String` can be transformed into a `Character` and back
 /// without loss of information.
-func checkRoundTripThroughCharacter(s: String) {
+func checkRoundTripThroughCharacter(_ s: String) {
   let c = Character(s)
   var s2 = String(c)
   expectEqual(
@@ -183,7 +175,7 @@ func checkRoundTripThroughCharacter(s: String) {
   )
 }
 
-func isSmallRepresentation(s: String) -> Bool {
+func isSmallRepresentation(_ s: String) -> Bool {
   switch Character(s)._representation {
     case .small:
       return true
@@ -192,7 +184,7 @@ func isSmallRepresentation(s: String) -> Bool {
   }
 }
 
-func checkRepresentation(s: String) {
+func checkRepresentation(_ s: String) {
   let expectSmall = s.utf8.count <= 8
   let isSmall = isSmallRepresentation(s)
 

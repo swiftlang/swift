@@ -1,3 +1,4 @@
+
 //===--- Index.swift.gyb - tests for Index types and operations -----------===//
 //
 // This source file is part of the Swift.org open source project
@@ -19,290 +20,81 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
-
-struct DistanceToTest {
-  let startIndex: Int
-  let endIndex: Int
-  let expectedDistance: Int
-  let loc: SourceLoc
-
-  init(
-    startIndex: Int, endIndex: Int, expectedDistance: Int,
-    file: String = #file, line: UInt = #line
-  ) {
-    self.startIndex = startIndex
-    self.endIndex = endIndex
-    self.expectedDistance = expectedDistance
-    self.loc = SourceLoc(file, line, comment: "distance(to:) test data")
-  }
-}
-
-struct AdvancedByTest {
-  let startIndex: Int
-  let distance: Int
-  let limit: Int?
-  let expectedIndex: Int
-  let loc: SourceLoc
-  init(
-    startIndex: Int, distance: Int, expectedIndex: Int,
-    limit: Int? = nil,
-    file: String = #file, line: UInt = #line
-  ) {
-    self.startIndex = startIndex
-    self.distance = distance
-    self.expectedIndex = expectedIndex
-    self.limit = limit
-    self.loc = SourceLoc(file, line, comment: "advanced(by:) test data")
-  }
-}
-
-let distanceToTests = [
-  DistanceToTest(
-    startIndex: 0,
-    endIndex: 0,
-    expectedDistance: 0
-  ),
-  DistanceToTest(
-    startIndex: 10,
-    endIndex: 10,
-    expectedDistance: 0
-  ),
-  DistanceToTest(
-    startIndex: 10,
-    endIndex: 13,
-    expectedDistance: 3
-  ),
-  DistanceToTest(
-    startIndex: 7,
-    endIndex: 10,
-    expectedDistance: 3
-  ),
-]
-
-let advancedByTests = [
-  AdvancedByTest(
-    startIndex: 0,
-    distance: 0,
-    expectedIndex: 0
-  ),
-  AdvancedByTest(
-    startIndex: 0,
-    distance: -1,
-    expectedIndex: -1
-  ),
-  AdvancedByTest(
-    startIndex: 0,
-    distance: 0,
-    expectedIndex: 0,
-    limit: 0
-  ),
-  AdvancedByTest(
-    startIndex: 0,
-    distance: 0,
-    expectedIndex: 0,
-    limit: 10
-  ),
-  AdvancedByTest(
-    startIndex: 0,
-    distance: 10,
-    expectedIndex: 0,
-    limit: 0
-  ),
-  AdvancedByTest(
-    startIndex: 0,
-    distance: -10,
-    expectedIndex: 0,
-    limit: 0
-  ),
-  AdvancedByTest(
-    startIndex: 0,
-    distance: 10,
-    expectedIndex: 10,
-    limit: 10
-  ),
-  AdvancedByTest(
-    startIndex: 0,
-    distance: 20,
-    expectedIndex: 10,
-    limit: 10
-  ),
-  AdvancedByTest(
-    startIndex: 10,
-    distance: -20,
-    expectedIndex: 0,
-    limit: 0
-  ),
-]
 
 var Index = TestSuite("Index")
 
-% for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
+% from gyb_stdlib_support import collectionForTraversal
 
-Index.test("${Traversal}Index/distance(to:)/dispatch") {
-  var start = ${Traversal}IndexLog.dispatchTester(0)
-  var end = ${Traversal}IndexLog.dispatchTester(10)
-  _ = start.distance(to: end)
-  expectCustomizable(start, start.log.distanceTo)
+% # RandomAccess does not add any new behaviors to Bidirectional
+% # so we are left with just 2 traversals for the following tests
+% for Traversal in ['Forward', 'Bidirectional']:
+%   TraversalCollection = collectionForTraversal(Traversal)
+
+Index.test("${TraversalCollection}/distance(to:)/dispatch") {
+  let c = ${TraversalCollection}Log.dispatchTester(Array(0..<10))
+  _ = c.distance(from: 0, to: 10)
+  expectCustomizable(c, c.log.distance)
 }
 
-Index.test("${Traversal}Index/advanced(by:)/dispatch") {
-  var start = ${Traversal}IndexLog.dispatchTester(0)
-  _ = start.advanced(by: 10)
-  expectCustomizable(start, start.log.advancedBy)
+Index.test("${TraversalCollection}/index(_:offsetBy:)/dispatch") {
+  let c = ${TraversalCollection}Log.dispatchTester(Array(0..<10))
+  _ = c.index(c.startIndex, offsetBy: 10)
+  expectCustomizable(c, c.log.advance)
 }
 
-Index.test("${Traversal}Index/advanced(by: n, limit:)/dispatch") {
-  let start = ${Traversal}IndexLog.dispatchTester(0)
-  let limit = ${Traversal}IndexLog.dispatchTester(5)
-  _ = start.advanced(by: 10, limit: limit)
-  expectCustomizable(start, start.log.advancedByWithLimit)
+Index.test("${TraversalCollection}/index(_:offsetBy:limitedBy:)/dispatch") {
+  let c = ${TraversalCollection}Log.dispatchTester(Array(0..<10))
+  _ = c.index(c.startIndex, offsetBy: 10, limitedBy: 5)
+  expectCustomizable(c, c.log.advanceLimit)
 }
 
-%   for Base in ['Minimal', 'Defaulted']:
-%     Kind = '{}{}'.format(Base, Traversal)
+% end
 
-Index.test("${Kind}Index/distance(to:)/semantics") {
-  for test in distanceToTests {
-    let start = ${Kind}Index(
-      position: test.startIndex,
-      startIndex: -20,
-      endIndex: 20)
-    let end = ${Kind}Index(
-      position: test.endIndex,
-      startIndex: -20,
-      endIndex: 20)
-    let d = start.distance(to: end)
-    expectEqual(test.expectedDistance, d,
-      stackTrace: SourceLocStack().with(test.loc))
-  }
-}
+% for Traversal in ['RandomAccess']:
+%   Collection = collectionForTraversal(Traversal).replace('Collection', '')
+%   for Base in ['Defaulted']:
+%     Kind = '{}{}'.format(Base, Collection)
 
-Index.test("${Kind}Index/advanced(by: n)/semantics") {
-  for test in advancedByTests.filter({$0.limit == nil}) {
-    let start = ${Kind}Index(
-      position: test.startIndex,
-      startIndex: -20,
-      endIndex: 20)
-    let expected = ${Kind}Index(
-      position: test.expectedIndex,
-      startIndex: -20,
-      endIndex: 20)
-
-%     if Traversal == 'Forward':
-
-    if test.distance < 0 {
-      // Negative distance trap tests are handled in
-      // advanced(by:-n)/semantics
-      continue
-    }
-
-%     end
-
-    let new = start.advanced(by: test.distance)
-    expectEqual(expected, new,
-      stackTrace: SourceLocStack().with(test.loc))
-  }
-}
-
-%     if Traversal == 'Forward':
-Index.test("${Kind}Index/advanced(by: -n)/semantics") {
-  for test in advancedByTests.filter({$0.limit == nil && $0.distance < 0}) {
-    let start = ${Kind}Index(
-      position: test.startIndex,
-      startIndex: -20,
-      endIndex: 20)
-    let expected = ${Kind}Index(
-      position: test.expectedIndex,
-      startIndex: -20,
-      endIndex: 20)
-    expectCrashLater()
-    let new = start.advanced(by: test.distance)
-  }
-}
-%     end
-
-%     if Traversal == 'Forward':
-Index.test("${Kind}Index/advanced(by: -n, limit:)/semantics") {
-  for test in advancedByTests.filter({$0.limit != nil && $0.distance < 0}) {
-    let start = ${Kind}Index(
-      position: test.startIndex,
-      startIndex: -20,
-      endIndex: 20)
-    let expected = ${Kind}Index(
-      position: test.expectedIndex,
-      startIndex: -20,
-      endIndex: 20)
-    expectCrashLater()
-    let new = start.advanced(by: test.distance)
-  }
-}
-%     end
-
-Index.test("${Kind}Index/advanced(by: n, limit:)/semantics") {
-  for test in advancedByTests.filter({$0.limit != nil}) {
-    let startIndex = test.startIndex
-    let endIndex = test.startIndex + test.distance
-    let start = ${Kind}Index(
-      position: test.startIndex,
-      startIndex: -20,
-      endIndex: 20)
-    let limit = ${Kind}Index(
-      position: test.limit!,
-      startIndex: -20,
-      endIndex: 20)
-
-%     if Traversal == 'Forward':
-
-    if test.distance < 0 {
-      expectCrashLater()
-    }
-
-%     end
-
-    let new = start.advanced(by: test.distance, limit: limit)
-    let expected = ${Kind}Index(
-      position: test.expectedIndex,
-      startIndex: -20,
-      endIndex: 20)
-    expectEqual(expected, new,
-      stackTrace: SourceLocStack().with(test.loc))
-  }
-}
-
-// Check that a random access index doesn't call into O(n) predecessor calls
-// when it has a more efficient implementation.
+// Check that a random access collection doesn't call into O(n) predecessor
+// calls when it has a more efficient implementation.
 
 %     if Traversal == 'RandomAccess' and Base == 'Defaulted':
+
 Index.test(
-  "${Kind}Index/advanced(by: n)/avoidsSuccessorAndPredecessor/dispatch"
+  "${Kind}Collection/index(_:offsetBy:)/"
+  + "avoidsSuccessorAndPredecessor/dispatch"
 ) {
-  for test in advancedByTests.filter({$0.limit == nil}) {
-    let i = ${Kind}Index(test.startIndex)
-    let result  = i.advanced(by: test.distance)
-    expectEqual(test.expectedIndex, result.base)
-    expectEqual(0, ${Kind}Index.timesSuccessorCalled.value)
-    expectEqual(0, ${Kind}Index.timesPredecessorCalled.value)
+  for test in indexStepsFromTests.filter(
+    {$0.limit == nil && $0.distance >= 0}
+  ) {
+    let c = ${Kind}Collection(Array(0..<10))
+
+    let i = c.nthIndex(test.startOffset)
+    let result  = c.index(i, offsetBy: test.distance)
+    expectEqual(0, c.timesSuccessorCalled.value)
+    expectEqual(0, c.timesPredecessorCalled.value)
   }
 }
 
+#if false // FIXME: swift-3-indexing-model. implementation missing
 Index.test(
-  "${Kind}Index/advanced(by: n, limit:)/avoidsSuccessorAndPredecessor/dispatch"
+  "${Kind}Index/index(_:offsetBy:limitedBy:)/"
+  + "avoidsSuccessorAndPredecessor/dispatch"
 ) {
-  for test in advancedByTests.filter({$0.limit != nil}) {
-    let i = ${Kind}Index(test.startIndex)
-    let result  = i.advanced(by: test.distance, limit: ${Kind}Index(test.limit!))
-    expectEqual(test.expectedIndex, result.base)
-    expectEqual(0, ${Kind}Index.timesSuccessorCalled.value)
-    expectEqual(0, ${Kind}Index.timesPredecessorCalled.value)
+  for test in indexStepsFromTests.filter(
+    {$0.limit != nil && $0.distance >= 0}
+  ) {
+    let c = ${Kind}Collection(Array(0..<10))
+
+    let i = c.nthIndex(test.startOffset)
+    let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
+    _ = c.index(i, offsetBy: test.distance, limitedBy: limit)
+    expectEqual(0, c.timesSuccessorCalled.value)
+    expectEqual(0, c.timesPredecessorCalled.value)
   }
 }
+#endif
+
 %     end
 %   end
 % end

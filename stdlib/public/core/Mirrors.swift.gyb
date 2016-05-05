@@ -40,7 +40,7 @@ for self_ty in all_integer_types(word_bits):
 extension ${Type[0]} : CustomReflectable {
   /// Returns a mirror that reflects `self`.
   public var customMirror: Mirror {
-    return Mirror(self, unlabeledChildren: [Any]())
+    return Mirror(self, unlabeledChildren: EmptyCollection<Void>())
   }
 }
 

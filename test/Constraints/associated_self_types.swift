@@ -36,7 +36,7 @@ struct MyRange<T> : _ExtendedSequence {
 }
 
 protocol Q : MySequence {
-  func f<QS : MySequence where QS.Iterator.Element == Self.Iterator.Element>(x: QS)
+  func f<QS : MySequence where QS.Iterator.Element == Self.Iterator.Element>(_ x: QS)
 }
 
 struct No<NT> : MyIteratorProtocol {
@@ -48,7 +48,7 @@ struct No<NT> : MyIteratorProtocol {
 class X<XT> : Q {
   typealias Iterator = No<XT>
   
-  func f<SX : MySequence where SX.Iterator.Element == X.Iterator.Element>(x: SX) {
+  func f<SX : MySequence where SX.Iterator.Element == X.Iterator.Element>(_ x: SX) {
   }
   
   func makeIterator() -> No<XT> {

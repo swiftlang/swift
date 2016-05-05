@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_BASIC_POINTERINTENUM_H
+#define SWIFT_BASIC_POINTERINTENUM_H
+
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
@@ -223,3 +226,5 @@ public:
 };
 
 } // end swift namespace
+
+#endif // SWIFT_BASIC_POINTERINTENUM_H

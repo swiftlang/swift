@@ -8,22 +8,22 @@
 
 import Foundation
 
-func allToInt<T>(x: T) -> Int {
+func allToInt<T>(_ x: T) -> Int {
   return x as! Int
 }
 
-func allToIntOrZero<T>(x: T) -> Int {
+func allToIntOrZero<T>(_ x: T) -> Int {
   if x is Int {
     return x as! Int
   }
   return 0
 }
 
-func anyToInt(x: protocol<>) -> Int {
+func anyToInt(_ x: protocol<>) -> Int {
   return x as! Int
 }
 
-func anyToIntOrZero(x: protocol<>) -> Int {
+func anyToIntOrZero(_ x: protocol<>) -> Int {
   if x is Int {
     return x as! Int
   }
@@ -47,51 +47,51 @@ class E : C {
 class X : Class {
 }
 
-func allToC<T>(x: T) -> C {
+func allToC<T>(_ x: T) -> C {
   return x as! C
 }
 
-func allToCOrE<T>(x: T) -> C {
+func allToCOrE<T>(_ x: T) -> C {
   if x is C {
     return x as! C
   }
   return E()
 }
 
-func anyToC(x: protocol<>) -> C {
+func anyToC(_ x: protocol<>) -> C {
   return x as! C
 }
 
-func anyToCOrE(x: protocol<>) -> C {
+func anyToCOrE(_ x: protocol<>) -> C {
   if x is C {
     return x as! C
   }
   return E()
 }
 
-func allClassesToC<T : Class>(x: T) -> C {
+func allClassesToC<T : Class>(_ x: T) -> C {
   return x as! C
 }
 
-func allClassesToCOrE<T : Class>(x: T) -> C {
+func allClassesToCOrE<T : Class>(_ x: T) -> C {
   if x is C {
     return x as! C
   }
   return E()
 }
 
-func anyClassToC(x: protocol<Class>) -> C {
+func anyClassToC(_ x: protocol<Class>) -> C {
   return x as! C
 }
 
-func anyClassToCOrE(x: protocol<Class>) -> C {
+func anyClassToCOrE(_ x: protocol<Class>) -> C {
   if x is C {
     return x as! C
   }
   return E()
 }
 
-func allToAll<T, U>(t: T, _: U.Type) -> Bool {
+func allToAll<T, U>(_ t: T, _: U.Type) -> Bool {
   return t is U
 }
 

@@ -16,7 +16,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/IDE/SourceEntityWalker.h"
+#include "swift/AST/SourceEntityWalker.h"
 #include "llvm/ADT/StringRef.h"
 #include <memory>
 #include <string>
@@ -125,6 +125,7 @@ void getLocationInfoForClangNode(ClangNode ClangNode,
 
 Optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
 
+Decl *getDeclFromUSR(ASTContext &context, StringRef USR, std::string &error);
 Decl *getDeclFromMangledSymbolName(ASTContext &context, StringRef mangledName,
                                    std::string &error);
 

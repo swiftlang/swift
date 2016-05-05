@@ -54,7 +54,7 @@ enum State : MyPrintable {
   }
 }
 
-func printPair<A: MyPrintable, B: MyPrintable>(p: BufferedPair<A,B>) {
+func printPair<A: MyPrintable, B: MyPrintable>(_ p: BufferedPair<A,B>) {
   print("\(p.front) ", terminator: "")
   p.first.myPrint()
   print(" ", terminator: "")
@@ -78,7 +78,7 @@ class AwkwardTriple<V, W, X> : BufferedPair<V, W> {
 
 func printTriple
   <D: MyPrintable, E: MyPrintable, F: MyPrintable>
-  (p: AwkwardTriple<D, E, F>)
+  (_ p: AwkwardTriple<D, E, F>)
 {
   print("\(p.front) ", terminator: "")
   p.first.myPrint()
@@ -108,7 +108,7 @@ class FourthWheel<P, Q, R, S> : AwkwardTriple<P, Q, R> {
 
 func printQuad
   <G: MyPrintable, H: MyPrintable, I: MyPrintable, J: MyPrintable>
-  (p: FourthWheel<G, H, I, J>)
+  (_ p: FourthWheel<G, H, I, J>)
 {
   print("\(p.front) ", terminator: "")
   p.first.myPrint()
@@ -153,11 +153,11 @@ class SemiConcreteTriple<O> : ConcretePair {
   }
 }
 
-func printConcretePair(p: ConcretePair) {
+func printConcretePair(_ p: ConcretePair) {
   print("\(p.first) \(p.second)")
 }
 
-func printSemiTriple<O : MyPrintable>(p: SemiConcreteTriple<O>) {
+func printSemiTriple<O : MyPrintable>(_ p: SemiConcreteTriple<O>) {
   print("\(p.first) \(p.second) ", terminator: "")
   p.third.myPrint()
   print("")
@@ -198,7 +198,7 @@ class RootGenericFixedLayout<T> {
   }
 }
 
-func checkRootGenericFixedLayout<T>(r: RootGenericFixedLayout<T>) {
+func checkRootGenericFixedLayout<T>(_ r: RootGenericFixedLayout<T>) {
   print(r.a)
   print(r.b)
 }
@@ -220,7 +220,7 @@ class GenericInheritsGenericFixedLayout<T> : RootGenericFixedLayout<T> {
 
 let gg = GenericInheritsGenericFixedLayout<Int>(a: [1, 2, 3], b: 4, c: 5)
 
-func checkGenericInheritsGenericFixedLayout<T>(g: GenericInheritsGenericFixedLayout<T>) {
+func checkGenericInheritsGenericFixedLayout<T>(_ g: GenericInheritsGenericFixedLayout<T>) {
   print(g.a)
   print(g.b)
   print(g.c)

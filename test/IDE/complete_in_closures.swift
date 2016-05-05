@@ -84,34 +84,34 @@ func testResolveClosureParam2() {
 
 //===--- Check that we can resolve parent function parameters.
 
-func testResolveParentParam1(fs: FooStruct) {
+func testResolveParentParam1(_ fs: FooStruct) {
   { (a: Int) in fs.#^RESOLVE_PARENT_PARAM_1^# }
 }
 
-func testResolveParentParam2(fs: FooStruct) {
+func testResolveParentParam2(_ fs: FooStruct) {
   { fs.#^RESOLVE_PARENT_PARAM_2^# }
 }
 
 class TestResolveParentParam3 {
-  func testResolveParentParam3a(fs: FooStruct) {
+  func testResolveParentParam3a(_ fs: FooStruct) {
     { (a: Int) in fs.#^RESOLVE_PARENT_PARAM_3^# }
   }
 }
 
 class TestResolveParentParam4 {
-  func testResolveParentParam4a(fs: FooStruct) {
+  func testResolveParentParam4a(_ fs: FooStruct) {
     { fs.#^RESOLVE_PARENT_PARAM_4^# }
   }
 }
 
-func testResolveParentParam5(fs: FooStruct) {
+func testResolveParentParam5(_ fs: FooStruct) {
   func testResolveParentParam5a() {
     { fs.#^RESOLVE_PARENT_PARAM_5^# }
   }
 }
 
 func testResolveParentParam6() {
-  func testResolveParentParam6a(fs: FooStruct) {
+  func testResolveParentParam6a(_ fs: FooStruct) {
     { fs.#^RESOLVE_PARENT_PARAM_6^# }
   }
 }
@@ -158,7 +158,7 @@ struct StructWithClosureMemberAndLocal {
   }
 }
 
-func acceptsTrailingClosureFooVoid(code: (FooStruct) -> Void) {}
+func acceptsTrailingClosureFooVoid(_ code: (FooStruct) -> Void) {}
 
 acceptsTrailingClosureFooVoid {
   #^IN_TRAILING_CLOSURE_1^#
@@ -183,7 +183,7 @@ acceptsTrailingClosureFooVoid {
 }
 
 func acceptsListAndTrailingClosureFooVoid(
-    list: [FooStruct], code: (FooStruct) -> Void) {
+    _ list: [FooStruct], code: (FooStruct) -> Void) {
 }
 
 acceptsListAndTrailingClosureFooVoid(
@@ -213,7 +213,7 @@ acceptsListAndTrailingClosureFooVoid(
   item.#^IN_TRAILING_CLOSURE_10^#
 }
 
-func acceptsListAndTrailingClosureTVoid<T>(list: [T], code: (T) -> Void) {}
+func acceptsListAndTrailingClosureTVoid<T>(_ list: [T], code: (T) -> Void) {}
 
 acceptsListAndTrailingClosureTVoid(
     [ FooStruct(instanceVar: 0), FooStruct(instanceVar: 0) ]) {
@@ -283,7 +283,7 @@ func testTypeInClosure2() {
 }
 func testTypeInClosure3() {
   acceptsTrailingClosureFooVoid {
-    func test(x: #^ARGUMENT_TYPE_IN_CLOSURE_0^#
+    func test(_ x: #^ARGUMENT_TYPE_IN_CLOSURE_0^#
   }
 }
 acceptsTrailingClosureFooVoid {
@@ -293,7 +293,7 @@ acceptsTrailingClosureFooVoid {
   class S : #^CLASS_INHERITANCE_IN_CLOSURE_1^#
 }
 acceptsTrailingClosureFooVoid {
-  func test(x: #^ARGUMENT_TYPE_IN_CLOSURE_1^#
+  func test(_ x: #^ARGUMENT_TYPE_IN_CLOSURE_1^#
 }
 
 struct LazyVar1 {
@@ -308,12 +308,12 @@ struct LazyVar2 {
 }
 struct LazyVar3 {
   lazy var x: Int = {
-    func test(x: #^ARGUMENT_TYPE_IN_CLOSURE_2^#
+    func test(_ x: #^ARGUMENT_TYPE_IN_CLOSURE_2^#
   }()
 }
 
-func closureTaker(theFunc:(theValue:Int) -> ()) {}
-func closureTaker2(theFunc: (Value1:Int, Value2:Int) -> ()) {}
+func closureTaker(_ theFunc:(theValue:Int) -> ()) {}
+func closureTaker2(_ theFunc: (Value1:Int, Value2:Int) -> ()) {}
 func testClosureParam1() {
   closureTaker { (theValue) -> () in
     #^CLOSURE_PARAM_1^#

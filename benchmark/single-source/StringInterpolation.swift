@@ -19,7 +19,7 @@ class RefTypePrintable : CustomStringConvertible {
 }
 
 @inline(never)
-public func run_StringInterpolation(N: Int) {
+public func run_StringInterpolation(_ N: Int) {
   let reps = 100
   let refResult = reps
   let anInt: Int64 = 0x1234567812345678
@@ -29,11 +29,12 @@ public func run_StringInterpolation(N: Int) {
     var result = 0
     for _ in 1...reps {
       let s = "\(anInt) abcdefdhijklmn \(aRefCountedObject) abcdefdhijklmn \u{01}"
+      let utf16 = s.utf16
 
       // FIXME: if String is not stored as UTF-16 on this platform, then the
       // following operation has a non-trivial cost and needs to be replaced
       // with an operation on the native storage type.
-      result = result &+ Int(s.utf16[s.utf16.endIndex.predecessor()])
+      result = result &+ Int(utf16[utf16.index(before: utf16.endIndex)])
     }
     CheckResults(result == refResult, "IncorrectResults in StringInterpolation: \(result) != \(refResult)")
   }

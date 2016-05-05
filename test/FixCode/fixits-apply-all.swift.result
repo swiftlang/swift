@@ -7,3 +7,13 @@
 func ftest1() {
   _ = 0
 }
+
+func foo() -> Int {
+  do {
+  } catch let err {
+    goo(err)
+  }
+}
+func goo(_ e: ErrorProtocol) {
+	
+}

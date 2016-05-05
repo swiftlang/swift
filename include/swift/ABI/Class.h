@@ -40,7 +40,7 @@ enum class ObjCClassFlags : uint32_t {
   /// This class has the exception attribute.
   Exception            = 0x00020,
 
-  /// (Obsolete) ARC-specific: this class has a .release_ivars method
+  /// (Obsolete) ARC-specific: this class has a .release_ivars method.
   HasIvarReleaser      = 0x00040,
 
   /// This class implementation was compiled under ARC.
@@ -61,4 +61,4 @@ inline ObjCClassFlags operator|(ObjCClassFlags lhs, ObjCClassFlags rhs) {
 
 }
 
-#endif
+#endif /* SWIFT_ABI_CLASS_H */

@@ -53,6 +53,8 @@ PASS(COWArrayOpts, "cowarray-opt",
      "COW Array optimizations")
 PASS(CSE, "cse",
      "Common subexpression elimination")
+PASS(CallerAnalysisPrinter, "caller-analysis-printer",
+     "Print callsites of every function in the module")
 PASS(CapturePromotion, "capture-promotion",
      "Promote captures from by-reference to by-value")
 PASS(CapturePropagation, "capture-prop",
@@ -86,6 +88,8 @@ PASS(DiagnoseUnreachable, "diagnose-unreachable",
      "Diagnose Unreachable Code")
 PASS(DiagnosticConstantPropagation, "diagnostic-constant-propagation",
      "Propagate constants and emit diagnostics")
+PASS(EagerSpecializer, "eager-specializer",
+     "Specialize speculatively and insert dispatch guarded by type checks")
 PASS(EarlyCodeMotion, "early-codemotion",
      "Code motion without release hoisting")
 PASS(EarlyInliner, "early-inline",
@@ -101,7 +105,7 @@ PASS(ExternalFunctionDefinitionsElimination, "external-func-definition-elim",
 PASS(FunctionOrderPrinter, "function-order-printer",
      "Print function orderings for test purposes")
 PASS(FunctionSignatureOpts, "function-signature-opts",
-     "Optimize Function Signatures")
+     "Create function with optimized signatures")
 PASS(ARCSequenceOpts, "arc-sequence-opts",
      "Optimize sequences of retain/release opts by removing redundant inner "
      "retain/release sequences")
@@ -175,6 +179,12 @@ PASS(PredictableMemoryOptimizations, "predictable-memopt",
      "Predictable early memory optimizations")
 PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "Devirtualize release-instructions")
+PASS(RetainSinking, "retain-sinking",
+     "Sink retains")
+PASS(ReleaseHoisting, "release-hoisting",
+     "Hoist releases")
+PASS(LateReleaseHoisting, "late-release-hoisting",
+     "Hoist releases")
 PASS(RemovePins, "remove-pins",
      "Remove pin/unpin pairs")
 PASS(SideEffectsDumper, "side-effects-dump",
@@ -183,6 +193,8 @@ PASS(SILCleanup, "cleanup",
      "Cleanup SIL in preparation for IRGen")
 PASS(SILCombine, "sil-combine",
      "Perform small peepholes and combine operations")
+PASS(SILDebugInfoGenerator, "sil-debuginfo-gen",
+     "Write a SIL file for debugging")
 PASS(SILLinker, "linker",
      "Link in all of the serialized SIL referenced in the module")
 PASS(SROA, "sroa",
@@ -206,6 +218,9 @@ PASS(StripDebugInfo, "strip-debug-info",
      "Strip debug info")
 PASS(SwiftArrayOpts, "array-specialize",
      "Specialize arrays")
+PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
+     "Peephole retain/release removal for regions denoted by "
+     "Builtin.unsafeGuaranteed")
 PASS(UsePrespecialized, "use-prespecialized",
      "Use pre-specialized functions")
 PASS_RANGE(AllPasses, AADumper, UsePrespecialized)

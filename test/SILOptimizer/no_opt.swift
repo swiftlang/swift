@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
 
-func bar(x : Int) { }
+func bar(_ x : Int) { }
 
 // CHECK-LABEL: _TF6no_opt4foo1FT_T_
 // CHECK-NOT: integer_literal

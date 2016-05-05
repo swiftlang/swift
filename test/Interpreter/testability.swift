@@ -7,7 +7,7 @@
 
 @testable import testability_helper
 
-func log(value: Any, line: Int = #line) {
+func log(_ value: Any, line: Int = #line) {
   print("\(line): \(value)")
 }
 

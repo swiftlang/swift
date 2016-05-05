@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @warn_unused_result
-public func ==(
+public func == (
   lhs: String.UnicodeScalarView.Index,
   rhs: String.UnicodeScalarView.Index
 ) -> Bool {
@@ -19,7 +19,7 @@ public func ==(
 }
 
 @warn_unused_result
-public func <(
+public func < (
   lhs: String.UnicodeScalarView.Index,
   rhs: String.UnicodeScalarView.Index
 ) -> Bool {
@@ -29,7 +29,11 @@ public func <(
 extension String {
   /// A collection of [Unicode scalar values](http://www.unicode.org/glossary/#unicode_scalar_value) that
   /// encodes a `String` value.
-  public struct UnicodeScalarView : Collection, CustomStringConvertible, CustomDebugStringConvertible {
+  public struct UnicodeScalarView :
+    BidirectionalCollection,
+    CustomStringConvertible,
+    CustomDebugStringConvertible
+  {
     internal init(_ _core: _StringCore) {
       self._core = _core
     }
@@ -37,10 +41,12 @@ extension String {
     internal struct _ScratchIterator : IteratorProtocol {
       var core: _StringCore
       var idx: Int
+      @_versioned
       init(_ core: _StringCore, _ pos: Int) {
         self.idx = pos
         self.core = core
       }
+      @inline(__always)
       mutating func next() -> UTF16.CodeUnit? {
         if idx == core.endIndex {
           return nil
@@ -51,36 +57,10 @@ extension String {
     }
 
     /// A position in a `String.UnicodeScalarView`.
-    public struct Index : BidirectionalIndex, Comparable {
+    public struct Index : Comparable {
       public init(_ _position: Int, _ _core: _StringCore) {
         self._position = _position
         self._core = _core
-      }
-
-      /// Returns the next consecutive value after `self`.
-      ///
-      /// - Precondition: The next value is representable.
-      @warn_unused_result
-      public func successor() -> Index {
-        var scratch = _ScratchIterator(_core, _position)
-        var decoder = UTF16()
-        let (_, length) = decoder._decodeOne(&scratch)
-        return Index(_position + length, _core)
-      }
-
-      /// Returns the previous consecutive value before `self`.
-      ///
-      /// - Precondition: The previous value is representable.
-      @warn_unused_result
-      public func predecessor() -> Index {
-        var i = _position-1
-        let codeUnit = _core[i]
-        if _slowPath((codeUnit >> 10) == 0b1101_11) {
-          if i != 0 && (_core[i - 1] >> 10) == 0b1101_10 {
-            i -= 1
-          }
-        }
-        return Index(i, _core)
       }
 
       /// The end index that for this view.
@@ -93,8 +73,8 @@ extension String {
         return Index(_core.endIndex, _core)
       }
 
-      internal var _position: Int
-      internal var _core: _StringCore
+      @_versioned internal var _position: Int
+      @_versioned internal var _core: _StringCore
     }
 
     /// The position of the first `UnicodeScalar` if the `String` is
@@ -107,9 +87,35 @@ extension String {
     ///
     /// `endIndex` is not a valid argument to `subscript`, and is always
     /// reachable from `startIndex` by zero or more applications of
-    /// `successor()`.
+    /// `index(after:)`.
     public var endIndex: Index {
       return Index(_core.endIndex, _core)
+    }
+
+    /// Returns the next consecutive location after `i`.
+    ///
+    /// - Precondition: The next location exists.
+    @warn_unused_result
+    public func index(after i: Index) -> Index {
+      var scratch = _ScratchIterator(_core, i._position)
+      var decoder = UTF16()
+      let (_, length) = decoder._decodeOne(&scratch)
+      return Index(i._position + length, _core)
+    }
+
+    /// Returns the previous consecutive location before `i`.
+    ///
+    /// - Precondition: The previous location exists.
+    @warn_unused_result
+    public func index(before i: Index) -> Index {
+      var i = i._position-1
+      let codeUnit = _core[i]
+      if _slowPath((codeUnit >> 10) == 0b1101_11) {
+        if i != 0 && (_core[i - 1] >> 10) == 0b1101_10 {
+          i -= 1
+        }
+      }
+      return Index(i, _core)
     }
 
     /// Access the element at `position`.
@@ -135,7 +141,7 @@ extension String {
     ///   O(N) conversion.
     public subscript(r: Range<Index>) -> UnicodeScalarView {
       return UnicodeScalarView(
-        _core[r.startIndex._position..<r.endIndex._position])
+        _core[r.lowerBound._position..<r.upperBound._position])
     }
 
     /// A type whose instances can produce the elements of this
@@ -162,7 +168,7 @@ extension String {
         }
       }
 
-      /// Advance to the next element and return it, or `nil` if no next element
+      /// Advances to the next element and returns it, or `nil` if no next element
       /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
       public mutating func next() -> UnicodeScalar? {
         var result: UnicodeDecodingResult
@@ -248,13 +254,13 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   /// Reserve enough space to store `n` ASCII characters.
   ///
   /// - Complexity: O(`n`).
-  public mutating func reserveCapacity(n: Int) {
+  public mutating func reserveCapacity(_ n: Int) {
     _core.reserveCapacity(n)
   }
   /// Append `x` to `self`.
   ///
   /// - Complexity: Amortized O(1).
-  public mutating func append(x: UnicodeScalar) {
+  public mutating func append(_ x: UnicodeScalar) {
     _core.append(x)
   }
   /// Append the elements of `newElements` to `self`.
@@ -269,15 +275,16 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
+  /// - Complexity: O(`bounds.count`) if `bounds.upperBound
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == UnicodeScalar
   >(
-    bounds: Range<Index>, with newElements: C
+    _ bounds: Range<Index>, with newElements: C
   ) {
-    let rawSubRange = bounds.startIndex._position
-      ..< bounds.endIndex._position
+    let rawSubRange: Range<Int> =
+      bounds.lowerBound._position
+      ..< bounds.upperBound._position
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
     _core.replaceSubrange(rawSubRange, with: lazyUTF16)
   }
@@ -308,7 +315,7 @@ extension String.UnicodeScalarIndex {
       // surrogate will be decoded as a single replacement character,
       // thus making the corresponding position valid.
       if UTF16.isTrailSurrogate(utf16[utf16Index])
-        && UTF16.isLeadSurrogate(utf16[utf16Index.predecessor()]) {
+        && UTF16.isLeadSurrogate(utf16[utf16.index(before: utf16Index)]) {
         return nil
       }
     }
@@ -384,7 +391,7 @@ extension String.UnicodeScalarIndex {
     if self == scalars.startIndex || self == scalars.endIndex {
       return true
     }
-    let precedingScalar = scalars[self.predecessor()]
+    let precedingScalar = scalars[scalars.index(before: self)]
 
     let graphemeClusterBreakProperty =
       _UnicodeGraphemeClusterBreakPropertyTrie()

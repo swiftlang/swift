@@ -16,8 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_DIAGNOSTIC_CONSUMER_H
-#define SWIFT_BASIC_DIAGNOSTIC_CONSUMER_H
+#ifndef SWIFT_BASIC_DIAGNOSTICCONSUMER_H
+#define SWIFT_BASIC_DIAGNOSTICCONSUMER_H
 
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/Support/SourceMgr.h"
@@ -103,6 +103,6 @@ public:
                         const DiagnosticInfo &Info) override;
 };
   
-}
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_DIAGNOSTICCONSUMER_H

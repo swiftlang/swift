@@ -349,4 +349,4 @@ ImmutablePointerSet<T> ImmutablePointerSetFactory<T>::EmptyPtrSet =
 
 } // end swift namespace
 
-#endif
+#endif // SWIFT_BASIC_IMMUTABLEPOINTERSET_H

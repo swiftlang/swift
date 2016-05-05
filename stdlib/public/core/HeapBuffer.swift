@@ -45,14 +45,14 @@ class _HeapBufferStorage<Value, Element> : NonObjectiveCBase {
   public override init() {}
 
   /// The type used to actually manage instances of
-  /// `_HeapBufferStorage<Value,Element>`.
+  /// `_HeapBufferStorage<Value, Element>`.
   typealias Buffer = _HeapBuffer<Value, Element>
   deinit {
     Buffer(self)._value.deinitialize()
   }
 
   @warn_unused_result
-  final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
+  final func __getInstanceSizeAndAlignMask() -> (Int, Int) {
     return Buffer(self)._allocatedSizeAndAlignMask()
   }
 }
@@ -139,7 +139,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
   }
 
   public // @testable
-  init(_ storage: _HeapBufferStorage<Value,Element>) {
+  init(_ storage: _HeapBufferStorage<Value, Element>) {
     self._storage = Builtin.castToNativeObject(storage)
   }
 
@@ -213,7 +213,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
   }
 
   @warn_unused_result
-  internal static func fromNativeObject(x: Builtin.NativeObject) -> _HeapBuffer {
+  internal static func fromNativeObject(_ x: Builtin.NativeObject) -> _HeapBuffer {
     return _HeapBuffer(nativeStorage: x)
   }
 

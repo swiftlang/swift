@@ -24,7 +24,7 @@ struct RC4 {
   }
 
   mutating
-  func initialize(Key: [UInt8]) {
+  func initialize(_ Key: [UInt8]) {
     for i in 0..<256 {
       State[i] = UInt8(i)
     }
@@ -39,7 +39,7 @@ struct RC4 {
   }
 
   mutating
-  func swapByIndex(x: Int, y: Int) {
+  func swapByIndex(_ x: Int, y: Int) {
     let T1 : UInt8 = State[x]
     let T2 : UInt8 = State[y]
     State[x] = T2
@@ -55,7 +55,7 @@ struct RC4 {
   }
 
   mutating
-  func encrypt(Data: inout [UInt8]) {
+  func encrypt(_ Data: inout [UInt8]) {
     let cnt = Data.count
     for i in 0..<cnt {
       Data[i] = Data[i] ^ next()
@@ -76,7 +76,7 @@ let RefResults : [UInt8] = [245, 62, 245, 202, 138, 120, 186, 107, 255, 189,
 
 
 @inline(never)
-public func run_RC4(N: Int) {
+public func run_RC4(_ N: Int) {
   let messageLen = 100
   let iterations = 500
   let Secret = "This is my secret message"

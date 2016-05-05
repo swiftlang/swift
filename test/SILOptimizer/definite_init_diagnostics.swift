@@ -2,7 +2,7 @@
 
 import Swift
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 // These are tests for definite initialization, which is implemented by the
 // memory promotion pass.
@@ -13,8 +13,8 @@ func test1() -> Int {
   return a     // expected-error {{variable 'a' used before being initialized}}
 }
 
-func takes_inout(a: inout Int) {}
-func takes_closure(fn: () -> ()) {}
+func takes_inout(_ a: inout Int) {}
+func takes_closure(_ fn: () -> ()) {}
 
 class SomeClass { 
   var x : Int   // expected-note {{'self.x' not initialized}}
@@ -162,13 +162,13 @@ func test4() {
   markUsed(t6.b)
 }
 
-func tupleinout(a: inout (lo: Int, hi: Int)) {
+func tupleinout(_ a: inout (lo: Int, hi: Int)) {
   markUsed(a.0)   // ok
   markUsed(a.1)   // ok
 }
 
 // Address only types
-func test5<T>(x: T, y: T) {
+func test5<T>(_ x: T, y: T) {
   var a : ((T, T), T)  // expected-note {{variable defined here}}
   a.0 = (x, y)
   
@@ -188,7 +188,7 @@ func test6() -> Int {
 }
 
 // Control flow.
-func test7(cond: Bool) {
+func test7(_ cond: Bool) {
   var a : Int
   
   if cond { a = 42 } else { a = 17 }
@@ -205,7 +205,7 @@ protocol SomeProtocol {
 
 protocol DerivedProtocol : SomeProtocol {}
 
-func existentials(i: Int, dp: DerivedProtocol) {
+func existentials(_ i: Int, dp: DerivedProtocol) {
   // expected-warning @+1 {{variable 'a' was written to, but never read}}
   var a : Any = ()
   a = i
@@ -256,7 +256,7 @@ class DITLC_Class {
 
 struct EmptyStruct {}
 
-func useEmptyStruct(a: EmptyStruct) {}
+func useEmptyStruct(_ a: EmptyStruct) {}
 
 func emptyStructTest() {
   // <rdar://problem/20065892> Diagnostic for an uninitialized constant calls it a variable
@@ -284,11 +284,11 @@ func emptyStructTest() {
   useEmptyStruct(g.1)
 }
 
-func takesTuplePair(a : inout (SomeClass, SomeClass)) {}
+func takesTuplePair(_ a : inout (SomeClass, SomeClass)) {}
 
 // This tests cases where a store might be an init or assign based on control
 // flow path reaching it.
-func conditionalInitOrAssign(c : Bool, x : Int) {
+func conditionalInitOrAssign(_ c : Bool, x : Int) {
   var t : Int  // Test trivial types.
   if c {
     t = 0
@@ -526,7 +526,7 @@ enum DelegatingCtorEnum {
 
 protocol TriviallyConstructible {
   init()
-  func go(x: Int)
+  func go(_ x: Int)
 }
 
 extension TriviallyConstructible {
@@ -544,7 +544,7 @@ extension TriviallyConstructible {
 class TrivialClass : TriviallyConstructible {
   required init() {}
 
-  func go(x: Int) {}
+  func go(_ x: Int) {}
 
   convenience init(y: Int) {
     self.init(up: y * y)
@@ -554,7 +554,7 @@ class TrivialClass : TriviallyConstructible {
 struct TrivialStruct : TriviallyConstructible {
   init() {}
 
-  func go(x: Int) {}
+  func go(_ x: Int) {}
 
   init(y: Int) {
     self.init(up: y * y)
@@ -568,7 +568,7 @@ enum TrivialEnum : TriviallyConstructible {
     self = NotSoTrivial
   }
 
-  func go(x: Int) {}
+  func go(_ x: Int) {}
 
   init(y: Int) {
     self.init(up: y * y)
@@ -614,7 +614,7 @@ func doesntReturn() {
 
 func doesReturn() {}
 
-func testNoReturn1(b : Bool) -> Any {
+func testNoReturn1(_ b : Bool) -> Any {
   var a : Any
   if b {
     a = 42
@@ -625,7 +625,7 @@ func testNoReturn1(b : Bool) -> Any {
   return a   // Ok, because the noreturn call path isn't viable.
 }
 
-func testNoReturn2(b : Bool) -> Any {
+func testNoReturn2(_ b : Bool) -> Any {
   var a : Any  // expected-note {{variable defined here}}
   if b {
     a = 42
@@ -646,7 +646,7 @@ class PerpetualMotion {
   }
 }
 
-func testNoReturn3(b : Bool) -> Any {
+func testNoReturn3(_ b : Bool) -> Any {
   let a : Int
 
   switch b {
@@ -657,7 +657,7 @@ func testNoReturn3(b : Bool) -> Any {
   return a
 }
 
-func testNoReturn4(b : Bool) -> Any {
+func testNoReturn4(_ b : Bool) -> Any {
   let a : Int
 
   switch b {
@@ -767,7 +767,7 @@ class rdar18414728Base {
     final_method()  // ok
   }
 
-  func method1(a : Int) {}
+  func method1(_ a : Int) {}
   final func final_method() {}
 }
 
@@ -825,7 +825,7 @@ struct rdar18414728Struct {
     j = 2
   }
 
-  func method(a : Int) {}
+  func method(_ a : Int) {}
 }
 
 
@@ -931,7 +931,7 @@ struct MyMutabilityImplementation : TestMutabilityProtocol {
 
 
 // <rdar://problem/16181314> don't require immediate initialization of 'let' values
-func testLocalProperties(b : Int) -> Int {
+func testLocalProperties(_ b : Int) -> Int {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let x : Int
   let y : Int // never assigned is ok    expected-warning {{immutable value 'y' was never used}} {{7-8=_}}
@@ -952,7 +952,7 @@ func testLocalProperties(b : Int) -> Int {
 }
 
 // Should be rejected as multiple assignment.
-func testAddressOnlyProperty<T>(b : T) -> T {
+func testAddressOnlyProperty<T>(_ b : T) -> T {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let x : T
   let y : T
@@ -1018,7 +1018,7 @@ struct StructMutatingMethodTest {
 }
 
 @_transparent
-func myTransparentFunction(x : inout Int) {}
+func myTransparentFunction(_ x : inout Int) {}
 
 
 // <rdar://problem/19782264> Immutable, optional class members can't have their subproperties read from during init()
@@ -1148,7 +1148,7 @@ extension ProtocolInitTest {
 }
 
 // <rdar://problem/22436880> Function accepting UnsafeMutablePointer is able to change value of immutable value
-func bug22436880(x: UnsafeMutablePointer<Int>) {}
+func bug22436880(_ x: UnsafeMutablePointer<Int>) {}
 func test22436880() {
   let x: Int
   x = 1

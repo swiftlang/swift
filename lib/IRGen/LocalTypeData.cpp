@@ -195,7 +195,7 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
 
   // At -O0, create an alloca to keep the type alive.
   auto name = type->getFullName();
-  if (!IGF.IGM.Opts.Optimize) {
+  if (!IGF.IGM.IRGen.Opts.Optimize) {
     auto temp = IGF.createAlloca(data->getType(), IGF.IGM.getPointerAlignment(),
                                  name);
     IGF.Builder.CreateStore(data, temp);
@@ -259,6 +259,7 @@ void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
   // anything, stop.
   FulfillmentMap fulfillments;
   if (!fulfillments.searchTypeMetadata(IGF.IGM, type, isExact,
+                                       /*isSelf*/ false,
                                        /*source*/ 0, MetadataPath(),
                                        FulfillmentMap::Everything())) {
     return;

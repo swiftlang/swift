@@ -186,7 +186,7 @@ struct A<T> : PP {
 }
 
 extension PP {
-  func map<T>(f: Self.E -> T) -> T {}
+  func map<T>(_ f: Self.E -> T) -> T {}
 }
 
 enum EE {
@@ -194,7 +194,7 @@ enum EE {
   case B
 }
 
-func good(a: A<EE>) -> Int {
+func good(_ a: A<EE>) -> Int {
   return a.map {
     switch $0 {
     case .A:
@@ -205,14 +205,14 @@ func good(a: A<EE>) -> Int {
   }
 }
 
-func bad(a: A<EE>) {
+func bad(_ a: A<EE>) {
   a.map { // expected-error {{generic parameter 'T' could not be inferred}}
     let _: EE = $0
     return 1
   }
 }
 
-func ugly(a: A<EE>) {
+func ugly(_ a: A<EE>) {
   a.map { // expected-error {{generic parameter 'T' could not be inferred}}
     switch $0 {
     case .A:

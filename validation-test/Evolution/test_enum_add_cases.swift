@@ -4,14 +4,6 @@
 import StdlibUnittest
 import enum_add_cases
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-import SwiftPrivatePthreadExtras
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var EnumAddCasesTest = TestSuite("EnumAddCases")
 
@@ -19,7 +11,7 @@ func myAddNoPayloadToSingletonCases() -> [AddNoPayloadToSingleton] {
   return [.Noses]
 }
 
-func evaluateAddNoPayloadToSingletonCases(e: [AddNoPayloadToSingleton]) -> [Int] {
+func evaluateAddNoPayloadToSingletonCases(_ e: [AddNoPayloadToSingleton]) -> [Int] {
   return e.map {
     switch $0 {
     case .Noses:
@@ -48,7 +40,7 @@ func myAddPayloadToSingletonCases() -> [AddPayloadToSingleton] {
   return [.Cats]
 }
 
-func evaluateAddPayloadToSingletonCases(e: [AddPayloadToSingleton]) -> [Int] {
+func evaluateAddPayloadToSingletonCases(_ e: [AddPayloadToSingleton]) -> [Int] {
   return e.map {
     switch $0 {
     case .Cats:
@@ -79,12 +71,12 @@ EnumAddCasesTest.test("AddPayloadToSingleton") {
 
 ///////////////////////////////////////////////////////////////////////
 
-func myAddNoPayloadToSinglePayloadCases(s: Starfish)
+func myAddNoPayloadToSinglePayloadCases(_ s: Starfish)
     -> [AddNoPayloadToSinglePayload] {
   return [.Cats(s), .Noses]
 }
 
-func evaluateAddNoPayloadToSinglePayloadCases(s: Starfish,
+func evaluateAddNoPayloadToSinglePayloadCases(_ s: Starfish,
                                             _ e: [AddNoPayloadToSinglePayload])
     -> [Int] {
   return e.map {
@@ -118,12 +110,12 @@ EnumAddCasesTest.test("AddNoPayloadToSinglePayload") {
 
 ///////////////////////////////////////////////////////////////////////
 
-func myAddPayloadToSinglePayloadCases(s: Starfish)
+func myAddPayloadToSinglePayloadCases(_ s: Starfish)
     -> [AddPayloadToSinglePayload] {
   return [.Cats, .Paws(s)]
 }
 
-func evaluateAddPayloadToSinglePayloadCases(s: Starfish,
+func evaluateAddPayloadToSinglePayloadCases(_ s: Starfish,
                                             _ e: [AddPayloadToSinglePayload])
     -> [Int] {
   return e.map {
@@ -157,12 +149,12 @@ EnumAddCasesTest.test("AddPayloadToSinglePayload") {
 
 ///////////////////////////////////////////////////////////////////////
 
-func myAddNoPayloadToMultiPayloadCases(s: Starfish)
+func myAddNoPayloadToMultiPayloadCases(_ s: Starfish)
     -> [AddNoPayloadToMultiPayload] {
   return [.Cats(s), .Puppies(s)]
 }
 
-func evaluateAddNoPayloadToMultiPayloadCases(s: Starfish,
+func evaluateAddNoPayloadToMultiPayloadCases(_ s: Starfish,
                                             _ e: [AddNoPayloadToMultiPayload])
     -> [Int] {
   return e.map {
@@ -197,12 +189,12 @@ EnumAddCasesTest.test("AddNoPayloadToMultiPayload") {
 
 ///////////////////////////////////////////////////////////////////////
 
-func myAddPayloadToMultiPayloadCases(s: Starfish)
+func myAddPayloadToMultiPayloadCases(_ s: Starfish)
     -> [AddPayloadToMultiPayload] {
   return [.Cats(s), .Ponies(s), .Pandas]
 }
 
-func evaluateAddPayloadToMultiPayloadCases(s: Starfish,
+func evaluateAddPayloadToMultiPayloadCases(_ s: Starfish,
                                             _ e: [AddPayloadToMultiPayload])
     -> [Int] {
   return e.map {

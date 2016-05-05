@@ -25,6 +25,11 @@ SourceLoc SILLocation::getSourceLoc() const {
   if (isSILFile())
     return Loc.SILFileLoc;
 
+  // Don't crash if the location is a DebugLoc.
+  // TODO: this is a workaround until rdar://problem/25225083 is implemented.
+  if (isDebugInfoLoc())
+    return SourceLoc();
+
   return getSourceLoc(Loc.ASTNode.Primary);
 }
 

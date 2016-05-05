@@ -25,7 +25,7 @@ class Hash {
   }
 
   /// \brief Add the bytes in \p Msg to the hash.
-  func update(Msg: String) {
+  func update(_ Msg: String) {
     for c in Msg.unicodeScalars {
       data[dataLength] = UInt8(ascii: c)
       dataLength += 1
@@ -35,7 +35,7 @@ class Hash {
   }
 
   /// \brief Add the bytes in \p Msg to the hash.
-  func update(Msg: [UInt8]) {
+  func update(_ Msg: [UInt8]) {
     for c in Msg {
       data[dataLength] = c
       dataLength += 1
@@ -52,7 +52,7 @@ class Hash {
     return x
   }
 
-  func digestFast(Res: inout [UInt8]) {
+  func digestFast(_ Res: inout [UInt8]) {
     fillBlock()
     hash()
     // We use [UInt8] to avoid using String::append.
@@ -76,7 +76,7 @@ class Hash {
   func hashState() -> String {
     fatalError("Pure virtual")
   }
-  func hashStateFast(Res: inout [UInt8]) {
+  func hashStateFast(_ Res: inout [UInt8]) {
     fatalError("Pure virtual")
   }
 
@@ -91,7 +91,7 @@ class Hash {
 
   /// \brief Convert a 4-byte integer to a hex string.
   final
-  func toHex(In: UInt32) -> String {
+  func toHex(_ In: UInt32) -> String {
     var In = In
     var Res = ""
     for _ in 0..<8 {
@@ -102,7 +102,7 @@ class Hash {
   }
 
   final
-  func toHexFast(In: UInt32, _ Res: inout Array<UInt8>, _ Index : Int) {
+  func toHexFast(_ In: UInt32, _ Res: inout Array<UInt8>, _ Index : Int) {
     var In = In
     for i in 0..<4 {
       // Convert one byte each iteration.
@@ -114,7 +114,7 @@ class Hash {
 
   /// \brief Left-rotate \p x by \p c.
   final
-  func rol(x: UInt32, _ c: UInt32) -> UInt32 {
+  func rol(_ x: UInt32, _ c: UInt32) -> UInt32 {
     // TODO: use the &>> operator.
     let a = UInt32(truncatingBitPattern: Int64(x) << Int64(c))
     let b = UInt32(truncatingBitPattern: Int64(x) >> (32 - Int64(c)))
@@ -123,7 +123,7 @@ class Hash {
 
   /// \brief Right-rotate \p x by \p c.
   final
-  func ror(x: UInt32, _ c: UInt32) -> UInt32 {
+  func ror(_ x: UInt32, _ c: UInt32) -> UInt32 {
     // TODO: use the &>> operator.
     let a = UInt32(truncatingBitPattern: Int64(x) >> Int64(c))
     let b = UInt32(truncatingBitPattern: Int64(x) << (32 - Int64(c)))
@@ -178,7 +178,7 @@ class MD5 : Hash {
     dataLength = 0
   }
 
-  func appendBytes(Val: Int, _ Message: inout Array<UInt8>, _ Offset : Int) {
+  func appendBytes(_ Val: Int, _ Message: inout Array<UInt8>, _ Offset : Int) {
     Message[Offset] = UInt8(truncatingBitPattern: Val)
     Message[Offset + 1] = UInt8(truncatingBitPattern: Val >> 8)
     Message[Offset + 2] = UInt8(truncatingBitPattern: Val >> 16)
@@ -215,7 +215,7 @@ class MD5 : Hash {
     dataLength += 8
   }
 
-  func toUInt32(Message: Array<UInt8>, _ Offset: Int) -> UInt32 {
+  func toUInt32(_ Message: Array<UInt8>, _ Offset: Int) -> UInt32 {
     let first = UInt32(Message[Offset + 0])
     let second = UInt32(Message[Offset + 1]) << 8
     let third = UInt32(Message[Offset + 2]) << 16
@@ -272,7 +272,7 @@ class MD5 : Hash {
     h3 = d &+ h3
   }
 
-  func reverseBytes(In: UInt32) -> UInt32 {
+  func reverseBytes(_ In: UInt32) -> UInt32 {
     let B0 = (In >> 0 ) & 0xFF
     let B1 = (In >> 8 ) & 0xFF
     let B2 = (In >> 16) & 0xFF
@@ -290,7 +290,7 @@ class MD5 : Hash {
   }
 
   override
-  func hashStateFast(Res: inout [UInt8]) {
+  func hashStateFast(_ Res: inout [UInt8]) {
 #if !NO_RANGE
     var Idx : Int = 0
     for h in [h0, h1, h2, h3] {
@@ -374,7 +374,10 @@ class SHA1 : Hash {
 
     // Init the rest of the "W" buffer.
     for t in 16..<80 {
-      w[t] = rol((w[t-3] ^ w[t-8] ^ w[t-14] ^ w[t-16]) ,1)
+      // splitting into 2 subexpressions to help typechecker
+      let lhs = w[t-3] ^ w[t-8]
+      let rhs = w[t-14] ^ w[t-16]
+      w[t] = rol(lhs ^ rhs, 1)
     }
 
     dataLength = 0
@@ -572,7 +575,7 @@ func == (lhs: [UInt8], rhs: [UInt8]) -> Bool {
 }
 
 @inline(never)
-public func run_HashTest(N: Int) {
+public func run_HashTest(_ N: Int) {
   let TestMD5 = [""                                : "d41d8cd98f00b204e9800998ecf8427e",
     "The quick brown fox jumps over the lazy dog." : "e4d909c290d0fb1ca068ffaddf22cbd0",
     "The quick brown fox jumps over the lazy cog." : "68aa5deab43e4df2b5e1f80190477fb0"]

@@ -76,15 +76,11 @@ public typealias CBool = Bool
 ///
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
-public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
+@_fixed_layout
+public struct OpaquePointer : Equatable, Hashable {
   internal var _rawValue: Builtin.RawPointer
 
-  /// Create an instance initialized with `nil`.
-  @_transparent
-  public init(nilLiteral: ()) {
-    self._rawValue = _nilRawPointer
-  }
-
+  @_versioned
   @_transparent
   internal init(_ v: Builtin.RawPointer) {
     self._rawValue = v
@@ -92,26 +88,46 @@ public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
 
   /// Construct an `OpaquePointer` from a given address in memory.
   @_transparent
-  public init(bitPattern: Int) {
+  public init?(bitPattern: Int) {
+    if bitPattern == 0 { return nil }
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Construct an `OpaquePointer` from a given address in memory.
   @_transparent
-  public init(bitPattern: UInt) {
+  public init?(bitPattern: UInt) {
+    if bitPattern == 0 { return nil }
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Convert a typed `UnsafePointer` to an opaque C pointer.
   @_transparent
-  public init<T>(_ source: UnsafePointer<T>) {
-    self._rawValue = source._rawValue
+  public init<T>(_ from: UnsafePointer<T>) {
+    self._rawValue = from._rawValue
+  }
+
+  /// Convert a typed `UnsafePointer` to an opaque C pointer.
+  ///
+  /// Returns nil if `from` is nil.
+  @_transparent
+  public init?<T>(_ from: UnsafePointer<T>?) {
+    guard let unwrapped = from else { return nil }
+    self.init(unwrapped)
   }
 
   /// Convert a typed `UnsafeMutablePointer` to an opaque C pointer.
   @_transparent
-  public init<T>(_ source: UnsafeMutablePointer<T>) {
-    self._rawValue = source._rawValue
+  public init<T>(_ from: UnsafeMutablePointer<T>) {
+    self._rawValue = from._rawValue
+  }
+
+  /// Convert a typed `UnsafeMutablePointer` to an opaque C pointer.
+  ///
+  /// Returns nil if `from` is nil.
+  @_transparent
+  public init?<T>(_ from: UnsafeMutablePointer<T>?) {
+    guard let unwrapped = from else { return nil }
+    self.init(unwrapped)
   }
 
   /// Unsafely convert an unmanaged class reference to an opaque
@@ -125,12 +141,6 @@ public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   @_transparent
   public init<T>(bitPattern bits: Unmanaged<T>) {
     self = unsafeBitCast(bits._value, to: OpaquePointer.self)
-  }
-
-  /// Determine whether the given pointer is null.
-  @_transparent
-  var _isNull : Bool {
-    return self == nil
   }
 
   /// The hash value.
@@ -152,12 +162,27 @@ extension OpaquePointer : CustomDebugStringConvertible {
   }
 }
 
+extension Int {
+  @warn_unused_result
+  public init(bitPattern pointer: OpaquePointer?) {
+    self.init(bitPattern: UnsafePointer<Void>(pointer))
+  }
+}
+
+extension UInt {
+  @warn_unused_result
+  public init(bitPattern pointer: OpaquePointer?) {
+    self.init(bitPattern: UnsafePointer<Void>(pointer))
+  }
+}
+
 @warn_unused_result
 public func ==(lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
 /// The corresponding Swift type to `va_list` in imported C APIs.
+@_fixed_layout
 public struct CVaListPointer {
   var value: UnsafeMutablePointer<Void>
 

@@ -118,7 +118,7 @@ public enum ResilientMultiPayloadEnum {
   case Y(Int)
 }
 
-public func makeResilientMultiPayloadEnum(n: Int, i: Int)
+public func makeResilientMultiPayloadEnum(_ n: Int, i: Int)
     -> ResilientMultiPayloadEnum {
   switch i {
   case 0:
@@ -144,7 +144,7 @@ public enum ResilientMultiPayloadEnumSpareBits {
   case Y(ArtClass)                // -2
 }
 
-public func makeResilientMultiPayloadEnumSpareBits(o: ArtClass, i: Int)
+public func makeResilientMultiPayloadEnumSpareBits(_ o: ArtClass, i: Int)
     -> ResilientMultiPayloadEnumSpareBits {
   switch i {
   case 0:

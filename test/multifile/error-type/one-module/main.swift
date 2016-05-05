@@ -5,4 +5,6 @@
 
 // REQUIRES: executable_test
 
+// REQUIRES: disabled // Fails on iPhone simulator target due to possible MC-JIT bug
+
 extension NuclearMeltdown : ErrorProtocol {}

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-inline-test-threshold=50 -sil-combine | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-combine | FileCheck %s
 
 sil_stage canonical
 
@@ -708,8 +708,34 @@ bb0:
 }
 sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
 
+sil @unknown_function : $@convention(thin) () -> ()
+
 sil @coldcall : $@convention(thin) () -> () {
 bb0:
+  // make it a non-trivial function
+  %f = function_ref @unknown_function : $@convention(thin) () -> ()
+  %a1 = apply %f() : $@convention(thin) () -> ()
+  %a2 = apply %f() : $@convention(thin) () -> ()
+  %a3 = apply %f() : $@convention(thin) () -> ()
+  %a4 = apply %f() : $@convention(thin) () -> ()
+  %a5 = apply %f() : $@convention(thin) () -> ()
+  %a6 = apply %f() : $@convention(thin) () -> ()
+  %a7 = apply %f() : $@convention(thin) () -> ()
+  %a8 = apply %f() : $@convention(thin) () -> ()
+  %a9 = apply %f() : $@convention(thin) () -> ()
+  %a10 = apply %f() : $@convention(thin) () -> ()
+  %a11 = apply %f() : $@convention(thin) () -> ()
+  %a12 = apply %f() : $@convention(thin) () -> ()
+  %a13 = apply %f() : $@convention(thin) () -> ()
+  %a14 = apply %f() : $@convention(thin) () -> ()
+  %a15 = apply %f() : $@convention(thin) () -> ()
+  %a16 = apply %f() : $@convention(thin) () -> ()
+  %a17 = apply %f() : $@convention(thin) () -> ()
+  %a18 = apply %f() : $@convention(thin) () -> ()
+  %a19 = apply %f() : $@convention(thin) () -> ()
+  %a20 = apply %f() : $@convention(thin) () -> ()
+  %a21 = apply %f() : $@convention(thin) () -> ()
+  %a22 = apply %f() : $@convention(thin) () -> ()
   %0 = tuple ()                                   // user: %1
   return %0 : $()                                 // id: %1
 }
@@ -764,6 +790,30 @@ bb2:                                              // Preds: bb0 bb1
 
 sil [transparent] @slowHelper : $@convention(thin) () -> () {
 bb0:
+  // make it a non-trivial function
+  %f = function_ref @unknown_function : $@convention(thin) () -> ()
+  %a1 = apply %f() : $@convention(thin) () -> ()
+  %a2 = apply %f() : $@convention(thin) () -> ()
+  %a3 = apply %f() : $@convention(thin) () -> ()
+  %a4 = apply %f() : $@convention(thin) () -> ()
+  %a5 = apply %f() : $@convention(thin) () -> ()
+  %a6 = apply %f() : $@convention(thin) () -> ()
+  %a7 = apply %f() : $@convention(thin) () -> ()
+  %a8 = apply %f() : $@convention(thin) () -> ()
+  %a9 = apply %f() : $@convention(thin) () -> ()
+  %a10 = apply %f() : $@convention(thin) () -> ()
+  %a11 = apply %f() : $@convention(thin) () -> ()
+  %a12 = apply %f() : $@convention(thin) () -> ()
+  %a13 = apply %f() : $@convention(thin) () -> ()
+  %a14 = apply %f() : $@convention(thin) () -> ()
+  %a15 = apply %f() : $@convention(thin) () -> ()
+  %a16 = apply %f() : $@convention(thin) () -> ()
+  %a17 = apply %f() : $@convention(thin) () -> ()
+  %a18 = apply %f() : $@convention(thin) () -> ()
+  %a19 = apply %f() : $@convention(thin) () -> ()
+  %a20 = apply %f() : $@convention(thin) () -> ()
+  %a21 = apply %f() : $@convention(thin) () -> ()
+  %a22 = apply %f() : $@convention(thin) () -> ()
   %t = tuple ()
   return %t : $()
 }
@@ -834,7 +884,7 @@ bb2:
 // from the performance inliner doesn't result in an assert/crash.
 
 class C {
-  @inline(never) func callThrowing<T>(other: T, @noescape closure: () throws -> T) -> T
+  @inline(never) func callThrowing<T>(other: T, closure: @noescape () throws -> T) -> T
 }
 
 // CHECK-LABEL: sil [noinline] @callThrowing

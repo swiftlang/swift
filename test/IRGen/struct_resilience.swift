@@ -6,14 +6,14 @@ import resilient_enum
 
 // CHECK: %Si = type <{ [[INT:i32|i64]] }>
 
-// CHECK-LABEL: @_TMPV17struct_resilience26StructWithResilientStorage = {{(protected )?}}global
+// CHECK-LABEL: @_TMfV17struct_resilience26StructWithResilientStorage = internal global
 
 // Resilient structs from outside our resilience domain are manipulated via
 // value witnesses
 
 // CHECK-LABEL: define{{( protected)?}} void @_TF17struct_resilience26functionWithResilientTypesFTV16resilient_struct4Size1fFS1_S1__S1_(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i8*, %swift.refcounted*)
 
-public func functionWithResilientTypes(s: Size, f: Size -> Size) -> Size {
+public func functionWithResilientTypes(_ s: Size, f: Size -> Size) -> Size {
 
 // CHECK: [[RESULT:%.*]] = alloca [[BUFFER_TYPE:\[.* x i8\]]]
 
@@ -53,7 +53,7 @@ public func functionWithResilientTypes(s: Size, f: Size -> Size) -> Size {
 // field offsets from it.
 
 // CHECK-LABEL: define{{( protected)?}} void @_TF17struct_resilience26functionWithResilientTypesFV16resilient_struct9RectangleT_(%V16resilient_struct9Rectangle* noalias nocapture)
-public func functionWithResilientTypes(r: Rectangle) {
+public func functionWithResilientTypes(_ r: Rectangle) {
 
 // CHECK: [[METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct9Rectangle()
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
@@ -82,7 +82,7 @@ public struct MySize {
 }
 
 // CHECK-LABEL: define{{( protected)?}} void @_TF17struct_resilience28functionWithMyResilientTypesFTVS_6MySize1fFS0_S0__S0_(%V17struct_resilience6MySize* {{.*}}, %V17struct_resilience6MySize* {{.*}}, i8*, %swift.refcounted*)
-public func functionWithMyResilientTypes(s: MySize, f: MySize -> MySize) -> MySize {
+public func functionWithMyResilientTypes(_ s: MySize, f: MySize -> MySize) -> MySize {
 
 // CHECK: [[TEMP:%.*]] = alloca %V17struct_resilience6MySize
 // CHECK: bitcast
@@ -146,17 +146,10 @@ public struct StructWithIndirectResilientEnum {
 // CHECK: ret %swift.type* bitcast ([[INT]]* getelementptr inbounds {{.*}} @_TMfV17struct_resilience6MySize, i32 0, i32 1) to %swift.type*)
 
 
-// FIXME: this should modify the template in-place instead of copying it
-
-// CHECK-LABEL: define{{( protected)?}} private %swift.type* @create_generic_metadata_StructWithResilientStorage(%swift.type_pattern*, i8**)
+// CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_StructWithResilientStorage(i8*)
 // CHECK: [[FIELDS:%.*]] = alloca [4 x i8**]
-// CHECK: [[RESULT:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_pattern* %0, i8** %1)
-// CHECK: [[RESULT_ADDR:%.*]] = bitcast %swift.type* [[RESULT]] to i8**
-// CHECK: [[VWT:%.*]] = getelementptr inbounds i8*, i8** [[RESULT_ADDR]], i32 8
-// CHECK: [[VWT_ADDR:%.*]] = bitcast i8** [[VWT]] to i8*
+// CHECK: [[VWT:%.*]] = load i8**, i8*** getelementptr inbounds ({{.*}} @_TMfV17struct_resilience26StructWithResilientStorage{{.*}}, [[INT]] -1)
 
-// CHECK: [[RESULT_ADDR2:%.*]] = bitcast %swift.type* %2 to [[INT]]*
-// CHECK: [[FIELD_OFFSETS_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[RESULT_ADDR:%.*]], i32 3
 // CHECK: [[FIELDS_ADDR:%.*]] = getelementptr inbounds [4 x i8**], [4 x i8**]* [[FIELDS]], i32 0, i32 0
 
 // public let s: Size
@@ -180,5 +173,6 @@ public struct StructWithIndirectResilientEnum {
 // CHECK: [[FIELD_4:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 3
 // CHECK: store i8** [[SIZE_AND_ALIGNMENT:%.*]], i8*** [[FIELD_4]]
 
-// CHECK: call void @swift_initStructMetadata_UniversalStrategy([[INT]] 4, i8*** [[FIELDS_ADDR]], [[INT]]* [[FIELD_OFFSETS_ADDR]], i8** [[VWT]])
-// CHECK: ret %swift.type* [[RESULT]]
+// CHECK: call void @swift_initStructMetadata_UniversalStrategy([[INT]] 4, i8*** [[FIELDS_ADDR]], [[INT]]* {{.*}}, i8** [[VWT]])
+// CHECK: store atomic %swift.type* {{.*}} @_TMfV17struct_resilience26StructWithResilientStorage{{.*}}, %swift.type** @_TMLV17struct_resilience26StructWithResilientStorage release,
+// CHECK: ret void

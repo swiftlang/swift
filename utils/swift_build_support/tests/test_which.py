@@ -19,7 +19,7 @@ class WhichTestCase(unittest.TestCase):
         self.assertIsNone(which('a-tool-that-doesnt-exist'))
 
     def test_when_cmd_found_returns_path(self):
-        self.assertEquals(os.path.split(which('ls'))[-1], 'ls')
+        self.assertEqual(os.path.split(which('ls'))[-1], 'ls')
 
 
 if __name__ == '__main__':

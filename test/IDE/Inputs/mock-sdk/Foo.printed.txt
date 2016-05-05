@@ -85,18 +85,18 @@ typealias FooTypedef1 = Int32
 var fooIntVar: Int32
 
 /// Aaa.  fooFunc1.  Bbb.
-func fooFunc1(a: Int32) -> Int32
+func fooFunc1(_ a: Int32) -> Int32
 
 func fooFunc1AnonymousParam(_: Int32) -> Int32
-func fooFunc3(a: Int32, _ b: Float, _ c: Double, _ d: UnsafeMutablePointer<Int32>) -> Int32
+func fooFunc3(_ a: Int32, _ b: Float, _ c: Double, _ d: UnsafeMutablePointer<Int32>!) -> Int32
 
 /*
   Very good
   fooFuncWithBlock function.
 */
-func fooFuncWithBlock(blk: ((Float) -> Int32)!)
+func fooFuncWithBlock(_ blk: ((Float) -> Int32)!)
 
-func fooFuncWithFunctionPointer(fptr: (@convention(c) (Float) -> Int32)!)
+func fooFuncWithFunctionPointer(_ fptr: (@convention(c) (Float) -> Int32)!)
 
 @noreturn func fooFuncNoreturn1()
 @noreturn func fooFuncNoreturn2()
@@ -135,10 +135,10 @@ func fooFuncWithComment4()
 func fooFuncWithComment5()
 
 /// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
-func redeclaredInMultipleModulesFunc1(a: Int32) -> Int32
+func redeclaredInMultipleModulesFunc1(_ a: Int32) -> Int32
 
 @available(*, unavailable, message: "Variadic function is unavailable")
-func fooFuncUsingVararg(a: Int32, _ varargs: Any...) -> Int32 // This comment should not show without decl.
+func fooFuncUsingVararg(_ a: Int32, _ varargs: Any...) -> Int32 // This comment should not show without decl.
 
 /// Aaa.  FooProtocolBase.  Bbb.
 protocol FooProtocolBase {
@@ -170,8 +170,8 @@ protocol FooProtocolDerived : FooProtocolBase {
 class FooClassBase {
   class func fooBaseInstanceFunc0()
   func fooBaseInstanceFunc0()
-  class func fooBaseInstanceFunc1(anObject: AnyObject!) -> FooClassBase!
-  func fooBaseInstanceFunc1(anObject: AnyObject!) -> FooClassBase!
+  class func fooBaseInstanceFunc1(_ anObject: AnyObject!) -> FooClassBase!
+  func fooBaseInstanceFunc1(_ anObject: AnyObject!) -> FooClassBase!
   init!()
   convenience init!(float f: Float)
   class func fooBaseInstanceFuncOverridden()
@@ -180,7 +180,7 @@ class FooClassBase {
   class func fooBaseClassFunc0()
   /*not inherited*/ init!(_ x: Int32)
   @available(*, unavailable, message: "use object construction 'FooClassBase(_:)'")
-  class func fooClassBase(x: Int32) -> FooClassBase!
+  class func fooClassBase(_ x: Int32) -> FooClassBase!
 }
 
 /// Aaa.  FooClassDerived.  Bbb.
@@ -195,8 +195,8 @@ class FooClassDerived : FooClassBase, FooProtocolDerived {
      blah blah.
   */
   func fooInstanceFunc0()
-  func fooInstanceFunc1(a: Int32)
-  func fooInstanceFunc2(a: Int32, withB b: Int32)
+  func fooInstanceFunc1(_ a: Int32)
+  func fooInstanceFunc2(_ a: Int32, withB b: Int32)
   
   func fooBaseInstanceFuncOverridden()
   
@@ -274,10 +274,22 @@ class FooClassPropertyOwnership : FooClassBase {
   convenience init!(float f: Float)
 }
 
+class FooClassWithClassProperties : FooClassBase {
+  unowned(unsafe) class var assignable: @sil_unmanaged AnyObject!
+  unowned(unsafe) class var unsafeAssignable: @sil_unmanaged AnyObject!
+  class var retainable: AnyObject!
+  class var strongRef: AnyObject!
+  @NSCopying class var copyable: AnyObject!
+  weak class var weakRef: @sil_weak AnyObject!
+  class var scalar: Int32
+  init!()
+  convenience init!(float f: Float)
+}
+
 class FooUnavailableMembers : FooClassBase {
   convenience init!(int i: Int32)
   @available(*, unavailable, message: "use object construction 'FooUnavailableMembers(int:)'")
-  class func withInt(i: Int32) -> Self!
+  class func withInt(_ i: Int32) -> Self!
   
   @available(*, unavailable, message: "x")
   func unavailable() // This comment should not show without decl. rdar://20092567

@@ -8,8 +8,20 @@ ARC Optimization for Swift
 
 .. admonition:: TODO
 
-   This is currently a place holder for design documentation on ARC
-   optimization.
+   This is an evolving document on ARC optimization in the Swift
+   compiler. Please extend it.
+
+Terms
+=====
+
+Some terms that are used often times in this document that must be
+defined. These may have more general definitions else where, but we define them
+with enough information for our purposes here:
+
+1. Reference type: This is referring to a retainable pointer, not an aggregate
+   that can contain a reference counted value.
+2. A trivial type: A type for which a retain_value on a value of this type is a
+   no-op.
 
 Reference Counting Instructions
 ===============================
@@ -53,16 +65,36 @@ count.
    also enable more LLVM level optimization in the presence of
    is_unique checks which currently appear to arbitrarily write memory.
 
+ARC and Copying
+===============
+
+TODO: Talk about how "ARC" and copying fit together. This means going into how
+retaining/releasing is really "copying"/"destroying" a pointer reference where
+the value that is pointed to does not change means you don't have to change the
+bits.
+
+Talk about how this fits into @owned and @guaranteed parameters.
+
 RC Identity
 ===========
 
 A core ARC concept in Swift optimization is the concept of ``Reference Count
-Identity`` (RC Identity) and RC Identity preserving instructions. An instruction
-``I`` with n SSA arguments and m SSA results is (i,j) RC Identity preserving if
-performing a ``retain_value`` on the ith SSA argument immediately before ``I``
-is executed is equivalent to performing a ``retain_value`` on the jth SSA result
-of ``I`` immediately following the execution of ``I``. For example in the
-following, if::
+Identity`` (RC Identity) and RC Identity preserving instructions. In this
+section, we:
+
+1. Define concepts related to RC identity.
+2. Contrast RC identity analysis with alias analysis.
+3. Discuss instructions/properties that cause certain instructions which "seem"
+   to be RC identical to not be so.
+
+Definitions
+-----------
+
+Let ``I`` be a SIL instruction with n operands and m results. We say that ``I``
+is a (i, j) RC Identity preserving instruction if performing a ``retain_value``
+on the ith SSA argument immediately before ``I`` is executed is equivalent to
+performing a ``retain_value`` on the jth SSA result of ``I`` immediately
+following the execution of ``I``. For example in the following, if::
 
     retain_value %x
     %y = unary_instruction %x
@@ -73,18 +105,72 @@ is equivalent to::
     retain_value %y
 
 then we say that unary_instruction is a (0,0) RC Identity preserving
-operation. In a case of a unary instruction, we omit (0,0) and just say that
+instruction. In a case of a unary instruction, we omit (0,0) and just say that
 the instruction is RC Identity preserving.
 
-In practice generally RC Identical operations are unary operations such as
-casts. This would make it seem like RC Identity is an extension of alias
-analysis. But RC Identity also has significantly more power than alias analysis
-since:
+TODO: This section defines RC identity only for loadable types. We also need to
+define it for instructions on addresses and instructions that mix addresses and
+values. It should be pretty straight forward to do this.
+
+Given two SSA values ``%a``, ``%b``, we define ``%a`` as immediately RC
+identical to ``%b`` (or ``%a ~rci %b``) if there exists an instruction ``I``
+such that:
+
+- ``%a`` is the jth result of ``I``.
+- ``%b`` is the ith argument of ``I``.
+- ``I`` is (i, j) RC identity preserving.
+
+Due to the nature of SSA form, we can not even speak of symmetry or
+reflexivity. But we do get transitivity! Easily if ``%b ~rci %a`` and ``%c ~rci
+%b``, we must by these two assumptions be able to do the following::
+
+  retain_value %a
+  %b = unary_instruction %a
+  %c = unary_instruction %b
+
+which by our assumption means that we can perform the following code motion::
+
+  %b = unary_instruction %a
+  %c = unary_instruction %b
+  retain_value %c
+
+our desired result. But we would really like for this operation to be reflexive
+and symmetric. To get around this issue, we define the equivalent relation RC
+identity as follows: We say that ``%a ~rc %b`` if:
+
+1. ``%a == %b``
+2. ``%a ~rci %b`` or ``%b ~rci %a``.
+3. There exists a finite sequence of ``n`` SSA values ``{%a[i]}`` such that:
+   a. ``%a ~rci %a[0]``
+   b. ``%a[i] ~rci %a[i+1]`` for all ``i < n``.
+   c. ``%a[n] ~rci %b``.
+
+These equivalence classes consisting of chains of RC identical values are
+computed via the SILAnalysis called ``RC Identity Analysis``. By performing ARC
+optimization on RC Identical operations, our optimizations are able to operate
+on the level of granularity that we actually care about, ignoring superficial
+changes in SSA form that still yield manipulations of the same reference count.
+
+.. admonition:: NOTE
+
+   RCIdentityAnalysis is a flow insensitive analysis. Dataflow that needs to
+   be flow sensitive must handle phi nodes in the dataflow itself.
+
+Contrasts with Alias Analysis
+-----------------------------
+
+A common question is what is the difference in between RC Identity analysis and
+alias analysis. While alias analysis is attempting to determine if two memory
+location are the same, RC identity analysis is attempting to determine if
+reference counting operations on different values would result in the same
+reference count being read or written to.
+
+Some interesting examples of where RC identity differs from alias analysis are:
 
  - ``struct`` is an RC identity preserving operation if the ``struct`` literal
-   only has one non-trivial operand. This means for instance that any struct with
-   one reference counted field used as an owning pointer is RC Identical with its
-   owning pointer (a useful property for Arrays).
+   only has one non-trivial operand. This means for instance that any struct
+   with one reference counted field used as an owning pointer is RC Identical
+   with its owning pointer (a useful property for Arrays).
 
  - An ``enum`` instruction is always RC Identical with the given tuple payload.
 
@@ -97,35 +183,91 @@ since:
 
 The corresponding value projection operations have analogous properties.
 
-Given two SSA values ``%a``, ``%b``, we define ``%a`` as immediately RC
-identical to ``%b`` if there exists an instruction ``I`` such that:
+.. admonition:: NOTE
 
-- ``%a`` is the jth result of ``I``.
-- ``%b`` is the ith argument of ``I``.
-- ``I`` is (i,j) RC identity preserving.
+    An important consequence of RC Identity is that value types with only one
+    RCIdentity are a simple case for ARC optimization to handle. The ARC
+    optimizer relies on other optimizations like SROA, Function Signature Opts,
+    and SimplifyCFG (for block arguments) to try and eliminate cases where value
+    types have multiple reference counted subtypes. If one has a struct type
+    with multiple reference counted sub fields, wrapping the struct in a COW
+    data structure (for instance storing the struct in an array of one element)
+    will reduce the reference count overhead.
 
-Easily the immediate RC identical relation must be reflexive and symmetric but
-by its nature is not transitive. Then define the equivalence relation RC
-Identity, ``~rc``, by the relations that ``%a ~rc %b`` if ``%a`` is immediately
-RC identical to ``%b`` or if there is a finite sequence of n SSA values
-``{%a[i]}`` such that ``%a`` is immediately RC identical to ``%a[0]`` and ``%b``
-is immediately RC identical to ``%a[n]``. We currently always assume that each
-equivalence class has one dominating definition.
+what is ``retain_value`` and why is it important
+------------------------------------------------
 
-These equivalence classes consisting of chains of RC identical values are
-computed via the SILAnalysis called ``RC Identity Analysis``. By performing ARC
-optimization on RC Identical operations, our optimizations are able to operate
-on the level of granularity that we actually care about, ignoring superficial
-changes in SSA form that still yield manipulations of the same reference count.
+Notice in the section above how we defined RC identity using the SIL
+``retain_value`` instruction. ``retain_value`` and ``release_value`` are the
+catch-all please retain or please release this value at the SIL level. The
+following table is a quick summary of what ``retain_value`` (``release_value``)
+does when applied to various types of objects:
 
-*NOTE* RCIdentityAnalysis is a flow insensitive analysis. Dataflow that needs to
- be flow sensitive must handle phi nodes in the dataflow itself.
++-----------+--------------+-------------------------------------------------------------------------------------+
+| Ownership | Type         | Effect                                                                              |
++===========+==============+=====================================================================================+
+| Strong    | Class        | Increment strong ref count of class                                                 |
++-----------+--------------+-------------------------------------------------------------------------------------+
+| Any       | Struct/Tuple | retain_value each field                                                             |
++-----------+--------------+-------------------------------------------------------------------------------------+
+| Any       | Enum         | switch on the enum and apply retain_value to the enum case's payload (if it exists) |
++-----------+--------------+-------------------------------------------------------------------------------------+
+| Unowned   | Class        | Increment the unowned ref count of class                                            |
++-----------+--------------+-------------------------------------------------------------------------------------+
 
-*NOTE* An important consequence of RC Identity is that value types with only one
-RCIdentity are a simple case for ARC optimization to handle. The ARC optimizer
-relies on other optimizations like SROA, Function Signature Opts, and
-SimplifyCFG (for block arguments) to try and eliminate cases where value types
-have multiple reference counted subtypes.
+.. admonition:: Notice
+
+  Aggregate value types like struct/tuple/enums's definitions are defined
+  recursively via retain_value on payloads/fields. This is why operations like
+  ``struct_extract`` do not always propagate RC identity.
+
+Conversions
+-----------
+
+Conversions are a common operation that propagate RC identity. But not all
+conversions have these properties. In this section, we attempt to explain why
+this is true. The rule for conversions is that a conversion that preserves RC
+identity must have the following properties:
+
+1. Both of its arguments must be non-trivial values with the same ownership
+   semantics (i.e. unowned, strong, weak). This means that conversions such as:
+
+   - address_to_pointer
+   - pointer_to_address
+   - unchecked_trivial_bitcast
+   - ref_to_raw_pointer
+   - raw_pointer_to_ref
+   - ref_to_unowned
+   - unowned_to_ref
+   - ref_to_unmanaged
+   - unmanaged_to_ref
+
+   The reason why we want the ownership semantics to be the same is that
+   whenever there is a change in ownership semantics, we want the programmer to
+   explicitly reason about the change in ownership semantics.
+
+2. The instruction must not introduce type aliasing. This disqualifies such
+   casts as:
+
+   - unchecked_addr_cast
+   - unchecked_bitwise_cast
+
+This means in sum that conversions that preserve types and preserve
+non-trivialness are the interesting instructions.
+
+ARC and Enums
+-------------
+
+Enum types provide interesting challenges for ARC optimization. This is because
+if there exists one case where an enum is non-trivial, the aggregate type in all
+situations must be treated as if it is non-trivial. An important consideration
+here is that when performing ARC optimization on cases, one has to be very
+careful about ensuring that one only ignores reference count operations on
+values that are able to be proved to be that specific case.
+
+.. admonition:: TODO
+
+  This section needs to be filled out more.
 
 Copy-On-Write Considerations
 ============================
@@ -190,7 +332,7 @@ is_unique performs depends on the argument type:
       (Builtin.NativeObject, known native class reference)
 
     - Objective-C object types require an additional check that the
-      dynamic object type uses native swift reference counting:
+      dynamic object type uses native Swift reference counting:
       (Builtin.UnknownObject, unknown class reference, class existential)
 
     - Bridged object types allow the dynamic object type check to be
@@ -200,7 +342,7 @@ is_unique performs depends on the argument type:
 Any of the above types may also be wrapped in an optional.  If the
 static argument type is optional, then a null check is also performed.
 
-Thus, is_unique only returns true for non-null, native swift object
+Thus, is_unique only returns true for non-null, native Swift object
 references with a strong reference count of one.
 
 is_unique_or_pinned has the same semantics as is_unique except that it
@@ -265,8 +407,10 @@ correction of the algorithm and describes its design. In the following
 discussion we talk about the algorithm conceptually and show its safety and
 considerations necessary for good performance.
 
-*NOTE* In the following when we refer to "hoisting", we are not just talking
-about upward code motion of retains, but also downward code motion of releases.
+.. admonition:: NOTE
+
+    In the following when we refer to "hoisting", we are not just talking about
+    upward code motion of retains, but also downward code motion of releases.
 
 Loop Canonicalization
 ---------------------

@@ -7,7 +7,7 @@
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtTSS2IdVs5Int64_",{{.*}} identifier: [[TT2:[^,)]+]])
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtTSSVs5Int64_",{{.*}} identifier: [[TT3:[^,)]+]])
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 // Variable:
 // mangling.myDict : Swift.Dictionary<Swift.Int64, Swift.String>

@@ -340,6 +340,17 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
           CalleeFunction->isTransparent() == IsNotTransparent)
         continue;
 
+      if (F->isFragile() &&
+          !CalleeFunction->hasValidLinkageForFragileRef()) {
+        if (!CalleeFunction->hasValidLinkageForFragileInline()) {
+          llvm::errs() << "caller: " << F->getName() << "\n";
+          llvm::errs() << "callee: " << CalleeFunction->getName() << "\n";
+          llvm_unreachable("Should never be inlining a resilient function into "
+                           "a fragile function");
+        }
+        continue;
+      }
+
       // Then recursively process it first before trying to inline it.
       if (!runOnFunctionRecursively(CalleeFunction, InnerAI, Mode,
                                     FullyInlinedSet, SetFactory,

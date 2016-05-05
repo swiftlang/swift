@@ -16,7 +16,7 @@ class Box {
 }
 
 @inline(never)
-func sumArray(a: [Box]) -> Int {
+func sumArray(_ a: [Box]) -> Int {
   var s = 0
   for i in 0..<a.count {
     s += a[i].v
@@ -24,7 +24,7 @@ func sumArray(a: [Box]) -> Int {
   return s
 }
 
-public func run_ClassArrayGetter(N: Int) {
+public func run_ClassArrayGetter(_ N: Int) {
   let aSize = 10_000
   var a: [Box] = []
   a.reserveCapacity(aSize)

@@ -24,11 +24,11 @@ sets, it was decided that the canonical ``Set`` interface should be
 written in terms of methods: [#operators]_ ::
 
   struct Set<Element> {
-    public func contains(x: Element) -> Bool                // x ∈ A, A ∋ x
-    public func isSubsetOf(b: Set<Element>) -> Bool         // A ⊆ B
-    public func isStrictSubsetOf(b: Set<Element>) -> Bool   // A ⊂ B
-    public func isSupersetOf(b: Set<Element>) -> Bool       // A ⊇ B
-    public func isStrictSupersetOf(b: Set<Element>) -> Bool // A ⊃ B
+    public func contains(_ x: Element) -> Bool                // x ∈ A, A ∋ x
+    public func isSubsetOf(_ b: Set<Element>) -> Bool         // A ⊆ B
+    public func isStrictSubsetOf(_ b: Set<Element>) -> Bool   // A ⊂ B
+    public func isSupersetOf(_ b: Set<Element>) -> Bool       // A ⊇ B
+    public func isStrictSupersetOf(_ b: Set<Element>) -> Bool // A ⊃ B
     ...
   }
 
@@ -36,17 +36,17 @@ When we started to look at the specifics, however, we ran into a
 familiar pattern::
    
   ...
-    public func union(b: Set<Element>) -> Set<Element>        // A ∪ B
-    public mutating func unionInPlace(b: Set<Element>)        // A ∪= B
+    public func union(_ b: Set<Element>) -> Set<Element>        // A ∪ B
+    public mutating func unionInPlace(_ b: Set<Element>)        // A ∪= B
 
-    public func intersect(b: Set<Element>) -> Set<Element>    // A ∩ B
-    public mutating func intersectInPlace(b: Set<Element>)    // A ∩= B
+    public func intersect(_ b: Set<Element>) -> Set<Element>    // A ∩ B
+    public mutating func intersectInPlace(_ b: Set<Element>)    // A ∩= B
 
-    public func subtract(b: Set<Element>) -> Set<Element>     // A - B
-    public mutating func subtractInPlace(b: Set<Element>)     // A -= B
+    public func subtract(_ b: Set<Element>) -> Set<Element>     // A - B
+    public mutating func subtractInPlace(_ b: Set<Element>)     // A -= B
 
-    public func exclusiveOr(b: Set<Element>) -> Set<Element>  // A ⊕ B
-    public mutating func exclusiveOrInPlace(b: Set<Element>)  // A ⊕= B
+    public func exclusiveOr(_ b: Set<Element>) -> Set<Element>  // A ⊕ B
+    public mutating func exclusiveOrInPlace(_ b: Set<Element>)  // A ⊕= B
 
 We had seen the same pattern when considering the API for
 ``String``, but in that case, there are no obvious operator
@@ -60,9 +60,9 @@ spellings in all of Unicode.  For example::
     public mutating func lowercaseInPlace()
 
     public func replace(
-      pattern: String, with replacement: String) -> String
+      _ pattern: String, with replacement: String) -> String
     public mutating func replaceInPlace(
-      pattern: String, with replacement: String)
+      _ pattern: String, with replacement: String)
 
     public func trim() -> String
     public mutating func trimInPlace()
@@ -92,7 +92,7 @@ We see at least four problems with this kind of API:
    mutating version of ``op(x: T, y: U) -> T`` can always be defined
    as ::
 
-     func opInPlace(inout x: T, y: U) {
+     func opInPlace(x: inout T, y: U) {
        x = op(x, y)
      }
 
@@ -192,7 +192,7 @@ The target of an assignment method is always required, even when the
 target is ``self``::
 
   extension Set {
-    mutating func frob(other: Set) {
+    mutating func frob(_ other: Set) {
       let brick = union(other) // self.union(other) implied
       self.=union(other)       // calls the assignment method
       union(other)             // warning: result ignored
@@ -361,7 +361,7 @@ An assignment operator for an immutable class ``X`` always has the form:
 
 .. parsed-literal::
 
-  func *op*\ **=** (**inout** lhs: X, rhs: Y) {
+  func *op*\ **=** (lhs: **inout** X, rhs: Y) {
     lhs = *expression creating a new X object*
   }
 
@@ -369,7 +369,7 @@ or, with COW optimization:
 
 .. parsed-literal::
 
-  func *op*\ **=** (**inout** lhs: X, rhs: Y) {
+  func *op*\ **=** (lhs: **inout** X, rhs: Y) {
     if isUniquelyReferenced(&lhs) {
       lhs.\ *mutateInPlace*\ (rhs)
     }
@@ -391,7 +391,7 @@ class types::
     let x: Int
     required init(x: Int) { self.x = x }
 
-    func advanced(amount: Int) -> Self {
+    func advanced(_ amount: Int) -> Self {
       return Self(x: self.x + amount)
     }
 
@@ -414,7 +414,7 @@ fine::
     let x: Int
     required init(x: Int) { self.x = x }
 
-    func advanced(amount: Int) -> Self {
+    func advanced(_ amount: Int) -> Self {
       return Self(x: self.x + amount)
     }
   }

@@ -875,6 +875,19 @@ createProjection(SILBuilder &B, SILLocation Loc, SILValue Arg) const {
   return Proj->createProjection(B, Loc, Arg);
 }
 
+std::string
+ProjectionTreeNode::getNameEncoding(const ProjectionTree &PT) const {
+  std::string Encoding;
+  const ProjectionTreeNode *Node = this;
+  while (Node) {
+    if (Node->isRoot())
+      break;
+    Encoding += std::to_string(Node->Proj->getIndex());
+    Node = Node->getParent(PT);
+  }
+  return Encoding;
+}
+
 void
 ProjectionTreeNode::
 processUsersOfValue(ProjectionTree &Tree,
@@ -1168,8 +1181,27 @@ ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &BPA, SILType BaseTy,
 }
 
 ProjectionTree::~ProjectionTree() {
-  for (auto *N : ProjectionTreeNodes)
-    N->~ProjectionTreeNode();
+  // Do nothing !. Eventually the all the projection tree nodes will be freed
+  // when the BPA allocator is free.
+}
+
+void
+ProjectionTree::initializeWithExistingTree(const ProjectionTree &PT) {
+  Kind = PT.Kind;
+  EpilogueReleases = PT.EpilogueReleases;
+  LiveLeafIndices = PT.LiveLeafIndices;
+  for (const auto &N : PT.ProjectionTreeNodes) {
+    ProjectionTreeNodes.push_back(new (Allocator) ProjectionTreeNode(*N));
+  }
+}
+
+std::string ProjectionTree::getNameEncoding() const {
+  std::string Encoding;
+  for (unsigned index : LiveLeafIndices) {
+    const ProjectionTreeNode *Node = ProjectionTreeNodes[index];
+    Encoding += Node->getNameEncoding(*this);
+  }
+  return Encoding;
 }
 
 SILValue
@@ -1210,7 +1242,7 @@ ProjectionTree::computeExplodedArgumentValueInner(SILBuilder &Builder,
 
 SILValue
 ProjectionTree::computeExplodedArgumentValue(
-                            SILBuilder &Builder,  SILLocation Loc,
+                            SILBuilder &Builder, SILLocation Loc,
                             llvm::SmallVector<SILValue, 8> &LeafValues) {
   // Construct the leaf index to leaf value map.
   llvm::DenseMap<unsigned, SILValue> LeafIndexToValue;

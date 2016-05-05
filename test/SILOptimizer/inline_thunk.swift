@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -parse-as-library -Xllvm -sil-inline-test-threshold=0 -emit-ir -O | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -parse-as-library -emit-ir -O | FileCheck %s
 
 // Two thunks are generated:
 // 1. from function signature opts
@@ -22,7 +22,19 @@ protocol Proto {
 
 struct TestStruct : Proto {
   func testit(x: Int32) -> Int32 {
-    return x + 1
+	var y = x * 2
+	y += 1
+	y *= x
+	y += 1
+	y *= x
+	y += 1
+	y *= x
+	y += 1
+	y *= x
+	y += 1
+	y *= x
+	y += 1
+    return y
   }
 }
 

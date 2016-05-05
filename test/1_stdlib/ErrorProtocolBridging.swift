@@ -4,13 +4,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import Foundation
 import CoreLocation
@@ -170,7 +163,7 @@ ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
-func opaqueUpcastToAny<T>(x: T) -> Any {
+func opaqueUpcastToAny<T>(_ x: T) -> Any {
   return x
 }
 
@@ -230,7 +223,7 @@ ErrorProtocolBridgingTests.test("ErrorProtocol-to-NSError bridging") {
 ErrorProtocolBridgingTests.test("enum-to-NSError round trip") {
   autoreleasepool {
     // Emulate throwing an error from Objective-C.
-    func throwNSError(error: EnumError) throws {
+    func throwNSError(_ error: EnumError) throws {
       throw NSError(domain: "main.EnumError", code: error.rawValue,
                     userInfo: [:])
     }

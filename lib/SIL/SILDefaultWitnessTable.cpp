@@ -18,6 +18,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Mangle.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallString.h"
@@ -34,13 +35,14 @@ void SILDefaultWitnessTable::addDefaultWitnessTable() {
 }
 
 SILDefaultWitnessTable *
-SILDefaultWitnessTable::create(SILModule &M, const ProtocolDecl *Protocol,
+SILDefaultWitnessTable::create(SILModule &M, SILLinkage Linkage,
+                               const ProtocolDecl *Protocol,
                                ArrayRef<SILDefaultWitnessTable::Entry> entries){
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILDefaultWitnessTable),
                          alignof(SILDefaultWitnessTable));
   SILDefaultWitnessTable *wt =
-      ::new (buf) SILDefaultWitnessTable(M, Protocol, entries);
+      ::new (buf) SILDefaultWitnessTable(M, Linkage, Protocol, entries);
 
   wt->addDefaultWitnessTable();
 
@@ -49,12 +51,13 @@ SILDefaultWitnessTable::create(SILModule &M, const ProtocolDecl *Protocol,
 }
 
 SILDefaultWitnessTable *
-SILDefaultWitnessTable::create(SILModule &M, const ProtocolDecl *Protocol) {
+SILDefaultWitnessTable::create(SILModule &M, SILLinkage Linkage,
+                               const ProtocolDecl *Protocol) {
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILDefaultWitnessTable),
                          alignof(SILDefaultWitnessTable));
   SILDefaultWitnessTable *wt =
-      ::new (buf) SILDefaultWitnessTable(M, Protocol);
+      ::new (buf) SILDefaultWitnessTable(M, Linkage, Protocol);
 
   wt->addDefaultWitnessTable();
 
@@ -64,16 +67,20 @@ SILDefaultWitnessTable::create(SILModule &M, const ProtocolDecl *Protocol) {
 
 SILDefaultWitnessTable::
 SILDefaultWitnessTable(SILModule &M,
+                       SILLinkage Linkage,
                        const ProtocolDecl *Protocol,
                        ArrayRef<Entry> entries)
-  : Mod(M), Protocol(Protocol), Entries(), IsDeclaration(true) {
+  : Mod(M), Linkage(Linkage), Protocol(Protocol), Entries(),
+    IsDeclaration(true) {
 
   convertToDefinition(entries);
 }
 
 SILDefaultWitnessTable::SILDefaultWitnessTable(SILModule &M,
+                                               SILLinkage Linkage,
                                                const ProtocolDecl *Protocol)
-  : Mod(M), Protocol(Protocol), Entries(), IsDeclaration(true) {}
+  : Mod(M), Linkage(Linkage), Protocol(Protocol), Entries(),
+    IsDeclaration(true) {}
 
 void SILDefaultWitnessTable::
 convertToDefinition(ArrayRef<Entry> entries) {
@@ -90,6 +97,16 @@ convertToDefinition(ArrayRef<Entry> entries) {
       entry.getWitness()->incrementRefCount();
     }
   }
+}
+
+Identifier SILDefaultWitnessTable::getIdentifier() const {
+  std::string name;
+  {
+    Mangle::Mangler mangler;
+    mangler.mangleType(getProtocol()->getDeclaredType(), /*uncurry*/ 0);
+    name = mangler.finalize();
+  }
+  return Mod.getASTContext().getIdentifier(name);
 }
 
 unsigned SILDefaultWitnessTable::getMinimumWitnessTableSize() const {

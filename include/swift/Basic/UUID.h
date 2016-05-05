@@ -115,6 +115,6 @@ namespace llvm {
       return a == b;
     }
   };
-}
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_UUID_H

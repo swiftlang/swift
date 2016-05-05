@@ -17,7 +17,7 @@ import ObjCIRExtras
 
 // Instance method invocation
 // CHECK: define hidden void @_TF7objc_ir15instanceMethodsFCSo1BT_([[B]]*
-func instanceMethods(b: B) {
+func instanceMethods(_ b: B) {
   // CHECK: load i8*, i8** @"\01L_selector(method:withFloat:)"
   // CHECK: call i32 bitcast (void ()* @objc_msgSend to i32
   var i = b.method(1, with: 2.5 as Float)
@@ -70,11 +70,18 @@ func propertyAccess(b b: B) {
    // CHECK: load i8*, i8** @"\01L_selector(counter)"
    // CHECK: load i8*, i8** @"\01L_selector(setCounter:)"
    b.counter = b.counter + 1
+
+   // CHECK: call %swift.type* @_TMaCSo1B()
+   // CHECK: bitcast %swift.type* {{%.+}} to %objc_class*
+   // CHECK: load i8*, i8** @"\01L_selector(sharedCounter)"
+   // CHECK: load i8*, i8** @"\01L_selector(setSharedCounter:)"
+   B.sharedCounter = B.sharedCounter + 1
 }
 
 // CHECK: define hidden [[B]]* @_TF7objc_ir8downcastFT1aCSo1A_CSo1B(
 func downcast(a a: A) -> B {
-  // CHECK: [[T0:%.*]] = call %objc_class* @rt_swift_getInitializedObjCClass(%objc_class* @"OBJC_CLASS_$_B")
+  // CHECK: [[CLASS:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
+  // CHECK: [[T0:%.*]] = call %objc_class* @rt_swift_getInitializedObjCClass(%objc_class* [[CLASS]])
   // CHECK: [[T1:%.*]] = bitcast %objc_class* [[T0]] to i8*
   // CHECK: call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[A:%.*]], i8* [[T1]]) [[NOUNWIND:#[0-9]+]]
   return a as! B
@@ -102,13 +109,13 @@ func getset(p p: FooProto) {
 }
 
 // CHECK-LABEL: define hidden void @_TF7objc_ir17pointerPropertiesFCSo14PointerWrapperT_(%CSo14PointerWrapper*) {{.*}} {
-func pointerProperties(obj: PointerWrapper) {
+func pointerProperties(_ obj: PointerWrapper) {
   // CHECK: load i8*, i8** @"\01L_selector(setVoidPtr:)"
   // CHECK: load i8*, i8** @"\01L_selector(setIntPtr:)"
   // CHECK: load i8*, i8** @"\01L_selector(setIdPtr:)"
-  obj.voidPtr = nil as UnsafeMutablePointer
-  obj.intPtr = nil as UnsafeMutablePointer
-  obj.idPtr = nil as AutoreleasingUnsafeMutablePointer
+  obj.voidPtr = nil as UnsafeMutablePointer?
+  obj.intPtr = nil as UnsafeMutablePointer?
+  obj.idPtr = nil as AutoreleasingUnsafeMutablePointer?
 }
 
 // CHECK-LABEL: define hidden void @_TF7objc_ir20customFactoryMethodsFT_T_() {{.*}} {

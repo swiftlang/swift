@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 struct MyCollection<Element> {  // expected-note {{'Element' declared as parameter to type 'MyCollection'}}
-  func map<T>(transform: (Element) -> T) -> MyCollection<T> {
+  func map<T>(_ transform: (Element) -> T) -> MyCollection<T> {
     fatalError("implement")
   }
 }

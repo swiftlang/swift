@@ -14,7 +14,7 @@ class OC1 : OP1 {
   @objc func reqOP1a() -> Bool { return true }
 }
 
-func testOP1(oc1: OC1, ao: AnyObject) {
+func testOP1(_ oc1: OC1, ao: AnyObject) {
   oc1.extOP1a()
   ao.reqOP1a!() // okay
 

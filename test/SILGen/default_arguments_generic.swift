@@ -4,10 +4,10 @@ func foo<T: IntegerLiteralConvertible>(x x: T = 0) { }
 
 struct Zim<T: IntegerLiteralConvertible> {
   init(x: T = 0) { }
-  init<U: FloatLiteralConvertible>(x: T = 0, y: U = 0.5) { }
+  init<U: FloatLiteralConvertible>(_ x: T = 0, y: U = 0.5) { }
 
   static func zim(x x: T = 0) { }
-  static func zang<U: FloatLiteralConvertible>(x: T = 0,
+  static func zang<U: FloatLiteralConvertible>(_ x: T = 0,
                                                y: U = 0.5) { }
 }
 

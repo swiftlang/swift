@@ -18,7 +18,9 @@ namespace swift {
 enum class SanitizerKind : unsigned {
   None = 0,
   Address,
+  Thread,
 };
 
-}
+} // end namespace swift
+
 #endif // SWIFT_BASIC_SANITIZERS_H

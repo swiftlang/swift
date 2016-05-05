@@ -87,7 +87,7 @@ Variables, functions and typealiases should have names that start with an
 underscore::
 
   var _value: Int
-  func _bridgeSomethingToAnything(something: AnyObject) -> AnyObject
+  func _bridgeSomethingToAnything(_ something: AnyObject) -> AnyObject
   typealias _InternalTypealias = HeapBuffer<Int, Int>
 
 To apply the rule to an initializer, one of its label arguments *or*

@@ -11,7 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 /// A collection whose elements are all identical `Element`s.
-public struct Repeated<Element> : Collection {
+public struct Repeated<Element> : RandomAccessCollection {
+
+  public typealias Indices = CountableRange<Int>
+
   /// A type that represents a valid position in the collection.
   /// 
   /// Valid indices consist of the position of every element and a
@@ -55,7 +58,7 @@ public struct Repeated<Element> : Collection {
 }
 
 /// Return a collection containing `n` repetitions of `elementInstance`.
-public func repeatElement<T>(element: T, count n: Int) -> Repeated<T> {
+public func repeatElement<T>(_ element: T, count n: Int) -> Repeated<T> {
   return Repeated(_repeating: element, count: n)
 }
 
@@ -65,6 +68,6 @@ public struct Repeat<Element> {}
 extension Repeated {
   @available(*, unavailable, renamed: "repeatElement")
   public init(count: Int, repeatedValue: Element) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

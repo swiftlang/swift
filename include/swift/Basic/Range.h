@@ -295,6 +295,6 @@ inline auto count_if(const Range &R, Predicate &&P)
   return std::count_if(R.begin(), R.end(), std::forward<Predicate>(P));
 }
 
-} // namespace swift
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_RANGE_H

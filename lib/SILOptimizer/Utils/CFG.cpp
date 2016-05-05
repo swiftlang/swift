@@ -693,24 +693,18 @@ bool swift::splitAllCriticalEdges(SILFunction &F, bool OnlyNonCondBr,
                                   DominanceInfo *DT, SILLoopInfo *LI) {
   bool Changed = false;
 
-  std::vector<SILBasicBlock*> Blocks;
-  Blocks.reserve(F.size());
-
-  for (auto &It : F)
-    Blocks.push_back(&It);
-
-  for (auto It : Blocks) {
+  for (SILBasicBlock &BB : F) {
     // Only split critical edges for terminators that don't support block
     // arguments.
-    if (OnlyNonCondBr && isa<CondBranchInst>(It->getTerminator()))
+    if (OnlyNonCondBr && isa<CondBranchInst>(BB.getTerminator()))
       continue;
 
-    if (isa<BranchInst>(It->getTerminator()))
+    if (isa<BranchInst>(BB.getTerminator()))
       continue;
 
-    for (unsigned Idx = 0, e = It->getSuccessors().size(); Idx != e; ++Idx)
+    for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx)
       Changed |=
-        (splitCriticalEdge(It->getTerminator(), Idx, DT, LI) != nullptr);
+        (splitCriticalEdge(BB.getTerminator(), Idx, DT, LI) != nullptr);
   }
   return Changed;
 }

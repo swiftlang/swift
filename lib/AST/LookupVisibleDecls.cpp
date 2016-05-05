@@ -20,6 +20,7 @@
 #include "swift/AST/AST.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/SetVector.h"
 #include <set>
 
@@ -174,6 +175,9 @@ static void doGlobalExtensionLookup(Type BaseType,
 
   // Look in each extension of this type.
   for (auto extension : nominal->getExtensions()) {
+    if (!isExtensionApplied(*const_cast<DeclContext*>(CurrDC), BaseType,
+                            extension))
+      continue;
     bool validatedExtension = false;
     if (TypeResolver && extension->getAsProtocolExtensionContext()) {
       if (!TypeResolver->isProtocolExtensionUsable(
@@ -366,8 +370,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
         // Skip type decls if they aren't visible, or any type that has a
         // witness. This cuts down on duplicates.
         if (areTypeDeclsVisibleInLookupMode(LS) &&
-            (!NormalConformance->hasTypeWitness(ATD) ||
-             NormalConformance->usesDefaultDefinition(ATD))) {
+            !NormalConformance->hasTypeWitness(ATD)) {
           Consumer.foundDecl(ATD, ReasonForThisProtocol);
         }
         continue;
@@ -375,11 +378,13 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
       if (auto *VD = dyn_cast<ValueDecl>(Member)) {
         if (TypeResolver)
           TypeResolver->resolveDeclSignature(VD);
+
         // Skip value requirements that have corresponding witnesses. This cuts
         // down on duplicates.
         if (!NormalConformance->hasWitness(VD) ||
-            NormalConformance->usesDefaultDefinition(VD) ||
-            NormalConformance->getWitness(VD, nullptr) == nullptr) {
+            NormalConformance->getWitness(VD, nullptr) == nullptr ||
+            NormalConformance->getWitness(VD, nullptr).getDecl()->getFullName()
+              != VD->getFullName()) {
           Consumer.foundDecl(VD, ReasonForThisProtocol);
         }
       }

@@ -10,7 +10,7 @@ func simple() {
 
 
 // Coercion of literals through operators.
-func operators(x1: Int8) {
+func operators(_ x1: Int8) {
   let x2 : Int8 = 1 + 2
   let x3 : Int8 = 1 + x1
   _ = x2 + 1 as Int8
@@ -20,8 +20,8 @@ func operators(x1: Int8) {
 // Check coercion failure due to overflow.
 struct X { }
 struct Y { }
-func accept_integer(x: Int8) -> X { } // expected-note 2{{found this candidate}}
-func accept_integer(x: Int16) -> Y { } // expected-note 2{{found this candidate}}
+func accept_integer(_ x: Int8) -> X { } // expected-note 2{{found this candidate}}
+func accept_integer(_ x: Int16) -> Y { } // expected-note 2{{found this candidate}}
 
 func overflow_check() {
   var y : Y = accept_integer(500)

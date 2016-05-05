@@ -37,7 +37,7 @@ numberBehavior = .behavior10_4
 var postingStyle: NSPostingStyle = .postWhenIdle
 postingStyle = .postASAP
 
-func handler(formatter: NSByteCountFormatter) {
+func handler(_ formatter: NSByteCountFormatter) {
 	// Ensure that the Equality protocol is properly added to an
 	// imported ObjC enum type before the type is referenced by name
     if (formatter.countStyle == .file) {}
@@ -143,10 +143,10 @@ var withQuince: NSRuncingOptions = .enableQuince
 var singleValue: NSSingleOptions = .value
 
 // Check OptionSet conformance.
-var minceAndQuince: NSRuncingOptions = NSRuncingOptions.enableMince.intersect(NSRuncingOptions.enableQuince)
+var minceAndQuince: NSRuncingOptions = NSRuncingOptions.enableMince.intersection(NSRuncingOptions.enableQuince)
 var minceOrQuince: NSRuncingOptions = [.enableMince, .enableQuince]
-minceOrQuince.intersectInPlace(minceAndQuince)
-minceOrQuince.unionInPlace(minceAndQuince)
+minceOrQuince.formIntersection(minceAndQuince)
+minceOrQuince.formUnion(minceAndQuince)
 
 var minceValue: UInt = minceAndQuince.rawValue
 var minceFromMask: NSRuncingOptions = []

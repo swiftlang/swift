@@ -6,7 +6,7 @@
 import Cocoa
 
 // CHECK: 0{{$}}
-print(NSNumber(integer: 0).description)
+print(NSNumber(value: 0).description)
 
 protocol Q { func foo() }
 

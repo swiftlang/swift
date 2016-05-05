@@ -132,6 +132,11 @@ public:
   const SILDebugScope *getDebugScope() const;
   SILDebugLocation getDebugLocation() const { return Location; }
 
+  /// Sets the debug location.
+  /// Note: Usually it should not be needed to use this function as the location
+  /// is already set in when creating an instruction.
+  void setDebugLocation(SILDebugLocation Loc) { Location = Loc; }
+
   /// removeFromParent - This method unlinks 'self' from the containing basic
   /// block, but does not delete it.
   ///
@@ -783,7 +788,7 @@ class ApplyInstBase<Impl, Base, true>
 protected:
   template <class... As>
   ApplyInstBase(As &&...args)
-    : ApplyInstBase<Impl,Base,false>(std::forward<As>(args)...) {}
+    : ApplyInstBase<Impl, Base, false>(std::forward<As>(args)...) {}
 
 public:
   using super::getCallee;
@@ -2280,15 +2285,35 @@ public:
 /// RefCountingInst - An abstract class of instructions which
 /// manipulate the reference count of their object operand.
 class RefCountingInst : public SILInstruction {
+public:
+  /// The atomicity of a reference counting operation to be used.
+  enum class Atomicity : bool {
+    /// Atomic reference counting operations should be used.
+    Atomic,
+    /// Non-atomic reference counting operations can be used.
+    NonAtomic,
+  };
+protected:
+  Atomicity atomicity;
 protected:
   RefCountingInst(ValueKind Kind, SILDebugLocation DebugLoc)
-      : SILInstruction(Kind, DebugLoc) {}
+      : SILInstruction(Kind, DebugLoc), atomicity(Atomicity::Atomic) {}
+
+  RefCountingInst(ValueKind Kind, SILDebugLocation DebugLoc, SILType Type)
+      : SILInstruction(Kind, DebugLoc, Type), atomicity(Atomicity::Atomic) {}
 
 public:
   static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_RefCountingInst &&
            V->getKind() <= ValueKind::Last_RefCountingInst;
   }
+
+  void setAtomicity(Atomicity flag) { atomicity = flag; }
+  void setNonAtomic() { atomicity = Atomicity::NonAtomic; }
+  void setAtomic() { atomicity = Atomicity::Atomic; }
+  Atomicity getAtomicity() const { return atomicity; }
+  bool isNonAtomic() const { return atomicity == Atomicity::NonAtomic; }
+  bool isAtomic() const { return atomicity == Atomicity::Atomic; }
 };
 
 /// RetainValueInst - Copies a loadable value.
@@ -2297,8 +2322,11 @@ class RetainValueInst : public UnaryInstructionBase<ValueKind::RetainValueInst,
                                                     /*HasValue*/ false> {
   friend class SILBuilder;
 
-  RetainValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand) {}
+  RetainValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                  Atomicity atomicity)
+      : UnaryInstructionBase(DebugLoc, operand) {
+    setAtomicity(atomicity);
+  }
 };
 
 /// ReleaseValueInst - Destroys a loadable value.
@@ -2307,8 +2335,11 @@ class ReleaseValueInst : public UnaryInstructionBase<ValueKind::ReleaseValueInst
                                                      /*HasValue*/ false> {
   friend class SILBuilder;
 
-  ReleaseValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand) {}
+  ReleaseValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                   Atomicity atomicity)
+      : UnaryInstructionBase(DebugLoc, operand) {
+    setAtomicity(atomicity);
+  }
 };
 
 /// Transfers ownership of a loadable value to the current autorelease pool.
@@ -2318,8 +2349,11 @@ class AutoreleaseValueInst
                                                 /*HasValue*/ false> {
   friend class SILBuilder;
 
-  AutoreleaseValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand) {}
+  AutoreleaseValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                       Atomicity atomicity)
+      : UnaryInstructionBase(DebugLoc, operand) {
+    setAtomicity(atomicity);
+  }
 };
 
 /// SetDeallocatingInst - Sets the operand in deallocating state.
@@ -2332,8 +2366,11 @@ class SetDeallocatingInst
                                                 /*HasValue*/ false> {
   friend class SILBuilder;
 
-  SetDeallocatingInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand) {}
+  SetDeallocatingInst(SILDebugLocation DebugLoc, SILValue operand,
+                      Atomicity atomicity)
+      : UnaryInstructionBase(DebugLoc, operand) {
+    setAtomicity(atomicity);
+  }
 };
 
 /// StrongPinInst - Ensure that the operand is retained and pinned, if
@@ -2344,24 +2381,28 @@ class SetDeallocatingInst
 /// unpin may be conservatively assumed to have arbitrary
 /// side-effects.)
 class StrongPinInst
-  : public UnaryInstructionBase<ValueKind::StrongPinInst, SILInstruction,
+  : public UnaryInstructionBase<ValueKind::StrongPinInst, RefCountingInst,
                                 /*HasResult*/ true>
 {
   friend class SILBuilder;
 
-  StrongPinInst(SILDebugLocation DebugLoc, SILValue operand);
+  StrongPinInst(SILDebugLocation DebugLoc, SILValue operand,
+                Atomicity atomicity);
 };
 
 /// StrongUnpinInst - Given that the operand is the result of a
 /// strong_pin instruction, unpin it.
 class StrongUnpinInst
-  : public UnaryInstructionBase<ValueKind::StrongUnpinInst, SILInstruction,
+  : public UnaryInstructionBase<ValueKind::StrongUnpinInst, RefCountingInst,
                                 /*HasResult*/ false>
 {
   friend class SILBuilder;
 
-  StrongUnpinInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand) {}
+  StrongUnpinInst(SILDebugLocation DebugLoc, SILValue operand,
+                  Atomicity atomicity)
+      : UnaryInstructionBase(DebugLoc, operand) {
+    setAtomicity(atomicity);
+  }
 };
 
 /// TupleInst - Represents a constructed loadable tuple.
@@ -3325,8 +3366,11 @@ class StrongRetainInst
 {
   friend class SILBuilder;
 
-  StrongRetainInst(SILDebugLocation DebugLoc, SILValue Operand)
-      : UnaryInstructionBase(DebugLoc, Operand) {}
+  StrongRetainInst(SILDebugLocation DebugLoc, SILValue Operand,
+                   Atomicity atomicity)
+      : UnaryInstructionBase(DebugLoc, Operand) {
+    setAtomicity(atomicity);
+  }
 };
 
 /// StrongReleaseInst - Decrease the strong reference count of an object.
@@ -3340,8 +3384,11 @@ class StrongReleaseInst
 {
   friend class SILBuilder;
 
-  StrongReleaseInst(SILDebugLocation DebugLoc, SILValue Operand)
-      : UnaryInstructionBase(DebugLoc, Operand) {}
+  StrongReleaseInst(SILDebugLocation DebugLoc, SILValue Operand,
+                    Atomicity atomicity)
+      : UnaryInstructionBase(DebugLoc, Operand) {
+    setAtomicity(atomicity);
+  }
 };
 
 /// StrongRetainUnownedInst - Increase the strong reference count of an object
@@ -3354,8 +3401,11 @@ class StrongRetainUnownedInst :
 {
   friend class SILBuilder;
 
-  StrongRetainUnownedInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand) {}
+  StrongRetainUnownedInst(SILDebugLocation DebugLoc, SILValue operand,
+                          Atomicity atomicity)
+      : UnaryInstructionBase(DebugLoc, operand) {
+    setAtomicity(atomicity);
+  }
 };
 
 /// UnownedRetainInst - Increase the unowned reference count of an object.
@@ -3365,8 +3415,11 @@ class UnownedRetainInst :
 {
   friend class SILBuilder;
 
-  UnownedRetainInst(SILDebugLocation DebugLoc, SILValue Operand)
-      : UnaryInstructionBase(DebugLoc, Operand) {}
+  UnownedRetainInst(SILDebugLocation DebugLoc, SILValue Operand,
+                    Atomicity atomicity)
+      : UnaryInstructionBase(DebugLoc, Operand) {
+    setAtomicity(atomicity);
+  }
 };
 
 /// UnownedReleaseInst - Decrease the unowned reference count of an object.
@@ -3376,8 +3429,11 @@ class UnownedReleaseInst :
 {
   friend class SILBuilder;
 
-  UnownedReleaseInst(SILDebugLocation DebugLoc, SILValue Operand)
-      : UnaryInstructionBase(DebugLoc, Operand) {}
+  UnownedReleaseInst(SILDebugLocation DebugLoc, SILValue Operand,
+                     Atomicity atomicity)
+      : UnaryInstructionBase(DebugLoc, Operand) {
+    setAtomicity(atomicity);
+  }
 };
 
 /// FixLifetimeInst - An artificial use of a value for the purposes of ARC or
@@ -3781,6 +3837,9 @@ public:
   }
 
   bool isBranch() const { return !getSuccessors().empty(); }
+
+  /// Returns true if this terminator exits the function.
+  bool isFunctionExiting() const;
 
   TermKind getTermKind() const { return ValueKindAsTermKind(getKind()); }
 };
@@ -4451,7 +4510,7 @@ public:
     default:                                                            \
       llvm_unreachable("not an apply instruction!");                    \
     }                                                                   \
-  } while(0)
+  } while (0)
 
   /// Return the callee operand.
   SILValue getCallee() const {

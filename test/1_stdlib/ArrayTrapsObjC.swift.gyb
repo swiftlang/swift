@@ -11,13 +11,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 import Foundation
 
@@ -44,7 +37,7 @@ ArrayTraps.test("downcast2")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
-  let a: [AnyObject] = [ "String", 1 ]
+  let a: [AnyObject] = ["String", 1]
   let sa = a as! [NSString]
   let s0 = sa[0]
   expectCrashLater()
@@ -115,11 +108,11 @@ class ViolateInoutSafetySwitchToObjcBuffer {
 
   @inline(never)
   func accessArrayViaInoutViolation() {
-    anArray = _convertNSArrayToArray(nsArray)
+    anArray = nsArray as! [ElementClass]
   }
 
   @inline(never)
-  func runLoop(A: inout [ElementClass]) {
+  func runLoop(_ A: inout [ElementClass]) {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeTypeChecked = A._hoistableIsNativeTypeChecked()
@@ -162,7 +155,7 @@ class ViolateInoutSafetyNeedElementTypeCheck {
   }
 
   @inline(never)
-  func runLoop(A: inout [ElementClass]) {
+  func runLoop(_ A: inout [ElementClass]) {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeTypeChecked = A._hoistableIsNativeTypeChecked()

@@ -17,20 +17,20 @@ infix operator != {
   precedence 160
 }
 
-func testslice(s: Array<Int>) {
+func testslice(_ s: Array<Int>) {
   for i in 0..<s.count { print(s[i]+1) }
   for i in s { print(i+1) }
   _ = s[0..<2]
   _ = s[0...1]
 }
 
-@_silgen_name("malloc") func c_malloc(size: Int) -> UnsafeMutablePointer<Void>
-@_silgen_name("free") func c_free(p: UnsafeMutablePointer<Void>)
+@_silgen_name("malloc") func c_malloc(_ size: Int) -> UnsafeMutablePointer<Void>
+@_silgen_name("free") func c_free(_ p: UnsafeMutablePointer<Void>)
 
 class Vector<T> {
   var length : Int
   var capacity : Int
-  var base : UnsafeMutablePointer<T>
+  var base : UnsafeMutablePointer<T>!
 
   init() {
     length = 0
@@ -38,7 +38,7 @@ class Vector<T> {
     base = nil
   }
 
-  func push_back(elem: T) {
+  func push_back(_ elem: T) {
     if length == capacity {
       let newcapacity = capacity * 2 + 2
       let size = Int(Builtin.sizeof(T.self))
@@ -86,7 +86,7 @@ protocol Comparable {
   func <(lhs: Self, rhs: Self) -> Bool
 }
 
-func sort<T : Comparable>(array: inout [T]) {
+func sort<T : Comparable>(_ array: inout [T]) {
   for i in 0..<array.count {
     for j in i+1..<array.count {
       if array[j] < array[i] {
@@ -98,7 +98,7 @@ func sort<T : Comparable>(array: inout [T]) {
   }
 }
 
-func find<T : Eq>(array: [T], value: T) -> Int {
+func find<T : Eq>(_ array: [T], value: T) -> Int {
   var idx = 0
   for elt in array {
      if (elt == value) { return idx }
@@ -107,7 +107,7 @@ func find<T : Eq>(array: [T], value: T) -> Int {
   return -1
 }
 
-func findIf<T>(array: [T], fn: (T) -> Bool) -> Int {
+func findIf<T>(_ array: [T], fn: (T) -> Bool) -> Int {
   var idx = 0
   for elt in array {
      if (fn(elt)) { return idx }

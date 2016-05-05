@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -arc-loop-opts %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts -disable-code-motion-arc=0 %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts -disable-code-motion-arc=0 %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -arc-loop-opts -disable-code-motion-arc=0 %s | FileCheck %s
 
 sil_stage canonical
 
@@ -297,7 +297,7 @@ bb0(%0 : $@box Builtin.Int32):
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: strong_release
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb1:
 // CHECK-NEXT: strong_retain
 // CHECK-NEXT: apply
@@ -816,7 +816,7 @@ bb2:
 // CHECK-NEXT: cond_br
 // CHECK: bb3:
 // CHECK-NEXT: apply
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb4:
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
@@ -873,10 +873,10 @@ bb3:
 // CHECK-NEXT: strong_retain
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb2:
 // CHECK-NEXT: strong_release
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb3:
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
@@ -903,9 +903,9 @@ bb3:
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
 // CHECK-NEXT: strong_release
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb2:
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb3:
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
@@ -953,9 +953,9 @@ bb3:
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
 // CHECK-NEXT: strong_release
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb2:
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb3:
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple ()
@@ -983,10 +983,10 @@ bb3:
 // CHECK-NEXT: strong_retain
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb2:
 // CHECK-NEXT: strong_release
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb3:
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple ()
@@ -1013,9 +1013,9 @@ bb3:
 // CHECK: bb0
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb2:
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb3:
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple ()
@@ -1044,9 +1044,9 @@ bb3:
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
 // CHECK-NEXT: strong_retain
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb2:
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb3:
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple ()
@@ -1072,10 +1072,10 @@ bb3:
 // CHECK: bb0
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb2:
 // CHECK-NEXT: strong_retain
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb3:
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple ()
@@ -1124,9 +1124,9 @@ bb3:
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
 // CHECK-NEXT: strong_retain
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb2:
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb3:
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple ()
@@ -1154,10 +1154,10 @@ bb3:
 // CHECK-NEXT: strong_retain
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb2:
 // CHECK-NEXT: strong_retain
-// CHECK-NEXT: br
+// CHECK-NEXT: br bb
 // CHECK: bb3:
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple ()

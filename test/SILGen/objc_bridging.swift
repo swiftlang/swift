@@ -1,13 +1,14 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-silgen-test-overlays
-
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module -o %t -I %S/../Inputs/ObjCBridging %S/../Inputs/ObjCBridging/Appliances.swift
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -I %S/../Inputs/ObjCBridging -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
 
 // REQUIRES: objc_interop
 
 import Foundation
+import Appliances
 
-func getDescription(o: NSObject) -> String {
+func getDescription(_ o: NSObject) -> String {
   return o.description
 }
 // CHECK-LABEL: sil hidden @_TF13objc_bridging14getDescription
@@ -26,7 +27,7 @@ func getDescription(o: NSObject) -> String {
 // CHECK:  return [[NATIVE]] 
 // CHECK:}
 
-func getUppercaseString(s: NSString) -> String {
+func getUppercaseString(_ s: NSString) -> String {
   return s.uppercase()
 }
 // CHECK-LABEL: sil hidden @_TF13objc_bridging18getUppercaseString
@@ -49,7 +50,7 @@ func getUppercaseString(s: NSString) -> String {
 // CHECK: }
 
 // @interface Foo -(void) setFoo: (NSString*)s; @end
-func setFoo(f: Foo, s: String) {
+func setFoo(_ f: Foo, s: String) {
   var s = s
   f.setFoo(s)
 }
@@ -70,7 +71,7 @@ func setFoo(f: Foo, s: String) {
 // CHECK: }
 
 // @interface Foo -(BOOL) zim; @end
-func getZim(f: Foo) -> Bool {
+func getZim(_ f: Foo) -> Bool {
   return f.zim()
 }
 
@@ -104,7 +105,7 @@ func getZim(f: Foo) -> Bool {
 // CHECK-arm64: }
 
 // @interface Foo -(void) setZim: (BOOL)b; @end
-func setZim(f: Foo, b: Bool) {
+func setZim(_ f: Foo, b: Bool) {
   f.setZim(b)
 }
 // CHECK-ios-i386-LABEL: sil hidden @_TF13objc_bridging6setZim
@@ -135,7 +136,7 @@ func setZim(f: Foo, b: Bool) {
 // CHECK-watchos-i386: }
 
 // @interface Foo -(_Bool) zang; @end
-func getZang(f: Foo) -> Bool {
+func getZang(_ f: Foo) -> Bool {
   return f.zang()
 }
 // CHECK-LABEL: sil hidden @_TF13objc_bridging7getZangFCSo3FooSb
@@ -143,7 +144,7 @@ func getZang(f: Foo) -> Bool {
 // CHECK:   return [[BOOL]]
 
 // @interface Foo -(void) setZang: (_Bool)b; @end
-func setZang(f: Foo, _ b: Bool) {
+func setZang(_ f: Foo, _ b: Bool) {
   f.setZang(b)
 }
 // CHECK-LABEL: sil hidden @_TF13objc_bridging7setZangFTCSo3FooSb_T_
@@ -170,7 +171,7 @@ func callBar() -> String {
 // CHECK: }
 
 // void setBar(NSString *s);
-func callSetBar(s: String) {
+func callSetBar(_ s: String) {
   var s = s
   setBar(s)
 }
@@ -212,7 +213,7 @@ extension NSString {
   // CHECK-NOT: _TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
   // CHECK: }
 
-  func nsstrArg(s: NSString) { }
+  func nsstrArg(_ s: NSString) { }
   // CHECK-LABEL: sil hidden [thunk] @_TToFE13objc_bridgingCSo8NSString8nsstrArg
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: _TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
@@ -306,7 +307,7 @@ class Bas : NSObject {
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[STR]])
   // CHECK:   return [[NSSTR]]
   // CHECK: }
-  func strArg(s: String) { }
+  func strArg(_ s: String) { }
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas6strArg
   // CHECK: bb0([[NSSTR:%.*]] : $NSString, [[THIS:%.*]] : $Bas):
   // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
@@ -322,7 +323,7 @@ class Bas : NSObject {
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: _TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
   // CHECK: }
-  func nsstrArg(s: NSString) { }
+  func nsstrArg(_ s: NSString) { }
   // CHECK-LABEL: sil hidden @_TFC13objc_bridging3Bas8nsstrArg
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: _TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
@@ -345,7 +346,7 @@ class Bas : NSObject {
   // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[ARRAY]], [[SELF]]) : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
   // CHECK:   strong_release [[SELF]] : $Bas
   // CHECK:   return [[RESULT]] : $()
-  func arrayArg(array: [AnyObject]) { }
+  func arrayArg(_ array: [AnyObject]) { }
   
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas11arrayResult{{.*}} : $@convention(objc_method) (Bas) -> @autoreleased NSArray
   // CHECK: bb0([[SELF:%[0-9]+]] : $Bas):
@@ -364,7 +365,7 @@ class Bas : NSObject {
 }
 
 // CHECK-LABEL: sil hidden @_TF13objc_bridging16applyStringBlock
-func applyStringBlock(f: @convention(block) String -> String, x: String) -> String {
+func applyStringBlock(_ f: @convention(block) String -> String, x: String) -> String {
   // CHECK: [[BLOCK:%.*]] = copy_block %0
   // CHECK: [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
   // CHECK: [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]
@@ -434,11 +435,51 @@ func forceNSArrayMembers() -> (NSArray, NSArray) {
 // CHECK-arm64:         function_ref @getBOOL : $@convention(c) () -> Bool
 // CHECK-arm64:         function_ref @getBool : $@convention(c) () -> Bool
 
-func bools(x: Bool) -> (Bool, Bool) {
+func bools(_ x: Bool) -> (Bool, Bool) {
   useBOOL(x)
   useBool(x)
 
   return (getBOOL(), getBool())
 }
 
+// CHECK-LABEL: sil hidden @_TF13objc_bridging9getFridge
+// CHECK: bb0([[HOME:%[0-9]+]] : $APPHouse):
+func getFridge(_ home: APPHouse) -> Refrigerator {
+  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[HOME]] : $APPHouse, #APPHouse.fridge!getter.1.foreign
+  // CHECK: [[OBJC_RESULT:%[0-9]+]] = apply [[GETTER]]([[HOME]])
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TZFV10Appliances12Refrigerator36_unconditionallyBridgeFromObjectiveC
+  // CHECK: [[REFRIGERATOR_META:%[0-9]+]] = metatype $@thin Refrigerator.Type
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[BRIDGE_FN]]([[OBJC_RESULT]], [[REFRIGERATOR_META]])
+  // CHECK: strong_release [[HOME]] : $APPHouse
+  // CHECK: return [[RESULT]] : $Refrigerator
+  return home.fridge
+}
 
+// CHECK-LABEL: sil hidden @_TF13objc_bridging16updateFridgeTemp
+// CHECK: bb0([[HOME:%[0-9]+]] : $APPHouse, [[DELTA:%[0-9]+]] : $Double):
+func updateFridgeTemp(_ home: APPHouse, delta: Double) {
+  // +=
+  // CHECK: [[PLUS_EQ:%[0-9]+]] = function_ref @_TZFsoi2peFTRSdSd_T_
+
+  // Temporary fridge
+  // CHECK: [[TEMP_FRIDGE:%[0-9]+]]  = alloc_stack $Refrigerator
+
+  // Get operation
+  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[HOME]] : $APPHouse, #APPHouse.fridge!getter.1.foreign
+  // CHECK: [[OBJC_FRIDGE:%[0-9]+]] = apply [[GETTER]]([[HOME]])
+  // CHECK: [[BRIDGE_FROM_FN:%[0-9]+]] = function_ref @_TZFV10Appliances12Refrigerator36_unconditionallyBridgeFromObjectiveC
+  // CHECK: [[REFRIGERATOR_META:%[0-9]+]] = metatype $@thin Refrigerator.Type
+  // CHECK: [[FRIDGE:%[0-9]+]] = apply [[BRIDGE_FROM_FN]]([[OBJC_FRIDGE]], [[REFRIGERATOR_META]])
+
+  // Addition
+  // CHECK: [[TEMP:%[0-9]+]] = struct_element_addr [[TEMP_FRIDGE]] : $*Refrigerator, #Refrigerator.temperature
+  // CHECK: apply [[PLUS_EQ]]([[TEMP]], [[DELTA]])
+
+  // Setter
+  // CHECK: [[FRIDGE:%[0-9]+]] = load [[TEMP_FRIDGE]] : $*Refrigerator
+  // CHECK: [[SETTER:%[0-9]+]] = class_method [volatile] [[HOME]] : $APPHouse, #APPHouse.fridge!setter.1.foreign
+  // CHECK: [[BRIDGE_TO_FN:%[0-9]+]] = function_ref @_TFV10Appliances12Refrigerator19_bridgeToObjectiveCfT_CSo15APPRefrigerator
+  // CHECK: [[OBJC_ARG:%[0-9]+]] = apply [[BRIDGE_TO_FN]]([[FRIDGE]])
+  // CHECK: apply [[SETTER]]([[OBJC_ARG]], [[HOME]])
+  home.fridge.temperature += delta
+}

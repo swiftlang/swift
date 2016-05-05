@@ -2,25 +2,25 @@
 
 // Test various tuple constraints.
 
-func f0(x x: Int, y: Float) {}
+func f0(x: Int, y: Float) {}
 
 var i : Int
 var j : Int
 var f : Float
 
-func f1(y y: Float, rest: Int...) {}
+func f1(y: Float, rest: Int...) {}
 
 func f2(_: (x: Int, y: Int) -> Int) {}
-func f2xy(x x: Int, y: Int) -> Int {}
-func f2ab(a a: Int, b: Int) -> Int {}
-func f2yx(y y: Int, x: Int) -> Int {}
+func f2xy(x: Int, y: Int) -> Int {}
+func f2ab(a: Int, b: Int) -> Int {}
+func f2yx(y: Int, x: Int) -> Int {}
 
-func f3(x: (x: Int, y: Int) -> ()) {}
-func f3a(x: Int, y: Int) {}
+func f3(_ x: (x: Int, y: Int) -> ()) {}
+func f3a(_ x: Int, y: Int) {}
 func f3b(_: Int) {}
 
-func f4(rest: Int...) {}
-func f5(x: (Int, Int)) {}
+func f4(_ rest: Int...) {}
+func f5(_ x: (Int, Int)) {}
 
 func f6(_: (i: Int, j: Int), k: Int = 15) {}
 
@@ -48,7 +48,7 @@ wantFloat(values.float)
 var e : (x: Int..., y: Int) // expected-error{{cannot create a variadic tuple}}
 
 typealias Interval = (a:Int, b:Int)
-func takeInterval(x: Interval) {}
+func takeInterval(_ x: Interval) {}
 takeInterval(Interval(1, 2))
 
 f5((1,1))
@@ -72,7 +72,7 @@ extension Int : PosixErrorReturn {
 }
 
 func posixCantFail<A, T : protocol<Comparable, PosixErrorReturn>>
-  (f:(A) -> T) -> (args:A) -> T
+  (_ f:(A) -> T) -> (args:A) -> T
 {
   return { args in
     let result = f(args)
@@ -81,7 +81,7 @@ func posixCantFail<A, T : protocol<Comparable, PosixErrorReturn>>
   }
 }
 
-func open(name: String, oflag: Int) -> Int { }
+func open(_ name: String, oflag: Int) -> Int { }
 
 var foo: Int = 0
 
@@ -93,7 +93,7 @@ class C {
   func f(_: C) {}
 }
 
-func testLValue(c: C) {
+func testLValue(_ c: C) {
   var c = c
   c.f(c)
 
@@ -103,7 +103,7 @@ func testLValue(c: C) {
 
 
 // <rdar://problem/21444509> Crash in TypeChecker::coercePatternToType
-func invalidPatternCrash(let k : Int) {
+func invalidPatternCrash(_ k : Int) {
   switch k {
   case (k, cph_: k) as UInt8:  // expected-error {{tuple pattern cannot match values of the non-tuple type 'UInt8'}} expected-warning {{cast from 'Int' to unrelated type 'UInt8' always fails}}
     break
@@ -124,7 +124,7 @@ func scruff() -> (AnyObject?, ErrorProtocol?) {
 }
 
 // Test variadics with trailing closures.
-func variadicWithTrailingClosure(x: Int..., y: Int = 2, fn: (Int, Int) -> Int) {
+func variadicWithTrailingClosure(_ x: Int..., y: Int = 2, fn: (Int, Int) -> Int) {
 }
 
 variadicWithTrailingClosure(1, 2, 3) { $0 + $1 }
@@ -146,7 +146,7 @@ variadicWithTrailingClosure(fn: +)
 
 
 // <rdar://problem/23700031> QoI: Terrible diagnostic in tuple assignment
-func gcd_23700031<T>(a: T, b: T) {
+func gcd_23700031<T>(_ a: T, b: T) {
   var a = a
   var b = b
   (a, b) = (b, a % b)  // expected-error {{binary operator '%' cannot be applied to two 'T' operands}}
@@ -164,15 +164,15 @@ struct Victory<General> {
 struct MagicKingdom<K> : Kingdom {
   typealias King = K
 }
-func magify<T>(t: T) -> MagicKingdom<T> { return MagicKingdom() }
-func foo(pair: (Int,Int)) -> Victory<(x:Int, y:Int)> {
+func magify<T>(_ t: T) -> MagicKingdom<T> { return MagicKingdom() }
+func foo(_ pair: (Int,Int)) -> Victory<(x:Int, y:Int)> {
   return Victory(magify(pair)) // expected-error {{cannot convert return expression of type 'Victory<(Int, Int)>' to return type 'Victory<(x: Int, y: Int)>'}}
 }
 
 
 // https://bugs.swift.org/browse/SR-596
 // Compiler crashes when accessing a non-existent property of a closure parameter
-func call(f: C -> Void) {}
+func call(_ f: C -> Void) {}
 func makeRequest() {
   call { obj in
     print(obj.invalidProperty)  // expected-error {{value of type 'C' has no member 'invalidProperty'}}

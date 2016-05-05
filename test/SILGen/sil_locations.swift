@@ -5,7 +5,7 @@
 func ifexpr() -> Int {
   var x : Int = 0
   if true {
-    x++; 
+    x+=1
   }
   return x
   // CHECK-LABEL: sil hidden  @_TF13sil_locations6ifexprFT_Si
@@ -18,9 +18,9 @@ func ifexpr() -> Int {
 func ifelseexpr() -> Int {
   var x : Int = 0
   if true {
-    x++; 
+    x+=1
   } else {
-    x--;
+    x-=1
   }
   return x
   // CHECK-LABEL: sil hidden  @_TF13sil_locations10ifelseexprFT_Si
@@ -62,25 +62,25 @@ func ifexpr_rval() -> Int {
   // CHECK: br bb{{[0-9]+}}({{%.*}}), loc "{{.*}}":[[@LINE-8]]:22
 }
 
-// TODO: missing info on the first branch.
-func forstmt_empty_cond(i: Int) -> Int {
-  for var i=0;;++i {}
-    // CHECK-LABEL: sil hidden  @{{.*}}forstmt_empty_cond{{.*}}
-    // CHECK: apply {{.*}}, loc "{{.*}}":[[@LINE-2]]:13
-    // CHECK: br [[TRUE_BB:bb[0-9]+]]
-    // CHECK: [[TRUE_BB:bb[0-9]+]]:
-    // CHECK: br [[TRUE_BB:bb[0-9]+]], loc "{{.*}}":[[@LINE-5]]:21
-}
+
+
+
+
+
+
+
+
+
 
 // --- Test function calls.
-func simpleDirectCallTest(i: Int) -> Int {
+func simpleDirectCallTest(_ i: Int) -> Int {
   return simpleDirectCallTest(i)
   // CHECK-LABEL: sil hidden  @_TF13sil_locations20simpleDirectCallTest
   // CHECK: function_ref @_TF13sil_locations20simpleDirectCallTest{{.*}}, loc "{{.*}}":[[@LINE-2]]:10
   // CHECK: {{%.*}} apply {{%.*}} line:[[@LINE-3]]:10
 }
 
-func templateTest<T>(value: T) -> T {
+func templateTest<T>(_ value: T) -> T {
   return value
 }
 func useTemplateTest() -> Int {
@@ -90,8 +90,8 @@ func useTemplateTest() -> Int {
   // CHECK: function_ref @_TFSiC{{.*}}, loc "{{.*}}":87
 }
 
-func foo(x: Int) -> Int {
-  func bar(y: Int) -> Int {
+func foo(_ x: Int) -> Int {
+  func bar(_ y: Int) -> Int {
     return x + y
   }
   return bar(1)
@@ -116,7 +116,7 @@ func multipleReturnsImplicitAndExplicit() {
   if x > 10 {
     return
   }
-  x++;
+  x += 1
   // CHECK-LABEL: sil hidden  @_TF13sil_locations34multipleReturnsImplicitAndExplicitFT_T_
   // CHECK: cond_br
   // CHECK: br bb{{[0-9]+}}, loc "{{.*}}":[[@LINE-5]]:5, {{.*}}:return
@@ -175,13 +175,13 @@ func testIf() {
 }
 
 func testFor() {
-  for (var i:Int = 0; i<10; i++) {
+  for i in 0..<10 {
     var y: Int = 300
-    y++;
+    y+=1
     if true {
       break
     }
-    y--;
+    y-=1
     continue
   }
 
@@ -215,7 +215,7 @@ protocol Ordinable {
   func ord() -> Int
 }
 
-func b<T : Ordinable>(seq: T) -> (Int) -> Int {
+func b<T : Ordinable>(_ seq: T) -> (Int) -> Int {
   return {i in i + seq.ord() }
 }
 
@@ -233,7 +233,7 @@ func captures_tuple<T, U>(x: (T, U)) -> () -> (T, U) {
   // CHECK: copy_addr {{.*}}, loc "{{.*}}":[[@LINE-10]]:11
 }
 
-func interpolated_string(x: Int, y: String) -> String {
+func interpolated_string(_ x: Int, y: String) -> String {
   return "The \(x) Million Dollar \(y)"
   // CHECK-LABEL: sil hidden @_TF13sil_locations19interpolated_string
 
@@ -245,9 +245,9 @@ func interpolated_string(x: Int, y: String) -> String {
 }
 
 
-func int(x: Int) {}
+func int(_ x: Int) {}
 func tuple() -> (Int, Float) { return (1, 1.0) }  
-func tuple_element(x: (Int, Float)) {
+func tuple_element(_ x: (Int, Float)) {
   int(tuple().0)
   // CHECK-LABEL: sil hidden @_TF13sil_locations13tuple_element
 
@@ -277,7 +277,7 @@ func a() {}
 func b() -> Int { return 0 }
 protocol P { func p() }
 struct X : P { func p() {} }
-func test_isa_2(p: P) {
+func test_isa_2(_ p: P) {
   switch (p, b()) {
   case (is X, b()):
     a()
@@ -306,7 +306,7 @@ enum SinglePayloadAddressOnly {
   case x(Runcible)
   case y
 }
-func printSinglePayloadAddressOnly(v:SinglePayloadAddressOnly) {
+func printSinglePayloadAddressOnly(_ v:SinglePayloadAddressOnly) {
   switch v {
   case .x(let runcible):
     runcible.runce()
@@ -350,9 +350,9 @@ func testStringForEachStmt() {
 
 
 func testForStmt() {
-  var i = 0
+  
   var m = 0
-  for (i = 0; i < 10; ++i) {
+  for i in 0..<10 {
     m += 1
     if m == 15 {
       break
@@ -363,19 +363,19 @@ func testForStmt() {
   }
 
 
-  // CHECK-LABEL: sil hidden @_TF13sil_locations11testForStmtFT_T_
-  // CHECK: br {{.*}} line:[[@LINE-12]]:3
-  // CHECK: cond_br {{.*}} line:[[@LINE-13]]:15
-  // CHECK: cond_br {{.*}} line:[[@LINE-12]]:8
-  // Break branch:
-  // CHECK: br {{.*}} line:[[@LINE-13]]:7
-  // Continue branch:
-  // CHECK: br {{.*}} line:[[@LINE-13]]:7
-  // Looping back branch:
-  // CHECK: br {{.*}} line:[[@LINE-12]]:3
-  // Condition is false branch:
-  // CHECK: br {{.*}} line:[[@LINE-22]]:3
 
+  
+
+  
+  
+  
+  
+  
+  
+  
+
+  
+  
 }
 
 

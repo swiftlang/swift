@@ -32,15 +32,15 @@ func testError() {
   } catch {}
 
 #elseif ASQEXPR
-// ASQEXPR: sil_witness_table shared TestError: _BridgedNSError module __ObjC
+// ASQEXPR: sil_witness_table shared [fragile] TestError: _BridgedNSError module __ObjC
   let wasTestError = testErrorNSError as? TestError; wasTestError
 
 #elseif ASBANGEXPR
-// ASBANGEXPR: sil_witness_table shared TestError: _BridgedNSError module __ObjC
+// ASBANGEXPR: sil_witness_table shared [fragile] TestError: _BridgedNSError module __ObjC
   let terr2 = testErrorNSError as! TestError; terr2
 
 #elseif ISEXPR
-// ISEXPR: sil_witness_table shared TestError: _BridgedNSError module __ObjC
+// ISEXPR: sil_witness_table shared [fragile] TestError: _BridgedNSError module __ObjC
   if (testErrorNSError is TestError) {
     print("true")
   } else {
@@ -48,14 +48,14 @@ func testError() {
   }
 
 #elseif CATCHIS
-// CATCHIS: sil_witness_table shared TestError: _BridgedNSError module __ObjC
+// CATCHIS: sil_witness_table shared [fragile] TestError: _BridgedNSError module __ObjC
   do {
     throw TestError.TETwo
   } catch is TestError {
   } catch {}
 
 #elseif CATCHAS
-// CATCHAS: sil_witness_table shared TestError: _BridgedNSError module __ObjC
+// CATCHAS: sil_witness_table shared [fragile] TestError: _BridgedNSError module __ObjC
   do {
     throw TestError.TETwo
   } catch let err as TestError {
@@ -65,13 +65,13 @@ func testError() {
 #elseif GENERICONLY
 // FIXME: THE BELOW IS WRONG! This alone doesn't pull in the conformance, but it should.
 // GENERICONLY-NOT: TestError: _BridgedNSError
-  func dyncast<T, U>(x: T) -> U {
+  func dyncast<T, U>(_ x: T) -> U {
     return x as! U
   }
   let _ : TestError = dyncast(testErrorNSError)
 
 #else
-// CHECK: sil_witness_table shared TestError: _BridgedNSError module __ObjC
+// CHECK: sil_witness_table shared [fragile] TestError: _BridgedNSError module __ObjC
   let terr = getErr()
   switch (terr) { case .TENone, .TEOne, .TETwo: break } // ok
 

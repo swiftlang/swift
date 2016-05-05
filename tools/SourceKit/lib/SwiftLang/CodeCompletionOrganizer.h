@@ -29,7 +29,7 @@ struct Options {
   bool useImportDepth = true;
   bool groupOverloads = false;
   bool groupStems = false;
-  bool includeExactMatch = false;
+  bool includeExactMatch = true;
   bool addInnerResults = false;
   bool addInnerOperators = true;
   bool addInitsToTopLevel = false;

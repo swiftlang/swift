@@ -25,6 +25,7 @@ public struct Character :
   //
   // If the grapheme cluster can be represented as `.small`, it
   // should be represented as such.
+  @_versioned
   internal enum Representation {
     // A _StringBuffer whose first grapheme cluster is self.
     // NOTE: may be more than 1 Character long.
@@ -93,7 +94,7 @@ public struct Character :
     _precondition(
       s._core.count != 0, "Can't form a Character from an empty String")
     _precondition(
-      s.startIndex.successor() == s.endIndex,
+      s.index(after: s.startIndex) == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 
     let (count, initialUTF8) = s._core._encodeSomeUTF8(from: 0)
@@ -106,7 +107,7 @@ public struct Character :
     }
     else {
       if let native = s._core.nativeBuffer
-              where native.start == UnsafeMutablePointer(s._core._baseAddress) {
+              where native.start == UnsafeMutablePointer(s._core._baseAddress!){
         _representation = .large(native._storage)
         return
       }
@@ -119,7 +120,7 @@ public struct Character :
   /// Returns the index of the lowest byte that is 0xFF, or 8 if
   /// there is none.
   @warn_unused_result
-  static func _smallSize(value: UInt64) -> Int {
+  static func _smallSize(_ value: UInt64) -> Int {
     var mask: UInt64 = 0xFF
     for i in 0..<8 {
       if (value & mask) == mask {
@@ -131,11 +132,17 @@ public struct Character :
   }
 
   @warn_unused_result
-  static func _smallValue(value: Builtin.Int63) -> UInt64 {
+  static func _smallValue(_ value: Builtin.Int63) -> UInt64 {
     return UInt64(Builtin.zext_Int63_Int64(value)) | (1<<63)
   }
 
-  internal struct _SmallUTF8 : Collection {
+  internal struct _SmallUTF8 : RandomAccessCollection {
+    typealias Indices = CountableRange<Int>
+    
+    var indices: CountableRange<Int> {
+      return startIndex..<endIndex
+    }
+
     init(_ u8: UInt64) {
       let utf8Count = Character._smallSize(u8)
       _sanityCheck(utf8Count <= 8, "Character with more than 8 UTF-8 code units")
@@ -154,7 +161,7 @@ public struct Character :
     ///
     /// `endIndex` is not a valid argument to `subscript`, and is always
     /// reachable from `startIndex` by zero or more applications of
-    /// `successor()`.
+    /// `index(after:)`.
     var endIndex: Int {
       return Int(count)
     }
@@ -197,7 +204,9 @@ public struct Character :
     var data: UInt64
   }
 
-  struct _SmallUTF16 : Collection {
+  struct _SmallUTF16 : RandomAccessCollection {
+    typealias Indices = CountableRange<Int>
+    
     init(_ u8: UInt64) {
       let count = UTF16.transcodedLength(
         of: _SmallUTF8(u8).makeIterator(),
@@ -269,6 +278,7 @@ public struct Character :
     return String(self).utf16
   }
 
+  @_versioned
   internal var _representation: Representation
 }
 
@@ -290,7 +300,7 @@ extension String {
         UTF8.self, input: smallUTF8)
     case let .large(value):
       let buf = String(_StringCore(_StringBuffer(value)))
-      self = buf[buf.startIndex..<buf.startIndex.successor()]
+      self = buf[buf.startIndex..<buf.index(after: buf.startIndex)]
     }
   }
 }

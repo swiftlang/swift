@@ -9,13 +9,13 @@ Abstract
 --------
 
 This document contains some useful information for debugging the
-swift compiler and swift compiler output.
+Swift compiler and Swift compiler output.
 
 Printing the Intermediate Representations
 -----------------------------------------
 
 The most important thing when debugging the compiler is to examine the IR.
-Here is how to dump the IR after the main phases of the swift compiler
+Here is how to dump the IR after the main phases of the Swift compiler
 (assuming you are compiling with optimizations enabled):
 
 #. **Parser**. To print the AST after parsing::
@@ -83,7 +83,7 @@ For details see ``PassManager.cpp``.
 Dumping the SIL and other Data in LLDB
 ``````````````````````````````````````
 
-When debugging the swift compiler with LLDB (or Xcode, of course), there is
+When debugging the Swift compiler with LLDB (or Xcode, of course), there is
 even a more powerful way to examine the data in the compiler, e.g. the SIL.
 Following LLVM's dump() convention, many SIL classes (as well as AST classes)
 provide a dump() function. You can call the dump function with LLDB's
@@ -113,6 +113,22 @@ debugging press <CTRL>-C on the LLDB prompt.
 Note that this only works in Xcode if the PATH variable in the scheme's
 environment setting contains the path to the dot tool.
 
+Debugging and Profiling on SIL level
+````````````````````````````````````
+
+The compiler provides a way to debug and profile on SIL level. To enable SIL
+debugging add the front-end option -gsil together with -g. Example::
+
+    swiftc -g -Xfrontend -gsil -O test.swift -o a.out
+
+This writes the SIL after optimizations into a file and generates debug info
+for it. In the debugger and profiler you can then see the SIL code instead of
+the Swift source code.
+For details see the SILDebugInfoGenerator pass.
+
+To enable SIL debugging and profiling for the Swift standard library, use
+the build-script-impl option ``--build-sil-debugging-stdlib``.
+
 Other Utilities
 ```````````````
 
@@ -125,7 +141,7 @@ Using Breakpoints
 `````````````````
 
 LLDB has very powerful breakpoints, which can be utilized in many ways to debug
-the compiler and swift executables. The examples in this section show the LLDB
+the compiler and Swift executables. The examples in this section show the LLDB
 command lines. In Xcode you can set the breakpoint properties by clicking 'Edit
 breakpoint'.
 
@@ -220,7 +236,7 @@ generality will be called test.lldb)::
     c
     dis -f
 
-TODO: Change this example to apply to the swift compiler instead of to the
+TODO: Change this example to apply to the Swift compiler instead of to the
 stdlib unittests.
 
 Then by running ``lldb test -s test.lldb``, lldb will:
@@ -240,14 +256,14 @@ needing to retype the various commands perfectly every time.
 Debugging Swift Executables
 ---------------------------
 
-One can use the previous tips for debugging the swift compiler with swift
+One can use the previous tips for debugging the Swift compiler with Swift
 executables as well. Here are some additional useful techniques that one can use
 in Swift executables.
 
 Determining the mangled name of a function in LLDB
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-One problem that often comes up when debugging swift code in LLDB is that LLDB
+One problem that often comes up when debugging Swift code in LLDB is that LLDB
 shows the demangled name instead of the mangled name. This can lead to mistakes
 where due to the length of the mangled names one will look at the wrong
 function. Using the following command, one can find the mangled name of the

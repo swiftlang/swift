@@ -122,7 +122,7 @@ To address the problems with the current declaration type checker, we propose a 
     
   }
 
-  func foo(x: X<Int>.Assoc) { }
+  func foo(_ x: X<Int>.Assoc) { }
 
 To bring the ``TypeRepr`` for ``X<Int>.Assoc`` to the "primary name binding" phase, we need to bring ``X`` up to the "primary name binding" phase. Once all dependencies for a phase transition have been resolved, we can perform the phase transition. As noted earlier, it's important to make the dependencies minimal: for example, note that we do not introduce any dependencies on the type argument (``Int``) because it does not affect name lookup. It could, however, affect declaration type validation.
 

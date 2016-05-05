@@ -10,45 +10,50 @@
 //
 //===----------------------------------------------------------------------===//
 
-//===----------------------------------------------------------------------===//
-// FIXME: Workaround for inability to create existentials of protocols
-// with associated types <rdar://problem/11689181>
-
 // This file contains "existentials" for the protocols defined in
 // Policy.swift.  Similar components should usually be defined next to
 // their respective protocols.
 
 internal struct _CollectionOf<
-  IndexType_ : ForwardIndex, T
+  IndexType : Strideable, Element
 > : Collection {
-  init(startIndex: IndexType_, endIndex: IndexType_,
-      _ subscriptImpl: (IndexType_) -> T) {
-    self.startIndex = startIndex
+
+  internal init(
+    _startIndex: IndexType, endIndex: IndexType,
+    _ subscriptImpl: (IndexType) -> Element
+  ) {
+    self.startIndex = _startIndex
     self.endIndex = endIndex
-    _subscriptImpl = subscriptImpl
+    self._subscriptImpl = subscriptImpl
   }
 
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  func makeIterator() -> AnyIterator<T> {
+  func makeIterator() -> AnyIterator<Element> {
     var index = startIndex
     return AnyIterator {
-      () -> T? in
+      () -> Element? in
       if _fastPath(index != self.endIndex) {
-        index._successorInPlace()
+        self.formIndex(after: &index)
         return self._subscriptImpl(index)
       }
       return nil
     }
   }
 
-  let startIndex: IndexType_
-  let endIndex: IndexType_
+  internal let startIndex: IndexType
+  internal let endIndex: IndexType
 
-  subscript(i: IndexType_) -> T {
+  @warn_unused_result
+  internal func index(after i: IndexType) -> IndexType {
+    return i.advanced(by: 1)
+  }
+
+  internal subscript(i: IndexType) -> Element {
     return _subscriptImpl(i)
   }
 
-  let _subscriptImpl: (IndexType_) -> T
+  internal let _subscriptImpl: (IndexType) -> Element
 }
+

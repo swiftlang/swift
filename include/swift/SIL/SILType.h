@@ -290,6 +290,12 @@ public:
   bool hasReferenceSemantics() const {
     return getSwiftRValueType().hasReferenceSemantics();
   }
+
+  /// Returns true if the referenced type is any sort of class-reference type,
+  /// meaning anything with reference semantics that is not a function type.
+  bool isAnyClassReferenceType() const {
+    return getSwiftRValueType().isAnyClassReferenceType();
+  }
   
   /// Returns true if the referenced type is guaranteed to have a
   /// single-retainable-pointer representation.
