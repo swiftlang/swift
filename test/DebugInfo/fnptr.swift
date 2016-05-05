@@ -1,4 +1,3 @@
-// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
 // CHECK-DAG: ![[SINODE:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int64",{{.*}} identifier: [[SI:.*]])

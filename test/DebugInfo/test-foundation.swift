@@ -1,4 +1,3 @@
-// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend -emit-ir -g %s -o %t.ll
 // RUN: FileCheck %s --check-prefix CHECK-HIDDEN < %t.ll
 // RUN: FileCheck %s --check-prefix IMPORT-CHECK < %t.ll

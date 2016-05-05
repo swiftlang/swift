@@ -1,4 +1,3 @@
-// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend %s -emit-ir -g -module-name inout -o %t.ll
 // RUN: cat %t.ll | FileCheck %s
 // RUN: cat %t.ll | FileCheck %s --check-prefix=PROMO-CHECK

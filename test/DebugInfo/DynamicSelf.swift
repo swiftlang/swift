@@ -1,4 +1,3 @@
-// REQUIRES: rdar26102242
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
 class C {
