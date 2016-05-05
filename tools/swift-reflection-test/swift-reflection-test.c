@@ -175,8 +175,8 @@ void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
 }
 
 static
-int PipeMemoryReader_readBytes(void *Context,
-                               addr_t Address, void *Dest, uint64_t Size) {
+int PipeMemoryReader_readBytes(void *Context, swift_addr_t Address, void *Dest,
+                               uint64_t Size) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
   uintptr_t TargetAddress = Address;
   size_t TargetSize = (size_t)Size;
@@ -189,8 +189,9 @@ int PipeMemoryReader_readBytes(void *Context,
 }
 
 static
-addr_t PipeMemoryReader_getSymbolAddress(void *Context, const char *SymbolName,
-                                         uint64_t Length) {
+swift_addr_t PipeMemoryReader_getSymbolAddress(void *Context,
+                                               const char *SymbolName,
+                                               uint64_t Length) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
   uintptr_t Address = 0;
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
@@ -306,7 +307,7 @@ PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
   free(RemoteInfos);
 }
 
-uint64_t PipeMemoryReader_getStringLength(void *Context, addr_t Address) {
+uint64_t PipeMemoryReader_getStringLength(void *Context, swift_addr_t Address) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
   uintptr_t TargetAddress = (uintptr_t)Address;
@@ -355,7 +356,7 @@ int reflectExistential(SwiftReflectionContextRef RC,
          instance);
 
   swift_typeref_t InstanceTypeRef;
-  addr_t StartOfInstanceData = 0;
+  swift_addr_t StartOfInstanceData = 0;
 
   // For testing purposes, we can assume that any existential is Any, since
   // we won't be looking at any witness tables that follow the container.

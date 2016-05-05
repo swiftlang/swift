@@ -248,10 +248,10 @@ swift_reflection_childOfInstance(SwiftReflectionContextRef ContextRef,
 }
 
 int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
-                                        addr_t ExistentialAddress,
+                                        swift_addr_t ExistentialAddress,
                                         swift_typeref_t ExistentialTypeRef,
                                         swift_typeref_t *InstanceTypeRef,
-                                        addr_t *StartOfInstanceData) {
+                                        swift_addr_t *StartOfInstanceData) {
   auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
   auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
   auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
