@@ -128,7 +128,7 @@ bb0:
 // CHECK-NEXT:   (generic_type_parameter depth=0 index=1)
 // CHECK-NEXT:   (generic_type_parameter depth=0 index=2))
 // CHECK-NEXT: (generic_argument index=0
-// CHECK-NEXT:   (reference_capture index=0))
+// CHECK-NEXT:   (metadata_capture index=0))
 
 
 // Generic caller and generic callee -- and one of the type parameters is

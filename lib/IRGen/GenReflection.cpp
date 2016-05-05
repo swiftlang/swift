@@ -589,7 +589,7 @@ public:
         (void) ParamType;
         (void) CaptureType;
 
-        auto Root = SourceBuilder.createReferenceCapture(Index);
+        auto Root = ConventionSource.getMetadataSource(SourceBuilder);
         auto Src = Fulfillment->Path.getMetadataSource(SourceBuilder, Root);
 
         auto SubstType = Caller.mapTypeOutOfContext(SubstMap[GenericParam]);
