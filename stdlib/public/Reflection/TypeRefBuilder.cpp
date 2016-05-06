@@ -280,7 +280,7 @@ void ClosureContextInfo::dump(std::ostream &OS) {
     else
       MS.first->dump(OS);
     if (MS.second == nullptr)
-      OS << "!!! Invalid matadata source\n";
+      OS << "!!! Invalid metadata source\n";
     else
       MS.second->dump(OS);
   }

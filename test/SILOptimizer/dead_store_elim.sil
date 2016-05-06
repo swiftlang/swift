@@ -1077,13 +1077,13 @@ bb0(%0 : $*S6):
 
 /// Make sure we generate the store to field x first.
 ///
-/// CHECK-LABEL : sil hidden @discontiguous_partial_dead_store_lives_insert_determinstically
+/// CHECK-LABEL : sil hidden @discontiguous_partial_dead_store_lives_insert_deterministically
 /// CHECK: bb0([[A:%.*]] : $*S6):
 /// CHECK: [[IN:%.*]] = apply
 /// CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S6, #S6.x
 /// CHECK: [[EXT2:%.*]] =  struct_element_addr [[A]] : $*S6, #S6.x
 /// CHECK: store [[EXT1]] to [[EXT2]] : $*Int
-sil hidden @discontiguous_partial_dead_store_lives_insert_determinstically : $@convention(thin) (@inout S6) -> () {
+sil hidden @discontiguous_partial_dead_store_lives_insert_deterministically : $@convention(thin) (@inout S6) -> () {
 bb0(%0 : $*S6):
   %1 = function_ref @S6_init : $@convention(thin) (@thin S6.Type) -> S6
   %2 = metatype $@thin S6.Type
