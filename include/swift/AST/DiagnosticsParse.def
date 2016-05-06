@@ -615,6 +615,8 @@ ERROR(expected_type_before_arrow,none,
       "expected type before '->'", ())
 ERROR(expected_type_after_arrow,none,
       "expected type after '->'", ())
+ERROR(non_tuple_function_param_type,none,
+      "type before '->' must be wrapped in parentheses", ())
 
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,PointsToFirstBadToken,
