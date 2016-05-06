@@ -58,8 +58,8 @@ class C2b : P2 {
 }
 
 @objc protocol P3 {
-  optional func doSomething(x: Int)
-  optional func doSomething(y: Int)
+  @objc optional func doSomething(x: Int)
+  @objc optional func doSomething(y: Int)
 }
 
 class C3a : P3 {
@@ -69,10 +69,10 @@ class C3a : P3 {
 // Complain about optional requirements that aren't satisfied
 // according to Swift, but would conflict in Objective-C.
 @objc protocol OptP1 {
-  optional func method() // expected-note 2{{requirement 'method()' declared here}}
+  @objc optional func method() // expected-note 2{{requirement 'method()' declared here}}
 
-  optional var property1: ObjCClass { get } // expected-note 2{{requirement 'property1' declared here}}
-  optional var property2: ObjCClass { get set } // expected-note{{requirement 'property2' declared here}}
+  @objc optional var property1: ObjCClass { get } // expected-note 2{{requirement 'property1' declared here}}
+  @objc optional var property2: ObjCClass { get set } // expected-note{{requirement 'property2' declared here}}
 }
 
 @objc class OptC1a : OptP1 { // expected-note 3{{class 'OptC1a' declares conformance to protocol 'OptP1' here}}

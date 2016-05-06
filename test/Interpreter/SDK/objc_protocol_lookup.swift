@@ -54,7 +54,7 @@ class Juice : NSObject {
 }
 
 @objc protocol Fruit {
-  optional var juice: Juice { get }
+  @objc optional var juice: Juice { get }
 }
 
 class Durian : NSObject, Fruit {

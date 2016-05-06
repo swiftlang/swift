@@ -2009,7 +2009,7 @@ class SubclassThrowsObjCName : ThrowsObjCName {
 }
 
 @objc protocol ProtocolThrowsObjCName {
-  optional func doThing(_ x: String) throws -> String // expected-note{{requirement 'doThing' declared here}}
+  @objc optional func doThing(_ x: String) throws -> String // expected-note{{requirement 'doThing' declared here}}
 }
 
 class ConformsToProtocolThrowsObjCName1 : ProtocolThrowsObjCName {

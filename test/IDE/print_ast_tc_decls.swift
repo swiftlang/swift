@@ -478,10 +478,10 @@ protocol d0130_TestProtocol {
 @objc protocol d0140_TestObjCProtocol {
 // PASS_COMMON-LABEL: {{^}}@objc protocol d0140_TestObjCProtocol {{{$}}
 
-  optional var property1: Int { get }
+  @objc optional var property1: Int { get }
 // PASS_COMMON-NEXT: {{^}}  @objc optional var property1: Int { get }{{$}}
 
-  optional func protocolFunc1()
+  @objc optional func protocolFunc1()
 // PASS_COMMON-NEXT: {{^}}  @objc optional func protocolFunc1(){{$}}
 }
 

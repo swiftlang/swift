@@ -229,7 +229,7 @@ func downcast(_ obj: AnyObject) -> X {
 @objc class Juice { }
 
 @objc protocol Fruit {
-  optional var juice: Juice { get }
+  @objc optional var juice: Juice { get }
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup7consumeFPS_5Fruit_T_

@@ -7808,9 +7808,9 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       TC.diagnose(OA->getLocation(),
                   diag::optional_attribute_non_protocol);
       D->getAttrs().removeAttribute(OA);
-    } else if (!cast<ProtocolDecl>(D->getDeclContext())->isObjC()) {
+    } else if (!D->getAttrs().getAttribute<ObjCAttr>()) {
       TC.diagnose(OA->getLocation(),
-                  diag::optional_attribute_non_objc_protocol);
+                  diag::optional_attribute_non_objc_attribute);
       D->getAttrs().removeAttribute(OA);
     } else if (isa<ConstructorDecl>(D)) {
       TC.diagnose(OA->getLocation(),

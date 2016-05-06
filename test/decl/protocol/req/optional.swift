@@ -6,11 +6,11 @@
 @objc class ObjCClass { }
 
 @objc protocol P1 {
-  optional func method(_ x: Int) // expected-note 2{{requirement 'method' declared here}}
+  @objc optional func method(_ x: Int) // expected-note 2{{requirement 'method' declared here}}
 
-  optional var prop: Int { get } // expected-note{{requirement 'prop' declared here}}
+  @objc optional var prop: Int { get } // expected-note{{requirement 'prop' declared here}}
 
-  optional subscript (i: Int) -> ObjCClass? { get } // expected-note{{requirement 'subscript' declared here}}
+  @objc optional subscript (i: Int) -> ObjCClass? { get } // expected-note{{requirement 'subscript' declared here}}
 }
 
 @objc protocol P2 {
@@ -219,10 +219,14 @@ optional class optErrorClass { // expected-error{{'optional' modifier cannot be 
 }
   
 protocol optErrorProtocol {
-  optional func foo(_ x: Int) // expected-error{{'optional' can only be applied to members of an @objc protocol}}
+  optional func foo(_ x: Int) // expected-error{{'optional' requirements are an Objective-C compatibility feature; add '@objc'}}
+}
+
+@objc protocol optObjcAttributeProtocol {
+  optional func foo(_ x: Int) // expected-error{{'optional' requirements are an Objective-C compatibility feature; add '@objc'}}
   optional associatedtype Assoc  // expected-error{{'optional' modifier cannot be applied to this declaration}} {{3-12=}}
 }
 
 @objc protocol optionalInitProto {
-  optional init() // expected-error{{'optional' cannot be applied to an initializer}}
+  @objc optional init() // expected-error{{'optional' cannot be applied to an initializer}}
 }

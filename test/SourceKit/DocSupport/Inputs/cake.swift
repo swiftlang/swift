@@ -50,5 +50,5 @@ public extension S1 {
 
 @objc
 public protocol P2 {
-  optional func foo1()
+  @objc optional func foo1()
 }
