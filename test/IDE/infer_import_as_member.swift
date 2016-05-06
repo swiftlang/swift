@@ -83,7 +83,7 @@ let mine = IAMStruct1()
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension IAMMutableStruct1 {
 // PRINT-NEXT:    init(with withIAMStruct1: IAMStruct1)
-// PRINT-NEXT:    init(withURL url: UnsafePointer<Int8>!)
+// PRINT-NEXT:    init(url url: UnsafePointer<Int8>!)
 // PRINT-NEXT:    func doSomething()
 // PRINT-NEXT:  }
 //
@@ -93,7 +93,7 @@ let mine = IAMStruct1()
 // PRINT-NEXT:    init(x x: Double)
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension TDStruct {
-// PRINT-NEXT:    init(with Float: Float)
+// PRINT-NEXT:    init(float Float: Float)
 // PRINT-NEXT:  }
 //
 // PRINT-LABEL: /// Class

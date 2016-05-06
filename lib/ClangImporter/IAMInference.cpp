@@ -89,7 +89,7 @@ IAMOptions IAMOptions::getDefault() { return {}; }
 // As append, but skip a repeated word at the boundary. First-letter-case
 // insensitive.
 // Example: appendUniq("FooBar", "barBaz") ==> "FooBarBaz"
-void appendUniq(NameBuffer &src, StringRef toAppend) {
+static void appendUniq(NameBuffer &src, StringRef toAppend) {
   if (src.empty()) {
     src = toAppend;
     return;
@@ -103,7 +103,7 @@ void appendUniq(NameBuffer &src, StringRef toAppend) {
   src.append(wI.getRestOfStr());
 }
 
-StringRef skipLeadingUnderscores(StringRef str) {
+static StringRef skipLeadingUnderscores(StringRef str) {
   while (!str.empty() && str.startswith("_"))
     str = str.drop_front(1);
   return str;
@@ -221,14 +221,31 @@ private:
                                 EffectiveClangContext effectiveDC) {
     ++SuccessImportAsConstructor;
     NameBuffer buf;
+    StringRef prefix = buf;
     if (name != initSpecifier) {
       assert(name.size() > initSpecifier.size() &&
              "should have more words in it");
-      auto didDrop = dropWordUniq(name, initSpecifier, buf);
+      bool didDrop = dropWordUniq(name, initSpecifier, buf);
       (void)didDrop;
+      prefix = buf;
+
+      // Skip "with"
+      auto prefixWords = camel_case::getWords(prefix);
+      if (prefixWords.begin() != prefixWords.end() &&
+          (*prefixWords.begin() == "With" || *prefixWords.begin() == "with")) {
+        prefix = prefix.drop_front(4);
+      }
+
+      // Skip "CF" or "NS"
+      prefixWords = camel_case::getWords(prefix);
+      if (prefixWords.begin() != prefixWords.end() &&
+          (*prefixWords.begin() == "CF" || *prefixWords.begin() == "NS")) {
+        prefix = prefix.drop_front(2);
+      }
+
       assert(didDrop != 0 && "specifier not present?");
     }
-    return {formDeclName("init", params, buf), effectiveDC};
+    return {formDeclName("init", params, prefix), effectiveDC};
   }
 
   // Instance computed property
