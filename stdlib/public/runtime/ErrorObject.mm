@@ -95,6 +95,12 @@ using namespace swift;
   return [self retain];
 }
 
+- (Class)classForCoder {
+  // This is a runtime-private subclass. When archiving or unarchiving, do so
+  // as an NSError.
+  return [NSError class];
+}
+
 @end
 
 Class swift::getNSErrorClass() {
