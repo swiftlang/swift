@@ -9,7 +9,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -parse
-// REQUIRES: asserts, no_asan
+// REQUIRES: asserts
 {
 protocol A{
 func<typealias e=b
