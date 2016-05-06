@@ -389,7 +389,7 @@ TEST(TypeRefTest, DeriveSubstitutions) {
   auto Nominal = Builder.createBoundGenericType(NominalName, NominalArgs,
                                                /*parent*/ nullptr);
 
-  auto Result = Builder.createTupleType({GTP00, GTP01}, "");
+  auto Result = Builder.createTupleType({GTP00, GTP01}, "", false);
   auto Func = Builder.createFunctionType({Nominal}, {}, Result,
                                          FunctionTypeFlags());
 
@@ -408,6 +408,8 @@ TEST(TypeRefTest, DeriveSubstitutions) {
   GenericArgumentMap DerivedSubs;
   EXPECT_TRUE(TypeRef::deriveSubstitutions(DerivedSubs, Func, Subst));
 
-  EXPECT_EQ(Subs[{0, 0}], DerivedSubs[{0, 0}]);
-  EXPECT_EQ(Subs[{0, 1}], DerivedSubs[{0, 1}]);
+  auto ResultOne = DerivedSubs[{0,0}];
+  auto ResultTwo = DerivedSubs[{0,1}];
+  EXPECT_EQ(SubstOne, ResultOne);
+  EXPECT_EQ(SubstTwo, ResultTwo);
 }

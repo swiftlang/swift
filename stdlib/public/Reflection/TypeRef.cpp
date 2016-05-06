@@ -719,11 +719,12 @@ bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,
   // Walk into parent types of concrete nominal types.
   if (auto *O = dyn_cast<NominalTypeRef>(OrigTR)) {
     if (auto *S = dyn_cast<NominalTypeRef>(SubstTR)) {
-      if (O->getParent() != S->getParent() ||
+      if (!!O->getParent() != !!S->getParent() ||
           O->getMangledName() != S->getMangledName())
         return false;
 
-      if (!deriveSubstitutions(Subs,
+      if (O->getParent() &&
+          !deriveSubstitutions(Subs,
                                O->getParent(),
                                S->getParent()))
         return false;
@@ -735,12 +736,13 @@ bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,
   // Decompose arguments of bound generic types in parallel.
   if (auto *O = dyn_cast<BoundGenericTypeRef>(OrigTR)) {
     if (auto *S = dyn_cast<BoundGenericTypeRef>(SubstTR)) {
-      if (O->getParent() != S->getParent() ||
+      if (!!O->getParent() != !!S->getParent() ||
           O->getMangledName() != S->getMangledName() ||
           O->getGenericParams().size() != S->getGenericParams().size())
         return false;
 
-      if (!deriveSubstitutions(Subs,
+      if (O->getParent() &&
+          !deriveSubstitutions(Subs,
                                O->getParent(),
                                S->getParent()))
         return false;
