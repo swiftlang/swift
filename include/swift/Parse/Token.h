@@ -70,7 +70,7 @@ class Token {
   unsigned EscapedIdentifier : 1;
 
   // modifiers for string literals
-  unsigned StringModifiers: 3;
+  unsigned StringModifiers: 10;
   
   /// Text - The actual string covered by the token in the source buffer.
   StringRef Text;

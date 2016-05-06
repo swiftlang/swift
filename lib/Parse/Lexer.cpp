@@ -40,6 +40,16 @@ using clang::isHorizontalWhitespace;
 using clang::isPrintable;
 using clang::isWhitespace;
 
+// number of bits must tally with Token.h
+enum StringLiteralModifiers : unsigned {
+  StringLiteralNoModifiers = 0,
+  StringLiteralUnderscoreDelimited = 1<<0,
+  StringLiteralUnprocessedEscapes = 1<<1,
+  StringLiteralRegexInterpolating = 1<<2,
+  StringLiteralTripleQuote = 1<<3,
+  StringLiteralStripIndent = 1<<4,
+};
+
 //===----------------------------------------------------------------------===//
 // UTF8 Validation/Encoding/Decoding helper functions
 //===----------------------------------------------------------------------===//
@@ -571,6 +581,9 @@ bool Lexer::buildModifiers(const char *ModPtr, unsigned &Modifiers) {
       break;
     case 'r':
       Modifiers |= StringLiteralRegexInterpolating;
+      break;
+    case 'i':
+      Modifiers |= StringLiteralStripIndent;
       break;
     default:
       diagnose(ModPtr, diag::lex_invalid_modifier);
@@ -1262,6 +1275,12 @@ void Lexer::lexStringLiteral(unsigned Modifiers) {
   // NOTE: We only allow single-quote string literals so we can emit useful
   // diagnostics about changing them to double quotes.
 
+  if (*TokStart == '"' && *CurPtr == '"' && *(CurPtr + 1) == '"') {
+    Modifiers |= StringLiteralTripleQuote;
+    TokStart += 2;
+    CurPtr += 2;
+  }
+
   bool wasErroneous = false;
   
   while (true) {
@@ -1282,7 +1301,7 @@ void Lexer::lexStringLiteral(unsigned Modifiers) {
     }
 
     // String literals cannot have \n or \r in them - unless multi-line.
-    if (*CurPtr == '\r' || *CurPtr == '\n' || CurPtr >= BufferEnd) {
+    if (((*CurPtr == '\r' || *CurPtr == '\n') && !(Modifiers & StringLiteralTripleQuote)) || CurPtr >= BufferEnd) {
       const char *TmpPtr = CurPtr;
       if (nextNonWhitespaceIsQuote(TmpPtr, *TokStart)) {
         CurPtr = TmpPtr;
@@ -1334,6 +1353,16 @@ void Lexer::lexStringLiteral(unsigned Modifiers) {
         diagnose(TokStart, diag::lex_single_quote_string)
           .fixItReplaceChars(getSourceLoc(TokStart), getSourceLoc(CurPtr),
                              replacement);
+      }
+
+      if (Modifiers & StringLiteralTripleQuote) {
+        if (*CurPtr == '"' && *(CurPtr + 1) == '"') {
+          formToken(tok::string_literal, TokStart, Modifiers);
+          CurPtr += 2;
+          return;
+        }
+        else
+          continue;
       }
 
       if (Modifiers & StringLiteralUnderscoreDelimited) {
@@ -1449,7 +1478,8 @@ void Lexer::tryLexEditorPlaceholder() {
 }
 
 StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
-                                         SmallVectorImpl<char> &TempString, unsigned Modifiers) {
+                                         SmallVectorImpl<char> &TempString,
+                                         unsigned Modifiers, std::string ToStrip) {
   TempString.clear();
   // Note that it is always safe to read one over the end of "Bytes" because
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
@@ -1457,14 +1487,15 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
   const char *BytesPtr = Bytes.begin();
   while (BytesPtr < Bytes.end()) {
     char CurChar = *BytesPtr++;
-    if (CurChar != '\\' || ((Modifiers & StringLiteralUnprocessedEscapes) &&
-                            (*BytesPtr != '"' || (Modifiers & StringLiteralUnderscoreDelimited)) &&
-                            *BytesPtr != '\r' && *BytesPtr != '\n')) {
+    bool notEscape = CurChar != '\\' || ((Modifiers & StringLiteralUnprocessedEscapes) &&
+                                         (*BytesPtr != '"' || (Modifiers & StringLiteralUnderscoreDelimited)) &&
+                                         *BytesPtr != '\r' && *BytesPtr != '\n');
+    if (notEscape) {
       if (CurChar != '\r')
         TempString.push_back(CurChar);
       else
         TempString.push_back('\n'); // literal should always have \n between lines?
-      if (CurChar == '\r' || CurChar == '\n')
+      if (!(Modifiers & StringLiteralTripleQuote) && (CurChar == '\r' || CurChar == '\n'))
         assert(nextNonWhitespaceIsQuote(BytesPtr, '"') && "Invalid string continuation");
       continue;
     }
@@ -1488,7 +1519,8 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     case '\\': TempString.push_back('\\'); continue;
     case '\r':
     case '\n':
-      assert(nextNonWhitespaceIsQuote(BytesPtr, '"') && "Invalid string continuation 2");
+      if (!(Modifiers & StringLiteralTripleQuote))
+        assert(nextNonWhitespaceIsQuote(BytesPtr, '"') && "Invalid string continuation 2");
       continue;
         
     // String interpolation.
@@ -1512,6 +1544,18 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
       EncodeToUTF8(CharValue, TempString);
   }
   
+  if (!ToStrip.empty()) {
+    std::string Stripped(TempString.data(), TempString.size());
+    size_t pos = 0;
+    while ((pos = Stripped.find(ToStrip, pos)) != std::string::npos) {
+      Stripped.replace(pos, ToStrip.size(), pos == 0 ? "" : "\n");
+      pos += 1;
+    }
+    TempString.clear();
+    for (auto c = Stripped.begin(); c!=Stripped.end(); ++c)
+      TempString.push_back(*c);
+  }
+
   // If we didn't escape or reprocess anything, then we don't need to use the
   // temporary string, just point to the original one. We know that this
   // is safe because unescaped strings are always shorter than their escaped
@@ -1531,6 +1575,15 @@ void Lexer::getStringLiteralSegments(
   // Get the bytes behind the string literal, dropping the double quotes.
   StringRef Bytes = Str.getText().drop_front().drop_back();
   unsigned Modifiers = Str.getStringModifiers();
+  std::string ToStrip = "";
+
+  if (Modifiers & StringLiteralStripIndent) {
+    const char *end = Bytes.end(), *start = end;
+    while (start > Bytes.begin() && isWhitespace(start[-1]))
+      --start;
+    if (*start == '\n' && end-start > 1)
+      ToStrip = std::string(start, end-start);
+  }
 
   // Note that it is always safe to read one over the end of "Bytes" because
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
@@ -1553,7 +1606,7 @@ void Lexer::getStringLiteralSegments(
     Segments.push_back(
         StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
                                   BytesPtr-SegmentStartPtr-2,
-                                  Modifiers));
+                                  Modifiers, ToStrip));
 
     // Find the closing ')'.
     const char *End = skipToEndOfInterpolatedExpression(BytesPtr,
@@ -1575,7 +1628,7 @@ void Lexer::getStringLiteralSegments(
   Segments.push_back(
       StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
                                 Bytes.end()-SegmentStartPtr,
-                                Modifiers));
+                                Modifiers, ToStrip));
 }
 
 
