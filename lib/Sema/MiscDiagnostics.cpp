@@ -1115,11 +1115,23 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
 
     // Continue on to diagnose any argument label renames.
 
-  } else if (parsed.BaseName == TC.Context.Id_init.str() &&
-             parsed.isMember() && CE) {
+  } else if (parsed.BaseName == TC.Context.Id_init.str() && CE) {
     // For initializers, replace with a "call" of the context type...but only
     // if we know we're doing a call (rather than a first-class reference).
-    diag.fixItReplace(referenceRange, parsed.ContextName);
+    if (parsed.isMember()) {
+      diag.fixItReplace(CE->getFn()->getSourceRange(), parsed.ContextName);
+
+    } else {
+      auto *dotCall = dyn_cast<DotSyntaxCallExpr>(CE->getFn());
+      if (!dotCall)
+        return;
+
+      SourceLoc removeLoc = dotCall->getDotLoc();
+      if (removeLoc.isInvalid())
+        return;
+
+      diag.fixItRemove(SourceRange(removeLoc, dotCall->getFn()->getEndLoc()));
+    }
 
   } else {
     // Just replace the base name.
@@ -1231,11 +1243,13 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr,
   // Only produce special descriptions for renames to
   // - instance members
   // - properties (or global bindings)
-  // - class/static methods (and initializers)
+  // - class/static methods
+  // - initializers, even if unqualified
   // Leave non-member renames alone, as well as renames from top-level types
   // and bindings to member types and class/static properties.
   if (!(parsed.isInstanceMember() || parsed.isPropertyAccessor() ||
-        (parsed.isMember() && parsed.IsFunctionName))) {
+        (parsed.isMember() && parsed.IsFunctionName) ||
+        (parsed.BaseName == ctx.Id_init.str()))) {
     return None;
   }
 
