@@ -4901,6 +4901,10 @@ namespace {
             continue;
 
         for (auto member : proto->getMembers()) {
+          // Skip unavailable members; there's no reason to mirror them.
+          if (member->getAttrs().isUnavailable(Impl.SwiftContext))
+            continue;
+
           if (auto prop = dyn_cast<VarDecl>(member)) {
             auto objcProp =
               dyn_cast_or_null<clang::ObjCPropertyDecl>(prop->getClangDecl());
@@ -6047,7 +6051,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
     Result = converter.Visit(ClangDecl);
     HadForwardDeclaration = converter.hadForwardDeclaration();
   }
-  if (!Result) {
+  if (!Result && !useSwift2Name) {
     // If we couldn't import this Objective-C entity, determine
     // whether it was a required member of a protocol.
     bool hasMissingRequiredMember = false;
@@ -6105,8 +6109,9 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
 
   // Note that the decl was imported from Clang.  Don't mark Swift decls as
   // imported.
-  if (!Result->getDeclContext()->isModuleScopeContext() ||
-      isa<ClangModuleUnit>(Result->getDeclContext())) {
+  if (Result &&
+      (!Result->getDeclContext()->isModuleScopeContext() ||
+       isa<ClangModuleUnit>(Result->getDeclContext()))) {
     // Either the Swift declaration was from stdlib,
     // or we imported the underlying decl of the typedef,
     // or we imported the decl itself.
@@ -6749,7 +6754,8 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
       // Import the Swift 2 stub declaration.
       if (auto swift2Member = importDecl(decl, true))
-        ext->addMember(swift2Member);
+        if (swift2Member->getDeclContext() == ext)
+          ext->addMember(swift2Member);
     }
 
     return;
