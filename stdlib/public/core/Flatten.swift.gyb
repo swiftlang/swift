@@ -123,7 +123,7 @@ extension Sequence where Iterator.Element : Sequence {
   /// - Returns: A flattened view of the elements of this
   ///   sequence of sequences.
   ///
-  /// - SeeAlso: `flatMap(_:)`, `joinWithSeparator(_:)`
+  /// - SeeAlso: `flatMap(_:)`, `joined(separator:)`
   @warn_unused_result
   public func flatten() -> FlattenSequence<Self> {
     return FlattenSequence(_base: self)
@@ -397,7 +397,7 @@ extension ${collectionForTraversal(traversal)}
   /// - Returns: A flattened view of the elements of this
   ///   collection of collections.
   ///
-  /// - SeeAlso: `flatMap(_:)`, `joinWithSeparator(_:)`
+  /// - SeeAlso: `flatMap(_:)`, `joined(separator:)`
   @warn_unused_result
   public func flatten() -> ${Collection}<Self> {
     return ${Collection}(self)
