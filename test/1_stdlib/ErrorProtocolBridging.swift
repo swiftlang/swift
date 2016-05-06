@@ -60,6 +60,14 @@ ErrorProtocolBridgingTests.test("NSError") {
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
+ErrorProtocolBridgingTests.test("NSCopying") {
+  autoreleasepool {
+    let orig = EnumError.ReallyBadError as NSError
+    let copy = orig.copy() as! NSError
+    expectEqual(orig, copy)
+  }
+}
+
 ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
