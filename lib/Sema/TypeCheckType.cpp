@@ -1192,7 +1192,8 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
         if (!Attr->Rename.empty()) {
           auto diag = TC.diagnose(Loc,
                                   diag::availability_decl_unavailable_rename,
-                                  CI->getIdentifier(), Attr->Rename);
+                                  CI->getIdentifier(), /*"replaced"*/false,
+                                  /*special kind*/0, Attr->Rename);
           fixItAvailableAttrRename(TC, diag, Loc, Attr, /*call*/nullptr);
         } else if (Attr->Message.empty()) {
           TC.diagnose(Loc, diag::availability_decl_unavailable,

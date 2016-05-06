@@ -1205,6 +1205,61 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
   diagnoseArgumentLabelError(TC, argExpr, argumentLabelIDs, false, &diag);
 }
 
+// Must be kept in sync with diag::availability_decl_unavailable_rename and
+// others.
+namespace {
+  enum class ReplacementDeclKind : unsigned {
+    None,
+    InstanceMethod,
+    Property,
+  };
+}
+
+static Optional<ReplacementDeclKind>
+describeRename(ASTContext &ctx, const AvailableAttr *attr,
+               SmallVectorImpl<char> &nameBuf) {
+  ParsedDeclName parsed = swift::parseDeclName(attr->Rename);
+  if (!parsed)
+    return None;
+
+  // Only produce special descriptions for renames to
+  // - instance members
+  // - properties (or global bindings)
+  // - class/static methods (and initializers)
+  // Leave non-member renames alone, as well as renames from top-level types
+  // and bindings to member types and class/static properties.
+  if (!(parsed.isInstanceMember() || parsed.isPropertyAccessor() ||
+        (parsed.isMember() && parsed.IsFunctionName))) {
+    return None;
+  }
+
+  llvm::raw_svector_ostream name(nameBuf);
+
+  if (!parsed.ContextName.empty())
+    name << parsed.ContextName << '.';
+
+  if (parsed.IsFunctionName) {
+    // FIXME: duplicated from above.
+    SmallVector<Identifier, 4> argumentLabelIDs;
+    std::transform(parsed.ArgumentLabels.begin(), parsed.ArgumentLabels.end(),
+                   std::back_inserter(argumentLabelIDs),
+                   [&ctx](StringRef labelStr) -> Identifier {
+      return labelStr.empty() ? Identifier() : ctx.getIdentifier(labelStr);
+    });
+    name << DeclName(ctx, ctx.getIdentifier(parsed.BaseName), argumentLabelIDs);
+  } else {
+    name << parsed.BaseName;
+  }
+
+  if (parsed.isMember() && parsed.isPropertyAccessor())
+    return ReplacementDeclKind::Property;
+  if (parsed.isInstanceMember() && parsed.IsFunctionName)
+    return ReplacementDeclKind::InstanceMethod;
+
+  // We don't have enough information.
+  return ReplacementDeclKind::None;
+}
+
 void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
                                      const DeclContext *ReferenceDC,
                                      const AvailableAttr *Attr,
@@ -1241,23 +1296,31 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
     return;
   }
 
-  if (Attr->Message.empty()) {
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_rename, Name,
-             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
-             DeprecatedVersion, Attr->Rename)
-      .highlight(Attr->getRange());
-  } else {
+  SmallString<32> newNameBuf;
+  Optional<ReplacementDeclKind> replacementDeclKind =
+    describeRename(Context, Attr, newNameBuf);
+  StringRef newName = replacementDeclKind ? newNameBuf.str() : Attr->Rename;
+
+  if (!Attr->Message.empty()) {
     EncodedDiagnosticMessage EncodedMessage(Attr->Message);
     diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name,
              Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
              DeprecatedVersion, EncodedMessage.Message)
+      .highlight(Attr->getRange());
+  } else {
+    unsigned rawReplaceKind = static_cast<unsigned>(
+        replacementDeclKind.getValueOr(ReplacementDeclKind::None));
+    diagnose(ReferenceRange.Start, diag::availability_deprecated_rename, Name,
+             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
+             DeprecatedVersion, replacementDeclKind.hasValue(), rawReplaceKind,
+             newName)
       .highlight(Attr->getRange());
   }
 
   if (!Attr->Rename.empty()) {
     auto renameDiag = diagnose(ReferenceRange.Start,
                                diag::note_deprecated_rename,
-                               Attr->Rename);
+                               newName);
     fixItAvailableAttrRename(*this, renameDiag, ReferenceRange, Attr, CE);
   }
 }
@@ -1293,13 +1356,22 @@ bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
   case UnconditionalAvailabilityKind::None:
   case UnconditionalAvailabilityKind::Unavailable:
     if (!Attr->Rename.empty()) {
+      SmallString<32> newNameBuf;
+      Optional<ReplacementDeclKind> replaceKind =
+          describeRename(Context, Attr, newNameBuf);
+      unsigned rawReplaceKind = static_cast<unsigned>(
+          replaceKind.getValueOr(ReplacementDeclKind::None));
+      StringRef newName = replaceKind ? newNameBuf.str() : Attr->Rename;
+
       if (Attr->Message.empty()) {
         auto diag = diagnose(Loc, diag::availability_decl_unavailable_rename,
-                             Name, Attr->Rename);
+                             Name, replaceKind.hasValue(), rawReplaceKind,
+                             newName);
         fixItAvailableAttrRename(*this, diag, R, Attr, CE);
       } else {
         auto diag = diagnose(Loc,diag::availability_decl_unavailable_rename_msg,
-                             Name, Attr->Rename, Attr->Message);
+                             Name, replaceKind.hasValue(), rawReplaceKind,
+                             newName, Attr->Message);
         fixItAvailableAttrRename(*this, diag, R, Attr, CE);
       }
     } else if (Attr->Message.empty()) {

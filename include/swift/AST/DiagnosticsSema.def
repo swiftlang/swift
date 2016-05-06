@@ -2749,11 +2749,16 @@ ERROR(dynamic_with_final,none,
 ERROR(availability_decl_unavailable, none,
   "%0 is unavailable", (DeclName))
 
+#define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
-      "%0 has been renamed to '%1'", (DeclName, StringRef))
+      "%0 has been %select{renamed to|replaced by}1"
+      "%" REPLACEMENT_DECL_KIND_SELECT "2 '%3'",
+      (DeclName, bool, unsigned, StringRef))
 
 ERROR(availability_decl_unavailable_rename_msg, none,
-      "%0 has been renamed to '%1': %2", (DeclName, StringRef, StringRef))
+      "%0 has been %select{renamed to|replaced by}1"
+      "%" REPLACEMENT_DECL_KIND_SELECT "2 '%3': %4",
+      (DeclName, bool, unsigned, StringRef, StringRef))
 
 ERROR(availability_decl_unavailable_msg, none,
   "%0 is unavailable: %1", (DeclName, StringRef))
@@ -2783,8 +2788,12 @@ WARNING(availability_deprecated_msg, none,
 
 WARNING(availability_deprecated_rename, none,
         "%0 %select{is|%select{is|was}3}1 deprecated"
-        "%select{| %select{on|in}3 %2%select{| %4}3}1: renamed to '%5'",
-        (DeclName, bool, StringRef, bool, clang::VersionTuple, StringRef))
+        "%select{| %select{on|in}3 %2%select{| %4}3}1: "
+        "%select{renamed to|replaced by}5%" REPLACEMENT_DECL_KIND_SELECT "6 "
+        "'%7'",
+        (DeclName, bool, StringRef, bool, clang::VersionTuple, bool, unsigned,
+         StringRef))
+#undef REPLACEMENT_DECL_KIND_SELECT
 
 NOTE(note_deprecated_rename, none,
      "use '%0' instead", (StringRef))

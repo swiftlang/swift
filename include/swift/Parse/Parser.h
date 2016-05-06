@@ -1310,7 +1310,7 @@ struct ParsedDeclName {
 
 /// Parse a stringified Swift declaration name,
 /// e.g. "Foo.translateBy(self:x:y:)".
-ParsedDeclName parseDeclName(StringRef name);
+ParsedDeclName parseDeclName(StringRef name) LLVM_READONLY;
 
 /// Form a Swift declaration name from its constituent parts.
 DeclName formDeclName(ASTContext &ctx,
