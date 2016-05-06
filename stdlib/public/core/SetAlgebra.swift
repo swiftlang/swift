@@ -25,7 +25,7 @@
 ///
 /// - Note: Unlike ordinary set types, the `Element` type of an `OptionSet` is
 ///   identical to the `OptionSet` type itself. The `SetAlgebra` protocol is
-///   specifically designed to accomodate both kinds of set.
+///   specifically designed to accommodate both kinds of set.
 ///
 /// Conforming to the SetAlgebra Protocol
 /// =====================================
