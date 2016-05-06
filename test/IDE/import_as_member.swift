@@ -64,7 +64,7 @@ let gVar = Struct1.globalVar
 print("\(gVar)")
 
 let iamStructInitFail = IAMStruct1CreateSimple(42)
-  // expected-error@-1{{'IAMStruct1CreateSimple' has been renamed to 'Struct1.init(value:)'}}
+  // expected-error@-1{{'IAMStruct1CreateSimple' has been replaced by 'Struct1.init(value:)'}}
 let iamStructInitFail2 = Struct1(value: 42)
 
 let gVar2 = Struct1.static2

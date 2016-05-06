@@ -2251,41 +2251,8 @@ auto ClangImporter::Implementation::importFullName(
                                              : getClangSema();
   ImportedName result;
 
-  // Local function to determine whether the given declaration is subject to
-  // a swift_private attribute.
-  auto hasSwiftPrivate = [&clangSema, this](const clang::NamedDecl *D) {
-    if (D->hasAttr<clang::SwiftPrivateAttr>())
-      return true;
-
-    // Enum constants that are not imported as members should be considered
-    // private if the parent enum is marked private.
-    if (auto *ECD = dyn_cast<clang::EnumConstantDecl>(D)) {
-      auto *ED = cast<clang::EnumDecl>(ECD->getDeclContext());
-      switch (getEnumKind(ED, &clangSema.getPreprocessor())) {
-        case EnumKind::Constants:
-        case EnumKind::Unknown:
-          if (ED->hasAttr<clang::SwiftPrivateAttr>())
-            return true;
-          if (auto *enumTypedef = ED->getTypedefNameForAnonDecl())
-            if (enumTypedef->hasAttr<clang::SwiftPrivateAttr>())
-              return true;
-          break;
-
-        case EnumKind::Enum:
-        case EnumKind::Options:
-          break;
-      }
-    }
-
-    return false;
-  };
-
   /// Whether we want the Swift 2.0 name.
   bool swift2Name = options.contains(ImportNameFlags::Swift2Name);
-
-  // Don't create Swift 2 versions of swift_private declarations.
-  if (swift2Name && hasSwiftPrivate(D))
-    return result;
 
   /// Whether we should honor the swift_newtype/swift_wrapper attribute.
   bool honorSwiftNewtypeAttr = HonorSwiftNewtypeAttr && !swift2Name;
@@ -2861,6 +2828,35 @@ auto ClangImporter::Implementation::importFullName(
                                            omitNeedlessWordsScratch);
     }
   }
+
+  // Local function to determine whether the given declaration is subject to
+  // a swift_private attribute.
+  auto hasSwiftPrivate = [&clangSema, this](const clang::NamedDecl *D) {
+    if (D->hasAttr<clang::SwiftPrivateAttr>())
+      return true;
+
+    // Enum constants that are not imported as members should be considered
+    // private if the parent enum is marked private.
+    if (auto *ECD = dyn_cast<clang::EnumConstantDecl>(D)) {
+      auto *ED = cast<clang::EnumDecl>(ECD->getDeclContext());
+      switch (getEnumKind(ED, &clangSema.getPreprocessor())) {
+        case EnumKind::Constants:
+        case EnumKind::Unknown:
+          if (ED->hasAttr<clang::SwiftPrivateAttr>())
+            return true;
+          if (auto *enumTypedef = ED->getTypedefNameForAnonDecl())
+            if (enumTypedef->hasAttr<clang::SwiftPrivateAttr>())
+              return true;
+          break;
+
+        case EnumKind::Enum:
+        case EnumKind::Options:
+          break;
+      }
+    }
+
+    return false;
+  };
 
   // If this declaration has the swift_private attribute, prepend "__" to the
   // appropriate place.
@@ -4445,7 +4441,8 @@ void ClangImporter::Implementation::lookupValue(
 
     // If the name matched, report this result.
     bool anyMatching = false;
-    if (decl->getFullName().matchesRef(name)) {
+    if (decl->getFullName().matchesRef(name) &&
+        decl->getDeclContext()->isModuleScopeContext()) {
       consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
       anyMatching = true;
     }
@@ -4453,7 +4450,8 @@ void ClangImporter::Implementation::lookupValue(
     // If there is an alternate declaration and the name matches,
     // report this result.
     if (auto alternate = getAlternateDecl(decl)) {
-      if (alternate->getFullName().matchesRef(name)) {
+      if (alternate->getFullName().matchesRef(name) &&
+          alternate->getDeclContext()->isModuleScopeContext()) {
         consumer.foundDecl(alternate, DeclVisibilityKind::VisibleAtTopLevel);
         anyMatching = true;
       }
@@ -4466,7 +4464,8 @@ void ClangImporter::Implementation::lookupValue(
         if (auto swift2Decl = cast_or_null<ValueDecl>(
                                 importDeclReal(clangDecl->getMostRecentDecl(),
                                                true))) {
-          if (swift2Decl->getFullName().matchesRef(name)) {
+          if (swift2Decl->getFullName().matchesRef(name) &&
+              swift2Decl->getDeclContext()->isModuleScopeContext()) {
             consumer.foundDecl(swift2Decl,
                                DeclVisibilityKind::VisibleAtTopLevel);
           }

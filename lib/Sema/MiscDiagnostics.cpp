@@ -1355,6 +1355,7 @@ bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
 
   case UnconditionalAvailabilityKind::None:
   case UnconditionalAvailabilityKind::Unavailable:
+  case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
     if (!Attr->Rename.empty()) {
       SmallString<32> newNameBuf;
       Optional<ReplacementDeclKind> replaceKind =

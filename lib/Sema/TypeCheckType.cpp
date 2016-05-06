@@ -1189,6 +1189,7 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
         break;
 
       case UnconditionalAvailabilityKind::Unavailable:
+      case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
         if (!Attr->Rename.empty()) {
           auto diag = TC.diagnose(Loc,
                                   diag::availability_decl_unavailable_rename,

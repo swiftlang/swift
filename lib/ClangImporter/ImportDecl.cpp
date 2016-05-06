@@ -1205,7 +1205,8 @@ namespace {
       }
 
       auto attr = AvailableAttr::createUnconditional(
-                    ctx, StringRef(), ctx.AllocateCopy(renamed.str()));
+                    ctx, StringRef(), ctx.AllocateCopy(renamed.str()),
+                    UnconditionalAvailabilityKind::UnavailableInCurrentSwift);
       decl->getAttrs().add(attr);
       decl->setImplicit();
     }
@@ -1303,11 +1304,12 @@ namespace {
             Impl.AlternateDecls[primary] = aliasRef;
 
             // The "Ref" variants have been removed.
-            auto attr = AvailableAttr::createUnconditional(
-                          Impl.SwiftContext,
-                          "",
-                          primary->getName().str(),
-                          UnconditionalAvailabilityKind::UnavailableInSwift);
+            auto attr =
+              AvailableAttr::createUnconditional(
+                Impl.SwiftContext,
+                "",
+                primary->getName().str(),
+                UnconditionalAvailabilityKind::UnavailableInSwift);
             aliasRef->getAttrs().add(attr);
           };
 
@@ -1830,6 +1832,7 @@ namespace {
         if (!swift3Decl) return nullptr;
 
         // If the Swift 3 declaration was unavailable, don't map to it.
+        // FIXME: This eliminates spurious errors, but affects QoI.
         if (swift3Decl->getAttrs().isUnavailable(Impl.SwiftContext))
           return nullptr;
 
@@ -1849,13 +1852,11 @@ namespace {
       
       // Did we already import an enum constant for this enum with the
       // same value? If so, import it as a standalone constant.
-      if (!useSwift2Name) {
-        auto insertResult =
-            Impl.EnumConstantValues.insert({{clangEnum, rawValue}, nullptr});
-        if (!insertResult.second)
-          return importEnumCaseAlias(name, decl, insertResult.first->second,
-                                     clangEnum, theEnum);
-      }
+      auto insertResult =
+        Impl.EnumConstantValues.insert({{clangEnum, rawValue}, nullptr});
+      if (!insertResult.second)
+        return importEnumCaseAlias(name, decl, insertResult.first->second,
+                                   clangEnum, theEnum);
 
       if (clangEnum->getIntegerType()->isSignedIntegerOrEnumerationType()
           && rawValue.slt(0)) {
@@ -1877,8 +1878,7 @@ namespace {
                                         name, TypeLoc(),
                                         SourceLoc(), rawValueExpr,
                                         theEnum);
-      if (!useSwift2Name)
-        Impl.EnumConstantValues[{clangEnum, rawValue}] = element;
+      insertResult.first->second = element;
 
       // Give the enum element the appropriate type.
       element->computeType();
@@ -4927,10 +4927,8 @@ namespace {
             continue;
 
         for (auto member : proto->getMembers()) {
-          // Skip implicit unavailable members; there's no reason to
-          // mirror them.
-          if (member->isImplicit() &&
-              member->getAttrs().isUnavailable(Impl.SwiftContext))
+          // Skip Swift 2 stubs; there's no reason to mirror them.
+          if (member->getAttrs().isUnavailableInCurrentSwift())
             continue;
 
           if (auto prop = dyn_cast<VarDecl>(member)) {
@@ -5029,9 +5027,8 @@ namespace {
           if (!ctor)
             continue;
 
-          // Don't inherit implicit, unavailable initializers.
-          if (ctor->isImplicit() &&
-              ctor->getAttrs().isUnavailable(Impl.SwiftContext))
+          // Don't inherit Swift 2 stubs.
+          if (ctor->getAttrs().isUnavailableInCurrentSwift())
             continue;
 
           // Don't inherit (non-convenience) factory initializers.
@@ -5226,8 +5223,8 @@ namespace {
           if (auto typeResolver = Impl.getTypeResolver())
             typeResolver->resolveDeclSignature(singleResult);
 
-          if (singleResult->isImplicit() &&
-              singleResult->getAttrs().isUnavailable(Impl.SwiftContext))
+          // Skip Swift 2 variants.
+          if (singleResult->getAttrs().isUnavailableInCurrentSwift())
             continue;
 
           if (found)
