@@ -205,9 +205,9 @@ func genericPointerArithmetic<T>(_ x: UnsafeMutablePointer<T>, i: Int, t: T) -> 
   p.initialize(with: t)
 }
 
-func passPointerToClosure(_ f: UnsafeMutablePointer<Float> -> Int) -> Int { }
+func passPointerToClosure(_ f: (UnsafeMutablePointer<Float>) -> Int) -> Int { }
 
-func pointerInClosure(_ f: UnsafeMutablePointer<Int> -> Int) -> Int {
+func pointerInClosure(_ f: (UnsafeMutablePointer<Int>) -> Int) -> Int {
   return passPointerToClosure { f(UnsafeMutablePointer($0)) }
 }
 

@@ -61,4 +61,4 @@ class Generic<X : C> {
 
 func genericFunc<T>(_ t: T) -> T { return t }
 
-let f: @convention(c) Int -> Int = genericFunc // expected-error{{cannot be formed from a reference to a generic function}}
+let f: @convention(c) (Int) -> Int = genericFunc // expected-error{{cannot be formed from a reference to a generic function}}

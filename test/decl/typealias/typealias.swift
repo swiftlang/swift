@@ -71,7 +71,7 @@ typealias D<T1, T2, T3> = MyType<T2, T1>  // expected-note {{'T3' declared as pa
 
 typealias E<T1, T2> = Int  // expected-note {{generic type 'E' declared here}}
 
-typealias F<T1, T2> = T1 -> T2
+typealias F<T1, T2> = (T1) -> T2
 
 // Type alias of type alias.
 typealias G<S1, S2> = A<S1, S2>
@@ -220,7 +220,7 @@ extension MySeq {
 // Specific diagnosis for trying to use complex typealiases in generic constraints
 protocol P1 {
     associatedtype A
-    typealias F = A -> ()
+    typealias F = (A) -> ()
 }
 
 protocol P2 {

@@ -277,7 +277,7 @@ function float_min() {
 function num_llvm_parallel_lto_link_jobs() {
     case "$(uname -s -m)" in
         Darwin\ x86_64)
-            # *WARNING! HUERISTIC!*
+            # *WARNING! HEURISTIC!*
             #
             # Use the formula (GB Memory - 3)/6.0GB to get the number of
             # parallel link threads we can support. This gives the OS 3 GB of
@@ -298,7 +298,7 @@ function num_llvm_parallel_lto_link_jobs() {
 function num_swift_parallel_lto_link_jobs() {
     case "$(uname -s -m)" in
         Darwin\ x86_64)
-            # *WARNING! HUERISTIC!*
+            # *WARNING! HEURISTIC!*
             #
             # Use the formula (GB Memory - 3)/8.0GB to get the number of
             # parallel link threads we can support. This gives the OS 3 GB of
@@ -1240,7 +1240,7 @@ function llvm_c_flags() {
     if [[ $(is_cmake_release_build_type "${LLVM_BUILD_TYPE}") ]] ; then
         echo -n " -fno-stack-protector"
     fi
-    if [[ $(true_false "${LLVM_ENABLE_LTO}") ]] ; then
+    if [[ $(true_false "${LLVM_ENABLE_LTO}") = "TRUE" ]] ; then
         echo -n " -gline-tables-only"
     fi
 }

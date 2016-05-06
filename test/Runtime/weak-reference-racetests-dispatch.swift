@@ -18,8 +18,12 @@ class WBox<T: AnyObject> {
 
 let WeakReferenceRaceTests = TestSuite("WeakReferenceRaceTests")
 
+func forwardOptional<T>(_ t: T!) -> T {
+  return t!
+}
+
 WeakReferenceRaceTests.test("class instance property [SR-192] (copy)") {
-  let q = dispatch_queue_create("", DISPATCH_QUEUE_CONCURRENT)!
+  let q = forwardOptional(dispatch_queue_create("", DISPATCH_QUEUE_CONCURRENT))
 
   // Capture a weak reference via its container object
   // "https://bugs.swift.org/browse/SR-192"
@@ -39,7 +43,7 @@ WeakReferenceRaceTests.test("class instance property [SR-192] (copy)") {
 }
 
 WeakReferenceRaceTests.test("class instance property [SR-192] (load)") {
-  let q = dispatch_queue_create("", DISPATCH_QUEUE_CONCURRENT)!
+  let q = forwardOptional(dispatch_queue_create("", DISPATCH_QUEUE_CONCURRENT))
 
   // Capture a weak reference via its container object
   // "https://bugs.swift.org/browse/SR-192"
@@ -59,7 +63,7 @@ WeakReferenceRaceTests.test("class instance property [SR-192] (load)") {
 }
 
 WeakReferenceRaceTests.test("direct capture (copy)") {
-  let q = dispatch_queue_create("", DISPATCH_QUEUE_CONCURRENT)!
+  let q = forwardOptional(dispatch_queue_create("", DISPATCH_QUEUE_CONCURRENT))
 
   // Capture a weak reference directly in multiple closures
   for i in 1...iterations {
@@ -78,7 +82,7 @@ WeakReferenceRaceTests.test("direct capture (copy)") {
 }
 
 WeakReferenceRaceTests.test("direct capture (load)") {
-  let q = dispatch_queue_create("", DISPATCH_QUEUE_CONCURRENT)!
+  let q = forwardOptional(dispatch_queue_create("", DISPATCH_QUEUE_CONCURRENT))
 
   // Capture a weak reference directly in multiple closures
   for i in 1...iterations {

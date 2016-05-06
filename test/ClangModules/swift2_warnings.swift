@@ -53,8 +53,7 @@ func testOldOptionCaseNames(i: Int) -> RuncingOptions {
 func testImportAsMember() {
   _ = IAMStruct1GlobalVar // expected-error{{'IAMStruct1GlobalVar' has been renamed to 'Struct1.globalVar'}}{{7-26=Struct1.globalVar}}
   _ = IAMStruct1CreateSimple(1.5)
-  // expected-error@-1{{'IAMStruct1CreateSimple' has been replaced by 'Struct1.init(value:)'}}{{7-29=Struct1.init}}{{30-30=value: }}
-  // FIXME: ".init" above is spurious.
+  // expected-error@-1{{'IAMStruct1CreateSimple' has been replaced by 'Struct1.init(value:)'}}{{7-29=Struct1}}{{30-30=value: }}
 
   var iam1 = Struct1(value: 1.5)
   _ = IAMStruct1Invert(iam1)

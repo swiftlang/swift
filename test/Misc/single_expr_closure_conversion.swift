@@ -2,7 +2,7 @@
 
 struct Blob {}
 
-func withBlob(block: Blob -> ()) {}
+func withBlob(block: (Blob) -> ()) {}
 
 protocol Binding {}
 extension Int: Binding {}

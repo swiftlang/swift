@@ -190,60 +190,60 @@ protocol ClassP : class {
 func generic<T: P>(_ t: T) {
   var t = t
   // Instance member of archetype
-  let _: Int -> () = id(t.bar)
+  let _: (Int) -> () = id(t.bar)
   let _: () = id(t.bar(0))
 
   // Static member of archetype metatype
   let _: () -> () = id(T.tum)
 
   // Instance member of archetype metatype
-  let _: T -> Int -> () = id(T.bar)
-  let _: Int -> () = id(T.bar(t))
+  let _: (T) -> (Int) -> () = id(T.bar)
+  let _: (Int) -> () = id(T.bar(t))
 
   _ = t.mut // expected-error{{partial application of 'mutating' method is not allowed}}
   _ = t.tum // expected-error{{static member 'tum' cannot be used on instance of type 'T'}}
 
   // Instance member of extension returning Self)
-  let _: T -> () -> T = id(T.returnSelfInstance)
+  let _: (T) -> () -> T = id(T.returnSelfInstance)
   let _: () -> T = id(T.returnSelfInstance(t))
   let _: T = id(T.returnSelfInstance(t)())
 
   let _: () -> T = id(t.returnSelfInstance)
   let _: T = id(t.returnSelfInstance())
 
-  let _: T -> Bool -> T? = id(T.returnSelfOptionalInstance)
-  let _: Bool -> T? = id(T.returnSelfOptionalInstance(t))
+  let _: (T) -> (Bool) -> T? = id(T.returnSelfOptionalInstance)
+  let _: (Bool) -> T? = id(T.returnSelfOptionalInstance(t))
   let _: T? = id(T.returnSelfOptionalInstance(t)(false))
 
-  let _: Bool -> T? = id(t.returnSelfOptionalInstance)
+  let _: (Bool) -> T? = id(t.returnSelfOptionalInstance)
   let _: T? = id(t.returnSelfOptionalInstance(true))
 
-  let _: T -> Bool -> T! = id(T.returnSelfIUOInstance)
-  let _: Bool -> T! = id(T.returnSelfIUOInstance(t))
+  let _: (T) -> (Bool) -> T! = id(T.returnSelfIUOInstance)
+  let _: (Bool) -> T! = id(T.returnSelfIUOInstance(t))
   let _: T! = id(T.returnSelfIUOInstance(t)(true))
 
-  let _: Bool -> T! = id(t.returnSelfIUOInstance)
+  let _: (Bool) -> T! = id(t.returnSelfIUOInstance)
   let _: T! = id(t.returnSelfIUOInstance(true))
 
   // Static member of extension returning Self)
   let _: () -> T = id(T.returnSelfStatic)
   let _: T = id(T.returnSelfStatic())
 
-  let _: Bool -> T? = id(T.returnSelfOptionalStatic)
+  let _: (Bool) -> T? = id(T.returnSelfOptionalStatic)
   let _: T? = id(T.returnSelfOptionalStatic(false))
 
-  let _: Bool -> T! = id(T.returnSelfIUOStatic)
+  let _: (Bool) -> T! = id(T.returnSelfIUOStatic)
   let _: T! = id(T.returnSelfIUOStatic(true))
 }
 
 func genericClassP<T: ClassP>(_ t: T) {
   // Instance member of archetype)
-  let _: Int -> () = id(t.bas)
+  let _: (Int) -> () = id(t.bas)
   let _: () = id(t.bas(0))
 
   // Instance member of archetype metatype)
-  let _: T -> Int -> () = id(T.bas)
-  let _: Int -> () = id(T.bas(t))
+  let _: (T) -> (Int) -> () = id(T.bas)
+  let _: (Int) -> () = id(T.bas(t))
   let _: () = id(T.bas(t)(1))
 }
 
@@ -258,7 +258,7 @@ func existential(_ p: P) {
   _ = p.mut // expected-error{{partial application of 'mutating' method is not allowed}}
 
   // Instance member of existential)
-  let _: Int -> () = id(p.bar)
+  let _: (Int) -> () = id(p.bar)
   let _: () = id(p.bar(0))
 
   // Static member of existential metatype)
@@ -277,13 +277,13 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
   _ = P() // expected-error{{protocol type 'P' cannot be instantiated}}
 
   // Instance member of metatype
-  let _: P -> Int -> () = P.bar
-  let _: Int -> () = P.bar(ppp)
+  let _: (P) -> (Int) -> () = P.bar
+  let _: (Int) -> () = P.bar(ppp)
   P.bar(ppp)(5)
 
   // Instance member of metatype value
-  let _: P -> Int -> () = pp.bar
-  let _: Int -> () = pp.bar(ppp)
+  let _: (P) -> (Int) -> () = pp.bar
+  let _: (Int) -> () = pp.bar(ppp)
   pp.bar(ppp)(5)
 
   // Static member of existential metatype value
@@ -301,21 +301,21 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
   let _: () -> P = id(p.returnSelfStatic)
   let _: P = id(p.returnSelfStatic())
 
-  let _: Bool -> P? = id(p.returnSelfOptionalStatic)
+  let _: (Bool) -> P? = id(p.returnSelfOptionalStatic)
   let _: P? = id(p.returnSelfOptionalStatic(false))
 
-  let _: Bool -> P! = id(p.returnSelfIUOStatic)
+  let _: (Bool) -> P! = id(p.returnSelfIUOStatic)
   let _: P! = id(p.returnSelfIUOStatic(true))
 }
 
 func existentialClassP(_ p: ClassP) {
   // Instance member of existential)
-  let _: Int -> () = id(p.bas)
+  let _: (Int) -> () = id(p.bas)
   let _: () = id(p.bas(0))
 
   // Instance member of existential metatype)
-  let _: ClassP -> Int -> () = id(ClassP.bas)
-  let _: Int -> () = id(ClassP.bas(p))
+  let _: (ClassP) -> (Int) -> () = id(ClassP.bas)
+  let _: (Int) -> () = id(ClassP.bas(p))
   let _: () = id(ClassP.bas(p)(1))
 }
 
@@ -338,7 +338,7 @@ func wrap<T>(_ t: T) -> T {
 
 func exercise(_ c: Coalgebra, f: Functional, v: Vector) {
   let _: (Vector, Vector) -> Scalar = wrap(c.coproduct(f))
-  let _: Scalar -> Vector = v.scale
+  let _: (Scalar) -> Vector = v.scale
 }
 
 // Make sure existential isn't closed too late

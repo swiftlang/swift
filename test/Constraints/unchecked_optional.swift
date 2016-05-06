@@ -56,7 +56,7 @@ func test3(_ x: Subscriptable!) -> Int {
 }
 
 // Callable
-func test4(_ f: (Int -> Float)!) -> Float {
+func test4(_ f: ((Int) -> Float)!) -> Float {
   return f(5)
 }
 

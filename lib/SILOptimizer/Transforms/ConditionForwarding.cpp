@@ -1,4 +1,4 @@
-//===----------- ConditionForwarding.cpp - Forwards conditions ------------===//
+//===--- ConditionForwarding.cpp - Forwards conditions --------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -144,7 +144,7 @@ static bool hasNoRelevantSideEffects(SILBasicBlock *BB) {
 }
 
 /// Try to move a condition, e.g. a whole if-then-else structure down to the
-/// switch_enum instruction \p SEI. If successfull, jump thread and replace
+/// switch_enum instruction \p SEI. If successful, jump thread and replace
 /// \p SEI with the condition.
 /// Returns true if the a change was made.
 bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
@@ -216,7 +216,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
   if (Condition->getMemoryBehavior() != SILInstruction::MemoryBehavior::None)
     return false;
 
-  // Are there any other branch block successors beside the predescessors which
+  // Are there any other branch block successors beside the predecessors which
   // we collected?
   if (CommonBranchBlock->getSuccessors().size() != PredBlocks.size())
     return false;

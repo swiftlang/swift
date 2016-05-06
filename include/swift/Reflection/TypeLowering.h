@@ -202,6 +202,29 @@ public:
   }
 };
 
+/// Utility class for performing universal layout for types such as
+/// tuples, structs, thick functions, etc.
+class RecordTypeInfoBuilder {
+  TypeConverter &TC;
+  unsigned Size, Alignment, Stride, NumExtraInhabitants;
+  RecordKind Kind;
+  std::vector<FieldInfo> Fields;
+  bool Invalid;
+
+public:
+  RecordTypeInfoBuilder(TypeConverter &TC, RecordKind Kind)
+    : TC(TC), Size(0), Alignment(1), Stride(0), NumExtraInhabitants(0),
+      Kind(Kind), Invalid(false) {}
+
+  bool isInvalid() const {
+    return Invalid;
+  }
+
+  unsigned addField(unsigned fieldSize, unsigned fieldAlignment);
+  void addField(const std::string &Name, const TypeRef *TR);
+  const RecordTypeInfo *build();
+};
+
 }
 }
 

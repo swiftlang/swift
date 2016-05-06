@@ -3,3 +3,8 @@ Name: SwiftName
 Enumerators:
 - Name: HomeworkExcuseTooHard
   SwiftName: challenging
+Functions:
+- Name: spuriousAPINotedSwiftName
+  SwiftName: spuriousAPINotedSwiftName
+- Name: poorlyNamedFunction
+  SwiftName: nicelyRenamedFunction

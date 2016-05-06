@@ -70,42 +70,42 @@ func fooT(_ callback: () -> Bool) {}
 
 // Throwing and non-throwing types are not equivalent.
 struct X<T> { }
-func specializedOnFuncType1(_ x: X<String throws -> Int>) { }
-func specializedOnFuncType2(_ x: X<String -> Int>) { }
-func testSpecializedOnFuncType(_ xThrows: X<String throws -> Int>,
-                               xNonThrows: X<String -> Int>) {
+func specializedOnFuncType1(_ x: X<(String) throws -> Int>) { }
+func specializedOnFuncType2(_ x: X<(String) -> Int>) { }
+func testSpecializedOnFuncType(_ xThrows: X<(String) throws -> Int>,
+                               xNonThrows: X<(String) -> Int>) {
   specializedOnFuncType1(xThrows) // ok
-  specializedOnFuncType1(xNonThrows) // expected-error{{cannot convert value of type 'X<String -> Int>' to expected argument type 'X<String throws -> Int>'}}
-  specializedOnFuncType2(xThrows)  // expected-error{{cannot convert value of type 'X<String throws -> Int>' to expected argument type 'X<String -> Int>'}}
+  specializedOnFuncType1(xNonThrows) // expected-error{{cannot convert value of type 'X<(String) -> Int>' (aka 'X<String -> Int>') to expected argument type 'X<(String) throws -> Int>' (aka 'X<String throws -> Int>')}}
+  specializedOnFuncType2(xThrows)  // expected-error{{cannot convert value of type 'X<(String) throws -> Int>' (aka 'X<String throws -> Int>') to expected argument type 'X<(String) -> Int>' (aka 'X<String -> Int>')}}
   specializedOnFuncType2(xNonThrows) // ok
 }
 
 // Subtyping
-func subtypeResult1(_ x: String -> (Int -> String)) { }
-func testSubtypeResult1(_ x1: String -> (Int throws -> String),
-                        x2: String -> (Int -> String)) {
-  subtypeResult1(x1) // expected-error{{cannot convert value of type 'String -> (Int throws -> String)' to expected argument type 'String -> (Int -> String)'}}
+func subtypeResult1(_ x: (String) -> ((Int) -> String)) { }
+func testSubtypeResult1(_ x1: (String) -> ((Int) throws -> String),
+                        x2: (String) -> ((Int) -> String)) {
+  subtypeResult1(x1) // expected-error{{cannot convert value of type '(String) -> ((Int) throws -> String)' to expected argument type '(String) -> ((Int) -> String)'}}
   subtypeResult1(x2)
 }
 
-func subtypeResult2(_ x: String -> (Int throws -> String)) { }
-func testSubtypeResult2(_ x1: String -> (Int throws -> String),
-                        x2: String -> (Int -> String)) {
+func subtypeResult2(_ x: (String) -> ((Int) throws -> String)) { }
+func testSubtypeResult2(_ x1: (String) -> ((Int) throws -> String),
+                        x2: (String) -> ((Int) -> String)) {
   subtypeResult2(x1)
   subtypeResult2(x2)
 }
 
-func subtypeArgument1(_ x: (fn: (String -> Int)) -> Int) { }
-func testSubtypeArgument1(_ x1: (fn: (String -> Int)) -> Int,
-                          x2: (fn: (String throws -> Int)) -> Int) {
+func subtypeArgument1(_ x: (fn: ((String) -> Int)) -> Int) { }
+func testSubtypeArgument1(_ x1: (fn: ((String) -> Int)) -> Int,
+                          x2: (fn: ((String) throws -> Int)) -> Int) {
   subtypeArgument1(x1)
   subtypeArgument1(x2)
 }
 
-func subtypeArgument2(_ x: (fn: (String throws -> Int)) -> Int) { }
-func testSubtypeArgument2(_ x1: (fn: (String -> Int)) -> Int,
-                          x2: (fn: (String throws -> Int)) -> Int) {
-  subtypeArgument2(x1) // expected-error{{cannot convert value of type '(fn: (String -> Int)) -> Int' to expected argument type '(fn: (String throws -> Int)) -> Int'}}
+func subtypeArgument2(_ x: (fn: ((String) throws -> Int)) -> Int) { }
+func testSubtypeArgument2(_ x1: (fn: ((String) -> Int)) -> Int,
+                          x2: (fn: ((String) throws -> Int)) -> Int) {
+  subtypeArgument2(x1) // expected-error{{cannot convert value of type '(fn: ((String) -> Int)) -> Int' to expected argument type '(fn: ((String) throws -> Int)) -> Int'}}
   subtypeArgument2(x2)
 }
 

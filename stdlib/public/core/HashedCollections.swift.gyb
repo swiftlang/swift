@@ -230,6 +230,11 @@ internal protocol _HashStorage {
   mutating func updateValue(_ value: Value, forKey key: Key) -> Value?
 
   @discardableResult
+  mutating func insert(
+    _ value: Value, forKey key: Key
+  ) -> (inserted: Bool, memberAfterInsert: Value)
+
+  @discardableResult
   mutating func remove(at index: Index) -> SequenceElement
 
   @discardableResult
@@ -577,12 +582,7 @@ public struct Set<Element : Hashable> :
   public mutating func insert(
     _ newMember: Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
-    // FIXME: optimize this to do just one lookup
-    if let i = index(of: newMember) {
-      return (inserted: false, memberAfterInsert: self[i])
-    }
-    _variantStorage.updateValue(newMember, forKey: newMember)
-    return (inserted: true, memberAfterInsert: newMember)
+    return _variantStorage.insert(newMember, forKey: newMember)
   }
 
   /// Inserts `newMember` unconditionally.
@@ -2731,6 +2731,14 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @discardableResult
+  internal mutating func insert(
+    _ value: Value, forKey key: Key
+  ) -> (inserted: Bool, memberAfterInsert: Value) {
+    _sanityCheckFailure(
+      "don't call mutating methods on _Native${Self}Storage")
+  }
+
+  @discardableResult
   internal mutating func remove(at index: Index) -> SequenceElement {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
@@ -3422,6 +3430,13 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
   }
 
   @discardableResult
+  internal mutating func insert(
+    _ value: Value, forKey key: Key
+  ) -> (inserted: Bool, memberAfterInsert: Value) {
+    _sanityCheckFailure("cannot mutate NS${Self}")
+  }
+
+  @discardableResult
   internal mutating func remove(at index: Index) -> SequenceElement {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
@@ -3837,6 +3852,61 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 #if _runtime(_ObjC)
       migrateDataToNativeStorage(cocoaStorage)
       return nativeUpdateValue(value, forKey: key)
+#else
+      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
+#endif
+    }
+  }
+
+  internal mutating func nativeInsert(
+    _ value: Value, forKey key: Key
+  ) -> (inserted: Bool, memberAfterInsert: Value) {
+    var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+
+    if found {
+%if Self == 'Set':
+      return (inserted: false, memberAfterInsert: asNative.key(at: i.offset))
+%elif Self == 'Dictionary':
+      return (inserted: false, memberAfterInsert: asNative.value(at: i.offset))
+%end
+    }
+
+    let minCapacity = NativeStorage.minimumCapacity(
+      minimumCount: asNative.count + 1,
+      maxLoadFactorInverse: asNative.maxLoadFactorInverse)
+
+    let (_, capacityChanged) = ensureUniqueNativeStorage(minCapacity)
+    if capacityChanged {
+      i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+    }
+
+%if Self == 'Set':
+    asNative.initializeKey(key, at: i.offset)
+    asNative.count += 1
+%elif Self == 'Dictionary':
+    asNative.initializeKey(key, value: value, at: i.offset)
+    asNative.count += 1
+%end
+
+    return (inserted: true, memberAfterInsert: value)
+  }
+
+  @discardableResult
+  internal mutating func insert(
+    _ value: Value, forKey key: Key
+  ) -> (inserted: Bool, memberAfterInsert: Value) {
+
+    if _fastPath(guaranteedNative) {
+      return nativeInsert(value, forKey: key)
+    }
+
+    switch self {
+    case .native:
+      return nativeInsert(value, forKey: key)
+    case .cocoa(let cocoaStorage):
+#if _runtime(_ObjC)
+      migrateDataToNativeStorage(cocoaStorage)
+      return nativeInsert(value, forKey: key)
 #else
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif

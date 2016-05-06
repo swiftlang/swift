@@ -4,7 +4,7 @@ func takeFunc(_ f: (Int) -> Int) -> Int {}
 func takeValueAndFunc(_ value: Int, _ f: (Int) -> Int) {}
 func takeTwoFuncs(_ f: (Int) -> Int, _ g: (Int) -> Int) {}
 func takeFuncWithDefault(f : ((Int) -> Int)? = nil) {}
-func takeTwoFuncsWithDefaults(f1 : (Int -> Int)? = nil, f2 : (String -> String)? = nil) {}
+func takeTwoFuncsWithDefaults(f1 : ((Int) -> Int)? = nil, f2 : ((String) -> String)? = nil) {}
 
 struct X {
   func takeFunc(_ f: (Int) -> Int) {}
@@ -37,8 +37,8 @@ func notPostfix() {
 }
 
 class C {
-  func map(_ x: Int -> Int) -> C { return self }
-  func filter(_ x: Int -> Bool) -> C { return self }
+  func map(_ x: (Int) -> Int) -> C { return self }
+  func filter(_ x: (Int) -> Bool) -> C { return self }
 }
 
 var a = C().map {$0 + 1}.filter {$0 % 3 == 0}
@@ -83,7 +83,7 @@ func labeledArgumentAndTrailingClosure() {
 
   // Trailing closure binds to last parameter, always.
  takeTwoFuncsWithDefaults { "Hello, " + $0 }
-  takeTwoFuncsWithDefaults { $0 + 1 } // expected-error {{cannot convert value of type '(_) -> Int' to expected argument type '(String -> String)?'}} 
+  takeTwoFuncsWithDefaults { $0 + 1 } // expected-error {{cannot convert value of type '(_) -> Int' to expected argument type '((String) -> String)?'}} 
   takeTwoFuncsWithDefaults(f1: {$0 + 1 })
 }
 

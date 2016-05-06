@@ -103,7 +103,7 @@ foo(true ? "foo" : "bar")
 func foo2<T>(_ x: T, y: Bool = true) {}
 
 extension Array {
-  func bar(_ x: Element -> Bool) -> Int? { return 0 }
+  func bar(_ x: (Element) -> Bool) -> Int? { return 0 }
 }
 
 foo2([].bar { $0 == "c" }!)

@@ -89,6 +89,12 @@ using namespace swift;
   }
 }
 
+- (id)copyWithZone:(NSZone *)zone {
+  (void)zone;
+  // _SwiftNativeNSError is immutable, so we can return the same instance back.
+  return [self retain];
+}
+
 @end
 
 Class swift::getNSErrorClass() {

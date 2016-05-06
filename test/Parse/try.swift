@@ -99,7 +99,7 @@ struct r21432429 {
 }
 
 // <rdar://problem/21427855> Swift 2: Omitting try from call to throwing closure in rethrowing function crashes compiler
-func callThrowingClosureWithoutTry(closure: Int throws -> Int) rethrows {
+func callThrowingClosureWithoutTry(closure: (Int) throws -> Int) rethrows {
   closure(0)  // expected-error {{call can throw but is not marked with 'try'}}
 }
 

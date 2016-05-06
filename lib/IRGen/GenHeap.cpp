@@ -253,7 +253,7 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
                                             llvm::Constant *captureDescriptor,
                                             MetadataKind kind) {
   // Build the fields of the private metadata.
-  SmallVector<llvm::Constant*, 4> fields;
+  SmallVector<llvm::Constant*, 5> fields;
   fields.push_back(dtorFn);
   fields.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
   fields.push_back(llvm::ConstantStruct::get(IGM.TypeMetadataStructTy,

@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-ir -g %s -o %t.ll
-// RUN: FileCheck %s --check-prefix CHECK-HIDDEN < %t.ll
 // RUN: FileCheck %s --check-prefix IMPORT-CHECK < %t.ll
 // RUN: FileCheck %s --check-prefix LOC-CHECK < %t.ll
 // RUN: llc %t.ll -filetype=obj -o %t.o
@@ -7,9 +6,6 @@
 // RUN: dwarfdump --verify %t.o
 
 // REQUIRES: OS=macosx
-
-// CHECK-HIDDEN: @[[HIDDEN_GV:_TWVVSC.*]] = linkonce_odr hidden
-// CHECK-HIDDEN-NOT: !DIGlobalVariable({{.*}}[[HIDDEN_GV]]
 
 import ObjectiveC
 import Foundation

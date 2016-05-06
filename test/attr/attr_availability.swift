@@ -296,6 +296,9 @@ func unavailableMultiUnnamedSame(_ a: Int, _ b: Int) {} // expected-note {{here}
 @available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)")
 func unavailableMultiNewlyUnnamed(a: Int, b: Int) {} // expected-note {{here}}
 
+@available(*, unavailable, renamed: "Int.init(other:)")
+func unavailableInit(a: Int) {} // expected-note 2 {{here}}
+
 
 func testArgNames() {
   unavailableArgNames(a: 0) // expected-error {{'unavailableArgNames(a:)' has been renamed to 'shinyLabeledArguments(example:)'}} {{3-22=shinyLabeledArguments}} {{23-24=example}}
@@ -317,6 +320,10 @@ func testArgNames() {
   unavailableMultiUnnamed(0, 1) // expected-error {{'unavailableMultiUnnamed' has been renamed to 'shinyLabeledArguments(example:another:)'}} {{3-26=shinyLabeledArguments}} {{27-27=example: }} {{30-30=another: }}
   unavailableMultiUnnamedSame(0, 1) // expected-error {{'unavailableMultiUnnamedSame' has been renamed to 'shinyLabeledArguments(_:_:)'}} {{3-30=shinyLabeledArguments}}
   unavailableMultiNewlyUnnamed(a: 0, b: 1) // expected-error {{'unavailableMultiNewlyUnnamed(a:b:)' has been renamed to 'shinyLabeledArguments(_:_:)'}} {{3-31=shinyLabeledArguments}} {{32-35=}} {{38-41=}}
+
+  unavailableInit(a: 0) // expected-error {{'unavailableInit(a:)' has been replaced by 'Int.init(other:)'}} {{3-18=Int}} {{19-20=other}}
+  let fn = unavailableInit // expected-error {{'unavailableInit(a:)' has been replaced by 'Int.init(other:)'}} {{12-27=Int.init}}
+  fn(a: 1)
 }
 
 @available(*, unavailable, renamed: "shinyLabeledArguments()")
@@ -470,4 +477,22 @@ func testRenameSetters() {
 
   var x = 0
   unavailableSetInstancePropertyInout(a: &x, b: 2) // expected-error{{'unavailableSetInstancePropertyInout(a:b:)' has been replaced by property 'Int.prop'}} {{3-38=x.prop}} {{38-49= = }} {{50-51=}}
+}
+
+extension Int {
+  @available(*, unavailable, renamed: "init(other:)")
+  static func factory(other: Int) -> Int { return other } // expected-note 2 {{here}}
+
+  @available(*, unavailable, renamed: "Int.init(other:)")
+  static func factory2(other: Int) -> Int { return other } // expected-note 2 {{here}}
+
+  static func testFactoryMethods() {
+    factory(other: 1) // expected-error {{'factory(other:)' has been replaced by 'init(other:)'}} {{none}}
+    factory2(other: 1) // expected-error {{'factory2(other:)' has been replaced by 'Int.init(other:)'}} {{5-13=Int}}
+  }
+}
+
+func testFactoryMethods() {
+  Int.factory(other: 1) // expected-error {{'factory(other:)' has been replaced by 'init(other:)'}} {{6-14=}}
+  Int.factory2(other: 1) // expected-error {{'factory2(other:)' has been replaced by 'Int.init(other:)'}} {{3-15=Int}}
 }

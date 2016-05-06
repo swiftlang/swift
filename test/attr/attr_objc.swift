@@ -1165,8 +1165,8 @@ class infer_instanceVar1 {
   var var_CFunctionPointer_1: @convention(c) () -> ()
   // CHECK-LABEL: @objc var var_CFunctionPointer_invalid_1: Int
   var var_CFunctionPointer_invalid_1: @convention(c) Int // expected-error {{@convention attribute only applies to function types}}
-  // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_2: @convention(c) PlainStruct -> Int
-  var var_CFunctionPointer_invalid_2: @convention(c) PlainStruct -> Int // expected-error {{'PlainStruct -> Int' is not representable in Objective-C, so it cannot be used with '@convention(c)'}}
+  // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_2: @convention(c) (PlainStruct) -> Int
+  var var_CFunctionPointer_invalid_2: @convention(c) (PlainStruct) -> Int // expected-error {{'(PlainStruct) -> Int' is not representable in Objective-C, so it cannot be used with '@convention(c)'}}
   
   // <rdar://problem/20918869> Confusing diagnostic for @convention(c) throws
   var var_CFunctionPointer_invalid_3 : @convention(c) (Int) throws -> Int // expected-error {{'(Int) throws -> Int' is not representable in Objective-C, so it cannot be used with '@convention(c)'}}
@@ -1319,10 +1319,10 @@ class infer_instanceVar1 {
 
   @objc var var_ArrayType1_: [AnyObject] // no-error
 
-  var var_ArrayType2: [@convention(block) AnyObject -> AnyObject] // no-error
-  // CHECK-LABEL: {{^}}  @objc var var_ArrayType2: [@convention(block) AnyObject -> AnyObject]
+  var var_ArrayType2: [@convention(block) (AnyObject) -> AnyObject] // no-error
+  // CHECK-LABEL: {{^}}  @objc var var_ArrayType2: [@convention(block) (AnyObject) -> AnyObject]
 
-  @objc var var_ArrayType2_: [@convention(block) AnyObject -> AnyObject] // no-error
+  @objc var var_ArrayType2_: [@convention(block) (AnyObject) -> AnyObject] // no-error
 
   var var_ArrayType3: [PlainStruct]
   // CHECK-LABEL: {{^}}  var var_ArrayType3: [PlainStruct]
@@ -1330,10 +1330,10 @@ class infer_instanceVar1 {
   @objc var var_ArrayType3_: [PlainStruct]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
-  var var_ArrayType4: [AnyObject -> AnyObject] // no-error
-  // CHECK-LABEL: {{^}}  var var_ArrayType4: [AnyObject -> AnyObject]
+  var var_ArrayType4: [(AnyObject) -> AnyObject] // no-error
+  // CHECK-LABEL: {{^}}  var var_ArrayType4: [(AnyObject) -> AnyObject]
 
-  @objc var var_ArrayType4_: [AnyObject -> AnyObject] 
+  @objc var var_ArrayType4_: [(AnyObject) -> AnyObject]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType5: [Protocol_ObjC1]
@@ -1388,15 +1388,15 @@ class infer_instanceVar1 {
   @objc var var_ArrayType15_: [AnyObject?]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
-  var var_ArrayType16: [[@convention(block) AnyObject -> AnyObject]] // no-error
-  // CHECK-LABEL: {{^}}  @objc var var_ArrayType16: {{\[}}[@convention(block) AnyObject -> AnyObject]]
+  var var_ArrayType16: [[@convention(block) (AnyObject) -> AnyObject]] // no-error
+  // CHECK-LABEL: {{^}}  @objc var var_ArrayType16: {{\[}}[@convention(block) (AnyObject) -> AnyObject]]
 
-  @objc var var_ArrayType16_: [[@convention(block) AnyObject -> AnyObject]] // no-error
+  @objc var var_ArrayType16_: [[@convention(block) (AnyObject) -> AnyObject]] // no-error
 
-  var var_ArrayType17: [[AnyObject -> AnyObject]] // no-error
-  // CHECK-LABEL: {{^}}  var var_ArrayType17: {{\[}}[AnyObject -> AnyObject]]
+  var var_ArrayType17: [[(AnyObject) -> AnyObject]] // no-error
+  // CHECK-LABEL: {{^}}  var var_ArrayType17: {{\[}}[(AnyObject) -> AnyObject]]
 
-  @objc var var_ArrayType17_: [[AnyObject -> AnyObject]]
+  @objc var var_ArrayType17_: [[(AnyObject) -> AnyObject]]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 }
 
@@ -1804,22 +1804,22 @@ struct NotObjCStruct {}
 // CHECK-LABEL: @objc class ClosureArguments
 @objc class ClosureArguments {
   // CHECK: @objc func foo
-  @objc func foo(f: Int -> ()) {}
+  @objc func foo(f: (Int) -> ()) {}
   // CHECK: @objc func bar
-  @objc func bar(f: NotObjCEnum -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc func bar(f: (NotObjCEnum) -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func bas
-  @objc func bas(f: NotObjCEnum -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc func bas(f: (NotObjCEnum) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func zim
   @objc func zim(f: () -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func zang
   @objc func zang(f: (NotObjCEnum, NotObjCStruct) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   @objc func zangZang(f: (Int...) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func fooImplicit
-  func fooImplicit(f: Int -> ()) {}
+  func fooImplicit(f: (Int) -> ()) {}
   // CHECK: {{^}}  func barImplicit
-  func barImplicit(f: NotObjCEnum -> NotObjCStruct) {}
+  func barImplicit(f: (NotObjCEnum) -> NotObjCStruct) {}
   // CHECK: {{^}}  func basImplicit
-  func basImplicit(f: NotObjCEnum -> ()) {}
+  func basImplicit(f: (NotObjCEnum) -> ()) {}
   // CHECK: {{^}}  func zimImplicit
   func zimImplicit(f: () -> NotObjCStruct) {}
   // CHECK: {{^}}  func zangImplicit
@@ -1828,8 +1828,8 @@ struct NotObjCStruct {}
   func zangZangImplicit(f: (Int...) -> ()) {}
 }
 
-typealias GoodBlock = @convention(block) Int -> ()
-typealias BadBlock = @convention(block) NotObjCEnum -> () // expected-error{{'NotObjCEnum -> ()' is not representable in Objective-C, so it cannot be used with '@convention(block)'}}
+typealias GoodBlock = @convention(block) (Int) -> ()
+typealias BadBlock = @convention(block) (NotObjCEnum) -> () // expected-error{{'(NotObjCEnum) -> ()' is not representable in Objective-C, so it cannot be used with '@convention(block)'}}
 
 
 @objc class AccessControl {
@@ -1969,8 +1969,8 @@ class ThrowsRedecl1 {
   @objc func method2AndReturnError(_ x: Int) { } // expected-note{{declared here}}
   @objc func method2() throws { } // expected-error{{with Objective-C selector 'method2AndReturnError:'}}
 
-  @objc func method3(_ x: Int, error: Int, closure: Int -> Int) { }  // expected-note{{declared here}}
-  @objc func method3(_ x: Int, closure: Int -> Int) throws { } // expected-error{{with Objective-C selector 'method3:error:closure:'}}
+  @objc func method3(_ x: Int, error: Int, closure: (Int) -> Int) { }  // expected-note{{declared here}}
+  @objc func method3(_ x: Int, closure: (Int) -> Int) throws { } // expected-error{{with Objective-C selector 'method3:error:closure:'}}
 
   @objc(initAndReturnError:) func initMethod1(error: Int) { } // expected-note{{declared here}}
   @objc init() throws { } // expected-error{{with Objective-C selector 'initAndReturnError:'}}
@@ -1978,14 +1978,14 @@ class ThrowsRedecl1 {
   @objc(initWithString:error:) func initMethod2(string: String, error: Int) { } // expected-note{{declared here}}
   @objc init(string: String) throws { } // expected-error{{with Objective-C selector 'initWithString:error:'}}
 
-  @objc(initAndReturnError:fn:) func initMethod3(error: Int, fn: Int -> Int) { } // expected-note{{declared here}}
-  @objc init(fn: Int -> Int) throws { } // expected-error{{with Objective-C selector 'initAndReturnError:fn:'}}
+  @objc(initAndReturnError:fn:) func initMethod3(error: Int, fn: (Int) -> Int) { } // expected-note{{declared here}}
+  @objc init(fn: (Int) -> Int) throws { } // expected-error{{with Objective-C selector 'initAndReturnError:fn:'}}
 }
 
 class ThrowsObjCName {
-  @objc(method4:closure:error:) func method4(x: Int, closure: Int -> Int) throws { }
+  @objc(method4:closure:error:) func method4(x: Int, closure: (Int) -> Int) throws { }
 
-  @objc(method5AndReturnError:x:closure:) func method5(x: Int, closure: Int -> Int) throws { }
+  @objc(method5AndReturnError:x:closure:) func method5(x: Int, closure: (Int) -> Int) throws { }
 
   @objc(method6) func method6() throws { } // expected-error{{@objc' method name provides names for 0 arguments, but method has one parameter (the error parameter)}}
 

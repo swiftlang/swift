@@ -3037,8 +3037,11 @@ namespace {
       auto resultTy = type->castTo<FunctionType>()->getResult();
       auto loc = Impl.importSourceLoc(decl->getLocation());
 
-      assert((!name.isSimpleName() || !name) &&
-             "Cannot have a simple name here");
+      if (name && name.isSimpleName()) {
+        assert(hasCustomName && "imported function with simple name?");
+        // Just fill in empty argument labels.
+        name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
+      }
 
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());

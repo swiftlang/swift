@@ -56,5 +56,5 @@ func typoFunc2<T : P1>(x: TypoType, y: T) { // expected-error{{use of undeclared
   let _: T.Assoc -> () = { let _ = $0 } // expected-error{{'Assoc' is not a member type of 'T'}}
 }
 
-func typoFunc3<T : P1>(x: TypoType, y: T.Assoc -> ()) { // expected-error{{use of undeclared type 'TypoType'}}
+func typoFunc3<T : P1>(x: TypoType, y: (T.Assoc) -> ()) { // expected-error{{use of undeclared type 'TypoType'}}
 }

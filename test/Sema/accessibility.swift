@@ -161,9 +161,9 @@ internal typealias InternalTA3 = PrivateStruct // expected-error {{type alias ca
 
 public typealias PublicFromInternal = InternalTA1 // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}
 
-typealias FunctionType1 = PrivateStruct -> PublicStruct // expected-error {{type alias must be declared private because its underlying type uses a private type}}
-typealias FunctionType2 = PublicStruct -> PrivateStruct // expected-error {{type alias must be declared private because its underlying type uses a private type}}
-typealias FunctionType3 = PrivateStruct -> PrivateStruct // expected-error {{type alias must be declared private because its underlying type uses a private type}}
+typealias FunctionType1 = (PrivateStruct) -> PublicStruct // expected-error {{type alias must be declared private because its underlying type uses a private type}}
+typealias FunctionType2 = (PublicStruct) -> PrivateStruct // expected-error {{type alias must be declared private because its underlying type uses a private type}}
+typealias FunctionType3 = (PrivateStruct) -> PrivateStruct // expected-error {{type alias must be declared private because its underlying type uses a private type}}
 
 typealias ArrayType = [PrivateStruct] // expected-error {{type alias must be declared private because its underlying type uses a private type}}
 typealias DictType = [String : PrivateStruct] // expected-error {{type alias must be declared private because its underlying type uses a private type}}

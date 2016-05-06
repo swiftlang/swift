@@ -186,69 +186,6 @@ public:
   }
 };
 
-/// Utility class for performing universal layout for types such as
-/// tuples, structs, thick functions, etc.
-class RecordTypeInfoBuilder {
-  TypeConverter &TC;
-  unsigned Size, Alignment, Stride, NumExtraInhabitants;
-  RecordKind Kind;
-  std::vector<FieldInfo> Fields;
-  bool Invalid;
-
-public:
-  RecordTypeInfoBuilder(TypeConverter &TC, RecordKind Kind)
-    : TC(TC), Size(0), Alignment(1), Stride(0), NumExtraInhabitants(0),
-      Kind(Kind), Invalid(false) {}
-
-  unsigned addField(unsigned fieldSize, unsigned fieldAlignment) {
-    // Align the current size appropriately
-    Size = ((Size + fieldAlignment - 1) & ~(fieldAlignment - 1));
-
-    // Record the offset
-    unsigned offset = Size;
-
-    // Update the aggregate size
-    Size += fieldSize;
-
-    // Update the aggregate alignment
-    Alignment = std::max(Alignment, fieldAlignment);
-
-    // Re-calculate the stride
-    Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
-
-    return offset;
-  }
-
-  void addField(const std::string &Name, const TypeRef *TR) {
-    const TypeInfo *TI = TC.getTypeInfo(TR);
-    if (TI == nullptr) {
-      Invalid = true;
-      return;
-    }
-
-    // FIXME: I just made this up
-    if (Size == 0)
-      NumExtraInhabitants = TI->getNumExtraInhabitants();
-    else
-      NumExtraInhabitants = 0;
-
-    unsigned fieldSize = TI->getSize();
-    unsigned fieldAlignment = TI->getAlignment();
-
-    unsigned fieldOffset = addField(fieldSize, fieldAlignment);
-    Fields.push_back({Name, fieldOffset, TR, *TI});
-  }
-
-  const RecordTypeInfo *build() {
-    if (Invalid)
-      return nullptr;
-
-    return TC.makeTypeInfo<RecordTypeInfo>(
-        Size, Alignment, Stride,
-        NumExtraInhabitants, Kind, Fields);
-  }
-};
-
 /// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {
   TypeConverter &TC;
@@ -359,6 +296,56 @@ public:
   }
 };
 
+}
+
+unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
+                                         unsigned fieldAlignment) {
+  // Align the current size appropriately
+  Size = ((Size + fieldAlignment - 1) & ~(fieldAlignment - 1));
+
+  // Record the offset
+  unsigned offset = Size;
+
+  // Update the aggregate size
+  Size += fieldSize;
+
+  // Update the aggregate alignment
+  Alignment = std::max(Alignment, fieldAlignment);
+
+  // Re-calculate the stride
+  Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+
+  return offset;
+}
+
+void RecordTypeInfoBuilder::addField(const std::string &Name,
+                                     const TypeRef *TR) {
+  const TypeInfo *TI = TC.getTypeInfo(TR);
+  if (TI == nullptr) {
+    Invalid = true;
+    return;
+  }
+
+  // FIXME: I just made this up
+  if (Size == 0)
+    NumExtraInhabitants = TI->getNumExtraInhabitants();
+  else
+    NumExtraInhabitants = 0;
+
+  unsigned fieldSize = TI->getSize();
+  unsigned fieldAlignment = TI->getAlignment();
+
+  unsigned fieldOffset = addField(fieldSize, fieldAlignment);
+  Fields.push_back({Name, fieldOffset, TR, *TI});
+}
+
+const RecordTypeInfo *RecordTypeInfoBuilder::build() {
+  if (Invalid)
+    return nullptr;
+
+  return TC.makeTypeInfo<RecordTypeInfo>(
+      Size, Alignment, Stride,
+      NumExtraInhabitants, Kind, Fields);
 }
 
 const ReferenceTypeInfo *

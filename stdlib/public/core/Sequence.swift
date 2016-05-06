@@ -212,7 +212,7 @@ public protocol IteratorProtocol {
 
 /// A type that provides sequential, iterated access to its elements.
 ///
-/// Sequences are lists of values that let you you step over their values
+/// Sequences are lists of values that let you step over their values
 /// one at a time. The most common way to iterate over the elements of a
 /// sequence is to use a `for`-`in` loop:
 ///
