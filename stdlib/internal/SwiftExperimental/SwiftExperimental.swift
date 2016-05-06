@@ -39,7 +39,7 @@ infix operator ∘ {
 ///
 /// - Returns: a function that applies ``g`` to the result of applying ``f``
 ///   to the argument of the new function.
-public func ∘<T, U, V>(g: U -> V, f: T -> U) -> (T -> V) {
+public func ∘<T, U, V>(g: (U) -> V, f: (T) -> U) -> ((T) -> V) {
   return { g(f($0)) }
 }
 

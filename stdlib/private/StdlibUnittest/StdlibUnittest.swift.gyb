@@ -2271,8 +2271,8 @@ public func expectEqualsUnordered<
 }
 
 public func expectEqualFunctionsForDomain<ArgumentType, Result : Equatable>(
-    _ arguments: [ArgumentType], _ function1: ArgumentType -> Result,
-    _ function2: ArgumentType -> Result
+    _ arguments: [ArgumentType], _ function1: (ArgumentType) -> Result,
+    _ function2: (ArgumentType) -> Result
 ) {
   for a in arguments {
     let expected = function1(a)
@@ -2285,8 +2285,8 @@ public func expectEqualMethodsForDomain<
   SelfType, ArgumentType, Result : Equatable
 >(
   _ selfs: [SelfType], _ arguments: [ArgumentType],
-  _ function1: SelfType -> ArgumentType -> Result,
-  _ function2: SelfType -> ArgumentType -> Result
+  _ function1: (SelfType) -> (ArgumentType) -> Result,
+  _ function2: (SelfType) -> (ArgumentType) -> Result
 ) {
   for s in selfs {
     for a in arguments {
@@ -2313,7 +2313,7 @@ public func expectEqualUnicodeScalars(
   }
 }
 
-func compose<A, B, C>(_ f: A -> B, _ g: B -> C) -> A -> C {
+func compose<A, B, C>(_ f: (A) -> B, _ g: (B) -> C) -> (A) -> C {
   return { a in
     return g(f(a))
   }
