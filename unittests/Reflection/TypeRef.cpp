@@ -378,3 +378,36 @@ TEST(TypeRefTest, NestedTypes) {
   EXPECT_EQ(SubstChild, Child->subst(Builder, Subs));
 }
 
+TEST(TypeRefTest, DeriveSubstitutions) {
+  TypeRefBuilder Builder;
+
+  auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
+  auto GTP01 = Builder.createGenericTypeParameterType(0, 1);
+
+  std::string NominalName("nominal");
+  std::vector<const TypeRef *> NominalArgs { GTP00 };
+  auto Nominal = Builder.createBoundGenericType(NominalName, NominalArgs,
+                                               /*parent*/ nullptr);
+
+  auto Result = Builder.createTupleType({GTP00, GTP01}, "");
+  auto Func = Builder.createFunctionType({Nominal}, {}, Result,
+                                         FunctionTypeFlags());
+
+  std::string SubstOneName("subst1");
+  auto SubstOne = Builder.createNominalType(SubstOneName, /*parent*/ nullptr);
+
+  std::string SubstTwoName("subst2");
+  auto SubstTwo = Builder.createNominalType(SubstTwoName, /*parent*/ nullptr);
+
+  GenericArgumentMap Subs;
+  Subs[{0,0}] = SubstOne;
+  Subs[{0,1}] = SubstTwo;
+
+  auto Subst = Func->subst(Builder, Subs);
+
+  GenericArgumentMap DerivedSubs;
+  EXPECT_TRUE(TypeRef::deriveSubstitutions(DerivedSubs, Func, Subst));
+
+  EXPECT_EQ(Subs[{0, 0}], DerivedSubs[{0, 0}]);
+  EXPECT_EQ(Subs[{0, 1}], DerivedSubs[{0, 1}]);
+}

@@ -150,6 +150,17 @@ public:
   GenericArgumentMap getSubstMap() const;
 
   virtual ~TypeRef() = default;
+
+  /// Given an original type and substituted type, decompose them in
+  /// parallel to derive substitutions that produced the substituted
+  /// type.
+  ///
+  /// This will fail if the resulting substitutions contradict already
+  /// known substitutions, or if the original and substituted types
+  /// have a structural mismatch.
+  static bool deriveSubstitutions(GenericArgumentMap &Subs,
+                                  const TypeRef *OrigTR,
+                                  const TypeRef *SubstTR);
 };
 
 class BuiltinTypeRef final : public TypeRef {
@@ -652,6 +663,13 @@ protected:
 public:
   const TypeRef *getType() const {
     return Type;
+  }
+
+  static bool classof(const TypeRef *TR) {
+    auto Kind = TR->getKind();
+    return (Kind == TypeRefKind::UnownedStorage &&
+            Kind == TypeRefKind::WeakStorage &&
+            Kind == TypeRefKind::UnmanagedStorage);
   }
 };
 

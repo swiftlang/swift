@@ -712,3 +712,139 @@ TypeRef::subst(TypeRefBuilder &Builder, const GenericArgumentMap &Subs) const {
   return Result;
 }
 
+bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,
+                                  const TypeRef *OrigTR,
+                                  const TypeRef *SubstTR) {
+
+  // Walk into parent types of concrete nominal types.
+  if (auto *O = dyn_cast<NominalTypeRef>(OrigTR)) {
+    if (auto *S = dyn_cast<NominalTypeRef>(SubstTR)) {
+      if (O->getParent() != S->getParent() ||
+          O->getMangledName() != S->getMangledName())
+        return false;
+
+      if (!deriveSubstitutions(Subs,
+                               O->getParent(),
+                               S->getParent()))
+        return false;
+
+      return true;
+    }
+  }
+
+  // Decompose arguments of bound generic types in parallel.
+  if (auto *O = dyn_cast<BoundGenericTypeRef>(OrigTR)) {
+    if (auto *S = dyn_cast<BoundGenericTypeRef>(SubstTR)) {
+      if (O->getParent() != S->getParent() ||
+          O->getMangledName() != S->getMangledName() ||
+          O->getGenericParams().size() != S->getGenericParams().size())
+        return false;
+
+      if (!deriveSubstitutions(Subs,
+                               O->getParent(),
+                               S->getParent()))
+        return false;
+
+      for (unsigned i = 0, e = O->getGenericParams().size(); i < e; i++) {
+        if (!deriveSubstitutions(Subs,
+                                 O->getGenericParams()[i],
+                                 S->getGenericParams()[i]))
+          return false;
+      }
+
+      return true;
+    }
+  }
+
+  // Decompose tuple element types in parallel.
+  if (auto *O = dyn_cast<TupleTypeRef>(OrigTR)) {
+    if (auto *S = dyn_cast<TupleTypeRef>(SubstTR)) {
+      if (O->getElements().size() != S->getElements().size())
+        return false;
+
+      for (unsigned i = 0, e = O->getElements().size(); i < e; i++) {
+        if (!deriveSubstitutions(Subs,
+                                 O->getElements()[i],
+                                 S->getElements()[i]))
+          return false;
+      }
+
+      return true;
+    }
+  }
+
+  // Decompose argument and result types in parallel.
+  if (auto *O = dyn_cast<FunctionTypeRef>(OrigTR)) {
+    if (auto *S = dyn_cast<FunctionTypeRef>(SubstTR)) {
+
+      if (O->getArguments().size() != S->getArguments().size())
+        return false;
+
+      for (unsigned i = 0, e = O->getArguments().size(); i < e; i++) {
+        if (!deriveSubstitutions(Subs,
+                                 O->getArguments()[i],
+                                 S->getArguments()[i]))
+          return false;
+      }
+
+      if (!deriveSubstitutions(Subs,
+                               O->getResult(),
+                               S->getResult()))
+        return false;
+
+      return true;
+    }
+  }
+
+  // Walk down into the instance type.
+  if (auto *O = dyn_cast<MetatypeTypeRef>(OrigTR)) {
+    if (auto *S = dyn_cast<MetatypeTypeRef>(SubstTR)) {
+
+      if (!deriveSubstitutions(Subs,
+                               O->getInstanceType(),
+                               S->getInstanceType()))
+        return false;
+
+      return true;
+    }
+  }
+
+  // Walk down into the referent storage type.
+  if (auto *O = dyn_cast<ReferenceStorageTypeRef>(OrigTR)) {
+    if (auto *S = dyn_cast<ReferenceStorageTypeRef>(SubstTR)) {
+
+      if (O->getKind() != S->getKind())
+        return false;
+
+      if (!deriveSubstitutions(Subs,
+                               O->getType(),
+                               S->getType()))
+        return false;
+
+      return true;
+    }
+  }
+
+  if (isa<DependentMemberTypeRef>(OrigTR)) {
+    // FIXME: Do some validation here?
+    return true;
+  }
+
+  // If the original type is a generic type parameter, just make
+  // sure the substituted type matches anything we've already
+  // seen.
+  if (auto *O = dyn_cast<GenericTypeParameterTypeRef>(OrigTR)) {
+    DepthAndIndex key = {O->getDepth(), O->getIndex()};
+    auto found = Subs.find(key);
+    if (found == Subs.end()) {
+      Subs[key] = SubstTR;
+      return true;
+    }
+
+    return (found->second == SubstTR);
+  }
+
+  // Anything else must be concrete and the two types must match
+  // exactly.
+  return (OrigTR == SubstTR);
+}
