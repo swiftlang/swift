@@ -220,6 +220,10 @@ public:
 
 struct TypeRefIsConcrete
   : public TypeRefVisitor<TypeRefIsConcrete, bool> {
+  const GenericArgumentMap &Subs;
+
+  TypeRefIsConcrete(const GenericArgumentMap &Subs) : Subs(Subs) {}
+
   bool visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     return true;
   }
@@ -278,8 +282,8 @@ struct TypeRefIsConcrete
   }
 
   bool
-  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
-    return false;
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
+    return Subs.find({GTP->getDepth(), GTP->getIndex()}) != Subs.end();
   }
 
   bool
@@ -333,7 +337,13 @@ void TypeRef::dump(std::ostream &OS, unsigned Indent) const {
 }
 
 bool TypeRef::isConcrete() const {
-  return TypeRefIsConcrete().visit(this);
+  GenericArgumentMap Subs;
+  return TypeRefIsConcrete(Subs).visit(this);
+}
+
+bool TypeRef::isConcreteAfterSubstitutions(
+    const GenericArgumentMap &Subs) const {
+  return TypeRefIsConcrete(Subs).visit(this);
 }
 
 unsigned NominalTypeTrait::getDepth() const {

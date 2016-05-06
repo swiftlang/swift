@@ -142,6 +142,7 @@ public:
   void dump(std::ostream &OS, unsigned Indent = 0) const;
 
   bool isConcrete() const;
+  bool isConcreteAfterSubstitutions(const GenericArgumentMap &Subs) const;
 
   const TypeRef *
   subst(TypeRefBuilder &Builder, const GenericArgumentMap &Subs) const;

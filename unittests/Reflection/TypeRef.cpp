@@ -374,6 +374,7 @@ TEST(TypeRefTest, NestedTypes) {
   GenericArgumentMap Subs;
   Subs[{0,0}] = SubstArg;
 
+  EXPECT_TRUE(Child->isConcreteAfterSubstitutions(Subs));
   EXPECT_EQ(SubstChild, Child->subst(Builder, Subs));
 }
 
