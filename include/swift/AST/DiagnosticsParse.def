@@ -108,6 +108,8 @@ NOTE(lex_comment_start,none,
 
 ERROR(lex_invalid_modifier,none,
       "invalid string modifier", ())
+WARNING(lex_ambiguous_string_indent,none,
+      "Invalid mix of multi-line string literal indentation", ())
 ERROR(lex_unterminated_string,none,
       "unterminated string literal", ())
 ERROR(lex_invalid_escape,none,

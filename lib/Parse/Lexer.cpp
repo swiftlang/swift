@@ -47,7 +47,7 @@ enum StringLiteralModifiers : unsigned {
   StringLiteralUnprocessedEscapes = 1<<1,
   StringLiteralRegexInterpolating = 1<<2,
   StringLiteralTripleQuote = 1<<3,
-  StringLiteralStripIndent = 1<<4,
+  StringLiteralStripIndent = 1<<4
 };
 
 //===----------------------------------------------------------------------===//
@@ -1262,9 +1262,21 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
 }
 
 static bool nextNonWhitespaceIsQuote(const char *&CurPtr, char StopQuote) {
-    while (isWhitespace(*CurPtr))
-        CurPtr++;
-    return *CurPtr++ == StopQuote;
+  while (isWhitespace(*CurPtr))
+    CurPtr++;
+  return *CurPtr++ == StopQuote;
+}
+
+static std::string getTrailingIndent(const Token &Str) {
+  StringRef Bytes = Str.getText().drop_front().drop_back();
+  const char *end = Bytes.end(), *start = end;
+
+  while (start > Bytes.begin() && isWhitespace(start[-1]))
+    --start;
+  if (*start == '\n' && end-start > 1)
+    return std::string(start, end-start);
+
+  return "";
 }
 
 /// lexStringLiteral:
@@ -1276,7 +1288,7 @@ void Lexer::lexStringLiteral(unsigned Modifiers) {
   // diagnostics about changing them to double quotes.
 
   if (*TokStart == '"' && *CurPtr == '"' && *(CurPtr + 1) == '"') {
-    Modifiers |= StringLiteralTripleQuote;
+    Modifiers |= StringLiteralTripleQuote | StringLiteralStripIndent;
     TokStart += 2;
     CurPtr += 2;
   }
@@ -1359,6 +1371,17 @@ void Lexer::lexStringLiteral(unsigned Modifiers) {
         if (*CurPtr == '"' && *(CurPtr + 1) == '"') {
           formToken(tok::string_literal, TokStart, Modifiers);
           CurPtr += 2;
+
+          if (Modifiers & StringLiteralStripIndent) {
+            std::string ToStrip = getTrailingIndent(NextToken);
+            if (!ToStrip.empty()) {
+              StringRef Bytes = NextToken.getText().drop_front().drop_back();
+              const char *BytesPtr = Bytes.begin();
+              while ((BytesPtr = (const char *)memchr(BytesPtr, '\n', Bytes.end()-BytesPtr)) != nullptr)
+                if (StringRef(BytesPtr++, ToStrip.size()) != ToStrip)
+                  diagnose(BytesPtr, diag::lex_ambiguous_string_indent);
+            }
+          }
           return;
         }
         else
@@ -1366,13 +1389,13 @@ void Lexer::lexStringLiteral(unsigned Modifiers) {
       }
 
       if (Modifiers & StringLiteralUnderscoreDelimited) {
-        if (*CurPtr != '_')
-          continue;
-        else {
+        if (*CurPtr == '_') {
           formToken(tok::string_literal, TokStart, Modifiers);
           CurPtr++;
           return;
         }
+        else
+          continue;
       }
 
       return formToken(tok::string_literal, TokStart, Modifiers);
@@ -1577,13 +1600,8 @@ void Lexer::getStringLiteralSegments(
   unsigned Modifiers = Str.getStringModifiers();
   std::string ToStrip = "";
 
-  if (Modifiers & StringLiteralStripIndent) {
-    const char *end = Bytes.end(), *start = end;
-    while (start > Bytes.begin() && isWhitespace(start[-1]))
-      --start;
-    if (*start == '\n' && end-start > 1)
-      ToStrip = std::string(start, end-start);
-  }
+  if (Modifiers & StringLiteralStripIndent)
+      ToStrip = getTrailingIndent(Str);
 
   // Note that it is always safe to read one over the end of "Bytes" because
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
