@@ -1,11 +1,3 @@
-// RUN: rm -rf %t
-// RUN: mkdir %t
-// RUN: %target-build-swift -c -force-single-frontend-invocation -parse-as-library -parse-stdlib -module-name Swift -emit-module -emit-module-path %t/Swift.swiftmodule -o %t/Swift.o %s
-// RUN: ls %t/Swift.swiftmodule
-// RUN: ls %t/Swift.swiftdoc
-// RUN: ls %t/Swift.o
-// REQUIRES: executable_test
-
 //
 // A bare-bones Swift standard library
 //
@@ -89,6 +81,18 @@ public struct UnsafeMutablePointer<T> {
 
 public typealias CInt = Int32
 public typealias CChar = Int8
+
+@_silgen_name("putchar")
+public func putchar(_: CChar)
+
+public func printHello() {
+  putchar(0x48)
+  putchar(0x65)
+  putchar(0x6c)
+  putchar(0x6c)
+  putchar(0x6f)
+  putchar(0x0a)
+}
 
 //public var C_ARGC: CInt = CInt()
 
