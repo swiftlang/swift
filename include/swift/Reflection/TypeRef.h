@@ -288,8 +288,8 @@ public:
 
   template <typename Allocator>
   static const TupleTypeRef *create(Allocator &A,
-                              std::vector<const TypeRef *> Elements,
-                              bool Variadic = false) {
+                                    std::vector<const TypeRef *> Elements,
+                                    bool Variadic = false) {
     FIND_OR_CREATE_TYPEREF(A, TupleTypeRef, Elements, Variadic);
   }
 
@@ -331,9 +331,9 @@ public:
 
   template <typename Allocator>
   static const FunctionTypeRef *create(Allocator &A,
-                                 std::vector<const TypeRef *> Arguments,
-                                 const TypeRef *Result,
-                                 FunctionTypeFlags Flags) {
+                                       std::vector<const TypeRef *> Arguments,
+                                       const TypeRef *Result,
+                                       FunctionTypeFlags Flags) {
     FIND_OR_CREATE_TYPEREF(A, FunctionTypeRef, Arguments, Result, Flags);
   }
 
@@ -435,8 +435,8 @@ public:
 
   template <typename Allocator>
   static const MetatypeTypeRef *create(Allocator &A,
-                                 const TypeRef *InstanceType,
-                                 bool WasAbstract = false) {
+                                       const TypeRef *InstanceType,
+                                       bool WasAbstract = false) {
     FIND_OR_CREATE_TYPEREF(A, MetatypeTypeRef, InstanceType, WasAbstract);
   }
 
@@ -575,7 +575,7 @@ public:
 
   template <typename Allocator>
   static const ForeignClassTypeRef *create(Allocator &A,
-                                     const std::string &Name) {
+                                           const std::string &Name) {
     FIND_OR_CREATE_TYPEREF(A, ForeignClassTypeRef, Name);
   }
 
@@ -660,7 +660,7 @@ public:
 
   template <typename Allocator>
   static const UnownedStorageTypeRef *create(Allocator &A,
-                                       const TypeRef *Type) {
+                                             const TypeRef *Type) {
     FIND_OR_CREATE_TYPEREF(A, UnownedStorageTypeRef, Type);
   }
 
@@ -677,7 +677,7 @@ public:
 
   template <typename Allocator>
   static const WeakStorageTypeRef *create(Allocator &A,
-                                    const TypeRef *Type) {
+                                          const TypeRef *Type) {
     FIND_OR_CREATE_TYPEREF(A, WeakStorageTypeRef, Type);
   }
 
