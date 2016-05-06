@@ -291,7 +291,7 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
       UnsafeGuaranteedI->eraseFromParent();
 
       if (RestartAtBeginningOfBlock)
-        ++It = BB.begin();
+        It = BB.begin();
 
       Changed = true;
     }
