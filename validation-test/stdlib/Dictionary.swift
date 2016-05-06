@@ -3467,7 +3467,7 @@ class MockDictionaryWithCustomCount : NSDictionary {
   static var timesCountWasCalled = 0
 }
 
-func getMockDictionaryWithCustomCount(count count: Int)
+func getMockDictionaryWithCustomCount(count: Int)
   -> Dictionary<NSObject, AnyObject> {
 
   return MockDictionaryWithCustomCount(count: count) as Dictionary
