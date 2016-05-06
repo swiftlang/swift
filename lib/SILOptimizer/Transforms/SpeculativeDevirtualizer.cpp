@@ -471,6 +471,10 @@ static FullApplySite speculateMonomorphicMetatypeTarget(FullApplySite AI,
 /// Returns the thick metatype for the given SILType.
 /// e.g. $*T -> $@thick T.Type
 static SILType getThickMetatypeType(CanType Ty) {
+  // If it is a metatype already, simply return it.
+  if (isa<MetatypeType>(Ty))
+    return SILType::getPrimitiveObjectType(Ty);
+
   auto SwiftTy = CanMetatypeType::get(Ty, MetatypeRepresentation::Thick);
   return SILType::getPrimitiveObjectType(SwiftTy);
 }
@@ -520,6 +524,7 @@ emitTypeCheck(SILBuilder &Builder, SILLocation &Loc,
   Builder.emitBlock(SuccessBB);
 }
 
+
 // Insert monomorphic inline caches for a specific class or metatype
 /// type \p SubClassTy.
 static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
@@ -529,13 +534,28 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
                                                 SmallVectorImpl<SILInstruction *> &InsertedDeallocs
 ) {
   CCBI = nullptr;
-  // Bail if this class_method cannot be devirtualized.
-  if (!canDevirtualizeClassMethod(AI, SubType))
-    return FullApplySite();
 
   MethodInst *CMI = cast<MethodInst>(AI.getCallee());
   assert(AI.hasSelfArgument());
   auto Self = AI.getSelfArgument();
+  bool isMetatype = false;
+  // Is it a call on a metatype? E.g. a constructor call or static/class method call?
+  //if (isa<MetatypeType>(Self->getType().getSwiftRValueType())) {
+  if (Self->getType().is<MetatypeType>()) {
+    //return speculateMonomorphicMetatypeTarget(AI, SubType, CCBI);
+    isMetatype = true;
+  }
+
+  // Bail if this class_method cannot be devirtualized.
+  SILType LookupType = SubType;
+  if (isMetatype && SubType.is<MetatypeType>()) {
+    //assert(SubType.is<MetatypeType>() && "Sub-type should be a metatype");
+    LookupType = SubType.getMetatypeInstanceType(AI.getModule());
+  }
+
+  if (!canDevirtualizeClassMethod(AI, LookupType))
+    return FullApplySite();
+
 
   // TODO: If self is open_existential_addr, then the result
   // of open_existential_addr is the address of the payload.
@@ -555,11 +575,6 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
     OrigExistential = OEAI->getOperand();
   else
     OrigExistential = Self;
-
-  // Is it a call on a metatype? E.g. a constructor call or static/class method call?
-  if (isa<MetatypeType>(Self->getType().getSwiftRValueType())) {
-    return speculateMonomorphicMetatypeTarget(AI, SubType, CCBI);
-  }
 
   /*
   if (!OEAI) {
@@ -601,9 +616,9 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
 #endif
 
   auto Loc = AI.getLoc();
-  SILValue TargetAlloc;
+  ////SILValue TargetAlloc;
   // create alloc_stack for a target type.
-  TargetAlloc = Builder.createAllocStack(AI.getLoc(), SubType);
+  ////TargetAlloc = Builder.createAllocStack(AI.getLoc(), SubType);
 
   // Check if the type of of self is identical to the subtype.
   // To do this, extract the information about the static type from the
@@ -634,7 +649,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILBuilderWithScope VirtBuilder(Virt, AI.getInstruction());
   SILBuilderWithScope IdenBuilder(Iden, AI.getInstruction());
 
-  InsertedDeallocs.push_back(VirtBuilder.createDeallocStack(Loc, TargetAlloc));
+  ////InsertedDeallocs.push_back(VirtBuilder.createDeallocStack(Loc, TargetAlloc));
   //VirtBuilder.createDeallocStack(Loc, SelfCopyAlloc);
 
   //if (!OrigExistential->getType().isTrivial(AI.getModule()))
@@ -651,12 +666,16 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   // Self is always the address of the actual payload inside the existential or
   // the address of the argument of a generic type conforming to a protocol.
   DownCastedClassInstance = Self;
+  if (!isMetatype) {
   // Cast self to type required by the devirtualized function.
   DownCastedClassInstance =
       castValueToABICompatibleType(&IdenBuilder, AI.getLoc(), Self,
                                    Self->getType(), SubType.getAddressType())
           .getValue();
-
+  } else {
+    DownCastedClassInstance = IdenBuilder.createMetatype(
+        AI.getLoc(), getThickMetatypeType(SubType.getSwiftRValueType()));
+  }
   //  IdenBuilder.createDeallocStack(Loc, TargetAlloc);
   //  IdenBuilder.createDeallocStack(Loc, SelfCopyAlloc);
 
@@ -720,16 +739,15 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
     SILBuilderWithScope Builder(
         &*std::next(NewInstPair.second.getInstruction()->getIterator()),
         NewInstPair.second.getInstruction());
-    InsertedDeallocs.push_back(Builder.createDeallocStack(Loc, TargetAlloc));
+    ////InsertedDeallocs.push_back(Builder.createDeallocStack(Loc, TargetAlloc));
     //Builder.createDeallocStack(Loc, SelfCopyAlloc);
   } else {
     // Insert the dealloc at the beginning of all successor blocks.
     for (auto SuccBB : NewInstPair.first->getParentBB()->getSuccessorBlocks()) {
       assert(SuccBB->getSinglePredecessor() &&
              "Successor blocks should have a single predecessor");
-      SILBuilderWithScope Builder(&SuccBB->front());
-      InsertedDeallocs.push_back(
-          Builder.createDeallocStack(Loc, TargetAlloc));
+      ////SILBuilderWithScope Builder(&SuccBB->front());
+      ////InsertedDeallocs.push_back(Builder.createDeallocStack(Loc, TargetAlloc));
     }
     //llvm_unreachable("try_apply not supported yet");
   }
@@ -1278,7 +1296,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     }
 
     FullApplySite NewAI;
-    if (WMIProtocol->requiresClass()) {
+    if (WMIProtocol->requiresClass() && !SubType.getAs<AnyMetatypeType>()) {
       // checked_cast_br can be used only for class protocols, because
       // the size of the value needs to be known.
       CheckedCastBranchInst *LastCCBI = nullptr;

@@ -613,6 +613,15 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     return CastedValue;
   }
 
+  if (isa<AnyMetatypeType>(SrcTy.getSwiftRValueType()) &&
+      isa<AnyMetatypeType>(DestTy.getSwiftRValueType())) {
+    // Cast between two metatypes and that's it.
+    if (CheckOnly)
+      return Value;
+    CastedValue = B->createUncheckedBitCast(Loc, Value, DestTy);
+    return CastedValue;
+  }
+
   if (SrcTy.isAddress() && DestTy.isAddress()) {
     if (CheckOnly)
       return Value;

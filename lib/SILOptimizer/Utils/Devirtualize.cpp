@@ -573,13 +573,19 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
 
   SILModule &Mod = AI.getModule();
   auto *MI = cast<MethodInst>(AI.getCallee());
-  auto ClassOrMetatypeType = ClassOrMetatype->getType();
-  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, MI);
+  SILType ClassOrMetatypeType = ClassOrMetatype->getType();
+  SILType LookupType;
+  if (auto *MI = dyn_cast<MetatypeInst>(ClassOrMetatype)) {
+    LookupType = MI->getType().getMetatypeInstanceType(AI.getModule());
+  } else {
+    LookupType = ClassOrMetatypeType;
+  }
+  auto *F = getTargetClassMethod(Mod, LookupType, MI);
 
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
 
   auto Subs = getSubstitutionsForCallee(Mod, GenCalleeType,
-                                        ClassOrMetatypeType, AI);
+                                        LookupType, AI);
   CanSILFunctionType SubstCalleeType = GenCalleeType;
   if (GenCalleeType->isPolymorphic())
     SubstCalleeType = GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
