@@ -17,7 +17,7 @@ func testOldMethodNames(array: NSArray) {
 }
 
 func testOldPropertyNames(hive: Hive) {
-  _ = hive.makingHoney // FIXME: Fix-It.
+  _ = hive.makingHoney // expected-error{{'makingHoney' has been renamed to 'isMakingHoney'}}{{12-23=isMakingHoney}}
 }
 
 func testOldInitializerNames(array: NSArray) {
@@ -26,12 +26,25 @@ func testOldInitializerNames(array: NSArray) {
 func testOldEnumCaseNames(i: Int) -> XMLNodeKind {
   switch i {
   case 0:
-    return .InvalidKind // FIXME: Fix-It.
+    return .InvalidKind // expected-error{{'InvalidKind' has been renamed to 'invalidKind'}}{{13-24=invalidKind}}
 
   case 1:
-    return XMLNodeKind.InvalidKind // FIXME: Fix-It.
+    return XMLNodeKind.InvalidKind // expected-error{{InvalidKind' has been renamed to 'invalidKind'}}{{24-35=invalidKind}}
 
   default:
     return .invalidKind
+  }
+}
+
+func testOldOptionCaseNames(i: Int) -> RuncingOptions {
+  switch i {
+  case 0:
+    return .EnableQuince // expected-error{{'EnableQuince' has been renamed to 'enableQuince'}}{{13-25=enableQuince}}
+
+  case 1:
+    return RuncingOptions.EnableMince // expected-error{{'EnableMince' has been renamed to 'enableMince'}}{{27-38=enableMince}}
+
+  default:
+    return .enableQuince
   }
 }

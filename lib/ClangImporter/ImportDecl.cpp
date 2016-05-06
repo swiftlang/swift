@@ -1207,6 +1207,7 @@ namespace {
       auto attr = AvailableAttr::createUnconditional(
                     ctx, StringRef(), ctx.AllocateCopy(renamed.str()));
       decl->getAttrs().add(attr);
+      decl->setImplicit();
     }
 
     /// Create a typealias for the Swift 2 name of a Clang type declaration.
@@ -1816,7 +1817,8 @@ namespace {
     /// Import an NS_ENUM constant as a case of a Swift enum.
     Decl *importEnumCase(const clang::EnumConstantDecl *decl,
                          const clang::EnumDecl *clangEnum,
-                         EnumDecl *theEnum) {
+                         EnumDecl *theEnum,
+                         Decl *swift3Decl = nullptr) {
       auto &context = Impl.SwiftContext;
       Optional<ImportedName> swift3Name;
       auto name = importFullName(decl, swift3Name).Imported.getBaseName();
@@ -1825,8 +1827,11 @@ namespace {
 
       if (swift3Name) {
         // We're creating a Swift 2 stub. Treat it as an enum case alias.
-        auto swift3Decl = Impl.importDecl(decl, /*useSwift2Name=*/false);
         if (!swift3Decl) return nullptr;
+
+        // If the Swift 3 declaration was unavailable, don't map to it.
+        if (swift3Decl->getAttrs().isUnavailable(Impl.SwiftContext))
+          return nullptr;
 
         auto swift3Case = dyn_cast<EnumElementDecl>(swift3Decl);
         if (!swift3Case) return nullptr;
@@ -2175,16 +2180,26 @@ namespace {
       for (auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
            ec != ecEnd; ++ec) {
         Decl *enumeratorDecl;
+        Decl *swift2EnumeratorDecl = nullptr;
         switch (enumKind) {
         case EnumKind::Constants:
         case EnumKind::Unknown:
           enumeratorDecl = Impl.importDecl(*ec, /*useSwift2Name=*/false);
+          swift2EnumeratorDecl = Impl.importDecl(*ec, /*useSwift2Name=*/true);
           break;
         case EnumKind::Options:
-          enumeratorDecl = importOptionConstant(*ec, decl, result);
+          enumeratorDecl = SwiftDeclConverter(Impl, /*useSwift2Name=*/false)
+                             .importOptionConstant(*ec, decl, result);
+          swift2EnumeratorDecl = SwiftDeclConverter(Impl,/*useSwift2Name=*/true)
+                                   .importOptionConstant(*ec, decl, result);
           break;
         case EnumKind::Enum:
-          enumeratorDecl = importEnumCase(*ec, decl, cast<EnumDecl>(result));
+          enumeratorDecl = SwiftDeclConverter(Impl, /*useSwift2Name=*/false)
+                             .importEnumCase(*ec, decl, cast<EnumDecl>(result));
+          swift2EnumeratorDecl = SwiftDeclConverter(Impl,/*useSwift2Name=*/true)
+                                   .importEnumCase(*ec, decl,
+                                                   cast<EnumDecl>(result),
+                                                   enumeratorDecl);
           break;
         }
         if (!enumeratorDecl)
@@ -2194,6 +2209,12 @@ namespace {
           result->addMember(enumeratorDecl);
           if (auto *var = dyn_cast<VarDecl>(enumeratorDecl))
             result->addMember(var->getGetter());
+
+          if (swift2EnumeratorDecl) {
+            result->addMember(swift2EnumeratorDecl);
+            if (auto *var = dyn_cast<VarDecl>(swift2EnumeratorDecl))
+              result->addMember(var->getGetter());
+          }
         }
       }
 
@@ -4612,8 +4633,10 @@ namespace {
     /// Import the accessor and its attributes.
     FuncDecl *importAccessor(clang::ObjCMethodDecl *clangAccessor,
                              DeclContext *dc) {
+      SwiftDeclConverter converter(Impl, /*useSwift2Name=*/false);
       auto *accessor =
-          cast_or_null<FuncDecl>(VisitObjCMethodDecl(clangAccessor, dc));
+          cast_or_null<FuncDecl>(
+            converter.VisitObjCMethodDecl(clangAccessor, dc));
       if (!accessor) {
         return nullptr;
       }
@@ -4904,8 +4927,10 @@ namespace {
             continue;
 
         for (auto member : proto->getMembers()) {
-          // Skip unavailable members; there's no reason to mirror them.
-          if (member->getAttrs().isUnavailable(Impl.SwiftContext))
+          // Skip implicit unavailable members; there's no reason to
+          // mirror them.
+          if (member->isImplicit() &&
+              member->getAttrs().isUnavailable(Impl.SwiftContext))
             continue;
 
           if (auto prop = dyn_cast<VarDecl>(member)) {
@@ -5004,6 +5029,11 @@ namespace {
           if (!ctor)
             continue;
 
+          // Don't inherit implicit, unavailable initializers.
+          if (ctor->isImplicit() &&
+              ctor->getAttrs().isUnavailable(Impl.SwiftContext))
+            continue;
+
           // Don't inherit (non-convenience) factory initializers.
           // Note that convenience factories return instancetype and can be
           // inherited.
@@ -5034,6 +5064,8 @@ namespace {
 
             Optional<ImportedName> swift3Name;
             ImportedName importedName = importFullName(objcMethod, swift3Name);
+            assert(!swift3Name &&
+                   "Import inherited initializers never references swift3name");
             importedName.HasCustomName = true;
             bool redundant;
             if (auto newCtor = importConstructor(objcMethod, classDecl,
@@ -5188,17 +5220,27 @@ namespace {
     T *resolveSwiftDeclImpl(const U *decl, Identifier name, Module *adapter) {
       SmallVector<ValueDecl *, 4> results;
       adapter->lookupValue({}, name, NLKind::QualifiedLookup, results);
-      if (results.size() == 1) {
-        if (auto singleResult = dyn_cast<T>(results.front())) {
+      T *found = nullptr;
+      for (auto result : results) {
+        if (auto singleResult = dyn_cast<T>(result)) {
           if (auto typeResolver = Impl.getTypeResolver())
             typeResolver->resolveDeclSignature(singleResult);
-          Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}]
-            = singleResult;
-          return singleResult;
+
+          if (singleResult->isImplicit() &&
+              singleResult->getAttrs().isUnavailable(Impl.SwiftContext))
+            continue;
+
+          if (found)
+            return nullptr;
+
+          found = singleResult;
         }
       }
 
-      return nullptr;
+      if (found)
+        Impl.ImportedDecls[{decl->getCanonicalDecl(), false}] = found;
+
+      return found;
     }
 
     template <typename T, typename U>
