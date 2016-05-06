@@ -232,7 +232,7 @@ var closureWithObservedProperty: () -> () = {
 
 
 // rdar://19179412 - Crash on valid code.
-func rdar19179412() -> Int -> Int {
+func rdar19179412() -> (Int) -> Int {
   return { x in
     class A {
       let d : Int = 0
@@ -271,7 +271,7 @@ f { $0 && !$1 }
 
 
 // <rdar://problem/18123596> unexpected error on self. capture inside class method
-func TakesIntReturnsVoid(_ fp : (Int -> ())) {}
+func TakesIntReturnsVoid(_ fp : ((Int) -> ())) {}
 
 struct TestStructWithStaticMethod {
   static func myClassMethod(_ count: Int) {

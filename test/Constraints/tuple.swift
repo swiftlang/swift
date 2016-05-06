@@ -172,7 +172,7 @@ func foo(_ pair: (Int,Int)) -> Victory<(x:Int, y:Int)> {
 
 // https://bugs.swift.org/browse/SR-596
 // Compiler crashes when accessing a non-existent property of a closure parameter
-func call(_ f: C -> Void) {}
+func call(_ f: (C) -> Void) {}
 func makeRequest() {
   call { obj in
     print(obj.invalidProperty)  // expected-error {{value of type 'C' has no member 'invalidProperty'}}

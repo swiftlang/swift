@@ -120,5 +120,5 @@ func fixitThrow1() throw -> Int {} // expected-error{{expected throwing specifie
 func fixitThrow2() throws {
   var _: (Int)
   throw MSV.Foo
-  var _: Int throw -> Int // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{14-19=throws}}
+  var _: (Int) throw -> Int // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{16-21=throws}}
 }

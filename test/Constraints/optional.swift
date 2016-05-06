@@ -33,7 +33,7 @@ func test1(_ a: A) {
 
 // <rdar://problem/15508756>
 extension Optional {
-  func bind<U>(_ f: Wrapped -> U?) -> U? {
+  func bind<U>(_ f: (Wrapped) -> U?) -> U? {
     switch self {
     case .some(let x):
       return f(x)
@@ -116,6 +116,6 @@ func testVoidOptional() {
   let noop: () -> Void = {}
   voidOptional(noop)
 
-  let optNoop: ()? -> ()? = { return $0 }
+  let optNoop: (()?) -> ()? = { return $0 }
   voidOptional(optNoop)
 }

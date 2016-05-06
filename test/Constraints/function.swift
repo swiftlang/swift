@@ -23,14 +23,14 @@ func ff() -> (Int) -> (Float) { return weirdCast }
 
 // Block <-> function conversions
 
-var funct: Int -> Int = { $0 }
-var block: @convention(block) Int -> Int = funct
+var funct: (Int) -> Int = { $0 }
+var block: @convention(block) (Int) -> Int = funct
 funct = block
 block = funct
 
 // Application of implicitly unwrapped optional functions
 
-var optFunc: (String -> String)! = { $0 }
+var optFunc: ((String) -> String)! = { $0 }
 var s: String = optFunc("hi")
 
 // <rdar://problem/17652759> Default arguments cause crash with tuple permutation

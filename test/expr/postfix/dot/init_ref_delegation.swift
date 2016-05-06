@@ -297,10 +297,10 @@ func foo<T: C where T: P>(_ x: T, y: T.Type) {
   var cs5 = T.init(notfound: "") // expected-error{{argument labels '(notfound:)' do not match any available overloads}}
   // expected-note @-1 {{overloads for 'T.Type.init' exist with these partially matching parameter lists: (x: Int), (required: Double), (proto: String)}}
 
-  var csf1: Double -> T = T.init
-  var csf2: Int -> T    = T.init // expected-error{{'required' initializer}}
+  var csf1: (Double) -> T = T.init
+  var csf2: (Int) -> T    = T.init // expected-error{{'required' initializer}}
   var csf3: () -> T     = T.init // expected-error{{'required' initializer}}
-  var csf4: String -> T = T.init
+  var csf4: (String) -> T = T.init
 
   var cs1a = T(required: 0)
   var cs2a = T(x: 0) // expected-error{{'required' initializer}}

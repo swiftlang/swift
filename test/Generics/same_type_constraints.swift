@@ -85,7 +85,7 @@ public struct LazySequenceOf<S : Sequence, A where S.Iterator.Element == A> : Se
   public subscript(i : A) -> A { return i }
 }
 
-public func iterate<A>(_ f : A -> A) -> (x : A) -> LazySequenceOf<Iterate<A>, A>? {
+public func iterate<A>(_ f : (A) -> A) -> (x : A) -> LazySequenceOf<Iterate<A>, A>? {
   return { x in nil }
 }
 
@@ -105,7 +105,7 @@ public final class IterateGenerator<A> : IteratorProtocol {
 // rdar://problem/18475138
 public protocol Observable : class {
     associatedtype Output
-    func addObserver(_ obj : Output -> Void)
+    func addObserver(_ obj : (Output) -> Void)
 }
 
 public protocol Bindable : class {
@@ -124,7 +124,7 @@ infix operator <- { associativity right precedence 90 }
 
 func <- <
     Right : Observable
-    >(lhs:Right.Output -> Void, rhs: Right) -> Composed<SideEffect<Right>, Right>?
+    >(lhs:(Right.Output) -> Void, rhs: Right) -> Composed<SideEffect<Right>, Right>?
 {
   return nil
 }

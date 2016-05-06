@@ -186,7 +186,7 @@ struct A<T> : PP {
 }
 
 extension PP {
-  func map<T>(_ f: Self.E -> T) -> T {}
+  func map<T>(_ f: (Self.E) -> T) -> T {}
 }
 
 enum EE {

@@ -83,13 +83,13 @@ func forgotAmpersand() {
   increment(array[1]) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}}{{13-13=&}}
 }
 
-func maybeFn() -> (Int -> Int)? { }
+func maybeFn() -> ((Int) -> Int)? { }
 
 func extraCall() {
   var i = 7
   i = i() // expected-error{{cannot call value of non-function type 'Int'}}
 
-  maybeFn()(5) // expected-error{{value of optional type '(Int -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}{{12-12=!}}
+  maybeFn()(5) // expected-error{{value of optional type '((Int) -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}{{12-12=!}}
 }
 
 class U {
