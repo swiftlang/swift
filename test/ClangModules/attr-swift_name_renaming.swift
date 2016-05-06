@@ -11,25 +11,25 @@ func test() {
 
   // Enum name remapping.
   var color: ColorKind = CT_red
-  var color2: ColorType = CT_Red // FIXME: should provide Fix-It expected-error{{use of undeclared type 'ColorType'}}
+  var color2: ColorType = CT_Red // FIXME: should provide Fix-It expected-error{{use of undeclared type 'ColorType'}} {{none}}
 
   // Enumerator remapping.
   var excuse: HomeworkExcuse = .dogAteIt
-  excuse = .overslept // FIXME: should provide Fix-It  expected-error{{type 'HomeworkExcuse' has no member 'overslept'}}
+  excuse = .overslept // FIXME: should provide Fix-It  expected-error{{type 'HomeworkExcuse' has no member 'overslept'}} {{none}}
   excuse = .tired
-  excuse = .tooHard // FIXME: should provide Fix-It expected-error{{type 'HomeworkExcuse' has no member 'tooHard'}}
+  excuse = .tooHard // FIXME: should provide Fix-It expected-error{{type 'HomeworkExcuse' has no member 'tooHard'}} {{none}}
   excuse = .challenging
 
   // Typedef-of-anonymous-type-name renaming
   var p = Point()
-  var p2 = PointType() // FIXME: should provide Fix-It expected-error{{use of unresolved identifier 'PointType'}}
+  var p2 = PointType() // FIXME: should provide Fix-It expected-error{{use of unresolved identifier 'PointType'}} {{none}}
 
   // Field name remapping
   p.x = 7
 
   // Typedef renaming
   var mi: MyInt = 5
-  var mi2: my_int_t = 7 // FIXME: should provide Fix-It expected-error{{use of undeclared type 'my_int_t'}}
+  var mi2: my_int_t = 7 // FIXME: should provide Fix-It expected-error{{use of undeclared type 'my_int_t'}} {{none}}
 
   spuriousAPINotedSwiftName(0)
   nicelyRenamedFunction("go apinotes!")
