@@ -1115,6 +1115,12 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
 
     // Continue on to diagnose any argument label renames.
 
+  } else if (parsed.BaseName == TC.Context.Id_init.str() &&
+             parsed.isMember() && CE) {
+    // For initializers, replace with a "call" of the context type...but only
+    // if we know we're doing a call (rather than a first-class reference).
+    diag.fixItReplace(referenceRange, parsed.ContextName);
+
   } else {
     // Just replace the base name.
     SmallString<64> baseReplace;
