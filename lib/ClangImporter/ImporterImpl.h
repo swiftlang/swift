@@ -973,6 +973,10 @@ public:
   /// translated into Swift.
   ValueDecl *importMacro(Identifier name, clang::MacroInfo *macro);
 
+  /// Find the swift_newtype attribute on the given typedef, if present.
+  clang::SwiftNewtypeAttr *getSwiftNewtypeAttr(
+       const clang::TypedefNameDecl *decl);
+
   /// Import attributes from the given Clang declaration to its Swift
   /// equivalent.
   ///

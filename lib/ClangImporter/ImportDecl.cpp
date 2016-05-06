@@ -1300,9 +1300,8 @@ namespace {
         return nullptr;
 
       // Check for swift_newtype
-      if (!SwiftType && Impl.HonorSwiftNewtypeAttr) {
-        if (auto newtypeAttr =
-                Decl->template getAttr<clang::SwiftNewtypeAttr>()) {
+      if (!SwiftType) {
+        if (auto newtypeAttr = Impl.getSwiftNewtypeAttr(Decl)) {
           switch (newtypeAttr->getNewtypeKind()) {
           case clang::SwiftNewtypeAttr::NK_Enum:
             // TODO: import as closed enum instead
@@ -5595,6 +5594,17 @@ canSkipOverTypedef(ClangImporter::Implementation &Impl,
 
   TypedefIsSuperfluous = true;
   return UnderlyingDecl;
+}
+
+clang::SwiftNewtypeAttr *ClangImporter::Implementation::getSwiftNewtypeAttr(
+      const clang::TypedefNameDecl *decl) {
+  // If we aren't honoring the swift_newtype attribute, don't even
+  // bother looking.
+  if (!HonorSwiftNewtypeAttr)
+    return nullptr;
+
+  // Retrieve the attribute.
+  return decl->getAttr<clang::SwiftNewtypeAttr>();
 }
 
 /// Import Clang attributes as Swift attributes.

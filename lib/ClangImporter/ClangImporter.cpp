@@ -2034,13 +2034,12 @@ static bool moduleIsInferImportAsMember(const clang::NamedDecl *decl,
 
 // If this decl is associated with a swift_newtype typedef, return it, otherwise
 // null
-static clang::TypedefNameDecl *findSwiftNewtype(const clang::Decl *decl,
-                                                bool honorSwiftNewtypeAttr) {
-  if (!honorSwiftNewtypeAttr) return nullptr;
-
+static clang::TypedefNameDecl *findSwiftNewtype(
+     ClangImporter::Implementation &impl,
+     const clang::Decl *decl) {
   if (auto varDecl = dyn_cast<clang::VarDecl>(decl))
     if (auto typedefTy = varDecl->getType()->getAs<clang::TypedefType>())
-      if (typedefTy->getDecl()->hasAttr<clang::SwiftNewtypeAttr>())
+      if (impl.getSwiftNewtypeAttr(typedefTy->getDecl()))
         return typedefTy->getDecl();
 
   return nullptr;
@@ -2081,7 +2080,7 @@ auto ClangImporter::Implementation::importFullName(
       break;
     }
   // Import onto a swift_newtype if present
-  } else if (auto newtypeDecl = findSwiftNewtype(D, HonorSwiftNewtypeAttr)) {
+  } else if (auto newtypeDecl = findSwiftNewtype(*this, D)) {
     result.EffectiveContext = newtypeDecl;
   // Everything else goes into its redeclaration context.
   } else {
@@ -2556,7 +2555,7 @@ auto ClangImporter::Implementation::importFullName(
 
   // swift_newtype-ed declarations may have common words with the type name
   // stripped.
-  if (auto newtypeDecl = findSwiftNewtype(D, HonorSwiftNewtypeAttr)) {
+  if (auto newtypeDecl = findSwiftNewtype(*this, D)) {
     // Skip a leading 'k' in a 'kConstant' pattern
     if (baseName.size() >= 2 && baseName[0] == 'k' &&
         clang::isUppercase(baseName[1]))
