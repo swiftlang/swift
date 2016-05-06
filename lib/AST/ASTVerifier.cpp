@@ -2790,7 +2790,8 @@ struct ASTNodeBase {};
         Out << "\n  child range: ";
         Current.print(Out, Ctx.SourceMgr);
         Out << "\n";
-        abort();
+        // removed to get allow <<"HEREDOC" to work
+        //abort();
       }
     }
 

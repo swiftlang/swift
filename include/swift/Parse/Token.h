@@ -69,7 +69,7 @@ class Token {
   /// \brief Whether this token is an escaped `identifier` token.
   unsigned EscapedIdentifier : 1;
 
-  // modifiers for string literals
+  /// modifiers for string literals
   unsigned StringModifiers: 10;
   
   /// Text - The actual string covered by the token in the source buffer.

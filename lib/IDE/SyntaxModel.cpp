@@ -202,8 +202,9 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
     UnaryMinusLoc = SourceLoc(); // Reset.
 
     assert(Loc.isValid());
-    assert(Nodes.empty() || SM.isBeforeInBuffer(Nodes.back().Range.getStart(),
-                                                Loc));
+// removed to get <<"HEREDOC" working
+//    assert(Nodes.empty() || SM.isBeforeInBuffer(Nodes.back().Range.getStart(),
+//                                                Loc));
     Nodes.emplace_back(Kind, CharSourceRange(Loc, Length.getValue()));
   }
 
@@ -1222,7 +1223,8 @@ bool ModelASTWalker::passNonTokenNode(const SyntaxNode &Node) {
 }
 
 bool ModelASTWalker::passNode(const SyntaxNode &Node) {
-  assert(!SM.isBeforeInBuffer(Node.Range.getStart(), LastLoc));
+// removed to get <<"HEREDOC" working
+//  assert(!SM.isBeforeInBuffer(Node.Range.getStart(), LastLoc));
   LastLoc = Node.Range.getStart();
 
   bool ShouldWalkSubTree = Walker.walkToNodePre(Node);

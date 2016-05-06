@@ -90,6 +90,10 @@ class Lexer {
   /// in a SIL file.  This enables some context-sensitive lexing.
   bool InSILBody = false;
   
+  /// experimentation with <<"HERE" or <<'HERE'
+  const char *HeredocStart;
+  const char *HeredocEnd;
+
 public:
   /// \brief Lexer state can be saved/restored to/from objects of this class.
   class State {
@@ -430,6 +434,7 @@ private:
 
   void skipSlashStarComment();
   void lexHash();
+  void lexHeredoc();
   void lexIdentifier();
   void lexDollarIdent();
   void lexOperatorIdentifier();
@@ -443,6 +448,7 @@ private:
   void lexStringLiteral(unsigned Modifiers = 0);
   void lexEscapedIdentifier();
 
+  void validateIndents();
   void tryLexEditorPlaceholder();
   const char *findEndOfCurlyQuoteStringLiteral(const char*);
 };
