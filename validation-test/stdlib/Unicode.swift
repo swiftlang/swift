@@ -2263,7 +2263,7 @@ StringCookedViews.test("UTF8ForContiguousUTF16") {
     backingStorage.withUnsafeBufferPointer {
       (ptr) -> Void in
       let cfstring = CFStringCreateWithCharactersNoCopy(kCFAllocatorDefault,
-          ptr.baseAddress, backingStorage.count, kCFAllocatorNull)
+          ptr.baseAddress, backingStorage.count, kCFAllocatorNull)!
       expectFalse(CFStringGetCStringPtr(cfstring,
           CFStringBuiltInEncodings.ASCII.rawValue) != nil)
       expectTrue(CFStringGetCharactersPtr(cfstring) != nil)

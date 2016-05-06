@@ -73,6 +73,9 @@ def disable_objc_interop :
   Flag<["-"], "disable-objc-interop">,
   HelpText<"Disable Objective-C interop code generation and config directives">;
 
+def enable_swiftcall : Flag<["-"], "enable-swiftcall">,
+  HelpText<"Enable the use of LLVM swiftcall support">;
+
 def enable_objc_attr_requires_foundation_module :
   Flag<["-"], "enable-objc-attr-requires-foundation-module">,
   HelpText<"Enable requiring uses of @objc to require importing the "
@@ -243,10 +246,6 @@ def enable_strip_ns_prefix :
 def swift3_migration :
   Flag<["-"], "swift3-migration">,
   HelpText<"Enable Fix-It based migration aids for Swift 3">;
-
-def disable_infer_iuos :
-  Flag<["-"], "disable-infer-iuos">,
-  HelpText<"Disable inferring IUO type for otherwise unconstrained variables">;
 
 def warn_omit_needless_words :
   Flag<["-"], "Womit-needless-words">,

@@ -36,17 +36,17 @@ extension TestSuite {
     wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
     extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
-    checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-    outOfBoundsIndexOffset: Int = 1
+    outOfBoundsIndexOffset: Int = 1,
+    collectionIsBidirectional: Bool = false
   ) {
     var testNamePrefix = testNamePrefix
 
     // Don't run the same tests twice.
-    if checksAdded.value.contains(#function) {
+    if checksAdded.contains(#function) {
       return
     }
-    checksAdded.value.insert(#function)
+    checksAdded.insert(#function)
 
     addRangeReplaceableCollectionTests(
       testNamePrefix,
@@ -56,9 +56,10 @@ extension TestSuite {
       makeCollectionOfEquatable: makeCollectionOfEquatable,
       wrapValueIntoEquatable: wrapValueIntoEquatable,
       extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks,
-      outOfBoundsIndexOffset: outOfBoundsIndexOffset)
+      outOfBoundsIndexOffset: outOfBoundsIndexOffset,
+      collectionIsBidirectional: collectionIsBidirectional
+    )
 
     func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
@@ -170,17 +171,16 @@ extension TestSuite {
     wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
     extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
-    checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) {
     var testNamePrefix = testNamePrefix
 
     // Don't run the same tests twice.
-    if checksAdded.value.contains(#function) {
+    if checksAdded.contains(#function) {
       return
     }
-    checksAdded.value.insert(#function)
+    checksAdded.insert(#function)
 
     addRangeReplaceableSliceTests(
       testNamePrefix,
@@ -190,9 +190,10 @@ extension TestSuite {
       makeCollectionOfEquatable: makeCollectionOfEquatable,
       wrapValueIntoEquatable: wrapValueIntoEquatable,
       extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks,
-      outOfBoundsIndexOffset: outOfBoundsIndexOffset)
+      outOfBoundsIndexOffset: outOfBoundsIndexOffset,
+      collectionIsBidirectional: true
+    )
 
     addRangeReplaceableBidirectionalCollectionTests(
       testNamePrefix,
@@ -202,7 +203,6 @@ extension TestSuite {
       makeCollectionOfEquatable: makeCollectionOfEquatable,
       wrapValueIntoEquatable: wrapValueIntoEquatable,
       extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
@@ -318,17 +318,16 @@ extension TestSuite {
     wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
     extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
-    checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
   ) {
     var testNamePrefix = testNamePrefix
 
     // Don't run the same tests twice.
-    if checksAdded.value.contains(#function) {
+    if checksAdded.contains(#function) {
       return
     }
-    checksAdded.value.insert(#function)
+    checksAdded.insert(#function)
 
     addRangeReplaceableBidirectionalSliceTests(
       testNamePrefix,
@@ -338,7 +337,6 @@ extension TestSuite {
       makeCollectionOfEquatable: makeCollectionOfEquatable,
       wrapValueIntoEquatable: wrapValueIntoEquatable,
       extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
@@ -350,7 +348,6 @@ extension TestSuite {
       makeCollectionOfEquatable: makeCollectionOfEquatable,
       wrapValueIntoEquatable: wrapValueIntoEquatable,
       extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks,
       outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 

@@ -421,6 +421,8 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
     Info.Kind = KeywordUID;
   } else if (Result->getKind() == CodeCompletionResult::Pattern) {
     Info.Kind = PatternUID;
+  } else if (Result->getKind() == CodeCompletionResult::BuiltinOperator) {
+    Info.Kind = PatternUID; // FIXME: add a UID for operators
   } else if (Result->getKind() == CodeCompletionResult::Declaration) {
     Info.Kind = SwiftLangSupport::getUIDForCodeCompletionDeclKind(
         Result->getAssociatedDeclKind());
@@ -916,7 +918,7 @@ static void transformAndForwardResults(
     auto *completionString =
         CodeCompletionString::create(innerSink.allocator, chunks);
     CodeCompletion::SwiftResult paren(
-        CodeCompletion::SwiftResult::ResultKind::Pattern,
+        CodeCompletion::SwiftResult::ResultKind::BuiltinOperator,
         SemanticContextKind::ExpressionSpecific,
         exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString);
 
@@ -997,7 +999,7 @@ static void transformAndForwardResults(
       // won't overwhelm other results that also match the filter text.
       innerResults = extendCompletions(
           topResults, innerSink, info, nameToPopularity, options, exactMatch,
-          SemanticContextKind::None, SemanticContextKind::ExpressionSpecific);
+          SemanticContextKind::None, SemanticContextKind::None);
     });
 
     auto *inputBuf = session->getBuffer();

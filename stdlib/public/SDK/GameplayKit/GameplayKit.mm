@@ -12,7 +12,9 @@
 
 #import <GameplayKit/GameplayKit.h>
 
-extern "C" NS_RETURNS_RETAINED GKComponent * __nullable
+#include "swift/Runtime/Config.h"
+
+extern "C" SWIFT_CC(swift) NS_RETURNS_RETAINED GKComponent * __nullable
 GK_Swift_GKEntity_componentForClass(
     id NS_RELEASES_ARGUMENT __nonnull self_,
     Class __nonnull componentClass) {
@@ -22,7 +24,7 @@ GK_Swift_GKEntity_componentForClass(
   return component;
 }
 
-extern "C" NS_RETURNS_RETAINED GKState * __nullable
+extern "C" SWIFT_CC(swift) NS_RETURNS_RETAINED GKState * __nullable
 GK_Swift_GKStateMachine_stateForClass(
     id NS_RELEASES_ARGUMENT __nonnull self_,
     Class __nonnull stateClass) {

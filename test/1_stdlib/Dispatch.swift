@@ -47,7 +47,7 @@ DispatchAPI.test("dispatch_block_t conversions") {
 
 if #available(OSX 10.10, iOS 8.0, *) {
   DispatchAPI.test("dispatch_block_t identity") {
-    let block = dispatch_block_create(DISPATCH_BLOCK_INHERIT_QOS_CLASS) {
+    let block: dispatch_block_t = dispatch_block_create(DISPATCH_BLOCK_INHERIT_QOS_CLASS) {
       _ = 1
     }
 
@@ -59,7 +59,7 @@ if #available(OSX 10.10, iOS 8.0, *) {
   DispatchAPI.test("dispatch_block_t conversions with dispatch_block_create") {
     var counter = 0
 
-    let block = dispatch_block_create(dispatch_block_flags_t(0)) {
+    let block: dispatch_block_t = dispatch_block_create(dispatch_block_flags_t(0)) {
       counter += 1
     }
     block()

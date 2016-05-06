@@ -92,7 +92,10 @@ extension _StringCore {
 
 extension String {
   /// A collection of UTF-8 code units that encodes a `String` value.
-  public struct UTF8View : Collection, CustomStringConvertible, CustomDebugStringConvertible {
+  public struct UTF8View
+    : Collection, 
+      CustomStringConvertible, 
+      CustomDebugStringConvertible {
     internal let _core: _StringCore
     internal let _startIndex: Index
     internal let _endIndex: Index

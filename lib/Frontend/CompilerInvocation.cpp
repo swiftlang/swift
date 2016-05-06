@@ -48,27 +48,7 @@ static void updateRuntimeLibraryPath(SearchPathOptions &SearchPathOpts,
   llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
   SearchPathOpts.RuntimeLibraryPath = LibPath.str();
 
-  // The linux provided triple for ARM contains a trailing 'l'
-  // denoting little-endian.  This is not used in the path for
-  // libraries.  LLVM matches these SubArchTypes to the generic
-  // ARMSubArch_v7 (for example) type.  If that is the case,
-  // use the base of the architecture type in the library path.
-  if (Triple.isOSLinux()) {
-    switch(Triple.getSubArch()) {
-    default:
-      llvm::sys::path::append(LibPath, Triple.getArchName());
-      break;
-    case llvm::Triple::SubArchType::ARMSubArch_v7:
-      llvm::sys::path::append(LibPath, "armv7");
-      break;
-    case llvm::Triple::SubArchType::ARMSubArch_v6:
-      llvm::sys::path::append(LibPath, "armv6");
-      break;
-    }
-  } else {
-    llvm::sys::path::append(LibPath, Triple.getArchName());
-  }
-
+  llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
   SearchPathOpts.RuntimeLibraryImportPath = LibPath.str();
 }
 
@@ -780,9 +760,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.WarnOmitNeedlessWords = Args.hasArg(OPT_warn_omit_needless_words);
   Opts.StripNSPrefix |= Args.hasArg(OPT_enable_strip_ns_prefix);
   Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
-  if (Args.hasArg(OPT_disable_infer_iuos)) {
-    Opts.InferIUOs = false;
-  }
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
 
@@ -1239,6 +1216,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
+
+  Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);
 
   // This is set to true by default.
   Opts.UseIncrementalLLVMCodeGen &=

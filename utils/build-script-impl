@@ -189,7 +189,7 @@ KNOWN_SETTINGS=(
     darwin-install-extract-symbols ""            "whether to extract symbols with dsymutil during installations"
     host-target                 ""               "The host target. LLVM, Clang, and Swift will be built for this target. The built LLVM and Clang will be used to compile Swift for the cross-compilation targets. **This argument is required**"
     stdlib-deployment-targets   ""               "space-separated list of targets to compile or cross-compile the Swift standard library for"
-    cross-compile-tools-deployment-targets ""    "space-separated list of targets to cross-compile host Swift tools for"
+    cross-compile-tools-deployment-targets ""    "space-separated list of targets to cross-compile host Swift tools for. We can't run the resulting binaries on the build machine"
     skip-merge-lipo-cross-compile-tools ""       "set to skip running merge-lipo after installing cross-compiled host Swift tools"
     darwin-deployment-version-osx     "10.9"     "minimum deployment target version for OS X"
     darwin-deployment-version-ios     "7.0"      "minimum deployment target version for iOS"
@@ -277,10 +277,15 @@ function float_min() {
 function num_llvm_parallel_lto_link_jobs() {
     case "$(uname -s -m)" in
         Darwin\ x86_64)
-            # Currently with -gline-tables-only clang is ~3.5GB on Darwin. Use
-            # the formula GB Memory/3.5GB to get the number of parallel link
-            # threads we can support.
-            local NUM_MEMORY_THREADS=$(echo $(system_memory_in_bytes)/1000000000.0/3.5 | bc)
+            # *WARNING! HUERISTIC!*
+            #
+            # Use the formula (GB Memory - 3)/6.0GB to get the number of
+            # parallel link threads we can support. This gives the OS 3 GB of
+            # room to work with.
+            #
+            # This is a bit conservative, but I have found that this number
+            # prevents me from swapping on my test machine.
+            local NUM_MEMORY_THREADS=$(echo \( $(system_memory_in_bytes)/1000000000.0 - 3.0 \) / 6.0 | bc)
             echo $(float_min "${NUM_MEMORY_THREADS}" "${BUILD_JOBS}")
             ;;
         *)
@@ -293,10 +298,15 @@ function num_llvm_parallel_lto_link_jobs() {
 function num_swift_parallel_lto_link_jobs() {
     case "$(uname -s -m)" in
         Darwin\ x86_64)
-            # Currently with -gline-tables-only swift is ~5-6GB on Darwin. Use
-            # the formula GB Memory/6GB to get the number of parallel link
-            # threads we can support.
-            local NUM_MEMORY_THREADS=$(echo $(system_memory_in_bytes)/1000000000/6.0 | bc)
+            # *WARNING! HUERISTIC!*
+            #
+            # Use the formula (GB Memory - 3)/8.0GB to get the number of
+            # parallel link threads we can support. This gives the OS 3 GB of
+            # room to work with.
+            #
+            # This is a bit conservative, but I have found that this number
+            # prevents me from swapping on my test machine.
+            local NUM_MEMORY_THREADS=$(echo \( $(system_memory_in_bytes)/1000000000 - 3.0 \) / 8.0 | bc)
             echo $(float_min "${NUM_MEMORY_THREADS}" "${BUILD_JOBS}")
             ;;
         *)
@@ -507,7 +517,7 @@ function set_deployment_target_based_options() {
                     )
                     ;;
                 *)
-                    echo "Unknown deployment target"
+                    echo "Unknown deployment target: ${deployment_target}"
                     exit 1
                     ;;
             esac
@@ -531,10 +541,6 @@ function set_deployment_target_based_options() {
                 fi
 
                 llvm_cmake_options+=(
-                    "-DCMAKE_C_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
-                    "-DCMAKE_CXX_FLAGS=-O2 -flto -gline-tables-only -fno-stack-protector "
-                    "-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
-                    "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -flto -gline-tables-only -fno-stack-protector "
                     "-DLLVM_PARALLEL_LINK_JOBS=$(num_llvm_parallel_lto_link_jobs)"
                 )
             fi
@@ -880,21 +886,14 @@ function make_relative_symlink() {
     ln -sf "${RELATIVE_SOURCE}" "${TARGET}"
 }
 
-# A list of deployment targets to cross-compile the Swift host tools for.
-# We can't run the resulting binaries on the build machine.
-CROSS_TOOLS_DEPLOYMENT_TARGETS=()
-
 # Sanitize the list of cross-compilation targets.
+CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS=($CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS)
 for t in ${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS} ; do
     case ${t} in
         iphonesimulator-i386 | iphonesimulator-x86_64 | \
         iphoneos-arm64 | iphoneos-armv7 | iphoneos-armv7s | \
         appletvos-arm64 | appletvsimulator-x86_64 | \
         watchos-armv7k | watchsimulator-i386)
-            CROSS_TOOLS_DEPLOYMENT_TARGETS=(
-                "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
-                "${t}"
-            )
             ;;
         *)
             echo "Unknown deployment target: ${t}"
@@ -905,7 +904,7 @@ done
 
 function is_cross_tools_deployment_target() {
     local deployment_target="$1"
-    for t in "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}" ; do
+    for t in "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS[@]}" ; do
         if [ "${deployment_target}" == "${t}" ] ; then
             echo 1
         fi
@@ -984,19 +983,21 @@ fi
 if [[ ! "${SKIP_BUILD_LLBUILD}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" llbuild)
 fi
-if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" swiftpm)
-fi
 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" libdispatch)
 fi
-# XCTest has a dependency on Foundation, so Foundation must be added to the
-# list of build products first.
+# SwiftPM and XCTest are dependent on Foundation, so Foundation must be
+# added to the list of build products first.
 if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" foundation)
 fi
+# SwiftPM is dependent on XCTest, so XCTest must be added to the list of
+# build products first.
 if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" xctest)
+fi
+if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" swiftpm)
 fi
 
 SWIFT_STDLIB_TARGETS=()
@@ -1239,6 +1240,9 @@ function llvm_c_flags() {
     if [[ $(is_cmake_release_build_type "${LLVM_BUILD_TYPE}") ]] ; then
         echo -n " -fno-stack-protector"
     fi
+    if [[ $(true_false "${LLVM_ENABLE_LTO}") ]] ; then
+        echo -n " -gline-tables-only"
+    fi
 }
 
 function cmark_c_flags() {
@@ -1300,9 +1304,11 @@ function cmake_config_opt() {
 function set_swiftpm_bootstrap_command() {
     SWIFTC_BIN="$(build_directory_bin ${deployment_target} swift)/swiftc"
     LLBUILD_BIN="$(build_directory_bin ${deployment_target} llbuild)/swift-build-tool"
-    if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! "${SKIP_BUILD_XCTEST}" ]] ; then
+    if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
         FOUNDATION_BUILD_DIR=$(build_directory ${deployment_target} foundation)
-        XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
+        if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
+            XCTEST_BUILD_DIR=$(build_directory ${deployment_target} xctest)
+        fi
     fi
     if [ ! -e "${LLBUILD_BIN}" ]; then
         echo "Error: Cannot build swiftpm without llbuild (swift-build-tool)."
@@ -1316,10 +1322,13 @@ function set_swiftpm_bootstrap_command() {
         --swiftc="${SWIFTC_BIN}"
         --sbt="${LLBUILD_BIN}"
         --build="${build_dir}")
-    if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! "${SKIP_BUILD_XCTEST}" ]] ; then
+    if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
         swiftpm_bootstrap_command+=(
-            --foundation="${FOUNDATION_BUILD_DIR}/Foundation"
-            --xctest="${XCTEST_BUILD_DIR}")
+            --foundation="${FOUNDATION_BUILD_DIR}/Foundation")
+        if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
+            swiftpm_bootstrap_command+=(
+                --xctest="${XCTEST_BUILD_DIR}")
+        fi
     fi
 }
 
@@ -1364,7 +1373,7 @@ fi
 # Configure and build each product
 #
 # Start with native deployment targets because the resulting tools are used during cross-compilation.
-for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
+for deployment_target in "${HOST_TARGET}" "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
     set_deployment_target_based_options
 
     case "${COMPILER_VENDOR}" in
@@ -1527,6 +1536,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}"
                     -DLLVM_INCLUDE_TESTS:BOOL=$(true_false "${SOURCE_TREE_INCLUDES_TESTS}")
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
+                    -DLLVM_ENABLE_LTO=$(true_false "${LLVM_ENABLE_LTO}")
                     "${llvm_cmake_options[@]}"
                 )
                 if [[ $(is_cross_tools_deployment_target ${deployment_target}) ]] ; then
@@ -1619,6 +1629,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DCMAKE_CXX_FLAGS="$(swift_c_flags ${deployment_target})"
                     -DCMAKE_BUILD_TYPE:STRING="${SWIFT_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${SWIFT_ENABLE_ASSERTIONS}")
+                    -DLLVM_ENABLE_LTO=$(true_false "${LLVM_ENABLE_LTO}")
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
@@ -1825,6 +1836,9 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     -DFILECHECK_EXECUTABLE:PATH="$(build_directory_bin ${deployment_target} llvm)/FileCheck"
                     -DCMAKE_BUILD_TYPE:STRING="${LLBUILD_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
+                    # We disable all bindings, since llbuild builds before Swift
+                    # and can't use the unbuilt `swiftc`.
+                    -DLLBUILD_SUPPORT_BINDINGS:=
                 )
                 ;;
             swiftpm)
@@ -1949,7 +1963,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
                     ( ! -z "${generator_output_path}" && ! -f "${generator_output_path}" ) ]] ; then
             set -x
             mkdir -p "${build_dir}"
-            rm -f "${cmake_cache_path}"
             (cd "${build_dir}" && "${CMAKE}" "${cmake_options[@]}" "${EXTRA_CMAKE_OPTIONS[@]}" "${source_dir}")
             { set +x; } 2>/dev/null
         fi
@@ -2223,7 +2236,7 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
     done
 done
 
-for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
+for deployment_target in "${HOST_TARGET}" "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
     set_deployment_target_based_options
 
     for product in "${PRODUCTS[@]}"; do
@@ -2392,9 +2405,9 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"
 done
 
 if [[ "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS}" ]] && [[ ! "${SKIP_MERGE_LIPO_CROSS_COMPILE_TOOLS}" ]] ; then
-    echo "--- Merging and running lipo for ${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]} ---"
+    echo "--- Merging and running lipo for ${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS[@]} ---"
     lipo_src_dirs=()
-    for deployment_target in "${CROSS_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
+    for deployment_target in "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS[@]}"; do
         lipo_src_dirs=(
             "${lipo_src_dirs[@]}"
             "${BUILD_DIR}"/intermediate-install/"${deployment_target}"

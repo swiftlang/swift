@@ -398,7 +398,8 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
     llvm::sys::path::append(
       GlibcModuleMapPath,
-      swift::getPlatformNameForTriple(triple), triple.getArchName(),
+      swift::getPlatformNameForTriple(triple),
+      swift::getMajorArchitectureName(triple),
       "glibc.modulemap");
 
     // Only specify the module map if that file actually exists.

@@ -381,11 +381,6 @@
       key.namelength: 11,
       key.bodyoffset: 654,
       key.bodylength: 186,
-      key.attributes: [
-        {
-          key.attribute: source.decl.attribute.__raw_doc_comment
-        }
-      ],
       key.substructure: [
         {
           key.kind: source.lang.swift.syntaxtype.comment.mark,
@@ -404,11 +399,6 @@
           key.namelength: 16,
           key.bodyoffset: 713,
           key.bodylength: 125,
-          key.attributes: [
-            {
-              key.attribute: source.decl.attribute.__raw_doc_comment
-            }
-          ],
           key.substructure: [
             {
               key.kind: source.lang.swift.decl.var.parameter,
@@ -552,12 +542,7 @@
       key.length: 15,
       key.typename: "Qtys",
       key.nameoffset: 1040,
-      key.namelength: 4,
-      key.attributes: [
-        {
-          key.attribute: source.decl.attribute.__raw_doc_comment
-        }
-      ]
+      key.namelength: 4
     },
     {
       key.kind: source.lang.swift.decl.function.free,
@@ -902,9 +887,6 @@
       key.attributes: [
         {
           key.attribute: source.decl.attribute.objc
-        },
-        {
-          key.attribute: source.decl.attribute.__raw_doc_comment
         }
       ],
       key.elements: [

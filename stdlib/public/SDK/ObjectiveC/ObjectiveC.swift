@@ -149,7 +149,7 @@ extension Selector : CustomStringConvertible {
     if name == nil {
       return "<NULL>"
     }
-    return String(cString: name)
+    return String(cString: name!)
   }
 }
 
@@ -181,7 +181,7 @@ public struct NSZone {
 typealias Zone = NSZone
 
 //===----------------------------------------------------------------------===//
-// FIXME: @autoreleasepool substitute
+// @autoreleasepool substitute
 //===----------------------------------------------------------------------===//
 
 @warn_unused_result
@@ -191,10 +191,14 @@ func __pushAutoreleasePool() -> OpaquePointer
 @_silgen_name("_swift_objc_autoreleasePoolPop")
 func __popAutoreleasePool(_ pool: OpaquePointer)
 
-public func autoreleasepool(_ code: @noescape () -> Void) {
+public func autoreleasepool<Result>(
+  _ body: @noescape () throws -> Result
+) rethrows -> Result {
   let pool = __pushAutoreleasePool()
-  code()
-  __popAutoreleasePool(pool)
+  defer {
+    __popAutoreleasePool(pool)
+  }
+  return try body()
 }
 
 //===----------------------------------------------------------------------===//

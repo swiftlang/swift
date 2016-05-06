@@ -169,5 +169,5 @@ public struct TestAddressOnlyStruct<T> {
 // CHECK-NEXT: store %0 to [[CAST]] : $*Optional<Int>
 // CHECK-NEXT: strong_release [[X]] : $@box ImplicitlyUnwrappedOptional<Int>
 func testContextualInitOfNonAddrOnlyType(_ a : Int?) {
-  var x = a as Int!
+  var x: Int! = a
 }

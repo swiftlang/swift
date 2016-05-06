@@ -12,6 +12,8 @@
 
 import StdlibUnittest
 
+internal var checksAdded: Set<String> = []
+
 public struct SubscriptRangeTest {
   public let expected: [OpaqueValue<Int>]
   public let collection: [OpaqueValue<Int>]
@@ -479,22 +481,28 @@ internal func _product<C1 : Collection, C2 : Collection>(
     extractValueFromEquatable:
       ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
-    checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
-    outOfBoundsSubscriptOffset: Int = 1
+    outOfBoundsSubscriptOffset: Int = 1, 
+    collectionIsBidirectional: Bool
   '''
+  
+  import re
+  forwardTestArgs = ',\n    '.join(
+    [ x.group(1) + ': ' + x.group(1)
+      for x in re.finditer(r'([a-zA-Z0-9_]+):', testParams) ]
+  ).replace('testNamePrefix: ', '\n    ')
 }% 
 extension TestSuite {
   public func addCollectionTests<
     ${testConstraints('Collection')}
-  >(${testParams}) {
+  >(${testParams} = false) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(#function) {
+    if checksAdded.contains(#function) {
       return
     }
-    checksAdded.value.insert(#function)
+    checksAdded.insert(#function)
 
     addSequenceTests(
       testNamePrefix,
@@ -504,7 +512,6 @@ extension TestSuite {
       makeSequenceOfEquatable: makeCollectionOfEquatable,
       wrapValueIntoEquatable: wrapValueIntoEquatable,
       extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks)
 
     func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
@@ -1150,30 +1157,19 @@ extension TestSuite {
     }
 
     //===------------------------------------------------------------------===//
-
+    self.addCommonTests(${forwardTestArgs})
   } // addCollectionTests
 
   public func addBidirectionalCollectionTests<
     ${testConstraints('BidirectionalCollection')}
-  >(${testParams}) {
+  >(${testParams} = true) {
     var testNamePrefix = testNamePrefix
-    if checksAdded.value.contains(#function) {
+    if checksAdded.contains(#function) {
       return
     }
-    checksAdded.value.insert(#function)
+    checksAdded.insert(#function)
 
-    addCollectionTests(
-      testNamePrefix,
-      makeCollection: makeCollection,
-      wrapValue: wrapValue,
-      extractValue: extractValue,
-      makeCollectionOfEquatable: makeCollectionOfEquatable,
-      wrapValueIntoEquatable: wrapValueIntoEquatable,
-      extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded,
-      resiliencyChecks: resiliencyChecks,
-      outOfBoundsIndexOffset: outOfBoundsIndexOffset,
-      outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset)
+    addCollectionTests(${forwardTestArgs})
 
     func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
@@ -1473,31 +1469,21 @@ extension TestSuite {
 
     //===------------------------------------------------------------------===//
 
+    self.addCommonTests(${forwardTestArgs})
   } // addBidirectionalCollectionTests
 
   public func addRandomAccessCollectionTests<
     ${testConstraints('RandomAccessCollection')}
-  >(${testParams}) {
+  >(${testParams} = true) {
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.value.contains(#function) {
+    if checksAdded.contains(#function) {
       return
     }
-    checksAdded.value.insert(#function)
+    checksAdded.insert(#function)
 
-    addBidirectionalCollectionTests(
-      testNamePrefix,
-      makeCollection: makeCollection,
-      wrapValue: wrapValue,
-      extractValue: extractValue,
-      makeCollectionOfEquatable: makeCollectionOfEquatable,
-      wrapValueIntoEquatable: wrapValueIntoEquatable,
-      extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded,
-      resiliencyChecks: resiliencyChecks,
-      outOfBoundsIndexOffset: outOfBoundsIndexOffset,
-      outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset)
-
+    addBidirectionalCollectionTests(${forwardTestArgs})
+    
     testNamePrefix += String(C.Type)
 
     func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
@@ -1532,6 +1518,101 @@ extension TestSuite {
       }
     }
 
-//===----------------------------------------------------------------------===//
+    //===------------------------------------------------------------------===//
+    self.addCommonTests(${forwardTestArgs})
   } // addRandomAccessCollectionTests
+
+% for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
+  func addCommonTests<
+    ${testConstraints(collectionForTraversal(Traversal))}
+  >(${testParams}) {
+    if checksAdded.contains(#function) {
+      return
+    }
+    checksAdded.insert(#function)
+
+    func toCollection(_ r: CountableRange<Int>) -> C {
+      return makeCollection(r.map { wrapValue(OpaqueValue($0)) })
+    }
+    
+    self.test("\(testNamePrefix)/distance(from:to:)/semantics") {
+      let c = toCollection(0..<20)
+      for test in distanceFromToTests {
+        let d = c.distance(
+          from: c.nthIndex(test.startOffset), to: c.nthIndex(test.endOffset))
+        expectEqual(
+          numericCast(test.expectedDistance),
+          d, stackTrace: SourceLocStack().with(test.loc))
+      }
+    }
+
+    self.test("\(testNamePrefix)/index(_:stepsFrom: n)/semantics") {
+      for test in indexStepsFromTests.filter(
+        {$0.limit == nil && $0.distance >= 0}
+      ) {
+        let c = toCollection(0..<10)
+
+        let new = c.index(
+          c.nthIndex(test.startOffset),
+          offsetBy: numericCast(test.distance))
+        
+        // Since the `nthIndex(offset:)` method performs the same operation
+        // (i.e. adavances `c.startIndex` by `test.distance`, it would be
+        // silly to compare index values. Luckily the underlying collection
+        // contains exactly index offsets.
+        expectEqual(test.expectedOffset!, extractValue(c[new]).value,
+          stackTrace: SourceLocStack().with(test.loc))
+      }
+    }
+
+    if !collectionIsBidirectional {
+      self.test("\(testNamePrefix)/index(_:stepsFrom: -n)/semantics") {
+        for test in indexStepsFromTests.filter(
+          {$0.limit == nil && $0.distance < 0}
+        ) {
+          let c = toCollection(0..<10)
+          let start = c.nthIndex(test.startOffset)
+          expectCrashLater()
+          _ = c.index(start, offsetBy: numericCast(test.distance))
+        }
+      }
+      self.test("\(testNamePrefix)/advance(by: -n, limitedBy:)/semantics") {
+        for test in indexStepsFromTests.filter(
+          {$0.limit != nil && $0.distance < 0}
+        ) {
+          let c = toCollection(0..<10)
+          let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
+          let start = c.nthIndex(test.startOffset)
+          expectCrashLater()
+          _ = c.index(
+            start, offsetBy: numericCast(test.distance), limitedBy: limit)
+        }
+      }
+    }
+
+    self.test("\(testNamePrefix)/advance(by: n, limitedBy:)/semantics") {
+      for test in indexStepsFromTests.filter(
+        {$0.limit != nil && $0.distance >= 0}
+      ) {
+        let c = toCollection(0..<20)
+        let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
+
+        if !collectionIsBidirectional && test.distance < 0 {
+          expectCrashLater()
+        }
+
+        let new = c.index(
+          c.nthIndex(test.startOffset),
+          offsetBy: numericCast(test.distance),
+          limitedBy: limit)
+        if test.expectedOffset == nil {
+          expectEmpty(new)
+        } else {
+          expectEqual(c.nthIndex(test.expectedOffset!), new!,
+            stackTrace: SourceLocStack().with(test.loc))
+        }
+      }
+    }
+  }
+% end
 }

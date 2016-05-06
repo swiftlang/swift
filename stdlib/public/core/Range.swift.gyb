@@ -1,4 +1,4 @@
-//===--- Range.swift ------------------------------------------------------===//
+//===--- Range.swift.gyb --------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -68,7 +68,7 @@ public struct CountableRange<
   ///
   /// `upperBound` is not a valid argument to `subscript`, and is always
   /// reachable from `lowerBound` by zero or more applications of
-  /// `location(after:)`.
+  /// `index(after:)`.
   ///
   /// Identical to `lowerBound` in an empty range.
   public let upperBound: Bound

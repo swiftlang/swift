@@ -14,12 +14,12 @@ from __future__ import print_function
 import argparse
 import multiprocessing
 import os
+import pipes
 import platform
 import re
+import shlex
 import shutil
 import sys
-import pipes
-import shlex
 
 # FIXME: Instead of modifying the system path in order to enable imports from
 #        other directories, all Python modules related to the build script
@@ -872,7 +872,11 @@ details of the setups of other systems or automated environments.""")
     parser.add_argument(
         "--verbose-build",
         help="print the commands executed during the build",
-        action="store_true")
+        metavar="BOOL",
+        nargs='?',
+        type=argparse_bool,
+        default=False,
+        const=True)
 
     args = migration.parse_args(parser, sys.argv[1:])
 
@@ -987,10 +991,10 @@ details of the setups of other systems or automated environments.""")
     if args.test_optimized:
         args.test = True
 
-    # XCTest has a dependency on Foundation.
+    # SwiftPM and XCTest have a dependency on Foundation.
     # On OS X, Foundation is built automatically using xcodebuild.
     # On Linux, we must ensure that it is built manually.
-    if args.build_xctest and platform.system() != "Darwin":
+    if (args.build_swiftpm or args.build_xctest) and platform.system() != "Darwin":
         args.build_foundation = True
 
     # --skip-test-ios is merely a shorthand for host and simulator tests.

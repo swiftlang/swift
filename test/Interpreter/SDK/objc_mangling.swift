@@ -26,7 +26,7 @@ func checkClassName(_ cls: AnyClass, _ name: String, _ mangled: String)
   // Look up by unmangled name should work.
   // Look up by mangled name should also work.
   for query in [name, mangled] {
-    let cls2 = NSClassFromString(query)
+    let cls2 = NSClassFromString(query)!
     assert(cls === cls2)
     assert(object_getClass(cls) === object_getClass(cls2))
   }
@@ -48,7 +48,7 @@ func checkProtocolName(_ proto: Protocol, _ name: String, _ mangled: String)
 func checkIvarName(_ cls: AnyClass, _ name: String)
 {
   let ivarName = ivar_getName(class_getInstanceVariable(cls, name))
-  let s = ivarName != nil ? String(cString: ivarName) : Optional.none
+  let s = ivarName != nil ? String(cString: ivarName!) : Optional.none
   assert(name == s)
 }
 

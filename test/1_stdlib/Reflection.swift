@@ -148,13 +148,6 @@ switch true.customPlaygroundQuickLook {
   default: print("wrong quicklook type")
 }
 
-// CHECK-NEXT: Optional("Hello world")
-// CHECK-NEXT:   some: "Hello world"
-dump(Optional<String>("Hello world"))
-// CHECK-NEXT: - nil
-let noneString: String? = nil
-dump(noneString)
-
 let intArray = [1,2,3,4,5]
 // CHECK-NEXT: 5 elements
 // CHECK-NEXT: 1
@@ -170,14 +163,6 @@ dump(justSomeFunction as Any)
 
 // CHECK-NEXT: Swift.String
 dump(String.self)
-
-// CHECK-NEXT: Swift.CollectionOfOne<Swift.String>
-// CHECK-NEXT:   element: "Howdy Swift!"
-dump(CollectionOfOne("Howdy Swift!"))
-
-// CHECK-NEXT: EmptyCollection
-var emptyCollectionOfInt: EmptyCollection<Int> = EmptyCollection()
-dump(emptyCollectionOfInt)
 
 // CHECK-NEXT: ▿
 // CHECK-NEXT: from: 1.0

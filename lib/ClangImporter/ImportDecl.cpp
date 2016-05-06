@@ -1436,13 +1436,15 @@ namespace {
             auto storedUnderlyingType = Impl.importType(
                 Decl->getUnderlyingType(), ImportTypeKind::Value,
                 isInSystemModule(DC),
-                Decl->getUnderlyingType()->isBlockPointerType());
+                Decl->getUnderlyingType()->isBlockPointerType(),
+                OTK_Optional);
 
             // Find a bridged type, which may be different
             auto computedPropertyUnderlyingType = Impl.importType(
                 Decl->getUnderlyingType(), ImportTypeKind::Property,
                 isInSystemModule(DC),
-                Decl->getUnderlyingType()->isBlockPointerType());
+                Decl->getUnderlyingType()->isBlockPointerType(),
+                OTK_Optional);
 
             if (storedUnderlyingType.getCanonicalTypeOrNull() ==
                 computedPropertyUnderlyingType.getCanonicalTypeOrNull()) {
@@ -1477,7 +1479,8 @@ namespace {
         SwiftType = Impl.importType(ClangType,
                                     ImportTypeKind::Typedef,
                                     isInSystemModule(DC),
-                                    ClangType->isBlockPointerType());
+                                    ClangType->isBlockPointerType(),
+                                    OTK_Optional);
       }
 
       if (!SwiftType)

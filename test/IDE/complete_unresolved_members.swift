@@ -217,6 +217,12 @@ extension C7 {
 var cInst1 = C7()
 cInst1.extendedf1(.#^UNRESOLVED_26^#
 
+      
+// This #if works around:
+// <rdar://problem/26057202> Crash in code completion on invalid input
+#if false
+#endif
+      
 func f() -> SomeEnum1 {
   return .#^UNRESOLVED_27^#
 }

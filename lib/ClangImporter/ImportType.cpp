@@ -456,7 +456,8 @@ namespace {
       auto resultTy = Impl.importType(type->getReturnType(),
                                       ImportTypeKind::Result,
                                       AllowNSUIntegerAsInt,
-                                      CanFullyBridgeTypes);
+                                      CanFullyBridgeTypes,
+                                      OTK_Optional);
       if (!resultTy)
         return Type();
 
@@ -466,7 +467,8 @@ namespace {
            param != paramEnd; ++param) {
         auto swiftParamTy = Impl.importType(*param, ImportTypeKind::Parameter,
                                             AllowNSUIntegerAsInt,
-                                            CanFullyBridgeTypes);
+                                            CanFullyBridgeTypes,
+                                            OTK_Optional);
         if (!swiftParamTy)
           return Type();
 
@@ -489,7 +491,8 @@ namespace {
       auto resultTy = Impl.importType(type->getReturnType(),
                                       ImportTypeKind::Result,
                                       AllowNSUIntegerAsInt,
-                                      CanFullyBridgeTypes);
+                                      CanFullyBridgeTypes,
+                                      OTK_Optional);
       if (!resultTy)
         return Type();
 

@@ -23,6 +23,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "clang/CodeGen/SwiftCallingConv.h"
 
 #include "EnumPayload.h"
 #include "LoadableTypeInfo.h"
@@ -144,6 +145,13 @@ LoadedRef LoadableTypeInfo::loadRefcountedPtr(IRGenFunction &IGF,
   IGF.IGM.error(loc, "Can only load from an address that holds a reference to "
                 "a refcounted type or an address of an optional reference.");
   llvm::report_fatal_error("loadRefcountedPtr: Invalid SIL in IRGen");
+}
+
+void LoadableTypeInfo::addScalarToAggLowering(IRGenModule &IGM,
+                                              SwiftAggLowering &lowering,
+                                              llvm::Type *type, Size offset,
+                                              Size storageSize) {
+  lowering.addTypedData(type, offset.asCharUnits(), storageSize.asCharUnits());
 }
 
 static llvm::Constant *asSizeConstant(IRGenModule &IGM, Size size) {
@@ -379,6 +387,8 @@ namespace {
                        IsFixedSize) {}
     unsigned getExplosionSize() const override { return 0; }
     void getSchema(ExplosionSchema &schema) const override {}
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {}
     void loadAsCopy(IRGenFunction &IGF, Address addr,
                     Explosion &e) const override {}
     void loadAsTake(IRGenFunction &IGF, Address addr,
@@ -491,7 +501,7 @@ namespace {
     
     void loadAsTake(IRGenFunction &IGF, Address addr,
                     Explosion &explosion) const override {
-      addr = IGF.Builder.CreateBitCast(addr, ScalarType->getPointerTo());
+      addr = IGF.Builder.CreateElementBitCast(addr, ScalarType);
       explosion.add(IGF.Builder.CreateLoad(addr));
     }
     
@@ -502,7 +512,7 @@ namespace {
     
     void initialize(IRGenFunction &IGF, Explosion &explosion,
                     Address addr) const override {
-      addr = IGF.Builder.CreateBitCast(addr, ScalarType->getPointerTo());
+      addr = IGF.Builder.CreateElementBitCast(addr, ScalarType);
       IGF.Builder.CreateStore(explosion.claimNext(), addr);
     }
     
@@ -531,6 +541,12 @@ namespace {
     
     void getSchema(ExplosionSchema &schema) const override {
       schema.add(ExplosionSchema::Element::forScalar(ScalarType));
+    }
+
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      lowering.addOpaqueData(offset.asCharUnits(),
+                             getFixedSize().asCharUnits());
     }
     
     void packIntoEnumPayload(IRGenFunction &IGF,
@@ -1173,30 +1189,6 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   return convertedTI;
 }
 
-/// A convenience for grabbing the TypeInfo for a class declaration.
-const TypeInfo &TypeConverter::getTypeInfo(ClassDecl *theClass) {
-  // This type doesn't really matter except for serving as a key.
-  CanType theType
-    = getExemplarType(theClass->getDeclaredType()->getCanonicalType());
-
-  // If we have generic parameters, use the bound-generics conversion
-  // routine.  This does an extra level of caching based on the common
-  // class decl.
-  TypeCacheEntry entry;
-  if (theClass->getGenericParams()) {
-    entry = convertAnyNominalType(theType, theClass);
-
-  // Otherwise, just look up the declared type.
-  } else {
-    assert(isa<ClassType>(theType));
-    entry = getTypeEntry(theType);
-  }
-
-  // This will always yield a TypeInfo because forward-declarations
-  // are unnecessary when converting class types.
-  return *entry.get<const TypeInfo*>();
-}
-
 /// Return a TypeInfo the represents opaque storage for a loadable POD value
 /// with the given storage size.
 ///
@@ -1495,10 +1487,15 @@ namespace {
       return false;
     }
 
-    // Classes do not need unique implementations.
-    bool visitClassType(CanClassType type) { return false; }
+    // Conservatively assume classes need unique implementations.
+    bool visitClassType(CanClassType type) {
+      return visitClassDecl(type->getDecl());
+     }
     bool visitBoundGenericClassType(CanBoundGenericClassType type) {
-      return false;
+      return visitClassDecl(type->getDecl());
+    }
+    bool visitClassDecl(ClassDecl *theClass) {
+      return true;
     }
 
     // Reference storage types propagate the decision.
@@ -1522,8 +1519,8 @@ namespace {
 
 static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
   assert(!isa<ProtocolDecl>(decl));
-  if (isa<ClassDecl>(decl)) {
-    return false;
+  if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
+    return IsIRTypeDependent(IGM).visitClassDecl(classDecl);
   } else if (auto structDecl = dyn_cast<StructDecl>(decl)) {
     return IsIRTypeDependent(IGM).visitStructDecl(structDecl);
   } else {
@@ -1552,7 +1549,7 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
       llvm_unreachable("protocol types shouldn't be handled here");
 
     case DeclKind::Class:
-      return convertClassType(cast<ClassDecl>(decl));
+      return convertClassType(type, cast<ClassDecl>(decl));
     case DeclKind::Enum:
       return convertEnumType(type.getPointer(), type, cast<EnumDecl>(decl));
     case DeclKind::Struct:
@@ -1587,12 +1584,8 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
   case DeclKind::Protocol:
     llvm_unreachable("protocol types don't take generic parameters");
 
-  case DeclKind::Class: {
-    auto result = convertClassType(cast<ClassDecl>(decl));
-    assert(!Cache.count(key));
-    Cache.insert(std::make_pair(key, result));
-    return result;
-  }
+  case DeclKind::Class:
+    llvm_unreachable("classes are always considered dependent for now");
 
   case DeclKind::Enum: {
     auto type = CanType(decl->getDeclaredTypeInContext());
@@ -1641,9 +1634,17 @@ TypeConverter::getMetatypeTypeInfo(MetatypeRepresentation representation) {
 }
 
 /// createNominalType - Create a new nominal type.
-llvm::StructType *IRGenModule::createNominalType(TypeDecl *decl) {
+llvm::StructType *IRGenModule::createNominalType(CanType type) {
+  assert(type.getNominalOrBoundGenericNominal());
+
+  // We share type infos for different instantiations of a generic type
+  // when the archetypes have the same exemplars.  Mangling the archetypes
+  // in this case can be very misleading, so we just mangle the base name.
+  if (type->hasArchetype())
+    type = type.getNominalOrBoundGenericNominal()->getDeclaredType()
+                                                 ->getCanonicalType();
+
   llvm::SmallString<32> typeName;
-  auto type = decl->getDeclaredType()->getCanonicalType();
   LinkEntity::forTypeMangling(type).mangle(typeName);
   return llvm::StructType::create(getLLVMContext(), typeName.str());
 }

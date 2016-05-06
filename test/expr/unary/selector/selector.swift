@@ -116,7 +116,5 @@ func testParseErrors3(_ c1: C1) {
 
 func testParseErrors4() {
   // Subscripts
-  _ = #selector(C1.subscript) // expected-error{{expected member name following '.'}}
-  // expected-error@-1{{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2{{expected '(' for subscript parameters}}
+  _ = #selector(C1.subscript) // expected-error{{type 'C1.Type' has no subscript members}}
 }

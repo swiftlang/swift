@@ -882,20 +882,19 @@ bool SKIndexingConsumer::startSourceEntity(const EntityInfo &Info) {
   if (!Info.Group.empty())
     Elem.set(KeyGroupName, Info.Group);
 
-  if (Info.EntityType == EntityInfo::FuncDecl) {
-    const FuncDeclEntityInfo &FDInfo =
-        static_cast<const FuncDeclEntityInfo &>(Info);
-    if (FDInfo.IsTestCandidate)
-      Elem.setBool(KeyIsTestCandidate, true);
-  }
+  if (!Info.ReceiverUSR.empty())
+    Elem.set(KeyReceiverUSR, Info.ReceiverUSR);
+  if (Info.IsDynamic)
+    Elem.setBool(KeyIsDynamic, true);
+  if (Info.IsTestCandidate)
+    Elem.setBool(KeyIsTestCandidate, true);
 
-  if (Info.EntityType == EntityInfo::CallReference) {
-    const CallRefEntityInfo &CRInfo =
-        static_cast<const CallRefEntityInfo &>(Info);
-    if (!CRInfo.ReceiverUSR.empty())
-      Elem.set(KeyReceiverUSR, CRInfo.ReceiverUSR);
-    if (CRInfo.IsDynamic)
-      Elem.setBool(KeyIsDynamic, true);
+  if (!Info.Attrs.empty()) {
+    auto AttrArray = Elem.setArray(KeyAttributes);
+    for (auto Attr : Info.Attrs) {
+      auto AttrDict = AttrArray.appendDictionary();
+      AttrDict.set(KeyAttribute, Attr);
+    }
   }
 
   EntitiesStack.push_back({ Info.Kind, Elem, ResponseBuilder::Array(),

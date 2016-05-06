@@ -1,4 +1,4 @@
-//===--- Map.swift - Lazily map over a Sequence ---------------------------===//
+//===--- Map.swift.gyb - Lazily map over a Sequence -----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -245,14 +245,14 @@ public struct LazyMapGenerator<Base : IteratorProtocol, Element> {}
 extension LazyMapSequence {
   @available(*, unavailable, message: "use '.lazy.map' on the sequence")
   public init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
 extension LazyMapCollection {
   @available(*, unavailable, message: "use '.lazy.map' on the collection")
   public init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 

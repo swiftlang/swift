@@ -659,6 +659,9 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
       break;
     }
     break;
+  case ResultKind::BuiltinOperator:
+    Prefix.append("BuiltinOperator");
+    break;
   }
   Prefix.append("/");
   switch (getSemanticContext()) {
@@ -880,6 +883,75 @@ static CodeCompletionResult::ExpectedTypeRelation calculateMaxTypeRelationForDec
   return Result;
 }
 
+CodeCompletionOperatorKind
+CodeCompletionResult::getCodeCompletionOperatorKind(StringRef name) {
+  using CCOK = CodeCompletionOperatorKind;
+  using OpPair = std::pair<StringRef, CCOK>;
+
+  // This list must be kept in alphabetical order.
+  static OpPair ops[] = {
+      std::make_pair("!", CCOK::Bang),
+      std::make_pair("!=", CCOK::NotEq),
+      std::make_pair("!==", CCOK::NotEqEq),
+      std::make_pair("%", CCOK::Modulo),
+      std::make_pair("%=", CCOK::ModuloEq),
+      std::make_pair("&", CCOK::Amp),
+      std::make_pair("&&", CCOK::AmpAmp),
+      std::make_pair("&*", CCOK::AmpStar),
+      std::make_pair("&+", CCOK::AmpPlus),
+      std::make_pair("&-", CCOK::AmpMinus),
+      std::make_pair("&=", CCOK::AmpEq),
+      std::make_pair("(", CCOK::LParen),
+      std::make_pair("*", CCOK::Star),
+      std::make_pair("*=", CCOK::StarEq),
+      std::make_pair("+", CCOK::Plus),
+      std::make_pair("+=", CCOK::PlusEq),
+      std::make_pair("-", CCOK::Minus),
+      std::make_pair("-=", CCOK::MinusEq),
+      std::make_pair(".", CCOK::Dot),
+      std::make_pair("...", CCOK::DotDotDot),
+      std::make_pair("..<", CCOK::DotDotLess),
+      std::make_pair("/", CCOK::Slash),
+      std::make_pair("/=", CCOK::SlashEq),
+      std::make_pair("<", CCOK::Less),
+      std::make_pair("<<", CCOK::LessLess),
+      std::make_pair("<<=", CCOK::LessLessEq),
+      std::make_pair("<=", CCOK::LessEq),
+      std::make_pair("=", CCOK::Eq),
+      std::make_pair("==", CCOK::EqEq),
+      std::make_pair("===", CCOK::EqEqEq),
+      std::make_pair(">", CCOK::Greater),
+      std::make_pair(">=", CCOK::GreaterEq),
+      std::make_pair(">>", CCOK::GreaterGreater),
+      std::make_pair(">>=", CCOK::GreaterGreaterEq),
+      std::make_pair("?.", CCOK::QuestionDot),
+      std::make_pair("^", CCOK::Caret),
+      std::make_pair("^=", CCOK::CaretEq),
+      std::make_pair("|", CCOK::Pipe),
+      std::make_pair("|=", CCOK::PipeEq),
+      std::make_pair("||", CCOK::PipePipe),
+      std::make_pair("~=", CCOK::TildeEq),
+  };
+  static auto opsSize = sizeof(ops) / sizeof(ops[0]);
+
+  auto I = std::lower_bound(
+      ops, &ops[opsSize], std::make_pair(name, CCOK::None),
+      [](const OpPair &a, const OpPair &b) { return a.first < b.first; });
+
+  if (I == &ops[opsSize] || I->first != name)
+    return CCOK::Unknown;
+  return I->second;
+}
+
+static StringRef getOperatorName(CodeCompletionString *str) {
+  return str->getFirstTextChunk(/*includeLeadingPunctuation=*/true);
+}
+
+CodeCompletionOperatorKind
+CodeCompletionResult::getCodeCompletionOperatorKind(CodeCompletionString *str) {
+  return getCodeCompletionOperatorKind(getOperatorName(str));
+}
+
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   auto *CCS = CodeCompletionString::create(*Sink.Allocator, Chunks);
 
@@ -938,6 +1010,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         CodeCompletionResult(KeywordKind, SemanticContext, NumBytesToErase,
                              CCS, ExpectedTypeRelation);
 
+  case CodeCompletionResult::ResultKind::BuiltinOperator:
   case CodeCompletionResult::ResultKind::Pattern:
     return new (*Sink.Allocator) CodeCompletionResult(
         Kind, SemanticContext, NumBytesToErase, CCS, ExpectedTypeRelation);
@@ -1021,8 +1094,9 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
   return None;
 }
 
-StringRef CodeCompletionString::getFirstTextChunk() const {
-  Optional<unsigned> Idx = getFirstTextChunkIndex();
+StringRef
+CodeCompletionString::getFirstTextChunk(bool includeLeadingPunctuation) const {
+  Optional<unsigned> Idx = getFirstTextChunkIndex(includeLeadingPunctuation);
   if (Idx.hasValue())
     return getChunks()[*Idx].getText();
   return StringRef();
@@ -2925,7 +2999,7 @@ public:
 
   void addPostfixBang(Type resultType) {
     CodeCompletionResultBuilder builder(
-        Sink, CodeCompletionResult::ResultKind::Pattern,
+        Sink, CodeCompletionResult::ResultKind::BuiltinOperator,
         SemanticContextKind::None, {});
     // FIXME: we can't use the exclamation mark chunk kind, or it isn't
     // included in the completion name.
@@ -2969,7 +3043,7 @@ public:
 
   void addAssignmentOperator(Type RHSType, Type resultType) {
     CodeCompletionResultBuilder builder(
-        Sink, CodeCompletionResult::ResultKind::Pattern,
+        Sink, CodeCompletionResult::ResultKind::BuiltinOperator,
         SemanticContextKind::None, {});
 
     if (HaveLeadingSpace)

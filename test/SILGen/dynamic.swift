@@ -294,7 +294,7 @@ func managedDispatch(_ c: Foo) {
 // CHECK-LABEL: sil hidden @_TF7dynamic21foreignMethodDispatchFT_T_
 func foreignMethodDispatch() {
   // CHECK: function_ref @_TFCSo9GuisemeauC
-  let g = Guisemeau()
+  let g = Guisemeau()!
   // CHECK: class_method [volatile] {{%.*}} : $Gizmo, #Gizmo.frob!1.foreign
   g.frob()
   // CHECK: class_method [volatile] {{%.*}} : $Gizmo, #Gizmo.count!getter.1.foreign

@@ -769,21 +769,21 @@ extension String {
 extension String {
   @available(*, unavailable, renamed: "append")
   public mutating func appendContentsOf(_ other: String) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "append(contentsOf:)")
   public mutating func appendContentsOf<
     S : Sequence where S.Iterator.Element == Character
   >(_ newElements: S) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "insert(contentsOf:at:)")
   public mutating func insertContentsOf<
     S : Collection where S.Iterator.Element == Character
   >(_ newElements: S, at i: Index) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "replaceSubrange")
@@ -792,40 +792,40 @@ extension String {
   >(
     _ subRange: Range<Index>, with newElements: C
   ) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
     
   @available(*, unavailable, renamed: "replaceSubrange")
   public mutating func replaceRange(
     _ subRange: Range<Index>, with newElements: String
   ) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
   
   @available(*, unavailable, renamed: "removeAt")
   public mutating func removeAtIndex(_ i: Index) -> Character {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "removeSubrange")
   public mutating func removeRange(_ subRange: Range<Index>) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "lowercased()")
   public var lowercaseString: String {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "uppercased()")
   public var uppercaseString: String {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
 extension Sequence where Iterator.Element == String {
   @available(*, unavailable, renamed: "joined")
   public func joinWithSeparator(_ separator: String) -> String {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }

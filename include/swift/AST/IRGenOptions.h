@@ -150,15 +150,18 @@ public:
   /// standard library.
   unsigned EnableReflectionBuiltins : 1;
 
-  /// List of backend command-line options for -embed-bitcode.
-  std::vector<uint8_t> CmdArgs;
-
   /// Should we try to build incrementally by not emitting an object file if it
   /// has the same IR hash as the module that we are preparing to emit?
   ///
   /// This is a debugging option meant to make it easier to perform compile time
   /// measurements on a non-clean build directory.
   unsigned UseIncrementalLLVMCodeGen : 1;
+
+  /// Enable use of the swiftcall calling convention.
+  unsigned UseSwiftCall : 1;
+
+  /// List of backend command-line options for -embed-bitcode.
+  std::vector<uint8_t> CmdArgs;
 
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
                    Optimize(false), Sanitize(SanitizerKind::None),
@@ -170,8 +173,9 @@ public:
                    PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
                    HasValueNamesSetting(false), ValueNames(false),
                    EnableReflectionMetadata(false), EnableReflectionNames(false),
-                   EnableReflectionBuiltins(false), CmdArgs(),
-                   UseIncrementalLLVMCodeGen(true)
+                   EnableReflectionBuiltins(false),
+                   UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
+                   CmdArgs()
                    {}
 
   /// Gets the name of the specified output filename.

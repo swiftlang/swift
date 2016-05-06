@@ -236,7 +236,7 @@ if True:
 ///     // Prints "nil, nil"
 ///
 /// You can access individual array elements through a subscript. The first
-/// element of an nonempty array is always at index zero. You can
+/// element of a nonempty array is always at index zero. You can
 /// subscript an array with any integer from zero up to, but not including,
 /// the count of the array. Using a negative number or an index equal to or
 /// greater than `count` triggers a runtime error. For example:
@@ -455,8 +455,8 @@ ${SelfDocComment}
 %end
 public struct ${Self}<Element>
   : RandomAccessCollection,
-  MutableCollection,
-  _DestructorSafeContainer
+    MutableCollection,
+    _DestructorSafeContainer
 {
 
   public typealias Index = Int
@@ -503,11 +503,89 @@ public struct ${Self}<Element>
 %end
   }
 
-  public typealias Indices = CountableRange<Int>
-
-  public var indices: CountableRange<Int> {
-    return startIndex..<endIndex
+  @warn_unused_result
+  public func index(after i: Int) -> Int {
+    // NOTE: this is a manual specialization of index movement for a Strideable
+    // index that is required for Array performance.  The optimizer is not
+    // capable of creating partial specializations yet.
+    // NOTE: Range checks are not performed here, because it is done later by
+    // the subscript function.
+    return i + 1
   }
+
+  public func formIndex(after i: inout Int) {
+    // NOTE: this is a manual specialization of index movement for a Strideable
+    // index that is required for Array performance.  The optimizer is not
+    // capable of creating partial specializations yet.
+    // NOTE: Range checks are not performed here, because it is done later by
+    // the subscript function.
+    i += 1
+  }
+
+  @warn_unused_result
+  public func index(before i: Int) -> Int {
+    // NOTE: this is a manual specialization of index movement for a Strideable
+    // index that is required for Array performance.  The optimizer is not
+    // capable of creating partial specializations yet.
+    // NOTE: Range checks are not performed here, because it is done later by
+    // the subscript function.
+    return i - 1
+  }
+
+  public func formIndex(before i: inout Int) {
+    // NOTE: this is a manual specialization of index movement for a Strideable
+    // index that is required for Array performance.  The optimizer is not
+    // capable of creating partial specializations yet.
+    // NOTE: Range checks are not performed here, because it is done later by
+    // the subscript function.
+    i -= 1
+  }
+
+  @warn_unused_result
+  public func index(_ i: Int, offsetBy n: Int) -> Int {
+    // NOTE: this is a manual specialization of index movement for a Strideable
+    // index that is required for Array performance.  The optimizer is not
+    // capable of creating partial specializations yet.
+    // NOTE: Range checks are not performed here, because it is done later by
+    // the subscript function.
+    return i + n
+  }
+
+  @warn_unused_result
+  public func index(
+    _ i: Int, offsetBy n: Int, limitedBy limit: Int
+  ) -> Int? {
+    // NOTE: this is a manual specialization of index movement for a Strideable
+    // index that is required for Array performance.  The optimizer is not
+    // capable of creating partial specializations yet.
+    // NOTE: Range checks are not performed here, because it is done later by
+    // the subscript function.
+    let l = limit - i
+    if n > 0 ? l >= 0 && l < n : l <= 0 && n < l {
+      return nil
+    }
+    return i + n
+  }
+
+  @warn_unused_result
+  public func distance(from start: Int, to end: Int) -> Int {
+    // NOTE: this is a manual specialization of index movement for a Strideable
+    // index that is required for Array performance.  The optimizer is not
+    // capable of creating partial specializations yet.
+    // NOTE: Range checks are not performed here, because it is done later by
+    // the subscript function.
+    return end - start
+  }
+
+  public func _failEarlyRangeCheck(_ index: Int, bounds: Range<Int>) {
+    // NOTE: This method is a no-op for performance reasons.
+  }
+
+  public func _failEarlyRangeCheck(_ range: Range<Int>, bounds: Range<Int>) {
+    // NOTE: This method is a no-op for performance reasons.
+  }
+
+  public typealias Indices = CountableRange<Int>
 
 %{
 SubscriptDocComment="""\
@@ -2061,19 +2139,19 @@ extension ContiguousArray {
 extension ${Self} {
   @available(*, unavailable, message: "Please use init(repeating:count:) instead")
   init(count: Int, repeatedValue: Element) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "remove")
   public mutating func removeAtIndex(_ index: Int) -> Element {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "replaceSubrange")
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == _Buffer.Element
   >(_ subRange: Range<Int>, with newElements: C) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "append(contentsOf:)")
@@ -2082,7 +2160,7 @@ extension ${Self} {
     where
     S.Iterator.Element == Element
   >(_ newElements: S) {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 %end

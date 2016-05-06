@@ -48,8 +48,10 @@ enum Archetype<T: AnyObject> {
   case A(T), B(C)
 }
 // can't use spare bits—archetype may be bound to tagged pointer type
-// CHECK-32: [[ARCHETYPE:%O15enum_spare_bits9Archetype.*]] = type <{ [4 x i8], [1 x i8] }>
-// CHECK-64: [[ARCHETYPE:%O15enum_spare_bits9Archetype.*]] = type <{ [8 x i8], [1 x i8] }>
+// CHECK-32: [[ARCHETYPE:%GO15enum_spare_bits9ArchetypeCS_1C_]] = type <{ [4 x i8], [1 x i8] }>
+// CHECK-32: [[ARCHETYPE_OBJC:%GO15enum_spare_bits9ArchetypeCSo8NSObject_]] = type <{ [4 x i8], [1 x i8] }>
+// CHECK-64: [[ARCHETYPE:%GO15enum_spare_bits9ArchetypeCS_1C_]] = type <{ [8 x i8], [1 x i8] }>
+// CHECK-64: [[ARCHETYPE_OBJC:%GO15enum_spare_bits9ArchetypeCSo8NSObject_]] = type <{ [8 x i8], [1 x i8] }>
 
 sil_global @swiftClass: $SwiftClass
 sil_global @objcClass: $ObjCClass
@@ -59,7 +61,7 @@ sil_global @archetypeBoundToSwift: $Archetype<C>
 sil_global @archetypeBoundToObjC: $Archetype<NSObject>
 
 // CHECK: @archetypeBoundToSwift = {{(protected )?}}global [[ARCHETYPE]]
-// CHECK: @archetypeBoundToObjC = {{(protected )?}}global [[ARCHETYPE]]
+// CHECK: @archetypeBoundToObjC = {{(protected )?}}global [[ARCHETYPE_OBJC]]
 
 sil @instantiate_globals : $() -> () {
 entry:

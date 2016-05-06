@@ -329,7 +329,9 @@ public:
     return ExistentialMetatypeType::get(instance);
   }
 
-  Type createMetatypeType(Type instance) {
+  Type createMetatypeType(Type instance, bool wasAbstract=false) {
+    // FIXME: Plumb through metatype representation and generalize silly
+    // 'wasAbstract' flag
     return MetatypeType::get(instance);
   }
 
@@ -360,6 +362,10 @@ public:
     if (!base->allowsOwnership())
       return Type();
     return WeakStorageType::get(base, Ctx);
+  }
+
+  Type createSILBoxType(Type base) {
+    return SILBoxType::get(base->getCanonicalType());
   }
 
   Type createObjCClassType(StringRef name) {
@@ -832,7 +838,7 @@ private:
     switch (kind) {
     case MemberAccessStrategy::OffsetKind::Bytes_Word: {
       int64_t rawOffset;
-      if (readWordOffset(address, &rawOffset))
+      if (!readWordOffset(address, &rawOffset))
         return false;
       offset = Size(rawOffset);
       return true;

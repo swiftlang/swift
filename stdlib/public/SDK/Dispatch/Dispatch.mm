@@ -12,23 +12,25 @@
 
 #include <dispatch/dispatch.h>
 
-__attribute__((visibility("hidden")))
+#include "swift/Runtime/Config.h"
+
+SWIFT_CC(swift) __attribute__((visibility("hidden")))
 extern "C" dispatch_queue_attr_t 
 _swift_dispatch_queue_concurrent(void) {
   return DISPATCH_QUEUE_CONCURRENT;
 }
 
-__attribute__((visibility("hidden")))
-extern "C" dispatch_data_t
+SWIFT_CC(swift) __attribute__((visibility("hidden")))
+extern "C" SWIFT_CC(swift) dispatch_data_t
 _swift_dispatch_data_empty(void) {
   return dispatch_data_empty;
 }
 
-#define SOURCE(t)                               \
-  __attribute__((visibility("hidden")))         \
-  extern "C" dispatch_source_type_t             \
-  _swift_dispatch_source_type_##t(void) {       \
-    return DISPATCH_SOURCE_TYPE_##t;            \
+#define SOURCE(t)                                         \
+  SWIFT_CC(swift) __attribute__((visibility("hidden")))   \
+  extern "C" dispatch_source_type_t                       \
+  _swift_dispatch_source_type_##t(void) {                 \
+    return DISPATCH_SOURCE_TYPE_##t;                      \
   }
 
 SOURCE(DATA_ADD)

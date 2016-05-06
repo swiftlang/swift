@@ -83,47 +83,34 @@ private:
     });
   }
 
-  bool finishSourceEntity(SymbolKind kind, SymbolSubKind subKind,
-                          bool isRef) override {
-    auto UID = SwiftLangSupport::getUIDForSymbol(kind, subKind, isRef);
+  bool finishSourceEntity(SymbolKind kind, SymbolSubKindSet subKinds,
+                          SymbolRoleSet roles) override {
+    bool isRef = roles & (unsigned)SymbolRole::Reference;
+    auto UID = SwiftLangSupport::getUIDForSymbol(kind, subKinds, isRef);
     return impl.finishSourceEntity(UID);
   }
 
   template <typename F>
   bool withEntityInfo(const IndexSymbol &symbol, F func) {
-    auto initEntity = [](EntityInfo &info, const IndexSymbol &symbol) {
-      info.Kind = SwiftLangSupport::getUIDForSymbol(symbol.kind, symbol.subKind,
-                                                    symbol.isRef);
-      info.Name = symbol.name;
-      info.USR = symbol.USR;
-      info.Group = symbol.group;
-      info.Line = symbol.line;
-      info.Column = symbol.column;
-    };
-
-    switch (symbol.entityType) {
-    case IndexSymbol::Base: {
-      EntityInfo info;
-      initEntity(info, symbol);
-      return func(info);
+    EntityInfo info;
+    bool isRef = symbol.roles & (unsigned)SymbolRole::Reference;
+    info.Kind = SwiftLangSupport::getUIDForSymbol(symbol.kind, symbol.subKinds,
+                                                  isRef);
+    info.Name = symbol.name;
+    info.USR = symbol.USR;
+    info.Group = symbol.group;
+    info.Line = symbol.line;
+    info.Column = symbol.column;
+    info.ReceiverUSR = symbol.receiverUSR;
+    info.IsDynamic = symbol.roles & (unsigned)SymbolRole::Dynamic;
+    info.IsTestCandidate = symbol.subKinds & SymbolSubKind::UnitTest;
+    std::vector<UIdent> uidAttrs;
+    if (!isRef) {
+      uidAttrs =
+        SwiftLangSupport::UIDsFromDeclAttributes(symbol.decl->getAttrs());
+      info.Attrs = uidAttrs;
     }
-    case IndexSymbol::FuncDecl: {
-      FuncDeclEntityInfo info;
-      initEntity(info, symbol);
-      info.IsTestCandidate =
-          static_cast<const FuncDeclIndexSymbol &>(symbol).IsTestCandidate;
-      return func(info);
-    }
-    case IndexSymbol::CallReference: {
-      CallRefEntityInfo info;
-      initEntity(info, symbol);
-      auto call = static_cast<const CallRefIndexSymbol &>(symbol);
-      info.ReceiverUSR = call.ReceiverUSR;
-      info.IsDynamic = call.IsDynamic;
-      return func(info);
-    }
-    }
-    llvm_unreachable("unexpected symbol kind");
+    return func(info);
   }
 
 private:

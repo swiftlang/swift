@@ -553,6 +553,11 @@ public:
   }
 
   MetatypeRepresentation
+  visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
     assert(false && "Must have concrete TypeRef");
     return MetatypeRepresentation::Unknown;
@@ -654,7 +659,7 @@ public:
         }
 
         // FIXME: If the unsubstituted payload type is empty, but not
-        // resilient, we treat the case as an no-payload case.
+        // resilient, we treat the case as a no-payload case.
         //
         // This should be handled by IRGen emitting the enum strategy
         // explicitly.
@@ -844,6 +849,11 @@ public:
     return visitAnyStorageTypeRef(US->getType(), ReferenceKind::Unmanaged);
   }
 
+  const TypeInfo *visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
+    return TC.getReferenceTypeInfo(ReferenceKind::Strong,
+                                   ReferenceCounting::Native);
+  }
+
   const TypeInfo *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     assert(false && "Can't lower opaque TypeRef");
     return nullptr;
@@ -870,9 +880,9 @@ const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
   return TI;
 }
 
-const TypeInfo *TypeConverter::getInstanceTypeInfo(const TypeRef *TR,
-                                                   unsigned start,
-                                                   unsigned align) {
+const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
+                                                        unsigned start,
+                                                        unsigned align) {
   const FieldDescriptor *FD = getBuilder().getFieldTypeInfo(TR);
   if (FD == nullptr)
     return nullptr;

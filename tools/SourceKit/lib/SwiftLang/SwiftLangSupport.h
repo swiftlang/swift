@@ -248,8 +248,11 @@ public:
       swift::ide::SyntaxStructureElementKind Kind);
 
   static SourceKit::UIdent getUIDForSymbol(swift::index::SymbolKind kind,
-                                           swift::index::SymbolSubKind subKind,
+                                           swift::index::SymbolSubKindSet subKinds,
                                            bool isRef);
+
+  static std::vector<UIdent> UIDsFromDeclAttributes(const swift::DeclAttributes &Attrs);
+
 
   static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS);
 

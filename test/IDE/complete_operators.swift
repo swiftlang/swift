@@ -85,7 +85,7 @@ func testPostfix3(x: S) {
 func testPostfix4(x: S?) {
   x#^POSTFIX_4^#
 }
-// POSTFIX_4: Pattern/None:  ![#S#]
+// POSTFIX_4: BuiltinOperator/None:  ![#S#]
 
 struct T {}
 postfix func +-<G>(x: [G]) -> G { return x! }
@@ -175,7 +175,7 @@ func testInfix2(x: inout S2) {
 // S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:   + {#S2#}[#S2#]
 // S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/CurrModule:   ** {#Int#}[#S2#]
 // S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/CurrModule:   **= {#Int#}[#Void#]
-// S2_INFIX_LVALUE-DAG: Pattern/None:                             = {#S2#}[#Void#]
+// S2_INFIX_LVALUE-DAG: BuiltinOperator/None:                             = {#S2#}[#Void#]
 // S2_INFIX_LVALUE: End completions
 // NEGATIVE_S2_INFIX_LVALUE-NOT: +=
 // NEGATIVE_S2_INFIX_LVALUE-NOT: \* {#Int#}
@@ -351,11 +351,11 @@ func testAssignTuple3() {
 // FIXME: technically this is sometimes legal, but we would need to
 // differentiate between cases like () = and print() =. Since it's not very
 // useful anyway, just omit the completion.
-// ASSIGN_TUPLE_1-NOT: Pattern/None:  = {
+// ASSIGN_TUPLE_1-NOT: BuiltinOperator/None:  = {
 
 func testAssignTuple2() {
   var x: S2
   var y: S2
   (x, y)#^ASSIGN_TUPLE_2^#
 }
-// ASSIGN_TUPLE_2: Pattern/None:                        = {#(S2, S2)#}[#Void#];
+// ASSIGN_TUPLE_2: BuiltinOperator/None:                        = {#(S2, S2)#}[#Void#];

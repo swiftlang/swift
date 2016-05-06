@@ -14,10 +14,12 @@
 #define SWIFT_INDEX_INDEXSYMBOL_H
 
 #include "swift/Basic/LLVM.h"
+#include "clang/Index/IndexSymbol.h"
 #include "llvm/ADT/SmallString.h"
 
 namespace swift {
 class Decl;
+class ValueDecl;
 
 namespace index {
 
@@ -57,54 +59,54 @@ enum class SymbolKind {
   Destructor,
 };
 
-enum class SymbolSubKind {
-  None,
+enum class SymbolSubKind : uint32_t {
+  None                          = 0,
 
-  AccessorGetter,
-  AccessorSetter,
-  AccessorWillSet,
-  AccessorDidSet,
-  AccessorAddressor,
-  AccessorMutableAddressor,
+  AccessorGetter                = 1 << 0,
+  AccessorSetter                = 1 << 1,
+  AccessorWillSet               = 1 << 2,
+  AccessorDidSet                = 1 << 3,
+  AccessorAddressor             = 1 << 4,
+  AccessorMutableAddressor      = 1 << 5,
 
-  ExtensionOfStruct,
-  ExtensionOfClass,
-  ExtensionOfEnum,
-  ExtensionOfProtocol,
+  ExtensionOfStruct             = 1 << 6,
+  ExtensionOfClass              = 1 << 7,
+  ExtensionOfEnum               = 1 << 8,
+  ExtensionOfProtocol           = 1 << 9,
+
+  UnitTest                      = 1 << 10,
 };
 
-struct IndexSymbol {
-  enum TypeKind { Base, FuncDecl, CallReference };
-  TypeKind entityType = Base;
+typedef uint32_t SymbolSubKindSet;
 
+inline SymbolSubKindSet operator&(SymbolSubKindSet SKSet, SymbolSubKind SK) {
+  return SKSet & (SymbolSubKindSet)SK;
+}
+inline SymbolSubKindSet operator|(SymbolSubKindSet SKSet, SymbolSubKind SK) {
+  return SKSet | (SymbolSubKindSet)SK;
+}
+inline SymbolSubKindSet &operator|=(SymbolSubKindSet &SKSet, SymbolSubKind SK) {
+  return SKSet = SKSet | SK;
+}
+
+using SymbolRole = clang::index::SymbolRole;
+using SymbolRoleSet = clang::index::SymbolRoleSet;
+
+struct IndexSymbol {
+  const ValueDecl *decl;
   SymbolKind kind;
-  SymbolSubKind subKind = SymbolSubKind::None;
-  bool isRef;
+  SymbolSubKindSet subKinds = SymbolSubKindSet(0);
+  SymbolRoleSet roles = SymbolRoleSet(0);
   // The following strings are guaranteed to live at least as long as the
   // current indexing action.
   StringRef name;
   StringRef USR; // USR may be safely compared by pointer.
   StringRef group;
+  StringRef receiverUSR;
   unsigned line = 0;
   unsigned column = 0;
 
   IndexSymbol() = default;
-
-protected:
-  IndexSymbol(TypeKind TK) : entityType(TK) {}
-};
-
-struct FuncDeclIndexSymbol : public IndexSymbol {
-  bool IsTestCandidate = false;
-
-  FuncDeclIndexSymbol() : IndexSymbol(FuncDecl) {}
-};
-
-struct CallRefIndexSymbol : public IndexSymbol {
-  StringRef ReceiverUSR;
-  bool IsDynamic = false;
-
-  CallRefIndexSymbol() : IndexSymbol(CallReference) {}
 };
 
 SymbolKind getSymbolKindForDecl(const Decl *D);

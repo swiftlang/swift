@@ -17,6 +17,7 @@
 // REQUIRES: OS=macosx
 
 // CHECK: Loaded module ASTSection from
+// CHECK: - Swift Version: {{.+}}.{{.+}}
 // CHECK: - Target: {{.+}}-{{.+}}-{{.+}}
 // CHECK: - SDK path: /fake/sdk/path{{$}}
 // CHECK: - -Xcc options: -working-directory {{.+}} -DA -DB

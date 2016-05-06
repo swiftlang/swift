@@ -578,7 +578,7 @@ if let array = obj as? Dictionary<String, [Dictionary<String, String>]> {
 }
 
 // Helper function that downcasts 
-func downcastToStringArrayOptOpt(_ obj: AnyObject??!!) {
+func downcastToStringArrayOptOpt(_ obj: AnyObject???!) {
   if let strArrOptOpt = obj as? [String]?? {
     if let strArrOpt = strArrOptOpt {
       if let strArr = strArrOpt {

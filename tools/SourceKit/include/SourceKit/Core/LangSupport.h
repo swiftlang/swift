@@ -30,37 +30,18 @@ namespace SourceKit {
   class Context;
 
 struct EntityInfo {
-  enum TypeKind {
-    Base,
-    FuncDecl,
-    CallReference
-  };
-  TypeKind EntityType = Base;
-
   UIdent Kind;
   StringRef Name;
   StringRef USR;
   StringRef Group;
-  unsigned Line = 0;
-  unsigned Column = 0;
-
-  EntityInfo() = default;
-
-protected:
-  EntityInfo(TypeKind TK) : EntityType(TK) { }
-};
-
-struct FuncDeclEntityInfo : public EntityInfo {
-  bool IsTestCandidate = false;
-
-  FuncDeclEntityInfo() : EntityInfo(FuncDecl) { }
-};
-
-struct CallRefEntityInfo : public EntityInfo {
   StringRef ReceiverUSR;
   bool IsDynamic = false;
+  bool IsTestCandidate = false;
+  unsigned Line = 0;
+  unsigned Column = 0;
+  ArrayRef<UIdent> Attrs;
 
-  CallRefEntityInfo() : EntityInfo(CallReference) { }
+  EntityInfo() = default;
 };
 
 class IndexingConsumer {

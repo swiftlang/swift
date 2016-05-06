@@ -61,8 +61,8 @@ const char *_swift_stdlib_strtof_clocale(const char *nptr, float *outResult);
   
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.
-SWIFT_RUNTIME_EXPORT
-const Metadata *swift_class_getSuperclass(const Metadata *);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const Metadata *_swift_class_getSuperclass(const Metadata *);
   
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void _swift_stdlib_flockfile_stdout(void);

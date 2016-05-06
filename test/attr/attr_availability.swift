@@ -284,6 +284,8 @@ func unavailableUnnamed(_ a: Int) {} // expected-note {{here}}
 func unavailableUnnamedSame(_ a: Int) {} // expected-note {{here}}
 @available(*, unavailable, renamed: "shinyLabeledArguments(_:)")
 func unavailableNewlyUnnamed(a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "shinyLabeledArguments(veryLongNameToOverflowASmallStringABCDEFGHIJKLMNOPQRSTUVWXYZ:)")
+func unavailableVeryLongArgNames(a: Int) {} // expected-note {{here}}
 
 @available(*, unavailable, renamed: "shinyLabeledArguments(a:b:)")
 func unavailableMultiSame(a: Int, b: Int) {} // expected-note {{here}}
@@ -299,10 +301,10 @@ func testArgNames() {
   unavailableArgNames(a: 0) // expected-error {{'unavailableArgNames(a:)' has been renamed to 'shinyLabeledArguments(example:)'}} {{3-22=shinyLabeledArguments}} {{23-24=example}}
   deprecatedArgNames(b: 1) // expected-warning {{'deprecatedArgNames(b:)' is deprecated: renamed to 'moreShinyLabeledArguments(example:)'}} expected-note {{use 'moreShinyLabeledArguments(example:)' instead}} {{3-21=moreShinyLabeledArguments}} {{22-23=example}}
 
-  unavailableMemberArgNames(a: 0) // expected-error {{'unavailableMemberArgNames(a:)' has been renamed to 'DummyType.shinyLabeledArguments(example:)'}} {{3-28=DummyType.shinyLabeledArguments}} {{29-30=example}}
-  deprecatedMemberArgNames(b: 1) // expected-warning {{'deprecatedMemberArgNames(b:)' is deprecated: renamed to 'DummyType.moreShinyLabeledArguments(example:)'}} expected-note {{use 'DummyType.moreShinyLabeledArguments(example:)' instead}} {{3-27=DummyType.moreShinyLabeledArguments}} {{28-29=example}}
+  unavailableMemberArgNames(a: 0) // expected-error {{'unavailableMemberArgNames(a:)' has been replaced by 'DummyType.shinyLabeledArguments(example:)'}} {{3-28=DummyType.shinyLabeledArguments}} {{29-30=example}}
+  deprecatedMemberArgNames(b: 1) // expected-warning {{'deprecatedMemberArgNames(b:)' is deprecated: replaced by 'DummyType.moreShinyLabeledArguments(example:)'}} expected-note {{use 'DummyType.moreShinyLabeledArguments(example:)' instead}} {{3-27=DummyType.moreShinyLabeledArguments}} {{28-29=example}}
 
-  unavailableMemberArgNamesMsg(a: 0) // expected-error {{'unavailableMemberArgNamesMsg(a:)' has been renamed to 'DummyType.shinyLabeledArguments(example:)': ha}} {{3-31=DummyType.shinyLabeledArguments}} {{32-33=example}}
+  unavailableMemberArgNamesMsg(a: 0) // expected-error {{'unavailableMemberArgNamesMsg(a:)' has been replaced by 'DummyType.shinyLabeledArguments(example:)': ha}} {{3-31=DummyType.shinyLabeledArguments}} {{32-33=example}}
   deprecatedMemberArgNamesMsg(b: 1) // expected-warning {{'deprecatedMemberArgNamesMsg(b:)' is deprecated: ha}} expected-note {{use 'DummyType.moreShinyLabeledArguments(example:)' instead}} {{3-30=DummyType.moreShinyLabeledArguments}} {{31-32=example}}
 
   unavailableNoArgs() // expected-error {{'unavailableNoArgs()' has been renamed to 'shinyLabeledArguments()'}} {{3-20=shinyLabeledArguments}}
@@ -310,6 +312,7 @@ func testArgNames() {
   unavailableUnnamed(0) // expected-error {{'unavailableUnnamed' has been renamed to 'shinyLabeledArguments(example:)'}} {{3-21=shinyLabeledArguments}} {{22-22=example: }}
   unavailableUnnamedSame(0) // expected-error {{'unavailableUnnamedSame' has been renamed to 'shinyLabeledArguments(_:)'}} {{3-25=shinyLabeledArguments}}
   unavailableNewlyUnnamed(a: 0) // expected-error {{'unavailableNewlyUnnamed(a:)' has been renamed to 'shinyLabeledArguments(_:)'}} {{3-26=shinyLabeledArguments}} {{27-30=}}
+  unavailableVeryLongArgNames(a: 0) // expected-error {{'unavailableVeryLongArgNames(a:)' has been renamed to 'shinyLabeledArguments(veryLongNameToOverflowASmallStringABCDEFGHIJKLMNOPQRSTUVWXYZ:)'}} {{3-30=shinyLabeledArguments}} {{31-32=veryLongNameToOverflowASmallStringABCDEFGHIJKLMNOPQRSTUVWXYZ}}
   unavailableMultiSame(a: 0, b: 1) // expected-error {{'unavailableMultiSame(a:b:)' has been renamed to 'shinyLabeledArguments(a:b:)'}} {{3-23=shinyLabeledArguments}}
   unavailableMultiUnnamed(0, 1) // expected-error {{'unavailableMultiUnnamed' has been renamed to 'shinyLabeledArguments(example:another:)'}} {{3-26=shinyLabeledArguments}} {{27-27=example: }} {{30-30=another: }}
   unavailableMultiUnnamedSame(0, 1) // expected-error {{'unavailableMultiUnnamedSame' has been renamed to 'shinyLabeledArguments(_:_:)'}} {{3-30=shinyLabeledArguments}}
@@ -333,4 +336,138 @@ func testRenameArgMismatch() {
   unavailableTooMany(a: 0) // expected-error{{'unavailableTooMany(a:)' has been renamed to 'shinyLabeledArguments(a:b:)'}} {{3-21=shinyLabeledArguments}}
   unavailableTooManyUnnamed(0) // expected-error{{'unavailableTooManyUnnamed' has been renamed to 'shinyLabeledArguments(a:b:)'}} {{3-28=shinyLabeledArguments}}
   unavailableNoArgsTooMany() // expected-error{{'unavailableNoArgsTooMany()' has been renamed to 'shinyLabeledArguments(a:)'}} {{3-27=shinyLabeledArguments}}
+}
+
+@available(*, unavailable, renamed: "Int.foo(self:)")
+func unavailableInstance(a: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "Int.foo(self:)")
+func unavailableInstanceUnlabeled(_ a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.foo(self:other:)")
+func unavailableInstanceFirst(a: Int, b: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.foo(other:self:)")
+func unavailableInstanceSecond(a: Int, b: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.foo(_:self:c:)")
+func unavailableInstanceSecondOfThree(a: Int, b: Int, c: Int) {} // expected-note {{here}}
+
+@available(*, unavailable, renamed: "Int.foo(self:)", message: "blah")
+func unavailableInstanceMessage(a: Int) {} // expected-note {{here}}
+@available(*, deprecated, renamed: "Int.foo(self:)")
+func deprecatedInstance(a: Int) {}
+@available(*, deprecated, renamed: "Int.foo(self:)", message: "blah")
+func deprecatedInstanceMessage(a: Int) {}
+
+func testRenameInstance() {
+  unavailableInstance(a: 0) // expected-error{{'unavailableInstance(a:)' has been replaced by instance method 'Int.foo()'}} {{3-22=0.foo}} {{23-27=}}
+  unavailableInstanceUnlabeled(0) // expected-error{{'unavailableInstanceUnlabeled' has been replaced by instance method 'Int.foo()'}} {{3-31=0.foo}} {{32-33=}}
+  unavailableInstanceFirst(a: 0, b: 1) // expected-error{{'unavailableInstanceFirst(a:b:)' has been replaced by instance method 'Int.foo(other:)'}} {{3-27=0.foo}} {{28-34=}} {{34-35=other}}
+  unavailableInstanceSecond(a: 0, b: 1) // expected-error{{'unavailableInstanceSecond(a:b:)' has been replaced by instance method 'Int.foo(other:)'}} {{3-28=1.foo}} {{29-30=other}} {{33-39=}}
+  unavailableInstanceSecondOfThree(a: 0, b: 1, c: 2) // expected-error{{'unavailableInstanceSecondOfThree(a:b:c:)' has been replaced by instance method 'Int.foo(_:c:)'}} {{3-35=1.foo}} {{36-39=}} {{42-48=}}
+
+  unavailableInstance(a: 0 + 0) // expected-error{{'unavailableInstance(a:)' has been replaced by instance method 'Int.foo()'}} {{3-22=(0 + 0).foo}} {{23-31=}}
+
+  unavailableInstanceMessage(a: 0) // expected-error{{'unavailableInstanceMessage(a:)' has been replaced by instance method 'Int.foo()': blah}} {{3-29=0.foo}} {{30-34=}}
+  deprecatedInstance(a: 0) // expected-warning{{'deprecatedInstance(a:)' is deprecated: replaced by instance method 'Int.foo()'}} expected-note{{use 'Int.foo()' instead}} {{3-21=0.foo}} {{22-26=}}
+  deprecatedInstanceMessage(a: 0) // expected-warning{{'deprecatedInstanceMessage(a:)' is deprecated: blah}} expected-note{{use 'Int.foo()' instead}} {{3-28=0.foo}} {{29-33=}}
+}
+
+@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:)")
+func unavailableInstanceTooFew(a: Int, b: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:)")
+func unavailableInstanceTooFewUnnamed(_ a: Int, _ b: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:b:)")
+func unavailableInstanceTooMany(a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:b:)")
+func unavailableInstanceTooManyUnnamed(_ a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:)")
+func unavailableInstanceNoArgsTooMany() {} // expected-note {{here}}
+
+func testRenameInstanceArgMismatch() {
+  unavailableInstanceTooFew(a: 0, b: 1) // expected-error{{'unavailableInstanceTooFew(a:b:)' has been replaced by instance method 'Int.shinyLabeledArguments()'}} {{none}}
+  unavailableInstanceTooFewUnnamed(0, 1) // expected-error{{'unavailableInstanceTooFewUnnamed' has been replaced by instance method 'Int.shinyLabeledArguments()'}} {{none}}
+  unavailableInstanceTooMany(a: 0) // expected-error{{'unavailableInstanceTooMany(a:)' has been replaced by instance method 'Int.shinyLabeledArguments(b:)'}} {{none}}
+  unavailableInstanceTooManyUnnamed(0) // expected-error{{'unavailableInstanceTooManyUnnamed' has been replaced by instance method 'Int.shinyLabeledArguments(b:)'}} {{none}}
+  unavailableInstanceNoArgsTooMany() // expected-error{{'unavailableInstanceNoArgsTooMany()' has been replaced by instance method 'Int.shinyLabeledArguments()'}} {{none}}
+}
+
+@available(*, unavailable, renamed: "getter:Int.prop(self:)")
+func unavailableInstanceProperty(a: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "getter:Int.prop(self:)")
+func unavailableInstancePropertyUnlabeled(_ a: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "getter:Int.prop()")
+func unavailableClassProperty() {} // expected-note {{here}}
+@available(*, unavailable, renamed: "getter:global()")
+func unavailableGlobalProperty() {} // expected-note {{here}}
+
+@available(*, unavailable, renamed: "getter:Int.prop(self:)", message: "blah")
+func unavailableInstancePropertyMessage(a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "getter:Int.prop()", message: "blah")
+func unavailableClassPropertyMessage() {} // expected-note {{here}}
+@available(*, unavailable, renamed: "getter:global()", message: "blah")
+func unavailableGlobalPropertyMessage() {} // expected-note {{here}}
+
+@available(*, deprecated, renamed: "getter:Int.prop(self:)")
+func deprecatedInstanceProperty(a: Int) {}
+@available(*, deprecated, renamed: "getter:Int.prop()")
+func deprecatedClassProperty() {}
+@available(*, deprecated, renamed: "getter:global()")
+func deprecatedGlobalProperty() {}
+
+@available(*, deprecated, renamed: "getter:Int.prop(self:)", message: "blah")
+func deprecatedInstancePropertyMessage(a: Int) {}
+@available(*, deprecated, renamed: "getter:Int.prop()", message: "blah")
+func deprecatedClassPropertyMessage() {}
+@available(*, deprecated, renamed: "getter:global()", message: "blah")
+func deprecatedGlobalPropertyMessage() {}
+
+func testRenameGetters() {
+  unavailableInstanceProperty(a: 1) // expected-error{{'unavailableInstanceProperty(a:)' has been replaced by property 'Int.prop'}} {{3-30=1.prop}} {{30-36=}}
+  unavailableInstancePropertyUnlabeled(1) // expected-error{{'unavailableInstancePropertyUnlabeled' has been replaced by property 'Int.prop'}} {{3-39=1.prop}} {{39-42=}}
+  unavailableInstanceProperty(a: 1 + 1) // expected-error{{'unavailableInstanceProperty(a:)' has been replaced by property 'Int.prop'}} {{3-30=(1 + 1).prop}} {{30-40=}}
+  unavailableInstancePropertyUnlabeled(1 + 1) // expected-error{{'unavailableInstancePropertyUnlabeled' has been replaced by property 'Int.prop'}} {{3-39=(1 + 1).prop}} {{39-46=}}
+  unavailableClassProperty() // expected-error{{'unavailableClassProperty()' has been replaced by property 'Int.prop'}} {{3-27=Int.prop}} {{27-29=}}
+  unavailableGlobalProperty() // expected-error{{'unavailableGlobalProperty()' has been replaced by 'global'}} {{3-28=global}} {{28-30=}}
+
+  unavailableInstancePropertyMessage(a: 1) // expected-error{{'unavailableInstancePropertyMessage(a:)' has been replaced by property 'Int.prop': blah}} {{3-37=1.prop}} {{37-43=}}
+  unavailableClassPropertyMessage() // expected-error{{'unavailableClassPropertyMessage()' has been replaced by property 'Int.prop': blah}} {{3-34=Int.prop}} {{34-36=}}
+  unavailableGlobalPropertyMessage() // expected-error{{'unavailableGlobalPropertyMessage()' has been replaced by 'global': blah}} {{3-35=global}} {{35-37=}}
+
+  deprecatedInstanceProperty(a: 1) // expected-warning {{'deprecatedInstanceProperty(a:)' is deprecated: replaced by property 'Int.prop'}} expected-note{{use 'Int.prop' instead}} {{3-29=1.prop}} {{29-35=}}
+  deprecatedClassProperty() // expected-warning {{'deprecatedClassProperty()' is deprecated: replaced by property 'Int.prop'}} expected-note{{use 'Int.prop' instead}} {{3-26=Int.prop}} {{26-28=}}
+  deprecatedGlobalProperty() // expected-warning {{'deprecatedGlobalProperty()' is deprecated: replaced by 'global'}} expected-note{{use 'global' instead}} {{3-27=global}} {{27-29=}}
+
+  deprecatedInstancePropertyMessage(a: 1) // expected-warning {{'deprecatedInstancePropertyMessage(a:)' is deprecated: blah}} expected-note{{use 'Int.prop' instead}} {{3-36=1.prop}} {{36-42=}}
+  deprecatedClassPropertyMessage() // expected-warning {{'deprecatedClassPropertyMessage()' is deprecated: blah}} expected-note{{use 'Int.prop' instead}} {{3-33=Int.prop}} {{33-35=}}
+  deprecatedGlobalPropertyMessage() // expected-warning {{'deprecatedGlobalPropertyMessage()' is deprecated: blah}} expected-note{{use 'global' instead}} {{3-34=global}} {{34-36=}}
+}
+
+@available(*, unavailable, renamed: "setter:Int.prop(self:_:)")
+func unavailableSetInstanceProperty(a: Int, b: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "setter:Int.prop(_:self:)")
+func unavailableSetInstancePropertyReverse(a: Int, b: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "setter:Int.prop(self:newValue:)")
+func unavailableSetInstancePropertyUnlabeled(_ a: Int, _ b: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "setter:Int.prop(newValue:self:)")
+func unavailableSetInstancePropertyUnlabeledReverse(_ a: Int, _ b: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "setter:Int.prop(x:)")
+func unavailableSetClassProperty(a: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "setter:global(_:)")
+func unavailableSetGlobalProperty(_ a: Int) {} // expected-note {{here}}
+
+@available(*, unavailable, renamed: "setter:Int.prop(self:_:)")
+func unavailableSetInstancePropertyInout(a: inout Int, b: Int) {} // expected-note {{here}}
+
+func testRenameSetters() {
+  unavailableSetInstanceProperty(a: 1, b: 2) // expected-error{{'unavailableSetInstanceProperty(a:b:)' has been replaced by property 'Int.prop'}} {{3-33=1.prop}} {{33-43= = }} {{44-45=}}
+  unavailableSetInstancePropertyUnlabeled(1, 2) // expected-error{{'unavailableSetInstancePropertyUnlabeled' has been replaced by property 'Int.prop'}} {{3-42=1.prop}} {{42-46= = }} {{47-48=}}
+  unavailableSetInstancePropertyReverse(a: 1, b: 2) // expected-error{{'unavailableSetInstancePropertyReverse(a:b:)' has been replaced by property 'Int.prop'}} {{3-40=2.prop}} {{40-44= = }} {{45-52=}}
+  unavailableSetInstancePropertyUnlabeledReverse(1, 2) // expected-error{{'unavailableSetInstancePropertyUnlabeledReverse' has been replaced by property 'Int.prop'}} {{3-49=2.prop}} {{49-50= = }} {{51-55=}}
+  unavailableSetInstanceProperty(a: 1 + 1, b: 2 + 2) // expected-error{{'unavailableSetInstanceProperty(a:b:)' has been replaced by property 'Int.prop'}} {{3-33=(1 + 1).prop}} {{33-47= = }} {{52-53=}}
+  unavailableSetInstancePropertyUnlabeled(1 + 1, 2 + 2) // expected-error{{'unavailableSetInstancePropertyUnlabeled' has been replaced by property 'Int.prop'}} {{3-42=(1 + 1).prop}} {{42-50= = }} {{55-56=}}
+  unavailableSetInstancePropertyReverse(a: 1 + 1, b: 2 + 2) // expected-error{{'unavailableSetInstancePropertyReverse(a:b:)' has been replaced by property 'Int.prop'}} {{3-40=(2 + 2).prop}} {{40-44= = }} {{49-60=}}
+  unavailableSetInstancePropertyUnlabeledReverse(1 + 1, 2 + 2) // expected-error{{'unavailableSetInstancePropertyUnlabeledReverse' has been replaced by property 'Int.prop'}} {{3-49=(2 + 2).prop}} {{49-50= = }} {{55-63=}}
+  unavailableSetClassProperty(a: 1) // expected-error{{'unavailableSetClassProperty(a:)' has been replaced by property 'Int.prop'}} {{3-30=Int.prop}} {{30-34= = }} {{35-36=}}
+  unavailableSetGlobalProperty(1) // expected-error{{'unavailableSetGlobalProperty' has been replaced by 'global'}} {{3-31=global}} {{31-32= = }} {{33-34=}}
+
+  var x = 0
+  unavailableSetInstancePropertyInout(a: &x, b: 2) // expected-error{{'unavailableSetInstancePropertyInout(a:b:)' has been replaced by property 'Int.prop'}} {{3-38=x.prop}} {{38-49= = }} {{50-51=}}
 }

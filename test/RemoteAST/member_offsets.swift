@@ -128,14 +128,13 @@ printTypeMemberOffset(D<Float>.self, "b")
 // CHECK-NEXT: found offset: 24
 
 printTypeMemberOffset(D<Float>.self, "c")
-// FIXME
-// CHECK-NEXT: failed to find offset
+// CHECK-NEXT: found offset: 28
 
 printTypeMemberOffset(D<Float>.self, "d")
-// CHECK-NEXT: failed to find offset
+// CHECK-NEXT: found offset: 32
 
 printTypeMemberOffset(D<Float>.self, "e")
-// CHECK-NEXT: failed to find offset
+// CHECK-NEXT: found offset: 34
 
 printTypeMemberOffset(D<Float>.self, "f")
 // CHECK-NEXT: type has no member named 'f'

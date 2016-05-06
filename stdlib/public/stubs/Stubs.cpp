@@ -61,6 +61,9 @@ static long double swift_strtold_l(const char *nptr,
 #include "swift/Runtime/Debug.h"
 #include "swift/Basic/Lazy.h"
 
+#include "../SwiftShims/RuntimeShims.h"
+#include "../SwiftShims/RuntimeStubs.h"
+
 static uint64_t uint64ToStringImpl(char *Buffer, uint64_t Value,
                                    int64_t Radix, bool Uppercase,
                                    bool Negative) {
@@ -88,7 +91,7 @@ static uint64_t uint64ToStringImpl(char *Buffer, uint64_t Value,
   return size_t(P - Buffer);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" uint64_t swift_int64ToString(char *Buffer, size_t BufferLength,
                                         int64_t Value, int64_t Radix,
                                         bool Uppercase) {
@@ -112,7 +115,7 @@ extern "C" uint64_t swift_int64ToString(char *Buffer, size_t BufferLength,
                             Negative);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" uint64_t swift_uint64ToString(char *Buffer, intptr_t BufferLength,
                                          uint64_t Value, int64_t Radix,
                                          bool Uppercase) {
@@ -224,21 +227,21 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
   return i;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" uint64_t swift_float32ToString(char *Buffer, size_t BufferLength,
                                           float Value, bool Debug) {
   return swift_floatingPointToString<float>(Buffer, BufferLength, Value,
                                             "%0.*g", Debug);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" uint64_t swift_float64ToString(char *Buffer, size_t BufferLength,
                                           double Value, bool Debug) {
   return swift_floatingPointToString<double>(Buffer, BufferLength, Value,
                                              "%0.*g", Debug);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
                                           long double Value, bool Debug) {
   return swift_floatingPointToString<long double>(Buffer, BufferLength, Value,
@@ -250,23 +253,22 @@ extern "C" uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
 ///
 /// \returns Size of character data returned in \c LinePtr, or -1
 /// if an error occurred, or EOF was reached.
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" ssize_t swift_stdlib_readLine_stdin(char **LinePtr) {
+ssize_t swift::swift_stdlib_readLine_stdin(char **LinePtr) {
   size_t Capacity = 0;
   return getline(LinePtr, &Capacity, stdin);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" float _swift_fmodf(float lhs, float rhs) {
     return fmodf(lhs, rhs);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" double _swift_fmod(double lhs, double rhs) {
     return fmod(lhs, rhs);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" long double _swift_fmodl(long double lhs, long double rhs) {
     return fmodl(lhs, rhs);
 }
@@ -395,18 +397,18 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   return nptr + pos;
 }
 
-extern "C" const char *_swift_stdlib_strtold_clocale(
+const char *swift::_swift_stdlib_strtold_clocale(
     const char *nptr, void *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(
     nptr, static_cast<long double*>(outResult));
 }
 
-extern "C" const char *_swift_stdlib_strtod_clocale(
+const char *swift::_swift_stdlib_strtod_clocale(
     const char * nptr, double *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(nptr, outResult);
 }
 
-extern "C" const char *_swift_stdlib_strtof_clocale(
+const char *swift::_swift_stdlib_strtof_clocale(
     const char * nptr, float *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(nptr, outResult);
 }
@@ -430,44 +432,37 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   return EndPtr;
 }
     
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" const char *_swift_stdlib_strtold_clocale(
+const char *swift::_swift_stdlib_strtold_clocale(
   const char * nptr, void *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(
     nptr, static_cast<long double*>(outResult), HUGE_VALL, strtold_l);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" const char *_swift_stdlib_strtod_clocale(
+const char *swift::_swift_stdlib_strtod_clocale(
     const char * nptr, double *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(
     nptr, outResult, HUGE_VAL, strtod_l);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" const char *_swift_stdlib_strtof_clocale(
+const char *swift::_swift_stdlib_strtof_clocale(
     const char * nptr, float *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(
     nptr, outResult, HUGE_VALF, strtof_l);
 }
 #endif
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" void _swift_stdlib_flockfile_stdout() {
+void swift::_swift_stdlib_flockfile_stdout() {
   flockfile(stdout);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" void _swift_stdlib_funlockfile_stdout() {
+void swift::_swift_stdlib_funlockfile_stdout() {
   funlockfile(stdout);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" int _swift_stdlib_putc_stderr(int C) {
+int swift::_swift_stdlib_putc_stderr(int C) {
   return putc(C, stderr);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" size_t _swift_stdlib_getHardwareConcurrency() {
+size_t swift::_swift_stdlib_getHardwareConcurrency() {
   return sysconf(_SC_NPROCESSORS_ONLN);
 }

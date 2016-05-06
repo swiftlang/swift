@@ -44,7 +44,9 @@ class ReflectionContext
 
 public:
   using super::getBuilder;
+  using super::readIsaMask;
   using super::readTypeFromMetadata;
+  using super::readMetadataFromInstance;
   using typename super::StoredPointer;
 
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
@@ -65,13 +67,9 @@ public:
     getBuilder().addReflectionInfo(I);
   }
 
-  std::pair<bool, StoredPointer> readerIsaMask() {
-    return getReader().readIsaMask();
-  }
-
-  /// Return a description of the layout of a heap object having the given
+  /// Return a description of the layout of a class instance with the given
   /// metadata as its isa pointer.
-  const TypeInfo *getInstanceTypeInfo(StoredPointer MetadataAddress) {
+  const TypeInfo *getMetadataTypeInfo(StoredPointer MetadataAddress) {
     // See if we cached the layout already
     auto found = Cache.find(MetadataAddress);
     if (found != Cache.end())
@@ -98,7 +96,7 @@ public:
 
           // Perform layout
           if (valid)
-            TI = TC.getInstanceTypeInfo(TR, size, align);
+            TI = TC.getClassInstanceTypeInfo(TR, size, align);
         }
         break;
       }
@@ -110,6 +108,94 @@ public:
     // Cache the result for future lookups
     Cache[MetadataAddress] = TI;
     return TI;
+  }
+
+  /// Return a description of the layout of a class instance with the given
+  /// metadata as its isa pointer.
+  const TypeInfo *getInstanceTypeInfo(StoredPointer ObjectAddress) {
+    auto MetadataAddress = readMetadataFromInstance(ObjectAddress);
+    if (!MetadataAddress.first)
+      return nullptr;
+    return getMetadataTypeInfo(MetadataAddress.second);
+  }
+
+  bool
+  projectExistential(RemoteAddress ExistentialAddress,
+                     const TypeRef *ExistentialTR,
+                     const TypeRef **OutInstanceTR,
+                     RemoteAddress *OutInstanceAddress) {
+    if (ExistentialTR == nullptr)
+      return false;
+
+    auto ExistentialTI = getTypeInfo(ExistentialTR);
+    if (ExistentialTI == nullptr)
+      return false;
+
+    auto ExistentialRecordTI = dyn_cast<const RecordTypeInfo>(ExistentialTI);
+    if (ExistentialRecordTI == nullptr)
+      return false;
+
+    switch (ExistentialRecordTI->getRecordKind()) {
+    // Class existentials have trivial layout.
+    // It is itself the pointer to the instance followed by the witness tables.
+    case RecordKind::ClassExistential:
+      *OutInstanceTR = getBuilder().getTypeConverter().getUnknownObjectTypeRef();
+      *OutInstanceAddress = ExistentialAddress;
+      return true;
+
+    // Other existentials have two cases:
+    // If the value fits in three words, it starts at the beginning of the
+    // container. If it doesn't, the first word is a pointer to a heap box.
+    case RecordKind::Existential: {
+      auto Fields = ExistentialRecordTI->getFields();
+      auto ExistentialMetadataField = std::find_if(Fields.begin(), Fields.end(),
+                                   [](const FieldInfo &FI) -> bool {
+        return FI.Name.compare("metadata") == 0;
+      });
+      if (ExistentialMetadataField == Fields.end())
+        return false;
+
+      // Get the metadata pointer for the contained instance type.
+      // This is equivalent to:
+      // auto PointerArray = reinterpret_cast<uintptr_t*>(ExistentialAddress);
+      // uintptr_t MetadataAddress = PointerArray[Offset];
+      auto MetadataAddressAddress
+        = RemoteAddress(ExistentialAddress.getAddressData() +
+                        ExistentialMetadataField->Offset);
+
+      StoredPointer MetadataAddress = 0;
+      if (!getReader().readInteger(MetadataAddressAddress, &MetadataAddress))
+        return false;
+
+      auto InstanceTR = readTypeFromMetadata(MetadataAddress);
+      if (!InstanceTR)
+        return false;
+
+      *OutInstanceTR = InstanceTR;
+
+      auto InstanceTI = getTypeInfo(InstanceTR);
+      if (!InstanceTI)
+        return false;
+
+      if (InstanceTI->getSize() <= ExistentialMetadataField->Offset) {
+        // The value fits in the existential container, so it starts at the
+        // start of the container.
+        *OutInstanceAddress = ExistentialAddress;
+      } else {
+        // Otherwise it's in a box somewhere off in the heap. The first word
+        // of the container has the address to that box.
+        StoredPointer BoxAddress = 0;
+
+        if (!getReader().readInteger(ExistentialAddress, &BoxAddress))
+          return false;
+
+        *OutInstanceAddress = RemoteAddress(BoxAddress);
+      }
+      return true;
+    }
+    default:
+      return false;
+    }
   }
 
   /// Return a description of the layout of a value with the given type.

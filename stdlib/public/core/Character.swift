@@ -136,7 +136,13 @@ public struct Character :
     return UInt64(Builtin.zext_Int63_Int64(value)) | (1<<63)
   }
 
-  internal struct _SmallUTF8 : Collection {
+  internal struct _SmallUTF8 : RandomAccessCollection {
+    typealias Indices = CountableRange<Int>
+    
+    var indices: CountableRange<Int> {
+      return startIndex..<endIndex
+    }
+
     init(_ u8: UInt64) {
       let utf8Count = Character._smallSize(u8)
       _sanityCheck(utf8Count <= 8, "Character with more than 8 UTF-8 code units")
@@ -198,7 +204,9 @@ public struct Character :
     var data: UInt64
   }
 
-  struct _SmallUTF16 : Collection {
+  struct _SmallUTF16 : RandomAccessCollection {
+    typealias Indices = CountableRange<Int>
+    
     init(_ u8: UInt64) {
       let count = UTF16.transcodedLength(
         of: _SmallUTF8(u8).makeIterator(),

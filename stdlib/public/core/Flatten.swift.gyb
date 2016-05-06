@@ -428,7 +428,7 @@ public struct FlattenGenerator<
 extension FlattenSequence {
   @available(*, unavailable, renamed: "makeIterator")
   public func generate() -> FlattenIterator<Base.Iterator> {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 
@@ -436,7 +436,7 @@ extension FlattenSequence {
 extension Flatten${collectionForTraversal(traversal)} {
   @available(*, unavailable, message: "Please use underestimatedCount property instead.")
   public func underestimateCount() -> Int {
-    fatalError("unavailable function can't be called")
+    Builtin.unreachable()
   }
 }
 %end

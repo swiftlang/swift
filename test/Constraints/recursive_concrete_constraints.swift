@@ -17,6 +17,10 @@ struct S<A: Collection where A.Index == Int> : Collection {
     return baseRange.count
   }
 
+  func index(after i: Index) -> Index {
+    return base.index(after: i)
+  }
+  
   subscript(i: Index) -> Element {
     return base[baseRange.lowerBound + i]
   }

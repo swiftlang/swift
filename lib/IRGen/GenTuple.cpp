@@ -210,6 +210,15 @@ namespace {
                           alwaysFixedSize)
       {}
 
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      for (auto &field : getFields()) {
+        auto fieldOffset = offset + field.getFixedByteOffset();
+        cast<LoadableTypeInfo>(field.getTypeInfo())
+          .addToAggLowering(IGM, lowering, fieldOffset);
+      }
+    }
+
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
       return None;
     }

@@ -3,6 +3,7 @@ set(TRANSFORMS_SOURCES
   Transforms/ArrayCountPropagation.cpp
   Transforms/ArrayElementValuePropagation.cpp
   Transforms/CSE.cpp
+  Transforms/ConditionForwarding.cpp
   Transforms/CopyForwarding.cpp
   Transforms/DeadCodeElimination.cpp
   Transforms/DeadObjectElimination.cpp

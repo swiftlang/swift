@@ -86,7 +86,7 @@ set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
     "Enable using the gold linker when available")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
-    "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc")
+    "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror-headers")
 
 # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
 set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
@@ -112,6 +112,7 @@ set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
 # * tools -- tools (other than the compiler) useful for developers writing
 #   Swift code.
 # * testsuite-tools -- extra tools required to run the Swift testsuite.
+# * toolchain-dev-tools -- install development tools useful in a shared toolchain
 # * dev -- headers and libraries required to use Swift compiler as a library.
 
 set(SWIFT_SDKS "" CACHE STRING
@@ -285,6 +286,7 @@ include(CMakeParseArguments)
 include(SwiftTranslateFlag)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
+include(SwiftSource)
 include(AddSwift)
 include(SwiftConfigureSDK)
 include(SwiftInstallComponents)
@@ -301,7 +303,10 @@ else()
 endif()
 
 # lipo is used to create universal binaries.
-find_program(LIPO "lipo")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  include(SwiftDarwin)
+  find_toolchain_tool(LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
+endif()
 
 if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_CROSS_COMPILING FALSE)
@@ -394,8 +399,8 @@ const std::regex broken_regex{
 int main() {}
 ")
 
-    check_cxx_source_runs("${std_regex_test_source}" result)
-    if (result)
+    check_cxx_source_runs("${std_regex_test_source}" "${result_var_name}_TEST")
+    if ("${${result_var_name}_TEST}")
       set("${result_var_name}" TRUE PARENT_SCOPE)
     else()
       set("${result_var_name}" FALSE PARENT_SCOPE)
@@ -694,6 +699,13 @@ if(SWIFT_PARALLEL_LINK_JOBS)
     set_property(GLOBAL APPEND PROPERTY JOB_POOLS swift_link_job_pool=${SWIFT_PARALLEL_LINK_JOBS})
     set(CMAKE_JOB_POOL_LINK swift_link_job_pool)
   endif()
+endif()
+
+# Set the CMAKE_OSX_* variables in a way that minimizes conflicts.
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  set(CMAKE_OSX_SYSROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_PATH}")
+  set(CMAKE_OSX_ARCHITECTURES "")
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "")
 endif()
 
 message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")

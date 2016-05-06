@@ -124,20 +124,8 @@ if(PYTHONINTERP_FOUND)
   normalize_boolean_spelling(SWIFT_ASAN_BUILD)
   is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
-  if(SWIFT_ANALYZE_CODE_COVERAGE STREQUAL "MERGED")
-    set(profdata_merge_worker
-        "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge/main.py")
-    set(command_profdata_merge_start
-      COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}"
-          -l "${swift_test_results_dir}/profdata_merge.log"
-          start
-          -o "${swift_test_results_dir}")
-    set(command_profdata_merge_stop
-      COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}" stop)
-  else()
-    set(command_profdata_merge_start)
-    set(command_profdata_merge_stop)
-  endif()
+  set(profdata_merge_worker
+      "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge/main.py")
 
   set(TEST_MODES
       optimize_none optimize optimize_unchecked
@@ -161,6 +149,19 @@ if(PYTHONINTERP_FOUND)
       # A directory where to put the xUnit-style XML test results.
       set(swift_test_results_dir
           "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+
+      if(SWIFT_ANALYZE_CODE_COVERAGE STREQUAL "MERGED")
+          set(command_profdata_merge_start
+              COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}"
+              -l "${swift_test_results_dir}/profdata_merge.log"
+              start
+              -o "${swift_test_results_dir}")
+          set(command_profdata_merge_stop
+              COMMAND "${PYTHON_EXECUTABLE}" "${profdata_merge_worker}" stop)
+      else()
+          set(command_profdata_merge_start)
+          set(command_profdata_merge_stop)
+      endif()
 
       set(command_clean_test_results_dir
           COMMAND "${CMAKE_COMMAND}" -E remove_directory "${swift_test_results_dir}"

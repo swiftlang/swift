@@ -21,12 +21,13 @@
 import MachO
 import Darwin
 
+let RequestInstanceKind = "k"
 let RequestInstanceAddress = "i"
 let RequestReflectionInfos = "r"
 let RequestReadBytes = "b";
 let RequestSymbolAddress = "s"
 let RequestStringLength = "l"
-let RequestExit = "e"
+let RequestDone = "d"
 let RequestPointerSize = "p"
 
 internal func debugLog(_ message: String) {
@@ -34,6 +35,13 @@ internal func debugLog(_ message: String) {
   fputs("Child: \(message)\n", stderr)
   fflush(stderr)
 #endif
+}
+
+public enum InstanceKind : UInt8 {
+  case None
+  case Object
+  case Existential
+  case Closure
 }
 
 /// Represents a section in a loaded image in this process.
@@ -54,6 +62,7 @@ internal struct ReflectionInfo : Sequence {
   internal let fieldmd: Section?
   internal let assocty: Section?
   internal let builtin: Section?
+  internal let capture: Section?
   internal let typeref: Section?
   internal let reflstr: Section?
 
@@ -62,6 +71,7 @@ internal struct ReflectionInfo : Sequence {
       fieldmd,
       assocty,
       builtin,
+      capture,
       typeref,
       reflstr
     ].makeIterator())
@@ -85,7 +95,7 @@ internal func getSectionInfo(_ name: String,
   _ imageHeader: UnsafePointer<MachHeader>) -> Section? {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   var size: UInt = 0
-  let address = getsectiondata(imageHeader, "__DATA", name, &size)
+  let address = getsectiondata(imageHeader, "__TEXT", name, &size)
   guard let nonNullAddress = address else { return nil }
   guard size != 0 else { return nil }
   return Section(startAddress: nonNullAddress, size: size)
@@ -98,6 +108,7 @@ internal func getSectionInfo(_ name: String,
 /// - __swift3_fieldmd
 /// - __swift3_assocty
 /// - __swift3_builtin
+/// - __swift3_capture
 /// - __swift3_typeref
 /// - __swift3_reflstr (optional, may have been stripped out)
 ///
@@ -109,16 +120,18 @@ internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
   let header = unsafeBitCast(_dyld_get_image_header(i),
     to: UnsafePointer<MachHeader>.self)
 
-  let imageName = _dyld_get_image_name(i)
+  let imageName = _dyld_get_image_name(i)!
   if let fieldmd = getSectionInfo("__swift3_fieldmd", header) {
-     let assocty = getSectionInfo("__swift3_assocty", header)
-     let builtin = getSectionInfo("__swift3_builtin", header)
-     let typeref = getSectionInfo("__swift3_typeref", header)
-     let reflstr = getSectionInfo("__swift3_reflstr", header)
+      let assocty = getSectionInfo("__swift3_assocty", header)
+      let builtin = getSectionInfo("__swift3_builtin", header)
+      let capture = getSectionInfo("__swift3_capture", header)
+      let typeref = getSectionInfo("__swift3_typeref", header)
+      let reflstr = getSectionInfo("__swift3_reflstr", header)
       return ReflectionInfo(imageName: String(validatingUTF8: imageName)!,
                             fieldmd: fieldmd,
                             assocty: assocty,
                             builtin: builtin,
+                            capture: capture,
                             typeref: typeref,
                             reflstr: reflstr)
   }
@@ -171,16 +184,10 @@ internal func sendReflectionInfos() {
 
   var numInfos = infos.count
   debugLog("\(numInfos) reflection info bundles.")
-  sendBytes(from: &numInfos, count: sizeof(UInt.self))
   precondition(numInfos >= 1)
+  sendBytes(from: &numInfos, count: sizeof(UInt.self))
   for info in infos {
     debugLog("Sending info for \(info.imageName)")
-    let imageNameBytes = Array(info.imageName.utf8)
-    var imageNameLength = UInt(imageNameBytes.count)
-    fwrite(&imageNameLength, sizeof(UInt.self), 1, stdout)
-    fflush(stdout)
-    fwrite(imageNameBytes, 1, imageNameBytes.count, stdout)
-    fflush(stdout)
     for section in info {
       sendValue(section?.startAddress)
       sendValue(section?.size ?? 0)
@@ -190,7 +197,7 @@ internal func sendReflectionInfos() {
 
 internal func printErrnoAndExit() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
-  let errorCString = strerror(errno)
+  let errorCString = strerror(errno)!
   let message = String(validatingUTF8: errorCString)! + "\n"
   let bytes = Array(message.utf8)
   fwrite(bytes, 1, bytes.count, stderr)
@@ -256,11 +263,17 @@ internal func sendPointerSize() {
 /// - Get the pointer size of this process, which affects assumptions about the
 ///   the layout of runtime structures with pointer-sized fields.
 /// - Read raw bytes out of this process's address space.
-public func reflect(_ instance: AnyObject) {
+///
+/// The parent sends a Done message to indicate that it's done
+/// looking at this instance. It will continue to ask for instances,
+/// so call doneReflecting() when you don't have any more instances.
+internal func reflect(instanceAddress: UInt, kind: InstanceKind) {
   while let command = readLine(strippingNewline: true) {
     switch command {
+    case String(validatingUTF8: RequestInstanceKind)!:
+      sendValue(kind.rawValue)
     case String(validatingUTF8: RequestInstanceAddress)!:
-      sendAddress(of: instance)
+      sendValue(instanceAddress)
     case String(validatingUTF8: RequestReflectionInfos)!:
       sendReflectionInfos()
     case String(validatingUTF8: RequestReadBytes)!:
@@ -271,12 +284,84 @@ public func reflect(_ instance: AnyObject) {
       sendStringLength()
     case String(validatingUTF8: RequestPointerSize)!:
       sendPointerSize();
-    case String(validatingUTF8: RequestExit)!:
-      exit(EXIT_SUCCESS)
+    case String(validatingUTF8: RequestDone)!:
+      return;
     default:
-      fatalError("Unknown request received!")
+      fatalError("Unknown request received: '\(Array(command.utf8))'!")
     }
   }
+}
+
+/// Reflect a class instance.
+public func reflect(object: AnyObject) {
+  let address = unsafeAddress(of: object)
+  let addressValue = unsafeBitCast(address, to: UInt.self)
+  reflect(instanceAddress: addressValue, kind: .Object)
+}
+
+/// Reflect any type at all by boxing it into an existential container (an `Any`)
+///
+/// This function serves to exercise the projectExistential function of the
+/// SwiftRemoteMirror API.
+///
+/// It tests the three conditions of existential layout:
+///
+/// ## Class existentials
+///
+/// For example, a `MyClass as Any`:
+/// ```
+/// [Pointer to class instance]
+/// [Witness table 1]
+/// [Witness table 2]
+/// ...
+/// [Witness table n]
+/// ```
+///
+/// ## Existentials whose contained type fits in the 3-word buffer
+///
+/// For example, a `(1, 2) as Any`:
+/// ```
+/// [Tuple element 1: Int]
+/// [Tuple element 2: Int]
+/// [-Empty_]
+/// [Metadata Pointer]
+/// [Witness table 1]
+/// [Witness table 2]
+/// ...
+/// [Witness table n]
+/// ```
+///
+/// ## Existentials whose contained type has to be allocated into a
+///    heap buffer.
+///
+/// For example, a `LargeStruct<T> as Any`:
+/// ```
+/// [Pointer to unmanaged heap container] --> [Large struct]
+/// [-Empty-]
+/// [-Empty-]
+/// [Metadata Pointer]
+/// [Witness table 1]
+/// [Witness table 2]
+/// ...
+/// [Witness table n]
+/// ```
+///
+/// The test doesn't care about the witness tables - we only care
+/// about what's in the buffer, so we always put these values into
+/// an Any existential.
+public func reflect<T>(any: T) {
+  let any: Any = any
+  let anyPointer = UnsafeMutablePointer<Any>(allocatingCapacity: sizeof(Any.self))
+  anyPointer.initialize(with: any)
+  let anyPointerValue = unsafeBitCast(anyPointer, to: UInt.self)
+  reflect(instanceAddress: anyPointerValue, kind: .Existential)
+  anyPointer.deallocateCapacity(sizeof(Any.self))
+}
+
+/// Call this function to indicate to the parent that there are
+/// no more instances to look at.
+public func doneReflecting() {
+  sendValue(InstanceKind.None.rawValue)
 }
 
 /* Example usage

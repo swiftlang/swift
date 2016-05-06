@@ -179,9 +179,9 @@ public:
   /// class.
   ///
   /// Not cached.
-  const TypeInfo *getInstanceTypeInfo(const TypeRef *TR,
-                                      unsigned start,
-                                      unsigned align);
+  const TypeInfo *getClassInstanceTypeInfo(const TypeRef *TR,
+                                           unsigned start,
+                                           unsigned align);
 
   /* Not really public */
   const ReferenceTypeInfo *

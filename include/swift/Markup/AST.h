@@ -729,6 +729,27 @@ bool isAFieldTag(StringRef Tag);
 void dump(const MarkupASTNode *Node, llvm::raw_ostream &OS, unsigned indent = 0);
 void printInlinesUnder(const MarkupASTNode *Node, llvm::raw_ostream &OS,
                        bool PrintDecorators = false);
+
+
+template <typename ImplClass, typename RetTy = void, typename... Args>
+class MarkupASTVisitor {
+public:
+  RetTy visit(const MarkupASTNode *Node, Args... args) {
+    switch (Node->getKind()) {
+#define MARKUP_AST_NODE(Id, Parent) \
+    case ASTNodeKind::Id: \
+      return static_cast<ImplClass*>(this) \
+        ->visit##Id(cast<const Id>(Node), \
+                    ::std::forward<Args>(args)...);
+#define ABSTRACT_MARKUP_AST_NODE(Id, Parent)
+#define MARKUP_AST_NODE_RANGE(Id, FirstId, LastId)
+#include "swift/Markup/ASTNodes.def"
+    }
+  }
+
+  virtual ~MarkupASTVisitor() {}
+};
+
 } // namespace markup
 } // namespace swift
 
