@@ -225,11 +225,15 @@ struct TypeRefIsConcrete
   }
 
   bool visitNominalTypeRef(const NominalTypeRef *N) {
+    if (N->getParent())
+      return visit(N->getParent());
     return true;
   }
 
   bool visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
-    std::vector<TypeRef *> GenericParams;
+    if (BG->getParent())
+      if (!visit(BG->getParent()))
+        return false;
     for (auto Param : BG->getGenericParams())
       if (!visit(Param))
         return false;
@@ -549,15 +553,21 @@ public:
   }
 
   const TypeRef *visitNominalTypeRef(const NominalTypeRef *N) {
+    if (N->getParent())
+      return NominalTypeRef::create(Builder, N->getMangledName(),
+                                    visit(N->getParent()));
     return N;
   }
 
   const TypeRef *visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
+    auto *Parent = BG->getParent();
+    if (Parent != nullptr)
+      Parent = visit(Parent);
     std::vector<const TypeRef *> GenericParams;
     for (auto Param : BG->getGenericParams())
       GenericParams.push_back(visit(Param));
     return BoundGenericTypeRef::create(Builder, BG->getMangledName(),
-                                       GenericParams);
+                                       GenericParams, Parent);
   }
 
   const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
@@ -686,7 +696,7 @@ public:
 };
 
 const TypeRef *
-TypeRef::subst(TypeRefBuilder &Builder, GenericArgumentMap Subs) const {
+TypeRef::subst(TypeRefBuilder &Builder, const GenericArgumentMap &Subs) const {
   const TypeRef *Result = TypeRefSubstitution(Builder, Subs).visit(this);
   assert(Result->isConcrete());
   return Result;

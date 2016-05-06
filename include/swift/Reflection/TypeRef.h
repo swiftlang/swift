@@ -144,7 +144,7 @@ public:
   bool isConcrete() const;
 
   const TypeRef *
-  subst(TypeRefBuilder &Builder, GenericArgumentMap Subs) const;
+  subst(TypeRefBuilder &Builder, const GenericArgumentMap &Subs) const;
 
   GenericArgumentMap getSubstMap() const;
 
@@ -186,6 +186,7 @@ protected:
   static TypeRefID Profile(const std::string &MangledName,
                            const TypeRef *Parent) {
     TypeRefID ID;
+    ID.addPointer(Parent);
     ID.addString(MangledName);
     return ID;
   }
@@ -236,6 +237,7 @@ class BoundGenericTypeRef final : public TypeRef, public NominalTypeTrait {
                            const std::vector<const TypeRef *> &GenericParams,
                            const TypeRef *Parent) {
     TypeRefID ID;
+    ID.addPointer(Parent);
     ID.addString(MangledName);
     for (auto Param : GenericParams)
       ID.addPointer(Param);

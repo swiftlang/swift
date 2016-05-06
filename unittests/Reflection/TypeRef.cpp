@@ -346,3 +346,34 @@ TEST(TypeRefTest, UniqueAfterSubstitution) {
   EXPECT_EQ(ConcreteBG, SubstitutedBG);
 }
 
+// Make sure subst() and isConcrete() walk into parent types
+TEST(TypeRefTest, NestedTypes) {
+  TypeRefBuilder Builder;
+
+  auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
+
+  std::string ParentName("parent");
+  std::vector<const TypeRef *> ParentArgs { GTP00 };
+  auto Parent = Builder.createBoundGenericType(ParentName, ParentArgs,
+                                               /*parent*/ nullptr);
+
+  std::string ChildName("child");
+  auto Child = Builder.createNominalType(ChildName, Parent);
+
+  EXPECT_FALSE(Child->isConcrete());
+
+  std::string SubstName("subst");
+  auto SubstArg = Builder.createNominalType(SubstName, /*parent*/ nullptr);
+
+  std::vector<const TypeRef *> SubstParentArgs { SubstArg };
+  auto SubstParent = Builder.createBoundGenericType(ParentName,
+                                                    SubstParentArgs,
+                                                    /*parent*/ nullptr);
+  auto SubstChild = Builder.createNominalType(ChildName, SubstParent);
+
+  GenericArgumentMap Subs;
+  Subs[{0,0}] = SubstArg;
+
+  EXPECT_EQ(SubstChild, Child->subst(Builder, Subs));
+}
+
