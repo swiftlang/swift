@@ -22,3 +22,6 @@ typedef struct SWIFT_NAME(Point) {
 } PointType;
 
 typedef int my_int_t SWIFT_NAME(MyInt);
+
+void spuriousAPINotedSwiftName(int);
+void poorlyNamedFunction(const char *);

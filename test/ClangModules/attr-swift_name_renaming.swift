@@ -30,4 +30,7 @@ func test() {
   // Typedef renaming
   var mi: MyInt = 5
   var mi2: my_int_t = 7 // FIXME: should provide Fix-It expected-error{{use of undeclared type 'my_int_t'}}
+
+  spuriousAPINotedSwiftName(0)
+  nicelyRenamedFunction("go apinotes!")
 }
