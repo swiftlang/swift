@@ -994,7 +994,8 @@ details of the setups of other systems or automated environments.""")
     # SwiftPM and XCTest have a dependency on Foundation.
     # On OS X, Foundation is built automatically using xcodebuild.
     # On Linux, we must ensure that it is built manually.
-    if (args.build_swiftpm or args.build_xctest) and platform.system() != "Darwin":
+    if (args.build_swiftpm or args.build_xctest) and \
+            platform.system() != "Darwin":
         args.build_foundation = True
 
     # --skip-test-ios is merely a shorthand for host and simulator tests.
