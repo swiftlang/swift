@@ -1439,14 +1439,14 @@ namespace {
                 Decl->getUnderlyingType(), ImportTypeKind::Value,
                 isInSystemModule(DC),
                 Decl->getUnderlyingType()->isBlockPointerType(),
-                OTK_Optional);
+                OTK_None);
 
             // Find a bridged type, which may be different
             auto computedPropertyUnderlyingType = Impl.importType(
                 Decl->getUnderlyingType(), ImportTypeKind::Property,
                 isInSystemModule(DC),
                 Decl->getUnderlyingType()->isBlockPointerType(),
-                OTK_Optional);
+                OTK_None);
 
             if (storedUnderlyingType.getCanonicalTypeOrNull() ==
                 computedPropertyUnderlyingType.getCanonicalTypeOrNull()) {
