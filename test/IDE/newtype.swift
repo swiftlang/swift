@@ -42,6 +42,13 @@
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension MyFloat {
 // PRINT-NEXT:    static let globalFloat: MyFloat
+// PRINT-NEXT:    static let PI: MyFloat
+// PRINT-NEXT:    static let version: MyFloat
+// PRINT-NEXT:  }
+// PRINT-LABEL: extension NSURLResourceKey {
+// PRINT-NEXT:    static let isRegularFileKey: NSURLResourceKey
+// PRINT-NEXT:    static let isDirectoryKey: NSURLResourceKey
+// PRINT-NEXT:    static let localizedNameKey: NSURLResourceKey
 // PRINT-NEXT:  }
 
 // RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules -enable-swift-newtype

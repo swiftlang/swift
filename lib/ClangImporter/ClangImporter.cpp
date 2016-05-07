@@ -2733,12 +2733,15 @@ auto ClangImporter::Implementation::importFullName(
   if (auto newtypeDecl = findSwiftNewtype(*this, D, swift2Name)) {
     // Skip a leading 'k' in a 'kConstant' pattern
     if (baseName.size() >= 2 && baseName[0] == 'k' &&
-        clang::isUppercase(baseName[1]))
-      baseName.drop_front(1);
+        clang::isUppercase(baseName[1])) {
+      baseName = baseName.drop_front(1);
+      strippedPrefix = true;
+    }
 
     bool nonIdentifier = false;
     auto pre =
         getCommonWordPrefix(newtypeDecl->getName(), baseName, nonIdentifier);
+
     if (pre.size()) {
       baseName = baseName.drop_front(pre.size());
       strippedPrefix = true;

@@ -29,4 +29,10 @@ typedef NSString * IUONewtype __attribute((swift_newtype(struct)));
 
 typedef float MyFloat __attribute((swift_newtype(struct)));
 extern const MyFloat globalFloat;
+extern const MyFloat kPI;
+extern const MyFloat kVersion;
 
+typedef NSString * NSURLResourceKey __attribute((swift_newtype(struct)));
+extern NSURLResourceKey const NSURLIsRegularFileKey;
+extern NSURLResourceKey const NSURLIsDirectoryKey;
+extern NSURLResourceKey const NSURLLocalizedNameKey;
