@@ -2437,9 +2437,9 @@ SetTestSuite.test("SetUpcastBridgedEntryPoint") {
     var s: Set<TestObjCKeyTy> = _setBridgeToObjectiveC(s)
 
     expectEqual(3, s.count)
-    expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
-    expectTrue(s.contains(TestBridgedKeyTy(2020) as NSObject))
-    expectTrue(s.contains(TestBridgedKeyTy(3030) as NSObject))
+    expectTrue(s.contains(TestBridgedKeyTy(1010) as TestObjCKeyTy))
+    expectTrue(s.contains(TestBridgedKeyTy(2020) as TestObjCKeyTy))
+    expectTrue(s.contains(TestBridgedKeyTy(3030) as TestObjCKeyTy))
   }
 }
 
@@ -2462,9 +2462,9 @@ SetTestSuite.test("SetUpcastBridged") {
     var s: Set<TestObjCKeyTy> = s
 
     expectEqual(3, s.count)
-    expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
-    expectTrue(s.contains(TestBridgedKeyTy(2020) as NSObject))
-    expectTrue(s.contains(TestBridgedKeyTy(3030) as NSObject))
+    expectTrue(s.contains(TestBridgedKeyTy(1010) as TestObjCKeyTy))
+    expectTrue(s.contains(TestBridgedKeyTy(2020) as TestObjCKeyTy))
+    expectTrue(s.contains(TestBridgedKeyTy(3030) as TestObjCKeyTy))
   }
 }
 
