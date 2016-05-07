@@ -19,7 +19,7 @@ func foo(x : NSUInteger) { // expected-error {{'NSUInteger' is unavailable: use 
 // Test preventing overrides of unavailable methods.
 class ClassWithUnavailable {
   @available(*, unavailable)
-  func doNotOverride() {}
+  func doNotOverride() {} // expected-note {{'doNotOverride()' has been explicitly marked unavailable here}}
 
   // FIXME: extraneous diagnostic here
   @available(*, unavailable)

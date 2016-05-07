@@ -1576,6 +1576,14 @@ public:
                                       const DeclContext *DC,
                                       const CallExpr *CE);
 
+  /// Emit a diagnostic for references to declarations that have been
+  /// marked as unavailable, either through "unavailable" or "obsoleted:".
+  bool diagnoseExplicitUnavailability(
+      const ValueDecl *D,
+      SourceRange R,
+      const DeclContext *DC,
+      llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts);
+
   /// @}
 
   /// \name Overload resolution

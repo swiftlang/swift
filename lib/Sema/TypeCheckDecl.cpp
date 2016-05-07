@@ -5478,6 +5478,28 @@ public:
     return true;
   }
 
+  static void diagnoseUnavailableOverride(TypeChecker &TC,
+                                          const ValueDecl *override,
+                                          const ValueDecl *base,
+                                          const AvailableAttr *attr) {
+    if (attr->Rename.empty()) {
+      if (attr->Message.empty())
+        TC.diagnose(override, diag::override_unavailable, override->getName());
+      else
+        TC.diagnose(override, diag::override_unavailable_msg,
+                    override->getName(), attr->Message);
+      TC.diagnose(base, diag::availability_marked_unavailable,
+                  base->getFullName());
+      return;
+    }
+
+    TC.diagnoseExplicitUnavailability(base, override->getLoc(),
+                                      override->getDeclContext(),
+                                      [](InFlightDiagnostic &diag) {
+      // FIXME: Apply fix-its here.
+    });
+  }
+
   /// Record that the \c overriding declarations overrides the
   /// \c overridden declaration.
   ///
@@ -5580,8 +5602,8 @@ public:
     }
 
     // FIXME: Possibly should extend to more availability checking.
-    if (base->getAttrs().isUnavailable(TC.Context)) {
-      TC.diagnose(override, diag::override_unavailable, override->getName());
+    if (auto *attr = base->getAttrs().getUnavailable(TC.Context)) {
+      diagnoseUnavailableOverride(TC, override, base, attr);
     }
     
     if (!TC.getLangOpts().DisableAvailabilityChecking) {

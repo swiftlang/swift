@@ -496,3 +496,24 @@ func testFactoryMethods() {
   Int.factory(other: 1) // expected-error {{'factory(other:)' has been replaced by 'init(other:)'}} {{6-14=}}
   Int.factory2(other: 1) // expected-error {{'factory2(other:)' has been replaced by 'Int.init(other:)'}} {{3-15=Int}}
 }
+
+class Base {
+  @available(*, unavailable)
+  func bad() {} // expected-note {{here}}
+
+  @available(*, unavailable, message: "it was smelly")
+  func smelly() {} // expected-note {{here}}
+
+  @available(*, unavailable, renamed: "new")
+  func old() {} // expected-note {{here}}
+
+  @available(*, unavailable, renamed: "new", message: "it was smelly")
+  func oldAndSmelly() {} // expected-note {{here}}
+}
+
+class Sub : Base {
+  override func bad() {} // expected-error {{cannot override 'bad' which has been marked unavailable}} {{none}}
+  override func smelly() {} // expected-error {{cannot override 'smelly' which has been marked unavailable: it was smelly}} {{none}}
+  override func old() {} // expected-error {{'old()' has been renamed to 'new'}} {{none}}
+  override func oldAndSmelly() {} // expected-error {{'oldAndSmelly()' has been renamed to 'new': it was smelly}} {{none}}
+}

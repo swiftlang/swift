@@ -1371,8 +1371,12 @@ NOTE(overridden_here_with_type,none,
      "overridden declaration here has type %0", (Type))
 ERROR(missing_override,none,
       "overriding declaration requires an 'override' keyword", ())
+
 ERROR(override_unavailable,none,
       "cannot override %0 which has been marked unavailable", (Identifier))
+ERROR(override_unavailable_msg, none,
+      "cannot override %0 which has been marked unavailable: %1",
+      (Identifier, StringRef))
 
 ERROR(override_less_available,none,
       "overriding %0 must be as available as declaration it overrides",

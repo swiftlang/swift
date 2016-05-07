@@ -1352,6 +1352,18 @@ bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
                                                  SourceRange R,
                                                  const DeclContext *DC,
                                                  const CallExpr *CE) {
+  return diagnoseExplicitUnavailability(D, R, DC,
+                                        [=](InFlightDiagnostic &diag) {
+    fixItAvailableAttrRename(*this, diag, R, AvailableAttr::isUnavailable(D),
+                             CE);
+  });
+}
+
+bool TypeChecker::diagnoseExplicitUnavailability(
+    const ValueDecl *D,
+    SourceRange R,
+    const DeclContext *DC,
+    llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts) {
   auto *Attr = AvailableAttr::isUnavailable(D);
   if (!Attr)
     return false;
@@ -1388,12 +1400,12 @@ bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
         auto diag = diagnose(Loc, diag::availability_decl_unavailable_rename,
                              Name, replaceKind.hasValue(), rawReplaceKind,
                              newName);
-        fixItAvailableAttrRename(*this, diag, R, Attr, CE);
+        attachRenameFixIts(diag);
       } else {
         auto diag = diagnose(Loc,diag::availability_decl_unavailable_rename_msg,
                              Name, replaceKind.hasValue(), rawReplaceKind,
                              newName, Attr->Message);
-        fixItAvailableAttrRename(*this, diag, R, Attr, CE);
+        attachRenameFixIts(diag);
       }
     } else if (Attr->Message.empty()) {
       diagnose(Loc, diag::availability_decl_unavailable, Name).highlight(R);
