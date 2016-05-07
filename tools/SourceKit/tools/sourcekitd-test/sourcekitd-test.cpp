@@ -402,7 +402,9 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   switch (Opts.Request) {
   case SourceKitRequest::None:
     llvm::errs() << "request is not set\n";
-    llvm::cl::PrintHelpMessage();
+    // FIXME: This non-zero return value is not propogated as an exit code.
+    //        In other words, despite returning 1 here, the program still exits
+    //        with a zero (successful) exit code.
     return 1;
 
   case SourceKitRequest::ProtocolVersion:
