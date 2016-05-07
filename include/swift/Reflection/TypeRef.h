@@ -94,7 +94,7 @@ public:
                          (((uint32_t) String[i+3]) << 24);
         Bits.push_back(entry);
       }
-      for(; i < String.size(); ++i) {
+      for (; i < String.size(); ++i) {
         Bits.push_back(String[i]);
       }
     }

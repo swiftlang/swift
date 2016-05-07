@@ -597,7 +597,7 @@ void DSEContext::processBasicBlockForGenKillSet(SILBasicBlock *BB) {
 
   // Handle SILArgument for base invalidation.
   ArrayRef<SILArgument *> Args = BB->getBBArgs();
-  for(auto &X : Args) {
+  for (auto &X : Args) {
     invalidateBase(X, BBState, DSEKind::BuildGenKillSet);
   }
 }
@@ -640,7 +640,7 @@ void DSEContext::processBasicBlockForDSE(SILBasicBlock *BB, bool Optimistic) {
 
   // Handle SILArgument for base invalidation.
   ArrayRef<SILArgument *> Args = BB->getBBArgs();
-  for(auto &X : Args) {
+  for (auto &X : Args) {
     invalidateBase(X, S, DSEKind::BuildGenKillSet);
   }
 
