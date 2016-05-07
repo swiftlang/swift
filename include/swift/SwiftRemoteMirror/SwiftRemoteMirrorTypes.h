@@ -41,6 +41,10 @@ typedef struct swift_reflection_info {
   swift_reflection_section_t capture;
   swift_reflection_section_t typeref;
   swift_reflection_section_t reflstr;
+
+  // Start address in local and remote address spaces.
+  uintptr_t LocalStartAddress;
+  uintptr_t RemoteStartAddress;
 } swift_reflection_info_t;
 
 /// The layout kind of a Swift type.
