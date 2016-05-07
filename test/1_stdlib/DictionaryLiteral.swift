@@ -48,7 +48,7 @@ expectType(DictionaryLiteral<String, NSString>.self, &stringNSStringLiteral)
 
 let aString = "1"
 let anNSString = "Foo" as NSString
-var stringNSStringLet: DictionaryLiteral = ["a": aString, "b": anNSString]
+var stringNSStringLet: DictionaryLiteral = [ "a": aString as NSString, "b": anNSString]
 expectType(DictionaryLiteral<String, NSString>.self, &stringNSStringLet)
 
 var hetero1: DictionaryLiteral = ["a": 1, "b": "Foo" as NSString]
