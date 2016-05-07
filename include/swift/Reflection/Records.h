@@ -476,8 +476,16 @@ class CaptureDescriptor {
   }
 
 public:
+  /// The number of captures in the closure and the number of typerefs that
+  /// immediately follow this struct.
   uint32_t NumCaptureTypes;
+
+  /// The number of sources of metadata available in the MetadataSourceMap
+  /// directly following the list of capture's typerefs.
   uint32_t NumMetadataSources;
+
+  /// The number of items in the NecessaryBindings structure at the head of
+  /// the closure.
   uint32_t NumBindings;
 
   using const_iterator = FieldRecordIterator;
