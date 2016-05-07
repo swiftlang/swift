@@ -73,7 +73,7 @@ public func createTemporaryFile(
   _ fileNamePrefix: String, _ fileNameSuffix: String, _ contents: String
 ) -> String {
 #if _runtime(_ObjC)
-  let tempDir: NSString = NSTemporaryDirectory() as NSString
+  let tempDir: NSString = NSTemporaryDirectory()
   var fileName = tempDir.appendingPathComponent(
     fileNamePrefix + "XXXXXX" + fileNameSuffix)
 #else

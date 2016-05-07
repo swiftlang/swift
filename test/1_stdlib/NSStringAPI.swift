@@ -1043,8 +1043,8 @@ NSStringAPIs.test("paragraphRangeFor(_:)") {
 }
 
 NSStringAPIs.test("pathComponents") {
-  expectEqual([ "/", "foo", "bar" ] as [NSString], ("/foo/bar" as NSString).pathComponents)
-  expectEqual([ "/", "абв", "где" ] as [NSString], ("/абв/где" as NSString).pathComponents)
+  expectEqual(["/", "foo", "bar"], "/foo/bar".pathComponents)
+  expectEqual(["/", "абв", "где"], "/абв/где".pathComponents)
 }
 
 NSStringAPIs.test("pathExtension") {
@@ -1646,10 +1646,10 @@ NSStringAPIs.test("trimmingCharacters(in:)") {
 }
 
 NSStringAPIs.test("NSString.stringsByAppendingPaths(_:)") {
-  expectEqual([] as [NSString], ("" as NSString).strings(byAppendingPaths: []))
+  expectEqual([], "".strings(byAppendingPaths: []))
   expectEqual(
-    [ "/tmp/foo", "/tmp/bar" ] as [NSString],
-    ("/tmp" as NSString).strings(byAppendingPaths: [ "foo", "bar" ]))
+    ["/tmp/foo", "/tmp/bar"],
+    "/tmp".strings(byAppendingPaths: ["foo", "bar"]))
 }
 
 NSStringAPIs.test("substring(from:)") {
@@ -1867,8 +1867,8 @@ NSStringAPIs.test("MixedTypeComparisons") {
   expectTrue(ys != "\u{1e69}")
   expectFalse("\u{1e69}" == ys)
   expectTrue("\u{1e69}" != ys)
-  expectFalse(xs as NSString == ys)
-  expectTrue(xs as NSString != ys)
+  expectFalse(xs == ys)
+  expectTrue(xs != ys)
   expectTrue(ys == ys)
   expectFalse(ys != ys)
 }

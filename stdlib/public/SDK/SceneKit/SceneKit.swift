@@ -29,9 +29,9 @@ extension SCNVector3 {
     self.z = SCNFloat(z)
   }
   public init(_ x: CGFloat, _ y: CGFloat, _ z: CGFloat) {
-    self.x = SCNFloat(x as NSNumber)
-    self.y = SCNFloat(y as NSNumber)
-    self.z = SCNFloat(z as NSNumber)
+    self.x = SCNFloat(x)
+    self.y = SCNFloat(y)
+    self.z = SCNFloat(z)
   }
   public init(_ x: Double, _ y: Double, _ z: Double) {
     self.init(SCNFloat(x), SCNFloat(y), SCNFloat(z))
@@ -69,10 +69,10 @@ extension SCNVector4 {
     self.w = SCNFloat(w)
   }
   public init(_ x: CGFloat, _ y: CGFloat, _ z: CGFloat, _ w: CGFloat) {
-    self.x = SCNFloat(x as NSNumber)
-    self.y = SCNFloat(y as NSNumber)
-    self.z = SCNFloat(z as NSNumber)
-    self.w = SCNFloat(w as NSNumber)
+    self.x = SCNFloat(x)
+    self.y = SCNFloat(y)
+    self.z = SCNFloat(z)
+    self.w = SCNFloat(w)
   }
   public init(_ x: Double, _ y: Double, _ z: Double, _ w: Double) {
     self.init(SCNFloat(x), SCNFloat(y), SCNFloat(z), SCNFloat(w))
@@ -182,7 +182,7 @@ extension SCNSceneSource {
   @warn_unused_result
   public func entryWithIdentifier<T>(_ uid: String, withClass entryClass: T.Type) -> T? {
     return SCN_Swift_SCNSceneSource_entryWithIdentifier(
-      self, uid as NSString, entryClass as! AnyObject) as! T?
+      self, uid, entryClass as! AnyObject) as! T?
   }
 }
 

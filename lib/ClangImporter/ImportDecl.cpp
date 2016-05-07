@@ -1701,10 +1701,8 @@ namespace {
         // Construct right-hand side.
         // FIXME: get the parameter from the init, and plug it in here.
         auto rhs = new (cxt)
-            CoerceExpr(new (cxt) DeclRefExpr(
-                        init->getParameterList(1)->get(0), 
-                        DeclNameLoc(),
-                        /*Implicit=*/true), {}, {nullptr, storedUnderlyingType});
+            DeclRefExpr(init->getParameterList(1)->get(0), DeclNameLoc(),
+                        /*Implicit=*/true);
 
         // Add assignment.
         auto assign = new (cxt) AssignExpr(lhs, SourceLoc(), rhs,
