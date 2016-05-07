@@ -77,9 +77,9 @@ bb0(%t: $*T):
 sil @generic_caller3 : $@convention(thin) <A, B, C> () -> @owned @callee_owned () -> () {
 bb0:
   %f = function_ref @generic_callee3 : $@convention(thin) <T, U> (@in T) -> ()
-  %t = alloc_stack $Optional<A -> B>
-  %c = partial_apply %f<Optional<A -> B>, (B, C -> Int)>(%t) : $@convention(thin) <T, U> (@in T) -> ()
-  dealloc_stack %t : $*Optional<A -> B>
+  %t = alloc_stack $Optional<(A) -> B>
+  %c = partial_apply %f<Optional<(A) -> B>, (B, (C) -> Int)>(%t) : $@convention(thin) <T, U> (@in T) -> ()
+  dealloc_stack %t : $*Optional<(A) -> B>
   return %c : $@callee_owned () -> ()
 }
 
@@ -112,8 +112,8 @@ bb0(%t: $@thick Optional<T>.Type):
 sil @generic_caller4 : $@convention(thin) <A, B, C> () -> @owned @callee_owned () -> () {
 bb0:
   %f = function_ref @generic_callee4 : $@convention(thin) <T, U> (@thick Optional<T>.Type) -> ()
-  %t = metatype $@thick Optional<B -> C>.Type
-  %c = partial_apply %f<B -> C, Int>(%t) : $@convention(thin) <T, U> (@thick Optional<T>.Type) -> ()
+  %t = metatype $@thick Optional<(B) -> C>.Type
+  %c = partial_apply %f<(B) -> C, Int>(%t) : $@convention(thin) <T, U> (@thick Optional<T>.Type) -> ()
   return %c : $@callee_owned () -> ()
 }
 

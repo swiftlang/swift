@@ -195,13 +195,13 @@ pr.foo()
 
 var _ : ([Int]).Type = [4].dynamicType
 // CHECK: : ([Int]).Type
-var _ : (Int -> Int)? = .none
-// CHECK: : (Int -> Int)?
-func chained(f f: Int -> ()) -> Int { return 0 }
+var _ : ((Int) -> Int)? = .none
+// CHECK: : ((Int) -> Int)?
+func chained(f f: (Int) -> ()) -> Int { return 0 }
 chained
-// CHECK: : (f: Int -> ()) -> Int
+// CHECK: : (f: (Int) -> ()) -> Int
 [chained]
-// CHECK: : [(f: Int -> ()) -> Int]
+// CHECK: : [(f: (Int) -> ()) -> Int]
 
 ({97210}())
 // CHECK: = 97210

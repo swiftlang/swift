@@ -9,7 +9,7 @@ class B : A {
 }
 
 func printA(_ v: A) { v.printA() }
-func printOpt<T>(_ subprint: T -> ()) -> (T?) -> () {
+func printOpt<T>(_ subprint: (T) -> ()) -> (T?) -> () {
   return { x in
     switch (x) {
     case .some(let y): print(".some(", terminator: ""); subprint(y); print(")", terminator: "")
