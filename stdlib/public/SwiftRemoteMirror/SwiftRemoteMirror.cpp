@@ -138,6 +138,8 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
       return SWIFT_EXISTENTIAL_METATYPE;
     case RecordKind::ClassInstance:
       return SWIFT_CLASS_INSTANCE;
+    case RecordKind::ClosureContext:
+      return SWIFT_CLOSURE_CONTEXT;
     }
   }
   case TypeInfoKind::Reference: {

@@ -1762,6 +1762,10 @@ struct TargetHeapLocalVariableMetadata
   using StoredPointer = typename Runtime::StoredPointer;
   uint32_t OffsetToFirstCapture;
   TargetPointer<Runtime, const char> CaptureDescription;
+
+  static bool classof(const TargetMetadata<Runtime> *metadata) {
+    return metadata->getKind() == MetadataKind::HeapLocalVariable;
+  }
 };
 using HeapLocalVariableMetadata
   = TargetHeapLocalVariableMetadata<InProcess>;
