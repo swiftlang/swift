@@ -131,11 +131,11 @@ class Y: X<D> {
 // optional.
 
 class Foo {
-  func foo(x: Int -> Int) -> (Int -> Int)? {}
+  func foo(x: (Int) -> Int) -> ((Int) -> Int)? {}
 }
 
 class Bar: Foo {
-  override func foo(x: (Int -> Int)?) -> Int -> Int {}
+  override func foo(x: ((Int) -> Int)?) -> (Int) -> Int {}
 }
 
 // rdar://problem/21364764
@@ -151,7 +151,7 @@ class Aap {
 
   func flip() -> (() -> S?) {}
 
-  func map() -> S -> () -> Aap? {}
+  func map() -> (S) -> () -> Aap? {}
 }
 
 class Noot : Aap {
@@ -163,7 +163,7 @@ class Noot : Aap {
 
   override func flip() -> (() -> S) {}
 
-  override func map() -> S? -> () -> Noot {}
+  override func map() -> (S?) -> () -> Noot {}
 }
 
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks3Bar3foo{{.*}} : $@convention(method) (@owned @callee_owned (Int) -> Int, @guaranteed Bar) -> @owned Optional<Int -> Int>

@@ -428,7 +428,7 @@ protocol HasAssoc {
 protocol GenericParameterNameCollisionProtocol {
   func foo<T>(_ x: T)
   associatedtype Assoc2
-  func bar<T>(_ x: T -> Assoc2)
+  func bar<T>(_ x: (T) -> Assoc2)
 }
 
 struct GenericParameterNameCollision<T: HasAssoc> :
@@ -442,7 +442,7 @@ struct GenericParameterNameCollision<T: HasAssoc> :
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}bar{{.*}} : $@convention(witness_method) <T1 where T1 : HasAssoc><T> (@owned @callee_owned (@in T) -> @out T1.Assoc, @in_guaranteed GenericParameterNameCollision<T1>) -> () {
   // CHECK:       bb0(%0 : $@callee_owned (@in T) -> @out T1.Assoc, %1 : $*GenericParameterNameCollision<T1>):
   // CHECK:         apply {{%.*}}<T1, T1.Assoc, T>
-  func bar<V>(_ x: V -> T.Assoc) {}
+  func bar<V>(_ x: (V) -> T.Assoc) {}
 }
 
 protocol PropertyRequirement {

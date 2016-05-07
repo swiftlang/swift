@@ -4,7 +4,7 @@
 // CHECK:         function_ref @_TF5cdecl5apple
 // CHECK-LABEL: sil hidden @_TF5cdecl5apple
 @_cdecl("pear")
-func apple(_ f: @convention(c) Int -> Int) {
+func apple(_ f: @convention(c) (Int) -> Int) {
 }
 
 // CHECK-LABEL: sil hidden @_TF5cdecl16forceCEntryPoint

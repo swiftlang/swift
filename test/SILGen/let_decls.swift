@@ -353,14 +353,14 @@ func address_only_let_closure<T>(_ x:T) -> T {
 }
 
 struct GenericFunctionStruct<T, U> {
-  var f: T -> U
+  var f: (T) -> U
 }
 
 
 // CHECK-LABEL: sil hidden @{{.*}}member_ref_abstraction_change
 // CHECK: function_ref reabstraction thunk helper
 // CHECK: return
-func member_ref_abstraction_change(_ x: GenericFunctionStruct<Int, Int>) -> Int -> Int {
+func member_ref_abstraction_change(_ x: GenericFunctionStruct<Int, Int>) -> (Int) -> Int {
   return x.f
 }
 

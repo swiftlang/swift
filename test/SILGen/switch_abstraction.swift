@@ -12,7 +12,7 @@ enum Optionable<T> {
 // CHECK: [[DEST]]([[ORIG:%.*]] : $@callee_owned (@in A) -> @out A):
 // CHECK:   [[REABSTRACT:%.*]] = function_ref @_TTR
 // CHECK:   [[SUBST:%.*]] = partial_apply [[REABSTRACT]]([[ORIG]])
-func enum_reabstraction(x x: Optionable<A -> A>, a: A) {
+func enum_reabstraction(x x: Optionable<(A) -> A>, a: A) {
   switch x {
   case .Summn(var f):
     f(a)
@@ -23,7 +23,7 @@ func enum_reabstraction(x x: Optionable<A -> A>, a: A) {
 
 enum Wacky<A, B> {
   case Foo(A)
-  case Bar(B -> A)
+  case Bar((B) -> A)
 }
 
 // CHECK-LABEL: sil hidden @_TF18switch_abstraction45enum_addr_only_to_loadable_with_reabstraction{{.*}} : $@convention(thin) <T> (@in Wacky<T, A>, A) -> @out T {

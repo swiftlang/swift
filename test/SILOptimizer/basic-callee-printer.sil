@@ -180,7 +180,7 @@ bb0(%0 : $private_derived):
 sil private [noinline] @call_private : $@convention(thin) (@owned private_base) -> () {
 bb0(%0 : $private_base):
   debug_value %0 : $private_base
-  %2 = class_method %0 : $private_base, #private_base.foo!1 : private_base -> () -> () , $@convention(method) (@guaranteed private_base) -> ()
+  %2 = class_method %0 : $private_base, #private_base.foo!1 : (private_base) -> () -> () , $@convention(method) (@guaranteed private_base) -> ()
   %3 = apply %2(%0) : $@convention(method) (@guaranteed private_base) -> ()
   strong_release %0 : $private_base
   %5 = tuple ()
@@ -231,9 +231,9 @@ bb0(%0 : $internal_derived):
 sil hidden [noinline] @call_internal : $@convention(thin) (@owned internal_base) -> () {
 bb0(%0 : $internal_base):
   debug_value %0 : $internal_base
-  %2 = class_method %0 : $internal_base, #internal_base.foo!1 : internal_base -> () -> () , $@convention(method) (@guaranteed internal_base) -> ()
+  %2 = class_method %0 : $internal_base, #internal_base.foo!1 : (internal_base) -> () -> () , $@convention(method) (@guaranteed internal_base) -> ()
   %3 = apply %2(%0) : $@convention(method) (@guaranteed internal_base) -> ()
-  %4 = class_method %0 : $internal_base, #internal_base.bar!1 : internal_base -> () -> () , $@convention(method) (@guaranteed internal_base) -> ()
+  %4 = class_method %0 : $internal_base, #internal_base.bar!1 : (internal_base) -> () -> () , $@convention(method) (@guaranteed internal_base) -> ()
   %5 = apply %4(%0) : $@convention(method) (@guaranteed internal_base) -> ()
   strong_release %0 : $internal_base
   %7 = tuple ()

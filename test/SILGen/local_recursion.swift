@@ -56,7 +56,7 @@ func local_recursion(_ x: Int, y: Int) {
   // CHECK: [[CLOSURE_REF:%.*]] = function_ref @_TFF15local_recursion15local_recursionFTSi1ySi_T_U0_FSiT_
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[CLOSURE_REF]]([[X]], [[Y]])
   // CHECK: apply [[CLOSURE]]([[X]])
-  let f: Int -> () = {
+  let f: (Int) -> () = {
     self_recursive($0)
     transitive_capture_2($0)
   }

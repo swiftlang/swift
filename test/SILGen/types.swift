@@ -63,13 +63,13 @@ func g(b b : Bool) {
 }
 
 struct ReferencedFromFunctionStruct {
-  let f: ReferencedFromFunctionStruct -> () = {x in ()}
-  let g: ReferencedFromFunctionEnum -> () = {x in ()}
+  let f: (ReferencedFromFunctionStruct) -> () = {x in ()}
+  let g: (ReferencedFromFunctionEnum) -> () = {x in ()}
 }
 
 enum ReferencedFromFunctionEnum {
-  case f(ReferencedFromFunctionEnum -> ())
-  case g(ReferencedFromFunctionStruct -> ())
+  case f((ReferencedFromFunctionEnum) -> ())
+  case g((ReferencedFromFunctionStruct) -> ())
 }
 
 // CHECK-LABEL: sil hidden @_TF5types34referencedFromFunctionStructFieldsFVS_28ReferencedFromFunctionStructTFS0_T_FOS_26ReferencedFromFunctionEnumT__
@@ -78,7 +78,7 @@ enum ReferencedFromFunctionEnum {
 // CHECK:         [[G:%.*]] = struct_extract [[X]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.g
 // CHECK:         [[G]] : $@callee_owned (@owned ReferencedFromFunctionEnum) -> ()
 func referencedFromFunctionStructFields(_ x: ReferencedFromFunctionStruct)
-    -> (ReferencedFromFunctionStruct -> (), ReferencedFromFunctionEnum -> ()) {
+    -> ((ReferencedFromFunctionStruct) -> (), (ReferencedFromFunctionEnum) -> ()) {
   return (x.f, x.g)
 }
 
@@ -87,8 +87,8 @@ func referencedFromFunctionStructFields(_ x: ReferencedFromFunctionStruct)
 // CHECK:       bb{{[0-9]+}}([[G:%.*]] : $@callee_owned (@owned ReferencedFromFunctionStruct) -> ()):
 func referencedFromFunctionEnumFields(_ x: ReferencedFromFunctionEnum)
     -> (
-      (ReferencedFromFunctionEnum -> ())?,
-      (ReferencedFromFunctionStruct -> ())?
+      ((ReferencedFromFunctionEnum) -> ())?,
+      ((ReferencedFromFunctionStruct) -> ())?
     ) {
   switch x {
   case .f(let f):

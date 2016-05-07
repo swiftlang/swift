@@ -6,7 +6,7 @@ import resilient_struct
 
 // CHECK-LABEL: sil hidden @_TF17struct_resilience26functionWithResilientTypesFTV16resilient_struct4Size1fFS1_S1__S1_ : $@convention(thin) (@in Size, @owned @callee_owned (@in Size) -> @out Size) -> @out Size
 // CHECK:       bb0(%0 : $*Size, %1 : $*Size, %2 : $@callee_owned (@in Size) -> @out Size):
-func functionWithResilientTypes(_ s: Size, f: Size -> Size) -> Size {
+func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 
   // Stored properties of resilient structs from outside our resilience
   // domain are accessed through accessors
@@ -53,7 +53,7 @@ func resilientInOutTest(_ s: inout Size) {
 
 // CHECK-LABEL: sil hidden @_TF17struct_resilience28functionWithFixedLayoutTypesFTV16resilient_struct5Point1fFS1_S1__S1_ : $@convention(thin) (Point, @owned @callee_owned (Point) -> Point) -> Point
 // CHECK:       bb0(%0 : $Point, %1 : $@callee_owned (Point) -> Point):
-func functionWithFixedLayoutTypes(_ p: Point, f: Point -> Point) -> Point {
+func functionWithFixedLayoutTypes(_ p: Point, f: (Point) -> Point) -> Point {
 
   // Stored properties of fixed layout structs are accessed directly
   var p2 = p
@@ -75,7 +75,7 @@ func functionWithFixedLayoutTypes(_ p: Point, f: Point -> Point) -> Point {
 
 // CHECK-LABEL: sil hidden @_TF17struct_resilience39functionWithFixedLayoutOfResilientTypesFTV16resilient_struct9Rectangle1fFS1_S1__S1_ : $@convention(thin) (@in Rectangle, @owned @callee_owned (@in Rectangle) -> @out Rectangle) -> @out Rectangle
 // CHECK:        bb0(%0 : $*Rectangle, %1 : $*Rectangle, %2 : $@callee_owned (@in Rectangle) -> @out Rectangle):
-func functionWithFixedLayoutOfResilientTypes(_ r: Rectangle, f: Rectangle -> Rectangle) -> Rectangle {
+func functionWithFixedLayoutOfResilientTypes(_ r: Rectangle, f: (Rectangle) -> Rectangle) -> Rectangle {
   return f(r)
 }
 
@@ -125,7 +125,7 @@ public struct MySize {
 }
 
 // CHECK-LABEL: sil @_TF17struct_resilience28functionWithMyResilientTypesFTVS_6MySize1fFS0_S0__S0_ : $@convention(thin) (@in MySize, @owned @callee_owned (@in MySize) -> @out MySize) -> @out MySize
-public func functionWithMyResilientTypes(_ s: MySize, f: MySize -> MySize) -> MySize {
+public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> MySize {
 
   // Stored properties of resilient structs from inside our resilience
   // domain are accessed directly

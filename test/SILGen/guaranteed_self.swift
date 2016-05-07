@@ -390,11 +390,11 @@ class D: C {
   }
 }
 
-func S_curryThunk(_ s: S) -> (S -> Int -> ()/*, Int -> ()*/) {
+func S_curryThunk(_ s: S) -> ((S) -> (Int) -> ()/*, Int -> ()*/) {
   return (S.foo /*, s.foo*/)
 }
 
-func AO_curryThunk<T>(_ ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
+func AO_curryThunk<T>(_ ao: AO<T>) -> ((AO<T>) -> (Int) -> ()/*, Int -> ()*/) {
   return (AO.foo /*, ao.foo*/)
 }
 

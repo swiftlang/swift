@@ -9,7 +9,7 @@ import Swift
 ///////////////////
 
 protocol P {
-  func foo(f: Int32->Int32, _ j: Int32) -> Int32
+  func foo(f: (Int32)->Int32, _ j: Int32) -> Int32
 }
 
 // = Test Summary =
