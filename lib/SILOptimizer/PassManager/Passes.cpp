@@ -251,6 +251,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   } else
     PM.addEarlyCodeMotion();
 
+  PM.addReleaseHoisting();
   PM.addRetainSinking();
   PM.addReleaseHoisting();
   PM.addARCSequenceOpts();

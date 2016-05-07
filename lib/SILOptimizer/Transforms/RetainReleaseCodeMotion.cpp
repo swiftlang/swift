@@ -107,6 +107,30 @@ static bool isReleaseInstruction(SILInstruction *I) {
   return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I);
 }
 
+static bool hasPredecessorInstructionInBasicBlock(SILBasicBlock *BB,
+                                                  SILInstruction *I,
+                                                  SILInstruction *S) {
+  assert(I->getParent() == BB && "Invalidate basic block for instruction");
+  for (auto B = BB->begin(), E = SILBasicBlock::iterator(*I); B != E; ++B) {
+    if (&*B == S) 
+      return true;
+  }
+  return false;
+}
+
+#if 0
+static bool hasSuccessorInstructionInBasicBlock(SILBasicBlock *BB,
+                                                SILInstruction *I,
+                                                SILInstruction *S) {
+  assert(I->getParent() == BB && "Invalidate basic block for instruction");
+  for (auto B = BB->rbegin(), E = SILBasicBlock::iterator(*I); B != E; ++B) {
+    if (&*B == S) 
+      return true;
+  }
+  return false;
+}
+#endif
+
 /// Creates an increment on \p Ptr before insertion point \p InsertPt that
 /// creates a strong_retain if \p Ptr has reference semantics itself or a
 /// retain_value if \p Ptr is a non-trivial value without reference-semantics.
@@ -503,6 +527,25 @@ void RetainCodeMotionContext::computeCodeMotionGenKillSet() {
 
 bool RetainCodeMotionContext::performCodeMotion() {
   bool Changed = false;
+  llvm::SmallPtrSet<SILInstruction *, 4> InstsToDelete;
+  // Detect a pattern in which we have 1 retain and the very next 
+  // instruction blocks the retain. So this retain is NOT really moved.
+  for (auto Inst : RCInstructions) {
+    auto &InsertPoint = InsertPoints.find(getRCRoot(Inst))->second;
+    for (auto I = InsertPoint.begin(), E = InsertPoint.end(); I != E; ++I) {
+      if (&*(*I)->getParent()->begin() == *I)
+        continue;
+      if (!hasPredecessorInstructionInBasicBlock((*I)->getParent(), *I, Inst))
+        continue;
+      InstsToDelete.insert(Inst);
+      InsertPoint.erase(I);
+      break;
+    }
+  }
+
+  for (auto Inst : InstsToDelete)
+    RCInstructions.erase(Inst);
+
   // Create the new retain instructions.
   for (auto RC : RCRootVault) {
     auto Iter = InsertPoints.find(RC);
@@ -513,6 +556,7 @@ bool RetainCodeMotionContext::performCodeMotion() {
       Changed = true;
     }
   }
+
   // Remove the old retain instructions.
   for (auto R : RCInstructions) {
     ++NumRetainsSunk;
@@ -873,6 +917,23 @@ void ReleaseCodeMotionContext::mergeBBDataFlowStates(SILBasicBlock *BB) {
 
 bool ReleaseCodeMotionContext::performCodeMotion() {
   bool Changed = false;
+  llvm::SmallPtrSet<SILInstruction *, 4> InstsToDelete;
+  // Detect a pattern in which we have 1 release and the very previous
+  // instruction blocks the release. So this release is NOT really moved.
+  for (auto Inst : RCInstructions) {
+    auto &InsertPoint = InsertPoints.find(getRCRoot(Inst))->second;
+    for (auto I = InsertPoint.begin(), E = InsertPoint.end(); I != E; ++I) {
+      if (*I != Inst) 
+        continue;
+      InstsToDelete.insert(Inst);
+      InsertPoint.erase(I);
+      break;
+    }
+  }
+
+  for (auto Inst : InstsToDelete)
+    RCInstructions.erase(Inst);
+ 
   // Create the new releases at each anchor point.
   for (auto RC : RCRootVault) {
     auto Iter = InsertPoints.find(RC);
@@ -883,6 +944,7 @@ bool ReleaseCodeMotionContext::performCodeMotion() {
       Changed = true;
     }
   }
+
   // Remove the old release instructions.
   for (auto R : RCInstructions) {
     ++NumReleasesHoisted;
@@ -1055,35 +1117,36 @@ public:
     bool EdgeChanged = splitAllCriticalEdges(*F, false, nullptr, nullptr);
 
     llvm::BumpPtrAllocator BPA;
-    auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
-    auto *AA = PM->getAnalysis<AliasAnalysis>();
-    auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
+    bool Changed = true;
+    while (Changed) {
+      auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
+      auto *AA = PM->getAnalysis<AliasAnalysis>();
+      auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
+      if (Kind == Release) {
+        // TODO: we should consider Throw block as well, or better we should
+        // abstract the Return block or Throw block away in the matcher.
+        ConsumedArgToEpilogueReleaseMatcher ERM(RCFI, F, 
+              ConsumedArgToEpilogueReleaseMatcher::ExitKind::Return);
 
-    bool InstChanged = false;
-    if (Kind == Release) {
-      // TODO: we should consider Throw block as well, or better we should
-      // abstract the Return block or Throw block away in the matcher.
-      ConsumedArgToEpilogueReleaseMatcher ERM(RCFI, F, 
-            ConsumedArgToEpilogueReleaseMatcher::ExitKind::Return);
+        ReleaseCodeMotionContext RelCM(BPA, F, PO, AA, RCFI, 
+                                       FreezeEpilogueReleases, ERM); 
+        // Run release hoisting.
+        Changed = RelCM.run();
+      } else {
+        RetainCodeMotionContext RetCM(BPA, F, PO, AA, RCFI);
+        // Run retain sinking.
+        Changed = RetCM.run();
+      }
 
-      ReleaseCodeMotionContext RelCM(BPA, F, PO, AA, RCFI, 
-                                     FreezeEpilogueReleases, ERM); 
-      // Run release hoisting.
-      InstChanged |= RelCM.run();
-    } else {
-      RetainCodeMotionContext RetCM(BPA, F, PO, AA, RCFI);
-      // Run retain sinking.
-      InstChanged |= RetCM.run();
-    }
-
-    if (EdgeChanged) {
-      // We splitted critical edges.
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
-      return;
-    }
-    if (InstChanged) {
-      // We moved instructions.
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      if (EdgeChanged) {
+        // We splitted critical edges.
+        invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      } else if (Changed) {
+        // We moved instructions.
+        invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      }
+      // We can not split critical edges 2nd time.
+      EdgeChanged = false;
     }
   }
 };
