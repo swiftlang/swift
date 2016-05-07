@@ -356,8 +356,8 @@ public func check${Traversal}Collection<
     instances,
     distances: distances,
     of: collection,
-    distanceOracle: { (x:Int,y:Int) in numericCast(y - x) },
-    advanceOracle: { x,y in nextN(distances[y], instances[x]) },
+    distanceOracle: { (x:Int, y:Int) in numericCast(y - x) },
+    advanceOracle: { x, y in nextN(distances[y], instances[x]) },
     startIndex: collection.startIndex,
     endIndex: next5(partWay1), ${trace})
 

@@ -103,7 +103,7 @@ public var errno : Int32 {
   get {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD)
     return __error().pointee
-//FIXME: os(Windows) should be replaced, such as triple(Cygwin)
+// FIXME: os(Windows) should be replaced, such as triple(Cygwin)
 #elseif os(Android) || os(Windows)
     return __errno().pointee
 #else
