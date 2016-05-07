@@ -1057,8 +1057,6 @@ ERROR(extension_nongeneric_trailing_where,none,
 ERROR(extension_constrained_inheritance,none,
       "extension of type %0 with constraints cannot have an "
       "inheritance clause", (Type))
-ERROR(extension_protocol_inheritance,none,
-      "extension of protocol %0 cannot have an inheritance clause", (Type))
 ERROR(extension_protocol_type_definition,none,
       "type %0 cannot be defined within a protocol extension", (DeclName))
 ERROR(extension_protocol_via_typealias,none,
@@ -1166,6 +1164,10 @@ ERROR(protocol_property_must_be_computed,none,
       ())
 NOTE(inherited_protocol_does_not_conform,none,
      "type %0 does not conform to inherited protocol %1", (Type, Type))
+NOTE(extension_inherited_protocol_does_not_conform,none,
+"type %0 does not conform to protocol %1 inherited from an extension here",
+(Type, Type))
+
 NOTE(no_witnesses,none,
      "protocol requires %select{initializer %1|function %1|property %1|"
      "subscript}0 with type %2", (RequirementKind, DeclName, Type))
