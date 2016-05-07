@@ -293,7 +293,9 @@ PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
       makeLocalSection(Buffer, RemoteInfo.builtin, RemoteInfo),
       makeLocalSection(Buffer, RemoteInfo.capture, RemoteInfo),
       makeLocalSection(Buffer, RemoteInfo.typeref, RemoteInfo),
-      makeLocalSection(Buffer, RemoteInfo.reflstr, RemoteInfo)
+      makeLocalSection(Buffer, RemoteInfo.reflstr, RemoteInfo),
+      /*LocalStartAddress*/ (uintptr_t) Buffer,
+      /*RemoteStartAddress*/ RemoteInfo.StartAddress,
     };
     swift_reflection_addReflectionInfo(RC, Info);
   }
