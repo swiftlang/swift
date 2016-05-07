@@ -31,7 +31,7 @@ if #available(iOS 8.0, OSX 10.10, *) {
     expectEqual(scn_float_from_d, 2.0)
 
     let cg = CGFloat(3.0)
-    let scn_float_from_cg = SCNFloat(cg as NSNumber)
+    let scn_float_from_cg = SCNFloat(cg)
     expectEqual(scn_float_from_cg, 3.0)
 
     let node = SCNNode()

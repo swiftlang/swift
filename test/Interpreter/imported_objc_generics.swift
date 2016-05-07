@@ -105,11 +105,11 @@ ImportedObjCGenerics.test("ProtocolConstraints") {
 }
 
 ImportedObjCGenerics.test("ClassConstraints") {
-  func makeContainedAnimalMakeNoise<T>(x: AnimalContainer<T>) -> NSString {
-    return x.object.noise as NSString
+  func makeContainedAnimalMakeNoise<T>(_ x: AnimalContainer<T>) -> NSString {
+    return x.object.noise
   }
   let petCarrier = AnimalContainer(object: Dog())
-  expectEqual("woof", makeContainedAnimalMakeNoise(x: petCarrier))
+  expectEqual("woof", makeContainedAnimalMakeNoise(petCarrier))
 }
 
 class ClassWithMethodsUsingObjCGenerics: NSObject {
@@ -147,20 +147,20 @@ ImportedObjCGenerics.test("InheritanceFromNongeneric") {
 
 public class InheritInSwift: Container<NSString> {
   public override init(object: NSString) {
-    super.init(object: object.lowercased as NSString)
+    super.init(object: object.lowercased)
   }
   public override var object: NSString {
     get {
-      return super.object.uppercased as NSString
+      return super.object.uppercased
     }
     set {
-      super.object = newValue.lowercased as NSString
+      super.object = newValue.lowercased
     }
   }
 
   public var superObject: NSString {
     get {
-      return super.object as NSString
+      return super.object
     }
   }
 }
