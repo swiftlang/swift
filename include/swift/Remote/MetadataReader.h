@@ -488,9 +488,6 @@ private:
   using OwnedProtocolDescriptorRef =
     std::unique_ptr<const TargetProtocolDescriptor<Runtime>, delete_with_free>;
 
-  using OwnedCaptureDescriptor =
-    std::unique_ptr<const CaptureDescriptor, delete_with_free>;
-
   /// Cached isa mask.
   StoredPointer isaMask;
   bool hasIsaMask = false;
@@ -1058,39 +1055,6 @@ private:
 
     TypeCache.insert({metadata.getAddress(), nominal});
     return nominal;
-  }
-
-  /// Read the entire CaptureDescriptor in this address space, including
-  /// trailing capture typeref relative offsets, and GenericMetadataSource
-  /// pairs.
-  OwnedCaptureDescriptor readCaptureDescriptor(StoredPointer Address) {
-
-    uint32_t NumCaptures = 0;
-    uint32_t NumMetadataSources = 0;
-
-    StoredSize Offset = 0;
-
-    if (!Reader->readInteger(Address + Offset, &NumCaptures))
-      return nullptr;
-
-    Offset += sizeof(NumCaptures);
-
-    if (!Reader->readInteger(Address + Offset, &NumMetadataSources))
-      return nullptr;
-
-    StoredSize Size = sizeof(CaptureDescriptor) +
-      NumCaptures * sizeof(RelativeDirectPointer<const char>) +
-      NumMetadataSources * sizeof(GenericMetadataSource);
-
-    auto Buffer = (uint8_t *)malloc(Size);
-
-    if (!Reader->readBytes(Address, Buffer, Size)) {
-      free(Buffer);
-      return nullptr;
-    }
-
-    auto RawDescriptor = reinterpret_cast<const CaptureDescriptor *>(Buffer);
-    return OwnedCaptureDescriptor(RawDescriptor);
   }
 
   /// Given a pointer to an Objective-C class, try to read its class name.
