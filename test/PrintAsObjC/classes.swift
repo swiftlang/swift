@@ -593,7 +593,7 @@ public class NonObjCClass { }
 
   init() throws { }
   init(string: String) throws { }
-  init(fn: Int -> Int) throws { }
+  init(fn: (Int) -> Int) throws { }
 }
 
 @objc class Spoon: Fungible {}

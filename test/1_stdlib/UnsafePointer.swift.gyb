@@ -235,8 +235,8 @@ func checkPointerCorrectness(_ check: Check,
   }
 }
 
-let checkPtr: ((UnsafeMutablePointer<Missile> ->
-  (UnsafeMutablePointer<Missile>, count: Int) -> Void), Bool) -> Check -> Void
+let checkPtr: (((UnsafeMutablePointer<Missile>) ->
+  (UnsafeMutablePointer<Missile>, count: Int) -> Void), Bool) -> (Check) -> Void
   = { (f, m) in return { checkPointerCorrectness($0, f, m) } }
 
 UnsafeMutablePointerTestSuite.test("moveInitializeBackwardFrom") {

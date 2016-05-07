@@ -255,25 +255,25 @@ Runtime.test("dynamicCasting with as") {
   expectTrue(((someP1Ref2 as AnyObject) as? P1)!.boolValue)
   expectEmpty(((someNotP1Ref as AnyObject) as? P1))
 
-  let doesThrow: Int throws -> Int = { $0 }
-  let doesNotThrow: String -> String = { $0 }
+  let doesThrow: (Int) throws -> Int = { $0 }
+  let doesNotThrow: (String) -> String = { $0 }
 
   var any: Any = doesThrow
 
-  expectTrue(doesThrow as Any is Int throws -> Int)
-  expectFalse(doesThrow as Any is String throws -> Int)
-  expectFalse(doesThrow as Any is String throws -> String)
-  expectFalse(doesThrow as Any is Int throws -> String)
-  expectFalse(doesThrow as Any is Int -> Int)
-  expectFalse(doesThrow as Any is String throws -> String)
-  expectFalse(doesThrow as Any is String -> String)
-  expectTrue(doesNotThrow as Any is String throws -> String)
-  expectTrue(doesNotThrow as Any is String -> String)
-  expectFalse(doesNotThrow as Any is Int -> String)
-  expectFalse(doesNotThrow as Any is Int -> Int)
-  expectFalse(doesNotThrow as Any is String -> Int)
-  expectFalse(doesNotThrow as Any is Int throws -> Int)
-  expectFalse(doesNotThrow as Any is Int -> Int)
+  expectTrue(doesThrow as Any is (Int) throws -> Int)
+  expectFalse(doesThrow as Any is (String) throws -> Int)
+  expectFalse(doesThrow as Any is (String) throws -> String)
+  expectFalse(doesThrow as Any is (Int) throws -> String)
+  expectFalse(doesThrow as Any is (Int) -> Int)
+  expectFalse(doesThrow as Any is (String) throws -> String)
+  expectFalse(doesThrow as Any is (String) -> String)
+  expectTrue(doesNotThrow as Any is (String) throws -> String)
+  expectTrue(doesNotThrow as Any is (String) -> String)
+  expectFalse(doesNotThrow as Any is (Int) -> String)
+  expectFalse(doesNotThrow as Any is (Int) -> Int)
+  expectFalse(doesNotThrow as Any is (String) -> Int)
+  expectFalse(doesNotThrow as Any is (Int) throws -> Int)
+  expectFalse(doesNotThrow as Any is (Int) -> Int)
 }
 
 extension Int {

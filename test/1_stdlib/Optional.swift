@@ -209,7 +209,7 @@ OptionalTests.test("??") {
 }
 
 OptionalTests.test("flatMap") {
-  let half: Int32 -> Int16? =
+  let half: (Int32) -> Int16? =
     { if $0 % 2 == 0 { return Int16($0 / 2) } else { return .none } }
 
   expectOptionalEqual(2 as Int16, half(4))
