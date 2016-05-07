@@ -63,9 +63,9 @@ printTypeName(B.self)
 printTypeName(B2.self)
 printTypeName(B3.self)
 #else
-print("@convention(block) () -> ()")
-print("() -> @convention(block) () -> ()")
-print("(@convention(block) () -> ()) -> ()")
+print("@convention(block) (()) -> ()")
+print("() -> @convention(block) (()) -> ()")
+print("((@convention(block) (()) -> ())) -> ()")
 #endif
 // CHECK-NEXT: @convention(block) (()) -> ()
 // CHECK-NEXT: (()) -> @convention(block) (()) -> ()
