@@ -741,9 +741,10 @@ struct InductionInfo {
   /// If we compare for equality we need to make sure that the range does wrap.
   /// We would have trapped either when overflowing or when accessing an array
   /// out of bounds in the original loop.
-  void checkOverflow(SILBuilder &Builder) {
+  /// Returns true if an overflow check was inserted.
+  bool checkOverflow(SILBuilder &Builder) {
     if (IsOverflowCheckInserted || Cmp != BuiltinValueKind::ICMP_EQ)
-      return;
+      return false;
 
     auto Loc = Inc->getLoc();
     auto ResultTy = SILType::getBuiltinIntegerType(1, Builder.getASTContext());
@@ -757,6 +758,7 @@ struct InductionInfo {
     auto *CondFail = isOverflowChecked(cast<BuiltinInst>(Inc));
     if (CondFail)
       CondFail->eraseFromParent();
+    return true;
   }
 };
 
@@ -876,11 +878,16 @@ private:
   }
 };
 
-/// A block in the loop is guaranteed to be executed if it dominates the exiting
-/// block.
+/// A block in the loop is guaranteed to be executed if it dominates the single
+/// exiting block.
 static bool isGuaranteedToBeExecuted(DominanceInfo *DT, SILBasicBlock *Block,
-                                     SILBasicBlock *ExitingBlk) {
-  return DT->dominates(Block, ExitingBlk);
+                                     SILBasicBlock *SingleExitingBlk) {
+  // If there are multiple exiting blocks then no block in the loop is
+  // guaranteed to be executed in _all_ iterations until the upper bound of the
+  // induction variable is reached.
+  if (!SingleExitingBlk)
+    return false;
+  return DT->dominates(Block, SingleExitingBlk);
 }
 
 /// Describes the access function "a[f(i)]" that is based on a canonical
@@ -961,11 +968,12 @@ static bool hasArrayType(SILValue Value, SILModule &M) {
 static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
                               ABCAnalysis &ABC, InductionAnalysis &IndVars,
                               SILBasicBlock *Preheader, SILBasicBlock *Header,
-                              SILBasicBlock *ExitingBlk) {
+                              SILBasicBlock *SingleExitingBlk) {
 
   bool Changed = false;
   auto *CurBB = DTNode->getBlock();
-  bool blockAlwaysExecutes = isGuaranteedToBeExecuted(DT, CurBB, ExitingBlk);
+  bool blockAlwaysExecutes = isGuaranteedToBeExecuted(DT, CurBB,
+                                                      SingleExitingBlk);
 
   for (auto Iter = CurBB->begin(); Iter != CurBB->end();) {
     auto Inst = &*Iter;
@@ -1054,7 +1062,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
   // Traverse the children in the dominator tree.
   for (auto Child: *DTNode)
     Changed |= hoistChecksInLoop(DT, Child, ABC, IndVars, Preheader,
-                                 Header, ExitingBlk);
+                                 Header, SingleExitingBlk);
 
   return Changed;
 }
@@ -1127,7 +1135,8 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   DEBUG(llvm::dbgs() << "Attempting to hoist checks in " << *Loop);
 
   // Find an exiting block.
-  SILBasicBlock *ExitingBlk = Loop->getExitingBlock();
+  SILBasicBlock *SingleExitingBlk = Loop->getExitingBlock();
+  SILBasicBlock *ExitingBlk = SingleExitingBlk;
   SILBasicBlock *ExitBlk = Loop->getExitBlock();
   SILBasicBlock *Latch = Loop->getLoopLatch();
   if (!ExitingBlk || !Latch || !ExitBlk) {
@@ -1166,7 +1175,11 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
     for (auto *Arg: Header->getBBArgs()) {
       if (auto *IV = IndVars[Arg]) {
         SILBuilderWithScope B(Preheader->getTerminator(), IV->getInstruction());
-        IV->checkOverflow(B);
+
+        // Only if the loop has a single exiting block (which contains the
+        // induction variable check) we may hoist the overflow check.
+        if (SingleExitingBlk)
+          Changed |= IV->checkOverflow(B);
 
         if (!IV->IsOverflowCheckInserted)
           continue;
@@ -1212,7 +1225,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
 
   // Hoist bounds checks.
   Changed |= hoistChecksInLoop(DT, DT->getNode(Header), ABC, IndVars,
-                               Preheader, Header, ExitingBlk);
+                               Preheader, Header, SingleExitingBlk);
   if (Changed) {
     Preheader->getParent()->verify();
   }
