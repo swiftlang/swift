@@ -155,3 +155,8 @@ class r21949448 {
   var myArray: inout [Int] = []   // expected-error {{'inout' is only valid in parameter lists}}
 }
 
+// SE-0066 - Standardize function type argument syntax to require parentheses
+let _ : Int -> Float // expected-warning {{single argument function types require parentheses}} {{9-9=(}} {{12-12=)}}
+
+
+

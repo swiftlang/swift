@@ -1341,10 +1341,11 @@ Type TypeChecker::resolveIdentifierType(
   return result;
 }
 
-// Returns true if any illegal IUOs were found. If inference of IUO type is disabled, IUOs may only be specified in the following positions:
-//  * outermost type
-//  * function param
-//  * function return type
+/// Returns true if any illegal IUOs were found. If inference of IUO type is
+/// disabled, IUOs may only be specified in the following positions:
+///  * outermost type
+///  * function param
+///  * function return type
 static bool checkForIllegalIUOs(TypeChecker &TC, TypeRepr *Repr,
                                 TypeResolutionOptions Options) {
   class IllegalIUOWalker : public ASTWalker {
@@ -1889,6 +1890,20 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   extInfo = extInfo.withThrows(repr->throws());
 
   ModuleDecl *M = DC->getParentModule();
+  
+  
+  // If this is a function type without parens around the parameter list,
+  // diagnose this and produce a fixit to add them.
+  if (!isa<TupleTypeRepr>(repr->getArgsTypeRepr()) &&
+      !repr->isWarnedAbout()) {
+    auto args = repr->getArgsTypeRepr();
+    TC.diagnose(args->getStartLoc(), diag::function_type_no_parens)
+      .highlight(args->getSourceRange())
+      .fixItInsert(args->getStartLoc(), "(")
+    .fixItInsertAfter(args->getEndLoc(), ")");
+    // Don't emit this warning three times when in generics.
+    repr->setWarned();
+  }
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
   if (auto genericParams = repr->getGenericParams()) {
