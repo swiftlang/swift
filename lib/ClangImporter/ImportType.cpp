@@ -554,8 +554,7 @@ namespace {
       Type mappedType = decl->getDeclaredType();
       ImportHint hint = ImportHint::None;
 
-      if (Impl.HonorSwiftNewtypeAttr &&
-          type->getDecl()->hasAttr<clang::SwiftNewtypeAttr>()) {
+      if (Impl.getSwiftNewtypeAttr(type->getDecl(), /*useSwift2Name=*/false)) {
         hint = ImportHint::SwiftNewtype;
 
       // For certain special typedefs, we don't want to use the imported type.

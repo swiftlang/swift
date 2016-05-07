@@ -2123,13 +2123,13 @@ static bool moduleIsInferImportAsMember(const clang::NamedDecl *decl,
 
 // If this decl is associated with a swift_newtype typedef, return it, otherwise
 // null
-static clang::TypedefNameDecl *findSwiftNewtype(const clang::Decl *decl,
-                                                bool honorSwiftNewtypeAttr) {
-  if (!honorSwiftNewtypeAttr) return nullptr;
-
+static clang::TypedefNameDecl *findSwiftNewtype(
+     ClangImporter::Implementation &impl,
+     const clang::Decl *decl,
+     bool useSwift2Name) {
   if (auto varDecl = dyn_cast<clang::VarDecl>(decl))
     if (auto typedefTy = varDecl->getType()->getAs<clang::TypedefType>())
-      if (typedefTy->getDecl()->hasAttr<clang::SwiftNewtypeAttr>())
+      if (impl.getSwiftNewtypeAttr(typedefTy->getDecl(), useSwift2Name))
         return typedefTy->getDecl();
 
   return nullptr;
@@ -2254,9 +2254,6 @@ auto ClangImporter::Implementation::importFullName(
   /// Whether we want the Swift 2.0 name.
   bool swift2Name = options.contains(ImportNameFlags::Swift2Name);
 
-  /// Whether we should honor the swift_newtype/swift_wrapper attribute.
-  bool honorSwiftNewtypeAttr = HonorSwiftNewtypeAttr && !swift2Name;
-
   // Objective-C categories and extensions don't have names, despite
   // being "named" declarations.
   if (isa<clang::ObjCCategoryDecl>(D))
@@ -2284,7 +2281,7 @@ auto ClangImporter::Implementation::importFullName(
       break;
     }
   // Import onto a swift_newtype if present
-  } else if (auto newtypeDecl = findSwiftNewtype(D, honorSwiftNewtypeAttr)) {
+  } else if (auto newtypeDecl = findSwiftNewtype(*this, D, swift2Name)) {
     result.EffectiveContext = newtypeDecl;
   // Everything else goes into its redeclaration context.
   } else {
@@ -2733,7 +2730,7 @@ auto ClangImporter::Implementation::importFullName(
 
   // swift_newtype-ed declarations may have common words with the type name
   // stripped.
-  if (auto newtypeDecl = findSwiftNewtype(D, honorSwiftNewtypeAttr)) {
+  if (auto newtypeDecl = findSwiftNewtype(*this, D, swift2Name)) {
     // Skip a leading 'k' in a 'kConstant' pattern
     if (baseName.size() >= 2 && baseName[0] == 'k' &&
         clang::isUppercase(baseName[1]))

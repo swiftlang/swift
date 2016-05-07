@@ -1414,9 +1414,8 @@ namespace {
         return nullptr;
 
       // Check for swift_newtype
-      if (!SwiftType && Impl.HonorSwiftNewtypeAttr && !useSwift2Name) {
-        if (auto newtypeAttr =
-                Decl->template getAttr<clang::SwiftNewtypeAttr>()) {
+      if (!SwiftType) {
+        if (auto newtypeAttr = Impl.getSwiftNewtypeAttr(Decl, useSwift2Name)) {
           switch (newtypeAttr->getNewtypeKind()) {
           case clang::SwiftNewtypeAttr::NK_Enum:
             // TODO: import as closed enum instead
@@ -3686,7 +3685,8 @@ namespace {
       assert(Impl.isInitMethod(objcMethod) && "Not a real init method");
 
       // Check whether we've already created the constructor.
-      auto known = Impl.Constructors.find({objcMethod, dc, useSwift2Name});
+      auto known = Impl.Constructors.find(std::make_tuple(objcMethod, dc,
+                                                          useSwift2Name));
       if (known != Impl.Constructors.end())
         return known->second;
       
@@ -3980,7 +3980,8 @@ namespace {
       }
 
       // Check whether we've already created the constructor.
-      auto known = Impl.Constructors.find({objcMethod, dc, useSwift2Name});
+      auto known = Impl.Constructors.find(std::make_tuple(objcMethod, dc,
+                                                          useSwift2Name));
       if (known != Impl.Constructors.end())
         return known->second;
 
@@ -4077,7 +4078,8 @@ namespace {
       }
 
       // Record the constructor for future re-use.
-      Impl.Constructors[{objcMethod, dc, useSwift2Name}] = result;
+      Impl.Constructors[std::make_tuple(objcMethod, dc, useSwift2Name)] =
+        result;
 
       // If this constructor overrides another constructor, mark it as such.
       recordObjCOverride(result);
@@ -5881,6 +5883,22 @@ canSkipOverTypedef(ClangImporter::Implementation &Impl,
   return UnderlyingDecl;
 }
 
+clang::SwiftNewtypeAttr *ClangImporter::Implementation::getSwiftNewtypeAttr(
+    const clang::TypedefNameDecl *decl,
+    bool useSwift2Name) {
+  // If we aren't honoring the swift_newtype attribute, don't even
+  // bother looking.
+  if (!HonorSwiftNewtypeAttr)
+    return nullptr;
+
+  // If we're determining the Swift 2 name, don't honor this attribute.
+  if (useSwift2Name)
+    return nullptr;
+
+  // Retrieve the attribute.
+  return decl->getAttr<clang::SwiftNewtypeAttr>();
+}
+
 /// Import Clang attributes as Swift attributes.
 void ClangImporter::Implementation::importAttributes(
     const clang::NamedDecl *ClangDecl,
@@ -6356,7 +6374,8 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
                                     "importing (mirrored)");
 
   auto canon = decl->getCanonicalDecl();
-  auto known = ImportedProtocolDecls.find({canon, dc, useSwift2Name});
+  auto known = ImportedProtocolDecls.find(std::make_tuple(canon, dc,
+                                                          useSwift2Name));
   if (known != ImportedProtocolDecls.end())
     return known->second;
 
@@ -6399,7 +6418,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
       updateMirroredDecl(alternate);
   }
   if (result || !converter.hadForwardDeclaration())
-    ImportedProtocolDecls[{canon, dc, useSwift2Name}] = result;
+    ImportedProtocolDecls[std::make_tuple(canon, dc, useSwift2Name)] = result;
   return result;
 }
 
