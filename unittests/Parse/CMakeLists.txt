@@ -10,6 +10,5 @@ target_link_libraries(SwiftParseTests
     swiftClangImporter
     swiftParse
     swiftAST
-    LLVMCoverage
 )
 

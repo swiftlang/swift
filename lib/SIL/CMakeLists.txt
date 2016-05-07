@@ -33,5 +33,8 @@ add_swift_library(swiftSIL
   TypeLowering.cpp
   LINK_LIBRARIES
     swiftSerialization
-    swiftSema)
+    swiftSema
+
+    LLVMCoverage
+)
 

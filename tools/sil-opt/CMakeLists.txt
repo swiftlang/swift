@@ -5,7 +5,6 @@ add_swift_executable(sil-opt
     swiftIRGen
     swiftSILGen
     swiftSILOptimizer
-    LLVMCoverage
     LLVMDebugInfoCodeView
 )
 

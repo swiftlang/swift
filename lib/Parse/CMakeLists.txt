@@ -12,5 +12,8 @@ add_swift_library(swiftParse
   Scope.cpp
   LINK_LIBRARIES
     swiftSIL
-    swiftAST)
+    swiftAST
+
+    LLVMCoverage
+)
 

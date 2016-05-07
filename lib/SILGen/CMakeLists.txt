@@ -26,4 +26,8 @@ add_swift_library(swiftSILGen
   SILGenProlog.cpp
   SILGenStmt.cpp
   SILGenType.cpp
-  LINK_LIBRARIES swiftSIL)
+  LINK_LIBRARIES
+    swiftSIL
+
+    LLVMCoverage
+)

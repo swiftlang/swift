@@ -3,7 +3,6 @@ add_swift_executable(swift-remoteast-test
   LINK_LIBRARIES
     swiftFrontendTool
     swiftRemoteAST
-    LLVMCoverage
 )
 
 target_link_libraries(swift-remoteast-test edit)

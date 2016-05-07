@@ -2,7 +2,6 @@ add_swift_executable(lldb-moduleimport-test
   lldb-moduleimport-test.cpp
   LINK_LIBRARIES
     swiftASTSectionImporter swiftFrontend swiftClangImporter
-    LLVMCoverage
     LLVMDebugInfoCodeView
     )
 

@@ -6,7 +6,6 @@ add_swift_executable(sil-extract
     swiftSILOptimizer
     swiftSerialization
     swiftClangImporter
-    LLVMCoverage
     LLVMDebugInfoCodeView
 )
 
