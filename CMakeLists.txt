@@ -448,6 +448,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
 
   # FIXME: This will not work while trying to cross-compile.
   if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+    configure_sdk_unix(LINUX "Linux" "linux" "linux" "x86_64" "x86_64-unknown-linux-gnu")
     set(SWIFT_HOST_VARIANT_ARCH "x86_64")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
 
@@ -457,22 +458,12 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
       set(swift_can_crosscompile_stdlib TRUE)
     endif()
 
-    is_sdk_requested(LINUX swift_build_linux)
-    if(swift_build_linux)
-      configure_sdk_unix(LINUX "Linux" "linux" "linux" "x86_64" "x86_64-unknown-linux-gnu")
-      set(SWIFT_PRIMARY_VARIANT_SDK_default "LINUX")
-      set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
-    endif()
-
     is_sdk_requested(ANDROID swift_build_android)
     if(swift_build_android AND ${swift_can_crosscompile_stdlib})
       configure_sdk_unix(ANDROID "Android" "android" "android" "armv7" "armv7-none-linux-androideabi")
       # This must be set, as variables such as "${SWIFT_SDK_${sdk}_PATH}" are
       # referenced in several other locations.
       set(SWIFT_SDK_ANDROID_PATH "${SWIFT_ANDROID_SDK_PATH}")
-
-      set(SWIFT_PRIMARY_VARIANT_SDK_default "ANDROID")
-      set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")
     endif()
 
   # FIXME: This only matches ARMv6l (by far the most common variant).
