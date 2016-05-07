@@ -937,7 +937,7 @@ func convertArrayToNSArray<T>(_ array: [T]) -> NSArray {
 }
 
 func getBridgedNSArrayOfValueTypeCustomBridged(
-  numElements numElements: Int = 3,
+  numElements: Int = 3,
   capacity: Int? = nil
 ) -> NSArray {
   assert(!_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))

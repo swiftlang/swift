@@ -249,7 +249,7 @@ func getBridgedNSSetOfRefTypesBridgedVerbatim() -> NSSet {
 }
 
 func getBridgedNSSet_ValueTypesCustomBridged(
-  numElements numElements: Int = 3
+  numElements: Int = 3
 ) -> NSSet {
   expectTrue(!_isBridgedVerbatimToObjectiveC(TestBridgedKeyTy.self))
 
@@ -3501,7 +3501,7 @@ class MockSetWithCustomCount : NSSet {
   static var timesCountWasCalled = 0
 }
 
-func getMockSetWithCustomCount(count count: Int)
+func getMockSetWithCustomCount(count: Int)
   -> Set<NSObject> {
 
   return MockSetWithCustomCount(count: count) as Set
