@@ -29,11 +29,21 @@ endmacro()
 
 set(get_svn_script "${LLVM_MAIN_SRC_DIR}/cmake/modules/GetSVN.cmake")
 
+function(get_revision_inc_path revision_inc_var name)
+  set(${revision_inc_var} "${CMAKE_CURRENT_BINARY_DIR}/${name}Revision.inc"
+    PARENT_SCOPE)
+endfunction()
+
+function(remove_revision_inc name)
+  get_revision_inc_path(revision_inc "${name}")
+  file(REMOVE "${revision_inc}")
+endfunction()
+
 function(generate_revision_inc revision_inc_var name dir)
   find_first_existing_vc_file(dep_file "${dir}")
   if(DEFINED dep_file)
     # Create custom target to generate the VC revision include.
-    set(revision_inc "${CMAKE_CURRENT_BINARY_DIR}/${name}Revision.inc")
+    get_revision_inc_path(revision_inc "${name}")
     string(TOUPPER ${name} upper_name)
     add_custom_command(OUTPUT "${revision_inc}"
       DEPENDS "${dep_file}" "${get_svn_script}"
@@ -51,12 +61,20 @@ function(generate_revision_inc revision_inc_var name dir)
   endif()
 endfunction()
 
-generate_revision_inc(llvm_revision_inc LLVM "${LLVM_MAIN_SRC_DIR}")
-generate_revision_inc(clang_revision_inc Clang "${CLANG_MAIN_SRC_DIR}")
-generate_revision_inc(swift_revision_inc Swift "${SWIFT_SOURCE_DIR}")
+if(SWIFT_INCLUDE_REVISIONS_IN_VERSION)
+  generate_revision_inc(llvm_revision_inc LLVM "${LLVM_MAIN_SRC_DIR}")
+  generate_revision_inc(clang_revision_inc Clang "${CLANG_MAIN_SRC_DIR}")
+  generate_revision_inc(swift_revision_inc Swift "${SWIFT_SOURCE_DIR}")
 
-set(version_inc_files
-  ${llvm_revision_inc} ${clang_revision_inc} ${swift_revision_inc})
+  set(version_inc_files
+    ${llvm_revision_inc} ${clang_revision_inc} ${swift_revision_inc})
+else()
+  remove_revision_inc(LLVM)
+  remove_revision_inc(Clang)
+  remove_revision_inc(Swift)
+
+  set(version_inc_files)
+endif()
 
 add_swift_library(swiftBasic
   Cache.cpp

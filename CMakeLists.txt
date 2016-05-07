@@ -80,6 +80,9 @@ set(SWIFT_COMPILER_VERSION "" CACHE STRING
 set(CLANG_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Clang compiler")
 
+option(SWIFT_INCLUDE_REVISIONS_IN_VERSION
+       "Include version control revision ids in '--version' output" OFF)
+
 # Indicate whether Swift should attempt to use the gold linker.
 # This is not used on Darwin.
 set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL

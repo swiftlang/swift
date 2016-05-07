@@ -175,6 +175,7 @@ KNOWN_SETTINGS=(
     swift-user-visible-version  "3.0"            "user-visible version of the Swift language"
     swift-compiler-version      ""               "string that indicates a compiler version for Swift"
     clang-compiler-version      ""               "string that indicates a compiler version for Clang"
+    swift-include-revisions-in-version ""        "set to include version control revisions in 'swiftc --version' output"
     embed-bitcode-section       "0"              "embed an LLVM bitcode section in stdlib/overlay binaries for supported platforms"
     darwin-crash-reporter-client ""              "whether to enable CrashReporter integration"
     darwin-stdlib-install-name-dir ""            "the directory of the install_name for standard library dylibs"
@@ -1391,7 +1392,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARG
                 -DSWIFT_VENDOR=Apple
                 -DSWIFT_VENDOR_UTI=com.apple.compilers.llvm.swift
                 -DSWIFT_VERSION="${SWIFT_USER_VISIBLE_VERSION}"
-                -DSWIFT_COMPILER_VERSION="${SWIFT_COMPILER_VERSION}"
             )
             ;;
         *)
@@ -1414,7 +1414,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARG
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
             -DCLANG_COMPILER_VERSION="${CLANG_COMPILER_VERSION}"
-            -DSWIFT_COMPILER_VERSION="${SWIFT_COMPILER_VERSION}"
         )
     fi
     if [[ "${SWIFT_COMPILER_VERSION}" ]] ; then
@@ -1465,6 +1464,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARG
 
     swift_cmake_options=(
         "${swift_cmake_options[@]}"
+        -DSWIFT_INCLUDE_REVISIONS_IN_VERSION=$(true_false "${SWIFT_INCLUDE_REVISIONS_IN_VERSION}")
         -DSWIFT_AST_VERIFIER:BOOL=$(true_false "${SWIFT_ENABLE_AST_VERIFIER}")
         -DSWIFT_SIL_VERIFY_ALL:BOOL=$(true_false "${SIL_VERIFY_ALL}")
         -DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
