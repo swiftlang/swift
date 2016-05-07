@@ -122,6 +122,9 @@ public:
       case RecordKind::ClassInstance:
         printHeader("class_instance");
         break;
+      case RecordKind::ClosureContext:
+        printHeader("closure_context");
+        break;
       }
       printBasic(TI);
       printFields(RecordTI);

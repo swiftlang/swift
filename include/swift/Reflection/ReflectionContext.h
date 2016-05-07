@@ -26,6 +26,7 @@
 #include "swift/Reflection/TypeRefBuilder.h"
 
 #include <iostream>
+#include <set>
 #include <vector>
 #include <unordered_map>
 
@@ -46,6 +47,8 @@ public:
   using super::getBuilder;
   using super::readIsaMask;
   using super::readTypeFromMetadata;
+  using super::readParentFromMetadata;
+  using super::readGenericArgFromMetadata;
   using super::readMetadataFromInstance;
   using typename super::StoredPointer;
 
@@ -201,6 +204,224 @@ public:
   /// Return a description of the layout of a value with the given type.
   const TypeInfo *getTypeInfo(const TypeRef *TR) {
     return getBuilder().getTypeConverter().getTypeInfo(TR);
+  }
+
+private:
+  const TypeInfo *getClosureContextInfo(StoredPointer Context,
+                                        const ClosureContextInfo &Info) {
+    RecordTypeInfoBuilder Builder(getBuilder().getTypeConverter(),
+                                  RecordKind::ClosureContext);
+
+    auto Metadata = readMetadataFromInstance(Context);
+    if (!Metadata.first)
+      return nullptr;
+
+    // Calculate the offset of the first capture.
+    // See GenHeap.cpp, buildPrivateMetadata().
+    auto OffsetToFirstCapture =
+        this->readOffsetToFirstCaptureFromMetadata(Metadata.second);
+    if (!OffsetToFirstCapture.first)
+      return nullptr;
+
+    // Initialize the builder.
+    Builder.addField(OffsetToFirstCapture.second, sizeof(StoredPointer));
+
+    // FIXME: should be unordered_set but I'm too lazy to write a hash
+    // functor
+    std::set<std::pair<const TypeRef *, const MetadataSource *>> Done;
+    GenericArgumentMap Subs;
+
+    ArrayRef<const TypeRef *> CaptureTypes = Info.CaptureTypes;
+
+    // Closure context element layout depends on the layout of the
+    // captured types, but captured types might depend on element
+    // layout (of previous elements). Use an iterative approach to
+    // solve the problem.
+    while (!CaptureTypes.empty()) {
+      const TypeRef *OrigCaptureTR = CaptureTypes[0];
+      const TypeRef *SubstCaptureTR = nullptr;
+
+      // If we have enough substitutions to make this captured value's
+      // type concrete, or we know it's size anyway (because it is a
+      // class reference or metatype, for example), go ahead and add
+      // it to the layout.
+      if (OrigCaptureTR->isConcreteAfterSubstitutions(Subs))
+        SubstCaptureTR = OrigCaptureTR->subst(getBuilder(), Subs);
+      else if (getBuilder().getTypeConverter().hasFixedSize(OrigCaptureTR))
+        SubstCaptureTR = OrigCaptureTR;
+
+      if (SubstCaptureTR != nullptr) {
+        Builder.addField("", SubstCaptureTR);
+        if (Builder.isInvalid())
+          return nullptr;
+
+        // Try the next capture type.
+        CaptureTypes = CaptureTypes.slice(1);
+        continue;
+      }
+
+      // Ok, we do not have enough substitutions yet. Perhaps we have
+      // enough elements figured out that we can pick off some
+      // metadata sources though, and use those to derive some new
+      // substitutions.
+      bool Progress = false;
+      for (auto Source : Info.MetadataSources) {
+        // Don't read a source more than once.
+        if (Done.count(Source))
+          continue;
+
+        // If we don't have enough information to read this source
+        // (because it is fulfilled by metadata from a capture at
+        // at unknown offset), keep going.
+        if (!isMetadataSourceReady(Source.second, Builder))
+          continue;
+
+        auto Metadata = readMetadataSource(Context, Source.second, Builder);
+        if (!Metadata.first)
+          return nullptr;
+
+        auto *SubstTR = readTypeFromMetadata(Metadata.second);
+        if (SubstTR == nullptr)
+          return nullptr;
+
+        if (!TypeRef::deriveSubstitutions(Subs, Source.first, SubstTR))
+          return nullptr;
+
+        Done.insert(Source);
+        Progress = true;
+      }
+
+      // If we failed to make any forward progress above, we're stuck
+      // and cannot close out this layout.
+      if (!Progress)
+        return nullptr;
+    }
+
+    // Ok, we have a complete picture now.
+    return Builder.build();
+  }
+
+  /// Checks if we have enough information to read the given metadata
+  /// source.
+  ///
+  /// \param Builder Used to obtain offsets of elements known so far.
+  bool isMetadataSourceReady(const MetadataSource *MS,
+                             const RecordTypeInfoBuilder &Builder) {
+    switch (MS->getKind()) {
+    case MetadataSourceKind::ClosureBinding:
+      return true;
+    case MetadataSourceKind::ReferenceCapture: {
+      unsigned Index = cast<ReferenceCaptureMetadataSource>(MS)->getIndex();
+      return Index < Builder.getNumFields();
+    }
+    case MetadataSourceKind::MetadataCapture: {
+      unsigned Index = cast<MetadataCaptureMetadataSource>(MS)->getIndex();
+      return Index < Builder.getNumFields();
+    }
+    case MetadataSourceKind::GenericArgument: {
+      auto Base = cast<GenericArgumentMetadataSource>(MS)->getSource();
+      return isMetadataSourceReady(Base, Builder);
+    }
+    case MetadataSourceKind::Parent: {
+      auto Base = cast<ParentMetadataSource>(MS)->getChild();
+      return isMetadataSourceReady(Base, Builder);
+    }
+    case MetadataSourceKind::Self:
+    case MetadataSourceKind::SelfWitnessTable:
+      return true;
+    }
+  }
+
+  /// Read metadata for a captured generic type from a closure context.
+  ///
+  /// \param Context The closure context in the remote process.
+  ///
+  /// \param MS The metadata source, which must be "ready" as per the
+  /// above.
+  ///
+  /// \param Builder Used to obtain offsets of elements known so far.
+  std::pair<bool, StoredPointer>
+  readMetadataSource(StoredPointer Context,
+                     const MetadataSource *MS,
+                     const RecordTypeInfoBuilder &Builder) {
+    switch (MS->getKind()) {
+    case MetadataSourceKind::ClosureBinding: {
+      unsigned Index = cast<ClosureBindingMetadataSource>(MS)->getIndex();
+
+      // Skip the context's isa pointer.
+      //
+      // Metadata bindings are stored consecutively at the beginning of the
+      // closure context.
+      unsigned Offset = sizeof(StoredPointer) * (Index + 2);
+
+      StoredPointer MetadataAddress;
+      if (!getReader().readInteger(RemoteAddress(Context + Offset),
+                                   &MetadataAddress))
+        break;
+
+      return std::make_pair(true, MetadataAddress);
+    }
+    case MetadataSourceKind::ReferenceCapture: {
+      unsigned Index = cast<ReferenceCaptureMetadataSource>(MS)->getIndex();
+
+      // We should already have enough type information to know the offset
+      // of this capture in the context.
+      unsigned CaptureOffset = Builder.getFieldOffset(Index);
+
+      StoredPointer CaptureAddress;
+      if (!getReader().readInteger(RemoteAddress(Context + CaptureOffset),
+                                   &CaptureAddress))
+        break;
+
+      // Read the requested capture's isa pointer.
+      return readMetadataFromInstance(CaptureAddress);
+    }
+    case MetadataSourceKind::MetadataCapture: {
+      unsigned Index = cast<MetadataCaptureMetadataSource>(MS)->getIndex();
+
+      // We should already have enough type information to know the offset
+      // of this capture in the context.
+      unsigned CaptureOffset = Builder.getFieldOffset(Index);
+
+      StoredPointer CaptureAddress;
+      if (!getReader().readInteger(RemoteAddress(Context + CaptureOffset),
+                                   &CaptureAddress))
+        break;
+
+      return std::make_pair(true, CaptureAddress);
+    }
+    case MetadataSourceKind::GenericArgument: {
+      auto *GAMS = cast<GenericArgumentMetadataSource>(MS);
+      auto Base = readMetadataSource(Context, GAMS->getSource(), Builder);
+      if (!Base.first)
+        break;
+
+      unsigned Index = GAMS->getIndex();
+      auto Arg = readGenericArgFromMetadata(Base.second, Index);
+      if (!Arg.first)
+        break;
+
+      return Arg;
+    }
+    case MetadataSourceKind::Parent: {
+      auto Base = readMetadataSource(Context,
+          cast<ParentMetadataSource>(MS)->getChild(),
+          Builder);
+      if (!Base.first)
+        break;
+
+      auto Parent = readParentFromMetadata(Base.second);
+      if (!Parent.first)
+        break;
+
+      return Parent;
+    }
+    case MetadataSourceKind::Self:
+    case MetadataSourceKind::SelfWitnessTable:
+      break;
+    }
+
+    return std::make_pair(false, StoredPointer(0));
   }
 };
 
