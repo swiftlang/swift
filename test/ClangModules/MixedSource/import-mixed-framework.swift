@@ -25,4 +25,5 @@ _ = Mixed.PureSwiftClass.verify()
 
 let _: CustomName = convertToProto(CustomNameClass())
 
-_ = SwiftClassWithCustomName() // expected-error {{use of unresolved identifier 'SwiftClassWithCustomName'}}
+_ = SwiftClassWithCustomName() // expected-error {{'SwiftClassWithCustomName' has been renamed to 'CustomNameClass'}}
+

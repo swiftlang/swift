@@ -517,13 +517,15 @@ namespace {
         GenericParamList *genericParams = nullptr;
         if (auto *category =
               dyn_cast<clang::ObjCCategoryDecl>(typeParamContext)) {
-          auto ext = cast_or_null<ExtensionDecl>(Impl.importDecl(category));
+          auto ext = cast_or_null<ExtensionDecl>(Impl.importDecl(category,
+                                                                 false));
           if (!ext)
             return Type();
           genericParams = ext->getGenericParams();
         } else if (auto *interface =
             dyn_cast<clang::ObjCInterfaceDecl>(typeParamContext)) {
-          auto cls = cast_or_null<ClassDecl>(Impl.importDecl(interface));
+          auto cls = cast_or_null<ClassDecl>(Impl.importDecl(interface,
+                                                             false));
           if (!cls)
             return Type();
           genericParams = cls->getGenericParams();
@@ -543,7 +545,8 @@ namespace {
       }
 
       // Import the underlying declaration.
-      auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
+      auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl(),
+                                                             false));
 
       // If that fails, fall back on importing the underlying type.
       if (!decl) return Visit(type->desugar());
@@ -551,7 +554,7 @@ namespace {
       Type mappedType = decl->getDeclaredType();
       ImportHint hint = ImportHint::None;
 
-      if (Impl.getSwiftNewtypeAttr(type->getDecl())) {
+      if (Impl.getSwiftNewtypeAttr(type->getDecl(), /*useSwift2Name=*/false)) {
         hint = ImportHint::SwiftNewtype;
 
       // For certain special typedefs, we don't want to use the imported type.
@@ -645,7 +648,8 @@ namespace {
     }
 
     ImportResult VisitRecordType(const clang::RecordType *type) {
-      auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
+      auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl(),
+                                                             false));
       if (!decl)
         return nullptr;
 
@@ -671,7 +675,8 @@ namespace {
       case EnumKind::Enum:
       case EnumKind::Unknown:
       case EnumKind::Options: {
-        auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(clangDecl));
+        auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(clangDecl,
+                                                               false));
         if (!decl)
           return nullptr;
 
@@ -717,7 +722,8 @@ namespace {
       // If this object pointer refers to an Objective-C class (possibly
       // qualified),
       if (auto objcClass = type->getInterfaceDecl()) {
-        auto imported = cast_or_null<ClassDecl>(Impl.importDecl(objcClass));
+        auto imported = cast_or_null<ClassDecl>(Impl.importDecl(objcClass,
+                                                                false));
         if (!imported)
           return nullptr;
 
@@ -884,7 +890,8 @@ namespace {
         SmallVector<Type, 4> protocols;
         for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
              cp != cpEnd; ++cp) {
-          auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp));
+          auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp,
+                                                                  false));
           if (!proto)
             return Type();
 
@@ -2475,7 +2482,7 @@ Decl *ClangImporter::Implementation::importDeclByName(StringRef name) {
   }
 
   for (auto decl : lookupResult) {
-    if (auto swiftDecl = importDecl(decl->getUnderlyingDecl())) {
+    if (auto swiftDecl = importDecl(decl->getUnderlyingDecl(), false)) {
       return swiftDecl;
     }
   }
@@ -2526,7 +2533,7 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
     return Type();
 
   for (auto decl : lookupResult) {
-    if (auto swiftDecl = impl.importDecl(decl->getUnderlyingDecl())) {
+    if (auto swiftDecl = impl.importDecl(decl->getUnderlyingDecl(), false)) {
       if (auto protoDecl = dyn_cast<ProtocolDecl>(swiftDecl)) {
         return protoDecl->getDeclaredType();
       }

@@ -813,6 +813,7 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint) const {
 
   if (auto last = LastDeclAndKind.getPointer()) {
     last->NextDecl = member;
+    assert(last != member && "Simple cycle in decl list");
   } else {
     FirstDecl = member;
   }
