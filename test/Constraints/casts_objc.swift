@@ -42,6 +42,6 @@ func test(_ a : CFString!, b : CFString) {
 
 
 // <rdar://problem/22507759> QoI: poor error message for invalid unsafeDowncast()
-let r22507759: NSObject! = "test"
+let r22507759: NSObject! = "test" as NSString
 let _: NSString! = unsafeDowncast(r22507759)  // expected-error {{generic parameter 'T' could not be inferred}}
 

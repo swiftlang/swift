@@ -1386,9 +1386,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
   }
 
   // Delete the key from the NSMutableDictionary.
-  assert(nsd[TestBridgedKeyTy(10)] != nil)
-  nsd.removeObject(forKey: TestBridgedKeyTy(10))
-  assert(nsd[TestBridgedKeyTy(10)] == nil)
+  assert(nsd[TestBridgedKeyTy(10) as NSCopying] != nil)
+  nsd.removeObject(forKey: TestBridgedKeyTy(10) as NSCopying)
+  assert(nsd[TestBridgedKeyTy(10) as NSCopying] == nil)
 
   // Find an existing key, again.
   do {
@@ -1856,7 +1856,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
   let removedElement = d.remove(at: foundIndex1)
   assert(identity1 == unsafeBitCast(d, to: Int.self))
   assert(isNativeDictionary(d))
-  assert(removedElement.0 == TestObjCKeyTy(10))
+  assert(removedElement.0 == TestObjCKeyTy(10) as TestBridgedKeyTy)
   assert(removedElement.1.value == 1010)
   assert(d.count == 2)
   assert(d.index(forKey: TestBridgedKeyTy(10)) == nil)
@@ -2913,11 +2913,11 @@ DictionaryTestSuite.test("DictionaryToNSDictionaryConversion") {
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
-  let nsd: NSDictionary = d
+  let nsd: NSDictionary = d as NSDictionary
 
   checkDictionaryFastEnumerationFromSwift(
     [ (10, 1010), (20, 1020), (30, 1030) ],
-    d, { d },
+    d as NSDictionary, { d as NSDictionary },
     { ($0 as! TestObjCKeyTy).value },
     { ($0 as! TestObjCValueTy).value })
 
@@ -3824,13 +3824,13 @@ DictionaryTestSuite.test("dropsBridgedCache") {
   // This test will only fail in address sanitizer.
   var dict = [0:10]
   do {
-    var bridged: NSDictionary = dict
+    var bridged: NSDictionary = dict as NSDictionary
     expectEqual(10, bridged[0] as! Int)
   }
 
   dict[0] = 11
   do {
-    var bridged: NSDictionary = dict
+    var bridged: NSDictionary = dict as NSDictionary
     expectEqual(11, bridged[0] as! Int)
   }
 }
