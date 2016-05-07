@@ -116,12 +116,12 @@ func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
 }
 
 func isNativeNSSet(_ s: NSSet) -> Bool {
-  let className: NSString = NSStringFromClass(s.dynamicType)
+  let className: NSString = NSStringFromClass(s.dynamicType) as NSString
   return className.range(of: "NativeSetStorage").length > 0
 }
 
 func isCocoaNSSet(_ s: NSSet) -> Bool {
-  let className: NSString = NSStringFromClass(s.dynamicType)
+  let className: NSString = NSStringFromClass(s.dynamicType) as NSString
   return className.range(of: "NSSet").length > 0 ||
     className.range(of: "NSCFSet").length > 0
 }
@@ -1235,10 +1235,10 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SetIsCopied") {
   expectTrue(isNativeSet(s))
 
   expectTrue(s.contains(TestBridgedKeyTy(1010)))
-  expectNotEmpty(nss.member(TestBridgedKeyTy(1010)))
+  expectNotEmpty(nss.member(TestBridgedKeyTy(1010) as AnyObject))
 
-  nss.remove(TestBridgedKeyTy(1010))
-  expectEmpty(nss.member(TestBridgedKeyTy(1010)))
+  nss.remove(TestBridgedKeyTy(1010) as AnyObject)
+  expectEmpty(nss.member(TestBridgedKeyTy(1010) as AnyObject))
 
   expectTrue(s.contains(TestBridgedKeyTy(1010)))
 }
@@ -1449,7 +1449,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
 
   var members = [Int]()
   for i in s.indices {
-    var foundMember: AnyObject = s[i]
+    var foundMember: AnyObject = s[i] as NSObject
     let member = foundMember as! TestObjCKeyTy
     members.append(member.value)
   }
@@ -1793,11 +1793,11 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     var identity1 = unsafeBitCast(s, to: Int.self)
     expectTrue(isCocoaSet(s))
     expectEqual(3, s.count)
-    expectTrue(s.contains(TestBridgedKeyTy(1010)))
+    expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
 
     s.removeAll()
     expectEqual(0, s.count)
-    expectFalse(s.contains(TestBridgedKeyTy(1010)))
+    expectFalse(s.contains(TestBridgedKeyTy(1010) as NSObject))
   }
 
   do {
@@ -1805,7 +1805,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     var identity1 = unsafeBitCast(s1, to: Int.self)
     expectTrue(isCocoaSet(s1))
     expectEqual(3, s1.count)
-    expectTrue(s1.contains(TestBridgedKeyTy(1010)))
+    expectTrue(s1.contains(TestBridgedKeyTy(1010) as NSObject))
 
     var s2 = s1
     s2.removeAll()
@@ -1813,9 +1813,9 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
     expectNotEqual(identity2, identity1)
     expectEqual(3, s1.count)
-    expectTrue(s1.contains(TestBridgedKeyTy(1010)))
+    expectTrue(s1.contains(TestBridgedKeyTy(1010) as NSObject))
     expectEqual(0, s2.count)
-    expectFalse(s2.contains(TestBridgedKeyTy(1010)))
+    expectFalse(s2.contains(TestBridgedKeyTy(1010) as NSObject))
   }
 
   do {
@@ -1823,7 +1823,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     var identity1 = unsafeBitCast(s1, to: Int.self)
     expectTrue(isCocoaSet(s1))
     expectEqual(3, s1.count)
-    expectTrue(s1.contains(TestBridgedKeyTy(1010)))
+    expectTrue(s1.contains(TestBridgedKeyTy(1010) as NSObject))
 
     var s2 = s1
     s2.removeAll(keepingCapacity: true)
@@ -1831,9 +1831,9 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
     expectNotEqual(identity2, identity1)
     expectEqual(3, s1.count)
-    expectTrue(s1.contains(TestBridgedKeyTy(1010)))
+    expectTrue(s1.contains(TestBridgedKeyTy(1010) as NSObject))
     expectEqual(0 , s2.count)
-    expectFalse(s2.contains(TestBridgedKeyTy(1010)))
+    expectFalse(s2.contains(TestBridgedKeyTy(1010) as NSObject))
   }
 }
 
@@ -2382,7 +2382,7 @@ SetTestSuite.test("SetToNSSetConversion") {
   for i in [1010, 2020, 3030] {
     s.insert(TestObjCKeyTy(i))
   }
-  let nss: NSSet = s
+  let nss: NSSet = s as NSSet
 
   expectTrue(equalsUnordered(Array(s).map { $0.value }, [1010, 2020, 3030]))
 }
@@ -2428,18 +2428,18 @@ SetTestSuite.test("SetUpcastBridgedEntryPoint") {
   do {
     var s: Set<NSObject> = _setBridgeToObjectiveC(s)
 
-    expectTrue(s.contains(TestBridgedKeyTy(1010)))
-    expectTrue(s.contains(TestBridgedKeyTy(2020)))
-    expectTrue(s.contains(TestBridgedKeyTy(3030)))
+    expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
+    expectTrue(s.contains(TestBridgedKeyTy(2020) as NSObject))
+    expectTrue(s.contains(TestBridgedKeyTy(3030) as NSObject))
   }
 
   do {
     var s: Set<TestObjCKeyTy> = _setBridgeToObjectiveC(s)
 
     expectEqual(3, s.count)
-    expectTrue(s.contains(TestBridgedKeyTy(1010)))
-    expectTrue(s.contains(TestBridgedKeyTy(2020)))
-    expectTrue(s.contains(TestBridgedKeyTy(3030)))
+    expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
+    expectTrue(s.contains(TestBridgedKeyTy(2020) as NSObject))
+    expectTrue(s.contains(TestBridgedKeyTy(3030) as NSObject))
   }
 }
 
@@ -2453,18 +2453,18 @@ SetTestSuite.test("SetUpcastBridged") {
     var s: Set<NSObject> = s
 
     expectEqual(3, s.count)
-    expectTrue(s.contains(TestBridgedKeyTy(1010)))
-    expectTrue(s.contains(TestBridgedKeyTy(2020)))
-    expectTrue(s.contains(TestBridgedKeyTy(3030)))
+    expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
+    expectTrue(s.contains(TestBridgedKeyTy(2020) as NSObject))
+    expectTrue(s.contains(TestBridgedKeyTy(3030) as NSObject))
   }
 
   do {
     var s: Set<TestObjCKeyTy> = s
 
     expectEqual(3, s.count)
-    expectTrue(s.contains(TestBridgedKeyTy(1010)))
-    expectTrue(s.contains(TestBridgedKeyTy(2020)))
-    expectTrue(s.contains(TestBridgedKeyTy(3030)))
+    expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
+    expectTrue(s.contains(TestBridgedKeyTy(2020) as NSObject))
+    expectTrue(s.contains(TestBridgedKeyTy(3030) as NSObject))
   }
 }
 
