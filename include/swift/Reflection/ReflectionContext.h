@@ -119,7 +119,40 @@ public:
     auto MetadataAddress = readMetadataFromInstance(ObjectAddress);
     if (!MetadataAddress.first)
       return nullptr;
-    return getMetadataTypeInfo(MetadataAddress.second);
+
+    auto kind = this->readKindFromMetadata(MetadataAddress.second);
+    if (!kind.first)
+      return nullptr;
+
+    switch (kind.second) {
+    case MetadataKind::Class:
+      return getMetadataTypeInfo(MetadataAddress.second);
+
+    case MetadataKind::HeapLocalVariable: {
+      auto CDAddr = this->readCaptureDescriptorFromMetadata(MetadataAddress.second);
+      if (!CDAddr.first)
+        return nullptr;
+
+      auto *CD = getBuilder().getCaptureDescriptor(CDAddr.second);
+      if (CD == nullptr)
+        return nullptr;
+
+      auto Info = getBuilder().getClosureContextInfo(*CD);
+
+      return getClosureContextInfo(ObjectAddress, Info);
+    }
+
+    case MetadataKind::HeapGenericLocalVariable:
+      // SIL @box type
+      return nullptr;
+
+    case MetadataKind::ErrorObject:
+      // ErrorProtocol boxed existential on non-Objective C runtime target
+      return nullptr;
+
+    default:
+      return nullptr;
+    }
   }
 
   bool
