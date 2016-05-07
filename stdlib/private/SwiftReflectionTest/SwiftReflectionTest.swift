@@ -121,21 +121,19 @@ internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
     to: UnsafePointer<MachHeader>.self)
 
   let imageName = _dyld_get_image_name(i)!
-  if let fieldmd = getSectionInfo("__swift3_fieldmd", header) {
-      let assocty = getSectionInfo("__swift3_assocty", header)
-      let builtin = getSectionInfo("__swift3_builtin", header)
-      let capture = getSectionInfo("__swift3_capture", header)
-      let typeref = getSectionInfo("__swift3_typeref", header)
-      let reflstr = getSectionInfo("__swift3_reflstr", header)
-      return ReflectionInfo(imageName: String(validatingUTF8: imageName)!,
-                            fieldmd: fieldmd,
-                            assocty: assocty,
-                            builtin: builtin,
-                            capture: capture,
-                            typeref: typeref,
-                            reflstr: reflstr)
-  }
-  return nil
+  let fieldmd = getSectionInfo("__swift3_fieldmd", header)
+  let assocty = getSectionInfo("__swift3_assocty", header)
+  let builtin = getSectionInfo("__swift3_builtin", header)
+  let capture = getSectionInfo("__swift3_capture", header)
+  let typeref = getSectionInfo("__swift3_typeref", header)
+  let reflstr = getSectionInfo("__swift3_reflstr", header)
+  return ReflectionInfo(imageName: String(validatingUTF8: imageName)!,
+                        fieldmd: fieldmd,
+                        assocty: assocty,
+                        builtin: builtin,
+                        capture: capture,
+                        typeref: typeref,
+                        reflstr: reflstr)
 }
 
 internal func sendBytes<T>(from address: UnsafePointer<T>, count: Int) {
@@ -293,6 +291,9 @@ internal func reflect(instanceAddress: UInt, kind: InstanceKind) {
 }
 
 /// Reflect a class instance.
+///
+/// This reflects the stored properties of the immediate class.
+/// The superclass is not (yet?) visited.
 public func reflect(object: AnyObject) {
   let address = unsafeAddress(of: object)
   let addressValue = unsafeBitCast(address, to: UInt.self)
@@ -300,6 +301,9 @@ public func reflect(object: AnyObject) {
 }
 
 /// Reflect any type at all by boxing it into an existential container (an `Any`)
+///
+/// Given a class, this will reflect the reference value, and not the contents
+/// of the instance. Use `reflect(object:)` for that.
 ///
 /// This function serves to exercise the projectExistential function of the
 /// SwiftRemoteMirror API.
@@ -356,6 +360,30 @@ public func reflect<T>(any: T) {
   let anyPointerValue = unsafeBitCast(anyPointer, to: UInt.self)
   reflect(instanceAddress: anyPointerValue, kind: .Existential)
   anyPointer.deallocateCapacity(sizeof(Any.self))
+}
+
+/// Reflect a closure context. The given function must be a Swift-native
+/// @convention(thick) function value.
+public func reflect(function: () -> ()) {
+  struct ThickFunction {
+    var function: () -> ()
+  }
+
+  struct ThickFunctionParts {
+    var function: UnsafePointer<Void>
+    var context: Optional<UnsafePointer<Void>>
+  }
+
+  let fn = UnsafeMutablePointer<ThickFunction>(
+      allocatingCapacity: sizeof(ThickFunction.self))
+  fn.initialize(with: ThickFunction(function: function))
+
+  let parts = unsafeBitCast(fn, to: UnsafePointer<ThickFunctionParts>.self)
+  let contextPointer = unsafeBitCast(parts.pointee.context, to: UInt.self)
+
+  reflect(instanceAddress: contextPointer, kind: .Object)
+
+  fn.deallocateCapacity(sizeof(ThickFunction.self))
 }
 
 /// Call this function to indicate to the parent that there are

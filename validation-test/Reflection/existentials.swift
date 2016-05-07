@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-build-swift -Xfrontend -enable-reflection-metadata -Xfrontend -enable-reflection-names -lswiftSwiftReflectionTest %s -o %t/example
-// RUN: %target-run %target-swift-reflection-test %t/example 2>&1 | FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-build-swift -Xfrontend -enable-reflection-metadata -Xfrontend -enable-reflection-names -lswiftSwiftReflectionTest %s -o %t/existentials
+// RUN: %target-run %target-swift-reflection-test %t/existentials 2>&1 | FileCheck %s --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
 
 /*
@@ -42,7 +42,7 @@ reflect(any: mc)
 // CHECK-64: Reflecting an existential.
 // CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-64: Type reference:
-// CHECK-64: (bound_generic_class example.MyClass
+// CHECK-64: (bound_generic_class existentials.MyClass
 // CHECK-64:   (struct Swift.Int)
 // CHECK-64:   (struct Swift.Int))
 // CHECK-64: Type info:
@@ -51,7 +51,7 @@ reflect(any: mc)
 // CHECK-32: Reflecting an existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-32: Type reference:
-// CHECK-32: (bound_generic_class example.MyClass
+// CHECK-32: (bound_generic_class existentials.MyClass
 // CHECK-32:   (struct Swift.Int)
 // CHECK-32:   (struct Swift.Int))
 // CHECK-32: Type info:
@@ -64,7 +64,7 @@ reflect(any: smallStruct)
 // CHECK-64: Reflecting an existential.
 // CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-64: Type reference:
-// CHECK-64: (bound_generic_struct example.MyStruct
+// CHECK-64: (bound_generic_struct existentials.MyStruct
 // CHECK-64:   (struct Swift.Int)
 // CHECK-64:   (struct Swift.Int)
 // CHECK-64:   (struct Swift.Int))
@@ -86,7 +86,7 @@ reflect(any: smallStruct)
 // CHECK-32: Reflecting an existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-32: Type reference:
-// CHECK-32: (bound_generic_struct example.MyStruct
+// CHECK-32: (bound_generic_struct existentials.MyStruct
 // CHECK-32:   (struct Swift.Int)
 // CHECK-32:   (struct Swift.Int)
 // CHECK-32:   (struct Swift.Int))
@@ -113,7 +113,7 @@ reflect(any: largeStruct)
 // CHECK-64: Reflecting an existential.
 // CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-64: Type reference:
-// CHECK-64: (bound_generic_struct example.MyStruct
+// CHECK-64: (bound_generic_struct existentials.MyStruct
 // CHECK-64:   (tuple
 // CHECK-64:     (struct Swift.Int)
 // CHECK-64:     (struct Swift.Int)
@@ -174,7 +174,7 @@ reflect(any: largeStruct)
 // CHECK-32: Reflecting an existential.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-32: Type reference:
-// CHECK-32: (bound_generic_struct example.MyStruct
+// CHECK-32: (bound_generic_struct existentials.MyStruct
 // CHECK-32:   (tuple
 // CHECK-32:     (struct Swift.Int)
 // CHECK-32:     (struct Swift.Int)
