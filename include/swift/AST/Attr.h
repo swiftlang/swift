@@ -630,7 +630,7 @@ enum class UnconditionalAvailabilityKind {
   /// The declaration is unavailable in the current version of Swift,
   /// but was available in previous Swift versions.
   UnavailableInCurrentSwift,
-  /// The declararion is unavailable for other reasons.
+  /// The declaration is unavailable for other reasons.
   Unavailable,
 };
 
