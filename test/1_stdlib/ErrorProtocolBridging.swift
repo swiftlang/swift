@@ -68,6 +68,24 @@ ErrorProtocolBridgingTests.test("NSCopying") {
   }
 }
 
+func archiveAndUnarchiveObject<T: NSCoding where T: NSObject>(
+  _ object: T
+) -> T? {
+  let unarchiver = NSKeyedUnarchiver(forReadingWith:
+    NSKeyedArchiver.archivedData(withRootObject: object)
+  )
+  unarchiver.requiresSecureCoding = true
+  return unarchiver.decodeObjectOfClass(T.self, forKey: "root")
+}
+ErrorProtocolBridgingTests.test("NSCoding") {
+  autoreleasepool {
+    let orig = EnumError.ReallyBadError as NSError
+    let unarchived = archiveAndUnarchiveObject(orig)!
+    expectEqual(orig, unarchived)
+    expectTrue(unarchived.dynamicType == NSError.self)
+  }
+}
+
 ErrorProtocolBridgingTests.test("NSError-to-enum bridging") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
