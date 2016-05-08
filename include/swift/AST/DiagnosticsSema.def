@@ -910,7 +910,9 @@ ERROR(attribute_does_not_apply_to_type,none,
       "attribute does not apply to type", ())
 ERROR(optional_attribute_non_protocol,none,
       "'optional' can only be applied to protocol members", ())
-ERROR(optional_attribute_non_objc_attribute,none,
+ERROR(optional_attribute_non_objc_protocol,none,
+      "'optional' can only be applied to members of an @objc protocol", ())
+ERROR(optional_attribute_missing_explicit_objc,none,
       "'optional' requirements are an Objective-C compatibility feature; add '@objc'", 
       ())
 ERROR(optional_attribute_initializer,none,

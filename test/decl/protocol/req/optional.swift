@@ -219,11 +219,11 @@ optional class optErrorClass { // expected-error{{'optional' modifier cannot be 
 }
   
 protocol optErrorProtocol {
-  optional func foo(_ x: Int) // expected-error{{'optional' requirements are an Objective-C compatibility feature; add '@objc'}}
+  optional func foo(_ x: Int) // expected-error{{'optional' can only be applied to members of an @objc protocol}}
 }
 
 @objc protocol optObjcAttributeProtocol {
-  optional func foo(_ x: Int) // expected-error{{'optional' requirements are an Objective-C compatibility feature; add '@objc'}}
+  optional func foo(_ x: Int) // expected-error{{'optional' requirements are an Objective-C compatibility feature; add '@objc'}}{{3-3=@objc }}
   optional associatedtype Assoc  // expected-error{{'optional' modifier cannot be applied to this declaration}} {{3-12=}}
 }
 

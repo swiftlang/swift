@@ -7808,14 +7808,22 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       TC.diagnose(OA->getLocation(),
                   diag::optional_attribute_non_protocol);
       D->getAttrs().removeAttribute(OA);
-    } else if (!D->getAttrs().getAttribute<ObjCAttr>()) {
+    } else if (!cast<ProtocolDecl>(D->getDeclContext())->isObjC()) {
       TC.diagnose(OA->getLocation(),
-                  diag::optional_attribute_non_objc_attribute);
+                  diag::optional_attribute_non_objc_protocol);
       D->getAttrs().removeAttribute(OA);
     } else if (isa<ConstructorDecl>(D)) {
       TC.diagnose(OA->getLocation(),
                   diag::optional_attribute_initializer);
       D->getAttrs().removeAttribute(OA);
+    } else {
+      auto objcAttr = D->getAttrs().getAttribute<ObjCAttr>();
+      if (!objcAttr || objcAttr->isImplicit()) {
+        auto diag = TC.diagnose(OA->getLocation(),
+                                diag::optional_attribute_missing_explicit_objc);
+        if (auto VD = dyn_cast<ValueDecl>(D))
+          diag.fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
+      }
     }
   }
 
