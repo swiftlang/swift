@@ -54,41 +54,38 @@ struct QuotedString {
 
   explicit QuotedString(std::string Value) : Value(Value) {}
 };
-  
-  
-  DemanglerPrinter &operator<<(DemanglerPrinter &printer,
-                               const QuotedString &QS) {
-    printer << '"';
-    for (auto C : QS.Value) {
-      switch (C) {
-      case '\\': printer << "\\\\"; break;
-      case '\t': printer << "\\t"; break;
-      case '\n': printer << "\\n"; break;
-      case '\r': printer << "\\r"; break;
-      case '"': printer << "\\\""; break;
-      case '\'': printer << '\''; break; // no need to escape these
-      case '\0': printer << "\\0"; break;
-      default:
-        auto c = static_cast<char>(C);
-        // Other ASCII control characters should get escaped.
-        if (c < 0x20 || c == 0x7F) {
-          static const char Hexdigit[] = {
-            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-            'A', 'B', 'C', 'D', 'E', 'F'
-          };
-          printer << "\\x" << Hexdigit[c >> 4] << Hexdigit[c & 0xF];
-        } else {
-          printer << c;
-        }
-        break;
+} // end anonymous namespace.
+
+static DemanglerPrinter &operator<<(DemanglerPrinter &printer,
+                                    const QuotedString &QS) {
+  printer << '"';
+  for (auto C : QS.Value) {
+    switch (C) {
+    case '\\': printer << "\\\\"; break;
+    case '\t': printer << "\\t"; break;
+    case '\n': printer << "\\n"; break;
+    case '\r': printer << "\\r"; break;
+    case '"': printer << "\\\""; break;
+    case '\'': printer << '\''; break; // no need to escape these
+    case '\0': printer << "\\0"; break;
+    default:
+      auto c = static_cast<char>(C);
+      // Other ASCII control characters should get escaped.
+      if (c < 0x20 || c == 0x7F) {
+        static const char Hexdigit[] = {
+          '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+          'A', 'B', 'C', 'D', 'E', 'F'
+        };
+        printer << "\\x" << Hexdigit[c >> 4] << Hexdigit[c & 0xF];
+      } else {
+        printer << c;
       }
+      break;
     }
-    printer << '"';
-    return printer;
   }
-
-
-} // end unnamed namespace
+  printer << '"';
+  return printer;
+}
 
 Node::~Node() {
   switch (NodePayloadKind) {
