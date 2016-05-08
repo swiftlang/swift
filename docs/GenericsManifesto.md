@@ -27,7 +27,7 @@ There are a number of restrictions to the use of generics that fall out of the i
 
 ### Recursive protocol constraints (*)
 
-Currently, an associated type cannot be required to conform to its enclosing protocol (or any protocol that inherits that protocol). For example, in the standard library `SubSequence` type of a `Sequence` should itself be a Sequence:
+Currently, an associated type cannot be required to conform to its enclosing protocol (or any protocol that inherits that protocol). For example, in the standard library `SubSequence` type of a `Sequence` should itself be a `Sequence`:
 
 ```
 protocol Sequence {
@@ -130,7 +130,7 @@ extension<T> Array where Element == T? {
 }
 ```
 
-We can generalize this to a protocol extensions:
+We can generalize this to protocol extensions:
 
 ```
 extension<T> Sequence where Element == T? {
@@ -185,7 +185,7 @@ protocol Sequence {
 }
 ```
 
-Hanging the where clause off the associated type is protocol not ideal, but that's a discussion for another thread.
+Hanging the `where` clause off the associated type protocol is not ideal, but that's a discussion for another thread.
 
 ### Typealiases in protocols and protocol extensions (*)
 
@@ -274,7 +274,7 @@ extension Array : Equatable where Element : Equatable { }
 func ==<T : Equatable>(lhs: Array<T>, rhs: Array<T>) -> Bool { ... }
 ```
 
-Conditional conformances are a potentially very powerful feature. One important aspect of this feature is how deal with or avoid overlapping conformances. For example, imagine an adaptor over a `Sequence` that has conditional conformances to `Collection` and `MutableCollection`:
+Conditional conformances are a potentially very powerful feature. One important aspect of this feature is how to deal with or avoid overlapping conformances. For example, imagine an adaptor over a `Sequence` that has conditional conformances to `Collection` and `MutableCollection`:
 
 ```
 struct SequenceAdaptor<S: Sequence> : Sequence { }
@@ -303,7 +303,7 @@ public func zip<Sequence1 : Sequence, Sequence2 : Sequence>(
             -> Zip2Sequence<Sequence1, Sequence2> { ... }
 ```
 
-Supporting three arguments would require copy-paste of those of those:
+Supporting three arguments would require copy-pasting code:
 
 ```
 public struct Zip3Sequence<Sequence1 : Sequence,
@@ -545,7 +545,7 @@ let intSet: Set<Int> = ...
 intSet.map { String($0) }   // produces Set<String>
 ```
 
-Potential syntax borrowed from [one thread on higher-kinded types](https://lists.swift.org/pipermail/swift-evolution/Week-of-Mon-20151214/002736.html) uses ~= as a "similarity" constraint to describe a Functor protocol:
+Potential syntax borrowed from [one thread on higher-kinded types](https://lists.swift.org/pipermail/swift-evolution/Week-of-Mon-20151214/002736.html) uses `~=` as a "similarity" constraint to describe a `Functor` protocol:
 
 ```
 protocol Functor {
@@ -562,7 +562,7 @@ The type arguments of a generic function are always determined via type inferenc
 func f<T>(t: T)
 ```
 
-one cannot directly specify `T`: either one calls "f" (and T is determined via the argument's type) or one uses `f` in a context where it is given a particular function type (e.g., `let x: (Int) -> Void = f`  would infer `T = Int`). We could permit explicit specialization here, e.g.,
+one cannot directly specify `T`: either one calls `f` (and `T` is determined via the argument's type) or one uses `f` in a context where it is given a particular function type (e.g., `let x: (Int) -> Void = f`  would infer `T = Int`). We could permit explicit specialization here, e.g.,
 
 ```
 let x = f<Int> // x has type (Int) -> Void
@@ -604,7 +604,7 @@ func foo(strings: Sequence<String>) {  /// works on any sequence containing Stri
 }
 ```
 
-The actual requested feature here is the ability to say "Any type that conforms to Sequence whose Element type is String", which is covered by the section on "Generalized existentials", below.
+The actual requested feature here is the ability to say "Any type that conforms to `Sequence` whose `Element` type is `String`", which is covered by the section on "Generalized existentials", below.
 
 More importantly, modeling `Sequence` with generic parameters rather than associated types is tantalizing but wrong: you don't want a type conforming to `Sequence` in multiple ways, or (among other things) your `for..in` loops stop working, and you lose the ability to dynamically cast down to an existential `Sequence` without binding the `Element` type (again, see "Generalized existentials"). Use cases similar to the `ConstructibleFromValue` protocol above seem too few to justify the potential for confusion between associated types and generic parameters of protocols; we're better off not having the latter.
 
@@ -707,7 +707,7 @@ Additionally, it is reasonable to want to constrain the associated types of an e
 let strings: Any<Sequence where .Iterator.Element == String> = ["a", "b", "c"]
 ```
 
-The leading "." indicates that we're talking about the dynamic type, i.e., the "Self" type that's conforming to the Sequence protocol. There's no reason why we cannot support arbitrary "where" clauses within the "Any<...>". This very-general syntax is a bit unwieldy, but common cases can easily be wrapped up in a generic typealias (see the section "Generic typealiases" above):
+The leading `.` indicates that we're talking about the dynamic type, i.e., the `Self` type that's conforming to the `Sequence` protocol. There's no reason why we cannot support arbitrary `where` clauses within the `Any<...>`. This very-general syntax is a bit unwieldy, but common cases can easily be wrapped up in a generic typealias (see the section "Generic typealiases" above):
 
 ```
 typealias AnySequence<Element> = Any<Sequence where .Iterator.Element == Element>
@@ -716,7 +716,7 @@ let strings: AnySequence<String> = ["a", "b", "c"]
 
 ### Opening existentials
 
-Generalized existentials as described above will still have trouble with protocol requirements that involve `Self` or associated types in function parameters. For example, let's try to use Equatable as an existential:
+Generalized existentials as described above will still have trouble with protocol requirements that involve `Self` or associated types in function parameters. For example, let's try to use `Equatable` as an existential:
 
 ```
 protocol Equatable {
