@@ -779,8 +779,10 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
     return true;
 
   std::tie(Info.line, Info.column) = getLineCol(Loc);
-  if (auto Group = D->getGroupName())
-    Info.group = Group.getValue();
+  if (!IsRef) {
+    if (auto Group = D->getGroupName())
+      Info.group = Group.getValue();
+  }
   return false;
 }
 
