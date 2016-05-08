@@ -111,7 +111,7 @@ protocol ProtocolA {
   init(fromProtocolA: Int)
 
   func protoAFunc()
-  optional func protoAFuncOptional()
+  @objc optional func protoAFuncOptional()
 
   @noreturn
   func protoAFuncWithAttr()

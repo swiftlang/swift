@@ -58,16 +58,16 @@ import Foundation
 
 @objc protocol P {
   func requiredInstanceMethod(_ o: NSNumber) -> NSNumber
-  optional func optionalInstanceMethod(_ o: NSObject) -> NSObject
+  @objc optional func optionalInstanceMethod(_ o: NSObject) -> NSObject
   static func requiredClassMethod(_ o: NSString) -> NSString
-  optional static func optionalClassMethod(_ o: NSMutableString)
+  @objc optional static func optionalClassMethod(_ o: NSMutableString)
   var requiredInstanceProperty: NSMutableArray { get set }
   var requiredROInstanceProperty: NSMutableArray { get }
 
   func requiredInstanceMethod2(_ o: NSNumber) -> NSNumber
-  optional func optionalInstanceMethod2(_ o: NSObject) -> NSObject
+  @objc optional func optionalInstanceMethod2(_ o: NSObject) -> NSObject
   static func requiredClassMethod2(_ o: NSString) -> NSString
-  optional static func optionalClassMethod2(_ o: NSMutableString)
+  @objc optional static func optionalClassMethod2(_ o: NSMutableString)
   var requiredInstanceProperty2: NSMutableArray { get set }
   var requiredROInstanceProperty2: NSMutableArray { get }
 

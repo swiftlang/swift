@@ -4,7 +4,7 @@
 // nearly matches an optional requirement, but does not exactly match.
 
 @objc protocol P1 {
-  optional func doSomething(a: Int, b: Double) // expected-note 2{{requirement 'doSomething(a:b:)' declared here}}
+  @objc optional func doSomething(a: Int, b: Double) // expected-note 2{{requirement 'doSomething(a:b:)' declared here}}
 }
 
 class C1a : P1 {
@@ -44,8 +44,8 @@ class C1e : P1 {
 // Don't try to match an optional requirement against a declaration
 // that already satisfies one witness.
 @objc protocol P2 {
-  optional func doSomething(a: Int, b: Double)
-  optional func doSomething(a: Int, d: Double)
+  @objc optional func doSomething(a: Int, b: Double)
+  @objc optional func doSomething(a: Int, d: Double)
 }
 
 class C2a : P2 {
@@ -54,7 +54,7 @@ class C2a : P2 {
 
 // Cope with base names that change.
 @objc protocol P3 {
-  optional func doSomethingWithPriority(_ a: Int, d: Double) // expected-note{{requirement 'doSomethingWithPriority(_:d:)' declared here}}
+  @objc optional func doSomethingWithPriority(_ a: Int, d: Double) // expected-note{{requirement 'doSomethingWithPriority(_:d:)' declared here}}
 }
 
 class C3a : P3 {
@@ -66,7 +66,7 @@ class C3a : P3 {
 }
 
 @objc protocol P4 {
-  optional func doSomething(priority: Int, d: Double) // expected-note{{requirement 'doSomething(priority:d:)' declared here}}
+  @objc optional func doSomething(priority: Int, d: Double) // expected-note{{requirement 'doSomething(priority:d:)' declared here}}
 }
 
 class C4a : P4 {
@@ -80,7 +80,7 @@ class C4a : P4 {
 @objc class SomeClass { }
 
 @objc protocol P5 {
-  optional func methodWithInt(_: Int, forSomeClass: SomeClass, dividingDouble: Double)
+  @objc optional func methodWithInt(_: Int, forSomeClass: SomeClass, dividingDouble: Double)
   // expected-note@-1{{requirement 'methodWithInt(_:forSomeClass:dividingDouble:)' declared here}}
 }
 
@@ -93,7 +93,7 @@ class C5a : P5 {
 }
 
 @objc protocol P6 {
-  optional func method(_: Int, for someClass: SomeClass, dividing double: Double)
+  @objc optional func method(_: Int, for someClass: SomeClass, dividing double: Double)
   // expected-note@-1{{requirement 'method(_:for:dividing:)' declared here}}
 }
 
@@ -107,7 +107,7 @@ class C6a : P6 {
 
 // Use the first note to always describe why it didn't match.
 @objc protocol P7 {
-  optional func method(foo: Float)
+  @objc optional func method(foo: Float)
   // expected-note@-1{{requirement 'method(foo:)' declared here}}
 }
 

@@ -618,7 +618,7 @@ func _stdlib_installTrapInterceptor()
 
 #if _runtime(_ObjC)
 @objc protocol _StdlibUnittestNSException {
-  optional var name: AnyObject { get }
+  @objc optional var name: AnyObject { get }
 }
 #endif
 

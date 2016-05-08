@@ -31,7 +31,7 @@ private protocol ProtocolAPrivate {
   init(fromProtocolA: TagPA)
 
   func protoAFunc(x: TagPA)
-  optional func protoAFuncOptional(x: TagPA)
+  @objc optional func protoAFuncOptional(x: TagPA)
 
   @noreturn
   func protoAFuncWithAttr(x: TagPA)
@@ -47,7 +47,7 @@ protocol ProtocolBInternal {
   init(fromProtocolB: TagPB)
 
   func protoBFunc(x: TagPB)
-  optional func protoBFuncOptional(x: TagPB)
+  @objc optional func protoBFuncOptional(x: TagPB)
 
   @noreturn
   func protoBFuncWithBttr(x: TagPB)
@@ -63,7 +63,7 @@ public protocol ProtocolCPublic {
   init(fromProtocolC: TagPC)
 
   func protoCFunc(x: TagPC)
-  optional func protoCFuncOptional(x: TagPC)
+  @objc optional func protoCFuncOptional(x: TagPC)
 
   @noreturn
   func protoCFuncWithCttr(x: TagPC)
