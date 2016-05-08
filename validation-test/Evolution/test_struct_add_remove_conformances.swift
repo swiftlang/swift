@@ -22,6 +22,8 @@
 // Requires fixes to @_transparent attribute
 // XFAIL: *
 
+// REQUIRES: executable_test
+
 import StdlibUnittest
 import struct_add_remove_conformances
 

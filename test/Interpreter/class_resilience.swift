@@ -10,6 +10,8 @@
 
 // RUN: %target-run %t/main
 
+// REQUIRES: executable_test
+
 import StdlibUnittest
 import resilient_class
 import resilient_struct
