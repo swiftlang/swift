@@ -431,6 +431,59 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   return getterDecl;
 }
 
+// Build the rawValue getter for a bridged, swift_newtype'd type.
+//   struct SomeType: RawRepresentable {
+//     var _rawValue: ObjCType
+//     var rawValue: SwiftType {
+//       return _rawValue as SwiftType
+//     }
+//   }
+static FuncDecl *makeNewtypeBridgedRawValueGetter(
+                   ClangImporter::Implementation &Impl,
+                   StructDecl *structDecl,
+                   VarDecl *computedVar,
+                   VarDecl *storedVar) {
+  ASTContext &C = Impl.SwiftContext;
+  
+  auto selfDecl = ParamDecl::createSelf(SourceLoc(), structDecl);
+  
+  ParameterList *params[] = {
+    ParameterList::createWithoutLoc(selfDecl),
+    ParameterList::createEmpty(C)
+  };
+
+  auto computedType = computedVar->getType();
+
+  auto getterDecl =
+    FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+                     DeclName(), SourceLoc(), SourceLoc(), SourceLoc(), nullptr,
+                     Type(), params,
+                     TypeLoc::withoutLoc(computedType), structDecl);
+  getterDecl->setImplicit();
+  getterDecl->setType(ParameterList::getFullType(computedType, params));
+  getterDecl->setBodyResultType(computedType);
+  getterDecl->setAccessibility(Accessibility::Public);
+
+  computedVar->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
+                            SourceLoc());
+
+  // Don't bother synthesizing the body if we've already finished type-checking.
+  if (Impl.hasFinishedTypeChecking())
+    return getterDecl;
+
+  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
+  auto storedRef = new (C) MemberRefExpr(selfRef, SourceLoc(), storedVar,
+                                         DeclNameLoc(), /*Implicit=*/true);
+  auto coerce = new (C) CoerceExpr(storedRef, {}, {nullptr, computedType});
+  auto ret = new (C) ReturnStmt(SourceLoc(), coerce);
+  auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                /*implicit*/ true);
+  
+  getterDecl->setBody(body);
+  C.addExternalDecl(getterDecl);
+  return getterDecl;
+}
+
 static FuncDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                                      StructDecl *importedDecl,
                                      VarDecl *importedFieldDecl,
@@ -1668,18 +1721,21 @@ namespace {
 
       //
       // Create a computed value variable
-      auto dre = new (cxt) DeclRefExpr(
-          storedVar, {}, true, AccessSemantics::Ordinary, storedUnderlyingType);
-      auto coerce = new (cxt)
-          CoerceExpr(dre, {}, {nullptr, bridgedType});
-      auto computedVar = cast<VarDecl>(Impl.createConstant(
-          computedVarName, structDecl, bridgedType, coerce,
-          ConstantConvertKind::Coerce, false, {}));
+      auto computedVar = new (cxt) VarDecl(/*static*/ false,
+                                           /*IsLet*/ false,
+                                           SourceLoc(), computedVarName,
+                                           bridgedType, structDecl);
       computedVar->setImplicit();
       computedVar->setAccessibility(Accessibility::Public);
+      computedVar->setSetterAccessibility(Accessibility::Private);
+
+      // Create the getter for the computed value variable.
+      auto computedVarGetter = makeNewtypeBridgedRawValueGetter(Impl,
+                                                                structDecl,
+                                                                computedVar,
+                                                                storedVar);
 
       // Create a pattern binding to describe the variable.
-
       Pattern *computedVarPattern = createTypedNamedPattern(computedVar);
       auto computedPatternBinding = PatternBindingDecl::create(
           cxt, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
@@ -1711,9 +1767,6 @@ namespace {
                                            /*Implicit=*/true);
         auto body = BraceStmt::create(cxt, SourceLoc(), {assign}, SourceLoc());
         init->setBody(body);
-
-        // We want to inline away as much of this as we can
-        init->getAttrs().add(new (cxt) TransparentAttr(/*implicit*/ true));
       }
 
       structDecl->setHasDelayedMembers();
@@ -1722,6 +1775,7 @@ namespace {
       structDecl->addMember(storedVar);
       structDecl->addMember(computedPatternBinding);
       structDecl->addMember(computedVar);
+      structDecl->addMember(computedVarGetter);
     }
 
     /// \brief Create a constructor that initializes a struct from its members.
