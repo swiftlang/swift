@@ -1690,8 +1690,8 @@ namespace {
                                          /*wantBody=*/false);
       // Insert our custom init body
       if (!Impl.hasFinishedTypeChecking()) {
-        auto selfDecl = ParamDecl::createSelf(SourceLoc(), structDecl,
-                                              /*static*/ false, /*inout*/ true);
+        auto selfDecl = init->getParameterList(0)->get(0);
+
         // Construct left-hand side.
         Expr *lhs = new (cxt) DeclRefExpr(selfDecl, DeclNameLoc(),
                                           /*Implicit=*/true);
