@@ -182,8 +182,8 @@ public protocol IteratorProtocol {
   /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// Repeatedly calling this method returns, in order, all the elements of the
-  /// underlying sequence. After the sequence has run out of elements, the
-  /// `next()` method returns `nil`.
+  /// underlying sequence.  As soon as the sequence has run out of elements, all
+  /// subsequent calls return `nil`.
   ///
   /// You must not call this method if any other copy of this iterator has been
   /// advanced with a call to its `next()` method.
@@ -1179,7 +1179,9 @@ public struct IteratorSequence<
   }
 
   /// Advances to the next element and returns it, or `nil` if no next element
-  /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made.

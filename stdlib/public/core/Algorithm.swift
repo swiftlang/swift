@@ -85,7 +85,9 @@ public struct EnumeratedIterator<
   public typealias Element = (offset: Int, element: Base.Element)
 
   /// Advances to the next element and returns it, or `nil` if no next element
-  /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Element? {
     guard let b = _base.next() else { return nil }
     defer { _count += 1 }

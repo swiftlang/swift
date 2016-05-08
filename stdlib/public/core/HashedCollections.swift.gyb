@@ -4574,7 +4574,9 @@ public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
   }
 
   /// Advances to the next element and returns it, or `nil` if no next element
-  /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
   @inline(__always)
   public mutating func next() -> ${Sequence}? {
     if _fastPath(_guaranteedNative) {

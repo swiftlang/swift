@@ -296,11 +296,11 @@ public struct IndexingIterator<
   }
 
   /// Advances to the next element and returns it, or `nil` if no next element
-  /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
+  /// exists.
   ///
   /// Repeatedly calling this method returns all the elements of the underlying
-  /// sequence in order. As soon as the sequence has run out of elements, the
-  /// `next()` method returns `nil`.
+  /// sequence in order.  As soon as the sequence has run out of elements, all
+  /// subsequent calls return `nil`.
   ///
   /// This example shows how an iterator can be used explicitly to emulate a
   /// `for`-`in` loop. First, retrieve a sequence's iterator, and then call
