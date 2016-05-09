@@ -6,9 +6,9 @@ func f2(_ x: @autoclosure () -> Float) {}
 
 var f : Float
 
-f0(f0(f))
-f0(1)
-f1(f1(f))
+_ = f0(f0(f))
+_ = f0(1)
+_ = f1(f1(f))
 f2(f)
 f2(1.0)
 

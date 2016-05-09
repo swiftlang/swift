@@ -11,14 +11,17 @@ extension String: Binding {}
 extension Blob: Binding {}
 
 struct Stmt {
+  @discardableResult
   func bind(_ values: Binding?...) -> Stmt {
     return self
   }
 
+  @discardableResult
   func bind(_ values: [Binding?]) -> Stmt {
     return self
   }
 
+  @discardableResult
   func bind(_ values: [String: Binding?]) -> Stmt {
     return self
   }

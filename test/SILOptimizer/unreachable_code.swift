@@ -76,8 +76,8 @@ func ifTrueTransparent(_ b: Bool) -> Int {
   return 0
 }
 func testIfTrueTransparent() {
-  ifTrueTransparent(true)  // no-warning
-  ifTrueTransparent(false)  // no-warning
+  _ = ifTrueTransparent(true)  // no-warning
+  _ = ifTrueTransparent(false)  // no-warning
 }
 
 // We should not report unreachable user code inside generic instantiations.
@@ -101,8 +101,8 @@ func ifTrueGeneric<T : HavingGetCond>(_ x: T) -> Int {
   return 0
 }
 func testIfTrueGeneric(_ b1: ReturnsOpaque, b2: ReturnsTrue) {
-  ifTrueGeneric(b1)  // no-warning
-  ifTrueGeneric(b2)  // no-warning
+  _ = ifTrueGeneric(b1)  // no-warning
+  _ = ifTrueGeneric(b2)  // no-warning
 }
 
 // Test switch_enum folding/diagnostic.

@@ -483,7 +483,7 @@ func _workerThreadOneTrial<RT : RaceTestWithPerTrialData>(
   var threadLocalData = rt.makeThreadLocalData()
   if true {
     let trialSpinBarrier = sharedState.trialSpinBarrier
-    trialSpinBarrier.fetchAndAdd(1)
+    _ = trialSpinBarrier.fetchAndAdd(1)
     while trialSpinBarrier.load() < racingThreadCount {}
   }
   // Perform racy operations.

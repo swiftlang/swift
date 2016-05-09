@@ -25,6 +25,7 @@ func takesMutablePointer(_ x: UnsafeMutablePointer<Int>${suffix}) {}
 func takesMutableVoidPointer(_ x: UnsafeMutablePointer<Void>${suffix}) {}
 func takesMutableInt8Pointer(_ x: UnsafeMutablePointer<Int8>${suffix}) {}
 func takesMutableArrayPointer(_ x: UnsafeMutablePointer<[Int]>${suffix}) {}
+@discardableResult
 func takesConstPointer(_ x: UnsafePointer<Int>${suffix}) -> Character { return "x" }
 func takesConstInt8Pointer(_ x: UnsafePointer<Int8>${suffix}) {}
 func takesConstUInt8Pointer(_ x: UnsafePointer<UInt8>${suffix}) {}

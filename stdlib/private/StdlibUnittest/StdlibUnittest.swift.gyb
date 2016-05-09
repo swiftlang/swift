@@ -824,7 +824,6 @@ struct _ParentProcess {
 
     // Check if the child has sent us "end" markers for the current test.
     if stdoutEnd && stderrEnd {
-      testSuite._testByName(testName)
       var status: ProcessTerminationStatus? = nil
       if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
         status = _waitForChild()

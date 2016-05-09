@@ -25,6 +25,7 @@ class D {}
 
 func takesMutablePointer(_ x: UnsafeMutablePointer<Int>${suffix}) {}
 func takesMutableVoidPointer(_ x: UnsafeMutablePointer<Void>${suffix}) {}
+@discardableResult
 func takesConstPointer(_ x: UnsafePointer<Int>${suffix}) -> Character { return "x" }
 func takesConstVoidPointer(_ x: UnsafePointer<Void>${suffix}) {}
 

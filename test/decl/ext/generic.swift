@@ -130,7 +130,7 @@ extension GenericClass where T : Equatable {
 }
 
 func genericClassEquatable<T : Equatable>(_ gc: GenericClass<T>, x: T, y: T) {
-  gc.foo(x, y: y)
+  _ = gc.foo(x, y: y)
 }
 
 func genericClassNotEquatable<T>(_ gc: GenericClass<T>, x: T, y: T) {

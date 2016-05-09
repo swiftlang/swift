@@ -95,15 +95,15 @@ infix func +-+= (x: inout Int, y: Int) -> Int {} // expected-error {{'infix' mod
 var n = 0
 
 // Infix by context
-(+-+)(1, 2)
+_ = (+-+)(1, 2)
 // Prefix by context
-(+-+)(1)
+_ = (+-+)(1)
 
 // Ambiguous -- could be prefix or postfix
 (-+-)(&n) // expected-error{{ambiguous use of operator '-+-'}}
 
 // Assignment operator refs become inout functions
-(+-+=)(&n, 12)
+_ = (+-+=)(&n, 12)
 (+-+=)(n, 12)   // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{8-8=&}}
 
 var f1 : (Int, Int) -> Int = (+-+)
@@ -129,8 +129,8 @@ func ☃(x: Int, y: Int) -> Bool { return x == y }
 func ☃⃠(x: Int, y: Int) -> Bool { return x != y }
 
 var x, y : Int
-x☃y
-x☃⃠y
+_ = x☃y
+_ = x☃⃠y
 
 // rdar://14705150 - crash on invalid
 func test_14705150() {

@@ -39,7 +39,7 @@ func foo(_ a: CC, b: E) {
   var b = b
   _ = b
   globV = 0
-  a + a.instV
+  _ = a + a.instV
   a.meth()
   CC.smeth()
   b = E.EElem
@@ -87,7 +87,7 @@ class CC2 {
       return i
     }
     set(vvv) {
-      vvv+1
+      _ = vvv+1
     }
   }
 }

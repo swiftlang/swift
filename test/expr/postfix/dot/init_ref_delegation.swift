@@ -151,7 +151,7 @@ struct RDar16603812 {
    init() {}
    func foo() {
       self.init() // expected-error {{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{11-11=.dynamicType}}
-      self.dynamicType.init() // expected-warning{{result of initializer is unused}}
+      self.dynamicType.init() // expected-warning{{result of call to 'init()' is unused}}
    }
 }
 

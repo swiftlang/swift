@@ -7,9 +7,9 @@ let foo: Bool! = true
 
 // Used to be errors, should now work
 let a = /* */!foo
-1/**/+ 2
-1 /**/+ 2
-1 +/*hi*/2
+_ = 1/**/+ 2
+_ = 1 /**/+ 2
+_ = 1 +/*hi*/2
 
 // Used to work, should now be errors
 // The actual error produced is probably not important.
@@ -17,13 +17,13 @@ let a = /* */!foo
 func test1() { _ = foo/* */?.description }    // expected-error {{expected ':' after '? ...' in ternary expression}}
 func test2() { _ = foo/* */! }                // expected-error {{expected expression after operator}}
 func test3() { _ = 1/**/+2 }                  // expected-error {{consecutive statements on a line must be separated by ';'}} expected-error {{ambiguous use of operator '+'}}
-func test4() { _ = 1+/**/2 }                  // expected-error {{'+' is not a postfix unary operator}} expected-error {{consecutive statements on a line must be separated by ';'}}
+func test4() { _ = 1+/**/2 }                  // expected-error {{'+' is not a postfix unary operator}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
 
 // Continue to be errors
 func test5() { _ = !/* */foo }                // expected-error {{unary operator cannot be separated from its operand}}
-func test6() { _ = 1+/* */2 }                 // expected-error {{'+' is not a postfix unary operator}} expected-error {{consecutive statements on a line must be separated by ';'}}
+func test6() { _ = 1+/* */2 }                 // expected-error {{'+' is not a postfix unary operator}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
 
 // Continue to work
 foo!// this is dangerous
-1 +/**/ 2
-1 +/* hi */2
+_ = 1 +/**/ 2
+_ = 1 +/* hi */2

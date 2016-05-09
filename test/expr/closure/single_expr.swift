@@ -41,4 +41,4 @@ func expect<T>(_ expression: @autoclosure () -> T) -> Expectation<T> {
   return Expectation<T>()
 }
 func describe(_ closure: () -> ()) {}
-func f() { describe { expect("what") } }
+func f() { describe { _ = expect("what") } }

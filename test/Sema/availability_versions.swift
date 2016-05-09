@@ -101,12 +101,12 @@ let ignored4: (Int, Int) = (globalFuncAvailableOn10_51(), globalFuncAvailableOn1
     // expected-note@-1 2{{add 'if #available' version check}}
 
 
-globalFuncAvailableOn10_9()
+_ = globalFuncAvailableOn10_9()
 
 let ignored5 = globalFuncAvailableOn10_51 // expected-error {{'globalFuncAvailableOn10_51()' is only available on OS X 10.51 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
 
-globalFuncAvailableOn10_51() // expected-error {{'globalFuncAvailableOn10_51()' is only available on OS X 10.51 or newer}}
+_ = globalFuncAvailableOn10_51() // expected-error {{'globalFuncAvailableOn10_51()' is only available on OS X 10.51 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
 
 // Overloaded global functions
@@ -351,7 +351,7 @@ class ClassWithUnavailableProperties {
   
   var propWithSetterOnlyAvailableOn10_51 : Int {
     get {
-      globalFuncAvailableOn10_51() // expected-error {{'globalFuncAvailableOn10_51()' is only available on OS X 10.51 or newer}}
+      _ = globalFuncAvailableOn10_51() // expected-error {{'globalFuncAvailableOn10_51()' is only available on OS X 10.51 or newer}}
           // expected-note@-1 {{add @available attribute to enclosing class}}
           // expected-note@-2 {{add @available attribute to enclosing var}}
           // expected-note@-3 {{add 'if #available' version check}}
@@ -359,18 +359,18 @@ class ClassWithUnavailableProperties {
     }
     @available(OSX, introduced: 10.51)
     set(newVal) {
-    globalFuncAvailableOn10_51()
+    _ = globalFuncAvailableOn10_51()
     }
   }
   
   var propWithGetterOnlyAvailableOn10_51 : Int {
     @available(OSX, introduced: 10.51)
     get {
-      globalFuncAvailableOn10_51()
+      _ = globalFuncAvailableOn10_51()
       return 0
     }
     set(newVal) {
-      globalFuncAvailableOn10_51() // expected-error {{'globalFuncAvailableOn10_51()' is only available on OS X 10.51 or newer}}
+      _ = globalFuncAvailableOn10_51() // expected-error {{'globalFuncAvailableOn10_51()' is only available on OS X 10.51 or newer}}
           // expected-note@-1 {{add @available attribute to enclosing class}}
           // expected-note@-2 {{add @available attribute to enclosing var}}
           // expected-note@-3 {{add 'if #available' version check}}
@@ -1059,11 +1059,11 @@ func functionWithUnavailableInDeadBranch() {
   if #available(iOS 8.0, *) {
   } else {
     // This branch is dead on OSX, so we shouldn't a warning about use of potentially unavailable APIs in it.
-    globalFuncAvailableOn10_51() // no-warning
+    _ = globalFuncAvailableOn10_51() // no-warning
 
     @available(OSX 10.51, *)
     func localFuncAvailableOn10_51() {
-      globalFuncAvailableOn10_52() // no-warning
+      _ = globalFuncAvailableOn10_52() // no-warning
     }
 
     localFuncAvailableOn10_51() // no-warning
@@ -1074,7 +1074,7 @@ func functionWithUnavailableInDeadBranch() {
   }
 
   guard #available(iOS 8.0, *) else {
-    globalFuncAvailableOn10_51() // no-warning
+    _ = globalFuncAvailableOn10_51() // no-warning
 
     // CHECK:error: 'explicitlyUnavailable()' is unavailable
     explicitlyUnavailable() // expected-error {{'explicitlyUnavailable()' is unavailable}}

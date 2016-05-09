@@ -7,6 +7,7 @@ func values(_ arg: @convention(c) (Int) -> Int) -> @convention(c) (Int) -> Int {
 // CHECK:       bb0(%0 : $@convention(c) (Int) -> Int):
 // CHECK:         return %0 : $@convention(c) (Int) -> Int
 
+@discardableResult
 func calls(_ arg: @convention(c) (Int) -> Int, _ x: Int) -> Int {
   return arg(x)
 }
@@ -15,6 +16,7 @@ func calls(_ arg: @convention(c) (Int) -> Int, _ x: Int) -> Int {
 // CHECK:         [[RESULT:%.*]] = apply %0(%1)
 // CHECK:         return [[RESULT]]
 
+@discardableResult
 func calls_no_args(_ arg: @convention(c) () -> Int) -> Int {
   return arg()
 }
