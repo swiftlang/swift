@@ -115,8 +115,8 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
     L.lex(Tok);
     if (Tok.is(tok::eof))
       break;
-    assert(Tok.is(tok::comment));
-    addCommentToList(Comments, SingleRawComment(Tok.getRange(), SourceMgr));
+    if (Tok.is(tok::comment)) // was assert, now "if" because <<"HEREDOC"
+      addCommentToList(Comments, SingleRawComment(Tok.getRange(), SourceMgr));
   }
   RawComment Result;
   Result.Comments = Context.AllocateCopy(Comments);

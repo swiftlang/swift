@@ -49,7 +49,9 @@ enum StringLiteralModifiers : unsigned {
   StringLiteralTripleQuote = 1<<3,
   StringLiteralStripIndent = 1<<4,
   StringLiteralHeredocToken = 1<<5,
-  StringLiteralFirstSegment = 1<<6
+  StringLiteralNewLineOK = StringLiteralUnderscoreDelimited | StringLiteralTripleQuote,
+  StringLiteralNoContinuaton = StringLiteralTripleQuote | StringLiteralHeredocToken,
+  StringLiteralFirstSegment = 1<<10
 };
 
 //===----------------------------------------------------------------------===//
@@ -572,26 +574,40 @@ tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
   return Kind;
 }
 
-bool Lexer::buildModifiers(const char *ModPtr, unsigned &Modifiers) {
-  while (ModPtr < CurPtr)
+const char *Lexer::buildModifiers(const char *ModPtr, unsigned &Modifiers, bool warn) {
+  while (ModPtr < BufferEnd)
     switch (*ModPtr++) {
     case '_':
-      Modifiers |= StringLiteralUnderscoreDelimited;
+      Modifiers |= StringLiteralUnderscoreDelimited | StringLiteralStripIndent;
       break;
     case 'e':
       Modifiers |= StringLiteralUnprocessedEscapes;
       break;
-    case 'r':
-      Modifiers |= StringLiteralRegexInterpolating;
+    case 'E':
+      Modifiers &= ~StringLiteralUnprocessedEscapes;
       break;
     case 'i':
       Modifiers |= StringLiteralStripIndent;
       break;
+    case 'I':
+      Modifiers &= ~StringLiteralStripIndent;
+      break;
+    case 'r':
+      Modifiers |= StringLiteralRegexInterpolating;
+      break;
+    case 'R':
+      Modifiers &= ~StringLiteralRegexInterpolating;
+      break;
+    case '"':
+    case '`':
+    case '\'':
+      return ModPtr - 1;
     default:
-      diagnose(ModPtr, diag::lex_invalid_modifier);
-      return false;
+      if (warn)
+        diagnose(ModPtr, diag::lex_invalid_string_modifier);
+      return nullptr;
     }
-  return true;
+  return nullptr;
 }
 
 /// lexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
@@ -606,7 +622,7 @@ void Lexer::lexIdentifier() {
   while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
 
   unsigned Modifiers = 0;
-  if (*CurPtr == '"' && buildModifiers(TokStart, Modifiers)) {
+  if (*CurPtr == '"' && buildModifiers(TokStart, Modifiers, true)) {
     CurPtr++;
     return lexStringLiteral(Modifiers);
   }
@@ -1263,10 +1279,15 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
   }
 }
 
-static bool nextNonWhitespaceIsQuote(const char *&CurPtr, char StopQuote) {
-  while (isWhitespace(*CurPtr))
-    CurPtr++;
-  return *CurPtr++ == StopQuote;
+static bool nextNonWhitespaceIsContinuation(const char *&CurPtr) {
+  const char *TmpPtr = CurPtr;
+  while (isWhitespace(*TmpPtr))
+    TmpPtr++;
+  if (*TmpPtr == '"' || *TmpPtr == '|') {
+    CurPtr = TmpPtr + 1;
+    return true;
+  }
+  return false;
 }
 
 static StringRef getLiteralContent(const Token &Str) {
@@ -1286,9 +1307,8 @@ static std::string getTrailingIndent(const Token &Str) {
   const char *end = Bytes.end(), *start = end;
 
   while (start > Bytes.begin() && isWhitespace(start[-1]))
-    --start;
-  if (*start == '\n' && end-start > 1)
-    return std::string(start, end-start);
+    if (*--start == '\n')
+      return std::string(start, end-start);
 
   return "";
 }
@@ -1297,6 +1317,7 @@ void Lexer::validateIndents() {
   std::string ToStrip = getTrailingIndent(NextToken);
   if (ToStrip.empty())
     return;
+
   StringRef Bytes = getLiteralContent(NextToken);
   const char *BytesPtr = Bytes.begin();
   while ((BytesPtr = (const char *)memchr(BytesPtr, '\n', Bytes.end()-BytesPtr)) != nullptr)
@@ -1337,12 +1358,9 @@ void Lexer::lexStringLiteral(unsigned Modifiers) {
     }
 
     // String literals cannot have \n or \r in them - unless multi-line.
-    if (((*CurPtr == '\r' || *CurPtr == '\n') && !(Modifiers & StringLiteralTripleQuote)) || CurPtr >= BufferEnd) {
-      const char *TmpPtr = CurPtr;
-      if (nextNonWhitespaceIsQuote(TmpPtr, *TokStart)) {
-        CurPtr = TmpPtr;
+    if (((*CurPtr == '\r' || *CurPtr == '\n') && !(Modifiers & StringLiteralNewLineOK)) || CurPtr >= BufferEnd) {
+      if (nextNonWhitespaceIsContinuation(CurPtr))
         continue;
-      }
       diagnose(TokStart, diag::lex_unterminated_string);
       return formToken(tok::unknown, TokStart);
     }
@@ -1408,6 +1426,9 @@ void Lexer::lexStringLiteral(unsigned Modifiers) {
         if (*CurPtr == '_') {
           formToken(tok::string_literal, TokStart, Modifiers);
           CurPtr++;
+
+          if (Modifiers & StringLiteralStripIndent)
+            validateIndents();
           return;
         }
         else
@@ -1419,20 +1440,23 @@ void Lexer::lexStringLiteral(unsigned Modifiers) {
   }
 }
 
-// This doesn't pretend to be a rigorous implementation
-// It's intended for prototyping string literal types.
-void Lexer::lexHeredoc() {
-  unsigned Modifiers = StringLiteralHeredocToken | StringLiteralTripleQuote | StringLiteralStripIndent;
+// Implementation of <<"HEREDOC"
+// Looks ahead in the buffer and creates a token containing a SourceLoc
+// that is now out of file sequence which tickled a few asserts in the
+// compiler AST validation. Will probably take a while to settle down.
+void Lexer::lexHeredoc(unsigned Modifiers) {
   char DocType = CurPtr[1];
   if (DocType == '\'')
     Modifiers |= StringLiteralUnprocessedEscapes;
+  else if (DocType == '`')
+    Modifiers |= StringLiteralRegexInterpolating;
 
   const char *IdentStart = CurPtr += 2;
   if (advanceIfValidStartOfIdentifier(CurPtr, BufferEnd))
     while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
 
-  if (*CurPtr++ != DocType) {
-    diagnose(IdentStart, diag::lex_unterminated_string);
+  if (CurPtr == IdentStart || *CurPtr++ != DocType) {
+    diagnose(IdentStart, diag::lex_invalid_heredoc);
     return formToken(tok::unknown, IdentStart);
   }
 
@@ -1441,13 +1465,18 @@ void Lexer::lexHeredoc() {
   const char *DocEnd = DocStart ? strnstr(DocStart + 1, Ident.c_str(), BufferEnd - DocStart) : nullptr;
 
   if (DocEnd == nullptr) {
-    diagnose(IdentStart, diag::lex_unterminated_string);
+    diagnose(IdentStart, diag::lex_missing_heredoc);
     return formToken(tok::unknown, IdentStart);
   }
 
-  NextToken.setToken(tok::string_literal, StringRef(DocStart, DocEnd - DocStart),
+  // string is not validated for correct escape sequences
+
+  bool willStrip = Modifiers & StringLiteralStripIndent;
+  const char *TokStart = willStrip ? DocStart : DocStart + 1;
+  NextToken.setToken(tok::string_literal, StringRef(TokStart, DocEnd - TokStart),
                      0, Modifiers);
-  validateIndents();
+  if (willStrip)
+    validateIndents();
 
   if (HeredocStart == nullptr)
     HeredocStart = DocStart + 1;
@@ -1553,6 +1582,24 @@ void Lexer::tryLexEditorPlaceholder() {
 StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
                                          SmallVectorImpl<char> &TempString,
                                          unsigned Modifiers, std::string ToStrip) {
+
+  // Strip any indent that corresponds to the indent
+  // of the multi-line string terminating line.
+  std::string IndentStripped;
+
+  if (!ToStrip.empty()) {
+    IndentStripped = Bytes;
+    size_t pos = 0;
+    while ((pos = IndentStripped.find(ToStrip, pos)) != std::string::npos) {
+      bool removeInitialNewLine = pos == 0 && (Modifiers & StringLiteralFirstSegment);
+      IndentStripped.replace(pos, ToStrip.size(), removeInitialNewLine ? "" : "\n");
+      if (removeInitialNewLine && ToStrip == "\n")
+        break;
+      pos += 1;
+    }
+    Bytes = IndentStripped;
+  }
+
   TempString.clear();
   // Note that it is always safe to read one over the end of "Bytes" because
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
@@ -1568,8 +1615,8 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
         TempString.push_back(CurChar);
       else
         TempString.push_back('\n'); // literal should always have \n between lines?
-      if (!(Modifiers & StringLiteralTripleQuote) && (CurChar == '\r' || CurChar == '\n'))
-        assert(nextNonWhitespaceIsQuote(BytesPtr, '"') && "Invalid string continuation");
+      if (!(Modifiers & StringLiteralNoContinuaton) && (CurChar == '\r' || CurChar == '\n'))
+        nextNonWhitespaceIsContinuation(BytesPtr);
       continue;
     }
     
@@ -1592,8 +1639,8 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     case '\\': TempString.push_back('\\'); continue;
     case '\r':
     case '\n':
-      if (!(Modifiers & StringLiteralTripleQuote))
-        assert(nextNonWhitespaceIsQuote(BytesPtr, '"') && "Invalid string continuation 2");
+      if (!(Modifiers & StringLiteralNoContinuaton))
+        nextNonWhitespaceIsContinuation(BytesPtr);
       continue;
         
     // String interpolation.
@@ -1617,23 +1664,11 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
       EncodeToUTF8(CharValue, TempString);
   }
   
-  if (!ToStrip.empty()) {
-    std::string Stripped(TempString.data(), TempString.size());
-    size_t pos = 0;
-    while ((pos = Stripped.find(ToStrip, pos)) != std::string::npos) {
-      Stripped.replace(pos, ToStrip.size(), pos == 0 && (Modifiers & StringLiteralFirstSegment) ? "" : "\n");
-      pos += 1;
-    }
-    TempString.clear();
-    for (auto c = Stripped.begin(); c != Stripped.end(); ++c)
-      TempString.push_back(*c);
-  }
-
   // If we didn't escape or reprocess anything, then we don't need to use the
   // temporary string, just point to the original one. We know that this
   // is safe because unescaped strings are always shorter than their escaped
   // forms (in a valid string).
-  if (TempString.size() == Bytes.size()) {
+  if (TempString.size() == Bytes.size() && ToStrip.empty()) {
     TempString.clear();
     return Bytes;
   }
@@ -1661,39 +1696,39 @@ void Lexer::getStringLiteralSegments(
   const char *BytesPtr = SegmentStartPtr;
   // FIXME: Use SSE to scan for '\'.
   if (!(Modifiers & StringLiteralUnprocessedEscapes))
-  while (BytesPtr != Bytes.end()) {
-    char CurChar = *BytesPtr++;
-    if (CurChar != '\\')
-      continue;
+    while (BytesPtr != Bytes.end()) {
+      char CurChar = *BytesPtr++;
+      if (CurChar != '\\')
+        continue;
 
-    if (*BytesPtr++ != '(')
-      continue;
+      if (*BytesPtr++ != '(')
+        continue;
 
-    // String interpolation.
+      // String interpolation.
 
-    // Push the current segment.
-    Segments.push_back(
-        StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
-                                  BytesPtr-SegmentStartPtr-2,
-                                  Modifiers, ToStrip));
-    Modifiers &= ~StringLiteralFirstSegment;
+      // Push the current segment.
+      Segments.push_back(
+          StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
+                                    BytesPtr-SegmentStartPtr-2,
+                                    Modifiers, ToStrip));
+      Modifiers &= ~StringLiteralFirstSegment;
 
-    // Find the closing ')'.
-    const char *End = skipToEndOfInterpolatedExpression(BytesPtr,
-                                                        Str.getText().end(),
-                                                        Diags);
-    assert(*End == ')' && "invalid string literal interpolations should"
-           " not be returned as string literals");
-    ++End;
+      // Find the closing ')'.
+      const char *End = skipToEndOfInterpolatedExpression(BytesPtr,
+                                                          Str.getText().end(),
+                                                          Diags);
+      assert(*End == ')' && "invalid string literal interpolations should"
+             " not be returned as string literals");
+      ++End;
 
-    // Add an expression segment.
-    Segments.push_back(
-        StringSegment::getExpr(getSourceLoc(BytesPtr-1), End-BytesPtr+1));
+      // Add an expression segment.
+      Segments.push_back(
+          StringSegment::getExpr(getSourceLoc(BytesPtr-1), End-BytesPtr+1));
 
-    // Reset the beginning of the segment to the string that remains to be
-    // consumed.
-    SegmentStartPtr = BytesPtr = End;
-  }
+      // Reset the beginning of the segment to the string that remains to be
+      // consumed.
+      SegmentStartPtr = BytesPtr = End;
+    }
 
   Segments.push_back(
       StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
@@ -1876,8 +1911,16 @@ Restart:
   case '<':
     if (CurPtr[0] == '#')
       return tryLexEditorPlaceholder();
-    if (CurPtr[0] == '<' && (CurPtr[1] == '"' || CurPtr[1] == '\''))
-      return lexHeredoc();
+    if (CurPtr[0] == '<') {
+      unsigned Modifiers = StringLiteralHeredocToken | StringLiteralStripIndent;
+      const char *EndMods = buildModifiers(CurPtr + 1, Modifiers, false);
+      if (EndMods != nullptr) {
+        CurPtr = EndMods - 1;
+        return lexHeredoc(Modifiers);
+      }
+      else if (CurPtr[1] == '"' || CurPtr[1] == '\'' || CurPtr[1] == '`')
+        return lexHeredoc(Modifiers);
+    }
     SWIFT_FALLTHROUGH;
 
   case '=': case '-': case '+': case '*': case '>':

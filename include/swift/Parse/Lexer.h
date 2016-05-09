@@ -90,7 +90,7 @@ class Lexer {
   /// in a SIL file.  This enables some context-sensitive lexing.
   bool InSILBody = false;
   
-  /// experimentation with <<"HERE" or <<'HERE'
+  /// Heredoc syntax: <<"HERE" or <<'HERE' or perhaps <<e"HERE"
   const char *HeredocStart;
   const char *HeredocEnd;
 
@@ -434,7 +434,6 @@ private:
 
   void skipSlashStarComment();
   void lexHash();
-  void lexHeredoc();
   void lexIdentifier();
   void lexDollarIdent();
   void lexOperatorIdentifier();
@@ -444,8 +443,9 @@ private:
 
   unsigned lexCharacter(const char *&CurPtr,
                         char StopQuote, bool EmitDiagnostics, unsigned modifiers = 0);
-  bool buildModifiers(const char *ModPtr, unsigned &Modifiers);
+  const char *buildModifiers(const char *ModPtr, unsigned &Modifiers, bool warn);
   void lexStringLiteral(unsigned Modifiers = 0);
+  void lexHeredoc(unsigned Modifiers);
   void lexEscapedIdentifier();
 
   void validateIndents();
