@@ -13,17 +13,6 @@
 import StdlibUnittest
 import Foundation
 
-// FIXME: Should go into the standard library.
-public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
-      -> Self {
-    var result: Self? = nil
-    _forceBridgeFromObjectiveC(source!, result: &result)
-    return result!
-  }
-}
-
-
 struct NotBridgedKeyTy : Equatable, Hashable {
   init(_ value: Int) {
     self.value = value
@@ -194,6 +183,13 @@ struct TestBridgedKeyTy : Hashable, _ObjectiveCBridgeable {
   ) -> Bool {
     result = TestBridgedKeyTy(x.value)
     return true
+  }
+
+  static func _unconditionallyBridgeFromObjectiveC(_ source: TestObjCKeyTy?)
+      -> TestBridgedKeyTy {
+    var result: TestBridgedKeyTy? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
   }
 
   var value: Int

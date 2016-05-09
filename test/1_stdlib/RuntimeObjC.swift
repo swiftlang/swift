@@ -15,16 +15,6 @@ import CoreGraphics
 import SwiftShims
 import MirrorObjC
 
-// FIXME: Should go into the standard library.
-public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
-      -> Self {
-    var result: Self? = nil
-    _forceBridgeFromObjectiveC(source!, result: &result)
-    return result!
-  }
-}
-
 var nsObjectCanaryCount = 0
 @objc class NSObjectCanary : NSObject {
   override init() {
@@ -100,6 +90,13 @@ struct BridgedValueType : _ObjectiveCBridgeable {
     return false
   }
 
+  static func _unconditionallyBridgeFromObjectiveC(_ source: ClassA?)
+      -> BridgedValueType {
+    var result: BridgedValueType? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+
   var value: Int
   var canaryRef = SwiftObjectCanary()
 }
@@ -146,6 +143,13 @@ struct BridgedLargeValueType : _ObjectiveCBridgeable {
     return false
   }
 
+  static func _unconditionallyBridgeFromObjectiveC(_ source: ClassA?)
+      -> BridgedLargeValueType {
+    var result: BridgedLargeValueType? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+
   var value: Int {
     let x = value0
     assert(value0 == x && value1 == x && value2 == x && value3 == x &&
@@ -187,6 +191,13 @@ struct ConditionallyBridgedValueType<T> : _ObjectiveCBridgeable {
 
     result = nil
     return false
+  }
+
+  static func _unconditionallyBridgeFromObjectiveC(_ source: ClassA?)
+      -> ConditionallyBridgedValueType {
+    var result: ConditionallyBridgedValueType? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
   }
 
   static func _isBridgedToObjectiveC() -> Bool {

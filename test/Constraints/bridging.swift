@@ -4,16 +4,6 @@
 
 import Foundation
 
-// FIXME: Should go into the standard library.
-public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
-      -> Self {
-    var result: Self? = nil
-    _forceBridgeFromObjectiveC(source!, result: &result)
-    return result!
-  }
-}
-
 public class BridgedClass : NSObject, NSCopying {
   @objc(copyWithZone:)
   public func copy(with zone: NSZone?) -> AnyObject {
@@ -74,6 +64,13 @@ struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
     result: inout BridgedStruct?
   ) -> Bool {
     return true
+  }
+
+  static func _unconditionallyBridgeFromObjectiveC(_ source: BridgedClass?)
+      -> BridgedStruct {
+    var result: BridgedStruct? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
   }
 }
 

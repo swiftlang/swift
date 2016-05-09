@@ -24,16 +24,6 @@
 import Foundation
 import ArrayBridgeObjC
 
-// FIXME: Should go into the standard library.
-public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
-      -> Self {
-    var result: Self? = nil
-    _forceBridgeFromObjectiveC(source!, result: &result)
-    return result!
-  }
-}
-
 // CHECK: testing...
 print("testing...")
 
@@ -137,7 +127,14 @@ struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
     result = nil
     return false
   }
-  
+
+  static func _unconditionallyBridgeFromObjectiveC(_ source: BridgedObjC?)
+      -> BridgedSwift {
+    var result: BridgedSwift? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+
   var description: String {
     assert(trak.serialNumber > 0, "dead Tracked!")
     return "BridgedSwift#\(trak.serialNumber)(\(trak.value))"

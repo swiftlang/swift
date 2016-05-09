@@ -26,16 +26,6 @@ import SwiftShims
 import ObjectiveC
 import StdlibUnittest
 
-// FIXME: Should go into the standard library.
-public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
-      -> Self {
-    var result: Self? = nil
-    _forceBridgeFromObjectiveC(source!, result: &result)
-    return result!
-  }
-}
-
 struct X : _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool {
     return true
@@ -62,6 +52,13 @@ struct X : _ObjectiveCBridgeable {
   ) -> Bool {
     result = X(x.value)
     return true
+  }
+
+  static func _unconditionallyBridgeFromObjectiveC(_ source: LifetimeTracked?)
+      -> X {
+    var result: X? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
   }
 
   var value: Int
