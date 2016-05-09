@@ -36,3 +36,16 @@ typedef NSString * NSURLResourceKey __attribute((swift_newtype(struct)));
 extern NSURLResourceKey const NSURLIsRegularFileKey;
 extern NSURLResourceKey const NSURLIsDirectoryKey;
 extern NSURLResourceKey const NSURLLocalizedNameKey;
+
+// Special case: Notifications
+extern const NSString *FooNotification;
+extern const NSString *kBarNotification;
+
+// But not just 'Notification'
+extern const NSString *kNotification;
+extern const NSString *Notification;
+
+// Nor when explicitly swift_name-ed
+extern const NSString *kSNNotification
+    __attribute((swift_name("swiftNamedNotification")));
+

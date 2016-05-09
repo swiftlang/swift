@@ -3202,7 +3202,6 @@ namespace {
       if (!importedName) return nullptr;
 
       auto name = importedName.Imported.getBaseName();
-
       auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
       if (!dc)
         return nullptr;
@@ -3212,7 +3211,15 @@ namespace {
       // involve an ownership transfer.
       bool isAudited = decl->getType().isConstQualified();
 
-      Type type = Impl.importType(decl->getType(),
+      auto declType = decl->getType();
+
+      // Special case: NS Notifications
+      if (ClangImporter::Implementation::isNSNotificationGlobal(decl))
+        if (auto newtypeDecl =
+                Impl.findSwiftNewtype(decl, Impl.getClangSema(), false))
+          declType = Impl.getClangASTContext().getTypedefType(newtypeDecl);
+
+      Type type = Impl.importType(declType,
                                   (isAudited ? ImportTypeKind::AuditedVariable
                                    : ImportTypeKind::Variable),
                                   isInSystemModule(dc),

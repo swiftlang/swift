@@ -1261,6 +1261,18 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
                                      optionality);
 }
 
+bool ClangImporter::Implementation::isNSString(const clang::Type *type) {
+  if (auto ptrType = type->getAs<clang::ObjCObjectPointerType>())
+    if (auto interfaceType = ptrType->getInterfaceType())
+      if (interfaceType->getDecl()->getName() == "NSString")
+        return true;
+  return false;
+}
+
+bool ClangImporter::Implementation::isNSString(clang::QualType qt) {
+  return qt.getTypePtrOrNull() && isNSString(qt.getTypePtrOrNull());
+}
+
 bool ClangImporter::Implementation::shouldImportGlobalAsLet(
        clang::QualType type)
 {
@@ -1269,13 +1281,9 @@ bool ClangImporter::Implementation::shouldImportGlobalAsLet(
     return true;
   }
   // Globals of type NSString * should be imported as 'let'.
-  if (auto ptrType = type->getAs<clang::ObjCObjectPointerType>()) {
-    if (auto interfaceType = ptrType->getInterfaceType()) {
-      if (interfaceType->getDecl()->getName() == "NSString") {
-        return true;
-      }
-    }
-  }
+  if (isNSString(type))
+    return true;
+
   return false;
 }
 
