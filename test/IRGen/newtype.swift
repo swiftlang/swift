@@ -14,7 +14,7 @@ public func getErrorDomain() -> ErrorDomain {
 
 // CHECK-LABEL: _TF7newtype6getFooFT_VSC18NSNotificationName
 public func getFoo() -> NSNotificationName {
-  return NSNotificationName.foo
+  return NSNotificationName.Foo
   // CHECK: load {{.*}} @FooNotification
   // CHECK: ret
 }

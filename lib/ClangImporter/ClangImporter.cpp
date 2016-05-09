@@ -2318,18 +2318,25 @@ static clang::SwiftNameAttr *findSwiftNameAttr(const clang::Decl *decl,
 
 /// Prepare global name for importing onto a swift_newtype.
 static StringRef determineSwiftNewtypeBaseName(StringRef baseName,
-                                               StringRef newtypeName) {
-  baseName = stripLeadingK(baseName);
-
-  bool nonIdentifier = false;
-  auto pre = getCommonWordPrefix(newtypeName, baseName, nonIdentifier);
-  if (pre.size())
-    baseName = baseName.drop_front(pre.size());
+                                               StringRef newtypeName,
+                                               bool &strippedPrefix) {
+  StringRef newBaseName = stripLeadingK(baseName);
+  if (newBaseName != baseName) {
+    baseName = newBaseName;
+    strippedPrefix = true;
+  }
 
   // Special case: Strip Notification for NSNotificationName
   auto stripped = stripNotification(baseName);
   if (!stripped.empty())
-    baseName = stripped;
+    return stripped;
+
+  bool nonIdentifier = false;
+  auto pre = getCommonWordPrefix(newtypeName, baseName, nonIdentifier);
+  if (pre.size()) {
+    baseName = baseName.drop_front(pre.size());
+    strippedPrefix = true;
+  }
 
   return baseName;
 }
@@ -2822,8 +2829,8 @@ auto ClangImporter::Implementation::importFullName(
   // swift_newtype-ed declarations may have common words with the type name
   // stripped.
   if (auto newtypeDecl = findSwiftNewtype(D, clangSema, swift2Name)) {
-    baseName = determineSwiftNewtypeBaseName(baseName, newtypeDecl->getName());
-    strippedPrefix = true;
+    baseName = determineSwiftNewtypeBaseName(baseName, newtypeDecl->getName(),
+                                             strippedPrefix);
   }
 
   if (!result.isSubscriptAccessor() && !swift2Name) {

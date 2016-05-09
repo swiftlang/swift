@@ -54,8 +54,9 @@
 // PRINT-NEXT:    static let localizedNameKey: NSURLResourceKey
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension NSNotificationName {
-// PRINT-NEXT:    static let foo: NSNotificationName
+// PRINT-NEXT:    static let Foo: NSNotificationName
 // PRINT-NEXT:    static let bar: NSNotificationName
+// PRINT-NEXT:    static let NSWibble: NSNotificationName
 // PRINT-NEXT:  }
 // PRINT-NEXT:  let kNotification: String
 // PRINT-NEXT:  let Notification: String
@@ -79,7 +80,7 @@ func tests() {
 	let _ = ErrorDomain(rawValue: thirdEnum.rawValue!)
 	let _ = ClosedEnum(rawValue: errOne.rawValue)
 
-	let _ = NSNotificationName.foo
+	let _ = NSNotificationName.Foo
 	let _ = NSNotificationName.bar
 }
 

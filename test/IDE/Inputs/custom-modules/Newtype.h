@@ -40,6 +40,7 @@ extern NSURLResourceKey const NSURLLocalizedNameKey;
 // Special case: Notifications
 extern const NSString *FooNotification;
 extern const NSString *kBarNotification;
+extern const NSString *NSWibbleNotification;
 
 // But not just 'Notification'
 extern const NSString *kNotification;
