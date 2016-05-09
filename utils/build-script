@@ -1015,14 +1015,7 @@ details of the setups of other systems or automated environments.""")
 
     if not args.test and not args.validation_test and not args.long_test:
         build_script_impl_inferred_args += [
-            "--skip-test-cmark",
-            "--skip-test-lldb",
             "--skip-test-swift",
-            "--skip-test-llbuild",
-            "--skip-test-swiftpm",
-            "--skip-test-xctest",
-            "--skip-test-foundation",
-            "--skip-test-libdispatch",
             "--skip-test-linux",
             "--skip-test-freebsd",
             "--skip-test-cygwin",
@@ -1033,6 +1026,17 @@ details of the setups of other systems or automated environments.""")
             "--skip-test-tvos-host",
             "--skip-test-watchos-simulator",
             "--skip-test-watchos-host",
+        ]
+
+    if not args.test:
+        build_script_impl_inferred_args += [
+            "--skip-test-cmark",
+            "--skip-test-lldb",
+            "--skip-test-llbuild",
+            "--skip-test-swiftpm",
+            "--skip-test-xctest",
+            "--skip-test-foundation",
+            "--skip-test-libdispatch",
         ]
 
     if args.validation_test:
