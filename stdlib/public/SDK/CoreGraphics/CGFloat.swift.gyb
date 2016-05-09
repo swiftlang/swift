@@ -491,29 +491,27 @@ public prefix func + (x: CGFloat) -> CGFloat { return x }
 public prefix func - (x: CGFloat) -> CGFloat { return CGFloat(-x.native) }
 
 @_transparent
-public prefix func ++ (x: inout CGFloat) -> CGFloat {
-  x.native += 1.0
-  return x
+@available(*, unavailable, message: "use += 1")
+public prefix func ++(rhs: inout CGFloat) -> CGFloat {
+  fatalError("++ is not available")
 }
 
 @_transparent
-public prefix func -- (x: inout CGFloat) -> CGFloat {
-  x.native -= 1.0
-  return x
+@available(*, unavailable, message: "use -= 1")
+public prefix func --(rhs: inout CGFloat) -> CGFloat {
+  fatalError("-- is not available")
 }
 
 @_transparent
-public postfix func ++ (x: inout CGFloat) -> CGFloat {
-  let tmp = x
-  x.native += 1.0
-  return tmp 
+@available(*, unavailable, message: "use += 1")
+public postfix func ++(lhs: inout CGFloat) -> CGFloat {
+  fatalError("++ is not available")
 }
 
 @_transparent
-public postfix func -- (x: inout CGFloat) -> CGFloat {
-  let tmp = x
-  x.native -= 1.0
-  return tmp 
+@available(*, unavailable, message: "use -= 1")
+public postfix func --(lhs: inout CGFloat) -> CGFloat {
+  fatalError("-- is not available")
 }
 
 @_transparent

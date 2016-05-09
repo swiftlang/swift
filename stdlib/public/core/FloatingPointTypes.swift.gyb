@@ -693,8 +693,8 @@ extension ${Self} : Hashable {
       return Int(truncatingBitPattern: bitPattern >> 32) ^
              Int(truncatingBitPattern: bitPattern)
     %elif word_bits == 32: # Float80 -> 32-bit Int
-      return Int(truncatingBitPattern: UInt(significandBitPattern >> 32)) ^
-             Int(truncatingBitPattern: UInt(significandBitPattern)) ^
+      return Int(truncatingBitPattern: significandBitPattern >> 32) ^
+             Int(truncatingBitPattern: significandBitPattern) ^
              Int(_representation.signAndExponent)
     %else: # Float80 -> 64-bit Int
       return Int(bitPattern: UInt(significandBitPattern)) ^

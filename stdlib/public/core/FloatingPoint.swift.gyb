@@ -507,12 +507,12 @@ public enum FloatingPointClassification {
 }
 
 @warn_unused_result
-prefix func +<T: FloatingPoint>(x: T) -> T {
+public prefix func +<T : FloatingPoint>(x: T) -> T {
   return x
 }
 
 @warn_unused_result
-prefix func -<T: FloatingPoint>(x: T) -> T {
+public prefix func -<T : FloatingPoint>(x: T) -> T {
   return x.negated()
 }
 
@@ -527,39 +527,39 @@ binary_arithmetic = [
 
 %for op in binary_arithmetic:
 @warn_unused_result
-func ${op[0]}<T: FloatingPoint>(lhs: T, rhs: T) -> T {
+public func ${op[0]}<T : FloatingPoint>(lhs: T, rhs: T) -> T {
   return lhs.${op[1]}(${op[3]+': ' if op[3] else ''}rhs)
 }
 
-func ${op[0]}=<T: FloatingPoint>(lhs: inout T, rhs: T) {
+public func ${op[0]}=<T : FloatingPoint>(lhs: inout T, rhs: T) {
   return lhs.${op[2]}(${op[3]+': ' if op[3] else ''}rhs)
 }
 
 %end
 
 /*  TODO: uncomment once implemented.
-func sqrt<T: FloatingPoint>(_ rhs: T) -> T {
+public func sqrt<T : FloatingPoint>(_ rhs: T) -> T {
   return rhs.squareRoot()
 }
 */
 
-func ==<T: FloatingPoint>(lhs: T, rhs: T) -> Bool {
+public func ==<T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
   return lhs.isEqual(to: rhs)
 }
 
-func < <T: FloatingPoint>(lhs: T, rhs: T) -> Bool {
+public func < <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
   return lhs.isLess(than: rhs)
 }
 
-func <= <T: FloatingPoint>(lhs: T, rhs: T) -> Bool {
+public func <= <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
   return lhs.isLessThanOrEqualTo(rhs)
 }
 
-func > <T: FloatingPoint>(lhs: T, rhs: T) -> Bool {
+public func > <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
   return rhs.isLess(than: lhs)
 }
 
-func >= <T: FloatingPoint>(lhs: T, rhs: T) -> Bool {
+public func >= <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
   return rhs.isLessThanOrEqualTo(lhs)
 }
 
