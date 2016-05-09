@@ -3,6 +3,7 @@
 // RUN: %build-clang-importer-objc-overlays
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource) -I %t -I %S/Inputs/custom-modules -enable-swift-newtype -print-module -source-filename %s -module-to-print=Newtype > %t.printed.A.txt
 // RUN: FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
+// RUN: %target-parse-verify-swift -sdk %clang-importer-sdk -I %S/Inputs/custom-modules -enable-swift-newtype -I %t
 // REQUIRES: objc_interop
 
 // PRINT-LABEL: struct ErrorDomain : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
@@ -48,6 +49,7 @@
 // PRINT-NEXT:    static let PI: MyFloat
 // PRINT-NEXT:    static let version: MyFloat
 // PRINT-NEXT:  }
+//
 // PRINT-LABEL: extension NSURLResourceKey {
 // PRINT-NEXT:    static let isRegularFileKey: NSURLResourceKey
 // PRINT-NEXT:    static let isDirectoryKey: NSURLResourceKey
@@ -61,8 +63,18 @@
 // PRINT-NEXT:  let kNotification: String
 // PRINT-NEXT:  let Notification: String
 // PRINT-NEXT:  let swiftNamedNotification: String
-
-// RUN: %target-parse-verify-swift -sdk %clang-importer-sdk -I %S/Inputs/custom-modules -enable-swift-newtype -I %t
+//
+// PRINT-LABEL: struct CFNewType : RawRepresentable, _SwiftNewtypeWrapper {
+// PRINT-NEXT:    init(rawValue: CFString)
+// PRINT-NEXT:    let rawValue: CFString
+// PRINT-NEXT:  }
+// PRINT-NEXT:  extension CFNewType {
+// PRINT-NEXT:    static let MyCFNewTypeValue: CFNewType
+// PRINT-NEXT:    static let MyCFNewTypeValueUnauditedButConst: CFNewType
+// PRINT-NEXT:    static var MyCFNewTypeValueUnaudited: Unmanaged<CFString>
+// PRINT-NEXT:  }
+// PRINT-NEXT:  func FooAudited() -> CFNewType
+// PRINT-NEXT:  func FooUnaudited() -> Unmanaged<CFString>
 import Newtype
 
 func tests() {
@@ -73,7 +85,7 @@ func tests() {
 	fooErr.process()
 	Foo().process() // expected-error{{value of type 'Foo' has no member 'process'}}
 
-	let thirdEnum = ClosedEnum.thirdEntry
+	let thirdEnum = ClosedEnum.thirdEntry!
 	thirdEnum.process()
 	  // expected-error@-1{{value of type 'ClosedEnum' has no member 'process'}}
 
@@ -82,6 +94,10 @@ func tests() {
 
 	let _ = NSNotificationName.Foo
 	let _ = NSNotificationName.bar
+	let _ : CFNewType = CFNewType.MyCFNewTypeValue
+	let _ : CFNewType = CFNewType.MyCFNewTypeValueUnauditedButConst
+	let _ : CFNewType = CFNewType.MyCFNewTypeValueUnaudited
+	  // expected-error@-1{{cannot convert value of type 'Unmanaged<CFString>!' to specified type 'CFNewType'}}
 }
 
 func acceptSwiftNewtypeWrapper<T : _SwiftNewtypeWrapper>(_ t: T) { }

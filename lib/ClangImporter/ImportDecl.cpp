@@ -1334,6 +1334,16 @@ namespace {
           isInSystemModule(dc), decl->getUnderlyingType()->isBlockPointerType(),
           OTK_None);
 
+      // If the type is Unmanaged, that is it is not CF ARC audited,
+      // we will store the underlying type and leave it up to the use site
+      // to determine whether to use this new_type, or an Unmanaged<CF...> type.
+      if (auto genericType = storedUnderlyingType->getAs<BoundGenericType>()) {
+        if (genericType->getDecl() == Impl.SwiftContext.getUnmanagedDecl()) {
+          assert(genericType->getGenericArgs().size() == 1 && "other args?");
+          storedUnderlyingType = genericType->getGenericArgs()[0];
+        }
+      }
+
       // Find a bridged type, which may be different
       auto computedPropertyUnderlyingType = Impl.importType(
           decl->getUnderlyingType(), ImportTypeKind::Property,

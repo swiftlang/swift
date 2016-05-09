@@ -50,3 +50,16 @@ extern const NSString *Notification;
 extern const NSString *kSNNotification
     __attribute((swift_name("swiftNamedNotification")));
 
+// Test CFStringRef
+typedef CFStringRef CFNewType __attribute((swift_newtype(struct)));
+
+// CF audited
+_Pragma("clang arc_cf_code_audited begin")
+extern const CFNewType MyCFNewTypeValue;
+CFNewType FooAudited(void);
+_Pragma("clang arc_cf_code_audited end")
+extern const CFNewType MyCFNewTypeValueUnauditedButConst;
+
+// un-audited CFStringRef
+extern CFNewType MyCFNewTypeValueUnaudited;
+CFNewType FooUnaudited(void);
