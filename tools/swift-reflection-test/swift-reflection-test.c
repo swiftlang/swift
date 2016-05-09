@@ -389,6 +389,7 @@ int doDumpHeapInstance(const char *BinaryFilename) {
       close(PipeMemoryReader_getParentWriteFD(&Pipe));
       close(PipeMemoryReader_getParentReadFD(&Pipe));
       dup2(PipeMemoryReader_getChildReadFD(&Pipe), STDIN_FILENO);
+      dup2(PipeMemoryReader_getChildWriteFD(&Pipe), STDERR_FILENO);
       dup2(PipeMemoryReader_getChildWriteFD(&Pipe), STDOUT_FILENO);
       _execv(BinaryFilename, NULL);
       exit(EXIT_SUCCESS);
@@ -396,6 +397,7 @@ int doDumpHeapInstance(const char *BinaryFilename) {
     default: { // Parent
       close(PipeMemoryReader_getChildReadFD(&Pipe));
       close(PipeMemoryReader_getChildWriteFD(&Pipe));
+      dup2(STDOUT_FILENO, STDERR_FILENO);
       SwiftReflectionContextRef RC = swift_reflection_createReflectionContext(
         (void*)&Pipe,
         PipeMemoryReader_getPointerSize,
