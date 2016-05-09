@@ -50,8 +50,15 @@
 // PRINT-NEXT:    static let isDirectoryKey: NSURLResourceKey
 // PRINT-NEXT:    static let localizedNameKey: NSURLResourceKey
 // PRINT-NEXT:  }
+// PRINT-NEXT:  extension NSNotificationName {
+// PRINT-NEXT:    static let foo: NSNotificationName
+// PRINT-NEXT:    static let bar: NSNotificationName
+// PRINT-NEXT:  }
+// PRINT-NEXT:  let kNotification: String
+// PRINT-NEXT:  let Notification: String
+// PRINT-NEXT:  let swiftNamedNotification: String
 
-// RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules -enable-swift-newtype
+// RUN: %target-parse-verify-swift -sdk %clang-importer-sdk -I %S/Inputs/custom-modules -enable-swift-newtype
 import Newtype
 
 func tests() {
@@ -69,4 +76,6 @@ func tests() {
 	let _ = ErrorDomain(rawValue: thirdEnum.rawValue!)
 	let _ = ClosedEnum(rawValue: errOne.rawValue)
 
+	let _ = NSNotificationName.foo
+	let _ = NSNotificationName.bar
 }

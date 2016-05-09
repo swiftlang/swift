@@ -764,6 +764,9 @@ extern void CGColorRelease(CGColorRef color) __attribute__((availability(macosx,
 @property (readonly) Class classForPortCoder NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead");
 @end
 
+typedef NSString *__nonnull NSNotificationName
+    __attribute((swift_newtype(struct)));
+
 NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
 extern NSString * const NSConnectionReplyMode;
 NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")

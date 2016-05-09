@@ -2091,6 +2091,52 @@ hasOrInheritsSwiftBridgeAttr(const clang::ObjCInterfaceDecl *objcClass) {
   return false;
 }
 
+/// Skip a leading 'k' in a 'kConstant' pattern
+static StringRef stripLeadingK(StringRef name) {
+  if (name.size() >= 2 && name[0] == 'k' &&
+      clang::isUppercase(name[1]))
+    return name.drop_front(1);
+  return name;
+}
+
+/// Strips a trailing "Notification", if present. Returns {} if name doesn't end
+/// in "Notification", or it there would be nothing left.
+static StringRef stripNotification(StringRef name) {
+  name = stripLeadingK(name);
+  StringRef notification = "Notification";
+  if (name.size() <= notification.size() || !name.endswith(notification))
+    return {};
+  return name.drop_back(notification.size());
+}
+
+bool ClangImporter::Implementation::isNSNotificationGlobal(
+    const clang::NamedDecl *decl) {
+  // Looking for: extern NSString *fooNotification;
+
+  // Must be extern global variable
+  auto vDecl = dyn_cast<clang::VarDecl>(decl);
+  if (!vDecl || !vDecl->hasExternalFormalLinkage())
+    return false;
+
+  // No explicit swift_name
+  if (decl->getAttr<clang::SwiftNameAttr>())
+    return false;
+
+  // Must end in Notification
+  if (!vDecl->getDeclName().isIdentifier())
+    return false;
+  if (stripNotification(vDecl->getName()).empty())
+    return false;
+
+  // Must be NSString *
+  if (!isNSString(vDecl->getType()))
+    return false;
+
+  // We're a match!
+  return true;
+}
+
+
 /// Whether the decl is from a module who requested import-as-member inference
 static bool moduleIsInferImportAsMember(const clang::NamedDecl *decl,
                                         clang::Sema &clangSema) {
@@ -2123,14 +2169,41 @@ static bool moduleIsInferImportAsMember(const clang::NamedDecl *decl,
 
 // If this decl is associated with a swift_newtype typedef, return it, otherwise
 // null
-static clang::TypedefNameDecl *findSwiftNewtype(
-     ClangImporter::Implementation &impl,
-     const clang::Decl *decl,
-     bool useSwift2Name) {
-  if (auto varDecl = dyn_cast<clang::VarDecl>(decl))
-    if (auto typedefTy = varDecl->getType()->getAs<clang::TypedefType>())
-      if (impl.getSwiftNewtypeAttr(typedefTy->getDecl(), useSwift2Name))
-        return typedefTy->getDecl();
+clang::TypedefNameDecl *ClangImporter::Implementation::findSwiftNewtype(
+    const clang::NamedDecl *decl, clang::Sema &clangSema, bool useSwift2Name) {
+  // If we aren't honoring the swift_newtype attribute, don't even
+  // bother looking. Similarly for swift2 names
+  if (!HonorSwiftNewtypeAttr || useSwift2Name)
+    return nullptr;
+
+  auto varDecl = dyn_cast<clang::VarDecl>(decl);
+  if (!varDecl)
+    return nullptr;
+
+  if (auto typedefTy = varDecl->getType()->getAs<clang::TypedefType>())
+    if (getSwiftNewtypeAttr(typedefTy->getDecl(), false))
+      return typedefTy->getDecl();
+
+  // Special case: "extern NSString * fooNotification" adopts
+  // NSNotificationName type, and is a member of NSNotificationName
+  if (ClangImporter::Implementation::isNSNotificationGlobal(decl)) {
+    clang::IdentifierInfo *notificationName =
+        &clangSema.getASTContext().Idents.get("NSNotificationName");
+    clang::LookupResult lookupResult(clangSema, notificationName,
+                                     clang::SourceLocation(),
+                                     clang::Sema::LookupOrdinaryName);
+    if (!clangSema.LookupName(lookupResult, nullptr))
+      return nullptr;
+    auto nsDecl = lookupResult.getAsSingle<clang::TypedefNameDecl>();
+    if (!nsDecl)
+      return nullptr;
+
+    // Make sure it also has a newtype decl on it
+    if (getSwiftNewtypeAttr(nsDecl, false))
+      return nsDecl;
+
+    return nullptr;
+  }
 
   return nullptr;
 }
@@ -2243,6 +2316,24 @@ static clang::SwiftNameAttr *findSwiftNameAttr(const clang::Decl *decl,
   return nullptr;
 }
 
+/// Prepare global name for importing onto a swift_newtype.
+static StringRef determineSwiftNewtypeBaseName(StringRef baseName,
+                                               StringRef newtypeName) {
+  baseName = stripLeadingK(baseName);
+
+  bool nonIdentifier = false;
+  auto pre = getCommonWordPrefix(newtypeName, baseName, nonIdentifier);
+  if (pre.size())
+    baseName = baseName.drop_front(pre.size());
+
+  // Special case: Strip Notification for NSNotificationName
+  auto stripped = stripNotification(baseName);
+  if (!stripped.empty())
+    baseName = stripped;
+
+  return baseName;
+}
+
 auto ClangImporter::Implementation::importFullName(
        const clang::NamedDecl *D,
        ImportNameOptions options,
@@ -2281,7 +2372,7 @@ auto ClangImporter::Implementation::importFullName(
       break;
     }
   // Import onto a swift_newtype if present
-  } else if (auto newtypeDecl = findSwiftNewtype(*this, D, swift2Name)) {
+  } else if (auto newtypeDecl = findSwiftNewtype(D, clangSema, swift2Name)) {
     result.EffectiveContext = newtypeDecl;
   // Everything else goes into its redeclaration context.
   } else {
@@ -2730,22 +2821,9 @@ auto ClangImporter::Implementation::importFullName(
 
   // swift_newtype-ed declarations may have common words with the type name
   // stripped.
-  if (auto newtypeDecl = findSwiftNewtype(*this, D, swift2Name)) {
-    // Skip a leading 'k' in a 'kConstant' pattern
-    if (baseName.size() >= 2 && baseName[0] == 'k' &&
-        clang::isUppercase(baseName[1])) {
-      baseName = baseName.drop_front(1);
-      strippedPrefix = true;
-    }
-
-    bool nonIdentifier = false;
-    auto pre =
-        getCommonWordPrefix(newtypeDecl->getName(), baseName, nonIdentifier);
-
-    if (pre.size()) {
-      baseName = baseName.drop_front(pre.size());
-      strippedPrefix = true;
-    }
+  if (auto newtypeDecl = findSwiftNewtype(D, clangSema, swift2Name)) {
+    baseName = determineSwiftNewtypeBaseName(baseName, newtypeDecl->getName());
+    strippedPrefix = true;
   }
 
   if (!result.isSubscriptAccessor() && !swift2Name) {
@@ -4305,7 +4383,8 @@ ClangImporter::Implementation::SwiftNameLookupExtension::hashExtension(
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
                             Impl.InferImportAsMember,
-                            Impl.SwiftContext.LangOpts.StripNSPrefix);
+                            Impl.SwiftContext.LangOpts.StripNSPrefix,
+                            Impl.HonorSwiftNewtypeAttr);
 }
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>

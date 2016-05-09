@@ -1459,6 +1459,20 @@ public:
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();
+
+  /// Whether the given decl is a global Notification
+  static bool isNSNotificationGlobal(const clang::NamedDecl *);
+
+  // If this decl is associated with a swift_newtype (and we're honoring
+  // swift_newtype), return it, otherwise null
+  clang::TypedefNameDecl *findSwiftNewtype(const clang::NamedDecl *decl,
+                                           clang::Sema &clangSema,
+                                           bool useSwift2Name);
+
+  /// Whether the passed type is NSString *
+  static bool isNSString(const clang::Type *);
+  static bool isNSString(clang::QualType);
+
 };
 
 }
