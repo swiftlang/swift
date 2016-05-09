@@ -171,8 +171,16 @@ public:
 
   TypeRefBuilder &getBuilder() { return Builder; }
 
+  /// Tests if the type is concrete enough that its size is known.
+  /// For example, a bound generic class is fixed size even if some
+  /// of the generic argument types contain generic parameters.
+  bool hasFixedSize(const TypeRef *TR);
+
   /// Returns layout information for a value of the given type.
   /// For a class, this returns the lowering of the reference value.
+  ///
+  /// The type must either be concrete, or at least fixed-size, as
+  /// determined by the isFixedSize() predicate.
   const TypeInfo *getTypeInfo(const TypeRef *TR);
 
   /// Returns layout information for an instance of the given
