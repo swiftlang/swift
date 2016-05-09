@@ -61,6 +61,7 @@ public protocol _ObjectiveCBridgeable {
   ///   information is provided for the convenience of the runtime's `dynamic_cast`
   ///   implementation, so that it need not look into the optional representation
   ///   to determine success.
+  @discardableResult
   static func _conditionallyBridgeFromObjectiveC(
     _ source: _ObjectiveCType,
     result: inout Self?
@@ -255,7 +256,7 @@ public func _conditionallyBridgeFromObjectiveC<T>(
   }
 
   var result: T?
-  _bridgeNonVerbatimFromObjectiveCConditional(x, T.self, &result)
+  _ = _bridgeNonVerbatimFromObjectiveCConditional(x, T.self, &result)
   return result
 }
 

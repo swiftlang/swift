@@ -219,7 +219,7 @@ public struct Character :
         u16 = u16 << 16
         u16 = u16 | UInt64($0)
       }
-      transcode(
+      _ = transcode(
         _SmallUTF8(u8).makeIterator(),
         from: UTF8.self, to: UTF16.self,
         stoppingOnError: false,

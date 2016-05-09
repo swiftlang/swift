@@ -94,6 +94,7 @@ extension ${Self} : Sequence {
     return _base._copyToNativeArrayBuffer()
   }
   
+  @discardableResult
   public func _copyContents(
     initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
   ) -> UnsafeMutablePointer<Base.Iterator.Element> {

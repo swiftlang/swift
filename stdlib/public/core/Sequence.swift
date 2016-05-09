@@ -581,6 +581,7 @@ public protocol Sequence {
 
   /// Copy a Sequence into an array, returning one past the last
   /// element initialized.
+  @discardableResult
   func _copyContents(initializing ptr: UnsafeMutablePointer<Iterator.Element>)
     -> UnsafeMutablePointer<Iterator.Element>
 }
@@ -861,6 +862,7 @@ extension Sequence {
     var result: [AnySequence<Iterator.Element>] = []
     var subSequence: [Iterator.Element] = []
 
+    @discardableResult
     func appendSubsequence() -> Bool {
       if subSequence.isEmpty && omittingEmptySubsequences {
         return false
@@ -1144,6 +1146,7 @@ extension Sequence {
 }
 
 extension Sequence {
+  @discardableResult
   public func _copyContents(
     initializing ptr: UnsafeMutablePointer<Iterator.Element>
   ) -> UnsafeMutablePointer<Iterator.Element> {
