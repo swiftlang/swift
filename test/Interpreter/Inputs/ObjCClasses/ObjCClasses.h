@@ -14,9 +14,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property NSInteger t;
 @end
 
-/* This class has a method that doesn't fill in the error properly. */
-@interface NilError : NSObject
-+ (BOOL) throwIt: (NSError**) error;
+@interface TestingNSError : NSObject
++ (BOOL)throwNilError:(NSError**)error;
++ (nullable void *)maybeThrow:(BOOL)shouldThrow error:(NSError **)error;
++ (nullable void (^)(void))blockThrowError:(NSError **)error;
 @end
 
 @interface Container<C> : NSObject

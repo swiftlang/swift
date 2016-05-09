@@ -50,6 +50,10 @@
 // CHECK-NEXT:     TU: __swift
 // CHECK-NEXT:   accessibilityFloat:
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility accessibilityFloat]
+// CHECK-NEXT:   badPointerMethodAndReturnError:
+// CHECK-NEXT:     NSErrorImports: -[NSErrorImports badPointerMethodAndReturnError:]
+// CHECK-NEXT:   blockMethod:
+// CHECK-NEXT:     NSErrorImports: -[NSErrorImports blockMethodAndReturnError:]
 // CHECK-NEXT:   categoryMethodWith:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass categoryMethodWithX:y:], -[SNSomeClass categoryMethodWithX:y:z:]
 // CHECK:        doubleProperty:
@@ -58,6 +62,8 @@
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass extensionMethodWithX:y:]
 // CHECK:        floatProperty:
 // CHECK-NEXT:     SNSomeClass: SNSomeClass.floatProperty
+// CHECK-NEXT:   functionPointerMethod:
+// CHECK-NEXT:     NSErrorImports: -[NSErrorImports functionPointerMethodAndReturnError:]
 // CHECK-NEXT:   init:
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass initWithFloat:], -[SNSomeClass initWithDefault], +[SNSomeClass someClassWithDouble:], +[SNSomeClass someClassWithTry:], +[SNSomeClass buildWithUnsignedChar:]
 // CHECK-NEXT:     UIActionSheet: -[UIActionSheet initWithTitle:delegate:cancelButtonTitle:destructiveButtonTitle:otherButtonTitles:]
@@ -70,10 +76,14 @@
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
 // CHECK-NEXT:   optSetter:
 // CHECK-NEXT:     SNCollision: SNCollision.optSetter
+// CHECK-NEXT:   pointerMethod:
+// CHECK-NEXT:     NSErrorImports: -[NSErrorImports pointerMethodAndReturnError:]
 // CHECK-NEXT:   protoInstanceMethodWith:
 // CHECK-NEXT:     SNSomeProtocol: -[SNSomeProtocol protoInstanceMethodWithX:y:]
 // CHECK:        reqSetter:
 // CHECK-NEXT:     SNCollision: SNCollision.reqSetter
+// CHECK-NEXT:   selectorMethod:
+// CHECK-NEXT:     NSErrorImports: -[NSErrorImports selectorMethodAndReturnError:]
 // CHECK-NEXT:   setAccessibilityFloat:
 // CHECK-NEXT:     NSAccessibility: -[NSAccessibility setAccessibilityFloat:]
 // CHECK-NEXT:   subscript:

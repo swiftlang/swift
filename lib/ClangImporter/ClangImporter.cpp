@@ -1544,27 +1544,8 @@ static bool canImportAsOptional(clang::ASTContext &ctx, clang::QualType type) {
   // Objective-C object pointers.
   if (type->getAs<clang::ObjCObjectPointerType>()) return true;
 
-  // Block and function pointers.
-  if (type->isBlockPointerType() || type->isFunctionPointerType()) return true;
-
-  // CF types.
-  do {
-    // Check whether we have a typedef that refers to a CoreFoundation type.
-    if (auto typedefType = dyn_cast<clang::TypedefType>(type.getTypePtr())) {
-      if (ClangImporter::Implementation::isCFTypeDecl(typedefType->getDecl()))
-        return true;
-
-      type = typedefType->getDecl()->getUnderlyingType();
-      continue;
-    }
-
-    // Try to desugar one level...
-    clang::QualType desugared = type.getSingleStepDesugaredType(ctx);
-    if (desugared.getTypePtr() == type.getTypePtr())
-      break;
-
-    type = desugared;
-  } while (!type.isNull());
+  // Block and C pointers, including CF types.
+  if (type->isBlockPointerType() || type->isPointerType()) return true;
 
   return false;
 }
