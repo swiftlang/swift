@@ -41,6 +41,10 @@ typedef struct swift_reflection_info {
   swift_reflection_section_t capture;
   swift_reflection_section_t typeref;
   swift_reflection_section_t reflstr;
+
+  // Start address in local and remote address spaces.
+  uintptr_t LocalStartAddress;
+  uintptr_t RemoteStartAddress;
 } swift_reflection_info_t;
 
 /// The layout kind of a Swift type.
@@ -60,6 +64,7 @@ typedef enum swift_layout_kind {
   SWIFT_CLASS_EXISTENTIAL,
   SWIFT_EXISTENTIAL_METATYPE,
   SWIFT_CLASS_INSTANCE,
+  SWIFT_CLOSURE_CONTEXT,
 
   // References to other objects in the heap.
   SWIFT_STRONG_REFERENCE,

@@ -91,13 +91,8 @@ class TypeDecoder {
       auto mangledName = Demangle::mangleNode(Node);
       return Builder.createBuiltinType(mangledName);
     }
+    case NodeKind::Metatype:
     case NodeKind::ExistentialMetatype: {
-      auto instance = decodeMangledType(Node->getChild(0));
-      if (!instance)
-        return BuiltType();
-      return Builder.createExistentialMetatypeType(instance);
-    }
-    case NodeKind::Metatype: {
       unsigned i = 0;
       bool wasAbstract = false;
 
@@ -116,7 +111,16 @@ class TypeDecoder {
       auto instance = decodeMangledType(Node->getChild(i));
       if (!instance)
         return BuiltType();
-      return Builder.createMetatypeType(instance, wasAbstract);
+      if (Node->getKind() == NodeKind::Metatype) {
+        return Builder.createMetatypeType(instance, wasAbstract);
+      } else if (Node->getKind() == NodeKind::ExistentialMetatype) {
+        // FIXME: Ignore representation of existential metatype
+        // completely for now
+        return Builder.createExistentialMetatypeType(instance);
+      } else {
+        assert(false);
+        return nullptr;
+      }
     }
     case NodeKind::ProtocolList: {
       std::vector<BuiltType> protocols;
@@ -488,9 +492,6 @@ private:
   using OwnedProtocolDescriptorRef =
     std::unique_ptr<const TargetProtocolDescriptor<Runtime>, delete_with_free>;
 
-  using OwnedCaptureDescriptor =
-    std::unique_ptr<const CaptureDescriptor, delete_with_free>;
-
   /// Cached isa mask.
   StoredPointer isaMask;
   bool hasIsaMask = false;
@@ -732,13 +733,12 @@ public:
       return Builder.createForeignClassType(std::move(name));
     }
     case MetadataKind::HeapLocalVariable:
-      return Builder.getUnnamedForeignClassType(); // FIXME?
     case MetadataKind::HeapGenericLocalVariable:
-      return Builder.getUnnamedForeignClassType(); // FIXME?
     case MetadataKind::ErrorObject:
-      return Builder.getUnnamedForeignClassType(); // FIXME?
+      // Treat these all as Builtin.NativeObject for type lowering purposes.
+      return Builder.createBuiltinType("Bo");
     case MetadataKind::Opaque:
-      return Builder.getOpaqueType(); // FIXME?
+      return Builder.getOpaqueType();
     }
   }
 
@@ -764,6 +764,68 @@ public:
       return {false, 0};
 
     return {true, MetadataAddress & isaMaskValue};
+  }
+
+  /// Read the parent type metadata from a nested nominal type metadata.
+  std::pair<bool, StoredPointer>
+  readParentFromMetadata(StoredPointer metadata) {
+    auto Meta = readMetadata(metadata);
+    if (!Meta)
+      return std::make_pair(false, 0);
+
+    auto descriptorAddress = readAddressOfNominalTypeDescriptor(Meta);
+    if (!descriptorAddress)
+      return std::make_pair(false, 0);
+
+    // Read the nominal type descriptor.
+    auto descriptor = readNominalTypeDescriptor(descriptorAddress);
+    if (!descriptor)
+      return std::make_pair(false, 0);
+
+    // Read the parent type if the type has one.
+    if (descriptor->GenericParams.Flags.hasParent()) {
+      StoredPointer parentAddress = getNominalParent(Meta, descriptor);
+      if (!parentAddress)
+        return std::make_pair(false, 0);
+      return std::make_pair(true, parentAddress);
+    }
+
+    return std::make_pair(false, 0);
+  }
+
+  /// Read a single generic type argument from a bound generic type
+  /// metadata.
+  std::pair<bool, StoredPointer>
+  readGenericArgFromMetadata(StoredPointer metadata, unsigned index) {
+    auto Meta = readMetadata(metadata);
+    if (!Meta)
+      return std::make_pair(false, 0);
+
+    auto descriptorAddress = readAddressOfNominalTypeDescriptor(Meta);
+    if (!descriptorAddress)
+      return std::make_pair(false, 0);
+
+    // Read the nominal type descriptor.
+    auto descriptor = readNominalTypeDescriptor(descriptorAddress);
+    if (!descriptor)
+      return std::make_pair(false, 0);
+
+    auto numGenericParams = descriptor->GenericParams.NumPrimaryParams;
+    auto offsetToGenericArgs =
+      sizeof(StoredPointer) * (descriptor->GenericParams.Offset);
+    auto addressOfGenericArgAddress =
+      Meta.getAddress() + offsetToGenericArgs +
+      index * sizeof(StoredPointer);
+
+    if (index >= numGenericParams)
+      return std::make_pair(false, 0);
+
+    StoredPointer genericArgAddress;
+    if (!Reader->readInteger(RemoteAddress(addressOfGenericArgAddress),
+                             &genericArgAddress))
+      return std::make_pair(false, 0);
+
+    return std::make_pair(true, genericArgAddress);
   }
 
   /// Given the address of a nominal type descriptor, attempt to resolve
@@ -797,6 +859,28 @@ public:
     const auto &element = tupleMetadata->getElement(eltIndex);
     *offset = element.Offset;
     return true;
+  }
+
+  /// Given a remote pointer to class metadata, attempt to read its superclass.
+  std::pair<bool, StoredPointer>
+  readOffsetToFirstCaptureFromMetadata(StoredPointer MetadataAddress) {
+    auto meta = readMetadata(MetadataAddress);
+    if (!meta || meta->getKind() != MetadataKind::HeapLocalVariable)
+      return std::make_pair(false, 0);
+
+    auto heapMeta = cast<TargetHeapLocalVariableMetadata<Runtime>>(meta);
+    return std::make_pair(true, heapMeta->OffsetToFirstCapture);
+  }
+
+  /// Given a remote pointer to class metadata, attempt to read its superclass.
+  std::pair<bool, StoredPointer>
+  readCaptureDescriptorFromMetadata(StoredPointer MetadataAddress) {
+    auto meta = readMetadata(MetadataAddress);
+    if (!meta || meta->getKind() != MetadataKind::HeapLocalVariable)
+      return std::make_pair(false, 0);
+
+    auto heapMeta = cast<TargetHeapLocalVariableMetadata<Runtime>>(meta);
+    return std::make_pair(true, heapMeta->CaptureDescription);
   }
 
 protected:
@@ -1058,39 +1142,6 @@ private:
 
     TypeCache.insert({metadata.getAddress(), nominal});
     return nominal;
-  }
-
-  /// Read the entire CaptureDescriptor in this address space, including
-  /// trailing capture typeref relative offsets, and GenericMetadataSource
-  /// pairs.
-  OwnedCaptureDescriptor readCaptureDescriptor(StoredPointer Address) {
-
-    uint32_t NumCaptures = 0;
-    uint32_t NumMetadataSources = 0;
-
-    StoredSize Offset = 0;
-
-    if (!Reader->readInteger(Address + Offset, &NumCaptures))
-      return nullptr;
-
-    Offset += sizeof(NumCaptures);
-
-    if (!Reader->readInteger(Address + Offset, &NumMetadataSources))
-      return nullptr;
-
-    StoredSize Size = sizeof(CaptureDescriptor) +
-      NumCaptures * sizeof(RelativeDirectPointer<const char>) +
-      NumMetadataSources * sizeof(GenericMetadataSource);
-
-    auto Buffer = (uint8_t *)malloc(Size);
-
-    if (!Reader->readBytes(Address, Buffer, Size)) {
-      free(Buffer);
-      return nullptr;
-    }
-
-    auto RawDescriptor = reinterpret_cast<const CaptureDescriptor *>(Buffer);
-    return OwnedCaptureDescriptor(RawDescriptor);
   }
 
   /// Given a pointer to an Objective-C class, try to read its class name.

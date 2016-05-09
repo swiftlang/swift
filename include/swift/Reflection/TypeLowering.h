@@ -55,6 +55,10 @@ enum class RecordKind : unsigned {
   // A class instance layout, consisting of the stored properties of
   // one class, excluding superclasses.
   ClassInstance,
+
+  // A closure context instance layout, consisting of the captured values.
+  // For now, captured values do not retain their names.
+  ClosureContext,
 };
 
 enum class ReferenceCounting : unsigned {
@@ -171,8 +175,16 @@ public:
 
   TypeRefBuilder &getBuilder() { return Builder; }
 
+  /// Tests if the type is concrete enough that its size is known.
+  /// For example, a bound generic class is fixed size even if some
+  /// of the generic argument types contain generic parameters.
+  bool hasFixedSize(const TypeRef *TR);
+
   /// Returns layout information for a value of the given type.
   /// For a class, this returns the lowering of the reference value.
+  ///
+  /// The type must either be concrete, or at least fixed-size, as
+  /// determined by the isFixedSize() predicate.
   const TypeInfo *getTypeInfo(const TypeRef *TR);
 
   /// Returns layout information for an instance of the given
@@ -223,6 +235,14 @@ public:
   unsigned addField(unsigned fieldSize, unsigned fieldAlignment);
   void addField(const std::string &Name, const TypeRef *TR);
   const RecordTypeInfo *build();
+
+  unsigned getNumFields() const {
+    return Fields.size();
+  }
+
+  unsigned getFieldOffset(unsigned Index) const {
+    return Fields[Index].Offset;
+  }
 };
 
 }

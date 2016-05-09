@@ -79,6 +79,8 @@ struct ReflectionInfo {
   CaptureSection capture;
   GenericSection typeref;
   GenericSection reflstr;
+  uintptr_t LocalStartAddress;
+  uintptr_t RemoteStartAddress;
 };
 
 struct ClosureContextInfo {
@@ -86,7 +88,8 @@ struct ClosureContextInfo {
   std::vector<std::pair<const TypeRef *, const MetadataSource *>> MetadataSources;
   unsigned NumBindings = 0;
 
-  void dump(std::ostream &OS);
+  void dump() const;
+  void dump(std::ostream &OS) const;
 };
 
 /// An implementation of MetadataReader's BuilderType concept for
@@ -288,6 +291,10 @@ public:
 
   /// Get the primitive type lowering for a builtin type.
   const BuiltinTypeDescriptor *getBuiltinTypeInfo(const TypeRef *TR);
+
+  /// Get the raw capture descriptor for a remote capture descriptor
+  /// address.
+  const CaptureDescriptor *getCaptureDescriptor(uintptr_t RemoteAddress);
 
   /// Get the unsubstituted capture types for a closure context.
   ClosureContextInfo getClosureContextInfo(const CaptureDescriptor &CD);

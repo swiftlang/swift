@@ -152,6 +152,21 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
   return nullptr;
 }
 
+const CaptureDescriptor *
+TypeRefBuilder::getCaptureDescriptor(uintptr_t RemoteAddress) {
+  for (auto Info : ReflectionInfos) {
+    for (auto &CD : Info.capture) {
+      auto OtherAddr = ((uintptr_t) &CD -
+                        Info.LocalStartAddress +
+                        Info.RemoteStartAddress);
+      if (OtherAddr == RemoteAddress)
+        return &CD;
+    }
+  }
+
+  return nullptr;
+}
+
 /// Get the unsubstituted capture types for a closure context.
 ClosureContextInfo
 TypeRefBuilder::getClosureContextInfo(const CaptureDescriptor &CD) {
@@ -265,7 +280,11 @@ void TypeRefBuilder::dumpBuiltinTypeSection(std::ostream &OS) {
   }
 }
 
-void ClosureContextInfo::dump(std::ostream &OS) {
+void ClosureContextInfo::dump() const {
+  dump(std::cerr);
+}
+
+void ClosureContextInfo::dump(std::ostream &OS) const {
   OS << "- Capture types:\n";
   for (auto *TR : CaptureTypes) {
     if (TR == nullptr)

@@ -546,6 +546,10 @@ public:
     // the bindings structure directly.
     auto &Bindings = Layout.getBindings();
     for (unsigned i = 0; i < Bindings.size(); ++i) {
+      // Skip protocol requirements (FIXME: for now?)
+      if (Bindings[i].Protocol != nullptr)
+        continue;
+
       auto Source = SourceBuilder.createClosureBinding(i);
       auto BindingType = Caller.mapTypeOutOfContext(Bindings[i].TypeParameter);
       SourceMap.push_back({BindingType->getCanonicalType(), Source});
