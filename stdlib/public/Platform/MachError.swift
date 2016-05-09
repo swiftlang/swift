@@ -188,5 +188,8 @@
 
   /// The requested property cannot be changed at this time.
   case KERN_POLICY_STATIC             = 51
+  
+  /// The provided buffer is of insufficient size for the requested data.
+  case KERN_INSUFFICIENT_BUFFER_SIZE  = 52
 }
 #endif // os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
