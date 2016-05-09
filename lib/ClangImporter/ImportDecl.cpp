@@ -1307,6 +1307,114 @@ namespace {
       return alias;
     }
 
+    /// Create a swift_newtype struct corresponding to a typedef. Returns
+    /// nullptr if unable.
+    Decl *importSwiftNewtype(const clang::TypedefNameDecl *decl,
+                             clang::SwiftNewtypeAttr *newtypeAttr,
+                             DeclContext *dc, Identifier name) {
+      switch (newtypeAttr->getNewtypeKind()) {
+      case clang::SwiftNewtypeAttr::NK_Enum:
+      // TODO: import as closed enum instead
+      // For now, fall through and treat as a struct
+      case clang::SwiftNewtypeAttr::NK_Struct:
+        break;
+      // No other cases yet
+      }
+
+      auto &cxt = Impl.SwiftContext;
+      auto Loc = Impl.importSourceLoc(decl->getLocation());
+
+      auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
+          decl, Loc, name, Loc, None, nullptr, dc);
+      structDecl->computeType();
+
+      // Import the type of the underlying storage
+      auto storedUnderlyingType = Impl.importType(
+          decl->getUnderlyingType(), ImportTypeKind::Value,
+          isInSystemModule(dc), decl->getUnderlyingType()->isBlockPointerType(),
+          OTK_None);
+
+      // If the type is Unmanaged, that is it is not CF ARC audited,
+      // we will store the underlying type and leave it up to the use site
+      // to determine whether to use this new_type, or an Unmanaged<CF...> type.
+      if (auto genericType = storedUnderlyingType->getAs<BoundGenericType>()) {
+        if (genericType->getDecl() == Impl.SwiftContext.getUnmanagedDecl()) {
+          assert(genericType->getGenericArgs().size() == 1 && "other args?");
+          storedUnderlyingType = genericType->getGenericArgs()[0];
+        }
+      }
+
+      // Find a bridged type, which may be different
+      auto computedPropertyUnderlyingType = Impl.importType(
+          decl->getUnderlyingType(), ImportTypeKind::Property,
+          isInSystemModule(dc), decl->getUnderlyingType()->isBlockPointerType(),
+          OTK_None);
+
+      bool isBridged =
+          !storedUnderlyingType->isEqual(computedPropertyUnderlyingType);
+
+      // Determine the set of protocols to which the synthesized
+      // type will conform.
+      SmallVector<ProtocolDecl *, 4> protocols;
+      SmallVector<KnownProtocolKind, 4> synthesizedProtocols;
+
+      // Local function to add a known protocol.
+      auto addKnown = [&](KnownProtocolKind kind) {
+        if (auto proto = cxt.getProtocol(kind)) {
+          protocols.push_back(proto);
+          synthesizedProtocols.push_back(kind);
+        }
+      };
+
+      // Add conformances that are always available.
+      addKnown(KnownProtocolKind::RawRepresentable);
+      addKnown(KnownProtocolKind::SwiftNewtypeWrapper);
+
+      // Local function to add a known protocol only when the
+      // underlying type conforms to it.
+      auto computedNominal = computedPropertyUnderlyingType->getAnyNominal();
+      auto transferKnown = [&](KnownProtocolKind kind) {
+        if (!computedNominal)
+          return;
+
+        auto proto = cxt.getProtocol(kind);
+        if (!proto)
+          return;
+
+        SmallVector<ProtocolConformance *, 1> conformances;
+        if (computedNominal->lookupConformance(
+                computedNominal->getParentModule(), proto, conformances)) {
+          protocols.push_back(proto);
+          synthesizedProtocols.push_back(kind);
+        }
+      };
+
+      // Transfer conformances. Each of these needs a forwarding
+      // implementation in the standard library.
+      transferKnown(KnownProtocolKind::Equatable);
+      transferKnown(KnownProtocolKind::Hashable);
+      transferKnown(KnownProtocolKind::Comparable);
+      transferKnown(KnownProtocolKind::ObjectiveCBridgeable);
+
+      if (!isBridged) {
+        // Simple, our stored type is equivalent to our computed
+        // type.
+        makeStructRawValued(structDecl, storedUnderlyingType,
+                            synthesizedProtocols, protocols);
+      } else {
+        // We need to make a stored rawValue or storage type, and a
+        // computed one of bridged type.
+        makeStructRawValuedWithBridge(structDecl, storedUnderlyingType,
+                                      computedPropertyUnderlyingType,
+                                      synthesizedProtocols, protocols);
+      }
+
+      Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}] =
+          structDecl;
+      Impl.registerExternalDecl(structDecl);
+      return structDecl;
+    }
+
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
       Optional<ImportedName> swift3Name;
       auto importedName = importFullName(Decl, swift3Name);
@@ -1390,6 +1498,13 @@ namespace {
               if (!underlying)
                 return nullptr;
 
+              // Check for a newtype
+              if (auto newtypeAttr =
+                      Impl.getSwiftNewtypeAttr(Decl, useSwift2Name))
+                if (auto newtype =
+                        importSwiftNewtype(Decl, newtypeAttr, DC, Name))
+                  return newtype;
+
               // Create a typealias for this CF typedef.
               TypeAliasDecl *typealias = nullptr;
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
@@ -1467,104 +1582,10 @@ namespace {
         return nullptr;
 
       // Check for swift_newtype
-      if (!SwiftType) {
-        if (auto newtypeAttr = Impl.getSwiftNewtypeAttr(Decl, useSwift2Name)) {
-          switch (newtypeAttr->getNewtypeKind()) {
-          case clang::SwiftNewtypeAttr::NK_Enum:
-            // TODO: import as closed enum instead
-
-            // For now, fall through and treat as a struct
-          case clang::SwiftNewtypeAttr::NK_Struct: {
-
-            auto &cxt = Impl.SwiftContext;
-            auto Loc = Impl.importSourceLoc(Decl->getLocation());
-
-            auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-                Decl, Loc, Name, Loc, None, nullptr, DC);
-            structDecl->computeType();
-
-            // Import the type of the underlying storage
-            auto storedUnderlyingType = Impl.importType(
-                Decl->getUnderlyingType(), ImportTypeKind::Value,
-                isInSystemModule(DC),
-                Decl->getUnderlyingType()->isBlockPointerType(),
-                OTK_None);
-
-            // Find a bridged type, which may be different
-            auto computedPropertyUnderlyingType = Impl.importType(
-                Decl->getUnderlyingType(), ImportTypeKind::Property,
-                isInSystemModule(DC),
-                Decl->getUnderlyingType()->isBlockPointerType(),
-                OTK_None);
-
-            bool isBridged =
-              !storedUnderlyingType->isEqual(computedPropertyUnderlyingType);
-
-            // Determine the set of protocols to which the synthesized
-            // type will conform.
-            SmallVector<ProtocolDecl *, 4> protocols;
-            SmallVector<KnownProtocolKind, 4> synthesizedProtocols;
-
-            // Local function to add a known protocol.
-            auto addKnown = [&](KnownProtocolKind kind) {
-              if (auto proto = cxt.getProtocol(kind)) {
-                protocols.push_back(proto);
-                synthesizedProtocols.push_back(kind);
-              }
-            };
-
-            // Add conformances that are always available.
-            addKnown(KnownProtocolKind::RawRepresentable);
-            addKnown(KnownProtocolKind::SwiftNewtypeWrapper);
-
-            // Local function to add a known protocol only when the
-            // underlying type conforms to it.
-            auto computedNominal =
-              computedPropertyUnderlyingType->getAnyNominal();
-            auto transferKnown = [&](KnownProtocolKind kind) {
-              if (!computedNominal) return;
-
-              auto proto = cxt.getProtocol(kind);
-              if (!proto) return;
-
-              SmallVector<ProtocolConformance *, 1> conformances;
-              if (computedNominal->lookupConformance(
-                    computedNominal->getParentModule(), proto, conformances)) {
-                protocols.push_back(proto);
-                synthesizedProtocols.push_back(kind);                
-              }
-            };
- 
-            // Transfer conformances. Each of these needs a forwarding
-            // implementation in the standard library.
-            transferKnown(KnownProtocolKind::Equatable);
-            transferKnown(KnownProtocolKind::Hashable);
-            transferKnown(KnownProtocolKind::Comparable);
-            transferKnown(KnownProtocolKind::ObjectiveCBridgeable);
-            
-            if (!isBridged) {
-              // Simple, our stored type is equivalent to our computed
-              // type.
-              makeStructRawValued(structDecl, storedUnderlyingType,
-                                  synthesizedProtocols, protocols);
-            } else {
-              // We need to make a stored rawValue or storage type, and a
-              // computed one of bridged type.
-              makeStructRawValuedWithBridge(
-                  structDecl, storedUnderlyingType,
-                  computedPropertyUnderlyingType,
-                  synthesizedProtocols, protocols);
-            }
-
-            Impl.ImportedDecls[{Decl->getCanonicalDecl(), useSwift2Name}]
-              = structDecl;
-            Impl.registerExternalDecl(structDecl);
-            return structDecl;
-          }
-        }
-
-        }
-      }
+      if (!SwiftType)
+        if (auto newtypeAttr = Impl.getSwiftNewtypeAttr(Decl, useSwift2Name))
+          if (auto newtype = importSwiftNewtype(Decl, newtypeAttr, DC, Name))
+            return newtype;
 
       if (!SwiftType) {
         // Import typedefs of blocks as their fully-bridged equivalent Swift

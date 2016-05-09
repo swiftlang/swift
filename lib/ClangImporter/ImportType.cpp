@@ -90,6 +90,11 @@ namespace {
 
       /// The source type created a new Swift type, using swift_newtype
       SwiftNewtype,
+
+      /// The source type created a new Swift type, using swift_newtype, of an
+      /// original underlying CFPointer. This distinction is necessary to
+      /// trigger audit-checking.
+      SwiftNewtypeFromCFPointer,
     };
 
     ImportHintKind Kind;
@@ -121,7 +126,6 @@ namespace {
     case ImportHint::NSUInteger:
     case ImportHint::Reference:
     case ImportHint::Void:
-    case ImportHint::SwiftNewtype:
       return false;
 
     case ImportHint::Block:
@@ -130,6 +134,8 @@ namespace {
     case ImportHint::ObjCPointer:
     case ImportHint::CFunctionPointer:
     case ImportHint::OtherPointer:
+    case ImportHint::SwiftNewtype:
+    case ImportHint::SwiftNewtypeFromCFPointer:
       return true;
     }
   }
@@ -555,8 +561,10 @@ namespace {
       ImportHint hint = ImportHint::None;
 
       if (Impl.getSwiftNewtypeAttr(type->getDecl(), /*useSwift2Name=*/false)) {
-        hint = ImportHint::SwiftNewtype;
-
+        if (ClangImporter::Implementation::isCFTypeDecl(type->getDecl()))
+          hint = ImportHint::SwiftNewtypeFromCFPointer;
+        else
+          hint = ImportHint::SwiftNewtype;
       // For certain special typedefs, we don't want to use the imported type.
       } else if (auto specialKind = Impl.getSpecialTypedefKind(type->getDecl())) {
         switch (specialKind.getValue()) {
@@ -997,6 +1005,21 @@ static bool isNSString(Type type) {
   return false;
 }
 
+static Type findNewtypeUnderlyingType(Type newtype) {
+  auto structDecl = newtype->getStructOrBoundGenericStruct();
+  assert(structDecl && structDecl->getClangNode() &&
+         structDecl->getClangNode().getAsDecl() &&
+         structDecl->getClangNode()
+             .castAsDecl()
+             ->getAttr<clang::SwiftNewtypeAttr>() &&
+         "Called on a non-swift_newtype decl");
+  for (auto member : structDecl->getMembers())
+    if (auto varDecl = dyn_cast<VarDecl>(member))
+      if (varDecl->getName().str() == "rawValue")
+        return varDecl->getType();
+  assert(0 && "no rawValue variable member");
+}
+
 static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
                                         clang::QualType clangType,
                                         Type importedType,
@@ -1176,6 +1199,15 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   // context.
   if (hint == ImportHint::CFPointer && !isCFAudited(importKind)) {
     importedType = getUnmanagedType(impl, importedType);
+  }
+
+  // For types we import as new types in Swift, if the use is CF un-audited,
+  // then we have to for it to be unmanaged
+  if (hint == ImportHint::SwiftNewtypeFromCFPointer &&
+      !isCFAudited(importKind)) {
+    auto underlyingType = findNewtypeUnderlyingType(importedType);
+    if (underlyingType)
+      importedType = getUnmanagedType(impl, underlyingType);
   }
 
   // If we have a bridged Objective-C type and we are allowed to

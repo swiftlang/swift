@@ -33,3 +33,27 @@ public func getGlobalNotification(_ x: Int) -> String {
   }
 // CHECK: ret
 }
+
+// CHECK-LABEL: _TF7newtype17getCFNewTypeValueFT6useVarSb_VSC9CFNewType
+public func getCFNewTypeValue(useVar: Bool) -> CFNewType {
+  if (useVar) {
+    return CFNewType.MyCFNewTypeValue
+    // CHECK: load {{.*}} @MyCFNewTypeValue
+  } else {
+    return FooAudited()
+    // CHECK: call {{.*}} @FooAudited()
+  }
+  // CHECK: ret
+}
+
+// CHECK-LABEL: _TF7newtype21getUnmanagedCFNewTypeFT6useVarSb_GVs9UnmanagedCSo8CFString_
+public func getUnmanagedCFNewType(useVar: Bool) -> Unmanaged<CFString> {
+  if (useVar) {
+    return CFNewType.MyCFNewTypeValueUnaudited
+    // CHECK: load {{.*}} @MyCFNewTypeValueUnaudited
+  } else {
+    return FooUnaudited()
+    // CHECK: call {{.*}} @FooUnaudited()
+  }
+  // CHECK: ret
+}
