@@ -385,7 +385,7 @@ private:
       //
       // Metadata bindings are stored consecutively at the beginning of the
       // closure context.
-      unsigned Offset = ((sizeof(StoredPointer) == 4 ? 12 : 8) +
+      unsigned Offset = ((sizeof(StoredPointer) == 4 ? 12 : 16) +
                          sizeof(StoredPointer) * Index);
 
       StoredPointer MetadataAddress;
