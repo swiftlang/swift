@@ -378,7 +378,7 @@ acceptTuple1(1, false) // expected-error{{extra argument in call}}
 
 func acceptTuple2<T>(_ input : T) -> T { return input }
 var tuple1 = (1, "hello")
-acceptTuple2(tuple1)
-acceptTuple2((1, "hello", 3.14159))
+_ = acceptTuple2(tuple1)
+_ = acceptTuple2((1, "hello", 3.14159))
 
 

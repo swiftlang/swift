@@ -309,25 +309,25 @@ public func run_PolymorphicCalls(_ N:Int) {
     let UPTO = 10000 * N
 
     let a = A(b:B(x:1))
-    test(a, UPTO)
+    _ = test(a, UPTO)
 
     let a1 = A1(b:C1(x:1))
 
-    test(a1, UPTO)
+    _ = test(a1, UPTO)
 
     let a2 = A2(b:C2(x:1))
 
-    test(a2, UPTO)
+    _ = test(a2, UPTO)
 
     let a2_c2 = A2(b:C2(x:1))
     let a2_d2 = A2(b:D2(x:1))
 
-    test(a2_c2, a2_d2, UPTO)
+    _ = test(a2_c2, a2_d2, UPTO)
 
     let a3_c3 = A3(b:C3(x:1))
     let a3_d3 = A3(b:D3(x:1))
     let a3_e3 = A3(b:E3(x:1))
     let a3_f3 = A3(b:F3(x:1))
 
-    test(a3_c3, a3_d3, a3_e3, a3_f3, UPTO)
+    _ = test(a3_c3, a3_d3, a3_e3, a3_f3, UPTO)
 }

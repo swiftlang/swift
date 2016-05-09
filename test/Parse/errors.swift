@@ -90,7 +90,7 @@ struct IllegalContext {
 
   func catcher() throws {
     do {
-      try genError()
+      _ = try genError()
     } catch MSV.CarriesInt(genError()) { // expected-error {{call can throw, but errors cannot be thrown out of a catch pattern}}
     } catch MSV.CarriesInt(let i) where i == genError() { // expected-error {{call can throw, but errors cannot be thrown out of a catch guard expression}}
     }
@@ -99,7 +99,7 @@ struct IllegalContext {
 
 func illformed() throws {
     do {
-      try genError()
+      _ = try genError()
 
     // TODO: this recovery is terrible
     } catch MSV.CarriesInt(let i) where i == genError()) { // expected-error {{call can throw, but errors cannot be thrown out of a catch guard expression}} expected-error {{expected '{'}} expected-error {{braced block of statements is an unused closure}} expected-error {{expression resolves to an unused function}}

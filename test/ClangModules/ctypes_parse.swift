@@ -17,7 +17,7 @@ func testColor() {
   c = blue
   _ = c.rawValue
   checkRawRepresentable(c)
-  checkEquatable(c)
+  _ = checkEquatable(c)
   checkEquatablePattern(c)
 }
 

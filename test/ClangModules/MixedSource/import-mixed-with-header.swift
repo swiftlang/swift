@@ -27,5 +27,5 @@ func testCrossReferences(_ derived: Derived) {
   _ = obj.safeOverrideProto(ForwardProtoAdopter()) as NSObject
 
   testProtocolWrapper(ProtoConformer())
-  testStruct(Point(x: 2,y: 3))
+  _ = testStruct(Point(x: 2,y: 3))
 }

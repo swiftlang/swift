@@ -92,9 +92,9 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(_ ovl: Ovl, ovl2: Ovl,
   var b = ovl.getB()
 
   // Overloading based on arguments
-  ovl.f1(a)
+  _ = ovl.f1(a)
   a = ovl.f1(a)
-  ovl.f1(b)
+  _ = ovl.f1(b)
   b = ovl.f1(b)
 
   // Overloading based on return type

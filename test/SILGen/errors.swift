@@ -197,7 +197,7 @@ func IThrow() throws -> Int32 {
 //CHECK-NOT: builtin "willThrow"
 //CHECK: return
 func DoesNotThrow() throws -> Int32 {
-  try IThrow()
+  _ = try IThrow()
   return 2
 }
 

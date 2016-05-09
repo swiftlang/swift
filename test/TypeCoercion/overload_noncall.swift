@@ -48,7 +48,7 @@ func test_inout() {
   accept_X(xy); // expected-error{{passing value of type 'X' to an inout parameter requires explicit '&'}} {{12-12=&}}
   accept_X(&xy);
 
-  accept_XY(&x);
+  _ = accept_XY(&x);
   x = accept_XY(&xy);
 
   x = xy

@@ -7,5 +7,5 @@ func dict_int_string_indexer(_ getElement: (Dictionary<Int, String>) -> String) 
 }
 
 func test_dict_int_string_indexer() {
-  dict_int_string_indexer({ (x : Dictionary) in x[1]! })
+  _ = dict_int_string_indexer({ (x : Dictionary) in x[1]! })
 }

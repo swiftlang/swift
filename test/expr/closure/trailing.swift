@@ -1,5 +1,6 @@
 // RUN: %target-parse-verify-swift
 
+@discardableResult
 func takeFunc(_ f: (Int) -> Int) -> Int {}
 func takeValueAndFunc(_ value: Int, _ f: (Int) -> Int) {}
 func takeTwoFuncs(_ f: (Int) -> Int, _ g: (Int) -> Int) {}
@@ -33,7 +34,7 @@ func makeCalls() {
 }
 
 func notPostfix() {
-  1 + takeFunc { $0 }
+  _ = 1 + takeFunc { $0 }
 }
 
 class C {

@@ -124,12 +124,12 @@ func overloadtest(x: Int) {
 
   // Test overloaded operators.
   let s : a_struct
-  4 *** 17     // Resolved to the *** operator that takes ints.
+  _ = 4 *** 17     // Resolved to the *** operator that takes ints.
   s *** s     // Resolved to the *** operator that takes a_struct.
   s *** {$0 + 4}     // Closure obviously not a struct.
 
-  ov_fn_result2()(4)(4)  // picks the ov_fn_result2 taking an Int.
-  ov_fn_result2()(4)(s)  // picks the ov_fn_result2 taking a_struct.
+  _ = ov_fn_result2()(4)(4)  // picks the ov_fn_result2 taking an Int.
+  _ = ov_fn_result2()(4)(s)  // picks the ov_fn_result2 taking a_struct.
 }
 
 func localtest() {

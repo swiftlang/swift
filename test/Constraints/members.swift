@@ -27,13 +27,13 @@ var yf : Y<Float>
 
 func g0(_: (inout X) -> (Float) -> ()) {}
 
-x.f0(i)
+_ = x.f0(i)
 x.f0(i).f1(i)
 g0(X.f1)
-x.f0(x.f2(1))
-x.f0(1).f2(i)
-yf.f0(1)
-yf.f1(i, y: 1)
+_ = x.f0(x.f2(1))
+_ = x.f0(1).f2(i)
+_ = yf.f0(1)
+_ = yf.f1(i, y: 1)
 
 // Members referenced from inside the struct
 struct Z {
@@ -88,7 +88,7 @@ var zcurriedFull = z.curried(0)(1)
 Swift.print(3, terminator: "")
 
 var format : String
-format._splitFirstIf({ $0.isASCII })
+_ = format._splitFirstIf({ $0.isASCII })
 
 ////
 // Unqualified references

@@ -89,7 +89,7 @@ public func checkSequence<
 
   // Check that _copyContents does the right thing if we can do so
   // without destroying the sequence.
-  sequence._preprocessingPass { () -> Void in 
+  _ = sequence._preprocessingPass { () -> Void in
     var count = 0
     for _ in sequence { count += 1 }
     let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: count)

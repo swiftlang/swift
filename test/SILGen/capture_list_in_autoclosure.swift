@@ -5,7 +5,7 @@ func oneOf(_ a: Int?, _ b: @autoclosure () -> Int) -> Int { return 0 }
 class Foo {
     private var value: Int?
     func refresh() {
-        oneOf(self.value, block({
+        _ = oneOf(self.value, block({
             [unowned self] in _ = self
         }))
     }

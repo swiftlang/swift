@@ -24,7 +24,7 @@ func buildString() -> String {
 @inline(never)
 public func run_StringBuilder(_ N: Int) {
   for _ in 1...5000*N {
-    buildString()
+    _ = buildString()
   }
 }
 

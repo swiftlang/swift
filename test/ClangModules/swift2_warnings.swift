@@ -67,8 +67,8 @@ func testImportAsMember() {
   // expected-error@-1{{'IAMStruct1Rotate' has been replaced by instance method 'Struct1.translate(radians:)'}}{{7-23=(&iam1).translate}} {{24-31=}} {{31-31=radians: }}
   // FIXME: "&" part has to be removed for mutating methods.
 
-  IAMStruct1StaticMethod()
-  // expected-error@-1{{'IAMStruct1StaticMethod()' has been replaced by 'Struct1.staticMethod()'}}{{3-25=Struct1.staticMethod}}
+  _ = IAMStruct1StaticMethod()
+  // expected-error@-1{{'IAMStruct1StaticMethod()' has been replaced by 'Struct1.staticMethod()'}}{{7-29=Struct1.staticMethod}}
 
   _ = IAMStruct1GetRadius(&iam1)
   // expected-error@-1{{'IAMStruct1GetRadius' has been replaced by property 'Struct1.radius'}}{{7-26=(&iam1).radius}} {{26-33=}}
