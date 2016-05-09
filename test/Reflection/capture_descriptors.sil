@@ -13,18 +13,20 @@ import SwiftShims
 
 // Concrete caller and callee -- nothing interesting going on
 
-sil @concrete_callee1 : $@convention(thin) (Int, @owned @box Int, @thin Int.Type) -> () {
-bb0(%i: $Int, %b: $@box Int, %m: $@thin Int.Type):
+protocol P {}
+
+sil @concrete_callee1 : $@convention(thin) (Int, @owned @box Int, @thin Int.Type, @thick P.Type) -> () {
+bb0(%i: $Int, %b: $@box Int, %m: $@thin Int.Type, %p: $@thick P.Type):
   %12 = tuple ()
   return %12 : $()
 }
 
-sil @concrete_caller1 : $@convention(thin) (Int) -> @owned @callee_owned () -> () {
-bb0(%i: $Int):
-  %f = function_ref @concrete_callee1 : $@convention(thin) (Int, @owned @box Int, @thin Int.Type) -> ()
+sil @concrete_caller1 : $@convention(thin) (Int, @thick P.Type) -> @owned @callee_owned () -> () {
+bb0(%i: $Int, %p: $@thick P.Type):
+  %f = function_ref @concrete_callee1 : $@convention(thin) (Int, @owned @box Int, @thin Int.Type, @thick P.Type) -> ()
   %b = alloc_box $Int
   %m = metatype $@thin Int.Type
-  %c = partial_apply %f(%i, %b, %m) : $@convention(thin) (Int, @owned @box Int, @thin Int.Type) -> ()
+  %c = partial_apply %f(%i, %b, %m, %p) : $@convention(thin) (Int, @owned @box Int, @thin Int.Type, @thick P.Type) -> ()
   return %c : $@callee_owned () -> ()
 }
 
@@ -34,6 +36,8 @@ bb0(%i: $Int):
 // CHECK-NEXT:   (struct Swift.Int))
 // CHECK-NEXT: (metatype
 // CHECK-NEXT:   (struct Swift.Int))
+// CHECK-NEXT: (existential_metatype
+// CHECK-NEXT:   (protocol capture_descriptors.P))
 // CHECK-NEXT: - Metadata sources:
 
 

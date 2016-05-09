@@ -91,13 +91,8 @@ class TypeDecoder {
       auto mangledName = Demangle::mangleNode(Node);
       return Builder.createBuiltinType(mangledName);
     }
+    case NodeKind::Metatype:
     case NodeKind::ExistentialMetatype: {
-      auto instance = decodeMangledType(Node->getChild(0));
-      if (!instance)
-        return BuiltType();
-      return Builder.createExistentialMetatypeType(instance);
-    }
-    case NodeKind::Metatype: {
       unsigned i = 0;
       bool wasAbstract = false;
 
@@ -116,7 +111,16 @@ class TypeDecoder {
       auto instance = decodeMangledType(Node->getChild(i));
       if (!instance)
         return BuiltType();
-      return Builder.createMetatypeType(instance, wasAbstract);
+      if (Node->getKind() == NodeKind::Metatype) {
+        return Builder.createMetatypeType(instance, wasAbstract);
+      } else if (Node->getKind() == NodeKind::ExistentialMetatype) {
+        // FIXME: Ignore representation of existential metatype
+        // completely for now
+        return Builder.createExistentialMetatypeType(instance);
+      } else {
+        assert(false);
+        return nullptr;
+      }
     }
     case NodeKind::ProtocolList: {
       std::vector<BuiltType> protocols;
