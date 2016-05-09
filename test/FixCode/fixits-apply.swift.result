@@ -65,3 +65,5 @@ func ftest1() {
   // Don't replace the variable name with '_'
   let myvar = 0
 }
+
+func ftest2(x: Int) {}
