@@ -3,16 +3,6 @@ import Darwin
 import StdlibUnittest
 import Foundation
 
-// FIXME: Should go into the standard library.
-public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
-      -> Self {
-    var result: Self? = nil
-    _forceBridgeFromObjectiveC(source!, result: &result)
-    return result!
-  }
-}
-
 func convertDictionaryToNSDictionary<Key, Value>(
   _ d: [Key : Value]
 ) -> NSDictionary {
@@ -258,6 +248,13 @@ struct TestBridgedKeyTy
     return true
   }
 
+  static func _unconditionallyBridgeFromObjectiveC(_ source: TestObjCKeyTy?)
+      -> TestBridgedKeyTy {
+    var result: TestBridgedKeyTy? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+
   var value: Int
   var _hashValue: Int
   var serial: Int
@@ -319,6 +316,13 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
     return true
   }
 
+  static func _unconditionallyBridgeFromObjectiveC(_ source: TestObjCValueTy?)
+      -> TestBridgedValueTy {
+    var result: TestBridgedValueTy? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+
   var value: Int
   var serial: Int
 }
@@ -371,6 +375,14 @@ struct TestBridgedEquatableValueTy
   ) -> Bool {
     self._forceBridgeFromObjectiveC(x, result: &result)
     return true
+  }
+
+  static func _unconditionallyBridgeFromObjectiveC(
+    _ source: TestObjCEquatableValueTy?
+  ) -> TestBridgedEquatableValueTy {
+    var result: TestBridgedEquatableValueTy? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
   }
 
   var value: Int
