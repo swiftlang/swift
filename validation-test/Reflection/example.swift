@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift -Xfrontend -enable-reflection-metadata -Xfrontend -enable-reflection-names -lswiftSwiftReflectionTest %s -o %t/example
-// RUN: %target-run %target-swift-reflection-test %t/example 2>&1 | FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/example | FileCheck %s --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
 
 import SwiftReflectionTest
