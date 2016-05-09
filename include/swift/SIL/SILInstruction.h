@@ -2186,6 +2186,34 @@ public:
   }
 };
 
+/// Checks if two types are representing the same type.
+class IsSameTypeInst : public SILInstruction
+{
+  friend class SILBuilder;
+
+  CanType FirstType;
+  CanType SecondType;
+  SILType BoolTy;
+
+  IsSameTypeInst(SILDebugLocation Loc, CanType firstTy, CanType secondTy,
+                 SILType boolTy)
+      : SILInstruction(ValueKind::IsSameTypeInst, Loc, boolTy),
+        FirstType(firstTy), SecondType(secondTy), BoolTy(boolTy) {}
+
+public:
+  /// Returns the formal type of the source value.
+  CanType getFirstType() const { return FirstType; }
+  /// Returns the formal target type.
+  CanType getSecondType() const { return SecondType; }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::IsSameTypeInst;
+  }
+};
+
 /// StructInst - Represents a constructed loadable struct.
 class StructInst : public SILInstruction {
   friend class SILBuilder;

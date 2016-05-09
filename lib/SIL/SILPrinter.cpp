@@ -1061,7 +1061,12 @@ public:
        << " to " << CI->getTargetType() << " in " << getIDAndType(CI->getDest())
        << ", " << getID(CI->getSuccessBB()) << ", " << getID(CI->getFailureBB());
   }
-  
+
+  void visitIsSameTypeInst(IsSameTypeInst *ISTI) {
+    *this << "is_same_type "
+          << ISTI->getFirstType() << ", " << ISTI->getSecondType();
+  }
+
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "convert_function");
   }

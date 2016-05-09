@@ -381,6 +381,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::UnownedRetainInst:
     case ValueKind::IsUniqueInst:
     case ValueKind::IsUniqueOrPinnedInst:
+    case ValueKind::IsSameTypeInst:
     case ValueKind::UnownedToRefInst:
     case ValueKind::InitBlockStorageHeaderInst:
     case ValueKind::SelectEnumAddrInst:

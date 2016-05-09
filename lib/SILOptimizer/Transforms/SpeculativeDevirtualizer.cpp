@@ -496,7 +496,7 @@ static SILType getThickMetatypeType(CanType Ty) {
 //   : $Builtin.Int1
 // cond_br %
 static void
-emitTypeCheck(SILBuilder &Builder, SILLocation &Loc,
+emitTypeCheck1(SILBuilder &Builder, SILLocation &Loc,
               SILBasicBlock *FailedTypeCheckBB, SILType SelfTy,
               SILType SubTy) {
   // Instantiate a thick metatype for T.Type
@@ -524,6 +524,16 @@ emitTypeCheck(SILBuilder &Builder, SILLocation &Loc,
   Builder.emitBlock(SuccessBB);
 }
 
+static void
+emitTypeCheck(SILBuilder &Builder, SILLocation &Loc,
+              SILBasicBlock *FailedTypeCheckBB, SILType SelfTy,
+              SILType SubTy) {
+  auto Cmp = Builder.createIsSameTypeInst(Loc, SelfTy.getSwiftRValueType(),
+                                          SubTy.getSwiftRValueType());
+  auto *SuccessBB = Builder.getFunction().createBasicBlock();
+  Builder.createCondBranch(Loc, Cmp, SuccessBB, FailedTypeCheckBB);
+  Builder.emitBlock(SuccessBB);
+}
 
 // Insert monomorphic inline caches for a specific class or metatype
 /// type \p SubClassTy.
@@ -627,7 +637,12 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   // Create the checked_cast_addr_branch instruction that checks at runtime if the
   // class instance is identical to the SILType.
   //
-  if (!OEAI) {
+  if (isMetatype) {
+    emitTypeCheck(Builder, Loc, Virt,
+                  Self->getType().getMetatypeInstanceType(AI.getModule()),
+                  SubType);
+    Builder.createBranch(Loc, Iden);
+  } else if (!OEAI) {
     // Self is not an existential. Switch on its metatype.
     emitTypeCheck(Builder, Loc, Virt, Self->getType().getObjectType(), SubType);
     Builder.createBranch(Loc, Iden);

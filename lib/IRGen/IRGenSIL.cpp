@@ -852,6 +852,7 @@ public:
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *i);
   void visitCheckedCastBranchInst(CheckedCastBranchInst *i);
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
+  void visitIsSameTypeInst(IsSameTypeInst *i);
 };
 
 }
@@ -4146,6 +4147,14 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
   Builder.CreateCondBr(castSucceeded,
                        getLoweredBB(i->getSuccessBB()).bb,
                        getLoweredBB(i->getFailureBB()).bb);
+}
+
+void IRGenSILFunction::visitIsSameTypeInst(swift::IsSameTypeInst *i) {
+  llvm::Value *result =
+    emitSameTypeCheck(*this, i->getFirstType(), i->getSecondType());
+  Explosion out;
+  out.add(result);
+  setLoweredExplosion(i, out);
 }
 
 void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {
