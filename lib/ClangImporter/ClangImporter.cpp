@@ -2125,7 +2125,7 @@ bool ClangImporter::Implementation::isNSNotificationGlobal(
   // Must end in Notification
   if (!vDecl->getDeclName().isIdentifier())
     return false;
-  if (StringRef() == stripNotification(vDecl->getName()))
+  if (stripNotification(vDecl->getName()).empty())
     return false;
 
   // Must be NSString *
@@ -2328,7 +2328,7 @@ static StringRef determineSwiftNewtypeBaseName(StringRef baseName,
 
   // Special case: Strip Notification for NSNotificationName
   auto stripped = stripNotification(baseName);
-  if (stripped != StringRef())
+  if (!stripped.empty())
     baseName = stripped;
 
   return baseName;
