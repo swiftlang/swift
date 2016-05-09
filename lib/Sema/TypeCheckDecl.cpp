@@ -31,6 +31,7 @@
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Sema/IterativeTypeChecker.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
@@ -5479,7 +5480,7 @@ public:
   }
 
   static void diagnoseUnavailableOverride(TypeChecker &TC,
-                                          const ValueDecl *override,
+                                          ValueDecl *override,
                                           const ValueDecl *base,
                                           const AvailableAttr *attr) {
     if (attr->Rename.empty()) {
@@ -5495,8 +5496,30 @@ public:
 
     TC.diagnoseExplicitUnavailability(base, override->getLoc(),
                                       override->getDeclContext(),
-                                      [](InFlightDiagnostic &diag) {
-      // FIXME: Apply fix-its here.
+                                      [&](InFlightDiagnostic &diag) {
+      ParsedDeclName parsedName = parseDeclName(attr->Rename);
+      if (!parsedName || parsedName.isPropertyAccessor() ||
+          parsedName.isMember() || parsedName.isOperator()) {
+        return;
+      }
+
+      // Only initializers should be named 'init'.
+      if (isa<ConstructorDecl>(override) ^
+          (parsedName.BaseName == TC.Context.Id_init.str())) {
+        return;
+      }
+
+      if (!parsedName.IsFunctionName) {
+        diag.fixItReplace(override->getNameLoc(), parsedName.BaseName);
+        return;
+      }
+
+      DeclName newName = parsedName.formDeclName(TC.Context);
+      size_t numArgs = override->getFullName().getArgumentNames().size();
+      if (!newName || newName.getArgumentNames().size() != numArgs)
+        return;
+
+      fixDeclarationName(diag, override, newName);
     });
   }
 

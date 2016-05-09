@@ -500,20 +500,113 @@ func testFactoryMethods() {
 class Base {
   @available(*, unavailable)
   func bad() {} // expected-note {{here}}
-
   @available(*, unavailable, message: "it was smelly")
   func smelly() {} // expected-note {{here}}
-
   @available(*, unavailable, renamed: "new")
   func old() {} // expected-note {{here}}
-
   @available(*, unavailable, renamed: "new", message: "it was smelly")
   func oldAndSmelly() {} // expected-note {{here}}
+
+  @available(*, unavailable)
+  var badProp: Int { return 0 } // expected-note {{here}}
+  @available(*, unavailable, message: "it was smelly")
+  var smellyProp: Int { return 0 } // expected-note {{here}}
+  @available(*, unavailable, renamed: "new")
+  var oldProp: Int { return 0 } // expected-note {{here}}
+  @available(*, unavailable, renamed: "new", message: "it was smelly")
+  var oldAndSmellyProp: Int { return 0 } // expected-note {{here}}
+
+  @available(*, unavailable, renamed: "init")
+  func nowAnInitializer() {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "init()")
+  func nowAnInitializer2() {} // expected-note {{here}}
+
+  @available(*, unavailable, renamed: "foo")
+  init(nowAFunction: Int) {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "foo(_:)")
+  init(nowAFunction2: Int) {} // expected-note {{here}}
+
+  @available(*, unavailable, renamed: "shinyLabeledArguments(example:)")
+  func unavailableArgNames(a: Int) {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(example:)")
+  func unavailableArgRenamed(a: Int) {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments()")
+  func unavailableNoArgs() {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(a:)")
+  func unavailableSame(a: Int) {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(example:)")
+  func unavailableUnnamed(_ a: Int) {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(_:)")
+  func unavailableUnnamedSame(_ a: Int) {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(_:)")
+  func unavailableNewlyUnnamed(a: Int) {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(a:b:)")
+  func unavailableMultiSame(a: Int, b: Int) {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(example:another:)")
+  func unavailableMultiUnnamed(_ a: Int, _ b: Int) {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)")
+  func unavailableMultiUnnamedSame(_ a: Int, _ b: Int) {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(_:_:)")
+  func unavailableMultiNewlyUnnamed(a: Int, b: Int) {} // expected-note {{here}}
+
+  @available(*, unavailable, renamed: "init(shinyNewName:)")
+  init(unavailableArgNames: Int) {} // expected-note{{here}}
+  @available(*, unavailable, renamed: "init(a:)")
+  init(_ unavailableUnnamed: Int) {} // expected-note{{here}}
+  @available(*, unavailable, renamed: "init(_:)")
+  init(unavailableNewlyUnnamed: Int) {} // expected-note{{here}}
+  @available(*, unavailable, renamed: "init(a:b:)")
+  init(_ unavailableMultiUnnamed: Int, _ b: Int) {} // expected-note{{here}}
+  @available(*, unavailable, renamed: "init(_:_:)")
+  init(unavailableMultiNewlyUnnamed a: Int, b: Int) {} // expected-note{{here}}
+
+  @available(*, unavailable, renamed: "shinyLabeledArguments(x:)")
+  func unavailableTooFew(a: Int, b: Int) {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(x:b:)")
+  func unavailableTooMany(a: Int) {} // expected-note {{here}}
+  @available(*, unavailable, renamed: "shinyLabeledArguments(x:)")
+  func unavailableNoArgsTooMany() {} // expected-note {{here}}
+
+  @available(*, unavailable, renamed: "Base.shinyLabeledArguments()")
+  func unavailableHasType() {} // expected-note {{here}}
 }
 
 class Sub : Base {
   override func bad() {} // expected-error {{cannot override 'bad' which has been marked unavailable}} {{none}}
   override func smelly() {} // expected-error {{cannot override 'smelly' which has been marked unavailable: it was smelly}} {{none}}
-  override func old() {} // expected-error {{'old()' has been renamed to 'new'}} {{none}}
-  override func oldAndSmelly() {} // expected-error {{'oldAndSmelly()' has been renamed to 'new': it was smelly}} {{none}}
+  override func old() {} // expected-error {{'old()' has been renamed to 'new'}} {{17-20=new}}
+  override func oldAndSmelly() {} // expected-error {{'oldAndSmelly()' has been renamed to 'new': it was smelly}} {{17-29=new}}
+
+  override var badProp: Int { return 0 } // expected-error {{cannot override 'badProp' which has been marked unavailable}} {{none}}
+  override var smellyProp: Int { return 0 } // expected-error {{cannot override 'smellyProp' which has been marked unavailable: it was smelly}} {{none}}
+  override var oldProp: Int { return 0 } // expected-error {{'oldProp' has been renamed to 'new'}} {{16-23=new}}
+  override var oldAndSmellyProp: Int { return 0 } // expected-error {{'oldAndSmellyProp' has been renamed to 'new': it was smelly}} {{16-32=new}}
+
+  override func nowAnInitializer() {} // expected-error {{'nowAnInitializer()' has been replaced by 'init'}} {{none}}
+  override func nowAnInitializer2() {} // expected-error {{'nowAnInitializer2()' has been replaced by 'init()'}} {{none}}
+  override init(nowAFunction: Int) {} // expected-error {{'init(nowAFunction:)' has been renamed to 'foo'}} {{none}}
+  override init(nowAFunction2: Int) {} // expected-error {{'init(nowAFunction2:)' has been renamed to 'foo(_:)'}} {{none}}
+
+  override func unavailableArgNames(a: Int) {} // expected-error {{'unavailableArgNames(a:)' has been renamed to 'shinyLabeledArguments(example:)'}} {{17-36=shinyLabeledArguments}} {{37-37=example }}
+  override func unavailableArgRenamed(a param: Int) {} // expected-error {{'unavailableArgRenamed(a:)' has been renamed to 'shinyLabeledArguments(example:)'}} {{17-38=shinyLabeledArguments}} {{39-40=example}}
+  override func unavailableNoArgs() {} // expected-error {{'unavailableNoArgs()' has been renamed to 'shinyLabeledArguments()'}} {{17-34=shinyLabeledArguments}}
+  override func unavailableSame(a: Int) {} // expected-error {{'unavailableSame(a:)' has been renamed to 'shinyLabeledArguments(a:)'}} {{17-32=shinyLabeledArguments}}
+  override func unavailableUnnamed(_ a: Int) {} // expected-error {{'unavailableUnnamed' has been renamed to 'shinyLabeledArguments(example:)'}} {{17-35=shinyLabeledArguments}} {{36-37=example}}
+  override func unavailableUnnamedSame(_ a: Int) {} // expected-error {{'unavailableUnnamedSame' has been renamed to 'shinyLabeledArguments(_:)'}} {{17-39=shinyLabeledArguments}}
+  override func unavailableNewlyUnnamed(a: Int) {} // expected-error {{'unavailableNewlyUnnamed(a:)' has been renamed to 'shinyLabeledArguments(_:)'}} {{17-40=shinyLabeledArguments}} {{41-41=_ }}
+  override func unavailableMultiSame(a: Int, b: Int) {} // expected-error {{'unavailableMultiSame(a:b:)' has been renamed to 'shinyLabeledArguments(a:b:)'}} {{17-37=shinyLabeledArguments}}
+  override func unavailableMultiUnnamed(_ a: Int, _ b: Int) {} // expected-error {{'unavailableMultiUnnamed' has been renamed to 'shinyLabeledArguments(example:another:)'}} {{17-40=shinyLabeledArguments}} {{41-42=example}} {{51-52=another}}
+  override func unavailableMultiUnnamedSame(_ a: Int, _ b: Int) {} // expected-error {{'unavailableMultiUnnamedSame' has been renamed to 'shinyLabeledArguments(_:_:)'}} {{17-44=shinyLabeledArguments}}
+  override func unavailableMultiNewlyUnnamed(a: Int, b: Int) {} // expected-error {{'unavailableMultiNewlyUnnamed(a:b:)' has been renamed to 'shinyLabeledArguments(_:_:)'}} {{17-45=shinyLabeledArguments}} {{46-46=_ }} {{54-54=_ }}
+
+  override init(unavailableArgNames: Int) {} // expected-error {{'init(unavailableArgNames:)' has been renamed to 'init(shinyNewName:)'}} {{17-17=shinyNewName }}
+  override init(_ unavailableUnnamed: Int) {} // expected-error {{'init' has been renamed to 'init(a:)'}} {{17-18=a}}
+  override init(unavailableNewlyUnnamed: Int) {} // expected-error {{'init(unavailableNewlyUnnamed:)' has been renamed to 'init(_:)'}} {{17-17=_ }}
+  override init(_ unavailableMultiUnnamed: Int, _ b: Int) {} // expected-error {{'init' has been renamed to 'init(a:b:)'}} {{17-18=a}} {{49-51=}}
+  override init(unavailableMultiNewlyUnnamed a: Int, b: Int) {} // expected-error {{'init(unavailableMultiNewlyUnnamed:b:)' has been renamed to 'init(_:_:)'}} {{17-45=_}} {{54-54=_ }}
+
+  override func unavailableTooFew(a: Int, b: Int) {} // expected-error {{'unavailableTooFew(a:b:)' has been renamed to 'shinyLabeledArguments(x:)'}} {{none}}
+  override func unavailableTooMany(a: Int) {} // expected-error {{'unavailableTooMany(a:)' has been renamed to 'shinyLabeledArguments(x:b:)'}} {{none}}
+  override func unavailableNoArgsTooMany() {} // expected-error {{'unavailableNoArgsTooMany()' has been renamed to 'shinyLabeledArguments(x:)'}} {{none}}
+  override func unavailableHasType() {} // expected-error {{'unavailableHasType()' has been replaced by 'Base.shinyLabeledArguments()'}} {{none}}
 }

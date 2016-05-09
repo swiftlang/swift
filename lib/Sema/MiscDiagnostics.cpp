@@ -1234,7 +1234,7 @@ namespace {
 }
 
 static Optional<ReplacementDeclKind>
-describeRename(ASTContext &ctx, const AvailableAttr *attr,
+describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
                SmallVectorImpl<char> &nameBuf) {
   ParsedDeclName parsed = swift::parseDeclName(attr->Rename);
   if (!parsed)
@@ -1244,12 +1244,13 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr,
   // - instance members
   // - properties (or global bindings)
   // - class/static methods
-  // - initializers, even if unqualified
+  // - initializers, unless the original was known to be an initializer
   // Leave non-member renames alone, as well as renames from top-level types
   // and bindings to member types and class/static properties.
   if (!(parsed.isInstanceMember() || parsed.isPropertyAccessor() ||
         (parsed.isMember() && parsed.IsFunctionName) ||
-        (parsed.BaseName == ctx.Id_init.str()))) {
+        (parsed.BaseName == ctx.Id_init.str() &&
+         !dyn_cast_or_null<ConstructorDecl>(D)))) {
     return None;
   }
 
@@ -1318,7 +1319,7 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
 
   SmallString<32> newNameBuf;
   Optional<ReplacementDeclKind> replacementDeclKind =
-    describeRename(Context, Attr, newNameBuf);
+    describeRename(Context, Attr, /*decl*/nullptr, newNameBuf);
   StringRef newName = replacementDeclKind ? newNameBuf.str() : Attr->Rename;
 
   if (!Attr->Message.empty()) {
@@ -1391,7 +1392,7 @@ bool TypeChecker::diagnoseExplicitUnavailability(
     if (!Attr->Rename.empty()) {
       SmallString<32> newNameBuf;
       Optional<ReplacementDeclKind> replaceKind =
-          describeRename(Context, Attr, newNameBuf);
+          describeRename(Context, Attr, D, newNameBuf);
       unsigned rawReplaceKind = static_cast<unsigned>(
           replaceKind.getValueOr(ReplacementDeclKind::None));
       StringRef newName = replaceKind ? newNameBuf.str() : Attr->Rename;
