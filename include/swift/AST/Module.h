@@ -27,6 +27,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
@@ -929,6 +930,10 @@ private:
   /// May be -1, to indicate no association with a buffer.
   int BufferID;
 
+  /// The list of protocol conformances that were "used" within this
+  /// source file.
+  llvm::SetVector<NormalProtocolConformance *> UsedConformances;
+
   friend ASTContext;
   friend Impl;
 
@@ -1027,6 +1032,17 @@ public:
   Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
 
   virtual bool walk(ASTWalker &walker) override;
+
+  /// Note that the given conformance was used by this source file.
+  void addUsedConformance(NormalProtocolConformance *conformance) {
+    UsedConformances.insert(conformance);
+  }
+
+  /// Retrieve the set of conformances that were used in this source
+  /// file.
+  ArrayRef<NormalProtocolConformance *> getUsedConformances() const {
+    return UsedConformances.getArrayRef();
+  }
 
   /// @{
 

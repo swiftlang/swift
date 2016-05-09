@@ -1489,6 +1489,12 @@ public:
   /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
   void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);
 
+  /// If this bound-generic type is bridged, mark any
+  /// _ObjectiveCBridgeable conformances in the generic arguments of
+  /// the given type as "used".
+  void useObjectiveCBridgeableConformancesOfArgs(DeclContext *dc,
+                                                 BoundGenericType *bound);
+
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.
   ///

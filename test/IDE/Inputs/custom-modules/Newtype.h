@@ -1,4 +1,5 @@
 @import Foundation;
+@import CoreFoundation;
 
 typedef NSString *__nonnull SNTErrorDomain __attribute((swift_newtype(struct)))
 __attribute((swift_name("ErrorDomain")));
@@ -6,7 +7,7 @@ __attribute((swift_name("ErrorDomain")));
 extern void SNTErrorDomainProcess(SNTErrorDomain d)
     __attribute((swift_name("ErrorDomain.process(self:)")));
 
-typedef struct {} Foo;
+typedef struct {} Food;
 
 extern const SNTErrorDomain SNTErrOne
     __attribute((swift_name("ErrorDomain.one")));
@@ -16,7 +17,7 @@ extern const SNTErrorDomain SNTFourErrorDomain;
 extern const SNTErrorDomain SNTFive
     __attribute((swift_name("stillAMember")));
 extern const SNTErrorDomain SNTElsewhere
-    __attribute((swift_name("Foo.err")));
+    __attribute((swift_name("Food.err")));
 
 typedef NSString *__nullable SNTClosedEnum __attribute((swift_newtype(enum)))
 __attribute((swift_name("ClosedEnum")));

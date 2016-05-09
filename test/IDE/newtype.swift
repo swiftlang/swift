@@ -19,10 +19,10 @@
 // PRINT-NEXT:    static let fourErrorDomain: ErrorDomain
 // PRINT-NEXT:    static let stillAMember: ErrorDomain
 // PRINT-NEXT:  }
-// PRINT-NEXT:  struct Foo {
+// PRINT-NEXT:  struct Food {
 // PRINT-NEXT:    init()
 // PRINT-NEXT:  }
-// PRINT-NEXT:  extension Foo {
+// PRINT-NEXT:  extension Food {
 // PRINT-NEXT:    static let err: ErrorDomain
 // PRINT-NEXT:  }
 // PRINT-NEXT:  struct ClosedEnum : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
@@ -81,15 +81,15 @@ func tests() {
 	let errOne = ErrorDomain.one
 	errOne.process()
 
-	let fooErr = Foo.err
+	let fooErr = Food.err
 	fooErr.process()
-	Foo().process() // expected-error{{value of type 'Foo' has no member 'process'}}
+	Food().process() // expected-error{{value of type 'Food' has no member 'process'}}
 
 	let thirdEnum = ClosedEnum.thirdEntry!
 	thirdEnum.process()
 	  // expected-error@-1{{value of type 'ClosedEnum' has no member 'process'}}
 
-	let _ = ErrorDomain(rawValue: thirdEnum.rawValue!)
+	let _ = ErrorDomain(rawValue: thirdEnum.rawValue)
 	let _ = ClosedEnum(rawValue: errOne.rawValue)
 
 	let _ = NSNotificationName.Foo

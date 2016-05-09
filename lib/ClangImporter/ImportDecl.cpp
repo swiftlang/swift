@@ -1333,6 +1333,8 @@ namespace {
           decl->getUnderlyingType(), ImportTypeKind::Value,
           isInSystemModule(dc), decl->getUnderlyingType()->isBlockPointerType(),
           OTK_None);
+      if (auto objTy = storedUnderlyingType->getAnyOptionalObjectType())
+        storedUnderlyingType = objTy;
 
       // If the type is Unmanaged, that is it is not CF ARC audited,
       // we will store the underlying type and leave it up to the use site
@@ -1349,6 +1351,9 @@ namespace {
           decl->getUnderlyingType(), ImportTypeKind::Property,
           isInSystemModule(dc), decl->getUnderlyingType()->isBlockPointerType(),
           OTK_None);
+      if (auto objTy =
+            computedPropertyUnderlyingType->getAnyOptionalObjectType())
+        computedPropertyUnderlyingType = objTy;
 
       bool isBridged =
           !storedUnderlyingType->isEqual(computedPropertyUnderlyingType);

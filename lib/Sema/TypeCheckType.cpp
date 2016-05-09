@@ -532,6 +532,8 @@ Type TypeChecker::applyUnboundGenericArguments(
     if (checkGenericArguments(dc, loc, noteLoc, unbound, genericSig,
                               allGenericArgs))
       return nullptr;
+
+    useObjectiveCBridgeableConformancesOfArgs(dc, BGT);
   }
 
   return BGT;
@@ -2196,6 +2198,9 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   if (!sliceTy)
     return ErrorType::get(Context);
 
+  // Check for _ObjectiveCBridgeable conformances in the element type.
+  TC.useObjectiveCBridgeableConformances(DC, baseTy);
+
   return sliceTy;
 }
 
@@ -2220,6 +2225,11 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
             options.contains(TR_GenericSignature), Resolver)) {
       return ErrorType::get(TC.Context);
     }
+
+    // Check for _ObjectiveCBridgeable conformances in the key and value
+    // types.
+    TC.useObjectiveCBridgeableConformances(DC, keyTy);
+    TC.useObjectiveCBridgeableConformances(DC, valueTy);
 
     return dictTy;
   }

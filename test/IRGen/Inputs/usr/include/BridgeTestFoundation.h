@@ -59,3 +59,6 @@ extern int weak_variable __attribute__((weak_import));
 @property NSDictionary *userInfo;
 
 @end
+
+typedef NSString *__nonnull NSNotificationName
+    __attribute((swift_newtype(struct)));

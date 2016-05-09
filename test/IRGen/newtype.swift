@@ -1,10 +1,15 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir -enable-swift-newtype | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir -enable-swift-newtype | FileCheck %s
+import CoreFoundation
+import Foundation
 import Newtype
 
 // REQUIRES: objc_interop
+
+// Witness table for synthesized ClosedEnums : _ObjectiveCBridgeable.
+// CHECK: @_TWPVSC10ClosedEnums21_ObjectiveCBridgeable7Newtype = linkonce_odr
 
 // CHECK-LABEL: define %CSo8NSString* @_TF7newtype14getErrorDomainFT_VSC11ErrorDomain()
 public func getErrorDomain() -> ErrorDomain {
@@ -56,4 +61,9 @@ public func getUnmanagedCFNewType(useVar: Bool) -> Unmanaged<CFString> {
     // CHECK: call {{.*}} @FooUnaudited()
   }
   // CHECK: ret
+}
+
+// Triggers instantiation of ClosedEnum : _ObjectiveCBridgeable
+// witness table.
+public func hasArrayOfClosedEnums(closed: [ClosedEnum]) {
 }

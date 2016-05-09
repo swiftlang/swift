@@ -39,6 +39,7 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
     Cleanups(*this)
 {
   B.setCurrentDebugScope(F.getDebugScope());
+  checkForImportedUsedConformances(F.getLoweredType().getSwiftType());
 }
 
 /// SILGenFunction destructor - called after the entire function's AST has been

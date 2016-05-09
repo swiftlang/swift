@@ -34,6 +34,7 @@ namespace swift {
   class DeclContext;
   class Expr;
   class GenericTypeParamDecl;
+  class NormalProtocolConformance;
   class OperatorDecl;
   class ProtocolDecl;
   class ProtocolConformance;
@@ -91,6 +92,8 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::ASTContext, 2);
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::DeclContext, swift::DeclContextAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::Expr, swift::ExprAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ProtocolConformance, swift::DeclAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::NormalProtocolConformance,
+                            swift::DeclAlignInBits)
 
 static_assert(llvm::AlignOf<void*>::Alignment >= 2,
               "pointer alignment is too small");

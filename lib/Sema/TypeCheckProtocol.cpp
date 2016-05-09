@@ -4063,13 +4063,21 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     recordDependency(nullptr);
   }
 
-  // If we're using this conformance and it is incomplete, queue it for
-  // completion.
+  // If we're using this conformance, note that.
   if (options.contains(ConformanceCheckFlags::Used) &&
-      lookupResult->isConcrete() &&
-      lookupResult->getConcrete()->isIncomplete()) {
-    auto normalConf = lookupResult->getConcrete()->getRootNormalConformance();
-    UsedConformances.insert(normalConf);
+      lookupResult->isConcrete()) {
+    auto concrete = lookupResult->getConcrete();
+    auto normalConf = concrete->getRootNormalConformance();
+
+    // If the conformance is incomplete, queue it for completion.
+    if (normalConf->isIncomplete())
+      UsedConformances.insert(normalConf);
+
+    // Record the usage of this conformance in the enclosing source
+    // file.
+    if (auto sf = DC->getParentSourceFile()) {
+      sf->addUsedConformance(normalConf);
+    }
   }
   return true;
 }
@@ -4105,6 +4113,25 @@ void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
   if (!proto) return;
 
   type.walk(Walker(*this, dc, proto));
+}
+
+void TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
+       DeclContext *dc, BoundGenericType *bound) {
+  auto proto = getProtocol(SourceLoc(),
+                           KnownProtocolKind::ObjectiveCBridgeable);
+  if (!proto) return;
+
+  // Check whether the bound generic type itself is bridged to
+  // Objective-C.
+  ConformanceCheckOptions options = ConformanceCheckFlags::InExpression
+    | ConformanceCheckFlags::SuppressDependencyTracking;
+  if (!conformsToProtocol(bound->getDecl()->getDeclaredType(), proto, dc,
+                          options))
+    return;
+
+  // Mark the conformances within the arguments.
+  for (auto arg : bound->getGenericArgs())
+    useObjectiveCBridgeableConformances(dc, arg);
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
