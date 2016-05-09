@@ -197,9 +197,10 @@ swift::classifyDynamicCast(Module *M,
   auto sourceObject = source.getAnyOptionalObjectType();
   auto targetObject = target.getAnyOptionalObjectType();
 
-  // A common level of optionality doesn't affect the feasibility.
+  // When casting optionals to optionals, the cast can always succeed,
+  // because casts of nil between unrelated Optional types succeeds.
   if (sourceObject && targetObject) {
-    return classifyDynamicCast(M, sourceObject, targetObject);
+    return DynamicCastFeasibility::MaySucceed;
 
   // Nor does casting to a more optional type.
   } else if (targetObject) {
