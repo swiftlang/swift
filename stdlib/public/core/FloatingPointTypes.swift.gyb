@@ -155,10 +155,25 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   //  Implementation details.
-  static let _infinityExponent = 1 << UInt(exponentBitCount) - 1
-  static let _exponentBias = _infinityExponent >> 1
-  static let _significandMask = 1 << ${RawSignificand}(significandBitCount) - 1
-  static let _quietNaNMask = 1 << ${RawSignificand}(significandBitCount - 1)
+  static var _infinityExponent: UInt {
+    @inline(__always) get { return 1 << UInt(exponentBitCount) - 1 }
+  }
+
+  static var _exponentBias: UInt {
+    @inline(__always) get { return _infinityExponent >> 1 }
+  }
+
+  static var _significandMask: ${RawSignificand} {
+    @inline(__always) get {
+      return 1 << ${RawSignificand}(significandBitCount) - 1
+    }
+  }
+
+  static var _quietNaNMask: ${RawSignificand} {
+    @inline(__always) get {
+      return 1 << ${RawSignificand}(significandBitCount - 1)
+    }
+  }
 
 %if bits != 80:
   //  Conversions to/from integer encoding.  These are not part of the
@@ -237,7 +252,9 @@ extension ${Self}: BinaryFloatingPoint {
     return _representation.sign
   }
 
-  static let _explicitBitMask = UInt64(1) << 63
+  static var _explicitBitMask: UInt64 {
+    @inline(__always) get { return 1 << 63 }
+  }
 
   public var exponentBitPattern: UInt {
     let provisional = _representation.exponentBitPattern

@@ -28,7 +28,7 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 /// additional operations that only make sense for a fixed radix, and also
 /// provides default implementations of some of the FloatingPoint APIs.
 public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
-  SignedNumber, AbsoluteValuable {
+  SignedNumber, AbsoluteValuable, Strideable {
 
   /// An integer type that can represent any written exponent.
   associatedtype Exponent: SignedInteger
