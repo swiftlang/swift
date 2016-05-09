@@ -25,10 +25,10 @@
 // PRINT-NEXT:  extension Foo {
 // PRINT-NEXT:    static let err: ErrorDomain
 // PRINT-NEXT:  }
-// PRINT-NEXT:  struct ClosedEnum : RawRepresentable, _SwiftNewtypeWrapper {
-// PRINT-NEXT:    init(rawValue: String?)
-// PRINT-NEXT:    var _rawValue: NSString?
-// PRINT-NEXT:    var rawValue: String? { get }
+// PRINT-NEXT:  struct ClosedEnum : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
+// PRINT-NEXT:    init(rawValue: String)
+// PRINT-NEXT:    var _rawValue: NSString
+// PRINT-NEXT:    var rawValue: String { get }
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension ClosedEnum {
 // PRINT-NEXT:    static let firstClosedEntryEnum: ClosedEnum
