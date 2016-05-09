@@ -441,6 +441,111 @@ enum class MetatypeRepresentation : unsigned {
   Unknown
 };
 
+/// Visitor class to determine if a type has a fixed size.
+///
+/// Conservative approximation.
+class HasFixedSize
+  : public TypeRefVisitor<HasFixedSize, bool> {
+
+public:
+  HasFixedSize() {}
+
+  using TypeRefVisitor<HasFixedSize, bool>::visit;
+
+  bool visitBuiltinTypeRef(const BuiltinTypeRef *B) {
+    return true;
+  }
+
+  bool visitNominalTypeRef(const NominalTypeRef *N) {
+    return true;
+  }
+
+  bool visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
+    if (BG->isClass())
+      return true;
+    for (auto Arg : BG->getGenericParams()) {
+      if (!visit(Arg))
+        return false;
+    }
+    return true;
+  }
+
+  bool visitTupleTypeRef(const TupleTypeRef *T) {
+    for (auto Element : T->getElements())
+      if (!visit(Element))
+        return false;
+    return true;
+  }
+
+  bool visitFunctionTypeRef(const FunctionTypeRef *F) {
+    return true;
+  }
+
+  bool visitProtocolTypeRef(const ProtocolTypeRef *P) {
+    return true;
+  }
+
+  bool
+  visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    return true;
+  }
+
+  bool visitMetatypeTypeRef(const MetatypeTypeRef *M) {
+    return true;
+  }
+
+  bool
+  visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
+    return true;
+  }
+
+  bool
+  visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
+    return true;
+  }
+
+  bool
+  visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
+    return true;
+  }
+
+  bool visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
+    return true;
+  }
+
+  bool
+  visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
+    return true;
+  }
+
+  bool visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
+    return true;
+  }
+
+  bool
+  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
+    return true;
+  }
+
+  bool
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
+    return false;
+  }
+
+  bool
+  visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
+    return false;
+  }
+
+  bool visitOpaqueTypeRef(const OpaqueTypeRef *O) {
+    return false;
+  }
+};
+
+bool TypeConverter::hasFixedSize(const TypeRef *TR) {
+  return HasFixedSize().visit(TR);
+}
+
 MetatypeRepresentation combineRepresentations(MetatypeRepresentation rep1,
                                               MetatypeRepresentation rep2) {
   if (rep1 == rep2)
@@ -464,10 +569,9 @@ MetatypeRepresentation combineRepresentations(MetatypeRepresentation rep1,
 /// MetatypeTypeRefs.
 class HasSingletonMetatype
   : public TypeRefVisitor<HasSingletonMetatype, MetatypeRepresentation> {
-  TypeRefBuilder &Builder;
 
 public:
-  HasSingletonMetatype(TypeRefBuilder &Builder) : Builder(Builder) {}
+  HasSingletonMetatype() {}
 
   using TypeRefVisitor<HasSingletonMetatype, MetatypeRepresentation>::visit;
 
@@ -475,34 +579,16 @@ public:
     return MetatypeRepresentation::Thin;
   }
 
-  MetatypeRepresentation visitAnyNominalTypeRef(const TypeRef *TR) {
-    const FieldDescriptor *FD = Builder.getFieldTypeInfo(TR);
-    if (FD == nullptr)
-      return MetatypeRepresentation::Unknown;
-
-    switch (FD->Kind) {
-    case FieldDescriptorKind::Class:
-      // Classes can have subclasses, so the metatype is always thick.
-      return MetatypeRepresentation::Thick;
-
-    case FieldDescriptorKind::Struct:
-    case FieldDescriptorKind::Enum:
-      return MetatypeRepresentation::Thin;
-
-    case FieldDescriptorKind::ObjCProtocol:
-    case FieldDescriptorKind::ClassProtocol:
-    case FieldDescriptorKind::Protocol:
-      // Invalid field descriptor.
-      return MetatypeRepresentation::Unknown;
-    }
-  }
-
   MetatypeRepresentation visitNominalTypeRef(const NominalTypeRef *N) {
-    return visitAnyNominalTypeRef(N);
+    if (N->isClass())
+      return MetatypeRepresentation::Thick;
+    return MetatypeRepresentation::Thin;
   }
 
   MetatypeRepresentation visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
-    return visitAnyNominalTypeRef(BG);
+    if (BG->isClass())
+      return MetatypeRepresentation::Thick;
+    return MetatypeRepresentation::Thin;
   }
 
   MetatypeRepresentation visitTupleTypeRef(const TupleTypeRef *T) {
@@ -725,7 +811,7 @@ public:
   }
 
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
-    switch (HasSingletonMetatype(TC.getBuilder()).visit(M)) {
+    switch (HasSingletonMetatype().visit(M)) {
     case MetatypeRepresentation::Unknown:
       return nullptr;
     case MetatypeRepresentation::Thin:
