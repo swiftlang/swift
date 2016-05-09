@@ -566,10 +566,15 @@ private:
 
     printDocumentationComment(VD);
 
+    if (VD->isStatic()) {
+      // Older Clangs don't support class properties.
+      os << "SWIFT_CLASS_PROPERTY(";
+    }
+
     // For now, never promise atomicity.
     os << "@property (nonatomic";
 
-    if (!VD->isInstanceMember())
+    if (VD->isStatic())
       os << ", class";
 
     ASTContext &ctx = M.getASTContext();
@@ -670,7 +675,17 @@ private:
       print(ty, OTK_None, objCName);
     }
 
-    os << ";\n";
+    os << ";";
+    if (VD->isStatic()) {
+      os << ")\n";
+      // Older Clangs don't support class properties, so print the accessors as
+      // well. This is harmless.
+      printAbstractFunctionAsMethod(VD->getGetter(), true);
+      if (auto setter = VD->getSetter())
+        printAbstractFunctionAsMethod(setter, true);
+    } else {
+      os << "\n";
+    }
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
@@ -1750,6 +1765,13 @@ public:
            "\n"
            "#if !defined(SWIFT_METATYPE)\n"
            "# define SWIFT_METATYPE(X) Class\n"
+           "#endif\n"
+           "#if !defined(SWIFT_CLASS_PROPERTY)\n"
+           "# if __has_feature(objc_class_property)\n"
+           "#  define SWIFT_CLASS_PROPERTY(X) X\n"
+           "# else\n"
+           "#  define SWIFT_CLASS_PROPERTY(X)\n"
+           "# endif\n"
            "#endif\n"
            "\n"
            "#if defined(__has_attribute) && "
