@@ -1,4 +1,7 @@
-// RUN// RUN: %target-swift-frontend -sdk %clang-importer-sdk -I %S/../IDE/Inputs/custom-modules %s -emit-ir -enable-swift-newtype | FileCheck %s
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %build-irgen-test-overlays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir -enable-swift-newtype | FileCheck %s
 import Newtype
 
 // REQUIRES: objc_interop

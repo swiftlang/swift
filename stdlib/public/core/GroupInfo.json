@@ -138,6 +138,7 @@
     "Unmanaged.swift",
     "Availability.swift",
     "Process.swift",
-    "Tuple.swift"
+    "Tuple.swift",
+    "NewtypeWrapper.swift",
   ]
 }

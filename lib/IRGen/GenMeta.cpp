@@ -5478,6 +5478,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Comparable:
   case KnownProtocolKind::ObjectiveCBridgeable:
   case KnownProtocolKind::DestructorSafeContainer:
+  case KnownProtocolKind::SwiftNewtypeWrapper:
   case KnownProtocolKind::ArrayLiteralConvertible:
   case KnownProtocolKind::BooleanLiteralConvertible:
   case KnownProtocolKind::DictionaryLiteralConvertible:

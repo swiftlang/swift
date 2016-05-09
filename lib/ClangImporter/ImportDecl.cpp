@@ -1483,10 +1483,6 @@ namespace {
                 Decl, Loc, Name, Loc, None, nullptr, DC);
             structDecl->computeType();
 
-            ProtocolDecl *protocols[] = {
-                cxt.getProtocol(KnownProtocolKind::RawRepresentable),
-            };
-
             // Import the type of the underlying storage
             auto storedUnderlyingType = Impl.importType(
                 Decl->getUnderlyingType(), ImportTypeKind::Value,
@@ -1501,19 +1497,63 @@ namespace {
                 Decl->getUnderlyingType()->isBlockPointerType(),
                 OTK_None);
 
-            if (storedUnderlyingType.getCanonicalTypeOrNull() ==
-                computedPropertyUnderlyingType.getCanonicalTypeOrNull()) {
-              // Simple, our stored type is already bridged
+            bool isBridged =
+              !storedUnderlyingType->isEqual(computedPropertyUnderlyingType);
+
+            // Determine the set of protocols to which the synthesized
+            // type will conform.
+            SmallVector<ProtocolDecl *, 4> protocols;
+            SmallVector<KnownProtocolKind, 4> synthesizedProtocols;
+
+            // Local function to add a known protocol.
+            auto addKnown = [&](KnownProtocolKind kind) {
+              if (auto proto = cxt.getProtocol(kind)) {
+                protocols.push_back(proto);
+                synthesizedProtocols.push_back(kind);
+              }
+            };
+
+            // Add conformances that are always available.
+            addKnown(KnownProtocolKind::RawRepresentable);
+            addKnown(KnownProtocolKind::SwiftNewtypeWrapper);
+
+            // Local function to add a known protocol only when the
+            // underlying type conforms to it.
+            auto computedNominal =
+              computedPropertyUnderlyingType->getAnyNominal();
+            auto transferKnown = [&](KnownProtocolKind kind) {
+              if (!computedNominal) return;
+
+              auto proto = cxt.getProtocol(kind);
+              if (!proto) return;
+
+              SmallVector<ProtocolConformance *, 1> conformances;
+              if (computedNominal->lookupConformance(
+                    computedNominal->getParentModule(), proto, conformances)) {
+                protocols.push_back(proto);
+                synthesizedProtocols.push_back(kind);                
+              }
+            };
+ 
+            // Transfer conformances. Each of these needs a forwarding
+            // implementation in the standard library.
+            transferKnown(KnownProtocolKind::Equatable);
+            transferKnown(KnownProtocolKind::Hashable);
+            transferKnown(KnownProtocolKind::Comparable);
+            transferKnown(KnownProtocolKind::ObjectiveCBridgeable);
+            
+            if (!isBridged) {
+              // Simple, our stored type is equivalent to our computed
+              // type.
               makeStructRawValued(structDecl, storedUnderlyingType,
-                                  {KnownProtocolKind::RawRepresentable},
-                                  protocols);
+                                  synthesizedProtocols, protocols);
             } else {
               // We need to make a stored rawValue or storage type, and a
               // computed one of bridged type.
               makeStructRawValuedWithBridge(
                   structDecl, storedUnderlyingType,
                   computedPropertyUnderlyingType,
-                  {KnownProtocolKind::RawRepresentable}, protocols);
+                  synthesizedProtocols, protocols);
             }
 
             Impl.ImportedDecls[{Decl->getCanonicalDecl(), useSwift2Name}]
@@ -1647,12 +1687,11 @@ namespace {
     /// synthesized protocols, add the new variable and pattern bindings, and
     /// create the inits parameterized over a raw value
     ///
-    template <unsigned N>
     void makeStructRawValued(
         StructDecl *structDecl,
         Type underlyingType,
         ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-        ProtocolDecl *const(&protocols)[N],
+        ArrayRef<ProtocolDecl *> protocols,
         Accessibility setterAccessibility = Accessibility::Private,
         bool isLet = true,
         bool makeUnlabeledValueInit = false,
@@ -1699,12 +1738,12 @@ namespace {
     /// new variable and pattern bindings, and create the inits parameterized
     /// over a bridged type that will cast to the stored type, as appropriate.
     ///
-    template <unsigned N> void makeStructRawValuedWithBridge(
+    void makeStructRawValuedWithBridge(
         StructDecl *structDecl,
         Type storedUnderlyingType,
         Type bridgedType,
         ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-        ProtocolDecl *const(&protocols)[N]) {
+        ArrayRef<ProtocolDecl *> protocols) {
       auto &cxt = Impl.SwiftContext;
       addProtocolsToStruct(structDecl, synthesizedProtocolAttrs,
                            protocols);
@@ -2016,10 +2055,10 @@ namespace {
       return CD;
     }
 
-    template<unsigned N>
     void populateInheritedTypes(NominalTypeDecl *nominal,
-                                ProtocolDecl * const (&protocols)[N]) {
-      TypeLoc inheritedTypes[N];
+                                ArrayRef<ProtocolDecl *> protocols) {
+      SmallVector<TypeLoc, 4> inheritedTypes;
+      inheritedTypes.resize(protocols.size());
       for_each(MutableArrayRef<TypeLoc>(inheritedTypes),
                ArrayRef<ProtocolDecl *>(protocols),
                [](TypeLoc &tl, ProtocolDecl *proto) {
@@ -2030,11 +2069,10 @@ namespace {
     }
 
     /// Add protocol conformances and synthesized protocol attributes
-    template <unsigned N>
     void
     addProtocolsToStruct(StructDecl *structDecl,
                          ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-                         ProtocolDecl *const(&protocols)[N]) {
+                         ArrayRef<ProtocolDecl *> protocols) {
       populateInheritedTypes(structDecl, protocols);
 
       // Note synthesized protocols
