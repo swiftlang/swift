@@ -145,6 +145,7 @@ struct _Prespecialize {
   }
 
   // Force pre-specialization of Range<Int>
+  @discardableResult
   static internal func _specializeRanges() -> Int {
     let a = [Int](repeating: 1, count: 10)
     var count = 0

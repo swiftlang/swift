@@ -793,7 +793,7 @@ ${SubscriptDocComment}
 % if Self != 'Array':
     _buffer._checkValidSubscript(index)
 % else:
-    _checkSubscript(index, wasNativeTypeChecked: true)
+    _ = _checkSubscript(index, wasNativeTypeChecked: true)
 % end
   }
 

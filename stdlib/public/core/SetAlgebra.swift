@@ -184,6 +184,7 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///   distinguishable from `newMember`, e.g. via `===`).
   ///
   /// - Postcondition: `self.contains(newMember)`.
+  @discardableResult
   mutating func insert(
     _ newMember: Element
   ) -> (inserted: Bool, memberAfterInsert: Element)
@@ -198,6 +199,7 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///   `===`), or returns `nil` if no such element existed.
   ///
   /// - Postcondition: `self.intersection([e]).isEmpty`
+  @discardableResult
   mutating func remove(_ e: Element) -> Element?
 
   /// Inserts `e` unconditionally.
@@ -212,6 +214,7 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///   `===`), or returns `nil` if no such element existed.
   ///
   /// - Postcondition: `self.contains(e)`
+  @discardableResult
   mutating func update(with e: Element) -> Element?
   
   /// Adds the elements of the given set to the set.

@@ -119,6 +119,7 @@ extension Sequence
 
   /// Copy a Sequence into an array, returning one past the last
   /// element initialized.
+  @discardableResult
   public func _copyContents(
     initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
   ) -> UnsafeMutablePointer<Base.Iterator.Element> {

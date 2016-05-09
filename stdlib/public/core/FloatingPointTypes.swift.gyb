@@ -875,21 +875,25 @@ public func %=(lhs: inout ${Self}, rhs: ${Self}) {
 
 @_transparent
 @available(*, unavailable, message: "use += 1")
+@discardableResult
 public prefix func ++(rhs: inout ${Self}) -> ${Self} {
   fatalError("++ is not available")
 }
 @_transparent
 @available(*, unavailable, message: "use -= 1")
+@discardableResult
 public prefix func --(rhs: inout ${Self}) -> ${Self} {
   fatalError("-- is not available")
 }
 @_transparent
 @available(*, unavailable, message: "use += 1")
+@discardableResult
 public postfix func ++(lhs: inout ${Self}) -> ${Self} {
   fatalError("++ is not available")
 }
 @_transparent
 @available(*, unavailable, message: "use -= 1")
+@discardableResult
 public postfix func --(lhs: inout ${Self}) -> ${Self} {
   fatalError("-- is not available")
 }
