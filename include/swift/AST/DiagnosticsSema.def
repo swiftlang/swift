@@ -2196,11 +2196,6 @@ WARNING(expression_unused_result,none,
         "result of call to %0 is unused", (DeclName))
 WARNING(expression_unused_init_result,none,
         "result of initializer is unused", ())
-WARNING(expression_unused_result_message,none,
-        "result of call to %0 is unused: %1", (DeclName, StringRef))
-WARNING(expression_unused_result_nonmutating,none,
-        "result of call to non-mutating function %0 is unused; "
-        "use %1 to mutate in-place", (DeclName, DeclName))
 WARNING(expression_unused_optional_try,none,
         "result of 'try?' is unused", ())
 WARNING(expression_unused_selector_result, none,
