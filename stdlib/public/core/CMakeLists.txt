@@ -50,8 +50,8 @@ set(SWIFTLIB_ESSENTIAL
   FlatMap.swift
   Flatten.swift.gyb
   FloatingPoint.swift.gyb
-  FloatingPointOperations.swift.gyb
   FloatingPointParsing.swift.gyb
+  FloatingPointTypes.swift.gyb
   HashedCollections.swift.gyb
   Hashing.swift
   HeapBuffer.swift

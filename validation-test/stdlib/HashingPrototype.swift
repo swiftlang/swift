@@ -122,7 +122,7 @@ struct InProcessHashtableHasher : Hasher {
 
   mutating func combine(_ value: Float) {
     // Only for exposition.
-    _state = _state ^ Int(value._toBitPattern())
+    _state = _state ^ Int(value.bitPattern)
   }
 
   mutating func combineSequence<

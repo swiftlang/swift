@@ -169,60 +169,34 @@ public func ${bfunc}(_ lhs: ${T}, _ rhs: ${T}) -> ${T} {
 % end
 
 // Other functions
-
-% # These would be AllFloatTypes not OverlayFloatTypes because of the Int return.
-% # ... except we need special treatment for Double.
-% for T, CT, f in OverlayFloatTypes():
-@_transparent
-@warn_unused_result
-public func fpclassify(_ x: ${T}) -> Int {
-  return Int(__fpclassify${f}(${CT}(x)))
-}
-
-% end
-
-@_transparent
-@warn_unused_result
-public func fpclassify(_ x: Double) -> Int {
-#if os(Linux)
-  return Int(__fpclassify(CDouble(x)))
-#else
-  return Int(__fpclassifyd(CDouble(x)))
-#endif
-}
-
-% # These are AllFloatTypes not OverlayFloatTypes because we need to cover 
-% # them all because C's declarations are compiler builtins.
 % for T, CT, f in AllFloatTypes():
-@_transparent
-@warn_unused_result
-public func isnormal(_ value: ${T}) -> Bool {
-  return value.isNormal
+@available(*, deprecated, message: "use the floatingPointClass property.")
+public func fpclassify(_ value: ${T}) -> Int {
+%if T == 'Double':
+#if os(Linux)
+  return Int(__fpclassify(CDouble(value)))
+#else
+  return Int(__fpclassifyd(CDouble(value)))
+#endif
+%else:
+  return Int(__fpclassify${f}(${CT}(value)))
+%end
 }
 
-@_transparent
-@warn_unused_result
-public func isfinite(_ value: ${T}) -> Bool {
-  return value.isFinite
-}
+@available(*, unavailable, message: "use the isNormal property.")
+public func isnormal(_ value: ${T}) -> Bool { return value.isNormal }
 
-@_transparent
-@warn_unused_result
-public func isinf(_ value: ${T}) -> Bool {
-  return value.isInfinite
-}
+@available(*, unavailable, message: "use the isFinite property.")
+public func isfinite(_ value: ${T}) -> Bool { return value.isFinite }
 
-@_transparent
-@warn_unused_result
-public func isnan(_ value: ${T}) -> Bool {
-  return value.isNaN
-}
+@available(*, unavailable, message: "use the isInfinite property.")
+public func isinf(_ value: ${T}) -> Bool { return value.isInfinite }
 
-@_transparent
-@warn_unused_result
-public func signbit(_ value: ${T}) -> Int {
-  return value.isSignMinus ? 1 : 0
-}
+@available(*, unavailable, message: "use the isNaN property.")
+public func isnan(_ value: ${T}) -> Bool { return value.isNaN }
+
+@available(*, unavailable, message: "use the sign property.")
+public func signbit(_ value: ${T}) -> Int { return value.sign.rawValue }
 
 % end
 

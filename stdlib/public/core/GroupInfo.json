@@ -104,8 +104,8 @@
       "IntegerParsing.swift"],
     "Floating": [
       "FloatingPoint.swift",
-      "FloatingPointOperations.swift",
-      "FloatingPointParsing.swift"]}
+      "FloatingPointParsing.swift",
+      "FloatingPointTypes.swift"]}
   ],
   "Optional": [
     "ImplicitlyUnwrappedOptional.swift",

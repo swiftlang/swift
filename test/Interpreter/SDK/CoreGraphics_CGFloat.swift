@@ -97,8 +97,6 @@ CGFloatTestSuite.test("arithmetic") {
   expectEqual(1.0, x * y)
 
   expectEqual(0.0625, x / y)
-
-  expectEqual(0.25, x % z)
 }
 
 CGFloatTestSuite.test("striding") {
