@@ -80,6 +80,25 @@ public struct CGFloat {
     return NativeType.significandBitCount
   }
 
+  //  Conversions to/from integer encoding.  These are not part of the
+  //  BinaryFloatingPoint prototype because there's no guarantee that an
+  //  integer type of the same size actually exists (e.g. Float80).
+  public var bitPattern: UInt {
+    return UInt(native.bitPattern)
+  }
+
+  public init(bitPattern: UInt) {
+    native = NativeType(bitPattern: UInt${word_bits}(bitPattern))
+  }
+
+  @available(*, deprecated, message: "Use the .bitPattern property instead.")
+  public func _toBitPattern() -> UInt { return bitPattern }
+
+  @available(*, deprecated, message: "Use init(bitPattern:) instead.")
+  public static func _fromBitPattern(_ bits: UInt) -> CGFloat {
+    return CGFloat(bitPattern: bits)
+  }
+
   public var sign: FloatingPointSign {
     return native.sign
   }

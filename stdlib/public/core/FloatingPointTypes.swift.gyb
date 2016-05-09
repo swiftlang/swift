@@ -172,6 +172,14 @@ extension ${Self}: BinaryFloatingPoint {
     self.init(_bits: Builtin.bitcast_Int${bits}_FPIEEE${bits}(bitPattern._value))
   }
 
+  @available(*, deprecated, message: "Use the .bitPattern property instead.")
+  public func _toBitPattern() -> UInt${bits} { return bitPattern }
+
+  @available(*, deprecated, message: "Use init(bitPattern:) instead.")
+  public static func _fromBitPattern(_ bits: UInt${bits}) -> ${Self} {
+    return ${Self}(bitPattern: bits)
+  }
+
   public var sign: FloatingPointSign {
     let shift = ${Self}.significandBitCount + ${Self}.exponentBitCount
     return FloatingPointSign(rawValue: Int(bitPattern >> ${RawSignificand}(shift)))!
