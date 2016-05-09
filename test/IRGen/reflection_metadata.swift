@@ -38,7 +38,9 @@
 // CHECK-DAG: private constant [3 x i8] c"GS\00", section "{{[^"]*}}swift3_reflstr{{[^"]*}}"
 // CHECK-DAG: private constant [3 x i8] c"GE\00", section "{{[^"]*}}swift3_reflstr{{[^"]*}}"
 
-// CHECK: @"\01l__swift3_reflection_metadata{{.*}}" = private constant <{ {{.*}} }>
+// CHECK-DAG: @"\01l__swift3_capture_descriptor" = private constant <{ {{.*}} }> <{ i32 1, i32 1, i32 2, {{.*}} }>
+
+// CHECK-DAG: @"\01l__swift3_reflection_metadata{{.*}}" = private constant <{ {{.*}} }>
 
 public protocol MyProtocol {
   associatedtype Inner
@@ -101,7 +103,6 @@ public enum MyGenericEnum<T : MyProtocol> {
   case I(Int)
 }
 
-public func makeSomeClosures<T, U>(t: T, x: Int, y: MyGenericStruct<U>)
-    -> (() -> (), () -> (), () -> ()) {
-  return ({ _ = t }, { _ = x }, { _ = y })
+public func makeSomeClosures<T : MyProtocol>(t: T) -> (() -> ()) {
+  return { _ = t }
 }
