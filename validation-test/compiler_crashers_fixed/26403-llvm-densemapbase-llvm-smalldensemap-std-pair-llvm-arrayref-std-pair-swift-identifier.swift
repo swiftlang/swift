@@ -8,5 +8,3 @@
 // RUN: not %target-swift-frontend %s -parse
 class B<T where B:d
 class B<T>:B<T>
-
-// REQUIRES: disabled

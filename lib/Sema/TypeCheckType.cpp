@@ -526,7 +526,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     auto genericSig = unbound->getDecl()->getGenericSignature();
     if (unbound->getDecl()->IsValidatingGenericSignature()) {
       diagnose(loc, diag::recursive_requirement_reference);
-      return BGT;
+      return nullptr;
     }
     assert(genericSig != nullptr);
     if (checkGenericArguments(dc, loc, noteLoc, unbound, genericSig,
