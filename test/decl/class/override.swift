@@ -124,6 +124,19 @@ class G {
 
   func g1(_: Int, string: String) { } // expected-note{{potential overridden instance method 'g1(_:string:)' here}} {{28-28=string }}
   func g1(_: Int, path: String) { } // expected-note{{potential overridden instance method 'g1(_:path:)' here}} {{28-28=path }}
+
+  func g2(_: Int, string: String) { } // expected-note{{potential overridden instance method 'g2(_:string:)' here}} {{none}}
+  func g2(_: Int, path: String) { }
+
+  func g3(_: Int, _ another: Int) { }
+  func g3(_: Int, path: String) { } // expected-note{{potential overridden instance method 'g3(_:path:)' here}} {{none}}
+
+  func g4(_: Int, _ another: Int) { }
+  func g4(_: Int, path: String) { }
+
+  init(a: Int) {} // expected-note {{potential overridden initializer 'init(a:)' here}} {{none}}
+  init(a: String) {} // expected-note {{potential overridden initializer 'init(a:)' here}} {{17-17=a }} expected-note {{potential overridden initializer 'init(a:)' here}} {{none}}
+  init(b: String) {} // expected-note {{potential overridden initializer 'init(b:)' here}} {{17-17=b }} expected-note {{potential overridden initializer 'init(b:)' here}} {{none}}
 }
 
 class H : G {
@@ -136,7 +149,15 @@ class H : G {
 
   override func f7(_: Int, int value: Int) { } // okay
 
-  override func g1(_: Int, s: String) { } // expected-error{{declaration 'g1(_:s:)' has different argument names from any potential overrides}}
+  override func g1(_: Int, s: String) { } // expected-error{{declaration 'g1(_:s:)' has different argument names from any potential overrides}}{{none}}
+  override func g2(_: Int, string: Int) { } // expected-error{{method does not override any method from its superclass}} {{none}}
+  override func g3(_: Int, path: Int) { } // expected-error{{method does not override any method from its superclass}} {{none}}
+  override func g4(_: Int, string: Int) { } // expected-error{{argument names for method 'g4(_:string:)' do not match those of overridden method 'g4'}} {{28-28=_ }}
+
+  override init(x: Int) {} // expected-error{{argument names for initializer 'init(x:)' do not match those of overridden initializer 'init(a:)'}} {{17-17=a }}
+  override init(x: String) {} // expected-error{{declaration 'init(x:)' has different argument names from any potential overrides}} {{none}}
+  override init(a: Double) {} // expected-error{{initializer does not override a designated initializer from its superclass}} {{none}}
+  override init(b: Double) {} // expected-error{{initializer does not override a designated initializer from its superclass}} {{none}}
 }
 
 @objc class IUOTestBaseClass {
@@ -221,7 +242,7 @@ class GenericBase<T> {}
 class ConcreteDerived: GenericBase<Int> {}
 
 class OverriddenWithConcreteDerived<T> {
-  func foo() -> GenericBase<T> {}
+  func foo() -> GenericBase<T> {} // expected-note{{potential overridden instance method 'foo()' here}}
 }
 class OverridesWithMismatchedConcreteDerived<T>:
     OverriddenWithConcreteDerived<T> {

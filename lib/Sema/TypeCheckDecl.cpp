@@ -4789,6 +4789,7 @@ public:
   enum class OverrideCheckingAttempt {
     PerfectMatch,
     MismatchedOptional,
+    MismatchedTypes,
     BaseName,
     BaseNameWithMismatchedOptional,
     Final
@@ -4820,6 +4821,7 @@ public:
                   decl->getFullName());
       break;
     case OverrideCheckingAttempt::MismatchedOptional:
+    case OverrideCheckingAttempt::MismatchedTypes:
     case OverrideCheckingAttempt::BaseNameWithMismatchedOptional:
       if (isa<ConstructorDecl>(decl))
         TC.diagnose(decl, diag::initializer_does_not_override);
@@ -4910,6 +4912,7 @@ public:
     auto superclassMetaTy = MetatypeType::get(superclass);
     DeclName name = decl->getFullName();
     bool hadExactMatch = false;
+    LookupResult members;
 
     do {
       switch (attempt) {
@@ -4920,12 +4923,15 @@ public:
         if (!decl->getAttrs().hasAttribute<OverrideAttr>())
           return false;
         break;
+      case OverrideCheckingAttempt::MismatchedTypes:
+        break;
       case OverrideCheckingAttempt::BaseName:
         // Don't keep looking if this is already a simple name, or if there
         // are no arguments.
         if (name.isSimpleName() || name.getArgumentNames().empty())
           return false;
         name = name.getBaseName();
+        members.clear();
         break;
       case OverrideCheckingAttempt::BaseNameWithMismatchedOptional:
         break;
@@ -4934,11 +4940,12 @@ public:
         return false;
       }
 
-      NameLookupOptions lookupOptions
-        = defaultMemberLookupOptions - NameLookupFlags::DynamicLookup;
-      LookupResult members = TC.lookupMember(decl->getDeclContext(),
-                                             superclassMetaTy, name,
-                                             lookupOptions);
+      if (members.empty()) {
+        NameLookupOptions lookupOptions =
+            defaultMemberLookupOptions - NameLookupFlags::DynamicLookup;
+        members = TC.lookupMember(decl->getDeclContext(), superclassMetaTy,
+                                  name, lookupOptions);
+      }
 
       for (auto memberResult : members) {
         auto member = memberResult.Decl;
@@ -5015,7 +5022,8 @@ public:
         // If this is a property, we accept the match and then reject it below
         // if the types don't line up, since you can't overload properties based
         // on types.
-        if (isa<VarDecl>(parentDecl)) {
+        if (isa<VarDecl>(parentDecl) ||
+            attempt == OverrideCheckingAttempt::MismatchedTypes) {
           matches.push_back({parentDecl, false, parentDeclTy});
           continue;
         }
