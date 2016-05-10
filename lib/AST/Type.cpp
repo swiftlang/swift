@@ -1930,8 +1930,8 @@ bool TypeBase::isPotentiallyBridgedValueType() {
 }
 
 /// Determine whether this is a representable Objective-C object type.
-static ForeignRepresentableKind getObjCObjectRepresentable(Type type,
-                                                           DeclContext *dc) {
+static ForeignRepresentableKind
+getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   // @objc metatypes are representable when their instance type is.
   if (auto metatype = type->getAs<AnyMetatypeType>()) {
     // If the instance type is not representable, the metatype is not
@@ -1986,7 +1986,8 @@ static ForeignRepresentableKind getObjCObjectRepresentable(Type type,
 /// to be reflected in PrintAsObjC, so that the Swift type will be
 /// properly printed for (Objective-)C and in SIL's bridging logic.
 static std::pair<ForeignRepresentableKind, ProtocolConformance *>
-getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
+getForeignRepresentable(Type type, ForeignLanguage language,
+                        const DeclContext *dc) {
   // Look through one level of optional type, but remember that we did.
   bool wasOptional = false;
   if (auto valueType = type->getAnyOptionalObjectType()) {
@@ -2218,11 +2219,13 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
 }
 
 std::pair<ForeignRepresentableKind, ProtocolConformance *>
-TypeBase::getForeignRepresentableIn(ForeignLanguage language, DeclContext *dc) {
+TypeBase::getForeignRepresentableIn(ForeignLanguage language,
+                                    const DeclContext *dc) {
   return getForeignRepresentable(Type(this), language, dc);
 }
 
-bool TypeBase::isRepresentableIn(ForeignLanguage language, DeclContext *dc) {
+bool TypeBase::isRepresentableIn(ForeignLanguage language,
+                                 const DeclContext *dc) {
   switch (getForeignRepresentableIn(language, dc).first) {
   case ForeignRepresentableKind::None:
     return false;
@@ -2236,7 +2239,7 @@ bool TypeBase::isRepresentableIn(ForeignLanguage language, DeclContext *dc) {
 }
 
 bool TypeBase::isTriviallyRepresentableIn(ForeignLanguage language,
-                                          DeclContext *dc) {
+                                          const DeclContext *dc) {
   switch (getForeignRepresentableIn(language, dc).first) {
   case ForeignRepresentableKind::None:
   case ForeignRepresentableKind::Bridged:

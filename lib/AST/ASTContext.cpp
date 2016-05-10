@@ -3795,7 +3795,7 @@ static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx,
 ForeignRepresentationInfo
 ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
                                          ForeignLanguage language,
-                                         DeclContext *dc) {
+                                         const DeclContext *dc) {
   if (Impl.ForeignRepresentableCache.empty()) {
     // Local function to add a type with the given name and module as
     // trivially-representable.

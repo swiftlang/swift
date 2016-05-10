@@ -712,7 +712,7 @@ public:
   /// Determine whether the given type is representable in the given
   /// foreign language.
   std::pair<ForeignRepresentableKind, ProtocolConformance *>
-  getForeignRepresentableIn(ForeignLanguage language, DeclContext *dc);
+  getForeignRepresentableIn(ForeignLanguage language, const DeclContext *dc);
 
   /// Determines whether the given Swift type is representable within
   /// the given foreign language.
@@ -720,14 +720,14 @@ public:
   /// A given Swift type is representable in the given foreign
   /// language if the Swift type can be used from source code written
   /// in that language.
-  bool isRepresentableIn(ForeignLanguage language, DeclContext *dc);
+  bool isRepresentableIn(ForeignLanguage language, const DeclContext *dc);
 
   /// Determines whether the type is trivially representable within
   /// the foreign language, meaning that it is both representable in
   /// that language and that the runtime representations are
   /// equivalent.
   bool isTriviallyRepresentableIn(ForeignLanguage language,
-                                  DeclContext *dc);
+                                  const DeclContext *dc);
 
   /// \brief Given that this is a nominal type or bound generic nominal
   /// type, return its parent type; this will be a null type if the type

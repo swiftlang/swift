@@ -404,7 +404,7 @@ ProtocolConformance::getRootNormalConformance() const {
   return cast<NormalProtocolConformance>(C);
 }
 
-bool ProtocolConformance::isVisibleFrom(DeclContext *dc) const {
+bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
   // FIXME: Implement me!
   return true;
 }
