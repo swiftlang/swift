@@ -730,6 +730,35 @@ mirrors.test("PlaygroundQuickLook") {
   }
 }
 
+class Parent {}
+
+extension Parent : _DefaultCustomPlaygroundQuickLookable {
+  var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text("base")
+  }
+}
+
+class Child : Parent { }
+
+class FancyChild : Parent, CustomPlaygroundQuickLookable {
+  var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text("child")
+  }
+}
+
+mirrors.test("_DefaultCustomPlaygroundQuickLookable") {
+  // testing the workaround for custom quicklookables in subclasses
+  switch PlaygroundQuickLook(reflecting: Child()) {
+  case .text("base"): break
+  default: expectUnreachable("Base custom quicklookable was expected")
+  }
+
+  switch PlaygroundQuickLook(reflecting: FancyChild()) {
+  case .text("child"): break
+  default: expectUnreachable("FancyChild custom quicklookable was expected")
+  }
+}
+
 import MirrorObjC
 mirrors.test("ObjC") {
   // Some Foundation classes lie about their ivars, which would crash

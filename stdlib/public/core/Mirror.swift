@@ -697,6 +697,9 @@ extension PlaygroundQuickLook {
     if let customized = subject as? CustomPlaygroundQuickLookable {
       self = customized.customPlaygroundQuickLook
     }
+    else if let customized = subject as? _DefaultCustomPlaygroundQuickLookable {
+      self = customized._defaultCustomPlaygroundQuickLook
+    }
     else {
       if let q = _reflect(subject).quickLookObject {
         self = q
@@ -721,6 +724,13 @@ public protocol CustomPlaygroundQuickLookable {
   /// - Note: If `Self` has value semantics, the `PlaygroundQuickLook`
   ///   should be unaffected by subsequent mutations of `self`.
   var customPlaygroundQuickLook: PlaygroundQuickLook { get }
+}
+
+
+// A workaround for <rdar://problem/25971264>
+// FIXME(ABI)
+public protocol _DefaultCustomPlaygroundQuickLookable {
+  var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook { get }
 }
 
 //===--- General Utilities ------------------------------------------------===//
