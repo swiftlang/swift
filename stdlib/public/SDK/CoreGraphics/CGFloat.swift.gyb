@@ -381,6 +381,16 @@ extension CGFloat : CustomReflectable {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// Standard Operator Table
+//===----------------------------------------------------------------------===//
+
+//  TODO: These should not be necessary, since they're already provided by
+//  <T: FloatingPoint>, but in practice they are currently needed to
+//  disambiguate overloads.  We should find a way to remove them, either by
+//  tweaking the overload resolution rules, or by removing the other
+//  definitions in the standard lib, or both.
+
 @_transparent
 @warn_unused_result
 public func +(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
@@ -425,41 +435,9 @@ public func /=(lhs: inout CGFloat, rhs: CGFloat) {
   lhs.divide(by: rhs)
 }
 
-@_transparent
-@warn_unused_result
-public func ==(lhs: CGFloat, rhs: CGFloat) -> Bool {
-  return lhs.isEqual(to: rhs)
-}
-
-@_transparent
-@warn_unused_result
-public func !=(lhs:CGFloat, rhs: CGFloat) -> Bool {
-  return !lhs.isEqual(to: rhs)
-}
-
-@_transparent
-@warn_unused_result
-public func <(lhs: CGFloat, rhs: CGFloat) -> Bool {
-  return lhs.isLess(than: rhs)
-}
-
-@_transparent
-@warn_unused_result
-public func <=(lhs: CGFloat, rhs: CGFloat) -> Bool {
-  return lhs.isLessThanOrEqualTo(rhs)
-}
-
-@_transparent
-@warn_unused_result
-public func >(lhs: CGFloat, rhs: CGFloat) -> Bool {
-  return rhs.isLess(than: lhs)
-}
-
-@_transparent
-@warn_unused_result
-public func >=(lhs: CGFloat, rhs: CGFloat) -> Bool {
-  return rhs.isLessThanOrEqualTo(lhs)
-}
+//===----------------------------------------------------------------------===//
+// Strideable Conformance
+//===----------------------------------------------------------------------===//
 
 @_transparent extension CGFloat : Strideable {
   /// Returns a stride `x` such that `self.advanced(by: x)` approximates
@@ -481,14 +459,9 @@ public func >=(lhs: CGFloat, rhs: CGFloat) -> Bool {
   }
 }
 
-// CGFloat unary operators
-@_transparent
-@warn_unused_result
-public prefix func + (x: CGFloat) -> CGFloat { return x }
-
-@_transparent
-@warn_unused_result
-public prefix func - (x: CGFloat) -> CGFloat { return CGFloat(-x.native) }
+//===----------------------------------------------------------------------===//
+// Deprecated operators
+//===----------------------------------------------------------------------===//
 
 @_transparent
 @available(*, unavailable, message: "use += 1")
@@ -526,7 +499,10 @@ public func %=(lhs: inout CGFloat, rhs: CGFloat) {
   fatalError("%= is not available.")
 }
 
-// CGFloat tgmath.
+//===----------------------------------------------------------------------===//
+// tgmath
+//===----------------------------------------------------------------------===//
+
 @_transparent
 @warn_unused_result
 public func acos(_ x: CGFloat) -> CGFloat {
