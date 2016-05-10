@@ -105,6 +105,7 @@ else:
 % end
 
 ${SelfDocComment}
+@_fixed_layout
 public struct ${Self} {
   public // @testable
   var _value: Builtin.FPIEEE${bits}
@@ -155,6 +156,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   //  Implementation details.
+  @_versioned
   static var _infinityExponent: UInt {
     @inline(__always) get { return 1 << UInt(exponentBitCount) - 1 }
   }
@@ -169,6 +171,7 @@ extension ${Self}: BinaryFloatingPoint {
     }
   }
 
+  @_versioned
   static var _quietNaNMask: ${RawSignificand} {
     @inline(__always) get {
       return 1 << ${RawSignificand}(significandBitCount - 1)
