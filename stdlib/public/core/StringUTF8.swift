@@ -134,9 +134,9 @@ extension String {
       ///
       /// - Precondition: The next value is representable.
       @warn_unused_result
-      internal func successor() -> Index {
+      internal func _successor() -> Index {
         // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.index(after: Index)
-        // FIXME: swift-3-indexing-model: remove the successor() function.
+        // FIXME: swift-3-indexing-model: remove the _successor() function.
         let currentUnit = UTF8.CodeUnit(truncatingBitPattern: _buffer)
         let hiNibble = currentUnit >> 4
         // Map the high nibble of the current code unit into the
@@ -228,7 +228,7 @@ extension String {
     @warn_unused_result
     public func index(after i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
-      return i.successor()
+      return i._successor()
     }
 
     /// Access the element at `position`.
