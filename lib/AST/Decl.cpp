@@ -4655,3 +4655,25 @@ void InfixOperatorDecl::collectOperatorKeywordRanges(SmallVectorImpl
 bool FuncDecl::isDeferBody() const {
   return getName() == getASTContext().getIdentifier("$defer");
 }
+
+Type TypeBase::getSwiftNewtypeUnderlyingType() {
+  auto structDecl = getStructOrBoundGenericStruct();
+  if (!structDecl)
+    return {};
+
+  // Make sure the clang node has swift_newtype attribute
+  if (!structDecl->getClangNode())
+    return {};
+  auto clangNode = structDecl->getClangNode();
+  if (!clangNode.getAsDecl() ||
+      !clangNode.castAsDecl()->getAttr<clang::SwiftNewtypeAttr>())
+    return {};
+
+  // Underlying type is the type of rawValue
+  for (auto member : structDecl->getMembers())
+    if (auto varDecl = dyn_cast<VarDecl>(member))
+      if (varDecl->getName().str() == "rawValue")
+        return varDecl->getType();
+
+  return {};
+}

@@ -1005,21 +1005,6 @@ static bool isNSString(Type type) {
   return false;
 }
 
-static Type findNewtypeUnderlyingType(Type newtype) {
-  auto structDecl = newtype->getStructOrBoundGenericStruct();
-  assert(structDecl && structDecl->getClangNode() &&
-         structDecl->getClangNode().getAsDecl() &&
-         structDecl->getClangNode()
-             .castAsDecl()
-             ->getAttr<clang::SwiftNewtypeAttr>() &&
-         "Called on a non-swift_newtype decl");
-  for (auto member : structDecl->getMembers())
-    if (auto varDecl = dyn_cast<VarDecl>(member))
-      if (varDecl->getName().str() == "rawValue")
-        return varDecl->getType();
-  assert(0 && "no rawValue variable member");
-}
-
 static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
                                         clang::QualType clangType,
                                         Type importedType,
@@ -1205,7 +1190,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   // then we have to for it to be unmanaged
   if (hint == ImportHint::SwiftNewtypeFromCFPointer &&
       !isCFAudited(importKind)) {
-    auto underlyingType = findNewtypeUnderlyingType(importedType);
+    auto underlyingType = importedType->getSwiftNewtypeUnderlyingType();
     if (underlyingType)
       importedType = getUnmanagedType(impl, underlyingType);
   }
