@@ -248,6 +248,7 @@ public struct CountableClosedRange<
 ///     lowercase.contains("c")    // true
 ///     lowercase.contains("5")    // false
 ///     lowercase.contains("z")    // true
+@_fixed_layout
 public struct ClosedRange<
   Bound : Comparable
 > {

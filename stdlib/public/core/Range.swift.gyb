@@ -242,6 +242,7 @@ extension CountableRange
 ///     underFive.contains(3.14)    // true
 ///     underFive.contains(6.28)    // false
 ///     underFive.contains(5.0)     // false
+@_fixed_layout
 public struct Range<
   Bound : Comparable
 > {

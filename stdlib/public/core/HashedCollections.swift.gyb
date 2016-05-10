@@ -2668,6 +2668,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     i = i.successor()
   }
 
+  @_versioned
   @warn_unused_result
   @inline(__always)
   internal func index(forKey key: Key) -> Index? {
@@ -3358,6 +3359,7 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
     i = i.successor()
   }
 
+  @_versioned
   @warn_unused_result
   internal func index(forKey key: Key) -> Index? {
     // Fast path that does not involve creating an array of all keys.  In case
@@ -3687,6 +3689,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     i = index(after: i)
   }
 
+  @_versioned
   @warn_unused_result
   @inline(__always)
   internal func index(forKey key: Key) -> Index? {
