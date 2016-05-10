@@ -1930,8 +1930,8 @@ bool TypeBase::isPotentiallyBridgedValueType() {
 }
 
 /// Determine whether this is a representable Objective-C object type.
-static ForeignRepresentableKind getObjCObjectRepresentable(Type type,
-                                                           DeclContext *dc) {
+static ForeignRepresentableKind
+getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   // @objc metatypes are representable when their instance type is.
   if (auto metatype = type->getAs<AnyMetatypeType>()) {
     // If the instance type is not representable, the metatype is not
@@ -1986,7 +1986,8 @@ static ForeignRepresentableKind getObjCObjectRepresentable(Type type,
 /// to be reflected in PrintAsObjC, so that the Swift type will be
 /// properly printed for (Objective-)C and in SIL's bridging logic.
 static std::pair<ForeignRepresentableKind, ProtocolConformance *>
-getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
+getForeignRepresentable(Type type, ForeignLanguage language,
+                        const DeclContext *dc) {
   // Look through one level of optional type, but remember that we did.
   bool wasOptional = false;
   if (auto valueType = type->getAnyOptionalObjectType()) {
@@ -2089,10 +2090,6 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
 
   ASTContext &ctx = nominal->getASTContext();
 
-  // If the type is @objc, it is trivially representable in Objective-C.
-  if (nominal->isObjC() && language == ForeignLanguage::ObjectiveC)
-    return { ForeignRepresentableKind::Trivial, nullptr };
-
   // Unmanaged<T> can be trivially represented in Objective-C if T
   // is trivially represented in Objective-C.
   if (language == ForeignLanguage::ObjectiveC &&
@@ -2112,14 +2109,17 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
 
   // If the type was imported from Clang, check whether it is
   // representable in the requested language.
-  if (nominal->hasClangNode()) {
+  if (nominal->hasClangNode() || nominal->isObjC()) {
     switch (language) {
     case ForeignLanguage::C:
       // Imported structs and enums are trivially representable in C.
       // FIXME: This is not entirely true; we need to check that
       // all of the exposed parts are representable in C.
-      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
+      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
+        if (wasOptional)
+          break;
         return { ForeignRepresentableKind::Trivial, nullptr };
+      }
 
       // Imported classes and protocols are not.
       if (isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal))
@@ -2128,7 +2128,10 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
       llvm_unreachable("Unhandled nominal type declaration");
 
     case ForeignLanguage::ObjectiveC:
-      // Anything Clang imported is trivially representable in Objective-C.
+      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
+        if (wasOptional)
+          break;
+
       return { ForeignRepresentableKind::Trivial, nullptr };
     }
   }
@@ -2218,11 +2221,13 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
 }
 
 std::pair<ForeignRepresentableKind, ProtocolConformance *>
-TypeBase::getForeignRepresentableIn(ForeignLanguage language, DeclContext *dc) {
+TypeBase::getForeignRepresentableIn(ForeignLanguage language,
+                                    const DeclContext *dc) {
   return getForeignRepresentable(Type(this), language, dc);
 }
 
-bool TypeBase::isRepresentableIn(ForeignLanguage language, DeclContext *dc) {
+bool TypeBase::isRepresentableIn(ForeignLanguage language,
+                                 const DeclContext *dc) {
   switch (getForeignRepresentableIn(language, dc).first) {
   case ForeignRepresentableKind::None:
     return false;
@@ -2236,7 +2241,7 @@ bool TypeBase::isRepresentableIn(ForeignLanguage language, DeclContext *dc) {
 }
 
 bool TypeBase::isTriviallyRepresentableIn(ForeignLanguage language,
-                                          DeclContext *dc) {
+                                          const DeclContext *dc) {
   switch (getForeignRepresentableIn(language, dc).first) {
   case ForeignRepresentableKind::None:
   case ForeignRepresentableKind::Bridged:

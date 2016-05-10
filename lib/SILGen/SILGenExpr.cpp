@@ -2292,25 +2292,14 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
 static bool isNullableTypeInC(SILModule &M, Type ty) {
   ty = ty->getLValueOrInOutObjectType()->getReferenceStorageReferent();
 
+  // Functions, class instances, and @objc existentials are all nullable.
   if (ty->hasReferenceSemantics())
     return true;
-  
-  auto &C = ty->getASTContext();
-  auto nom = ty->getAnyNominal();
-  if (!nom)
-    return false;
 
-  if (nom == C.getUnsafePointerDecl()
-      || nom == C.getUnsafeMutablePointerDecl()
-      || nom == C.getAutoreleasingUnsafeMutablePointerDecl()
-      || nom == C.getOpaquePointerDecl())
-    return true;
-  
-  auto selectorTy = M.Types.getSelectorType();
-  if (selectorTy && ty->isEqual(selectorTy))
-    return true;
-  
-  return false;
+  // Other types like UnsafePointer can also be nullable.
+  ty = OptionalType::get(ty);
+  return ty->isTriviallyRepresentableIn(ForeignLanguage::C,
+                                        M.getAssociatedContext());
 }
 
 /// Determine whether the given declaration returns a non-optional object that

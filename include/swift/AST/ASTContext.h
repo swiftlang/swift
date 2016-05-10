@@ -522,7 +522,7 @@ public:
   ForeignRepresentationInfo
   getForeignRepresentationInfo(NominalTypeDecl *nominal,
                                ForeignLanguage language,
-                               DeclContext *dc);
+                               const DeclContext *dc);
 
   /// Add a declaration to a list of declarations that need to be emitted
   /// as part of the current module or source file, but are otherwise not
