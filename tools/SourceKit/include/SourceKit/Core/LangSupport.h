@@ -157,7 +157,7 @@ struct FilterRule {
   };
   Kind kind;
   bool hide;
-  std::vector<StringRef> names;
+  std::vector<StringRef> names; ///< Must be null-terminated.
   std::vector<UIdent> uids;
 };
 
