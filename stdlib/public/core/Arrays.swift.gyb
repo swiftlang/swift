@@ -231,6 +231,7 @@ if True:
 ///
 ///     if let firstElement = oddNumbers.first, lastElement = oddNumbers.last {
 ///         print(firstElement, lastElement, separator: ", ", terminator: "\n")
+///     }
 ///     // Prints "1, 15"
 ///
 ///     print(emptyDoubles.first, emptyDoubles.last, separator: ", ", terminator: "\n")
