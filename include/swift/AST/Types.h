@@ -871,6 +871,10 @@ public:
     return getAnyOptionalObjectType(ignored);
   }
 
+  // Return type underlying type of a swift_newtype annotated imported struct;
+  // otherwise, return the null type.
+  Type getSwiftNewtypeUnderlyingType();
+
   /// Return the type T after looking through all of the optional or
   /// implicitly-unwrapped optional types.
   Type lookThroughAllAnyOptionalTypes();

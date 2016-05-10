@@ -67,3 +67,36 @@ public func getUnmanagedCFNewType(useVar: Bool) -> Unmanaged<CFString> {
 // witness table.
 public func hasArrayOfClosedEnums(closed: [ClosedEnum]) {
 }
+
+// CHECK-LABEL: _TF7newtype11compareABIsFT_T_
+public func compareABIs() {
+  let new = getMyABINewType()
+  let old = getMyABIOldType()
+  takeMyABINewType(new)
+  takeMyABIOldType(old)
+
+  takeMyABINewTypeNonNull(new!)
+  takeMyABIOldTypeNonNull(old!)
+
+  let newNS = getMyABINewTypeNS()
+  let oldNS = getMyABIOldTypeNS()
+  takeMyABINewTypeNonNullNS(newNS!)
+  takeMyABIOldTypeNonNullNS(oldNS!)
+
+  // Make sure that the calling conventions align correctly, that is we don't
+  // have double-indirection or anything else like that
+  // CHECK: declare %struct.__CFString* @getMyABINewType() #0
+  // CHECK: declare %struct.__CFString* @getMyABIOldType() #0
+  //
+  // CHECK: declare void @takeMyABINewType(%struct.__CFString*) #0
+  // CHECK: declare void @takeMyABIOldType(%struct.__CFString*) #0
+  //
+  // CHECK: declare void @takeMyABINewTypeNonNull(%struct.__CFString*) #0
+  // CHECK: declare void @takeMyABIOldTypeNonNull(%struct.__CFString*) #0
+  //
+  // CHECK: declare %0* @getMyABINewTypeNS() #0
+  // CHECK: declare %0* @getMyABIOldTypeNS() #0
+  //
+  // CHECK: declare void @takeMyABINewTypeNonNullNS(%0*) #0
+  // CHECK: declare void @takeMyABIOldTypeNonNullNS(%0*) #0
+}

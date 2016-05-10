@@ -57,10 +57,34 @@ typedef CFStringRef CFNewType __attribute((swift_newtype(struct)));
 // CF audited
 _Pragma("clang arc_cf_code_audited begin")
 extern const CFNewType MyCFNewTypeValue;
-CFNewType FooAudited(void);
+extern CFNewType FooAudited(void);
 _Pragma("clang arc_cf_code_audited end")
 extern const CFNewType MyCFNewTypeValueUnauditedButConst;
 
 // un-audited CFStringRef
 extern CFNewType MyCFNewTypeValueUnaudited;
-CFNewType FooUnaudited(void);
+extern CFNewType FooUnaudited(void);
+
+// Tests to show identical calling convention / binary representation for
+// new_type and non-new_type
+typedef CFStringRef MyABINewType __attribute((swift_newtype(struct)));
+typedef CFStringRef MyABIOldType;
+_Pragma("clang arc_cf_code_audited begin")
+extern const MyABINewType kMyABINewTypeGlobal;
+extern const MyABIOldType kMyABIOldTypeGlobal;
+extern MyABINewType getMyABINewType(void);
+extern MyABIOldType getMyABIOldType(void);
+extern void takeMyABINewType(MyABINewType);
+extern void takeMyABIOldType(MyABIOldType);
+
+extern void takeMyABINewTypeNonNull(__nonnull MyABINewType);
+extern void takeMyABIOldTypeNonNull(__nonnull MyABIOldType);
+_Pragma("clang arc_cf_code_audited end")
+
+typedef NSString *MyABINewTypeNS __attribute((swift_newtype(struct)));
+typedef NSString *MyABIOldTypeNS;
+extern MyABINewTypeNS getMyABINewTypeNS(void);
+extern MyABIOldTypeNS getMyABIOldTypeNS(void);
+extern void takeMyABINewTypeNonNullNS(__nonnull MyABINewTypeNS);
+extern void takeMyABIOldTypeNonNullNS(__nonnull MyABIOldTypeNS);
+
