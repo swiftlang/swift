@@ -40,6 +40,8 @@ template <typename Runtime>
 class ReflectionContext
        : public remote::MetadataReader<Runtime, TypeRefBuilder> {
   using super = remote::MetadataReader<Runtime, TypeRefBuilder>;
+  using super::readMetadata;
+  using super::readObjCClassName;
 
   std::unordered_map<typename super::StoredPointer, const TypeInfo *> Cache;
 
@@ -228,6 +230,77 @@ public:
         *OutInstanceAddress = RemoteAddress(BoxAddress);
       }
       return true;
+    }
+    case RecordKind::ErrorExistential: {
+      // We have a pointer to an error existential, which is always heap object.
+
+      bool successfullyGotIsa = false;
+      StoredPointer MetadataAddress = 0;
+      std::tie(successfullyGotIsa, MetadataAddress)
+        = readMetadataFromInstance(ExistentialAddress.getAddressData());
+
+      if (!successfullyGotIsa)
+        return false;
+
+      bool isObjC = false;
+
+      // If we can determine the Objective-C class name, this is probably an
+      // error existential with NSError-compatible layout.
+      std::string ObjCClassName;
+      if (readObjCClassName(MetadataAddress, ObjCClassName)) {
+        if (ObjCClassName == "_SwiftNativeNSError")
+          isObjC = true;
+      } else {
+        // Otherwise, we can check to see if this is a class metadata with the
+        // kind value's least significant bit set, which indicates a pure
+        // Swift class.
+        auto Meta = readMetadata(MetadataAddress);
+        auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta);
+        if (!ClassMeta)
+          return false;
+
+        isObjC = ClassMeta->isPureObjC();
+      }
+
+      // In addition to the isa pointer and two 32-bit reference counts, if the
+      // error existential is layout-compatible with NSError, we also need to
+      // skip over its three word-sized fields: the error code, the domain,
+      // and userInfo.
+      StoredPointer InstanceMetadataAddressAddress
+        = ExistentialAddress.getAddressData() +
+          (isObjC ? 5 : 2) * sizeof(StoredPointer);
+
+      // We need to get the instance's alignment info so we can get the exact
+      // offset of the start of its data in the class.
+      StoredPointer InstanceMetadataAddress = 0;
+      std::tie(successfullyGotIsa, InstanceMetadataAddress) =
+        readMetadataFromInstance(InstanceMetadataAddressAddress);
+      if (!successfullyGotIsa)
+        return false;
+
+      auto InstanceTR = readTypeFromMetadata(InstanceMetadataAddress);
+      if (!InstanceTR)
+        return false;
+
+      auto InstanceTI = getTypeInfo(InstanceTR);
+      if (!InstanceTI)
+        return false;
+
+      // Now we need to skip over the instance metadata pointer and instance's
+      // conformance pointer for Swift.ErrorProtocol.
+      StoredPointer InstanceAddress = InstanceMetadataAddressAddress +
+        2 * sizeof(StoredPointer);
+
+      // Round up to alignment, and we have the start address of the
+      // instance payload.
+      auto Alignment = InstanceTI->getAlignment();
+      InstanceAddress += Alignment - InstanceAddress % Alignment;
+
+      *OutInstanceTR = InstanceTR;
+      *OutInstanceAddress = RemoteAddress(InstanceAddress);
+
+      return true;
+      break;
     }
     default:
       return false;

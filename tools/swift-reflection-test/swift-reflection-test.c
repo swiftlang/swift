@@ -344,7 +344,8 @@ int reflectHeapObject(SwiftReflectionContextRef RC,
 }
 
 int reflectExistential(SwiftReflectionContextRef RC,
-                        const PipeMemoryReader Pipe) {
+                       const PipeMemoryReader Pipe,
+                       swift_typeref_t MockExistentialTR) {
   uintptr_t instance = PipeMemoryReader_receiveInstanceAddress(&Pipe);
   if (instance == 0) {
     // Child has no more instances to examine
@@ -357,12 +358,7 @@ int reflectExistential(SwiftReflectionContextRef RC,
   swift_typeref_t InstanceTypeRef;
   addr_t StartOfInstanceData = 0;
 
-  // For testing purposes, we can assume that any existential is Any, since
-  // we won't be looking at any witness tables that follow the container.
-  swift_typeref_t AnyTR
-    = swift_reflection_typeRefForMangledTypeName(RC, "_TtP_", 5);
-
-  if (!swift_reflection_projectExistential(RC, instance, AnyTR,
+  if (!swift_reflection_projectExistential(RC, instance, MockExistentialTR,
                                            &InstanceTypeRef,
                                            &StartOfInstanceData)) {
     printf("swift_reflection_projectExistential failed.\n");
@@ -423,11 +419,24 @@ int doDumpHeapInstance(const char *BinaryFilename) {
           if (!reflectHeapObject(RC, Pipe))
             return EXIT_SUCCESS;
           break;
-        case Existential:
+        case Existential: {
+          swift_typeref_t AnyTR
+            = swift_reflection_typeRefForMangledTypeName(RC, "_TtP_", 5);
+
           printf("Reflecting an existential.\n");
-          if (!reflectExistential(RC, Pipe))
+          if (!reflectExistential(RC, Pipe, AnyTR))
             return EXIT_SUCCESS;
           break;
+        }
+        case ErrorExistential: {
+          swift_typeref_t ErrorTR
+            = swift_reflection_typeRefForMangledTypeName(RC,
+              "_TtPs13ErrorProtocol_", 21);
+          printf("Reflecting an error existential.\n");
+          if (!reflectExistential(RC, Pipe, ErrorTR))
+            return EXIT_SUCCESS;
+          break;
+        }
         case Closure:
           printf("Reflecting a closure.\n");
           if (!reflectHeapObject(RC, Pipe))

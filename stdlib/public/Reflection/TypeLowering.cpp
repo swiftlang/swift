@@ -116,6 +116,9 @@ public:
       case RecordKind::ClassExistential:
         printHeader("class_existential");
         break;
+      case RecordKind::ErrorExistential:
+        printHeader("error_existential");
+        break;
       case RecordKind::ExistentialMetatype:
         printHeader("existential_metatype");
         break;
@@ -192,57 +195,81 @@ public:
 /// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {
   TypeConverter &TC;
+  ExistentialTypeRepresentation Representation;
+  std::vector<const ProtocolTypeRef *> Protocols;
   bool ObjC;
-  bool Class;
   unsigned WitnessTableCount;
   bool Invalid;
 
+  bool isSingleErrorProtocol() const {
+    if (Protocols.size() != 1)
+      return false;
+
+    for (auto *P : Protocols) {
+      if (P->isErrorProtocol())
+        return true;
+    }
+    return false;
+  }
+
+  void examineProtocols() {
+    if (isSingleErrorProtocol()) {
+      Representation = ExistentialTypeRepresentation::ErrorProtocol;
+      // No extra witness table for protocol<ErrorProtocol>
+      return;
+    }
+
+    for (auto *P : Protocols) {
+      // FIXME: AnyObject should go away
+      if (P->isAnyObject()) {
+        Representation = ExistentialTypeRepresentation::Class;
+        // No extra witness table for AnyObject
+        continue;
+      }
+
+      const FieldDescriptor *FD = TC.getBuilder().getFieldTypeInfo(P);
+      if (FD == nullptr) {
+        Invalid = true;
+        continue;
+      }
+
+      switch (FD->Kind) {
+        case FieldDescriptorKind::ObjCProtocol:
+          // Objective-C protocols do not have any witness tables.
+          ObjC = true;
+          continue;
+        case FieldDescriptorKind::ClassProtocol:
+          Representation = ExistentialTypeRepresentation::Class;
+          WitnessTableCount++;
+          continue;
+        case FieldDescriptorKind::Protocol:
+          WitnessTableCount++;
+          continue;
+        case FieldDescriptorKind::Struct:
+        case FieldDescriptorKind::Enum:
+        case FieldDescriptorKind::Class:
+          Invalid = true;
+          continue;
+      }
+    }
+  }
+
 public:
   ExistentialTypeInfoBuilder(TypeConverter &TC)
-    : TC(TC), ObjC(false), Class(false), WitnessTableCount(0),
-      Invalid(false) {}
+    : TC(TC), Representation(ExistentialTypeRepresentation::Opaque),
+      ObjC(false), WitnessTableCount(0), Invalid(false) {}
 
   void addProtocol(const TypeRef *TR) {
-    auto *P = dyn_cast<ProtocolTypeRef>(TR);
-    if (P == nullptr) {
+    if (auto *P = dyn_cast<const ProtocolTypeRef>(TR)) {
+      Protocols.push_back(P);
+    } else {
       Invalid = true;
-      return;
-    }
-
-    // FIXME: AnyObject should go away
-    if (P->getMangledName() == "Ps9AnyObject_") {
-      // No witness table for AnyObject
-      Class = true;
-      return;
-    }
-
-    const FieldDescriptor *FD = TC.getBuilder().getFieldTypeInfo(TR);
-    if (FD == nullptr) {
-      Invalid = true;
-      return;
-    }
-
-    switch (FD->Kind) {
-    case FieldDescriptorKind::ObjCProtocol:
-      // Objective-C protocols do not have any witness tables.
-      ObjC = true;
-      break;
-    case FieldDescriptorKind::ClassProtocol:
-      Class = true;
-      WitnessTableCount++;
-      break;
-    case FieldDescriptorKind::Protocol:
-      WitnessTableCount++;
-      break;
-    case FieldDescriptorKind::Struct:
-    case FieldDescriptorKind::Enum:
-    case FieldDescriptorKind::Class:
-      Invalid = true;
-      break;
     }
   }
 
   const TypeInfo *build() {
+    examineProtocols();
+
     if (Invalid)
       return nullptr;
 
@@ -254,22 +281,38 @@ public:
                                      ReferenceCounting::Unknown);
     }
 
-    RecordTypeInfoBuilder builder(TC,
-                                  Class
-                                    ? RecordKind::ClassExistential
-                                    : RecordKind::Existential);
+    RecordKind Kind;
+    switch (Representation) {
+    case ExistentialTypeRepresentation::Class:
+      Kind = RecordKind::ClassExistential;
+      break;
+    case ExistentialTypeRepresentation::Opaque:
+      Kind = RecordKind::Existential;
+      break;
+    case ExistentialTypeRepresentation::ErrorProtocol:
+      Kind = RecordKind::ErrorExistential;
+      break;
+    }
 
-    if (Class) {
+    RecordTypeInfoBuilder builder(TC, Kind);
+
+    switch (Representation) {
+    case ExistentialTypeRepresentation::Class:
       // Class existentials consist of a single retainable pointer
       // followed by witness tables.
       builder.addField("object", TC.getUnknownObjectTypeRef());
-    } else {
+      break;
+    case ExistentialTypeRepresentation::Opaque:
       // Non-class existentials consist of a three-word buffer and
       // value metadata, followed by witness tables.
       builder.addField("value", TC.getRawPointerTypeRef());
       builder.addField("value", TC.getRawPointerTypeRef());
       builder.addField("value", TC.getRawPointerTypeRef());
       builder.addField("metadata", TC.getRawPointerTypeRef());
+      break;
+    case ExistentialTypeRepresentation::ErrorProtocol:
+      builder.addField("error", TC.getUnknownObjectTypeRef());
+      return builder.build();
     }
 
     for (unsigned i = 0; i < WitnessTableCount; i++)
@@ -279,6 +322,8 @@ public:
   }
 
   const TypeInfo *buildMetatype() {
+    examineProtocols();
+
     if (Invalid)
       return nullptr;
 

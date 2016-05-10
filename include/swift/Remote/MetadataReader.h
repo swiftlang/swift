@@ -895,6 +895,99 @@ protected:
     return targetAddress + signext;
   }
 
+  /// Given a pointer to an Objective-C class, try to read its class name.
+  bool readObjCClassName(StoredPointer classAddress, std::string &className) {
+    // The following algorithm only works on the non-fragile Apple runtime.
+
+    // Grab the RO-data pointer.  This part is not ABI.
+    StoredPointer roDataPtr = readObjCRODataPtr(classAddress);
+    if (!roDataPtr) return false;
+
+    // This is ABI.
+    static constexpr auto OffsetToName =
+    roundUpToAlignment(size_t(12), sizeof(StoredPointer))
+    + sizeof(StoredPointer);;
+
+    // Read the name pointer.
+    StoredPointer namePtr;
+    if (!Reader->readInteger(RemoteAddress(roDataPtr + OffsetToName), &namePtr))
+      return false;
+
+    // If the name pointer is null, treat that as an error.
+    if (!namePtr)
+      return false;
+
+    return Reader->readString(RemoteAddress(namePtr), className);
+  }
+
+  MetadataRef readMetadata(StoredPointer address) {
+    auto cached = MetadataCache.find(address);
+    if (cached != MetadataCache.end())
+      return MetadataRef(address, cached->second.get());
+
+    StoredPointer KindValue = 0;
+    if (!Reader->readInteger(RemoteAddress(address), &KindValue))
+      return nullptr;
+
+    switch (getEnumeratedMetadataKind(KindValue)) {
+      case MetadataKind::Class:
+        return _readMetadata<TargetClassMetadata>(address);
+      case MetadataKind::Enum:
+        return _readMetadata<TargetEnumMetadata>(address);
+      case MetadataKind::ErrorObject:
+        return _readMetadata<TargetEnumMetadata>(address);
+      case MetadataKind::Existential: {
+        StoredPointer numProtocolsAddress = address +
+        TargetExistentialTypeMetadata<Runtime>::OffsetToNumProtocols;
+        StoredPointer numProtocols;
+        if (!Reader->readInteger(RemoteAddress(numProtocolsAddress),
+                                 &numProtocols))
+          return nullptr;
+
+        auto totalSize = sizeof(TargetExistentialTypeMetadata<Runtime>)
+        + numProtocols *
+        sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
+
+        return _readMetadata(address, totalSize);
+      }
+      case MetadataKind::ExistentialMetatype:
+        return _readMetadata<TargetExistentialMetatypeMetadata>(address);
+      case MetadataKind::ForeignClass:
+        return _readMetadata<TargetForeignClassMetadata>(address);
+      case MetadataKind::Function:
+        return _readMetadata<TargetFunctionTypeMetadata>(address);
+      case MetadataKind::HeapGenericLocalVariable:
+        return _readMetadata<TargetHeapLocalVariableMetadata>(address);
+      case MetadataKind::HeapLocalVariable:
+        return _readMetadata<TargetHeapLocalVariableMetadata>(address);
+      case MetadataKind::Metatype:
+        return _readMetadata<TargetMetatypeMetadata>(address);
+      case MetadataKind::ObjCClassWrapper:
+        return _readMetadata<TargetObjCClassWrapperMetadata>(address);
+      case MetadataKind::Opaque:
+        return _readMetadata<TargetOpaqueMetadata>(address);
+      case MetadataKind::Optional:
+        return _readMetadata<TargetEnumMetadata>(address);
+      case MetadataKind::Struct:
+        return _readMetadata<TargetStructMetadata>(address);
+      case MetadataKind::Tuple: {
+        auto numElementsAddress = address +
+        TargetTupleTypeMetadata<Runtime>::OffsetToNumElements;
+        StoredSize numElements;
+        if (!Reader->readInteger(RemoteAddress(numElementsAddress),
+                                 &numElements))
+          return nullptr;
+        auto totalSize = sizeof(TargetTupleTypeMetadata<Runtime>)
+        + numElements * sizeof(StoredPointer);
+        return _readMetadata(address, totalSize);
+      }
+    }
+
+    // We can fall out here if the value wasn't actually a valid
+    // MetadataKind.
+    return nullptr;
+  }
+
 private:
   template <template <class R> class M>
   MetadataRef _readMetadata(StoredPointer address) {
@@ -912,74 +1005,6 @@ private:
     auto metadata = reinterpret_cast<TargetMetadata<Runtime>*>(buffer);
     MetadataCache.insert(std::make_pair(address, OwnedMetadataRef(metadata)));
     return MetadataRef(address, metadata);
-  }
-
-  MetadataRef readMetadata(StoredPointer address) {
-    auto cached = MetadataCache.find(address);
-    if (cached != MetadataCache.end())
-      return MetadataRef(address, cached->second.get());
-
-    StoredPointer KindValue = 0;
-    if (!Reader->readInteger(RemoteAddress(address), &KindValue))
-      return nullptr;
-
-    switch (getEnumeratedMetadataKind(KindValue)) {
-    case MetadataKind::Class:
-      return _readMetadata<TargetClassMetadata>(address);
-    case MetadataKind::Enum:
-      return _readMetadata<TargetEnumMetadata>(address);
-    case MetadataKind::ErrorObject:
-      return _readMetadata<TargetEnumMetadata>(address);
-    case MetadataKind::Existential: {
-      StoredPointer numProtocolsAddress = address +
-        TargetExistentialTypeMetadata<Runtime>::OffsetToNumProtocols;
-      StoredPointer numProtocols;
-      if (!Reader->readInteger(RemoteAddress(numProtocolsAddress),
-                               &numProtocols))
-        return nullptr;
-
-      auto totalSize = sizeof(TargetExistentialTypeMetadata<Runtime>)
-                     + numProtocols *
-          sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
-
-      return _readMetadata(address, totalSize);
-    }
-    case MetadataKind::ExistentialMetatype:
-      return _readMetadata<TargetExistentialMetatypeMetadata>(address);
-    case MetadataKind::ForeignClass:
-      return _readMetadata<TargetForeignClassMetadata>(address);
-    case MetadataKind::Function:
-      return _readMetadata<TargetFunctionTypeMetadata>(address);
-    case MetadataKind::HeapGenericLocalVariable:
-      return _readMetadata<TargetHeapLocalVariableMetadata>(address);
-    case MetadataKind::HeapLocalVariable:
-      return _readMetadata<TargetHeapLocalVariableMetadata>(address);
-    case MetadataKind::Metatype:
-      return _readMetadata<TargetMetatypeMetadata>(address);
-    case MetadataKind::ObjCClassWrapper:
-      return _readMetadata<TargetObjCClassWrapperMetadata>(address);
-    case MetadataKind::Opaque:
-      return _readMetadata<TargetOpaqueMetadata>(address);
-    case MetadataKind::Optional:
-      return _readMetadata<TargetEnumMetadata>(address);
-    case MetadataKind::Struct:
-      return _readMetadata<TargetStructMetadata>(address);
-    case MetadataKind::Tuple: {
-      auto numElementsAddress = address +
-        TargetTupleTypeMetadata<Runtime>::OffsetToNumElements;
-      StoredSize numElements;
-      if (!Reader->readInteger(RemoteAddress(numElementsAddress),
-                               &numElements))
-        return nullptr;
-      auto totalSize = sizeof(TargetTupleTypeMetadata<Runtime>)
-                     + numElements * sizeof(StoredPointer);
-      return _readMetadata(address, totalSize);
-    }
-    }
-
-    // We can fall out here if the value wasn't actually a valid
-    // MetadataKind.
-    return nullptr;
   }
 
   StoredPointer readAddressOfNominalTypeDescriptor(MetadataRef metadata) {
@@ -1142,31 +1167,6 @@ private:
 
     TypeCache.insert({metadata.getAddress(), nominal});
     return nominal;
-  }
-
-  /// Given a pointer to an Objective-C class, try to read its class name.
-  bool readObjCClassName(StoredPointer classAddress, std::string &className) {
-    // The following algorithm only works on the non-fragile Apple runtime.
-
-    // Grab the RO-data pointer.  This part is not ABI.
-    StoredPointer roDataPtr = readObjCRODataPtr(classAddress);
-    if (!roDataPtr) return false;
-
-    // This is ABI.
-    static constexpr auto OffsetToName =
-      roundUpToAlignment(size_t(12), sizeof(StoredPointer))
-        + sizeof(StoredPointer);;
-
-    // Read the name pointer.
-    StoredPointer namePtr;
-    if (!Reader->readInteger(RemoteAddress(roDataPtr + OffsetToName), &namePtr))
-      return false;
-
-    // If the name pointer is null, treat that as an error.
-    if (!namePtr)
-      return false;
-
-    return Reader->readString(RemoteAddress(namePtr), className);
   }
 
   /// Given that the remote process is running the non-fragile Apple runtime,

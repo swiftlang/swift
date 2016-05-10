@@ -386,6 +386,14 @@ public:
     FIND_OR_CREATE_TYPEREF(A, ProtocolTypeRef, MangledName);
   }
 
+  bool isAnyObject() const {
+    return MangledName == "Ps9AnyObject_";
+  }
+
+  bool isErrorProtocol() const {
+    return MangledName == "Ps13ErrorProtocol_";
+  }
+
   const std::string &getMangledName() const {
     return MangledName;
   }

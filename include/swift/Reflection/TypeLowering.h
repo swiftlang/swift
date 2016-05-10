@@ -52,6 +52,10 @@ enum class RecordKind : unsigned {
   // An existential metatype.
   ExistentialMetatype,
 
+  // An error existential is a special kind of heap object, so is a retainable
+  // pointer, with no witness tables.
+  ErrorExistential,
+
   // A class instance layout, consisting of the stored properties of
   // one class, excluding superclasses.
   ClassInstance,

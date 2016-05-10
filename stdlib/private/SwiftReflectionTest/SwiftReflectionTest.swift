@@ -41,6 +41,7 @@ public enum InstanceKind : UInt8 {
   case None
   case Object
   case Existential
+  case ErrorExistential
   case Closure
 }
 
@@ -360,6 +361,34 @@ public func reflect<T>(any: T) {
   let anyPointerValue = unsafeBitCast(anyPointer, to: UInt.self)
   reflect(instanceAddress: anyPointerValue, kind: .Existential)
   anyPointer.deallocateCapacity(sizeof(Any.self))
+}
+
+// Reflect an `ErrorProtocol`, a.k.a. an "error existential".
+//
+// These are always boxed on the heap, with the following layout:
+//
+// - Word 0: Metadata Pointer
+// - Word 1: 2x 32-bit reference counts
+//
+// If Objective-C interop is available, an ErrorProtocol is also an
+// `NSError`, and so has:
+//
+// - Word 2: code (NSInteger)
+// - Word 3: domain (NSString *)
+// - Word 4: userInfo (NSDictionary *)
+//
+// Then, always follow:
+//
+// - Word 2 or 5: Instance type metadata pointer
+// - Word 3 or 6: Instance witness table for conforming
+//   to `Swift.ErrorProtocol`.
+//
+// Following that is the instance that conforms to `ErrorProtocol`,
+// rounding up to its alignment.
+public func reflect<T: ErrorProtocol>(error: T) {
+  let error: ErrorProtocol = error
+  let errorPointerValue = unsafeBitCast(error, to: UInt.self)
+  reflect(instanceAddress: errorPointerValue, kind: .ErrorExistential)
 }
 
 /// Reflect a closure context. The given function must be a Swift-native
