@@ -31,8 +31,8 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
      // CHECK-DAG: !DILexicalBlock(scope: ![[FOO]],{{.*}} line: [[@LINE-3]], column: 43)
      // CHECK-DAG: ![[ASCOPE:.*]] = !DILocation(line: [[@LINE-4]], column: 10, scope: ![[FOO]])
      // Check that a is the first and b is the second argument.
-     // CHECK-DAG: store i64 %0, i64* [[AADDR:.*]], align 8
-     // CHECK-DAG: store i64 %1, i64* [[BADDR:.*]], align 8
+     // CHECK-DAG: store i64 %0, i64* [[AADDR:.*]], align
+     // CHECK-DAG: store i64 %1, i64* [[BADDR:.*]], align
      // CHECK-DAG: [[AVAL:%.*]] = getelementptr inbounds {{.*}}, [[AMEM:.*]], i32 0, i32 0
      // CHECK-DAG: [[BVAL:%.*]] = getelementptr inbounds {{.*}}, [[BMEM:.*]], i32 0, i32 0
      // CHECK-DAG: call void @llvm.dbg.declare(metadata i64* [[AADDR]], metadata ![[AARG:.*]], metadata !{{[0-9]+}}), !dbg ![[ASCOPE]]
