@@ -119,3 +119,26 @@ var m : D1 = parse()
 print(m.v)
 // CHECK: 2
 
+// rdar://problem/21770225 - infinite recursion with metadata
+// instantiation when associated type contains Self
+
+struct MySlice<T : MyIndexableType> : MySequenceType {}
+struct MyMutableSlice<T : MyMutableCollectionType> : MySequenceType {}
+
+protocol MySequenceType {}
+protocol MyIndexableType {}
+
+protocol MyCollectionType : MySequenceType, MyIndexableType {
+  associatedtype SubSequence = MySlice<Self>
+}
+protocol MyMutableCollectionType : MyCollectionType {
+  associatedtype SubSequence = MyMutableSlice<Self>
+}
+
+struct S : MyMutableCollectionType {}
+
+// CHECK: MyMutableSlice<S>()
+print(S.SubSequence())
+
+// CHECK: MyMutableSlice<S>
+print(S.SubSequence.self)
