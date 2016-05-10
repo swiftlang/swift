@@ -10,6 +10,7 @@ func okay() {}
 struct Foo {
   func bad() { }
   func good() { }
+  func good(_ p1: Int, p2: Any..., p3: ()->(), p4: (Int, Int), p5: inout Int) { }
   func okay() {}
   var sad: Int
   var xhappy: Int
@@ -38,11 +39,13 @@ struct Foo {
 
 // NOPOP_FOO: key.name: "bad()
 // NOPOP_FOO: key.name: "good()
+// NOPOP_FOO: key.name: "good(:p2:p3:p4:p5:)
 // NOPOP_FOO: key.name: "okay()
 // NOPOP_FOO: key.name: "sad
 // NOPOP_FOO: key.name: "xhappy
 // NOPOP_FOO: key.name: "zmeh
 
+// POP_FOO: key.name: "good(:p2:p3:p4:p5:)
 // POP_FOO: key.name: "good()
 // POP_FOO: key.name: "xhappy
 // POP_FOO: key.name: "okay()
