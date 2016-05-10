@@ -15,7 +15,7 @@ var bfx : Int, bfy : Int
 _ = 10
 
 func _(_ x: Int) {} // expected-error {{keyword '_' cannot be used as an identifier here}}
-// expected-note @-1 {{backticks can escape this name if it is important to use}}
+// expected-note @-1 {{if this name is unavoidable, use backticks to escape it}}
 
 
 var self1 = self1 // expected-error {{variable used within its own initial value}}

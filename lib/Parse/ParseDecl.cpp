@@ -1,4 +1,3 @@
-
 //===--- ParseDecl.cpp - Swift Language Parser for Declarations -----------===//
 //
 // This source file is part of the Swift.org open source project

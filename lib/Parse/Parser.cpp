@@ -603,7 +603,8 @@ bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
 
   if (Tok.isKeyword()) {
     diagnose(Tok, diag::keyword_cant_be_identifier, Tok.getText());
-    diagnose(Tok, diag::backticks_to_escape);
+    diagnose(Tok, diag::backticks_to_escape)
+      .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
   } else {
     diagnose(Tok, D);
   }

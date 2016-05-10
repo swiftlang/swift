@@ -45,10 +45,10 @@ import struct Swift.nonexistent // expected-error {{no such decl in module}}
 
 import Swift.import.abc // expected-error {{expected identifier in import declaration}}
 // expected-error @-1 {{keyword 'import' cannot be used as an identifier here}}
-// expected-note @-2 {{backticks can escape this name if it is important to use}}
+// expected-note @-2 {{if this name is unavoidable, use backticks to escape it}}
 import where Swift.Int // expected-error {{expected identifier}}
 // expected-error @-1 {{keyword 'where' cannot be used as an identifier here}}
-// expected-note @-2 {{backticks can escape this name if it is important to use}}
+// expected-note @-2 {{if this name is unavoidable, use backticks to escape it}}
 import 2 // expected-error {{expected identifier}}
 
 import really.nonexistent // expected-error {{no such module 'really.nonexistent'}}

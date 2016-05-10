@@ -92,8 +92,8 @@ class VarTester {
 
 func repeat() {}
 // expected-error @-1 {{keyword 'repeat' cannot be used as an identifier here}}
-// expected-note @-2 {{backticks can escape this name if it is important to use}}
+// expected-note @-2 {{if this name is unavoidable, use backticks to escape it}} {{6-12=`repeat`}}
 
 let for = 2
 // expected-error @-1 {{keyword 'for' cannot be used as an identifier here}}
-// expected-note @-2 {{backticks can escape this name if it is important to use}}
+// expected-note @-2 {{if this name is unavoidable, use backticks to escape it}} {{5-8=`for`}}
