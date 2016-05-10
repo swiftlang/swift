@@ -1,4 +1,3 @@
-// REQUIRES: rdar26198927
 // A (no longer) basic test for debug info.
 // --------------------------------------------------------------------
 // Verify that we don't emit any debug info by default.
