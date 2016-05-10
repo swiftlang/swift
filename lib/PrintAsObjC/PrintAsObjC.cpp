@@ -807,7 +807,7 @@ private:
     Type objcType = ProtocolConformance::getTypeWitnessByName(
                       nominal->getDeclaredType(),
                       conformance,
-                      ctx.getIdentifier("_ObjectiveCType"),
+                      ctx.Id_ObjectiveCType,
                       nullptr);
     if (!objcType) return false;
 
