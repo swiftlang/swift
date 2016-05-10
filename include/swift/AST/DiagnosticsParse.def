@@ -659,8 +659,10 @@ ERROR(expected_rangle_protocol,PointsToFirstBadToken,
 
 ERROR(expected_pattern,PointsToFirstBadToken,
       "expected pattern", ())
-ERROR(expected_pattern_is_keyword,none,
-      "keyword '%0' cannot be used as an identifier", (StringRef))
+ERROR(keyword_cant_be_identifier,none,
+      "keyword '%0' cannot be used as an identifier here", (StringRef))
+NOTE(backticks_to_escape,none,
+     "backticks can escape this name if it is important to use", ())
 ERROR(expected_rparen_tuple_pattern_list,none,
       "expected ')' at end of tuple pattern", ())
 ERROR(untyped_pattern_ellipsis,none,

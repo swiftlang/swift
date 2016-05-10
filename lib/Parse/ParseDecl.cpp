@@ -1,3 +1,4 @@
+
 //===--- ParseDecl.cpp - Swift Language Parser for Declarations -----------===//
 //
 // This source file is part of the Swift.org open source project
@@ -2424,6 +2425,8 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
       break;
     default:
       diagnose(Tok, diag::expected_identifier_in_decl, "import");
+      diagnose(Tok, diag::keyword_cant_be_identifier, Tok.getText());
+      diagnose(Tok, diag::backticks_to_escape);
       return nullptr;
     }
     KindLoc = consumeToken();

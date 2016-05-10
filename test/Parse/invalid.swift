@@ -89,3 +89,11 @@ class VarTester {
         b += 10
     }
 }
+
+func repeat() {}
+// expected-error @-1 {{keyword 'repeat' cannot be used as an identifier here}}
+// expected-note @-2 {{backticks can escape this name if it is important to use}}
+
+let for = 2
+// expected-error @-1 {{keyword 'for' cannot be used as an identifier here}}
+// expected-note @-2 {{backticks can escape this name if it is important to use}}
