@@ -15,10 +15,25 @@
 //===----------------------------------------------------------------------===//
 // Standardized aliases
 //===----------------------------------------------------------------------===//
-/// The empty tuple type.
+/// The return type of functions that don't explicitly specify a return type;
+/// an empty tuple (i.e., `()`).
 ///
-/// This is the default return type of functions for which no explicit
-/// return type is specified.
+/// When declaring a function or method, you don't need to specify a return
+/// type if no value will be returned. However, the type of a function,
+/// method, or closure always includes a return type, which is `Void` if
+/// otherwise unspeficied.
+///
+/// Use `Void` or an empty tuple as the return type when declaring a
+/// closure, function, or method that doesn't return a value.
+///
+///     // No return type declared:
+///     func logMessage(s: String) {
+///         print("Message: \(s)")
+///     }
+///
+///     let logger: String -> Void = logMessage
+///     logger("This is a void function")
+///     // Prints "Message: This is a void function"
 public typealias Void = ()
 
 //===----------------------------------------------------------------------===//
@@ -39,8 +54,21 @@ public typealias Float64 = Double
 public typealias IntegerLiteralType = Int
 /// The default type for an otherwise-unconstrained floating point literal.
 public typealias FloatLiteralType = Double
+
 /// The default type for an otherwise-unconstrained Boolean literal.
+///
+/// When you create a constant or variable using one of the Boolean literals
+/// `true` or `false`, the resulting type is determined by the
+/// `BooleanLiteralType` alias. For example:
+///
+///     let isBool = true
+///     print("isBool is a '\(isBool.dynamicType)'")
+///     // Prints "isBool is a 'Bool'"
+///
+/// The type aliased by `BooleanLiteralType` must conform to the
+/// `BooleanLiteralConvertible` protocol.
 public typealias BooleanLiteralType = Bool
+
 /// The default type for an otherwise-unconstrained unicode scalar literal.
 public typealias UnicodeScalarType = String
 /// The default type for an otherwise-unconstrained Unicode extended
@@ -71,40 +99,224 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 //===----------------------------------------------------------------------===//
 
 /// The protocol to which all types implicitly conform.
+///
+/// The `Any` protocol can be used as the concrete type for an instance of any
+/// type in Swift: a class, struct, or enumeration; a metatype, such as
+/// `Int.self`; a tuple with any types of components; or a closure or function
+/// type.
+///
+/// Casting Any Instances to a Known Type
+/// =====================================
+///
+/// When you use `Any` as a concrete type, you must cast your instance back to
+/// a known type before you can access its properties or methods. Instances
+/// with a concrete type of `Any` maintain their original dynamic type and can
+/// be cast to that type using one of the type-cast operators (`as`, `as?`, or
+/// `as!`). 
+/// 
+/// For example, use `as?` to conditionally downcast the first object
+/// in an heterogenous array to a `String`.
+///
+///     let mixed: [Any] = ["one", "two", 3, true, {(x: Int) -> Int in x * 2 }]
+///
+///     let first = = numberObjects.firstObject
+///     if let first = mixed.first as? String {
+///         print("The first item, '\(first)', is a String")
+///     }
+///     // Prints("The first item, 'one', is a String")
+///
+/// If you have prior knowledge that an `Any` instance is an instance of
+/// a particular type, you can use the `as!` operator to unconditionally
+/// downcast. Performing an invalid cast results in a runtime error.
+///
+///     let second = mixed[1] as! String
+///     print("'\(second)' is also a String")
+///     // Prints "'two' is also a String"
+///
+/// In a `switch` statement, a value is cast to a type only when pattern
+/// matching with that type succeeds. For that reason, you use the `as`
+/// operator instead of the conditional `as?` or unconditional `as!`
+/// operators.
+///
+///     for item in mixed {
+///         switch item {
+///         case let s as String:
+///             print("String: \(s)")
+///         case let i as Int:
+///             print("Integer: \(i)")
+///         case let b as Bool:
+///             print("Bool: \(b)")
+///         case let f as Int -> Int:
+///             print("Function: 2 * 5 = \(f(5))")
+///         default:
+///             print("Unrecognized type")
+///         }
+///     }
+///     // Prints "String: one"
+///     // Prints "String: two"
+///     // Prints "Integer: 3"
+///     // Prints "Bool: true"
+///     // Prints "Function: 2 * 5 = 10"
+///     
+/// - SeeAlso: `AnyObject`, `AnyClass`
 public typealias Any = protocol<>
 
 #if _runtime(_ObjC)
 /// The protocol to which all classes implicitly conform.
 ///
-/// When used as a concrete type, all known `@objc` methods and
-/// properties are available, as implicitly-unwrapped-optional methods
-/// and properties respectively, on each instance of `AnyObject`.  For
-/// example:
+/// You use `AnyObject` when you need the flexibility of an untyped object or
+/// when you use bridged Objective-C methods and properties that return an
+/// untyped result. `AnyObject` can be used as the concrete type for an
+/// instance of any class, class type, or class-only protocol. For example:
 ///
-///     class C {
-///       @objc func getCValue() -> Int { return 42 }
+///     class FloatRef {
+///         let value: Float
+///         init(_ value: Float) {
+///             self.value = value
+///         }
 ///     }
 ///
-///     // If x has a method @objc getValue() -> Int, call it and
-///     // return the result.  Otherwise, return `nil`.
-///     func getCValue1(_ x: AnyObject) -> Int? {
-///       if let f: () -> Int = x.getCValue { // <===
-///         return f()
-///       }
-///       return nil
+///     let x = FloatRef(2.3)
+///     let y: AnyObject = x
+///     let z: AnyObject = FloatRef.self
+///
+/// `AnyObject` can also be used as the concrete type for an instance of a type
+/// that bridges to an Objective-C class. Many value types in Swift bridge to
+/// Objective-C counterparts, like `String` and `Int`.
+///
+///     let s: AnyObject = "This is a bridged string."
+///     print(s is NSString)
+///     // Prints "true"
+///
+///     let v: AnyObject = 100
+///     print(v.dynamicType)
+///     // Prints "__NSCFNumber"
+///
+/// The flexible behavior of the `AnyObject` protocol is similar to
+/// Objective-C's `id` type. For this reason, imported Objective-C types
+/// frequently use `AnyObject` as the type for properties, method parameters,
+/// and return values.
+///
+/// Casting AnyObject Instances to a Known Type
+/// ===========================================
+///
+/// Objects with a concrete type of `AnyObject` maintain a specific dynamic
+/// type and can be cast to that type using one of the type-cast operators
+/// (`as`, `as?`, or `as!`).
+///
+/// In the code samples that follow, the elements of the `NSArray` instance
+/// `numberObjects` have `AnyObject` as their type. The first example uses the
+/// `as?` (conditional downcast) operator to conditionally cast the first
+/// object in the `numberObjects` array to an instance of Swift's `String`
+/// type.
+///
+///     let numberObjects: NSArray = ["one", "two", 3, 4]
+///
+///     let first: AnyObject = numberObjects[0]
+///     if let first = first as? String {
+///         print("The first object, '\(first)', is a String")
+///     }
+///     // Prints("The first object, 'one', is a String")
+///
+/// If you have prior knowledge that an `AnyObject` instance has a particular
+/// type, you can use the `as!` (unconditional downcast) operator. Performing
+/// an invalid cast triggers a runtime error.
+///
+///     let second = numberObjects.object(at: 1) as! String
+///     print("'\(second)' is also a String")
+///     // Prints "'two' is also a String"
+///
+///     let badCase = numberObjects.object(at: 2) as! NSDate
+///     // Runtime error
+///
+/// Casting is always safe in the context of a `switch` statement.
+///
+///     for object in numberObjects {
+///         switch object {
+///         case let x as String:
+///             print("'\(x)' is a String")
+///         default:
+///             print("'\(object)' is not a String")
+///         }
+///     }
+///     // Prints "'one' is a String"
+///     // Prints "'two' is a String"
+///     // Prints "'3' is not a String"
+///     // Prints "'4' is not a String"
+///
+/// You can call a method that takes an `AnyObject` parameter with an instance
+/// of any class, `@objc` protocol, or type that bridges to Objective-C. In
+/// the following example, the `toFind` constant is of type `Int`, which
+/// bridges to `NSNumber` when passed to an `NSArray` method that expects an
+/// `AnyObject` parameter:
+///
+///     let toFind = 3
+///     let i = numberObjects.index(of: toFind)
+///     if i != NSNotFound {
+///         print("Found '\(numberObjects[i])' at index \(i)")
+///     } else {
+///         print("Couldn't find \(toFind)")
+///     }
+///     // Prints "Found '3' at index 2"
+///
+/// Accessing Objective-C Methods and Properties
+/// ============================================
+///
+/// When you use `AnyObject` as a concrete type, you have at your disposal
+/// every `@objc` method and property---that is, methods and properties
+/// imported from Objective-C or marked with the `@objc` attribute. Because
+/// Swift can't guarantee at compile time that these methods and properties
+/// are actually available on an `AnyObject` instance's underlying type, these
+/// `@objc` symbols are available as implicitly unwrapped optional methods and
+/// properties, respectively.
+///
+/// This example defines an `IntegerRef` type with an `@objc` method named
+/// `getIntegerValue`.
+///
+///     class IntegerRef {
+///         let value: Int
+///         init(_ value: Int) {
+///             self.value = value
+///         }
+///
+///         @objc func getIntegerValue() -> Int {
+///             return value
+///         }
 ///     }
 ///
-///     // A more idiomatic implementation using "optional chaining"
-///     func getCValue2(_ x: AnyObject) -> Int? {
-///       return x.getCValue?() // <===
+///     func getObject() -> AnyObject {
+///         return IntegerRef(100)
 ///     }
 ///
-///     // An implementation that assumes the required method is present
-///     func getCValue3(_ x: AnyObject) -> Int { // <===
-///       return x.getCValue() // x.getCValue is implicitly unwrapped. // <===
-///     }
+///     let x: AnyObject = getObject()
 ///
-/// - SeeAlso: `AnyClass`
+/// In the example, `x` has a static type of `AnyObject` and a dynamic type of
+/// `IntegerRef`. You can use optional chaining to call the `@objc` method
+/// `getIntegerValue()` on `x` safely. If you're sure of the dynamic type of
+/// `x`, you can call `getIntegerValue()` directly.
+///
+///     let possibleValue = x.getIntegerValue?()
+///     print(possibleValue)
+///     // Prints "Optional(100)"
+///
+///     let certainValue = x.getIntegerValue()
+///     print(certainValue)
+///     // Prints "100"
+///
+/// If the dynamic type of `x` doesn't implement a `getIntegerValue()` method,
+/// the system returns a runtime error when you initialize `certainValue`.
+///
+/// Alternatively, if you need to test whether `x.getValue()` exists, use
+/// optional binding before calling the method.
+///
+///     if let f = x.getIntegerValue {
+///         print("The value of 'x' is \(f())")
+///     } else {
+///         print("'x' does not have a 'getIntegerValue()' method")
+///     }
+///     // Prints "The value of 'x' is 100"
+///
+/// - SeeAlso: `AnyClass`, `Any`
 @objc
 public protocol AnyObject : class {}
 #else
@@ -124,22 +336,33 @@ public protocol AnyObject : class {}
 
 /// The protocol to which all class types implicitly conform.
 ///
-/// When used as a concrete type, all known `@objc` `class` methods and
-/// properties are available, as implicitly-unwrapped-optional methods
-/// and properties respectively, on each instance of `AnyClass`. For
-/// example:
+/// You can use the `AnyClass` protocol as the concrete type for an instance of
+/// any class. When you do, all known `@objc` class methods and properties are
+/// available as implicitly unwrapped optional methods and properties,
+/// respectively. For example:
 ///
-///     class C {
-///       @objc class var cValue: Int { return 42 }
+///     class IntegerRef {
+///         @objc class func getDefaultValue() -> Int {
+///             return 42
+///         }
 ///     }
 ///
-///     // If x has an @objc cValue: Int, return its value.
-///     // Otherwise, return `nil`.
-///     func getCValue(_ x: AnyClass) -> Int? {
-///       return x.cValue // <===
+///     func getDefaultValue(_ c: AnyClass) -> Int? {
+///         return c.getDefaultValue?()
 ///     }
 ///
-/// - SeeAlso: `AnyObject`
+/// The `getDefaultValue(_:)` function uses optional chaining to safely call
+/// the implicitly unwrapped class method on `c`. Calling the function with
+/// different class types shows how the `getDefaultValue()` class method is
+/// only conditionally available.
+///
+///     print(getDefaultValue(IntegerRef.self))
+///     // Prints "Optional(42)"
+///
+///     print(getDefaultValue(NSString.self))
+///     // Prints "nil"
+///
+/// - SeeAlso: `AnyObject`, `Any`
 public typealias AnyClass = AnyObject.Type
 
 /// Returns `true` iff `lhs` and `rhs` are references to the same object
