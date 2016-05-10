@@ -2090,10 +2090,6 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
   ASTContext &ctx = nominal->getASTContext();
 
-  // If the type is @objc, it is trivially representable in Objective-C.
-  if (nominal->isObjC() && language == ForeignLanguage::ObjectiveC)
-    return { ForeignRepresentableKind::Trivial, nullptr };
-
   // Unmanaged<T> can be trivially represented in Objective-C if T
   // is trivially represented in Objective-C.
   if (language == ForeignLanguage::ObjectiveC &&
@@ -2113,14 +2109,17 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
   // If the type was imported from Clang, check whether it is
   // representable in the requested language.
-  if (nominal->hasClangNode()) {
+  if (nominal->hasClangNode() || nominal->isObjC()) {
     switch (language) {
     case ForeignLanguage::C:
       // Imported structs and enums are trivially representable in C.
       // FIXME: This is not entirely true; we need to check that
       // all of the exposed parts are representable in C.
-      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
+      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
+        if (wasOptional)
+          break;
         return { ForeignRepresentableKind::Trivial, nullptr };
+      }
 
       // Imported classes and protocols are not.
       if (isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal))
@@ -2129,7 +2128,10 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       llvm_unreachable("Unhandled nominal type declaration");
 
     case ForeignLanguage::ObjectiveC:
-      // Anything Clang imported is trivially representable in Objective-C.
+      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
+        if (wasOptional)
+          break;
+
       return { ForeignRepresentableKind::Trivial, nullptr };
     }
   }

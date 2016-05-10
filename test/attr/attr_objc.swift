@@ -1106,6 +1106,7 @@ class infer_instanceVar1 {
   var var_Optional12: OpaquePointer?
   var var_Optional13: UnsafeMutablePointer<Int>?
   var var_Optional14: UnsafeMutablePointer<Class_ObjC1>?
+  var var_Optional15: NSRange? // another bridged struct
 
 // CHECK-LABEL: @objc var var_Optional1: Class_ObjC1?
 // CHECK-LABEL: @objc var var_Optional2: Protocol_ObjC1?
@@ -1121,6 +1122,7 @@ class infer_instanceVar1 {
 // CHECK-LABEL: @objc var var_Optional12: OpaquePointer?
 // CHECK-LABEL: @objc var var_Optional13: UnsafeMutablePointer<Int>?
 // CHECK-LABEL: @objc var var_Optional14: UnsafeMutablePointer<Class_ObjC1>?
+// CHECK-LABEL: @objc var var_Optional15: NSRange?
 
 
   var var_ImplicitlyUnwrappedOptional1: Class_ObjC1!
@@ -1159,6 +1161,7 @@ class infer_instanceVar1 {
   var var_Optional_fail14: CBool?
   var var_Optional_fail20: AnyObject??
   var var_Optional_fail21: AnyObject.Type??
+  var var_Optional_fail22: NSComparisonResult? // a non-bridged imported value type
 // CHECK-NOT: @objc{{.*}}Optional_fail
 
   // CHECK-LABEL: @objc var var_CFunctionPointer_1: @convention(c) () -> ()
