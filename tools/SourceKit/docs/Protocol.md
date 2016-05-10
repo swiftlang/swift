@@ -136,13 +136,17 @@ that have already been returned.
 ```
 entity ::=
 {
-    <key.kind>:             (UID)             // UID for the declaration or reference kind (function, class, etc.).
-    <key.name>:             (string)          // Displayed name for the entity.
-    <key.usr>:              (string)          // USR string for the entity.
-    <key.line>:             (int64)           // Line of the position of the entity in source contents.
-    <key.column>:           (int64)           // Column of the position of the entity in source contents.
-    [opt] <key.entities>:   (array) [entity+] // One or more entities contained in the particular entity (sub-classes, references, etc.).
-    [opt] <key.related>:    (array) [entity+] // One or more entities related with the particular entity (inherited classes, protocols, etc.).
+    <key.kind>:                   (UID)             // UID for the declaration or reference kind (function, class, etc.).
+    <key.name>:                   (string)          // Displayed name for the entity.
+    <key.usr>:                    (string)          // USR string for the entity.
+    <key.line>:                   (int64)           // Line of the position of the entity in source contents.
+    <key.column>:                 (int64)           // Column of the position of the entity in source contents.
+    [opt] <key.is_test_candidate> (bool)            // Whether the instance method matches what XCTest considers
+                                                    // to be a viable test: a class instance method that takes no
+                                                    // parameters, returns void, and begins with "test". This key
+                                                    // is only present if the value is true.
+    [opt] <key.entities>:         (array) [entity+] // One or more entities contained in the particular entity (sub-classes, references, etc.).
+    [opt] <key.related>:          (array) [entity+] // One or more entities related with the particular entity (inherited classes, protocols, etc.).
 }
 ```
 
