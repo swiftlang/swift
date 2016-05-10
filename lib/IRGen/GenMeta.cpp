@@ -3977,10 +3977,13 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
   auto *metadataTy = cast<llvm::PointerType>(metadata->getType());
 
   // Create the alias.
-  llvm::GlobalAlias::create(metadataTy->getElementType(),
-                            metadataTy->getAddressSpace(),
-                            metadata->getLinkage(), classSymbol.str(),
-                            metadata, IGM.getModule());
+  auto *alias = llvm::GlobalAlias::create(metadataTy->getElementType(),
+                                          metadataTy->getAddressSpace(),
+                                          metadata->getLinkage(),
+                                          classSymbol.str(), metadata,
+                                          IGM.getModule());
+  if (IGM.TargetInfo.OutputObjectFormat == llvm::Triple::COFF)
+    alias->setDLLStorageClass(metadata->getDLLStorageClass());
 }
 
 /// Emit the type metadata or metadata template for a class.
