@@ -39,7 +39,7 @@ class A {
   var v8: Int = 0  // expected-note {{attempt to override property here}}
   var v9: Int { return 5 } // expected-note{{attempt to override property here}}
 
-  subscript (i: Int) -> String {
+  subscript (i: Int) -> String { // expected-note{{potential overridden subscript 'subscript' here}}
     get {
       return "hello"
     }
@@ -48,7 +48,7 @@ class A {
     }
   }
 
-  subscript (d: Double) -> String { // expected-note{{overridden declaration is here}}
+  subscript (d: Double) -> String { // expected-note{{overridden declaration is here}} expected-note{{potential overridden subscript 'subscript' here}}
     get {
       return "hello"
     }
@@ -57,11 +57,11 @@ class A {
     }
   }
 
-  subscript (i: Int8) -> A {
+  subscript (i: Int8) -> A { // expected-note{{potential overridden subscript 'subscript' here}}
     get { return self }
   }
 
-  subscript (i: Int16) -> A { // expected-note{{attempt to override subscript here}}
+  subscript (i: Int16) -> A { // expected-note{{attempt to override subscript here}} expected-note{{potential overridden subscript 'subscript' here}}
     get { return self }
     set { }
   }
