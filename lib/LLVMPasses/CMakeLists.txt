@@ -5,6 +5,7 @@ add_swift_library(swiftLLVMPasses
   LLVMARCContract.cpp
   LLVMInlineTree.cpp
   LLVMStackPromotion.cpp
+  LLVMMergeFunctions.cpp
   )
 
 add_dependencies(swiftLLVMPasses LLVMAnalysis)
