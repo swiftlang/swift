@@ -468,69 +468,65 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
 
 ProtocolConformance *
 ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
-  // Preserve specialization through this operation by peeling off the
-  // substitutions from a specialized conformance so we can apply them later.
-  const ProtocolConformance *unspecialized;
-  SubstitutionIterator subs;
+  auto &C = getProtocol()->getASTContext();
+  // Preserve specialization and class inheritance through this operation by
+  // reapplying them to the conformance we find.
   switch (getKind()) {
   case ProtocolConformanceKind::Specialized: {
     auto spec = cast<SpecializedProtocolConformance>(this);
-    unspecialized = spec->getGenericConformance();
-    subs = spec->getGenericSubstitutionIterator();
-    break;
-  }
+    auto inherited = spec->getGenericConformance()
+      ->getInheritedConformance(protocol);
+    assert(inherited->getType()->isEqual(spec->getGenericConformance()->getType())
+           && "inherited conformance doesn't match type?!");
     
-  case ProtocolConformanceKind::Normal:
-  case ProtocolConformanceKind::Inherited:
-    unspecialized = this;
-    break;
-  }
-  
-  
-  ProtocolConformance *foundInherited;
-  
-  // Search for the inherited conformance among our immediate parents.
-  auto &inherited = unspecialized->getInheritedConformances();
-  auto known = inherited.find(protocol);
-  if (known != inherited.end()) {
-    foundInherited = known->second;
-    goto found_inherited;
-  }
-
-  // If not there, the inherited conformance must be available through one of
-  // our parents.
-  for (auto &inheritedMapping : inherited)
-    if (inheritedMapping.first->inheritsFrom(protocol)) {
-      foundInherited = inheritedMapping.second->
-        getInheritedConformance(protocol);
-      goto found_inherited;
-    }
-
-  llvm_unreachable("Can't find the inherited conformance.");
-
-found_inherited:
-  
-  // Specialize the inherited conformance, if necessary.
-  if (!subs.empty()) {
     TypeSubstitutionMap subMap;
     ArchetypeConformanceMap conformanceMap;
-
+    
     // Fill in the substitution and conformance maps.
-    for (auto archAndSub : subs) {
+    for (auto archAndSub : spec->getGenericSubstitutionIterator()) {
       auto arch = archAndSub.first;
       auto sub = archAndSub.second;
       conformanceMap[arch] = sub.getConformances();
       if (arch->isPrimary())
         subMap[arch] = sub.getReplacement();
     }
-    return foundInherited->subst(getDeclContext()->getParentModule(),
-                                 getType(), subs.getSubstitutions(),
-                                 subMap, conformanceMap);
+    auto r = inherited->subst(getDeclContext()->getParentModule(),
+                            getType(), spec->getGenericSubstitutions(),
+                            subMap, conformanceMap);
+    assert(getType()->isEqual(r->getType())
+           && "substitution didn't produce conformance for same type?!");
+    return r;
   }
-  assert((getType()->isEqual(foundInherited->getType()) ||
-          foundInherited->getType()->isExactSuperclassOf(getType(), nullptr))
-         && "inherited conformance does not match type");
-  return foundInherited;
+    
+  case ProtocolConformanceKind::Inherited: {
+    auto classInherited = cast<InheritedProtocolConformance>(this);
+    auto protoInherited = classInherited->getInheritedConformance()
+      ->getInheritedConformance(protocol);
+    assert(protoInherited->getType()->isEqual(
+                           classInherited->getInheritedConformance()->getType())
+           && "inherited conformance doesn't match type?!");
+    return C.getInheritedConformance(classInherited->getType(),
+                                     protoInherited);
+  }
+
+  case ProtocolConformanceKind::Normal:
+    // For a normal conformance, do the inheritance lookup.
+    break;
+  }
+  
+  // Search for the inherited conformance among our immediate parents.
+  auto &inherited = getInheritedConformances();
+  auto known = inherited.find(protocol);
+  if (known != inherited.end())
+    return known->second;
+
+  // If not there, the inherited conformance must be available through one of
+  // our parents.
+  for (auto &inheritedMapping : inherited)
+    if (inheritedMapping.first->inheritsFrom(protocol))
+      return inheritedMapping.second->getInheritedConformance(protocol);
+
+  llvm_unreachable("Can't find the inherited conformance.");
 }
 
 #pragma mark Protocol conformance lookup
