@@ -454,12 +454,16 @@ private:
     case MetadataSourceKind::ClosureBinding: {
       unsigned Index = cast<ClosureBindingMetadataSource>(MS)->getIndex();
 
-      // Skip the context's isa pointer.
+      // Skip the context's isa pointer (4 or 8 bytes) and reference counts
+      // (4 bytes each regardless of platform word size). This is just
+      // sizeof(HeapObject) in the target.
       //
-      // Metadata bindings are stored consecutively at the beginning of the
-      // closure context.
-      unsigned Offset = ((sizeof(StoredPointer) == 4 ? 12 : 16) +
-                         sizeof(StoredPointer) * Index);
+      // Metadata and conformance tables are stored consecutively after
+      // the heap object header, in the 'necessary bindings' area.
+      //
+      // We should only have the index of a type metadata record here.
+      unsigned Offset = sizeof(StoredPointer) + 8 +
+                        sizeof(StoredPointer) * Index;
 
       StoredPointer MetadataAddress;
       if (!getReader().readInteger(RemoteAddress(Context + Offset),
