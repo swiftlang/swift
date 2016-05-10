@@ -7,10 +7,11 @@ set(SourceKitSupport_sources
   UIDRegistry.cpp
 )
 
+set(SourceKitSupport_Darwin_sources
+  Concurrency-Mac.cpp)
+set(LLVM_OPTIONAL_SOURCES ${SourceKitSupport_Darwin_sources})
 if(APPLE)
-  list(APPEND SourceKitSupport_sources
-    Concurrency-Mac.cpp
-  )
+  list(APPEND SourceKitSupport_sources ${SourceKitSupport_Darwin_sources})
 endif()
 
 add_sourcekit_library(SourceKitSupport
