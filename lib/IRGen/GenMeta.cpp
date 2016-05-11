@@ -1981,11 +1981,16 @@ llvm::Value *IRGenFunction::emitTypeLayoutRef(SILType type) {
 
 void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("unknown object format");
   case llvm::Triple::MachO:
-    var->setSection("__TEXT, __const");
+    var->setSection("__TEXT,__const");
     break;
-  // TODO: ELF?
-  default:
+  case llvm::Triple::ELF:
+    var->setSection(".rodata");
+    break;
+  case llvm::Triple::COFF:
+    var->setSection(".rdata");
     break;
   }
 }
