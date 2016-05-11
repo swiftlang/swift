@@ -11,8 +11,8 @@ b as! Derived
 b 
 
 var opti : Int?
-// Don't add bang.
-var i : Int = opti
+// Add bang.
+var i : Int = opti!
 // But remove unnecessary bang.
 var i2 : Int = i
 
