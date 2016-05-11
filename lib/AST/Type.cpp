@@ -24,6 +24,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -2112,25 +2113,23 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   if (nominal->hasClangNode() || nominal->isObjC()) {
     switch (language) {
     case ForeignLanguage::C:
-      // Imported structs and enums are trivially representable in C.
-      // FIXME: This is not entirely true; we need to check that
-      // all of the exposed parts are representable in C.
-      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
-        if (wasOptional)
-          break;
-        return { ForeignRepresentableKind::Trivial, nullptr };
-      }
-
-      // Imported classes and protocols are not.
+      // Imported classes and protocols are not representable in C.
       if (isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal))
         return failure();
-
-      llvm_unreachable("Unhandled nominal type declaration");
+      SWIFT_FALLTHROUGH;
 
     case ForeignLanguage::ObjectiveC:
-      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
-        if (wasOptional)
+      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
+        // Optional structs are not representable in (Objective-)C if they
+        // originally came from C, whether or not they are bridged. If they
+        // are defined in Swift, they are only representable if they are
+        // bridged (checked below).
+        if (wasOptional) {
+          if (nominal->hasClangNode())
+            return failure();
           break;
+        }
+      }
 
       return { ForeignRepresentableKind::Trivial, nullptr };
     }
