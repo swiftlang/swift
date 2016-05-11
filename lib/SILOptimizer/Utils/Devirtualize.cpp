@@ -441,7 +441,7 @@ getSubstitutionsForCallee(SILModule &M, CanSILFunctionType GenCalleeType,
   return Subs;
 }
 
-static SILFunction *getTargetClassMethod(SILModule &M,
+SILFunction *swift::getTargetClassMethod(SILModule &M,
                                          SILType ClassOrMetatypeType,
                                          MethodInst *MI) {
   assert((isa<ClassMethodInst>(MI) || isa<WitnessMethodInst>(MI) ||
@@ -507,6 +507,14 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   if (!F) {
     DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
                           "vtable method for this class.\n");
+    return false;
+  }
+
+  if (!F->shouldOptimize()) {
+    // Do not consider functions that should not be optimized.
+    DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function "
+                       << " because it is marked no-opt: " << F->getName()
+                       << "\n");
     return false;
   }
 
