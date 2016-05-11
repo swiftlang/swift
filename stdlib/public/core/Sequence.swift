@@ -878,13 +878,8 @@ extension Sequence {
       return result
     }
 
-    var hitEnd = false
     var iterator = self.makeIterator()
-    while true {
-      guard let element = iterator.next() else {
-        hitEnd = true
-        break
-      }
+    while let element = iterator.next() {
       if try isSeparator(element) {
         if !appendSubsequence() {
           continue
@@ -896,10 +891,8 @@ extension Sequence {
         subSequence.append(element)
       }
     }
-    if !hitEnd {
-      while let element = iterator.next() {
-        subSequence.append(element)
-      }
+    while let element = iterator.next() {
+      subSequence.append(element)
     }
     appendSubsequence()
     return result
