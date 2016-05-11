@@ -127,28 +127,3 @@ extension LazyCollectionProtocol
     return self.map(transform).filter { $0 != nil }.map { $0! }
   }
 }
-
-extension LazyCollectionProtocol
-  where
-  Self : RandomAccessCollection,
-  Elements : RandomAccessCollection
-{
-  /// Returns a `LazyMapRandomAccessCollection` containing the concatenated non-nil
-  /// results of mapping transform over this collection.  The elements of
-  /// the result are computed lazily, each time they are read.
-  ///
-  /// Use this method to receive only nonoptional values when your
-  /// transformation produces an optional value.
-  ///
-  /// - Parameter transform: A closure that accepts an element of this
-  /// collection as its argument and returns an optional value.
-  public func flatMap<U>(
-    _ transform: (Self.Elements.Iterator.Element) -> U?
-  ) -> LazyMapRandomAccessCollection<
-    LazyFilterRandomAccessCollection<
-      LazyMapRandomAccessCollection<Self.Elements, U?>>,
-    U
-  > {
-    return self.map(transform).filter { $0 != nil }.map { $0! }
-  }
-}

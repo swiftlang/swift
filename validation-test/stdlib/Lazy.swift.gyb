@@ -1161,20 +1161,6 @@ tests.test("LazyFilterBidirectionalCollection/AssociatedTypes") {
     indicesType: DefaultBidirectionalIndices<Subject>.self)
 }
 
-tests.test("LazyFilterRandomAccessCollection/AssociatedTypes") {
-  typealias Base = MinimalRandomAccessCollection<OpaqueValue<Int>>
-  typealias Subject = LazyFilterRandomAccessCollection<Base>
-  expectRandomAccessCollectionAssociatedTypes(
-    collectionType: Subject.self,
-    iteratorType: LazyFilterIterator<Base.Iterator>.self,
-    // FIXME(ABI): SubSequence should be `LazyFilterRandomAccessCollection<Base.Slice>`.
-    subSequenceType: RandomAccessSlice<Subject>.self,
-    indexType: LazyFilterIndex<Base>.self,
-    indexDistanceType: Base.IndexDistance.self,
-    indicesType: DefaultRandomAccessIndices<Subject>.self)
-}
-
-
 tests.test("lazy.filter/TypeInference") {
   let baseArray: [OpaqueValue<Int>] = (0..<10).map(OpaqueValue.init)
   do {
@@ -1204,7 +1190,7 @@ tests.test("lazy.filter/TypeInference") {
     var filtered = MinimalRandomAccessCollection(elements: baseArray)
       .lazy.filter { _ in true }
     expectType(
-      LazyFilterRandomAccessCollection<
+      LazyFilterBidirectionalCollection<
         MinimalRandomAccessCollection<OpaqueValue<Int>>
       >.self,
       &filtered)
@@ -1297,22 +1283,5 @@ do {
   }
 }
 
-% for Traversal in TRAVERSALS:
-%		TraversalCollection = collectionForTraversal(Traversal)
-tests.test("${TraversalCollection}/lazy/flatMap") {
-	let sample = (0..<100)
-	let expected = sample.filter { $0 % 3 != 0 }.map { String($0) }
-	let base = Minimal${TraversalCollection}(elements: sample).lazy
-
-	var calls = 0
-	let mapped = sample.lazy.flatMap { (x) -> String? in
-		calls += 1
-		return x % 3 != 0 ? String(x) : nil
-	}
-	expectEqual(0, calls, "unexpected eagerness in \(base.dynamicType).flatMap")
-	
-	checkSequence(expected, mapped, resiliencyChecks: .none)
-}
-%end
-
 runAllTests()
+

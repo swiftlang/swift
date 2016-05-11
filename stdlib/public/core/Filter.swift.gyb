@@ -165,7 +165,7 @@ public func > <Base : Collection>(
 // collapsed into one `LazyFilterCollection` using conditional conformances.
 // Maybe even combined with `LazyFilterSequence`.
 
-% for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
+% for Traversal in ['Forward', 'Bidirectional']:
 %   Self = "LazyFilter" + collectionForTraversal(Traversal)
 %   Slice = sliceTypeName(traversal=Traversal, mutable=False, rangeReplaceable=False)
 
@@ -244,7 +244,7 @@ public struct ${Self}<
     i = LazyFilterIndex(base: index)
   }
 
-%   if Traversal == 'Bidirectional' or Traversal == 'RandomAccess':
+%   if Traversal == 'Bidirectional':
   @warn_unused_result
   public func index(before i: Index) -> Index {
     var i = i
@@ -315,7 +315,7 @@ extension LazySequenceProtocol {
   }
 }
 
-% for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
+% for Traversal in ['Forward', 'Bidirectional']:
 
 extension LazyCollectionProtocol
   where
