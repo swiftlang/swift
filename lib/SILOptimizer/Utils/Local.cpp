@@ -621,13 +621,16 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     return CastedValue;
   }
 
-  if (isa<AnyMetatypeType>(SrcTy.getSwiftRValueType()) &&
-      isa<AnyMetatypeType>(DestTy.getSwiftRValueType())) {
-    // Cast between two metatypes and that's it.
-    if (CheckOnly)
-      return Value;
-    CastedValue = B->createUncheckedBitCast(Loc, Value, DestTy);
-    return CastedValue;
+  if (auto mt1 = dyn_cast<AnyMetatypeType>(SrcTy.getSwiftRValueType())) {
+    if (auto mt2 = dyn_cast<AnyMetatypeType>(DestTy.getSwiftRValueType())) {
+      if (mt1->getRepresentation() == mt2->getRepresentation()) {
+        // Cast between two metatypes and that's it.
+        if (CheckOnly)
+          return Value;
+        CastedValue = B->createUncheckedBitCast(Loc, Value, DestTy);
+        return CastedValue;
+      }
+    }
   }
 
   if (SrcTy.isAddress() && DestTy.isAddress()) {
