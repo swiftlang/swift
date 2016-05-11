@@ -409,6 +409,15 @@ static bool tryToSpeculateTarget(FullApplySite AI,
 
   // Try to devirtualize the static class of instance
   // if it is possible.
+  if (auto F = getTargetClassMethod(M, SubType, CMI)) {
+    // Do not devirtualize if a method in the base class is marked
+    // as non-optimizable. This way it is easy to disable the
+    // devirtualization of this method in the base class and
+    // any classes derived from it.
+    if (!F->shouldOptimize())
+      return false;
+  }
+
   auto FirstAI = speculateMonomorphicTarget(AI, SubType, LastCCBI);
   if (FirstAI) {
     Changed = true;

@@ -441,16 +441,20 @@ getSubstitutionsForCallee(SILModule &M, CanSILFunctionType GenCalleeType,
   return Subs;
 }
 
-static SILFunction *getTargetClassMethod(SILModule &M,
+SILFunction *swift::getTargetClassMethod(SILModule &M,
                                          SILType ClassOrMetatypeType,
-                                         SILDeclRef Member) {
+                                         MethodInst *MI) {
+  assert((isa<ClassMethodInst>(MI) || isa<WitnessMethodInst>(MI) ||
+          isa<SuperMethodInst>(MI)) &&
+         "Only class_method and witness_method instructions are supported");
+
+  SILDeclRef Member = MI->getMember();
   if (ClassOrMetatypeType.is<MetatypeType>())
     ClassOrMetatypeType = ClassOrMetatypeType.getMetatypeInstanceType(M);
 
   auto *CD = ClassOrMetatypeType.getClassOrBoundGenericClass();
   return M.lookUpFunctionInVTable(CD, Member);
 }
-
 
 /// \brief Check if it is possible to devirtualize an Apply instruction
 /// and a class member obtained using the class_method instruction into
@@ -473,13 +477,21 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   auto *MI = cast<MethodInst>(AI.getCallee());
 
   // Find the implementation of the member which should be invoked.
-  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, MI->getMember());
+  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, MI);
 
   // If we do not find any such function, we have no function to devirtualize
   // to... so bail.
   if (!F) {
     DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
                           "vtable method for this class.\n");
+    return false;
+  }
+
+  if (!F->shouldOptimize()) {
+    // Do not consider functions that should not be optimized.
+    DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function "
+                       << " because it is marked no-opt: " << F->getName()
+                       << "\n");
     return false;
   }
 
@@ -547,7 +559,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   SILModule &Mod = AI.getModule();
   auto *MI = cast<MethodInst>(AI.getCallee());
   auto ClassOrMetatypeType = ClassOrMetatype->getType();
-  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, MI->getMember());
+  auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, MI);
 
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
 
