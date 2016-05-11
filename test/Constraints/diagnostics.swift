@@ -583,7 +583,7 @@ func r21684487() {
   var closures = Array<MyClosure>()
   let testClosure = {(list: [Int]) -> Bool in return true}
   
-  let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot convert value of type '([Int]) -> Bool' to expected argument type 'AnyObject?'}}
+  let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot check reference equality of functions; operands here have types '_' and '([Int]) -> Bool'}}
 }
 
 // <rdar://problem/18397777> QoI: special case comparisons with nil
@@ -749,8 +749,8 @@ if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{binary operator '=
 func r24251022() {
   var a = 1
   var b: UInt32 = 2
-  a += a +
-    b // expected-error {{cannot convert value of type 'UInt32' to expected argument type 'Int'}}
+  a += a + // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{expected an argument list of type '(Int, Int)'}}
+    b
 }
 
 func overloadSetResultType(_ a : Int, b : Int) -> Int {

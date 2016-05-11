@@ -1806,8 +1806,8 @@ public:
 
   /// Diagnose common failures due to applications of an argument list to an
   /// ApplyExpr or SubscriptExpr.
-  bool diagnoseParameterErrors(CalleeCandidateInfo &CCI, Expr *fnExpr,
-                               Expr *argExpr);
+  bool diagnoseParameterErrors(CalleeCandidateInfo &CCI,
+                               Expr *fnExpr, Expr *argExpr);
 
   /// Attempt to diagnose a specific failure from the info we've collected from
   /// the failed constraint system.
@@ -2904,6 +2904,12 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
       TCEOptions |= TypeCheckExprFlags::PreferForceUnwrapToOptional;
   }
 
+  // Ensure that the expression we're about to type-check doesn't have
+  // anything that the type-checker doesn't expect to see.  This can happen
+  // because of repeated type-checking; the removal below, while independently
+  // important, isn't itself sufficient because of AST mutation.
+  eraseOpenedExistentials(subExpr);
+
   bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC,
                                              TypeLoc::withoutLoc(convertType),
                                              convertTypePurpose, TCEOptions,
@@ -3334,6 +3340,28 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
                             diag::assignment_lhs_not_lvalue);
 }
 
+static bool isSymmetricBinaryOperator(const CalleeCandidateInfo &CCI) {
+  // If we don't have at least one known candidate, don't trigger.
+  if (CCI.candidates.empty()) return false;
+
+  for (auto &candidate : CCI.candidates) {
+    // Each candidate must be a non-assignment operator function.
+    auto decl = dyn_cast_or_null<FuncDecl>(candidate.getDecl());
+    if (!decl) return false;
+    auto op = dyn_cast_or_null<InfixOperatorDecl>(decl->getOperatorDecl());
+    if (!op || op->isAssignment()) return false;
+
+    // It must have exactly two parameters.
+    auto params = decl->getParameterLists().back();
+    if (params->size() != 2) return false;
+
+    // Require the types to be the same.
+    if (!params->get(0)->getType()->isEqual(params->get(1)->getType()))
+      return false;
+  }
+
+  return true;
+}
 
 /// Special magic to handle inout exprs and tuples in argument lists.
 Expr *FailureDiagnosis::
@@ -3364,6 +3392,11 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
       if (decl->isInstanceMember() && candidates[0].level == 0 &&
           !isa<SubscriptDecl>(decl))
         argType = Type();
+
+  // Similarly, we get better results when we don't push argument types down
+  // to symmetric operators.
+  if (argType && isSymmetricBinaryOperator(candidates))
+    argType = Type();
   
 
   // FIXME: This should all just be a matter of getting the type of the
@@ -3735,12 +3768,17 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
   // (often because there is only one candidate in the set), then diagnose this
   // as a specific problem of passing something of the wrong type into a
   // parameter.
+  //
+  // We don't generally want to use this path to diagnose calls to
+  // symmetrically-typed binary operators because it's likely that both
+  // operands contributed to the type.
   if ((CCI.closeness == CC_OneArgumentMismatch ||
        CCI.closeness == CC_OneArgumentNearMismatch ||
        CCI.closeness == CC_OneGenericArgumentMismatch ||
        CCI.closeness == CC_OneGenericArgumentNearMismatch ||
        CCI.closeness == CC_GenericNonsubstitutableMismatch) &&
-      CCI.failedArgument.isValid()) {
+      CCI.failedArgument.isValid() &&
+      !isSymmetricBinaryOperator(CCI)) {
     // Map the argument number into an argument expression.
     TCCOptions options = TCC_ForceRecheck;
     if (CCI.failedArgument.parameterType->is<InOutType>())
@@ -4160,6 +4198,18 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         .highlight(lhsExpr->getSourceRange())
         .highlight(rhsExpr->getSourceRange());
       return true;
+    }
+
+    // Diagnose attempts to compare reference equality of certain types.
+    if (overloadName == "===" || overloadName == "!==") {
+      // Functions.
+      if (lhsType->is<AnyFunctionType>() || rhsType->is<AnyFunctionType>()) {
+        diagnose(callExpr->getLoc(), diag::cannot_reference_compare_types,
+                 overloadName, lhsType, rhsType)
+          .highlight(lhsExpr->getSourceRange())
+          .highlight(rhsExpr->getSourceRange());
+        return true;
+      }
     }
     
     // If we found an exact match, this must be a problem with a conversion from

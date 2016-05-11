@@ -138,6 +138,11 @@ ERROR(cannot_match_expr_pattern_with_value,none,
       "expression pattern of type %0 cannot match values of type %1",
       (Type, Type))
 
+ERROR(cannot_reference_compare_types,none,
+      "cannot check reference equality of functions; operands here have types "
+      "%1 and %2",
+      (StringRef, Type, Type))
+
 ERROR(cannot_apply_binop_to_args,none,
       "binary operator '%0' cannot be applied to operands of type "
       "%1 and %2",

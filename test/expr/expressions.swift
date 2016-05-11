@@ -51,7 +51,7 @@ func basictest() {
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
 
 
-  var x9 : Int16 = x8 + 1 // expected-error{{cannot convert value of type 'Int8' to expected argument type 'Int16'}}
+  var x9 : Int16 = x8 + 1 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int8' and 'Int'}} expected-note {{expected an argument list of type '(Int16, Int16)'}}
 
   // Various tuple types.
   var tuple1 : ()
@@ -114,7 +114,7 @@ func funcdecl7(_ a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
 // Error recovery.
 func testfunc2 (_: ((), Int) -> Int) -> Int {}
 func errorRecovery() {
-  testfunc2({ $0 + 1 }) // expected-error{{cannot convert value of type '((), Int)' to expected argument type 'Int'}}
+  testfunc2({ $0 + 1 }) // expected-error {{binary operator '+' cannot be applied to operands of type '((), Int)' and 'Int'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
   enum union1 {
     case bar
@@ -725,11 +725,11 @@ func testOptionalTypeParsing(_ a : AnyObject) -> String {
 func testParenExprInTheWay() {
   let x = 42
   
-  if x & 4.0 {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  if x & 4.0 {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
-  if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  if (x & 4.0) {}   // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
-  if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  if !(x & 4.0) {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
   
   if x & x {} // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
