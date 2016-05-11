@@ -12,12 +12,15 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
-// RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
-// RUN: %target-build-swift %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror
+// RUN: if [ %target-runtime == "objc" ]; \
+// RUN: then \
+// RUN:   %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g && \
+// RUN:   %target-build-swift %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror; \
+// RUN: else \
+// RUN:   %target-build-swift %s -o %t/Mirror; \
+// RUN: fi
 // RUN: %target-run %t/Mirror
 // REQUIRES: executable_test
-
-// XFAIL: linux
 
 import StdlibUnittest
 
@@ -354,6 +357,7 @@ mirrors.test("class/CustomizedSuper/Synthesized") {
   }
 }
 
+#if _runtime(_ObjC)
 import Foundation
 
 //===--- ObjC Base Classes ------------------------------------------------===//
@@ -461,6 +465,7 @@ mirrors.test("class/ObjCCustomizedSuper/Synthesized") {
     }
   }
 }
+#endif // _runtime(_ObjC)
 
 //===--- Suppressed Superclass Mirrors ------------------------------------===//
 mirrors.test("Class/Root/NoSuperclassMirror") {
@@ -717,7 +722,10 @@ mirrors.test("PlaygroundQuickLook") {
   struct X {}
   switch PlaygroundQuickLook(reflecting: X()) {
   case .text(let text):
+#if _runtime(_ObjC)
+// FIXME: Enable if non-objc hasSuffix is implemented.
     expectTrue(text.hasSuffix(".(X #1)()"), text)
+#endif
   default:
     expectTrue(false)
   }
@@ -759,6 +767,7 @@ mirrors.test("_DefaultCustomPlaygroundQuickLookable") {
   }
 }
 
+#if _runtime(_ObjC)
 import MirrorObjC
 mirrors.test("ObjC") {
   // Some Foundation classes lie about their ivars, which would crash
@@ -766,6 +775,7 @@ mirrors.test("ObjC") {
   // Objective-C classes from the default mirror implementation.
   expectEqual(0, Mirror(reflecting: HasIVars()).children.count)
 }
+#endif
 
 mirrors.test("String.init") {
   expectEqual("42", String(42))
