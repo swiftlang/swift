@@ -475,6 +475,14 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     return CastedValue;
   }
 
+  if (SrcTy.isAddress() != DestTy.isAddress()) {
+    // Addresses aren't compatible with values.
+    if (CheckOnly)
+      return None;
+    llvm_unreachable("Addresses aren't compatible with values");
+    return SILValue();
+  }
+
   auto &M = B->getModule();
   OptionalTypeKind SrcOTK;
   OptionalTypeKind DestOTK;
