@@ -21,6 +21,7 @@ CGFloatTestSuite.test("init") {
   expectEqual(0.0, CGFloat())
   expectEqual(4.125, CGFloat(Float(4.125)))
   expectEqual(4.125, CGFloat(Double(4.125)))
+  expectEqual(4.125, CGFloat(CGFloat(Double(4.125))))
 
   expectEqual(42, CGFloat(Int(42)))
   expectEqual(42, CGFloat(Int8(42)))

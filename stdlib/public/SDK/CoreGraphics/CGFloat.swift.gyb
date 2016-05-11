@@ -46,6 +46,11 @@ public struct CGFloat {
     self.native = NativeType(value)
   }
 
+  @_transparent
+  public init(_ value: CGFloat) {
+    self = value
+  }
+
   /// The native value.
   public var native: NativeType
 }
