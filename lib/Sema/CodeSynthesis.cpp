@@ -2040,14 +2040,11 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                     ClassDecl *classDecl,
                                     ConstructorDecl *superclassCtor,
                                     DesignatedInitKind kind) {
-  // Determine the initializer parameters.
-  Type superInitType = superclassCtor->getInitializerInterfaceType();
-  if (superInitType->is<GenericFunctionType>() ||
-      classDecl->getGenericParamsOfContext()) {
-    // FIXME: Handle generic initializers as well.
+  // FIXME: Inheriting initializers that have their own generic parameters
+  if (superclassCtor->getGenericParams())
     return nullptr;
-  }
 
+  // Determine the initializer parameters.
   auto &ctx = tc.Context;
 
   // Create the 'self' declaration and patterns.
@@ -2057,8 +2054,40 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   OptionSet<ParameterList::CloneFlags> options = ParameterList::Implicit;
   options |= ParameterList::Inherited;
   auto *bodyParams = superclassCtor->getParameterList(1)->clone(ctx,options);
-  
-  // Create the initializer declaration.
+
+  // If the superclass is generic, we need to map the superclass constructor's
+  // parameter types into the generic context of our class.
+  //
+  // We might have to apply substitutions, if for example we have a declaration
+  // like 'class A : B<Int>'.
+  auto superclassTy = classDecl->getSuperclass();
+  auto *superclassDecl = superclassTy->getAnyNominal();
+  if (superclassDecl->isGenericTypeContext()) {
+    if (auto *superclassSig = superclassDecl->getGenericSignatureOfContext()) {
+      auto *moduleDecl = classDecl->getParentModule();
+      auto subs = superclassTy->gatherAllSubstitutions(
+          moduleDecl, nullptr, nullptr);
+      auto subsMap = superclassSig->getSubstitutionMap(subs);
+
+      for (auto *decl : *bodyParams) {
+        // Map the parameter type to an interface type written in terms of
+        // the superclass generic signature.
+        auto paramTy = ArchetypeBuilder::mapTypeOutOfContext(
+            superclassDecl, decl->getType());
+
+        // Apply the superclass substitutions to produce an interface
+        // type in terms of the class generic signature.
+        auto paramSubstTy = paramTy.subst(moduleDecl, subsMap, SubstOptions());
+
+        // Map it to a contextual type in terms of the class's archetypes.
+        decl->overwriteType(ArchetypeBuilder::mapTypeIntoContext(
+            classDecl, paramSubstTy));
+      }
+    }
+  }
+
+  // Create the initializer declaration, inheriting the name,
+  // failability, and throws from the superclass initializer.
   auto ctor =
     new (ctx) ConstructorDecl(superclassCtor->getFullName(),
                               classDecl->getBraces().Start,
@@ -2068,20 +2097,27 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                               /*ThrowsLoc=*/SourceLoc(),
                               selfDecl, bodyParams,
                               /*GenericParams=*/nullptr, classDecl);
+
   ctor->setImplicit();
   ctor->setAccessibility(std::min(classDecl->getFormalAccess(),
                                   superclassCtor->getFormalAccess()));
 
   // Make sure the constructor is only as available as its superclass's
   // constructor.
-  AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor,
-                                                        ctx);
+  AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor, ctx);
 
   // Configure 'self'.
   auto selfType = configureImplicitSelf(tc, ctor);
 
-  // Set the type of the initializer.
+  // Set the interface type of the initializer.
+  if (classDecl->isGenericTypeContext()) {
+    ctor->setGenericSignature(classDecl->getGenericSignatureOfContext());
+    tc.configureInterfaceType(ctor);
+  }
+
+  // Set the contextual type of the initializer. This will go away one day.
   configureConstructorType(ctor, selfType, bodyParams->getType(ctx));
+
   if (superclassCtor->isObjC()) {
     // Inherit the @objc name from the superclass initializer, if it
     // has one.

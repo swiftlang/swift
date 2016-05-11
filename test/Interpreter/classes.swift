@@ -173,20 +173,37 @@ print((b as Bank).deposit(Account(owner: "A")))
 
 // rdar://25412647
 
-private class Parent <T> {
-    func doSomething() {
-        overriddenMethod()
-    }
+private class Parent<T> {
+  required init() {}
 
-    func overriddenMethod() {
-        fatalError("You should override this method in child class")
-    }
+  func doSomething() {
+    overriddenMethod()
+  }
+
+  func overriddenMethod() {
+    fatalError("You should override this method in child class")
+  }
 }
 
 private class Child: Parent<String> {
-    override func overriddenMethod() {
-        print("Heaven!")
-    }
+  override func overriddenMethod() {
+    print("Heaven!")
+  }
 }
 
 Child().doSomething() // CHECK: Heaven!
+
+// rdar://23376955
+
+protocol Makeable {
+  init()
+  func doSomething()
+}
+
+extension Parent : Makeable {}
+
+func makeOne<T : Makeable>(_: T.Type) -> T {
+  return T()
+}
+
+makeOne(Child.self).doSomething() // CHECK: Heaven!

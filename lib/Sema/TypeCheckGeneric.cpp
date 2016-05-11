@@ -553,9 +553,16 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     return true;
   }
 
-  // Compute the function type.
+  configureInterfaceType(func);
+  return false;
+}
+
+void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
   Type funcTy;
   Type initFuncTy;
+
+  auto *sig = func->getGenericSignature();
+
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     funcTy = fn->getBodyResultTypeLoc().getType();
     
@@ -631,73 +638,11 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     // to begin with, but fixing that requires a lot of reengineering for local
     // definitions in generic contexts.
     if (sig && i == e-1) {
-      if (func->getGenericParams()) {
-        // Collect all generic params referenced in parameter types,
-        // return type or requirements.
-        SmallPtrSet<GenericTypeParamDecl *, 4> referencedGenericParams;
-        argTy.visit([&referencedGenericParams](Type t) {
-          if (isa<GenericTypeParamType>(t.getCanonicalTypeOrNull())) {
-            referencedGenericParams.insert(
-                t->castTo<GenericTypeParamType>()->getDecl());
-          }
-        });
-        funcTy.visit([&referencedGenericParams](Type t) {
-          if (isa<GenericTypeParamType>(t.getCanonicalTypeOrNull())) {
-            referencedGenericParams.insert(
-                t->castTo<GenericTypeParamType>()->getDecl());
-          }
-        });
-
-        auto requirements = sig->getRequirements();
-        for (auto req : requirements) {
-          if (req.getKind() == RequirementKind::SameType) {
-            // Same type requirements may allow for generic
-            // inference, even if this generic parameter
-            // is not mentioned in the function signature.
-            // TODO: Make the test more precise.
-            auto left = req.getFirstType();
-            auto right = req.getSecondType();
-            // For now consider any references inside requirements
-            // as a possibility to infer the generic type.
-            left.visit([&referencedGenericParams](Type t) {
-              if (isa<GenericTypeParamType>(t.getCanonicalTypeOrNull())) {
-                referencedGenericParams.insert(
-                    t->castTo<GenericTypeParamType>()->getDecl());
-              }
-            });
-            right.visit([&referencedGenericParams](Type t) {
-              if (isa<GenericTypeParamType>(t.getCanonicalTypeOrNull())) {
-                referencedGenericParams.insert(
-                    t->castTo<GenericTypeParamType>()->getDecl());
-              }
-            });
-          }
-        }
-
-        // Find the depth of the function's own generic parameters.
-        unsigned fnGenericParamsDepth = func->getGenericParams()->getDepth();
-
-        // Check that every generic parameter type from the signature is
-        // among referencedArchetypes.
-        for (auto *genParam : sig->getGenericParams()) {
-          auto *paramDecl = genParam->getDecl();
-          if (paramDecl->getDepth() != fnGenericParamsDepth)
-            continue;
-          if (!referencedGenericParams.count(paramDecl)) {
-            // Produce an error that this generic parameter cannot be bound.
-            diagnose(paramDecl->getLoc(), diag::unreferenced_generic_parameter,
-                     paramDecl->getNameStr());
-            func->setInvalid();
-          }
-        }
-      }
-
       funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
       if (initFuncTy)
         initFuncTy = GenericFunctionType::get(sig, initArgTy, initFuncTy, info);
     } else {
       funcTy = FunctionType::get(argTy, funcTy, info);
-
       if (initFuncTy)
         initFuncTy = FunctionType::get(initArgTy, initFuncTy, info);
     }
@@ -707,7 +652,53 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   func->setInterfaceType(funcTy);
   if (initFuncTy)
     cast<ConstructorDecl>(func)->setInitializerInterfaceType(initFuncTy);
-  return false;
+
+  if (func->getGenericParams()) {
+    // Collect all generic params referenced in parameter types,
+    // return type or requirements.
+    SmallPtrSet<GenericTypeParamDecl *, 4> referencedGenericParams;
+
+    auto visitorFn = [&referencedGenericParams](Type t) {
+      if (auto *paramTy = t->getAs<GenericTypeParamType>())
+        referencedGenericParams.insert(paramTy->getDecl());
+    };
+
+    funcTy->castTo<AnyFunctionType>()->getInput().visit(visitorFn);
+    funcTy->castTo<AnyFunctionType>()->getResult().visit(visitorFn);
+
+    auto requirements = sig->getRequirements();
+    for (auto req : requirements) {
+      if (req.getKind() == RequirementKind::SameType) {
+        // Same type requirements may allow for generic
+        // inference, even if this generic parameter
+        // is not mentioned in the function signature.
+        // TODO: Make the test more precise.
+        auto left = req.getFirstType();
+        auto right = req.getSecondType();
+        // For now consider any references inside requirements
+        // as a possibility to infer the generic type.
+        left.visit(visitorFn);
+        right.visit(visitorFn);
+      }
+    }
+
+    // Find the depth of the function's own generic parameters.
+    unsigned fnGenericParamsDepth = func->getGenericParams()->getDepth();
+
+    // Check that every generic parameter type from the signature is
+    // among referencedArchetypes.
+    for (auto *genParam : sig->getGenericParams()) {
+      auto *paramDecl = genParam->getDecl();
+      if (paramDecl->getDepth() != fnGenericParamsDepth)
+        continue;
+      if (!referencedGenericParams.count(paramDecl)) {
+        // Produce an error that this generic parameter cannot be bound.
+        diagnose(paramDecl->getLoc(), diag::unreferenced_generic_parameter,
+                 paramDecl->getNameStr());
+        func->setInvalid();
+      }
+    }
+  }
 }
 
 GenericSignature *TypeChecker::validateGenericSignature(

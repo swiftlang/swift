@@ -921,6 +921,9 @@ public:
 
   void markInvalidGenericSignature(ValueDecl *VD);
 
+  /// Configure the interface type of a function declaration.
+  void configureInterfaceType(AbstractFunctionDecl *func);
+
   /// Validate the signature of a generic function.
   ///
   /// \param func The generic function.

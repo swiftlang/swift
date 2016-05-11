@@ -110,6 +110,27 @@ func testSubUnnamed(_ i: Int, d: Double, s: String, f: Float) {
   _ = SubUnnamed(f)
 }
 
+// rdar://problem/17960407 - Inheritance of generic initializers
+class ConcreteBase {
+  required init(i: Int) {}
+}
+
+class GenericDerived<T> : ConcreteBase {}
+
+class GenericBase<T> {
+  required init(t: T) {}
+}
+
+class GenericDerived2<U> : GenericBase<(U, U)> {}
+
+class ConcreteDerived : GenericBase<Int> {}
+
+func testGenericInheritance() {
+  _ = GenericDerived<Int>(i: 10)
+  _ = GenericDerived2<Int>(t: (10, 100))
+  _ = ConcreteDerived(t: 1000)
+}
+
 // FIXME: <rdar://problem/16331406> Implement inheritance of variadic designated initializers
 class SuperVariadic {
   init(ints: Int...) { } // expected-note{{variadic superclass initializer defined here}}

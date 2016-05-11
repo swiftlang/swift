@@ -7446,8 +7446,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
          classDecl->getSuperclass()->getAnyNominal()->isInvalid() ||
          classDecl->getSuperclass()->getAnyNominal()
            ->addedImplicitInitializers());
-  if (classDecl->hasSuperclass() && !classDecl->isGenericContext() &&
-      !classDecl->getSuperclass()->isSpecialized()) {
+  if (classDecl->hasSuperclass()) {
     bool canInheritInitializers = !FoundDesignatedInit;
 
     // We can't define these overrides if we have any uninitialized
