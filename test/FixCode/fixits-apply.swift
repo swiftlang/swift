@@ -63,4 +63,4 @@ func ftest1() {
   let myvar = 0
 }
 
-func ftest2(x x: Int) {}
+func ftest2(x x: Int -> Int) {}
