@@ -206,6 +206,9 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(ProjectBlockStorageInst, SILInstruction, None, DoesNotRelease)
   INST(InitBlockStorageHeaderInst, SILInstruction, None, DoesNotRelease)
 
+  // Type equality
+  INST(IsSameTypeInst, SILInstruction, None, DoesNotRelease)
+
   // Conversions
   ABSTRACT_VALUE(ConversionInst, SILInstruction)
     INST(UpcastInst, ConversionInst, None, DoesNotRelease)

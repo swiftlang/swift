@@ -1499,7 +1499,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // the type is the type of the second (dest) operand.
     auto CBI = cast<CheckedCastAddrBranchInst>(&SI);
     ValueID listOfValues[] = {
-      toStableCastConsumptionKind(CBI->getConsumptionKind()),
+      CBI->isExact() |
+        (toStableCastConsumptionKind(CBI->getConsumptionKind()) << 8),
       S.addTypeRef(CBI->getSourceType()),
       addValueRef(CBI->getSrc()),
       S.addTypeRef(CBI->getSrc()->getType().getSwiftRValueType()),

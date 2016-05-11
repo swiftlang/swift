@@ -852,6 +852,7 @@ public:
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *i);
   void visitCheckedCastBranchInst(CheckedCastBranchInst *i);
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
+  void visitIsSameTypeInst(IsSameTypeInst *i);
 };
 
 }
@@ -4130,6 +4131,14 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
 
 void IRGenSILFunction::visitCheckedCastAddrBranchInst(
                                           swift::CheckedCastAddrBranchInst *i) {
+#if 0
+  // THIS IS A HACK FOR DEBUG PURPOSES ONLY
+  if (i->isExact()) {
+    Builder.CreateBr(getLoweredBB(i->getFailureBB()).bb);
+    return;
+  }
+#endif
+
   Address dest = getLoweredAddress(i->getDest());
   Address src = getLoweredAddress(i->getSrc());
   llvm::Value *castSucceeded =
@@ -4138,6 +4147,14 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
   Builder.CreateCondBr(castSucceeded,
                        getLoweredBB(i->getSuccessBB()).bb,
                        getLoweredBB(i->getFailureBB()).bb);
+}
+
+void IRGenSILFunction::visitIsSameTypeInst(swift::IsSameTypeInst *i) {
+  llvm::Value *result =
+    emitSameTypeCheck(*this, i->getFirstType(), i->getSecondType());
+  Explosion out;
+  out.add(result);
+  setLoweredExplosion(i, out);
 }
 
 void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {

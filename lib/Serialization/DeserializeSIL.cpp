@@ -1703,7 +1703,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case ValueKind::UnconditionalCheckedCastAddrInst:
   case ValueKind::CheckedCastAddrBranchInst: {
-    CastConsumptionKind consumption = getCastConsumptionKind(ListOfValues[0]);
+    bool isExact = false;
+    if ((ValueKind)OpCode == ValueKind::CheckedCastAddrBranchInst) {
+      // ???? Use proper index
+      isExact = (ListOfValues[0] & 0xFF) != 0;
+    }
+    CastConsumptionKind consumption = getCastConsumptionKind(ListOfValues[0] >> 8);
 
     CanType sourceType = MF->getType(ListOfValues[1])->getCanonicalType();
     SILType srcAddrTy = getSILType(MF->getType(ListOfValues[3]),
@@ -1724,7 +1729,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     auto *successBB = getBBForReference(Fn, ListOfValues[7]);
     auto *failureBB = getBBForReference(Fn, ListOfValues[8]);
-    ResultVal = Builder.createCheckedCastAddrBranch(Loc, consumption,
+    ResultVal = Builder.createCheckedCastAddrBranch(Loc, isExact, consumption,
                                                     src, sourceType,
                                                     dest, targetType,
                                                     successBB, failureBB);

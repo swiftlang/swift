@@ -105,9 +105,12 @@ SILValue swift::stripCasts(SILValue V) {
 }
 
 SILValue swift::stripUpCasts(SILValue V) {
-  assert(V->getType().isClassOrClassMetatype() &&
+  assert((V->getType().isClassOrClassMetatype() ||
+          V->getType().isAnyExistentialType() ||
+          V->getType().is<AnyMetatypeType>() ||
+          V->getType().hasArchetype()) &&
          "Expected class or class metatype!");
-  
+
   V = stripSinglePredecessorArgs(V);
   
   while (isa<UpcastInst>(V))

@@ -103,6 +103,10 @@ namespace irgen {
   /// Emit a Protocol* value referencing an ObjC protocol.
   llvm::Value *emitReferenceToObjCProtocol(IRGenFunction &IGF,
                                            ProtocolDecl *proto);
+
+  llvm::Value *emitSameTypeCheck(IRGenFunction &IGF,
+                               CanType firstType,
+                               CanType secondType);
 } // end namespace irgen
 } // end namespace swift
 

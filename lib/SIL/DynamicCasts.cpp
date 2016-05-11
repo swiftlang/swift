@@ -374,7 +374,11 @@ swift::classifyDynamicCast(Module *M,
       if (source->isBindableToSuperclassOf(target, nullptr))
         return DynamicCastFeasibility::MaySucceed;
 
-      // FIXME: bridged types, e.g. CF <-> NS (but not for metatypes).
+      // FIXME: bridged types, e.g. CF <-> NS (but not for metatypes)
+      // If one of the types is a foreign type, don't optimize it away
+      // statically. Should it be "and" or "or".
+      if (sourceClass->hasClangNode() && targetClass->hasClangNode())
+        return DynamicCastFeasibility::MaySucceed;
       return DynamicCastFeasibility::WillFail;
     }
 

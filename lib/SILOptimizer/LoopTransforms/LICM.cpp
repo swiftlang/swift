@@ -226,7 +226,13 @@ static bool canHoistInstruction(SILInstruction *Inst, SILLoop *Loop,
   // Can't hoist terminators.
   if (isa<TermInst>(Inst))
     return false;
-  
+
+  // Can't hoist metatype instruction referring to an opened existential.
+  if (isa<MetatypeInst>(Inst) &&
+      Inst->getType().getSwiftRValueType()->hasOpenedExistential()) {
+    return false;
+  }
+
   // Can't hoist allocation and dealloc stacks.
   if (isa<AllocationInst>(Inst) || isa<DeallocStackInst>(Inst))
     return false;

@@ -2186,6 +2186,34 @@ public:
   }
 };
 
+/// Checks if two types are representing the same type.
+class IsSameTypeInst : public SILInstruction
+{
+  friend class SILBuilder;
+
+  CanType FirstType;
+  CanType SecondType;
+  SILType BoolTy;
+
+  IsSameTypeInst(SILDebugLocation Loc, CanType firstTy, CanType secondTy,
+                 SILType boolTy)
+      : SILInstruction(ValueKind::IsSameTypeInst, Loc, boolTy),
+        FirstType(firstTy), SecondType(secondTy), BoolTy(boolTy) {}
+
+public:
+  /// Returns the formal type of the source value.
+  CanType getFirstType() const { return FirstType; }
+  /// Returns the formal target type.
+  CanType getSecondType() const { return SecondType; }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::IsSameTypeInst;
+  }
+};
+
 /// StructInst - Represents a constructed loadable struct.
 class StructInst : public SILInstruction {
   friend class SILBuilder;
@@ -4354,6 +4382,7 @@ public:
 class CheckedCastAddrBranchInst : public TermInst {
   friend class SILBuilder;
 
+  bool IsExact;
   CastConsumptionKind ConsumptionKind;
 
   enum {
@@ -4368,12 +4397,13 @@ class CheckedCastAddrBranchInst : public TermInst {
   CanType SourceType;
   CanType TargetType;
 
-  CheckedCastAddrBranchInst(SILDebugLocation DebugLoc,
+  CheckedCastAddrBranchInst(SILDebugLocation DebugLoc, bool IsExact,
                             CastConsumptionKind consumptionKind, SILValue src,
                             CanType srcType, SILValue dest, CanType targetType,
                             SILBasicBlock *successBB, SILBasicBlock *failureBB)
       : TermInst(ValueKind::CheckedCastAddrBranchInst, DebugLoc),
-        ConsumptionKind(consumptionKind), Operands{this, src, dest},
+        IsExact(IsExact), ConsumptionKind(consumptionKind),
+        Operands{this, src, dest},
         DestBBs{{this, successBB}, {this, failureBB}}, SourceType(srcType),
         TargetType(targetType) {}
 
@@ -4382,6 +4412,8 @@ public:
 
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
+
+  bool isExact() const { return IsExact; }
 
   /// Returns the formal type of the source value.
   CanType getSourceType() const { return SourceType; }

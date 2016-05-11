@@ -1086,7 +1086,12 @@ public:
     return insert(new (F.getModule()) IsUniqueOrPinnedInst(
         getSILDebugLocation(Loc), value, Int1Ty));
   }
-
+  IsSameTypeInst *createIsSameTypeInst(SILLocation Loc, CanType firstTy,
+                                       CanType secondTy) {
+    auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
+    return insert(new (F.getModule()) IsSameTypeInst(
+        getSILDebugLocation(Loc), firstTy, secondTy, Int1Ty));
+  }
   DeallocStackInst *createDeallocStack(SILLocation Loc, SILValue operand) {
     return insert(new (F.getModule())
                       DeallocStackInst(getSILDebugLocation(Loc), operand));
@@ -1311,12 +1316,13 @@ public:
   }
 
   CheckedCastAddrBranchInst *
-  createCheckedCastAddrBranch(SILLocation Loc, CastConsumptionKind consumption,
+  createCheckedCastAddrBranch(SILLocation Loc, bool isExact,
+                              CastConsumptionKind consumption,
                               SILValue src, CanType sourceType, SILValue dest,
                               CanType targetType, SILBasicBlock *successBB,
                               SILBasicBlock *failureBB) {
     return insertTerminator(new (F.getModule()) CheckedCastAddrBranchInst(
-        getSILDebugLocation(Loc), consumption, src, sourceType, dest,
+        getSILDebugLocation(Loc), isExact, consumption, src, sourceType, dest,
         targetType, successBB, failureBB));
   }
 

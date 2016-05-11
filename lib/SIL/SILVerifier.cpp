@@ -2058,13 +2058,29 @@ public:
     }
 
     if (isExact) {
-      require(fromCanTy.getClassOrBoundGenericClass(),
-              "downcast operand must be a class type");
-      require(toCanTy.getClassOrBoundGenericClass(),
-              "downcast must convert to a class type");
-      require(SILType::getPrimitiveObjectType(fromCanTy).
-              isBindableToSuperclassOf(SILType::getPrimitiveObjectType(toCanTy)),
-              "downcast must convert to a subclass");
+      if (fromCanTy.getClassOrBoundGenericClass()) {
+        // It is a cast of a class.
+        require(SILType::getPrimitiveObjectType(fromCanTy).
+                isBindableToSuperclassOf(
+                  SILType::getPrimitiveObjectType(toCanTy)),
+                "downcast must convert to a subclass");
+
+      } else {
+        require(fromCanTy->isAnyExistentialType() ||
+                fromCanTy->is<AnyMetatypeType>() ||
+                fromCanTy->getNominalOrBoundGenericNominal() ||
+                (isa<ArchetypeType>(fromCanTy)),
+                "downcast operand must be a class type or opened existential");
+        // It is a cast of an opened class existential.
+        //require(fromCanTy.isAnyClassReferenceType() &&
+        //        isa<ArchetypeType>(fromCanTy),
+        //        "downcast operand must be a class type or opened existential");
+      }
+      require(toCanTy.getNominalOrBoundGenericNominal(),
+              "downcast must convert to a nominal type");
+
+      //require(toCanTy.getClassOrBoundGenericClass(),
+      //        "downcast must convert to a class type");
     }
   }
 
@@ -2098,6 +2114,13 @@ public:
         "success dest block of checked_cast_addr_br must not take an argument");
     require(CCABI->getFailureBB()->bbarg_size() == 0,
         "failure dest block of checked_cast_addr_br must not take an argument");
+
+    if (CCABI->isExact()) {
+      // TODO: Restrict the target type. It cannot be an existential
+      // (at least if the source is an existential).
+      require(!CCABI->getDest()->getType().isAnyExistentialType(),
+            "checked_cast_addr_br dest must not be an existential");
+    }
   }
 
   void checkThinToThickFunctionInst(ThinToThickFunctionInst *TTFI) {

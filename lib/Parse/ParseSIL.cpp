@@ -2123,6 +2123,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::UnconditionalCheckedCastAddrInst:
   case ValueKind::CheckedCastAddrBranchInst:
   case ValueKind::UncheckedRefCastAddrInst: {
+    bool isExact = false;
+    if (Opcode == ValueKind::CheckedCastAddrBranchInst &&
+        parseSILOptional(isExact, *this, "exact"))
+      return true;
+
     CastConsumptionKind consumptionKind;
     if (Opcode == ValueKind::UncheckedRefCastAddrInst)
       consumptionKind = CastConsumptionKind::TakeAlways;
@@ -2181,7 +2186,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    ResultVal = B.createCheckedCastAddrBranch(InstLoc, consumptionKind,
+    ResultVal = B.createCheckedCastAddrBranch(InstLoc, isExact, consumptionKind,
                                               sourceAddr, sourceType,
                                               destAddr, targetType,
                                 getBBForReference(successBBName, successBBLoc),

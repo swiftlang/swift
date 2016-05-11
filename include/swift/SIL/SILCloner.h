@@ -1022,7 +1022,18 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
                                                          SrcValue, SrcType,
                                                          DestValue, TargetType));
 }
-  
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitIsSameTypeInst(IsSameTypeInst *Inst) {
+  SILLocation OpLoc = getOpLocation(Inst->getLoc());
+  CanType FirstType = getOpASTType(Inst->getFirstType());
+  CanType SecondType = getOpASTType(Inst->getSecondType());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+         getBuilder().createIsSameTypeInst(OpLoc, FirstType, SecondType));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitRetainValueInst(RetainValueInst *Inst) {
@@ -1730,6 +1741,7 @@ void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
        getBuilder().createCheckedCastAddrBranch(getOpLocation(Inst->getLoc()),
+                                                Inst->isExact(),
                                                 Inst->getConsumptionKind(),
                                                 SrcValue, SrcType,
                                                 DestValue, TargetType,

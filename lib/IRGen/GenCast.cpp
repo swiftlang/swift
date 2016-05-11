@@ -89,9 +89,9 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
                                                  SILType fromType,
                                                  SILType toType) {
   // Check metatype objects directly. Don't try to find their meta-metatype.
-  bool isMetatype = isa<MetatypeType>(fromType.getSwiftRValueType());
+  bool isMetatype = isa<AnyMetatypeType>(fromType.getSwiftRValueType());
   if (isMetatype) {
-    auto metaType = cast<MetatypeType>(toType.getSwiftRValueType());
+    auto metaType = cast<AnyMetatypeType>(toType.getSwiftRValueType());
     assert(metaType->getRepresentation() != MetatypeRepresentation::ObjC &&
            "not implemented");
     toType = IGF.IGM.getLoweredType(metaType.getInstanceType());
@@ -105,7 +105,9 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   // test might fail; but it's a much faster check.
   // TODO: use ObjC class references
   llvm::Value *targetMetadata;
-  if (allowConservative &&
+  if (!toType.isAnyClassReferenceType()) {
+    targetMetadata = IGF.emitTypeMetadataRef(toType.getSwiftRValueType());
+  } else if (allowConservative &&
       (targetMetadata =
         tryEmitConstantHeapMetadataRef(IGF.IGM, toType.getSwiftRValueType(),
                                        /*allowUninitialized*/ true))) {
@@ -820,4 +822,77 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
 
   llvm::Value *result = emitClassDowncast(IGF, instance, targetType, mode);
   out.add(result);
+}
+
+llvm::Value *irgen::emitSameTypeCheck(IRGenFunction &IGF, CanType firstType,
+                                      CanType secondType) {
+  // Load type metadata for the first static type and the second type.
+  //llvm::Value *firstMetadata = IGF.emitTypeMetadataRef(firstType);
+  //llvm::Value *secondMetadata = IGF.emitTypeMetadataRef(secondType);
+
+  // TODO: Handle types which are results of an open_existentail_metatype instruction.
+  // This happens when speculatively devirtualizing static method calls.
+  //   %2 = existential_metatype $@thick P.Type, %0 : $P, loc "devirt_speculate_protocol_static.swift":111:12, scope 2 // user: %3
+  //   %3 = open_existential_metatype %2 : $@thick P.Type to $@thick (@opened("469D303C-1517-11E6-9942-B8E856428C60") P).Type,
+
+  // Check metatype objects directly. Don't try to find their meta-metatype.
+  bool isMetatype = isa<MetatypeType>(firstType);
+  SILType firstSILType;
+  SILType secondSILType;
+  if (isMetatype) {
+    auto firstMetaType = cast<MetatypeType>(firstType);
+    auto secondMetaType = cast<MetatypeType>(secondType);
+    assert(secondMetaType->getRepresentation() != MetatypeRepresentation::ObjC &&
+           "not implemented");
+    firstSILType = IGF.IGM.getLoweredType(firstMetaType.getInstanceType());
+    secondSILType = IGF.IGM.getLoweredType(secondMetaType.getInstanceType());
+  } else {
+    firstSILType = IGF.IGM.getLoweredType(firstType);
+    secondSILType = IGF.IGM.getLoweredType(secondType);
+  }
+
+  // Emit a reference to the heap metadata for the target type.
+  const bool allowConservative = true;
+
+  // If we're allowed to do a conservative check, try to just use the
+  // global class symbol.  If the class has been re-allocated, this
+  // might not be the heap metadata actually in use, and hence the
+  // test might fail; but it's a much faster check.
+  // TODO: use ObjC class references
+  llvm::Value *firstMetadata;
+  if (!firstType.isAnyClassReferenceType()) {
+    firstMetadata = IGF.emitTypeMetadataRef(firstType);
+  } else if (allowConservative &&
+      (firstMetadata =
+        tryEmitConstantHeapMetadataRef(IGF.IGM, firstSILType.getSwiftRValueType(),
+                                       /*allowUninitialized*/ true))) {
+    // ok
+  } else {
+    firstMetadata
+      = emitClassHeapMetadataRef(IGF, firstSILType.getSwiftRValueType(),
+                                 MetadataValueType::ObjCClass,
+                                 /*allowUninitialized*/ allowConservative);
+  }
+
+
+  llvm::Value *secondMetadata;
+  if (!secondType.isAnyClassReferenceType()) {
+    secondMetadata = IGF.emitTypeMetadataRef(secondType);
+  } else if (allowConservative &&
+      (secondMetadata =
+        tryEmitConstantHeapMetadataRef(IGF.IGM, secondSILType.getSwiftRValueType(),
+                                       /*allowUninitialized*/ true))) {
+    // ok
+  } else {
+    secondMetadata
+      = emitClassHeapMetadataRef(IGF, secondSILType.getSwiftRValueType(),
+                                 MetadataValueType::ObjCClass,
+                                 /*allowUninitialized*/ allowConservative);
+  }
+
+  firstMetadata = IGF.Builder.CreateBitCast(firstMetadata,
+                                             secondMetadata->getType());
+
+  llvm::Value *cond = IGF.Builder.CreateICmpEQ(firstMetadata, secondMetadata);
+  return cond;
 }
