@@ -235,6 +235,7 @@ int main(int argc, char **argv) {
   initializeSwiftARCContractPass(Registry);
   initializeSwiftStackPromotionPass(Registry);
   initializeInlineTreePrinterPass(Registry);
+  initializeSwiftMergeFunctionsPass(Registry);
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift LLVM optimizer\n");
 
