@@ -21,15 +21,15 @@ using namespace Punycode;
 // RFC 3492
 // Section 5: Parameter values for Punycode
 
-static const int base         = 36;
-static const int tmin         = 1;
-static const int tmax         = 26;
-static const int skew         = 38;
-static const int damp         = 700;
-static const int initial_bias = 72;
-static const uint32_t initial_n = 128;
+static constexpr int base         = 36;
+static constexpr int tmin         = 1;
+static constexpr int tmax         = 26;
+static constexpr int skew         = 38;
+static constexpr int damp         = 700;
+static constexpr int initial_bias = 72;
+static constexpr uint32_t initial_n = 128;
 
-static const char delimiter = '_';
+static constexpr char delimiter = '_';
 
 static char digit_value(int digit) {
   assert(digit < base && "invalid punycode digit");
