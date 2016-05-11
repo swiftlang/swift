@@ -140,7 +140,7 @@ default: break
 
 // <rdar://problem/21995744> QoI: Binary operator '~=' cannot be applied to operands of type 'String' and 'String?'
 switch ("foo" as String?) {
-case "what": break // expected-error{{expression pattern of type 'String' cannot match values of type 'String?'}}
+case "what": break // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}}
 default: break
 }
 
