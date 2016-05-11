@@ -96,6 +96,11 @@ public:
   bool isValid() const { return Start.isValid(); }
   bool isInvalid() const { return !isValid(); }
 
+  bool operator==(const SourceRange &other) const {
+    return Start == other.Start && End == other.End;
+  }
+  bool operator!=(const SourceRange &other) const { return !operator==(other); }
+
   /// Print out the SourceRange.  If the locations are in the same buffer
   /// as specified by LastBufferID, then we don't print the filename.  If not,
   /// we do print the filename, and then update LastBufferID with the BufferID
@@ -133,6 +138,13 @@ public:
 
   bool isValid() const { return Start.isValid(); }
   bool isInvalid() const { return !isValid(); }
+
+  bool operator==(const CharSourceRange &other) const {
+    return Start == other.Start && ByteLength == other.ByteLength;
+  }
+  bool operator!=(const CharSourceRange &other) const {
+    return !operator==(other);
+  }
 
   SourceLoc getStart() const { return Start; }
   SourceLoc getEnd() const { return Start.getAdvancedLocOrInvalid(ByteLength); }
