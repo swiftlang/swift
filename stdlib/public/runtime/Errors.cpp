@@ -160,8 +160,8 @@ reportBacktrace(int *count)
 extern "C" {
 CRASH_REPORTER_CLIENT_HIDDEN
 struct crashreporter_annotations_t gCRAnnotations
-    __attribute__((section("__DATA," CRASHREPORTER_ANNOTATIONS_SECTION))) = {
-        CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0, 0};
+__attribute__((__section__("__DATA," CRASHREPORTER_ANNOTATIONS_SECTION))) = {
+    CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0, 0};
 }
 
 // Report a message to any forthcoming crash log.
