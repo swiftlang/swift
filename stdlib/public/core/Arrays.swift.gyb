@@ -229,10 +229,12 @@ if True:
 /// array's first and last elements. If the array is empty, these properties
 /// are `nil`.
 ///
-///     print(oddNumbers.first, oddNumbers.last, separator=", ")
+///     if let firstElement = oddNumbers.first, lastElement = oddNumbers.last {
+///         print(firstElement, lastElement, separator: ", ")
+///     }
 ///     // Prints "1, 15"
 ///
-///     print(emptyDoubles.first, emptyDoubles.last, separator=", ")
+///     print(emptyDoubles.first, emptyDoubles.last, separator: ", ")
 ///     // Prints "nil, nil"
 ///
 /// You can access individual array elements through a subscript. The first
@@ -241,7 +243,7 @@ if True:
 /// the count of the array. Using a negative number or an index equal to or
 /// greater than `count` triggers a runtime error. For example:
 ///
-///     print(oddNumbers[0], oddNumbers[3], separator=", ")
+///     print(oddNumbers[0], oddNumbers[3], separator: ", ")
 ///     // Prints "1, 7"
 ///
 ///     print(emptyDoubles[0])
