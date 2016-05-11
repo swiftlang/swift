@@ -268,6 +268,10 @@ def use_ld : Joined<["-"], "use-ld=">,
   Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Specifies the linker to be used">;
 
+def ld_path : Separate<["-"], "Blinker">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Specifies where to look for the linker">;
+
 def Xlinker : Separate<["-"], "Xlinker">,
   Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Specifies an option which should be passed to the linker">;
