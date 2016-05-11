@@ -230,11 +230,11 @@ if True:
 /// are `nil`.
 ///
 ///     if let firstElement = oddNumbers.first, lastElement = oddNumbers.last {
-///         print(firstElement, lastElement, separator: ", ", terminator: "\n")
+///         print(firstElement, lastElement, separator: ", ")
 ///     }
 ///     // Prints "1, 15"
 ///
-///     print(emptyDoubles.first, emptyDoubles.last, separator: ", ", terminator: "\n")
+///     print(emptyDoubles.first, emptyDoubles.last, separator: ", ")
 ///     // Prints "nil, nil"
 ///
 /// You can access individual array elements through a subscript. The first
@@ -243,7 +243,7 @@ if True:
 /// the count of the array. Using a negative number or an index equal to or
 /// greater than `count` triggers a runtime error. For example:
 ///
-///     print(oddNumbers[0], oddNumbers[3], separator: ", ", terminator: "\n")
+///     print(oddNumbers[0], oddNumbers[3], separator: ", ")
 ///     // Prints "1, 7"
 ///
 ///     print(emptyDoubles[0])
@@ -621,10 +621,10 @@ ${SubscriptDocComment}
   public subscript(index: Int) -> Element {
     get {
       // This call may be hoisted or eliminated by the optimizer.  If
-      // there is an inout violation, this value may be stale so needs to be
+      // there is an inout violation, this value may be stale so needs to be 
       // checked again below.
       let wasNativeTypeChecked = _hoistableIsNativeTypeChecked()
-
+      
       // Make sure the index is in range and wasNativeTypeChecked is
       // still valid.
       let token = _checkSubscript(
@@ -636,7 +636,7 @@ ${SubscriptDocComment}
     }
     mutableAddressWithPinnedNativeOwner {
       _makeMutableAndUniqueOrPinned() // makes the array native, too
-      _checkSubscript_native(index)
+      _checkSubscript_native(index)   
       return (_getElementAddress(index), Builtin.tryPin(_getOwner_native()))
     }
   }
@@ -752,7 +752,7 @@ ${SubscriptDocComment}
       // We are hiding the access to '_buffer.owner' behind
       // _getOwner() to help the compiler hoist uniqueness checks in
       // the case of class or Objective-C existential typed array
-      // elements.
+      // elements. 
       return _getOwnerWithSemanticLabel_native()
     }
 #endif
@@ -992,12 +992,12 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   ///     func cacheImagesWithNames(names: [String]) {
   ///         // custom image loading and caching
   ///      }
-  ///
+  /// 
   ///     let namedHues: [String: Int] = ["Vermillion": 18, "Magenta": 302,
   ///             "Gold": 50, "Cerise": 320]
   ///     let colorNames = Array(namedHues.keys)
   ///     cacheImagesWithNames(colorNames)
-  ///
+  /// 
   ///     print(colorNames)
   ///     // Prints "["Gold", "Cerise", "Magenta", "Vermillion"]"
   ///
@@ -1084,15 +1084,15 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   internal static func _adoptStorage(
     _ storage: AnyObject, count: Int
   ) -> (Array, UnsafeMutablePointer<Element>) {
-
+    
     _sanityCheck(
       storage is _ContiguousArrayStorage<Element>, "Invalid array storage type")
-
+    
     let innerBuffer = _ContiguousArrayBuffer<Element>(
       count: count,
       storage: unsafeDowncast(
         storage, to: _ContiguousArrayStorage<Element>.self))
-
+    
     return (
       Array(_Buffer(innerBuffer, shiftedToStartIndex: 0)),
         innerBuffer.firstElementAddress)
