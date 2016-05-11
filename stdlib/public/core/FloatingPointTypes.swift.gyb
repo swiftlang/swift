@@ -179,6 +179,10 @@ extension ${Self}: BinaryFloatingPoint {
   //  Conversions to/from integer encoding.  These are not part of the
   //  BinaryFloatingPoint prototype because there's no guarantee that an
   //  integer type of the same size actually exists (e.g. Float80).
+  //
+  //  If we want them in a protocol at some future point, that protocol should
+  //  be "InterchangeFloatingPoint" or "PortableFloatingPoint" or similar, and
+  //  apply to IEEE 754 "interchange types".
   public var bitPattern: UInt${bits} {
     return UInt${bits}(Builtin.bitcast_FPIEEE${bits}_Int${bits}(_value))
   }
@@ -204,7 +208,7 @@ extension ${Self}: BinaryFloatingPoint {
   public var isSignMinus: Bool { return sign == .minus }
 
   public var exponentBitPattern: UInt {
-    return UInt(bitPattern) >> UInt(${Self}.significandBitCount) &
+    return UInt(bitPattern >> UInt${bits}(${Self}.significandBitCount)) &
       ${Self}._infinityExponent
   }
 
