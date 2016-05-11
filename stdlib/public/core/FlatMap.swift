@@ -34,12 +34,12 @@ extension LazySequenceProtocol {
   /// - Parameter transform: A closure that accepts an element of this
   /// sequence as its argument and returns an optional value.
   @warn_unused_result
-  public func flatMap<U>(
-    _ transform: (Self.Elements.Iterator.Element) -> U?
+  public func flatMap<ElementOfResult>(
+    _ transform: (Elements.Iterator.Element) -> ElementOfResult?
   ) -> LazyMapSequence<
     LazyFilterSequence<
-      LazyMapSequence<Self.Elements, U?>>,
-    U
+      LazyMapSequence<Elements, ElementOfResult?>>,
+    ElementOfResult
   > {
     return self.map(transform).filter { $0 != nil }.map { $0! }
   }
@@ -71,12 +71,12 @@ extension LazyCollectionProtocol {
   /// - Parameter transform: A closure that accepts an element of this
   /// collection as its argument and returns an optional value.
   @warn_unused_result
-  public func flatMap<U>(
-    _ transform: (Self.Elements.Iterator.Element) -> U?
+  public func flatMap<ElementOfResult>(
+    _ transform: (Elements.Iterator.Element) -> ElementOfResult?
   ) -> LazyMapCollection<
     LazyFilterCollection<
-      LazyMapCollection<Self.Elements, U?>>,
-    U
+      LazyMapCollection<Elements, ElementOfResult?>>,
+    ElementOfResult
   > {
     return self.map(transform).filter { $0 != nil }.map { $0! }
   }
@@ -114,12 +114,12 @@ extension LazyCollectionProtocol
   ///
   /// - Parameter transform: A closure that accepts an element of this
   /// collection as its argument and returns an optional value.
-  public func flatMap<U>(
-    _ transform: (Self.Elements.Iterator.Element) -> U?
+  public func flatMap<ElementOfResult>(
+    _ transform: (Elements.Iterator.Element) -> ElementOfResult?
   ) -> LazyMapBidirectionalCollection<
     LazyFilterBidirectionalCollection<
-      LazyMapBidirectionalCollection<Self.Elements, U?>>,
-    U
+      LazyMapBidirectionalCollection<Elements, ElementOfResult?>>,
+    ElementOfResult
   > {
     return self.map(transform).filter { $0 != nil }.map { $0! }
   }
