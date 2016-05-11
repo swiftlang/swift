@@ -12,9 +12,9 @@ var aHash: Int = Foo.A.hashValue
 enum Generic<T> {
   case A, B
 
-  static func method() -> Int {
+  func method() -> Int {
     if A == B { }
-    return Generic.A.hashValue
+    return A.hashValue
   }
 }
 

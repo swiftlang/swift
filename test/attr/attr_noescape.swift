@@ -282,11 +282,11 @@ enum r19997577Type {
   func reduce<Result>(_ initial: Result, _ combine: @noescape (Result, r19997577Type) -> Result) -> Result {
     let binary: @noescape (r19997577Type, r19997577Type) -> Result = { combine(combine(combine(initial, self), $0), $1) }
     switch self {
-    case .Unit:
+    case Unit:
       return combine(initial, self)
-    case let .Function(t1, t2):
+    case let Function(t1, t2):
       return binary(t1(), t2())
-    case let .Sum(t1, t2):
+    case let Sum(t1, t2):
       return binary(t1(), t2())
     }
   }

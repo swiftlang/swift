@@ -2278,22 +2278,6 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       } else {
         // Otherwise the static member lookup was invalid because it was
         // called on an instance
-        
-        // Handle enum element lookup on instance type
-        auto lookThroughBaseObjTy = baseObjTy->lookThroughAllAnyOptionalTypes();
-        if (lookThroughBaseObjTy->is<EnumType>()
-            || lookThroughBaseObjTy->is<BoundGenericEnumType>()) {
-          for (auto cand : result.UnviableCandidates) {
-            ValueDecl *decl = cand.first;
-            if (isa<EnumElementDecl>(decl)) {
-              diagnose(loc, diag::could_not_use_enum_element_on_instance,
-                       memberName);
-              return;
-            }
-          }
-        }
-        
-        // Provide diagnostic other static member lookups on instance type
         diagnose(loc, diag::could_not_use_type_member_on_instance,
                  baseObjTy, memberName)
           .highlight(baseRange).highlight(nameLoc.getSourceRange());

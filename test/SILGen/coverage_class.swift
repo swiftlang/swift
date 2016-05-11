@@ -26,5 +26,5 @@ enum E {
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.E.foo
   func foo() {}
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.E.init
-  init() { self = .Y }
+  init() { self = Y }
 }

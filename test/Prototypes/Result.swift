@@ -17,45 +17,45 @@ case Success(Value)
 case Error(ErrorProtocol)
 
   init(success x: Value) {
-    self = .Success(x)
+    self = Success(x)
   }
   
   init(error: ErrorProtocol) {
-    self = .Error(error)
+    self = Error(error)
   }
   
   func map<U>(_ transform: @noescape (Value) -> U) -> Result<U> {
     switch self {
-    case .Success(let x): return .Success(transform(x))
-    case .Error(let e): return .Error(e)
+    case Success(let x): return .Success(transform(x))
+    case Error(let e): return .Error(e)
     }
   }
 
   func flatMap<U>(_ transform: @noescape (Value) -> Result<U>) -> Result<U> {
     switch self {
-    case .Success(let x): return transform(x)
-    case .Error(let e): return .Error(e)
+    case Success(let x): return transform(x)
+    case Error(let e): return .Error(e)
     }
   }
 
   func get() throws -> Value {
     switch self {
-    case .Success(let x): return x
-    case .Error(let e): throw e
+    case Success(let x): return x
+    case Error(let e): throw e
     }
   }
 
   var success: Value? {
     switch self {
-    case .Success(let x): return x
-    case .Error: return nil
+    case Success(let x): return x
+    case Error: return nil
     }
   }
 
   var error: ErrorProtocol? {
     switch self {
-    case .Success: return nil
-    case .Error(let x): return x
+    case Success: return nil
+    case Error(let x): return x
     }
   }
 }
