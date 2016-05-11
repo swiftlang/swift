@@ -26,8 +26,7 @@ extension LazySequenceProtocol {
   }
   
   /// Returns a `LazyMapSequence` containing the concatenated non-nil
-  /// results of mapping transform over this `Sequence`.  The elements of
-  /// the result are computed lazily, each time they are read.
+  /// results of mapping transform over this `Sequence`.
   ///
   /// Use this method to receive only nonoptional values when your
   /// transformation produces an optional value.
@@ -64,8 +63,7 @@ extension LazyCollectionProtocol {
   }
   
   /// Returns a `LazyMapCollection` containing the concatenated non-nil
-  /// results of mapping transform over this collection.  The elements of
-  /// the result are computed lazily, each time they are read.
+  /// results of mapping transform over this collection.
   ///
   /// Use this method to receive only nonoptional values when your
   /// transformation produces an optional value.
@@ -109,8 +107,7 @@ extension LazyCollectionProtocol
   }
   
   /// Returns a `LazyMapBidirectionalCollection` containing the concatenated non-nil
-  /// results of mapping transform over this collection.  The elements of
-  /// the result are computed lazily, each time they are read.
+  /// results of mapping transform over this collection.
   ///
   /// Use this method to receive only nonoptional values when your
   /// transformation produces an optional value.
