@@ -15,9 +15,6 @@
 // MARK: Exposing SCNFloat
 
 #if os(OSX)
-private extension CGFloat {
-   init(_ x: CGFloat) { self = x }
-}
 public typealias SCNFloat = CGFloat
 #elseif os(iOS) || os(tvOS)
 public typealias SCNFloat = Float
