@@ -5,18 +5,22 @@ import Swift
 
 // Make sure we emit two traps.
 
-// CHECK-LABEL:  _test_cond_fail:
-// CHECK:        .cfi_startproc
-// CHECK-x86_64: ud2
-// CHECK-i386:   ud2
-// CHECK-arm64:  brk
-// CHECK-armv7:  trap
-// CHECK-NOT:    .cfi_endproc
-// CHECK-x86_64: ud2
-// CHECK-i386:   ud2
-// CHECK-arm64:  brk
-// CHECK-armv7:  trap
-// CHECK:        .cfi_endproc
+// CHECK-LABEL:       _test_cond_fail:
+// CHECK:             .cfi_startproc
+// CHECK-x86_64:      ud2
+// CHECK-i386:        ud2
+// CHECK-arm64:       brk
+// CHECK-armv7:       trap
+// CHECK-powerpc64:   trap
+// CHECK-powerpc64le: trap
+// CHECK-NOT:         .cfi_endproc
+// CHECK-x86_64:      ud2
+// CHECK-i386:        ud2
+// CHECK-arm64:       brk
+// CHECK-armv7:       trap
+// CHECK-powerpc64:   trap
+// CHECK-powerpc64le: trap
+// CHECK:             .cfi_endproc
 sil hidden @test_cond_fail : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %2 = integer_literal $Builtin.Int32, 1

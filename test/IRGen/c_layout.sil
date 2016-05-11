@@ -205,6 +205,38 @@ bb0:
 // CHECK-arm64-LABEL: declare i32 @ints(i32)
 // CHECK-arm64-LABEL: declare i32 @unsigneds(i32)
 
+// CHECK-powerpc64-LABEL: define{{( protected)?}} void @testIntegerExtension
+// CHECK-powerpc64:         call zeroext i8 @chareth(i8 zeroext %0)
+// CHECK-powerpc64:         call zeroext i8 @signedChareth(i8 zeroext %1)
+// CHECK-powerpc64:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
+// CHECK-powerpc64:         call signext i16 @eatMyShorts(i16 signext %3)
+// CHECK-powerpc64:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-powerpc64:         call signext i32 @ints(i32 signext %5)
+// CHECK-powerpc64:         call zeroext i32 @unsigneds(i32 zeroext %6)
+// CHECK-powerpc64-LABEL: declare zeroext i8 @chareth(i8 zeroext)
+// CHECK-powerpc64-LABEL: declare zeroext i8 @signedChareth(i8 zeroext)
+// CHECK-powerpc64-LABEL: declare zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-powerpc64-LABEL: declare signext i16 @eatMyShorts(i16 signext)
+// CHECK-powerpc64-LABEL: declare zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-powerpc64-LABEL: declare signext i32 @ints(i32 signext)
+// CHECK-powerpc64-LABEL: declare zeroext i32 @unsigneds(i32 zeroext)
+
+// CHECK-powerpc64le-LABEL: define{{( protected)?}} void @testIntegerExtension
+// CHECK-powerpc64le:         call zeroext i8 @chareth(i8 zeroext %0)
+// CHECK-powerpc64le:         call zeroext i8 @signedChareth(i8 zeroext %1)
+// CHECK-powerpc64le:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
+// CHECK-powerpc64le:         call signext i16 @eatMyShorts(i16 signext %3)
+// CHECK-powerpc64le:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-powerpc64le:         call signext i32 @ints(i32 signext %5)
+// CHECK-powerpc64le:         call zeroext i32 @unsigneds(i32 zeroext %6)
+// CHECK-powerpc64le-LABEL: declare zeroext i8 @chareth(i8 zeroext)
+// CHECK-powerpc64le-LABEL: declare zeroext i8 @signedChareth(i8 zeroext)
+// CHECK-powerpc64le-LABEL: declare zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-powerpc64le-LABEL: declare signext i16 @eatMyShorts(i16 signext)
+// CHECK-powerpc64le-LABEL: declare zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-powerpc64le-LABEL: declare signext i32 @ints(i32 signext)
+// CHECK-powerpc64le-LABEL: declare zeroext i32 @unsigneds(i32 zeroext)
+
 sil @testIntegerExtension : $@convention(thin) (CChar, CSignedChar, CUnsignedChar, CShort, CUnsignedShort, CInt, CUnsignedInt) -> () {
 entry(%a : $CChar, %b : $CSignedChar, %c : $CUnsignedChar, %d : $CShort, %e : $CUnsignedShort, %f : $CInt, %g : $CUnsignedInt):
   %h = function_ref @chareth : $@convention(c) (CChar) -> CChar

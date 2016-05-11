@@ -7,7 +7,7 @@
   // where they doesn't have CoreGraphics module.
   #if arch(i386) || arch(arm)
     typealias CGFloat = Float
-  #elseif arch(x86_64) || arch(arm64)
+  #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
     typealias CGFloat = Double
   #endif
 #else
