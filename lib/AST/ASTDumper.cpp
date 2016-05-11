@@ -1733,7 +1733,7 @@ public:
       OS << '\n';
       printRec(E->getArgument());
     }
-    OS << "')";
+    OS << ")";
   }
   void visitDotSelfExpr(DotSelfExpr *E) {
     printCommon(E, "dot_self_expr");

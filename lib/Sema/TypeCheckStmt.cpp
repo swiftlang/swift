@@ -332,7 +332,7 @@ public:
   template<typename StmtTy>
   bool typeCheckStmt(StmtTy *&S) {
     StmtTy *S2 = cast_or_null<StmtTy>(visit(S));
-    if (S2 == 0) return true;
+    if (S2 == nullptr) return true;
     S = S2;
     performStmtDiagnostics(TC, S);
     return false;

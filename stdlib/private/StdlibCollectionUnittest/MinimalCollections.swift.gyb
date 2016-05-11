@@ -158,23 +158,23 @@ internal enum _CollectionOperation : Equatable {
     var newElementsIds = elementsLastMutatedStateIds
     var newEndIndexId = endIndexLastMutatedStateId
     switch self {
-    case reserveCapacity:
+    case .reserveCapacity:
       let invalidIndices = newElementsIds.indices
       newElementsIds.replaceSubrange(
         Range(invalidIndices),
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
-    case append:
+    case .append:
       newElementsIds.append(nextStateId)
       newEndIndexId = nextStateId
 
-    case appendContentsOf(let count):
+    case .appendContentsOf(let count):
       newElementsIds.append(contentsOf:
         repeatElement(nextStateId, count: count))
       newEndIndexId = nextStateId
 
-    case replaceRange(let subRange, let replacementCount):
+    case .replaceRange(let subRange, let replacementCount):
       newElementsIds.replaceSubrange(
         subRange,
         with: repeatElement(nextStateId, count: replacementCount))
@@ -185,7 +185,7 @@ internal enum _CollectionOperation : Equatable {
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
-    case insert(let atIndex):
+    case .insert(let atIndex):
       newElementsIds.insert(nextStateId, at: atIndex)
 
       let invalidIndices = atIndex..<newElementsIds.endIndex
@@ -194,7 +194,7 @@ internal enum _CollectionOperation : Equatable {
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
-    case insertContentsOf(let atIndex, let count):
+    case .insertContentsOf(let atIndex, let count):
       newElementsIds.insert(
         contentsOf: repeatElement(nextStateId, count: count),
         at: atIndex)
@@ -205,7 +205,7 @@ internal enum _CollectionOperation : Equatable {
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
-    case removeAtIndex(let index):
+    case .removeAtIndex(let index):
       newElementsIds.remove(at: index)
 
       let invalidIndices = index..<newElementsIds.endIndex
@@ -214,11 +214,11 @@ internal enum _CollectionOperation : Equatable {
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
-    case removeLast:
+    case .removeLast:
       newElementsIds.removeLast()
       newEndIndexId = nextStateId
 
-    case removeRange(let subRange):
+    case .removeRange(let subRange):
       newElementsIds.removeSubrange(subRange)
 
       let invalidIndices = subRange.lowerBound..<newElementsIds.endIndex
@@ -227,7 +227,7 @@ internal enum _CollectionOperation : Equatable {
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
-    case removeAll(let keepCapacity):
+    case .removeAll(let keepCapacity):
       newElementsIds.removeAll(keepingCapacity: keepCapacity)
       newEndIndexId = nextStateId
     }
