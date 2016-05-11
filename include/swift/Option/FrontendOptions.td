@@ -247,6 +247,12 @@ def swift3_migration :
   Flag<["-"], "swift3-migration">,
   HelpText<"Enable Fix-It based migration aids for Swift 3">;
 
+def warn_long_function_bodies : Separate<["-"], "warn-long-function-bodies">,
+  MetaVarName<"<n>">,
+  HelpText<"Warns when type-checking a function takes longer than <n> ms">;
+def warn_long_function_bodies_EQ : Joined<["-"], "warn-long-function-bodies=">,
+  Alias<warn_long_function_bodies>;
+
 def warn_omit_needless_words :
   Flag<["-"], "Womit-needless-words">,
   HelpText<"Warn about needless words in names">;

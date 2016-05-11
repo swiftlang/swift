@@ -134,29 +134,56 @@ namespace {
     }
   };
 
+  /// Used for debugging which parts of the code are taking a long time to
+  /// compile.
   class FunctionBodyTimer {
-    PointerUnion<const AbstractFunctionDecl *,
-                 const AbstractClosureExpr *> Function;
+    AnyFunctionRef Function;
     llvm::TimeRecord StartTime = llvm::TimeRecord::getCurrentTime();
+    unsigned WarnLimit;
+    bool ShouldDump;
 
   public:
-    FunctionBodyTimer(decltype(Function) Fn) : Function(Fn) {}
+    FunctionBodyTimer(AnyFunctionRef Fn, bool shouldDump,
+                      unsigned warnLimit)
+        : Function(Fn), WarnLimit(warnLimit), ShouldDump(shouldDump) {}
+
     ~FunctionBodyTimer() {
       llvm::TimeRecord endTime = llvm::TimeRecord::getCurrentTime(false);
 
       auto elapsed = endTime.getProcessTime() - StartTime.getProcessTime();
-      llvm::errs() << llvm::format("%0.1f", elapsed * 1000) << "ms\t";
+      unsigned elapsedMS = static_cast<unsigned>(elapsed * 1000);
 
-      if (auto *AFD = Function.dyn_cast<const AbstractFunctionDecl *>()) {
-        AFD->getLoc().print(llvm::errs(), AFD->getASTContext().SourceMgr);
-        llvm::errs() << "\t";
-        AFD->print(llvm::errs(), PrintOptions());
-      } else {
-        auto *ACE = Function.get<const AbstractClosureExpr *>();
-        ACE->getLoc().print(llvm::errs(), ACE->getASTContext().SourceMgr);
-        llvm::errs() << "\t(closure)";
+      ASTContext &ctx = Function.getAsDeclContext()->getASTContext();
+
+      if (ShouldDump) {
+        llvm::errs() << llvm::format("%0.1f", elapsed * 1000) << "ms\t";
+        Function.getLoc().print(llvm::errs(), ctx.SourceMgr);
+
+        if (auto *AFD = Function.getAbstractFunctionDecl()) {
+          llvm::errs() << "\t";
+          AFD->print(llvm::errs(), PrintOptions());
+        } else {
+          llvm::errs() << "\t(closure)";
+        }
+        llvm::errs() << "\n";
       }
-      llvm::errs() << "\n";
+
+      if (WarnLimit != 0 && elapsedMS >= WarnLimit) {
+        if (auto *AFD = Function.getAbstractFunctionDecl()) {
+          DeclName name = AFD->getFullName();
+          if (!name) {
+            if (auto *method = dyn_cast<FuncDecl>(AFD)) {
+              name = method->getAccessorStorageDecl()->getFullName();
+            }
+          }
+          ctx.Diags.diagnose(AFD, diag::debug_long_function_body,
+                             AFD->getDescriptiveKind(), name,
+                             elapsedMS, WarnLimit);
+        } else {
+          ctx.Diags.diagnose(Function.getLoc(), diag::debug_long_closure_body,
+                             elapsedMS, WarnLimit);
+        }
+      }
     }
   };
 }
@@ -1191,8 +1218,8 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
     return false;
 
   Optional<FunctionBodyTimer> timer;
-  if (DebugTimeFunctionBodies)
-    timer.emplace(AFD);
+  if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
+    timer.emplace(AFD, DebugTimeFunctionBodies, WarnLongFunctionBodies);
 
   if (typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc()))
     return true;
@@ -1433,8 +1460,8 @@ void TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   BraceStmt *body = closure->getBody();
 
   Optional<FunctionBodyTimer> timer;
-  if (DebugTimeFunctionBodies)
-    timer.emplace(closure);
+  if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
+    timer.emplace(closure, DebugTimeFunctionBodies, WarnLongFunctionBodies);
 
   StmtChecker(*this, closure).typeCheckBody(body);
   if (body) {

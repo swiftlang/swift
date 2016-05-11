@@ -498,7 +498,8 @@ void swift::typeCheckExternalDefinitions(SourceFile &SF) {
 
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 OptionSet<TypeCheckingFlags> Options,
-                                unsigned StartElem) {
+                                unsigned StartElem,
+                                unsigned WarnLongFunctionBodies) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
@@ -516,6 +517,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     TypeChecker TC(Ctx);
     SharedTimer timer("Type checking / Semantic analysis");
 
+    TC.setWarnLongFunctionBodies(WarnLongFunctionBodies);
     if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
       TC.enableDebugTimeFunctionBodies();
 

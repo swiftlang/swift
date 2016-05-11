@@ -128,6 +128,12 @@ public:
   /// The path to collect the group information for the compiled source files.
   std::string GroupInfoPath;
 
+  /// If non-zero, warn when a function body takes longer than this many
+  /// milliseconds to type-check.
+  ///
+  /// Intended for debugging purposes only.
+  unsigned WarnLongFunctionBodies = 0;
+
   enum ActionType {
     NoneAction, ///< No specific action
     Parse, ///< Parse and type-check only

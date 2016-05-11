@@ -545,6 +545,12 @@ private:
   /// The index of the next response metavariable to bind to a REPL result.
   unsigned NextResponseVariableIndex = 0;
 
+  /// If non-zero, warn when a function body takes longer than this many
+  /// milliseconds to type-check.
+  ///
+  /// Intended for debugging purposes only.
+  unsigned WarnLongFunctionBodies = 0;
+
   /// If true, the time it takes to type-check each function will be dumped
   /// to llvm::errs().
   bool DebugTimeFunctionBodies = false;
@@ -569,6 +575,14 @@ public:
   /// Dump the time it takes to type-check each function to llvm::errs().
   void enableDebugTimeFunctionBodies() {
     DebugTimeFunctionBodies = true;
+  }
+
+  /// If \p timeInMS is non-zero, warn when a function body takes longer than
+  /// this many milliseconds to type-check.
+  ///
+  /// Intended for debugging purposes only.
+  void setWarnLongFunctionBodies(unsigned timeInMS) {
+    WarnLongFunctionBodies = timeInMS;
   }
 
   bool getInImmediateMode() {
