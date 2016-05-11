@@ -98,9 +98,9 @@ case NSAliasesEnum.differentValue:
 extension NSAliasesEnum {
   func test() {
     switch aliasOriginal {
-    case .bySameValue:
+    case bySameValue:
       break
-    case .differentValue:
+    case differentValue:
       break
     }
   }
