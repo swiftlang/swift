@@ -2031,7 +2031,7 @@ void SwiftMergeFunctions::removeEquivalenceClassFromTree(FunctionEntry *FE) {
 // Helper for writeThunk,
 // Selects proper bitcast operation,
 // but a bit simpler then CastInst::getCastOpcode.
-static Value *createCast(IRBuilder<false> &Builder, Value *V, Type *DestTy) {
+static Value *createCast(IRBuilder<> &Builder, Value *V, Type *DestTy) {
   Type *SrcTy = V->getType();
   if (SrcTy->isStructTy()) {
     assert(DestTy->isStructTy());
@@ -2066,7 +2066,7 @@ void SwiftMergeFunctions::writeThunk(Function *ToFunc, Function *Thunk,
   Thunk->dropAllReferences();
   
   BasicBlock *BB = BasicBlock::Create(Thunk->getContext(), "", Thunk);
-  IRBuilder<false> Builder(BB);
+  IRBuilder<> Builder(BB);
 
   SmallVector<Value *, 16> Args;
   unsigned ParamIdx = 0;
@@ -2137,7 +2137,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
 
     SmallVector<Type *, 8> OldParamTypes;
     SmallVector<Value *, 16> NewArgs;
-    IRBuilder<false> Builder(CI);
+    IRBuilder<> Builder(CI);
 
     FunctionType *NewFuncTy = New->getFunctionType();
     unsigned ParamIdx = 0;
