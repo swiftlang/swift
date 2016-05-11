@@ -106,6 +106,8 @@ SILValue swift::stripCasts(SILValue V) {
 
 SILValue swift::stripUpCasts(SILValue V) {
   assert((V->getType().isClassOrClassMetatype() ||
+          V->getType().isAnyExistentialType() ||
+          V->getType().is<AnyMetatypeType>() ||
           V->getType().hasArchetype()) &&
          "Expected class or class metatype!");
 

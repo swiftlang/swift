@@ -2066,13 +2066,21 @@ public:
                 "downcast must convert to a subclass");
 
       } else {
-        // It is a cast of an opened class existential.
-        require(fromCanTy.isAnyClassReferenceType() &&
-                isa<ArchetypeType>(fromCanTy),
+        require(fromCanTy->isAnyExistentialType() ||
+                fromCanTy->is<AnyMetatypeType>() ||
+                fromCanTy->getNominalOrBoundGenericNominal() ||
+                (isa<ArchetypeType>(fromCanTy)),
                 "downcast operand must be a class type or opened existential");
+        // It is a cast of an opened class existential.
+        //require(fromCanTy.isAnyClassReferenceType() &&
+        //        isa<ArchetypeType>(fromCanTy),
+        //        "downcast operand must be a class type or opened existential");
       }
-      require(toCanTy.getClassOrBoundGenericClass(),
-              "downcast must convert to a class type");
+      require(toCanTy.getNominalOrBoundGenericNominal(),
+              "downcast must convert to a nominal type");
+
+      //require(toCanTy.getClassOrBoundGenericClass(),
+      //        "downcast must convert to a class type");
     }
   }
 

@@ -89,9 +89,9 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
                                                  SILType fromType,
                                                  SILType toType) {
   // Check metatype objects directly. Don't try to find their meta-metatype.
-  bool isMetatype = isa<MetatypeType>(fromType.getSwiftRValueType());
+  bool isMetatype = isa<AnyMetatypeType>(fromType.getSwiftRValueType());
   if (isMetatype) {
-    auto metaType = cast<MetatypeType>(toType.getSwiftRValueType());
+    auto metaType = cast<AnyMetatypeType>(toType.getSwiftRValueType());
     assert(metaType->getRepresentation() != MetatypeRepresentation::ObjC &&
            "not implemented");
     toType = IGF.IGM.getLoweredType(metaType.getInstanceType());
@@ -105,7 +105,9 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   // test might fail; but it's a much faster check.
   // TODO: use ObjC class references
   llvm::Value *targetMetadata;
-  if (allowConservative &&
+  if (!toType.isAnyClassReferenceType()) {
+    targetMetadata = IGF.emitTypeMetadataRef(toType.getSwiftRValueType());
+  } else if (allowConservative &&
       (targetMetadata =
         tryEmitConstantHeapMetadataRef(IGF.IGM, toType.getSwiftRValueType(),
                                        /*allowUninitialized*/ true))) {

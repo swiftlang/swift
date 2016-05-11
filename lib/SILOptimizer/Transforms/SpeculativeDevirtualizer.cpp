@@ -38,238 +38,17 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
+#include "swift/SIL/DebugUtils.h"
+
 using namespace swift;
 
 static const char *Functions[] = {
-"_TZFsoi2aauRxs7BooleanrFzTxKzT_Sb_Sb",
-"_TFs9_fastPathuRxs7BooleanrFxSb",
-"_TFs9_slowPathuRxs7BooleanrFxSb",
-"_TZFsoi2oouRxs7BooleanrFzTxKzT_Sb_Sb",
-"_TFs11numericCastu0_Rxs14_SignedInteger_S_rFxq_",
-"_TFs11numericCastu0_Rxs14_SignedInteger_S_rFxq_",
-"_TFs11numericCastu0_Rxs14_SignedInteger_S_rFxq_",
-"_TFs11numericCastu0_Rxs14_SignedInteger_S_rFxq_",
-"_TFs11numericCastu0_Rxs14_SignedInteger_S_rFxq_",
-"_TFs11_branchHintuRxs7BooleanrFTx8expectedSb_Sb",
-"_TFSbCuRxs7BooleanrfxSb",
-"_TZFsop1nuRxs7BooleanrFxSb",
-"_TZFsoi2aau0_Rxs7Boolean_S_rFzTxKzT_q__Sb",
-"_TZFsoi2aau0_Rxs7Boolean_S_rFzTxKzT_q__Sb",
-"_TZFsoi2oou0_Rxs7Boolean_S_rFzTxKzT_q__Sb",
-"_TZFsoi2oou0_Rxs7Boolean_S_rFzTxKzT_q__Sb",
-"_TFs11numericCastu0_Rxs14_SignedInteger_s15UnsignedIntegerrFxq_",
-"_TFs11numericCastu0_Rxs14_SignedInteger_s15UnsignedIntegerrFxq_",
-"_TFs11numericCastu0_Rxs14_SignedInteger_s15UnsignedIntegerrFxq_",
-"_TFs11numericCastu0_Rxs14_SignedInteger_s15UnsignedIntegerrFxq_",
-"_TFs11numericCastu0_Rxs14_SignedInteger_s15UnsignedIntegerrFxq_",
-"_TFs10_introSortuRxs17MutableCollectionwx5Indexs17RandomAccessIndexWx8Iterator7Element_s10ComparablerFTRx8subRangeGVs5RangewxS0___T_",
-"_TFs10_introSortuRxs17MutableCollectionwx5Indexs17RandomAccessIndexWx8Iterator7Element_s10ComparablerFTRx8subRangeGVs5RangewxS0___T_",
-"_TFs10_introSortuRxs17MutableCollectionwx5Indexs17RandomAccessIndexWx8Iterator7Element_s10ComparablerFTRx8subRangeGVs5RangewxS0___T_",
-"_TFs10_introSortuRxs17MutableCollectionwx5Indexs17RandomAccessIndexWx8Iterator7Element_s10ComparablerFTRx8subRangeGVs5RangewxS0___T_",
-"_TFs10_introSortuRxs17MutableCollectionwx5Indexs17RandomAccessIndexWx8Iterator7Element_s10ComparablerFTRx8subRangeGVs5RangewxS0___T_",
-"_TFs10_introSortuRxs17MutableCollectionwx5Indexs17RandomAccessIndexrFTRx8subRangeGVs5RangewxS0__15isOrderedBeforeFTWx8Iterator7Element_WxS3_S4___Sb_T_",
-"_TFs10_introSortuRxs17MutableCollectionwx5Indexs17RandomAccessIndexrFTRx8subRangeGVs5RangewxS0__15isOrderedBeforeFTWx8Iterator7Element_WxS3_S4___Sb_T_",
-"_TFs10_introSortuRxs17MutableCollectionwx5Indexs17RandomAccessIndexrFTRx8subRangeGVs5RangewxS0__15isOrderedBeforeFTWx8Iterator7Element_WxS3_S4___Sb_T_",
-"_TFs10_introSortuRxs17MutableCollectionwx5Indexs17RandomAccessIndexrFTRx8subRangeGVs5RangewxS0__15isOrderedBeforeFTWx8Iterator7Element_WxS3_S4___Sb_T_",
-"_TFs10_introSortuRxs17MutableCollectionwx5Indexs17RandomAccessIndexrFTRx8subRangeGVs5RangewxS0__15isOrderedBeforeFTWx8Iterator7Element_WxS3_S4___Sb_T_",
-"_TFs11numericCastu0_Rxs15UnsignedInteger_S_rFxq_",
-"_TFs11numericCastu0_Rxs15UnsignedInteger_S_rFxq_",
-"_TFs11numericCastu0_Rxs15UnsignedInteger_S_rFxq_",
-"_TFs11numericCastu0_Rxs15UnsignedInteger_S_rFxq_",
-"_TFs11numericCastu0_Rxs15UnsignedInteger_S_rFxq_",
-"_TFs11numericCastu0_Rxs15UnsignedInteger_s14_SignedIntegerrFxq_",
-"_TFs11numericCastu0_Rxs15UnsignedInteger_s14_SignedIntegerrFxq_",
-"_TFs11numericCastu0_Rxs15UnsignedInteger_s14_SignedIntegerrFxq_",
-"_TFs11numericCastu0_Rxs15UnsignedInteger_s14_SignedIntegerrFxq_",
-"_TFs11numericCastu0_Rxs15UnsignedInteger_s14_SignedIntegerrFxq_",
-"_TFSSCuRxs14_SignedIntegerrfxSS",
-"_TFSSCuRxs14_SignedIntegerrfxSS",
-"_TFSSCuRxs14_SignedIntegerrfxSS",
-"_TFSSCuRxs14_SignedIntegerrfxSS",
-"_TFSSCuRxs14_SignedIntegerrfxSS",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_",
-"_TFFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_L_13printTypeNamefPMP_T_",
-"_TFFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_L_13printTypeNamefPMP_T_",
-"_TFSS5writeuRxs12OutputStreamrfT2toRx_T_",
-"_TFSS5writeuRxs12OutputStreamrfT2toRx_T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFs19_dumpPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq__T_",
-"_TFVs9Character5writeuRxs12OutputStreamrfT2toRx_T_",
-"_TFVs9Character5writeuRxs12OutputStreamrfT2toRx_T_",
-"_TFSc5writeuRxs12OutputStreamrfT2toRx_T_",
-"_TFSc5writeuRxs12OutputStreamrfT2toRx_T_",
-"_TFVs10_TeeStream5writefSST_",
-"_TFVs10_TeeStream5writefSST_",
-"_TFVs10_TeeStream5writefSST_",
-"_TFVs10_TeeStream5writefSST_",
-"_TFVs10_TeeStream5_lockfT_T_",
-"_TFVs10_TeeStream5_lockfT_T_",
-"_TFVs10_TeeStream5_lockfT_T_",
-"_TFVs10_TeeStream5_lockfT_T_",
-"_TFVs10_TeeStream7_unlockfT_T_",
-"_TFVs10_TeeStream7_unlockfT_T_",
-"_TFVs10_TeeStream7_unlockfT_T_",
-"_TFVs10_TeeStream7_unlockfT_T_",
-"_TFs6_printuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_",
-"_TFs6_printuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_",
-"_TFs6_printuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_",
-"_TFs6_printuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_",
-"_TFs6_printuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_",
-"_TFs6_printuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_",
-"_TFs11_debugPrintuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_",
-"_TFs11_debugPrintuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_",
-"_TFs11_debugPrintuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_",
-"_TFs11_debugPrintuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_",
-"_TFs11_debugPrintuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_",
-"_TFs11_debugPrintuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_",
-"_TFFs6_printuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_L_6$deferfT_T_",
-"_TFFs6_printuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_L_6$deferfT_T_",
-"_TFFs11_debugPrintuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_L_6$deferfT_T_",
-"_TFFs11_debugPrintuRxs12OutputStreamrFTGSaP__9separatorSS10terminatorSS2toRx_T_L_6$deferfT_T_",
-"_TFs4dumpu0_R_s12OutputStreamrFTx2toRq_4nameGSqSS_6indentSi8maxDepthSi8maxItemsSi_x",
-"_TFs4dumpu0_R_s12OutputStreamrFTx2toRq_4nameGSqSS_6indentSi8maxDepthSi8maxItemsSi_x",
-"_TFFs4dumpu0_R_s12OutputStreamrFTx2toRq_4nameGSqSS_6indentSi8maxDepthSi8maxItemsSi_xL_6$deferfT_T_",
-"_TFFs4dumpu0_R_s12OutputStreamrFTx2toRq_4nameGSqSS_6indentSi8maxDepthSi8maxItemsSi_xL_6$deferfT_T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs14_dump_unlockeduRxs12OutputStreamrFTP_2toRx4nameGSqSS_6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs24_dumpSuperclass_unlockeduRxs12OutputStreamrFT6mirrorVs6Mirror2toRx6indentSi8maxDepthSi14maxItemCounterRSi12visitedItemsRGVs10DictionaryVs16ObjectIdentifierSi__T_",
-"_TFs8_heapifyuRxs17MutableCollectionwx5Indexs17RandomAccessIndexrFTRx8subRangeGVs5RangewxS0__15isOrderedBeforeRFTWx8Iterator7Element_WxS3_S4___Sb_T_",
-"_TFs8_heapifyuRxs17MutableCollectionwx5Indexs17RandomAccessIndexrFTRx8subRangeGVs5RangewxS0__15isOrderedBeforeRFTWx8Iterator7Element_WxS3_S4___Sb_T_",
-"_TFs8_heapifyuRxs17MutableCollectionwx5Indexs17RandomAccessIndexrFTRx8subRangeGVs5RangewxS0__15isOrderedBeforeRFTWx8Iterator7Element_WxS3_S4___Sb_T_",
-"_TFs8_heapifyuRxs17MutableCollectionwx5Indexs17RandomAccessIndexrFTRx8subRangeGVs5RangewxS0__15isOrderedBeforeRFTWx8Iterator7Element_WxS3_S4___Sb_T_",
-"_TFs8_heapifyuRxs17MutableCollectionwx5Indexs17RandomAccessIndexrFTRx8subRangeGVs5RangewxS0__15isOrderedBeforeRFTWx8Iterator7Element_WxS3_S4___Sb_T_",
-"_TFs8_heapifyuRxs17MutableCollectionwx5Indexs17RandomAccessIndexWx8Iterator7Element_s10ComparablerFTRx8subRangeGVs5RangewxS0___T_",
-"_TFs8_heapifyuRxs17MutableCollectionwx5Indexs17RandomAccessIndexWx8Iterator7Element_s10ComparablerFTRx8subRangeGVs5RangewxS0___T_",
-"_TFs8_heapifyuRxs17MutableCollectionwx5Indexs17RandomAccessIndexWx8Iterator7Element_s10ComparablerFTRx8subRangeGVs5RangewxS0___T_",
-"_TFs8_heapifyuRxs17MutableCollectionwx5Indexs17RandomAccessIndexWx8Iterator7Element_s10ComparablerFTRx8subRangeGVs5RangewxS0___T_",
-"_TFs8_heapifyuRxs17MutableCollectionwx5Indexs17RandomAccessIndexWx8Iterator7Element_s10ComparablerFTRx8subRangeGVs5RangewxS0___T_",
-"_TFSSCuRxs15UnsignedIntegerrfxSS",
-"_TFSSCuRxs15UnsignedIntegerrfxSS",
-"_TFSSCuRxs15UnsignedIntegerrfxSS",
-"_TFSSCuRxs15UnsignedIntegerrfxSS",
-"_TFSSCuRxs15UnsignedIntegerrfxSS",
-"_TFSSCuRxs14_SignedIntegerrfTx5radixSi9uppercaseSb_SS",
-"_TFSSCuRxs14_SignedIntegerrfTx5radixSi9uppercaseSb_SS",
-"_TFSSCuRxs14_SignedIntegerrfTx5radixSi9uppercaseSb_SS",
-"_TFSSCuRxs14_SignedIntegerrfTx5radixSi9uppercaseSb_SS",
-"_TFSSCuRxs14_SignedIntegerrfTx5radixSi9uppercaseSb_SS",
-"_TFSSCuRxs15UnsignedIntegerrfTx5radixSi9uppercaseSb_SS",
-"_TFSSCuRxs15UnsignedIntegerrfTx5radixSi9uppercaseSb_SS",
-"_TFSSCuRxs15UnsignedIntegerrfTx5radixSi9uppercaseSb_SS",
-"_TFSSCuRxs15UnsignedIntegerrfTx5radixSi9uppercaseSb_SS",
-"_TFSSCuRxs15UnsignedIntegerrfTx5radixSi9uppercaseSb_SS",
 };
 
 static int startIdx = 78;
 // Start: minIdx = 0: max index: 201
 // static int endIdx = sizeof(Functions)/sizeof(Functions[0]);
 static int endIdx = 79;
-// 201 - bad (all bugs), 100 - bad ( bugs 72), 50 - bad (bugs 17), 25 - bad (bugs - 4)
-// (25, 50) - bad (bugs 17)
-// (25, 38) - bad (bugs 4)
-// (38, 50) - bad (bugs 17)
-// (38, 44) - bad (bugs 4)
-// (44, 47) - bad (bugs 17)
-// (47, 50) - bad (bugs 17)
-// (46, 47) - bad (bugs 17) -> the problematic function is (46) _TFs20_adHocPrint_unlockedu0_R_s12OutputStreamrFTxVs6MirrorRq_12isDebugPrintSb_T_<Paste>
-// which is Swift._adHocPrint_unlocked <A, B where B: Swift.OutputStream> (A, Swift.Mirror, inout B, isDebugPrint : Swift.Bool) -> () 
-// (44, 46) - bad (bugs 4)
-// (50, 100) - bad (bugs 72)
-// (50, 75) - bad (bugs 17)
-// (75, 81) - bad (bugs 72)
-// (75, 78) - bad (bugs 26)
-// (75, 76) - bad (bugs 17)
-// (76, 78) - bad (bugs 18)
-// (78, 81) - bad (bugs 66)
-// (78, 80) - bad (bugs 65)
-// (78, 79) - bad (bugs 65)
-// problem in _TFSS5writeuRxs12OutputStreamrfT2toRx_T_
-// Swift.String.write <A where A: Swift.OutputStream> (to : inout A) -> ()
-// (87, 100) - bad (bugs 9)
 
 static bool shouldProcessFunction(const char *Functions[], StringRef FuncName,
                                   int startIdx, int endIdx) {
@@ -366,9 +145,10 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
 
   //ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
   MethodInst *CMI = cast<MethodInst>(AI.getCallee());
+  auto Self = CMI->getOperand(0);
 
   CCBI = Builder.createCheckedCastBranch(AI.getLoc(), /*exact*/ true,
-                                       CMI->getOperand(0), SubType, Iden,
+                                       Self, SubType, Iden,
                                        Virt);
   It = CCBI->getIterator();
 
@@ -385,8 +165,8 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   // apply. If it exists, move it into position in the diamond.
   if (auto *Release =
           dyn_cast<StrongReleaseInst>(std::next(Continue->begin()))) {
-    if (Release->getOperand() == CMI->getOperand(0)) {
-      VirtBuilder.createStrongRelease(Release->getLoc(), CMI->getOperand(0),
+    if (Release->getOperand() == Self) {
+      VirtBuilder.createStrongRelease(Release->getLoc(), Self,
                                       Atomicity::Atomic);
       IdenBuilder.createStrongRelease(
           Release->getLoc(), DownCastedClassInstance, Atomicity::Atomic);
@@ -456,18 +236,6 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   return VirtAI;
 }
 
-static FullApplySite speculateMonomorphicMetatypeTarget(FullApplySite AI,
-                                                SILType SubType,
-                                                CheckedCastAddrBranchInst *&CCBI) {
-  llvm::dbgs() << "\nCannot devirt witness_method invocations on metatypes yet."
-    << " In function: " << AI.getFunction()->getName() << "\n";
-  AI.getInstruction()->dump();
-  return FullApplySite();
-}
-
-/// TODO: The following helper functions are borrowed from the @specialize
-/// implementation. Make them utility functions.
-
 /// Returns the thick metatype for the given SILType.
 /// e.g. $*T -> $@thick T.Type
 static SILType getThickMetatypeType(CanType Ty) {
@@ -479,73 +247,89 @@ static SILType getThickMetatypeType(CanType Ty) {
   return SILType::getPrimitiveObjectType(SwiftTy);
 }
 
-// Emits a type check in the current block.
-// Advances the builder to the successful type check's block.
-// 
-// Precondition: Builder's current insertion block is not terminated.
-//
-// Postcondition: Builder's insertion block is a new block that defines the
-// specialized call argument and has not been terminated.
-//
-// The type check is emitted in the current block as: 
-// metatype $@thick T.Type
-// %a = unchecked_bitwise_cast % to $Builtin.Int64
-// metatype $@thick <Specialized>.Type
-// %b = unchecked_bitwise_cast % to $Builtin.Int64
-// builtin "cmp_eq_Int64"(%a : $Builtin.Int64, %b : $Builtin.Int64)
-//   : $Builtin.Int1
-// cond_br %
-static void
-emitTypeCheck1(SILBuilder &Builder, SILLocation &Loc,
-              SILBasicBlock *FailedTypeCheckBB, SILType SelfTy,
-              SILType SubTy) {
-  // Instantiate a thick metatype for T.Type
-  auto GenericMT = Builder.createMetatype(
-    Loc, getThickMetatypeType(SelfTy.getSwiftRValueType()));
+// If possible, replace a sequence of instructions for obtaining
+// the dynamic type of the existential by a sequence of instructions
+// for obtaining a static type of the existential.
+static SILValue replaceDynamicTypeByStaticType(FullApplySite AI,
+                                               SILValue Self) {
+  auto &Module = AI.getModule();
+  WitnessMethodInst *CMI = cast<WitnessMethodInst>(AI.getCallee());
 
-  // Instantiate a thick metatype for <Specialized>.Type
-  auto SpecializedMT = Builder.createMetatype(
-    Loc, getThickMetatypeType(SubTy.getSwiftRValueType()));
+  // Check for a special pattern
+  // %emt = open_existential_metatype ( existential_metatype ...)
+  // apply %f(%emt)
+  if (auto *OEMI = dyn_cast<OpenExistentialMetatypeInst>(Self)) {
+    if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(OEMI->getOperand())) {
+      if (!isa<TryApplyInst>(AI.getInstruction())) {
+        // Check that open_existential_metatype is only used by
+        // witness_metho
+        // and apply instructions.
+        bool isValid = true;
+        unsigned Count = 0;
+        for (auto Use : getNonDebugUses(OEMI)) {
+          auto User = Use->getUser();
+          Count++;
+          if (isa<ApplyInst>(User) || isa<WitnessMethodInst>(User))
+            continue;
+          isValid = false;
+          break;
+        }
+        if (isValid && Count == 2) {
+          // Use a more efficient sequence
+          // metatype (open_existential_addr)
+          SILBuilderWithScope Builder(CMI);
+          auto OEAI = Builder.createOpenExistentialAddr(
+              AI.getLoc(), EMI->getOperand(),
+              Self->getType().getMetatypeInstanceType(Module));
+          Self = Builder.createMetatype(AI.getLoc(), Self->getType());
+          SILBuilderWithScope Builder2(
+              std::next(AI.getInstruction()->getIterator()));
+          Builder2.createFixLifetime(AI.getLoc(), OEAI);
+          OEMI->replaceAllUsesWith(Self);
+          // Remove the old Self
+          OEMI->eraseFromParent();
+          if (onlyHaveDebugUses(EMI))
+            EMI->eraseFromParent();
+        }
+      }
+    }
+  }
 
-  auto &Ctx = Builder.getASTContext();
-  auto WordTy = SILType::getBuiltinWordType(Ctx);
-  auto GenericMTVal =
-    Builder.createUncheckedBitwiseCast(Loc, GenericMT, WordTy);
-  auto SpecializedMTVal =
-    Builder.createUncheckedBitwiseCast(Loc, SpecializedMT, WordTy);
+  // Check for a special pattern:
+  // %vmt = value_metatype
+  // apply %f(%vmt)
+  if (auto *VMT = dyn_cast<ValueMetatypeInst>(Self)) {
+    bool isValid = true;
+    for (auto Use : getNonDebugUses(VMT)) {
+      if (auto UAI = FullApplySite::isa(Use->getUser())) {
+        if (UAI.getSelfArgument() == Self && UAI.getCallee() == CMI)
+          continue;
+      }
+      isValid = false;
+      break;
+    }
 
-  auto Cmp =
-    Builder.createBuiltinBinaryFunction(Loc, "cmp_eq", WordTy,
-                                        SILType::getBuiltinIntegerType(1, Ctx),
-                                        {GenericMTVal, SpecializedMTVal});
-
-  auto *SuccessBB = Builder.getFunction().createBasicBlock();
-  Builder.createCondBranch(Loc, Cmp, SuccessBB, FailedTypeCheckBB);
-  Builder.emitBlock(SuccessBB);
-}
-
-static void
-emitTypeCheck(SILBuilder &Builder, SILLocation &Loc,
-              SILBasicBlock *FailedTypeCheckBB, SILType SelfTy,
-              SILType SubTy) {
-  auto Cmp = Builder.createIsSameTypeInst(Loc, SelfTy.getSwiftRValueType(),
-                                          SubTy.getSwiftRValueType());
-  auto *SuccessBB = Builder.getFunction().createBasicBlock();
-  Builder.createCondBranch(Loc, Cmp, SuccessBB, FailedTypeCheckBB);
-  Builder.emitBlock(SuccessBB);
+    if (isValid) {
+      SILBuilderWithScope Builder(VMT);
+      Self = Builder.createMetatype(AI.getLoc(), VMT->getType());
+      VMT->replaceAllUsesWith(Self);
+      VMT->eraseFromParent();
+    }
+  }
+  return Self;
 }
 
 // Insert monomorphic inline caches for a specific class or metatype
 /// type \p SubClassTy.
 static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
                                                 SILType SubType,
-                                                SILValue SelfCopyAlloc,
-                                                CheckedCastAddrBranchInst *&CCBI,
-                                                SmallVectorImpl<SILInstruction *> &InsertedDeallocs
+                                                CheckedCastAddrBranchInst *&CCBI
 ) {
   CCBI = nullptr;
 
-  MethodInst *CMI = cast<MethodInst>(AI.getCallee());
+  auto &Module = AI.getModule();
+  WitnessMethodInst *CMI = cast<WitnessMethodInst>(AI.getCallee());
+  ProtocolDecl *WMIProtocol = CMI->getLookupProtocol();
   assert(AI.hasSelfArgument());
   auto Self = AI.getSelfArgument();
   bool isMetatype = false;
@@ -554,46 +338,27 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   if (Self->getType().is<MetatypeType>()) {
     //return speculateMonomorphicMetatypeTarget(AI, SubType, CCBI);
     isMetatype = true;
+
+    // NOTE: For speculative devirtualization we do not always need
+    // the exact dynamic type. A static type of the opaque existention is
+    // also OK.
+    // This is because for the non-class payloads, the static type and the
+    // dynamic type are always the same. For classes, it may be different,
+    // because the actual instance may be of a derived type of the static type.
+    if (!WMIProtocol->requiresClass()) {
+      Self = replaceDynamicTypeByStaticType(AI, Self);
+    }
   }
 
-  // Bail if this class_method cannot be devirtualized.
   SILType LookupType = SubType;
   if (isMetatype && SubType.is<MetatypeType>()) {
     //assert(SubType.is<MetatypeType>() && "Sub-type should be a metatype");
-    LookupType = SubType.getMetatypeInstanceType(AI.getModule());
+    LookupType = SubType.getMetatypeInstanceType(Module);
   }
 
+  // Bail if this witness_method cannot be devirtualized.
   if (!canDevirtualizeClassMethod(AI, LookupType))
     return FullApplySite();
-
-
-  // TODO: If self is open_existential_addr, then the result
-  // of open_existential_addr is the address of the payload.
-  // It should be used as a self for the devirtualized method.
-  // this may require casting into a proper pointer type required
-  // by the devirtualized method.
-  // In general, Self should be used as self for a devirtualized method.
-  auto *OEAI = dyn_cast<OpenExistentialAddrInst>(Self);
-
-  // Find the original exsistential which is referred by the opened_existential used by
-  // the apply instruciton.
-  SILValue OrigExistential;
-
-  // Handle the case where Self is a "metatype $@thick U.Type" instruction.
-  // It happens e.g. if one calls an initializer on this value.
-  if (OEAI)
-    OrigExistential = OEAI->getOperand();
-  else
-    OrigExistential = Self;
-
-  /*
-  if (!OEAI) {
-    llvm::dbgs() << "\nCannot speculateMonomorphicTarget in function "
-                 << AI.getFunction()->getName() << ":\n";
-    AI.getInstruction()->dumpInContext();
-    return FullApplySite();
-  }
-  */
 
   // Create a diamond shaped control flow and a checked_cast_addr_br
   // instruction that checks the exact type of the object.
@@ -607,29 +372,23 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILBasicBlock *Iden = F->createBasicBlock();
   // Virt is the block containing the slow virtual call.
   SILBasicBlock *Virt = F->createBasicBlock();
-  //Iden->createBBArg(SubType);
+
+  auto SubTypeMetatype = MetatypeType::get(SubType.getSwiftRValueType(),
+                                           MetatypeRepresentation::Thick);
+
+  SILType TargetType;
+  if ((isMetatype && SubType.is<MetatypeType>()) || WMIProtocol->requiresClass())
+    TargetType = SubType;
+  else
+    TargetType = Module.Types.getLoweredType(SubTypeMetatype, 0);
+
+  Iden->createBBArg(TargetType);
 
   SILBasicBlock *Continue = Entry->splitBasicBlock(It);
 
   SILBuilderWithScope Builder(Entry, AI.getInstruction());
 
-#if 0
-  SILValue SelfCopyAlloc;
-
-  // TODO: It is probably enough to allocate the copy only once for
-  // any given switch with multiple alternatives.
-  SelfCopyAlloc =
-      Builder.createAllocStack(AI.getLoc(), OrigExistential->getType());
-  Builder.createCopyAddr(AI.getLoc(), OrigExistential, SelfCopyAlloc,
-                         /* isTake */ IsTake_t::IsNotTake,
-                         /* isInit */ IsInitialization_t::IsInitialization);
-#endif
-
   auto Loc = AI.getLoc();
-  ////SILValue TargetAlloc;
-  // create alloc_stack for a target type.
-  ////TargetAlloc = Builder.createAllocStack(AI.getLoc(), SubType);
-
   // Check if the type of of self is identical to the subtype.
   // To do this, extract the information about the static type from the
   // existential or extract the information from the argument of a generic type.
@@ -637,39 +396,31 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   // Create the checked_cast_addr_branch instruction that checks at runtime if the
   // class instance is identical to the SILType.
   //
-  if (isMetatype) {
-    emitTypeCheck(Builder, Loc, Virt,
-                  Self->getType().getMetatypeInstanceType(AI.getModule()),
-                  SubType);
-    Builder.createBranch(Loc, Iden);
-  } else if (!OEAI) {
-    // Self is not an existential. Switch on its metatype.
-    emitTypeCheck(Builder, Loc, Virt, Self->getType().getObjectType(), SubType);
-    Builder.createBranch(Loc, Iden);
+  if (isMetatype || WMIProtocol->requiresClass()) {
+    assert((TargetType.is<MetatypeType>() ||
+            WMIProtocol->requiresClass()) &&
+           "Target type should be a metatype");
+    Builder.createCheckedCastBranch(AI.getLoc(), /*exact*/ true, Self,
+                                    TargetType, Iden, Virt);
   } else {
-    emitTypeCheck(Builder, Loc, Virt, Self->getType().getObjectType(), SubType);
-    Builder.createBranch(Loc, Iden);
-#if 0
-    CCBI = Builder.createCheckedCastAddrBranch(
-      AI.getLoc(), /*exact*/ true, CastConsumptionKind::TakeOnSuccess,
-      //AI.getLoc(), /*exact*/ true, CastConsumptionKind::TakeAlways,
-      SelfCopyAlloc, SelfCopyAlloc->getType().getSwiftRValueType(),
-      TargetAlloc, TargetAlloc->getType().getSwiftRValueType(),
-      Iden, Virt);
+    // It is OK to look at the static type of the existential.
+    auto MetaTy = Builder.createMetatype(
+        Loc, Module.Types.getLoweredType(
+                 MetatypeType::get(
+                     Self->getType().getSwiftRValueType(),
+                     SubTypeMetatype->getRepresentation()),
+                 0));
+    // CCBI =
+    Builder.createCheckedCastBranch(AI.getLoc(), /*exact*/ true,
+                                    MetaTy, TargetType, Iden,
+                                    Virt);
 
-  It = CCBI->getIterator();
-#endif
+
   }
 
   SILBuilderWithScope VirtBuilder(Virt, AI.getInstruction());
   SILBuilderWithScope IdenBuilder(Iden, AI.getInstruction());
 
-  ////InsertedDeallocs.push_back(VirtBuilder.createDeallocStack(Loc, TargetAlloc));
-  //VirtBuilder.createDeallocStack(Loc, SelfCopyAlloc);
-
-  //if (!OrigExistential->getType().isTrivial(AI.getModule()))
-  //  IdenBuilder.createDestroyAddr(AI.getLoc(), OrigExistential);
-  // IdenBuilder.createDestroyAddr(AI.getLoc(), SelfCopyAlloc);
 
   // Load the result of the cast.
   //SILValue DownCastedClassInstance = IdenBuilder.createLoad(AI.getLoc(), TargetAlloc);
@@ -682,17 +433,19 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   // the address of the argument of a generic type conforming to a protocol.
   DownCastedClassInstance = Self;
   if (!isMetatype) {
-  // Cast self to type required by the devirtualized function.
-  DownCastedClassInstance =
-      castValueToABICompatibleType(&IdenBuilder, AI.getLoc(), Self,
-                                   Self->getType(), SubType.getAddressType())
-          .getValue();
+    if (WMIProtocol->requiresClass())
+      DownCastedClassInstance = Iden->getBBArg(0);
+    else
+      // Cast self to type required by the devirtualized function.
+      DownCastedClassInstance = castValueToABICompatibleType(
+                                    &IdenBuilder, AI.getLoc(), Self,
+                                    Self->getType(), SubType.getAddressType())
+                                    .getValue();
   } else {
     DownCastedClassInstance = IdenBuilder.createMetatype(
         AI.getLoc(), getThickMetatypeType(SubType.getSwiftRValueType()));
   }
   //  IdenBuilder.createDeallocStack(Loc, TargetAlloc);
-  //  IdenBuilder.createDeallocStack(Loc, SelfCopyAlloc);
 
   // Copy the two apply instructions into the two blocks.
   FullApplySite IdenAI = CloneApply(AI, IdenBuilder);
@@ -703,7 +456,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   if (auto *Release =
           dyn_cast<StrongReleaseInst>(std::next(Continue->begin()))) {
     if (Release->getOperand() == Self) {
-      VirtBuilder.createStrongRelease(Release->getLoc(), CMI->getOperand(0),
+      VirtBuilder.createStrongRelease(Release->getLoc(), CMI->getOperand(),
                                       Atomicity::Atomic);
       IdenBuilder.createStrongRelease(
           Release->getLoc(), DownCastedClassInstance, Atomicity::Atomic);
@@ -754,15 +507,12 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
     SILBuilderWithScope Builder(
         &*std::next(NewInstPair.second.getInstruction()->getIterator()),
         NewInstPair.second.getInstruction());
-    ////InsertedDeallocs.push_back(Builder.createDeallocStack(Loc, TargetAlloc));
-    //Builder.createDeallocStack(Loc, SelfCopyAlloc);
   } else {
     // Insert the dealloc at the beginning of all successor blocks.
     for (auto SuccBB : NewInstPair.first->getParentBB()->getSuccessorBlocks()) {
       assert(SuccBB->getSinglePredecessor() &&
              "Successor blocks should have a single predecessor");
       ////SILBuilderWithScope Builder(&SuccBB->front());
-      ////InsertedDeallocs.push_back(Builder.createDeallocStack(Loc, TargetAlloc));
     }
     //llvm_unreachable("try_apply not supported yet");
   }
@@ -982,6 +732,9 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     Subs.erase(RemovedIt, Subs.end());
   }
 
+  // TODO: Remove any candidates that are not profitable from the inlining
+  // point of view.
+
   // Number of subclasses which cannot be handled by checked_cast_br checks.
   int NotHandledSubsNum = 0;
   if (Subs.size() > MaxNumSpeculativeTargets) {
@@ -1138,11 +891,6 @@ static bool tryToSpeculateTarget(FullApplySite AI,
       return false;
   }
 
-  // Strip any upcasts off of our 'self' value, potentially leaving us
-  // with a value whose type is closer (in the class hierarchy) to the
-  // actual dynamic type.
-  // CMI->getOperand() crashes, if this is a call like in
-  // func foo<T:S> (t: T) -> Int32 { return t.foo() }
   SILType SubType;
   if (CMI->hasOperand()) {
     SubType = CMI->getOperand()->getType();
@@ -1185,6 +933,9 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     Subs.erase(RemovedIt, Subs.end());
   }
 
+  // TODO: Remove any candidates that are not profitable from the inlining
+  // point of view.
+
   if (Subs.size() > MaxNumSpeculativeTargets) {
     // TODO: Use PGO to handle the most probable alternatives.
     DEBUG(llvm::dbgs() << "Protocol " << WMIProtocol->getName() << " has too many (" <<
@@ -1215,52 +966,20 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   //
   // TODO: The ordering of checks may benefit from using a PGO, because
   // the most probable alternatives could be checked first.
+  //
+  // TODO: If we have a class existential, then IRGen will lower dispatch
+  // on its type into a call of swift_getObjectType() followed by a switch.
+  // But it can be possible to have a cheaper way to to do this. We could
+  // check that the pointer it not a tagged pointer and then extract that
+  // static type as using a load. If the pointer is a tagged pointer,
+  // it is an ObjC object and thus its type cannot be equal to any
+  // Swift candidate type, which does not have an ObjC base.
+  // We may need to take non-ISA cases into account too.
 
-  SILInstruction *SelfCopyAlloc = nullptr;
-  SILInstruction *CopyAddrSelf = nullptr;
-  auto Loc = AI.getLoc();
-  SmallVector<SILInstruction *, 8> InsertedDeallocs;
-  if (!WMIProtocol->requiresClass()) {
-    // Create a copy of Self.
-    // It is enough to allocate the copy only once for
-    // any given switch with multiple alternatives.
-    auto Self = AI.getSelfArgument();
-    auto *OEAI = dyn_cast<OpenExistentialAddrInst>(Self);
-
-    // Find the original exsistential which is referred by the
-    // opened_existential used by the apply instruciton.
-    SILValue OrigExistential;
-
-    // Handle the case where Self is a "metatype $@thick U.Type" instruction.
-    // It happens e.g. if one calls an initializer on this value.
-    if (OEAI)
-      OrigExistential = OEAI->getOperand();
-    else
-      OrigExistential = Self;
-
-    if (!isa<MetatypeType>(Self->getType().getSwiftRValueType())) {
-
-      SILBuilderWithScope Builder(AI.getInstruction());
-      SelfCopyAlloc =
-          Builder.createAllocStack(AI.getLoc(), OrigExistential->getType());
-      CopyAddrSelf = Builder.createCopyAddr(AI.getLoc(), OrigExistential, SelfCopyAlloc,
-                             /* isTake */ IsTake_t::IsNotTake,
-                             /* isInit */ IsInitialization_t::IsInitialization);
-#if 0
-      // Insert dealloc of SelfCopyAlloc if needed.
-      if (auto *TAI = dyn_cast<TryApplyInst>(AI.getInstruction())) {
-        SILBuilderWithScope BuilderNormal(&TAI->getNormalBB()->front());
-        SILBuilderWithScope BuilderError(&TAI->getErrorBB()->front());
-        BuilderNormal.createDeallocStack(Loc, SelfCopyAlloc);
-        BuilderError.createDeallocStack(Loc, SelfCopyAlloc);
-      } else {
-        SILBuilderWithScope BuilderDealloc(
-            &*std::next(AI.getInstruction()->getIterator()));
-        BuilderDealloc.createDeallocStack(Loc, SelfCopyAlloc);
-      }
-#endif
-    }
-  }
+  // TODO: Group candidates into class and non-class candidates, if
+  // this is an opaque existential. This can be used to quickly skip
+  // useless checks if the existential contains a class, and the candidate
+  // is not a class.
 
   // Number of subclasses which cannot be handled by checked_cast_br checks.
   int NotHandledSubsNum = 0;
@@ -1280,7 +999,8 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     SILType ObjectTy = SILType::getPrimitiveObjectType(CanTy);
 
     if (!ObjectTy.getClassOrBoundGenericClass() &&
-        !ObjectTy.getStructOrBoundGenericStruct()) {
+        !ObjectTy.getStructOrBoundGenericStruct() &&
+        !ObjectTy.getEnumOrBoundGenericEnum()) {
       // This subclass cannot be handled. This happens e.g. if it is
       // a generic class.
       //llvm::dbgs() << "Cannot speculatively devirtualize type: "
@@ -1289,27 +1009,6 @@ static bool tryToSpeculateTarget(FullApplySite AI,
       NotHandledSubsNum++;
       continue;
     }
-
-#if 0
-    if (false && ObjectTy.getClassOrBoundGenericClass())
-    {
-      // Do not handle structs yet.
-      NotHandledSubsNum++;
-      continue;
-    }
-    if (false && !ObjectTy.isTrivial(AI.getModule()))
-    {
-      llvm::dbgs() << "Skip non-trivial type: ";
-      ObjectTy.dump();
-
-      // Do not handle structs yet.
-      NotHandledSubsNum++;
-      continue;
-    }
-#endif
-    //llvm::dbgs() << "Speculatively devirt type: ";
-    //ObjectTy.dump();
-
 
     auto ObjectOrMetatypeType = ObjectTy;
     if (auto EMT = SubType.getAs<AnyMetatypeType>()) {
@@ -1320,55 +1019,16 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     }
 
     FullApplySite NewAI;
-    if (WMIProtocol->requiresClass() && !SubType.getAs<AnyMetatypeType>()) {
-      // checked_cast_br can be used only for class protocols, because
-      // the size of the value needs to be known.
-      CheckedCastBranchInst *LastCCBI = nullptr;
-      NewAI = speculateMonomorphicTarget(AI, ObjectOrMetatypeType, LastCCBI);
-    } else {
-      // Pass the metatype of the subclass.
-      CheckedCastAddrBranchInst *LastCCABI = nullptr;
-      // TODO: Don't use checked_cast_br. Use something else if it is not
-      // known that all implementations are classes, i.e. it is effectively
-      // a class existential. Most likely, a checked_cast_addr_br [exact] should
-      // be used.
-      // Collect all inserted dealloc_stacks, because this info is needed to insert
-      // a dealloc_stack for the SelfCopyAlloc.
-      NewAI = speculateMonomorphicTarget(AI, ObjectOrMetatypeType,
-                                         SelfCopyAlloc, LastCCABI,
-                                         InsertedDeallocs);
-    }
+    // Pass the metatype of the subclass.
+    CheckedCastAddrBranchInst *LastCCABI = nullptr;
+    NewAI = speculateMonomorphicTarget(AI, ObjectOrMetatypeType,
+                                       LastCCABI);
     if (!NewAI) {
       NotHandledSubsNum++;
       continue;
     }
     AI = NewAI;
     Changed = true;
-  }
-
-  // Perform clean-up.
-  // Add dealloc_stack to match the alloc_stack if this stack location was used.
-  // If it was not used, remove the stack_alloc inserted above.
-  if (Changed && SelfCopyAlloc) {
-    SmallVector<SILInstruction *, 8> Users(InsertedDeallocs);
-    for (Operand *Op : SelfCopyAlloc->getUses()) {
-      Users.push_back(Op->getUser());
-    }
-    ValueLifetimeAnalysis VLA(SelfCopyAlloc, Users);
-    ValueLifetimeAnalysis::Frontier PAFrontier;
-    VLA.computeFrontier(PAFrontier, ValueLifetimeAnalysis::AllowToModifyCFG);
-    if (!PAFrontier.empty()) {
-      for (auto *EndPoint : PAFrontier) {
-        SILBuilderWithScope Builder(EndPoint);
-        Builder.createDestroyAddr(Loc, SelfCopyAlloc);
-        Builder.createDeallocStack(Loc, SelfCopyAlloc);
-      }
-    }
-  }
-
-  if (!Changed && SelfCopyAlloc) {
-    CopyAddrSelf->eraseFromParent();
-    SelfCopyAlloc->eraseFromParent();
   }
 
   return Changed;
