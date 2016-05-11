@@ -336,23 +336,16 @@ emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
     Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
 
   // Instantiate a thick metatype for <Specialized>.Type
-  auto SpecializedMT = Builder.createMetatype(
-    Loc, getThickMetatypeType(SubTy->getCanonicalType()));
+  auto SpecializedMT =
+      Builder.getModule().Types.getLoweredType(MetatypeType::get(
+          SubTy->getCanonicalType(), MetatypeRepresentation::Thick), 0);
 
   auto &Ctx = Builder.getASTContext();
-  auto WordTy = SILType::getBuiltinWordType(Ctx);
-  auto GenericMTVal =
-    Builder.createUncheckedBitwiseCast(Loc, GenericMT, WordTy);
-  auto SpecializedMTVal =
-    Builder.createUncheckedBitwiseCast(Loc, SpecializedMT, WordTy);
-
-  auto Cmp =
-    Builder.createBuiltinBinaryFunction(Loc, "cmp_eq", WordTy,
-                                        SILType::getBuiltinIntegerType(1, Ctx),
-                                        {GenericMTVal, SpecializedMTVal});
-
   auto *SuccessBB = Builder.getFunction().createBasicBlock();
-  Builder.createCondBranch(Loc, Cmp, SuccessBB, FailedTypeCheckBB);
+  SuccessBB->createBBArg(SpecializedMT);
+  Builder.createCheckedCastBranch(Loc, /* isExact*/ true, GenericMT,
+                                  SpecializedMT, SuccessBB,
+                                  FailedTypeCheckBB);
   Builder.emitBlock(SuccessBB);
 }
 
