@@ -22,14 +22,6 @@ from gyb_stdlib_support import (
 
 import StdlibUnittest
 
-/// State that is created every time a fresh generator is created with
-/// `MinimalSequence.makeIterator()`.
-internal class _MinimalIteratorPrivateState<T> {
-  internal init() {}
-
-  internal var returnedNilCounter: Int = 0
-}
-
 /// State shared by all generators of a MinimalSequence.
 internal class _MinimalIteratorSharedState<T> {
   internal init(_ data: [T]) {
@@ -64,26 +56,12 @@ public struct MinimalIterator<T> : IteratorProtocol {
 
   public func next() -> T? {
     if _sharedState.i == _sharedState.data.count {
-      if isConsumed {
-        expectUnreachable("next() was called on a consumed generator")
-      }
-      _privateState.returnedNilCounter += 1
       return nil
     }
     defer { _sharedState.i += 1 }
     return _sharedState.data[_sharedState.i]
   }
 
-  public var isConsumed: Bool {
-    return returnedNilCounter >= 1
-  }
-
-  public var returnedNilCounter: Int {
-    return _privateState.returnedNilCounter
-  }
-
-  internal let _privateState: _MinimalIteratorPrivateState<T> =
-    _MinimalIteratorPrivateState()
   internal let _sharedState: _MinimalIteratorSharedState<T>
 }
 
