@@ -64,5 +64,29 @@ ${Test}.test("flatMap/${Kind}/Lazy") {
       + "once per element")
     % end
   }
+  
+  for test in flatMapToOptionalTests {
+    let s = ${Minimal}<OpaqueValue<Int>>(elements:
+      test.sequence.map(OpaqueValue.init))
+    let closureLifetimeTracker = LifetimeTracked(0)
+    var timesClosureWasCalled = 0
+
+    var result = s.lazy.flatMap {
+      (element: OpaqueValue<Int>) -> OpaqueValue<Int32>? in
+      _blackHole(closureLifetimeTracker)
+      timesClosureWasCalled += 1
+      return test.transform(element.value).map(OpaqueValue.init)
+    }
+    expectEqual(0, timesClosureWasCalled, "unexpected eagerness")
+
+    let expected = test.expected.map(OpaqueValue.init)
+    expectEqualSequence(
+      expected, result,
+      stackTrace: SourceLocStack().with(test.loc)
+    ) { $0.value == $1.value }
+    expectEqual(
+      test.sequence.count, timesClosureWasCalled,
+      "iterating lazy flatMap() should call closure once per element")
+  }
 }
 % end

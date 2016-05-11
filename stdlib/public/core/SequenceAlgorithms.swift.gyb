@@ -657,10 +657,10 @@ extension Sequence {
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
   @warn_unused_result
-  public func flatMap<T>(
-    _ transform: @noescape (${GElement}) throws -> T?
-  ) rethrows -> [T] {
-    var result: [T] = []
+  public func flatMap<ElementOfResult>(
+    _ transform: @noescape (${GElement}) throws -> ElementOfResult?
+  ) rethrows -> [ElementOfResult] {
+    var result: [ElementOfResult] = []
     for element in self {
       if let newElement = try transform(element) {
         result.append(newElement)
