@@ -14,7 +14,7 @@ var closure3a : () -> () -> (Int,Int) = {{ (4, 2) }} // multi-level closing.
 var closure3b : (Int,Int) -> (Int) -> (Int,Int) = {{ (4, 2) }} // expected-error{{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}}  {{52-52=_,_ in }}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int = {
-       $0 + 1.0  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+       $0 + 1.0 // expected-error {{binary operator '+' cannot be applied to two 'Double' operands}} expected-note {{expected an argument list of type '(Int, Int)'}}
 }
 
 var closure6 = $0  // expected-error {{anonymous closure argument not contained in a closure}}
@@ -33,7 +33,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
   
   func6(fn: {$0 + $1})       // Closure with two named anonymous arguments
   func6(fn: {($0) + $1})    // Closure with sequence expr inferred type
-  func6(fn: {($0) + $0})    // expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Int'}}
+  func6(fn: {($0) + $0})    // // expected-error {{binary operator '+' cannot be applied to two '(Int, Int)' operands}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
 
   var testfunc : ((), Int) -> Int

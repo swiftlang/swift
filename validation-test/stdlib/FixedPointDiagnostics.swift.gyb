@@ -103,7 +103,7 @@ func testMixedSignArithmetic() {
     // disabled by the ambiguity trick.
     //===------------------------------------------------------------------===//
 
-    (x + x) as Stride   // expected-error {{}} // not convertible to 'Stride'
+    (x + x) as Stride   // expected-error {{}} expected-note {{}} // not convertible to 'Stride'
     Stride(1) - ${T}(0) // expected-error {{}} expected-note {{}}
 
     // These tests are expected to start failing when we get improved diagnostics.
