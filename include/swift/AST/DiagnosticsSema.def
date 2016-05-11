@@ -1460,6 +1460,12 @@ NOTE(subscript_override_here,none,
      "attempt to override subscript here", ())
 NOTE(convenience_init_override_here,none,
      "attempt to override convenience initializer here", ())
+NOTE(override_type_mismatch_with_fixits,none,
+     "type does not match superclass %0 with type %1",
+     (DescriptiveDeclKind, Type))
+NOTE(override_type_mismatch_with_fixits_init,none,
+     "type does not match superclass initializer with %select{no arguments|argument %1|arguments %1}0",
+     (unsigned, Type))
 ERROR(override_nonclass_decl,none,
       "'override' can only be specified on class members", ())
 ERROR(override_property_type_mismatch,none,

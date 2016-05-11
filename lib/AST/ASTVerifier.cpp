@@ -2769,14 +2769,6 @@ struct ASTNodeBase {};
       }
       checkSourceRanges(D->getSourceRange(), Parent,
                         [&]{ D->print(Out); });
-      if (auto *VD = dyn_cast<VarDecl>(D)) {
-        if (!VD->getTypeSourceRangeForDiagnostics().isValid()) {
-          Out << "invalid type source range for variable decl: ";
-          D->print(Out);
-          Out << "\n";
-          abort();
-        }
-      }
     }
 
     /// \brief Verify that the given source ranges is contained within the
