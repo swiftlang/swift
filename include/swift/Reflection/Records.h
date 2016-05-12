@@ -110,6 +110,8 @@ enum class FieldDescriptorKind : uint16_t {
   Protocol,
   ClassProtocol,
   ObjCProtocol,
+  ObjCClass,
+  Imported
 };
 
 // Field descriptors contain a collection of field records for a single

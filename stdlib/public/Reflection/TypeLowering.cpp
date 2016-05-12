@@ -239,6 +239,8 @@ class ExistentialTypeInfoBuilder {
         case FieldDescriptorKind::Protocol:
           WitnessTableCount++;
           continue;
+        case FieldDescriptorKind::Imported:
+        case FieldDescriptorKind::ObjCClass:
         case FieldDescriptorKind::Struct:
         case FieldDescriptorKind::Enum:
         case FieldDescriptorKind::Class:
@@ -749,8 +751,6 @@ public:
     switch (FD->Kind) {
     case FieldDescriptorKind::Class:
       // A value of class type is a single retainable pointer.
-      //
-      // FIXME: need to know if this is a NativeObject or UnknownObject
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                      ReferenceCounting::Native);
     case FieldDescriptorKind::Struct: {
@@ -801,6 +801,18 @@ public:
 
       return nullptr;
     }
+    case FieldDescriptorKind::Imported:
+      // Imported types are represented as a builtin type, an opaque blob with
+      // some size, alignment, etc. If we find it in the builtins, we'll use
+      // that information.
+      //
+      // FIXME: Emit field information for imported record types?
+      if (auto ImportedTypeDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR))
+        return TC.makeTypeInfo<BuiltinTypeInfo>(ImportedTypeDescriptor);
+      return nullptr;
+    case FieldDescriptorKind::ObjCClass:
+      return TC.getReferenceTypeInfo(ReferenceKind::Strong,
+                                     ReferenceCounting::Unknown);
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
     case FieldDescriptorKind::Protocol:
@@ -1020,6 +1032,8 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
   case FieldDescriptorKind::ObjCProtocol:
   case FieldDescriptorKind::ClassProtocol:
   case FieldDescriptorKind::Protocol:
+  case FieldDescriptorKind::Imported:
+  case FieldDescriptorKind::ObjCClass:
     // Invalid field descriptor.
     return nullptr;
   }
