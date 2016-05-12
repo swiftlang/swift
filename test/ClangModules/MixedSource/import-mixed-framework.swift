@@ -27,3 +27,11 @@ let _: CustomName = convertToProto(CustomNameClass())
 
 _ = SwiftClassWithCustomName() // expected-error {{'SwiftClassWithCustomName' has been renamed to 'CustomNameClass'}}
 
+func testAnyObject(_ obj: AnyObject) {
+  obj.method()
+  _ = obj.integerProperty
+  obj.extensionMethod()
+  obj.categoryMethod(clangStruct)
+  obj.protoMethod()
+  _ = obj.protoProperty
+}

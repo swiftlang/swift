@@ -3168,9 +3168,47 @@ isPotentiallyConflictingSetter(const clang::ObjCProtocolDecl *proto,
   return false;
 }
 
+bool
+ClangImporter::Implementation::hasNativeSwiftDecl(const clang::Decl *decl) {
+  for (auto annotation : decl->specific_attrs<clang::AnnotateAttr>()) {
+    if (annotation->getAnnotation() == SWIFT_NATIVE_ANNOTATION_STRING) {
+      return true;
+    }
+  }
+
+  if (auto *category = dyn_cast<clang::ObjCCategoryDecl>(decl)) {
+    clang::SourceLocation categoryNameLoc = category->getCategoryNameLoc();
+    if (categoryNameLoc.isMacroID()) {
+      // Climb up to the top-most macro invocation.
+      clang::ASTContext &clangCtx = category->getASTContext();
+      clang::SourceManager &SM = clangCtx.getSourceManager();
+
+      clang::SourceLocation macroCaller =
+          SM.getImmediateMacroCallerLoc(categoryNameLoc);
+      while (macroCaller.isMacroID()) {
+        categoryNameLoc = macroCaller;
+        macroCaller = SM.getImmediateMacroCallerLoc(categoryNameLoc);
+      }
+
+      StringRef macroName =
+          clang::Lexer::getImmediateMacroName(categoryNameLoc, SM,
+                                              clangCtx.getLangOpts());
+      if (macroName == "SWIFT_EXTENSION")
+        return true;
+    }
+  }
+
+  return false;
+}
+
 bool ClangImporter::Implementation::shouldSuppressDeclImport(
        const clang::Decl *decl) {
   if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(decl)) {
+    // First check if we're actually in a Swift class.
+    auto dc = decl->getDeclContext();
+    if (hasNativeSwiftDecl(cast<clang::ObjCContainerDecl>(dc)))
+      return true;
+
     // If this member is a method that is a getter or setter for a
     // property, don't add it into the table. property names and
     // getter names (by choosing to only have a property).
@@ -3186,13 +3224,19 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
 
     // If the method was declared within a protocol, check that it
     // does not conflict with the setter of a property.
-    if (auto proto = dyn_cast<clang::ObjCProtocolDecl>(decl->getDeclContext()))
+    if (auto proto = dyn_cast<clang::ObjCProtocolDecl>(dc))
       return isPotentiallyConflictingSetter(proto, objcMethod);
+
 
     return false;
   }
 
   if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(decl)) {
+    // First check if we're actually in a Swift class.
+    auto dc = objcProperty->getDeclContext();
+    if (hasNativeSwiftDecl(cast<clang::ObjCContainerDecl>(dc)))
+      return true;
+
     // Suppress certain accessibility properties; they're imported as
     // getter/setter pairs instead.
     if (isAccessibilityDecl(objcProperty))
@@ -3201,7 +3245,6 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
     // Check whether there is a superclass method for the getter that
     // is *not* suppressed, in which case we will need to suppress
     // this property.
-    auto dc = objcProperty->getDeclContext();
     auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(dc);
     if (!objcClass) {
       if (auto objcCategory = dyn_cast<clang::ObjCCategoryDecl>(dc)) {

@@ -5265,20 +5265,8 @@ namespace {
       if (decl->isInvalidDecl()) return nullptr;
 
       // Objective-C categories and extensions map to Swift extensions.
-      clang::SourceLocation categoryNameLoc = decl->getCategoryNameLoc();
-      if (categoryNameLoc.isMacroID()) {
-        // Climb up to the top-most macro invocation.
-        clang::Preprocessor &PP = Impl.getClangPreprocessor();
-        clang::SourceManager &SM = PP.getSourceManager();
-        clang::SourceLocation macroCaller =
-          SM.getImmediateMacroCallerLoc(categoryNameLoc);
-        while (macroCaller.isMacroID()) {
-          categoryNameLoc = macroCaller;
-          macroCaller = SM.getImmediateMacroCallerLoc(categoryNameLoc);
-        }
-        if (PP.getImmediateMacroName(categoryNameLoc) == "SWIFT_EXTENSION")
-          return nullptr;
-      }
+      if (ClangImporter::Implementation::hasNativeSwiftDecl(decl))
+        return nullptr;
 
       // Find the Swift class being extended.
       auto objcClass
@@ -5389,22 +5377,10 @@ namespace {
       return nullptr;
     }
 
-    template <typename U>
-    bool hasNativeSwiftDecl(const U *decl) {
-      using clang::AnnotateAttr;
-      for (auto annotation : decl->template specific_attrs<AnnotateAttr>()) {
-        if (annotation->getAnnotation() == SWIFT_NATIVE_ANNOTATION_STRING) {
-          return true;
-        }
-      }
-
-      return false;
-    }
-
     template <typename T, typename U>
     bool hasNativeSwiftDecl(const U *decl, Identifier name,
                             const DeclContext *dc, T *&swiftDecl) {
-      if (!hasNativeSwiftDecl(decl))
+      if (!ClangImporter::Implementation::hasNativeSwiftDecl(decl))
         return false;
       if (auto *nameAttr = decl->template getAttr<clang::SwiftNameAttr>()) {
         StringRef customName = nameAttr->getName();
