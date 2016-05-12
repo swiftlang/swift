@@ -150,8 +150,8 @@ def main_preset():
         build_script_args += ["--distcc"]
 
     print_with_argv0(
-        "using preset '" + args.preset + "', which expands to " +
-        quote_shell_command(build_script_args))
+        "using preset '" + args.preset + "', which expands to \n\n" +
+        quote_shell_command(build_script_args) + "\n")
 
     check_call(build_script_args, disable_sleep=True)
 
