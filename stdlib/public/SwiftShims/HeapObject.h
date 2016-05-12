@@ -60,7 +60,7 @@ static_assert(swift::IsTriviallyConstructible<HeapObject>::value,
 static_assert(std::is_trivially_destructible<HeapObject>::value,
               "HeapObject must be trivially destructible");
 
-}
-#endif 
+} // end namespace swift
+#endif
 
 #endif
