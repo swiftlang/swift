@@ -2675,14 +2675,26 @@ public:
               "no arguments");
   }
 
+  bool verifyBranchArgs(SILValue branchArg, SILArgument *bbArg) {
+    // NOTE: IRGen currently does not support the following method_inst
+    // variants as branch arguments.
+    // Once this is supported, the check can be removed.
+    require(
+        !isa<WitnessMethodInst>(branchArg) &&
+            !(isa<MethodInst>(branchArg) &&
+              cast<MethodInst>(branchArg)->getMember().getDecl()->isObjC()),
+        "branch argument cannot be a witness_method or an objc method_inst");
+    return branchArg->getType() == bbArg->getType();
+  }
+
   void checkBranchInst(BranchInst *BI) {
     require(BI->getArgs().size() == BI->getDestBB()->bbarg_size(),
             "branch has wrong number of arguments for dest bb");
     require(std::equal(BI->getArgs().begin(), BI->getArgs().end(),
-                      BI->getDestBB()->bbarg_begin(),
-                      [](SILValue branchArg, SILArgument *bbArg) {
-                        return branchArg->getType() == bbArg->getType();
-                      }),
+                       BI->getDestBB()->bbarg_begin(),
+                       [&](SILValue branchArg, SILArgument *bbArg) {
+                         return verifyBranchArgs(branchArg, bbArg);
+                       }),
             "branch argument types do not match arguments for dest bb");
   }
 
@@ -2704,8 +2716,8 @@ public:
             "identical destinations");
     require(std::equal(CBI->getTrueArgs().begin(), CBI->getTrueArgs().end(),
                       CBI->getTrueBB()->bbarg_begin(),
-                      [](SILValue branchArg, SILArgument *bbArg) {
-                        return branchArg->getType() == bbArg->getType();
+                      [&](SILValue branchArg, SILArgument *bbArg) {
+                        return verifyBranchArgs(branchArg, bbArg);
                       }),
             "true branch argument types do not match arguments for dest bb");
 
@@ -2713,8 +2725,8 @@ public:
             "false branch has wrong number of arguments for dest bb");
     require(std::equal(CBI->getFalseArgs().begin(), CBI->getFalseArgs().end(),
                       CBI->getFalseBB()->bbarg_begin(),
-                      [](SILValue branchArg, SILArgument *bbArg) {
-                        return branchArg->getType() == bbArg->getType();
+                      [&](SILValue branchArg, SILArgument *bbArg) {
+                        return verifyBranchArgs(branchArg, bbArg);
                       }),
             "false branch argument types do not match arguments for dest bb");
   }
