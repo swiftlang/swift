@@ -418,8 +418,9 @@ Functions:
 - Name: CGPDFDocumentGetPage
   SwiftName: CGPDFDocumentRef.page(self:at:)
 # CGPDFPage
-- Name: CGPDFPageGetBoxRect
-  SwiftName: getter:CGPDFPageRef.boxRect(self:)
+# FIXME: cannot be getter, due to extra parameter
+# - Name: CGPDFPageGetBoxRect
+#   SwiftName: getter:CGPDFPageRef.boxRect(self:)
 # CGPSConverter
 - Name: CGPSConverterIsConverting
   SwiftName: getter:CGPSConverterRef.isConverting(self:)
