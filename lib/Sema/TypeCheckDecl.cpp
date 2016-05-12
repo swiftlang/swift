@@ -5487,50 +5487,6 @@ public:
     return true;
   }
 
-  static void diagnoseUnavailableOverride(TypeChecker &TC,
-                                          ValueDecl *override,
-                                          const ValueDecl *base,
-                                          const AvailableAttr *attr) {
-    if (attr->Rename.empty()) {
-      if (attr->Message.empty())
-        TC.diagnose(override, diag::override_unavailable, override->getName());
-      else
-        TC.diagnose(override, diag::override_unavailable_msg,
-                    override->getName(), attr->Message);
-      TC.diagnose(base, diag::availability_marked_unavailable,
-                  base->getFullName());
-      return;
-    }
-
-    TC.diagnoseExplicitUnavailability(base, override->getLoc(),
-                                      override->getDeclContext(),
-                                      [&](InFlightDiagnostic &diag) {
-      ParsedDeclName parsedName = parseDeclName(attr->Rename);
-      if (!parsedName || parsedName.isPropertyAccessor() ||
-          parsedName.isMember() || parsedName.isOperator()) {
-        return;
-      }
-
-      // Only initializers should be named 'init'.
-      if (isa<ConstructorDecl>(override) ^
-          (parsedName.BaseName == TC.Context.Id_init.str())) {
-        return;
-      }
-
-      if (!parsedName.IsFunctionName) {
-        diag.fixItReplace(override->getNameLoc(), parsedName.BaseName);
-        return;
-      }
-
-      DeclName newName = parsedName.formDeclName(TC.Context);
-      size_t numArgs = override->getFullName().getArgumentNames().size();
-      if (!newName || newName.getArgumentNames().size() != numArgs)
-        return;
-
-      fixDeclarationName(diag, override, newName);
-    });
-  }
-
   /// Record that the \c overriding declarations overrides the
   /// \c overridden declaration.
   ///
@@ -5634,7 +5590,7 @@ public:
 
     // FIXME: Possibly should extend to more availability checking.
     if (auto *attr = base->getAttrs().getUnavailable(TC.Context)) {
-      diagnoseUnavailableOverride(TC, override, base, attr);
+      TC.diagnoseUnavailableOverride(override, base, attr);
     }
     
     if (!TC.getLangOpts().DisableAvailabilityChecking) {

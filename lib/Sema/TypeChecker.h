@@ -1596,6 +1596,10 @@ public:
                                    Identifier name, SourceLoc nameLoc,
                                    LookupTypeResult &lookup);
 
+  void diagnoseUnavailableOverride(ValueDecl *override,
+                                   const ValueDecl *base,
+                                   const AvailableAttr *attr);
+
   /// Emit a diagnostic for references to declarations that have been
   /// marked as unavailable, either through "unavailable" or "obsoleted:".
   bool diagnoseExplicitUnavailability(const ValueDecl *D,
