@@ -56,7 +56,7 @@ CalleeCache::getOrCreateCalleesForMethod(SILDeclRef Decl) {
   if (Found != TheCache.end())
     return Found->second;
 
-  auto *TheCallees = new Callees;
+  auto *TheCallees = new (Allocator.Allocate()) Callees;
 
   bool canCallUnknown = !calleesAreStaticallyKnowable(M, Decl);
   CalleesAndCanCallUnknown Entry(TheCallees, canCallUnknown);
