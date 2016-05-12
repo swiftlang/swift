@@ -212,6 +212,32 @@ bb1:
   return %4 : $()
 }
 
+public protocol P : class {
+  func foo() -> Int32
+  func boo() -> Int32
+}
+
+// Check that open_existential is not moved after its uses and still
+// dominates them after a run of a code sinking pass.
+// CHECK-LABEL: sil @dont_sink_open_existenial
+// CHECK-NOT: metatype
+// CHECK-NOT: witness_method
+// CHECK: open_existential_ref
+// CHECK: metatype
+sil @dont_sink_open_existenial : $@convention(thin) (@owned P) -> () {
+bb0(%0 : $P):
+  %1 = open_existential_ref %0 : $P to $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P
+  %2 = metatype $@thick (@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P).Type
+  %3 = witness_method $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P, #P.foo!1, %1 : $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+  br bb1
+
+bb1:
+  %4 = apply %3<@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P>(%1) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+  strong_release %0 : $P
+  %5 = tuple ()
+  return %5 : $()
+}
+
 sil_vtable X {
   #X.ping!1: _TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
   #X.init!initializer.1: _TFC14devirt_access21XcfMS0_FT_S0_	// devirt_access2.X.init (devirt_access2.X.Type)() -> devirt_access2.X
