@@ -374,9 +374,9 @@ Functions:
 - Name: CGLayerCreateWithContext
   SwiftName: CGLayerRef.init(_:size:auxiliaryInfo:)
 - Name: CGContextDrawLayerInRect
-  SwiftName: CGContextRef.draw(self:layer:in:)
+  SwiftName: CGContextRef.draw(self:in:layer:)
 - Name: CGContextDrawLayerAtPoint
-  SwiftName: CGContextRef.draw(self:layer:at:)
+  SwiftName: CGContextRef.draw(self:at:layer:)
 
 # CGPDFContext
 - Name: CGPDFContextCreate
