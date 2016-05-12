@@ -1347,6 +1347,49 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
 }
 
 
+void TypeChecker::diagnoseUnavailableOverride(ValueDecl *override,
+                                              const ValueDecl *base,
+                                              const AvailableAttr *attr) {
+  if (attr->Rename.empty()) {
+    if (attr->Message.empty())
+      diagnose(override, diag::override_unavailable, override->getName());
+    else
+      diagnose(override, diag::override_unavailable_msg,
+               override->getName(), attr->Message);
+    diagnose(base, diag::availability_marked_unavailable,
+             base->getFullName());
+    return;
+  }
+
+  diagnoseExplicitUnavailability(base, override->getLoc(),
+                                 override->getDeclContext(),
+                                 [&](InFlightDiagnostic &diag) {
+    ParsedDeclName parsedName = parseDeclName(attr->Rename);
+    if (!parsedName || parsedName.isPropertyAccessor() ||
+        parsedName.isMember() || parsedName.isOperator()) {
+      return;
+    }
+
+    // Only initializers should be named 'init'.
+    if (isa<ConstructorDecl>(override) ^
+        (parsedName.BaseName == Context.Id_init.str())) {
+      return;
+    }
+
+    if (!parsedName.IsFunctionName) {
+      diag.fixItReplace(override->getNameLoc(), parsedName.BaseName);
+      return;
+    }
+
+    DeclName newName = parsedName.formDeclName(Context);
+    size_t numArgs = override->getFullName().getArgumentNames().size();
+    if (!newName || newName.getArgumentNames().size() != numArgs)
+      return;
+
+    fixDeclarationName(diag, override, newName);
+  });
+}
+
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
