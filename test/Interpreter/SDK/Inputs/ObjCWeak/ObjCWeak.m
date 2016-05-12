@@ -9,24 +9,26 @@ void tryWeakReferencing(id (^makeThing)(void)) {
   __weak id weakThingy = thingy;
 
   @autoreleasepool {
-    NSLog(@"before giving up strong reference:");
+    fputs("before giving up strong reference:\n", stderr);
     id x = weakThingy;
     if (x) {
-      NSLog(@"%@", [x description]);
+      fputs([[x description] UTF8String], stderr);
+      fputs("\n", stderr);
     } else {
-      NSLog(@"Gone");
+      fputs("Gone\n", stderr);
     }
   }
 
   thingy = nil;
 
   @autoreleasepool {
-    NSLog(@"after giving up strong reference:");
+    fputs("after giving up strong reference:\n", stderr);
     id x = weakThingy;
     if (x) {
-      NSLog(@"%@", [x description]);
+      fputs([[x description] UTF8String], stderr);
+      fputs("\n", stderr);
     } else {
-      NSLog(@"Gone");
+      fputs("Gone\n", stderr);
     }
   }
 }
