@@ -812,37 +812,37 @@ public struct AnyIndex : Comparable {
 ///   identical.
 @warn_unused_result
 public func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  precondition(lhs._typeID == rhs._typeID, "base index types differ")
+  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
   return lhs._box._equal(to: rhs._box)
 }
 
 @warn_unused_result
 public func != (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  precondition(lhs._typeID == rhs._typeID, "base index types differ")
+  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
   return lhs._box._notEqual(to: rhs._box)
 }
 
 @warn_unused_result
 public func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  precondition(lhs._typeID == rhs._typeID, "base index types differ")
+  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
   return lhs._box._less(than: rhs._box)
 }
 
 @warn_unused_result
 public func <= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  precondition(lhs._typeID == rhs._typeID, "base index types differ")
+  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
   return lhs._box._lessOrEqual(to: rhs._box)
 }
 
 @warn_unused_result
 public func > (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  precondition(lhs._typeID == rhs._typeID, "base index types differ")
+  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
   return lhs._box._greater(than: rhs._box)
 }
 
 @warn_unused_result
 public func >= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  precondition(lhs._typeID == rhs._typeID, "base index types differ")
+  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
   return lhs._box._greaterOrEqual(to: rhs._box)
 }
 
