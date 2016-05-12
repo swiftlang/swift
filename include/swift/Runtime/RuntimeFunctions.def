@@ -44,16 +44,14 @@
 ///  SymbolName is the name of the global symbol
 ///  Impl is the name of the function implementing this entry point.
 #ifndef FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL
-#define FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(Id, Name, SymbolName, Impl, CC,  \
-                                             ReturnTys, ArgTys, Attrs)        \
+#define FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(Id, Name, CC, ReturnTys, ArgTys,  \
+                                             Attrs)                            \
   FUNCTION_ID(Id)
 #endif
 
-FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocBox, swift_allocBox,
-         _swift_allocBox, _swift_allocBox_, DefaultCC,
-         RETURNS(RefCountedPtrTy, OpaquePtrTy),
-         ARGS(TypeMetadataPtrTy),
-         ATTRS(NoUnwind))
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocBox, swift_allocBox, DefaultCC,
+                                     RETURNS(RefCountedPtrTy, OpaquePtrTy),
+                                     ARGS(TypeMetadataPtrTy), ATTRS(NoUnwind))
 
 FUNCTION(DeallocBox, swift_deallocBox, DefaultCC,
          RETURNS(VoidTy),
@@ -67,10 +65,10 @@ FUNCTION(ProjectBox, swift_projectBox, DefaultCC,
 
 // RefCounted *swift_allocObject(Metadata *type, size_t size, size_t alignMask);
 FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocObject, swift_allocObject,
-         _swift_allocObject, _swift_allocObject_, RegisterPreservingCC,
-         RETURNS(RefCountedPtrTy),
-         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy),
-         ATTRS(NoUnwind))
+                                     RegisterPreservingCC,
+                                     RETURNS(RefCountedPtrTy),
+                                     ARGS(TypeMetadataPtrTy, SizeTy, SizeTy),
+                                     ATTRS(NoUnwind))
 
 // HeapObject *swift_initStackObject(HeapMetadata const *metadata,
 //                                   HeapObject *object);
@@ -141,31 +139,25 @@ FUNCTION(CopyPOD, swift_copyPOD, DefaultCC,
 
 // void swift_retain(void *ptr);
 FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeStrongRetain, swift_retain,
-         _swift_retain,  _swift_retain_, RegisterPreservingCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind))
+                                     RegisterPreservingCC, RETURNS(VoidTy),
+                                     ARGS(RefCountedPtrTy), ATTRS(NoUnwind))
 
 // void swift_release(void *ptr);
 FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeStrongRelease, swift_release,
-         _swift_release, _swift_release_, RegisterPreservingCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind))
+                                     RegisterPreservingCC, RETURNS(VoidTy),
+                                     ARGS(RefCountedPtrTy), ATTRS(NoUnwind))
 
 // void swift_retain_n(void *ptr, int32_t n);
 FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeStrongRetainN, swift_retain_n,
-         _swift_retain_n, _swift_retain_n_, RegisterPreservingCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy, Int32Ty),
-         ATTRS(NoUnwind))
+                                     RegisterPreservingCC, RETURNS(VoidTy),
+                                     ARGS(RefCountedPtrTy, Int32Ty),
+                                     ATTRS(NoUnwind))
 
 // void swift_release_n(void *ptr, int32_t n);
 FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeStrongReleaseN, swift_release_n,
-         _swift_release_n, _swift_release_n_, RegisterPreservingCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy, Int32Ty),
-         ATTRS(NoUnwind))
+                                     RegisterPreservingCC, RETURNS(VoidTy),
+                                     ARGS(RefCountedPtrTy, Int32Ty),
+                                     ATTRS(NoUnwind))
 
 // void swift_setDeallocating(void *ptr);
 FUNCTION(NativeSetDeallocating, swift_setDeallocating,
@@ -175,18 +167,18 @@ FUNCTION(NativeSetDeallocating, swift_setDeallocating,
          ATTRS(NoUnwind))
 
 // void swift_nonatomic_retain_n(void *ptr, int32_t n);
-FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongRetainN, swift_nonatomic_retain_n,
-         _swift_nonatomic_retain_n, _swift_nonatomic_retain_n_, RegisterPreservingCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy, Int32Ty),
-         ATTRS(NoUnwind))
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongRetainN,
+                                     swift_nonatomic_retain_n,
+                                     RegisterPreservingCC, RETURNS(VoidTy),
+                                     ARGS(RefCountedPtrTy, Int32Ty),
+                                     ATTRS(NoUnwind))
 
 // void swift_nonatomic_release_n(void *ptr, int32_t n);
-FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongReleaseN, swift_nonatomic_release_n,
-         _swift_nonatomic_release_n, _swift_nonatomic_release_n_, RegisterPreservingCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy, Int32Ty),
-         ATTRS(NoUnwind))
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongReleaseN,
+                                     swift_nonatomic_release_n,
+                                     RegisterPreservingCC, RETURNS(VoidTy),
+                                     ARGS(RefCountedPtrTy, Int32Ty),
+                                     ATTRS(NoUnwind))
 
 // void swift_unknownRetain_n(void *ptr, int32_t n);
 FUNCTION(UnknownRetainN, swift_unknownRetain_n,
@@ -245,11 +237,10 @@ FUNCTION(NonAtomicBridgeObjectReleaseN, swift_nonatomic_bridgeObjectRelease_n,
          ATTRS(NoUnwind))
 
 // void swift_nonatomic_retain(void *ptr);
-FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongRetain, swift_nonatomic_retain,
-         _swift_nonatomic_retain, _swift_nonatomic_retain_, RegisterPreservingCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind))
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongRetain,
+                                     swift_nonatomic_retain,
+                                     RegisterPreservingCC, RETURNS(VoidTy),
+                                     ARGS(RefCountedPtrTy), ATTRS(NoUnwind))
 
 // void *swift_tryPin(void *ptr);
 FUNCTION(NativeTryPin, swift_tryPin, RegisterPreservingCC,
@@ -258,18 +249,16 @@ FUNCTION(NativeTryPin, swift_tryPin, RegisterPreservingCC,
          ATTRS(NoUnwind))
 
 // void swift_nonatomic_release(void *ptr);
-FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongRelease, swift_nonatomic_release,
-         _swift_nonatomic_release, _swift_nonatomic_release_, RegisterPreservingCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind))
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongRelease,
+                                     swift_nonatomic_release,
+                                     RegisterPreservingCC, RETURNS(VoidTy),
+                                     ARGS(RefCountedPtrTy), ATTRS(NoUnwind))
 
 // void *swift_tryRetain(void *ptr);
 FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeTryRetain, swift_tryRetain,
-         _swift_tryRetain, _swift_tryRetain_, RegisterPreservingCC,
-         RETURNS(RefCountedPtrTy),
-         ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind))
+                                     RegisterPreservingCC,
+                                     RETURNS(RefCountedPtrTy),
+                                     ARGS(RefCountedPtrTy), ATTRS(NoUnwind))
 
 // void swift_unpin(void *ptr);
 FUNCTION(NativeUnpin, swift_unpin, RegisterPreservingCC,
@@ -279,10 +268,9 @@ FUNCTION(NativeUnpin, swift_unpin, RegisterPreservingCC,
 
 // bool swift_isDeallocating(void *ptr);
 FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(IsDeallocating, swift_isDeallocating,
-         _swift_isDeallocating, _swift_isDeallocating_, DefaultCC,
-         RETURNS(Int1Ty),
-         ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind, ZExt))
+                                     DefaultCC, RETURNS(Int1Ty),
+                                     ARGS(RefCountedPtrTy),
+                                     ATTRS(NoUnwind, ZExt))
 
 // void *swift_nonatomic_tryPin(void *ptr);
 FUNCTION(NonAtomicNativeTryPin, swift_nonatomic_tryPin, RegisterPreservingCC,

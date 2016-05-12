@@ -568,23 +568,23 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
   FUNCTION_FOR_CONV_##CC(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS),            \
                          QUOTE(ATTRS))
 
-#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_DefaultCC(ID, NAME, SYMBOL, CC,   \
-                                                       RETURNS, ARGS, ATTRS)   \
+#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_DefaultCC(ID, NAME, CC, RETURNS,  \
+                                                       ARGS, ATTRS)            \
   FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
-#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_C_CC(ID, NAME, SYMBOL, CC,        \
-                                                  RETURNS, ARGS, ATTRS)        \
+#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_C_CC(ID, NAME, CC, RETURNS, ARGS, \
+                                                  ATTRS)                       \
   FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
 #define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_RegisterPreservingCC(             \
-    ID, NAME, SYMBOL, CC, RETURNS, ARGS, ATTRS)                                \
-  FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, SYMBOL, CC, QUOTE(RETURNS),       \
-                                   QUOTE(ARGS), QUOTE(ATTRS))
+    ID, NAME, CC, RETURNS, ARGS, ATTRS)                                        \
+  FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, SWIFT_RT_ENTRY_REF(NAME), CC,     \
+                                   QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
-#define FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(ID, NAME, SYMBOL, IMPL, CC,       \
-                                             RETURNS, ARGS, ATTRS)             \
-  FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_##CC(                                   \
-      ID, NAME, SYMBOL, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
+#define FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(ID, NAME, CC, RETURNS, ARGS,      \
+                                             ATTRS)                            \
+  FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_##CC(ID, NAME, CC, QUOTE(RETURNS),      \
+                                            QUOTE(ARGS), QUOTE(ATTRS))
 
 #define RETURNS(...)                                                           \
   { __VA_ARGS__ }
