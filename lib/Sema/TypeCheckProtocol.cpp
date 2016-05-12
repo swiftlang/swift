@@ -2059,8 +2059,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                                     witness->getFullName(),
                                     proto->getDeclaredType(),
                                     requirement->getFullName());
-            fixDeclarationName(diag, cast<AbstractFunctionDecl>(witness),
-                               requirement->getFullName());
+            fixDeclarationName(diag, witness, requirement->getFullName());
           }
 
           tc.diagnose(requirement, diag::protocol_requirement_here,
