@@ -1341,6 +1341,10 @@ public:
   // Is a SIL type a potential lowering of a formal type?
   static bool isLoweringOf(SILType loweredType,
                            CanType formalType) {
+    // Dynamic self has the same lowering as its contained type.
+    if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalType))
+      formalType = CanType(dynamicSelf->getSelfType());
+
     // Metatypes preserve their instance type through lowering.
     if (auto loweredMT = loweredType.getAs<MetatypeType>()) {
       if (auto formalMT = dyn_cast<MetatypeType>(formalType)) {
