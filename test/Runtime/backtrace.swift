@@ -10,6 +10,10 @@
 
 // REQUIRES: executable_test
 
+// Backtraces are not emitted when optimizations are enabled. This test can not
+// run when optimizations are enabled.
+// REQUIRES: swift_test_mode_optimize_none
+
 func main() {
   let x = UnsafePointer<Int>(bitPattern: 0)!
   print("\(x.pointee)")
