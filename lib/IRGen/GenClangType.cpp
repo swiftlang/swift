@@ -68,14 +68,16 @@ static CanType getNamedSwiftType(Module *stdlib, StringRef name) {
   return CanType();
 }
 
-static clang::CanQualType getClangBuiltinTypeFromKind(
-  const clang::ASTContext &context,
-  clang::BuiltinType::Kind kind) {
+static clang::CanQualType
+getClangBuiltinTypeFromKind(const clang::ASTContext &context,
+                            clang::BuiltinType::Kind kind) {
   switch (kind) {
-#define BUILTIN_TYPE(Id, SingletonId) \
-  case clang::BuiltinType::Id: return context.SingletonId;
+#define BUILTIN_TYPE(Id, SingletonId)                                          \
+  case clang::BuiltinType::Id:                                                 \
+    return context.SingletonId;
 #include "clang/AST/BuiltinTypes.def"
   }
+  llvm_unreachable("Unexpected builtin type!");
 }
 
 static clang::CanQualType getClangSelectorType(
