@@ -1473,6 +1473,12 @@ public:
   static bool isNSString(const clang::Type *);
   static bool isNSString(clang::QualType);
 
+  /// Whether the given declaration was exported from Swift.
+  ///
+  /// Note that this only checks the immediate declaration being passed.
+  /// For things like methods and properties that are nested in larger types,
+  /// it's the top-level declaration that should be checked.
+  static bool hasNativeSwiftDecl(const clang::Decl *decl);
 };
 
 }
