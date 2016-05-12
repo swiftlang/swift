@@ -78,8 +78,8 @@ extension RandomAccessIndexable {
   /// - Complexity:
   ///   - O(1)
   @warn_unused_result
-  func index(
-    i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  public func index(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: tests.
     let l = distance(from: i, to: limit)

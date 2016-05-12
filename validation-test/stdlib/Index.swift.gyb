@@ -50,24 +50,17 @@ Index.test("${TraversalCollection}/index(_:offsetBy:limitedBy:)/dispatch") {
 
 % end
 
-% for Traversal in ['RandomAccess']:
-%   Collection = collectionForTraversal(Traversal).replace('Collection', '')
-%   for Base in ['Defaulted']:
-%     Kind = '{}{}'.format(Base, Collection)
-
 // Check that a random access collection doesn't call into O(n) predecessor
 // calls when it has a more efficient implementation.
 
-%     if Traversal == 'RandomAccess' and Base == 'Defaulted':
-
 Index.test(
-  "${Kind}Collection/index(_:offsetBy:)/"
+  "DefaultedRandomAccessCollection/index(_:offsetBy:)/"
   + "avoidsSuccessorAndPredecessor/dispatch"
 ) {
   for test in indexStepsFromTests.filter(
     {$0.limit == nil && $0.distance >= 0}
   ) {
-    let c = ${Kind}Collection(Array(0..<10))
+    let c = DefaultedRandomAccessCollection(Array(0..<10))
 
     let i = c.nthIndex(test.startOffset)
     let result  = c.index(i, offsetBy: test.distance)
@@ -76,15 +69,14 @@ Index.test(
   }
 }
 
-#if false // FIXME: swift-3-indexing-model. implementation missing
 Index.test(
-  "${Kind}Index/index(_:offsetBy:limitedBy:)/"
+  "DefaultedRandomAccessCollection/index(_:offsetBy:limitedBy:)/"
   + "avoidsSuccessorAndPredecessor/dispatch"
 ) {
   for test in indexStepsFromTests.filter(
     {$0.limit != nil && $0.distance >= 0}
   ) {
-    let c = ${Kind}Collection(Array(0..<10))
+    let c = DefaultedRandomAccessCollection(Array(0..<10))
 
     let i = c.nthIndex(test.startOffset)
     let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
@@ -93,10 +85,5 @@ Index.test(
     expectEqual(0, c.timesPredecessorCalled.value)
   }
 }
-#endif
-
-%     end
-%   end
-% end
 
 runAllTests()
