@@ -818,9 +818,6 @@ void IRGenModule::emitAssociatedTypeMetadataRecord(const ExtensionDecl *Ext) {
 }
 
 void IRGenModule::emitBuiltinReflectionMetadata() {
-  if (!IRGen.Opts.EnableReflectionBuiltins)
-    return;
-
   if (getSwiftModule()->isStdlibModule()) {
     BuiltinTypes.insert(Context.TheNativeObjectType);
     BuiltinTypes.insert(Context.TheUnknownObjectType);
