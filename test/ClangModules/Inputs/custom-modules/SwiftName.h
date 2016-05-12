@@ -25,3 +25,10 @@ typedef int my_int_t SWIFT_NAME(MyInt);
 
 void spuriousAPINotedSwiftName(int);
 void poorlyNamedFunction(const char *);
+
+@interface Foo
+- (instancetype)init;
+@end
+
+void acceptsClosure(id value, void (*fn)(void)) SWIFT_NAME(Foo.accepts(self:closure:));
+void acceptsClosureStatic(void (*fn)(void)) SWIFT_NAME(Foo.accepts(closure:));

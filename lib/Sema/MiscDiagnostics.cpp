@@ -1193,15 +1193,20 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
       return;
     }
 
+    auto argumentLabelsToCheck = llvm::makeArrayRef(argumentLabelIDs);
+    // The argument label for a trailing closure is ignored.
+    if (args->hasTrailingClosure())
+      argumentLabelsToCheck = argumentLabelsToCheck.drop_back();
+
     if (args->hasElementNames()) {
-      if (std::equal(argumentLabelIDs.begin(), argumentLabelIDs.end(),
+      if (std::equal(argumentLabelsToCheck.begin(), argumentLabelsToCheck.end(),
                      args->getElementNames().begin())) {
         // Already matching.
         return;
       }
 
     } else {
-      if (std::all_of(argumentLabelIDs.begin(), argumentLabelIDs.end(),
+      if (std::all_of(argumentLabelsToCheck.begin(),argumentLabelsToCheck.end(),
                       std::mem_fn(&Identifier::empty))) {
         // Already matching (as in, there are no labels).
         return;
