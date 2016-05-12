@@ -91,7 +91,7 @@ func testChainedAliases(_ fridge: CCRefrigerator) {
   _ = fridge as CCRefrigerator
 
   _ = fridge as CCFridge
-  _ = fridge as CCFridgeRef // expected-error{{'CCFridgeRef' is unavailable in Swift}}
+  _ = fridge as CCFridgeRef // expected-error{{'CCFridgeRef' has been renamed to 'CCFridge'}} {{17-28=CCFridge}}
 }
 
 func testBannedImported(_ object: CCOpaqueTypeRef) {
@@ -139,7 +139,7 @@ func nameCollisions() {
   isOptionalFloat(&otherAlias) // okay
 
   var np: NotAProblem?
-  var np2: NotAProblemRef? // expected-error{{'NotAProblemRef' is unavailable in Swift}}
+  var np2: NotAProblemRef? // expected-error{{'NotAProblemRef' has been renamed to 'NotAProblem'}} {{12-26=NotAProblem}}
 
   np = np2
   np2 = np
