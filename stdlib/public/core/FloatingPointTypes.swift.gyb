@@ -334,7 +334,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   public static var signalingNaN: ${Self} {
-    return ${Self}(nan: 0, signaling: true)
+    return ${Self}(nan: 1, signaling: true)
   }
 
   @available(*, deprecated, renamed: "nan")
@@ -462,7 +462,13 @@ extension ${Self}: BinaryFloatingPoint {
     _precondition(payload < ${Self}._quietNaNMask,
       "NaN payload is not encodable.")
     var significand = payload
-    if !signaling { significand |= ${Self}._quietNaNMask }
+    if signaling {
+      _precondition(payload != 0,
+                    "Signaling NaN must have non-zero payload")
+    }
+    else {
+      significand |= ${Self}._quietNaNMask
+    }
     self.init(sign: .plus,
               exponentBitPattern: ${Self}._infinityExponent,
               significandBitPattern: significand)

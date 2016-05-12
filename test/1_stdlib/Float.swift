@@ -222,6 +222,12 @@ func checkQNaN(_ qnan: TestFloat) {
   _precondition(qnan.floatingPointClass == .quietNaN)
 }
 
+func checkSNaN(_ snan: TestFloat) {
+  checkNaN(snan)
+  _precondition(snan.isSignaling)
+  _precondition(snan.floatingPointClass == .signalingNaN)
+}
+
 func testNaN() {
   var stdlibDefaultNaN = TestFloat.nan
   checkQNaN(stdlibDefaultNaN)
@@ -229,6 +235,8 @@ func testNaN() {
   var stdlibQNaN = TestFloat.quietNaN
   checkQNaN(stdlibQNaN)
 
+  var stdlibSNaN = TestFloat.signalingNaN
+  checkSNaN(stdlibSNaN)
   print("testNaN done")
 }
 testNaN()
