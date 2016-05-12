@@ -18,6 +18,7 @@
 namespace clang {
 class ASTContext;
 class Preprocessor;
+class Sema;
 } // namespace clang
 
 namespace swift {
@@ -30,6 +31,7 @@ protected:
 public:
   virtual clang::ASTContext &getClangASTContext() const = 0;
   virtual clang::Preprocessor &getClangPreprocessor() const = 0;
+  virtual clang::Sema &getClangSema() const = 0;
   virtual void printStatistics() const = 0;
 
   /// Returns the module that contains imports and declarations from all loaded
