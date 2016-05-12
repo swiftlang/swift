@@ -350,11 +350,26 @@ func _float${bits}ToStringImpl(
 
 func _float${bits}ToString(_ value: Float${bits}, debug: Bool) -> String {
 
-  if value.isInfinite {
-    return value.sign == .minus ? "-inf" : "inf"
-  }
-  if value.isNaN {
-    return "nan"
+  if !value.isFinite {
+    let significand = value.significandBitPattern
+    if significand == 0 {
+      // Infinity
+      return value.sign == .minus ? "-inf" : "inf"
+    }
+    else {
+      // NaN
+      if !debug {
+        return "nan"
+      }
+      let isSignaling = (significand & Float${bits}._quietNaNMask) == 0
+      let payload = significand & ((Float${bits}._quietNaNMask >> 1) - 1)
+      // FIXME(performance): Inefficient String manipulation. We could move
+      // this to C function.
+      return
+        (value.sign == .minus ? "-" : "")
+        + (isSignaling ? "snan" : "nan")
+        + (payload == 0 ? "" : ("(0x" + String(payload, radix: 16) + ")"))
+    }
   }
 
   _sanityCheck(sizeof(_Buffer32.self) == 32)
