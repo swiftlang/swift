@@ -33,18 +33,18 @@ func checkNormal(_ normal: TestFloat) {
   _precondition(!normal.isSubnormal)
   _precondition(!normal.isInfinite)
   _precondition(!normal.isNaN)
-  _precondition(!normal.isSignaling)
+  _precondition(!normal.isSignalingNaN)
 }
 
 func testNormal() {
   let positiveNormal: TestFloat = 42.0
   checkNormal(positiveNormal)
-  _precondition(!positiveNormal.isSignMinus)
+  _precondition(positiveNormal.sign == .plus)
   _precondition(positiveNormal.floatingPointClass == .positiveNormal)
 
   let negativeNormal: TestFloat = -42.0
   checkNormal(negativeNormal)
-  _precondition(negativeNormal.isSignMinus)
+  _precondition(negativeNormal.sign == .minus)
   _precondition(negativeNormal.floatingPointClass == .negativeNormal)
 
   _precondition(positiveNormal == positiveNormal)
@@ -70,18 +70,18 @@ func checkZero(_ zero: TestFloat) {
   _precondition(!zero.isSubnormal)
   _precondition(!zero.isInfinite)
   _precondition(!zero.isNaN)
-  _precondition(!zero.isSignaling)
+  _precondition(!zero.isSignalingNaN)
 }
 
 func testZero() {
   let plusZero = noinlinePlusZero()
   checkZero(plusZero)
-  _precondition(!plusZero.isSignMinus)
+  _precondition(plusZero.sign == .plus)
   _precondition(plusZero.floatingPointClass == .positiveZero)
 
   let minusZero = noinlineMinusZero()
   checkZero(minusZero)
-  _precondition(minusZero.isSignMinus)
+  _precondition(minusZero.sign == .minus)
   _precondition(minusZero.floatingPointClass == .negativeZero)
 
   _precondition(plusZero == 0.0)
@@ -107,7 +107,7 @@ func checkSubnormal(_ subnormal: TestFloat) {
   _precondition(subnormal.isSubnormal)
   _precondition(!subnormal.isInfinite)
   _precondition(!subnormal.isNaN)
-  _precondition(!subnormal.isSignaling)
+  _precondition(!subnormal.isSignalingNaN)
 }
 
 func asUInt64(_ a: UInt64) -> UInt64 {
@@ -120,7 +120,7 @@ func asUInt64(_ a: UInt32) -> UInt64 {
 
 func testSubnormal() {
   var iterations: Int
-  switch asUInt64(TestFloat._BitsType.max) {
+  switch asUInt64(TestFloat.RawSignificand.max) {
     case UInt64.max:
       iterations = 1023
     case asUInt64(UInt32.max):
@@ -133,7 +133,7 @@ func testSubnormal() {
     positiveSubnormal /= 2.0 as TestFloat
   }
   checkSubnormal(positiveSubnormal)
-  _precondition(!positiveSubnormal.isSignMinus)
+  _precondition(positiveSubnormal.sign == .plus)
   _precondition(positiveSubnormal.floatingPointClass == .positiveSubnormal)
   _precondition(positiveSubnormal != 0.0)
 
@@ -142,7 +142,7 @@ func testSubnormal() {
     negativeSubnormal /= 2.0 as TestFloat
   }
   checkSubnormal(negativeSubnormal)
-  _precondition(negativeSubnormal.isSignMinus)
+  _precondition(negativeSubnormal.sign == .minus)
   _precondition(negativeSubnormal.floatingPointClass == .negativeSubnormal)
   _precondition(negativeSubnormal != -0.0)
 
