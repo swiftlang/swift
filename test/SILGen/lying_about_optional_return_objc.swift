@@ -37,6 +37,23 @@ func optionalChainingForeignFunctionTypeProperties(b: BlockProperty?) {
   // CHECK: unchecked_ref_cast
   _ = b?[b!]
 
+  // CHECK: enum $Optional<{{.*}} -> {{.*}}>
+  _ = b?.voidReturning
+  // CHECK: enum $Optional<{{.*}} -> {{.*}}>
+  _ = b?.voidPointerReturning
+  // CHECK: enum $Optional<{{.*}} -> {{.*}}>
+  _ = b?.opaquePointerReturning
+  // CHECK: enum $Optional<{{.*}} -> {{.*}}>
+  _ = b?.pointerReturning
+  // CHECK: enum $Optional<{{.*}} -> {{.*}}>
+  _ = b?.constPointerReturning
+  // CHECK: enum $Optional<{{.*}} -> {{.*}}>
+  _ = b?.idReturning
+  // CHECK: enum $Optional<{{.*}} -> {{.*}}>
+  _ = b?.selectorReturning
+  // CHECK: enum $Optional<{{.*}} -> {{.*}}>
+  _ = b?.objectReturning
+
   let dynamic: AnyObject? = b!
 
   // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
@@ -60,6 +77,23 @@ func optionalChainingForeignFunctionTypeProperties(b: BlockProperty?) {
   // CHECK: unchecked_trivial_bit_cast
   _ = dynamic?.selector
 
+  // CHECK: unchecked_bitwise_cast {{%.*}} : $ImplicitlyUnwrappedOptional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  _ = dynamic?.voidReturning
+  // CHECK: unchecked_bitwise_cast {{%.*}} : $ImplicitlyUnwrappedOptional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  _ = dynamic?.voidPointerReturning
+  // CHECK: unchecked_bitwise_cast {{%.*}} : $ImplicitlyUnwrappedOptional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  _ = dynamic?.opaquePointerReturning
+  // CHECK: unchecked_bitwise_cast {{%.*}} : $ImplicitlyUnwrappedOptional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  _ = dynamic?.pointerReturning
+  // CHECK: unchecked_bitwise_cast {{%.*}} : $ImplicitlyUnwrappedOptional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  _ = dynamic?.constPointerReturning
+  // CHECK: unchecked_bitwise_cast {{%.*}} : $ImplicitlyUnwrappedOptional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  _ = dynamic?.idReturning
+  // CHECK: unchecked_bitwise_cast {{%.*}} : $ImplicitlyUnwrappedOptional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  _ = dynamic?.selectorReturning
+  // CHECK: unchecked_bitwise_cast {{%.*}} : $ImplicitlyUnwrappedOptional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  _ = dynamic?.objectReturning
+
   // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
   _ = dynamic?.voidReturning?()
   // CHECK: unchecked_trivial_bit_cast
@@ -77,4 +111,6 @@ func optionalChainingForeignFunctionTypeProperties(b: BlockProperty?) {
   // CHECK: unchecked_ref_cast
   _ = dynamic?.idReturning?()
   _ = dynamic?.objectReturning?()
+
+
 }

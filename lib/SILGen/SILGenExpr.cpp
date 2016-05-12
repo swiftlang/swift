@@ -2383,14 +2383,19 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M, Expr *expr) {
     // or having a C-derived convention.
     ValueDecl *method = nullptr;
     if (auto selfApply = dyn_cast<ApplyExpr>(apply->getFn())) {
-      if (auto methodRef = dyn_cast<DeclRefExpr>(selfApply->getFn()))
+      if (auto methodRef = dyn_cast<DeclRefExpr>(selfApply->getFn())) {
         method = methodRef->getDecl();
+      }
     } else if (auto force = dyn_cast<ForceValueExpr>(apply->getFn())) {
       method = getFuncDeclFromDynamicMemberLookup(force->getSubExpr());
     } else if (auto bind = dyn_cast<BindOptionalExpr>(apply->getFn())) {
       method = getFuncDeclFromDynamicMemberLookup(bind->getSubExpr());
     } else if (auto fnRef = dyn_cast<DeclRefExpr>(apply->getFn())) {
-      method = fnRef->getDecl();
+      // Only consider a full application of a method. Partial applications
+      // never lie.
+      if (auto func = dyn_cast<AbstractFunctionDecl>(fnRef->getDecl()))
+        if (func->getParameterLists().size() == 1)
+          method = fnRef->getDecl();
     }
     if (method && mayLieAboutNonOptionalReturn(M, method))
       return true;
