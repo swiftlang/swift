@@ -363,15 +363,12 @@ func _float${bits}ToStringImpl(
 @warn_unused_result
 func _float${bits}ToString(_ value: Float${bits}, debug: Bool) -> String {
 
-% # FIXME: support Float80
-% if bits != 80:
   if value.isInfinite {
-    return value.isSignMinus ? "-inf" : "inf"
+    return value.sign == .minus ? "-inf" : "inf"
   }
   if value.isNaN {
     return "nan"
   }
-% end
 
   _sanityCheck(sizeof(_Buffer32.self) == 32)
   _sanityCheck(sizeof(_Buffer72.self) == 72)

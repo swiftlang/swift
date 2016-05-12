@@ -200,7 +200,7 @@ let d: Double = 3.14159
 inferDouble = d
 
 // rdar://problem/17962491
-var inferDouble2 = 1 % 3 / 3.0
+var inferDouble2 = 1 % 3 / 3.0 // expected-error{{'%' is unavailable: Use truncatingRemainder instead}}
 let d2: Double = 3.14159
 inferDouble2 = d2
 
