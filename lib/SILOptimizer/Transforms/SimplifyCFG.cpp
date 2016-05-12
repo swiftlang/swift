@@ -1406,7 +1406,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   if (TrueTrampolineBr &&
       !wouldIntroduceCriticalEdge(BI, TrueTrampolineBr->getDestBB())) {
     DEBUG(llvm::dbgs() << "true-trampoline from bb" << ThisBB->getDebugID() <<
-          " to bb" << TrueTrampolineDest->getDebugID() << '\n');
+          " to bb" << TrueTrampolineBr->getDestBB()->getDebugID() << '\n');
     SILBuilderWithScope(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(),
         TrueTrampolineBr->getDestBB(), TrueTrampolineBr->getArgs(),
@@ -1424,7 +1424,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   if (FalseTrampolineBr &&
       !wouldIntroduceCriticalEdge(BI, FalseTrampolineBr->getDestBB())) {
     DEBUG(llvm::dbgs() << "false-trampoline from bb" << ThisBB->getDebugID() <<
-          " to bb" << FalseTrampolineDest->getDebugID() << '\n');
+          " to bb" << FalseTrampolineBr->getDestBB()->getDebugID() << '\n');
     SILBuilderWithScope(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(),
         TrueSide, TrueArgs,
