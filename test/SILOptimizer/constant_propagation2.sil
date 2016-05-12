@@ -12,3 +12,11 @@ bb0(%0 : $Builtin.RawPointer):
   %8 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 0
   return %8 : $Builtin.Int64
 }
+
+sil @dont_crash_on_frem : $@convention(thin) () -> Builtin.FPIEEE64 {
+bb0:
+  %1 = float_literal $Builtin.FPIEEE64, 0x402E4CCCCCCCCCCD // 15.15
+  %2 = float_literal $Builtin.FPIEEE64, 0x400A666666666666 // 3.2999999999999998 // user: %12
+  %3 = builtin "frem_FPIEEE64"(%1 : $Builtin.FPIEEE64, %2 : $Builtin.FPIEEE64) : $Builtin.FPIEEE64
+  return %3 : $Builtin.FPIEEE64
+}
