@@ -22,6 +22,7 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/Allocator.h"
 
 namespace swift {
 class ClassDecl;
@@ -73,12 +74,15 @@ public:
 /// any function application site (including those that are simple
 /// function_ref, thin_to_thick, or partial_apply callees).
 class CalleeCache {
-  typedef llvm::SmallVector<SILFunction *, 4> Callees;
+  typedef llvm::SmallVector<SILFunction *, 16> Callees;
   typedef llvm::PointerIntPair<Callees *, 1> CalleesAndCanCallUnknown;
   typedef llvm::DenseMap<AbstractFunctionDecl *, CalleesAndCanCallUnknown>
       CacheType;
 
   SILModule &M;
+
+  // Allocator for the SmallVectors that we will be allocating.
+  llvm::SpecificBumpPtrAllocator<Callees> Allocator;
 
   // The cache of precomputed callee lists for function decls appearing
   // in class virtual dispatch tables and witness tables.
@@ -91,10 +95,7 @@ public:
   }
 
   ~CalleeCache() {
-    for (auto &Pair : TheCache) {
-      auto *Callees = Pair.second.getPointer();
-      delete Callees;
-    }
+    Allocator.DestroyAll();
   }
 
   /// Return the list of callees that can potentially be called at the
