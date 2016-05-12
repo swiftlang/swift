@@ -811,7 +811,6 @@ public struct ${mattype} : CustomDebugStringConvertible {
   /// Inverse of the matrix if it exists, otherwise the contents of the
   /// resulting matrix are undefined.
   @_transparent
-  @warn_unused_result
   public var inverse: ${mattype} {
     %inverse_func = '__invert_' + ('f' if type == 'Float' else 'd') + str(cols)
     return ${mattype}(${inverse_func}(self.cmatrix))
@@ -819,7 +818,6 @@ public struct ${mattype} : CustomDebugStringConvertible {
 
   /// Determinant of the matrix.
   @_transparent
-  @warn_unused_result
   public var determinant: ${type} {
     return matrix_determinant(self.cmatrix)
   }
