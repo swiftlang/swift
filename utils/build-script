@@ -1274,7 +1274,7 @@ details of the setups of other systems or automated environments.""")
     build_script_impl_args = [
         "--workspace", workspace.source_root,
         "--build-dir", workspace.build_root,
-        "--install-prefix", os.path.abspath(args.install_prefix),
+        "--install-prefix", args.install_prefix,
         "--host-target", args.host_target,
         "--stdlib-deployment-targets",
         " ".join(args.stdlib_deployment_targets),
