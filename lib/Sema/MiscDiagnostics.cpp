@@ -2809,22 +2809,10 @@ public:
       return { true, expr };
     }
 
-    // Separate out the accessor methods.
-    auto splitPoint =
-      std::stable_partition(allMethods.begin(), allMethods.end(),
-                            [](AbstractFunctionDecl *abstractFunc) -> bool {
-                              if (auto func = dyn_cast<FuncDecl>(abstractFunc))
-                                return !func->isAccessor();
-
-                              return true;
-                            });
-    ArrayRef<AbstractFunctionDecl *> methods(allMethods.begin(), splitPoint);
-    ArrayRef<AbstractFunctionDecl *> accessors(splitPoint, allMethods.end());
-
     // Find the "best" method that has this selector, so we can report
     // that.
     AbstractFunctionDecl *bestMethod = nullptr;
-    for (auto method : methods) {
+    for (auto method : allMethods) {
       // If this is the first method, use it.
       if (!bestMethod) {
         bestMethod = method;
@@ -2883,9 +2871,38 @@ public:
         llvm::raw_svector_ostream out(replacement);
         auto nominal = bestMethod->getDeclContext()
                          ->getAsNominalTypeOrNominalTypeExtensionContext();
-        auto name = bestMethod->getFullName();
-        out << "#selector(" << nominal->getName().str() << "."
-            << name.getBaseName().str();
+        out << "#selector(";
+
+        DeclName name;
+        auto bestFunc = dyn_cast<FuncDecl>(bestMethod);
+        bool isAccessor = bestFunc && bestFunc->isAccessor();
+        if (isAccessor) {
+          switch (bestFunc->getAccessorKind()) {
+          case AccessorKind::NotAccessor:
+            llvm_unreachable("not an accessor");
+
+          case AccessorKind::IsGetter:
+            out << "getter: ";
+            name = bestFunc->getAccessorStorageDecl()->getFullName();
+            break;
+
+          case AccessorKind::IsSetter:
+          case AccessorKind::IsWillSet:
+          case AccessorKind::IsDidSet:
+            out << "setter: ";
+            name = bestFunc->getAccessorStorageDecl()->getFullName();
+            break;
+
+          case AccessorKind::IsMaterializeForSet:
+          case AccessorKind::IsAddressor:
+          case AccessorKind::IsMutableAddressor:
+            llvm_unreachable("cannot be @objc");
+          }
+        } else {
+          name = bestMethod->getFullName();
+        }
+
+        out << nominal->getName().str() << "." << name.getBaseName().str();
         auto argNames = name.getArgumentNames();
 
         // Only print the parentheses if there are some argument
@@ -2902,7 +2919,7 @@ public:
 
         // If there will be an ambiguity when referring to the method,
         // introduce a coercion to resolve it to the method we found.
-        if (isSelectorReferenceAmbiguous(bestMethod)) {
+        if (!isAccessor && isSelectorReferenceAmbiguous(bestMethod)) {
           if (auto fnType =
                 bestMethod->getInterfaceType()->getAs<FunctionType>()) {
             // For static/class members, drop the metatype argument.

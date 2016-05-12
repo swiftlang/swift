@@ -378,16 +378,16 @@ func testPreferClassMethodToCurriedInstanceMethod(_ obj: NSObject) {
 func testPropertyAndMethodCollision(_ obj: PropertyAndMethodCollision,
                                     rev: PropertyAndMethodReverseCollision) {
   obj.object = nil
-  obj.object(obj, doSomething:Selector("action"))
+  obj.object(obj, doSomething:#selector(getter: NSMenuItem.action))
 
   obj.dynamicType.classRef = nil
-  obj.dynamicType.classRef(obj, doSomething:Selector("action"))
+  obj.dynamicType.classRef(obj, doSomething:#selector(getter: NSMenuItem.action))
 
   rev.object = nil
-  rev.object(rev, doSomething:Selector("action"))
+  rev.object(rev, doSomething:#selector(getter: NSMenuItem.action))
 
   rev.dynamicType.classRef = nil
-  rev.dynamicType.classRef(rev, doSomething:Selector("action"))
+  rev.dynamicType.classRef(rev, doSomething:#selector(getter: NSMenuItem.action))
 
   var value: AnyObject
   value = obj.protoProp()
