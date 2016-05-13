@@ -2549,7 +2549,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   /// padding to align the start to word alignment.
   internal static func bytesForBitMap(capacity: Int) -> Int {
     let numWords = _BitMap.wordsFor(capacity)
-    return numWords * sizeof(UInt) + alignof(UInt)
+    return numWords * strideof(UInt) + alignof(UInt)
   }
 
   /// Returns the bytes necessary to store 'capacity' keys and padding to align
