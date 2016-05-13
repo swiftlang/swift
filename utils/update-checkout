@@ -53,6 +53,20 @@ NEXT_BRANCHES = {
     'swift-integration-tests': 'master',
 }
 
+SWIFT_3_0_PREVIEW_1_BRANCHES = {
+    'llvm': 'swift-3.0-branch',
+    'clang': 'swift-3.0-branch',
+    'swift': 'swift-3.0-preview-1-branch',
+    'lldb': 'swift-3.0-preview-1-branch',
+    'cmark': 'swift-3.0-preview-1-branch',
+    'llbuild': 'swift-3.0-preview-1-branch',
+    'swiftpm': 'swift-3.0-preview-1-branch',
+    'swift-corelibs-xctest': 'swift-3.0-preview-1-branch',
+    'swift-corelibs-foundation': 'swift-3.0-preview-1-branch',
+    'swift-corelibs-libdispatch': 'swift-3.0-preview-1-branch',
+    'swift-integration-tests': 'swift-3.0-preview-1-branch',
+    'compiler-rt': 'swift-3.0-branch',
+}
 
 def update_working_copy(repo_path, branch):
     if not os.path.isdir(repo_path):
@@ -97,6 +111,9 @@ def obtain_additional_swift_sources(
                 if branch:
                     if branch == "stable-next" or branch == "master-next":
                         repo_branch = NEXT_BRANCHES[dir_name]
+                    elif branch == "swift-3.0-branch" or \
+                        branch == "swift-3.0-preview-1-branch":
+                        repo_branch = SWIFT_3_0_PREVIEW_1_BRANCHES[dir_name]
                     else:
                         repo_branch = branch
                     src_path = SWIFT_SOURCE_ROOT + "/" + dir_name + "/" + \
@@ -153,6 +170,9 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         if branch:
             if branch == "stable-next" or branch == "master-next":
                 repo_branch = NEXT_BRANCHES[dir_name]
+            elif branch == "swift-3.0-branch" or \
+                branch == "swift-3.0-preview-1-branch":
+                        repo_branch = SWIFT_3_0_PREVIEW_1_BRANCHES[dir_name]
 
         update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, dir_name),
                             repo_branch)
