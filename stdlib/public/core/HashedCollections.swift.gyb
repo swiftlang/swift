@@ -2560,12 +2560,11 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     return strideof(Key.self) * capacity + padding
   }
 
+%if Self == 'Dictionary':
   /// Returns the bytes necessary to store 'capacity' values and padding to
   /// align the start to the alignment of the 'Value' type assuming a base
   /// address aligned to the maximum of the alignment of the 'Key' type and the
   /// alignment of a word.
-
-%if Self == 'Dictionary':
   internal static func bytesForValues(capacity: Int) -> Int {
     let maxPrevAlignment = max(alignof(Key.self), alignof(UInt))
     let padding = max(0, alignof(Value.self) - maxPrevAlignment)
