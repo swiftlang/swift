@@ -1661,6 +1661,9 @@ public:
 
   DeclName getObjectLiteralConstructorName(ObjectLiteralExpr *expr);
 
+  Type getObjectLiteralParameterType(ObjectLiteralExpr *expr,
+                                     ConstructorDecl *ctor);
+
   /// Get the module appropriate for looking up standard library types.
   ///
   /// This is "Swift", if that module is imported, or the current module if
