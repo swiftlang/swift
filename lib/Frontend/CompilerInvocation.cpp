@@ -1266,6 +1266,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.Sanitize = parseSanitizerArgValues(A, Triple, Diags);
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
+    Opts.SanitizeCoverage =
+        parseSanitizerCoverageArgValue(A, Triple, Diags, Opts.Sanitize);
+  }
+
   if (Args.hasArg(OPT_disable_reflection_metadata)) {
     Opts.EnableReflectionMetadata = false;
     Opts.EnableReflectionNames = false;

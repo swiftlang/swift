@@ -20,6 +20,9 @@
 
 #include "swift/AST/LinkLibrary.h"
 #include "swift/Basic/Sanitizers.h"
+// FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
+// split the header upstream so we don't include so much.
+#include "llvm/Transforms/Instrumentation.h"
 #include <string>
 #include <vector>
 
@@ -159,19 +162,21 @@ public:
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
 
-  IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
-                   Optimize(false), Sanitize(SanitizerKind::None),
-                   DebugInfoKind(IRGenDebugInfoKind::None),
-                   UseJIT(false), DisableLLVMOptzns(false),
-                   DisableLLVMARCOpts(false), DisableLLVMSLPVectorizer(false),
-                   DisableFPElim(true), Playground(false),
-                   EmitStackPromotionChecks(false), GenerateProfile(false),
-                   PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
-                   HasValueNamesSetting(false), ValueNames(false),
-                   EnableReflectionMetadata(true), EnableReflectionNames(true),
-                   UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
-                   CmdArgs()
-                   {}
+  /// Which sanitizer coverage is turned on.
+  llvm::SanitizerCoverageOptions SanitizeCoverage;
+
+  IRGenOptions()
+      : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
+        Optimize(false), Sanitize(SanitizerKind::None),
+        DebugInfoKind(IRGenDebugInfoKind::None), UseJIT(false),
+        DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
+        DisableLLVMSLPVectorizer(false), DisableFPElim(true), Playground(false),
+        EmitStackPromotionChecks(false), GenerateProfile(false),
+        PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
+        HasValueNamesSetting(false), ValueNames(false),
+        EnableReflectionMetadata(true), EnableReflectionNames(true),
+        UseIncrementalLLVMCodeGen(true), UseSwiftCall(false), CmdArgs(),
+        SanitizeCoverage(llvm::SanitizerCoverageOptions()) {}
 
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.

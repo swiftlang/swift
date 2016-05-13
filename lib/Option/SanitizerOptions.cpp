@@ -34,6 +34,67 @@ static StringRef toStringRef(const SanitizerKind kind) {
   llvm_unreachable("Unsupported sanitizer");
 }
 
+llvm::SanitizerCoverageOptions swift::parseSanitizerCoverageArgValue(
+    const llvm::opt::Arg *A, const llvm::Triple &Triple,
+    DiagnosticEngine &Diags, SanitizerKind sanitizer) {
+
+  llvm::SanitizerCoverageOptions opts;
+  // The coverage names here follow the names used by clang's
+  // ``-fsanitize-coverage=`` flag.
+  for (int i = 0, n = A->getNumValues(); i != n; ++i) {
+    if (opts.CoverageType == llvm::SanitizerCoverageOptions::SCK_None) {
+      opts.CoverageType =
+          llvm::StringSwitch<llvm::SanitizerCoverageOptions::Type>(
+              A->getValue(i))
+              .Case("func", llvm::SanitizerCoverageOptions::SCK_Function)
+              .Case("bb", llvm::SanitizerCoverageOptions::SCK_BB)
+              .Case("edge", llvm::SanitizerCoverageOptions::SCK_Edge)
+              .Default(llvm::SanitizerCoverageOptions::SCK_None);
+      if (opts.CoverageType != llvm::SanitizerCoverageOptions::SCK_None)
+        continue;
+    }
+
+    if (StringRef(A->getValue(i)) == "indirect-calls") {
+      opts.IndirectCalls = true;
+      continue;
+    } else if (StringRef(A->getValue(i)) == "trace-bb") {
+      opts.TraceBB = true;
+      continue;
+    } else if (StringRef(A->getValue(i)) == "trace-cmp") {
+      opts.TraceCmp = true;
+      continue;
+    } else if (StringRef(A->getValue(i)) == "8bit-counters") {
+      opts.Use8bitCounters = true;
+      continue;
+    }
+
+    // Argument is not supported.
+    Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
+                   A->getOption().getPrefixedName(), A->getValue(i));
+    return llvm::SanitizerCoverageOptions();
+  }
+
+  if (opts.CoverageType == llvm::SanitizerCoverageOptions::SCK_None) {
+    Diags.diagnose(SourceLoc(), diag::error_option_missing_required_argument,
+                   A->getSpelling(), "\"func\", \"bb\", \"edge\"");
+    return llvm::SanitizerCoverageOptions();
+  }
+
+  // Running the sanitizer coverage pass will add undefined symbols to
+  // functions in compiler-rt's "sanitizer_common". "sanitizer_common" isn't
+  // shipped as a separate library we can link with. However those are defined
+  // in the various sanitizer runtime libraries so we require that we are
+  // doing a sanitized build so we pick up the required functions during
+  // linking.
+  if (opts.CoverageType != llvm::SanitizerCoverageOptions::SCK_None &&
+      sanitizer == SanitizerKind::None) {
+    Diags.diagnose(SourceLoc(), diag::error_option_requires_sanitizer,
+                   A->getSpelling());
+    return llvm::SanitizerCoverageOptions();
+  }
+  return opts;
+}
+
 SanitizerKind swift::parseSanitizerArgValues(const llvm::opt::Arg *A,
                                       const llvm::Triple &Triple,
                                       DiagnosticEngine &Diags) {
