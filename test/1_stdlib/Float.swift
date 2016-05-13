@@ -222,6 +222,15 @@ func checkQNaN(_ qnan: TestFloat) {
   _precondition(qnan.floatingPointClass == .quietNaN)
 }
 
+func checkSNaN(_ snan: TestFloat) {
+  checkNaN(snan)
+// sNaN cannot be fully supported on i386.
+#if !arch(i386)
+  _precondition(snan.isSignaling)
+  _precondition(snan.floatingPointClass == .signalingNaN)
+#endif
+}
+
 func testNaN() {
   var stdlibDefaultNaN = TestFloat.nan
   checkQNaN(stdlibDefaultNaN)
@@ -229,6 +238,8 @@ func testNaN() {
   var stdlibQNaN = TestFloat.quietNaN
   checkQNaN(stdlibQNaN)
 
+  var stdlibSNaN = TestFloat.signalingNaN
+  checkSNaN(stdlibSNaN)
   print("testNaN done")
 }
 testNaN()
