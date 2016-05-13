@@ -568,20 +568,28 @@ public:
   }
 
   /// Check that the given type is a legal SIL value.
-  void checkLegalType(SILFunction *F, SILType type) {
-    auto rvalueType = type.getSwiftRValueType();
-    require(!isa<LValueType>(rvalueType),
-            "l-value types are not legal in SIL");
-    require(!isa<AnyFunctionType>(rvalueType),
+  void checkLegalType(SILFunction *F, SILType InputType) {
+    auto RValueType = InputType.getSwiftRValueType();
+    require(!isa<LValueType>(RValueType), "l-value types are not legal in SIL");
+    require(!isa<AnyFunctionType>(RValueType),
             "AST function types are not legal in SIL");
 
-    rvalueType.visit([&](Type t) {
+    auto VerifyArchetypes = [&](Type t) {
       auto *A = dyn_cast<ArchetypeType>(t.getPointer());
       if (!A)
         return;
       require(isArchetypeValidInFunction(A, F),
               "Operand is of an ArchetypeType that does not exist in the "
               "Caller's generic param list.");
+    };
+    RValueType.visit(VerifyArchetypes);
+
+    // Check all of our child type lowerings to make sure that types stored in
+    // type lowering has archetypes that are valid in this function.
+    auto &TL = F->getModule().getTypeLowering(InputType);
+    TL.getLoweredType().getSwiftRValueType().visit(VerifyArchetypes);
+    TL.visit(F->getModule(), [&](const Lowering::TypeLowering &ChildTL) {
+      ChildTL.getLoweredType().getSwiftRValueType().visit(VerifyArchetypes);
     });
   }
 

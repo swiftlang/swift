@@ -547,6 +547,11 @@ namespace {
                           SILValue value) const override {
       // Trivial
     }
+
+    void visit(SILModule &M,
+               std::function<void(const TypeLowering &)> F) const override {
+      // Trivial
+    }
   };
 
   class NonTrivialLoadableTypeLowering : public LoadableTypeLowering {
@@ -569,6 +574,11 @@ namespace {
       if (!isInit) oldValue = B.createLoad(loc, addr);
       B.createStore(loc, newValue, addr);
       if (!isInit) emitReleaseValue(B, loc, oldValue);
+    }
+
+    void visit(SILModule &M,
+               std::function<void(const TypeLowering &)> F) const override {
+      // Trivial
     }
   };
 
@@ -620,6 +630,15 @@ namespace {
       }
       return Children;
     }
+
+    void visit(SILModule &M,
+               std::function<void(const TypeLowering &)> F) const override {
+      for (auto &child : getChildren(M)) {
+        auto &childLowering = child.getLowering();
+        childLowering.visit(M, F);
+        F(childLowering);
+      }
+    };
 
     template <class T>
     void forEachNonTrivialChild(SILBuilder &B, SILLocation loc,
@@ -1010,6 +1029,11 @@ namespace {
                                  SILValue value,
                                  LoweringStyle style) const override {
       llvm_unreachable("type is not loadable!");
+    }
+
+    void visit(SILModule &M,
+               std::function<void(const TypeLowering &)> F) const override {
+      // Address only types do not have any sub type lowerings.
     }
   };
 
