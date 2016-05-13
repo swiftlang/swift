@@ -100,7 +100,7 @@ where Index : Strideable,
   }
 
   internal func _validityChecked(_ i: Index) -> Index {
-    precondition(i >= startIndex && i <= endIndex, "index out of range")
+    _precondition(i >= startIndex && i <= endIndex, "index out of range")
     return i
   }
   

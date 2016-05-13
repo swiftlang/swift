@@ -1041,7 +1041,7 @@ extension Sequence where
   ///   the beginning of the sequence.
   @warn_unused_result
   public func dropFirst(_ n: Int) -> AnySequence<Iterator.Element> {
-    precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
     return AnySequence(_DropFirstSequence(_iterator: makeIterator(), limit: n))
   }
@@ -1064,7 +1064,7 @@ extension Sequence where
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @warn_unused_result
   public func dropLast(_ n: Int) -> AnySequence<Iterator.Element> {
-    precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
 
     // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
@@ -1109,7 +1109,7 @@ extension Sequence where
   /// - Complexity: O(1)
   @warn_unused_result
   public func prefix(_ maxLength: Int) -> AnySequence<Iterator.Element> {
-    precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
+    _precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
     if maxLength == 0 {
       return AnySequence(EmptyCollection<Iterator.Element>())
     }
