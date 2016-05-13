@@ -1,0 +1,58 @@
+FIELDS:
+=======
+TypesToReflect.HasCTypes
+------------------------
+mcs: __C.MyCStruct
+(struct __C.MyCStruct)
+
+mce: __C.MyCEnum
+(struct __C.MyCEnum)
+
+mcu: __C.MyCUnion
+(struct __C.MyCUnion)
+
+mcsbf: __C.MyCStructWithBitfields
+(struct __C.MyCStructWithBitfields)
+
+__C.MyCStruct
+-------------
+__C.MyCEnum
+-----------
+__C.MyCUnion
+------------
+__C.MyCStructWithBitfields
+--------------------------
+
+ASSOCIATED TYPES:
+=================
+
+BUILTIN TYPES:
+==============
+
+- __C.MyCStruct:
+Size: 9
+Alignment: 4
+Stride: 12
+NumExtraInhabitants: 0
+
+- __C.MyCEnum:
+Size: 4
+Alignment: 4
+Stride: 4
+NumExtraInhabitants: 0
+
+- __C.MyCUnion:
+Size: 4
+Alignment: 4
+Stride: 4
+NumExtraInhabitants: 0
+
+- __C.MyCStructWithBitfields:
+Size: 2
+Alignment: 4
+Stride: 4
+NumExtraInhabitants: 0
+
+CAPTURE DESCRIPTORS:
+====================
+

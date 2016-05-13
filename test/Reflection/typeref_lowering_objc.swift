@@ -8,5 +8,14 @@
 V12TypeLowering14FunctionStruct
 // CHECK:      (struct TypeLowering.FunctionStruct)
 // CHECK-NEXT: (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647
-  (field name=blockFunction offset=0
-    (reference kind=strong refcounting=unknown)))
+// CHECK-NEXT:   (field name=blockFunction offset=0
+// CHECK-NEXT:     (reference kind=strong refcounting=unknown)))
+
+C12TypeLowering14HasObjCClasses
+// CHECK: (class TypeLowering.HasObjCClasses)
+// CHECK-NEXT: (reference kind=strong refcounting=native)
+
+C12TypeLowering16NSObjectSubclass
+// CHECK: (class TypeLowering.NSObjectSubclass)
+// CHECK-NEXT: (reference kind=strong refcounting=unknown)
+

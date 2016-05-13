@@ -200,10 +200,6 @@ def enable_reflection_names : Flag<["-"], "enable-reflection-names">,
   HelpText<"Enable emission of names of stored properties and enum cases in"
            "reflection metadata">;
 
-def enable_reflection_builtins : Flag<["-"], "enable-reflection-builtins">,
-  HelpText<"Enable emission of reflection metadata for builtin types"
-           " (standard library only)">;
-
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
   HelpText<"Emit runtime checks for correct stack promotion of objects.">;
 

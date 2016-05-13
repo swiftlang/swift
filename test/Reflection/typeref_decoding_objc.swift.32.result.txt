@@ -2,29 +2,18 @@ FIELDS:
 =======
 TypesToReflect.OC
 -----------------
-nsObject: __ObjC.NSObject
-(class __ObjC.NSObject)
-
-nsString: __ObjC.NSString
-(class __ObjC.NSString)
-
-cfString: __ObjC.CFString
-(class __ObjC.CFString)
-
-aBlock: @convention(block) () -> ()
-(function convention=block
-  (tuple))
-
 TypesToReflect.GenericOC
 ------------------------
-ocnss: TypesToReflect.GenericOC<__ObjC.NSString>
-(bound_generic_class TypesToReflect.GenericOC
-  (class __ObjC.NSString))
+TypesToReflect.HasObjCClasses
+-----------------------------
+url: __ObjC.NSURL
+(class __ObjC.NSURL)
 
-occfs: TypesToReflect.GenericOC<__ObjC.CFString>
-(bound_generic_class TypesToReflect.GenericOC
-  (class __ObjC.CFString))
+integer: Swift.Int
+(struct Swift.Int)
 
+__ObjC.NSURL
+------------
 
 ASSOCIATED TYPES:
 =================
@@ -42,9 +31,16 @@ ASSOCIATED TYPES:
 - TypesToReflect.GenericOC : Swift.CVarArg
 - TypesToReflect.GenericOC : Swift.CustomStringConvertible
 - TypesToReflect.GenericOC : Swift.CustomDebugStringConvertible
+- TypesToReflect.HasObjCClasses : Swift.AnyObject
 
 BUILTIN TYPES:
 ==============
+
+- __ObjC.NSURL:
+Size: 4
+Alignment: 4
+Stride: 4
+NumExtraInhabitants: 4096
 
 CAPTURE DESCRIPTORS:
 ====================
