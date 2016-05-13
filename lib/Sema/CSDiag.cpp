@@ -577,6 +577,16 @@ resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
   return { expr, nullptr };
 }
 
+static bool isLoadedLValue(Expr *expr) {
+  expr = expr->getSemanticsProvidingExpr();
+  if (isa<LoadExpr>(expr))
+    return true;
+  if (auto ifExpr = dyn_cast<IfExpr>(expr))
+    return isLoadedLValue(ifExpr->getThenExpr())
+        && isLoadedLValue(ifExpr->getElseExpr());
+  return false;
+}
+
 static void diagnoseSubElementFailure(Expr *destExpr,
                                       SourceLoc loc,
                                       ConstraintSystem &CS,
@@ -672,6 +682,16 @@ static void diagnoseSubElementFailure(Expr *destExpr,
         .highlight(ICE->getSourceRange());
       return;
     }
+
+  if (auto IE = dyn_cast<IfExpr>(immInfo.first)) {
+    if (isLoadedLValue(IE)) {
+      TC.diagnose(loc, diagID,
+                  "result of conditional operator '? :' is never mutable")
+        .highlight(IE->getQuestionLoc())
+        .highlight(IE->getColonLoc());
+      return;
+    }
+  }
 
   TC.diagnose(loc, unknownDiagID, destExpr->getType())
     .highlight(immInfo.first->getSourceRange());
