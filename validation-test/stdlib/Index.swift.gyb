@@ -53,37 +53,59 @@ Index.test("${TraversalCollection}/index(_:offsetBy:limitedBy:)/dispatch") {
 // Check that a random access collection doesn't call into O(n) predecessor
 // calls when it has a more efficient implementation.
 
+% for IsStrideable in [False, True]:
+%   Collection = 'DefaultedRandomAccessCollection'
+%   Collection += 'WithStrideableIndex' if IsStrideable else ''
+
 Index.test(
-  "DefaultedRandomAccessCollection/index(_:offsetBy:)/"
+  "${Collection}/index(_:offsetBy:)/"
   + "avoidsSuccessorAndPredecessor/dispatch"
 ) {
   for test in indexStepsFromTests.filter(
     {$0.limit == nil && $0.distance >= 0}
   ) {
-    let c = DefaultedRandomAccessCollection(Array(0..<10))
+    let c = ${Collection}(Array(0..<10))
 
     let i = c.nthIndex(test.startOffset)
     let result  = c.index(i, offsetBy: test.distance)
+
+%   if IsStrideable:
+    expectTrue(i.timesAdvancedCalled.value <= 1)
+    if i.timesAdvancedCalled.value == 0 {
+      expectEqual(1, i.timesDistanceCalled.value)
+    }
+%   else:
     expectEqual(0, c.timesSuccessorCalled.value)
     expectEqual(0, c.timesPredecessorCalled.value)
+%   end
   }
 }
 
 Index.test(
-  "DefaultedRandomAccessCollection/index(_:offsetBy:limitedBy:)/"
+  "${Collection}/index(_:offsetBy:limitedBy:)/"
   + "avoidsSuccessorAndPredecessor/dispatch"
 ) {
   for test in indexStepsFromTests.filter(
-    {$0.limit != nil && $0.distance >= 0}
+    {$0.limit != nil}
   ) {
-    let c = DefaultedRandomAccessCollection(Array(0..<10))
+    let c = ${Collection}(Array(0..<10))
 
     let i = c.nthIndex(test.startOffset)
     let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
     _ = c.index(i, offsetBy: test.distance, limitedBy: limit)
+
+%   if IsStrideable:
+    expectTrue(i.timesAdvancedCalled.value <= 1)
+    if i.timesAdvancedCalled.value == 0 {
+      expectEqual(1, i.timesDistanceCalled.value)
+    }
+%   else:
     expectEqual(0, c.timesSuccessorCalled.value)
     expectEqual(0, c.timesPredecessorCalled.value)
+%   end
   }
 }
+
+% end
 
 runAllTests()
