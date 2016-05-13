@@ -789,6 +789,14 @@ static NullablePtr<EnumElementDecl> getEnumCase(SILValue Val,
 
     EnumElementDecl *CommonCase = nullptr;
     for (std::pair<SILBasicBlock *, SILValue> Incoming : IncomingVals) {
+      TermInst *TI = Incoming.first->getTerminator();
+
+      // If the terminator of the incoming value is e.g. a switch_enum, the
+      // incoming value is the switch_enum operand and not the enum payload
+      // (which would be the real incoming value of the argument).
+      if (!isa<BranchInst>(TI) && !isa<CondBranchInst>(TI))
+        return nullptr;
+
       NullablePtr<EnumElementDecl> IncomingCase =
         getEnumCase(Incoming.second, Incoming.first, RecursionDepth + 1);
       if (!IncomingCase)
