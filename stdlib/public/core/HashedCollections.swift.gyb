@@ -2605,38 +2605,23 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 
   internal
   var _initializedHashtableEntriesBitMapStorage: UnsafeMutablePointer<UInt> {
-    get {
-      let start = UInt(Builtin.ptrtoint_Word(buffer._elementPointer._rawValue))
-      let alignment = UInt(alignof(UInt))
-      let alignMask = alignment &- UInt(1)
-      return UnsafeMutablePointer<UInt>(
-          bitPattern:(start &+ alignMask) & ~alignMask)!
-    }
+    return _roundUp(buffer._elementPointer, toAlignmentOf: UInt.self)
   }
 
   internal var _keys: UnsafeMutablePointer<Key> {
-    get {
-      let start =
-          UInt(Builtin.ptrtoint_Word(
-              _initializedHashtableEntriesBitMapStorage._rawValue)) &+
-          UInt(_BitMap.wordsFor(_capacity)) &* UInt(strideof(UInt))
-      let alignment = UInt(alignof(Key))
-      let alignMask = alignment &- UInt(1)
-      return UnsafeMutablePointer<Key>(
-          bitPattern:(start &+ alignMask) & ~alignMask)!
-    }
+    let bitMapSizeInBytes =
+      _unsafeMultiply(_BitMap.wordsFor(_capacity), strideof(UInt))
+    let start =
+      UnsafeMutablePointer<UInt8>(_initializedHashtableEntriesBitMapStorage)
+      + bitMapSizeInBytes
+    return _roundUp(start, toAlignmentOf: Key.self)
   }
 
 %if Self == 'Dictionary':
   internal var _values: UnsafeMutablePointer<Value> {
-    get {
-      let start = UInt(Builtin.ptrtoint_Word(_keys._rawValue)) &+
-        UInt(_capacity) &* UInt(strideof(Key.self))
-      let alignment = UInt(alignof(Value))
-      let alignMask = alignment &- UInt(1)
-      return UnsafeMutablePointer<Value>(
-          bitPattern:(start &+ alignMask) & ~alignMask)!
-    }
+    let keysSizeInBytes = _unsafeMultiply(_capacity, strideof(Key.self))
+    let start = UnsafeMutablePointer<UInt8>(_keys) + keysSizeInBytes
+    return _roundUp(start, toAlignmentOf: Value.self)
   }
 %end
 
