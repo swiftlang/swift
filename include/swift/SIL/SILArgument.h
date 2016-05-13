@@ -184,23 +184,38 @@ public:
 
   /// Returns the incoming SILValue from the \p BBIndex predecessor of this
   /// argument's parent BB. If the routine fails, it returns an empty SILValue.
+  /// Note that for some predecessor terminators the incoming value is not
+  /// exactly the argument value. E.g. the incoming value for a switch_enum
+  /// payload argument is the enum itself (the operand of the switch_enum).
   SILValue getIncomingValue(unsigned BBIndex);
 
   /// Returns the incoming SILValue for this argument from BB. If the routine
   /// fails, it returns an empty SILValue.
+  /// Note that for some predecessor terminators the incoming value is not
+  /// exactly the argument value. E.g. the incoming value for a switch_enum
+  /// payload argument is the enum itself (the operand of the switch_enum).
   SILValue getIncomingValue(SILBasicBlock *BB);
 
   /// Returns true if we were able to find incoming values for each predecessor
   /// of this arguments basic block. The found values are stored in OutArray.
+  /// Note that for some predecessor terminators the incoming value is not
+  /// exactly the argument value. E.g. the incoming value for a switch_enum
+  /// payload argument is the enum itself (the operand of the switch_enum).
   bool getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray);
 
   /// Returns true if we were able to find incoming values for each predecessor
   /// of this arguments basic block. The found values are stored in OutArray.
+  /// Note that for some predecessor terminators the incoming value is not
+  /// exactly the argument value. E.g. the incoming value for a switch_enum
+  /// payload argument is the enum itself (the operand of the switch_enum).
   bool getIncomingValues(
       llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray);
 
   /// If this SILArgument's parent block has one predecessor, return the
   /// incoming value from that predecessor. Returns SILValue() otherwise.
+  /// Note that for some predecessor terminators the incoming value is not
+  /// exactly the argument value. E.g. the incoming value for a switch_enum
+  /// payload argument is the enum itself (the operand of the switch_enum).
   SILValue getSingleIncomingValue() const;
 
   /// Returns true if this SILArgument is the self argument of its
