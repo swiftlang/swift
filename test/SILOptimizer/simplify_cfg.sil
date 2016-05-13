@@ -2643,6 +2643,10 @@ bb1(%10 : $Optional<TwoCase>):
   switch_enum %10 : $Optional<TwoCase>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb5
 
 bb2(%1 : $TwoCase):
+  // Simplification of that switch_enum crashed the compiler because
+  // SILArgument::getIncomingValues returns %10 ($Optional<TwoCase>) as the
+  // incoming value for %1 ($TwoCase).
+  // rdar://problem/26251856
   switch_enum %1 : $TwoCase, case #TwoCase.First!enumelt: bb3, case #TwoCase.Second!enumelt: bb4
 
 bb3:
