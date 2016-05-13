@@ -2460,13 +2460,16 @@ internal struct _BitMap {
   internal let values: UnsafeMutablePointer<UInt>
   internal let bitCount: Int
 
-  // Note: We use UInt here to get unsigned math (shifts).
-  internal static func wordIndex(_ i: UInt) -> UInt {
-    return i / UInt._sizeInBits
+  internal static func wordIndex(_ i: Int) -> Int {
+    // Note: We perform the operation on UInts to get faster unsigned math
+    // (shifts).
+    return Int(bitPattern: UInt(bitPattern: i) / UInt(UInt._sizeInBits))
   }
 
-  internal static func bitIndex(_ i: UInt) -> UInt {
-    return i % UInt._sizeInBits
+  internal static func bitIndex(_ i: Int) -> UInt {
+    // Note: We perform the operation on UInts to get faster unsigned math
+    // (shifts).
+    return UInt(bitPattern: i) % UInt(UInt._sizeInBits)
   }
 
   internal static func wordsFor(_ bitCount: Int) -> Int {
@@ -2493,21 +2496,18 @@ internal struct _BitMap {
   internal subscript(i: Int) -> Bool {
     get {
       _sanityCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
-      let idx = UInt(i)
-      let word = values[Int(_BitMap.wordIndex(idx))]
-      let bit = word & (1 << _BitMap.bitIndex(idx))
+      let word = values[_BitMap.wordIndex(i)]
+      let bit = word & (1 << _BitMap.bitIndex(i))
       return bit != 0
     }
     nonmutating set {
       _sanityCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
-      let idx = UInt(i)
-      let wordIdx = _BitMap.wordIndex(idx)
+      let wordIdx = _BitMap.wordIndex(i)
+      let bitMask = 1 << _BitMap.bitIndex(i)
       if newValue {
-        values[Int(wordIdx)] =
-            values[Int(wordIdx)] | (1 << _BitMap.bitIndex(idx))
+        values[wordIdx] = values[wordIdx] | bitMask
       } else {
-        values[Int(wordIdx)] =
-            values[Int(wordIdx)] & ~(1 << _BitMap.bitIndex(idx))
+        values[wordIdx] = values[wordIdx] & ~bitMask
       }
     }
   }
