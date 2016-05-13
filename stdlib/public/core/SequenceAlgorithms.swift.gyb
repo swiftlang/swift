@@ -620,10 +620,10 @@ extension Sequence {
   ///   and *n* is the length of the result.
   /// - SeeAlso: `flatten()`, `map(_:)`
   @warn_unused_result
-  public func flatMap<S : Sequence>(
-    _ transform: @noescape (${GElement}) throws -> S
-  ) rethrows -> [S.${GElement}] {
-    var result: [S.${GElement}] = []
+  public func flatMap<SegmentOfResult : Sequence>(
+    _ transform: @noescape (${GElement}) throws -> SegmentOfResult
+  ) rethrows -> [SegmentOfResult.${GElement}] {
+    var result: [SegmentOfResult.${GElement}] = []
     for element in self {
       result.append(contentsOf: try transform(element))
     }
