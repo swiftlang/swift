@@ -1,4 +1,3 @@
-// REQUIRES: rdar26099576
 // RUN: rm -rf %t && mkdir -p %t
 
 // RUN: not %target-swift-frontend -parse %s -I %S/Inputs/custom-modules/ -show-diagnostics-after-fatal -D MISSING_FROM_MODULE 2> %t/err.txt

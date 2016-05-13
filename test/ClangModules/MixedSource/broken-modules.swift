@@ -1,4 +1,3 @@
-// REQUIRES: rdar26099576
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: not %target-swift-frontend -parse %s -I %S/Inputs/broken-modules/ -enable-source-import -show-diagnostics-after-fatal 2> %t/err.txt
 // RUN: FileCheck -check-prefix CHECK -check-prefix CLANG-CHECK %s < %t/err.txt

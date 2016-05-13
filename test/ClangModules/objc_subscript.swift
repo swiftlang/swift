@@ -1,4 +1,3 @@
-// REQUIRES: rdar26099576
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-clang-importer-objc-overlays
 

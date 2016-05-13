@@ -1,4 +1,3 @@
-// REQUIRES: rdar26099576
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: not %target-swift-frontend -parse %s -I %S/Inputs/non-modular -F %S/Inputs/non-modular 2>&1 | FileCheck %s
 

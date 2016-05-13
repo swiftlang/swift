@@ -1,4 +1,3 @@
-// REQUIRES: rdar26099576
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=ImportAsMember.Proto -always-argument-labels > %t.printed.Proto.txt
 
 // RUN: FileCheck %s -check-prefix=PRINT-PROTO -strict-whitespace < %t.printed.Proto.txt

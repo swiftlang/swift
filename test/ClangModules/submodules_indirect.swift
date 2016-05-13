@@ -1,4 +1,3 @@
-// REQUIRES: rdar26099576
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify -I %S/Inputs/custom-modules/ %s
