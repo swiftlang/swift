@@ -264,7 +264,7 @@ reflect(any: he)
 // CHECK-64:       (field name=error offset=0
 // CHECK-64:         (reference kind=strong refcounting=unknown))))
 // CHECK-64:   (field name=errorInComposition offset=8
-// CHECK-64:     (existential size=48 alignment=8 stride=48 num_extra_inhabitants=0
+// CHECK-64:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=0
 // CHECK-64:       (field name=value offset=0
 // CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
 // CHECK-64:       (field name=value offset=8
@@ -278,7 +278,7 @@ reflect(any: he)
 // CHECK-64:       (field name=wtable offset=40
 // CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
 // CHECK-64:   (field name=customError offset=56
-// CHECK-64:     (existential size=40 alignment=8 stride=40 num_extra_inhabitants=0
+// CHECK-64:     (opaque_existential size=40 alignment=8 stride=40 num_extra_inhabitants=0
 // CHECK-64:       (field name=value offset=0
 // CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
 // CHECK-64:       (field name=value offset=8
@@ -290,7 +290,7 @@ reflect(any: he)
 // CHECK-64:       (field name=wtable offset=32
 // CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
 // CHECK-64:   (field name=customErrorInComposition offset=96
-// CHECK-64:     (existential size=48 alignment=8 stride=48 num_extra_inhabitants=0
+// CHECK-64:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=0
 // CHECK-64:       (field name=value offset=0
 // CHECK-64:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
 // CHECK-64:       (field name=value offset=8
@@ -316,7 +316,7 @@ reflect(any: he)
 // CHECK-32:       (field name=error offset=0
 // CHECK-32:         (reference kind=strong refcounting=unknown))))
 // CHECK-32:   (field name=errorInComposition offset=4
-// CHECK-32:     (existential size=24 alignment=4 stride=24 num_extra_inhabitants=0
+// CHECK-32:     (opaque_existential size=24 alignment=4 stride=24 num_extra_inhabitants=0
 // CHECK-32:       (field name=value offset=0
 // CHECK-32:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1))
 // CHECK-32:       (field name=value offset=4
@@ -330,7 +330,7 @@ reflect(any: he)
 // CHECK-32:       (field name=wtable offset=20
 // CHECK-32:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1))))
 // CHECK-32:   (field name=customError offset=28
-// CHECK-32:     (existential size=20 alignment=4 stride=20 num_extra_inhabitants=0
+// CHECK-32:     (opaque_existential size=20 alignment=4 stride=20 num_extra_inhabitants=0
 // CHECK-32:       (field name=value offset=0
 // CHECK-32:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1))
 // CHECK-32:       (field name=value offset=4
@@ -342,7 +342,7 @@ reflect(any: he)
 // CHECK-32:       (field name=wtable offset=16
 // CHECK-32:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1))))
 // CHECK-32:   (field name=customErrorInComposition offset=48
-// CHECK-32:     (existential size=24 alignment=4 stride=24 num_extra_inhabitants=0
+// CHECK-32:     (opaque_existential size=24 alignment=4 stride=24 num_extra_inhabitants=0
 // CHECK-32:       (field name=value offset=0
 // CHECK-32:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1))
 // CHECK-32:       (field name=value offset=4

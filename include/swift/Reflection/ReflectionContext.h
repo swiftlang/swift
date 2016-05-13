@@ -181,10 +181,10 @@ public:
       *OutInstanceAddress = ExistentialAddress;
       return true;
 
-    // Other existentials have two cases:
+    // Opaque existentials fall under two cases:
     // If the value fits in three words, it starts at the beginning of the
     // container. If it doesn't, the first word is a pointer to a heap box.
-    case RecordKind::Existential: {
+    case RecordKind::OpaqueExistential: {
       auto Fields = ExistentialRecordTI->getFields();
       auto ExistentialMetadataField = std::find_if(Fields.begin(), Fields.end(),
                                    [](const FieldInfo &FI) -> bool {
@@ -300,7 +300,6 @@ public:
       *OutInstanceAddress = RemoteAddress(InstanceAddress);
 
       return true;
-      break;
     }
     default:
       return false;

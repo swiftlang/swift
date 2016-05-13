@@ -124,7 +124,7 @@ V12TypeLowering17ExistentialStruct
 // CHECK:      (struct TypeLowering.ExistentialStruct)
 // CHECK-NEXT: (struct size=224 alignment=8 stride=224 num_extra_inhabitants=0
 // CHECK-NEXT:   (field name=any offset=0
-// CHECK-NEXT:     (existential size=32 alignment=8 stride=32 num_extra_inhabitants=0
+// CHECK-NEXT:     (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=0
 // CHECK-NEXT:       (field name=value offset=0
 // CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
 // CHECK-NEXT:       (field name=value offset=8
@@ -138,7 +138,7 @@ V12TypeLowering17ExistentialStruct
 // CHECK-NEXT:       (field name=object offset=0
 // CHECK-NEXT:         (reference kind=strong refcounting=unknown))))
 // CHECK-NEXT:   (field name=anyProto offset=40
-// CHECK-NEXT:     (existential size=40 alignment=8 stride=40 num_extra_inhabitants=0
+// CHECK-NEXT:     (opaque_existential size=40 alignment=8 stride=40 num_extra_inhabitants=0
 // CHECK-NEXT:       (field name=value offset=0
 // CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
 // CHECK-NEXT:       (field name=value offset=8
@@ -150,7 +150,7 @@ V12TypeLowering17ExistentialStruct
 // CHECK-NEXT:       (field name=wtable offset=32
 // CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
 // CHECK-NEXT:   (field name=anyProtoComposition offset=80
-// CHECK-NEXT:     (existential size=48 alignment=8 stride=48 num_extra_inhabitants=0
+// CHECK-NEXT:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=0
 // CHECK-NEXT:       (field name=value offset=0
 // CHECK-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
 // CHECK-NEXT:       (field name=value offset=8

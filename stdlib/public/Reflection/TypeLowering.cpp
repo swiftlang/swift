@@ -110,8 +110,8 @@ public:
       case RecordKind::ThickFunction:
         printHeader("thick_function");
         break;
-      case RecordKind::Existential:
-        printHeader("existential");
+      case RecordKind::OpaqueExistential:
+        printHeader("opaque_existential");
         break;
       case RecordKind::ClassExistential:
         printHeader("class_existential");
@@ -178,19 +178,13 @@ void TypeInfo::dump(std::ostream &OS, unsigned Indent) const {
   OS << '\n';
 }
 
+BuiltinTypeInfo::BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor)
+  : TypeInfo(TypeInfoKind::Builtin,
+             descriptor->Size, descriptor->Alignment,
+             descriptor->Stride, descriptor->NumExtraInhabitants),
+    Name(descriptor->getMangledTypeName()) {}
+
 namespace {
-
-class BuiltinTypeInfo : public TypeInfo {
-public:
-  BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor)
-    : TypeInfo(TypeInfoKind::Builtin,
-               descriptor->Size, descriptor->Alignment,
-               descriptor->Stride, descriptor->NumExtraInhabitants) {}
-
-  static bool classof(const TypeInfo *TI) {
-    return TI->getKind() == TypeInfoKind::Builtin;
-  }
-};
 
 /// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {
@@ -287,7 +281,7 @@ public:
       Kind = RecordKind::ClassExistential;
       break;
     case ExistentialTypeRepresentation::Opaque:
-      Kind = RecordKind::Existential;
+      Kind = RecordKind::OpaqueExistential;
       break;
     case ExistentialTypeRepresentation::ErrorProtocol:
       Kind = RecordKind::ErrorExistential;
@@ -312,7 +306,7 @@ public:
       break;
     case ExistentialTypeRepresentation::ErrorProtocol:
       builder.addField("error", TC.getUnknownObjectTypeRef());
-      return builder.build();
+      break;
     }
 
     for (unsigned i = 0; i < WitnessTableCount; i++)
