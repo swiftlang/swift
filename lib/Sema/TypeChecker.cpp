@@ -168,18 +168,56 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
 
 DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
   switch (expr->getLiteralKind()) {
-    case ObjectLiteralExpr::colorLiteral: {
-      return DeclName(Context, Context.Id_init,
-                      { Context.getIdentifier("red"),
-                        Context.getIdentifier("green"),
-                        Context.getIdentifier("blue"),
-                        Context.getIdentifier("alpha") });
-    }
-    case ObjectLiteralExpr::imageLiteral:
-    case ObjectLiteralExpr::fileLiteral: {
-      return DeclName(Context, Context.Id_init,
-                      { Context.getIdentifier("resourceName") });
-    }
+  case ObjectLiteralExpr::colorLiteral: {
+    return DeclName(Context, Context.Id_init,
+                    { Context.getIdentifier("colorLiteralRed"),
+                      Context.getIdentifier("green"),
+                      Context.getIdentifier("blue"),
+                      Context.getIdentifier("alpha") });
+  }
+  case ObjectLiteralExpr::imageLiteral: {
+    return DeclName(Context, Context.Id_init,
+                    { Context.getIdentifier("imageLiteralResourceName") });
+  }
+  case ObjectLiteralExpr::fileLiteral: {
+    return DeclName(Context, Context.Id_init,
+            { Context.getIdentifier("fileReferenceLiteralResourceName") });
+  }
+  }
+  llvm_unreachable("unknown literal constructor");
+}
+
+/// Return an idealized form of the parameter type of the given
+/// object-literal initializer.  This removes references to the protocol
+/// name from the first argument label, which would be otherwise be
+/// redundant when writing out the object-literal syntax:
+///
+///   #fileLiteral(fileReferenceLiteralResourceName: "hello.jpg")
+///
+/// Doing this allows us to preserve a nicer (and source-compatible)
+/// literal syntax while still giving the initializer a semantically
+/// unambiguous name.
+Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
+                                                ConstructorDecl *ctor) {
+  Type argType = ctor->getArgumentType();
+  auto argTuple = argType->getAs<TupleType>();
+  if (!argTuple) return argType;
+
+  auto replace = [&](StringRef replacement) -> Type {
+    SmallVector<TupleTypeElt, 4> elements;
+    elements.append(argTuple->getElements().begin(),
+                    argTuple->getElements().end());
+    elements[0] = TupleTypeElt(elements[0].getType(),
+                               Context.getIdentifier(replacement));
+    return TupleType::get(elements, Context);
+  };
+
+  switch (expr->getLiteralKind()) {
+  case ObjectLiteralExpr::colorLiteral:
+    return replace("red");
+  case ObjectLiteralExpr::fileLiteral:
+  case ObjectLiteralExpr::imageLiteral:
+    return replace("resourceName");
   }
   llvm_unreachable("unknown literal constructor");
 }

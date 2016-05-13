@@ -4868,8 +4868,9 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
   if (constrs.size() != 1 || !isa<ConstructorDecl>(constrs.front()))
     return false;
   auto *constr = cast<ConstructorDecl>(constrs.front());
+  auto paramType = TC.getObjectLiteralParameterType(E, constr);
   if (!typeCheckChildIndependently(
-        E->getArg(), constr->getArgumentType(), CTP_CallArgument))
+        E->getArg(), paramType, CTP_CallArgument))
     return true;
 
   // Conditions for showing this diagnostic:

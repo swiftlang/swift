@@ -2,7 +2,7 @@
 // REQUIRES: OS=ios
 
 struct S: _ColorLiteralConvertible {
-  init(red: Float, green: Float, blue: Float, alpha: Float) {}
+  init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) {}
 }
 
 let y: S = #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)
@@ -10,14 +10,14 @@ let y2 = #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1) // expected-error{{c
 let y3 = #colorLiteral(red: 1, bleen: 0, grue: 0, alpha: 1) // expected-error{{cannot convert value of type '(red: Int, bleen: Int, grue: Int, alpha: Int)' to expected argument type '(red: Float, green: Float, blue: Float, alpha: Float)'}}
 
 struct I: _ImageLiteralConvertible {
-  init(resourceName: String) {}
+  init(imageLiteralResourceName: String) {}
 }
 
 let z: I = #imageLiteral(resourceName: "hello.png")
 let z2 = #imageLiteral(resourceName: "hello.png") // expected-error{{could not infer type of image literal}} expected-note{{import UIKit to use 'UIImage' as the default image literal type}}
 
 struct Path: _FileReferenceLiteralConvertible {
-  init(resourceName: String) {}
+  init(fileReferenceLiteralResourceName: String) {}
 }
 
 let p1: Path = #fileLiteral(resourceName: "what.txt")
