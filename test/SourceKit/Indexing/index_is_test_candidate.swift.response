@@ -1,0 +1,99 @@
+{
+  key.hash: <hash>,
+  key.dependencies: [
+    {
+      key.kind: source.lang.swift.import.module.swift,
+      key.name: "Swift",
+      key.filepath: Swift.swiftmodule,
+      key.hash: <hash>,
+      key.is_system: 1
+    }
+  ],
+  key.entities: [
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.name: "test_takesNoParams_andReturnsVoid_butIsNotAnInstanceMethod()",
+      key.usr: "s:F23index_is_test_candidate58test_takesNoParams_andReturnsVoid_butIsNotAnInstanceMethodFT_T_",
+      key.line: 4,
+      key.column: 6
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.name: "MyPrivateClass",
+      key.usr: "s:C23index_is_test_candidateP33_E06F4E7BC5F577AB6E2EC6D3ECA1C8B914MyPrivateClass",
+      key.line: 6,
+      key.column: 15
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.name: "MyClass",
+      key.usr: "s:C23index_is_test_candidate7MyClass",
+      key.line: 10,
+      key.column: 14,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "doesNotStartWithTest()",
+          key.usr: "s:FC23index_is_test_candidate7MyClass20doesNotStartWithTestFT_T_",
+          key.line: 11,
+          key.column: 8
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "test_startsWithTest_butTakesAParam(param:)",
+          key.usr: "s:FC23index_is_test_candidate7MyClass34test_startsWithTest_butTakesAParamFT5paramSi_T_",
+          key.line: 12,
+          key.column: 8,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 12,
+              key.column: 50
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "test_startsWithTest_andTakesNoParams_butReturnsNonVoid()",
+          key.usr: "s:FC23index_is_test_candidate7MyClass54test_startsWithTest_andTakesNoParams_butReturnsNonVoidFT_Si",
+          key.line: 13,
+          key.column: 8,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 13,
+              key.column: 68
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "test_startsWithTest_takesNoParams_andReturnsVoid_butIsPrivate()",
+          key.usr: "s:FC23index_is_test_candidate7MyClassP33_E06F4E7BC5F577AB6E2EC6D3ECA1C8B961test_startsWithTest_takesNoParams_andReturnsVoid_butIsPrivateFT_T_",
+          key.line: 14,
+          key.column: 16,
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "test_startsWithTest_takesNoParams_returnsVoid()",
+          key.usr: "s:FC23index_is_test_candidate7MyClass45test_startsWithTest_takesNoParams_returnsVoidFT_T_",
+          key.line: 15,
+          key.column: 8,
+          key.is_test_candidate: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "test_startsWithTest_takesNoParams_returnsVoid_andThrows()",
+          key.usr: "s:FC23index_is_test_candidate7MyClass55test_startsWithTest_takesNoParams_returnsVoid_andThrowsFzT_T_",
+          key.line: 16,
+          key.column: 8,
+          key.is_test_candidate: 1
+        }
+      ]
+    }
+  ]
+}
