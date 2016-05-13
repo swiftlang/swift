@@ -219,7 +219,8 @@ extension UIView : _DefaultCustomPlaygroundQuickLookable {
 #endif
 
 extension UIColor : _ColorLiteralConvertible {
-  @nonobjc public required convenience init(red: Float, green: Float,
+  @nonobjc public required convenience init(colorLiteralRed red: Float,
+                                            green: Float,
                                             blue: Float, alpha: Float) {
     self.init(red: CGFloat(red), green: CGFloat(green),
               blue: CGFloat(blue), alpha: CGFloat(alpha))
@@ -233,7 +234,7 @@ extension UIImage : _ImageLiteralConvertible {
     self.init(named: name)
   }
 
-  public required convenience init(resourceName name: String) {
+  public required convenience init(imageLiteralResourceName name: String) {
     self.init(failableImageLiteral: name)
   }
 }

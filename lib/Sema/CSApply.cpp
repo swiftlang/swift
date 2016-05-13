@@ -2047,6 +2047,38 @@ namespace {
       }
     }
 
+    /// Adjust the type of the arguments to an object literal.
+    ///
+    /// The constraint system has verified that the arguments are convertible
+    /// to an idealized initializer signature, but we need them to be
+    /// convertible to the actual initializer signature, which differs only
+    /// by labels.  We make this work by rewriting the type of the argument
+    /// expression to use the correct labels.  This creates an inconsistency
+    /// between the labels of the TupleExpr and its type, but it has the
+    /// great merit of not requiring any complexity outside of the treatment
+    /// of object literals.
+    void adjustObjectLiteralArgumentType(Expr *arg, DeclName constrName) {
+      // If the argument expression isn't a tuple, propagating this type
+      // is more complicated than we can do here.  Bailing out will probably
+      // cause a terrible diagnostic, but fortunately, this is not a case we
+      // need excellent QoI for.
+      if (!isa<TupleExpr>(arg))
+        return;
+
+      auto paramLabels = constrName.getArgumentNames();
+
+      auto argType = arg->getType()->getAs<TupleType>();
+      if (!argType || argType->getNumElements() != paramLabels.size())
+        return;
+
+      SmallVector<TupleTypeElt, 4> newElts;
+      size_t index = 0;
+      for (auto &oldElt : argType->getElements()) {
+        newElts.push_back(TupleTypeElt(oldElt.getType(), paramLabels[index++]));
+      }
+      arg->setType(TupleType::get(newElts, cs.getASTContext()));
+    }
+
     Expr *visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       if (expr->getType() && !expr->getType()->hasTypeVariable())
         return expr;
@@ -2078,6 +2110,7 @@ namespace {
         
       DeclName constrName(tc.getObjectLiteralConstructorName(expr));
       Expr *arg = expr->getArg();
+      adjustObjectLiteralArgumentType(arg, constrName);
       Expr *base = TypeExpr::createImplicitHack(expr->getLoc(), conformingType,
                                                 ctx);
       Expr *semanticExpr = tc.callWitness(base, dc, proto, conformance,

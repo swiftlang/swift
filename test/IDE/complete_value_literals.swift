@@ -201,7 +201,7 @@ func testTuple2() {
 // TUPLE_2: Literal[Tuple]/None/TypeRelation[Identical]: ({#(values)#})[#(MyInt1, MyString1, MyDouble1)#];
 
 struct MyColor1: _ColorLiteralConvertible {
-  init(red: Float, green: Float, blue: Float, alpha: Float) {}
+  init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) {}
 }
 func testColor0() {
   let x: Int = #^COLOR_0^#
@@ -219,7 +219,7 @@ func testColor2() {
 // COLOR_2: Literal[_Color]/None/TypeRelation[Convertible]: #colorLiteral({#red: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#})[#MyColor1#];
 
 struct MyImage1: _ImageLiteralConvertible {
-  init(resourceName: String) {}
+  init(imageLiteralResourceName: String) {}
 }
 func testImage0() {
   let x: Int = #^IMAGE_0^#
