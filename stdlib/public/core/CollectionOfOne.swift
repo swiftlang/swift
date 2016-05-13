@@ -103,7 +103,7 @@ public struct CollectionOfOne<Element>
     }
     set {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-      precondition(bounds.count == newValue.count,
+      _precondition(bounds.count == newValue.count,
         "CollectionOfOne can't be resized")
       if let newElement = newValue.first {
         _element = newElement
