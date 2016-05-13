@@ -37,9 +37,9 @@ extension B {
 
 func callOverridden(_ b: B) {
   b.f3()
-  b.f4()
+  _ = b.f4()
   b.f7()
-  b.f8()
+  _ = b.f8()
 }
 
 @objc

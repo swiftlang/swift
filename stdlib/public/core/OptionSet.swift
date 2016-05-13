@@ -288,6 +288,7 @@ extension OptionSet where Element == Self {
   ///   non-empty.  Returns `nil` otherwise.
   ///
   /// - Postcondition: `self.contains(e)`
+  @discardableResult
   public mutating func update(with e: Element) -> Element? {
     let r = self.intersection(e)
     self.formUnion(e)

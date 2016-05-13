@@ -4,8 +4,8 @@ func myMap<T1, T2>(_ array: [T1], _ fn: (T1) -> T2) -> [T2] {}
 
 var intArray : [Int]
 
-myMap(intArray, { String($0) })
-myMap(intArray, { x -> String in String(x) } )
+_ = myMap(intArray, { String($0) })
+_ = myMap(intArray, { x -> String in String(x) } )
 
 // Closures with too few parameters.
 func foo(_ x: (Int, Int) -> Int) {}
@@ -15,7 +15,7 @@ struct X {}
 func mySort(_ array: [String], _ predicate: (String, String) -> Bool) -> [String] {}
 func mySort(_ array: [X], _ predicate: (X, X) -> Bool) -> [X] {}
 var strings : [String]
-mySort(strings, { x, y in x < y })
+_ = mySort(strings, { x, y in x < y })
 
 // Closures with inout arguments.
 func f0<T, U>(_ t: T, _ f: (inout T) -> U) -> U {
@@ -27,7 +27,7 @@ struct X2 {
   func g() -> Float { return 0 }  
 }
 
-f0(X2(), {$0.g()})
+_ = f0(X2(), {$0.g()})
 
 // Autoclosure
 func f1(f: @autoclosure () -> Int) { }

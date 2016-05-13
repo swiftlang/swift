@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s | FileCheck %s
 
+@discardableResult
 func rethrower(_ fn: () throws -> Int) rethrows -> Int {
   return try fn()
 }

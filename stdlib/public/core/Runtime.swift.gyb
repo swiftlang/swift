@@ -78,6 +78,7 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
 }
 
 @_transparent
+@discardableResult
 public // @testable
 func _stdlib_atomicInitializeARCRef(
   object target: UnsafeMutablePointer<AnyObject?>,
@@ -518,7 +519,7 @@ class _SwiftNativeNSEnumerator {}
   @objc dynamic func initializeReturnAutoreleased() {
     // On x86_64 it is sufficient to perform one cycle of return-autoreleased
     // call sequence in order to initialize all required PLT entries.
-    self.returnsAutoreleased(self)
+    _ = self.returnsAutoreleased(self)
   }
 }
 

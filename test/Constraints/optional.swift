@@ -50,13 +50,13 @@ func test4() {
   func foo() -> Int { return 0 }
   func takes_optfn(_ f : () -> Int?) -> Int? { return f() }
 
-  takes_optfn(foo)
+  _ = takes_optfn(foo)
 
   func takes_objoptfn(_ f : () -> AnyObject?) -> AnyObject? { return f() }
   func objFoo() -> AnyObject { return A() }
-  takes_objoptfn(objFoo) // okay
+  _ = takes_objoptfn(objFoo) // okay
   func objBar() -> A { return A() }
-  takes_objoptfn(objBar) // okay
+  _ = takes_objoptfn(objBar) // okay
 }
 
 func test5() -> Int? {

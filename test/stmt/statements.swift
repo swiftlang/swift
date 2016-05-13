@@ -20,7 +20,7 @@ func nested1(_ x: Int) {
     return x+y+z
   }
   
-  nested2(1)
+  _ = nested2(1)
 }
 
 func funcdecl5(_ a: Int, y: Int) {
@@ -30,8 +30,8 @@ func funcdecl5(_ a: Int, y: Int) {
   if (x != 0) {
     if (x != 0 || f3() != 0) {
       // while with and without a space after it.
-      while(true) { 4; 2; 1 }
-      while (true) { 4; 2; 1 }
+      while(true) { 4; 2; 1 } // expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
+      while (true) { 4; 2; 1 } // expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
     }
   }
 
@@ -159,7 +159,7 @@ func missing_semicolons() {
   var w = 321
   func g() {}
   g() w += 1             // expected-error{{consecutive statements}} {{6-6=;}}
-  var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}}
+  var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}} expected-warning {{result of call to 'init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)' is unused}}
   class  C {}class  C2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   struct S {}struct S2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   func j() {}func k() {}  // expected-error{{consecutive statements}} {{14-14=;}}
@@ -328,7 +328,7 @@ func testMyEnumWithCaseLabels(_ a : MyEnumWithCaseLabels) {
 func test_defer(_ a : Int) {
   
   defer { VoidReturn1() }
-  defer { breakContinue(1)+42 }
+  defer { breakContinue(1)+42 } // expected-warning {{result of call to '+' is unused}}
   
   // Ok:
   defer { while false { break } }

@@ -28,6 +28,7 @@ a.f(1,b: 2)
 var b : Int = SInt.f(1)
 
 struct S2<T> {
+  @discardableResult
   static func f() -> T {
     S2.f()
   }
@@ -191,7 +192,7 @@ func useNested(_ ii: Int, hni: HasNested<Int>,
   typealias InnerF = HasNested<Float>.Inner
   var innerF : InnerF = innerI // expected-error{{cannot convert value of type 'InnerI' (aka 'HasNested<Int>.Inner') to specified type 'InnerF' (aka 'HasNested<Float>.Inner')}}
 
-  innerI.identity(i)
+  _ = innerI.identity(i)
   i = innerI.identity(i)
 
   // Generic function in a generic class

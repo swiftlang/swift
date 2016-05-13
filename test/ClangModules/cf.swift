@@ -95,7 +95,7 @@ func testChainedAliases(_ fridge: CCRefrigerator) {
 }
 
 func testBannedImported(_ object: CCOpaqueTypeRef) {
-  CCRetain(object) // expected-error {{'CCRetain' is unavailable: Core Foundation objects are automatically memory managed}}
+  CCRetain(object) // expected-error {{'CCRetain' is unavailable: Core Foundation objects are automatically memory managed}} expected-warning {{result of call to 'CCRetain' is unused}}
   CCRelease(object) // expected-error {{'CCRelease' is unavailable: Core Foundation objects are automatically memory managed}}
 }
 

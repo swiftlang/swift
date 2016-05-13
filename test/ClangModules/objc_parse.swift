@@ -400,7 +400,7 @@ func testPropertyAndMethodCollision(_ obj: PropertyAndMethodCollision,
 func testSubscriptAndPropertyRedeclaration(_ obj: SubscriptAndProperty) {
   _ = obj.x
   obj.x = 5
-  obj.objectAtIndexedSubscript(5) // expected-error{{'objectAtIndexedSubscript' is unavailable: use subscripting}}
+  _ = obj.objectAtIndexedSubscript(5) // expected-error{{'objectAtIndexedSubscript' is unavailable: use subscripting}}
   obj.setX(5) // expected-error{{value of type 'SubscriptAndProperty' has no member 'setX'}}
 
   _ = obj[0]

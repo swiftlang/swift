@@ -99,7 +99,7 @@ class ClassWithReferencesLazyInitializers {
 func unavailableUseInUnavailableFunction() {
   // Diagnose references to unavailable functions in non-implicit code
   // as errors
-  unavailableFunction() // expected-error {{'unavailableFunction()' is unavailable}}
+  unavailableFunction() // expected-error {{'unavailableFunction()' is unavailable}} expected-warning {{result of call to 'unavailableFunction()' is unused}}
 }
 
 

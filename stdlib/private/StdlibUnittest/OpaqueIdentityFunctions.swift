@@ -24,7 +24,7 @@ public func _opaqueIdentity<T>(_ x: T) -> T {
 }
 
 func _blackHolePtr<T>(_ x: UnsafePointer<T>) {
-  _stdlib_getPointer(OpaquePointer(x))
+  _ = _stdlib_getPointer(OpaquePointer(x))
 }
 
 public func _blackHole<T>(_ x: T) {

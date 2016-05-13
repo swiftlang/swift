@@ -579,6 +579,7 @@ public struct Set<Element : Hashable> :
   ///   distinguishable from `newMember`, e.g. via `===`).
   ///
   /// - Postcondition: `self.contains(newMember)`.
+  @discardableResult
   public mutating func insert(
     _ newMember: Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
@@ -592,6 +593,7 @@ public struct Set<Element : Hashable> :
   ///   `===`), or `nil` if no such element existed.
   ///
   /// - Postcondition: `self.contains(newMember)`
+  @discardableResult
   public mutating func update(with newMember: Element) -> Element? {
     return _variantStorage.updateValue(newMember, forKey: newMember)
   }
@@ -610,6 +612,7 @@ public struct Set<Element : Hashable> :
   /// - Parameter member: The element to remove from the set.
   /// - Returns: The value of the `member` parameter if it was a member of the
   ///   set; otherwise, `nil`.
+  @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
     return _variantStorage.removeValue(forKey: member)
   }

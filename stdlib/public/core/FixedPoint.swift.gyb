@@ -609,6 +609,7 @@ extension ${Self} {
 
 @_transparent
 @available(*, unavailable, message: "it has been removed in Swift 3")
+@discardableResult
 public prefix func ++ (x: inout ${Self}) -> ${Self} {
   x = x + 1
   return x
@@ -616,6 +617,7 @@ public prefix func ++ (x: inout ${Self}) -> ${Self} {
 
 @_transparent
 @available(*, unavailable, message: "it has been removed in Swift 3")
+@discardableResult
 public postfix func ++ (x: inout ${Self}) -> ${Self} {
   let ret = x
   x = x + 1
@@ -624,6 +626,7 @@ public postfix func ++ (x: inout ${Self}) -> ${Self} {
 
 @_transparent
 @available(*, unavailable, message: "it has been removed in Swift 3")
+@discardableResult
 public prefix func -- (x: inout ${Self}) -> ${Self} {
   x = x - 1
   return x
@@ -631,6 +634,7 @@ public prefix func -- (x: inout ${Self}) -> ${Self} {
 
 @_transparent
 @available(*, unavailable, message: "it has been removed in Swift 3")
+@discardableResult
 public postfix func -- (x: inout ${Self}) -> ${Self} {
   let ret = x
   x = x - 1

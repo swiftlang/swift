@@ -17,7 +17,7 @@ func test_unavailable_method_in_protocol(_ x : NSObjectProtocol) {
   x.retain() // expected-error {{'retain()' is unavailable}}
 }
 func test_unavailable_method_in_protocol_use_class_instance(_ x : NSObject) {
-  x.retain() // expected-error {{'retain()' is unavailable}}
+  x.retain() // expected-error {{'retain()' is unavailable}} expected-warning {{result of call to 'retain()' is unused}}
 }
 
 func test_unavailable_func(_ x : NSObject) {
@@ -33,8 +33,8 @@ func test_NSInvocation(_ x: NSInvocation,         // expected-error {{'NSInvocat
                        z: NSMethodSignature) {} // expected-error {{'NSMethodSignature' is unavailable}}
 
 func test_class_avail(_ x:NSObject, obj: AnyObject) {
-  x.`class`() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}}
-  NSObject.`class`() // expected-error {{'class()' is unavailable in Swift: use 'self' instead}}
+  x.`class`() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}} expected-warning {{result of call to 'class()' is unused}}
+  NSObject.`class`() // expected-error {{'class()' is unavailable in Swift: use 'self' instead}} expected-warning {{result of call to 'class()' is unused}}
   obj.`class`!() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}}
 }
 
@@ -55,9 +55,9 @@ func test_swift_unavailable() {
 func test_CFReleaseRetainAutorelease(_ x: CFTypeRef, color: CGColor) {
   CFRelease(x)              // expected-error {{'CFRelease' is unavailable: Core Foundation objects are automatically memory managed}}
   CGColorRelease(color)     // expected-error {{'CGColorRelease' is unavailable: Core Foundation objects are automatically memory managed}}
-  CFRetain(x)               // expected-error {{'CFRetain' is unavailable: Core Foundation objects are automatically memory managed}}
-  CGColorRetain(color)      // expected-error {{'CGColorRetain' is unavailable: Core Foundation objects are automatically memory managed}}
-  CFAutorelease(x)          // expected-error {{'CFAutorelease' is unavailable: Core Foundation objects are automatically memory managed}}
+  CFRetain(x)               // expected-error {{'CFRetain' is unavailable: Core Foundation objects are automatically memory managed}} expected-warning {{result of call to 'CFRetain' is unused}}
+  CGColorRetain(color)      // expected-error {{'CGColorRetain' is unavailable: Core Foundation objects are automatically memory managed}} expected-warning {{result of call to 'CGColorRetain' is unused}}
+  CFAutorelease(x)          // expected-error {{'CFAutorelease' is unavailable: Core Foundation objects are automatically memory managed}} expected-warning {{result of call to 'CFAutorelease' is unused}}
 }
 
 func testRedeclarations() {
@@ -82,9 +82,9 @@ func testRedeclarations() {
 }
 
 func test_NSZone(_ z : NSZone) { 
-  NSCreateZone(1, 1, true)  // expected-error {{'NSCreateZone' is unavailable}}
+  NSCreateZone(1, 1, true)  // expected-error {{'NSCreateZone' is unavailable}} expected-warning {{result of call to 'NSCreateZone' is unused}}
   NSSetZoneName(z, "name")  // expected-error {{'NSSetZoneName' is unavailable}}
-  NSZoneName(z)             // expected-error {{'NSZoneName' is unavailable}}
+  NSZoneName(z)             // expected-error {{'NSZoneName' is unavailable}} expected-warning {{result of call to 'NSZoneName' is unused}}
 }
 
 func test_DistributedObjects(_ o: NSObject,

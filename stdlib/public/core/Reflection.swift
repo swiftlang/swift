@@ -150,6 +150,7 @@ func _getSummary<T>(_ out: UnsafeMutablePointer<String>, x: T) {
 internal func _reflect<T>(_ x: T) -> _Mirror
 
 /// Dump an object's contents using its mirror to the specified output stream.
+@discardableResult
 public func dump<T, TargetStream : OutputStream>(
   _ value: T,
   to target: inout TargetStream,
@@ -174,6 +175,7 @@ public func dump<T, TargetStream : OutputStream>(
 }
 
 /// Dump an object's contents using its mirror to standard output.
+@discardableResult
 public func dump<T>(
   _ value: T,
   name: String? = nil,

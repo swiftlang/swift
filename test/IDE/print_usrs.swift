@@ -110,7 +110,7 @@ class GenCls<T> {
     }
     // CHECK: [[@LINE+1]]:5 s:FC14swift_ide_test6GenClss9subscriptFTSiSi_Si{{$}}
     set(v) {
-      v + i - j
+      _ = v + i - j
     }
   }
 }

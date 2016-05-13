@@ -1232,7 +1232,7 @@ self.test("\(testNamePrefix).removeLast()/whereIndexIsBidirectional/semantics") 
 self.test("\(testNamePrefix).removeLast()/whereIndexIsBidirectional/empty/semantics") {
   var c = makeWrappedCollection([])
   expectCrashLater()
-  c.removeLast() // Should trap.
+  _ = c.removeLast() // Should trap.
 }
 
 //===----------------------------------------------------------------------===//

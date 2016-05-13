@@ -125,7 +125,10 @@ public class _stdlib_Barrier {
   }
 
   deinit {
-    _stdlib_pthread_barrier_destroy(_pthreadBarrierPtr)
+    let ret = _stdlib_pthread_barrier_destroy(_pthreadBarrierPtr)
+    if ret != 0 {
+      fatalError("_stdlib_pthread_barrier_destroy() failed")
+    }
   }
 
   public func wait() {
