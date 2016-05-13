@@ -13,6 +13,8 @@
 // REQUIRES: OS=macosx
 // XFAIL: asan
 
+// REQUIRES: rdar26081474
+
 // CHECK-INTERNAL: Functions shown: 1
 // CHECK-COV: 1|{{.*}}[[@LINE+1]]|{{.*}}func f_internal
 internal func f_internal() {}
