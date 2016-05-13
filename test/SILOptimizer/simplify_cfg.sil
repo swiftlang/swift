@@ -2629,3 +2629,35 @@ bb3(%4 : $Optional<Int>):
 }
 
 
+// CHECK-LABEL: sil @dont_crash_on_enum_payload_is_enum
+// CHECK: bb0(%0 : $TwoCase):
+// CHECK:   switch_enum %0
+// CHECK: bb1:
+// CHECK:   return
+sil @dont_crash_on_enum_payload_is_enum : $@convention(thin) (TwoCase) -> () {
+bb0(%0 : $TwoCase):
+  %x = enum $Optional<TwoCase>, #Optional.some!enumelt.1, %0 : $TwoCase
+  br bb1(%x : $Optional<TwoCase>)
+
+bb1(%10 : $Optional<TwoCase>):
+  switch_enum %10 : $Optional<TwoCase>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb5
+
+bb2(%1 : $TwoCase):
+  switch_enum %1 : $TwoCase, case #TwoCase.First!enumelt: bb3, case #TwoCase.Second!enumelt: bb4
+
+bb3:
+  %f1 = function_ref @unknown : $@convention(thin) () -> ()
+  %n1 = apply %f1() : $@convention(thin) () -> ()
+  br bb6
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %6 = tuple ()
+  return %6 : $()
+}
+
