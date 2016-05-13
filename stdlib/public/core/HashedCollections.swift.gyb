@@ -2486,9 +2486,7 @@ internal struct _BitMap {
   }
 
   internal func initializeToZero() {
-    for i in 0 ..< numberOfWords {
-      (values + i).initialize(with: 0)
-    }
+    values.initialize(with: 0, count: numberOfWords)
   }
 
   internal subscript(i: Int) -> Bool {
