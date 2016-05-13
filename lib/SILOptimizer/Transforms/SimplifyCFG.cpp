@@ -2507,8 +2507,11 @@ bool ArgumentSplitter::createNewArguments() {
   if (!Arg->getIncomingValues(IncomingValues))
     return false;
 
-  // Only handle struct and tuple type.
   SILType Ty = Arg->getType();
+  if (Ty.hasTypeParameter())
+    return false;
+
+  // Only handle struct and tuple type.
   if (!Ty.getStructOrBoundGenericStruct() && !Ty.getAs<TupleType>())
     return false;
 

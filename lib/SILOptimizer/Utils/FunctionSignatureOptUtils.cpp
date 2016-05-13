@@ -57,10 +57,6 @@ bool swift::canSpecializeFunction(SILFunction *F) {
   if (F->getInlineStrategy() == Inline_t::AlwaysInline)
     return false;
 
-  // For now ignore generic functions to keep things simple...
-  if (F->getLoweredFunctionType()->isPolymorphic())
-    return false;
-
   // Make sure F has a linkage that we can optimize.
   if (!isSpecializableRepresentation(F->getRepresentation()))
     return false;
@@ -259,6 +255,12 @@ bool FunctionSignatureInfo::analyzeParameters() {
     ArgumentDescriptor A(Allocator, Args[i], EpilogueReleases);
     bool HaveOptimizedArg = false;
 
+    // Do not optimize generic parameter.
+    if (Args[i]->getKnownParameterInfo().getSILType().hasTypeParameter()) {
+      ArgDescList.push_back(std::move(A));
+      continue;
+    }
+
     // Whether we will explode the argument or not.
     A.Explode = A.shouldExplode();
 
@@ -330,7 +332,8 @@ bool FunctionSignatureInfo::analyzeResult() {
   }
   // For now, only do anything if there's a single direct result.
   if (DirectResults.size() == 1 &&
-      ResultDescList[0].hasConvention(ResultConvention::Owned)) {
+      ResultDescList[0].hasConvention(ResultConvention::Owned) &&
+      !ResultDescList[0].ResultInfo.getSILType().hasTypeParameter()) {
     auto &RI = ResultDescList[0];
     // We have an @owned return value, find the epilogue retains now.
     ConsumedResultToEpilogueRetainMatcher RVToReturnRetainMap(RCFI, AA, F);
