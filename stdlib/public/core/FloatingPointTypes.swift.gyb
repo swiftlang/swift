@@ -459,10 +459,11 @@ extension ${Self}: BinaryFloatingPoint {
   /// Compares not equal to every value, including itself.  Most operations
   /// with a NaN operand will produce a NaN result.
   public init(nan payload: RawSignificand, signaling: Bool) {
-    _precondition(payload < ${Self}._quietNaNMask,
+    // We use significandBitCount - 2 bits for NaN payload.
+    _precondition(payload < (${Self}._quietNaNMask >> 1),
       "NaN payload is not encodable.")
     var significand = payload
-    if !signaling { significand |= ${Self}._quietNaNMask }
+    significand |= ${Self}._quietNaNMask >> (signaling ? 1 : 0)
     self.init(sign: .plus,
               exponentBitPattern: ${Self}._infinityExponent,
               significandBitPattern: significand)
