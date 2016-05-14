@@ -1693,7 +1693,6 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
     DEBUG(doSanityCheck(Worklist));
 
     SmallVector<FunctionEntry *, 8> FuncsToMerge;
-    SmallVector<FunctionEntry *, 8> FuncsInCallCycleToMerge;
 
     // Insert all candidates into the Worklist.
     for (std::vector<WeakVH>::iterator I = Worklist.begin(),
