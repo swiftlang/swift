@@ -18,9 +18,8 @@
 # 11 libswiftCore.dylib 0x000000000dce84d0l _fatalErrorMessage(StaticString,
 # StaticString, StaticString, UInt, flags : UInt32) -> () + 444
 
-import sys
-import os
 import re
+import sys
 
 TARGET_RE = re.compile(
     "(?P<index>\d+) +(?P<object>\S+) +(?P<address>0x[0-9a-fA-F]{16}) "
