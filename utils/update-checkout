@@ -68,6 +68,7 @@ SWIFT_3_0_PREVIEW_1_BRANCHES = {
     'compiler-rt': 'swift-3.0-branch',
 }
 
+
 def update_working_copy(repo_path, branch):
     if not os.path.isdir(repo_path):
         return
@@ -112,7 +113,7 @@ def obtain_additional_swift_sources(
                     if branch == "stable-next" or branch == "master-next":
                         repo_branch = NEXT_BRANCHES[dir_name]
                     elif branch == "swift-3.0-branch" or \
-                        branch == "swift-3.0-preview-1-branch":
+                            branch == "swift-3.0-preview-1-branch":
                         repo_branch = SWIFT_3_0_PREVIEW_1_BRANCHES[dir_name]
                     else:
                         repo_branch = branch
@@ -171,8 +172,8 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
             if branch == "stable-next" or branch == "master-next":
                 repo_branch = NEXT_BRANCHES[dir_name]
             elif branch == "swift-3.0-branch" or \
-                branch == "swift-3.0-preview-1-branch":
-                        repo_branch = SWIFT_3_0_PREVIEW_1_BRANCHES[dir_name]
+                    branch == "swift-3.0-preview-1-branch":
+                repo_branch = SWIFT_3_0_PREVIEW_1_BRANCHES[dir_name]
 
         update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, dir_name),
                             repo_branch)
