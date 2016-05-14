@@ -481,6 +481,9 @@ namespace {
     bool isInitializedAtUse(const DIMemoryUse &Use,
                             bool *SuperInitDone = nullptr,
                             bool *FailedSelfUse = nullptr);
+    
+    bool hasUninitializedMemberAtInst(SILInstruction *Inst, unsigned FirstElt,
+                                      unsigned NumElts);
 
     void handleStoreUse(unsigned UseID);
     void handleInOutUse(const DIMemoryUse &Use);
@@ -1329,12 +1332,22 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
     return;
   }
 
+  SILLocation Loc = Inst->getLoc();
+  
+  // Try to find the return location
+  auto TermLoc = Inst->getParent()->getTerminator()->getLoc();
+  if (TermLoc.getKind() == SILLocation::ReturnKind) {
+    Loc = TermLoc;
+  }
+    
   // If this is a load with a single user that is a return (and optionally a
   // retain_value for non-trivial structs/enums), then this is a return in the
   // enum/struct init case, and we haven't stored to self.   Emit a specific
   // diagnostic.
   if (auto *LI = dyn_cast<LoadInst>(Inst)) {
     bool hasReturnUse = false, hasUnknownUses = false;
+    
+    auto *LoadBB = LI->getParent();
     
     for (auto LoadUse : LI->getUses()) {
       auto *User = LoadUse->getUser();
@@ -1349,6 +1362,18 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
 
       if (auto *EI = dyn_cast<EnumInst>(User))
         if (isFailableInitReturnUseOfEnum(EI)) {
+          // Try to find the return location
+          for (auto Pred : LoadBB->getPreds()) {
+            auto *TI = Pred->getTerminator();
+            auto TermLoc = TI->getLoc();
+            
+            // Check if this is an early return with uninitialized members
+            if (TermLoc.getKind() == SILLocation::ReturnKind &&
+                hasUninitializedMemberAtInst(TI, Use.FirstElement,
+                                             Use.NumElements))
+              Loc = TermLoc;
+          }
+
           hasReturnUse = true;
           continue;
         }
@@ -1360,13 +1385,13 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
     if (hasReturnUse && !hasUnknownUses) {
       if (TheMemory.isEnumInitSelf()) {
         if (!shouldEmitError(Inst)) return;
-        diagnose(Module, Inst->getLoc(),
+        diagnose(Module, Loc,
                  diag::return_from_init_without_initing_self);
         return;
       } else if (TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf() &&
                  !TheMemory.isDelegatingInit()) {
         if (!shouldEmitError(Inst)) return;
-        diagnose(Module, Inst->getLoc(),
+        diagnose(Module, Loc,
                  diag::return_from_init_without_initing_stored_properties);
         noteUninitializedMembers(Use);
         return;
@@ -2446,6 +2471,21 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
   return true;
 }
 
+bool LifetimeChecker::hasUninitializedMemberAtInst(SILInstruction *Inst,
+                                                   unsigned FirstElt,
+                                                   unsigned NumElts) {
+  // Determine the liveness states of the elements that we care about.
+  AvailabilitySet Liveness =
+  getLivenessAtInst(Inst, FirstElt, NumElts);
+  
+  // Find unintialized member
+  for (unsigned i = FirstElt, e = i+NumElts;
+       i != e; ++i)
+    if (Liveness.get(i) != DIKind::Yes)
+      return true;
+  
+  return false;
+}
 
 
 
