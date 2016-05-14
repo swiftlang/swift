@@ -97,10 +97,10 @@ function(_add_variant_c_compile_link_flags)
       "-F" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks"
       "-m${SWIFT_SDK_${CFLAGS_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
       
-    if(CFLAGS_ANALYZE_CODE_COVERAGE)
-      list(APPEND result "-fprofile-instr-generate"
-                         "-fcoverage-mapping")
-    endif()
+  endif()
+  if(CFLAGS_ANALYZE_CODE_COVERAGE)
+    list(APPEND result "-fprofile-instr-generate"
+                       "-fcoverage-mapping")
   endif()
 
   if(CFLAGS_ENABLE_LTO)

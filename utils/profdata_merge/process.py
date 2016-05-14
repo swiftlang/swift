@@ -18,17 +18,25 @@ import sys
 
 from multiprocessing import Process
 
-
 # hack to import SwiftBuildSupport and swift_build_support
 parent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 sys.path.append(parent_dir)
 support_dir = os.path.join(parent_dir, 'swift_build_support')
 sys.path.append(support_dir)
-from swift_build_support import xcrun  # noqa (E402)
+from swift_build_support.toolchain import host_toolchain # noqa (E402)
 from SwiftBuildSupport import check_output, check_call  # noqa (E402)
 
-# FIXME: This doesn't work on non-Darwin platforms.
-LLVM_PROFDATA_PATH = xcrun.find('default', 'llvm-profdata')
+_profdata_toolchain = host_toolchain(
+    tools={'llvm_profdata': 'llvm-profdata'},
+)
+if not _profdata_toolchain:
+    logging.error('Could not find llvm-profdata alongside clang.\n' +
+                  'Ensure you have installed an LLVM toolchain that ' +
+                  'matches your installed clang.')
+    sys.exit(1)
+LLVM_PROFDATA_PATH = _profdata_toolchain.llvm_profdata
+print(LLVM_PROFDATA_PATH)
+
 _profdata_help = check_output([LLVM_PROFDATA_PATH, 'merge', '-help'])
 LLVM_PROFDATA_SUPPORTS_SPARSE = 'sparse' in _profdata_help
 

@@ -56,17 +56,13 @@ def _freebsd_release_date():
         return None
 
 
-def _first_common_toolchain(tools, suffixes=None):
+def _first_common_toolchain(tools, suffixes):
     """
     Return a Toolchain of resolved paths where each path has
     the same suffix.
 
     If there is no common version of all binaries found, return None.
     """
-    if suffixes is None:
-        # No suffixes provided, default to using empty suffix only
-        suffixes = ['']
-
     for suffix in suffixes:
         path_map = dict()
         for name in tools:
@@ -80,7 +76,25 @@ def _first_common_toolchain(tools, suffixes=None):
     return None
 
 
-def host_toolchain(xcrun_toolchain='default', tools=None, suffixes=None):
+def _suffixes_for_current_platform():
+    if platform.system() == 'FreeBSD':
+        # See: https://github.com/apple/swift/pull/169
+        # Building Swift from source requires a recent version of the Clang
+        # compiler with C++14 support.
+        freebsd_release_date = _freebsd_release_date()
+        if freebsd_release_date and freebsd_release_date >= 1100000:
+            # On newer releases of FreeBSD, the default Clang is sufficient.
+            return ['']
+        else:
+            # On older releases, or on releases for which we cannot determine
+            # the release date, we search for the most modern version
+            # available.
+            return ['38', '37', '36', '35']
+    return ['', '-3.8', '-3.7', '-3.6', '-3.5']
+
+
+def host_toolchain(xcrun_toolchain='default', tools=None,
+        suffixes=_suffixes_for_current_platform()):
     """
     Return a Toolchain with the first available versions of all
     specified tools, plus clang and clang++, searching in the order of the
@@ -111,24 +125,5 @@ def host_toolchain(xcrun_toolchain='default', tools=None, suffixes=None):
         return _first_common_toolchain(tools, suffixes=suffixes)
 
 
-def host_clang(xcrun_toolchain):
-    """
-    Return a Toolchain for the host platform.
-    If no appropriate compilers can be found, return None.
-    """
-    if platform.system() == 'FreeBSD':
-        # See: https://github.com/apple/swift/pull/169
-        # Building Swift from source requires a recent version of the Clang
-        # compiler with C++14 support.
-        freebsd_release_date = _freebsd_release_date()
-        if freebsd_release_date and freebsd_release_date >= 1100000:
-            # On newer releases of FreeBSD, the default Clang is sufficient.
-            return host_toolchain(xcrun_toolchain)
-        else:
-            # On older releases, or on releases for which we cannot determine
-            # the release date, we search for the most modern version
-            # available.
-            return host_toolchain(xcrun_toolchain,
-                                  suffixes=['38', '37', '36', '35'])
-    return host_toolchain(xcrun_toolchain,
-                          suffixes=['', '-3.8', '-3.7', '-3.6', '-3.5'])
+# If you just want clang, just use host_clang
+host_clang = host_toolchain
