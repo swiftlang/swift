@@ -81,6 +81,7 @@ public class SequenceLog {
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
   public static var forEach = TypeIndexed(0)
+  public static var find = TypeIndexed(0)
   public static var dropFirst = TypeIndexed(0)
   public static var dropLast = TypeIndexed(0)
   public static var prefixMaxLength = TypeIndexed(0)
@@ -242,6 +243,13 @@ public struct ${Self}<
   ) rethrows {
     Log.forEach[selfType] += 1
     try base.forEach(body)
+  }
+  
+  public func find(
+    where predicate: @noescape (Base.Iterator.Element) throws -> Void
+  ) rethrows -> Base.Iterator.Element? {
+    Log.find[selfType] += 1
+    return base.find(where: predicate)
   }
 
   public typealias SubSequence = Base.SubSequence
