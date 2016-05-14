@@ -431,7 +431,7 @@ bb0(%0 : $Derived2):
 }
 
 // Check that class_method is not speculatively devirtualized, because the
-// method foo in the class Base, which mentioned in the the class_method
+// method foo in the class Base, which mentioned in the class_method
 // instruction is marked with @_semantics("optimize.sil.never").
 //
 // CHECK-LABEL: sil @_TF14optimize_never19testDoNotDevirtBaseFT1oCS_4Base_Vs5Int32

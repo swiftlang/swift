@@ -181,7 +181,7 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
   ///     print(nonOverflowingSquare)
   ///     // Prints "Optional(1746)"
   ///
-  /// - Parameter f: A closure that takes the unwrapped value of the intance.
+  /// - Parameter f: A closure that takes the unwrapped value of the instance.
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   @warn_unused_result
@@ -505,7 +505,7 @@ public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T)
 /// value, you can chain default values by using `??` multiple times. The
 /// first optional value that isn't `nil` stops the chain and becomes the
 /// result of the whole expression. The next example tries to find the correct
-/// text for a greeting in two sepearate dictionaries before falling back to a
+/// text for a greeting in two separate dictionaries before falling back to a
 /// static default.
 ///
 ///     let greeting = userPrefs[greetingKey] ??

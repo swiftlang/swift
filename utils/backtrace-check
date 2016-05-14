@@ -34,7 +34,7 @@ for l in lines:
     l = l.rstrip("\n")
 
     # First see if we found the start of our stack trace start. If so, set the
-    # found  stack trace flag and continue.
+    # found stack trace flag and continue.
     if l == "Current stack trace:":
         assert(not found_stack_trace_start)
         found_stack_trace_start = True

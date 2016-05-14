@@ -287,7 +287,7 @@ public protocol BooleanLiteralConvertible {
   /// A type that can represent a Boolean literal, such as `Bool`.
   associatedtype BooleanLiteralType : _BuiltinBooleanLiteralConvertible
 
-  /// Creates an instance initialized to to the given Boolean value.
+  /// Creates an instance initialized to the given Boolean value.
   ///
   /// Do not call this initializer directly. Instead, initialize a variable or
   /// constant using one of the Boolean literals `true` and `false`. For
