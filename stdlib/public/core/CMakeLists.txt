@@ -70,7 +70,7 @@ set(SWIFTLIB_ESSENTIAL
   Mirrors.swift.gyb
   Misc.swift
   MutableCollection.swift
-  NewtypeWrapper.swift
+  NewtypeWrapper.swift.gyb
   ObjCMirrors.swift
   Optional.swift
   OptionSet.swift
