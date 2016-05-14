@@ -617,6 +617,26 @@ SequenceTypeTests.test("contains/Predicate") {
 }
 
 //===----------------------------------------------------------------------===//
+// first()
+//===----------------------------------------------------------------------===//
+
+SequenceTypeTests.test("first/Predicate") {
+  for test in findTests {
+    let s = MinimalSequence<MinimalEquatableValue>(elements: test.sequence)
+    let found = s.first { $0 == test.element }
+    expectEqual(
+      test.expected == nil ? nil : test.element,
+      found,
+      stackTrace: SourceLocStack().with(test.loc))
+    if let found = found {
+      expectEqual(
+        test.expected, found.identity,
+        "find() should find only the first element matching its predicate")
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // reduce()
 //===----------------------------------------------------------------------===//
 

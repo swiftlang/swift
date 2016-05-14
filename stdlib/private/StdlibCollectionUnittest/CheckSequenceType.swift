@@ -127,7 +127,11 @@ public struct FindTest {
   ) {
     self.expected = expected
     self.element = MinimalEquatableValue(element)
-    self.sequence = sequence.map(MinimalEquatableValue.init)
+    var elementIndex = 0
+    self.sequence = sequence.map {
+    	defer { elementIndex += 1 }
+    	return MinimalEquatableValue($0, identity: elementIndex) 
+    }
     self.expectedLeftoverSequence = expectedLeftoverSequence.map(
       MinimalEquatableValue.init)
     self.loc = SourceLoc(file, line, comment: "test data")
