@@ -564,6 +564,18 @@ public protocol Sequence {
     isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence]
 
+  /// Returns the first element of the sequence that satisfies the given
+  /// predicate or nil if no such element is found.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element is a match.
+  /// - Returns: The first match or `nil` if there was no match.
+  @warn_unused_result
+  func first(
+    predicate: @noescape (Iterator.Element) throws -> Bool
+  ) rethrows -> Iterator.Element?
+
   @warn_unused_result
   func _customContainsEquatableElement(
     _ element: Iterator.Element
@@ -950,12 +962,31 @@ extension Sequence {
   ///
   /// - Parameter body: A closure that takes an element of the sequence as a
   ///   parameter.
+  @warn_unused_result
   public func forEach(
     _ body: @noescape (Iterator.Element) throws -> Void
   ) rethrows {
     for element in self {
       try body(element)
     }
+  }
+  
+  /// Returns the first element of the sequence that satisfies the given
+  /// predicate or nil if no such element is found.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element is a match.
+  /// - Returns: The first match or `nil` if there was no match.
+  public func first(
+    predicate: @noescape (Iterator.Element) throws -> Bool
+  ) rethrows -> Iterator.Element? {
+    for element in self {
+      if try predicate(element) {
+        return element
+      }
+    }
+    return nil
   }
 }
 
