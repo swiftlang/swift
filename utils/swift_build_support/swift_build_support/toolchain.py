@@ -62,7 +62,7 @@ class Darwin(Toolchain):
     def find_tool(self, *names):
         for name in names:
             # NOTE: xcrun searches from developer tools directory *and* from
-            #       PATH. Relatively slow, but we don't need `which `for
+            #       PATH. Relatively slow, but we don't need `which` for
             #       Darwin.
             found = xcrun.find(name,
                                sdk=self.xcrun_sdk,
