@@ -970,8 +970,8 @@ extension Sequence {
   }
 }
 
-private enum _StopIteration: ErrorProtocol {
-    case stop
+internal enum _StopIteration : ErrorProtocol {
+  case stop
 }
 
 extension Sequence {
