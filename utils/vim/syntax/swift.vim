@@ -61,7 +61,7 @@ syn match swiftChar /'\([^'\\]\|\\\(["'tnr0\\]\|x[0-9a-fA-F]\{2}\|u[0-9a-fA-F]\{
 
 syn keyword swiftLabel get set
 
-syn match swiftPreproc /^#\<if\>\|^#\<endif\>/
+syn match swiftPreproc /^\s*#\(\<if\>\|\<else\>\|\<elseif\>\|\<endif\>\)/
 
 syn match swiftAttribute /@\<\w\+\>/ skipwhite
 
