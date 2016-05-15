@@ -180,6 +180,7 @@ int fooFuncUsingVararg(int a, ...);// This comment should not show without decl.
 
 @class BarForwardDeclaredClass;
 enum BarforwardDeclaredEnum;
+typedef int typedef_int_t;
 
 /* FOO_MACRO_1 is the answer */
 #define FOO_MACRO_1 0
@@ -187,6 +188,8 @@ enum BarforwardDeclaredEnum;
 #define FOO_MACRO_3 (-1) // Don't use FOO_MACRO_3 on Saturdays.
 #define FOO_MACRO_4 0xffffffffu
 #define FOO_MACRO_5 0xffffffffffffffffull
+#define FOO_MACRO_6 ((typedef_int_t) 42)
+#define FOO_MACRO_7 ((typedef_int_t) -1)
 
 #define FOO_MACRO_UNDEF_1 0
 #undef FOO_MACRO_UNDEF_1

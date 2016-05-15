@@ -76,7 +76,8 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
                                        Identifier name,
                                        const clang::Token *signTok,
                                        const clang::Token &tok,
-                                       const clang::MacroInfo *ClangN) {
+                                       const clang::MacroInfo *ClangN,
+                                       clang::QualType *castType) {
   assert(tok.getKind() == clang::tok::numeric_constant &&
          "not a numeric token");
   {
@@ -96,11 +97,20 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
 
   if (const clang::Expr *parsed = parseNumericLiteral<>(Impl, tok)) {
     auto clangTy = parsed->getType();
-    auto type = Impl.importType(clangTy, ImportTypeKind::Value,
-                                isInSystemModule(DC),
-                                /*isFullyBridgeable*/false);
-    if (!type)
+    auto literalType = Impl.importType(clangTy, ImportTypeKind::Value,
+                                       isInSystemModule(DC),
+                                       /*isFullyBridgeable*/false);
+    if (!literalType)
       return nullptr;
+
+    Type constantType;
+    if (castType) {
+      constantType = Impl.importType(*castType, ImportTypeKind::Value,
+                                     isInSystemModule(DC),
+                                     /*isFullyBridgeable*/false);
+    } else {
+      constantType = literalType;
+    }
 
     if (auto *integer = dyn_cast<clang::IntegerLiteral>(parsed)) {
       // Determine the value.
@@ -117,7 +127,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
         }
       }
 
-      return Impl.createConstant(name, DC, type, clang::APValue(value),
+      return Impl.createConstant(name, DC, constantType, clang::APValue(value),
                                  ConstantConvertKind::Coerce,
                                  /*static*/ false, ClangN);
     }
@@ -134,7 +144,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
         value.changeSign();
       }
 
-      return Impl.createConstant(name, DC, type, clang::APValue(value),
+      return Impl.createConstant(name, DC, constantType, clang::APValue(value),
                                  ConstantConvertKind::Coerce,
                                  /*static*/ false, ClangN);
     }
@@ -195,7 +205,7 @@ static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,
   switch (tok.getKind()) {
   case clang::tok::numeric_constant:
     return importNumericLiteral(Impl, DC, MI, name, /*signTok*/nullptr, tok,
-                                ClangN);
+                                ClangN, /*castType*/nullptr);
 
   case clang::tok::string_literal:
   case clang::tok::utf8_string_literal:
@@ -250,7 +260,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     // Check for a single-token expansion of the form <literal>.
     // TODO: or <identifier>.
     const clang::Token &tok = *tokenI;
-    
+
     // If it's a literal token, we might be able to translate the literal.
     if (tok.isLiteral()) {
       return importLiteral(impl, DC, macro, name, tok, ClangN);
@@ -287,9 +297,10 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     // but are pervasive in C headers anyway.
     clang::Token const &first = tokenI[0];
     clang::Token const &second = tokenI[1];
-    
+
     if (isSignToken(first) && second.is(clang::tok::numeric_constant))
-      return importNumericLiteral(impl, DC, macro, name, &first, second, ClangN);
+      return importNumericLiteral(impl, DC, macro, name, &first, second, ClangN,
+                                  /*casttype*/ nullptr);
 
     // We also allow @"string".
     if (first.is(clang::tok::at) && isStringToken(second))
@@ -334,6 +345,29 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         tokenI[3].is(clang::tok::r_paren)) {
       return importStringLiteral(impl, DC, macro, name, tokenI[2],
                                  MappedStringLiteralKind::CFString, ClangN);
+    // Check for literals with a cast, e.g. "(cpu_type_t) 1"
+    } else if (tokenI[0].is(clang::tok::l_paren) &&
+               tokenI[1].is(clang::tok::identifier) &&
+               tokenI[2].is(clang::tok::r_paren) &&
+               tokenI[3].is(clang::tok::numeric_constant)) {
+      auto identifierInfo = tokenI[1].getIdentifierInfo();
+      if (identifierInfo->isStr("id")) {
+        auto *integerLiteral =
+          parseNumericLiteral<clang::IntegerLiteral>(impl, tokenI[3]);
+        if (!integerLiteral || integerLiteral->getValue() != 0)
+          break;
+        return importNil(impl, DC, name, ClangN);
+      }
+      auto identifierName = identifierInfo->getName();
+      auto &identifier = impl.getClangASTContext().Idents.get(identifierName);
+      auto castType = impl.getClangSema().getTypeName(identifier,
+                                                      clang::SourceLocation(),
+                                                      /*scope*/nullptr);
+      if (castType) {
+        auto clangTy = castType.get();
+        return importNumericLiteral(impl, DC, macro, name, /*signTok*/nullptr,
+                                    tokenI[3], ClangN, &clangTy);
+      }
     }
     break;
   }
@@ -350,6 +384,22 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       if (!integerLiteral || integerLiteral->getValue() != 0)
         break;
       return importNil(impl, DC, name, ClangN);
+    // Check for literals with a cast, e.g. "(cpu_type_t) -1"
+    } else if (tokenI[0].is(clang::tok::l_paren) &&
+               tokenI[1].is(clang::tok::identifier) &&
+               tokenI[2].is(clang::tok::r_paren) &&
+               isSignToken(tokenI[3]) &&
+               tokenI[4].is(clang::tok::numeric_constant)) {
+      auto identifierName = tokenI[1].getIdentifierInfo()->getName();
+      auto &identifier = impl.getClangASTContext().Idents.get(identifierName);
+      auto castType = impl.getClangSema().getTypeName(identifier,
+                                                      clang::SourceLocation(),
+                                                      /*scope*/nullptr);
+      if (castType) {
+        auto clangTy = castType.get();
+        return importNumericLiteral(impl, DC, macro, name, &tokenI[3],
+                                    tokenI[4], ClangN, &clangTy);
+      }
     }
     break;
   default:

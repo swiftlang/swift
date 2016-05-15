@@ -181,11 +181,14 @@ class FooClassDerived : FooClassBase, FooProtocolDerived {
   func fooProtoFuncWithExtraIndentation2()
   class func fooProtoClassFunc()
 }
+typealias typedef_int_t = Int32
 var FOO_MACRO_1: Int32 { get }
 var FOO_MACRO_2: Int32 { get }
 var FOO_MACRO_3: Int32 { get }
 var FOO_MACRO_4: UInt32 { get }
 var FOO_MACRO_5: UInt64 { get }
+var FOO_MACRO_6: typedef_int_t { get }
+var FOO_MACRO_7: typedef_int_t { get }
 var FOO_MACRO_REDEF_1: Int32 { get }
 var FOO_MACRO_REDEF_2: Int32 { get }
 func theLastDeclInFoo()
@@ -235,6 +238,8 @@ class FooClassWithClassProperties : FooClassBase {
   init!()
   convenience init!(float f: Float)
 }
+@available(*, unavailable, message: "use 'nil' instead of this imported macro")
+var FOO_NIL: ()
 class FooUnavailableMembers : FooClassBase {
   convenience init!(int i: Int32)
   @available(*, unavailable, message: "use object construction 'FooUnavailableMembers(int:)'")
