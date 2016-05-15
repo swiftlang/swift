@@ -149,7 +149,7 @@ public:
       return nullptr;
 
     case MetadataKind::ErrorObject:
-      // ErrorProtocol boxed existential on non-Objective C runtime target
+      // ErrorProtocol boxed existential on non-Objective-C runtime target
       return nullptr;
 
     default:

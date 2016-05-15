@@ -113,7 +113,7 @@ func testNonObjCMembers(nonObjCInstance: NonObjCClass) {
   let _ = #selector(getter: myObjcInstance.undefinedProperty) // expected-error{{value of type 'ObjCClass' has no member 'undefinedProperty'}}
 }
 
-// Ambigous expressions
+// Ambiguous expressions
 func testAmbiguous(myObjcInstance: ObjCClass) { // expected-note{{'myObjcInstance' declared here}}
 
   // Referring to a properties not within a type.
@@ -212,7 +212,7 @@ class InstanceStaticTestClass {
   }
 }
 
-// Acccessibility
+// Accessibility
 let otherObjCInstance = OtherObjCClass()
 
 let v11 = #selector(getter: OtherObjCClass.privateVar) // expected-error{{'privateVar' is inaccessible due to 'private' protection level}}

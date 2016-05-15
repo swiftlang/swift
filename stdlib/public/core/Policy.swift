@@ -21,7 +21,7 @@
 /// When declaring a function or method, you don't need to specify a return
 /// type if no value will be returned. However, the type of a function,
 /// method, or closure always includes a return type, which is `Void` if
-/// otherwise unspeficied.
+/// otherwise unspecified.
 ///
 /// Use `Void` or an empty tuple as the return type when declaring a
 /// closure, function, or method that doesn't return a value.
@@ -115,7 +115,7 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 /// `as!`). 
 /// 
 /// For example, use `as?` to conditionally downcast the first object
-/// in an heterogenous array to a `String`.
+/// in a heterogeneous array to a `String`.
 ///
 ///     let mixed: [Any] = ["one", "two", 3, true, {(x: Int) -> Int in x * 2 }]
 ///
