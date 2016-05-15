@@ -29,8 +29,20 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @_transparent
-  public static func fromOpaque(_ value: OpaquePointer) -> Unmanaged {
+  public static func fromOpaque(_ value: UnsafePointer<Void>) -> Unmanaged {
     return Unmanaged(_private: unsafeBitCast(value, to: Instance.self))
+  }
+
+  /// Unsafely convert an unmanaged class reference to a pointer
+  ///
+  /// This operation does not change reference counts.
+  ///
+  ///     let str0: CFString = "boxcar"
+  ///     let bits = Unmanaged.passUnretained(str0)
+  ///     let str1 = Unmanaged<CFString>(bits).object
+  @_transparent
+  public func toOpaque() -> UnsafeMutablePointer<Void> {
+    return unsafeBitCast(_value, to: UnsafeMutablePointer<Void>.self)
   }
 
   /// Create an unmanaged reference with an unbalanced retain.
@@ -200,4 +212,18 @@ public struct Unmanaged<Instance : AnyObject> {
     return self
   }
 #endif
+}
+
+extension Unmanaged {
+  @available(*, unavailable, 
+    message:"use 'fromOpaque(_: UnsafePointer<Void>)' instead")
+  public static func fromOpaque(_ value: OpaquePointer) -> Unmanaged {
+    Builtin.unreachable()
+  }
+  
+  @available(*, unavailable, 
+    message:"use 'toOpaque() -> UnsafePointer<Void>' instead")
+  public func toOpaque() -> OpaquePointer {
+    Builtin.unreachable()
+  }
 }
