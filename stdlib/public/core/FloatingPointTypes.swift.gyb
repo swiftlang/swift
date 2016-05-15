@@ -39,7 +39,7 @@ cFunctionSuffix = { 32:'f', 64:'', 80:'l' }
 def allInts():
     for bits in allIntBits:
         for signed in False, True:
-            yield bits,signed
+            yield bits, signed
 
 def baseIntName(name):
     return 'Int' if name == 'Int' else 'Int' + str(name)
@@ -932,7 +932,7 @@ extension ${Self} {
   public init(_ other: ${That}) {
     _precondition(other.isFinite,
       "${That} value cannot be converted to ${Self} because it is either infinite or NaN")
-%     (lower,upper) = getFtoIBounds(srcBits, int(intBits), signed)
+%     (lower, upper) = getFtoIBounds(srcBits, int(intBits), signed)
     _precondition(other > ${str(lower)}.0,
       "${That} value cannot be converted to ${Self} because the result would be less than ${Self}.min")
     _precondition(other < ${str(upper)}.0,
