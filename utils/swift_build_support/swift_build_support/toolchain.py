@@ -32,62 +32,25 @@ class Toolchain(object):
     """Represents native host toolchain
     """
 
-    def find_tool(self, tool, versioned=False):
+    def find_tool(self, *names):
         raise NotImplementedError('Subclasses must implement this method')
 
-    # NOTE: We are declaring attribute for each tools because we need
-    #       them be assignable. For example, `toolchain.cc` can be
-    #       overriden by user supplied argument: --host-cc=/path/to/clang
-    #       And we don't want to override __getattr__ because that would need
-    #       heuristic command name inference. e.g. llvm_cov -> llvm-cov
 
-    @cache_util.reify
-    def cc(self):
-        '''Return Clang host tool path if found. `None` otherwise.
-        '''
-        return self.find_tool('clang')
-
-    @cache_util.reify
-    def cxx(self):
-        '''Return Clang host tool path if found. `None` otherwise.
-        '''
-        return self.find_tool('clang++')
-
-    @cache_util.reify
-    def cmake(self):
-        '''Return CMake host tool path if found. `None` otherwise.
-        '''
-        return self.find_tool('cmake')
-
-    @cache_util.reify
-    def ninja(self):
-        '''Return Ninja host tool path if found. `None` otherwise.
-        '''
-        return self.find_tool('ninja', 'ninja-build')
-
-    @cache_util.reify
-    def distcc(self):
-        '''Return distcc host tool path if found. `None` otherwise.
-        '''
-        return self.find_tool('distcc')
-
-    @cache_util.reify
-    def distcc_pump(self):
-        '''Return distcc-pump host tool path if found. `None` otherwise.
-        '''
-        return self.find_tool('distcc-pump', 'pump')
-
-    @cache_util.reify
-    def llvm_profdata(self):
-        '''Return llvm-profdata host tool path if found. `None` otherwise.
-        '''
-        return self.find_tool('llvm-profdata')
-
-    @cache_util.reify
-    def llvm_cov(self):
-        '''Return llvm-cov host tool path if found. `None` otherwise.
-        '''
-        return self.find_tool('llvm-cov')
+# Declare properties for each tools.
+# These properties are loaded lazily and assignable.
+def _register(name, *tool):
+    def _getter(self):
+        return self.find_tool(*tool)
+    _getter.__name__ = name
+    setattr(Toolchain, name, cache_util.reify(_getter))
+_register("cc", "clang")
+_register("cxx", "clang++")
+_register("ninja", "ninja", "ninja-build")
+_register("cmake", "cmake")
+_register("distcc", "distcc")
+_register("distcc_pump", "distcc-pump", "pump")
+_register("llvm_profdata", "llvm-profdata")
+_register("llvm_cov", "llvm-cov")
 
 
 class Darwin(Toolchain):
@@ -198,9 +161,7 @@ class FreeBSD(GenericUnix):
 
 
 class Cygwin(Linux):
-    # FIXME: Currently, Cygwin is considered as the same as Linux.
-    #        I'm not sure it's correct or not.
-    #        Please some Cygwin user could confirm this or fix it.
+    # Currently, Cygwin is considered as the same as Linux.
     pass
 
 

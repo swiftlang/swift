@@ -1308,8 +1308,7 @@ details of the setups of other systems or automated environments.""")
         build_script_impl_args += [
             "--foundation-build-type", args.foundation_build_variant
         ]
-    if (args.cmake_generator == 'Ninja' and
-            toolchain.ninja is None):
+    if args.cmake_generator == 'Ninja' and toolchain.ninja is None:
         build_script_impl_args += ["--build-ninja"]
 
     if args.skip_build_linux:
