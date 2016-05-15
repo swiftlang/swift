@@ -968,7 +968,13 @@ extension Sequence {
       try body(element)
     }
   }
-  
+}
+
+private enum _StopIteration: ErrorProtocol {
+    case stop
+}
+
+extension Sequence {
   /// Returns the first element of the sequence that satisfies the given
   /// predicate or nil if no such element is found.
   ///
@@ -979,12 +985,16 @@ extension Sequence {
   public func first(
     where predicate: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
-    for element in self {
-      if try predicate(element) {
-        return element
+    var foundElement: Iterator.Element? = nil
+    do {
+      try self.forEach {
+        if try predicate($0) {
+          foundElement = $0
+          throw _StopIteration.stop
+        }
       }
-    }
-    return nil
+    } catch is _StopIteration { }
+    return foundElement
   }
 }
 

@@ -249,7 +249,7 @@ public struct ${Self}<
     where predicate: @noescape (Base.Iterator.Element) throws -> Void
   ) rethrows -> Base.Iterator.Element? {
     Log.find[selfType] += 1
-    return base.find(where: predicate)
+    return try base.find(where: predicate)
   }
 
   public typealias SubSequence = Base.SubSequence
