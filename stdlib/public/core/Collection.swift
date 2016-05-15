@@ -1301,7 +1301,7 @@ extension Collection {
     }
 
     if maxSplits == 0 || isEmpty {
-      appendSubsequence(end: endIndex)
+      _ = appendSubsequence(end: endIndex)
       return result
     }
 
@@ -1426,6 +1426,7 @@ extension Collection where SubSequence == Self {
 extension Sequence
   where Self : _ArrayProtocol, Self.Element == Self.Iterator.Element {
   // A fast implementation for when you are backed by a contiguous array.
+  @discardableResult
   public func _copyContents(
     initializing ptr: UnsafeMutablePointer<Iterator.Element>
   ) -> UnsafeMutablePointer<Iterator.Element> {

@@ -287,7 +287,7 @@ public protocol BooleanLiteralConvertible {
   /// A type that can represent a Boolean literal, such as `Bool`.
   associatedtype BooleanLiteralType : _BuiltinBooleanLiteralConvertible
 
-  /// Creates an instance initialized to to the given Boolean value.
+  /// Creates an instance initialized to the given Boolean value.
   ///
   /// Do not call this initializer directly. Instead, initialize a variable or
   /// constant using one of the Boolean literals `true` and `false`. For
@@ -497,19 +497,19 @@ public protocol StringInterpolationConvertible {
 /// Conforming types can be initialized with color literals (e.g.
 /// `#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)`).
 public protocol _ColorLiteralConvertible {
-  init(red: Float, green: Float, blue: Float, alpha: Float)
+  init(colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float)
 }
 
 /// Conforming types can be initialized with image literals (e.g.
 /// `#imageLiteral(resourceName: "hi.png")`).
 public protocol _ImageLiteralConvertible {
-  init(resourceName: String)
+  init(imageLiteralResourceName path: String)
 }
 
 /// Conforming types can be initialized with strings (e.g.
 /// `#fileLiteral(resourceName: "resource.txt")`).
 public protocol _FileReferenceLiteralConvertible {
-  init(resourceName: String)
+  init(fileReferenceLiteralResourceName path: String)
 }
 
 /// A container is destructor safe if whether it may store to memory on

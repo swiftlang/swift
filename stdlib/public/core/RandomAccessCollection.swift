@@ -92,7 +92,7 @@ extension RandomAccessIndexable {
 
 extension RandomAccessCollection
 where Index : Strideable, 
-      Index.Stride == IndexDistance, 
+      Index.Stride == IndexDistance,
       Indices == CountableRange<Index> {
 
   public var indices: CountableRange<Index> {
@@ -100,7 +100,7 @@ where Index : Strideable,
   }
 
   internal func _validityChecked(_ i: Index) -> Index {
-    precondition(i >= startIndex && i <= endIndex, "index out of range")
+    _precondition(i >= startIndex && i <= endIndex, "index out of range")
     return i
   }
   

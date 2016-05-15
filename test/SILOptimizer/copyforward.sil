@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -copy-forwarding -enable-copyforwarding -enable-destroyhoisting | FileCheck %s
 
+// REQUIRES: rdar26081474
+
 sil_stage canonical
 
 import Builtin

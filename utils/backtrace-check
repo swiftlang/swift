@@ -18,9 +18,8 @@
 # 11 libswiftCore.dylib 0x000000000dce84d0l _fatalErrorMessage(StaticString,
 # StaticString, StaticString, UInt, flags : UInt32) -> () + 444
 
-import sys
-import os
 import re
+import sys
 
 TARGET_RE = re.compile(
     "(?P<index>\d+) +(?P<object>\S+) +(?P<address>0x[0-9a-fA-F]{16}) "
@@ -34,7 +33,7 @@ for l in lines:
     l = l.rstrip("\n")
 
     # First see if we found the start of our stack trace start. If so, set the
-    # found  stack trace flag and continue.
+    # found stack trace flag and continue.
     if l == "Current stack trace:":
         assert(not found_stack_trace_start)
         found_stack_trace_start = True

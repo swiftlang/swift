@@ -110,8 +110,8 @@ public:
       case RecordKind::ThickFunction:
         printHeader("thick_function");
         break;
-      case RecordKind::Existential:
-        printHeader("existential");
+      case RecordKind::OpaqueExistential:
+        printHeader("opaque_existential");
         break;
       case RecordKind::ClassExistential:
         printHeader("class_existential");
@@ -178,19 +178,13 @@ void TypeInfo::dump(std::ostream &OS, unsigned Indent) const {
   OS << '\n';
 }
 
+BuiltinTypeInfo::BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor)
+  : TypeInfo(TypeInfoKind::Builtin,
+             descriptor->Size, descriptor->Alignment,
+             descriptor->Stride, descriptor->NumExtraInhabitants),
+    Name(descriptor->getMangledTypeName()) {}
+
 namespace {
-
-class BuiltinTypeInfo : public TypeInfo {
-public:
-  BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor)
-    : TypeInfo(TypeInfoKind::Builtin,
-               descriptor->Size, descriptor->Alignment,
-               descriptor->Stride, descriptor->NumExtraInhabitants) {}
-
-  static bool classof(const TypeInfo *TI) {
-    return TI->getKind() == TypeInfoKind::Builtin;
-  }
-};
 
 /// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {
@@ -245,6 +239,8 @@ class ExistentialTypeInfoBuilder {
         case FieldDescriptorKind::Protocol:
           WitnessTableCount++;
           continue;
+        case FieldDescriptorKind::Imported:
+        case FieldDescriptorKind::ObjCClass:
         case FieldDescriptorKind::Struct:
         case FieldDescriptorKind::Enum:
         case FieldDescriptorKind::Class:
@@ -287,7 +283,7 @@ public:
       Kind = RecordKind::ClassExistential;
       break;
     case ExistentialTypeRepresentation::Opaque:
-      Kind = RecordKind::Existential;
+      Kind = RecordKind::OpaqueExistential;
       break;
     case ExistentialTypeRepresentation::ErrorProtocol:
       Kind = RecordKind::ErrorExistential;
@@ -312,7 +308,7 @@ public:
       break;
     case ExistentialTypeRepresentation::ErrorProtocol:
       builder.addField("error", TC.getUnknownObjectTypeRef());
-      return builder.build();
+      break;
     }
 
     for (unsigned i = 0; i < WitnessTableCount; i++)
@@ -755,8 +751,6 @@ public:
     switch (FD->Kind) {
     case FieldDescriptorKind::Class:
       // A value of class type is a single retainable pointer.
-      //
-      // FIXME: need to know if this is a NativeObject or UnknownObject
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                      ReferenceCounting::Native);
     case FieldDescriptorKind::Struct: {
@@ -807,6 +801,18 @@ public:
 
       return nullptr;
     }
+    case FieldDescriptorKind::Imported:
+      // Imported types are represented as a builtin type, an opaque blob with
+      // some size, alignment, etc. If we find it in the builtins, we'll use
+      // that information.
+      //
+      // FIXME: Emit field information for imported record types?
+      if (auto ImportedTypeDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR))
+        return TC.makeTypeInfo<BuiltinTypeInfo>(ImportedTypeDescriptor);
+      return nullptr;
+    case FieldDescriptorKind::ObjCClass:
+      return TC.getReferenceTypeInfo(ReferenceKind::Strong,
+                                     ReferenceCounting::Unknown);
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
     case FieldDescriptorKind::Protocol:
@@ -1026,6 +1032,8 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
   case FieldDescriptorKind::ObjCProtocol:
   case FieldDescriptorKind::ClassProtocol:
   case FieldDescriptorKind::Protocol:
+  case FieldDescriptorKind::Imported:
+  case FieldDescriptorKind::ObjCClass:
     // Invalid field descriptor.
     return nullptr;
   }

@@ -44,6 +44,7 @@ class SomeClass {
     takesNoEscapeClosure { x }
   }
 
+  @discardableResult
   func foo() -> Int {
     foo()
 
@@ -105,6 +106,7 @@ class SomeClass {
     }
 
     struct Outer {
+      @discardableResult
       func bar() -> Int {
         bar()
 
@@ -126,6 +128,7 @@ class SomeClass {
 
     func structOuter() {
       struct Inner {
+        @discardableResult
         func bar() -> Int {
           bar() // no-warning
 

@@ -346,7 +346,7 @@ func f7(_ a: Int) -> (b: Int) -> Int {
   return { b in a+b }
 }
 
-f7(1)(b: 1)
+_ = f7(1)(b: 1)
 f7(1.0)(2)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 f7(1)(1.0)       // expected-error {{missing argument label 'b:' in call}}

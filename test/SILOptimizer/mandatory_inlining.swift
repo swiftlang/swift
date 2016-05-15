@@ -164,6 +164,6 @@ func invoke(_ c: C) {
   // CHECK-NOT: function_ref @_TF18mandatory_inlining25class_constrained_generic
   // CHECK-NOT: apply
   // CHECK: init_existential_metatype
-  class_constrained_generic(c)
+  _ = class_constrained_generic(c)
   // CHECK: return
 }

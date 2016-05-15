@@ -45,7 +45,7 @@ func WalshImpl(_ data: inout [Double], _ temp: inout [Double], _ start: Int, _ s
     temp[start + i + stride] = data[start + i] - data[start + i + stride]
   }
 
-  WalshImpl(&temp, &data, start, stride)
+  _ = WalshImpl(&temp, &data, start, stride)
   return WalshImpl(&temp, &data, start + stride, stride)
 }
 

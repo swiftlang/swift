@@ -21,21 +21,13 @@ extension _SwiftNewtypeWrapper where Self.RawValue : Hashable {
   }
 }
 
-public func < <T : _SwiftNewtypeWrapper where T.RawValue : Comparable>(lhs: T, rhs: T) -> Bool {
-  return lhs.rawValue < rhs.rawValue
+% for op in ['<', '>', '<=', '>=']:
+public func ${op} <
+  T : _SwiftNewtypeWrapper where T.RawValue : Comparable
+>(lhs: T, rhs: T) -> Bool {
+  return lhs.rawValue ${op} rhs.rawValue
 }
-
-public func > <T : _SwiftNewtypeWrapper where T.RawValue : Comparable>(lhs: T, rhs: T) -> Bool {
-  return lhs.rawValue > rhs.rawValue
-}
-
-public func <= <T : _SwiftNewtypeWrapper where T.RawValue : Comparable>(lhs: T, rhs: T) -> Bool {
-  return lhs.rawValue <= rhs.rawValue
-}
-
-public func >= <T : _SwiftNewtypeWrapper where T.RawValue : Comparable>(lhs: T, rhs: T) -> Bool {
-  return lhs.rawValue >= rhs.rawValue
-}
+% end
 
 #if _runtime(_ObjC)
 extension _SwiftNewtypeWrapper where Self.RawValue : _ObjectiveCBridgeable {
@@ -61,17 +53,17 @@ extension _SwiftNewtypeWrapper where Self.RawValue : _ObjectiveCBridgeable {
   ) -> Bool {
     var innerResult: Self.RawValue?
     let success = Self.RawValue._conditionallyBridgeFromObjectiveC(
-                    source,
-                    result: &innerResult)
+      source,
+      result: &innerResult)
     result = innerResult.flatMap { Self(rawValue: $0) }
     return success
   }
 
   public static func _unconditionallyBridgeFromObjectiveC(
-                       _ source: Self.RawValue._ObjectiveCType?)
-      -> Self {
-    return Self(rawValue: Self.RawValue._unconditionallyBridgeFromObjectiveC(
-                            source))!
+    _ source: Self.RawValue._ObjectiveCType?
+  ) -> Self {
+    return Self(
+      rawValue: Self.RawValue._unconditionallyBridgeFromObjectiveC(source))!
   }
 }
 #endif

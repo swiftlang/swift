@@ -22,3 +22,9 @@ public class GenericOC<T> : NSObject {
     self.occfs = cfs
   }
 }
+
+public class HasObjCClasses {
+  let url = NSURL()
+  let integer = NSInteger()
+}
+

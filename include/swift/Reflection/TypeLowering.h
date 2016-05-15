@@ -32,6 +32,7 @@ using llvm::dyn_cast;
 
 class TypeRef;
 class TypeRefBuilder;
+class BuiltinTypeDescriptor;
 
 enum class RecordKind : unsigned {
   Tuple,
@@ -43,7 +44,7 @@ enum class RecordKind : unsigned {
 
   // An existential is a three-word buffer followed by value metadata and
   // witness tables.
-  Existential,
+  OpaqueExistential,
 
   // A class existential is a retainable pointer followed by witness
   // tables.
@@ -110,6 +111,22 @@ struct FieldInfo {
   unsigned Offset;
   const TypeRef *TR;
   const TypeInfo &TI;
+};
+
+/// Builtins and (opaque) imported value types
+class BuiltinTypeInfo : public TypeInfo {
+  std::string Name;
+
+public:
+  explicit BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor);
+
+  const std::string &getMangledTypeName() const {
+    return Name;
+  }
+
+  static bool classof(const TypeInfo *TI) {
+    return TI->getKind() == TypeInfoKind::Builtin;
+  }
 };
 
 /// Class instances, structs, tuples

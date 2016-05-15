@@ -682,11 +682,6 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringUppercaseString/NoLeak") {
   expectEqual(0, nsStringCanaryCount)
 }
 
-// FIXME: Temporarily commented out due to linker failure in finding
-// __swift_stdlib_CFStringCreateCopy, __swift_stdlib_CFStringGetCharactersPtr,
-// and  __swift_stdlib_CFStringGetLength during optimized builds.
-// rdar://problem/26239602
-/*
 RuntimeFoundationWrappers.test("_stdlib_CFStringCreateCopy/NoLeak") {
   nsStringCanaryCount = 0
   autoreleasepool {
@@ -716,7 +711,6 @@ RuntimeFoundationWrappers.test("_stdlib_CFStringGetCharactersPtr/NoLeak") {
   }
   expectEqual(0, nsStringCanaryCount)
 }
-*/
 
 RuntimeFoundationWrappers.test("bridgedNSArray") {
   var c = [NSObject]()

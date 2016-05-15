@@ -37,7 +37,7 @@ public class CC<T : PP> {
 // CHECK-LABEL: sil [noinline] [_specialize <RR, Float, SS, Int>] @_TFC15specialize_attr2CC3foouRd__S_2QQrfTqd__1gGVS_2GGx__Tqd__GS2_x__ : $@convention(method) <T where T : PP><U where U : QQ> (@in U, GG<T>, @guaranteed CC<T>) -> (@out U, GG<T>) {
 
 // -----------------------------------------------------------------------------
-// Test user-specialized subscript accesors.
+// Test user-specialized subscript accessors.
 
 public protocol TestSubscriptable {
   associatedtype Element

@@ -132,6 +132,8 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
   std::string MangledName;
   if (auto B = dyn_cast<BuiltinTypeRef>(TR))
     MangledName = B->getMangledName();
+  else if (auto N = dyn_cast<NominalTypeRef>(TR))
+    MangledName = N->getMangledName();
   else
     return nullptr;
 

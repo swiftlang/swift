@@ -1,0 +1,86 @@
+FIELDS:
+=======
+TypesToReflect.OC
+-----------------
+TypesToReflect.GenericOC
+------------------------
+TypesToReflect.HasObjCClasses
+-----------------------------
+url: __ObjC.NSURL
+(class __ObjC.NSURL)
+
+integer: Swift.Int
+(struct Swift.Int)
+
+__ObjC.NSURL
+------------
+
+ASSOCIATED TYPES:
+=================
+- TypesToReflect.OC : Swift.AnyObject
+- TypesToReflect.OC : __ObjC.NSObjectProtocol
+- TypesToReflect.OC : Swift.Equatable
+- TypesToReflect.OC : Swift.Hashable
+- TypesToReflect.OC : Swift.CVarArg
+- TypesToReflect.OC : Swift.CustomStringConvertible
+- TypesToReflect.OC : Swift.CustomDebugStringConvertible
+- TypesToReflect.GenericOC : Swift.AnyObject
+- TypesToReflect.GenericOC : __ObjC.NSObjectProtocol
+- TypesToReflect.GenericOC : Swift.Equatable
+- TypesToReflect.GenericOC : Swift.Hashable
+- TypesToReflect.GenericOC : Swift.CVarArg
+- TypesToReflect.GenericOC : Swift.CustomStringConvertible
+- TypesToReflect.GenericOC : Swift.CustomDebugStringConvertible
+- TypesToReflect.HasObjCClasses : Swift.AnyObject
+
+BUILTIN TYPES:
+==============
+
+- __ObjC.NSURL:
+Size: 8
+Alignment: 8
+Stride: 8
+NumExtraInhabitants: 2147483647
+
+CAPTURE DESCRIPTORS:
+====================
+- Capture types:
+(struct Swift.StaticString)
+(struct Swift.StaticString)
+(struct Swift.UInt)
+(struct Swift.UInt)
+- Metadata sources:
+
+- Capture types:
+(function
+  (tuple))
+- Metadata sources:
+
+- Capture types:
+(struct Swift.StaticString)
+(bound_generic_struct Swift.UnsafeBufferPointer
+  (struct Swift.UInt8))
+(struct Swift.UInt)
+(struct Swift.UInt)
+- Metadata sources:
+
+- Capture types:
+(function
+  (tuple))
+- Metadata sources:
+
+- Capture types:
+(bound_generic_struct Swift.UnsafeBufferPointer
+  (struct Swift.UInt8))
+(bound_generic_struct Swift.UnsafeBufferPointer
+  (struct Swift.UInt8))
+(struct Swift.UInt)
+(struct Swift.UInt)
+- Metadata sources:
+
+- Capture types:
+(function
+  (tuple))
+- Metadata sources:
+
+

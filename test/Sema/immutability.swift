@@ -546,3 +546,20 @@ func testBindOptional() {
   a?.mutatingfunc()
 }
 
+struct HasTestStruct2 {
+  var t = TestStruct2()
+}
+
+func testConditional(b : Bool) {
+  var x = TestStruct2()
+  var y = TestStruct2()
+  var z = HasTestStruct2()
+
+  (b ? x : y).mutatingfunc() // expected-error {{cannot use mutating member on immutable value: result of conditional operator '? :' is never mutable}}
+
+  (b ? (b ? x : y) : y).mutatingfunc() // expected-error {{cannot use mutating member on immutable value: result of conditional operator '? :' is never mutable}}
+
+  (b ? x : (b ? x : y)).mutatingfunc() // expected-error {{cannot use mutating member on immutable value: result of conditional operator '? :' is never mutable}}
+
+  (b ? x : z.t).mutatingfunc() // expected-error {{cannot use mutating member on immutable value: result of conditional operator '? :' is never mutable}}
+}

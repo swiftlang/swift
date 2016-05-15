@@ -116,3 +116,29 @@ final class SchnozType : OlfactoryProtocol {
   @objc func unavailableNoArgsTooMany() {} // expected-error {{'unavailableNoArgsTooMany()' has been renamed to 'shinyLabeledArguments(x:)'}} {{none}}
   @objc func unavailableHasType() {} // expected-error {{'unavailableHasType()' has been replaced by 'Base.shinyLabeledArguments()'}} {{none}}
 }
+
+// Make sure we can still conform to a protocol with unavailable requirements,
+// and check for some bogus diagnostics not being emitted.
+@objc
+protocol Snout {
+  @available(*, unavailable)
+  func sniff()
+}
+
+class Tapir : Snout {}
+
+class Elephant : Snout {
+  @nonobjc func sniff() {}
+}
+
+class Puppy : Snout {}
+
+extension Puppy {
+  func sniff() {}
+}
+
+class Kitten : Snout {}
+
+extension Kitten {
+  @nonobjc func sniff() {}
+}

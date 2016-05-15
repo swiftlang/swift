@@ -51,9 +51,9 @@ STATISTIC(NumDeadInst, "Number of dead insts eliminated");
 /// worklist (this significantly speeds up SILCombine on code where many
 /// instructions are dead or constant).
 void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
-  llvm::SmallVector<SILBasicBlock*, 256> Worklist;
-  llvm::SmallVector<SILInstruction*, 128> InstrsForSILCombineWorklist;
-  llvm::SmallPtrSet<SILBasicBlock*, 64> Visited;
+  llvm::SmallVector<SILBasicBlock *, 256> Worklist;
+  llvm::SmallVector<SILInstruction *, 128> InstrsForSILCombineWorklist;
+  llvm::SmallPtrSet<SILBasicBlock *, 32> Visited;
 
   Worklist.push_back(BB);
   do {
@@ -225,7 +225,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 void SILCombineWorklist::addInitialGroup(ArrayRef<SILInstruction *> List) {
   assert(Worklist.empty() && "Worklist must be empty to add initial group");
   Worklist.reserve(List.size()+16);
-  WorklistMap.resize(List.size());
+  WorklistMap.reserve(List.size());
   DEBUG(llvm::dbgs() << "SC: ADDING: " << List.size()
         << " instrs to worklist\n");
   while (!List.empty()) {

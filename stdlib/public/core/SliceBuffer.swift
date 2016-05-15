@@ -185,6 +185,7 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
     return nil
   }
 
+  @discardableResult
   public func _copyContents(
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<Element>

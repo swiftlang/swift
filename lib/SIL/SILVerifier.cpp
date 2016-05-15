@@ -2682,7 +2682,7 @@ public:
     require(
         !isa<WitnessMethodInst>(branchArg) &&
             !(isa<MethodInst>(branchArg) &&
-              cast<MethodInst>(branchArg)->getMember().getDecl()->isObjC()),
+              cast<MethodInst>(branchArg)->getMember().isForeign),
         "branch argument cannot be a witness_method or an objc method_inst");
     return branchArg->getType() == bbArg->getType();
   }

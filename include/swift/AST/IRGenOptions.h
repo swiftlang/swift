@@ -146,10 +146,6 @@ public:
   /// Emit names of struct stored properties and enum cases.
   unsigned EnableReflectionNames : 1;
 
-  /// Emit metadata for certain builtin types. Only for use by
-  /// standard library.
-  unsigned EnableReflectionBuiltins : 1;
-
   /// Should we try to build incrementally by not emitting an object file if it
   /// has the same IR hash as the module that we are preparing to emit?
   ///
@@ -173,7 +169,6 @@ public:
                    PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
                    HasValueNamesSetting(false), ValueNames(false),
                    EnableReflectionMetadata(false), EnableReflectionNames(false),
-                   EnableReflectionBuiltins(false),
                    UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
                    CmdArgs()
                    {}

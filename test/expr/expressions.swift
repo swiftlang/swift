@@ -18,7 +18,7 @@ var func7 : () -> (Int,Int,Int)              // Takes nothing, returns tuple.
 
 // Top-Level expressions.  These are 'main' content.
 func1()
-4+7
+_ = 4+7
 
 var bind_test1 : () -> () = func1
 var bind_test2 : Int = 4; func1 // expected-error {{expression resolves to an unused l-value}}
@@ -40,13 +40,13 @@ func basictest() {
 
   //var x6 : Float = 4+5
 
-  var x7 = 4; 5   // TODO: 5 should get a "unused expr" warning.
+  var x7 = 4; 5 // expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
 
   // Test implicit conversion of integer literal to non-Int64 type.
   var x8 : Int8 = 4
   x8 = x8 + 1
-  x8 + 1
-  0 + x8
+  _ = x8 + 1
+  _ = 0 + x8
   1.0 + x8 // expected-error{{binary operator '+' cannot be applied to operands of type 'Double' and 'Int8'}}
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
 
@@ -67,7 +67,7 @@ func basictest() {
   // Brace expressions.
   var brace3 = {
     var brace2 = 42  // variable shadowing.
-    brace2+7
+    _ = brace2+7
   }
 
   // Function calls.
@@ -102,12 +102,12 @@ func funcdecl4(_ a: ((Int) -> Int), b: Int) {}
 func signal(_ sig: Int, f: (Int) -> Void) -> (Int) -> Void {}
 
 // Doing fun things with named arguments.  Basic stuff first.
-func funcdecl6(_ a: Int, b: Int) -> Int { a+b }
+func funcdecl6(_ a: Int, b: Int) -> Int { return a+b }
 
 // Can dive into tuples, 'b' is a reference to a whole tuple, c and d are
 // fields in one.  Cannot dive into functions or through aliases.
 func funcdecl7(_ a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
-  a + b.0 + b.c + third.0 + third.1
+  _ = a + b.0 + b.c + third.0 + third.1
   b.foo // expected-error {{value of tuple type '(c: Int, d: Int)' has no member 'foo'}}
 }
 
@@ -142,7 +142,7 @@ var test1c = { { 42 } }
 var test1d = { { { 42 } } }
 
 func test2(_ a: Int, b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}} {{34-37=}}
- a+b
+ _ = a+b
  a+b+c // expected-error{{use of unresolved identifier 'c'}}
  return a+b
 }
@@ -438,22 +438,22 @@ func stringliterals(_ d: [String: Int]) {
 } // expected-error {{expected ')' in expression list}}
 
 func testSingleQuoteStringLiterals() {
-  'abc' // expected-error{{single-quoted string literal found, use '"'}}{{3-8="abc"}}
+  _ = 'abc' // expected-error{{single-quoted string literal found, use '"'}}{{7-12="abc"}}
   _ = 'abc' + "def" // expected-error{{single-quoted string literal found, use '"'}}{{7-12="abc"}}
 
-  'ab\nc' // expected-error{{single-quoted string literal found, use '"'}}{{3-10="ab\\nc"}}
+  _ = 'ab\nc' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab\\nc"}}
 
-  "abc\('def')" // expected-error{{single-quoted string literal found, use '"'}}{{9-14="def"}}
+  _ = "abc\('def')" // expected-error{{single-quoted string literal found, use '"'}}{{13-18="def"}}
 
-  "abc' // expected-error{{unterminated string literal}}
-  'abc" // expected-error{{unterminated string literal}}
-  "a'c"
+  _ = "abc' // expected-error{{unterminated string literal}}
+  _ = 'abc" // expected-error{{unterminated string literal}}
+  _ = "a'c"
 
-  'ab\'c' // expected-error{{single-quoted string literal found, use '"'}}{{3-10="ab'c"}}
+  _ = 'ab\'c' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab'c"}}
 
-  'ab"c' // expected-error{{single-quoted string literal found, use '"'}}{{3-9="ab\\"c"}}
-  'ab\"c' // expected-error{{single-quoted string literal found, use '"'}}{{3-10="ab\\"c"}}
-  'ab\\"c' // expected-error{{single-quoted string literal found, use '"'}}{{3-11="ab\\\\\\"c"}}
+  _ = 'ab"c' // expected-error{{single-quoted string literal found, use '"'}}{{7-13="ab\\"c"}}
+  _ = 'ab\"c' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab\\"c"}}
+  _ = 'ab\\"c' // expected-error{{single-quoted string literal found, use '"'}}{{7-15="ab\\\\\\"c"}}
 }
 
 // <rdar://problem/17128913>
@@ -599,6 +599,7 @@ func magic_literals() {
 
 
 infix operator +-+= {}
+@discardableResult
 func +-+= (x: inout Int, y: Int) -> Int { return 0}
 
 func lvalue_processing() {

@@ -16,7 +16,8 @@ func unwrapTrivialGeneric<T, U>(_ tg: TrivialGeneric<T, U>) -> (T, U) {
 func wrapTrivialGeneric<T, U>(_ t: T, u: U) -> TrivialGeneric<T, U> {
   return .x(t, u)
 }
-// CHECK-DAG: !DIGlobalVariable(name: "tg",{{.*}} line: [[@LINE+2]],{{.*}} type: !"_TtGO12generic_enum14TrivialGenericVs5Int64SS_",{{.*}} isLocal: false, isDefinition: true
+// CHECK-DAG: ![[T1:.*]] = !DICompositeType({{.*}}identifier: "_TtGO12generic_enum14TrivialGenericVs5Int64SS_"
+// CHECK-DAG: !DIGlobalVariable(name: "tg",{{.*}} line: [[@LINE+2]],{{.*}} type: ![[T1]],{{.*}} isLocal: false, isDefinition: true
 // CHECK-DAG: !DICompositeType(tag: DW_TAG_union_type, name: "TrivialGeneric", {{.*}}identifier: "_TtGO12generic_enum14TrivialGenericVs5Int64SS_"
 var tg : TrivialGeneric<Int64, String> = .x(23, "skidoo")
 switch tg {

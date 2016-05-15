@@ -1277,7 +1277,8 @@ checkWitness(Accessibility requiredAccess,
     return RequirementCheck(CheckKind::Availability, requiredAvailability);
   }
 
-  if (requirement->getAttrs().getUnavailable(TC.Context)) {
+  if (requirement->getAttrs().isUnavailable(TC.Context) &&
+      match.Witness->getDeclContext() == DC) {
     return RequirementCheck(CheckKind::Unavailable);
   }
 
@@ -2358,7 +2359,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
 
   // An optional requirement is trivially satisfied with an empty requirement.
-  // An 'unavailable' requirement is treated like optional requirements.
+  // An 'unavailable' requirement is treated like an optional requirement.
   auto Attrs = requirement->getAttrs();
   if (Attrs.hasAttribute<OptionalAttr>() || Attrs.isUnavailable(TC.Context)) {
     recordOptionalWitness(requirement);
@@ -3649,7 +3650,8 @@ void ConformanceChecker::checkConformance() {
       if (!witness) return;
 
       // Objective-C checking for @objc requirements.
-      if (requirement->isObjC()) {
+      if (requirement->isObjC() &&
+          !requirement->getAttrs().isUnavailable(TC.Context)) {
         // The witness must also be @objc.
         if (!witness->isObjC()) {
           bool isOptional =

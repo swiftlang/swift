@@ -23,14 +23,14 @@ func generic<T>(_ x: T) {}
 
 var a, b, c, d : Int
 
-a < b
+_ = a < b
 (a < b, c > d)
 // Parses as generic because of lparen after '>'
 (a < b, c > (d)) // expected-error{{use of undeclared type 'b'}}
 // Parses as generic because of lparen after '>'
 (a<b, c>(d)) // expected-error{{use of undeclared type 'b'}} 
-a>(b)
-a > (b)
+_ = a>(b)
+_ = a > (b)
 
 generic<Int>(0) // expected-error{{cannot explicitly specialize a generic function}} expected-note{{while parsing this '<' as a type parameter bracket}}
 

@@ -577,6 +577,16 @@ resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
   return { expr, nullptr };
 }
 
+static bool isLoadedLValue(Expr *expr) {
+  expr = expr->getSemanticsProvidingExpr();
+  if (isa<LoadExpr>(expr))
+    return true;
+  if (auto ifExpr = dyn_cast<IfExpr>(expr))
+    return isLoadedLValue(ifExpr->getThenExpr())
+        && isLoadedLValue(ifExpr->getElseExpr());
+  return false;
+}
+
 static void diagnoseSubElementFailure(Expr *destExpr,
                                       SourceLoc loc,
                                       ConstraintSystem &CS,
@@ -672,6 +682,16 @@ static void diagnoseSubElementFailure(Expr *destExpr,
         .highlight(ICE->getSourceRange());
       return;
     }
+
+  if (auto IE = dyn_cast<IfExpr>(immInfo.first)) {
+    if (isLoadedLValue(IE)) {
+      TC.diagnose(loc, diagID,
+                  "result of conditional operator '? :' is never mutable")
+        .highlight(IE->getQuestionLoc())
+        .highlight(IE->getColonLoc());
+      return;
+    }
+  }
 
   TC.diagnose(loc, unknownDiagID, destExpr->getType())
     .highlight(immInfo.first->getSourceRange());
@@ -4868,8 +4888,9 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
   if (constrs.size() != 1 || !isa<ConstructorDecl>(constrs.front()))
     return false;
   auto *constr = cast<ConstructorDecl>(constrs.front());
+  auto paramType = TC.getObjectLiteralParameterType(E, constr);
   if (!typeCheckChildIndependently(
-        E->getArg(), constr->getArgumentType(), CTP_CallArgument))
+        E->getArg(), paramType, CTP_CallArgument))
     return true;
 
   // Conditions for showing this diagnostic:

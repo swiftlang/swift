@@ -24,6 +24,7 @@
 #include "swift/SIL/SILModule.h"
 
 #include "ConstantBuilder.h"
+#include "GenClass.h"
 #include "GenHeap.h"
 #include "GenProto.h"
 #include "IRGenModule.h"
@@ -180,6 +181,13 @@ protected:
     type.visit([&](Type t) {
       if (t->is<BuiltinType>())
         BuiltinTypes.insert(CanType(t));
+
+      // We need at least size/alignment information for types imported by
+      // clang, so we'll treat them as a builtin type, essentially an
+      // opaque blob.
+      if (auto Nominal = t->getAnyNominal())
+        if (Nominal->hasClangNode())
+          BuiltinTypes.insert(CanType(t));
     });
   }
 
@@ -338,12 +346,37 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     }
   }
 
+  void addObjCClassRecord() {
+    addConstantInt16(uint16_t(FieldDescriptorKind::ObjCClass));
+    addConstantInt16(0);
+    addConstantInt32(0);
+  }
+
+  void addImportedRecord() {
+    addConstantInt16(uint16_t(FieldDescriptorKind::Imported));
+    addConstantInt16(0);
+    addConstantInt32(0);
+  }
+
   void layout() {
     using swift::reflection::FieldDescriptorKind;
 
     PrettyStackTraceDecl DebugStack("emitting field type metadata", NTD);
     auto type = NTD->getDeclaredType()->getCanonicalType();
     addTypeRef(NTD->getModuleContext(), type);
+
+    if (auto CD = dyn_cast<ClassDecl>(NTD)) {
+      auto RC = getReferenceCountingForClass(IGM, const_cast<ClassDecl *>(CD));
+      if (RC == ReferenceCounting::ObjC || CD->hasClangNode()) {
+        addObjCClassRecord();
+        return;
+      }
+    }
+
+    if (NTD->hasClangNode()) {
+      addImportedRecord();
+      return;
+    }
 
     switch (NTD->getKind()) {
       case DeclKind::Class:
@@ -760,8 +793,6 @@ void IRGenModule::emitReflectionMetadata(const NominalTypeDecl *Decl) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return;
 
-  llvm::SetVector<CanType> BuiltinTypes;
-
   emitFieldMetadataRecord(Decl);
   emitAssociatedTypeMetadataRecord(Decl);
 }
@@ -787,14 +818,18 @@ void IRGenModule::emitAssociatedTypeMetadataRecord(const ExtensionDecl *Ext) {
 }
 
 void IRGenModule::emitBuiltinReflectionMetadata() {
-  if (!IRGen.Opts.EnableReflectionBuiltins)
-    return;
+  if (getSwiftModule()->isStdlibModule()) {
+    BuiltinTypes.insert(Context.TheNativeObjectType);
+    BuiltinTypes.insert(Context.TheUnknownObjectType);
+    BuiltinTypes.insert(Context.TheBridgeObjectType);
+    BuiltinTypes.insert(Context.TheRawPointerType);
+    BuiltinTypes.insert(Context.TheUnsafeValueBufferType);
+  }
 
-  BuiltinTypes.insert(Context.TheNativeObjectType);
-  BuiltinTypes.insert(Context.TheUnknownObjectType);
-  BuiltinTypes.insert(Context.TheBridgeObjectType);
-  BuiltinTypes.insert(Context.TheRawPointerType);
-  BuiltinTypes.insert(Context.TheUnsafeValueBufferType);
+  for (auto Ty : BuiltinTypes)
+    if (auto Nominal = Ty.getAnyNominal())
+      if (Nominal->hasClangNode())
+        emitFieldMetadataRecord(Nominal);
 
   BuiltinTypeMetadataBuilder builder(*this, BuiltinTypes);
   auto var = builder.emit();

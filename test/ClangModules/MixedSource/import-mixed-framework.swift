@@ -13,7 +13,7 @@
 import Mixed
 
 let instance = SwiftClass(x: 42)
-instance.pureSwiftMethod(nil)
+_ = instance.pureSwiftMethod(nil)
 
 let clangStruct = PureClangType(x: 1, y: 2)
 instance.categoryMethod(clangStruct)

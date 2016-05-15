@@ -89,9 +89,13 @@ class C3 : Super {
 
 /** Semantics ****************************************************************/
 
+@discardableResult
 func call(_ fn: () throws -> Int) rethrows -> Int { return try fn() }
+@discardableResult
 func callAC(_ fn: @autoclosure () throws -> Int) rethrows -> Int { return try fn() }
+@discardableResult
 func raise() throws -> Int { return 0 }
+@discardableResult
 func noraise() -> Int { return 0 }
 
 /** Global functions **/
@@ -136,10 +140,14 @@ func testForward2(_ fn: () throws -> Int) rethrows {
 /** Methods **/
 
 struct MyStruct : MyProto {
+  @discardableResult
   func call(_ fn: () throws -> Int) rethrows -> Int { return try fn() }
+  @discardableResult
   func callAC(_ fn: @autoclosure () throws -> Int) rethrows -> Int { return try fn() }
 
+  @discardableResult
   static func static_call(_ fn: () throws -> Int) rethrows -> Int { return try fn() }
+  @discardableResult
   static func static_callAC(_ fn: @autoclosure () throws -> Int) rethrows -> Int { return try fn() }
 }
 
@@ -198,10 +206,14 @@ func testMethodCallACHandled(_ s: MyStruct) throws {
 /** Protocol methods **/
 
 protocol MyProto {
+  @discardableResult
   func call(_ fn: () throws -> Int) rethrows -> Int
+  @discardableResult
   func callAC(_ fn: @autoclosure () throws -> Int) rethrows -> Int
 
+  @discardableResult
   static func static_call(_ fn: () throws -> Int) rethrows -> Int
+  @discardableResult
   static func static_callAC(_ fn: @autoclosure () throws -> Int) rethrows -> Int
 }
 

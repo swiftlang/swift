@@ -117,7 +117,7 @@ extension UInt8 : Squigglable {
 }
 
 var rdar14005696 : UInt8
-rdar14005696 ~~~ 5
+_ = rdar14005696 ~~~ 5
 
 // <rdar://problem/15168483>
 public struct SomeIterator<

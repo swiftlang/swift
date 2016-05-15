@@ -15,7 +15,7 @@ class OC1 : OP1 {
 }
 
 func testOP1(_ oc1: OC1, ao: AnyObject) {
-  oc1.extOP1a()
+  _ = oc1.extOP1a()
   ao.reqOP1a!() // okay
 
   // Extension of @objc protocol does not have @objc members.

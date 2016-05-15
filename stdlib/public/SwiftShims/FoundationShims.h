@@ -29,6 +29,10 @@
 
 #include "SwiftStdint.h"
 
+#ifdef __cplusplus
+namespace swift { extern "C" {
+#endif
+
 typedef struct {
   __swift_intptr_t location;
   __swift_intptr_t length;
@@ -50,7 +54,12 @@ typedef struct {
   __swift_intptr_t patchVersion;
 } _SwiftNSOperatingSystemVersion;
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 _SwiftNSOperatingSystemVersion _swift_stdlib_operatingSystemVersion();
+
+#ifdef __cplusplus
+}} // extern "C", namespace swift
+#endif
 
 #endif // SWIFT_STDLIB_SHIMS_FOUNDATIONSHIMS_H
 

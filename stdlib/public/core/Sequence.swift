@@ -581,6 +581,7 @@ public protocol Sequence {
 
   /// Copy a Sequence into an array, returning one past the last
   /// element initialized.
+  @discardableResult
   func _copyContents(initializing ptr: UnsafeMutablePointer<Iterator.Element>)
     -> UnsafeMutablePointer<Iterator.Element>
 }
@@ -861,6 +862,7 @@ extension Sequence {
     var result: [AnySequence<Iterator.Element>] = []
     var subSequence: [Iterator.Element] = []
 
+    @discardableResult
     func appendSubsequence() -> Bool {
       if subSequence.isEmpty && omittingEmptySubsequences {
         return false
@@ -1039,7 +1041,7 @@ extension Sequence where
   ///   the beginning of the sequence.
   @warn_unused_result
   public func dropFirst(_ n: Int) -> AnySequence<Iterator.Element> {
-    precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
     return AnySequence(_DropFirstSequence(_iterator: makeIterator(), limit: n))
   }
@@ -1062,7 +1064,7 @@ extension Sequence where
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @warn_unused_result
   public func dropLast(_ n: Int) -> AnySequence<Iterator.Element> {
-    precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
 
     // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
@@ -1107,7 +1109,7 @@ extension Sequence where
   /// - Complexity: O(1)
   @warn_unused_result
   public func prefix(_ maxLength: Int) -> AnySequence<Iterator.Element> {
-    precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
+    _precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
     if maxLength == 0 {
       return AnySequence(EmptyCollection<Iterator.Element>())
     }
@@ -1144,6 +1146,7 @@ extension Sequence {
 }
 
 extension Sequence {
+  @discardableResult
   public func _copyContents(
     initializing ptr: UnsafeMutablePointer<Iterator.Element>
   ) -> UnsafeMutablePointer<Iterator.Element> {

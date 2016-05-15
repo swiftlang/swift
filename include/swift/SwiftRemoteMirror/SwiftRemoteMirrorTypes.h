@@ -56,22 +56,30 @@ typedef enum swift_layout_kind {
   // interpretation.
   SWIFT_BUILTIN,
 
-  // Record types consisting of zero or more fields.
+  // A pointer-size value that is known to contain the address of
+  // another heap allocation, or NULL.
+  SWIFT_RAW_POINTER,
+
+  // Value types consisting of zero or more fields.
   SWIFT_TUPLE,
   SWIFT_STRUCT,
   SWIFT_THICK_FUNCTION,
-  SWIFT_EXISTENTIAL,
+  SWIFT_OPAQUE_EXISTENTIAL,
   SWIFT_CLASS_EXISTENTIAL,
   SWIFT_ERROR_EXISTENTIAL,
   SWIFT_EXISTENTIAL_METATYPE,
-  SWIFT_CLASS_INSTANCE,
-  SWIFT_CLOSURE_CONTEXT,
 
   // References to other objects in the heap.
   SWIFT_STRONG_REFERENCE,
   SWIFT_UNOWNED_REFERENCE,
   SWIFT_WEAK_REFERENCE,
   SWIFT_UNMANAGED_REFERENCE,
+
+  // Layouts of heap objects. These are only ever returned from
+  // swift_reflection_infoFor{Instance,Metadata}(), and not
+  // swift_reflection_infoForTypeRef().
+  SWIFT_CLASS_INSTANCE,
+  SWIFT_CLOSURE_CONTEXT,
 } swift_layout_kind_t;
 
 struct swift_childinfo;

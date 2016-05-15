@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This pass looks for similar functions that are mergable and folds them.
+// This pass looks for similar functions that are mergeable and folds them.
 // The implementation is similar to LLVM's MergeFunctions pass. Instead of
 // merging identical functions, it merges functions which only differ by a few
 // constants in certain instructions.
@@ -243,7 +243,7 @@ private:
   int cmpConstants(const Constant *L, const Constant *R);
 
   /// Compares two global values by number. Uses the GlobalNumbersState to
-  /// identify the same gobals across function calls.
+  /// identify the same globals across function calls.
   int cmpGlobalValues(GlobalValue *L, GlobalValue *R);
 
   /// Assign or look up previously assigned numbers for the two values, and
@@ -482,7 +482,7 @@ int FunctionComparator::cmpRangeMetadata(const MDNode* L,
   // TODO: Note that as this is metadata, it is possible to drop and/or merge
   // this data when considering functions to merge. Thus this comparison would
   // return 0 (i.e. equivalent), but merging would become more complicated
-  // because the ranges would need to be unioned. It is not likely that
+  // because the ranges would need to be combined. It is not likely that
   // functions differ ONLY in this metadata if they are actually the same
   // function semantically.
   if (int Res = cmpNumbers(L->getNumOperands(), R->getNumOperands()))
@@ -607,8 +607,8 @@ int FunctionComparator::cmpConstants(const Constant *L, const Constant *R) {
     const auto *SeqR = cast<ConstantDataSequential>(R);
     // This handles ConstantDataArray and ConstantDataVector. Note that we
     // compare the two raw data arrays, which might differ depending on the host
-    // endianness. This isn't a problem though, because the endiness of a module
-    // will affect the order of the constants, but this order is the same
+    // endianness. This isn't a problem though, because the endianness of a
+    // module will affect the order of the constants, but this order is the same
     // for a given input module and host platform.
     return cmpMem(SeqL->getRawDataValues(), SeqR->getRawDataValues());
   }
@@ -1383,7 +1383,7 @@ private:
     /// first entry.
     int numUnhandledCallees;
 
-    /// The iterator of the functions's equivalence class in the FnTree.
+    /// The iterator of the function's equivalence class in the FnTree.
     /// It's FnTree.end() if the function is not in an equivalence class.
     FnTreeType::iterator TreeIter;
 
@@ -1693,7 +1693,6 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
     DEBUG(doSanityCheck(Worklist));
 
     SmallVector<FunctionEntry *, 8> FuncsToMerge;
-    SmallVector<FunctionEntry *, 8> FuncsInCallCycleToMerge;
 
     // Insert all candidates into the Worklist.
     for (std::vector<WeakVH>::iterator I = Worklist.begin(),
@@ -1796,7 +1795,7 @@ bool SwiftMergeFunctions::tryMergeEquivalenceClass(FunctionEntry *FirstInClass) 
   // Merged or not: in any case we remove the equivalence class from the FnTree.
   removeEquivalenceClassFromTree(FirstInClass);
 
-  // Containes functions which differ too much from the first function (i.e.
+  // Contains functions which differ too much from the first function (i.e.
   // would need too many parameters).
   FunctionInfos Removed;
 
@@ -2031,7 +2030,7 @@ void SwiftMergeFunctions::removeEquivalenceClassFromTree(FunctionEntry *FE) {
 // Helper for writeThunk,
 // Selects proper bitcast operation,
 // but a bit simpler then CastInst::getCastOpcode.
-static Value *createCast(IRBuilder<false> &Builder, Value *V, Type *DestTy) {
+static Value *createCast(IRBuilder<> &Builder, Value *V, Type *DestTy) {
   Type *SrcTy = V->getType();
   if (SrcTy->isStructTy()) {
     assert(DestTy->isStructTy());
@@ -2066,7 +2065,7 @@ void SwiftMergeFunctions::writeThunk(Function *ToFunc, Function *Thunk,
   Thunk->dropAllReferences();
   
   BasicBlock *BB = BasicBlock::Create(Thunk->getContext(), "", Thunk);
-  IRBuilder<false> Builder(BB);
+  IRBuilder<> Builder(BB);
 
   SmallVector<Value *, 16> Args;
   unsigned ParamIdx = 0;
@@ -2137,7 +2136,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
 
     SmallVector<Type *, 8> OldParamTypes;
     SmallVector<Value *, 16> NewArgs;
-    IRBuilder<false> Builder(CI);
+    IRBuilder<> Builder(CI);
 
     FunctionType *NewFuncTy = New->getFunctionType();
     unsigned ParamIdx = 0;

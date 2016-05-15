@@ -48,7 +48,7 @@ public struct _stdlib_ShardedAtomicCounter {
 
   public func add(_ operand: Int, randomInt: Int) {
     let shardIndex = Int(UInt(bitPattern: randomInt) % UInt(self._shardsCount))
-    _swift_stdlib_atomicFetchAddInt(
+    _ = _swift_stdlib_atomicFetchAddInt(
       object: self._shardsPtr + shardIndex, operand: operand)
   }
 

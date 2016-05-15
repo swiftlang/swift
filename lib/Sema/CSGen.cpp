@@ -1386,7 +1386,12 @@ namespace {
                        protocol->getDeclaredType(),
                        CS.getConstraintLocator(expr));
 
-      // Add constraint on args.
+      // The arguments are required to be argument-convertible to the
+      // idealized parameter type of the initializer, which generally
+      // simplifies the first label (e.g. "colorLiteralRed:") by stripping
+      // all the redundant stuff about literals (leaving e.g. "red:").
+      // Constraint application will quietly rewrite the type of 'args' to
+      // use the right labels before forming the call to the initializer.
       DeclName constrName = tc.getObjectLiteralConstructorName(expr);
       assert(constrName);
       ArrayRef<ValueDecl *> constrs = protocol->lookupDirect(constrName);
@@ -1395,8 +1400,9 @@ namespace {
         return nullptr;
       }
       auto *constr = cast<ConstructorDecl>(constrs.front());
+      auto constrParamType = tc.getObjectLiteralParameterType(expr, constr);
       CS.addConstraint(ConstraintKind::ArgumentTupleConversion,
-        expr->getArg()->getType(), constr->getArgumentType(),
+        expr->getArg()->getType(), constrParamType,
         CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
 
       Type result = tv;

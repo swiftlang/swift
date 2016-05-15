@@ -86,8 +86,8 @@ func testMixedSignArithmetic() {
 % for T in "UInt UInt64 UInt32 UInt16 UInt8".split():
   do {
     typealias Stride = ${T}.Stride
-    ${T}(1) + 0          // OK
-    0 + ${T}(1)         // OK
+    _ = ${T}(1) + 0     // OK
+    _ = 0 + ${T}(1)     // OK
     ${T}(1) + Stride(0) // expected-error {{}} // ambiguous use of operator '+'
     Stride(1) + ${T}(0) // expected-error {{}} // ambiguous use of operator '+'
     ${T}(1) - Stride(0) // expected-error {{}} // ambiguous use of operator '-'

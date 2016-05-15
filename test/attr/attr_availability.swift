@@ -481,9 +481,11 @@ func testRenameSetters() {
 
 extension Int {
   @available(*, unavailable, renamed: "init(other:)")
+  @discardableResult
   static func factory(other: Int) -> Int { return other } // expected-note 2 {{here}}
 
   @available(*, unavailable, renamed: "Int.init(other:)")
+  @discardableResult
   static func factory2(other: Int) -> Int { return other } // expected-note 2 {{here}}
 
   static func testFactoryMethods() {

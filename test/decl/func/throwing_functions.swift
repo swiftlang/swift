@@ -60,7 +60,7 @@ func fred(_ callback: (UInt8) throws -> ()) throws { }
 func rachel() -> Int { return 12 }
 func donna(_ generator: () throws -> Int) -> Int { return generator() } // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
 
-donna(rachel)
+_ = donna(rachel)
 
 func barT() throws -> Int { return 0 } // expected-note{{}}
 func barT() -> Int { return 0 } // expected-error{{invalid redeclaration of 'barT()'}}

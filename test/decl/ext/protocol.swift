@@ -4,6 +4,7 @@
 // Using protocol requirements from inside protocol extensions
 // ----------------------------------------------------------------------------
 protocol P1 {
+  @discardableResult
   func reqP1a() -> Bool
 }
 
@@ -156,6 +157,7 @@ func testSubscriptP1(_ ss1: SubscriptS1, sc1: SubscriptC1,
 // Using protocol extensions on types that conform to the protocols.
 // ----------------------------------------------------------------------------
 struct S1 : P1 {
+  @discardableResult
   func reqP1a() -> Bool { return true }
 
   func once() -> Bool {
@@ -758,7 +760,7 @@ func testSConstrained3(_ sc3a: SConstrained3a, sc3b: SConstrained3b) {
   s = "hello"
   _ = s
 
-  sc3b.pc2()
+  _ = sc3b.pc2()
   s = sc3b.pc2()
   var _: Bool = sc3b.pc2()
 }
