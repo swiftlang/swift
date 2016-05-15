@@ -222,7 +222,7 @@ public:
   clang::TargetInfo &getTargetInfo() const;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
-  clang::Sema &getClangSema() const;
+  clang::Sema &getClangSema() const override;
   clang::CodeGenOptions &getClangCodeGenOpts() const;
 
   std::string getClangModuleHash() const;
