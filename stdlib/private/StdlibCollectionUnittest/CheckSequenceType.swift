@@ -127,7 +127,7 @@ public struct FindTest {
   ) {
     self.expected = expected
     self.element = MinimalEquatableValue(element)
-    self.sequence = sequence.enumerate().map {
+    self.sequence = sequence.enumerated().map {
       return MinimalEquatableValue($1, identity: $0) 
     }
     self.expectedLeftoverSequence = expectedLeftoverSequence.map(
@@ -1777,21 +1777,21 @@ self.test("\(testNamePrefix).forEach/semantics") {
 // first()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("\(testNamePrefix).first/semantics") {
+self.test("\(testNamePrefix).first/semantics") {
   for test in findTests {
-    let s = MinimalSequence<MinimalEquatableValue>(elements: test.sequence)
+    let s = makeWrappedSequenceWithEquatableElement(test.sequence)
     let closureLifetimeTracker = LifetimeTracked(0)
     let found = s.first {
       _blackHole(closureLifetimeTracker)
-      return $0 == test.element
+      return $0 == wrapValueIntoEquatable(test.element)
     }
     expectEqual(
-      test.expected == nil ? nil : test.element,
+      test.expected == nil ? nil : wrapValueIntoEquatable(test.element),
       found,
       stackTrace: SourceLocStack().with(test.loc))
-    if let found = found {
+    if test.expected != nil {
       expectEqual(
-        test.expected, found.identity,
+        test.expected, (found as? MinimalEquatableValue)?.identity,
         "find() should find only the first element matching its predicate")
     }
   }
