@@ -1,15 +1,13 @@
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %target-build-swift %s -o %t/a.out -Xfrontend -disable-objc-attr-requires-foundation-module
+// RUN: %target-run %t/a.out
 // REQUIRES: executable_test
-
-// FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: linux
 
 import SwiftPrivate
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-
-import Foundation
 
 var UTF16APIs = TestSuite("UTF16APIs")
 
@@ -816,7 +814,7 @@ UTF8Decoder.test("Internal/_decodeOne") {
   var validLengthCounts = [ 0, 0, 0, 0, 0 ]
   var maximalSubpartCounts = [ 0, 0, 0, 0, 0 ]
   func countValidSequences(
-    head head: CountableClosedRange<UInt32>, tail: CountableClosedRange<UInt32>
+    head: CountableClosedRange<UInt32>, tail: CountableClosedRange<UInt32>
   ) {
     for cu0 in head {
       for rest in tail {
@@ -2157,6 +2155,9 @@ UnicodeAPIs.test("transcode/ReferenceTypedArray") {
   expectEqual(input, transcoded)
 }
 
+#if _runtime(_ObjC)
+import Foundation
+
 // The most simple subclass of NSString that CoreFoundation does not know
 // about.
 class NonContiguousNSString : NSString {
@@ -2460,6 +2461,8 @@ StringTests.test("StreamableConformance") {
     expectEqual(expected, actual)
   }
 }
+
+#endif // _runtime(_ObjC)
 
 runAllTests()
 
