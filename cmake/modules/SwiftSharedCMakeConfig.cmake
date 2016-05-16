@@ -252,6 +252,9 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
                       "${CLANG_MAIN_INCLUDE_DIR}"
                       "${CMARK_MAIN_INCLUDE_DIR}"
                       "${CMARK_BUILD_INCLUDE_DIR}")
+  foreach (INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
+    include_directories(${INCLUDE_DIR})
+  endforeach ()
 
   link_directories(
       "${LLVM_LIBRARY_DIR}"
