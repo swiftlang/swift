@@ -4838,7 +4838,7 @@ namespace {
 
       // Synthesize trivial conformances for each of the protocols.
       SmallVector<ProtocolConformance *, 4> conformances;
-;
+
       auto dc = decl->getInnermostDeclContext();
       auto &ctx = Impl.SwiftContext;
       for (unsigned i = 0, n = protocols.size(); i != n; ++i) {
