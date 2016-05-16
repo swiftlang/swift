@@ -23,7 +23,6 @@ public struct CollectionMisuseResiliencyChecks {
     case trap
   }
 
-  public var callNextOnExhaustedGenerator: Bool = true
   public var creatingOutOfBoundsIndicesBehavior: FailureKind = .trap
   public var subscriptOnOutOfBoundsIndicesBehavior: FailureKind = .trap
   public var subscriptRangeOnOutOfBoundsRangesBehavior: FailureKind = .trap
@@ -34,7 +33,6 @@ public struct CollectionMisuseResiliencyChecks {
 
   public static var none: CollectionMisuseResiliencyChecks {
     return CollectionMisuseResiliencyChecks(
-      callNextOnExhaustedGenerator: false,
       creatingOutOfBoundsIndicesBehavior: .none,
       subscriptOnOutOfBoundsIndicesBehavior: .none,
       subscriptRangeOnOutOfBoundsRangesBehavior: .none)

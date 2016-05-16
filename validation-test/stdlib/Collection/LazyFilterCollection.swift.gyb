@@ -63,65 +63,44 @@ CollectionTests.add${traversal}${kind}Tests(
 % for (traversal, kind) in variations:
 CollectionTests.test("LazyFilterCollection instances (${traversal}${kind})") {
   do {
-    // MinimalIterator will error if next() is called after exhaustion
-    var resiliency = CollectionMisuseResiliencyChecks.all
-    resiliency.callNextOnExhaustedGenerator = false
-
     let expected : [String] = []
     let base = ["apple", "orange", "banana", "grapefruit", "lychee"]
 % if kind == 'Sequence':
     checkSequence(
       expected,
-      MinimalSequence(elements: base).lazy.filter { _ in return false },
-      resiliencyChecks: resiliency
-    )
+      MinimalSequence(elements: base).lazy.filter { _ in return false })
 % elif traversal == '' and kind == 'Collection':
     checkForwardCollection(
       expected,
       MinimalCollection(elements: base).lazy.filter { _ in return false },
-      resiliencyChecks: resiliency,
-      sameValue: { $0 == $1 }
-    )
+      sameValue: { $0 == $1 })
 % else:
     check${traversal}${kind}(
       expected,
       Minimal${traversal}${kind}(elements: base).lazy.filter { _ in return false },
-      resiliencyChecks: resiliency,
-      sameValue: { $0 == $1 }
-    )
+      sameValue: { $0 == $1 })
 % end
   }
   do {
-    var resiliency = CollectionMisuseResiliencyChecks.all
-    resiliency.callNextOnExhaustedGenerator = false
-
     let expected = ["apple", "orange", "banana", "grapefruit", "lychee"]
     let base = ["apple", "orange", "banana", "grapefruit", "lychee"]
 % if kind == 'Sequence':
     checkSequence(
       expected,
-      MinimalSequence(elements: base).lazy.filter { _ in return true },
-      resiliencyChecks: resiliency
-    )
+      MinimalSequence(elements: base).lazy.filter { _ in return true })
 % elif traversal == '' and kind == 'Collection':
     checkForwardCollection(
       expected,
       MinimalCollection(elements: base).lazy.filter { _ in return true },
-      resiliencyChecks: resiliency,
-      sameValue: { $0 == $1 }
-    )
+      sameValue: { $0 == $1 })
 % else:
     check${traversal}${kind}(
       expected,
       Minimal${traversal}${kind}(elements: base).lazy.filter { _ in return true },
-      resiliencyChecks: resiliency,
-      sameValue: { $0 == $1 }
-    )
+      sameValue: { $0 == $1 })
 % end
   }
   do {
-    var resiliency = CollectionMisuseResiliencyChecks.all
-    resiliency.callNextOnExhaustedGenerator = false
     let predicate: Int -> Bool = { $0 % 3 == 0 || $0 % 5 == 0 }
 
     let base = randArray(500)
@@ -133,23 +112,17 @@ CollectionTests.test("LazyFilterCollection instances (${traversal}${kind})") {
 % if kind == 'Sequence':
     checkSequence(
       expected,
-      MinimalSequence(elements: base).lazy.filter(predicate),
-      resiliencyChecks: resiliency
-    )
+      MinimalSequence(elements: base).lazy.filter(predicate))
 % elif traversal == '' and kind == 'Collection':
     checkForwardCollection(
       expected,
       MinimalCollection(elements: base).lazy.filter(predicate),
-      resiliencyChecks: resiliency,
-      sameValue: { $0 == $1 }
-    )
+      sameValue: { $0 == $1 })
 % else:
     check${traversal}${kind}(
       expected,
       Minimal${traversal}${kind}(elements: base).lazy.filter(predicate),
-      resiliencyChecks: resiliency,
-      sameValue: { $0 == $1 }
-    )
+      sameValue: { $0 == $1 })
 % end
   }
 }
