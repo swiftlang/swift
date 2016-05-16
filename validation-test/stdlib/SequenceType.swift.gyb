@@ -945,6 +945,16 @@ SequenceTypeTests.test("forEach/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
+// first()
+//===----------------------------------------------------------------------===//
+
+SequenceTypeTests.test("first/dispatch") {
+  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  tester.first { $0.value == 1 }
+  expectCustomizable(tester, tester.log.first)
+}
+
+//===----------------------------------------------------------------------===//
 // dropFirst()
 //===----------------------------------------------------------------------===//
 
