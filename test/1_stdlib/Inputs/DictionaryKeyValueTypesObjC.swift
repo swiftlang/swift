@@ -33,18 +33,18 @@ func isCocoaDictionary<KeyTy : Hashable, ValueTy>(
   return !isNativeDictionary(d)
 }
 
- func isNativeNSDictionary(_ d: NSDictionary) -> Bool {
+func isNativeNSDictionary(_ d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType) as NSString
   return className.range(of: "_NativeDictionaryStorageOwner").length > 0
 }
 
- func isCocoaNSDictionary(_ d: NSDictionary) -> Bool {
+func isCocoaNSDictionary(_ d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType) as NSString
   return className.range(of: "NSDictionary").length > 0 ||
     className.range(of: "NSCFDictionary").length > 0
 }
 
- func isNativeNSArray(_ d: NSArray) -> Bool {
+func isNativeNSArray(_ d: NSArray) -> Bool {
   let className: NSString = NSStringFromClass(d.dynamicType) as NSString
   return className.range(of: "_SwiftDeferredNSArray").length > 0
 }
