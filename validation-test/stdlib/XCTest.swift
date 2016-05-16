@@ -45,6 +45,38 @@ XCTestTestSuite.test("exceptions") {
   expectFalse(testRun.hasSucceeded)
 }
 
+XCTestTestSuite.test("XCTAssertEqual/Optional<T>") {
+  class AssertEqualOptionalTestCase: XCTestCase {
+    dynamic func test_whenOptionalsAreEqual_passes() {
+      XCTAssertEqual(Optional(1),Optional(1))
+    }
+
+    dynamic func test_whenOptionalsAreNotEqual_fails() {
+      XCTAssertEqual(Optional(1),Optional(2))
+    }
+  }
+
+  let passingTestCase = AssertEqualOptionalTestCase(selector: #selector(AssertEqualOptionalTestCase.test_whenOptionalsAreEqual_passes))
+  execute(passingTestCase.run)
+  let passingTestRun = passingTestCase.testRun!
+  expectEqual(1, passingTestRun.testCaseCount)
+  expectEqual(1, passingTestRun.executionCount)
+  expectEqual(0, passingTestRun.failureCount)
+  expectEqual(0, passingTestRun.unexpectedExceptionCount)
+  expectEqual(0, passingTestRun.totalFailureCount)
+  expectTrue(passingTestRun.hasSucceeded)
+
+  let failingTestCase = AssertEqualOptionalTestCase(selector: #selector(AssertEqualOptionalTestCase.test_whenOptionalsAreNotEqual_fails))
+  execute(failingTestCase.run)
+  let failingTestRun = failingTestCase.testRun!
+  expectEqual(1, failingTestRun.testCaseCount)
+  expectEqual(1, failingTestRun.executionCount)
+  expectEqual(1, failingTestRun.failureCount)
+  expectEqual(0, failingTestRun.unexpectedExceptionCount)
+  expectEqual(1, failingTestRun.totalFailureCount)
+  expectFalse(failingTestRun.hasSucceeded)
+}
+
 XCTestTestSuite.test("XCTAssertEqual/Array<T>") {
   class AssertEqualArrayTestCase: XCTestCase {
     dynamic func test_whenArraysAreEqual_passes() {
