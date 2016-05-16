@@ -43,20 +43,8 @@ struct ARCMatchingSet {
   /// The set of reference count increments that were paired.
   llvm::SetVector<SILInstruction *> Increments;
 
-  /// An insertion point for an increment means the earliest point in the
-  /// program after the increment has occurred that the increment can be moved
-  /// to
-  /// without moving the increment over an instruction that may decrement a
-  /// reference count.
-  llvm::SetVector<SILInstruction *> IncrementInsertPts;
-
   /// The set of reference count decrements that were paired.
   llvm::SetVector<SILInstruction *> Decrements;
-
-  /// An insertion point for a decrement means the latest point in the program
-  /// before the decrement that the optimizer conservatively assumes that a
-  /// reference counted value could be used.
-  llvm::SetVector<SILInstruction *> DecrementInsertPts;
 
   // This is a data structure that cannot be moved or copied.
   ARCMatchingSet() = default;
@@ -68,15 +56,13 @@ struct ARCMatchingSet {
   void clear() {
     Ptr = SILValue();
     Increments.clear();
-    IncrementInsertPts.clear();
     Decrements.clear();
-    DecrementInsertPts.clear();
   }
 };
 
 struct MatchingSetFlags {
   bool KnownSafe;
-  bool Partial;
+  bool CodeMotionSafe;
 };
 static_assert(std::is_pod<MatchingSetFlags>::value,
               "MatchingSetFlags should be a pod.");

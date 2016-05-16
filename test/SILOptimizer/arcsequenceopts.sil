@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts -disable-code-motion-arc=0 %s | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts -disable-code-motion-arc=0 %s | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -arc-loop-opts -disable-code-motion-arc=0 %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
+// RUN: %target-sil-opt -enable-sil-verify-all -arc-loop-opts  %s | FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
 
 sil_stage canonical
 
@@ -218,9 +218,9 @@ bb0(%0 : $S):
 
 // CHECK-LABEL: sil @move_delete_retain_over_decrement_use_when_knownsafe : $@convention(thin) (@box Builtin.Int32) -> ()
 // CHECK: bb0
-// CHECK: integer_literal
+// CHECK: strong_retain
 // CHECK-NEXT: integer_literal
-// CHECK-NEXT: strong_retain
+// CHECK-NEXT: integer_literal
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: strong_release
@@ -243,9 +243,9 @@ bb0(%0 : $@box Builtin.Int32):
 
 // CHECK-LABEL: sil @delete_copyvalue_over_decrement_use_when_knownsafe : $@convention(thin) (S) -> ()
 // CHECK: bb0
-// CHECK: integer_literal
+// CHECK: retain_value
 // CHECK-NEXT: integer_literal
-// CHECK-NEXT: retain_value
+// CHECK-NEXT: integer_literal
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: release_value
@@ -544,8 +544,8 @@ bb0(%0 : $Cls):
 }
 
 // CHECK-LABEL: sil @dont_remove_as_arg0_may_be_indirectly_released_by_callee
-// CHECK: strong_retain
-// CHECK: strong_release
+// CHECK: retain_value
+// CHECK: release_value
 sil @dont_remove_as_arg0_may_be_indirectly_released_by_callee : $@convention(thin) (Cls, Cls) -> () {
 bb0(%0 : $Cls, %1 : $Cls):
   %2 = function_ref @release_arg1 : $@convention(thin) (Cls, Cls) -> ()
@@ -575,8 +575,8 @@ bb0(%0 : $Cls):
 }
 
 // CHECK-LABEL: sil @dont_remove_as_local_object_indirectly_escapes_to_callee
-// CHECK: strong_retain
-// CHECK: strong_release
+// CHECK: retain_value
+// CHECK: release_value
 sil @dont_remove_as_local_object_indirectly_escapes_to_callee : $@convention(thin) (Cls) -> () {
 bb0(%0 : $Cls):
   %1 = alloc_ref $Cls
@@ -1271,13 +1271,14 @@ bb0(%0 : $@box Builtin.Int32):
 // CHECK-LABEL: sil @increment_known_safe_merge_with_last_knownsafe : $@convention(thin) (@box Builtin.Int32) -> () {
 // CHECK: bb1:
 // CHECK-NEXT: strong_retain
+// CHECK-NEXT: strong_retain
 // CHECK-NEXT: br bb3
 // CHECK: bb2:
 // CHECK-NEXT: strong_retain
 // CHECK-NEXT: apply
+// CHECK-NEXT: strong_retain
 // CHECK-NEXT: br bb3
 // CHECK: bb3:
-// CHECK-NEXT: strong_retain
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: strong_release
@@ -1314,12 +1315,12 @@ bb3:
 // CHECK-NEXT: strong_retain
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
-// CHECK-NEXT: strong_release
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
 // CHECK-NEXT: strong_release
+// CHECK-NEXT: strong_release
 // CHECK-NEXT: br bb3
-// CHECK-NOT: strong_release
+// CHECK: strong_release
 sil @decrement_known_safe_merge_with_last_knownsafe : $@convention(thin) (@box Builtin.Int32) -> () {
 bb0(%0 : $@box Builtin.Int32):
   %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
@@ -1384,12 +1385,11 @@ bb3:
 /// we run into dominance problems if the bitcast is in a branch.
 // CHECK-LABEL: sil @switch_merge_with_bit_cast_in_branches : $@convention(thin) (@owned S) -> () {
 // CHECK: bb1:
-// CHECK-NOT: strong_retain
+// CHECK: strong_retain
 // CHECK: bb2:
-// CHECK-NOT: strong_retain
+// CHECK: strong_retain
 // CHECK: bb3:
-// CHECK: retain_value
-// CHECK: release_value
+// CHECK: strong_release 
 sil @switch_merge_with_bit_cast_in_branches : $@convention(thin) (@owned S) -> () {
 bb0(%0 : $S):
   cond_br undef, bb1, bb2
@@ -1591,10 +1591,12 @@ bb5:
   unreachable
 }
 
+// Only check for the removal of RR in bb0 when loop arc is enabled.
+//
 // CHECK-LABEL: sil @propagate_postdominating_owned_release_info : $@convention(thin) (@owned @box Builtin.Int32) -> () {
 // CHECK: bb0(
-// CHECK-NOT: retain
-// CHECK-NOT: release
+// CHECK-LOOP-NOT: retain
+// CHECK-LOOP-NOT: release
 // CHECK: bb1:
 // CHECK-NOT: retain
 // CHECK-NOT: release
@@ -1650,14 +1652,14 @@ bb0(%0 : $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: sil @guaranteed_check_if_we_already_have_insertion_pt_we_use_that_one : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
-// CHECK: function_ref @guaranteed_use
 // CHECK: strong_retain
+// CHECK: function_ref @guaranteed_use
 // CHECK: strong_release
 // CHECK: apply
 // CHECK: function_ref @guaranteed_use
 // CHECK: strong_retain
-// CHECK: strong_release
 // CHECK: function_ref @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: strong_release
 sil @guaranteed_check_if_we_already_have_insertion_pt_we_use_that_one : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   strong_retain %0 : $Builtin.NativeObject
