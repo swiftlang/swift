@@ -1,9 +1,10 @@
-//===- LLVMMergeFunctions.cpp - Merge similar functions for swift ---------===//
+//===--- LLVMMergeFunctions.cpp - Merge similar functions for swift -------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// This source file is part of the Swift.org open source project
+// Licensed under Apache License v2.0 with Runtime Library Exception
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// See http://swift.org/LICENSE.txt for license information
 //
 //===----------------------------------------------------------------------===//
 //
