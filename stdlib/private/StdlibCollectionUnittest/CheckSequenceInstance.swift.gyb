@@ -43,12 +43,10 @@ public func checkIterator<
   expectEqualSequence(
     expected, actual, ${trace}, sameValue: sameValue)
 
-  if resiliencyChecks.callNextOnExhaustedGenerator {
-    // Having returned `.None` once, a `IteratorProtocol` should not generate more
-    // elements.
-    for _ in 0..<10 {
-      expectEmpty(mutableGen.next(), ${trace})
-    }
+  // Having returned `.None` once, a `IteratorProtocol` should not generate
+  // more elements.
+  for _ in 0..<10 {
+    expectEmpty(mutableGen.next(), ${trace})
   }
 }
 
