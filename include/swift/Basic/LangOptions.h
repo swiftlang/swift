@@ -233,6 +233,10 @@ namespace swift {
     /// a supported target architecture.
     static bool isPlatformConditionArchSupported(StringRef ArchName);
 
+    /// Returns true if the 'endian' platform condition argument represents
+    /// a supported target endianness.
+    static bool isPlatformConditionEndiannessSupported(StringRef endianness);
+
   private:
     llvm::SmallVector<std::pair<std::string, std::string>, 3>
         PlatformConditionValues;
