@@ -31,6 +31,7 @@
 #include "swift/Basic/Malloc.h"
 #include "swift/Basic/FlaggedPointer.h"
 #include "swift/Basic/RelativePointer.h"
+#include "../../../stdlib/public/SwiftShims/HeapObject.h"
 
 namespace swift {
 
@@ -2493,6 +2494,63 @@ struct TargetGenericMetadata {
   }
 };
 using GenericMetadata = TargetGenericMetadata<InProcess>;
+
+/// Heap metadata for a box, which may have been generated statically by the
+/// compiler or by the runtime.
+template <typename Runtime>
+struct TargetBoxHeapMetadata : public TargetHeapMetadata<Runtime> {
+  /// The offset from the beginning of a box to its value.
+  unsigned Offset;
+
+  constexpr TargetBoxHeapMetadata(MetadataKind kind, unsigned offset)
+  : TargetHeapMetadata<Runtime>(kind), Offset(offset) {}
+};
+using BoxHeapMetadata = TargetBoxHeapMetadata<InProcess>;
+
+/// Heap metadata for runtime-instantiated generic boxes.
+template <typename Runtime>
+struct TargetGenericBoxHeapMetadata : public TargetBoxHeapMetadata<Runtime> {
+  using super = TargetBoxHeapMetadata<Runtime>;
+  using super::Offset;
+
+  /// The type inside the box.
+  ConstTargetMetadataPointer<Runtime, TargetMetadata> BoxedType;
+
+  constexpr
+  TargetGenericBoxHeapMetadata(MetadataKind kind, unsigned offset,
+    ConstTargetMetadataPointer<Runtime, TargetMetadata> boxedType)
+  : TargetBoxHeapMetadata<Runtime>(kind, offset), BoxedType(boxedType)
+  {}
+
+  static unsigned getHeaderOffset(const Metadata *boxedType) {
+    // Round up the header size to alignment.
+    unsigned alignMask = boxedType->getValueWitnesses()->getAlignmentMask();
+    return (sizeof(HeapObject) + alignMask) & ~alignMask;
+  }
+
+  /// Project the value out of a box of this type.
+  OpaqueValue *project(HeapObject *box) const {
+    auto bytes = reinterpret_cast<char*>(box);
+    return reinterpret_cast<OpaqueValue *>(bytes + Offset);
+  }
+
+  /// Get the allocation size of this box.
+  unsigned getAllocSize() const {
+    return Offset + BoxedType->getValueWitnesses()->getSize();
+  }
+
+  /// Get the allocation alignment of this box.
+  unsigned getAllocAlignMask() const {
+    // Heap allocations are at least pointer aligned.
+    return BoxedType->getValueWitnesses()->getAlignmentMask()
+    | (alignof(void*) - 1);
+  }
+
+  static bool classof(const TargetMetadata<Runtime> *metadata) {
+    return metadata->getKind() == MetadataKind::HeapGenericLocalVariable;
+  }
+};
+using GenericBoxHeapMetadata = TargetGenericBoxHeapMetadata<InProcess>;
 
 /// \brief The control structure of a generic or resilient protocol
 /// conformance.
