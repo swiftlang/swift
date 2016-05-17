@@ -234,6 +234,14 @@ extension AnimalContainer {
     _ = #selector(AnimalContainer.doesntUseGenericParam3)
     _ = #selector(AnimalContainer.doesntUseGenericParam4)
   }
+
+  // rdar://problem/26283886
+  func funcWithWrongArgType(x: NSObject) {}
+
+  func crashWithInvalidSubscript(x: NSArray) {
+    _ = funcWithWrongArgType(x: x[12])
+    // expected-error@-1{{'AnyObject' is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}}
+  }
 }
 
 extension PettableContainer {
