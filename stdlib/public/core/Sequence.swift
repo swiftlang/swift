@@ -564,6 +564,17 @@ public protocol Sequence {
     isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence]
 
+  /// Returns the first element of the sequence that satisfies the given
+  /// predicate or nil if no such element is found.
+  ///
+  /// - Parameter where: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element is a match.
+  /// - Returns: The first match or `nil` if there was no match.
+  func first(
+    where: @noescape (Iterator.Element) throws -> Bool
+  ) rethrows -> Iterator.Element?
+
   @warn_unused_result
   func _customContainsEquatableElement(
     _ element: Iterator.Element
@@ -956,6 +967,34 @@ extension Sequence {
     for element in self {
       try body(element)
     }
+  }
+}
+
+internal enum _StopIteration : ErrorProtocol {
+  case stop
+}
+
+extension Sequence {
+  /// Returns the first element of the sequence that satisfies the given
+  /// predicate or nil if no such element is found.
+  ///
+  /// - Parameter where: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element is a match.
+  /// - Returns: The first match or `nil` if there was no match.
+  public func first(
+    where predicate: @noescape (Iterator.Element) throws -> Bool
+  ) rethrows -> Iterator.Element? {
+    var foundElement: Iterator.Element? = nil
+    do {
+      try self.forEach {
+        if try predicate($0) {
+          foundElement = $0
+          throw _StopIteration.stop
+        }
+      }
+    } catch is _StopIteration { }
+    return foundElement
   }
 }
 
