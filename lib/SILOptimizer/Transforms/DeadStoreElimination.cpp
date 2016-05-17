@@ -323,7 +323,7 @@ private:
   TypeExpansionAnalysis *TE;
 
   /// The allocator we are using.
-  llvm::BumpPtrAllocator &BPA;
+  llvm::SpecificBumpPtrAllocator<BlockState> &BPA;
 
   /// The epilogue release matcher we are using.
   ConsumedArgToEpilogueReleaseMatcher& ERM;
@@ -429,7 +429,7 @@ public:
   /// Constructor.
   DSEContext(SILFunction *F, SILModule *M, SILPassManager *PM,
              AliasAnalysis *AA, TypeExpansionAnalysis *TE,
-             llvm::BumpPtrAllocator &BPA,
+             llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
              ConsumedArgToEpilogueReleaseMatcher &ERM)
     : Mod(M), F(F), PM(PM), AA(AA), TE(TE), BPA(BPA), ERM(ERM) {}
 
@@ -1154,7 +1154,7 @@ bool DSEContext::run() {
   // Initialize the BBToLocState mapping.
   unsigned LocationNum = this->getLocationVault().size();
   for (auto &B : *F) {
-    auto *State = new (BPA) BlockState(&B, LocationNum, Optimistic);
+    auto *State = new (BPA.Allocate()) BlockState(&B, LocationNum, Optimistic);
     BBToLocState[&B] = State;
     State->initStoreSetAtEndOfBlock(*this);
   }
@@ -1234,7 +1234,7 @@ public:
     auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
 
     // The allocator we are using.
-    llvm::BumpPtrAllocator BPA;
+    llvm::SpecificBumpPtrAllocator<BlockState> BPA;
 
     // The epilogue release matcher we are using.
     ConsumedArgToEpilogueReleaseMatcher ERM(RCFI, F);
