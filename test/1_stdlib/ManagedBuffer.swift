@@ -146,7 +146,7 @@ tests.test("basic") {
     let s = TestManagedBuffer<LifetimeTracked>.create(10)
     expectEqual(0, s.count)
     expectLE(10, s.myCapacity)
-    expectGE(12, s.myCapacity)  // allow some over-allocation but not too much
+    expectGE(13, s.myCapacity)  // allow some over-allocation but not too much
     
     expectEqual(1, LifetimeTracked.instances)
     for i in 1..<6 {
