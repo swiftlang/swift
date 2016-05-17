@@ -36,22 +36,22 @@ struct Some0<T> {
 
 @inline(never)
 func flood<T>(_ x: T) {
-  Some1<Some1<Some1<Some1<T>>>>() is Pingable
-  Some1<Some1<Some1<Some0<T>>>>() is Pingable
-  Some1<Some1<Some0<Some1<T>>>>() is Pingable
-  Some1<Some1<Some0<Some0<T>>>>() is Pingable
-  Some1<Some0<Some1<Some1<T>>>>() is Pingable
-  Some1<Some0<Some1<Some0<T>>>>() is Pingable
-  Some1<Some0<Some0<Some1<T>>>>() is Pingable
-  Some1<Some0<Some0<Some0<T>>>>() is Pingable
-  Some0<Some1<Some1<Some1<T>>>>() is Pingable
-  Some0<Some1<Some1<Some0<T>>>>() is Pingable
-  Some0<Some1<Some0<Some1<T>>>>() is Pingable
-  Some0<Some1<Some0<Some0<T>>>>() is Pingable
-  Some0<Some0<Some1<Some1<T>>>>() is Pingable
-  Some0<Some0<Some1<Some0<T>>>>() is Pingable
-  Some0<Some0<Some0<Some1<T>>>>() is Pingable
-  Some0<Some0<Some0<Some0<T>>>>() is Pingable
+  _ = Some1<Some1<Some1<Some1<T>>>>() is Pingable
+  _ = Some1<Some1<Some1<Some0<T>>>>() is Pingable
+  _ = Some1<Some1<Some0<Some1<T>>>>() is Pingable
+  _ = Some1<Some1<Some0<Some0<T>>>>() is Pingable
+  _ = Some1<Some0<Some1<Some1<T>>>>() is Pingable
+  _ = Some1<Some0<Some1<Some0<T>>>>() is Pingable
+  _ = Some1<Some0<Some0<Some1<T>>>>() is Pingable
+  _ = Some1<Some0<Some0<Some0<T>>>>() is Pingable
+  _ = Some0<Some1<Some1<Some1<T>>>>() is Pingable
+  _ = Some0<Some1<Some1<Some0<T>>>>() is Pingable
+  _ = Some0<Some1<Some0<Some1<T>>>>() is Pingable
+  _ = Some0<Some1<Some0<Some0<T>>>>() is Pingable
+  _ = Some0<Some0<Some1<Some1<T>>>>() is Pingable
+  _ = Some0<Some0<Some1<Some0<T>>>>() is Pingable
+  _ = Some0<Some0<Some0<Some1<T>>>>() is Pingable
+  _ = Some0<Some0<Some0<Some0<T>>>>() is Pingable
 }
 
 @inline(never)
