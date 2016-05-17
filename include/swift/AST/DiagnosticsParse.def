@@ -1262,6 +1262,10 @@ ERROR(expected_rangle_generics_param,PointsToFirstBadToken,
       "expected '>' to complete generic parameter list", ())
 ERROR(expected_generics_parameter_name,PointsToFirstBadToken,
       "expected an identifier to name generic parameter", ())
+ERROR(unexpected_class_constraint,none,
+       "'class' constraint can only appear on protocol declarations", ())
+NOTE(suggest_anyobject,none,
+     "did you mean to constrain %0 with the 'AnyObject' protocol?", (Identifier))
 ERROR(expected_generics_type_restriction,none,
       "expected a type name or protocol composition restricting %0",
       (Identifier))
