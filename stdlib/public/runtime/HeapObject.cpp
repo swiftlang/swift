@@ -133,57 +133,6 @@ SWIFT_RUNTIME_EXPORT
 extern "C" intptr_t swift_bufferHeaderSize() { return sizeof(HeapObject); }
 
 namespace {
-/// Heap metadata for a box, which may have been generated statically by the
-/// compiler or by the runtime.
-struct BoxHeapMetadata : public HeapMetadata {
-  /// The offset from the beginning of a box to its value.
-  unsigned Offset;
-
-  constexpr BoxHeapMetadata(MetadataKind kind,
-                            unsigned offset)
-    : HeapMetadata{kind}, Offset(offset)
-  {}
-
-
-};
-
-/// Heap metadata for runtime-instantiated generic boxes.
-struct GenericBoxHeapMetadata : public BoxHeapMetadata {
-  /// The type inside the box.
-  const Metadata *BoxedType;
-
-  constexpr GenericBoxHeapMetadata(MetadataKind kind,
-                                   unsigned offset,
-                                   const Metadata *boxedType)
-    : BoxHeapMetadata{kind, offset},
-      BoxedType(boxedType)
-  {}
-
-  static unsigned getHeaderOffset(const Metadata *boxedType) {
-    // Round up the header size to alignment.
-    unsigned alignMask = boxedType->getValueWitnesses()->getAlignmentMask();
-    return (sizeof(HeapObject) + alignMask) & ~alignMask;
-  }
-
-  /// Project the value out of a box of this type.
-  OpaqueValue *project(HeapObject *box) const {
-    auto bytes = reinterpret_cast<char*>(box);
-    return reinterpret_cast<OpaqueValue *>(bytes + Offset);
-  }
-
-  /// Get the allocation size of this box.
-  unsigned getAllocSize() const {
-    return Offset + BoxedType->getValueWitnesses()->getSize();
-  }
-
-  /// Get the allocation alignment of this box.
-  unsigned getAllocAlignMask() const {
-    // Heap allocations are at least pointer aligned.
-    return BoxedType->getValueWitnesses()->getAlignmentMask()
-      | (alignof(void*) - 1);
-  }
-};
-
 /// Heap object destructor for a generic box allocated with swift_allocBox.
 static void destroyGenericBox(HeapObject *o) {
   auto metadata = static_cast<const GenericBoxHeapMetadata *>(o->metadata);
