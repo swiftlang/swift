@@ -98,12 +98,22 @@ let for = 2
 // expected-error @-1 {{keyword 'for' cannot be used as an identifier here}}
 // expected-note @-2 {{if this name is unavoidable, use backticks to escape it}} {{5-8=`for`}}
 
-func dog cow() {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}} {{6-13=dogcow}}
-func friend ship<T>(x: T) {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}} {{6-17=friendship}}
+func dog cow() {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}}
+// expected-note@-1 {{join the identifiers together}} {{6-13=dogcow}}
+// expected-note@-2 {{join the identifiers together with camel-case}} {{6-13=dogCow}}
+func cat Mouse() {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}}
+// expected-note@-1 {{join the identifiers together}} {{6-15=catMouse}}
+func friend ship<T>(x: T) {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}}
+// expected-note@-1 {{join the identifiers together}} {{6-17=friendship}}
+// expected-note@-2 {{join the identifiers together with camel-case}} {{6-17=friendShip}}
 func were
-wolf() {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}} {{6-5=werewolf}}
+wolf() {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}}
+// expected-note@-1 {{join the identifiers together}} {{6-5=werewolf}}
+// expected-note@-2 {{join the identifiers together with camel-case}} {{6-5=wereWolf}}
 func hammer
-leavings<T>(x: T) {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}} {{6-9=hammerleavings}}
+leavings<T>(x: T) {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}}
+// expected-note@-1 {{join the identifiers together}} {{6-9=hammerleavings}}
+// expected-note@-2 {{join the identifiers together with camel-case}} {{6-9=hammerLeavings}}
 
 prefix operator % {}
 prefix func %<T>(x: T) -> T { return x } // No error expected - the < is considered an identifier but is peeled off by the parser.
