@@ -117,3 +117,8 @@ leavings<T>(x: T) {} // expected-error {{found an unexpected second identifier i
 
 prefix operator % {}
 prefix func %<T>(x: T) -> T { return x } // No error expected - the < is considered an identifier but is peeled off by the parser.
+
+struct Weak<T: class> { // expected-error {{'class' constraint can only appear on protocol declarations}}
+  // expected-note@-1 {{did you mean to constrain 'T' with the 'AnyObject' protocol?}} {{16-21=AnyObject}}
+  weak var value: T // expected-error {{'weak' may not be applied to non-class-bound 'T'; consider adding a protocol conformance that has a class bound}}
+}
