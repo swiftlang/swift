@@ -1,5 +1,13 @@
 // RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_closures %s | FileCheck %s
 
+// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_closures.bar
+func bar(arr: [(Int32) -> Int32]) {
+  // CHECK: [[@LINE+1]]:13 -> [[@LINE+1]]:42
+  for a in [{ (b : Int32) -> Int32 in b }] {
+    a(0)
+  }
+}
+
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_closures.foo
 func foo() {
   // CHECK: [[@LINE+1]]:12 -> [[@LINE+1]]:59 : 1
@@ -19,4 +27,5 @@ func foo() {
   f1 { left, right in left == 0 || right == 1 }
 }
 
+bar(arr: [{ x in x }])
 foo()
