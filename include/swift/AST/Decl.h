@@ -3203,6 +3203,10 @@ public:
   /// Retrieve the superclass of this class, or null if there is no superclass.
   Type getSuperclass() const { return LazySemanticInfo.Superclass.getPointer(); }
 
+  /// Retrieve the ClassDecl for the superclass of this class, or null if there
+  /// is no superclass.
+  ClassDecl *getSuperclassDecl() const;
+
   /// Set the superclass of this class.
   void setSuperclass(Type superclass) {
     LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);

@@ -33,6 +33,7 @@ namespace swift {
   class Decl;
   class DeclContext;
   class Expr;
+  class ExtensionDecl;
   class GenericTypeParamDecl;
   class NormalProtocolConformance;
   class OperatorDecl;
@@ -80,6 +81,7 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::GenericTypeParamDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::OperatorDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ProtocolDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ValueDecl, swift::DeclAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::ExtensionDecl, swift::DeclAlignInBits)
 
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeBase, swift::TypeAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ArchetypeType, swift::TypeAlignInBits)

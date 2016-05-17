@@ -4677,3 +4677,9 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
 
   return {};
 }
+
+ClassDecl *ClassDecl::getSuperclassDecl() const {
+  if (auto superclass = getSuperclass())
+    return superclass->getClassOrBoundGenericClass();
+    return nullptr;
+}
