@@ -787,7 +787,12 @@ public:
 
   void emitSourceFile(SourceFile &SF, unsigned StartElem);
   void addLinkLibrary(const LinkLibrary &linkLib);
-  void finalize();
+
+  /// Attempt to finalize the module.
+  ///
+  /// This can fail, in which it will return false and the module will be
+  /// invalid.
+  bool finalize();
 
   llvm::AttributeSet constructInitialAttributes();
 

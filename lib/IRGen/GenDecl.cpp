@@ -843,10 +843,6 @@ void IRGenModule::finishEmitAfterTopLevel() {
   for (auto def : Context.ExternalDefinitions) {
     emitExternalDefinition(def);
   }
-
-  // Let ClangCodeGen emit its global data structures (llvm.used, debug info,
-  // etc.)
-  finalizeClangCodeGen();
 }
 
 static void emitLazyTypeMetadata(IRGenModule &IGM, CanType type) {

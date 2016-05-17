@@ -969,7 +969,7 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
                          (uint32_t)(swiftVersion << 8));
 }
 
-void IRGenModule::finalize() {
+bool IRGenModule::finalize() {
   const char *ModuleHashVarName = "llvm.swift_module_hash";
   if (IRGen.Opts.OutputKind == IRGenOutputKind::ObjectFile &&
       !Module.getGlobalVariable(ModuleHashVarName)) {
@@ -1000,11 +1000,21 @@ void IRGenModule::finalize() {
     addUsedGlobal(ModuleHash);
   }
   emitLazyPrivateDefinitions();
+
+  // Finalize clang IR-generation.
+  finalizeClangCodeGen();
+
+  // If that failed, report failure up and skip the final clean-up.
+  if (!ClangCodeGen->GetModule())
+    return false;
+
   emitAutolinkInfo();
   emitGlobalLists();
   if (DebugInfo)
     DebugInfo->finalize();
   cleanupClangCodeGenMetadata();
+
+  return true;
 }
 
 /// Emit lazy definitions that have to be emitted in this specific

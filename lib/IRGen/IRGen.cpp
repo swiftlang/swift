@@ -628,7 +628,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       });
     }
 
-    IGM.finalize();
+    if (!IGM.finalize())
+      return nullptr;
 
     setModuleFlags(IGM);
   }
@@ -821,7 +822,9 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
       updateLinkage(F);
     }
 
-    IGM->finalize();
+    if (!IGM->finalize())
+      return;
+
     setModuleFlags(*IGM);
   }
 
