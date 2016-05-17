@@ -25,6 +25,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -4463,9 +4464,27 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     // identifier, it might've been a single identifier that got broken by a
     // space or newline accidentally.
     if (Tok.isIdentifierOrUnderscore() && SimpleName.str().back() != '<') {
-      diagnose(Tok.getLoc(), diag::repeated_identifier, "function")
-        .fixItReplace(SourceRange(NameLoc, Tok.getLoc()),
-                      NameTok.getText().str() + Tok.getText().str());
+      diagnose(Tok.getLoc(), diag::repeated_identifier, "function");
+
+      SourceRange DoubleIdentifierRange(NameLoc, Tok.getLoc());
+
+      // Provide two fix-its: a direct concatentation of the two identifiers
+      // and a camel-cased version.
+
+      auto DirectConcatenation = NameTok.getText().str() + Tok.getText().str();
+
+      diagnose(Tok.getLoc(), diag::join_identifiers)
+        .fixItReplace(DoubleIdentifierRange, DirectConcatenation);
+
+      SmallString<8> CapitalizedScratch;
+      auto Capitalized = camel_case::toSentencecase(Tok.getText(),
+                                                    CapitalizedScratch);
+      auto CamelCaseConcatenation = NameTok.getText().str() + Capitalized.str();
+
+      if (DirectConcatenation != CamelCaseConcatenation)
+        diagnose(Tok.getLoc(), diag::join_identifiers_camel_case)
+          .fixItReplace(DoubleIdentifierRange, CamelCaseConcatenation);
+
       consumeToken();
     }
   }
