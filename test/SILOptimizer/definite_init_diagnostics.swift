@@ -47,6 +47,7 @@ func test2() {
   // Address-of with Builtin.addressof.
   var a4 : Int            // expected-note {{variable defined here}}
   Builtin.addressof(&a4)  // expected-error {{address of variable 'a4' taken before it is initialized}}
+  // expected-warning @-1 {{result of call is unused, but produces 'Builtin.RawPointer'}}
 
 
   // Closures.

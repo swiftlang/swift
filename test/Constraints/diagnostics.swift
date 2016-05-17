@@ -353,7 +353,7 @@ f7(1)(1.0)       // expected-error {{missing argument label 'b:' in call}}
 f7(1)(b: 1.0)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 let f8 = f7(2)
-f8(b: 1)
+_ = f8(b: 1)
 f8(10)          // expected-error {{missing argument label 'b:' in call}} {{4-4=b: }}
 f8(1.0)         // expected-error {{missing argument label 'b:' in call}}
 f8(b: 1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}

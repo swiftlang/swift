@@ -1015,6 +1015,17 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     return;
   }
 
+  // Drill through noop expressions we don't care about, like ParanExprs.
+  auto valueE = E;
+  while (1) {
+    valueE = valueE->getValueProvidingExpr();
+    
+    if (auto *OEE = dyn_cast<OpenExistentialExpr>(valueE))
+      valueE = OEE->getSubExpr();
+    else
+      break;
+  }
+  
   // Complain about functions that aren't called.
   // TODO: What about tuples which contain functions by-value that are
   // dead?
@@ -1024,7 +1035,11 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     return;
   }
 
-  auto valueE = E->getValueProvidingExpr();
+  // If the result of this expression is of type "()", then it is safe to
+  // ignore.
+  if (valueE->getType()->isVoid() ||
+      valueE->getType()->is<ErrorType>())
+    return;
   
   // Complain about '#selector'.
   if (auto *ObjCSE = dyn_cast<ObjCSelectorExpr>(valueE)) {
@@ -1047,15 +1062,20 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OEE->getSubExpr()))
       return checkIgnoredExpr(IIO->getSubExpr());
 
-  // FIXME: Complain about literals
-
   // Check if we have a call to a function not marked with
   // '@discardableResult'.
   if (auto call = dyn_cast<ApplyExpr>(valueE)) {
     // Dig through all levels of calls.
-    Expr *fn = call->getFn()->getSemanticsProvidingExpr();
-    while (auto applyFn = dyn_cast<ApplyExpr>(fn)) {
-      fn = applyFn->getFn()->getSemanticsProvidingExpr();
+    Expr *fn = call->getFn();
+    while (true) {
+      fn = fn->getSemanticsProvidingExpr();
+      if (auto applyFn = dyn_cast<ApplyExpr>(fn)) {
+        fn = applyFn->getFn();
+      } else if (auto FVE = dyn_cast<ForceValueExpr>(fn)) {
+        fn = FVE->getSubExpr();
+      } else {
+        break;
+      }
     }
 
     // Find the callee.
@@ -1069,19 +1089,45 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     else if (auto dynMemberRef = dyn_cast<DynamicMemberRefExpr>(fn))
       callee = dyn_cast<AbstractFunctionDecl>(
                  dynMemberRef->getMember().getDecl());
+    
+    // If the callee explicitly allows its result to be ignored, then don't
+    // complain.
+    if (callee && callee->getAttrs().getAttribute<DiscardableResultAttr>())
+      return;
 
-    if (callee) {
-      if (!callee->getAttrs().getAttribute<DiscardableResultAttr>() &&
-          !valueE->getType()->isVoid()) {
-        diagnose(fn->getLoc(), diag::expression_unused_result,
-                 callee->getFullName());
-        return;
-      }
-      if (isa<ConstructorDecl>(callee) && !call->isImplicit()) {
-        diagnose(fn->getLoc(), diag::expression_unused_init_result);
-      }
+    // Otherwise, complain.  Start with more specific diagnostics.
+    if (callee && isa<ConstructorDecl>(callee) && !call->isImplicit()) {
+      diagnose(fn->getLoc(), diag::expression_unused_init_result,
+               callee->getDeclContext()->getDeclaredTypeOfContext())
+        .highlight(call->getArg()->getSourceRange());
+      return;
     }
+    
+    SourceRange SR1 = call->getArg()->getSourceRange(), SR2;
+    if (auto *BO = dyn_cast<BinaryExpr>(call)) {
+      SR1 = BO->getArg()->getElement(0)->getSourceRange();
+      SR2 = BO->getArg()->getElement(1)->getSourceRange();
+    }
+    
+    // Otherwise, produce a generic diagnostic.
+    if (callee) {
+      auto diagID = diag::expression_unused_result_call;
+      if (callee->getFullName().isOperator())
+        diagID = diag::expression_unused_result_operator;
+      
+      diagnose(fn->getLoc(), diagID, callee->getFullName())
+        .highlight(SR1).highlight(SR2);
+    } else
+      diagnose(fn->getLoc(), diag::expression_unused_result_unknown,
+               valueE->getType())
+        .highlight(SR1).highlight(SR2);
+
+    return;
   }
+
+  // Produce a generic diagnostic.
+  diagnose(valueE->getLoc(), diag::expression_unused_result, valueE->getType())
+    .highlight(valueE->getSourceRange());
 }
 
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {

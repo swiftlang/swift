@@ -24,6 +24,6 @@ func test5() { _ = !/* */foo }                // expected-error {{unary operator
 func test6() { _ = 1+/* */2 }                 // expected-error {{'+' is not a postfix unary operator}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
 
 // Continue to work
-foo!// this is dangerous
+_ = foo!// this is dangerous
 _ = 1 +/**/ 2
 _ = 1 +/* hi */2

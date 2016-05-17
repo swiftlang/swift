@@ -69,7 +69,7 @@ extension P2 {
 }
 
 func testP2(_ pt: P2.Type) {
-  pt.init().elements
+  pt.init().elements // expected-warning {{expression of type '[P2]' is unused}}
 }
 
 // rdar://problem/21597711

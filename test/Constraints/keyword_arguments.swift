@@ -282,13 +282,13 @@ func intToInt(_ i: Int) -> Int { return i }
 
 func testClosures() {
   let c0 = { (x: Int, y: Int) in x + y }
-  c0(1, 2)
+  _ = c0(1, 2)
 
   let c1 = { x, y in intToInt(x + y) }
-  c1(1, 2)
+  _ = c1(1, 2)
 
   let c2 = { intToInt($0 + $1) }
-  c2(1, 2)
+  _ = c2(1, 2)
 }
 
 func acceptAutoclosure(f: @autoclosure () -> Int) { }

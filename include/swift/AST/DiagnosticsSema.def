@@ -2192,10 +2192,16 @@ ERROR(expression_unused_function,none,
       "expression resolves to an unused function", ())
 ERROR(expression_unused_lvalue,none,
       "expression resolves to an unused l-value", ())
-WARNING(expression_unused_result,none,
+WARNING(expression_unused_result_call,none,
         "result of call to %0 is unused", (DeclName))
+WARNING(expression_unused_result_operator,none,
+        "result of operator %0 is unused", (DeclName))
+WARNING(expression_unused_result_unknown, none,
+        "result of call is unused, but produces %0", (Type))
+WARNING(expression_unused_result, none,
+        "expression of type %0 is unused", (Type))
 WARNING(expression_unused_init_result,none,
-        "result of initializer is unused", ())
+        "result of %0 initializer is unused", (Type))
 WARNING(expression_unused_optional_try,none,
         "result of 'try?' is unused", ())
 WARNING(expression_unused_selector_result, none,

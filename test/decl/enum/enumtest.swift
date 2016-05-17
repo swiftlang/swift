@@ -75,10 +75,12 @@ func test3(_ a: ZeroOneTwoThree) {
   var _ : Int =
      ZeroOneTwoThree.Zero // expected-error {{cannot convert value of type 'ZeroOneTwoThree' to specified type 'Int'}}
 
+  // expected-warning @+1 {{unused}}
   test3 ZeroOneTwoThree.Zero // expected-error {{expression resolves to an unused function}} expected-error{{consecutive statements}} {{8-8=;}}
   test3 (ZeroOneTwoThree.Zero)
   test3(ZeroOneTwoThree.Zero)
   test3 // expected-error {{expression resolves to an unused function}}
+  // expected-warning @+1 {{unused}}
   (ZeroOneTwoThree.Zero)
   
   var _ : ZeroOneTwoThree = .One(4)

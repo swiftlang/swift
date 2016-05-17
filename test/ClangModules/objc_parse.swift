@@ -49,7 +49,7 @@ func instanceMethods(_ b: B) {
   b.performAdd(1, 2, 3, 4) // expected-error{{missing argument labels 'withValue:withValue:withValue2:' in call}} {{19-19=withValue: }} {{22-22=withValue: }} {{25-25=withValue2: }}
 
   // Both class and instance methods exist.
-  b.description
+  _ = b.description
   b.instanceTakesObjectClassTakesFloat(b)
   b.instanceTakesObjectClassTakesFloat(2.0) // expected-error{{cannot convert value of type 'Double' to expected argument type 'AnyObject!'}}
 
@@ -86,21 +86,21 @@ func instanceMethodsInExtensions(_ b: B) {
   b.method(1, separateExtMethod:3.5)
 
   let m1 = b.method(_:onCat1:)
-  m1(1, onCat1: 2.5)
+  _ = m1(1, onCat1: 2.5)
 
   let m2 = b.method(_:onExtA:)
-  m2(1, onExtA: 2.5)
+  _ = m2(1, onExtA: 2.5)
 
   let m3 = b.method(_:onExtB:)
-  m3(1, onExtB: 2.5)
+  _ = m3(1, onExtB: 2.5)
 
   let m4 = b.method(_:separateExtMethod:)
-  m4(1, separateExtMethod: 2.5)
+  _ = m4(1, separateExtMethod: 2.5)
 }
 
 func dynamicLookupMethod(_ b: AnyObject) {
   if let m5 = b.method(_:separateExtMethod:) {
-    m5(1, separateExtMethod: 2.5)
+    _ = m5(1, separateExtMethod: 2.5)
   }
 }
 
@@ -204,15 +204,16 @@ func testProtocolMethods(_ b: B, p2m: P2.Type) {
   // Imported constructor.
   var b2 = B(viaP2: 3.14159, second: 3.14159)
 
-  p2m.init(viaP2:3.14159, second: 3.14159)
+  _ = p2m.init(viaP2:3.14159, second: 3.14159)
 }
 
 func testId(_ x: AnyObject) {
   x.perform!("foo:", with: x) // expected-warning{{no method declared with Objective-C selector 'foo:'}}
+  // expected-warning @-1 {{result of call is unused, but produces 'Unmanaged<AnyObject>!'}}
 
-  x.performAdd(1, withValue: 2, withValue: 3, withValue2: 4)
-  x.performAdd!(1, withValue: 2, withValue: 3, withValue2: 4)
-  x.performAdd?(1, withValue: 2, withValue: 3, withValue2: 4)
+  _ = x.performAdd(1, withValue: 2, withValue: 3, withValue2: 4)
+  _ = x.performAdd!(1, withValue: 2, withValue: 3, withValue2: 4)
+  _ = x.performAdd?(1, withValue: 2, withValue: 3, withValue2: 4)
 }
 
 class MySubclass : B {
@@ -224,7 +225,7 @@ class MySubclass : B {
 }
 
 func getDescription(_ array: NSArray) {
-  array.description
+  _ = array.description
 }
 
 // Method overriding with unfortunate ordering.
@@ -257,7 +258,7 @@ func almostSubscriptableKeyMismatchInherited(_ roc: ReadOnlyCollectionChild,
 
 // Use of 'Class' via dynamic lookup.
 func classAnyObject(_ obj: NSObject) {
-  obj.myClass().description!()
+  _ = obj.myClass().description!()
 }
 
 // Protocol conformances
@@ -307,8 +308,8 @@ func customAccessors(_ hive: Hive, bee: Bee) {
   markUsed(hive.makingHoney()) // expected-error{{cannot call value of non-function type 'Bool'}}
   hive.setMakingHoney(true) // expected-error{{value of type 'Hive' has no member 'setMakingHoney'}}
 
-  hive.`guard`.description // okay
-  hive.`guard`.description! // no-warning
+  _ = hive.`guard`.description // okay
+  _ = hive.`guard`.description! // no-warning
   hive.`guard` = bee // no-warning
 }
 
@@ -339,7 +340,7 @@ func testDynamicSelf(_ queen: Bee, wobbler: NSWobbling) {
 }
 
 func testRepeatedProtocolAdoption(_ w: NSWindow) {
-  w.description
+  _ = w.description
 }
 
 class ProtocolAdopter1 : FooProto {
