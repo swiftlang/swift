@@ -769,7 +769,7 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name,
                                SourceLoc Loc,
                                SmallVectorImpl<ValueDecl *> &Lookup,
                                bool ExpectMultipleResults) {
-  unsigned options = NL_QualifiedDefault;
+  NLOptions options = NL_QualifiedDefault;
   // FIXME: a bit of a hack.
   if (Name == P.Context.Id_deinit || Name == P.Context.Id_init)
     options = options & ~NL_VisitSupertypes;

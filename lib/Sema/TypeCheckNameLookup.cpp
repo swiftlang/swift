@@ -237,7 +237,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
                                        Type type, DeclName name,
                                        NameLookupOptions options) {
   LookupResult result;
-  unsigned subOptions = NL_QualifiedDefault;
+  NLOptions subOptions = NL_QualifiedDefault;
   if (options.contains(NameLookupFlags::KnownPrivate))
     subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::DynamicLookup))
@@ -326,7 +326,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
          
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
-  unsigned subOptions = NL_QualifiedDefault;
+  NLOptions subOptions = NL_QualifiedDefault;
   if (options.contains(NameLookupFlags::KnownPrivate))
     subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::ProtocolMembers))

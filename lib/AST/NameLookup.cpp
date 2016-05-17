@@ -520,7 +520,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         if (TypeResolver)
           TypeResolver->resolveDeclSignature(BaseDecl);
 
-        unsigned options = NL_UnqualifiedDefault;
+        NLOptions options = NL_UnqualifiedDefault;
         if (isCascadingUse.getValue())
           options |= NL_KnownCascadingDependency;
         else
@@ -1024,7 +1024,7 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
 
 bool DeclContext::lookupQualified(Type type,
                                   DeclName member,
-                                  unsigned options,
+                                  NLOptions options,
                                   LazyResolver *typeResolver,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
