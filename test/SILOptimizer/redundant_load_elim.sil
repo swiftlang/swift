@@ -1128,3 +1128,21 @@ bb0(%0 : $AB):
   %4 = tuple ()
   return %4 : $()
 }
+
+// Make sure we have a deterministic forward ordering and also both loads are forwarded.
+//
+// CHECK-LABEL: sil @load_store_deterministic_forwarding
+// CHECK: bb0
+// CHECK-NEXT: [[VAL:%.*]] = integer_literal $Builtin.Int64, 0
+// CHECK-NEXT: store 
+// CHECK-NEXT: store 
+// CHECK-NEXT: return [[VAL]] : $Builtin.Int64
+sil @load_store_deterministic_forwarding : $@convention(thin) (@inout Builtin.Int64, @inout Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
+  %2 = integer_literal $Builtin.Int64, 0
+  store %2 to %0 : $*Builtin.Int64
+  %3 = load %0 : $*Builtin.Int64
+  store %3 to %1: $*Builtin.Int64
+  %4 = load %1 : $*Builtin.Int64
+  return %4 : $Builtin.Int64
+}
