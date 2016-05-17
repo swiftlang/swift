@@ -93,29 +93,6 @@ extension String.CharacterView : BidirectionalCollection {
       self._countUTF16 = _countUTF16
     }
 
-    /// Returns the next consecutive value after `self`.
-    ///
-    /// - Precondition: The next value is representable.
-    // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.index(after: Index)
-    internal func _successor() -> Index {
-      _precondition(_base != _base._viewEndIndex, "cannot increment endIndex")
-      return Index(_base: _endBase)
-    }
-
-    /// Returns the previous consecutive value before `self`.
-    ///
-    /// - Precondition: The previous value is representable.
-    // FIXME: swift-3-indexing-model: pull the following logic into UTF8View.index(before: Index)
-    internal func _predecessor() -> Index {
-      _precondition(_base != _base._viewStartIndex,
-          "cannot decrement startIndex")
-      let predecessorLengthUTF16 =
-          Index._measureExtendedGraphemeClusterBackward(from: _base)
-      return Index(
-        _base: UnicodeScalarView.Index(
-          _utf16Index - predecessorLengthUTF16, _base._core))
-    }
-
     internal let _base: UnicodeScalarView.Index
 
     /// The count of this extended grapheme cluster in UTF-16 code units.
@@ -238,17 +215,28 @@ extension String.CharacterView : BidirectionalCollection {
     return Index(_base: unicodeScalars.endIndex)
   }
 
-  // TODO: swift-3-indexing-model - add docs
+  /// Returns the next consecutive position after `i`.
+  ///
+  /// - Precondition: The next position is valid.
   @warn_unused_result
   public func index(after i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: range check i?
-    return i._successor()
+    _precondition(i._base != i._base._viewEndIndex, "cannot increment endIndex")
+    return Index(_base: i._endBase)
   }
 
-  // TODO: swift-3-indexing-model - add docs
+  /// Returns the previous consecutive position before `i`.
+  ///
+  /// - Precondition: The previous position is valid.
   @warn_unused_result
   public func index(before i: Index) -> Index {
-    return i._predecessor()
+    // FIXME: swift-3-indexing-model: range check i?
+    _precondition(i._base != i._base._viewStartIndex,
+        "cannot decrement startIndex")
+    let predecessorLengthUTF16 =
+        Index._measureExtendedGraphemeClusterBackward(from: i._base)
+    return Index(
+      _base: UnicodeScalarView.Index(
+        i._utf16Index - predecessorLengthUTF16, i._base._core))
   }
 
   /// Access the `Character` at `position`.
