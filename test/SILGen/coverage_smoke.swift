@@ -8,9 +8,11 @@
 // RUN: %llvm-profdata show %t/default.profdata -function=main | FileCheck %s --check-prefix=CHECK-MAIN
 // RUN: %llvm-cov show %t/main -instr-profile=%t/default.profdata | FileCheck %s --check-prefix=CHECK-COV
 // RUN: rm -rf %t
+
 // REQUIRES: profile_runtime
 // REQUIRES: OS=macosx
 
+// XFAIL: asan
 // CHECK-INTERNAL: Functions shown: 1
 // CHECK-COV: 1|{{.*}}[[@LINE+1]]|{{.*}}func f_internal
 internal func f_internal() {}
