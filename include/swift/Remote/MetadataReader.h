@@ -957,7 +957,7 @@ protected:
       case MetadataKind::Function:
         return _readMetadata<TargetFunctionTypeMetadata>(address);
       case MetadataKind::HeapGenericLocalVariable:
-        return _readMetadata<TargetHeapLocalVariableMetadata>(address);
+        return _readMetadata<TargetGenericBoxHeapMetadata>(address);
       case MetadataKind::HeapLocalVariable:
         return _readMetadata<TargetHeapLocalVariableMetadata>(address);
       case MetadataKind::Metatype:
