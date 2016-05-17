@@ -115,9 +115,9 @@ var c2 : () throws -> Int = c1 // ok
 var c3 : () -> Int = c1 // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c4 : () -> Int = {() throws -> Int in 0} // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c5 : () -> Int = { try c2() } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
-var c6 : () throws -> Int = { do { try c2() } ; return 0 }
+var c6 : () throws -> Int = { do { _ = try c2() } ; return 0 }
 var c7 : () -> Int = { do { try c2() } ; return 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> _' to non-throwing function type '() -> Int'}}
-var c8 : () -> Int = { do { try c2()  } catch _ { var x = 0 } ; return 0 }
+var c8 : () -> Int = { do { _ = try c2()  } catch _ { var x = 0 } ; return 0 }
 var c9 : () -> Int = { do { try c2()  } catch Exception.A { var x = 0 } ; return 0 }// expected-error{{invalid conversion from throwing function of type '() throws -> _' to non-throwing function type '() -> Int'}}
 var c10 : () -> Int = { throw Exception.A; return 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> _' to non-throwing function type '() -> Int'}}
 var c11 : () -> Int = { try! c2() }

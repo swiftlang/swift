@@ -634,8 +634,8 @@ func classAvailability() {
       // expected-note@-1 {{add @available attribute to enclosing global function}}
       // expected-note@-2 {{add 'if #available' version check}}
 
-  ClassAvailableOn10_9.self
-  ClassAvailableOn10_51.self // expected-error {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
+  _ = ClassAvailableOn10_9.self
+  _ = ClassAvailableOn10_51.self // expected-error {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing global function}}
       // expected-note@-2 {{add 'if #available' version check}}
   

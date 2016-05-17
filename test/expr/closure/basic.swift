@@ -22,9 +22,9 @@ func variadic() {
     }
     return result
   }
-  f(1)
-  f(1, 2)
-  f(1, 3)
+  _ = f(1)
+  _ = f(1, 2)
+  _ = f(1, 3)
 
   let D = { (Ss ...) in 1 } // expected-error{{'...' cannot be applied to a subpattern which is not explicitly typed}}, expected-error{{unable to infer closure type in the current context}}
 }
@@ -38,6 +38,6 @@ func attrs() {
 func argAndParamNames() -> Int {
   let _: (x: Int, y: Int) -> Int = { (a x, b y) in x + y }  // expected-error 2 {{closure cannot have keyword arguments}}
   let f1: (x: Int, y: Int) -> Int = { (x, y) in x + y }
-  f1(x: 1, y: 2)
+  _ = f1(x: 1, y: 2)
   return f1(x: 1, y: 2)
 }

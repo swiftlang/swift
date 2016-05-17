@@ -13,7 +13,7 @@ func statement_starts() {
   a[0] = 1
   a [0] = 1
   a // expected-error{{expression resolves to an unused l-value}}
-  [0, 1, 2]
+  [0, 1, 2] // expected-warning {{expression of type '[Int]' is unused}}
 }
 
 // Within a function

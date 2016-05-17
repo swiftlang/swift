@@ -93,7 +93,7 @@ func parenPatternInArg((a): Int) -> Int { // expected-error {{expected parameter
 parenPatternInArg(0)  // expected-error {{argument passed to call that takes no arguments}}
 
 var nullaryClosure: (Int) -> Int = {_ in 0}
-nullaryClosure(0)
+_ = nullaryClosure(0)
 
 
 // rdar://16737322 - This argument is an unnamed argument that has a labeled

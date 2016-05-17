@@ -42,7 +42,7 @@ import Foundation
   // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo16cFunctionPointer
   // CHECK:         apply [[NATIVE]]([[F]], [[X]], [[SELF]])
   dynamic func cFunctionPointer(_ fp: @convention(c) (Int) -> Int, x: Int) -> Int {
-    fp(x)
+    _ = fp(x)
   }
 
   // Blocks and C function pointers must not be reabstracted when placed in optionals.

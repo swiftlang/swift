@@ -17,8 +17,9 @@ x // expected-error {{parameterless closing #sourceLocation() directive without 
 x x ; // should be ignored by expected_error because it is in a different file
 x
 #sourceLocation()
-x
+_ = x
 x x // expected-error{{consecutive statements}} {{2-2=;}}
+// expected-warning @-1 2 {{unused}}
 
 // rdar://19582475
 public struct S { // expected-note{{in declaration of 'S'}}
