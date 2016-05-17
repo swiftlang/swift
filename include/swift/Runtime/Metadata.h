@@ -2543,7 +2543,7 @@ struct TargetGenericBoxHeapMetadata : public TargetBoxHeapMetadata<Runtime> {
   unsigned getAllocAlignMask() const {
     // Heap allocations are at least pointer aligned.
     return BoxedType->getValueWitnesses()->getAlignmentMask()
-    | (alignof(void*) - 1);
+      | (alignof(void*) - 1);
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
