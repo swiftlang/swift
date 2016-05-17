@@ -661,6 +661,8 @@ ERROR(expected_pattern,PointsToFirstBadToken,
       "expected pattern", ())
 ERROR(keyword_cant_be_identifier,none,
       "keyword '%0' cannot be used as an identifier here", (StringRef))
+ERROR(repeated_identifier,none,
+      "found an unexpected second identifier in %0 declaration; is there an accidental break?", (StringRef))
 NOTE(backticks_to_escape,none,
      "if this name is unavoidable, use backticks to escape it", ())
 ERROR(expected_rparen_tuple_pattern_list,none,

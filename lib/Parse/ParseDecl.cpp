@@ -4458,6 +4458,16 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                                 diag::invalid_diagnostic);
     if (NameStatus.isError())
       return nullptr;
+  } else {
+    // We parsed an identifier for the function declaration. If we see another
+    // identifier, it might've been a single identifier that got broken by a
+    // space or newline accidentally.
+    if (Tok.isIdentifierOrUnderscore() && SimpleName.str().back() != '<') {
+      diagnose(Tok.getLoc(), diag::repeated_identifier, "function")
+        .fixItReplace(SourceRange(NameLoc, Tok.getLoc()),
+                      NameTok.getText().str() + Tok.getText().str());
+      consumeToken();
+    }
   }
 
   DebuggerContextChange DCC(*this, SimpleName, DeclKind::Func);
