@@ -167,28 +167,28 @@ func checkInf(_ inf: TestFloat) {
   _precondition(!inf.isSubnormal)
   _precondition(inf.isInfinite)
   _precondition(!inf.isNaN)
-  _precondition(!inf.isSignaling)
+  _precondition(!inf.isSignalingNaN)
 }
 
 func testInf() {
   var stdlibPlusInf = TestFloat.infinity
   checkInf(stdlibPlusInf)
-  _precondition(!stdlibPlusInf.isSignMinus)
+  _precondition(stdlibPlusInf.sign == .plus)
   _precondition(stdlibPlusInf.floatingPointClass == .positiveInfinity)
 
   var stdlibMinusInf = -TestFloat.infinity
   checkInf(stdlibMinusInf)
-  _precondition(stdlibMinusInf.isSignMinus)
+  _precondition(stdlibMinusInf.sign == .minus)
   _precondition(stdlibMinusInf.floatingPointClass == .negativeInfinity)
 
   var computedPlusInf = 1.0 / noinlinePlusZero()
   checkInf(computedPlusInf)
-  _precondition(!computedPlusInf.isSignMinus)
+  _precondition(computedPlusInf.sign == .plus)
   _precondition(computedPlusInf.floatingPointClass == .positiveInfinity)
 
   var computedMinusInf = -1.0 / noinlinePlusZero()
   checkInf(computedMinusInf)
-  _precondition(computedMinusInf.isSignMinus)
+  _precondition(computedMinusInf.sign == .minus)
   _precondition(computedMinusInf.floatingPointClass == .negativeInfinity)
 
   _precondition(stdlibPlusInf == computedPlusInf)
@@ -207,7 +207,7 @@ testInf()
 //===---
 
 func checkNaN(_ nan: TestFloat) {
-  _precondition(!nan.isSignMinus)
+  _precondition(nan.sign == .plus)
   _precondition(!nan.isNormal)
   _precondition(!nan.isFinite)
   _precondition(!nan.isZero)
@@ -218,7 +218,7 @@ func checkNaN(_ nan: TestFloat) {
 
 func checkQNaN(_ qnan: TestFloat) {
   checkNaN(qnan)
-  _precondition(!qnan.isSignaling)
+  _precondition(!qnan.isSignalingNaN)
   _precondition(qnan.floatingPointClass == .quietNaN)
 }
 
@@ -226,7 +226,7 @@ func checkSNaN(_ snan: TestFloat) {
   checkNaN(snan)
 // sNaN cannot be fully supported on i386.
 #if !arch(i386)
-  _precondition(snan.isSignaling)
+  _precondition(snan.isSignalingNaN)
   _precondition(snan.floatingPointClass == .signalingNaN)
 #endif
 }
@@ -235,7 +235,7 @@ func testNaN() {
   var stdlibDefaultNaN = TestFloat.nan
   checkQNaN(stdlibDefaultNaN)
 
-  var stdlibQNaN = TestFloat.quietNaN
+  var stdlibQNaN = TestFloat.nan
   checkQNaN(stdlibQNaN)
 
   var stdlibSNaN = TestFloat.signalingNaN
