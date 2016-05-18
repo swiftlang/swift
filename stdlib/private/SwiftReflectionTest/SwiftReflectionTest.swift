@@ -418,7 +418,7 @@ public func reflect(function: () -> ()) {
 /// Call this function to indicate to the parent that there are
 /// no more instances to look at.
 public func doneReflecting() {
-  sendValue(InstanceKind.None.rawValue)
+  reflect(instanceAddress: UInt(InstanceKind.None.rawValue), kind: .None)
 }
 
 /* Example usage

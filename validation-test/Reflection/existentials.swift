@@ -3,9 +3,6 @@
 // RUN: %target-run %target-swift-reflection-test %t/existentials | FileCheck %s --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
 
-// rdar://problem/26230879
-// REQUIRES: OS=macosx
-
 /*
    This file pokes at the swift_reflection_projectExistential API
    of the SwiftRemoteMirror library.
