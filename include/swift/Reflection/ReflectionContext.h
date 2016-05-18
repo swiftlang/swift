@@ -344,6 +344,10 @@ private:
     // Initialize the builder.
     Builder.addField(OffsetToFirstCapture.second, sizeof(StoredPointer));
 
+    // Skip the closure's necessary bindings struct, if it's present.
+    auto SizeOfNecessaryBindings = Info.NumBindings * sizeof(StoredPointer);
+    Builder.addField(SizeOfNecessaryBindings, sizeof(StoredPointer));
+
     // FIXME: should be unordered_set but I'm too lazy to write a hash
     // functor
     std::set<std::pair<const TypeRef *, const MetadataSource *>> Done;
