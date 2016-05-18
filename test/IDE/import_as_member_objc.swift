@@ -43,8 +43,6 @@ import IAMError
 
 // Errors
 ErrorStruct.hasPrototype();
-ErrorStruct.nonPrototype();
-  // expected-error@-1{{type 'ErrorStruct' has no member 'nonPrototype'}}
 
 // Protocols
 @objc class Foo : NSObject, IAMProto {}
