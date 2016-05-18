@@ -13,10 +13,8 @@
 // RUN-DISABLED: %target-run-simple-swift | FileCheck %s
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/NewArray.swift
 // RUN: %S/../../utils/line-directive %t/NewArray.swift -- %target-build-swift %t/NewArray.swift -o %t/a.out -Xfrontend -disable-access-control
-// RUN: %target-run %t/a.out 2>&1 | %S/../../utils/line-directive %t/NewArray.swift -- FileCheck %t/NewArray.swift
+// RUN: %target-run %t/a.out 2>&1 | %S/../../utils/line-directive %t/NewArray.swift -- FileCheck %t/NewArray.swift --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 // REQUIRES: executable_test
-
-// XFAIL: linux
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -185,6 +183,7 @@ func testAsArray() {
 }
 testAsArray()
 
+#if _runtime(_ObjC)
 import Foundation
 
 func nsArrayOfStrings() -> Array<NSString> {
@@ -198,51 +197,52 @@ func nsArrayOfStrings() -> Array<NSString> {
 
 func testCocoa() {
   print("== Cocoa ==")
-  // CHECK: == Cocoa ==
+  // CHECK-objc: == Cocoa ==
 
   var a = nsArrayOfStrings()
   printSequence(a)
-  // CHECK-NEXT: [foo, bar, baz]
+  // CHECK-objc-NEXT: [foo, bar, baz]
   
   a.append("qux")
   printSequence(a)
-  // CHECK-NEXT: [foo, bar, baz, qux]
+  // CHECK-objc-NEXT: [foo, bar, baz, qux]
 
   a = nsArrayOfStrings()
   printSequence(a)
-  // CHECK-NEXT: [foo, bar, baz]
+  // CHECK-objc-NEXT: [foo, bar, baz]
   
   let b = a
   
   a[1] = "garply"
   printSequence(a)
-  // CHECK-NEXT: [foo, garply, baz]
+  // CHECK-objc-NEXT: [foo, garply, baz]
 
   // Mutating an element in a has no effect on b
   printSequence(b)
-  // CHECK-NEXT: [foo, bar, baz]
+  // CHECK-objc-NEXT: [foo, bar, baz]
   
   a = nsArrayOfStrings()
   a.insert("bag", at: 2)
   printSequence(a)
-  // CHECK-NEXT: [foo, bar, bag, baz]
+  // CHECK-objc-NEXT: [foo, bar, bag, baz]
 
   a = nsArrayOfStrings()
   a.reserveCapacity(30)
   printSequence(a)
-  // CHECK-NEXT: [foo, bar, baz]
+  // CHECK-objc-NEXT: [foo, bar, baz]
   
   print(a.capacity >= 30)
-  // CHECK-NEXT: true
+  // CHECK-objc-NEXT: true
 
   // Prove that we create contiguous storage for an opaque NSArray
   a.withUnsafeBufferPointer {
     (p) -> () in
     print(p[0])
-    // CHECK-NEXT: foo
+    // CHECK-objc-NEXT: foo
   }
 }
 testCocoa()
+#endif // _runtime(_ObjC)
 
 extension ArraySlice {
   mutating func qsort(_ compare: (Element, Element) -> Bool) {
@@ -280,29 +280,31 @@ func testSlice() {
   printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 5, 6, 7, 8, 9, 41]
   printSequence(c)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6, 7, 8, 9]
 
+#if _runtime(_ObjC)
   // Now a bridged slice
   var a = Array<NSString>(
     _ArrayBuffer(nsArray: nsArrayOfStrings()._buffer._asCocoaArray()))
 
-  printSequence(a)                // CHECK-NEXT: [foo, bar, baz]
+  printSequence(a)                // CHECK-objc-NEXT: [foo, bar, baz]
 
-  var aSlice = a[1..<3]           // CHECK-NEXT: [bar, baz]
+  var aSlice = a[1..<3]           // CHECK-objc-NEXT: [bar, baz]
   printSequence(aSlice)
 
   // Writing into aSlice works
-  aSlice[1] = "buzz"              // CHECK-NEXT: [buzz, baz]
+  aSlice[1] = "buzz"              // CHECK-objc-NEXT: [buzz, baz]
   printSequence(aSlice)
 
   // ...and doesn't affect a
-  printSequence(a)                // CHECK-NEXT: [foo, bar, baz]
+  printSequence(a)                // CHECK-objc-NEXT: [foo, bar, baz]
 
   // Appending to aSlice works...
   aSlice.append("fodder")
-  print("<\(aSlice.count)>")      // CHECK-NEXT: <3>
-  printSequence(aSlice)           // CHECK-NEXT: [buzz, baz, fodder]
+  print("<\(aSlice.count)>")      // CHECK-objc-NEXT: <3>
+  printSequence(aSlice)           // CHECK-objc-NEXT: [buzz, baz, fodder]
 
   // And doesn't change a
-  printSequence(a)                // CHECK-NEXT: [foo, bar, baz]
+  printSequence(a)                // CHECK-objc-NEXT: [foo, bar, baz]
+#endif
 }
 testSlice()
 
@@ -454,6 +456,7 @@ func rdar16958865() {
 }
 rdar16958865()
 
+#if _runtime(_ObjC)
 #if os(OSX)
 import AppKit
 typealias OSColor = NSColor
@@ -472,7 +475,8 @@ class Rdar16914909 : NSObject {
 }
 
 Rdar16914909().doColorStuff()
-// CHECK-NEXT: appended
+// CHECK-objc-NEXT: appended
+#endif
 
 print("leaks = \(LifetimeTracked.instances)")
 // CHECK-NEXT: leaks = 0
