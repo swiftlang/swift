@@ -275,8 +275,12 @@ bool SILDeclRef::isClangGenerated() const {
   if (!hasDecl())
     return false;
 
-  auto clangNode = getDecl()->getClangNode().getAsDecl();
-  if (auto nd = dyn_cast_or_null<clang::NamedDecl>(clangNode)) {
+  return isClangGenerated(getDecl()->getClangNode());
+}
+
+// FIXME: this is a weird predicate.
+bool SILDeclRef::isClangGenerated(ClangNode node) {
+  if (auto nd = dyn_cast_or_null<clang::NamedDecl>(node.getAsDecl())) {
     // ie, 'static inline' functions for which we must ask Clang to emit a body
     // for explicitly
     if (!nd->isExternallyVisible())
