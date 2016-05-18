@@ -2940,9 +2940,13 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << " #" << (pointer->getChild(0)->getIndex() + 1) << ')';
     return;
   case Node::Kind::PrivateDeclName:
-    Printer << '(';
+    if (Options.ShowPrivateDiscriminators)
+      Printer << '(';
+
     print(pointer->getChild(1));
-    Printer << " in " << pointer->getChild(0)->getText() << ')';
+
+    if (Options.ShowPrivateDiscriminators)
+      Printer << " in " << pointer->getChild(0)->getText() << ')';
     return;
   case Node::Kind::Module:
     if (Options.DisplayModuleNames)
