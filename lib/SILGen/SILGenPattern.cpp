@@ -1171,7 +1171,8 @@ void PatternMatchEmission::bindNamedPattern(NamedPattern *pattern,
                                             bool forIrrefutableRow,
                                             bool hasMultipleItems) {
   bindVariable(pattern, pattern->getDecl(), value,
-               pattern->getType()->getCanonicalType(), forIrrefutableRow, hasMultipleItems);
+               pattern->getType()->getCanonicalType(), forIrrefutableRow,
+               hasMultipleItems);
 }
 
 /// Should we take control of the mang
