@@ -3,6 +3,9 @@
 // RUN: %target-run %target-swift-reflection-test %t/example | FileCheck %s --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
 
+// rdar://problem/26230879
+// REQUIRES: OS=macosx
+
 import SwiftReflectionTest
 
 class Container {

@@ -3,6 +3,9 @@
 // RUN: %target-run %target-swift-reflection-test %t/functions 2>&1 | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
 
+// rdar://problem/26230879
+// REQUIRES: OS=macosx
+
 /*
    This file pokes at the swift_reflection_infoForInstance() API
    of the SwiftRemoteMirror library.
