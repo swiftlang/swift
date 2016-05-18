@@ -135,6 +135,12 @@ public:
       if (!CDAddr.first)
         return nullptr;
 
+      // FIXME: Non-generic SIL boxes also use the HeapLocalVariable metadata
+      // kind, but with a null capture descriptor right now (see
+      // FixedBoxTypeInfoBase::allocate).
+      //
+      // Non-generic SIL boxes share metadata among types with compatible
+      // layout, but we need some way to get an outgoing pointer map for them.
       auto *CD = getBuilder().getCaptureDescriptor(CDAddr.second);
       if (CD == nullptr)
         return nullptr;
@@ -144,9 +150,16 @@ public:
       return getClosureContextInfo(ObjectAddress, Info);
     }
 
-    case MetadataKind::HeapGenericLocalVariable:
-      // SIL @box type
+    case MetadataKind::HeapGenericLocalVariable: {
+      // Generic SIL @box type - there is always an instantiated metadata
+      // pointer for the boxed type.
+      if (auto Meta = readMetadata(MetadataAddress.second)) {
+        auto GenericHeapMeta =
+          cast<TargetGenericBoxHeapMetadata<Runtime>>(Meta.getLocalBuffer());
+        return getMetadataTypeInfo(GenericHeapMeta->BoxedType);
+      }
       return nullptr;
+    }
 
     case MetadataKind::ErrorObject:
       // ErrorProtocol boxed existential on non-Objective-C runtime target
