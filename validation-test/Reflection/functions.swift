@@ -76,21 +76,21 @@ func generic<T : P, U, V : C>(x: T, y: U, z: V, i: Int) {
 // CHECK-NEXT:    (builtin Builtin.NativeObject)
 
 // CHECK-32:      Type info:
-// CHECK-32-NEXT: (closure_context size=40 alignment=4 stride=40 num_extra_inhabitants=0
-// CHECK-32-NEXT:   (field offset=28
+// CHECK-32-NEXT: (closure_context size=24 alignment=4 stride=24 num_extra_inhabitants=0
+// CHECK-32-NEXT:   (field offset=12
 // CHECK-32-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-32-NEXT:   (field offset=32
+// CHECK-32-NEXT:   (field offset=16
 // CHECK-32-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-32-NEXT:   (field offset=36
+// CHECK-32-NEXT:   (field offset=20
 // CHECK-32-NEXT:     (reference kind=strong refcounting=native)))
 
 // CHECK-64:      Type info:
-// CHECK-64-NEXT: (closure_context size=72 alignment=8 stride=72 num_extra_inhabitants=0
-// CHECK-64-NEXT:   (field offset=48
+// CHECK-64-NEXT: (closure_context size=40 alignment=8 stride=40 num_extra_inhabitants=0
+// CHECK-64-NEXT:   (field offset=16
 // CHECK-64-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-64-NEXT:   (field offset=56
+// CHECK-64-NEXT:   (field offset=24
 // CHECK-64-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-64-NEXT:   (field offset=64
+// CHECK-64-NEXT:   (field offset=32
 // CHECK-64-NEXT:     (reference kind=strong refcounting=native)))
 }
 
