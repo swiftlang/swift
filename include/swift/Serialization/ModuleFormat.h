@@ -851,6 +851,7 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     BCFixed<1>,  // stub implementation?
+    BCFixed<1>,  // throws?
     CtorInitializerKindField,  // initializer kind
     TypeIDField, // type (signature)
     TypeIDField, // type (interface)
@@ -904,6 +905,7 @@ namespace decls_block {
     BCFixed<1>,   // explicitly objc?
     BCFixed<1>,   // mutating?
     BCFixed<1>,   // has dynamic self?
+    BCFixed<1>,   // throws?
     BCVBR<5>,     // number of parameter patterns
     TypeIDField,  // type (signature)
     TypeIDField,  // interface type

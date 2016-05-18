@@ -3199,10 +3199,11 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
 
   // Start the function.
   auto *D = FuncDecl::create(P->Context, StaticLoc, StaticSpellingKind::None,
-                             /* FIXME*/DeclLoc, Identifier(),
-                             DeclLoc, SourceLoc(), AccessorKeywordLoc,
+                             /*FIXME FuncLoc=*/DeclLoc, Identifier(),
+                             /*NameLoc=*/DeclLoc, /*Throws=*/false,
+                             /*ThrowsLoc=*/SourceLoc(), AccessorKeywordLoc,
                              /*GenericParams=*/nullptr,
-                             Type(), Params, ReturnType, P->CurDeclContext);
+                             Params, Type(), ReturnType, P->CurDeclContext);
 
   // Non-static set/willSet/didSet/materializeForSet/mutableAddress
   // default to mutating.  get/address default to
@@ -4575,8 +4576,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
     // Create the decl for the func and add it to the parent scope.
     FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
-                          FuncLoc, FullName, NameLoc, throwsLoc, SourceLoc(),
-                          GenericParams, Type(), BodyParams, FuncRetTy,
+                          FuncLoc, FullName, NameLoc,
+                          /*Throws=*/throwsLoc.isValid(), throwsLoc,
+                          /*AccessorKeywordLoc=*/SourceLoc(),
+                          GenericParams, BodyParams, Type(), FuncRetTy,
                           CurDeclContext);
     
     // Add the attributes here so if we need them while parsing the body
@@ -5379,8 +5382,9 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   Scope S2(this, ScopeKind::ConstructorBody);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failability, FailabilityLoc,
+                                           throwsLoc.isValid(), throwsLoc,
                                            SelfDecl, BodyPattern,
-                                           GenericParams, throwsLoc,
+                                           GenericParams,
                                            CurDeclContext);
   
   CtorInitializerKind initKind = CtorInitializerKind::Designated;

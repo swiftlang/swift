@@ -1299,8 +1299,7 @@ Type swift::configureImplicitSelf(TypeChecker &tc,
 /// the given constructor.
 void swift::configureConstructorType(ConstructorDecl *ctor,
                                      Type selfType,
-                                     Type argType,
-                                     bool throws) {
+                                     Type argType) {
   Type fnType;
   Type allocFnType;
   Type initFnType;
@@ -1309,7 +1308,9 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
     resultType = OptionalType::get(ctor->getFailability(), resultType);
   }
 
-  auto extInfo = AnyFunctionType::ExtInfo().withThrows(throws);
+  AnyFunctionType::ExtInfo extInfo;
+  if (ctor->hasThrows())
+    extInfo = extInfo.withThrows();
 
   GenericParamList *outerGenericParams =
       ctor->getDeclContext()->getGenericParamsOfContext();
@@ -2367,7 +2368,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
         // adopt it.  Set the foreign error convention for a throwing
         // method.  Note that the foreign error convention affects the
         // selector, so we perform this before inferring a selector.
-        if (method->isBodyThrowing()) {
+        if (method->hasThrows()) {
           if (auto baseErrorConvention
                 = baseMethod->getForeignErrorConvention()) {
             errorConvention = baseErrorConvention;
@@ -2376,7 +2377,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
           assert(errorConvention && "Missing error convention");
           method->setForeignErrorConvention(*errorConvention);
         }
-      } else if (method->isBodyThrowing()) {
+      } else if (method->hasThrows()) {
         // Attach the foreign error convention.
         assert(errorConvention && "Missing error convention");
         method->setForeignErrorConvention(*errorConvention);
@@ -2414,7 +2415,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
       inferObjCName(TC, D);
     }
   } else if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
-    if (method->isBodyThrowing()) {
+    if (method->hasThrows()) {
       // Attach the foreign error convention.
       assert(errorConvention && "Missing error convention");
       method->setForeignErrorConvention(*errorConvention);
@@ -4449,7 +4450,7 @@ public:
       Optional<ForeignErrorConvention> errorConvention;
       if (TC.isRepresentableInObjC(FD, ObjCReason::ExplicitlyCDecl,
                                    errorConvention)) {
-        if (FD->isBodyThrowing()) {
+        if (FD->hasThrows()) {
           FD->setForeignErrorConvention(*errorConvention);
           TC.diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);
         }
@@ -5331,7 +5332,7 @@ public:
       // Require 'rethrows' on the override if it was there on the base,
       // unless the override is completely non-throwing.
       if (!Override->getAttrs().hasAttribute<RethrowsAttr>() &&
-          cast<AbstractFunctionDecl>(Override)->isBodyThrowing()) {
+          cast<AbstractFunctionDecl>(Override)->hasThrows()) {
         TC.diagnose(Override, diag::override_rethrows_with_non_rethrows,
                     isa<ConstructorDecl>(Override));
         TC.diagnose(Base, diag::overridden_here);
@@ -5573,15 +5574,15 @@ public:
     // If the overriding declaration is 'throws' but the base is not,
     // complain.
     if (auto overrideFn = dyn_cast<AbstractFunctionDecl>(override)) {
-      if (overrideFn->isBodyThrowing() &&
-          !cast<AbstractFunctionDecl>(base)->isBodyThrowing()) {
+      if (overrideFn->hasThrows() &&
+          !cast<AbstractFunctionDecl>(base)->hasThrows()) {
         TC.diagnose(override, diag::override_throws,
                     isa<ConstructorDecl>(override));
         TC.diagnose(base, diag::overridden_here);
       }
 
-      if (!overrideFn->isBodyThrowing() && base->isObjC() &&
-          cast<AbstractFunctionDecl>(base)->isBodyThrowing()) {
+      if (!overrideFn->hasThrows() && base->isObjC() &&
+          cast<AbstractFunctionDecl>(base)->hasThrows()) {
         TC.diagnose(override, diag::override_throws_objc,
                     isa<ConstructorDecl>(override));
         TC.diagnose(base, diag::overridden_here);
@@ -5943,8 +5944,7 @@ public:
       CD->setInvalid();
     } else {
       configureConstructorType(CD, SelfTy,
-                               CD->getParameterList(1)->getType(TC.Context),
-                               CD->getThrowsLoc().isValid());
+                               CD->getParameterList(1)->getType(TC.Context));
     }
 
     validateAttributes(TC, CD);
@@ -7760,7 +7760,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
             numParameters = 0;  // Something like "init(foo: ())"
 
         // A throwing method has an error parameter.
-        if (func->isBodyThrowing())
+        if (func->hasThrows())
           ++numParameters;
 
         unsigned numArgumentNames = objcName->getNumArgs();
@@ -7772,7 +7772,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
                       numArgumentNames != 1,
                       numParameters,
                       numParameters != 1,
-                      func->isBodyThrowing());
+                      func->hasThrows());
           D->getAttrs().add(
             ObjCAttr::createUnnamed(TC.Context,
                                     objcAttr->AtLoc,

@@ -2347,7 +2347,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::CONSTRUCTOR_DECL: {
     DeclContextID contextID;
     uint8_t rawFailability;
-    bool isImplicit, isObjC, hasStubImplementation;
+    bool isImplicit, isObjC, hasStubImplementation, throws;
     uint8_t storedInitKind, rawAccessLevel;
     TypeID signatureID;
     TypeID interfaceID;
@@ -2357,7 +2357,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     decls_block::ConstructorLayout::readRecord(scratch, contextID,
                                                rawFailability, isImplicit, 
                                                isObjC, hasStubImplementation,
-                                               storedInitKind,
+                                               throws, storedInitKind,
                                                signatureID, interfaceID,
                                                overriddenID, rawAccessLevel,
                                                argNameIDs);
@@ -2379,10 +2379,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       failability = *actualFailability;
 
     DeclName name(ctx, ctx.Id_init, argNames);
-    auto ctor = createDecl<ConstructorDecl>(name, SourceLoc(), failability,
-                                            SourceLoc(), /*bodyParams=*/nullptr,
-                                            nullptr, genericParams, SourceLoc(),
-                                            parent);
+    auto ctor =
+      createDecl<ConstructorDecl>(name, SourceLoc(),
+                                  failability, /*FailabilityLoc=*/SourceLoc(),
+                                  /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
+                                  /*bodyParams=*/nullptr, nullptr,
+                                  genericParams, parent);
     declOrOffset = ctor;
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
@@ -2556,7 +2558,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isImplicit;
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel, rawAddressorKind;
-    bool isObjC, isMutating, hasDynamicSelf;
+    bool isObjC, isMutating, hasDynamicSelf, throws;
     unsigned numParamPatterns;
     TypeID signatureID;
     TypeID interfaceTypeID;
@@ -2568,7 +2570,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
                                         isStatic, rawStaticSpelling, isObjC,
-                                        isMutating, hasDynamicSelf,
+                                        isMutating, hasDynamicSelf, throws,
                                         numParamPatterns, signatureID,
                                         interfaceTypeID, associatedDeclID,
                                         overriddenID, accessorStorageDeclID,
@@ -2607,9 +2609,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         name = DeclName(names[0]);
     }
     auto fn = FuncDecl::createDeserialized(
-        ctx, SourceLoc(), staticSpelling.getValue(), SourceLoc(), name,
-        SourceLoc(), SourceLoc(), SourceLoc(), genericParams, /*type=*/nullptr,
-        numParamPatterns, DC);
+        ctx, /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
+        /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
+        /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
+        /*AccessorKeywordLoc=*/SourceLoc(), genericParams,
+        numParamPatterns, /*type=*/nullptr, DC);
     fn->setEarlyAttrValidation();
     declOrOffset = fn;
 

@@ -1297,7 +1297,7 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
                                       /*Implicit=*/true);
   r = new (Context) CallExpr(r, args, /*Implicit=*/true);
 
-  if (ctor->isBodyThrowing())
+  if (ctor->hasThrows())
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*Implicit=*/true);
 
   if (typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,

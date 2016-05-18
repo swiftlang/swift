@@ -2066,7 +2066,7 @@ static AbstractFunctionDecl *lookupObjCMethodInType(
 
 void AbstractFunctionDecl::setForeignErrorConvention(
                                          const ForeignErrorConvention &conv) {
-  assert(isBodyThrowing() && "setting error convention on non-throwing decl");
+  assert(hasThrows() && "setting error convention on non-throwing decl");
   auto &conventionsMap = getASTContext().Impl.ForeignErrorConventions;
   assert(!conventionsMap.count(this) && "error convention already set");
   conventionsMap.insert({this, conv});
@@ -2076,7 +2076,7 @@ Optional<ForeignErrorConvention>
 AbstractFunctionDecl::getForeignErrorConvention() const {
   if (!isObjC() && !getAttrs().hasAttribute<CDeclAttr>())
     return None;
-  if (!isBodyThrowing())
+  if (!hasThrows())
     return None;
   auto &conventionsMap = getASTContext().Impl.ForeignErrorConventions;
   auto it = conventionsMap.find(this);

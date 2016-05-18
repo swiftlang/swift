@@ -735,7 +735,7 @@ matchWitness(TypeChecker &tc,
     // rethrows or be non-throwing.
     if (reqAttrs.hasAttribute<RethrowsAttr>() &&
         !witnessAttrs.hasAttribute<RethrowsAttr>() &&
-        cast<AbstractFunctionDecl>(witness)->isBodyThrowing())
+        cast<AbstractFunctionDecl>(witness)->hasThrows())
       return RequirementMatch(witness, MatchKind::RethrowsConflict);
 
     // We want to decompose the parameters to handle them separately.

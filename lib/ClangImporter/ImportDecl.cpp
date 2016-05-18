@@ -337,10 +337,12 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto paramPL = ParameterList::createWithoutLoc(param);
   
   DeclName name(C, C.Id_init, paramPL);
-  auto *ctorDecl = new (C) ConstructorDecl(name, enumDecl->getLoc(),
-                                           OTK_Optional, SourceLoc(),
-                                           selfDecl, paramPL,
-                                           nullptr, SourceLoc(), enumDecl);
+  auto *ctorDecl =
+    new (C) ConstructorDecl(name, enumDecl->getLoc(),
+                            OTK_Optional, /*FailabilityLoc=*/SourceLoc(),
+                            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                            selfDecl, paramPL,
+                            /*GenericParams=*/nullptr, enumDecl);
   ctorDecl->setImplicit();
   ctorDecl->setAccessibility(Accessibility::Public);
 
@@ -398,9 +400,11 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   };
 
   auto getterDecl =
-    FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-                     DeclName(), SourceLoc(), SourceLoc(), SourceLoc(), nullptr,
-                     Type(), params,
+    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+                     /*FuncLoc=*/SourceLoc(), DeclName(), /*NameLoc=*/SourceLoc(),
+                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*AccessorKeywordLoc=*/SourceLoc(),
+                     /*GenericParams=*/nullptr, params, Type(),
                      TypeLoc::withoutLoc(enumDecl->getRawType()), enumDecl);
   getterDecl->setImplicit();
   getterDecl->setType(ParameterList::getFullType(enumDecl->getRawType(),
@@ -455,9 +459,12 @@ static FuncDecl *makeNewtypeBridgedRawValueGetter(
   auto computedType = computedVar->getType();
 
   auto getterDecl =
-    FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-                     DeclName(), SourceLoc(), SourceLoc(), SourceLoc(), nullptr,
-                     Type(), params,
+    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+                     /*FuncLoc=*/SourceLoc(), DeclName(), /*NameLoc=*/SourceLoc(),
+                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*AccessorKeywordLoc=*/SourceLoc(),
+                     /*GenericParams=*/nullptr,
+                     params, Type(),
                      TypeLoc::withoutLoc(computedType), structDecl);
   getterDecl->setImplicit();
   getterDecl->setType(ParameterList::getFullType(computedType, params));
@@ -497,12 +504,14 @@ static FuncDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
   };
   
   auto getterType = importedFieldDecl->getType();
-  auto getterDecl = FuncDecl::create(C, importedFieldDecl->getLoc(),
-                                     StaticSpellingKind::None,
-                                     SourceLoc(), DeclName(), SourceLoc(),
-                                     SourceLoc(), SourceLoc(), nullptr, Type(),
-                                     params, TypeLoc::withoutLoc(getterType),
-                                     importedDecl, clangNode);
+  auto getterDecl =
+    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+                     /*FuncLoc=*/importedFieldDecl->getLoc(),
+                     DeclName(), /*NameLoc=*/SourceLoc(),
+                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*AccessorKeywordLoc=*/SourceLoc(),
+                     /*GenericParams=*/nullptr, params, Type(),
+                     TypeLoc::withoutLoc(getterType), importedDecl, clangNode);
   getterDecl->setAccessibility(Accessibility::Public);
   getterDecl->setType(ParameterList::getFullType(getterType, params));
   getterDecl->setBodyResultType(getterType);
@@ -529,11 +538,13 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
 
   auto voidTy = TupleType::getEmpty(C);
 
-  auto setterDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
-                                     SourceLoc(), DeclName(), SourceLoc(),
-                                     SourceLoc(), SourceLoc(), nullptr, Type(),
-                                     params, TypeLoc::withoutLoc(voidTy),
-                                     importedDecl, clangNode);
+  auto setterDecl =
+    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+                     /*FuncLoc=*/SourceLoc(), DeclName(), /*NameLoc=*/SourceLoc(),
+                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*AccessorKeywordLoc=*/SourceLoc(),
+                     /*GenericParams=*/nullptr, params, Type(),
+                     TypeLoc::withoutLoc(voidTy), importedDecl, clangNode);
 
   setterDecl->setType(ParameterList::getFullType(voidTy, params));
   setterDecl->setBodyResultType(voidTy);
@@ -896,52 +907,57 @@ static void inferProtocolMemberAvailability(ClangImporter::Implementation &impl,
 static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                            clang::NamedDecl *errorDomainDecl,
                            ClangImporter::Implementation &importer) {
-  auto &swiftCtx = importer.SwiftContext;
+  auto &C = importer.SwiftContext;
   auto swiftValueDecl =
       dyn_cast_or_null<ValueDecl>(importer.importDecl(errorDomainDecl,
                                                       false));
-  auto stringTy = swiftCtx.getStringDecl()->getDeclaredType();
+  auto stringTy = C.getStringDecl()->getDeclaredType();
   assert(stringTy && "no string type available");
   if (!swiftValueDecl || !swiftValueDecl->getType()->isEqual(stringTy)) {
     // Couldn't actually import it as an error enum, fall back to enum
     return false;
   }
 
-  SourceLoc noLoc = SourceLoc();
   bool isStatic = true;
   bool isImplicit = true;
 
-  DeclRefExpr *domainDeclRef = new (swiftCtx)
+  DeclRefExpr *domainDeclRef = new (C)
       DeclRefExpr(ConcreteDeclRef(swiftValueDecl), {}, isImplicit);
   ParameterList *params[] = {
       ParameterList::createWithoutLoc(
-          ParamDecl::createSelf(noLoc, swiftDecl, isStatic)),
-      ParameterList::createEmpty(swiftCtx)};
+          ParamDecl::createSelf(SourceLoc(), swiftDecl, isStatic)),
+      ParameterList::createEmpty(C)};
   auto toStringTy = ParameterList::getFullType(stringTy, params);
 
-  FuncDecl *getterDecl = FuncDecl::create(
-      swiftCtx, noLoc, StaticSpellingKind::None, noLoc, {}, noLoc, noLoc, noLoc,
-      nullptr, toStringTy, params, TypeLoc::withoutLoc(stringTy), swiftDecl);
+  FuncDecl *getterDecl =
+    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+                     /*FuncLoc=*/SourceLoc(), DeclName(), /*NameLoc=*/SourceLoc(),
+                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*AccessorKeywordLoc=*/SourceLoc(),
+                     /*GenericParams=*/nullptr, params, toStringTy,
+                     TypeLoc::withoutLoc(stringTy), swiftDecl);
 
   // Make the property decl
-  auto errorDomainPropertyDecl = new (swiftCtx) VarDecl(
+  auto errorDomainPropertyDecl = new (C) VarDecl(
       isStatic,
-      /*isLet=*/false, noLoc, swiftCtx.Id_nsErrorDomain, stringTy, swiftDecl);
+      /*isLet=*/false, SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
   errorDomainPropertyDecl->setAccessibility(Accessibility::Public);
 
   swiftDecl->addMember(errorDomainPropertyDecl);
   swiftDecl->addMember(getterDecl);
-  errorDomainPropertyDecl->makeComputed(noLoc, getterDecl, /*Set=*/nullptr,
-                                        /*MaterializeForSet=*/nullptr, noLoc);
+  errorDomainPropertyDecl->makeComputed(SourceLoc(), getterDecl,
+                                        /*Set=*/nullptr,
+                                        /*MaterializeForSet=*/nullptr,
+                                        SourceLoc());
 
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
   getterDecl->setBodyResultType(stringTy);
   getterDecl->setAccessibility(Accessibility::Public);
 
-  auto ret = new (swiftCtx) ReturnStmt(noLoc, domainDeclRef);
+  auto ret = new (C) ReturnStmt(SourceLoc(), domainDeclRef);
   getterDecl->setBody(
-      BraceStmt::create(swiftCtx, noLoc, {ret}, noLoc, isImplicit));
+      BraceStmt::create(C, SourceLoc(), {ret}, SourceLoc(), isImplicit));
   importer.registerExternalDecl(getterDecl);
   return true;
 }
@@ -1640,8 +1656,10 @@ namespace {
       DeclName name(context, context.Id_init, emptyPL);
       auto constructor =
         new (context) ConstructorDecl(name, structDecl->getLoc(),
-                                      OTK_None, SourceLoc(), selfDecl, emptyPL,
-                                      nullptr, SourceLoc(), structDecl);
+                                      OTK_None, /*FailabilityLoc=*/SourceLoc(),
+                                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                                      selfDecl, emptyPL,
+                                      /*GenericParams=*/nullptr, structDecl);
       
       // Set the constructor's type.
       auto selfType = structDecl->getDeclaredTypeInContext();
@@ -1876,9 +1894,10 @@ namespace {
       DeclName name(context, context.Id_init, paramLists[1]);
       auto constructor =
         new (context) ConstructorDecl(name, structDecl->getLoc(),
-                                      OTK_None, SourceLoc(),
+                                      OTK_None, /*FailabilityLoc=*/SourceLoc(),
+                                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                                       selfDecl, paramLists[1],
-                                      nullptr, SourceLoc(), structDecl);
+                                      /*GenericParams=*/nullptr, structDecl);
 
       // Set the constructor's type.
       auto paramTy = paramLists[1]->getType(context);
@@ -2199,7 +2218,7 @@ namespace {
       }
 
       case EnumKind::Enum: {
-        auto &swiftCtx = Impl.SwiftContext;
+        auto &C = Impl.SwiftContext;
         EnumDecl *nativeDecl;
         bool declaredNative = hasNativeSwiftDecl(decl, name, dc, nativeDecl);
         if (declaredNative && nativeDecl)
@@ -2225,14 +2244,14 @@ namespace {
         inheritedTypes.push_back(TypeLoc::withoutLoc(underlyingType));
         if (enumInfo.isErrorEnum())
           inheritedTypes.push_back(TypeLoc::withoutLoc(
-              swiftCtx.getProtocol(KnownProtocolKind::BridgedNSError)
+              C.getProtocol(KnownProtocolKind::BridgedNSError)
                   ->getDeclaredType()));
-        enumDecl->setInherited(swiftCtx.AllocateCopy(inheritedTypes));
+        enumDecl->setInherited(C.AllocateCopy(inheritedTypes));
         enumDecl->setCheckedInheritanceClause();
 
         // Set up error conformance to be lazily expanded
         if (enumInfo.isErrorEnum())
-          enumDecl->getAttrs().add(new (swiftCtx) SynthesizedProtocolAttr(
+          enumDecl->getAttrs().add(new (C) SynthesizedProtocolAttr(
               KnownProtocolKind::BridgedNSError));
 
         // Provide custom implementations of the init(rawValue:) and rawValue
@@ -2241,8 +2260,8 @@ namespace {
         // undeclared values, and won't ever add cases.
         auto rawValueConstructor = makeEnumRawValueConstructor(Impl, enumDecl);
 
-        auto varName = swiftCtx.Id_rawValue;
-        auto rawValue = new (swiftCtx) VarDecl(/*static*/ false,
+        auto varName = C.Id_rawValue;
+        auto rawValue = new (C) VarDecl(/*static*/ false,
                                                /*IsLet*/ false,
                                                SourceLoc(), varName,
                                                underlyingType, enumDecl);
@@ -2254,7 +2273,7 @@ namespace {
         Pattern *varPattern = createTypedNamedPattern(rawValue);
 
         auto rawValueBinding = PatternBindingDecl::create(
-            swiftCtx, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+            C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
             varPattern, nullptr, enumDecl);
 
         auto rawValueGetter = makeEnumRawValueGetter(Impl, enumDecl, rawValue);
@@ -2772,7 +2791,6 @@ namespace {
       bool allowNSUIntegerAsInt =
         Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
 
-      SourceLoc noLoc{};
       ArrayRef<Identifier> argNames = name.getArgumentNames();
 
       ParameterList *parameterList = nullptr;
@@ -2781,7 +2799,8 @@ namespace {
         // argument label
         parameterList =
             ParameterList::createWithoutLoc(new (Impl.SwiftContext) ParamDecl(
-                /*IsLet=*/true, noLoc, noLoc, argNames.front(), noLoc,
+                /*IsLet=*/true, SourceLoc(), SourceLoc(),
+                argNames.front(), SourceLoc(),
                 argNames.front(), Impl.SwiftContext.TheEmptyTupleType, dc));
       } else {
         parameterList = Impl.importFunctionParameterList(
@@ -2793,7 +2812,7 @@ namespace {
 
       bool selfIsInOut =
           !dc->getDeclaredTypeOfContext()->hasReferenceSemantics();
-      auto selfParam = ParamDecl::createSelf(noLoc, dc, /*static=*/false,
+      auto selfParam = ParamDecl::createSelf(SourceLoc(), dc, /*static=*/false,
                                              /*inout=*/selfIsInOut);
 
       OptionalTypeKind initOptionality;
@@ -2802,9 +2821,11 @@ namespace {
       (void)resultType->getAnyOptionalObjectType(initOptionality);
 
       auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
-          decl, name, noLoc, initOptionality, noLoc, selfParam,
-          parameterList,
-          /*GenericParams=*/nullptr, noLoc, dc);
+          decl, name, /*NameLoc=*/SourceLoc(),
+          initOptionality, /*FailabilityLoc=*/SourceLoc(),
+          /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+          selfParam, parameterList,
+          /*GenericParams=*/nullptr, dc);
       result->setInitKind(initKind);
       result->setImportAsStaticMember();
 
@@ -2842,8 +2863,7 @@ namespace {
       bool allowNSUIntegerAsInt =
           Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
 
-      auto &SwiftCtx = Impl.SwiftContext;
-      SourceLoc noLoc{};
+      auto &C = Impl.SwiftContext;
       SmallVector<ParameterList *, 2> bodyParams;
 
       // There is an inout 'self' when we have an instance method of a
@@ -2859,7 +2879,8 @@ namespace {
       }
 
       bodyParams.push_back(ParameterList::createWithoutLoc(
-          ParamDecl::createSelf(noLoc, dc, !selfIdx.hasValue(), selfIsInOut)));
+          ParamDecl::createSelf(SourceLoc(), dc, !selfIdx.hasValue(),
+                                selfIsInOut)));
       bodyParams.push_back(getNonSelfParamList(
           decl, selfIdx, name.getArgumentNames(), allowNSUIntegerAsInt, !name));
 
@@ -2870,10 +2891,12 @@ namespace {
       auto loc = Impl.importSourceLoc(decl->getLocation());
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto result =
-          FuncDecl::create(SwiftCtx, noLoc, StaticSpellingKind::None, loc, name,
-                           nameLoc, noLoc, noLoc,
-                           /*GenericParams=*/nullptr, Type(), bodyParams,
-                           TypeLoc::withoutLoc(swiftResultTy), dc, decl);
+        FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+                         /*FuncLoc=*/loc, name, nameLoc,
+                         /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                         /*AccessorKeywordLoc=*/SourceLoc(),
+                         /*GenericParams=*/nullptr, bodyParams, Type(),
+                         TypeLoc::withoutLoc(swiftResultTy), dc, decl);
 
       if (auto proto = dc->getAsProtocolOrProtocolExtensionContext()) {
         Type interfaceType;
@@ -2900,7 +2923,7 @@ namespace {
 
       if (dc->getAsClassOrClassExtensionContext())
         // FIXME: only if the class itself is not marked final
-        result->getAttrs().add(new (SwiftCtx) FinalAttr(/*IsImplicit=*/true));
+        result->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
       finishFuncDecl(decl, result);
       return result;
@@ -3165,9 +3188,11 @@ namespace {
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto result = FuncDecl::create(
-          Impl.SwiftContext, SourceLoc(), StaticSpellingKind::None, loc,
-          name, nameLoc, SourceLoc(), SourceLoc(),
-          /*GenericParams=*/nullptr, type, bodyParams,
+          Impl.SwiftContext, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+          /*FuncLoc=*/loc, name, nameLoc,
+          /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+          /*AccessorKeywordLoc=*/SourceLoc(),
+          /*GenericParams=*/nullptr, bodyParams, type,
           TypeLoc::withoutLoc(resultTy), dc, decl);
 
       result->setBodyResultType(resultTy);
@@ -3619,10 +3644,12 @@ namespace {
       }
 
       auto result = FuncDecl::create(
-          Impl.SwiftContext, SourceLoc(), StaticSpellingKind::None,
-          SourceLoc(), name, SourceLoc(), SourceLoc(), SourceLoc(),
-          /*GenericParams=*/nullptr, Type(),
-          bodyParams, TypeLoc(), dc, decl);
+          Impl.SwiftContext, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+          /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
+          /*Throws=*/importedName.ErrorInfo.hasValue(), /*ThrowsLoc=*/SourceLoc(),
+          /*AccessorKeywordLoc=*/SourceLoc(),
+          /*GenericParams=*/nullptr, bodyParams,
+          Type(), TypeLoc(), dc, decl);
 
       result->setAccessibility(Accessibility::Public);
 
@@ -4116,9 +4143,13 @@ namespace {
 
       // Create the actual constructor.
       auto result = Impl.createDeclWithClangNode<ConstructorDecl>(objcMethod,
-                      name, SourceLoc(), failability, SourceLoc(), selfVar,
-                      bodyParams.back(), /*GenericParams=*/nullptr,
-                      SourceLoc(), dc);
+                      name, /*NameLoc=*/SourceLoc(),
+                      failability, /*FailabilityLoc=*/SourceLoc(),
+                      /*Throws=*/importedName.ErrorInfo.hasValue(),
+                      /*ThrowsLoc=*/SourceLoc(),
+                      selfVar, bodyParams.back(),
+                      /*GenericParams=*/nullptr,
+                      dc);
 
       // Make the constructor declaration immediately visible in its
       // class or protocol type.
@@ -4294,13 +4325,13 @@ namespace {
     /// Build a declaration for an Objective-C subscript getter.
     FuncDecl *buildSubscriptGetterDecl(const FuncDecl *getter, Type elementTy,
                                        DeclContext *dc, ParamDecl *index) {
-      auto &context = Impl.SwiftContext;
+      auto &C = Impl.SwiftContext;
       auto loc = getter->getLoc();
 
       // self & index.
       ParameterList *getterArgs[] = {
         ParameterList::createSelf(SourceLoc(), dc),
-        ParameterList::create(context, index)
+        ParameterList::create(C, index)
       };
 
       // Form the type of the getter.
@@ -4320,9 +4351,12 @@ namespace {
 
       // Create the getter thunk.
       FuncDecl *thunk = FuncDecl::create(
-          context, SourceLoc(), StaticSpellingKind::None, loc,
-          Identifier(), SourceLoc(), SourceLoc(), SourceLoc(), nullptr, getterType,
-          getterArgs, TypeLoc::withoutLoc(elementTy), dc,
+          C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+          /*FuncLoc=*/loc, /*Name=*/Identifier(), /*NameLoc=*/SourceLoc(),
+          /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+          /*AccessorKeywordLoc=*/SourceLoc(),
+          /*GenericParams=*/nullptr, getterArgs,
+          getterType, TypeLoc::withoutLoc(elementTy), dc,
           getter->getClangNode());
       thunk->setBodyResultType(elementTy);
       thunk->setInterfaceType(interfaceType);
@@ -4330,7 +4364,7 @@ namespace {
 
       auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>();
       assert(objcAttr);
-      thunk->getAttrs().add(objcAttr->clone(context));
+      thunk->getAttrs().add(objcAttr->clone(C));
       // FIXME: Should we record thunks?
 
       return thunk;
@@ -4339,7 +4373,7 @@ namespace {
       /// Build a declaration for an Objective-C subscript setter.
     FuncDecl *buildSubscriptSetterDecl(const FuncDecl *setter, Type elementTy,
                                        DeclContext *dc, ParamDecl *index) {
-      auto &context = Impl.SwiftContext;
+      auto &C = Impl.SwiftContext;
       auto loc = setter->getLoc();
 
       // Objective-C subscript setters are imported with a function type
@@ -4354,13 +4388,13 @@ namespace {
       // 'self'
       auto selfDecl = ParamDecl::createSelf(SourceLoc(), dc);
 
-      auto paramVarDecl = new (context) ParamDecl(/*isLet=*/false, SourceLoc(),
-                                                  SourceLoc(), Identifier(),loc,
-                                                  valueIndex->get(0)->getName(),
-                                                  elementTy, dc);
+      auto paramVarDecl = new (C) ParamDecl(/*isLet=*/false, SourceLoc(),
+                                            SourceLoc(), Identifier(),loc,
+                                            valueIndex->get(0)->getName(),
+                                            elementTy, dc);
       
       
-      auto valueIndicesPL = ParameterList::create(context, {
+      auto valueIndicesPL = ParameterList::create(C, {
         paramVarDecl,
         index
       });
@@ -4372,7 +4406,7 @@ namespace {
       };
       
       // Form the type of the setter.
-      Type setterType = ParameterList::getFullType(TupleType::getEmpty(context),
+      Type setterType = ParameterList::getFullType(TupleType::getEmpty(C),
                                                    setterArgs);
 
       // If we're in a protocol or extension thereof, the setter thunk
@@ -4390,18 +4424,22 @@ namespace {
 
       // Create the setter thunk.
       FuncDecl *thunk = FuncDecl::create(
-          context, SourceLoc(), StaticSpellingKind::None, setter->getLoc(),
-          Identifier(), SourceLoc(), SourceLoc(), SourceLoc(), nullptr,
-                                         setterType,
-          setterArgs, TypeLoc::withoutLoc(TupleType::getEmpty(context)), dc,
+          C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+          /*FuncLoc=*/setter->getLoc(),
+          /*Name=*/Identifier(), /*NameLoc=*/SourceLoc(),
+          /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+          /*AccessorKeywordLoc=*/SourceLoc(),
+          /*GenericParams=*/nullptr,
+          setterArgs, setterType,
+          TypeLoc::withoutLoc(TupleType::getEmpty(C)), dc,
           setter->getClangNode());
-      thunk->setBodyResultType(TupleType::getEmpty(context));
+      thunk->setBodyResultType(TupleType::getEmpty(C));
       thunk->setInterfaceType(interfaceType);
       thunk->setAccessibility(Accessibility::Public);
 
       auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>();
       assert(objcAttr);
-      thunk->getAttrs().add(objcAttr->clone(context));
+      thunk->getAttrs().add(objcAttr->clone(C));
 
       return thunk;
     }
@@ -4723,9 +4761,9 @@ namespace {
                                                setterIndex);
 
       // Build the subscript declaration.
-      auto &context = Impl.SwiftContext;
-      auto bodyParams = getterThunk->getParameterList(1)->clone(context);
-      DeclName name(context, context.Id_subscript, { Identifier() });
+      auto &C = Impl.SwiftContext;
+      auto bodyParams = getterThunk->getParameterList(1)->clone(C);
+      DeclName name(C, C.Id_subscript, { Identifier() });
       auto subscript
         = Impl.createDeclWithClangNode<SubscriptDecl>(getter->getClangNode(),
                                       name, decl->getLoc(), bodyParams,
@@ -4737,7 +4775,7 @@ namespace {
 
       subscript->makeComputed(SourceLoc(), getterThunk, setterThunk, nullptr,
                               SourceLoc());
-      auto indicesType = bodyParams->getType(context);
+      auto indicesType = bodyParams->getType(C);
       
       subscript->setType(FunctionType::get(indicesType, elementTy)); // TODO: no good when generics are around
       addObjCAttribute(subscript, None);
@@ -6749,7 +6787,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               ConstantConvertKind convertKind,
                                               bool isStatic,
                                               ClangNode ClangN) {
-  auto &context = SwiftContext;
+  auto &C = SwiftContext;
 
   VarDecl *var = nullptr;
   if (ClangN) {
@@ -6770,17 +6808,20 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   }
   
   // empty tuple
-  getterArgs.push_back(ParameterList::createEmpty(context));
+  getterArgs.push_back(ParameterList::createEmpty(C));
 
   // Form the type of the getter.
   auto getterType = ParameterList::getFullType(type, getterArgs);
 
   // Create the getter function declaration.
-  auto func = FuncDecl::create(context, SourceLoc(), StaticSpellingKind::None,
-                               SourceLoc(), Identifier(),
-                               SourceLoc(), SourceLoc(), SourceLoc(),
-                               nullptr, getterType,
-                               getterArgs, TypeLoc::withoutLoc(type), dc);
+  auto func =
+    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+                     /*FuncLoc=*/SourceLoc(),
+                     /*Name=*/Identifier(), /*NameLoc=*/SourceLoc(),
+                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*AccessorKeywordLoc=*/SourceLoc(),
+                     /*GenericParams=*/nullptr, getterArgs,
+                     getterType, TypeLoc::withoutLoc(type), dc);
   func->setStatic(isStatic);
   func->setBodyResultType(type);
   func->setAccessibility(Accessibility::Public);
@@ -6796,16 +6837,16 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
     case ConstantConvertKind::Construction:
     case ConstantConvertKind::ConstructionWithUnwrap: {
-      auto typeRef = TypeExpr::createImplicit(type, context);
+      auto typeRef = TypeExpr::createImplicit(type, C);
       
       // make a "(rawValue: <subexpr>)" tuple.
-      expr = TupleExpr::create(context, SourceLoc(), expr,
-                               context.Id_rawValue, SourceLoc(),
+      expr = TupleExpr::create(C, SourceLoc(), expr,
+                               C.Id_rawValue, SourceLoc(),
                                SourceLoc(), /*trailingClosure*/false,
                                /*implicit*/true);
-      expr = new (context) CallExpr(typeRef, expr, /*Implicit=*/true);
+      expr = new (C) CallExpr(typeRef, expr, /*Implicit=*/true);
       if (convertKind == ConstantConvertKind::ConstructionWithUnwrap)
-        expr = new (context) ForceValueExpr(expr, SourceLoc());
+        expr = new (C) ForceValueExpr(expr, SourceLoc());
       break;
     }
 
@@ -6813,24 +6854,24 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
       break;
 
     case ConstantConvertKind::Downcast: {
-      expr = new (context) ForcedCheckedCastExpr(expr, SourceLoc(), SourceLoc(),
-                                                 TypeLoc::withoutLoc(type));
+      expr = new (C) ForcedCheckedCastExpr(expr, SourceLoc(), SourceLoc(),
+                                           TypeLoc::withoutLoc(type));
       expr->setImplicit();
       break;
     }
     }
 
     // Create the return statement.
-    auto ret = new (context) ReturnStmt(SourceLoc(), expr);
+    auto ret = new (C) ReturnStmt(SourceLoc(), expr);
 
     // Finally, set the body.
-    func->setBody(BraceStmt::create(context, SourceLoc(),
+    func->setBody(BraceStmt::create(C, SourceLoc(),
                                     ASTNode(ret),
                                     SourceLoc()));
   }
 
   // Mark the function transparent so that we inline it away completely.
-  func->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));
+  func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
   
   // Set the function up as the getter.
   var->makeComputed(SourceLoc(), func, nullptr, nullptr, SourceLoc());
