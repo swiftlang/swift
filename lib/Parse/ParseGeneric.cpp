@@ -74,6 +74,12 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
         Ty = parseTypeIdentifier();
       } else if (Tok.getKind() == tok::kw_protocol) {
         Ty = parseTypeComposition();
+      } else if (Tok.getKind() == tok::kw_class) {
+        diagnose(Tok, diag::unexpected_class_constraint);
+        diagnose(Tok, diag::suggest_anyobject, Name)
+          .fixItReplace(Tok.getLoc(), "AnyObject");
+        consumeToken();
+        Invalid = true;
       } else {
         diagnose(Tok, diag::expected_generics_type_restriction, Name);
         Invalid = true;
