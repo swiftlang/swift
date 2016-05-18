@@ -369,6 +369,10 @@ function(_compile_swift_files dependency_target_out_var_name)
     set(main_command "-emit-sib")
   endif()
 
+  if (SWIFT_CHECK_INCREMENTAL_COMPILATION)
+    set(swift_compiler_tool "${SWIFT_SOURCE_DIR}/utils/check-incremental" "${swift_compiler_tool}")
+  endif()
+
   add_custom_command_target(
       dependency_target
       ${command_create_dirs}

@@ -36,6 +36,10 @@ option(SWIFT_STDLIB_SIL_DEBUGGING
     "Compile the Swift standard library with -gsil to enable debugging and profiling on SIL level"
     FALSE)
 
+option(SWIFT_CHECK_INCREMENTAL_COMPILATION
+    "Check if incremental compilation works when compiling the Swift libraries"
+    FALSE)
+
 option(SWIFT_BUILD_TOOLS
     "Build the Swift compiler and other tools"
     TRUE)
