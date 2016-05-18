@@ -4,7 +4,6 @@
 // REQUIRES: objc_interop
 
 // REQUIRES: OS=macosx
-// REQUIRES: disabled
 
 // watchOS 2.0 does not have an XCTest module.
 // XFAIL: OS=watchos
