@@ -34,6 +34,8 @@ typedef struct {
 #include <type_traits>
 #include <stdint.h>
 #include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "swift/Basic/type_traits.h"
 
@@ -195,7 +197,10 @@ class StrongRefCount {
   //
   // Precondition: the reference count must be 1
   void decrementFromOneAndDeallocateNonAtomic() {
-    assert(refCount == RC_ONE && "Expect a count of 1");
+    if (refCount != RC_ONE) {
+      fprintf(stderr, "nonatomic fail (want 0x%x, have 0x%x)\n", (int)RC_ONE, (int)refCount);
+      abort();
+    }
     __atomic_store_n(&refCount, RC_DEALLOCATING_FLAG, __ATOMIC_RELAXED);
   }
 

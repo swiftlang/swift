@@ -256,7 +256,7 @@ if(PYTHONINTERP_FOUND)
              (test_subset STREQUAL "validation") OR
              (test_subset STREQUAL "only_long") OR
              (test_subset STREQUAL "all"))
-            list(APPEND directories "${test_bin_dir}")
+            list(APPEND directories "${test_bin_dir}/1_stdlib/ArrayTraps.swift.gyb")
           endif()
           if((test_subset STREQUAL "validation") OR
              (test_subset STREQUAL "only_validation") OR
