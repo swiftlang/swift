@@ -723,8 +723,8 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
 
   // Generate function info for this signature.
   auto extInfo = clang::FunctionType::ExtInfo();
-  auto &FI = IGM.ABITypes->arrangeFreeFunctionCall(clangResultTy, paramTys,
-                                                   extInfo,
+  auto &FI = clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(),
+                                             clangResultTy, paramTys, extInfo,
                                              clang::CodeGen::RequiredArgs::All);
   ForeignInfo.ClangInfo = &FI;
 
