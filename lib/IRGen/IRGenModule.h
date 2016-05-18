@@ -66,11 +66,9 @@ namespace clang {
   class Decl;
   class Type;
   namespace CodeGen {
-    class CodeGenABITypes;
     class CGFunctionInfo;
   }
 }
-using clang::CodeGen::CodeGenABITypes;
 
 namespace swift {
   class ArchetypeBuilder;
@@ -361,9 +359,6 @@ public:
   const SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
   IRGenDebugInfo *DebugInfo;
-  /// A Clang-to-IR-type converter for types appearing in function
-  /// signatures of Objective-C methods and C functions.
-  CodeGenABITypes *ABITypes;
 
   /// A global variable which stores the hash of the module. Used for
   /// incremental compilation.
