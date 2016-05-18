@@ -144,6 +144,19 @@ public:
   /// Return the value that is written into the global variable.
   SILInstruction *getValueOfStaticInitializer();
 
+  /// Return whether this variable corresponds to a Clang node.
+  bool hasClangNode() const {
+    return VDecl->hasClangNode();
+  }
+
+  /// Return the Clang node associated with this variable if it has one.
+  ClangNode getClangNode() const {
+    return VDecl->getClangNode();
+  }
+  const clang::Decl *getClangDecl() const {
+    return VDecl->getClangDecl();
+  }
+
   //===--------------------------------------------------------------------===//
   // Miscellaneous
   //===--------------------------------------------------------------------===//

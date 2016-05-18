@@ -355,10 +355,12 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
 
   F->setGlobalInit(constant.isGlobal());
   if (constant.hasDecl()) {
-    if (constant.isForeign && constant.isClangGenerated())
-      F->setForeignBody(HasForeignBody);
+    auto decl = constant.getDecl();
 
-    auto Attrs = constant.getDecl()->getAttrs();
+    if (constant.isForeign && decl->hasClangNode())
+      F->setClangNodeOwner(decl);
+
+    auto Attrs = decl->getAttrs();
     for (auto *A : Attrs.getAttributes<SemanticsAttr, false /*AllowInvalid*/>())
       F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
 
