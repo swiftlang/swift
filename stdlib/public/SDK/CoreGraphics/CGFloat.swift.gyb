@@ -136,9 +136,9 @@ public struct CGFloat {
     return CGFloat(NativeType.signalingNaN)
   }
   
-  @available(*, deprecated, renamed: "nan")
+  @available(*, unavailable, renamed: "nan")
   public static var quietNaN: CGFloat {
-    return CGFloat(NativeType.nan)
+    fatalError("unavailable")
   }
 
   public static var greatestFiniteMagnitude: CGFloat {
@@ -269,9 +269,9 @@ public struct CGFloat {
     return native.isSignalingNaN
   }
 
-  @available(*, deprecated, renamed: "isSignalingNaN")
+  @available(*, unavailable, renamed: "isSignalingNaN")
   public var isSignaling: Bool {
-    return native.isSignalingNaN
+    fatalError("unavailable")
   }
 
   public var isCanonical: Bool {
@@ -302,33 +302,25 @@ public struct CGFloat {
 }
 
 extension CGFloat {
-  @available(*, deprecated, message: "use CGFloat.leastNormalMagnitude")
-  @_transparent public static var min: CGFloat {
-#if arch(i386) || arch(arm)
-   return CGFloat(FLT_MIN)
-#else
-   return CGFloat(DBL_MIN)
-#endif
+  @available(*, unavailable, renamed: "leastNormalMagnitude")
+  public static var min: CGFloat {
+    fatalError("unavailable")
   }
 
-  @available(*, deprecated, message: "use CGFloat.greatestFiniteMagnitude")
-  @_transparent public static var max: CGFloat {
-#if arch(i386) || arch(arm)
-   return CGFloat(FLT_MAX)
-#else
-   return CGFloat(DBL_MAX)
-#endif
+  @available(*, unavailable, renamed: "greatestFiniteMagnitude")
+  public static var max: CGFloat {
+    fatalError("unavailable")
   }
 }
 
-@available(*, unavailable, message: "use CGFloat.leastNormalMagnitude")
+@available(*, unavailable, renamed: "CGFloat.leastNormalMagnitude")
 public var CGFLOAT_MIN: CGFloat {
-  fatalError("can't retrieve unavailable property")
+  fatalError("unavailable")
 }
 
-@available(*, unavailable, message: "use CGFloat.greatestFiniteMagnitude")
+@available(*, unavailable, renamed: "CGFloat.greatestFiniteMagnitude")
 public var CGFLOAT_MAX: CGFloat {
-  fatalError("can't retrieve unavailable property")
+  fatalError("unavailable")
 }
 
 extension CGFloat : CustomReflectable {
@@ -761,9 +753,9 @@ public func fmin(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
 
 @_transparent
 @warn_unused_result
-@available(*, deprecated, message: "use the floatingPointClass property.")
+@available(*, unavailable, message: "use the floatingPointClass property.")
 public func fpclassify(_ x: CGFloat) -> Int {
-  return fpclassify(x.native)
+  fatalError("unavailable")
 }
 
 @available(*, unavailable, message: "use the isNormal property.")

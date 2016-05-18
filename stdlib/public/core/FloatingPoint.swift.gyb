@@ -813,7 +813,7 @@ extension BinaryFloatingPoint {
     return true
   }
   
-  @available(*, deprecated, renamed: "isSignalingNaN")
+  @available(*, unavailable, renamed: "isSignalingNaN")
   public var isSignaling: Bool {
     return isSignalingNaN
   }

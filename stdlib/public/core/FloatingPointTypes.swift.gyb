@@ -207,8 +207,8 @@ extension ${Self}: BinaryFloatingPoint {
     return FloatingPointSign(rawValue: Int(bitPattern >> ${RawSignificand}(shift)))!
   }
 
-  @available(*, deprecated, message: "Use the .sign property instead.")
-  public var isSignMinus: Bool { return sign == .minus }
+  @available(*, unavailable, renamed: "sign")
+  public var isSignMinus: Bool { Builtin.unreachable() }
 
   public var exponentBitPattern: UInt {
     return UInt(bitPattern >> UInt${bits}(${Self}.significandBitCount)) &
@@ -337,8 +337,8 @@ extension ${Self}: BinaryFloatingPoint {
     return ${Self}(nan: 0, signaling: true)
   }
 
-  @available(*, deprecated, renamed: "nan")
-  public static var quietNaN: ${Self} { return nan }
+  @available(*, unavailable, renamed: "nan")
+  public static var quietNaN: ${Self} { Builtin.unreachable()}
 
   public static var greatestFiniteMagnitude: ${Self} {
     return ${Self}(sign: .plus,
