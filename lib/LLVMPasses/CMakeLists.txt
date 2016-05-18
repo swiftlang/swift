@@ -6,6 +6,8 @@ add_swift_library(swiftLLVMPasses
   LLVMInlineTree.cpp
   LLVMStackPromotion.cpp
   LLVMMergeFunctions.cpp
+
+  COMPONENT_DEPENDS
+  analysis
   )
 
-add_dependencies(swiftLLVMPasses LLVMAnalysis)
