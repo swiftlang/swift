@@ -2552,7 +2552,7 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
     // foreign error convention that replaces NSErrorPointer with ()
     // and this is the replaced parameter.
     AbstractFunctionDecl *overridden;
-    if (param->getType()->isVoid() && AFD->isBodyThrowing() &&
+    if (param->getType()->isVoid() && AFD->hasThrows() &&
         (overridden = AFD->getOverriddenDecl())) {
       auto foreignError = overridden->getForeignErrorConvention();
       if (foreignError &&
@@ -2810,7 +2810,7 @@ bool TypeChecker::isRepresentableInObjC(
   }
 
   // Throwing functions must map to a particular error convention.
-  if (AFD->isBodyThrowing()) {
+  if (AFD->hasThrows()) {
     DeclContext *dc = const_cast<AbstractFunctionDecl *>(AFD);
     SourceLoc throwsLoc;
     Type resultType;

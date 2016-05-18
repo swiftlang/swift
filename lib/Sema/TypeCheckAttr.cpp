@@ -1691,11 +1691,7 @@ TypeChecker::applyFunctionTypeAttributes(AbstractFunctionDecl *func,
   // innermost function.
   if (i == 0) {
     info = info.withIsNoReturn(func->getAttrs().hasAttribute<NoReturnAttr>());
-
-    if (auto FD = dyn_cast<FuncDecl>(func))
-      info = info.withThrows(FD->getThrowsLoc().isValid());
-    else if (auto CD = dyn_cast<ConstructorDecl>(func))
-      info = info.withThrows(CD->getThrowsLoc().isValid());
+    info = info.withThrows(func->hasThrows());
   }
 
   return info;

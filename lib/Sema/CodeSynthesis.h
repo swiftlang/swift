@@ -50,8 +50,7 @@ Type configureImplicitSelf(TypeChecker &tc,
                            AbstractFunctionDecl *func);
 void configureConstructorType(ConstructorDecl *ctor,
                               Type selfType,
-                              Type argType,
-                              bool throws);
+                              Type argType);
 bool checkOverrides(TypeChecker &TC, ValueDecl *decl);
 
 // These are implemented in CodeSynthesis.cpp.

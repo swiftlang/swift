@@ -53,7 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 249; // Last change: SIL clang decls
+const uint16_t VERSION_MINOR = 250; // Last change: Add Throws bit
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -851,6 +851,7 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     BCFixed<1>,  // stub implementation?
+    BCFixed<1>,  // throws?
     CtorInitializerKindField,  // initializer kind
     TypeIDField, // type (signature)
     TypeIDField, // type (interface)
@@ -904,6 +905,7 @@ namespace decls_block {
     BCFixed<1>,   // explicitly objc?
     BCFixed<1>,   // mutating?
     BCFixed<1>,   // has dynamic self?
+    BCFixed<1>,   // throws?
     BCVBR<5>,     // number of parameter patterns
     TypeIDField,  // type (signature)
     TypeIDField,  // interface type

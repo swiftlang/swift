@@ -278,10 +278,13 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   auto retTy = OptionalType::get(enumType);
   DeclName name(C, C.Id_init, paramList);
   
-  auto initDecl = new (C) ConstructorDecl(name, SourceLoc(),
-                                          /*failability*/ OTK_Optional,
-                                          SourceLoc(), selfDecl, paramList,
-                                          nullptr, SourceLoc(), parentDC);
+  auto initDecl =
+    new (C) ConstructorDecl(name, SourceLoc(),
+                            /*Failability=*/ OTK_Optional,
+                            /*FailabilityLoc=*/SourceLoc(),
+                            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                            selfDecl, paramList,
+                            /*GenericParams=*/nullptr, parentDC);
   
   initDecl->setImplicit();
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);

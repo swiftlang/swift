@@ -2476,6 +2476,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isObjC(),
                            fn->isMutating(),
                            fn->hasDynamicSelf(),
+                           fn->hasThrows(),
                            fn->getParameterLists().size(),
                            addTypeRef(fn->getType()),
                            addTypeRef(fn->getInterfaceType()),
@@ -2595,6 +2596,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   ctor->isImplicit(),
                                   ctor->isObjC(),
                                   ctor->hasStubImplementation(),
+                                  ctor->hasThrows(),
                                   getStableCtorInitializerKind(
                                     ctor->getInitKind()),
                                   addTypeRef(ctor->getType()),

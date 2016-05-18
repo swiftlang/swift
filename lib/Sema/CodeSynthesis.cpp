@@ -145,8 +145,10 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   auto getter = FuncDecl::create(
       TC.Context, staticLoc, StaticSpellingKind::None, loc, Identifier(), loc,
-      SourceLoc(), SourceLoc(), /*GenericParams=*/nullptr, Type(), getterParams,
-      TypeLoc::withoutLoc(storageType), storage->getDeclContext());
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
+      getterParams, Type(), TypeLoc::withoutLoc(storageType),
+      storage->getDeclContext());
   getter->setImplicit();
 
   if (storage->isGetterMutating())
@@ -187,8 +189,10 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   Type setterRetTy = TupleType::getEmpty(TC.Context);
   FuncDecl *setter = FuncDecl::create(
       TC.Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
-      Identifier(), loc, SourceLoc(), SourceLoc(), /*generic=*/nullptr, Type(),
-      params, TypeLoc::withoutLoc(setterRetTy), storage->getDeclContext());
+      Identifier(), loc, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
+      params, Type(), TypeLoc::withoutLoc(setterRetTy),
+      storage->getDeclContext());
   setter->setImplicit();
 
   if (!storage->isSetterNonMutating())
@@ -259,8 +263,9 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
 
   auto *materializeForSet = FuncDecl::create(
       ctx, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
-      Identifier(), loc, SourceLoc(), SourceLoc(), /*generic=*/nullptr, Type(),
-      params, TypeLoc::withoutLoc(retTy), DC);
+      Identifier(), loc, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
+      params, Type(), TypeLoc::withoutLoc(retTy), DC);
   materializeForSet->setImplicit();
   
   // materializeForSet is mutating and static if the setter is.
@@ -1381,16 +1386,16 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   }
   ParamLists.push_back(ParameterList::create(Context, Params));
 
-  auto *Parameter = FuncDecl::create(Context, SourceLoc(),
-                                     StaticSpellingKind::None,
-                                     SourceLoc(),
-                                     DeclName(Context, ParameterBaseName,
-                                              NameComponents),
-                                     SourceLoc(), SourceLoc(),
-                                     SourceLoc(), nullptr, SubstContextTy,
-                                     ParamLists,
-                                     TypeLoc::withoutLoc(SubstBodyResultTy),
-                                     DC);
+  auto *Parameter =
+    FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+                     /*FuncLoc=*/SourceLoc(),
+                     DeclName(Context, ParameterBaseName, NameComponents),
+                     /*NameLoc=*/SourceLoc(),
+                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*AccessorKeywordLoc=*/SourceLoc(),
+                     /*GenericParams=*/nullptr, ParamLists,
+                     SubstContextTy,
+                     TypeLoc::withoutLoc(SubstBodyResultTy), DC);
 
   Parameter->setInterfaceType(SubstInterfaceTy);
   // Mark the method to be final, implicit, and private.  In a class, this
@@ -1960,9 +1965,12 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   DeclName name(context, context.Id_init, paramList);
   auto *selfParam = ParamDecl::createSelf(Loc, decl,
                                           /*static*/false, /*inout*/true);
-  auto *ctor = new (context) ConstructorDecl(name, Loc, OTK_None, SourceLoc(),
-                                             selfParam, paramList,
-                                             nullptr, SourceLoc(), decl);
+  auto *ctor =
+    new (context) ConstructorDecl(name, Loc,
+                                  OTK_None, /*FailabilityLoc=*/SourceLoc(),
+                                  /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                                  selfParam, paramList,
+                                  nullptr, decl);
 
   // Mark implicit.
   ctor->setImplicit();
@@ -2051,11 +2059,15 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   auto *bodyParams = superclassCtor->getParameterList(1)->clone(ctx,options);
   
   // Create the initializer declaration.
-  auto ctor = new (ctx) ConstructorDecl(superclassCtor->getFullName(), 
-                                        classDecl->getBraces().Start,
-                                        superclassCtor->getFailability(),
-                                        SourceLoc(), selfDecl, bodyParams,
-                                        nullptr, SourceLoc(), classDecl);
+  auto ctor =
+    new (ctx) ConstructorDecl(superclassCtor->getFullName(),
+                              classDecl->getBraces().Start,
+                              superclassCtor->getFailability(),
+                              /*FailabilityLoc=*/SourceLoc(),
+                              /*Throws=*/superclassCtor->hasThrows(),
+                              /*ThrowsLoc=*/SourceLoc(),
+                              selfDecl, bodyParams,
+                              /*GenericParams=*/nullptr, classDecl);
   ctor->setImplicit();
   ctor->setAccessibility(std::min(classDecl->getFormalAccess(),
                                   superclassCtor->getFormalAccess()));
@@ -2069,8 +2081,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   auto selfType = configureImplicitSelf(tc, ctor);
 
   // Set the type of the initializer.
-  configureConstructorType(ctor, selfType, bodyParams->getType(ctx),
-                           superclassCtor->isBodyThrowing());
+  configureConstructorType(ctor, selfType, bodyParams->getType(ctx));
   if (superclassCtor->isObjC()) {
     // Inherit the @objc name from the superclass initializer, if it
     // has one.
@@ -2125,7 +2136,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   }
 
   Expr *superCall = new (ctx) CallExpr(ctorRef, ctorArgs, /*Implicit=*/true);
-  if (superclassCtor->isBodyThrowing()) {
+  if (superclassCtor->hasThrows()) {
     superCall = new (ctx) TryExpr(SourceLoc(), superCall, Type(),
                                   /*Implicit=*/true);
   }

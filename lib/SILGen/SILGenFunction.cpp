@@ -421,7 +421,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 
   Type resultTy = fd->getResultType();
   emitProlog(fd, fd->getParameterLists(), resultTy);
-  prepareEpilog(resultTy, fd->isBodyThrowing(), CleanupLocation(fd));
+  prepareEpilog(resultTy, fd->hasThrows(), CleanupLocation(fd));
 
   emitProfilerIncrement(fd->getBody());
   emitStmt(fd->getBody());

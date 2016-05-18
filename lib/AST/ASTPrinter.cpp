@@ -2613,7 +2613,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
     });
   }
 
-  if (AFD->isBodyThrowing()) {
+  if (AFD->hasThrows()) {
     if (AFD->getAttrs().hasAttribute<RethrowsAttr>())
       Printer << " " << tok::kw_rethrows;
     else
