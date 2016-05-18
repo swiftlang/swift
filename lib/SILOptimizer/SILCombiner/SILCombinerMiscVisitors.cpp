@@ -310,7 +310,12 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   // If the only users of the alloc_stack are alloc, destroy and
   // init_existential_addr then we can promote the allocation of the init
   // existential.
-  if (IEI && !OEI) {
+  // Be careful with open archetypes, because they cannot be moved before
+  // their definitions.
+  if (IEI && !OEI &&
+      !IEI->getLoweredConcreteType()
+           .getSwiftRValueType()
+           ->isOpenedExistential()) {
     auto *ConcAlloc = Builder.createAllocStack(
         AS->getLoc(), IEI->getLoweredConcreteType(), AS->getVarInfo());
     IEI->replaceAllUsesWith(ConcAlloc);
