@@ -1225,6 +1225,11 @@ createInPlaceMetadataInitializationFunction(IRGenModule &IGM,
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, fn);
 
+  // Skip instrumentation when building for TSan to avoid false positives.
+  // The syncronization for this happens in the Runtime and we do not see it.
+  if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
+    fn->removeFnAttr(llvm::Attribute::SanitizeThread);
+
   // Emit the initialization.
   llvm::Value *relocatedMetadata = initialize(IGF, metadata);
 
@@ -1279,7 +1284,10 @@ emitInPlaceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   // We can just load the cache now.
   // TODO: this should be consume-ordered when LLVM supports it.
   Address cacheAddr = Address(cacheVariable, IGF.IGM.getPointerAlignment());
-  llvm::Value *relocatedMetadata = IGF.Builder.CreateLoad(cacheAddr);
+  llvm::LoadInst *relocatedMetadata = IGF.Builder.CreateLoad(cacheAddr);
+  // Make this barrier explicit when building for TSan to avoid false positives.
+  if (IGF.IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
+    relocatedMetadata->setOrdering(llvm::AtomicOrdering::Acquire);
 
   // emitLazyCacheAccessFunction will see that the value was loaded from
   // the guard variable and skip the redundant store back.
@@ -2880,6 +2888,12 @@ namespace {
       f->setAttributes(IGM.constructInitialAttributes());
       
       IRGenFunction IGF(IGM, f);
+
+      // Skip instrumentation when building for TSan to avoid false positives.
+      // The syncronization for this happens in the Runtime and we do not see it.
+      if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
+        f->removeFnAttr(llvm::Attribute::SanitizeThread);
+
       if (IGM.DebugInfo)
         IGM.DebugInfo->emitArtificialFunction(IGF, f);
 
