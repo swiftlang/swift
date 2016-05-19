@@ -13,7 +13,7 @@ import Newtype
 
 // CHECK-LABEL: define %CSo8NSString* @_TF7newtype14getErrorDomainFT_VSC11ErrorDomain()
 public func getErrorDomain() -> ErrorDomain {
-  // CHECK: load %CSo8NSString*, %CSo8NSString** getelementptr inbounds (%VSC11ErrorDomain, %VSC11ErrorDomain* @SNTErrOne
+  // CHECK: load %CSo8NSString*, %CSo8NSString** getelementptr inbounds (%VSC11ErrorDomain, %VSC11ErrorDomain* {{.*}}@SNTErrOne
   return .one
 }
 
@@ -85,18 +85,18 @@ public func compareABIs() {
 
   // Make sure that the calling conventions align correctly, that is we don't
   // have double-indirection or anything else like that
-  // CHECK: declare %struct.__CFString* @getMyABINewType() #0
-  // CHECK: declare %struct.__CFString* @getMyABIOldType() #0
+  // CHECK: declare %struct.__CFString* @getMyABINewType()
+  // CHECK: declare %struct.__CFString* @getMyABIOldType()
   //
-  // CHECK: declare void @takeMyABINewType(%struct.__CFString*) #0
-  // CHECK: declare void @takeMyABIOldType(%struct.__CFString*) #0
+  // CHECK: declare void @takeMyABINewType(%struct.__CFString*)
+  // CHECK: declare void @takeMyABIOldType(%struct.__CFString*)
   //
-  // CHECK: declare void @takeMyABINewTypeNonNull(%struct.__CFString*) #0
-  // CHECK: declare void @takeMyABIOldTypeNonNull(%struct.__CFString*) #0
+  // CHECK: declare void @takeMyABINewTypeNonNull(%struct.__CFString*)
+  // CHECK: declare void @takeMyABIOldTypeNonNull(%struct.__CFString*)
   //
-  // CHECK: declare %0* @getMyABINewTypeNS() #0
-  // CHECK: declare %0* @getMyABIOldTypeNS() #0
+  // CHECK: declare %0* @getMyABINewTypeNS()
+  // CHECK: declare %0* @getMyABIOldTypeNS()
   //
-  // CHECK: declare void @takeMyABINewTypeNonNullNS(%0*) #0
-  // CHECK: declare void @takeMyABIOldTypeNonNullNS(%0*) #0
+  // CHECK: declare void @takeMyABINewTypeNonNullNS(%0*)
+  // CHECK: declare void @takeMyABIOldTypeNonNullNS(%0*)
 }

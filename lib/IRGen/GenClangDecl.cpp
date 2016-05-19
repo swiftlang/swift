@@ -13,6 +13,7 @@
 #include "IRGenModule.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclGroup.h"
+#include "clang/AST/GlobalDecl.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -35,10 +36,11 @@ public:
 };
 } // end anonymous namespace
 
-void IRGenModule::emitClangDecl(clang::Decl *decl) {
+void IRGenModule::emitClangDecl(const clang::Decl *decl) {
   auto valueDecl = dyn_cast<clang::ValueDecl>(decl);
   if (!valueDecl || valueDecl->isExternallyVisible()) {
-    ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(decl));
+    ClangCodeGen->HandleTopLevelDecl(
+                          clang::DeclGroupRef(const_cast<clang::Decl*>(decl)));
     return;
   }
 
@@ -67,6 +69,16 @@ void IRGenModule::emitClangDecl(clang::Decl *decl) {
     }
     ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(next));
   }
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfClangGlobalDecl(clang::GlobalDecl global,
+                                      ForDefinition_t forDefinition) {
+  // Register the decl with the clang code generator.
+  if (auto decl = global.getDecl())
+    emitClangDecl(decl);
+
+  return ClangCodeGen->GetAddrOfGlobal(global, (bool) forDefinition);
 }
 
 void IRGenModule::finalizeClangCodeGen() {

@@ -64,6 +64,7 @@ namespace clang {
   template <class> class CanQual;
   class CodeGenerator;
   class Decl;
+  class GlobalDecl;
   class Type;
   namespace CodeGen {
     class CGFunctionInfo;
@@ -643,6 +644,9 @@ public:
                         llvm::function_ref<void(IRGenFunction &IGF)> generate);
 
 private:
+  llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
+                                           ForDefinition_t forDefinition);
+
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
@@ -804,7 +808,7 @@ public:
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
 
   void emitNestedTypeDecls(DeclRange members);
-  void emitClangDecl(clang::Decl *decl);
+  void emitClangDecl(const clang::Decl *decl);
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
@@ -950,7 +954,6 @@ public:
   void emitTypeVerifier();
 private:
   void emitGlobalDecl(Decl *D);
-  void emitExternalDefinition(Decl *D);
 };
 
 /// Stores a pointer to an IRGenModule.

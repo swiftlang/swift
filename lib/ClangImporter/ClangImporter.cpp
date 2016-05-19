@@ -326,7 +326,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     // Don't emit LLVM IR.
     "-fsyntax-only",
 
-    "-femit-all-decls",
     SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
     "-fretain-comments-from-system-headers",
     "-fmodules-validate-system-headers",

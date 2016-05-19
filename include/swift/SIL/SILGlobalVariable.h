@@ -146,15 +146,15 @@ public:
 
   /// Return whether this variable corresponds to a Clang node.
   bool hasClangNode() const {
-    return VDecl->hasClangNode();
+    return (VDecl ? VDecl->hasClangNode() : false);
   }
 
   /// Return the Clang node associated with this variable if it has one.
   ClangNode getClangNode() const {
-    return VDecl->getClangNode();
+    return (VDecl ? VDecl->getClangNode() : ClangNode());
   }
   const clang::Decl *getClangDecl() const {
-    return VDecl->getClangDecl();
+    return (VDecl ? VDecl->getClangDecl() : nullptr);
   }
 
   //===--------------------------------------------------------------------===//
