@@ -17,7 +17,6 @@ extension LazySequenceProtocol {
   ///     self.map(transform).flatten()
   ///
   /// - Complexity: O(1)
-  @warn_unused_result
   public func flatMap<SegmentOfResult : Sequence>(
     _ transform: (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazySequence<
@@ -33,7 +32,6 @@ extension LazySequenceProtocol {
   ///
   /// - Parameter transform: A closure that accepts an element of this
   /// sequence as its argument and returns an optional value.
-  @warn_unused_result
   public func flatMap<ElementOfResult>(
     _ transform: (Elements.Iterator.Element) -> ElementOfResult?
   ) -> LazyMapSequence<
@@ -52,7 +50,6 @@ extension LazyCollectionProtocol {
   ///     self.map(transform).flatten()
   ///
   /// - Complexity: O(1)
-  @warn_unused_result
   public func flatMap<SegmentOfResult : Collection>(
     _ transform: (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazyCollection<
@@ -70,7 +67,6 @@ extension LazyCollectionProtocol {
   ///
   /// - Parameter transform: A closure that accepts an element of this
   /// collection as its argument and returns an optional value.
-  @warn_unused_result
   public func flatMap<ElementOfResult>(
     _ transform: (Elements.Iterator.Element) -> ElementOfResult?
   ) -> LazyMapCollection<
@@ -93,7 +89,6 @@ extension LazyCollectionProtocol
   ///     self.map(transform).flatten()
   ///
   /// - Complexity: O(1)
-  @warn_unused_result
   public func flatMap<
     SegmentOfResult : Collection
     where SegmentOfResult : BidirectionalCollection

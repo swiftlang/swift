@@ -144,7 +144,6 @@ extension OptionSet {
   /// - Parameter other: An option set.
   /// - Returns: A new option set made up of the elements contained in this
   ///   set, in `other`, or in both.
-  @warn_unused_result
   public func union(_ other: Self) -> Self {
     var r: Self = Self(rawValue: self.rawValue)
     r.formUnion(other)
@@ -171,7 +170,6 @@ extension OptionSet {
   /// - Parameter other: An option set.
   /// - Returns: A new option set with only the elements contained in both this
   ///   set and `other`.
-  @warn_unused_result
   public func intersection(_ other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
     r.formIntersection(other)
@@ -184,7 +182,6 @@ extension OptionSet {
   /// - Parameter other: An option set.
   /// - Returns: A new option set with only the elements contained in either
   ///   this set or `other`, but not in both.
-  @warn_unused_result
   public func symmetricDifference(_ other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
     r.formSymmetricDifference(other)
@@ -214,7 +211,6 @@ extension OptionSet where Element == Self {
   /// - Parameter member: The element to look for in the option set.
   /// - Returns: `true` if the option set contains `member`; otherwise,
   ///   `false`.
-  @warn_unused_result
   public func contains(_ member: Self) -> Bool {
     return self.isSuperset(of: member)
   }

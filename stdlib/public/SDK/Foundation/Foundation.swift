@@ -68,7 +68,6 @@ public class NSSimpleCString {}
 @available(*, unavailable, message: "Please use String or NSString")
 public class NSConstantString {}
 
-@warn_unused_result
 @_silgen_name("swift_convertStringToNSString")
 public // COMPILER_INTRINSIC
 func _convertStringToNSString(_ string: String) -> NSString {
@@ -924,7 +923,6 @@ extension NSRange {
     length = x.count
   }
 
-  @warn_unused_result
   public func toRange() -> Range<Int>? {
     if location == NSNotFound { return nil }
     return location..<(location+length)
@@ -936,7 +934,6 @@ extension NSRange {
 //===----------------------------------------------------------------------===//
 
 /// Returns a localized string, using the main bundle if one is not specified.
-@warn_unused_result
 public
 func NSLocalizedString(_ key: String,
                        tableName: String? = nil,
@@ -1008,7 +1005,6 @@ public typealias ErrorPointer = NSErrorPointer
 public // COMPILER_INTRINSIC
 let _nilObjCError: ErrorProtocol = _GenericObjCError.nilError
 
-@warn_unused_result
 @_silgen_name("swift_convertNSErrorToErrorProtocol")
 public // COMPILER_INTRINSIC
 func _convertNSErrorToErrorProtocol(_ error: NSError?) -> ErrorProtocol {
@@ -1018,7 +1014,6 @@ func _convertNSErrorToErrorProtocol(_ error: NSError?) -> ErrorProtocol {
   return _nilObjCError
 }
 
-@warn_unused_result
 @_silgen_name("swift_convertErrorProtocolToNSError")
 public // COMPILER_INTRINSIC
 func _convertErrorProtocolToNSError(_ error: ErrorProtocol) -> NSError {
@@ -1064,7 +1059,6 @@ extension NSString {
     self.init(format: format as String, locale: locale, arguments: va_args)
   }
 
-  @warn_unused_result
   public class func localizedStringWithFormat(
     _ format: NSString, _ args: CVarArg...
   ) -> Self {
@@ -1073,7 +1067,6 @@ extension NSString {
     }
   }
 
-  @warn_unused_result
   public func appendingFormat(_ format: NSString, _ args: CVarArg...)
   -> NSString {
     return withVaList(args) {
@@ -1212,20 +1205,17 @@ extension NSUndoManager {
 // NSCoder
 //===----------------------------------------------------------------------===//
 
-@warn_unused_result
 @_silgen_name("NS_Swift_NSCoder_decodeObject")
 internal func NS_Swift_NSCoder_decodeObject(
   _ self_: AnyObject,
   _ error: NSErrorPointer) -> AnyObject?
 
-@warn_unused_result
 @_silgen_name("NS_Swift_NSCoder_decodeObjectForKey")
 internal func NS_Swift_NSCoder_decodeObjectForKey(
   _ self_: AnyObject,
   _ key: AnyObject,
   _ error: NSErrorPointer) -> AnyObject?
 
-@warn_unused_result
 @_silgen_name("NS_Swift_NSCoder_decodeObjectOfClassForKey")
 internal func NS_Swift_NSCoder_decodeObjectOfClassForKey(
   _ self_: AnyObject,
@@ -1233,7 +1223,6 @@ internal func NS_Swift_NSCoder_decodeObjectOfClassForKey(
   _ key: AnyObject,
   _ error: NSErrorPointer) -> AnyObject?
 
-@warn_unused_result
 @_silgen_name("NS_Swift_NSCoder_decodeObjectOfClassesForKey")
 internal func NS_Swift_NSCoder_decodeObjectOfClassesForKey(
   _ self_: AnyObject,
@@ -1250,13 +1239,11 @@ internal func resolveError(_ error: NSError?) throws {
 }
 
 extension NSCoder {
-  @warn_unused_result
   public func decodeObjectOfClass<DecodedObjectType: NSCoding where DecodedObjectType: NSObject>(_ cls: DecodedObjectType.Type, forKey key: String) -> DecodedObjectType? {
     let result = NS_Swift_NSCoder_decodeObjectOfClassForKey(self as AnyObject, cls as AnyObject, key as AnyObject, nil)
     return result as! DecodedObjectType?
   }
 
-  @warn_unused_result
   @nonobjc
   public func decodeObjectOfClasses(_ classes: NSSet?, forKey key: String) -> AnyObject? {
     var classesAsNSObjects: Set<NSObject>? = nil
@@ -1269,7 +1256,6 @@ extension NSCoder {
     return self.__decodeObject(ofClasses: classesAsNSObjects, forKey: key)
   }
 
-  @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
   public func decodeTopLevelObject() throws -> AnyObject? {
     var error: NSError?
@@ -1278,7 +1264,6 @@ extension NSCoder {
     return result
   }
 
-  @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
   public func decodeTopLevelObjectForKey(_ key: String) throws -> AnyObject? {
     var error: NSError?
@@ -1287,7 +1272,6 @@ extension NSCoder {
     return result
   }
 
-  @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
   public func decodeTopLevelObjectOfClass<DecodedObjectType: NSCoding where DecodedObjectType: NSObject>(_ cls: DecodedObjectType.Type, forKey key: String) throws -> DecodedObjectType? {
     var error: NSError?
@@ -1296,7 +1280,6 @@ extension NSCoder {
     return result as! DecodedObjectType?
   }
 
-  @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
   public func decodeTopLevelObjectOfClasses(_ classes: NSSet?, forKey key: String) throws -> AnyObject? {
     var error: NSError?
@@ -1310,7 +1293,6 @@ extension NSCoder {
 // NSKeyedUnarchiver
 //===----------------------------------------------------------------------===//
 
-@warn_unused_result
 @_silgen_name("NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData")
 internal func NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(
   _ self_: AnyObject,
@@ -1318,7 +1300,6 @@ internal func NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(
   _ error: NSErrorPointer) -> AnyObject?
 
 extension NSKeyedUnarchiver {
-  @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
   public class func unarchiveTopLevelObjectWithData(_ data: NSData) throws -> AnyObject? {
     var error: NSError?

@@ -103,7 +103,6 @@ extension Bool : _BuiltinBooleanLiteralConvertible, BooleanLiteralConvertible {
 
 extension Bool : Boolean {
   @_transparent
-  @warn_unused_result
   public func _getBuiltinLogicValue() -> Builtin.Int1 {
     return _value
   }
@@ -167,13 +166,11 @@ extension Bool : Equatable, Hashable {
 ///
 /// - Parameter a: The Boolean value to negate.
 @_transparent
-@warn_unused_result
 public prefix func !(a: Bool) -> Bool {
   return Bool(Builtin.xor_Int1(a._value, true._value))
 }
 
 @_transparent
-@warn_unused_result
 public func ==(lhs: Bool, rhs: Bool) -> Bool {
   return Bool(Builtin.cmp_eq_Int1(lhs._value, rhs._value))
 }

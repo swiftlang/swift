@@ -119,7 +119,6 @@ public struct Character :
 
   /// Returns the index of the lowest byte that is 0xFF, or 8 if
   /// there is none.
-  @warn_unused_result
   static func _smallSize(_ value: UInt64) -> Int {
     var mask: UInt64 = 0xFF
     for i in 0..<8 {
@@ -131,7 +130,6 @@ public struct Character :
     return 8
   }
 
-  @warn_unused_result
   static func _smallValue(_ value: Builtin.Int63) -> UInt64 {
     return UInt64(Builtin.zext_Int63_Int64(value)) | (1<<63)
   }
@@ -318,7 +316,6 @@ internal var _minASCIICharReprBuiltin: Builtin.Int63 {
   }
 }
 
-@warn_unused_result
 public func ==(lhs: Character, rhs: Character) -> Bool {
   switch (lhs._representation, rhs._representation) {
   case let (.small(lbits), .small(rbits)) where
@@ -332,7 +329,6 @@ public func ==(lhs: Character, rhs: Character) -> Bool {
   }
 }
 
-@warn_unused_result
 public func <(lhs: Character, rhs: Character) -> Bool {
   switch (lhs._representation, rhs._representation) {
   case let (.small(lbits), .small(rbits)) where

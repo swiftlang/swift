@@ -29,7 +29,6 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @_transparent
-  @warn_unused_result
   public static func fromOpaque(_ value: OpaquePointer) -> Unmanaged {
     return Unmanaged(_private: unsafeBitCast(value, to: Instance.self))
   }
@@ -41,7 +40,6 @@ public struct Unmanaged<Instance : AnyObject> {
   /// does not know the ownership rules for, but you know that the
   /// API expects you to pass the object at +1.
   @_transparent
-  @warn_unused_result
   public static func passRetained(_ value: Instance) -> Unmanaged {
     return Unmanaged(_private: value).retain()
   }
@@ -56,7 +54,6 @@ public struct Unmanaged<Instance : AnyObject> {
   ///     CFArraySetValueAtIndex(.passUnretained(array), i,
   ///                            .passUnretained(object))
   @_transparent
-  @warn_unused_result
   public static func passUnretained(_ value: Instance) -> Unmanaged {
     return Unmanaged(_private: value)
   }
@@ -66,7 +63,6 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   /// This is useful when a function returns an unmanaged reference
   /// and you know that you're not responsible for releasing the result.
-  @warn_unused_result
   public func takeUnretainedValue() -> Instance {
     return _value
   }
@@ -76,7 +72,6 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   /// This is useful when a function returns an unmanaged reference
   /// and you know that you're responsible for releasing the result.
-  @warn_unused_result
   public func takeRetainedValue() -> Instance {
     let result = _value
     release()

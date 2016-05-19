@@ -28,7 +28,6 @@ public protocol BidirectionalIndexable : Indexable {
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
-  @warn_unused_result
   func index(before i: Index) -> Index
 
   /// Replaces the given index with its predecessor.
@@ -72,7 +71,6 @@ public protocol BidirectionalCollection
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
-  @warn_unused_result
   func index(before i: Index) -> Index
 
   /// Replaces the given index with its predecessor.
@@ -118,7 +116,6 @@ extension BidirectionalIndexable {
     i = index(before: i)
   }
 
-  @warn_unused_result
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n)
@@ -130,7 +127,6 @@ extension BidirectionalIndexable {
     return i
   }
 
-  @warn_unused_result
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -147,7 +143,6 @@ extension BidirectionalIndexable {
     return i
   }
 
-  @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     var start = start
     var count: IndexDistance = 0
@@ -187,7 +182,6 @@ extension BidirectionalCollection where SubSequence == Self {
   ///
   /// - Complexity: O(1).
   /// - SeeAlso: `removeLast()`
-  @warn_unused_result
   public mutating func popLast() -> Iterator.Element? {
     guard !isEmpty else { return nil }
     let element = last!
@@ -246,7 +240,6 @@ extension BidirectionalCollection {
   /// - Returns: A subsequence that leaves off `n` elements from the end.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements to drop.
-  @warn_unused_result
   public func dropLast(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
@@ -275,7 +268,6 @@ extension BidirectionalCollection {
   ///   most `maxLength` elements.
   ///
   /// - Complexity: O(*n*), where *n* is equal to `maxLength`.
-  @warn_unused_result
   public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,

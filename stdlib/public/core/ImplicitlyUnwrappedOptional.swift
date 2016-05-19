@@ -64,7 +64,6 @@ extension ImplicitlyUnwrappedOptional : CustomDebugStringConvertible {
 }
 
 @_transparent
-@warn_unused_result
 public // COMPILER_INTRINSIC
 func _stdlib_ImplicitlyUnwrappedOptional_isSome<Wrapped>
   (_ `self`: Wrapped!) -> Bool {
@@ -73,7 +72,6 @@ func _stdlib_ImplicitlyUnwrappedOptional_isSome<Wrapped>
 }
 
 @_transparent
-@warn_unused_result
 public // COMPILER_INTRINSIC
 func _stdlib_ImplicitlyUnwrappedOptional_unwrapped<Wrapped>
   (_ `self`: Wrapped!) -> Wrapped {

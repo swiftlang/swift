@@ -199,7 +199,6 @@ public struct UTF8 : UnicodeCodec {
   /// - Requires: There is at least one used byte in `buffer`, and the unused
   ///   space in `buffer` is filled with some value not matching the UTF-8
   ///   continuation byte form (`0b10xxxxxx`).
-  @warn_unused_result
   public // @testable
   static func _decodeOne(_ buffer: UInt32) -> (result: UInt32?, length: UInt8) {
     // Note the buffer is read least significant byte first: [ #3 #2 #1 #0 ].
@@ -318,7 +317,6 @@ public struct UTF8 : UnicodeCodec {
 
   /// Returns `true` if `byte` is a continuation byte of the form
   /// `0b10xxxxxx`.
-  @warn_unused_result
   public static func isContinuation(_ byte: CodeUnit) -> Bool {
     return byte & 0b11_00__0000 == 0b10_00__0000
   }
@@ -571,7 +569,6 @@ public func transcode<
 ///
 /// Returns the index of the first unhandled code unit and the UTF-8 data
 /// that was encoded.
-@warn_unused_result
 internal func _transcodeSomeUTF16AsUTF8<
   Input : Collection
   where
@@ -666,10 +663,8 @@ internal func _transcodeSomeUTF16AsUTF8<
 /// representation.
 public // @testable
 protocol _StringElement {
-  @warn_unused_result
   static func _toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
 
-  @warn_unused_result
   static func _fromUTF16CodeUnit(_ utf16: UTF16.CodeUnit) -> Self
 }
 
@@ -703,7 +698,6 @@ extension UTF8.CodeUnit : _StringElement {
 
 extension UTF16 {
   /// Returns the number of code units required to encode `x`.
-  @warn_unused_result
   public static func width(_ x: UnicodeScalar) -> Int {
     return x.value <= 0xFFFF ? 1 : 2
   }
@@ -712,7 +706,6 @@ extension UTF16 {
   /// `x`.
   ///
   /// - Precondition: `width(x) == 2`.
-  @warn_unused_result
   public static func leadSurrogate(_ x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return UTF16.CodeUnit((x.value - 0x1_0000) >> (10 as UInt32)) + 0xD800
@@ -722,7 +715,6 @@ extension UTF16 {
   /// `x`.
   ///
   /// - Precondition: `width(x) == 2`.
-  @warn_unused_result
   public static func trailSurrogate(_ x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return UTF16.CodeUnit(
@@ -730,12 +722,10 @@ extension UTF16 {
     ) + 0xDC00
   }
 
-  @warn_unused_result
   public static func isLeadSurrogate(_ x: CodeUnit) -> Bool {
     return 0xD800...0xDBFF ~= x
   }
 
-  @warn_unused_result
   public static func isTrailSurrogate(_ x: CodeUnit) -> Bool {
     return 0xDC00...0xDFFF ~= x
   }
@@ -767,7 +757,6 @@ extension UTF16 {
   /// If `repairIllFormedSequences` is `true`, the function always succeeds.
   /// If it is `false`, `nil` is returned if an ill-formed code unit sequence is
   /// found in `input`.
-  @warn_unused_result
   public static func transcodedLength<
     Encoding : UnicodeCodec, Input : IteratorProtocol
     where Encoding.CodeUnit == Input.Element

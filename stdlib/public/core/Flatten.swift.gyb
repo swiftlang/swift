@@ -124,7 +124,6 @@ extension Sequence where Iterator.Element : Sequence {
   ///   sequence of sequences.
   ///
   /// - SeeAlso: `flatMap(_:)`, `joined(separator:)`
-  @warn_unused_result
   public func flatten() -> FlattenSequence<Self> {
     return FlattenSequence(_base: self)
   }
@@ -136,7 +135,6 @@ extension LazySequenceProtocol
   Iterator.Element : Sequence {
 
   /// A concatenation of the elements of `self`.
-  @warn_unused_result
   public func flatten() -> LazySequence<
     FlattenSequence<Elements>
   > {
@@ -178,7 +176,6 @@ public struct ${Index}<
   internal let _inner: BaseElements.Iterator.Element.Index?
 }
 
-@warn_unused_result
 public func == <BaseElements> (
   lhs: ${Index}<BaseElements>, 
   rhs: ${Index}<BaseElements>
@@ -186,7 +183,6 @@ public func == <BaseElements> (
   return lhs._outer == rhs._outer && lhs._inner == rhs._inner
 }
 
-@warn_unused_result
 public func < <BaseElements> (
   lhs: ${Index}<BaseElements>, 
   rhs: ${Index}<BaseElements>
@@ -284,7 +280,6 @@ public struct ${Collection}<
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(after i: Index) -> Index {
     let innerCollection = _base[i._outer]
     let nextInner = innerCollection.index(after: i._inner!)
@@ -306,7 +301,6 @@ public struct ${Collection}<
 
 % if traversal == 'Bidirectional':
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(before i: Index) -> Index {
     var prevOuter = i._outer
     if prevOuter == _base.endIndex {
@@ -398,7 +392,6 @@ extension ${collectionForTraversal(traversal)}
   ///   collection of collections.
   ///
   /// - SeeAlso: `flatMap(_:)`, `joined(separator:)`
-  @warn_unused_result
   public func flatten() -> ${Collection}<Self> {
     return ${Collection}(self)
   }
@@ -412,7 +405,6 @@ extension LazyCollectionProtocol
   ${constraints % {'Base': 'Elements.'}},
   Iterator.Element == Elements.Iterator.Element {
   /// A concatenation of the elements of `self`.
-  @warn_unused_result
   public func flatten() -> LazyCollection<${Collection}<Elements>> {
     return ${Collection}(elements).lazy
   }

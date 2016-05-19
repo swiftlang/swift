@@ -539,19 +539,16 @@ extension ${Self}: BinaryFloatingPoint {
   */
 
   @_transparent
-  @warn_unused_result
   public func isEqual(to other: ${Self}) -> Bool {
     return Bool(Builtin.fcmp_oeq_FPIEEE${bits}(self._value, other._value))
   }
 
   @_transparent
-  @warn_unused_result
   public func isLess(than other: ${Self}) -> Bool {
     return Bool(Builtin.fcmp_olt_FPIEEE${bits}(self._value, other._value))
   }
 
   @_transparent
-  @warn_unused_result
   public func isLessThanOrEqualTo(_ other: ${Self}) -> Bool {
     return Bool(Builtin.fcmp_ole_FPIEEE${bits}(self._value, other._value))
   }
@@ -708,20 +705,17 @@ extension ${Self} : Hashable {
 extension ${Self} : AbsoluteValuable {
   /// Returns the absolute value of `x`.
   @_transparent
-  @warn_unused_result
   public static func abs(_ x: ${Self}) -> ${Self} {
     return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(x._value))
   }
 }
 
 @_transparent
-@warn_unused_result
 public prefix func +(x: ${Self}) -> ${Self} {
   return x
 }
 
 @_transparent
-@warn_unused_result
 public prefix func -(x: ${Self}) -> ${Self} {
   return ${Self}(_bits: Builtin.fneg_FPIEEE${bits}(x._value))
 }
@@ -782,25 +776,21 @@ extension ${Self} {
 //  definitions in the standard lib, or both.
 
 @_transparent
-@warn_unused_result
 public func +(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return lhs.adding(rhs)
 }
 
 @_transparent
-@warn_unused_result
 public func -(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return lhs.subtracting(rhs)
 }
 
 @_transparent
-@warn_unused_result
 public func *(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return lhs.multiplied(by: rhs)
 }
 
 @_transparent
-@warn_unused_result
 public func /(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return lhs.divided(by: rhs)
 }

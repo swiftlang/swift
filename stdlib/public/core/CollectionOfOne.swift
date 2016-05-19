@@ -59,14 +59,12 @@ public struct CollectionOfOne<Element>
   }
   
   /// Always returns `endIndex`.
-  @warn_unused_result
   public func index(after i: Int) -> Int {
     _precondition(i == startIndex)
     return endIndex
   }
 
   /// Always returns `startIndex`.
-  @warn_unused_result
   public func index(before i: Int) -> Int {
     _precondition(i == endIndex)
     return startIndex

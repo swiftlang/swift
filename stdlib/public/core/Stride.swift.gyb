@@ -35,7 +35,6 @@ public protocol ${Self} : ${Conformance} {
   /// If `Stride` conforms to `Integer`, then `self.advanced(by: x) == other`.
   ///
   /// - Complexity: O(1).
-  @warn_unused_result
   func distance(to other: Self) -> Stride
 
   /// Returns a `Self` `x` such that `self.distance(to: x)` approximates `n`.
@@ -43,7 +42,6 @@ public protocol ${Self} : ${Conformance} {
   /// If `Stride` conforms to `Integer`, then `self.distance(to: x) == n`.
   ///
   /// - Complexity: O(1).
-  @warn_unused_result
   func advanced(by n: Stride) -> Self
 
   associatedtype _DisabledRangeIndex = _DisabledRangeIndex_
@@ -60,22 +58,18 @@ public func == <T : Strideable>(x: T, y: T) -> Bool {
   return x.distance(to: y) == 0
 }
 
-@warn_unused_result
 public func + <T : Strideable>(lhs: T, rhs: T.Stride) -> T {
   return lhs.advanced(by: rhs)
 }
 
-@warn_unused_result
 public func + <T : Strideable>(lhs: T.Stride, rhs: T) -> T {
   return rhs.advanced(by: lhs)
 }
 
-@warn_unused_result
 public func - <T : Strideable>(lhs: T, rhs: T.Stride) -> T {
   return lhs.advanced(by: -rhs)
 }
 
-@warn_unused_result
 public func - <T : Strideable>(lhs: T, rhs: T) -> T.Stride {
   return rhs.distance(to: lhs)
 }
@@ -181,7 +175,6 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
 /// Returns the sequence of values (`self`, `self + stride`, `self +
 /// stride + stride`, ... *last*) where *last* is the last value in
 /// the progression that is less than `end`.
-@warn_unused_result
 public func stride<T : Strideable>(
   from start: T, to end: T, by stride: T.Stride
 ) -> StrideTo<T> {
@@ -250,7 +243,6 @@ public struct StrideThrough<
 /// the progression less than or equal to `end`.
 ///
 /// - Note: There is no guarantee that `end` is an element of the sequence.
-@warn_unused_result
 public func stride<T : Strideable>(
   from start: T, through end: T, by stride: T.Stride
 ) -> StrideThrough<T> {

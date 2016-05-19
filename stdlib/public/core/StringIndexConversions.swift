@@ -68,7 +68,6 @@ extension String.Index {
   /// to `self`.
   ///
   /// - Precondition: `self` is an element of `String(utf8).indices`.
-  @warn_unused_result
   public func samePosition(
     in utf8: String.UTF8View
   ) -> String.UTF8View.Index {
@@ -79,7 +78,6 @@ extension String.Index {
   /// to `self`.
   ///
   /// - Precondition: `self` is an element of `String(utf16).indices`.
-  @warn_unused_result
   public func samePosition(
     in utf16: String.UTF16View
   ) -> String.UTF16View.Index {
@@ -90,7 +88,6 @@ extension String.Index {
   /// to `self`.
   ///
   /// - Precondition: `self` is an element of `String(unicodeScalars).indices`.
-  @warn_unused_result
   public func samePosition(
     in unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarView.Index {

@@ -122,14 +122,12 @@ extension ErrorProtocol {
 #if _runtime(_ObjC)
 // Helper functions for the C++ runtime to have easy access to domain and
 // code as Objective-C values.
-@warn_unused_result
 @_silgen_name("swift_stdlib_getErrorDomainNSString")
 public func _stdlib_getErrorDomainNSString<T : ErrorProtocol>(_ x: UnsafePointer<T>)
 -> AnyObject {
   return x.pointee._domain._bridgeToObjectiveCImpl()
 }
 
-@warn_unused_result
 @_silgen_name("swift_stdlib_getErrorCode")
 public func _stdlib_getErrorCode<T : ErrorProtocol>(_ x: UnsafePointer<T>) -> Int {
   return x.pointee._code
@@ -137,7 +135,6 @@ public func _stdlib_getErrorCode<T : ErrorProtocol>(_ x: UnsafePointer<T>) -> In
 
 // Known function for the compiler to use to coerce `ErrorProtocol` instances
 // to `NSError`.
-@warn_unused_result
 @_silgen_name("swift_bridgeErrorProtocolToNSError")
 public func _bridgeErrorProtocolToNSError(_ error: ErrorProtocol) -> AnyObject
 #endif

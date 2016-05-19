@@ -168,7 +168,6 @@ public struct ${Self}<Base : ${BaseRequirements}>
   // We can't do it right now because we don't have enough
   // constraints on the Base.Indices type in this context.
 
-  @warn_unused_result
   public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _base.index(after: i)
@@ -180,7 +179,6 @@ public struct ${Self}<Base : ${BaseRequirements}>
   }
 
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
-  @warn_unused_result
   public func index(before i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _base.index(before: i)
@@ -192,13 +190,11 @@ public struct ${Self}<Base : ${BaseRequirements}>
   }
 %     end
 
-  @warn_unused_result
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _base.index(i, offsetBy: n)
   }
 
-  @warn_unused_result
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -206,7 +202,6 @@ public struct ${Self}<Base : ${BaseRequirements}>
     return _base.index(i, offsetBy: n, limitedBy: limit)
   }
 
-  @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     // FIXME: swift-3-indexing-model: range check.
     return _base.distance(from: start, to: end)

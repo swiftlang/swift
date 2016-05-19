@@ -52,7 +52,6 @@ extension CGPoint : CustomDebugStringConvertible {
 
 extension CGPoint : Equatable {}
 @_transparent // @fragile
-@warn_unused_result
 public func == (lhs: CGPoint, rhs: CGPoint) -> Bool {
   return lhs.x == rhs.x  &&  lhs.y == rhs.y
 }
@@ -95,7 +94,6 @@ extension CGSize : CustomDebugStringConvertible {
 
 extension CGSize : Equatable {}
 @_transparent // @fragile
-@warn_unused_result
 public func == (lhs: CGSize, rhs: CGSize) -> Bool {
   return lhs.width == rhs.width  &&  lhs.height == rhs.height
 }
@@ -119,7 +117,6 @@ public extension CGVector {
 
 extension CGVector : Equatable {}
 @_transparent // @fragile
-@warn_unused_result
 public func == (lhs: CGVector, rhs: CGVector) -> Bool {
   return lhs.dx == rhs.dx  &&  lhs.dy == rhs.dy
 }
@@ -180,7 +177,6 @@ public extension CGRect {
   }
 
   @_transparent // @fragile
-  @warn_unused_result
   func divide(_ atDistance: CGFloat, fromEdge: CGRectEdge)
     -> (slice: CGRect, remainder: CGRect)
   {
@@ -215,7 +211,6 @@ extension CGRect : CustomDebugStringConvertible {
 
 extension CGRect : Equatable {}
 @_transparent // @fragile
-@warn_unused_result
 public func == (lhs: CGRect, rhs: CGRect) -> Bool {
   return lhs.equalTo(rhs)
 }

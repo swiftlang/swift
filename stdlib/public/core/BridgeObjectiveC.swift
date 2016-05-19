@@ -25,11 +25,9 @@ public protocol _ObjectiveCBridgeable {
   /// successfully to `Self`; for example, an `NSArray` will only
   /// convert successfully to `[String]` if it contains only
   /// `NSString`s.
-  @warn_unused_result
   static func _isBridgedToObjectiveC() -> Bool
 
   /// Convert `self` to Objective-C.
-  @warn_unused_result
   func _bridgeToObjectiveC() -> _ObjectiveCType
 
   /// Bridge from an Objective-C object of the bridged class type to a
@@ -162,7 +160,6 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 ///   + otherwise, returns the result of `x._bridgeToObjectiveC()`;
 ///
 /// - otherwise, the result is empty.
-@warn_unused_result
 public func _bridgeToObjectiveC<T>(_ x: T) -> AnyObject? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return unsafeBitCast(x, to: AnyObject.self)
@@ -170,7 +167,6 @@ public func _bridgeToObjectiveC<T>(_ x: T) -> AnyObject? {
   return _bridgeNonVerbatimToObjectiveC(x)
 }
 
-@warn_unused_result
 public func _bridgeToObjectiveCUnconditional<T>(_ x: T) -> AnyObject {
   let optResult: AnyObject? = _bridgeToObjectiveC(x)
   _precondition(optResult != nil,
@@ -180,7 +176,6 @@ public func _bridgeToObjectiveCUnconditional<T>(_ x: T) -> AnyObject {
 
 /// Same as `_bridgeToObjectiveCUnconditional`, but autoreleases the
 /// return value if `T` is bridged non-verbatim.
-@warn_unused_result
 func _bridgeToObjectiveCUnconditionalAutorelease<T>(_ x: T) -> AnyObject
 {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
@@ -195,7 +190,6 @@ func _bridgeToObjectiveCUnconditionalAutorelease<T>(_ x: T) -> AnyObject
   return bridged
 }
 
-@warn_unused_result
 @_silgen_name("_swift_bridgeNonVerbatimToObjectiveC")
 func _bridgeNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject?
 
@@ -210,7 +204,6 @@ func _bridgeNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject?
 ///     or a subclass of it, trap;
 ///   + otherwise, returns the result of `T._forceBridgeFromObjectiveC(x)`;
 /// - otherwise, trap.
-@warn_unused_result
 public func _forceBridgeFromObjectiveC<T>(_ x: AnyObject, _: T.Type) -> T {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return x as! T
@@ -223,7 +216,6 @@ public func _forceBridgeFromObjectiveC<T>(_ x: AnyObject, _: T.Type) -> T {
 
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
-@warn_unused_result
 @_silgen_name("_forceBridgeFromObjectiveC_bridgeable")
 public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>
   (_ x: T._ObjectiveCType, _: T.Type) -> T {
@@ -246,7 +238,6 @@ public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>
 ///   + otherwise, returns the result of
 ///     `T._conditionallyBridgeFromObjectiveC(x)`;
 /// - otherwise, the result is empty.
-@warn_unused_result
 public func _conditionallyBridgeFromObjectiveC<T>(
   _ x: AnyObject,
   _: T.Type
@@ -262,7 +253,6 @@ public func _conditionallyBridgeFromObjectiveC<T>(
 
 /// Attempt to convert `x` from its Objective-C representation to its Swift
 /// representation.
-@warn_unused_result
 @_silgen_name("_conditionallyBridgeFromObjectiveC_bridgeable")
 public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>(
   _ x: T._ObjectiveCType,
@@ -300,7 +290,6 @@ func _bridgeNonVerbatimFromObjectiveCConditional<T>(
 /// - If `T` is a class type, returns `true`;
 /// - otherwise, if `T` conforms to `_ObjectiveCBridgeable`, returns
 ///   `T._isBridgedToObjectiveC()`.
-@warn_unused_result
 public func _isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return true
@@ -308,7 +297,6 @@ public func _isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
   return _isBridgedNonVerbatimToObjectiveC(T.self)
 }
 
-@warn_unused_result
 @_silgen_name("_swift_isBridgedNonVerbatimToObjectiveC")
 func _isBridgedNonVerbatimToObjectiveC<T>(_: T.Type) -> Bool
 
@@ -316,13 +304,11 @@ func _isBridgedNonVerbatimToObjectiveC<T>(_: T.Type) -> Bool
 /// `_ObjectiveCBridgeable`, and can have its bits reinterpreted as an
 /// `AnyObject`.  When this function returns true, the storage of an
 /// `Array<T>` can be `unsafeBitCast` as an array of `AnyObject`.
-@warn_unused_result
 public func _isBridgedVerbatimToObjectiveC<T>(_: T.Type) -> Bool {
   return _isClassOrObjCExistential(T.self)
 }
 
 /// Retrieve the Objective-C type to which the given type is bridged.
-@warn_unused_result
 public func _getBridgedObjectiveCType<T>(_: T.Type) -> Any.Type? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return T.self
@@ -330,7 +316,6 @@ public func _getBridgedObjectiveCType<T>(_: T.Type) -> Any.Type? {
   return _getBridgedNonVerbatimObjectiveCType(T.self)
 }
 
-@warn_unused_result
 @_silgen_name("_swift_getBridgedNonVerbatimObjectiveCType")
 func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 
@@ -469,7 +454,6 @@ extension AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
 }
 
 @_transparent
-@warn_unused_result
 public func == <Pointee> (
   lhs: AutoreleasingUnsafeMutablePointer<Pointee>,
   rhs: AutoreleasingUnsafeMutablePointer<Pointee>

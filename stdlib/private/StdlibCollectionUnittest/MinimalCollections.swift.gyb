@@ -117,7 +117,6 @@ public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
 
   public let timesMakeIteratorCalled = ResettableValue(0)
 
-  @warn_unused_result
   public func makeIterator() -> MinimalIterator<T> {
     timesMakeIteratorCalled.value += 1
     return MinimalIterator(_sharedState)
@@ -480,14 +479,12 @@ public func < (lhs: ${Index}, rhs: ${Index}) -> Bool {
 extension MinimalStrideableIndex : Strideable {
   public typealias Stride = Int
 
-  @warn_unused_result
   public func distance(to other: MinimalStrideableIndex) -> Int {
     timesDistanceCalled.value += 1
     _expectCompatibleIndices(self, other)
     return other.position - position
   }
 
-  @warn_unused_result
   public func advanced(by n: Int) -> MinimalStrideableIndex {
     timesAdvancedCalled.value += 1
     return MinimalStrideableIndex(
@@ -652,14 +649,12 @@ public struct ${Self}<T> : ${SelfProtocols} {
       in: bounds.lowerBound.position..<bounds.upperBound.position)
   }
 
-  @warn_unused_result
   public func index(after i: ${Index}) -> ${Index} {
     _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
     return _uncheckedIndex(forPosition: i.position + 1)
   }
 
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
-  @warn_unused_result
   public func index(before i: ${Index}) -> ${Index} {
     // FIXME: swift-3-indexing-model: perform a range check and use
     // return _uncheckedIndex(forPosition: i.position - 1)
@@ -667,7 +662,6 @@ public struct ${Self}<T> : ${SelfProtocols} {
   }
 %     end
 
-  @warn_unused_result
   public func distance(from start: ${Index}, to end: ${Index})
     -> IndexDistance {
 %     if Traversal == 'Forward':
@@ -684,7 +678,6 @@ public struct ${Self}<T> : ${SelfProtocols} {
     return end.position - start.position
   }
 
-  @warn_unused_result
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
 %     if Traversal == 'Forward':
     _precondition(n >= 0,
@@ -851,7 +844,6 @@ public struct DefaultedSequence<Element> : Sequence {
       elements: elements, underestimatedCount: underestimatedCount))
   }
 
-  @warn_unused_result
   public func makeIterator() -> MinimalIterator<Element> {
     return base.makeIterator()
   }
@@ -921,7 +913,6 @@ public struct ${Self}<Element> : ${SelfProtocols} {
 
   public let timesMakeIteratorCalled = ResettableValue(0)
 
-  @warn_unused_result
   public func makeIterator() -> MinimalIterator<Element> {
     timesMakeIteratorCalled.value += 1
     return base.makeIterator()
@@ -931,7 +922,6 @@ public struct ${Self}<Element> : ${SelfProtocols} {
 
   public let timesSuccessorCalled = ResettableValue(0)
 
-  @warn_unused_result
   public func index(after i: ${Index}) -> ${Index} {
     timesSuccessorCalled.value += 1
     return base.index(after: i)
@@ -940,7 +930,6 @@ public struct ${Self}<Element> : ${SelfProtocols} {
 %       if Traversal in ['Bidirectional', 'RandomAccess']:
   public let timesPredecessorCalled = ResettableValue(0)
 
-  @warn_unused_result
   public func index(before i: ${Index}) -> ${Index} {
     timesPredecessorCalled.value += 1
     return base.index(before: i)
@@ -948,13 +937,11 @@ public struct ${Self}<Element> : ${SelfProtocols} {
 %       end
 
 %       if Traversal == 'RandomAccess':
-  @warn_unused_result
   public func distance(from start: ${Index}, to end: ${Index})
     -> IndexDistance {
     return base.distance(from: start, to: end)
   }
 
-  @warn_unused_result
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     return base.index(i, offsetBy: n)
   }
@@ -1062,7 +1049,6 @@ public struct Defaulted${Traversal}RangeReplaceableSlice<Element>
       base: Base(elements: elements))
   }
 
-  @warn_unused_result
   public func makeIterator() -> MinimalIterator<Element> {
     return MinimalIterator(Array(self))
   }

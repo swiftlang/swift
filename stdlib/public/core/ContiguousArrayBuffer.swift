@@ -36,12 +36,10 @@ internal final class _EmptyArrayStorage
 
   // FIXME(ABI): remove 'Void' arguments here and elsewhere in this file, they
   // are a workaround for an old compiler limitation.
-  @warn_unused_result
   override func _getNonVerbatimBridgedCount(_ dummy: Void) -> Int {
     return 0
   }
 
-  @warn_unused_result
   override func _getNonVerbatimBridgedHeapBuffer(
     _ dummy: Void
   ) -> _HeapBuffer<Int, AnyObject> {
@@ -50,7 +48,6 @@ internal final class _EmptyArrayStorage
   }
 #endif
 
-  @warn_unused_result
   override func canStoreElements(ofDynamicType _: Any.Type) -> Bool {
     return false
   }
@@ -127,7 +124,6 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   /// Returns the number of elements in the array.
   ///
   /// - Precondition: `Element` is bridged non-verbatim.
-  @warn_unused_result
   override internal func _getNonVerbatimBridgedCount(_ dummy: Void) -> Int {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(Element.self),
@@ -138,7 +134,6 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   /// Bridge array elements and return a new buffer that owns them.
   ///
   /// - Precondition: `Element` is bridged non-verbatim.
-  @warn_unused_result
   override internal func _getNonVerbatimBridgedHeapBuffer(_ dummy: Void) ->
     _HeapBuffer<Int, AnyObject> {
     _sanityCheck(
@@ -161,7 +156,6 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   /// `Element`.  We can't store anything else without violating type
   /// safety; for example, the destructor has static knowledge that
   /// all of the elements can be destroyed as `Element`.
-  @warn_unused_result
   override func canStoreElements(
     ofDynamicType proposedElementType: Any.Type
   ) -> Bool {
@@ -297,7 +291,6 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     self = buffer
   }
 
-  @warn_unused_result
   public mutating func requestUniqueMutableBackingBuffer(
     minimumCapacity: Int
   ) -> _ContiguousArrayBuffer<Element>? {
@@ -307,12 +300,10 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     return nil
   }
 
-  @warn_unused_result
   public mutating func isMutableAndUniquelyReferenced() -> Bool {
     return isUniquelyReferenced()
   }
 
-  @warn_unused_result
   public mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
     return isUniquelyReferencedOrPinned()
   }
@@ -320,13 +311,11 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
-  @warn_unused_result
   public func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
     return self
   }
 
   @_versioned
-  @warn_unused_result
   func getElement(_ i: Int) -> Element {
     _sanityCheck(i >= 0 && i < count, "Array index out of range")
     return firstElementAddress[i]
@@ -421,7 +410,6 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// - Note: This does not mean the buffer is mutable.  Other factors
   ///   may need to be considered, such as whether the buffer could be
   ///   some immutable Cocoa container.
-  @warn_unused_result
   public mutating func isUniquelyReferenced() -> Bool {
     return __bufferPointer.holdsUniqueReference()
   }
@@ -429,7 +417,6 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// Returns `true` iff this buffer's storage is either
   /// uniquely-referenced or pinned.  NOTE: this does not mean
   /// the buffer is mutable; see the comment on isUniquelyReferenced.
-  @warn_unused_result
   public mutating func isUniquelyReferencedOrPinned() -> Bool {
     return __bufferPointer.holdsUniqueOrPinnedReference()
   }
@@ -440,7 +427,6 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// - Precondition: `Element` is bridged to Objective-C.
   ///
   /// - Complexity: O(1).
-  @warn_unused_result
   public func _asCocoaArray() -> _NSArrayCore {
     _sanityCheck(
         _isBridgedToObjectiveC(Element.self),
@@ -482,7 +468,6 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// - Precondition: `U` is a class or `@objc` existential.
   ///
   /// - Complexity: O(N).
-  @warn_unused_result
   func storesOnlyElementsOfType<U>(
     _: U.Type
   ) -> Bool {
@@ -559,7 +544,6 @@ extension Sequence {
   }
 }
 
-@warn_unused_result
 internal func _copySequenceToNativeArrayBuffer<
   S : Sequence
 >(_ source: S) -> _ContiguousArrayBuffer<S.Iterator.Element> {
@@ -606,7 +590,6 @@ extension _ContiguousArrayBuffer {
 /// ARC loops, the extra retain, release overhead cannot be eliminated which
 /// makes assigning ranges very slow. Once this has been implemented, this code
 /// should be changed to use _UnsafePartiallyInitializedContiguousArrayBuffer.
-@warn_unused_result
 internal func _copyCollectionToNativeArrayBuffer<
   C : Collection
 >(_ source: C) -> _ContiguousArrayBuffer<C.Iterator.Element>
@@ -694,7 +677,6 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   /// Returns the fully-initialized buffer. `self` is reset to contain an
   /// empty buffer and cannot be used afterward.
   @inline(__always) // For performance reasons.
-  @warn_unused_result
   mutating func finish() -> _ContiguousArrayBuffer<Element> {
     // Adjust the initialized count of the buffer.
     result.count = result.capacity - remainingCapacity
@@ -709,7 +691,6 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   /// Returns the fully-initialized buffer. `self` is reset to contain an
   /// empty buffer and cannot be used afterward.
   @inline(__always) // For performance reasons.
-  @warn_unused_result
   mutating func finishWithOriginalCount() -> _ContiguousArrayBuffer<Element> {
     _sanityCheck(remainingCapacity == result.capacity - result.count,
       "_UnsafePartiallyInitializedContiguousArrayBuffer has incorrect count")

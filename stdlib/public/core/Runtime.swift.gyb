@@ -21,7 +21,6 @@ import SwiftShims
 //===----------------------------------------------------------------------===//
 
 @_transparent
-@warn_unused_result
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtrImpl(
   object target: UnsafeMutablePointer<OpaquePointer?>,
@@ -65,7 +64,6 @@ func _stdlib_atomicCompareExchangeStrongPtrImpl(
 /// compare-and-exchange instruction will operate on the writeback buffer, and
 /// you will get a *race* while doing writeback into shared memory.
 @_transparent
-@warn_unused_result
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtr<T>(
   object target: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
@@ -99,7 +97,6 @@ func _stdlib_atomicInitializeARCRef(
 
 % for bits in [ 32, 64 ]:
 
-@warn_unused_result
 @_transparent
 public // @testable
 func _stdlib_atomicCompareExchangeStrongUInt${bits}(
@@ -113,7 +110,6 @@ func _stdlib_atomicCompareExchangeStrongUInt${bits}(
   return Bool(won)
 }
 
-@warn_unused_result
 @_transparent
 public // @testable
 func _stdlib_atomicCompareExchangeStrongInt${bits}(
@@ -143,7 +139,6 @@ func _swift_stdlib_atomicStoreInt${bits}(
     desired: UInt${bits}(bitPattern: desired))
 }
 
-@warn_unused_result
 public // @testable
 func _swift_stdlib_atomicLoadUInt${bits}(
   object target: UnsafeMutablePointer<UInt${bits}>) -> UInt${bits} {
@@ -152,7 +147,6 @@ func _swift_stdlib_atomicLoadUInt${bits}(
   return UInt${bits}(value)
 }
 
-@warn_unused_result
 func _swift_stdlib_atomicLoadInt${bits}(
   object target: UnsafeMutablePointer<Int${bits}>) -> Int${bits} {
   return Int${bits}(bitPattern:
@@ -175,7 +169,6 @@ func _swift_stdlib_atomicFetch${operation}UInt${bits}(
 }
 
 // Warning: no overflow checking.
-@warn_unused_result
 func _swift_stdlib_atomicFetch${operation}Int${bits}(
   object target: UnsafeMutablePointer<Int${bits}>,
   operand: Int${bits}) -> Int${bits} {
@@ -188,7 +181,6 @@ func _swift_stdlib_atomicFetch${operation}Int${bits}(
 
 % end
 
-@warn_unused_result
 func _stdlib_atomicCompareExchangeStrongInt(
   object target: UnsafeMutablePointer<Int>,
   expected: UnsafeMutablePointer<Int>,
@@ -221,7 +213,6 @@ func _swift_stdlib_atomicStoreInt(
 }
 
 @_transparent
-@warn_unused_result
 public func _swift_stdlib_atomicLoadInt(
   object target: UnsafeMutablePointer<Int>) -> Int {
 #if arch(i386) || arch(arm)
@@ -235,7 +226,6 @@ public func _swift_stdlib_atomicLoadInt(
 #endif
 }
 
-@warn_unused_result
 @_transparent
 public // @testable
 func _swift_stdlib_atomicLoadPtrImpl(
@@ -246,7 +236,6 @@ func _swift_stdlib_atomicLoadPtrImpl(
 }
 
 @_transparent
-@warn_unused_result
 public // @testable
 func _stdlib_atomicLoadARCRef(
   object target: UnsafeMutablePointer<AnyObject?>
@@ -293,7 +282,6 @@ public final class _stdlib_AtomicInt {
     return _swift_stdlib_atomicStoreInt(object: _valuePtr, desired: desired)
   }
 
-  @warn_unused_result
   public func load() -> Int {
     return _swift_stdlib_atomicLoadInt(object: _valuePtr)
   }
@@ -310,7 +298,6 @@ public final class _stdlib_AtomicInt {
   }
 % end
 
-  @warn_unused_result
   public func compareExchange(expected: inout Int, desired: Int) -> Bool {
     var expectedVar = expected
     let result = _stdlib_atomicCompareExchangeStrongInt(
@@ -353,7 +340,6 @@ internal struct _Buffer72 {
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 % end
 
-@warn_unused_result
 @_silgen_name("swift_float${bits}ToString")
 func _float${bits}ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
@@ -361,7 +347,6 @@ func _float${bits}ToStringImpl(
   _ debug: Bool
 ) -> UInt
 
-@warn_unused_result
 func _float${bits}ToString(_ value: Float${bits}, debug: Bool) -> String {
 
   if value.isInfinite {
@@ -392,7 +377,6 @@ func _float${bits}ToString(_ value: Float${bits}, debug: Bool) -> String {
 
 % end
 
-@warn_unused_result
 @_silgen_name("swift_int64ToString")
 func _int64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
@@ -400,7 +384,6 @@ func _int64ToStringImpl(
   _ radix: Int64, _ uppercase: Bool
 ) -> UInt
 
-@warn_unused_result
 func _int64ToString(
   _ value: Int64, radix: Int64 = 10, uppercase: Bool = false
 ) -> String {
@@ -431,14 +414,12 @@ func _int64ToString(
   }
 }
 
-@warn_unused_result
 @_silgen_name("swift_uint64ToString")
 func _uint64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt, _ value: UInt64, _ radix: Int64, _ uppercase: Bool
 ) -> UInt
 
-@warn_unused_result
 public // @testable
 func _uint64ToString(
     _ value: UInt64, radix: Int64 = 10, uppercase: Bool = false
@@ -470,7 +451,6 @@ func _uint64ToString(
   }
 }
 
-@warn_unused_result
 func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
   var result = _uint64ToString(
     UInt64(

@@ -173,13 +173,11 @@ public struct MinimalStrideableValue : Equatable, Comparable, Strideable {
 
   public typealias Stride = Int
 
-  @warn_unused_result
   public func distance(to other: MinimalStrideableValue) -> Stride {
     MinimalStrideableValue.timesDistanceWasCalled.value += 1
     return other.value - self.value
   }
 
-  @warn_unused_result
   public func advanced(by n: Stride) -> MinimalStrideableValue {
     MinimalStrideableValue.timesAdvancedWasCalled.value += 1
     return MinimalStrideableValue(self.value + n, identity: self.identity)

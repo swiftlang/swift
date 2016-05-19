@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-@warn_unused_result
 public func == (
   lhs: String.UnicodeScalarView.Index,
   rhs: String.UnicodeScalarView.Index
@@ -18,7 +17,6 @@ public func == (
   return lhs._position == rhs._position
 }
 
-@warn_unused_result
 public func < (
   lhs: String.UnicodeScalarView.Index,
   rhs: String.UnicodeScalarView.Index
@@ -95,7 +93,6 @@ extension String {
     /// Returns the next consecutive location after `i`.
     ///
     /// - Precondition: The next location exists.
-    @warn_unused_result
     public func index(after i: Index) -> Index {
       var scratch = _ScratchIterator(_core, i._position)
       var decoder = UTF16()
@@ -106,7 +103,6 @@ extension String {
     /// Returns the previous consecutive location before `i`.
     ///
     /// - Precondition: The previous location exists.
-    @warn_unused_result
     public func index(before i: Index) -> Index {
       var i = i._position-1
       let codeUnit = _core[i]
@@ -210,7 +206,6 @@ extension String {
     /// this sequence.
     ///
     /// - Complexity: O(1).
-    @warn_unused_result
     public func makeIterator() -> Iterator {
       return Iterator(_core)
     }
@@ -363,7 +358,6 @@ extension String.UnicodeScalarIndex {
   /// to `self`.
   ///
   /// - Precondition: `self` is an element of `String(utf8)!.indices`.
-  @warn_unused_result
   public func samePosition(in utf8: String.UTF8View) -> String.UTF8View.Index {
     return String.UTF8View.Index(self, within: utf8)
   }
@@ -372,7 +366,6 @@ extension String.UnicodeScalarIndex {
   /// to `self`.
   ///
   /// - Precondition: `self` is an element of `String(utf16)!.indices`.
-  @warn_unused_result
   public func samePosition(
     in utf16: String.UTF16View
   ) -> String.UTF16View.Index {
@@ -384,7 +377,6 @@ extension String.UnicodeScalarIndex {
   ///
   /// - Precondition: `self` is an element of
   ///   `characters.unicodeScalars.indices`.
-  @warn_unused_result
   public func samePosition(in characters: String) -> String.Index? {
     return String.Index(self, within: characters)
   }

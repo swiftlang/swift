@@ -124,7 +124,6 @@ public struct String {
 }
 
 extension String {
-  @warn_unused_result
   public // @testable
   static func _fromWellFormedCodeUnitSequence<
     Encoding: UnicodeCodec, Input: Collection
@@ -135,7 +134,6 @@ extension String {
     return String._fromCodeUnitSequence(encoding, input: input)!
   }
 
-  @warn_unused_result
   public // @testable
   static func _fromCodeUnitSequence<
     Encoding: UnicodeCodec, Input: Collection
@@ -153,7 +151,6 @@ extension String {
     }
   }
 
-  @warn_unused_result
   public // @testable
   static func _fromCodeUnitSequenceWithRepair<
     Encoding: UnicodeCodec, Input: Collection
@@ -271,7 +268,6 @@ extension String : CustomDebugStringConvertible {
 extension String {
   /// Returns the number of code units occupied by this string
   /// in the given encoding.
-  @warn_unused_result
   func _encodedLength<
     Encoding: UnicodeCodec
   >(_ encoding: Encoding.Type) -> Int {
@@ -325,7 +321,6 @@ public func _stdlib_compareNSStringDeterministicUnicodeCollationPointer(
 extension String : Equatable {
 }
 
-@warn_unused_result
 public func ==(lhs: String, rhs: String) -> Bool {
   if lhs._core.isASCII && rhs._core.isASCII {
     if lhs._core.count != rhs._core.count {
@@ -354,7 +349,6 @@ extension String {
   ///   0027  ; [*02F8.0020.0002] # APOSTROPHE
   ///
   /// - Precondition: Both `self` and `rhs` are ASCII strings.
-  @warn_unused_result
   public // @testable
   func _compareASCII(_ rhs: String) -> Int {
     var compare = Int(_swift_stdlib_memcmp(
@@ -370,7 +364,6 @@ extension String {
 #endif
 
   /// Compares two strings with the Unicode Collation Algorithm.
-  @warn_unused_result
   @inline(never)
   @_semantics("stdlib_binary_only") // Hide the CF/ICU dependency
   public  // @testable
@@ -418,7 +411,6 @@ extension String {
 #endif
   }
 
-  @warn_unused_result
   public  // @testable
   func _compareString(_ rhs: String) -> Int {
 #if _runtime(_ObjC)
@@ -432,7 +424,6 @@ extension String {
   }
 }
 
-@warn_unused_result
 public func <(lhs: String, rhs: String) -> Bool {
   return lhs._compareString(rhs) < 0
 }
@@ -459,11 +450,9 @@ extension String {
 }
 
 #if _runtime(_ObjC)
-@warn_unused_result
 @_silgen_name("swift_stdlib_NSStringHashValue")
 func _stdlib_NSStringHashValue(_ str: AnyObject, _ isASCII: Bool) -> Int
 
-@warn_unused_result
 @_silgen_name("swift_stdlib_NSStringHashValuePointer")
 func _stdlib_NSStringHashValuePointer(_ str: OpaquePointer, _ isASCII: Bool) -> Int
 #endif
@@ -512,7 +501,6 @@ extension String : Hashable {
   }
 }
 
-@warn_unused_result
 @effects(readonly)
 @_semantics("string.concat")
 public func + (lhs: String, rhs: String) -> String {
@@ -569,7 +557,6 @@ extension Sequence where Iterator.Element == String {
   /// - Parameter separator: A string to insert between each of the elements
   ///   in this sequence.
   /// - Returns: A single, concatenated string.
-  @warn_unused_result
   public func joined(separator: String) -> String {
     var result = ""
 
@@ -613,15 +600,12 @@ extension Sequence where Iterator.Element == String {
 }
 
 #if _runtime(_ObjC)
-@warn_unused_result
 @_silgen_name("swift_stdlib_NSStringLowercaseString")
 func _stdlib_NSStringLowercaseString(_ str: AnyObject) -> _CocoaString
 
-@warn_unused_result
 @_silgen_name("swift_stdlib_NSStringUppercaseString")
 func _stdlib_NSStringUppercaseString(_ str: AnyObject) -> _CocoaString
 #else
-@warn_unused_result
 internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
   var buffer = _StringBuffer(
     capacity: str._core.count, initialSize: str._core.count, elementWidth: 2)
@@ -645,7 +629,6 @@ internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
   return String(_storage: buffer)
 }
 
-@warn_unused_result
 internal func _nativeUnicodeUppercaseString(_ str: String) -> String {
   var buffer = _StringBuffer(
     capacity: str._core.count, initialSize: str._core.count, elementWidth: 2)

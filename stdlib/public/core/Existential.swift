@@ -45,7 +45,6 @@ internal struct _CollectionOf<
   internal let startIndex: IndexType
   internal let endIndex: IndexType
 
-  @warn_unused_result
   internal func index(after i: IndexType) -> IndexType {
     return i.advanced(by: 1)
   }

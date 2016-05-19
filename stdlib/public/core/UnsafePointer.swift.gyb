@@ -126,7 +126,6 @@ public struct ${Self}<Pointee>
   /// instances of `Pointee`.
   ///
   /// - Postcondition: The pointee is allocated, but not initialized.
-  @warn_unused_result
   public init(allocatingCapacity count: Int) {
     let size = strideof(Pointee.self) * count
     self._rawValue =
@@ -193,7 +192,6 @@ public struct ${Self}<Pointee>
   /// - Precondition: The pointee is initialized.
   ///
   /// - Postcondition: The memory is uninitialized.
-  @warn_unused_result
   public func move() -> Pointee {
     return Builtin.take(_rawValue)
   }
@@ -481,7 +479,6 @@ extension ${Self} : CustomPlaygroundQuickLookable {
 }
 
 @_transparent
-@warn_unused_result
 public func == <Pointee>(
   lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>
 ) -> Bool {
@@ -489,33 +486,28 @@ public func == <Pointee>(
 }
 
 @_transparent
-@warn_unused_result
 public func < <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
   return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
 @_transparent
-@warn_unused_result
 public func + <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
   return ${Self}(Builtin.gep_Word(
     lhs._rawValue, (rhs &* strideof(Pointee.self))._builtinWordValue))
 }
 
 @_transparent
-@warn_unused_result
 public func + <Pointee>(lhs: Int,
            rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
   return rhs + lhs
 }
 
 @_transparent
-@warn_unused_result
 public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
   return lhs + -rhs
 }
 
 @_transparent
-@warn_unused_result
 public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
   return
     Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
@@ -579,7 +571,6 @@ extension ${Self} {
 }
 
 extension Int {
-  @warn_unused_result
   public init<U>(bitPattern: ${Self}<U>?) {
     if let bitPattern = bitPattern {
       self = Int(Builtin.ptrtoint_Word(bitPattern._rawValue))
@@ -590,7 +581,6 @@ extension Int {
 }
 
 extension UInt {
-  @warn_unused_result
   public init<U>(bitPattern: ${Self}<U>?) {
     if let bitPattern = bitPattern {
       self = UInt(Builtin.ptrtoint_Word(bitPattern._rawValue))

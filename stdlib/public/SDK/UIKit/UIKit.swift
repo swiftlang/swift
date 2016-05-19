@@ -36,7 +36,6 @@ public extension UIOffset {
 //===----------------------------------------------------------------------===//
 
 @_transparent // @fragile
-@warn_unused_result
 public func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
   return lhs.top == rhs.top &&
          lhs.left == rhs.left &&
@@ -47,7 +46,6 @@ public func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
 extension UIEdgeInsets : Equatable {}
 
 @_transparent // @fragile
-@warn_unused_result
 public func == (lhs: UIOffset, rhs: UIOffset) -> Bool {
   return lhs.horizontal == rhs.horizontal &&
          lhs.vertical == rhs.vertical
@@ -85,21 +83,18 @@ public extension UIDeviceOrientation {
   }
 }
 
-@warn_unused_result
 public func UIDeviceOrientationIsLandscape(
   _ orientation: UIDeviceOrientation
 ) -> Bool {
   return orientation.isLandscape
 }
 
-@warn_unused_result
 public func UIDeviceOrientationIsPortrait(
   _ orientation: UIDeviceOrientation
 ) -> Bool {
   return orientation.isPortrait
 }
 
-@warn_unused_result
 public func UIDeviceOrientationIsValidInterfaceOrientation(
   _ orientation: UIDeviceOrientation) -> Bool
 {
@@ -122,13 +117,11 @@ public extension UIInterfaceOrientation {
   }
 }
 
-@warn_unused_result
 public func UIInterfaceOrientationIsPortrait(
   _ orientation: UIInterfaceOrientation) -> Bool {
   return orientation.isPortrait
 }
 
-@warn_unused_result
 public func UIInterfaceOrientationIsLandscape(
   _ orientation: UIInterfaceOrientation
 ) -> Bool {

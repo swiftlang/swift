@@ -139,12 +139,10 @@ public struct Mirror {
     case dictionary, `set`
   }
 
-  @warn_unused_result
   static func _noSuperclassMirror() -> Mirror? { return nil }
 
   /// Returns the legacy mirror representing the part of `subject`
   /// corresponding to the superclass of `staticSubclass`.
-  @warn_unused_result
   internal static func _legacyMirror(
     _ subject: AnyObject, asClass targetSuperclass: AnyClass) -> _Mirror? {
     
@@ -164,7 +162,6 @@ public struct Mirror {
     return nil
   }
   
-  @warn_unused_result
   internal static func _superclassIterator<Subject : Any>(
     _ subject: Subject, _ ancestorRepresentation: AncestorRepresentation
   ) -> () -> Mirror? {
@@ -443,7 +440,6 @@ extension Mirror {
   /// this function is suitable for exploring the structure of a
   /// `Mirror` in a REPL or playground, but don't expect it to be
   /// efficient.
-  @warn_unused_result
   public func descendant(
     _ first: MirrorPath, _ rest: MirrorPath...
   ) -> Any? {
@@ -490,7 +486,6 @@ extension Mirror.DisplayStyle {
   }
 }
 
-@warn_unused_result
 internal func _isClassSuperMirror(_ t: Any.Type) -> Bool {
 #if  _runtime(_ObjC)
   return t == _ClassSuperMirror.self || t == _ObjCSuperMirror.self
@@ -500,7 +495,6 @@ internal func _isClassSuperMirror(_ t: Any.Type) -> Bool {
 }
 
 extension _Mirror {
-  @warn_unused_result
   internal func _superMirror() -> _Mirror? {
     if self.count > 0 {
       let childMirror = self[0].1

@@ -59,28 +59,24 @@ extension String {
     }
 
     // TODO: swift-3-indexing-model - add docs
-    @warn_unused_result
     public func index(after i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
       return Index(_offset: _unsafePlus(i._offset, 1))
     }
 
     // TODO: swift-3-indexing-model - add docs
-    @warn_unused_result
     public func index(before i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
       return Index(_offset: _unsafeMinus(i._offset, 1))
     }
 
     // TODO: swift-3-indexing-model - add docs
-    @warn_unused_result
     public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
       return Index(_offset: i._offset.advanced(by: n))
     }
 
     // TODO: swift-3-indexing-model - add docs
-    @warn_unused_result
     public func index(
       _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
     ) -> Index? {
@@ -93,13 +89,11 @@ extension String {
     }
 
     // TODO: swift-3-indexing-model - add docs
-    @warn_unused_result
     public func distance(from start: Index, to end: Index) -> IndexDistance {
       // FIXME: swift-3-indexing-model: range check start and end?
       return start._offset.distance(to: end._offset)
     }
 
-    @warn_unused_result
     func _internalIndex(at i: Int) -> Int {
       return _core.startIndex + _offset + i
     }
@@ -231,14 +225,12 @@ extension String {
 
 // FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
 //        assuming String.UTF8View.Index continues to exist
-@warn_unused_result
 public func == (
   lhs: String.UTF16View.Index, rhs: String.UTF16View.Index
 ) -> Bool {
   return lhs._offset == rhs._offset
 }
 
-@warn_unused_result
 public func < (
   lhs: String.UTF16View.Index, rhs: String.UTF16View.Index
 ) -> Bool {
@@ -293,7 +285,6 @@ extension String.UTF16View.Index {
   ///
   /// - Precondition: `self` is an element of
   ///   `String(utf8)!.utf16.indices`.
-  @warn_unused_result
   public func samePosition(
     in utf8: String.UTF8View
   ) -> String.UTF8View.Index? {
@@ -305,7 +296,6 @@ extension String.UTF16View.Index {
   ///
   /// - Precondition: `self` is an element of
   ///   `String(unicodeScalars).utf16.indices`.
-  @warn_unused_result
   public func samePosition(
     in unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
@@ -316,7 +306,6 @@ extension String.UTF16View.Index {
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Precondition: `self` is an element of `characters.utf16.indices`.
-  @warn_unused_result
   public func samePosition(
     in characters: String
   ) -> String.Index? {
@@ -379,7 +368,6 @@ extension String.UTF16View.Indices : BidirectionalCollection {
       endIndex: bounds.upperBound)
   }
 
-  @warn_unused_result
   public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _elements.index(after: i)
@@ -390,7 +378,6 @@ extension String.UTF16View.Indices : BidirectionalCollection {
     _elements.formIndex(after: &i)
   }
 
-  @warn_unused_result
   public func index(before i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _elements.index(before: i)
@@ -401,13 +388,11 @@ extension String.UTF16View.Indices : BidirectionalCollection {
     _elements.formIndex(before: &i)
   }
 
-  @warn_unused_result
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // FIXME: swift-3-indexing-model: range check i?
     return _elements.index(i, offsetBy: n)
   }
 
-  @warn_unused_result
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -416,7 +401,6 @@ extension String.UTF16View.Indices : BidirectionalCollection {
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     // FIXME: swift-3-indexing-model: range check start and end?
     return _elements.distance(from: start, to: end)
