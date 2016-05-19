@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// This protocol is an implementation detail of `Integer`; do not use it
+/// directly.
 @_show_in_interface
 public protocol _Incrementable : Equatable {}
 

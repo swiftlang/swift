@@ -152,6 +152,11 @@ public protocol IndexableBase {
   func formIndex(after i: inout Index)
 }
 
+/// A type that provides subscript access to its elements, with forward index
+/// traversal.
+///
+/// In most cases, it's best to ignore this protocol and use the `Collection`
+/// protocol instead, because it has a more complete interface.
 public protocol Indexable : IndexableBase {
   /// A type that can represent the number of steps between a pair of
   /// indices.
