@@ -2036,7 +2036,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   bool doNotDiagnoseMatches = false;
   bool ignoringNames = false;
   bool considerRenames =
-    !canDerive && !requirement->getAttrs().hasAttribute<OptionalAttr>();
+    !canDerive && !requirement->getAttrs().hasAttribute<OptionalAttr>() &&
+    !requirement->getAttrs().isUnavailable(TC.Context);
 
   if (findBestWitness(requirement,
                       considerRenames ? &ignoringNames : nullptr,
@@ -2049,6 +2050,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     // If the name didn't actually line up, complain.
     if (ignoringNames && 
         requirement->getFullName() != best.Witness->getFullName()) {
+
       diagnoseOrDefer(requirement, false,
         [witness, requirement](TypeChecker &tc,
                                NormalProtocolConformance *conformance) {
@@ -4570,6 +4572,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       SmallVector<ValueDecl *, 4> bestOptionalReqs;
       unsigned bestScore = UINT_MAX;
       for (auto req : unsatisfiedReqs) {
+        // Skip unavailable requirements.
+        if (req->getAttrs().isUnavailable(Context)) continue;
+
         // Score this particular optional requirement.
         auto score = scorePotentiallyMatching(req, value, bestScore);
 
