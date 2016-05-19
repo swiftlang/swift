@@ -2154,37 +2154,12 @@ SetTestSuite.test("BridgedToObjC.Verbatim.Count") {
 }
 
 SetTestSuite.test("BridgedToObjC.Verbatim.Contains") {
-  let s = getBridgedNSSetOfRefTypesBridgedVerbatim()
+  let nss = getBridgedNSSetOfRefTypesBridgedVerbatim()
 
-  var v: AnyObject? = s.member(TestObjCKeyTy(1010))
-  expectEqual(1010, (v as! TestObjCKeyTy).value)
-  let idValue10 = unsafeBitCast(v, to: UInt.self)
-
-  v = s.member(TestObjCKeyTy(2020))
-  expectEqual(2020, (v as! TestObjCKeyTy).value)
-  let idValue20 = unsafeBitCast(v, to: UInt.self)
-
-  v = s.member(TestObjCKeyTy(3030))
-  expectEqual(3030, (v as! TestObjCKeyTy).value)
-  let idValue30 = unsafeBitCast(v, to: UInt.self)
-
-  expectEmpty(s.member(TestObjCKeyTy(4040)))
-
-  // NSSet can store mixed key types.  Swift's Set is typed, but when bridged
-  // to NSSet, it should behave like one, and allow queries for mismatched key
-  // types.
-  expectEmpty(s.member(TestObjCInvalidKeyTy()))
-
-  for i in 0..<3 {
-    expectEqual(idValue10,
-      unsafeBitCast(s.member(TestObjCKeyTy(1010)), to: UInt.self))
-
-    expectEqual(idValue20,
-      unsafeBitCast(s.member(TestObjCKeyTy(2020)), to: UInt.self))
-
-    expectEqual(idValue30,
-      unsafeBitCast(s.member(TestObjCKeyTy(3030)), to: UInt.self))
-  }
+  expectNotEmpty(nss.member(TestObjCKeyTy(1010)))
+  expectNotEmpty(nss.member(TestObjCKeyTy(2020)))
+  expectNotEmpty(nss.member(TestObjCKeyTy(3030)))
+  expectEmpty(nss.member(TestObjCKeyTy(4040)))
 
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
