@@ -2832,6 +2832,7 @@ namespace {
         return nullptr;
       }
 
+      
       // Make sure we can reference ObjectiveC.Selector.
       // FIXME: Fix-It to add the import?
       auto type = CS.getTypeChecker().getObjCSelectorType(CS.DC);
@@ -2841,6 +2842,10 @@ namespace {
       }
 
       return type;
+    }
+
+    Type visitObjCKeyPathExpr(ObjCKeyPathExpr *E) {
+      return E->getSemanticExpr()->getType();
     }
   };
 
@@ -2914,6 +2919,13 @@ namespace {
       // unevaluated.
       if (auto sel = dyn_cast<ObjCSelectorExpr>(expr)) {
         CG.getConstraintSystem().UnevaluatedRootExprs.insert(sel->getSubExpr());
+      }
+
+      // Check a key-path expression, which fills in its semantic
+      // expression as a string literal.
+      if (auto keyPath = dyn_cast<ObjCKeyPathExpr>(expr)) {
+        auto &cs = CG.getConstraintSystem();
+        (void)cs.getTypeChecker().checkObjCKeyPathExpr(cs.DC, keyPath);
       }
 
       // For closures containing only a single expression, the body participates

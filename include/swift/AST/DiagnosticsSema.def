@@ -368,6 +368,26 @@ ERROR(noescape_functiontype_mismatch,none,
       "invalid conversion from non-escaping function of type %0 to "
       "potentially escaping function type %1", (Type, Type))
 
+// Key-path expressions.
+ERROR(expr_keypath_no_objc_runtime,none,
+      "'#keyPath' can only be used with the Objective-C runtime", ())
+ERROR(expression_unused_keypath_result,none,
+      "result of '#keyPath' is unused", ())
+ERROR(expr_keypath_non_objc_property,none,
+      "argument of '#keyPath' refers to non-'@objc' property %0",
+      (DeclName))
+ERROR(stdlib_anyobject_not_found,none,
+      "broken standard library: cannot find 'AnyObject' protocol", ())
+ERROR(expr_keypath_type_of_property,none,
+      "cannot refer to type member %0 within instance of type %1",
+      (DeclName, Type))
+ERROR(expr_keypath_generic_type,none,
+      "'#keyPath' cannot refer to generic type %0", (DeclName))
+ERROR(expr_keypath_not_property,none,
+      "'#keyPath' cannot refer to %0 %1", (DescriptiveDeclKind, DeclName))
+ERROR(expr_keypath_empty,none,
+      "empty '#keyPath' does not refer to a property", ())
+
 // Selector expressions.
 ERROR(expr_selector_no_objc_runtime,none,
       "'#selector' can only be used with the Objective-C runtime", ())
@@ -401,7 +421,7 @@ ERROR(expr_selector_not_objc,none,
       "argument of '#selector' refers to %0 %1 that is not exposed to "
       "Objective-C",
       (DescriptiveDeclKind, DeclName))
-NOTE(expr_selector_make_objc,none,
+NOTE(make_decl_objc,none,
      "add '@objc' to expose this %0 to Objective-C",
      (DescriptiveDeclKind))
 

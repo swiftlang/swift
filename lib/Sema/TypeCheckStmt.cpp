@@ -1032,6 +1032,13 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       .highlight(E->getSourceRange());
     return;
   }
+
+  // Complain about '#keyPath'.
+  if (isa<ObjCKeyPathExpr>(valueE)) {
+    diagnose(valueE->getLoc(), diag::expression_unused_keypath_result)
+      .highlight(E->getSourceRange());
+    return;
+  }
     
   // Always complain about 'try?'.
   if (auto *OTE = dyn_cast<OptionalTryExpr>(valueE)) {

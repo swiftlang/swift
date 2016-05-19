@@ -1081,11 +1081,23 @@ ERROR(expected_type_after_as,none,
 ERROR(string_interpolation_extra,none,
       "extra tokens after interpolated string expression", ())
 
+// Keypath expressions.
+ERROR(expr_keypath_expected_lparen,PointsToFirstBadToken,
+      "expected '(' following '#keyPath'", ())
+ERROR(expr_keypath_expected_property_or_type,PointsToFirstBadToken,
+      "expected property or type name within '#keyPath(...)'", ())
+ERROR(expr_keypath_expected_rparen,PointsToFirstBadToken,
+      "expected ')' to complete '#keyPath' expression", ())
+ERROR(expr_keypath_compound_name,none,
+      "cannot use compound name %0 in '#keyPath' expression", (DeclName))
+
 // Selector expressions.
 ERROR(expr_selector_expected_lparen,PointsToFirstBadToken,
       "expected '(' following '#selector'", ())
-ERROR(expr_selector_expected_expr,PointsToFirstBadToken,
+ERROR(expr_selector_expected_method_expr,PointsToFirstBadToken,
       "expected expression naming a method within '#selector(...)'", ())
+ERROR(expr_selector_expected_property_expr,PointsToFirstBadToken,
+      "expected expression naming a property within '#selector(...)'", ())
 ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
       "expected ')' to complete '#selector' expression", ())
 
