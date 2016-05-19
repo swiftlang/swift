@@ -843,9 +843,6 @@ function(_add_swift_library_single target name)
     LINK_FLAGS " ${link_flags} -L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
   target_link_libraries("${target}" PRIVATE
       ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
-  if(${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES})
-    message(FATAL_ERROR "${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES}")
-  endif()
   target_link_libraries("${target}" INTERFACE
       ${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES})
   set_property(TARGET "${target}" PROPERTY
