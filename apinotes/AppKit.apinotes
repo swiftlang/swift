@@ -1,6 +1,14 @@
 ---
 Name: AppKit
 Classes:
+- Name: NSObjectController
+  Methods:
+  - Selector: 'remove:'
+    SwiftName: 'remove(sender:)'
+    MethodKind: Instance
+  - Selector: 'removeObject:'
+    SwiftName: 'remove(object:)'
+    MethodKind: Instance
 - Name: NSCell
   Methods:
   - Selector: 'initImageCell:'
