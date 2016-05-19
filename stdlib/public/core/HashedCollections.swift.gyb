@@ -3275,9 +3275,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   @warn_unused_result
   internal func bridgingObjectForKey(_ aKey: AnyObject)
     -> AnyObject? {
-    guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
-    else { return nil }
-
+    let nativeKey = _forceBridgeFromObjectiveC(aKey, Key.self)
     let (i, found) = nativeStorage._find(
       nativeKey, startBucket: nativeStorage._bucket(nativeKey))
     if found {

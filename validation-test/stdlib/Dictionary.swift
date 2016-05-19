@@ -2558,11 +2558,6 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.ObjectForKey") {
 
   expectEmpty(d.object(forKey: TestObjCKeyTy(40)))
 
-  // NSDictionary can store mixed key types.  Swift's Dictionary is typed, but
-  // when bridged to NSDictionary, it should behave like one, and allow queries
-  // for mismatched key types.
-  expectEmpty(d.object(forKey: TestObjCInvalidKeyTy()))
-
   for i in 0..<3 {
     expectEqual(idValue10, unsafeBitCast(
       d.object(forKey: TestObjCKeyTy(10)), to: UInt.self))
