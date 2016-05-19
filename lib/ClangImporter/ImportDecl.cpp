@@ -1452,33 +1452,6 @@ namespace {
           if (!DC)
             return nullptr;
 
-          // Local function to create the alias, if needed.
-          auto createAlias = [&](TypeDecl *primary) {
-            if (!importedName.Alias) return;
-
-            auto aliasRef = Impl.createDeclWithClangNode<TypeAliasDecl>(
-                              Decl,
-                              Impl.importSourceLoc(Decl->getLocStart()),
-                              importedName.Alias.getBaseName(),
-                              Impl.importSourceLoc(Decl->getLocation()),
-                              TypeLoc::withoutLoc(
-                                primary->getDeclaredInterfaceType()),
-                              /*genericparams*/nullptr, DC);
-            aliasRef->computeType();
-
-            // Record this as the alternate declaration.
-            Impl.AlternateDecls[primary] = aliasRef;
-
-            // The "Ref" variants have been removed.
-            auto attr =
-              AvailableAttr::createUnconditional(
-                Impl.SwiftContext,
-                "",
-                primary->getName().str(),
-                UnconditionalAvailabilityKind::UnavailableInSwift);
-            aliasRef->getAttrs().add(attr);
-          };
-
           if (auto pointee = CFPointeeInfo::classifyTypedef(Decl)) {
             // If the pointee is a record, consider creating a class type.
             if (pointee.isRecord()) {
@@ -1489,7 +1462,6 @@ namespace {
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
-              createAlias(swiftClass);
               return swiftClass;
             }
 
@@ -1524,7 +1496,6 @@ namespace {
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
-              createAlias(typealias);
               return typealias;
             }
 
@@ -1550,7 +1521,6 @@ namespace {
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
-              createAlias(typealias);
               return typealias;
             }
           }

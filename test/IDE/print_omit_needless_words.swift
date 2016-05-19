@@ -222,10 +222,6 @@
 // Note: no lowercasing of initialisms when there might be a prefix.
 // CHECK-CORECOOLING: func CFBottom() ->
 
-// Note: "Ref" variants are unavailable.
-// CHECK-CORECOOLING: @available(*, unavailable, renamed: "CCPowerSupply", message: "Not available in Swift")
-// CHECK-CORECOOLING-NEXT: typealias CCPowerSupplyRef = CCPowerSupply
-
 // Note: Skipping over "Ref"
 // CHECK-CORECOOLING: func replace(_: CCPowerSupply!)
 

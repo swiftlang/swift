@@ -101,10 +101,6 @@ let mine = IAMStruct1()
 // PRINT-LABEL: /// Class
 // PRINT-NEXT:  class IAMClass {
 // PRINT-NEXT:  }
-//
-// PRINT-LABEL: /// Class
-// PRINT-NEXT:  @available(*, unavailable, renamed: "IAMClass", message: "Not available in Swift")
-// PRINT-NEXT:  typealias IAMClassRef = IAMClass
 // PRINT-NEXT:  typealias IAMOtherName = IAMClass
 // PRINT-NEXT:  extension IAMClass {
 // PRINT-NEXT:    class var typeID: UInt32 { get }

@@ -779,10 +779,6 @@ void ClangImporter::Implementation::addEntryToLookupTable(
   if (auto importedName = importFullName(named, None, &clangSema)) {
     table.addEntry(importedName.Imported, named, importedName.EffectiveContext);
 
-    // Also add the alias, if needed.
-    if (importedName.Alias)
-      table.addEntry(importedName.Alias, named, importedName.EffectiveContext);
-
     // Also add the subscript entry, if needed.
     if (importedName.isSubscriptAccessor())
       table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript,
@@ -2784,19 +2780,11 @@ auto ClangImporter::Implementation::importFullName(
   // Typedef declarations might be CF types that will drop the "Ref"
   // suffix.
   clang::ASTContext &clangCtx = clangSema.Context;
-  bool aliasIsFunction = false;
-  bool aliasIsInitializer = false;
-  StringRef aliasBaseName;
-  SmallVector<StringRef, 4> aliasArgumentNames;
-  if (auto typedefNameDecl = dyn_cast<clang::TypedefNameDecl>(D)) {
-    auto swiftName = getCFTypeName(typedefNameDecl, &aliasBaseName);
-    if (!swiftName.empty()) {
-      if (!aliasBaseName.empty() &&
-          hasConflict(&clangCtx.Idents.get(swiftName), typedefNameDecl)) {
-        // Use the alias name (the "Ref" name), only.
-        baseName = aliasBaseName;
-        aliasBaseName = StringRef();
-      } else {
+  if (!swift2Name) {
+    if (auto typedefNameDecl = dyn_cast<clang::TypedefNameDecl>(D)) {
+      auto swiftName = getCFTypeName(typedefNameDecl);
+      if (!swiftName.empty() &&
+          !hasConflict(&clangCtx.Idents.get(swiftName), typedefNameDecl)) {
         // Adopt the requested name.
         baseName = swiftName;
       }
@@ -2926,7 +2914,6 @@ auto ClangImporter::Implementation::importFullName(
   // If this declaration has the swift_private attribute, prepend "__" to the
   // appropriate place.
   SmallString<16> swiftPrivateScratch;
-  SmallString<16> swiftPrivateAliasScratch;
   if (hasSwiftPrivate(D)) {
     // Make the given name private.
     //
@@ -2966,19 +2953,10 @@ auto ClangImporter::Implementation::importFullName(
     if (makeNamePrivate(isInitializer, baseName, argumentNames,
                         result.InitKind, swiftPrivateScratch))
       return result;
-
-    // If we have an alias name, make it private as well.
-    if (!aliasBaseName.empty()) {
-      (void)makeNamePrivate(aliasIsInitializer, aliasBaseName,
-                            aliasArgumentNames, CtorInitializerKind::Designated,
-                            swiftPrivateAliasScratch);
-    }
   }
 
   result.Imported = formDeclName(SwiftContext, baseName, argumentNames,
                                  isFunction);
-  result.Alias = formDeclName(SwiftContext, aliasBaseName, aliasArgumentNames,
-                              aliasIsFunction);
   return result;
 }
 

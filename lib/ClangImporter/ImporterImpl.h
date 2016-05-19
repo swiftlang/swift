@@ -780,8 +780,7 @@ public:
 
   /// Determine the imported CF type for the given typedef-name, or the empty
   /// string if this is not an imported CF type name.
-  static StringRef getCFTypeName(const clang::TypedefNameDecl *decl,
-                                 StringRef *secondaryName = nullptr);
+  static StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
 
   /// Retrieve the type name of a Clang type for the purposes of
   /// omitting unneeded words.
@@ -836,10 +835,6 @@ public:
   struct ImportedName {
     /// The imported name.
     DeclName Imported;
-
-    /// An additional alias to the imported name, which should be
-    /// recorded in name lookup tables as well.
-    DeclName Alias;
 
     /// Whether this name was explicitly specified via a Clang
     /// swift_name attribute.
