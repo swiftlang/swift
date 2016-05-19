@@ -300,3 +300,7 @@ typedef NSPoint *NSPointPointer;
 - (void)addRect:(NSRect)rect;
 + (void)conjureRect:(NSRect)rect;
 @end
+
+@interface NSDocument (URL)
+@property (copy,nonnull) NSURL *URL;
+@end

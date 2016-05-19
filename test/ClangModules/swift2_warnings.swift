@@ -5,6 +5,7 @@
 
 import Foundation
 import ImportAsMember.A
+import AppKit
 
 func testOldTypeNames() {
   var ps: NSPostingStyle? // expected-error{{'NSPostingStyle' has been renamed to 'PostingStyle'}}{{11-25=PostingStyle}}
@@ -76,4 +77,17 @@ func testImportAsMember() {
 
   IAMStruct1SetRadius(iam1, 3.14159)
   // expected-error@-1{{'IAMStruct1SetRadius' has been replaced by property 'Struct1.radius'}}{{3-22=iam1.radius}} {{22-29= = }} {{36-37=}}
+}
+
+// rdar://problem/26236989
+class X : NSDocument {
+  func test(url: URL) {
+  }
+  func test2() {
+    let url = URL(string: "ABC")
+    self.url = url!
+  }
+  func getTheURL() -> URL {
+    return url
+  }
 }
