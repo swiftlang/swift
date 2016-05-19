@@ -1047,7 +1047,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
     Arguments.push_back("-application_extension");
   }
 
-  // Liking in sanitizers will add rpaths, which might negatively interact when
+  // Linking sanitizers will add rpaths, which might negatively interact when
   // other rpaths are involved, so we should make sure we add the rpaths after
   // all user-specified rpaths.
   if (context.OI.SelectedSanitizer == SanitizerKind::Address)
