@@ -461,6 +461,35 @@ static Type getResultType(TypeChecker &TC, FuncDecl *fn, Type resultType) {
   return resultType;
 }
 
+void TypeChecker::markInvalidGenericSignature(ValueDecl *VD) {
+  GenericParamList *genericParams;
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
+    genericParams = AFD->getGenericParams();
+  else
+    genericParams = cast<GenericTypeDecl>(VD)->getGenericParams();
+
+  // If there aren't any generic parameters at this level, we're done.
+  if (genericParams == nullptr)
+    return;
+
+  DeclContext *DC = VD->getDeclContext();
+  ArchetypeBuilder builder = createArchetypeBuilder(DC->getParentModule());
+
+  if (auto sig = DC->getGenericSignatureOfContext())
+    builder.addGenericSignature(sig, true);
+
+  // Visit each of the generic parameters.
+  for (auto param : *genericParams)
+    builder.addGenericParameter(param);
+
+  // Wire up the archetypes.
+  for (auto GP : *genericParams)
+    GP->setArchetype(builder.getArchetype(GP));
+
+  genericParams->setAllArchetypes(
+      Context.AllocateCopy(builder.getAllArchetypes()));
+}
+
 bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   bool invalid = false;
 

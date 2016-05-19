@@ -919,6 +919,8 @@ public:
   bool isProtocolExtensionUsable(DeclContext *dc, Type type,
                                  ExtensionDecl *protocolExtension) override;
 
+  void markInvalidGenericSignature(ValueDecl *VD);
+
   /// Validate the signature of a generic function.
   ///
   /// \param func The generic function.
