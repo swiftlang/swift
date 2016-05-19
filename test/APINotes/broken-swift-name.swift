@@ -13,4 +13,12 @@ func testBrokenSwiftName(x: inout ZXSpectrum) {
 
   _ = x.misnamedRegister // expected-error{{has no member}}
   x.misnamedRegister = 0 // expected-error{{has no member}}
+
+  // Ensure that definitions with invalid API notes are still available
+  // under their original names.
+  ZXSpectrumGetRegister(&x, 0)
+  ZXSpectrumSetRegister(&x, 0, 1)
+  ZXSpectrumGetMisnamedRegister(&x, 0)
+  // TODO: Conservative validation in Clang doesn't reject the API name here
+  // ZXSpectrumSetMisnamedRegister(&x, 0, 1)
 }
