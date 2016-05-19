@@ -22,6 +22,9 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
   set(swift_runtime_port_sources
       CygwinPort.cpp)
 endif()
+
+list(APPEND swift_runtime_compile_flags
+     "-D__SWIFT_CURRENT_DYLIB=swiftCore")
     
 set(swift_runtime_objc_sources)
 set(swift_runtime_unicode_normalization_sources)

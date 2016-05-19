@@ -79,6 +79,10 @@ function(handle_swift_sources
     # <rdar://problem/15972329>
     list(APPEND swift_compile_flags "-force-single-frontend-invocation")
 
+    if(SWIFTSOURCES_IS_STDLIB_CORE)
+      list(APPEND swift_compile_flags "-Xcc" "-D__SWIFT_CURRENT_DYLIB=swiftCore")
+    endif()
+
     _compile_swift_files(
         dependency_target
         OUTPUT ${swift_obj}
