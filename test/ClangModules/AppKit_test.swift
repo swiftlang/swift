@@ -4,6 +4,16 @@
 
 import AppKit
 
+class MyController {
+  init() {
+    let arrayController = NSArrayController()
+    let object = "test" as NSString
+    arrayController.remove(sender: object)
+    arrayController.remove(object: object)
+    arrayController.remove(object) // expected-error {{'remove' has been renamed to 'remove(sender:)'}}
+  }
+}
+
 class MyDocument : NSDocument {
   override func read(from URL: NSURL, ofType type: String) throws {
     try super.read(from: URL, ofType: type)
@@ -36,4 +46,3 @@ class MyView : NSView {
     // expected-note@-2 {{use 'Swift.' to reference the global function}} {{5-5=Swift.}}
   }
 }
-

@@ -300,3 +300,16 @@ typedef NSPoint *NSPointPointer;
 - (void)addRect:(NSRect)rect;
 + (void)conjureRect:(NSRect)rect;
 @end
+
+@interface NSController : NSObject
+@end
+
+@interface NSObjectController : NSController
+- (void)removeObject:(nonnull id)object;
+- (void)remove:(nullable id)sender;
+@end
+
+@interface NSArrayController : NSObjectController
+- (void)removeObject:(nonnull id)object;
+- (void)remove:(nullable id)sender;
+@end
