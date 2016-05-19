@@ -113,6 +113,39 @@ class TestObjCKeyTy : NSObject, NSCopying {
   var serial: Int
 }
 
+// A type that satisfies the requirements of an NSDictionary key (or an NSSet
+// member), but traps when any of its methods are called.
+class TestObjCInvalidKeyTy {
+  init() {
+    _objcKeyCount.fetchAndAdd(1)
+    serial = _objcKeySerial.addAndFetch(1)
+  }
+
+  deinit {
+    assert(serial > 0, "double destruction")
+    _objcKeyCount.fetchAndAdd(-1)
+    serial = -serial
+  }
+
+  @objc
+  var description: String {
+    assert(serial > 0, "dead TestObjCInvalidKeyTy")
+    fatalError()
+  }
+
+  @objc
+  func isEqual(_ object: AnyObject!) -> Bool {
+    fatalError()
+  }
+
+  @objc
+  var hash : Int {
+    fatalError()
+  }
+
+  var serial: Int
+}
+
 var _objcValueCount = _stdlib_AtomicInt(0)
 var _objcValueSerial = _stdlib_AtomicInt(0)
 
