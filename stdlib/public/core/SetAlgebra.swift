@@ -155,12 +155,12 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   @warn_unused_result
   func symmetricDifference(_ other: Self) -> Self
 
-  /// If `newMember` is not already contained in `self`, inserts it.
+  /// Inserts the given element in the set if it is not already present.
   ///
-  /// If the element is already contained in the set, this method has no
-  /// effect. In this example, a new element is inserted into `classDays`, a
-  /// set of days of the week. When an existing element is inserted, the
-  /// `classDays` set does not change.
+  /// If an element equal to `newMember` is already contained in the set, this
+  /// method has no effect. In this example, a new element is inserted into
+  /// `classDays`, a set of days of the week. When an existing element is
+  /// inserted, the `classDays` set does not change.
   ///
   ///     enum DayOfTheWeek: Int {
   ///         case sunday, monday, tuesday, wednesday, thursday,
@@ -178,44 +178,58 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///     print(classDays)
   ///     // Prints "[.friday, .wednesday, .monday]"
   ///
-  /// - Returns: `(true, newMember)` if `newMember` was not contained in
-  ///   `self`. Otherwise, returns `(false, oldMember)`, where `oldMember` is
-  ///   the member of `self` equal to `newMember` (which may be
-  ///   distinguishable from `newMember`, e.g. via `===`).
-  ///
-  /// - Postcondition: `self.contains(newMember)`.
+  /// - Parameter newMember: An element to insert into the set.
+  /// - Returns: `(true, newMember)` if `newMember` was not contained in the
+  ///   set. If an element equal to `newMember` was already contained in the
+  ///   set, the method returns `(false, oldMember)`, where `oldMember` is the
+  ///   element that was equal to `newMember`. In some cases, `oldMember` may
+  ///   be distinguishable from `newMember` by identity comparison or some
+  ///   other means.
   @discardableResult
   mutating func insert(
     _ newMember: Element
   ) -> (inserted: Bool, memberAfterInsert: Element)
   
-  /// If `self` intersects `[e]`, removes and returns an element `r`
-  /// such that `self.intersection([e]) == [r]`; returns `nil`
-  /// otherwise.
+  /// Removes the given element and any elements subsumed by the given element.
   ///
-  /// - Note: for ordinary sets where `Self` is not the same type as
-  ///   `Element`, `s.remove(e)` removes and returns an element equal
-  ///   to `e` (which may be distinguishable from `e`, e.g. via
-  ///   `===`), or returns `nil` if no such element existed.
+  /// - Parameter member: The element of the set to remove.
+  /// - Returns: For ordinary sets, an element equal to `member` if `member` is
+  ///   contained in the set; otherwise, `nil`. In some cases, a returned
+  ///   element may be distinguishable from `newMember` by identity comparison
+  ///   or some other means.
   ///
-  /// - Postcondition: `self.intersection([e]).isEmpty`
+  ///   For sets where the set type and element type are the same, like
+  ///   `OptionSet` types, this method returns any intersection between the set
+  ///   and `[member]`, or `nil` if the intersection is empty.
   @discardableResult
-  mutating func remove(_ e: Element) -> Element?
+  mutating func remove(_ member: Element) -> Element?
 
-  /// Inserts `e` unconditionally.
+  /// Inserts the given element into the set unconditionally.
   ///
-  /// - Returns: a former member `r` of `self` such that
-  ///   `self.intersection([e]) == [r]` if `self.intersection([e])` was
-  ///   non-empty.  Returns `nil` otherwise.
+  /// If an element equal to `newMember` is already contained in the set,
+  /// `newMember` replaces the existing element. In this example, an existing
+  /// element is inserted into `classDays`, a set of days of the week.
   ///
-  /// - Note: for ordinary sets where `Self` is not the same type as
-  ///   `Element`, `s.update(with: e)` returns an element equal
-  ///   to `e` (which may be distinguishable from `e`, e.g. via
-  ///   `===`), or returns `nil` if no such element existed.
+  ///     enum DayOfTheWeek: Int {
+  ///         case sunday, monday, tuesday, wednesday, thursday,
+  ///             friday, saturday
+  ///     }
   ///
-  /// - Postcondition: `self.contains(e)`
+  ///     var classDays: Set<DayOfTheWeek> = [.monday, .wednesday, .friday]
+  ///     print(classDays.update(with: .monday))
+  ///     // Prints "Optional(.monday)"
+  ///
+  /// - Parameter newMember: An element to insert into the set.
+  /// - Returns: For ordinary sets, an element equal to `newMember` if the set
+  ///   already contained such a member; otherwise, `nil`. In some cases, the
+  ///   returned element may be distinguishable from `newMember` by identity
+  ///   comparison or some other means.
+  ///
+  ///   For sets where the set type and element type are the same, like
+  ///   `OptionSet` types, this method returns any intersection between the 
+  ///   set and `[newMember]`, or `nil` if the intersection is empty.
   @discardableResult
-  mutating func update(with e: Element) -> Element?
+  mutating func update(with newMember: Element) -> Element?
   
   /// Adds the elements of the given set to the set.
   ///
@@ -396,7 +410,7 @@ extension SetAlgebra {
   /// strings:
   ///
   ///     let ingredients: Set = ["cocoa beans", "sugar", "cocoa butter", "salt"]
-  ///     if ingredients.isSupersetOf(["sugar", "salt"]) {
+  ///     if ingredients.isSuperset(of: ["sugar", "salt"]) {
   ///         print("Whatever it is, it's bound to be delicious!")
   ///     }
   ///     // Prints "Whatever it is, it's bound to be delicious!"
