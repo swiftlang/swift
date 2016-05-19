@@ -833,6 +833,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitObjCKeyPathExpr(ObjCKeyPathExpr *E) {
+    HANDLE_SEMANTIC_EXPR(E);
+    return E;
+  }
+
   //===--------------------------------------------------------------------===//
   //                           Everything Else
   //===--------------------------------------------------------------------===//

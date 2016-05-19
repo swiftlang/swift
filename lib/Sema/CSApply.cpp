@@ -3568,7 +3568,7 @@ namespace {
         tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
                     foundDecl->getDescriptiveKind(), foundDecl->getFullName())
           .highlight(subExpr->getSourceRange());
-        tc.diagnose(foundDecl, diag::expr_selector_make_objc,
+        tc.diagnose(foundDecl, diag::make_decl_objc,
                     foundDecl->getDescriptiveKind())
           .fixItInsert(foundDecl->getAttributeInsertionLoc(false),
                        "@objc ");
@@ -3577,6 +3577,13 @@ namespace {
 
       // Note which method we're referencing.
       E->setMethod(method);
+      return E;
+    }
+
+    Expr *visitObjCKeyPathExpr(ObjCKeyPathExpr *E) {
+      if (auto semanticE = E->getSemanticExpr())
+        E->setType(semanticE->getType());
+
       return E;
     }
 

@@ -311,6 +311,19 @@ class alignas(8) Expr {
   enum { NumObjCSelectorExprBits = NumExprBits + 2 };
   static_assert(NumObjCSelectorExprBits <= 32, "fits in an unsigned");
 
+  class ObjCKeyPathExprBitfields {
+    friend class ObjCKeyPathExpr;
+    unsigned : NumExprBits;
+
+    /// The number of components in the selector path.
+    unsigned NumComponents : 8;
+
+    /// Whether the names have corresponding source locations.
+    unsigned HaveSourceLocations : 1;
+  };
+  enum { NumObjCKeyPathExprBits = NumExprBits + 17 };
+  static_assert(NumObjCKeyPathExprBits <= 32, "fits in an unsigned");
+
 protected:
   union {
     ExprBitfields ExprBits;
@@ -333,6 +346,7 @@ protected:
     CollectionUpcastConversionExprBitfields CollectionUpcastConversionExprBits;
     TupleShuffleExprBitfields TupleShuffleExprBits;
     ObjCSelectorExprBitfields ObjCSelectorExprBits;
+    ObjCKeyPathExprBitfields ObjCKeyPathExprBits;
   };
 
 private:
@@ -3857,6 +3871,111 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ObjCSelector;
+  }
+};
+
+/// Produces a keypath string for the given referenced property.
+///
+/// \code
+/// #keyPath(Person.friends.firstName)
+/// \endcode
+class ObjCKeyPathExpr : public Expr {
+  SourceLoc KeywordLoc;
+  SourceLoc LParenLoc;
+  SourceLoc RParenLoc;
+  Expr *SemanticExpr = nullptr;
+
+  /// A single stored component, which will be either an identifier or
+  /// a resolved declaration.
+  typedef llvm::PointerUnion<Identifier, ValueDecl *> StoredComponent;
+
+  ObjCKeyPathExpr(SourceLoc keywordLoc, SourceLoc lParenLoc,
+              ArrayRef<Identifier> names,
+              ArrayRef<SourceLoc> nameLocs,
+              SourceLoc rParenLoc);
+
+  /// Retrieve a mutable version of the "components" array, for
+  /// initialization purposes.
+  MutableArrayRef<StoredComponent> getComponentsMutable() {
+    return { reinterpret_cast<StoredComponent *>(this + 1), getNumComponents() };
+  }
+
+  /// Retrieve the "components" storage.
+  ArrayRef<StoredComponent> getComponents() const {
+    return { reinterpret_cast<StoredComponent const *>(this + 1),
+             getNumComponents() };
+  }
+
+  /// Retrieve a mutable version of the name locations array, for
+  /// initialization purposes.
+  MutableArrayRef<SourceLoc> getNameLocsMutable() {
+    if (!ObjCKeyPathExprBits.HaveSourceLocations) return { };
+
+    auto mutableComponents = getComponentsMutable();
+    return { reinterpret_cast<SourceLoc *>(mutableComponents.end()),
+             mutableComponents.size() };
+  }
+
+public:
+  /// Create a new #keyPath expression.
+  ///
+  /// \param nameLocs The locations of the names in the key-path,
+  /// which must either have the same number of entries as \p names or
+  /// must be empty.
+  static ObjCKeyPathExpr *create(ASTContext &ctx,
+                             SourceLoc keywordLoc, SourceLoc lParenLoc,
+                             ArrayRef<Identifier> names,
+                             ArrayRef<SourceLoc> nameLocs,
+                             SourceLoc rParenLoc);
+
+  SourceLoc getLoc() const { return KeywordLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(KeywordLoc, RParenLoc);
+  }
+
+  /// Retrieve the number of components in the key-path.
+  unsigned getNumComponents() const {
+    return ObjCKeyPathExprBits.NumComponents;
+  }
+
+  /// Retrieve's the name for the (i)th component;
+  Identifier getComponentName(unsigned i) const;
+
+  /// Retrieve's the declaration corresponding to the (i)th component,
+  /// or null if this component has not yet been resolved.
+  ValueDecl *getComponentDecl(unsigned i) const {
+    return getComponents()[i].dyn_cast<ValueDecl *>();
+  }
+
+  /// Retrieve the location corresponding to the (i)th name.
+  ///
+  /// If no location information is available, returns an empty
+  /// \c DeclNameLoc.
+  SourceLoc getComponentNameLoc(unsigned i) const {
+    if (!ObjCKeyPathExprBits.HaveSourceLocations) return { };
+
+    auto components = getComponents();
+    ArrayRef<SourceLoc> nameLocs(
+        reinterpret_cast<SourceLoc const *>(components.end()),
+        components.size());
+
+    return nameLocs[i];
+  }
+
+  /// Retrieve the semantic expression, which will be \c NULL prior to
+  /// type checking and a string literal after type checking.
+  Expr *getSemanticExpr() const { return SemanticExpr; }
+
+  /// Set the semantic expression.
+  void setSemanticExpr(Expr *expr) { SemanticExpr = expr; }
+
+  /// Resolve the given component to the given declaration.
+  void resolveComponent(unsigned idx, ValueDecl *decl) {
+    getComponentsMutable()[idx] = decl;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ObjCKeyPath;
   }
 };
 

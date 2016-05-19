@@ -1175,6 +1175,9 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpressionShallow(Expr *&expr, DeclContext *dc);
 
+  /// Check the key-path expression.
+  ObjCKeyPathExpr *checkObjCKeyPathExpr(DeclContext *dc, ObjCKeyPathExpr *expr);
+
   /// \brief Type check whether the given type declaration includes members of
   /// unsupported recursive value types.
   ///

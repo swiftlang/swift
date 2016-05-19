@@ -2226,6 +2226,24 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+
+  void visitObjCKeyPathExpr(ObjCKeyPathExpr *E) {
+    printCommon(E, "keypath_expr");
+    for (unsigned i = 0, n = E->getNumComponents(); i != n; ++i) {
+      OS << "\n";
+      OS.indent(Indent + 2);
+      OS << "component=";
+      if (auto decl = E->getComponentDecl(i))
+        decl->dumpRef(OS);
+      else
+        OS << E->getComponentName(i);
+    }
+    if (auto semanticE = E->getSemanticExpr()) {
+      OS << '\n';
+      printRec(semanticE);
+    }
+    OS << ")";
+  }
 };
 
 } // end anonymous namespace.
