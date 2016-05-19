@@ -488,11 +488,13 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   var isCanonical: Bool { get }
 }
 
+/// The sign of a floating-point value.
 public enum FloatingPointSign: Int {
   case plus
   case minus
 }
 
+/// The IEEE 754 floating-point classes.
 public enum FloatingPointClassification {
   case signalingNaN
   case quietNaN

@@ -14,7 +14,7 @@
 
 /// Performs a logical NOT operation on a Boolean value.
 ///
-/// The `!` (logical NOT) operator inverts a Boolean value. If the value is
+/// The logical NOT operator (`!`) inverts a Boolean value. If the value is
 /// `true`, the result of the operation is `false`; if the value is `false`,
 /// the result is `true`. For example:
 ///
@@ -34,7 +34,7 @@ public prefix func !<T : Boolean>(a: T) -> Bool {
 
 /// Performs a logical AND operation on two Boolean values.
 ///
-/// The `&&` (logical AND) operator combines two Boolean values and returns
+/// The logical AND operator (`&&`) combines two Boolean values and returns
 /// `true` if both of the values are `true`. If either of the values is
 /// `false`, the operator returns `false`.
 ///
@@ -74,7 +74,7 @@ public func && <T : Boolean, U : Boolean>(
 
 /// Performs a logical OR operation on two Boolean values.
 ///
-/// The `||` (logical OR) operator combines two Boolean values and returns
+/// The logical OR operator (`||`) combines two Boolean values and returns
 /// `true` if at least one of the values is `true`. If both values are
 /// `false`, the operator returns `false`.
 ///
@@ -115,7 +115,7 @@ public func || <T : Boolean, U : Boolean>(
 
 /// Performs a logical AND operation on two Boolean values.
 ///
-/// The `&&` (logical AND) operator combines two Boolean values and returns
+/// The logical AND operator (`&&`) combines two Boolean values and returns
 /// `true` if both of the values are `true`. If either of the values is
 /// `false`, the operator returns `false`.
 ///
@@ -158,7 +158,7 @@ public func && <T : Boolean>(
 
 /// Performs a logical OR operation on two Boolean values.
 ///
-/// The `||` (logical OR) operator combines two Boolean values and returns
+/// The logical OR operator (`||`) combines two Boolean values and returns
 /// `true` if at least one of the values is `true`. If both values are
 /// `false`, the operator returns `false`.
 ///

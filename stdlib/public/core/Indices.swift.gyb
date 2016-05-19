@@ -14,17 +14,20 @@
 from gyb_stdlib_support import (
     TRAVERSALS,
     collectionForTraversal,
-    defaultIndicesForTraversal
+    defaultIndicesForTraversal,
+    documentationNameForTraversal
 )
 }%
 
 % for Traversal in TRAVERSALS:
 %   Self = defaultIndicesForTraversal(Traversal)
+%   collection = documentationNameForTraversal(Traversal)
 
 // FIXME(ABI)(compiler limitation): There should be just one default
 // indices type that has conditional conformances to
 // `BidirectionalCollection` and `RandomAccessCollection`.
 
+/// A collection of indices for an arbitrary ${collection}.
 public struct ${Self}<
   Elements : ${collectionForTraversal(Traversal).replace('Collection', 'Indexable')}
   // FIXME(ABI)(compiler limitation):
@@ -105,6 +108,23 @@ public struct ${Self}<
 }
 
 extension ${collectionForTraversal(Traversal)} where Indices == ${Self}<Self> {
+  /// The indices that are valid for subscripting the collection, in ascending
+  /// order.
+  ///
+  /// A collections's `indices` property can hold a strong reference to the
+  /// collection itself, causing the collection to be non-uniquely referenced.
+  /// If you mutate the collection while iterating over its indices, a strong
+  /// reference can cause an unexpected copy of the collection. To avoid the
+  /// unexpected copy, use the `index(after:)` method starting with
+  /// `startIndex` to produce indices instead.
+  ///
+  ///     var c = MyFancyCollection([10, 20, 30, 40, 50])
+  ///     var i = c.startIndex
+  ///     while i != c.endIndex {
+  ///         c[i] /= 5
+  ///         i = c.index(after: i)
+  ///     }
+  ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
   public var indices: ${Self}<Self> {
     return ${Self}(
       _elements: self,
