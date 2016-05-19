@@ -14,17 +14,20 @@
 from gyb_stdlib_support import (
     TRAVERSALS,
     collectionForTraversal,
-    defaultIndicesForTraversal
+    defaultIndicesForTraversal,
+    documentationNameForTraversal
 )
 }%
 
 % for Traversal in TRAVERSALS:
 %   Self = defaultIndicesForTraversal(Traversal)
+%   collection = documentationNameForTraversal(Traversal)
 
 // FIXME(ABI)(compiler limitation): There should be just one default
 // indices type that has conditional conformances to
 // `BidirectionalCollection` and `RandomAccessCollection`.
 
+/// A collection of indices for an arbitrary ${collection}.
 public struct ${Self}<
   Elements : ${collectionForTraversal(Traversal).replace('Collection', 'Indexable')}
   // FIXME(ABI)(compiler limitation):
