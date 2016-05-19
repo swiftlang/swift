@@ -1252,15 +1252,33 @@ void
 SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
   auto conformance =
     getOpConformance(Inst->getLookupType(), Inst->getConformance());
+  auto lookupType = Inst->getLookupType();
+  auto newLookupType = getOpASTType(lookupType);
+  SILValue OpenedExistential;
+  if (Inst->hasOperand())
+    OpenedExistential = getOpValue(Inst->getOperand());
+  else if (isa<ArchetypeType>(newLookupType) &&
+           !cast<ArchetypeType>(newLookupType)
+                ->getOpenedExistentialType()
+                .isNull()) {
+    // Obtain the instruction defining this opened archetype.
+    auto &F = getBuilder().getFunction();
+    // Obtain the instruction defining this opened archetype.
+    assert(F.getOpenedArchetypeDef(newLookupType) &&
+           "Definition of an opened archetype should have been seen before its "
+           "use");
+    OpenedExistential = F.getOpenedArchetypeDef(newLookupType);
+  }
+
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(
       Inst,
       getBuilder()
           .createWitnessMethod(
               getOpLocation(Inst->getLoc()),
-              getOpASTType(Inst->getLookupType()), conformance,
+              newLookupType, conformance,
               Inst->getMember(), getOpType(Inst->getType()),
-              Inst->hasOperand() ? getOpValue(Inst->getOperand()) : SILValue(),
+              OpenedExistential,
               Inst->isVolatile()));
 }
 

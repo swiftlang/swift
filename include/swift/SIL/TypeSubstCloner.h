@@ -204,6 +204,22 @@ protected:
     auto Conformance = sub.getConformances()[0];
 
     auto newLookupType = getOpASTType(Inst->getLookupType());
+    SILValue OpenedExistential;
+    if (Inst->hasOperand())
+      OpenedExistential = getOpValue(Inst->getOperand());
+    else if (isa<ArchetypeType>(newLookupType) &&
+             !cast<ArchetypeType>(newLookupType)
+                  ->getOpenedExistentialType()
+                  .isNull()) {
+      auto &F = getBuilder().getFunction();
+      // Obtain the instruction defining this opened archetype.
+      assert(
+          F.getOpenedArchetypeDef(newLookupType) &&
+          "Definition of an opened archetype should have been seen before its "
+          "use");
+      OpenedExistential = F.getOpenedArchetypeDef(newLookupType);
+    }
+
     if (Conformance.isConcrete()) {
       CanType Ty = Conformance.getConcrete()->getType()->getCanonicalType();
 
@@ -223,7 +239,7 @@ protected:
         getBuilder().createWitnessMethod(
             getOpLocation(Inst->getLoc()), newLookupType, Conformance,
             Inst->getMember(), getOpType(Inst->getType()),
-            Inst->hasOperand() ? getOpValue(Inst->getOperand()) : SILValue(),
+            OpenedExistential,
             Inst->isVolatile()));
   }
 
