@@ -730,36 +730,6 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   }
 }
 
-static void markInvalidGenericSignature(ValueDecl *VD, TypeChecker &TC) {
-  GenericParamList *genericParams;
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
-    genericParams = AFD->getGenericParams();
-  else
-    genericParams = cast<GenericTypeDecl>(VD)->getGenericParams();
-  
-  // If there aren't any generic parameters at this level, we're done.
-  if (genericParams == nullptr)
-    return;
-
-  DeclContext *DC = VD->getDeclContext();
-  ArchetypeBuilder builder = TC.createArchetypeBuilder(DC->getParentModule());
-
-  if (auto sig = DC->getGenericSignatureOfContext())
-    builder.addGenericSignature(sig, true);
-  
-  // Visit each of the generic parameters.
-  for (auto param : *genericParams)
-    builder.addGenericParameter(param);
-  
-  // Wire up the archetypes.
-  for (auto GP : *genericParams)
-    GP->setArchetype(builder.getArchetype(GP));
-
-  genericParams->setAllArchetypes(
-      TC.Context.AllocateCopy(builder.getAllArchetypes()));
-}
-
-
 /// Finalize the given generic parameter list, assigning archetypes to
 /// the generic parameters.
 static void finalizeGenericParamList(ArchetypeBuilder &builder,
@@ -4338,7 +4308,7 @@ public:
       gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
 
       if (TC.validateGenericFuncSignature(FD)) {
-        markInvalidGenericSignature(FD, TC);
+        TC.markInvalidGenericSignature(FD);
       } else {
         // Create a fresh archetype builder.
         ArchetypeBuilder builder =
@@ -4365,7 +4335,7 @@ public:
       }
     } else if (FD->getDeclContext()->isGenericTypeContext()) {
       if (TC.validateGenericFuncSignature(FD)) {
-        markInvalidGenericSignature(FD, TC);
+        TC.markInvalidGenericSignature(FD);
       } else if (!FD->hasType()) {
         // Revert all of the types within the signature of the function.
         TC.revertGenericFuncSignature(FD);
@@ -5912,7 +5882,7 @@ public:
       gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
 
       if (TC.validateGenericFuncSignature(CD)) {
-        markInvalidGenericSignature(CD, TC);
+        TC.markInvalidGenericSignature(CD);
       } else {
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(CD->getModuleContext());
@@ -5931,7 +5901,7 @@ public:
       }
     } else if (CD->getDeclContext()->isGenericTypeContext()) {
       if (TC.validateGenericFuncSignature(CD)) {
-        CD->setInvalid();
+        TC.markInvalidGenericSignature(CD);
       } else {
         // Revert all of the types within the signature of the constructor.
         TC.revertGenericFuncSignature(CD);
@@ -6483,7 +6453,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
       // Validate the generic type parameters.
       if (validateGenericTypeSignature(typeAlias)) {
-        markInvalidGenericSignature(typeAlias, *this);
+        markInvalidGenericSignature(typeAlias);
         return;
       }
       
@@ -6521,7 +6491,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
       // Validate the generic type parameters.
       if (validateGenericTypeSignature(nominal)) {
-        markInvalidGenericSignature(nominal, *this);
+        markInvalidGenericSignature(nominal);
         return;
       }
 
