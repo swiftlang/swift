@@ -187,9 +187,32 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
   // If splicing blocks not in the same function, update the parent pointers.
   for (; First != Last; ++First) {
     First->Parent = Parent;
-    for (auto &II : *First)
+    for (auto &II : *First) {
       II.setDebugScope(B,
                        ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
+      SILInstruction *I = &II;
+      // Maintain the registrations of opened archetypes.
+      if (isa<OpenExistentialAddrInst>(I) || isa<OpenExistentialRefInst>(I) ||
+          isa<OpenExistentialBoxInst>(I)) {
+        auto Ty = I->getType().getSwiftRValueType();
+        if (isa<ArchetypeType>(Ty) &&
+            !cast<ArchetypeType>(Ty)->getOpenedExistentialType().isNull()) {
+          SrcTraits.Parent->removeOpenedArchetypeDef(Ty, I);
+          Parent->addOpenedArchetypeDef(Ty, I);
+        }
+      } else if (isa<OpenExistentialMetatypeInst>(I)) {
+        SILType InstanceTy = I->getType();
+        while (isa<AnyMetatypeType>(InstanceTy.getSwiftRValueType())) {
+          InstanceTy = InstanceTy.getMetatypeInstanceType(I->getModule());
+        }
+        auto Ty = InstanceTy.getSwiftRValueType();
+        if (isa<ArchetypeType>(Ty) &&
+            !cast<ArchetypeType>(Ty)->getOpenedExistentialType().isNull()) {
+          SrcTraits.Parent->removeOpenedArchetypeDef(Ty, I);
+          Parent->addOpenedArchetypeDef(Ty, I);
+        }
+      }
+    }
   }
 }
 

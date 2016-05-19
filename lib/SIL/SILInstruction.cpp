@@ -69,11 +69,50 @@ SILBasicBlock *llvm::ilist_traits<SILInstruction>::getContainingBlock() {
 void llvm::ilist_traits<SILInstruction>::addNodeToList(SILInstruction *I) {
   assert(I->ParentBB == 0 && "Already in a list!");
   I->ParentBB = getContainingBlock();
+  if (isa<OpenExistentialAddrInst>(I) ||
+      isa<OpenExistentialRefInst>(I) ||
+      isa<OpenExistentialBoxInst>(I)) {
+    auto Ty = I->getType().getSwiftRValueType();
+    if (isa<ArchetypeType>(Ty) &&
+        !cast<ArchetypeType>(Ty)->getOpenedExistentialType().isNull()) {
+      I->getFunction()->addOpenedArchetypeDef(Ty, I);
+    }
+  }
+  else if (isa<OpenExistentialMetatypeInst>(I)) {
+    SILType InstanceTy = I->getType();
+    while (isa<AnyMetatypeType>(InstanceTy.getSwiftRValueType())) {
+      InstanceTy = InstanceTy.getMetatypeInstanceType(I->getModule());
+    }
+    auto Ty = InstanceTy.getSwiftRValueType();
+    if (isa<ArchetypeType>(Ty) &&
+        !cast<ArchetypeType>(Ty)->getOpenedExistentialType().isNull()) {
+      I->getFunction()->addOpenedArchetypeDef(Ty, I);
+    }
+  }
 }
 
 void llvm::ilist_traits<SILInstruction>::removeNodeFromList(SILInstruction *I) {
   // When an instruction is removed from a BB, clear the parent pointer.
   assert(I->ParentBB && "Not in a list!");
+  if (isa<OpenExistentialAddrInst>(I) ||
+      isa<OpenExistentialRefInst>(I) ||
+      isa<OpenExistentialBoxInst>(I)) {
+    auto Ty = I->getType().getSwiftRValueType();
+    if (isa<ArchetypeType>(Ty) &&
+        !cast<ArchetypeType>(Ty)->getOpenedExistentialType().isNull()) {
+      I->getFunction()->removeOpenedArchetypeDef(Ty, I);
+    }
+  } else if (isa<OpenExistentialMetatypeInst>(I)) {
+    SILType InstanceTy = I->getType();
+    while (isa<AnyMetatypeType>(InstanceTy.getSwiftRValueType())) {
+      InstanceTy = InstanceTy.getMetatypeInstanceType(I->getModule());
+    }
+    auto Ty = InstanceTy.getSwiftRValueType();
+    if (isa<ArchetypeType>(Ty) &&
+        !cast<ArchetypeType>(Ty)->getOpenedExistentialType().isNull()) {
+      I->getFunction()->removeOpenedArchetypeDef(Ty, I);
+    }
+  }
   I->ParentBB = 0;
 }
 

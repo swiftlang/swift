@@ -80,6 +80,7 @@ public:
 private:
   friend class SILBasicBlock;
   friend class SILModule;
+  friend class SILVerifier;
     
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
@@ -110,6 +111,9 @@ private:
 
   /// The source location and scope of the function.
   const SILDebugScope *DebugScope;
+
+  /// Mapping from opened archetypes to their definitions
+  llvm::DenseMap<Type, SILValue> OpenedArchetypeDefs;
 
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.
@@ -688,6 +692,29 @@ public:
     assert(hasSelfMetadataParam() && "This method can only be called if the "
            "SILFunction has a self-metadata parameter");
     return getArguments().back();
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Opened archetypes management
+  //===--------------------------------------------------------------------===//
+  void addOpenedArchetypeDef(Type archetype, SILValue Def) {
+    OpenedArchetypeDefs[archetype] = Def;
+  }
+
+  void removeOpenedArchetypeDef(Type archetype, SILValue Def) {
+    auto FoundDef = OpenedArchetypeDefs.lookup(archetype);
+    assert(FoundDef &&
+           "Opened archetype definition is not registered in SILFunction");
+    if (FoundDef == Def)
+      OpenedArchetypeDefs.erase(archetype);
+  }
+
+  SILValue getOpenedArchetypeDef(Type archetype) const {
+    return OpenedArchetypeDefs.lookup(archetype);
+  }
+
+  llvm::DenseMap<Type, SILValue> &getOpenedArchetypeDefs() {
+    return OpenedArchetypeDefs;
   }
 
   //===--------------------------------------------------------------------===//
