@@ -89,7 +89,7 @@ Functions:
 - Name: CGBitmapContextCreateWithData
   SwiftName: CGContextRef.init(data:width:height:bitsPerComponent:bytesPerRow:space:bitmapInfo:releaseCallback:releaseInfo:)
 - Name: CGBitmapContextCreate
-  SwiftName: CGContextRef.init(data:width:height:bitsPerComponent:bytesPerRow:space:bitmapInfo)
+  SwiftName: CGContextRef.init(data:width:height:bitsPerComponent:bytesPerRow:space:bitmapInfo:)
 - Name: CGBitmapContextGetData
   SwiftName: getter:CGContextRef.data(self:)
 - Name: CGBitmapContextGetWidth

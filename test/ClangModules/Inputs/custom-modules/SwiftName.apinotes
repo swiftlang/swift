@@ -5,6 +5,6 @@ Enumerators:
   SwiftName: challenging
 Functions:
 - Name: spuriousAPINotedSwiftName
-  SwiftName: spuriousAPINotedSwiftName
+  SwiftName: spuriousAPINotedSwiftName(_:)
 - Name: poorlyNamedFunction
-  SwiftName: nicelyRenamedFunction
+  SwiftName: nicelyRenamedFunction(_:)
