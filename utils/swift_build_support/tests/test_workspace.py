@@ -63,21 +63,21 @@ class ComputeBuildSubdirTestCase(unittest.TestCase):
             swift_assertions=assertions,
             swift_stdlib_assertions=assertions)
 
-    def test_Ninja_ReleaseAssert(self):
+    def test_Ninja_ReleaseAssert(self):  # noqa (N802 function name should be lowercase)
         # build-script -R
         args = self.create_basic_args(
             "Ninja", variant="Release", assertions=True)
         self.assertEqual(compute_build_subdir(args),
                          "Ninja-ReleaseAssert")
 
-    def test_Ninja_Release(self):
+    def test_Ninja_Release(self):  # noqa (N802 function name should be lowercase)
         # build-script -R --no-assertions
         args = self.create_basic_args(
             "Ninja", variant="Release", assertions=False)
         self.assertEqual(compute_build_subdir(args),
                          "Ninja-Release")
 
-    def test_Ninja_Release_stdlib_ReleaseAssert(self):
+    def test_Ninja_Release_stdlib_ReleaseAssert(self):  # noqa (N802 function name should be lowercase)
         # build-script -R --no-assertions --swift-stdlib-assertions
         args = self.create_basic_args(
             "Ninja", variant="Release", assertions=False)
@@ -85,7 +85,7 @@ class ComputeBuildSubdirTestCase(unittest.TestCase):
         self.assertEqual(compute_build_subdir(args),
                          "Ninja-Release+stdlib-ReleaseAssert")
 
-    def test_Ninja_mixed(self):
+    def test_Ninja_mixed(self):  # noqa (N802 function name should be lowercase)
         # build-script -R --no-assertions
         #     --llvm-build-variant=RelWithDebInfo
         #     --swift-analyze-code-coverage="merged"
@@ -99,7 +99,7 @@ class ComputeBuildSubdirTestCase(unittest.TestCase):
                          "Ninja+cmark-Release+llvm-RelWithDebInfo"
                          "+swift-ReleaseCoverage+stdlib-ReleaseAssert")
 
-    def test_Unix_Makefiles_ReleaseAssert(self):
+    def test_Unix_Makefiles_ReleaseAssert(self):  # noqa (N802 function name should be lowercase)
         # build-script -R -m
         args = self.create_basic_args(
             "Unix Makefiles", variant="Release", assertions=True)

@@ -49,11 +49,11 @@ def defaultIndicesForTraversal(traversal):  # noqa (N802)
     assert False, 'unknown traversal'
 
 
-def documentationNameForTraversal(traversal):
-  if traversal == 'Forward':
-    return 'collection'
+def documentationNameForTraversal(traversal):  # noqa (N802)
+    if traversal == 'Forward':
+        return 'collection'
     if traversal == 'Bidirectional':
-      return 'bidirectional collection'
+        return 'bidirectional collection'
     if traversal == 'RandomAccess':
-      return 'random-access collection'
+        return 'random-access collection'
     assert False, 'unknown traversal'

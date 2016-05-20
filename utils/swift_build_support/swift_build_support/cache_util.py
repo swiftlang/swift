@@ -47,7 +47,7 @@ def reify(func):
 
     Note: Support method that takes no arguments.
     """
-    class wrapper(object):
+    class Wrapper(object):
         def __get__(self, obj, objtype=None):
             if obj is None:
                 return self
@@ -55,4 +55,4 @@ def reify(func):
             setattr(obj, func.__name__, result)
             return result
 
-    return update_wrapper(wrapper(), func)
+    return update_wrapper(Wrapper(), func)
