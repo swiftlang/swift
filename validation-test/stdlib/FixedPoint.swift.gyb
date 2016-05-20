@@ -307,10 +307,17 @@ FixedPoint.test("OverflowCheck") {
 
 FixedPoint.test("String.init") {
   let x: UInt32 = 0xdeadbeef
+#if _endian(little)
   expectEqual("efbeadde", String(x.bigEndian, radix: 16))
 
   let y = UInt32(bigEndian: 0xdeadbeef)
   expectEqual("deadbeef", String(y.bigEndian, radix: 16))
+#else
+  expectEqual("efbeadde", String(x.littleEndian, radix: 16))
+
+  let y = UInt32(littleEndian: 0xdeadbeef)
+  expectEqual("deadbeef", String(y.littleEndian, radix: 16))
+#endif
 }
 
 FixedPoint.test("byteSwapped") {
@@ -427,4 +434,3 @@ BoolTestSuite.test("||") {
 }
 
 runAllTests()
-
