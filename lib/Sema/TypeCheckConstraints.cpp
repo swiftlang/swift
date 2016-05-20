@@ -2746,7 +2746,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (toExistential || fromExistential || fromArchetype || toArchetype)
     return CheckedCastKind::ValueCast;
 
-  // Reality check casts between concrete types.
+  // Check for casts between concrete types that cannot succeed.
 
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
   
@@ -2821,14 +2821,25 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // This "always fails" diagnosis makes no sense when paired with the CF
   // one.
   auto clas = toType->getClassOrBoundGenericClass();
-  if (!clas || !clas->isForeign()) {
-    if (suppressDiagnostics) {
-      return CheckedCastKind::Unresolved;
-    }
-    diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
-      .highlight(diagFromRange)
-      .highlight(diagToRange);
+  if (clas && clas->isForeign())
+    return CheckedCastKind::ValueCast;
+  
+  // Don't warn on casts that change the generic parameters of ObjC generic
+  // classes. This may be necessary to force-fit ObjC APIs that depend on
+  // covariance, or for APIs where the generic parameter annotations in the
+  // ObjC headers are inaccurate.
+  if (clas && clas->usesObjCGenericsModel()) {
+    if (fromType->getClassOrBoundGenericClass() == clas)
+      return CheckedCastKind::ValueCast;
   }
+  
+  if (suppressDiagnostics) {
+    return CheckedCastKind::Unresolved;
+  }
+  diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
+    .highlight(diagFromRange)
+    .highlight(diagToRange);
+
   return CheckedCastKind::ValueCast;
 }
 
