@@ -48,6 +48,8 @@ from swift_build_support import migration  # noqa (E402)
 import swift_build_support.tar        # noqa (E402)
 import swift_build_support.targets    # noqa (E402)
 from swift_build_support.cmake import CMake  # noqa (E402)
+from swift_build_support.workspace import Workspace  # noqa(E402)
+from swift_build_support.workspace import compute_build_subdir  # noqa(E402)
 
 
 # A strict parser for bools (unlike Python's `bool()`, where
@@ -1203,69 +1205,21 @@ details of the setups of other systems or automated environments.""")
         ]
 
     if args.build_subdir is None:
-        # Create a name for the build directory.
-        args.build_subdir = args.cmake_generator.replace(" ", "_")
-        cmark_build_dir_label = args.cmark_build_variant
-        if args.cmark_assertions:
-            cmark_build_dir_label += "Assert"
+        args.build_subdir = compute_build_subdir(args)
 
-        llvm_build_dir_label = args.llvm_build_variant
-        if args.llvm_assertions:
-            llvm_build_dir_label += "Assert"
+    workspace = Workspace(
+        source_root=SWIFT_SOURCE_ROOT,
+        build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
 
-        swift_build_dir_label = args.swift_build_variant
-        if args.swift_assertions:
-            swift_build_dir_label += "Assert"
-        if args.swift_analyze_code_coverage != "false":
-            swift_build_dir_label += "Coverage"
-
-        swift_stdlib_build_dir_label = args.swift_stdlib_build_variant
-        if args.swift_stdlib_assertions:
-            swift_stdlib_build_dir_label += "Assert"
-
-        # FIXME: mangle LLDB build configuration into the directory name.
-        if (llvm_build_dir_label == swift_build_dir_label and
-                llvm_build_dir_label == swift_stdlib_build_dir_label and
-                llvm_build_dir_label == cmark_build_dir_label):
-            # Use a simple directory name if all projects use the same build
-            # type.
-            args.build_subdir += "-" + llvm_build_dir_label
-        elif (llvm_build_dir_label != swift_build_dir_label and
-                llvm_build_dir_label == swift_stdlib_build_dir_label and
-                llvm_build_dir_label == cmark_build_dir_label):
-            # Swift build type differs.
-            args.build_subdir += "-" + llvm_build_dir_label
-            args.build_subdir += "+swift-" + swift_build_dir_label
-        elif (llvm_build_dir_label == swift_build_dir_label and
-                llvm_build_dir_label != swift_stdlib_build_dir_label and
-                llvm_build_dir_label == cmark_build_dir_label):
-            # Swift stdlib build type differs.
-            args.build_subdir += "-" + llvm_build_dir_label
-            args.build_subdir += "+stdlib-" + swift_stdlib_build_dir_label
-        elif (llvm_build_dir_label == swift_build_dir_label and
-                llvm_build_dir_label == swift_stdlib_build_dir_label and
-                llvm_build_dir_label != cmark_build_dir_label):
-            # cmark build type differs.
-            args.build_subdir += "-" + llvm_build_dir_label
-            args.build_subdir += "+cmark-" + cmark_build_dir_label
-        else:
-            # We don't know how to create a short name, so just mangle in all
-            # the information.
-            args.build_subdir += "+cmark-" + cmark_build_dir_label
-            args.build_subdir += "+llvm-" + llvm_build_dir_label
-            args.build_subdir += "+swift-" + swift_build_dir_label
-            args.build_subdir += "+stdlib-" + swift_stdlib_build_dir_label
-
-    build_dir = os.path.join(SWIFT_BUILD_ROOT, args.build_subdir)
-
-    if args.clean and os.path.isdir(build_dir):
-        shutil.rmtree(build_dir)
+    if args.clean and os.path.isdir(workspace.build_root):
+        shutil.rmtree(workspace.build_root)
 
     cmake = CMake(args=args,
                   toolchain=toolchain)
 
     build_script_impl_args = [
-        "--build-dir", build_dir,
+        "--workspace", workspace.source_root,
+        "--build-dir", workspace.build_root,
         "--install-prefix", os.path.abspath(args.install_prefix),
         "--host-target", args.host_target,
         "--stdlib-deployment-targets",
@@ -1287,7 +1241,6 @@ details of the setups of other systems or automated environments.""")
             args.swift_analyze_code_coverage).lower(),
         "--cmake-generator", args.cmake_generator,
         "--build-jobs", str(args.build_jobs),
-        "--workspace", SWIFT_SOURCE_ROOT,
         "--common-cmake-options=%s" % ' '.join(
             pipes.quote(opt) for opt in cmake.common_options()),
         "--build-args=%s" % ' '.join(
