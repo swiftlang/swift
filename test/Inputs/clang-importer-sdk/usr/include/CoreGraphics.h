@@ -34,3 +34,5 @@ typedef struct CGRect CGRect;
 typedef CGRect CGRectTy;
 
 typedef struct CGColor *CGColorRef;
+
+CGColorRef CGColorCreateGenericGray(CGFloat gray, CGFloat alpha);
