@@ -784,6 +784,9 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
 
   if (!CurrentModule)
     CurrentModule = D->getModuleContext();
+
+  if (D->getAttrs().getDeprecated(D->getASTContext()))
+    setNotRecommended(CodeCompletionResult::Deprecated);
 }
 
 StringRef CodeCompletionContext::copyString(StringRef Str) {
