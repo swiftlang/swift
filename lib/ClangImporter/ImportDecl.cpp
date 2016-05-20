@@ -1276,7 +1276,7 @@ namespace {
 
       // FIXME: We cannot currently handle generic types.
       if (auto generic = dyn_cast<GenericTypeDecl>(typeDecl)) {
-        if (generic->getGenericSignature())
+        if (generic->getGenericSignature() && !isa<ProtocolDecl>(typeDecl))
           return nullptr;
       }
 

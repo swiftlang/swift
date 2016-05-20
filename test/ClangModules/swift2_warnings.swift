@@ -91,3 +91,5 @@ class X : NSDocument {
     return url
   }
 }
+
+func makeCopy<T: NSCopying>(thing: T) {} // expected-error {{'NSCopying' has been renamed to 'Copying'}} {{18-27=Copying}} 
