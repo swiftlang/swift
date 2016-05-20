@@ -504,7 +504,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
     entries.insert(distance, std::move(decl));
   });
 
-  lookupVisibleDecls(consumer, DC, nullptr, /*top level*/ true, nameLoc);
+  lookupVisibleDecls(consumer, DC, this, /*top level*/ true, nameLoc);
 
   // Impose a maximum distance from the best score.
   entries.filterMaxScoreRange(MaxCallEditDistanceFromBestCandidate);
