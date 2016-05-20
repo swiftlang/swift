@@ -13,7 +13,5 @@ add_swift_library(swiftParse
   LINK_LIBRARIES
     swiftSIL
     swiftAST
-
-    LLVMCoverage
 )
 

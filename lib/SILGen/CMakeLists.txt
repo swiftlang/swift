@@ -28,6 +28,4 @@ add_swift_library(swiftSILGen
   SILGenType.cpp
   LINK_LIBRARIES
     swiftSIL
-
-    LLVMCoverage
 )
