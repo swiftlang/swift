@@ -450,11 +450,28 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // If we failed lookup of an operator, check to see it to see if it is
     // because two operators are juxtaposed e.g. (x*-4) that needs whitespace.
     // If so, emit specific diagnostics for it.
-    if (!diagnoseOperatorJuxtaposition(UDRE, DC, *this)) {
-      diagnose(Loc, diag::use_unresolved_identifier, Name,
-               UDRE->getName().isOperator())
-        .highlight(UDRE->getSourceRange());
+    if (diagnoseOperatorJuxtaposition(UDRE, DC, *this)) {
+      return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
+
+    // TODO: Name will be a compound name if it was written explicitly as
+    // one, but we should also try to propagate labels into this.
+    DeclNameLoc nameLoc = UDRE->getNameLoc();
+
+    performTypoCorrection(DC, UDRE->getRefKind(), Name, Loc, LookupOptions,
+                          Lookup);
+
+    diagnose(Loc, diag::use_unresolved_identifier, Name, Name.isOperator())
+      .highlight(UDRE->getSourceRange());
+
+    // Note all the correction candidates.
+    for (auto &result : Lookup) {
+      noteTypoCorrection(Name, nameLoc, result);
+    }
+
+    // TODO: consider recovering from here.  We may want some way to suppress
+    // downstream diagnostics, though.
+
     return new (Context) ErrorExpr(UDRE->getSourceRange());
   }
 

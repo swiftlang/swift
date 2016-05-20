@@ -1876,6 +1876,18 @@ public:
 
   /// Check for needless words in the member reference.
   void checkOmitNeedlessWords(MemberRefExpr *memberRef);
+
+  /// Check for a typo correction.
+  void performTypoCorrection(DeclContext *DC,
+                             DeclRefKind refKind,
+                             DeclName name,
+                             SourceLoc lookupLoc,
+                             NameLookupOptions lookupOptions,
+                             LookupResult &result,
+                             unsigned maxResults = 4);
+
+  void noteTypoCorrection(DeclName name, DeclNameLoc nameLoc,
+                          const LookupResult::Result &suggestion);
 };
 
 /// \brief RAII object that cleans up the given expression if not explicitly
