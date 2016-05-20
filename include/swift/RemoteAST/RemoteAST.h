@@ -69,7 +69,7 @@ public:
     if (IsSuccess) {
       ::new (&S.Success) T(other.S.Success);
     } else {
-      ::new (&S.Failure) remote::Failure(other.S.Failure);      
+      ::new (&S.Failure) remote::Failure(other.S.Failure);
     }
   }
 

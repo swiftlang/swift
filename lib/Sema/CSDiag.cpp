@@ -2409,7 +2409,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     if (anchor)
       resolvedAnchorToExpr = true;
     else
-      anchor = locator->getAnchor();    
+      anchor = locator->getAnchor();
   }
 
   Type fromType = CS->simplifyType(constraint->getFirstType());

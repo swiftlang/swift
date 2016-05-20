@@ -338,7 +338,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
         } while (superclassDecl != circularSuperclass);
       }
     }
-    break;    
+    break;
 
   case ConformanceStage::ExpandedImplied:
     // Record explicit conformances and import inherited conformances

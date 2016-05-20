@@ -698,7 +698,7 @@ GenericSignature *TypeChecker::validateGenericSignature(
 
   // Type check the generic parameters, treating all generic type
   // parameters as dependent, unresolved.
-  DependentGenericTypeResolver dependentResolver(builder);  
+  DependentGenericTypeResolver dependentResolver(builder);
   if (checkGenericParamList(&builder, genericParams, parentSig,
                             false, &dependentResolver)) {
     invalid = true;

@@ -1090,7 +1090,7 @@ public:
                                         SILDeclRef accessor);
 
   SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl,
-                              bool isDirectAccessorUse);  
+                              bool isDirectAccessorUse);
   RValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
                          ArrayRef<Substitution> substitutions,
                          ArgumentSource &&optionalSelfValue,
@@ -1098,7 +1098,7 @@ public:
                          RValue &&optionalSubscripts, SGFContext C);
 
   SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl,
-                              bool isDirectAccessorUse);  
+                              bool isDirectAccessorUse);
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        ArrayRef<Substitution> substitutions,
                        ArgumentSource &&optionalSelfValue,
@@ -1106,7 +1106,7 @@ public:
                        RValue &&optionalSubscripts, RValue &&value);
 
   SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl,
-                                         bool isDirectAccessorUse);  
+                                         bool isDirectAccessorUse);
   MaterializedLValue
   emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                                 ArrayRef<Substitution> substitutions,

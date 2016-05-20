@@ -2808,7 +2808,7 @@ namespace {
         OS << "=";
         OS << nestedType.first.str() << " ";
         if (!nestedType.second) {
-          PrintWithColorRAII(OS, TypeColor) << "unresolved";          
+          PrintWithColorRAII(OS, TypeColor) << "unresolved";
         } else if (auto concrete = nestedType.second.getAsConcreteType()) {
           PrintWithColorRAII(OS, TypeColor) << "concrete";
           OS << "=" << concrete.getString();

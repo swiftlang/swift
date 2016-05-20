@@ -2860,7 +2860,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       }
     }
 
-    if (useParens) Printer << ')';      
+    if (useParens) Printer << ')';
   };
 
   Node::Kind kind = pointer->getKind();

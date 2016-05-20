@@ -297,7 +297,7 @@ namespace {
     }
 
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
-      src.claimNext();      
+      src.claimNext();
       IGF.emitFixLifetime(src.claimNext());
     }
 

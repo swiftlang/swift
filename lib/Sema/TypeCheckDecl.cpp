@@ -4596,8 +4596,8 @@ public:
                                       fnType->getExtInfo());
     }
     
-    assert(!isa<PolymorphicFunctionType>(fnType));  
-    return FunctionType::get(inputType, resultType, fnType->getExtInfo());    
+    assert(!isa<PolymorphicFunctionType>(fnType));
+    return FunctionType::get(inputType, resultType, fnType->getExtInfo());
   }
 
   static bool

@@ -1012,7 +1012,7 @@ static ArrayRef<SILArgument*> emitEntryPointIndirectReturn(
   unsigned numIndirectResults = funcTy->getNumIndirectResults();
   for (unsigned i = 0; i != numIndirectResults; ++i) {
     SILArgument *ret = bbargs[i];
-    auto &retTI = IGF.IGM.getTypeInfo(ret->getType());    
+    auto &retTI = IGF.IGM.getTypeInfo(ret->getType());
     IGF.setLoweredAddress(ret, retTI.getAddressForPointer(params.claimNext()));
   }  
 
@@ -1962,7 +1962,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     }
   }
 
-  Explosion llArgs;    
+  Explosion llArgs;
   WitnessMetadata witnessMetadata;
   CallEmission emission =
     getCallEmissionForLoweredValue(*this, origCalleeType, substCalleeType,
@@ -4258,7 +4258,7 @@ void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrIn
   
   // Allocate in the destination fixed-size buffer.
   Address address =
-    srcTI.allocateBuffer(*this, buffer, i->getLoweredConcreteType());  
+    srcTI.allocateBuffer(*this, buffer, i->getLoweredConcreteType());
   setLoweredAddress(i, address);
 }
 

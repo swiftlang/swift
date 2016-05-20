@@ -2414,7 +2414,7 @@ int TupleType::getElementForScalarInit() const {
     }
     
     // Otherwise, remember this field number.
-    FieldWithoutDefault = i;    
+    FieldWithoutDefault = i;
   }
   
   // If all the elements have default values, the scalar initializes the first

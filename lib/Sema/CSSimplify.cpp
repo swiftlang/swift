@@ -3862,7 +3862,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   // K1 < K2 && V1 < V2 || K1 bridges to K2 && V1 bridges to V2 ===> 
   //   Dictionary<K1, V1> <c Dictionary<K2, V2>
   case ConversionRestrictionKind::DictionaryUpcast: {
-    auto t1 = type1->getDesugaredType();    
+    auto t1 = type1->getDesugaredType();
     Type key1, value1;
     std::tie(key1, value1) = *isDictionaryType(t1);
 
@@ -3874,7 +3874,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     // need to know their structure before we can decide whether this
     // can be an upcast.
     TypeVariableType *keyTypeVar1 = nullptr;
-    TypeVariableType *valueTypeVar1 = nullptr;    
+    TypeVariableType *valueTypeVar1 = nullptr;
     key1 = getFixedTypeRecursive(key1, keyTypeVar1, false, false);
     if (!keyTypeVar1) {
       value1 = getFixedTypeRecursive(value1, valueTypeVar1, false, false);
@@ -3917,7 +3917,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       // their structure to determine whether we'll be bridging or
       // upcasting the key and value.
       TypeVariableType *keyTypeVar2 = nullptr;
-      TypeVariableType *valueTypeVar2 = nullptr;    
+      TypeVariableType *valueTypeVar2 = nullptr;
       key2 = getFixedTypeRecursive(key2, keyTypeVar2, false, false);
       if (!keyTypeVar2) {
         value2 = getFixedTypeRecursive(value2, valueTypeVar2, false, false);
@@ -3970,7 +3970,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
 
   // T1 < T2 || T1 bridges to T2 ===> Set<T1> <c Set<T2>
   case ConversionRestrictionKind::SetUpcast: {
-    auto t1 = type1->getDesugaredType();    
+    auto t1 = type1->getDesugaredType();
     Type baseType1 = getBaseTypeForSetType(t1);
 
     auto t2 = type2->getDesugaredType();

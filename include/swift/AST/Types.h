@@ -3157,7 +3157,7 @@ public:
   }
 
   using ParameterSILTypeArrayRef
-    = ArrayRefView<SILParameterInfo, SILType, getParameterSILType>;  
+    = ArrayRefView<SILParameterInfo, SILType, getParameterSILType>;
   ParameterSILTypeArrayRef getParameterSILTypes() const {
     return ParameterSILTypeArrayRef(getParameters());
   }

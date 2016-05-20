@@ -197,7 +197,7 @@ private:
         maybeAddMethod(fn, SILDeclRef::Kind::Allocator, explosionLevel, 
                        uncurryLevel);
       maybeAddMethod(fn, SILDeclRef::Kind::Initializer, explosionLevel, 
-                     uncurryLevel);      
+                     uncurryLevel);
     }
   }
 

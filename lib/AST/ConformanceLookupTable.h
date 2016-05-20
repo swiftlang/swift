@@ -158,14 +158,14 @@ class ConformanceLookupTable {
     /// for the inheriting class.
     ClassDecl *getInheritingClass() const {
       assert(getKind() == ConformanceEntryKind::Inherited);
-      return static_cast<ClassDecl *>(Storage.getPointer());      
+      return static_cast<ClassDecl *>(Storage.getPointer());
     }
 
     /// For an explicit conformance, retrieve the declaration context
     /// that specifies the conformance.
     DeclContext *getExplicitDeclContext() const {
       assert(getKind() == ConformanceEntryKind::Explicit);
-      return static_cast<DeclContext *>(Storage.getPointer());      
+      return static_cast<DeclContext *>(Storage.getPointer());
     }
 
     /// For a synthesized conformance, retrieve the nominal type decl

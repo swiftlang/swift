@@ -47,7 +47,7 @@
       background: gray;
       -moz-border-radius:10px;
       -webkit-border-radius:10px;
-      border-radius:10px;    
+      border-radius:10px;
       color: #fff;
       z-index: 1;
     }

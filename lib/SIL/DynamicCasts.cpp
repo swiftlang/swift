@@ -509,7 +509,7 @@ namespace {
 
     Source emitTopLevel(Source source, Target target) {
       unsigned sourceOptDepth = getOptionalDepth(source.FormalType);
-      unsigned targetOptDepth = getOptionalDepth(target.FormalType);      
+      unsigned targetOptDepth = getOptionalDepth(target.FormalType);
 
       assert(sourceOptDepth <= targetOptDepth);
       return emitAndInjectIntoOptionals(source, target,
