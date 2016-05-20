@@ -153,7 +153,6 @@ public struct ${vectype} :
 
 /// Vector sum of `lhs` and `rhs`.
 @inline(__always)
-@warn_unused_result
 public func ${wrap}+(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(_bits:
 %if is_floating:
@@ -166,7 +165,6 @@ public func ${wrap}+(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
 
 /// Vector difference of `lhs` and `rhs`.
 @inline(__always)
-@warn_unused_result
 public func ${wrap}-(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(_bits:
 %if is_floating:
@@ -179,7 +177,6 @@ public func ${wrap}-(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
 
 /// Negation of `rhs`.
 @inline(__always)
-@warn_unused_result
 public prefix func -(rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(0) ${wrap}- rhs
 }
@@ -187,7 +184,6 @@ public prefix func -(rhs: ${vectype}) -> ${vectype} {
 /// Elementwise product of `lhs` and `rhs`.  A.k.a. the Hadamard or Schur
 /// product of the two vectors.
 @inline(__always)
-@warn_unused_result
 public func ${wrap}*(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(_bits:
 %if is_floating:
@@ -201,7 +197,6 @@ public func ${wrap}*(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
 /// Elementwise quotient of `lhs` and `rhs`.  This is the inverse operation
 /// of the elementwise product.
 @inline(__always)
-@warn_unused_result
 public func /(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(_bits:
 %if is_floating:
@@ -242,14 +237,12 @@ public func /=(lhs: inout ${vectype}, rhs: ${vectype}) -> Void {
 
 /// Scalar-Vector product.
 @inline(__always)
-@warn_unused_result
 public func ${wrap}*(lhs: ${type}, rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(lhs) ${wrap}* rhs
 }
 
 /// Scalar-Vector product.
 @inline(__always)
-@warn_unused_result
 public func ${wrap}*(lhs: ${vectype}, rhs: ${type}) -> ${vectype} {
   return lhs ${wrap}* ${vectype}(rhs)
 }
@@ -266,7 +259,6 @@ public func *=(lhs: inout ${vectype}, rhs: ${type}) -> Void {
 /// Elementwise absolute value of a vector.  The result is a vector of the same
 /// length with all elements positive.
 @inline(__always)
-@warn_unused_result
 public func abs(_ x: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c: \
                     'abs(x.' + c + ')', \
@@ -277,7 +269,6 @@ public func abs(_ x: ${vectype}) -> ${vectype} {
 /// Elementwise minimum of two vectors.  Each component of the result is the
 /// smaller of the corresponding component of the inputs.
 @inline(__always)
-@warn_unused_result
 public func min(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:             \
                     'min(x.' + c + ', y.' + c + ')', \
@@ -287,7 +278,6 @@ public func min(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
 /// Elementwise maximum of two vectors.  Each component of the result is the
 /// larger of the corresponding component of the inputs.
 @inline(__always)
-@warn_unused_result
 public func max(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:             \
                     'max(x.' + c + ', y.' + c + ')', \
@@ -297,7 +287,6 @@ public func max(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
 /// Vector-scalar minimum.  Each component of the result is the minimum of the
 /// corresponding element of the input vector and the scalar.
 @inline(__always)
-@warn_unused_result
 public func min(_ vector: ${vectype}, _ scalar: ${type}) -> ${vectype} {
   return min(vector, ${vectype}(scalar))
 }
@@ -305,7 +294,6 @@ public func min(_ vector: ${vectype}, _ scalar: ${type}) -> ${vectype} {
 /// Vector-scalar maximum.  Each component of the result is the maximum of the
 /// corresponding element of the input vector and the scalar.
 @inline(__always)
-@warn_unused_result
 public func max(_ vector: ${vectype}, _ scalar: ${type}) -> ${vectype} {
   return max(vector, ${vectype}(scalar))
 }
@@ -314,7 +302,6 @@ public func max(_ vector: ${vectype}, _ scalar: ${type}) -> ${vectype} {
 /// the range formed by the corresponding elements of `min` and `max`.  Any
 /// lanes of `x` that contain NaN will end up with the `min` value.
 @inline(__always)
-@warn_unused_result
 public func clamp(_ x: ${vectype},
                   min: ${vectype},
                   max: ${vectype})
@@ -325,7 +312,6 @@ public func clamp(_ x: ${vectype},
 /// Clamp each element of `x` to the range [`min`, max].  If any lane of `x` is
 /// NaN, the corresponding lane of the result is `min`.
 @inline(__always)
-@warn_unused_result
 public func clamp(_ x: ${vectype},
                   min: ${type},
                   max: ${type})
@@ -335,21 +321,18 @@ public func clamp(_ x: ${vectype},
 
 /// Sum of the elements of the vector.
 @inline(__always)
-@warn_unused_result
 public func reduce_add(_ x: ${vectype}) -> ${type} {
   return ${(' '+wrap+'+ ').join(map(lambda x:'x.'+x, component[:size]))}
 }
 
 /// Minimum element of the vector.
 @inline(__always)
-@warn_unused_result
 public func reduce_min(_ x: ${vectype}) -> ${type} {
   return min(${', '.join(map(lambda x:'x.'+x, component[:size]))})
 }
 
 /// Maximum element of the vector.
 @inline(__always)
-@warn_unused_result
 public func reduce_max(_ x: ${vectype}) -> ${type} {
   return max(${', '.join(map(lambda x:'x.'+x, component[:size]))})
 }
@@ -360,7 +343,6 @@ public func reduce_max(_ x: ${vectype}) -> ${type} {
 /// is less than zero, +1 if the corresponding lane of `x` is greater than
 /// zero, and 0 otherwise.
 @inline(__always)
-@warn_unused_result
 public func sign(_ x: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:  \
                     'sign(x.' + c + ')', \
@@ -370,7 +352,6 @@ public func sign(_ x: ${vectype}) -> ${vectype} {
 /// Linear interpolation between `x` (at `t=0`) and `y` (at `t=1`).  May be
 /// used with `t` outside of [0, 1] as well.
 @inline(__always)
-@warn_unused_result
 public func mix(_ x: ${vectype}, _ y: ${vectype}, t: ${vectype}) -> ${vectype} {
   return x + t*(y-x)
 }
@@ -378,14 +359,12 @@ public func mix(_ x: ${vectype}, _ y: ${vectype}, t: ${vectype}) -> ${vectype} {
 /// Linear interpolation between `x` (at `t=0`) and `y` (at `t=1`).  May be
 /// used with `t` outside of [0, 1] as well.
 @inline(__always)
-@warn_unused_result
 public func mix(_ x: ${vectype}, _ y: ${vectype}, t: ${type}) -> ${vectype} {
   return x + t*(y-x)
 }
 
 /// Elementwise reciprocal.
 @inline(__always)
-@warn_unused_result
 public func recip(_ x: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:  \
                     'recip(x.' + c + ')', \
@@ -394,7 +373,6 @@ public func recip(_ x: ${vectype}) -> ${vectype} {
 
 /// Elementwise reciprocal square root.
 @inline(__always)
-@warn_unused_result
 public func rsqrt(_ x: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:  \
                     'rsqrt(x.' + c + ')', \
@@ -403,14 +381,12 @@ public func rsqrt(_ x: ${vectype}) -> ${vectype} {
 
 /// Alternate name for minimum of two floating-point vectors.
 @inline(__always)
-@warn_unused_result
 public func fmin(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
   return min(x, y)
 }
 
 /// Alternate name for maximum of two floating-point vectors.
 @inline(__always)
-@warn_unused_result
 public func fmax(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
   return max(x, y)
 }
@@ -418,7 +394,6 @@ public func fmax(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
 /// Each element of the result is the smallest integral value greater than or
 /// equal to the corresponding element of the input.
 @inline(__always)
-@warn_unused_result
 public func ceil(_ x: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:  \
                     'ceil(x.' + c + ')', \
@@ -428,7 +403,6 @@ public func ceil(_ x: ${vectype}) -> ${vectype} {
 /// Each element of the result is the largest integral value less than or equal
 /// to the corresponding element of the input.
 @inline(__always)
-@warn_unused_result
 public func floor(_ x: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:  \
                     'floor(x.' + c + ')', \
@@ -438,7 +412,6 @@ public func floor(_ x: ${vectype}) -> ${vectype} {
 /// Each element of the result is the closest integral value with magnitude
 /// less than or equal to that of the corresponding element of the input.
 @inline(__always)
-@warn_unused_result
 public func trunc(_ x: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:  \
                     'trunc(x.' + c + ')', \
@@ -449,14 +422,12 @@ public func trunc(_ x: ${vectype}) -> ${vectype} {
 /// the result would be 1.0 when `x` is a very small negative number, which may
 /// result in out-of-bounds table accesses in common usage.
 @inline(__always)
-@warn_unused_result
 public func fract(_ x: ${vectype}) -> ${vectype} {
   return fmin(x - floor(x), ${vectype}(${one_minus_ulp[type]}))
 }
 
 /// 0.0 if `x < edge`, and 1.0 otherwise.
 @inline(__always)
-@warn_unused_result
 public func step(_ x: ${vectype}, edge: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:                 \
                     'step(x.' + c + ', edge: edge.' + c + ')', \
@@ -466,7 +437,6 @@ public func step(_ x: ${vectype}, edge: ${vectype}) -> ${vectype} {
 /// 0.0 if `x < edge0`, 1.0 if `x > edge1`, and cubic interpolation between
 /// 0 and 1 in the interval [edge0, edge1].
 @inline(__always)
-@warn_unused_result
 public func smoothstep(_ x: ${vectype},
                               edge0: ${vectype},
                               edge1: ${vectype})
@@ -477,14 +447,12 @@ public func smoothstep(_ x: ${vectype},
 
 /// Dot product of `x` and `y`.
 @inline(__always)
-@warn_unused_result
 public func dot(_ x: ${vectype}, _ y: ${vectype}) -> ${type} {
   return reduce_add(x * y)
 }
 
 /// Projection of `x` onto `y`.
 @inline(__always)
-@warn_unused_result
 public func project(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
   return dot(x, y) / dot(y, y) * y
 }
@@ -502,49 +470,42 @@ public func project(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
 /// Doing it this way avoids one or two square roots, which is a fairly costly
 /// operation.
 @inline(__always)
-@warn_unused_result
 public func length_squared(_ x: ${vectype}) -> ${type} {
   return dot(x, x)
 }
 
 /// Length (two-norm or "Euclidean norm") of `x`.
 @inline(__always)
-@warn_unused_result
 public func length(_ x: ${vectype}) -> ${type} {
   return sqrt(length_squared(x))
 }
 
 /// The one-norm (or "taxicab norm") of `x`.
 @inline(__always)
-@warn_unused_result
 public func norm_one(_ x: ${vectype}) -> ${type} {
   return reduce_add(abs(x))
 }
 
 /// The infinity-norm (or "sup norm") of `x`.
 @inline(__always)
-@warn_unused_result
 public func norm_inf(_ x: ${vectype}) -> ${type} {
   return reduce_max(abs(x))
 }
 
 /// Distance between `x` and `y`, squared.
 @inline(__always)
-@warn_unused_result
 public func distance_squared(_ x: ${vectype}, _ y: ${vectype}) -> ${type} {
   return length_squared(x - y)
 }
 
 /// Distance between `x` and `y`.
 @inline(__always)
-@warn_unused_result
 public func distance(_ x: ${vectype}, _ y: ${vectype}) -> ${type} {
   return length(x - y)
 }
 
 /// Unit vector pointing in the same direction as `x`.
 @inline(__always)
-@warn_unused_result
 public func normalize(_ x: ${vectype}) -> ${vectype} {
   return x * rsqrt(length_squared(x))
 }
@@ -553,7 +514,6 @@ public func normalize(_ x: ${vectype}) -> ${vectype} {
 /// through the origin.  E.g. if `x` is [1,2,3] and `n` is [0,0,1], the result
 /// is [1,2,-3].
 @inline(__always)
-@warn_unused_result
 public func reflect(_ x: ${vectype}, n: ${vectype}) -> ${vectype} {
   return x - 2 * dot(x, n) * n
 }
@@ -563,7 +523,6 @@ public func reflect(_ x: ${vectype}, n: ${vectype}) -> ${vectype} {
 /// incident vector and the surface is so small that total internal reflection
 /// occurs, zero is returned.
 @inline(__always)
-@warn_unused_result
 public func refract(_ x: ${vectype},
                            n: ${vectype},
                            eta: ${type})
@@ -580,24 +539,20 @@ public func refract(_ x: ${vectype},
 
 /// Returns -1 if `x < 0`, +1 if `x > 0`, and 0 otherwise (`sign(NaN)` is 0).
 @inline(__always)
-@warn_unused_result
 public func sign(_ x: ${type}) -> ${type} {
   return x < 0 ? -1 : (x > 0 ? 1 : 0)
 }
 
 /// Reciprocal.
 @inline(__always)
-@warn_unused_result
 public func recip(_ x: ${type}) -> ${type} { return 1/x }
 
 /// Reciprocal square root.
 @inline(__always)
-@warn_unused_result
 public func rsqrt(_ x: ${type}) -> ${type} { return 1/sqrt(x) }
 
 /// Returns 0.0 if `x < edge`, and 1.0 otherwise.
 @inline(__always)
-@warn_unused_result
 public func step(_ x: ${type}, edge: ${type}) -> ${type} {
   return x < edge ? 0.0 : 1.0
 }
@@ -605,7 +560,6 @@ public func step(_ x: ${type}, edge: ${type}) -> ${type} {
 /// Interprets two two-dimensional vectors as three-dimensional vectors in the
 /// xy-plane and computes their cross product, which lies along the z-axis.
 @inline(__always)
-@warn_unused_result
 public func cross(_ x: ${ctype[type]}2,
                        _ y: ${ctype[type]}2)
                          -> ${ctype[type]}3 {
@@ -616,7 +570,6 @@ public func cross(_ x: ${ctype[type]}2,
 /// perpendicular to the plane determined by `x` and `y`, with length equal to
 /// the oriented area of the parallelogram they determine.
 @inline(__always)
-@warn_unused_result
 public func cross(_ x: ${ctype[type]}3,
                        _ y: ${ctype[type]}3)
                          -> ${ctype[type]}3 {
@@ -820,7 +773,6 @@ public struct ${mattype} : CustomDebugStringConvertible {
 }
 
 /// Sum of two matrices.
-@warn_unused_result
 public func +(lhs: ${mattype}, rhs: ${mattype}) -> ${mattype} {
   return ${mattype}(${', '.join(map(lambda i: \
                     'lhs._columns.'+str(i)+' + rhs._columns.'+str(i), \
@@ -828,7 +780,6 @@ public func +(lhs: ${mattype}, rhs: ${mattype}) -> ${mattype} {
 }
 
 /// Negation of a matrix.
-@warn_unused_result
 public prefix func -(rhs: ${mattype}) -> ${mattype} {
   return ${mattype}(${', '.join(map(lambda i: \
                     '-rhs._columns.'+str(i),  \
@@ -836,7 +787,6 @@ public prefix func -(rhs: ${mattype}) -> ${mattype} {
 }
 
 /// Difference of two matrices.
-@warn_unused_result
 public func -(lhs: ${mattype}, rhs: ${mattype}) -> ${mattype} {
   return ${mattype}(${', '.join(map(lambda i: \
                     'lhs._columns.'+str(i)+' - rhs._columns.'+str(i), \
@@ -852,7 +802,6 @@ public func -=(lhs: inout ${mattype}, rhs: ${mattype}) -> Void {
 }
 
 /// Scalar-Matrix multiplication.
-@warn_unused_result
 public func *(lhs: ${type}, rhs: ${mattype}) -> ${mattype} {
   return ${mattype}(${', '.join(map(lambda i: \
                     'lhs*rhs._columns.'+str(i), \
@@ -860,7 +809,6 @@ public func *(lhs: ${type}, rhs: ${mattype}) -> ${mattype} {
 }
 
 /// Matrix-Scalar multiplication.
-@warn_unused_result
 public func *(lhs: ${mattype}, rhs: ${type}) -> ${mattype} {
   return rhs*lhs
 }
@@ -873,7 +821,6 @@ public func *=(lhs: inout ${mattype}, rhs: ${type}) -> Void {
 /// `${type}NxM` where `N` is the number of *columns* and `M` is the number of
 /// *rows*, so we multiply a `${type}3x2 * ${type}3` to get a `${type}2`, for
 /// example.
-@warn_unused_result
 public func *(lhs: ${mattype}, rhs: ${rowtype}) -> ${coltype} {
   return ${' + '.join(map(lambda i: \
          'lhs._columns.'+str(i)+'*rhs.'+component[i], \
@@ -881,7 +828,6 @@ public func *(lhs: ${mattype}, rhs: ${rowtype}) -> ${coltype} {
 }
 
 /// Vector-Matrix multiplication.
-@warn_unused_result
 public func *(lhs: ${coltype}, rhs: ${mattype}) -> ${rowtype} {
   return ${rowtype}(${', '.join(map(lambda i: \
                     'dot(lhs, rhs._columns.'+str(i)+')', \
@@ -893,7 +839,6 @@ public func *(lhs: ${coltype}, rhs: ${mattype}) -> ${rowtype} {
 /// product).
 %   lhstype = ctype[type] + str(k) + 'x' + str(rows)
 %   rhstype = ctype[type] + str(cols) + 'x' + str(k)
-@warn_unused_result
 public func *(lhs: ${lhstype}, rhs: ${rhstype}) -> ${mattype} {
   return ${mattype}(${', '.join(map(lambda i: \
                     'lhs*rhs._columns.'+str(i), \

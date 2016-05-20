@@ -111,7 +111,6 @@ internal final class _IteratorBox<
   internal var _base: Base
 }
 
-@warn_unused_result
 internal func _typeID(_ instance: AnyObject) -> ObjectIdentifier {
   return ObjectIdentifier(instance.dynamicType)
 }
@@ -137,19 +136,16 @@ internal class _AnyRandomAccessCollectionBox<Element>
 {
 
 %   if Kind == 'Sequence':
-  @warn_unused_result
   internal func _makeIterator() -> AnyIterator<Element> { _abstract() }
 
   internal var _underestimatedCount: Int { _abstract() }
 
-  @warn_unused_result
   internal func _map<T>(
     _ transform: @noescape (Element) throws -> T
   ) rethrows -> [T] {
     _abstract()
   }
 
-  @warn_unused_result
   internal func _filter(
     _ includeElement: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
@@ -162,26 +158,22 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
-  @warn_unused_result
   internal func __customContainsEquatableElement(
     _ element: Element
   ) -> Bool? {
     _abstract()
   }
 
-  @warn_unused_result
   internal func __preprocessingPass<R>(
     _ preprocess: @noescape () throws -> R
   ) rethrows -> R? {
     _abstract()
   }
 
-  @warn_unused_result
   internal func __copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
     _abstract()
   }
 
-  @warn_unused_result
   internal func __copyContents(initializing ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
     _abstract()
@@ -190,27 +182,22 @@ internal class _AnyRandomAccessCollectionBox<Element>
 %   end
 
 %   override = 'override' if Kind != 'Sequence' else ''
-  @warn_unused_result
   internal ${override} func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
-  @warn_unused_result
   internal ${override} func _dropLast(_ n: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
-  @warn_unused_result
   internal ${override} func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
-  @warn_unused_result
   internal ${override} func _suffix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
-  @warn_unused_result
   internal func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
     isSeparator: @noescape (Element) throws -> Bool
@@ -221,19 +208,16 @@ internal class _AnyRandomAccessCollectionBox<Element>
 %   if Kind == 'Collection':
   internal subscript(i: _AnyIndexBox) -> Element { _abstract() }
   
-  @warn_unused_result
   internal func _index(after i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
   
   internal func _formIndex(after i: _AnyIndexBox) { _abstract() }
   
-  @warn_unused_result
   internal func _index(
     _ i: _AnyIndexBox, offsetBy n: IntMax
   ) -> _AnyIndexBox {
     _abstract()
   }
   
-  @warn_unused_result
   internal func _index(
     _ i: _AnyIndexBox, offsetBy n: IntMax, limitedBy limit: _AnyIndexBox
   ) -> _AnyIndexBox? {
@@ -250,7 +234,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
   
-  @warn_unused_result
   internal func _distance(
     from start: _AnyIndexBox, to end: _AnyIndexBox
   ) -> IntMax {
@@ -261,13 +244,10 @@ internal class _AnyRandomAccessCollectionBox<Element>
   /*
   var _indices: Indices
 
-  @warn_unused_result
   func prefix(upTo end: Index) -> SubSequence
 
-  @warn_unused_result
   func suffix(from start: Index) -> SubSequence
 
-  @warn_unused_result
   func prefix(through position: Index) -> SubSequence
 
   var isEmpty: Bool { get }
@@ -277,7 +257,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
   // TODO: swift-3-indexing-model: forward the following methods.
   /*
-  @warn_unused_result
   func _customIndexOfEquatableElement(element: Iterator.Element) -> Index??
   */
 
@@ -362,20 +341,17 @@ internal final class _${Kind}Box<
 > : _Any${Kind}Box<S.Iterator.Element> {
   internal typealias Element = S.Iterator.Element
 
-  @warn_unused_result
   internal override func _makeIterator() -> AnyIterator<Element> {
     return AnyIterator(_base.makeIterator())
   }
   internal override var _underestimatedCount: Int {
     return _base.underestimatedCount
   }
-  @warn_unused_result
   internal override func _map<T>(
     _ transform: @noescape (Element) throws -> T
   ) rethrows -> [T] {
     return try _base.map(transform)
   }
-  @warn_unused_result
   internal override func _filter(
     _ includeElement: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
@@ -386,45 +362,36 @@ internal final class _${Kind}Box<
   ) rethrows {
     return try _base.forEach(body)
   }
-  @warn_unused_result
   internal override func __customContainsEquatableElement(
     _ element: Element
   ) -> Bool? {
     return _base._customContainsEquatableElement(element)
   }
-  @warn_unused_result
   internal override func __preprocessingPass<R>(
     _ preprocess: @noescape () throws -> R
   ) rethrows -> R? {
     return try _base._preprocessingPass(preprocess)
   }
-  @warn_unused_result
   internal override func __copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
     return _base._copyToNativeArrayBuffer()._storage
   }
-  @warn_unused_result
   internal override func __copyContents(initializing ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
     return _base._copyContents(initializing: ptr)
   }
-  @warn_unused_result
   internal override func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.dropFirst(n))
   }
-  @warn_unused_result
   internal override func _dropLast(_ n: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.dropLast(n))
   }
-  @warn_unused_result
   internal override func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.prefix(maxLength))
   }
-  @warn_unused_result
   internal override func _suffix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.suffix(maxLength))
   }
 %   for ResultKind in EqualAndWeakerKinds:
-  @warn_unused_result
   internal override func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
     isSeparator: @noescape (Element) throws -> Bool
@@ -472,7 +439,6 @@ internal final class _${Kind}Box<
     )
   }
 
-  @warn_unused_result
   internal override func _index(after position: _AnyIndexBox) -> _AnyIndexBox {
     return _IndexBox(_base: _base.index(after: _unbox(position)))
   }
@@ -484,14 +450,12 @@ internal final class _${Kind}Box<
     fatalError("Index type mismatch!")
   }
 
-  @warn_unused_result
   internal override func _index(
     _ i: _AnyIndexBox, offsetBy n: IntMax
   ) -> _AnyIndexBox {
     return _IndexBox(_base: _base.index(_unbox(i), offsetBy: numericCast(n)))
   }
 
-  @warn_unused_result
   internal override func _index(
     _ i: _AnyIndexBox,
     offsetBy n: IntMax,
@@ -525,7 +489,6 @@ internal final class _${Kind}Box<
     fatalError("Index type mismatch!")
   }
 
-  @warn_unused_result
   internal override func _distance(
     from start: _AnyIndexBox,
     to end: _AnyIndexBox
@@ -542,7 +505,6 @@ internal final class _${Kind}Box<
   }
 
 %     if Kind in ['BidirectionalCollection', 'RandomAccessCollection']:
-  @warn_unused_result
   internal override func _index(before position: _AnyIndexBox) -> _AnyIndexBox {
     return _IndexBox(_base: _base.index(before: _unbox(position)))
   }
@@ -622,7 +584,6 @@ extension Any${Kind} {
 %   end
   ///
   /// - Complexity: O(1).
-  @warn_unused_result
   public func makeIterator() -> AnyIterator<Element> {
     return _box._makeIterator()
   }
@@ -631,14 +592,12 @@ extension Any${Kind} {
     return _box._underestimatedCount
   }
 
-  @warn_unused_result
   public func map<T>(
     _ transform: @noescape (Element) throws -> T
   ) rethrows -> [T] {
     return try _box._map(transform)
   }
 
-  @warn_unused_result
   public func filter(
     _ includeElement: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
@@ -651,27 +610,22 @@ extension Any${Kind} {
     return try _box._forEach(body)
   }
 
-  @warn_unused_result
   public func dropFirst(_ n: Int) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._dropFirst(n))
   }
 
-  @warn_unused_result
   public func dropLast(_ n: Int) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._dropLast(n))
   }
 
-  @warn_unused_result
   public func prefix(_ maxLength: Int) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._prefix(maxLength))
   }
 
-  @warn_unused_result
   public func suffix(_ maxLength: Int) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._suffix(maxLength))
   }
 
-  @warn_unused_result
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
@@ -683,19 +637,16 @@ extension Any${Kind} {
       isSeparator: isSeparator)
   }
 
-  @warn_unused_result
   public func _preprocessingPass<R>(
     _ preprocess: @noescape () throws -> R
   ) rethrows -> R? {
     return try _box.__preprocessingPass(preprocess)
   }
 
-  @warn_unused_result
   public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
     return _ContiguousArrayBuffer(self._box.__copyToNativeArrayBuffer())
   }
 
-  @warn_unused_result
   public func _copyContents(initializing ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
     return _box.__copyContents(initializing: ptr)
@@ -709,25 +660,18 @@ extension Any${Kind} {
 internal protocol _AnyIndexBox : class {
   var _typeID: ObjectIdentifier { get }
 
-  @warn_unused_result
   func _unbox<T : Comparable>() -> T?
 
-  @warn_unused_result
   func _equal(to rhs: _AnyIndexBox) -> Bool
 
-  @warn_unused_result
   func _notEqual(to rhs: _AnyIndexBox) -> Bool
 
-  @warn_unused_result
   func _less(than rhs: _AnyIndexBox) -> Bool
 
-  @warn_unused_result
   func _lessOrEqual(to rhs: _AnyIndexBox) -> Bool
 
-  @warn_unused_result
   func _greater(than rhs: _AnyIndexBox) -> Bool
 
-  @warn_unused_result
   func _greaterOrEqual(to rhs: _AnyIndexBox) -> Bool
 }
 
@@ -740,7 +684,6 @@ internal final class _IndexBox<
     self._base = _base
   }
 
-  @warn_unused_result
   internal func _unsafeUnbox(_ other: _AnyIndexBox) -> BaseIndex {
     return unsafeDowncast(other, to: _IndexBox.self)._base
   }
@@ -749,37 +692,30 @@ internal final class _IndexBox<
     return Swift._typeID(self)
   }
 
-  @warn_unused_result
   internal func _unbox<T : Comparable>() -> T? {
     return (self as _AnyIndexBox as? _IndexBox<T>)?._base
   }
 
-  @warn_unused_result
   internal func _equal(to rhs: _AnyIndexBox) -> Bool {
     return _base == _unsafeUnbox(rhs)
   }
 
-  @warn_unused_result
   internal func _notEqual(to rhs: _AnyIndexBox) -> Bool {
     return _base != _unsafeUnbox(rhs)
   }
 
-  @warn_unused_result
   internal func _less(than rhs: _AnyIndexBox) -> Bool {
     return _base < _unsafeUnbox(rhs)
   }
 
-  @warn_unused_result
   internal func _lessOrEqual(to rhs: _AnyIndexBox) -> Bool {
     return _base <= _unsafeUnbox(rhs)
   }
 
-  @warn_unused_result
   internal func _greater(than rhs: _AnyIndexBox) -> Bool {
     return _base > _unsafeUnbox(rhs)
   }
 
-  @warn_unused_result
   internal func _greaterOrEqual(to rhs: _AnyIndexBox) -> Bool {
     return _base >= _unsafeUnbox(rhs)
   }
@@ -810,37 +746,31 @@ public struct AnyIndex : Comparable {
 ///
 /// - Precondition: The types of indices wrapped by `lhs` and `rhs` are
 ///   identical.
-@warn_unused_result
 public func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
   _precondition(lhs._typeID == rhs._typeID, "base index types differ")
   return lhs._box._equal(to: rhs._box)
 }
 
-@warn_unused_result
 public func != (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
   _precondition(lhs._typeID == rhs._typeID, "base index types differ")
   return lhs._box._notEqual(to: rhs._box)
 }
 
-@warn_unused_result
 public func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
   _precondition(lhs._typeID == rhs._typeID, "base index types differ")
   return lhs._box._less(than: rhs._box)
 }
 
-@warn_unused_result
 public func <= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
   _precondition(lhs._typeID == rhs._typeID, "base index types differ")
   return lhs._box._lessOrEqual(to: rhs._box)
 }
 
-@warn_unused_result
 public func > (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
   _precondition(lhs._typeID == rhs._typeID, "base index types differ")
   return lhs._box._greater(than: rhs._box)
 }
 
-@warn_unused_result
 public func >= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
   _precondition(lhs._typeID == rhs._typeID, "base index types differ")
   return lhs._box._greaterOrEqual(to: rhs._box)
@@ -862,7 +792,6 @@ public protocol AnyCollectionProtocol : Collection {
 }
 
 /// Returns `true` iff `lhs` and `rhs` store the same underlying collection.
-@warn_unused_result
 public func === <
   L : AnyCollectionProtocol, R : AnyCollectionProtocol
 >(lhs: L, rhs: R) -> Bool {
@@ -870,7 +799,6 @@ public func === <
 }
 
 /// Returns `false` iff `lhs` and `rhs` store the same underlying collection.
-@warn_unused_result
 public func !== <
   L : AnyCollectionProtocol, R : AnyCollectionProtocol
 >(lhs: L, rhs: R) -> Bool {
@@ -1002,7 +930,6 @@ public struct ${Self}<Element>
     // range check for QoI purposes.
   }
 
-  @warn_unused_result
   public func index(after i: AnyIndex) -> AnyIndex {
     return AnyIndex(_box: _box._index(after: i._box))
   }
@@ -1016,12 +943,10 @@ public struct ${Self}<Element>
     }
   }
 
-  @warn_unused_result
   public func index(_ i: AnyIndex, offsetBy n: IntMax) -> AnyIndex {
     return AnyIndex(_box: _box._index(i._box, offsetBy: n))
   }
 
-  @warn_unused_result
   public func index(
     _ i: AnyIndex,
     offsetBy n: IntMax,
@@ -1055,7 +980,6 @@ public struct ${Self}<Element>
     return false
   }
 
-  @warn_unused_result
   public func distance(from start: AnyIndex, to end: AnyIndex) -> IntMax {
     return _box._distance(from: start._box, to: end._box)
   }

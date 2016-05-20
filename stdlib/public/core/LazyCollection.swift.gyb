@@ -130,7 +130,6 @@ extension ${Self} : ${TraversalCollection} {
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(after i: Base.Index) -> Base.Index {
     return _base.index(after: i)
   }
@@ -183,13 +182,11 @@ extension ${Self} : ${TraversalCollection} {
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(_ i: Index, offsetBy n: Base.IndexDistance) -> Index {
     return _base.index(i, offsetBy: n)
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(
     _ i: Index, offsetBy n: Base.IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -197,14 +194,12 @@ extension ${Self} : ${TraversalCollection} {
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func distance(from start: Index, to end: Index) -> Base.IndexDistance {
     return _base.distance(from:start, to: end)
   }
 
 %   if Traversal != 'Forward':
 
-  @warn_unused_result
   public func index(before i: Base.Index) -> Base.Index {
     return _base.index(before: i)
   }

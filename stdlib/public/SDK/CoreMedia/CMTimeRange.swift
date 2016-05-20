@@ -45,37 +45,29 @@ extension CMTimeRange {
     return CMTimeRangeGetEnd(self)
   }
 
-  @warn_unused_result
   public func union(_ otherRange: CMTimeRange) -> CMTimeRange {
     return CMTimeRangeGetUnion(self, otherRange)
   }
-  @warn_unused_result
   public func intersection(_ otherRange: CMTimeRange) -> CMTimeRange {
     return CMTimeRangeGetIntersection(self, otherRange)
   }
-  @warn_unused_result
   public func containsTime(_ time: CMTime) -> Bool {
     return CMTimeRangeContainsTime(self, time).boolValue
   }
-  @warn_unused_result
   public func containsTimeRange(_ range: CMTimeRange) -> Bool {
     return CMTimeRangeContainsTimeRange(self, range).boolValue
   }
 }
 
-@warn_unused_result
 public func CMTIMERANGE_IS_VALID (_ range: CMTimeRange) -> Bool {
   return range.isValid
 }
-@warn_unused_result
 public func CMTIMERANGE_IS_INVALID (_ range: CMTimeRange) -> Bool {
   return !range.isValid
 }
-@warn_unused_result
 public func CMTIMERANGE_IS_INDEFINITE (_ range: CMTimeRange) -> Bool {
   return range.isIndefinite
 }
-@warn_unused_result
 public func CMTIMERANGE_IS_EMPTY (_ range: CMTimeRange) -> Bool {
   return range.isEmpty
 }
@@ -83,12 +75,10 @@ public func CMTIMERANGE_IS_EMPTY (_ range: CMTimeRange) -> Bool {
 extension CMTimeRange : Equatable {}
 
 // CMTimeRangeEqual
-@warn_unused_result
 public func == (range1: CMTimeRange, range2: CMTimeRange) -> Bool {
   return CMTimeRangeEqual(range1, range2).boolValue
 }
 
-@warn_unused_result
 public func != (range1: CMTimeRange, range2: CMTimeRange) -> Bool {
   return !CMTimeRangeEqual(range1, range2).boolValue
 }

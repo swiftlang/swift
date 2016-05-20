@@ -71,7 +71,6 @@ public struct ${Self}<
       endIndex: bounds.upperBound)
   }
 
-  @warn_unused_result
   public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _elements.index(after: i)
@@ -83,7 +82,6 @@ public struct ${Self}<
   }
 
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
-  @warn_unused_result
   public func index(before i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _elements.index(before: i)

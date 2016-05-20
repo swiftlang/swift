@@ -113,7 +113,6 @@ extension String.CharacterView : BidirectionalCollection {
 
     /// Returns the length of the first extended grapheme cluster in UTF-16
     /// code units.
-    @warn_unused_result
     @inline(never)
     internal static func _measureExtendedGraphemeClusterForward(
         from start: UnicodeScalarView.Index
@@ -155,7 +154,6 @@ extension String.CharacterView : BidirectionalCollection {
 
     /// Returns the length of the previous extended grapheme cluster in UTF-16
     /// code units.
-    @warn_unused_result
     @inline(never)
     internal static func _measureExtendedGraphemeClusterBackward(
         from end: UnicodeScalarView.Index
@@ -218,7 +216,6 @@ extension String.CharacterView : BidirectionalCollection {
   /// Returns the next consecutive position after `i`.
   ///
   /// - Precondition: The next position is valid.
-  @warn_unused_result
   public func index(after i: Index) -> Index {
     _precondition(i._base != i._base._viewEndIndex, "cannot increment endIndex")
     return Index(_base: i._endBase)
@@ -227,7 +224,6 @@ extension String.CharacterView : BidirectionalCollection {
   /// Returns the previous consecutive position before `i`.
   ///
   /// - Precondition: The previous position is valid.
-  @warn_unused_result
   public func index(before i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check i?
     _precondition(i._base != i._base._viewStartIndex,

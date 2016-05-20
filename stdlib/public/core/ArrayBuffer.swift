@@ -38,7 +38,6 @@ public struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
   ///
   /// - Precondition: The elements actually have dynamic type `U`, and `U`
   ///   is a class or `@objc` existential.
-  @warn_unused_result
   internal func cast<U>(toBufferOf _: U.Type) -> _ArrayBuffer<U> {
     _sanityCheck(_isClassOrObjCExistential(Element.self))
     _sanityCheck(_isClassOrObjCExistential(U.self))
@@ -54,7 +53,6 @@ public struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
   ///
   /// - Precondition: `U` is a class or `@objc` existential derived from
   /// `Element`.
-  @warn_unused_result
   internal func downcast<U>(
     toBufferWithDeferredTypeCheckOf _: U.Type
   ) -> _ArrayBuffer<U> {
@@ -96,7 +94,6 @@ extension _ArrayBuffer {
   }
 
   /// Returns `true` iff this buffer's storage is uniquely-referenced.
-  @warn_unused_result
   mutating func isUniquelyReferenced() -> Bool {
     if !_isClassOrObjCExistential(Element.self) {
       return _storage.isUniquelyReferenced_native_noSpareBits()
@@ -106,7 +103,6 @@ extension _ArrayBuffer {
 
   /// Returns `true` iff this buffer's storage is either
   /// uniquely-referenced or pinned.
-  @warn_unused_result
   mutating func isUniquelyReferencedOrPinned() -> Bool {
     if !_isClassOrObjCExistential(Element.self) {
       return _storage.isUniquelyReferencedOrPinned_native_noSpareBits()
@@ -118,7 +114,6 @@ extension _ArrayBuffer {
   ///
   /// - Precondition: `_isBridgedToObjectiveC(Element.self)`.
   ///   O(1) if the element type is bridged verbatim, O(N) otherwise.
-  @warn_unused_result
   public func _asCocoaArray() -> _NSArrayCore {
     _sanityCheck(
       _isBridgedToObjectiveC(Element.self),
@@ -131,7 +126,6 @@ extension _ArrayBuffer {
   /// `_ContiguousArrayBuffer` that can be grown in-place to allow the self
   /// buffer store minimumCapacity elements, returns that buffer.
   /// Otherwise, returns `nil`.
-  @warn_unused_result
   public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
   -> NativeBuffer? {
     if _fastPath(isUniquelyReferenced()) {
@@ -143,12 +137,10 @@ extension _ArrayBuffer {
     return nil
   }
 
-  @warn_unused_result
   public mutating func isMutableAndUniquelyReferenced() -> Bool {
     return isUniquelyReferenced()
   }
 
-  @warn_unused_result
   public mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
     return isUniquelyReferencedOrPinned()
   }
@@ -156,7 +148,6 @@ extension _ArrayBuffer {
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
-  @warn_unused_result
   public func requestNativeBuffer() -> NativeBuffer? {
     if !_isClassOrObjCExistential(Element.self) {
       return _native
@@ -346,7 +337,6 @@ extension _ArrayBuffer {
 
   @_versioned
   @inline(__always)
-  @warn_unused_result
   func getElement(_ i: Int, wasNativeTypeChecked: Bool) -> Element {
     if _fastPath(wasNativeTypeChecked) {
       return _nativeTypeChecked[i]
@@ -356,7 +346,6 @@ extension _ArrayBuffer {
 
   @_versioned
   @inline(never)
-  @warn_unused_result
   func _getElementSlowPath(_ i: Int) -> AnyObject {
     _sanityCheck(
       _isClassOrObjCExistential(Element.self),

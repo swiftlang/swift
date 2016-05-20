@@ -32,7 +32,6 @@ extension _StringCore {
   /// and the second element contains the encoded UTF-8 starting in its
   /// low byte.  Any unused high bytes in the result will be set to
   /// 0xFF.
-  @warn_unused_result
   func _encodeSomeUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(i <= count)
 
@@ -62,7 +61,6 @@ extension _StringCore {
 
   /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
   /// storage is contiguous UTF-16.
-  @warn_unused_result
   func _encodeSomeContiguousUTF16AsUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
     _sanityCheck(_baseAddress != nil)
@@ -74,7 +72,6 @@ extension _StringCore {
 #if _runtime(_ObjC)
   /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
   /// storage is non-contiguous UTF-16.
-  @warn_unused_result
   func _encodeSomeNonContiguousUTF16AsUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
     _sanityCheck(_baseAddress == nil)
@@ -190,7 +187,6 @@ extension String {
     /// Returns the next consecutive position after `i`.
     ///
     /// - Precondition: The next position is representable.
-    @warn_unused_result
     public func index(after i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
       let currentUnit = UTF8.CodeUnit(truncatingBitPattern: i._buffer)
@@ -307,7 +303,6 @@ extension String {
 
 // FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
 //        assuming String.UTF8View.Index continues to exist
-@warn_unused_result
 public func == (
   lhs: String.UTF8View.Index,
   rhs: String.UTF8View.Index
@@ -344,7 +339,6 @@ public func == (
   while true
 }
 
-@warn_unused_result
 public func < (
   lhs: String.UTF8View.Index,
   rhs: String.UTF8View.Index
@@ -414,7 +408,6 @@ extension String.UTF8View.Index {
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Precondition: `self` is an element of `String(utf16)!.utf8.indices`.
-  @warn_unused_result
   public func samePosition(
     in utf16: String.UTF16View
   ) -> String.UTF16View.Index? {
@@ -426,7 +419,6 @@ extension String.UTF8View.Index {
   ///
   /// - Precondition: `self` is an element of
   ///   `String(unicodeScalars).utf8.indices`.
-  @warn_unused_result
   public func samePosition(
     in unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
@@ -437,7 +429,6 @@ extension String.UTF8View.Index {
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Precondition: `self` is an element of `characters.utf8.indices`.
-  @warn_unused_result
   public func samePosition(
     in characters: String
   ) -> String.Index? {

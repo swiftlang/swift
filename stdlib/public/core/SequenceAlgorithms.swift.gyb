@@ -117,7 +117,6 @@ ${orderingExplanation}
   ///
   /// - SeeAlso: `min(isOrderedBefore:)`
 %   end
-  @warn_unused_result
   public func min(
 %   if preds:
     isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
@@ -170,7 +169,6 @@ ${orderingExplanation}
   ///
   /// - SeeAlso: `max(isOrderedBefore:)`
 %   end
-  @warn_unused_result
   public func max(
 %   if preds:
     isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
@@ -238,7 +236,6 @@ ${equivalenceExplanation}
   ///
   /// - SeeAlso: `starts(with:isEquivalent:)`
 %   end
-  @warn_unused_result
   public func starts<
     PossiblePrefix : Sequence where PossiblePrefix.${GElement} == ${GElement}
   >(
@@ -313,7 +310,6 @@ ${equivalenceExplanation}
   ///
   /// - SeeAlso: `elementsEqual(_:isEquivalent:)`
 %   end
-  @warn_unused_result
   public func elementsEqual<
     OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
   >(
@@ -397,7 +393,6 @@ ${orderingExplanation}
   ///   perform localized comparison.
   /// - SeeAlso: `lexicographicallyPrecedes(_:isOrderedBefore:)`
 %   end
-  @warn_unused_result
   public func lexicographicallyPrecedes<
     OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
   >(
@@ -449,7 +444,6 @@ extension Sequence where Iterator.Element : Equatable {
   /// - Parameter element: The element to find in the sequence.
   /// - Returns: `true` if the element was found in the sequence; otherwise,
   ///   `false`.
-  @warn_unused_result
   public func contains(_ element: ${GElement}) -> Bool {
     if let result = _customContainsEquatableElement(element) {
       return result
@@ -500,7 +494,6 @@ extension Sequence {
   ///   the passed element represents a match.
   /// - Returns: `true` if the sequence contains an element that satisfies
   ///   `predicate`; otherwise, `false`.
-  @warn_unused_result
   public func contains(
     _ predicate: @noescape (${GElement}) throws -> Bool
   ) rethrows -> Bool {
@@ -547,7 +540,6 @@ extension Sequence {
   ///     in the next call of the `combine` closure or returned to the
   ///     caller.
   /// - Returns: The final accumulated value.
-  @warn_unused_result
   public func reduce<T>(
     _ initial: T, combine: @noescape (T, ${GElement}) throws -> T
   ) rethrows -> T {
@@ -573,7 +565,6 @@ extension Sequence {
   ///
   /// - Returns: An array containing the elements of this sequence in
   ///   reverse order.
-  @warn_unused_result
   public func reversed() -> [${GElement}] {
     // FIXME(performance): optimize to 1 pass?  But Array(self) can be
     // optimized to a memcpy() sometimes.  Those cases are usually collections,
@@ -619,7 +610,6 @@ extension Sequence {
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
   /// - SeeAlso: `flatten()`, `map(_:)`
-  @warn_unused_result
   public func flatMap<SegmentOfResult : Sequence>(
     _ transform: @noescape (${GElement}) throws -> SegmentOfResult
   ) rethrows -> [SegmentOfResult.${GElement}] {
@@ -656,7 +646,6 @@ extension Sequence {
   ///
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
-  @warn_unused_result
   public func flatMap<ElementOfResult>(
     _ transform: @noescape (${GElement}) throws -> ElementOfResult?
   ) rethrows -> [ElementOfResult] {

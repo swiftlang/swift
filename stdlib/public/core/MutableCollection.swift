@@ -157,7 +157,6 @@ public protocol MutableIndexable : Indexable {
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
-  @warn_unused_result
   func index(after i: Index) -> Index
 
   /// Replaces the given index with its successor.

@@ -97,7 +97,6 @@ public struct _StringCore {
   /// storage.  Caveats: The string must have contiguous storage; the
   /// element may be 1 or 2 bytes wide, depending on elementWidth; the
   /// result may be null if the string is empty.
-  @warn_unused_result
   func _pointer(toElementAt n: Int) -> OpaquePointer {
     _sanityCheck(hasContiguousStorage && n >= 0 && n <= count)
     return OpaquePointer(
@@ -296,7 +295,6 @@ public struct _StringCore {
 
   /// Get the Nth UTF-16 Code Unit stored.
   @_versioned
-  @warn_unused_result
   func _nthContiguous(_ position: Int) -> UTF16.CodeUnit {
     let p =
         UnsafeMutablePointer<UInt8>(_pointer(toElementAt: position)._rawValue)
@@ -382,7 +380,6 @@ public struct _StringCore {
   /// - Note: If unsuccessful because of insufficient space in an
   ///   existing buffer, the suggested new capacity will at least double
   ///   the existing buffer's storage.
-  @warn_unused_result
   mutating func _claimCapacity(
     _ newSize: Int, minElementWidth: Int) -> (Int, OpaquePointer?) {
     if _fastPath((nativeBuffer != nil) && elementWidth >= minElementWidth) {
@@ -416,7 +413,6 @@ public struct _StringCore {
   /// Effectively appends garbage to the String until it has newSize
   /// UTF-16 code units.  Returns a pointer to the garbage code units;
   /// you must immediately copy valid data into that storage.
-  @warn_unused_result
   mutating func _growBuffer(
     _ newSize: Int, minElementWidth: Int
   ) -> OpaquePointer {
@@ -555,7 +551,6 @@ public struct _StringCore {
   /// represented as pure ASCII.
   ///
   /// - Complexity: O(N) in the worst case.
-  @warn_unused_result
   func isRepresentableAsASCII() -> Bool {
     if _slowPath(!hasContiguousStorage) {
       return false

@@ -51,7 +51,6 @@ extension String {
   /// Returns `nil` if the `cString` is `nil` or if it contains ill-formed code
   /// units and no repairing has been requested. Otherwise replaces
   /// ill-formed code units with replacement characters (U+FFFD).
-  @warn_unused_result
   public static func decodeCString<Encoding : UnicodeCodec>(
     _ cString: UnsafePointer<Encoding.CodeUnit>?,
     as encoding: Encoding.Type,
@@ -77,7 +76,6 @@ extension String {
 /// From a non-`nil` `UnsafePointer` to a null-terminated string
 /// with possibly-transient lifetime, create a null-terminated array of 'C' char.
 /// Returns `nil` if passed a null pointer.
-@warn_unused_result
 public func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
   guard let s = p else {
     return nil
@@ -92,13 +90,11 @@ public func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
 
 extension String {
   @available(*, unavailable, message: "Please use String.init?(validatingUTF8:) instead. Note that it no longer accepts NULL as a valid input. Also consider using String(cString:), that will attempt to repair ill-formed code units.")
-  @warn_unused_result
   public static func fromCString(_ cs: UnsafePointer<CChar>) -> String? {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, message: "Please use String.init(cString:) instead. Note that it no longer accepts NULL as a valid input. See also String.decodeCString if you need more control.")
-  @warn_unused_result
   public static func fromCStringRepairingIllFormedUTF8(
     _ cs: UnsafePointer<CChar>
   ) -> (String?, hadError: Bool) {

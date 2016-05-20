@@ -66,7 +66,6 @@ extension Sequence
   ///   value of the same or of a different type.
   /// - Returns: An array containing the transformed elements of this
   ///   sequence.
-  @warn_unused_result
   public func map<T>(
     _ transform: @noescape (Base.Iterator.Element) throws -> T
   ) rethrows -> [T] {
@@ -88,7 +87,6 @@ extension Sequence
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
   /// - Returns: An array of the elements that `includeElement` allowed.
-  @warn_unused_result
   public func filter(
     _ includeElement: @noescape (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.Iterator.Element] {

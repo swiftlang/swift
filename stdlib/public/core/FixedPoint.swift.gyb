@@ -69,7 +69,6 @@ public protocol Integer : _Integer, Strideable {}
 public protocol _SignedInteger : _Integer, SignedNumber {
   /// Represent this number using Swift's widest native signed integer
   /// type.
-  @warn_unused_result
   func toIntMax() -> IntMax
 
   /// Convert from Swift's widest signed integer type, trapping on
@@ -117,7 +116,6 @@ public protocol _DisallowMixedSignArithmetic : _Integer {
 public protocol UnsignedInteger : _DisallowMixedSignArithmetic, Integer {
   /// Represent this number using Swift's widest native unsigned
   /// integer type.
-  @warn_unused_result
   func toUIntMax() -> UIntMax
 
   /// Convert from Swift's widest unsigned integer type, trapping on
@@ -147,7 +145,6 @@ extension UnsignedInteger {
 ///
 ///     func f(_ x: Int32) {}
 ///     func g(_ x: Int64) { f(numericCast(x)) }
-@warn_unused_result
 public func numericCast<
   T : _SignedInteger, U : _SignedInteger
 >(_ x: T) -> U {
@@ -162,7 +159,6 @@ public func numericCast<
 ///
 ///     func f(_ x: UInt32) {}
 ///     func g(_ x: UInt64) { f(numericCast(x)) }
-@warn_unused_result
 public func numericCast<
   T : UnsignedInteger, U : UnsignedInteger
 >(_ x: T) -> U {
@@ -177,7 +173,6 @@ public func numericCast<
 ///
 ///     func f(_ x: UInt32) {}
 ///     func g(_ x: Int64) { f(numericCast(x)) }
-@warn_unused_result
 public func numericCast<
   T : _SignedInteger, U : UnsignedInteger
 >(_ x: T) -> U {
@@ -192,7 +187,6 @@ public func numericCast<
 ///
 ///     func f(_ x: Int32) {}
 ///     func g(_ x: UInt64) { f(numericCast(x)) }
-@warn_unused_result
 public func numericCast<
 T : UnsignedInteger, U : _SignedInteger
 >(_ x: T) -> U {
@@ -673,7 +667,6 @@ public postfix func -- (x: inout ${Self}) -> ${Self} {
 /// Returns the argument and specifies that the value is not negative.
 /// It has only an effect if the argument is a load or call.
 @_transparent
-@warn_unused_result
 public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
   _sanityCheck(x >= 0)
   return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x._value))

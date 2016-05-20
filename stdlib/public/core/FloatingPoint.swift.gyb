@@ -234,7 +234,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// 754 addition operation.
   ///
   /// A default implementation is provided in terms of `add()`.
-  @warn_unused_result
   func adding(_ other: Self) -> Self
 
   /// Replace `self` with the sum of `self` and `other` rounded to a
@@ -242,7 +241,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   mutating func add(_ other: Self)
 
   /// Additive inverse of `self`.  Always exact.
-  @warn_unused_result
   func negated() -> Self
 
   /// Replace `self` with its additive inverse.
@@ -252,7 +250,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// representable value.  The IEEE 754 subtraction operation.
   ///
   /// A default implementation is provided in terms of `subtract()`.
-  @warn_unused_result
   func subtracting(_ other: Self) -> Self
 
   /// Replace `self` with the sum of `self` and the additive inverse of `other`
@@ -263,7 +260,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// IEEE 754 multiply operation.
   ///
   /// A default implementation is provided in terms of `multiply(by:)`.
-  @warn_unused_result
   func multiplied(by other: Self) -> Self
 
   /// Replace `self` with the product of `self` and `other` rounded to a
@@ -274,7 +270,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// IEEE 754 divide operation.
   ///
   /// A default implementation is provided in terms of `divide(by:)`.
-  @warn_unused_result
   func divided(by other: Self) -> Self
 
   /// Replace `self` with the quotient of `self` and `other` rounded to a
@@ -296,7 +291,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// `r` satisfies `-|other|/2 <= r` and `r <= |other|/2`.
   ///
   /// `remainder` is always exact.
-  @warn_unused_result
   func remainder(dividingBy other: Self) -> Self
 
   /// Mutating form of `remainder`.
@@ -312,7 +306,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// of `self/other`.
   ///
   /// `truncatingRemainder` is always exact.
-  @warn_unused_result
   func truncatingRemainder(dividingBy other: Self) -> Self
 
   /// Mutating form of `truncatingRemainder`.
@@ -321,7 +314,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /* TODO: Need to call C sqrt and fma or llvm sqrt and fma intrinsics
    * for these.
   /// Square root of `self`.
-  @warn_unused_result
   func squareRoot() -> Self
 
   /// Mutating form of square root.
@@ -329,7 +321,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
 
   /// `self + lhs*rhs` computed without intermediate rounding.  Implements the
   /// IEEE 754 `fusedMultiplyAdd` operation.
-  @warn_unused_result
   func addingProduct(_ lhs: Self, _ rhs: Self) -> Self
 
   /// Fused multiply-add, accumulating the product of `lhs` and `rhs` to `self`.
@@ -345,7 +336,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// This function is an implementation hook to be used by the free function
   /// min(Self, Self) -> Self so that we get the IEEE 754 behavior with regard
   /// to NaNs.
-  @warn_unused_result
   static func minimum(_ x: Self, _ y: Self) -> Self
 
   /// The maximum of `x` and `y`.  Implements the IEEE 754 `maxNum` operation.
@@ -357,7 +347,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// This function is an implementation hook to be used by the free function
   /// max(Self, Self) -> Self so that we get the IEEE 754 behavior with regard
   /// to NaNs.
-  @warn_unused_result
   static func maximum(_ x: Self, _ y: Self) -> Self
 
   /// Whichever of `x` or `y` has lesser magnitude.  Implements the IEEE 754
@@ -366,7 +355,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// Returns `x` if abs(x) <= abs(y), `y` if abs(y) < abs(x), and whichever of
   /// `x` or `y` is a number if the other is NaN.  The result is NaN
   /// only if both arguments are NaN.
-  @warn_unused_result
   static func minimumMagnitude(_ x: Self, _ y: Self) -> Self
 
   /// Whichever of `x` or `y` has greater magnitude.  Implements the IEEE 754
@@ -375,7 +363,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// Returns `x` if abs(x) >= abs(y), `y` if abs(y) > abs(x), and whichever of
   /// `x` or `y` is a number if the other is NaN.  The result is NaN
   /// only if both arguments are NaN.
-  @warn_unused_result
   static func maximumMagnitude(_ x: Self, _ y: Self) -> Self
 
   /// The least representable value that compares greater than `self`.
@@ -396,7 +383,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   ///
   /// -0 compares equal to +0, and NaN compares not equal to anything,
   /// including itself.
-  @warn_unused_result
   func isEqual(to other: Self) -> Bool
 
   /// IEEE 754 less-than predicate.
@@ -404,7 +390,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// NaN compares not less than anything.  -infinity compares less than
   /// all values except for itself and NaN.  Everything except for NaN and
   /// +infinity compares less than +infinity.
-  @warn_unused_result
   func isLess(than other: Self) -> Bool
 
   /// IEEE 754 less-than-or-equal predicate.
@@ -421,7 +406,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// Note that this predicate does not impose a total order.  The
   /// `isTotallyOrdered` predicate refines this relation so that all values
   /// are totally ordered.
-  @warn_unused_result
   func isLessThanOrEqualTo(_ other: Self) -> Bool
 
   /// True if and only if `self` precedes `other` in the IEEE 754 total order
@@ -431,7 +415,6 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// values of type `Self`, including non-canonical encodings, signed zeros,
   /// and NaNs.  Because it is used much less frequently than the usual
   /// comparisons, there is no operator form of this relation.
-  @warn_unused_result
   func isTotallyOrdered(below other: Self) -> Bool
 
   /// True if and only if `self` is normal.
@@ -509,13 +492,11 @@ public enum FloatingPointClassification {
 }
 
 @_transparent
-@warn_unused_result
 public prefix func +<T : FloatingPoint>(x: T) -> T {
   return x
 }
 
 @_transparent
-@warn_unused_result
 public prefix func -<T : FloatingPoint>(x: T) -> T {
   return x.negated()
 }
@@ -531,7 +512,6 @@ binary_arithmetic = [
 
 %for op in binary_arithmetic:
 @_transparent
-@warn_unused_result
 public func ${op[0]}<T : FloatingPoint>(lhs: T, rhs: T) -> T {
   return lhs.${op[1]}(${op[3]+': ' if op[3] else ''}rhs)
 }
@@ -545,38 +525,32 @@ public func ${op[0]}=<T : FloatingPoint>(lhs: inout T, rhs: T) {
 
 /*  TODO: uncomment once implemented.
 @_transparent
-@warn_unused_result
 public func sqrt<T : FloatingPoint>(_ rhs: T) -> T {
   return rhs.squareRoot()
 }
 */
 
 @_transparent
-@warn_unused_result
 public func ==<T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
   return lhs.isEqual(to: rhs)
 }
 
 @_transparent
-@warn_unused_result
 public func < <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
   return lhs.isLess(than: rhs)
 }
 
 @_transparent
-@warn_unused_result
 public func <= <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
   return lhs.isLessThanOrEqualTo(rhs)
 }
 
 @_transparent
-@warn_unused_result
 public func > <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
   return rhs.isLess(than: lhs)
 }
 
 @_transparent
-@warn_unused_result
 public func >= <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
   return rhs.isLessThanOrEqualTo(lhs)
 }
@@ -686,16 +660,12 @@ public protocol BinaryFloatingPoint: FloatingPoint, FloatLiteralConvertible {
 
   /*  TODO: Implement these once it becomes possible to do so.  (Requires
    *  revised Integer protocol).
-  @warn_unused_result
   func isEqual<Other: BinaryFloatingPoint>(to other: Other) -> Bool
 
-  @warn_unused_result
   func isLess<Other: BinaryFloatingPoint>(than other: Other) -> Bool
 
-  @warn_unused_result
   func isLessThanOrEqualTo<Other: BinaryFloatingPoint>(other: Other) -> Bool
 
-  @warn_unused_result
   func isTotallyOrdered<Other: BinaryFloatingPoint>(below other: Other) -> Bool
   */
 }
@@ -828,7 +798,6 @@ extension BinaryFloatingPoint {
   //  subnormal when converted to the other type.  This is an extremely niche
   //  corner case, however (it cannot occur with the usual IEEE 754 floating-
   //  point types).  Nonetheless, this should be fixed someday.
-  @warn_unused_result
   public func isEqual<Other: BinaryFloatingPoint>(to other: Other) -> Bool {
     if Self.significandBitCount >= Other.significandBitCount {
       return self.isEqual(to: Self(other))
@@ -836,7 +805,6 @@ extension BinaryFloatingPoint {
     return other.isEqual(to: Other(self))
   }
 
-  @warn_unused_result
   public func isLess<Other: BinaryFloatingPoint>(than other: Other) -> Bool {
     if Self.significandBitCount >= Other.significandBitCount {
       return self.isLess(than: Self(other))
@@ -844,7 +812,6 @@ extension BinaryFloatingPoint {
     return Other(self).isLess(than: other)
   }
 
-  @warn_unused_result
   public func isLessThanOrEqualTo<Other: BinaryFloatingPoint>(other: Other) -> Bool {
     if Self.significandBitCount >= Other.significandBitCount {
       return self.isLessThanOrEqualTo(Self(other))
@@ -852,7 +819,6 @@ extension BinaryFloatingPoint {
     return Other(self).isLessThanOrEqualTo(other)
   }
 
-  @warn_unused_result
   public func isTotallyOrdered<Other: BinaryFloatingPoint>(before other: Other) -> Bool {
     if Self.significandBitCount >= Other.significandBitCount {
       return self.totalOrder(with: Self(other))

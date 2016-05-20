@@ -18,7 +18,6 @@ public protocol _Reflectable {
   // corresponding change to Reflection.cpp.
 
   /// Returns a mirror that reflects `self`.
-  @warn_unused_result
   func _getMirror() -> _Mirror
 }
 
@@ -52,12 +51,10 @@ public struct ObjectIdentifier : Hashable, Comparable {
   }
 }
 
-@warn_unused_result
 public func <(lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
   return UInt(lhs) < UInt(rhs)
 }
 
-@warn_unused_result
 public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(x._value, y._value))
 }
@@ -134,7 +131,6 @@ public protocol _Mirror {
 /// An entry point that can be called from C++ code to get the summary string
 /// for an arbitrary object. The memory pointed to by "out" is initialized with
 /// the summary string.
-@warn_unused_result
 @_silgen_name("swift_getSummary")
 public // COMPILER_INTRINSIC
 func _getSummary<T>(_ out: UnsafeMutablePointer<String>, x: T) {
@@ -145,7 +141,6 @@ func _getSummary<T>(_ out: UnsafeMutablePointer<String>, x: T) {
 /// `_Reflectable`, invoke its `_getMirror()` method; otherwise, fall back
 /// to an implementation in the runtime that structurally reflects values
 /// of any type.
-@warn_unused_result
 @_silgen_name("swift_reflectAny")
 internal func _reflect<T>(_ x: T) -> _Mirror
 
@@ -410,7 +405,6 @@ struct _OpaqueMirror : _Mirror {
   var disposition: _MirrorDisposition { return .aggregate }
 }
 
-@warn_unused_result
 @_silgen_name("swift_TupleMirror_count")
 func _getTupleCount(_: _MagicMirrorData) -> Int
 
@@ -422,7 +416,6 @@ func _getTupleCount(_: _MagicMirrorData) -> Int
 // ABI rules on most platforms.  Therefore, we make this function generic,
 // which has the disadvantage of passing the String type metadata as an
 // extra argument, but does force the string to be returned indirectly.
-@warn_unused_result
 @_silgen_name("swift_TupleMirror_subscript")
 func _getTupleChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
@@ -443,11 +436,9 @@ internal struct _TupleMirror : _Mirror {
   var disposition: _MirrorDisposition { return .tuple }
 }
 
-@warn_unused_result
 @_silgen_name("swift_StructMirror_count")
 func _getStructCount(_: _MagicMirrorData) -> Int
 
-@warn_unused_result
 @_silgen_name("swift_StructMirror_subscript")
 func _getStructChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
@@ -471,15 +462,12 @@ struct _StructMirror : _Mirror {
   var disposition: _MirrorDisposition { return .`struct` }
 }
 
-@warn_unused_result
 @_silgen_name("swift_EnumMirror_count")
 func _getEnumCount(_: _MagicMirrorData) -> Int
 
-@warn_unused_result
 @_silgen_name("swift_EnumMirror_subscript")
 func _getEnumChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
-@warn_unused_result
 @_silgen_name("swift_EnumMirror_caseName")
 func _swift_EnumMirror_caseName(
     _ data: _MagicMirrorData) -> UnsafePointer<CChar>
@@ -512,11 +500,9 @@ struct _EnumMirror : _Mirror {
   var disposition: _MirrorDisposition { return .`enum` }
 }
 
-@warn_unused_result
 @_silgen_name("swift_ClassMirror_count")
 func _getClassCount(_: _MagicMirrorData) -> Int
 
-@warn_unused_result
 @_silgen_name("swift_ClassMirror_subscript")
 func _getClassChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 

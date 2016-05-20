@@ -486,14 +486,12 @@ public protocol RangeReplaceableCollection
   /// want to replace the default implementation.
   ///
   /// - Returns: A non-nil value if the operation was performed.
-  @warn_unused_result
   mutating func _customRemoveLast() -> Iterator.Element?
 
   /// Customization point for `removeLast(_:)`.  Implement this function if you
   /// want to replace the default implementation.
   ///
   /// - Returns: `true` if the operation was performed.
-  @warn_unused_result
   mutating func _customRemoveLast(_ n: Int) -> Bool
 
   /// Removes and returns the first element of the collection.
@@ -956,12 +954,10 @@ extension RangeReplaceableCollection
 % end
 
 extension RangeReplaceableCollection {
-  @warn_unused_result
   public mutating func _customRemoveLast() -> Iterator.Element? {
     return nil
   }
 
-  @warn_unused_result
   public mutating func _customRemoveLast(_ n: Int) -> Bool {
     return false
   }
@@ -972,14 +968,12 @@ extension RangeReplaceableCollection
   Self : BidirectionalCollection,
   SubSequence == Self {
 
-  @warn_unused_result
   public mutating func _customRemoveLast() -> Iterator.Element? {
     let element = last!
     self = self[startIndex..<index(before: endIndex)]
     return element
   }
 
-  @warn_unused_result
   public mutating func _customRemoveLast(_ n: Int) -> Bool {
     self = self[startIndex..<index(endIndex, offsetBy: numericCast(-n))]
     return true
@@ -1107,7 +1101,6 @@ extension RangeReplaceableCollection
 /// - Parameters:
 ///   - lhs: A range-replaceable collection.
 ///   - rhs: A collection or finite sequence.
-@warn_unused_result
 public func +<
     C : RangeReplaceableCollection,
     S : Sequence
@@ -1138,7 +1131,6 @@ public func +<
 /// - Parameters:
 ///   - lhs: A collection or finite sequence.
 ///   - rhs: A range-replaceable collection.
-@warn_unused_result
 public func +<
   C : RangeReplaceableCollection,
   S : Sequence
@@ -1169,7 +1161,6 @@ public func +<
 /// - Parameters:
 ///   - lhs: A range-replaceable collection.
 ///   - rhs: Another range-replaceable collection.
-@warn_unused_result
 public func +<
   RRC1 : RangeReplaceableCollection,
   RRC2 : RangeReplaceableCollection

@@ -15,7 +15,6 @@
 // FIXME: Once we have an FFI interface, make these have proper function bodies
 
 @_transparent
-@warn_unused_result
 public // @testable
 func _countLeadingZeros(_ value: Int64) -> Int64 {
     return Int64(Builtin.int_ctlz_Int64(value._value, false._value))
@@ -23,7 +22,6 @@ func _countLeadingZeros(_ value: Int64) -> Int64 {
 
 /// Returns if `x` is a power of 2.
 @_transparent
-@warn_unused_result
 public // @testable
 func _isPowerOf2(_ x: UInt) -> Bool {
   if x == 0 {
@@ -36,7 +34,6 @@ func _isPowerOf2(_ x: UInt) -> Bool {
 
 /// Returns if `x` is a power of 2.
 @_transparent
-@warn_unused_result
 public // @testable
 func _isPowerOf2(_ x: Int) -> Bool {
   if x <= 0 {
@@ -78,7 +75,6 @@ public func _getTypeName(_ type: Any.Type, qualified: Bool)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the demangled qualified name of a metatype.
-@warn_unused_result
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
   let (stringPtr, count) = _getTypeName(type, qualified: qualified)
@@ -94,7 +90,6 @@ func _getTypeByMangledName(
 
 /// Lookup a class given a name. Until the demangled encoding of type
 /// names is stabilized, this is limited to top-level class names (Foo.bar).
-@warn_unused_result
 public // SPI(Foundation)
 func _typeByName(_ name: String) -> Any.Type? {
   let components = name.characters.split{$0 == "."}.map(String.init)
@@ -134,7 +129,6 @@ func _typeByName(_ name: String) -> Any.Type? {
 ///      floorLog2(9) == floorLog2(15) == 3
 ///
 /// TODO: Implement version working on Int instead of Int64.
-@warn_unused_result
 @_transparent
 public // @testable
 func _floorLog2(_ x: Int64) -> Int {

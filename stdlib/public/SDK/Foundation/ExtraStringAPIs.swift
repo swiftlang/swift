@@ -20,12 +20,10 @@ extension String.UTF16View.Index : Strideable {
     self.init(_offset: offset)
   }
 
-  @warn_unused_result
   public func distance(to other: String.UTF16View.Index) -> Int {
     return other._offset.distance(to: _offset)
   }
 
-  @warn_unused_result
   public func advanced(by n: Int) -> String.UTF16View.Index {
     return String.UTF16View.Index(_offset.advanced(by: n))
   }

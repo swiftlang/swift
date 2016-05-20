@@ -163,20 +163,17 @@ extension OpaquePointer : CustomDebugStringConvertible {
 }
 
 extension Int {
-  @warn_unused_result
   public init(bitPattern pointer: OpaquePointer?) {
     self.init(bitPattern: UnsafePointer<Void>(pointer))
   }
 }
 
 extension UInt {
-  @warn_unused_result
   public init(bitPattern pointer: OpaquePointer?) {
     self.init(bitPattern: UnsafePointer<Void>(pointer))
   }
 }
 
-@warn_unused_result
 public func ==(lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }

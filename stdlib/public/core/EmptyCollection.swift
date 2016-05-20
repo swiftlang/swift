@@ -59,7 +59,6 @@ public struct EmptyCollection<Element> :
   ///
   /// EmptyCollection does not have any element indices, so it is not
   /// possible to advance indices.
-  @warn_unused_result
   public func index(after i: Index) -> Index {
     _preconditionFailure("EmptyCollection can't advance indices")
   }
@@ -68,7 +67,6 @@ public struct EmptyCollection<Element> :
   ///
   /// EmptyCollection does not have any element indices, so it is not
   /// possible to advance indices.
-  @warn_unused_result
   public func index(before i: Index) -> Index {
     _preconditionFailure("EmptyCollection can't advance indices")
   }
@@ -109,13 +107,11 @@ public struct EmptyCollection<Element> :
     return 0
   }
 
-  @warn_unused_result
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     _precondition(i == startIndex && n == 0, "Index out of range")
     return i
   }
 
-  @warn_unused_result
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -125,7 +121,6 @@ public struct EmptyCollection<Element> :
   }
 
   /// The distance between two indexes (always zero).
-  @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     _precondition(start == 0, "From must be startIndex (or endIndex)")
     _precondition(end == 0, "To must be endIndex (or startIndex)")

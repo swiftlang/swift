@@ -78,13 +78,11 @@ extension ObjCBool : CustomStringConvertible {
 
 // Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
 
-@warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool {
   return ObjCBool(x)
 }
 
-@warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
   return Bool(x)
@@ -124,7 +122,6 @@ public struct Selector : StringLiteralConvertible {
   }
 }
 
-@warn_unused_result
 public func ==(lhs: Selector, rhs: Selector) -> Bool {
   return sel_isEqual(lhs, rhs)
 }
@@ -184,7 +181,6 @@ typealias Zone = NSZone
 // @autoreleasepool substitute
 //===----------------------------------------------------------------------===//
 
-@warn_unused_result
 @_silgen_name("_swift_objc_autoreleasePoolPush")
 func __pushAutoreleasePool() -> OpaquePointer
 
@@ -218,7 +214,6 @@ public var NO: ObjCBool {
 // rdar://problem/19418937, so here are some @_transparent overloads
 // for ObjCBool
 @_transparent
-@warn_unused_result
 public func && <T : Boolean>(
   lhs: T, rhs: @autoclosure () -> ObjCBool
 ) -> Bool {
@@ -226,7 +221,6 @@ public func && <T : Boolean>(
 }
 
 @_transparent
-@warn_unused_result
 public func || <T : Boolean>(
   lhs: T, rhs: @autoclosure () -> ObjCBool
 ) -> Bool {
@@ -254,7 +248,6 @@ extension NSObject : Equatable, Hashable {
   }
 }
 
-@warn_unused_result
 public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }

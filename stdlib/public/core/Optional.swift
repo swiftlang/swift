@@ -156,7 +156,6 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
   /// - Parameter f: A closure that takes the unwrapped value of the instance.
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
-  @warn_unused_result
   public func map<U>(_ f: @noescape (Wrapped) throws -> U) rethrows -> U? {
     switch self {
     case .some(let y):
@@ -184,7 +183,6 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
   /// - Parameter f: A closure that takes the unwrapped value of the instance.
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
-  @warn_unused_result
   public func flatMap<U>(_ f: @noescape (Wrapped) throws -> U?) rethrows -> U? {
     switch self {
     case .some(let y):
@@ -287,14 +285,12 @@ extension Optional : CustomReflectable {
 }
 
 @_transparent
-@warn_unused_result
 public // COMPILER_INTRINSIC
 func _stdlib_Optional_isSome<Wrapped>(_ `self`: Wrapped?) -> Bool {
   return `self` != nil
 }
 
 @_transparent
-@warn_unused_result
 public // COMPILER_INTRINSIC
 func _stdlib_Optional_unwrapped<Wrapped>(_ `self`: Wrapped?) -> Wrapped {
   switch `self` {
@@ -313,7 +309,6 @@ func _diagnoseUnexpectedNilOptional() {
     "unexpectedly found nil while unwrapping an Optional value")
 }
 
-@warn_unused_result
 public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -325,7 +320,6 @@ public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
   }
 }
 
-@warn_unused_result
 public func != <T : Equatable> (lhs: T?, rhs: T?) -> Bool {
   return !(lhs == rhs)
 }
@@ -340,7 +334,6 @@ public struct _OptionalNilComparisonType : NilLiteralConvertible {
   }
 }
 @_transparent
-@warn_unused_result
 public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
   case .some(_):
@@ -352,7 +345,6 @@ public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
 
 // Enable equality comparisons against the nil literal, even if the
 // element type isn't equatable
-@warn_unused_result
 public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
   case .some(_):
@@ -362,7 +354,6 @@ public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   }
 }
 
-@warn_unused_result
 public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
   case .some(_):
@@ -372,7 +363,6 @@ public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   }
 }
 
-@warn_unused_result
 public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
   case .some(_):
@@ -382,7 +372,6 @@ public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   }
 }
 
-@warn_unused_result
 public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
   case .some(_):
@@ -392,7 +381,6 @@ public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   }
 }
 
-@warn_unused_result
 public func < <T : Comparable> (lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -404,7 +392,6 @@ public func < <T : Comparable> (lhs: T?, rhs: T?) -> Bool {
   }
 }
 
-@warn_unused_result
 public func > <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -414,7 +401,6 @@ public func > <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   }
 }
 
-@warn_unused_result
 public func <= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -424,7 +410,6 @@ public func <= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   }
 }
 
-@warn_unused_result
 public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -467,7 +452,6 @@ public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
 ///   - defaultValue: A value to use as a default. `defaultValue` is the same
 ///     type as the `Wrapped` type of `optional`.
 @_transparent
-@warn_unused_result
 public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T)
     rethrows -> T {
   switch optional {
@@ -521,7 +505,6 @@ public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T)
 ///   - defaultValue: A value to use as a default. `defaultValue` and
 ///     `optional` have the same type.
 @_transparent
-@warn_unused_result
 public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T?)
     rethrows -> T? {
   switch optional {

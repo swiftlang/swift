@@ -369,7 +369,6 @@ public typealias AnyClass = AnyObject.Type
 /// instance (in other words, are identical pointers).
 ///
 /// - SeeAlso: `Equatable`, `==`
-@warn_unused_result
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -384,7 +383,6 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   }
 }
 
-@warn_unused_result
 public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   return !(lhs === rhs)
 }
@@ -540,7 +538,6 @@ public protocol Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  @warn_unused_result
   func == (lhs: Self, rhs: Self) -> Bool
 }
 
@@ -555,7 +552,6 @@ public protocol Equatable {
 /// - Parameters:
 ///   - lhs: A value to compare.
 ///   - rhs: Another value to compare.
-@warn_unused_result
 public func != <T : Equatable>(lhs: T, rhs: T) -> Bool {
   return !(lhs == rhs)
 }
@@ -573,7 +569,6 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool {
 /// - Parameters:
 ///   - lhs: A value to compare.
 ///   - rhs: Another value to compare.
-@warn_unused_result
 public func > <T : Comparable>(lhs: T, rhs: T) -> Bool {
   return rhs < lhs
 }
@@ -587,7 +582,6 @@ public func > <T : Comparable>(lhs: T, rhs: T) -> Bool {
 /// - Parameters:
 ///   - lhs: A value to compare.
 ///   - rhs: Another value to compare.
-@warn_unused_result
 public func <= <T : Comparable>(lhs: T, rhs: T) -> Bool {
   return !(rhs < lhs)
 }
@@ -603,7 +597,6 @@ public func <= <T : Comparable>(lhs: T, rhs: T) -> Bool {
 ///   - rhs: Another value to compare.
 /// - Returns: `true` if `lhs` is greater than or equal to `rhs`; otherwise,
 ///   `false`.
-@warn_unused_result
 public func >= <T : Comparable>(lhs: T, rhs: T) -> Bool {
   return !(lhs < rhs)
 }
@@ -743,7 +736,6 @@ public protocol Comparable : Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  @warn_unused_result
   func < (lhs: Self, rhs: Self) -> Bool
 
   /// Returns a Boolean value indicating whether the value of the first
@@ -752,7 +744,6 @@ public protocol Comparable : Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  @warn_unused_result
   func <= (lhs: Self, rhs: Self) -> Bool
 
   /// Returns a Boolean value indicating whether the value of the first
@@ -761,7 +752,6 @@ public protocol Comparable : Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  @warn_unused_result
   func >= (lhs: Self, rhs: Self) -> Bool
 
   /// Returns a Boolean value indicating whether the value of the first
@@ -770,7 +760,6 @@ public protocol Comparable : Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  @warn_unused_result
   func > (lhs: Self, rhs: Self) -> Bool
 }
 
@@ -883,7 +872,6 @@ public protocol BitwiseOperations {
   ///     // Prints "0"
   ///
   /// - Complexity: O(1).
-  @warn_unused_result
   func & (lhs: Self, rhs: Self) -> Self
 
   /// Returns the union of bits set in the two arguments.
@@ -903,7 +891,6 @@ public protocol BitwiseOperations {
   ///     // Prints "5"
   ///
   /// - Complexity: O(1).
-  @warn_unused_result
   func | (lhs: Self, rhs: Self) -> Self
 
   /// Returns the bits that are set in exactly one of the two arguments.
@@ -924,7 +911,6 @@ public protocol BitwiseOperations {
   ///     // Prints "5"
   ///
   /// - Complexity: O(1).
-  @warn_unused_result
   func ^ (lhs: Self, rhs: Self) -> Self
 
   /// Returns the inverse of the bits set in the argument.
@@ -944,7 +930,6 @@ public protocol BitwiseOperations {
   ///     let allOnes = ~UInt8.allZeros   // 0b11111111
   ///
   /// - Complexity: O(1).
-  @warn_unused_result
   prefix func ~ (x: Self) -> Self
 
   /// The empty bitset.
@@ -1087,7 +1072,6 @@ public protocol Hashable : Equatable {
 
 // Equatable types can be matched in patterns by value equality.
 @_transparent
-@warn_unused_result
 public func ~= <T : Equatable> (a: T, b: T) -> Bool {
   return a == b
 }

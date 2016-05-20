@@ -70,12 +70,10 @@ public struct CustomPrintableValue
 
   public typealias Stride = Int
 
-  @warn_unused_result
   public func distance(to other: CustomPrintableValue) -> Stride {
     return other.value - self.value
   }
 
-  @warn_unused_result
   public func advanced(by n: Stride) -> CustomPrintableValue {
     return CustomPrintableValue(self.value + n, identity: self.identity)
   }

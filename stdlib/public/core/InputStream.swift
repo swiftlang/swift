@@ -21,7 +21,6 @@ import SwiftShims
 ///
 /// Standard input is interpreted as `UTF-8`.  Invalid bytes
 /// will be replaced by Unicode [replacement characters](http://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character).
-@warn_unused_result
 public func readLine(strippingNewline: Bool = true) -> String? {
   var linePtrVar: UnsafeMutablePointer<CChar>? = nil
   var readBytes = swift_stdlib_readLine_stdin(&linePtrVar)

@@ -29,25 +29,21 @@ extension String {
   public var endIndex: Index { return characters.endIndex }
 
     // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(after i: Index) -> Index {
     return characters.index(after: i)
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(before i: Index) -> Index {
     return characters.index(before: i)
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     return characters.index(i, offsetBy: n)
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -55,7 +51,6 @@ extension String {
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     return characters.distance(from: start, to: end)
   }
@@ -75,12 +70,10 @@ extension String {
   }
 }
 
-@warn_unused_result
 public func == (lhs: String.Index, rhs: String.Index) -> Bool {
   return lhs._base == rhs._base
 }
 
-@warn_unused_result
 public func < (lhs: String.Index, rhs: String.Index) -> Bool {
   return lhs._base < rhs._base
 }

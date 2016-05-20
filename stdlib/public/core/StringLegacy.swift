@@ -38,7 +38,6 @@ extension String {
     return _split(separator: "\n")
   }
   
-  @warn_unused_result
   public func _split(separator: UnicodeScalar) -> [String] {
     let scalarSlices = unicodeScalars.split { $0 == separator }
     return scalarSlices.map { String($0) }

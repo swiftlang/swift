@@ -113,7 +113,6 @@ public struct LazyFilterIndex<Base : Collection> : Comparable {
   public let base: Base.Index
 }
 
-@warn_unused_result
 public func == <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
@@ -121,7 +120,6 @@ public func == <Base : Collection>(
   return lhs.base == rhs.base
 }
 
-@warn_unused_result
 public func != <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
@@ -129,7 +127,6 @@ public func != <Base : Collection>(
   return lhs.base != rhs.base
 }
 
-@warn_unused_result
 public func < <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
@@ -137,7 +134,6 @@ public func < <Base : Collection>(
   return lhs.base < rhs.base
 }
 
-@warn_unused_result
 public func <= <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
@@ -145,7 +141,6 @@ public func <= <Base : Collection>(
   return lhs.base <= rhs.base
 }
 
-@warn_unused_result
 public func >= <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
@@ -153,7 +148,6 @@ public func >= <Base : Collection>(
   return lhs.base >= rhs.base
 }
 
-@warn_unused_result
 public func > <Base : Collection>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
@@ -227,7 +221,6 @@ public struct ${Self}<
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(after i: Index) -> Index {
     var i = i
     formIndex(after: &i)
@@ -245,7 +238,6 @@ public struct ${Self}<
   }
 
 %   if Traversal == 'Bidirectional':
-  @warn_unused_result
   public func index(before i: Index) -> Index {
     var i = i
     formIndex(before: &i)
@@ -306,7 +298,6 @@ extension LazySequenceProtocol {
   ///   the result is used. No buffering storage is allocated and each
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
-  @warn_unused_result
   public func filter(
     _ predicate: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilterSequence<Self.Elements> {
@@ -328,7 +319,6 @@ extension LazyCollectionProtocol
   ///   the result is used. No buffering storage is allocated and each
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
-  @warn_unused_result
   public func filter(
     _ predicate: (Elements.Iterator.Element) -> Bool
   ) -> LazyFilter${collectionForTraversal(Traversal)}<Self.Elements> {

@@ -40,7 +40,6 @@ public protocol _ObjectiveCBridgeableErrorProtocol : ErrorProtocol {
 /// If the bridge succeeds, the bridged value is written to the uninitialized
 /// memory pointed to by 'out', and true is returned. Otherwise, 'out' is
 /// left uninitialized, and false is returned.
-@warn_unused_result
 @_silgen_name("swift_stdlib_bridgeNSErrorToErrorProtocol")
 public func _stdlib_bridgeNSErrorToErrorProtocol<
   T : _ObjectiveCBridgeableErrorProtocol
@@ -60,7 +59,6 @@ public protocol __BridgedNSError : RawRepresentable, ErrorProtocol {
 }
 
 // Allow two bridged NSError types to be compared.
-@warn_unused_result
 public func ==<T: __BridgedNSError where T.RawValue: SignedInteger>(
   lhs: T,
   rhs: T
@@ -88,7 +86,6 @@ public extension __BridgedNSError where RawValue: SignedInteger {
 }
 
 // Allow two bridged NSError types to be compared.
-@warn_unused_result
 public func ==<T: __BridgedNSError where T.RawValue: UnsignedInteger>(
   lhs: T,
   rhs: T
@@ -142,7 +139,6 @@ public struct NSCocoaError : RawRepresentable, _BridgedNSError {
   public static var _nsErrorDomain: String { return NSCocoaErrorDomain }
 }
 
-@warn_unused_result
 public func ~=(match: NSCocoaError, error: ErrorProtocol) -> Bool {
   guard let cocoaError = error as? NSCocoaError else { return false }
   return match.rawValue == cocoaError.rawValue

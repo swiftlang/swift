@@ -62,7 +62,6 @@ extension Collection where ${IElement} : Equatable {
   ///   found in the collection, returns `nil`.
   ///
   /// - SeeAlso: `index(where:)`
-  @warn_unused_result
   public func index(of element: ${IElement}) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
       return result
@@ -102,7 +101,6 @@ extension Collection {
   ///   returns `nil`.
   ///
   /// - SeeAlso: `index(of:)`
-  @warn_unused_result
   public func index(
     where predicate: @noescape (${IElement}) throws -> Bool
   ) rethrows -> Index? {
@@ -209,7 +207,6 @@ ${orderingExplanation}
   ///   collection is empty.
   ///
   /// - SeeAlso: `partition()`
-  @warn_unused_result
   public mutating func partition(
     isOrderedBefore: @noescape (${IElement}, ${IElement}) -> Bool
   ) -> Index
@@ -252,7 +249,6 @@ ${orderingExplanation}
   ///   equal to the collection's end index only if the collection is empty.
   ///
   /// - SeeAlso: `partition(isOrderedBefore:)`
-  @warn_unused_result
   public mutating func partition() -> Index
 
 %   end
@@ -677,7 +673,6 @@ extension MutableCollection where Self : RandomAccessCollection {
 
 extension Collection where ${IElement} : Equatable {
   @available(*, unavailable, renamed: "index(of:)")
-  @warn_unused_result
   public func indexOf(_ element: ${IElement}) -> Index? {
     Builtin.unreachable()
   }
@@ -685,7 +680,6 @@ extension Collection where ${IElement} : Equatable {
 
 extension Collection {
   @available(*, unavailable, renamed: "index(where:)")
-  @warn_unused_result
   public func indexOf(
     _ predicate: @noescape (${IElement}) throws -> Bool
   ) rethrows -> Index? {

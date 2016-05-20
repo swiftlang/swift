@@ -78,7 +78,6 @@ public struct UnicodeScalar :
   ///
   /// - parameter forceASCII: If `true`, forces most values into a numeric
   ///   representation.
-  @warn_unused_result
   public func escaped(asASCII forceASCII: Bool) -> String {
     func lowNibbleAsHex(_ v: UInt32) -> String {
       let nibble = v & 15
@@ -218,12 +217,10 @@ extension UInt64 {
 extension UnicodeScalar : Comparable, Equatable {
 }
 
-@warn_unused_result
 public func ==(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
   return lhs.value == rhs.value
 }
 
-@warn_unused_result
 public func <(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
   return lhs.value < rhs.value
 }
@@ -268,7 +265,6 @@ extension UnicodeScalar.UTF16View : RandomAccessCollection {
 }
 
 /// Returns c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
-@warn_unused_result
 public // SPI(SwiftExperimental)
 func _ascii16(_ c: UnicodeScalar) -> UTF16.CodeUnit {
   _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")

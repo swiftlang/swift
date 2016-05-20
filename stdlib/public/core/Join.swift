@@ -175,7 +175,6 @@ extension Sequence where Iterator.Element : Sequence {
   /// - Returns: The joined sequence of elements.
   ///
   /// - SeeAlso: `flatten()`
-  @warn_unused_result
   public func joined<
     Separator : Sequence
     where
