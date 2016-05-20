@@ -589,3 +589,15 @@ public func ..< <
 // swift-3-indexing-model: this is not really a proper rename
 @available(*, unavailable, renamed: "IndexingIterator")
 public struct RangeGenerator<Bound> {}
+
+extension Range {
+  @available(*, unavailable, renamed: "lowerBound")
+  public var startIndex: Bound {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "upperBound")
+  public var endIndex: Bound {
+    Builtin.unreachable()
+  }
+}
