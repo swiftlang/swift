@@ -92,4 +92,4 @@ class X : NSDocument {
   }
 }
 
-func makeCopy<T: NSCopying>(thing: T) {} // expected-error {{'NSCopying' has been renamed to 'Copying'}} {{18-27=Copying}} 
+func makeCopy<T: NSWobbling>(thing: T) {} // expected-error {{'NSWobbling' has been renamed to 'Wobbling'}} {{18-28=Wobbling}} 
