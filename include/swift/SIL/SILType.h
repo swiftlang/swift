@@ -581,7 +581,7 @@ inline SILType SILResultInfo::getSILType() const {
   if (isIndirect()) {
     return SILType::getPrimitiveAddressType(getType());
   } else {
-    return SILType::getPrimitiveObjectType(getType());    
+    return SILType::getPrimitiveObjectType(getType());
   }
 }
 

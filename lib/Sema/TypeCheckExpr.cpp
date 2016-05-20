@@ -308,7 +308,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     // Resolve the 'as' or 'is' expression.
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     assert(RHS == as && "'as' with non-type RHS?!");
-    as->setSubExpr(LHS);    
+    as->setSubExpr(LHS);
     return makeResultExpr(as);
   }
 

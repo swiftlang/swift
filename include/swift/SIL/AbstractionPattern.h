@@ -867,7 +867,7 @@ public:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
     case Kind::ObjCMethodType:
-      llvm_unreachable("pattern is not a tuple");      
+      llvm_unreachable("pattern is not a tuple");
     case Kind::Tuple:
       return getNumTupleElements_Stored();
     case Kind::Type:

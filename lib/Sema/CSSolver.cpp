@@ -221,7 +221,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
                                                 overload.second.choice,
                                                 overload.first,
                                                 overload.second.openedFullType,
-                                                overload.second.openedType};    
+                                                overload.second.openedType};
   }
 
   // Register constraint restrictions.
@@ -537,7 +537,7 @@ namespace {
     AllowedBindingKind Kind;
 
     /// The defaulted protocol associated with this binding.
-    Optional<ProtocolDecl *> DefaultedProtocol;    
+    Optional<ProtocolDecl *> DefaultedProtocol;
   };
 
   struct PotentialBindings {

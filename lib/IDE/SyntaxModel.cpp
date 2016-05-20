@@ -99,12 +99,12 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 #define POUND_NORMAL_KEYWORD(Name) case tok::pound_##Name:
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:
 #define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) case tok::pound_##Name:
-#include "swift/Parse/Tokens.def"    
+#include "swift/Parse/Tokens.def"
         Kind = SyntaxNodeKind::Keyword;
         break;
 
 #define POUND_CONFIG(Name) case tok::pound_##Name:
-#include "swift/Parse/Tokens.def"    
+#include "swift/Parse/Tokens.def"
         Kind = SyntaxNodeKind::BuildConfigKeyword;
         break;
 
@@ -485,7 +485,7 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::ObjectLiteralExpression;
     SN.Range = charSourceRangeFromSourceRange(SM, ObjectE->getSourceRange());
-    SourceLoc NRStart = ObjectE->getSourceLoc().getAdvancedLoc(1);    
+    SourceLoc NRStart = ObjectE->getSourceLoc().getAdvancedLoc(1);
     SourceLoc NREnd =
       NRStart.getAdvancedLoc(ObjectE->getLiteralKindRawName().size());
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);

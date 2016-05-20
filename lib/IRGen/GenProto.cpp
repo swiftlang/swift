@@ -1433,7 +1433,7 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   llvm::Value *instantiationArgs =
     llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy);
   if (SpecializedBaseConformances.empty()) {
-    instantiationFn = llvm::ConstantInt::get(IGM.RelativeAddressTy, 0);    
+    instantiationFn = llvm::ConstantInt::get(IGM.RelativeAddressTy, 0);
   } else {
     llvm::Constant *fn = buildInstantiationFunction();
     instantiationFn = IGM.emitDirectRelativeReference(fn, cache, { 4 });

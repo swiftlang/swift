@@ -630,7 +630,7 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
     auto clangFunctionType = getClangFunctionType(getClangType());
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               getResultType(getType()),
-                              clangFunctionType->getReturnType().getTypePtr());    
+                              clangFunctionType->getReturnType().getTypePtr());
   }
   case Kind::CurriedObjCMethodType:
     return getPartialCurriedObjCMethod(

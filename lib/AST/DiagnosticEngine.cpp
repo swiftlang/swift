@@ -456,7 +456,7 @@ static void formatDiagnosticText(StringRef InText,
     }
       
     // Parse the digit sequence into an argument index.
-    unsigned ArgIndex;      
+    unsigned ArgIndex;
     bool Result = InText.substr(0, Length).getAsInteger(10, ArgIndex);
     assert(!Result && "Unparseable argument index value?");
     (void)Result;

@@ -1292,7 +1292,7 @@ function cmake_config_opt() {
                 ;;
             foundation)
                 echo "--config ${FOUNDATION_BUILD_TYPE}"
-                ;;            
+                ;;
             libdispatch)
                 ;;
             *)

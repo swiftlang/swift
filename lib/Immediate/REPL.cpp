@@ -237,7 +237,7 @@ public:
 /// grovel into the REPL's AST, then locking will be necessary to serialize
 /// access to the AST.
 class REPLInput {
-  PrettyStackTraceREPL StackTrace;  
+  PrettyStackTraceREPL StackTrace;
   
   EditLine *e;
   HistoryW *h;

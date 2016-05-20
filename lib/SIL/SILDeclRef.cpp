@@ -230,7 +230,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
     : atUncurryLevel;
   Expansion = (unsigned) expansion;
   
-  isCurried = uncurryLevel != naturalUncurryLevel;  
+  isCurried = uncurryLevel != naturalUncurryLevel;
   isForeign = asForeign;
 }
 

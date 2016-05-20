@@ -4833,7 +4833,7 @@ namespace {
     CanType unboundType
       = decl->getDeclaredTypeOfContext()->getCanonicalType();
     
-    dependent = hasDependentValueWitnessTable(IGM, unboundType);    
+    dependent = hasDependentValueWitnessTable(IGM, unboundType);
     if (dependent)
       return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     else

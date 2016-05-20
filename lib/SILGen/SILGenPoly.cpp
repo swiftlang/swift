@@ -1684,7 +1684,7 @@ void ResultPlanner::plan(AbstractionPattern innerOrigType,
              outerSubstTupleType.getElementType(eltIndex),
              planData);
       }
-      return;      
+      return;
     }
 
     // Otherwise, the next outer result must be either opaque or optional.
@@ -1991,7 +1991,7 @@ ResultPlanner::planScalarIntoIndirectResult(AbstractionPattern innerOrigType,
     } else {
       addReabstractDirectToIndirect(innerOrigType, innerSubstType,
                                     outerOrigType, outerSubstType,
-                                    innerResult, outerResultAddr);      
+                                    innerResult, outerResultAddr);
     }
   }
 }

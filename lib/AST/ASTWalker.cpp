@@ -693,7 +693,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     E2 = doIt(E->getRHS());
     if (E2 == nullptr) return nullptr;
     E->setRHS(E2);
-    return E;      
+    return E;
   }
 
   Expr *visitExplicitCastExpr(ExplicitCastExpr *E) {

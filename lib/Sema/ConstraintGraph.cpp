@@ -432,7 +432,7 @@ TypeVariableType *ConstraintGraph::getMemberType(
   auto &node = (*this)[repTypeVar];
   
   return node.getMemberType(name, [&]() {
-    auto memberTypeVar = create();  
+    auto memberTypeVar = create();
     if (ActiveScope)
       Changes.push_back(Change::addedMemberType(repTypeVar, name));
     return memberTypeVar;

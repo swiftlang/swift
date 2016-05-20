@@ -892,7 +892,7 @@ void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
       && !proto->getAttrs().hasAttribute<ObjCAttr>()) {
     TC.diagnose(attr->getLocation(),
                 diag::no_objc_tagged_pointer_not_class_protocol);
-    attr->setInvalid();    
+    attr->setInvalid();
   }
 }
 
@@ -1370,13 +1370,13 @@ void AttributeChecker::visitWarnUnusedResultAttr(WarnUnusedResultAttr *attr) {
     if (func->getExtensionType()->getClassOrBoundGenericClass()) {
       TC.diagnose(attr->getLocation(),
                   diag::attr_warn_unused_result_mutable_variable, 3);
-      return;      
+      return;
     }
 
     if (func->isMutating()) {
       TC.diagnose(attr->getLocation(),
                   diag::attr_warn_unused_result_mutable_variable, 4);
-      return;      
+      return;
     }
   }
 }

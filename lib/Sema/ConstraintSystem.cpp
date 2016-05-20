@@ -379,7 +379,7 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
   case SolutionKind::Unsolved:
     // We couldn't solve this constraint; add it to the pile.
     if (!isExternallySolved) {
-      InactiveConstraints.push_back(constraint);        
+      InactiveConstraints.push_back(constraint);
     }
 
     // Add this constraint to the constraint graph.
