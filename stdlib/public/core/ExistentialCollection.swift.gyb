@@ -286,24 +286,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   internal func _index(before i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
   internal func _formIndex(before i: _AnyIndexBox) { _abstract() }
   internal var _last: Element? { _abstract() }
-
-  internal override init(
-    _startIndex: _AnyIndexBox,
-    endIndex: _AnyIndexBox
-  ) {
-    super.init(_startIndex: _startIndex, endIndex: endIndex)
-  }
 %   end
-
-%   if Kind == 'RandomAccessCollection':
-  internal override init(
-    _startIndex: _AnyIndexBox,
-    endIndex: _AnyIndexBox
-  ) {
-    super.init(_startIndex: _startIndex, endIndex: endIndex)
-  }
-%   end
-
 }
 % end
 
