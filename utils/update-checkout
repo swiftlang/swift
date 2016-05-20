@@ -42,6 +42,7 @@ REPOSITORIES = {
 NEXT_BRANCHES = {
     'llvm': 'stable-next',
     'clang': 'stable-next',
+    'compiler-rt': 'stable-next',
     'swift': 'master-next',
     'lldb': 'master-next',
     'cmark': 'master',
