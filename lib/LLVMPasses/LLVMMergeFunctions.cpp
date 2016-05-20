@@ -241,11 +241,11 @@ private:
   /// look at their particular properties (bit-width for vectors, and
   /// address space for pointers).
   /// If these properties are equal - compare their contents.
-  int cmpConstants(const Constant *L, const Constant *R);
+  int cmpConstants(const Constant *L, const Constant *R) const;
 
   /// Compares two global values by number. Uses the GlobalNumbersState to
   /// identify the same globals across function calls.
-  int cmpGlobalValues(GlobalValue *L, GlobalValue *R);
+  int cmpGlobalValues(GlobalValue *L, GlobalValue *R) const;
 
   /// Assign or look up previously assigned numbers for the two values, and
   /// return whether the numbers are equal. Numbers are assigned in the order
@@ -265,7 +265,7 @@ private:
   ///          then left value is greater.
   ///          In another words, we compare serial numbers, for more details
   ///          see comments for sn_mapL and sn_mapR.
-  int cmpValues(const Value *L, const Value *R);
+  int cmpValues(const Value *L, const Value *R) const;
 
   /// Compare two Instructions for equivalence, similar to
   /// Instruction::isSameOperationAs but with modifications to the type
@@ -395,7 +395,7 @@ private:
   /// But, we are still not able to compare operands of PHI nodes, since those
   /// could be operands from further BBs we didn't scan yet.
   /// So it's impossible to use dominance properties in general.
-  DenseMap<const Value*, int> sn_mapL, sn_mapR;
+  mutable DenseMap<const Value *, int> sn_mapL, sn_mapR;
 
   // The global state we will use
   GlobalNumberState* GlobalNumbers;
@@ -528,7 +528,8 @@ int FunctionComparator::cmpOperandBundlesSchema(const Instruction *L,
 /// type.
 /// 2. Compare constant contents.
 /// For more details see declaration comments.
-int FunctionComparator::cmpConstants(const Constant *L, const Constant *R) {
+int FunctionComparator::cmpConstants(const Constant *L,
+                                     const Constant *R) const {
 
   Type *TyL = L->getType();
   Type *TyR = R->getType();
@@ -725,7 +726,7 @@ int FunctionComparator::cmpConstants(const Constant *L, const Constant *R) {
   }
 }
 
-int FunctionComparator::cmpGlobalValues(GlobalValue *L, GlobalValue* R) {
+int FunctionComparator::cmpGlobalValues(GlobalValue *L, GlobalValue *R) const {
   return cmpNumbers(GlobalNumbers->getNumber(L), GlobalNumbers->getNumber(R));
 }
 
@@ -975,6 +976,17 @@ int FunctionComparator::cmpOperations(const Instruction *L,
     return cmpNumbers(RMWI->getSynchScope(),
                       cast<AtomicRMWInst>(R)->getSynchScope());
   }
+  if (const PHINode *PNL = dyn_cast<PHINode>(L)) {
+    const PHINode *PNR = cast<PHINode>(R);
+    // Ensure that in addition to the incoming values being identical
+    // (checked by the caller of this function), the incoming blocks
+    // are also identical.
+    for (unsigned i = 0, e = PNL->getNumIncomingValues(); i != e; ++i) {
+      if (int Res =
+              cmpValues(PNL->getIncomingBlock(i), PNR->getIncomingBlock(i)))
+        return Res;
+    }
+  }
   return 0;
 }
 
@@ -1038,7 +1050,7 @@ int FunctionComparator::cmpInlineAsm(const InlineAsm *L,
 /// this is the first time the values are seen, they're added to the mapping so
 /// that we will detect mismatches on next use.
 /// See comments in declaration for more details.
-int FunctionComparator::cmpValues(const Value *L, const Value *R) {
+int FunctionComparator::cmpValues(const Value *L, const Value *R) const {
   // Catch self-reference case.
   if (L == FnL) {
     if (R == FnR)
