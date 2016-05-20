@@ -476,14 +476,15 @@ namespace {
     
     AvailabilitySet getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt,
                                       unsigned NumElts);
+    int getAnyUninitializedMemberAtInst(SILInstruction *Inst, unsigned FirstElt,
+                                        unsigned NumElts);
+
     DIKind getSelfConsumedAtInst(SILInstruction *Inst);
 
     bool isInitializedAtUse(const DIMemoryUse &Use,
                             bool *SuperInitDone = nullptr,
                             bool *FailedSelfUse = nullptr);
     
-    bool hasUninitializedMemberAtInst(SILInstruction *Inst, unsigned FirstElt,
-                                      unsigned NumElts);
 
     void handleStoreUse(unsigned UseID);
     void handleInOutUse(const DIMemoryUse &Use);
@@ -674,20 +675,14 @@ std::string LifetimeChecker::getUninitElementName(const DIMemoryUse &Use) {
   // the query, to get a bitmask of exactly which elements are uninitialized.
   // In a multi-element query, the first element may already be defined and
   // we want to point to the second one.
-  AvailabilitySet Liveness =
-    getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);
-
-  unsigned FirstUndefElement = Use.FirstElement;
-  while (Liveness.get(FirstUndefElement) == DIKind::Yes) {
-    ++FirstUndefElement;
-    assert(FirstUndefElement != Use.FirstElement+Use.NumElements &&
-           "No undef elements found?");
-  }
-
+  unsigned firstUndefElement =
+    getAnyUninitializedMemberAtInst(Use.Inst, Use.FirstElement,Use.NumElements);
+  assert(firstUndefElement != ~0U && "No undef elements found?");
+  
   // Verify that it isn't the super.init marker that failed.  The client should
   // handle this, not pass it down to diagnoseInitError.
   assert((!TheMemory.isDerivedClassSelf() ||
-          FirstUndefElement != TheMemory.NumElements-1) &&
+          firstUndefElement != TheMemory.NumElements-1) &&
          "super.init failure not handled in the right place");
 
   // If the definition is a declaration, try to reconstruct a name and
@@ -698,7 +693,7 @@ std::string LifetimeChecker::getUninitElementName(const DIMemoryUse &Use) {
   // an error about "v" instead of "v.0" when "v" has tuple type and the whole
   // thing is accessed inappropriately.
   std::string Name;
-  TheMemory.getPathStringToElement(FirstUndefElement, Name);
+  TheMemory.getPathStringToElement(firstUndefElement, Name);
 
   return Name;
 }
@@ -1331,23 +1326,13 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
              (unsigned)TheMemory.isDelegatingInit());
     return;
   }
-
-  SILLocation Loc = Inst->getLoc();
   
-  // Try to find the return location
-  auto TermLoc = Inst->getParent()->getTerminator()->getLoc();
-  if (TermLoc.getKind() == SILLocation::ReturnKind) {
-    Loc = TermLoc;
-  }
-    
   // If this is a load with a single user that is a return (and optionally a
   // retain_value for non-trivial structs/enums), then this is a return in the
   // enum/struct init case, and we haven't stored to self.   Emit a specific
   // diagnostic.
   if (auto *LI = dyn_cast<LoadInst>(Inst)) {
     bool hasReturnUse = false, hasUnknownUses = false;
-    
-    auto *LoadBB = LI->getParent();
     
     for (auto LoadUse : LI->getUses()) {
       auto *User = LoadUse->getUser();
@@ -1362,18 +1347,6 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
 
       if (auto *EI = dyn_cast<EnumInst>(User))
         if (isFailableInitReturnUseOfEnum(EI)) {
-          // Try to find the return location
-          for (auto Pred : LoadBB->getPreds()) {
-            auto *TI = Pred->getTerminator();
-            auto TermLoc = TI->getLoc();
-            
-            // Check if this is an early return with uninitialized members
-            if (TermLoc.getKind() == SILLocation::ReturnKind &&
-                hasUninitializedMemberAtInst(TI, Use.FirstElement,
-                                             Use.NumElements))
-              Loc = TermLoc;
-          }
-
           hasReturnUse = true;
           continue;
         }
@@ -1382,16 +1355,41 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
       break;
     }
     
+    // Okay, this load is part of a return sequence, diagnose it specially.
     if (hasReturnUse && !hasUnknownUses) {
+      // The load is probably part of the common epilog for the function, try to
+      // find a more useful source location than the syntactic end of the
+      // function.
+      SILLocation returnLoc = Inst->getLoc();
+      auto TermLoc = Inst->getParent()->getTerminator()->getLoc();
+      if (TermLoc.getKind() == SILLocation::ReturnKind) {
+        // Function has a single return that got merged into the epilog block.
+        returnLoc = TermLoc;
+      } else {
+        // Otherwise, there are multiple paths to the epilog block, scan its
+        // predecessors to see if there are any where the value is unavailable.
+        // If so, we can use its location information for more precision.
+        for (auto pred : LI->getParent()->getPreds()) {
+          auto *TI = pred->getTerminator();
+          // Check if this is an early return with uninitialized members.
+          if (TI->getLoc().getKind() == SILLocation::ReturnKind &&
+              getAnyUninitializedMemberAtInst(TI, Use.FirstElement,
+                                              Use.NumElements) != -1)
+            returnLoc = TI->getLoc();
+        }
+      }
+      
       if (TheMemory.isEnumInitSelf()) {
         if (!shouldEmitError(Inst)) return;
-        diagnose(Module, Loc,
+        diagnose(Module, returnLoc,
                  diag::return_from_init_without_initing_self);
         return;
-      } else if (TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf() &&
+      }
+      
+      if (TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf() &&
                  !TheMemory.isDelegatingInit()) {
         if (!shouldEmitError(Inst)) return;
-        diagnose(Module, Loc,
+        diagnose(Module, returnLoc,
                  diag::return_from_init_without_initing_stored_properties);
         noteUninitializedMembers(Use);
         return;
@@ -1746,8 +1744,7 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   // destruction.
   assert(isa<StrongReleaseInst>(Release) || isa<DestroyAddrInst>(Release));
   
-  AvailabilitySet Availability =
-    getLivenessAtInst(Release, 0, TheMemory.NumElements);
+  auto Availability = getLivenessAtInst(Release, 0, TheMemory.NumElements);
   DIKind SelfConsumed =
     getSelfConsumedAtInst(Release);
 
@@ -2407,6 +2404,23 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
   return Result;
 }
 
+/// If any of the elements in the specified range are uninitialized at the
+/// specified instruction, return the first element that is uninitialized.  If
+/// they are all initialized, return -1.
+int LifetimeChecker::getAnyUninitializedMemberAtInst(SILInstruction *Inst,
+                                                     unsigned FirstElt,
+                                                     unsigned NumElts) {
+  // Determine the liveness states of the elements that we care about.
+  auto Liveness = getLivenessAtInst(Inst, FirstElt, NumElts);
+  
+  // Find unintialized member.
+  for (unsigned i = FirstElt, e = i+NumElts; i != e; ++i)
+    if (Liveness.get(i) != DIKind::Yes)
+      return i;
+  
+  return -1;
+}
+
 /// getSelfConsumedAtInst - Compute the liveness state for any number of tuple
 /// elements at the specified instruction.  The elements are returned as an
 /// AvailabilitySet.  Elements outside of the range specified may not be
@@ -2471,21 +2485,6 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
   return true;
 }
 
-bool LifetimeChecker::hasUninitializedMemberAtInst(SILInstruction *Inst,
-                                                   unsigned FirstElt,
-                                                   unsigned NumElts) {
-  // Determine the liveness states of the elements that we care about.
-  AvailabilitySet Liveness =
-  getLivenessAtInst(Inst, FirstElt, NumElts);
-  
-  // Find unintialized member
-  for (unsigned i = FirstElt, e = i+NumElts;
-       i != e; ++i)
-    if (Liveness.get(i) != DIKind::Yes)
-      return true;
-  
-  return false;
-}
 
 
 
