@@ -1215,3 +1215,71 @@ class r23013334Derived : rdar16119509_Base {
 
 }
 
+// sr-1469
+struct SR1469_Struct1 {
+  let a: Int
+  let b: Int // expected-note {{'self.b' not initialized}}
+  
+  init?(x: Int, y: Int) {
+    self.a = x
+    if y == 42 {
+      return // expected-error {{return from initializer without initializing all stored properties}}
+    }
+    // many lines later
+    self.b = y
+  }
+}
+
+struct SR1469_Struct2 {
+  let a: Int
+  let b: Int // expected-note {{'self.b' not initialized}}
+  
+  init?(x: Int, y: Int) {
+    self.a = x
+    return // expected-error {{return from initializer without initializing all stored properties}}
+  }
+}
+
+struct SR1469_Struct3 {
+  let a: Int
+  let b: Int // expected-note {{'self.b' not initialized}}
+  
+  init?(x: Int, y: Int) {
+    self.a = x
+    if y == 42 {
+      self.b = y
+      return
+    }
+  } // expected-error {{return from initializer without initializing all stored properties}}
+}
+
+enum SR1469_Enum1 {
+  case A, B
+  
+  init?(x: Int) {
+    if x == 42 {
+      return // expected-error {{return from enum initializer method without storing to 'self'}}
+    }
+    // many lines later
+    self = .A
+  }
+}
+
+enum SR1469_Enum2 {
+  case A, B
+  
+  init?() {
+    return // expected-error {{return from enum initializer method without storing to 'self'}}
+  }
+}
+enum SR1469_Enum3 {
+  case A, B
+  
+  init?(x: Int) {
+    if x == 42 {
+      self = .A
+      return
+    }
+  } // expected-error {{return from enum initializer method without storing to 'self'}}
+}
+
