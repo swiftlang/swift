@@ -1650,30 +1650,7 @@ static bool hasErrorMethodNameCollision(ClangImporter::Implementation &importer,
   // been marked NS_SWIFT_UNAVAILABLE, because it's actually marked unavailable,
   // or because it was deprecated before our API sunset. We can handle
   // "conflicts" where one form is unavailable.
-  // FIXME: Somewhat duplicated from Implementation::importAttributes.
-  clang::AvailabilityResult availability = conflict->getAvailability();
-  if (availability != clang::AR_Unavailable &&
-      importer.DeprecatedAsUnavailableFilter) {
-    for (auto *attr : conflict->specific_attrs<clang::AvailabilityAttr>()) {
-      if (attr->getPlatform()->getName() == "swift") {
-        availability = clang::AR_Unavailable;
-        break;
-      }
-      if (importer.PlatformAvailabilityFilter &&
-          !importer.PlatformAvailabilityFilter(attr->getPlatform()->getName())){
-        continue;
-      }
-      clang::VersionTuple version = attr->getDeprecated();
-      if (version.empty())
-        continue;
-      if (importer.DeprecatedAsUnavailableFilter(version.getMajor(),
-                                                 version.getMinor())) {
-        availability = clang::AR_Unavailable;
-        break;
-      }
-    }
-  }
-  return availability != clang::AR_Unavailable;
+  return !importer.isUnavailableInSwift(conflict);
 }
 
 /// Determine the optionality of the given Objective-C method.
@@ -2809,7 +2786,8 @@ auto ClangImporter::Implementation::importFullName(
         (isa<clang::TypeDecl>(D) ||
          (isa<clang::ObjCInterfaceDecl>(D) &&
           !hasOrInheritsSwiftBridgeAttr(cast<clang::ObjCInterfaceDecl>(D))) ||
-         isa<clang::ObjCProtocolDecl>(D))) {
+         isa<clang::ObjCProtocolDecl>(D)) &&
+        !isUnavailableInSwift(D)) {
       // Find the original declaration, from which we can determine
       // the owning module.
       const clang::Decl *owningD = D->getCanonicalDecl();

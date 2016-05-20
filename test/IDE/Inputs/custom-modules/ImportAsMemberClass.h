@@ -19,4 +19,17 @@ __attribute__((swift_name("SomeClass.applyOptions(self:_:)")))
 void IAMSomeClassApplyOptions(IAMSomeClass * _Nonnull someClass, 
                               IAMSomeClassOptions options);
 
+@interface UnavailableDefaultInit : NSObject
+-(instancetype)init __attribute__((availability(swift,unavailable)));
+@end
+
+@interface UnavailableDefaultInitSub : UnavailableDefaultInit
+@end
+
+__attribute__((swift_name("UnavailableDefaultInit.init()")))
+UnavailableDefaultInit * _Nonnull MakeUnavailableDefaultInit(void);
+
+__attribute__((swift_name("UnavailableDefaultInitSub.init()")))
+UnavailableDefaultInitSub * _Nonnull MakeUnavailableDefaultInitSub(void);
+
 #endif

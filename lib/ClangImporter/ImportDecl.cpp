@@ -3856,6 +3856,14 @@ namespace {
                                CtorInitializerKind kind) {
       CtorInitializerKind existingKind = existingCtor->getInitKind();
 
+      // If one constructor is unavailable in Swift and the other is
+      // not, keep the available one.
+      bool existingIsUnavailable =
+        existingCtor->getAttrs().isUnavailable(Impl.SwiftContext);
+      bool newIsUnavailable = Impl.isUnavailableInSwift(objcMethod);
+      if (existingIsUnavailable != newIsUnavailable)
+        return existingIsUnavailable;
+
       // If the new kind is the same as the existing kind, stick with
       // the existing constructor.
       if (existingKind == kind)
@@ -6165,6 +6173,35 @@ void ClangImporter::Implementation::importAttributes(
   if (ClangDecl->hasAttr<clang::PureAttr>()) {
     MappedDecl->getAttrs().add(new (C) EffectsAttr(EffectsKind::ReadOnly));
   }
+}
+
+bool ClangImporter::Implementation::isUnavailableInSwift(
+    const clang::Decl *decl) {
+  // FIXME: Somewhat duplicated from importAttributes(), but this is a
+  // more direct path.
+  if (decl->getAvailability() == clang::AR_Unavailable) return true;
+
+  // Apply the deprecated-as-unavailable filter.
+  if (!DeprecatedAsUnavailableFilter) return false;
+
+  for (auto *attr : decl->specific_attrs<clang::AvailabilityAttr>()) {
+    if (attr->getPlatform()->getName() == "swift")
+      return true;
+
+    if (PlatformAvailabilityFilter &&
+        !PlatformAvailabilityFilter(attr->getPlatform()->getName())){
+      continue;
+    }
+
+    clang::VersionTuple version = attr->getDeprecated();
+    if (version.empty())
+      continue;
+    if (DeprecatedAsUnavailableFilter(version.getMajor(),
+                                      version.getMinor()))
+      return true;
+  }
+
+  return false;
 }
 
 Decl *
