@@ -619,15 +619,29 @@ public:
   llvm::SetVector<FoundDeclTy> DeclsToReport;
   Type BaseTy;
   const DeclContext *DC;
+  LazyResolver *TypeResolver;
 
-  OverrideFilteringConsumer(Type BaseTy, const DeclContext *DC)
-      : BaseTy(BaseTy->getRValueType()), DC(DC) {
+  OverrideFilteringConsumer(Type BaseTy, const DeclContext *DC,
+                            LazyResolver *resolver)
+      : BaseTy(BaseTy->getRValueType()), DC(DC), TypeResolver(resolver) {
     assert(DC && BaseTy);
   }
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
     if (!AllFoundDecls.insert(VD).second)
       return;
+
+    // If this kind of declaration doesn't participate in overriding, there's
+    // no filtering to do here.
+    if (!isa<AbstractFunctionDecl>(VD) && !isa<AbstractStorageDecl>(VD)) {
+      DeclsToReport.insert(FoundDeclTy(VD, Reason));
+      return;
+    }
+
+    if (TypeResolver) {
+      TypeResolver->resolveDeclSignature(VD);
+      TypeResolver->resolveAccessibility(VD);
+    }
 
     if (VD->isInvalid()) {
       FoundDecls[VD->getName()].insert(VD);
@@ -718,7 +732,7 @@ public:
 static void lookupVisibleMemberDecls(
     Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
     LookupState LS, DeclVisibilityKind Reason, LazyResolver *TypeResolver) {
-  OverrideFilteringConsumer ConsumerWrapper(BaseTy, CurrDC);
+  OverrideFilteringConsumer ConsumerWrapper(BaseTy, CurrDC, TypeResolver);
   VisitedSet Visited;
   lookupVisibleMemberDeclsImpl(BaseTy, ConsumerWrapper, CurrDC, LS, Reason,
                                TypeResolver, Visited);
