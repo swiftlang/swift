@@ -39,6 +39,20 @@ REPOSITORIES = {
     'swift-integration-tests': 'apple/swift-integration-tests',
 }
 
+MASTER_BRANCHES = {
+    'llvm': 'stable',
+    'clang': 'stable',
+    'swift': 'master',
+    'lldb': 'master',
+    'cmark': 'master',
+    'llbuild': 'master',
+    'swiftpm': 'master',
+    'swift-corelibs-xctest': 'master',
+    'swift-corelibs-foundation': 'master',
+    'swift-corelibs-libdispatch': 'master',
+    'swift-integration-tests': 'master',
+}
+
 NEXT_BRANCHES = {
     'llvm': 'stable-next',
     'clang': 'stable-next',
@@ -110,7 +124,9 @@ def obtain_additional_swift_sources(
                     check_call(['git', 'clone', '--recursive', remote,
                                 dir_name])
                 if branch:
-                    if branch == "stable-next" or branch == "master-next":
+                    if branch == "master" or branch == "stable":
+                        repo_branch = MASTER_BRANCHES[dir_name]
+                    elif branch == "stable-next" or branch == "master-next":
                         repo_branch = NEXT_BRANCHES[dir_name]
                     elif branch == "swift-3.0-branch" or \
                             branch == "swift-3.0-preview-1-branch":
@@ -169,7 +185,9 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
             print("--- Skipping '" + dir_name + "' ---")
             continue
         if branch:
-            if branch == "stable-next" or branch == "master-next":
+            if branch == "master" or branch == "stable":
+                repo_branch = MASTER_BRANCHES[dir_name]
+            elif branch == "stable-next" or branch == "master-next":
                 repo_branch = NEXT_BRANCHES[dir_name]
             elif branch == "swift-3.0-branch" or \
                     branch == "swift-3.0-preview-1-branch":
