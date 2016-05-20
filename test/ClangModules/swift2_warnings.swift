@@ -91,3 +91,5 @@ class X : NSDocument {
     return url
   }
 }
+
+func makeCopy<T: NSWobbling>(thing: T) {} // expected-error {{'NSWobbling' has been renamed to 'Wobbling'}} {{18-28=Wobbling}} 
