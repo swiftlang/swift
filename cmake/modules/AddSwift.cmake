@@ -345,8 +345,8 @@ function(_target_merge_static_library dst_target src_target)
   add_custom_command(TARGET "${dst_target}" POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${unpack_dir}"
     COMMAND cd "${unpack_dir}"
-    COMMAND "${CMAKE_AR}" -x "$<TARGET_FILE:${src_target}>"
-    COMMAND "${CMAKE_AR}" -r "$<TARGET_FILE:${dst_target}>" ./*.o
+    COMMAND "${CMAKE_AR}" x "$<TARGET_FILE:${src_target}>"
+    COMMAND "${CMAKE_AR}" r "$<TARGET_FILE:${dst_target}>" ./*.o
     COMMAND cd "${CMAKE_BINARY_DIR}"
     COMMAND "${CMAKE_COMMAND}" -E remove_directory "${unpack_dir}"
   )
