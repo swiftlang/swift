@@ -430,9 +430,9 @@ Functions:
 - Name: CGPathCreateCopyByTransformingPath
   SwiftName: CGPathRef.copy(self:using:)
 - Name: CGPathCreateMutableCopy
-  SwiftName: CGMutablePathRef.copy(self:)
+  SwiftName: CGPathRef.mutableCopy(self:)
 - Name: CGPathCreateMutableCopyByTransformingPath
-  SwiftName: CGMutablePathRef.copy(self:using:)
+  SwiftName: CGPathRef.mutableCopy(self:using:)
 - Name: CGPathEqualToPath
   SwiftName: CGPathRef.equalTo(self:_:)
 - Name: CGPathGetPathBoundingBox
