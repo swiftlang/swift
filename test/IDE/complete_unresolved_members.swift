@@ -74,12 +74,14 @@ struct SomeOptions2 : OptionSet {
 enum EnumAvail1 {
   case aaa
   @available(*, unavailable) case AAA
+  @available(*, deprecated) case BBB
 }
 
 struct OptionsAvail1 : OptionSet {
   let rawValue: Int
   static let aaa = OptionsAvail1(rawValue: 1 << 0)
   @available(*, unavailable) static let AAA = OptionsAvail1(rawValue: 1 << 0)
+  @available(*, deprecated) static let BBB = OptionsAvail1(rawValue: 1 << 1)
 }
 
 func OptionSetTaker1(Op : SomeOptions1) {}
@@ -250,13 +252,19 @@ let TopLevelVar3 = OptionSetTaker7([.Option1], Op2: [.#^UNRESOLVED_30^#])
 func testAvail1(x: EnumAvail1) {
   testAvail1(.#^ENUM_AVAIL_1^#)
 }
-// ENUM_AVAIL_1: Begin completions
-// ENUM_AVAIL_1-NEXT: Decl[EnumElement]/ExprSpecific:     aaa[#EnumAvail1#];
-// ENUM_AVAIL_1-NEXT: End completions
+// ENUM_AVAIL_1: Begin completions, 2 items
+// ENUM_AVAIL_1-NOT: AAA
+// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific:     aaa[#EnumAvail1#];
+// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific/NotRecommended: BBB[#EnumAvail1#];
+// ENUM_AVAIL_1-NOT: AAA
+// ENUM_AVAIL_1: End completions
 
 func testAvail2(x: OptionsAvail1) {
   testAvail2(.#^OPTIONS_AVAIL_1^#)
 }
-// OPTIONS_AVAIL_1: Begin completions
-// OPTIONS_AVAIL_1_NEXT: Decl[StaticVar]/CurrNominal:        aaa[#OptionsAvail1#];
-// OPTIONS_AVAIL_1_NEXT: End completions
+// OPTIONS_AVAIL_1: Begin completions, 2 items
+// ENUM_AVAIL_1-NOT: AAA
+// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal:        aaa[#OptionsAvail1#];
+// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal/NotRecommended: BBB[#OptionsAvail1#];
+// ENUM_AVAIL_1-NOT: AAA
+// OPTIONS_AVAIL_1: End completions

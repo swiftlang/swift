@@ -104,6 +104,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAS_THROWING -code-completion-keywords=false | FileCheck %s -check-prefix=HAS_THROWING
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOC_TYPE1 -code-completion-keywords=false | FileCheck %s -check-prefix=ASSOC_TYPE1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPRECATED_1 -code-completion-keywords=false | FileCheck %s -check-prefix=DEPRECATED_1
+
 @objc
 class TagPA {}
 @objc
@@ -496,3 +498,13 @@ class C1 : P1 {
 // ASSOC_TYPE1: Begin completions, 2 items
 // ASSOC_TYPE1: Decl[AssociatedType]/Super:         typealias T2 = {#(Type)#}; name=T2 = Type
 // ASSOC_TYPE1: Decl[AssociatedType]/Super:         typealias T3 = {#(Type)#}; name=T3 = Type
+
+class Deprecated1 {
+  @available(*, deprecated)
+  func deprecated() {}
+}
+
+class Deprecated2 : Deprecated1 {
+  override func #^DEPRECATED_1^#
+}
+// DEPRECATED_1: Decl[InstanceMethod]/Super/NotRecommended: deprecated() {|};

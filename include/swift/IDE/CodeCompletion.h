@@ -535,11 +535,9 @@ public:
   };
 
   enum NotRecommendedReason {
-
     Redundant,
-
     TypeMismatch,
-
+    Deprecated,
     NoReason,
   };
 
