@@ -1914,9 +1914,10 @@ public:
   }
 
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason) {
-    if (!VD->hasName())
-      return;
-    if (!VD->isUserAccessible())
+    if (!VD->hasName() ||
+        !VD->isUserAccessible() ||
+        (VD->hasAccessibility() && !VD->isAccessibleFrom(CurrDeclContext)) ||
+        AvailableAttr::isUnavailable(VD))
       return;
 
     StringRef Name = VD->getName().get();
@@ -2483,7 +2484,9 @@ public:
   void addEnumElementRef(const EnumElementDecl *EED,
                          DeclVisibilityKind Reason,
                          bool HasTypeContext) {
-    if (!EED->hasName())
+    if (!EED->hasName() ||
+        (EED->hasAccessibility() && !EED->isAccessibleFrom(CurrDeclContext)) ||
+        AvailableAttr::isUnavailable(EED))
       return;
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
