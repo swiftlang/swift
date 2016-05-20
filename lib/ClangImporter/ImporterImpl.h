@@ -1101,6 +1101,10 @@ public:
                             bool isStatic,
                             ClangNode ClangN);
 
+  /// Determine whether the given declaration is considered
+  /// 'unavailable' in Swift.
+  bool isUnavailableInSwift(const clang::Decl *decl);
+
   /// \brief Add "Unavailable" annotation to the swift declaration.
   void markUnavailable(ValueDecl *decl, StringRef unavailabilityMsg);
 
