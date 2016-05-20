@@ -1006,9 +1006,19 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
                                      InFlightDiagnostic &diag,
                                      SourceRange referenceRange,
                                      const AvailableAttr *attr,
-                                     const CallExpr *CE) {
+                                     const ApplyExpr *call) {
   ParsedDeclName parsed = swift::parseDeclName(attr->Rename);
   if (!parsed)
+    return;
+
+  bool originallyWasKnownOperatorExpr = false;
+  if (call) {
+    originallyWasKnownOperatorExpr =
+        isa<BinaryExpr>(call) ||
+        isa<PrefixUnaryExpr>(call) ||
+        isa<PostfixUnaryExpr>(call);
+  }
+  if (parsed.isOperator() != originallyWasKnownOperatorExpr)
     return;
 
   SourceManager &sourceMgr = TC.Context.SourceMgr;
@@ -1018,7 +1028,7 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
     // We can only do a good job with the fix-it if we have the whole call
     // expression.
     // FIXME: Should we be validating the ContextName in some way?
-    if (!CE)
+    if (!dyn_cast_or_null<CallExpr>(call))
       return;
 
     unsigned selfIndex = parsed.SelfIndex.getValue();
@@ -1026,7 +1036,7 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
     SourceLoc removeRangeStart;
     SourceLoc removeRangeEnd;
 
-    const Expr *argExpr = CE->getArg();
+    const Expr *argExpr = call->getArg();
     if (auto args = dyn_cast<TupleExpr>(argExpr)) {
       size_t numElementsWithinParens = args->getNumElements();
       numElementsWithinParens -= args->hasTrailingClosure();
@@ -1115,21 +1125,22 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
       selfReplace.push_back(')');
     selfReplace.push_back('.');
     selfReplace += parsed.BaseName;
-    diag.fixItReplace(CE->getFn()->getSourceRange(), selfReplace);
+    diag.fixItReplace(call->getFn()->getSourceRange(), selfReplace);
 
     if (!parsed.isPropertyAccessor())
       diag.fixItRemoveChars(removeRangeStart, removeRangeEnd);
 
     // Continue on to diagnose any argument label renames.
 
-  } else if (parsed.BaseName == TC.Context.Id_init.str() && CE) {
+  } else if (parsed.BaseName == TC.Context.Id_init.str() &&
+             dyn_cast_or_null<CallExpr>(call)) {
     // For initializers, replace with a "call" of the context type...but only
     // if we know we're doing a call (rather than a first-class reference).
     if (parsed.isMember()) {
-      diag.fixItReplace(CE->getFn()->getSourceRange(), parsed.ContextName);
+      diag.fixItReplace(call->getFn()->getSourceRange(), parsed.ContextName);
 
     } else {
-      auto *dotCall = dyn_cast<DotSyntaxCallExpr>(CE->getFn());
+      auto *dotCall = dyn_cast<DotSyntaxCallExpr>(call->getFn());
       if (!dotCall)
         return;
 
@@ -1151,10 +1162,10 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
     diag.fixItReplace(referenceRange, baseReplace);
   }
 
-  if (!CE)
+  if (!dyn_cast_or_null<CallExpr>(call))
     return;
 
-  const Expr *argExpr = CE->getArg();
+  const Expr *argExpr = call->getArg();
   if (parsed.IsGetter) {
     diag.fixItRemove(argExpr->getSourceRange());
     return;
@@ -1297,7 +1308,7 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
                                      const DeclContext *ReferenceDC,
                                      const AvailableAttr *Attr,
                                      DeclName Name,
-                                     const CallExpr *CE) {
+                                     const ApplyExpr *Call) {
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
@@ -1354,7 +1365,7 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
     auto renameDiag = diagnose(ReferenceRange.Start,
                                diag::note_deprecated_rename,
                                newName);
-    fixItAvailableAttrRename(*this, renameDiag, ReferenceRange, Attr, CE);
+    fixItAvailableAttrRename(*this, renameDiag, ReferenceRange, Attr, Call);
   }
 }
 
@@ -1407,11 +1418,11 @@ void TypeChecker::diagnoseUnavailableOverride(ValueDecl *override,
 bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
                                                  SourceRange R,
                                                  const DeclContext *DC,
-                                                 const CallExpr *CE) {
+                                                 const ApplyExpr *call) {
   return diagnoseExplicitUnavailability(D, R, DC,
                                         [=](InFlightDiagnostic &diag) {
     fixItAvailableAttrRename(*this, diag, R, AvailableAttr::isUnavailable(D),
-                             CE);
+                             call);
   });
 }
 
@@ -1546,7 +1557,7 @@ public:
 
     if (auto DR = dyn_cast<DeclRefExpr>(E))
       diagAvailability(DR->getDecl(), DR->getSourceRange(),
-                       getEnclosingCallExpr());
+                       getEnclosingApplyExpr());
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
       walkMemberRef(MR);
       return skipChildren();
@@ -1554,11 +1565,11 @@ public:
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
       diagAvailability(OCDR->getDecl(),
                        OCDR->getConstructorLoc().getSourceRange(),
-                       getEnclosingCallExpr());
+                       getEnclosingApplyExpr());
     if (auto DMR = dyn_cast<DynamicMemberRefExpr>(E))
       diagAvailability(DMR->getMember().getDecl(),
                        DMR->getNameLoc().getSourceRange(),
-                       getEnclosingCallExpr());
+                       getEnclosingApplyExpr());
     if (auto DS = dyn_cast<DynamicSubscriptExpr>(E))
       diagAvailability(DS->getMember().getDecl(), DS->getSourceRange());
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
@@ -1586,12 +1597,12 @@ public:
 
 private:
   bool diagAvailability(const ValueDecl *D, SourceRange R,
-                        const CallExpr *CE = nullptr);
+                        const ApplyExpr *call = nullptr);
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
                              const AvailableAttr *Attr);
 
-  /// Walks up from a potential callee to the enclosing CallExpr.
-  const CallExpr *getEnclosingCallExpr() const {
+  /// Walks up from a potential callee to the enclosing ApplyExpr.
+  const ApplyExpr *getEnclosingApplyExpr() const {
     ArrayRef<const Expr *> parents = ExprStack;
     assert(!parents.empty() && "must be called while visiting an expression");
     size_t idx = parents.size() - 1;
@@ -1606,7 +1617,7 @@ private:
              isa<ForceValueExpr>(parents[idx]) || // f!(a)
              isa<BindOptionalExpr>(parents[idx])); // f?(a)
 
-    auto *call = dyn_cast<CallExpr>(parents[idx]);
+    auto *call = dyn_cast<ApplyExpr>(parents[idx]);
     if (!call || call->getFn() != parents[idx+1])
       return nullptr;
     return call;
@@ -1723,7 +1734,7 @@ private:
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
-                                          const CallExpr *CE) {
+                                          const ApplyExpr *call) {
   if (!D)
     return false;
 
@@ -1731,12 +1742,12 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
     if (diagnoseIncDecRemoval(D, R, attr))
       return true;
 
-  if (TC.diagnoseExplicitUnavailability(D, R, DC, CE))
+  if (TC.diagnoseExplicitUnavailability(D, R, DC, call))
     return true;
 
   // Diagnose for deprecation
   if (const AvailableAttr *Attr = TypeChecker::getDeprecated(D)) {
-    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName(), CE);
+    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName(), call);
   }
 
   if (TC.getLangOpts().DisableAvailabilityChecking)

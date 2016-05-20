@@ -492,6 +492,39 @@ func testInstanceTrailingClosure() {
   trailingClosureArg2(0, 1) {} // expected-error {{'trailingClosureArg2(_:_:fn:)' has been replaced by instance method 'Int.foo(bar:execute:)'}} {{3-22=1.foo}} {{23-23=bar: }} {{24-27=}}
 }
 
+@available(*, unavailable, renamed: "+")
+func add(_ value: Int, _ other: Int) {} // expected-note {{here}}
+
+infix operator *** {}
+@available(*, unavailable, renamed: "add")
+func ***(value: (), other: ()) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.foo(self:_:)")
+func ***(value: Int, other: Int) {} // expected-note {{here}}
+
+prefix operator *** {}
+@available(*, unavailable, renamed: "add")
+prefix func ***(value: Int?) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.foo(self:)")
+prefix func ***(value: Int) {} // expected-note {{here}}
+
+postfix operator *** {}
+@available(*, unavailable, renamed: "add")
+postfix func ***(value: Int?) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "Int.foo(self:)")
+postfix func ***(value: Int) {} // expected-note {{here}}
+
+func testOperators() {
+  add(0, 1) // expected-error {{'add' has been renamed to '+'}} {{none}}
+  () *** () // expected-error {{'***' has been renamed to 'add'}} {{none}}
+  0 *** 1 // expected-error {{'***' has been replaced by instance method 'Int.foo(_:)'}} {{none}}
+
+  ***nil // expected-error {{'***' has been renamed to 'add'}} {{none}}
+  ***0 // expected-error {{'***' has been replaced by instance method 'Int.foo()'}} {{none}}
+  
+  nil*** // expected-error {{'***' has been renamed to 'add'}} {{none}}
+  0*** // expected-error {{'***' has been replaced by instance method 'Int.foo()'}} {{none}}
+}
+
 extension Int {
   @available(*, unavailable, renamed: "init(other:)")
   @discardableResult
