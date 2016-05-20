@@ -464,6 +464,37 @@ static bool isPlausibleTypo(DeclRefKind refKind, DeclName typedName,
   return true;
 }
 
+static bool isLocInVarInit(TypeChecker &TC, VarDecl *var, SourceLoc loc) {
+  auto binding = var->getParentPatternBinding();
+  if (!binding || binding->isImplicit())
+    return false;
+
+  auto initRange = binding->getSourceRange();
+  return TC.Context.SourceMgr.rangeContainsTokenLoc(initRange, loc);
+}
+
+namespace {
+  class TypoCorrectionResolver : public DelegatingLazyResolver {
+    TypeChecker &TC() { return static_cast<TypeChecker&>(Principal); }
+    SourceLoc NameLoc;
+  public:
+    TypoCorrectionResolver(TypeChecker &TC, SourceLoc nameLoc)
+      : DelegatingLazyResolver(TC), NameLoc(nameLoc) {}
+
+    void resolveDeclSignature(ValueDecl *VD) override {
+      if (VD->isInvalid() || VD->hasType()) return;
+
+      // Don't process a variable if we're within its initializer.
+      if (auto var = dyn_cast<VarDecl>(VD)) {
+        if (isLocInVarInit(TC(), var, NameLoc))
+          return;
+      }
+
+      DelegatingLazyResolver::resolveDeclSignature(VD);
+    }
+  };
+}
+
 void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         DeclName targetDeclName,
                                         SourceLoc nameLoc,
@@ -481,12 +512,8 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
 
     // Don't suggest a variable within its own initializer.
     if (auto var = dyn_cast<VarDecl>(decl)) {
-      if (auto binding = var->getParentPatternBinding()) {
-        if (!binding->isImplicit() &&
-            Context.SourceMgr.rangeContainsTokenLoc(binding->getSourceRange(),
-                                                    nameLoc))
-          return;
-      }
+      if (isLocInVarInit(*this, var, nameLoc))
+        return;
     }
 
     // Don't waste time computing edit distances that are more than
@@ -504,7 +531,8 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
     entries.insert(distance, std::move(decl));
   });
 
-  lookupVisibleDecls(consumer, DC, this, /*top level*/ true, nameLoc);
+  TypoCorrectionResolver resolver(*this, nameLoc);
+  lookupVisibleDecls(consumer, DC, &resolver, /*top level*/ true, nameLoc);
 
   // Impose a maximum distance from the best score.
   entries.filterMaxScoreRange(MaxCallEditDistanceFromBestCandidate);

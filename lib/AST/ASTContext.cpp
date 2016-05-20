@@ -48,6 +48,7 @@
 using namespace swift;
 
 LazyResolver::~LazyResolver() = default;
+DelegatingLazyResolver::~DelegatingLazyResolver() = default;
 void ModuleLoader::anchor() {}
 void ClangModuleLoader::anchor() {}
 
