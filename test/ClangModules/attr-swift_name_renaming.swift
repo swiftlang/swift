@@ -37,7 +37,7 @@ func test() {
   // This particular instance method mapping previously caused a crash because
   // of the trailing closure.
   acceptsClosure(Foo(), test) // expected-error {{'acceptsClosure' has been replaced by instance method 'Foo.accepts(closure:)'}} {{3-17=(Foo()).accepts}} {{18-25=}} {{25-25=closure: }}
-  acceptsClosure(Foo()) {} // expected-error {{'acceptsClosure' has been replaced by instance method 'Foo.accepts(closure:)'}} {{3-17=(Foo()).accepts}} {{18-25=}}
+  acceptsClosure(Foo()) {} // expected-error {{'acceptsClosure' has been replaced by instance method 'Foo.accepts(closure:)'}} {{3-17=(Foo()).accepts}} {{18-23=}}
 
   Foo().accepts(closure: test)
   Foo().accepts() {}
