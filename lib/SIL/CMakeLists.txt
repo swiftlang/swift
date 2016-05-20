@@ -34,7 +34,5 @@ add_swift_library(swiftSIL
   LINK_LIBRARIES
     swiftSerialization
     swiftSema
-
-    LLVMCoverage
 )
 
