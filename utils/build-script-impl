@@ -325,6 +325,7 @@ function set_deployment_target_based_options() {
 
     case ${deployment_target} in
         linux-x86_64)
+            USE_GOLD_LINKER=1
             SWIFT_HOST_VARIANT_ARCH="x86_64"
             ;;
         linux-armv6)
@@ -346,9 +347,11 @@ function set_deployment_target_based_options() {
             SWIFT_HOST_VARIANT_ARCH="x86_64"
             ;;
         linux-powerpc64)
+            USE_GOLD_LINKER=1
             SWIFT_HOST_VARIANT_ARCH="powerpc64"
             ;;
         linux-powerpc64le)
+            USE_GOLD_LINKER=1
             SWIFT_HOST_VARIANT_ARCH="powerpc64le"
             ;;
         cygwin-x86_64)
