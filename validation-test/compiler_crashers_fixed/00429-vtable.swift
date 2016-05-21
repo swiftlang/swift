@@ -9,7 +9,7 @@
 
 // REQUIRES: asserts
 // SR-1584
-// XFAIL: *
+// XFAIL: objc_interop
 
 }
 struct S {
