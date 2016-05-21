@@ -696,15 +696,40 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
 
   // Compute the set of substitutions.
   TypeSubstitutionMap substitutions;
-  auto genericParams = gpContext->getGenericParamsOfContext();
-  unsigned index = 0;
-  for (Type arg : canon->getGenericArgs()) {
-    auto gp = genericParams->getParams()[index++];
-    auto archetype = gp->getArchetype();
-    substitutions[archetype] = arg;
+
+  CanType parent(canon);
+  auto *parentDC = gpContext;
+  while (parent) {
+    if (auto boundGeneric = dyn_cast<BoundGenericType>(parent)) {
+      auto genericParams = parentDC->getGenericParamsOfContext();
+      unsigned index = 0;
+
+      assert(boundGeneric->getGenericArgs().size() ==
+             genericParams->getParams().size());
+
+      for (Type arg : boundGeneric->getGenericArgs()) {
+        auto gp = genericParams->getParams()[index++];
+        auto archetype = gp->getArchetype();
+        substitutions[archetype] = arg;
+      }
+
+      parent = CanType(boundGeneric->getParent());
+      parentDC = parentDC->getParent();
+      continue;
+    }
+
+    if (auto nominal = dyn_cast<NominalType>(parent)) {
+      parent = CanType(nominal->getParent());
+      parentDC = parentDC->getParent();
+      continue;
+    }
+
+    llvm_unreachable("Not a nominal or bound generic type");
   }
 
   // Collect all of the archetypes.
+  auto *genericParams = gpContext->getGenericParamsOfContext();
+
   SmallVector<ArchetypeType *, 2> allArchetypesList;
   ArrayRef<ArchetypeType *> allArchetypes = genericParams->getAllArchetypes();
   if (genericParams->getOuterParameters()) {
@@ -727,7 +752,7 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
   bool hasTypeVariables = canon->hasTypeVariable();
   SmallVector<Substitution, 4> resultSubstitutions;
   resultSubstitutions.resize(allArchetypes.size());
-  index = 0;
+  unsigned index = 0;
   for (auto archetype : allArchetypes) {
     // Substitute into the type.
     SubstOptions options;
@@ -913,9 +938,7 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
     if (!explicitConformanceType->isEqual(type)) {
       // Gather the substitutions we need to map the generic conformance to
       // the specialized conformance.
-      SmallVector<Substitution, 4> substitutionsVec;
-      auto substitutions = type->gatherAllSubstitutions(this, substitutionsVec,
-                                                        resolver,
+      auto substitutions = type->gatherAllSubstitutions(this, resolver,
                                                         explicitConformanceDC);
       
       for (auto sub : substitutions) {

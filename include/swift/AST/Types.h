@@ -574,17 +574,6 @@ public:
   /// Gather all of the substitutions used to produce the given specialized type
   /// from its unspecialized type.
   ///
-  /// \param scratchSpace The substitutions will be written into this scratch
-  /// space if a single substitutions array cannot be returned.
-  ArrayRef<Substitution> gatherAllSubstitutions(
-                           ModuleDecl *module,
-                           SmallVectorImpl<Substitution> &scratchSpace,
-                           LazyResolver *resolver,
-                           DeclContext *gpContext = nullptr);
-
-  /// Gather all of the substitutions used to produce the given specialized type
-  /// from its unspecialized type.
-  ///
   /// \returns ASTContext-allocated substitutions.
   ArrayRef<Substitution> gatherAllSubstitutions(
                            ModuleDecl *module,

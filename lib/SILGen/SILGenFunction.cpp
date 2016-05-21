@@ -834,12 +834,11 @@ MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
   case MetatypeRepresentation::Thick:
   case MetatypeRepresentation::ObjC: {
     // Walk the type recursively to look for substitutions we may need.
-    SmallVector<Substitution, 2> subsBuf;
     theMetatype.getInstanceType().findIf([&](Type t) -> bool {
       if (!t->getAnyNominal())
         return false;
 
-      auto subs = t->gatherAllSubstitutions(SGM.SwiftModule, subsBuf, nullptr);
+      auto subs = t->gatherAllSubstitutions(SGM.SwiftModule, nullptr);
       SGM.useConformancesFromSubstitutions(subs);
       return false;
     });

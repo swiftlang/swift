@@ -331,25 +331,10 @@ ArrayRef<Type> TypeBase::getAllGenericArgs(SmallVectorImpl<Type> &scratch) {
 
 ArrayRef<Substitution>
 TypeBase::gatherAllSubstitutions(Module *module,
-                                 SmallVectorImpl<Substitution> &scratchSpace,
                                  LazyResolver *resolver,
                                  DeclContext *gpContext) {
   Type type(this);
-  SmallVector<ArrayRef<Substitution>, 2> allSubstitutions;
-  scratchSpace.clear();
-
   while (type) {
-    // Record the substitutions in a bound generic type.
-    if (auto boundGeneric = type->getAs<BoundGenericType>()) {
-      allSubstitutions.push_back(boundGeneric->getSubstitutions(module,
-                                                                resolver,
-                                                                gpContext));
-      type = boundGeneric->getParent();
-      if (gpContext)
-        gpContext = gpContext->getParent();
-      continue;
-    }
-
     // Skip to the parent of a nominal type.
     if (auto nominal = type->getAs<NominalType>()) {
       type = nominal->getParent();
@@ -358,35 +343,17 @@ TypeBase::gatherAllSubstitutions(Module *module,
       continue;
     }
 
+    // Return the substitutions in a bound generic type.
+    // This walks any further parent types.
+    if (auto boundGeneric = type->getAs<BoundGenericType>())
+      return boundGeneric->getSubstitutions(module, resolver, gpContext);
+
     llvm_unreachable("Not a nominal or bound generic type");
   }
 
-  // If there are no substitutions, return an empty array.
-  if (allSubstitutions.empty())
-    return { };
-
-  // If there is only one list of substitutions, return it. There's no
-  // need to copy it.
-  if (allSubstitutions.size() == 1)
-    return allSubstitutions.front();
-
-  for (auto substitutions : allSubstitutions)
-    scratchSpace.append(substitutions.begin(), substitutions.end());
-  return scratchSpace;
+  // Not a generic type.
+  return { };
 }
-
-ArrayRef<Substitution> TypeBase::gatherAllSubstitutions(Module *module,
-                                                        LazyResolver *resolver,
-                                                        DeclContext *gpContext){
-  SmallVector<Substitution, 4> scratchSpace;
-  auto subs = gatherAllSubstitutions(module, scratchSpace, resolver,
-                                     gpContext);
-  if (scratchSpace.empty())
-    return subs;
-
-  return getASTContext().AllocateCopy(subs);
-}
-
 
 bool TypeBase::isUnspecializedGeneric() {
   CanType CT = getCanonicalType();
