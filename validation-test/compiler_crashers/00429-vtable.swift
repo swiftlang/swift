@@ -5,7 +5,8 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not --crash %target-swift-frontend %s -parse
+// XFAIL: linux
 }
 struct S {
 static let i: B<Q<T where A"""
