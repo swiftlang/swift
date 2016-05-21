@@ -722,8 +722,8 @@ void
 ConsumedArgToEpilogueReleaseMatcher::
 processMatchingReleases() {
   llvm::DenseSet<SILArgument *> ArgToRemove;
-  // If we can not find a releases for all parts with reference semantics
-  // that means we did not find all release for the base.
+  // If we can not find a release for all parts with reference semantics
+  // that means we did not find all releases for the base.
   for (auto Arg : ArgInstMap) {
     // If an argument has a single release and it is rc-identical to the
     // SILArgument. Then we do not need to use projection to check for whether

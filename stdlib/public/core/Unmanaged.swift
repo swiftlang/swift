@@ -139,7 +139,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///    }
   ///  }
   ///
-  /// The last rule applies transitively through a chains of stored references
+  /// The last rule applies transitively through a chain of stored references
   /// and nested structs.
   ///
   /// Examples:
