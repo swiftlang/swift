@@ -174,8 +174,6 @@ public:
 
 } // end anonymous namespace
 
-static Lazy<MetadataCache<BoxCacheEntry>> Boxes;
-
 SWIFT_RUNTIME_EXPORT
 BoxPair::Return
 swift::swift_allocBox(const Metadata *type) {
@@ -185,6 +183,8 @@ swift::swift_allocBox(const Metadata *type) {
 SWIFT_RT_ENTRY_IMPL_VISIBILITY
 extern "C"
 BoxPair::Return SWIFT_RT_ENTRY_IMPL(swift_allocBox)(const Metadata *type) {
+  static Lazy<MetadataCache<BoxCacheEntry>> Boxes;
+
   // Get the heap metadata for the box.
   auto &B = Boxes.get();
   const void *typeArg = type;

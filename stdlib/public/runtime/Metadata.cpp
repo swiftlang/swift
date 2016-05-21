@@ -311,9 +311,6 @@ namespace {
   };
 }
 
-/// The uniquing structure for ObjC class-wrapper metadata.
-static Lazy<MetadataCache<ObjCClassCacheEntry>> ObjCClassWrappers;
-
 const Metadata *
 swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
   // If the class pointer is valid as metadata, no translation is required.
@@ -322,8 +319,10 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
   }
 
 #if SWIFT_OBJC_INTEROP
-  // Search the cache.
+  /// The uniquing structure for ObjC class-wrapper metadata.
+  static Lazy<MetadataCache<ObjCClassCacheEntry>> ObjCClassWrappers;
 
+  // Search the cache.
   const size_t numGenericArgs = 1;
   const void *args[] = { theClass };
   auto &Wrappers = ObjCClassWrappers.get();
@@ -377,8 +376,6 @@ namespace {
   };
 }
 
-/// The uniquing structure for function type metadata.
-static Lazy<MetadataCache<FunctionCacheEntry>> FunctionTypes;
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
@@ -428,6 +425,9 @@ swift::swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata(const void *flagsArgsAndResult[]) {
+  /// The uniquing structure for function type metadata.
+  static Lazy<MetadataCache<FunctionCacheEntry>> FunctionTypes;
+
   auto flags = FunctionTypeFlags::fromIntValue(size_t(flagsArgsAndResult[0]));
 
   unsigned numArguments = flags.getNumArguments();
@@ -527,9 +527,6 @@ namespace {
     }
   };
 }
-
-/// The uniquing structure for tuple type metadata.
-static Lazy<MetadataCache<TupleCacheEntry>> TupleTypes;
 
 /// Given a metatype pointer, produce the value-witness table for it.
 /// This is equivalent to metatype->ValueWitnesses but more efficient.
@@ -991,6 +988,9 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
                                   const Metadata * const *elements,
                                   const char *labels,
                                   const ValueWitnessTable *proposedWitnesses) {
+  /// The uniquing structure for tuple type metadata.
+  static Lazy<MetadataCache<TupleCacheEntry>> TupleTypes;
+
   // Bypass the cache for the empty tuple. We might reasonably get called
   // by generic code, like a demangler that produces type objects.
   if (numElements == 0) return &_TMT_;
@@ -1800,9 +1800,6 @@ namespace {
   };
 }
 
-/// The uniquing structure for metatype type metadata.
-static Lazy<MetadataCache<MetatypeCacheEntry>> MetatypeTypes;
-
 /// \brief Find the appropriate value witness table for the given type.
 static const ValueWitnessTable *
 getMetatypeValueWitnesses(const Metadata *instanceType) {
@@ -1815,6 +1812,9 @@ getMetatypeValueWitnesses(const Metadata *instanceType) {
 SWIFT_RUNTIME_EXPORT
 extern "C" const MetatypeMetadata *
 swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
+  /// The uniquing structure for metatype type metadata.
+  static Lazy<MetadataCache<MetatypeCacheEntry>> MetatypeTypes;
+
   // Search the cache.
   const size_t numGenericArgs = 1;
   const void *args[] = { instanceMetadata };
@@ -1866,9 +1866,6 @@ struct ExistentialMetatypeState {
   llvm::DenseMap<unsigned, const ExtraInhabitantsValueWitnessTable*>
     ValueWitnessTables;
 };
-
-/// The uniquing structure for existential metatype type metadata.
-static Lazy<ExistentialMetatypeState> ExistentialMetatypes;
 
 static const ExtraInhabitantsValueWitnessTable
 ExistentialMetatypeValueWitnesses_1 =
@@ -1927,6 +1924,9 @@ getExistentialMetatypeValueWitnesses(ExistentialMetatypeState &EM,
 SWIFT_RUNTIME_EXPORT
 extern "C" const ExistentialMetatypeMetadata *
 swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
+  /// The uniquing structure for existential metatype type metadata.
+  static Lazy<ExistentialMetatypeState> ExistentialMetatypes;
+
   // Search the cache.
   const size_t numGenericArgs = 1;
   const void *args[] = { instanceMetadata };
@@ -1991,9 +1991,6 @@ struct ExistentialTypeState {
   llvm::DenseMap<unsigned, const ExtraInhabitantsValueWitnessTable*>
     ClassValueWitnessTables;
 };
-
-/// The uniquing structure for existential type metadata.
-static Lazy<ExistentialTypeState> Existentials;
 
 static const ValueWitnessTable OpaqueExistentialValueWitnesses_0 =
   ValueWitnessTableForBox<OpaqueExistentialBox<0>>::table;
@@ -2301,8 +2298,10 @@ swift::swift_getExistentialTypeMetadata(size_t numProtocols,
       classConstraint = ProtocolClassConstraint::Class;
   }
 
-  // Search the cache.
+  /// The uniquing structure for existential type metadata.
+  static Lazy<ExistentialTypeState> Existentials;
 
+  // Search the cache.
   auto protocolArgs = reinterpret_cast<const void * const *>(protocols);
 
   auto &E = Existentials.get();
@@ -2407,10 +2406,10 @@ struct ForeignTypeState {
 };
 }
 
-static Lazy<ForeignTypeState> ForeignTypes;
-
 const ForeignTypeMetadata *
 swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
+  static Lazy<ForeignTypeState> ForeignTypes;
+
   // Fast path: check the invasive cache.
   if (auto unique = nonUnique->getCachedUniqueMetadata()) {
     return unique;
