@@ -4,6 +4,7 @@
 // REQUIRES: objc_interop
 // REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
+// REQUIRES: tsan_runtime
 
 // We expect not to report any races on this testcase.
 

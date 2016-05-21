@@ -2,6 +2,7 @@
 // RUN: not env ASAN_OPTIONS=abort_on_error=0 %target-run %t_tsan-binary 2>&1 | FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: asan_runtime
 // XFAIL: linux
 
 // Test AddressSanitizer execution end-to-end.
