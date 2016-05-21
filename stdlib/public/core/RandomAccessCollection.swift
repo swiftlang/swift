@@ -160,7 +160,7 @@ where Index : Strideable,
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
   ///
-  /// A collections's `indices` property can hold a strong reference to the
+  /// A collection's `indices` property can hold a strong reference to the
   /// collection itself, causing the collection to be non-uniquely referenced.
   /// If you mutate the collection while iterating over its indices, a strong
   /// reference can cause an unexpected copy of the collection. To avoid the

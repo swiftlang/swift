@@ -15,7 +15,7 @@ from swift_build_support import xcrun
 
 
 @unittest.skipUnless(platform.system() == 'Darwin',
-                     'xcrun is avaiable in Darwin platform only')
+                     'xcrun is available in Darwin platform only')
 class XCRunTestCase(unittest.TestCase):
     def test_find(self):
         # Unknown tool
@@ -23,7 +23,7 @@ class XCRunTestCase(unittest.TestCase):
                                      sdk='macosx',
                                      toolchain='default'))
 
-        # Avaiable tool
+        # Available tool
         self.assertTrue(xcrun.find('clang',
                                    sdk='macosx',
                                    toolchain='default').endswith('/clang'))

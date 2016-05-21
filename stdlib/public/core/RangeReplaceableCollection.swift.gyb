@@ -20,7 +20,7 @@
 /// the elements of another collection.
 ///
 /// In most cases, it's best to ignore this protocol and use the
-/// `RangeRepleaceableCollection` protocol instead, because it has a more
+/// `RangeReplaceableCollection` protocol instead, because it has a more
 /// complete interface.
 public protocol RangeReplaceableIndexable : Indexable {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol

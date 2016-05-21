@@ -150,7 +150,7 @@ public:
     // drop values with that score.
     //
     // Note that all of the values between EndOfAccepted and MaxSize
-    // should have the same score, beause otherwise there's a tier we
+    // should have the same score, because otherwise there's a tier we
     // shouldn't have marked dead.
 
     // Just overwrite the next element instead of inserting if possible.
