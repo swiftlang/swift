@@ -6,7 +6,8 @@ add_swift_executable(swift-ide-test
     swiftDriver
     swiftFrontend
     swiftIDE
-    LLVMDebugInfoCodeView
+  COMPONENT_DEPENDS
+    DebugInfoCodeView
 )
 
 # If libxml2 is available, make it available for swift-ide-test.
