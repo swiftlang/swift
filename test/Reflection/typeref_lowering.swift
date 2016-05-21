@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-build-swift %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -Xfrontend -enable-reflection-metadata -Xfrontend -enable-reflection-names -o %t/libTypesToReflect.%target-dylib-extension
+// RUN: %target-build-swift %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -o %t/libTypesToReflect.%target-dylib-extension
 // RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension -binary-filename %platform-module-dir/libswiftCore.%target-dylib-extension -dump-type-lowering < %s | FileCheck %s --check-prefix=CHECK-%target-ptrsize
 
 V12TypeLowering11BasicStruct
@@ -8,66 +8,66 @@ V12TypeLowering11BasicStruct
 // CHECK-64-NEXT: (struct size=16 alignment=4 stride=16 num_extra_inhabitants=0
 // CHECK-64-NEXT:   (field name=i1 offset=0
 // CHECK-64-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
-// CHECK-64-NEXT:       (field offset=0
+// CHECK-64-NEXT:       (field name=_value offset=0
 // CHECK-64-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0))))
 // CHECK-64-NEXT:   (field name=i2 offset=2
 // CHECK-64-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
-// CHECK-64-NEXT:       (field offset=0
+// CHECK-64-NEXT:       (field name=_value offset=0
 // CHECK-64-NEXT:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))
 // CHECK-64-NEXT:   (field name=i3 offset=4
 // CHECK-64-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
-// CHECK-64-NEXT:       (field offset=0
+// CHECK-64-NEXT:       (field name=_value offset=0
 // CHECK-64-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
 // CHECK-64-NEXT:   (field name=bi1 offset=8
 // CHECK-64-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
 // CHECK-64-NEXT:       (field name=value offset=0
 // CHECK-64-NEXT:         (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
-// CHECK-64-NEXT:           (field offset=0
+// CHECK-64-NEXT:           (field name=_value offset=0
 // CHECK-64-NEXT:             (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0))))))
 // CHECK-64-NEXT:   (field name=bi2 offset=10
 // CHECK-64-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
 // CHECK-64-NEXT:       (field name=value offset=0
 // CHECK-64-NEXT:         (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
-// CHECK-64-NEXT:           (field offset=0
+// CHECK-64-NEXT:           (field name=_value offset=0
 // CHECK-64-NEXT:             (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))))
 // CHECK-64-NEXT:   (field name=bi3 offset=12
 // CHECK-64-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // CHECK-64-NEXT:       (field name=value offset=0
 // CHECK-64-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
-// CHECK-64-NEXT:           (field offset=0
+// CHECK-64-NEXT:           (field name=_value offset=0
 // CHECK-64-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0)))))))
 
 // CHECK-32: (struct TypeLowering.BasicStruct)
 // CHECK-32-NEXT: (struct size=16 alignment=4 stride=16 num_extra_inhabitants=0
 // CHECK-32-NEXT:   (field name=i1 offset=0
 // CHECK-32-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
-// CHECK-32-NEXT:       (field offset=0
+// CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0))))
 // CHECK-32-NEXT:   (field name=i2 offset=2
 // CHECK-32-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
-// CHECK-32-NEXT:       (field offset=0
+// CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))
 // CHECK-32-NEXT:   (field name=i3 offset=4
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
-// CHECK-32-NEXT:       (field offset=0
+// CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
 // CHECK-32-NEXT:   (field name=bi1 offset=8
 // CHECK-32-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=value offset=0
 // CHECK-32-NEXT:         (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
-// CHECK-32-NEXT:           (field offset=0
+// CHECK-32-NEXT:           (field name=_value offset=0
 // CHECK-32-NEXT:             (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0))))))
 // CHECK-32-NEXT:   (field name=bi2 offset=10
 // CHECK-32-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=value offset=0
 // CHECK-32-NEXT:         (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
-// CHECK-32-NEXT:           (field offset=0
+// CHECK-32-NEXT:           (field name=_value offset=0
 // CHECK-32-NEXT:             (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))))
 // CHECK-32-NEXT:   (field name=bi3 offset=12
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=value offset=0
 // CHECK-32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
-// CHECK-32-NEXT:           (field offset=0
+// CHECK-32-NEXT:           (field name=_value offset=0
 // CHECK-32-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0)))))))
 
 V12TypeLowering15AssocTypeStruct
@@ -79,13 +79,13 @@ V12TypeLowering15AssocTypeStruct
 // CHECK-64-NEXT:         (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
 // CHECK-64-NEXT:           (field name=value offset=0
 // CHECK-64-NEXT:             (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
-// CHECK-64-NEXT:               (field offset=0
+// CHECK-64-NEXT:               (field name=_value offset=0
 // CHECK-64-NEXT:                 (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))))
 // CHECK-64-NEXT:       (field name=b offset=2
 // CHECK-64-NEXT:         (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
 // CHECK-64-NEXT:           (field name=value offset=0
 // CHECK-64-NEXT:             (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
-// CHECK-64-NEXT:               (field offset=0
+// CHECK-64-NEXT:               (field name=_value offset=0
 // CHECK-64-NEXT:                 (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0))))))
 // CHECK-64-NEXT:       (field name=c offset=4
 // CHECK-64-NEXT:         (tuple size=3 alignment=2 stride=4 num_extra_inhabitants=0
@@ -93,13 +93,13 @@ V12TypeLowering15AssocTypeStruct
 // CHECK-64-NEXT:             (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
 // CHECK-64-NEXT:               (field name=value offset=0
 // CHECK-64-NEXT:                 (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
-// CHECK-64-NEXT:                   (field offset=0
+// CHECK-64-NEXT:                   (field name=_value offset=0
 // CHECK-64-NEXT:                     (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))))
 // CHECK-64-NEXT:           (field offset=2
 // CHECK-64-NEXT:             (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
 // CHECK-64-NEXT:               (field name=value offset=0
 // CHECK-64-NEXT:                 (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
-// CHECK-64-NEXT:                   (field offset=0
+// CHECK-64-NEXT:                   (field name=_value offset=0
 // CHECK-64-NEXT:                     (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0)))))))))))
 
 // CHECK-32:     (struct TypeLowering.AssocTypeStruct)
@@ -110,13 +110,13 @@ V12TypeLowering15AssocTypeStruct
 // CHECK-32-NEXT:         (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
 // CHECK-32-NEXT:           (field name=value offset=0
 // CHECK-32-NEXT:             (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
-// CHECK-32-NEXT:               (field offset=0
+// CHECK-32-NEXT:               (field name=_value offset=0
 // CHECK-32-NEXT:                 (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))))
 // CHECK-32-NEXT:       (field name=b offset=2
 // CHECK-32-NEXT:         (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
 // CHECK-32-NEXT:           (field name=value offset=0
 // CHECK-32-NEXT:             (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
-// CHECK-32-NEXT:               (field offset=0
+// CHECK-32-NEXT:               (field name=_value offset=0
 // CHECK-32-NEXT:                 (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0))))))
 // CHECK-32-NEXT:       (field name=c offset=4
 // CHECK-32-NEXT:         (tuple size=3 alignment=2 stride=4 num_extra_inhabitants=0
@@ -124,13 +124,13 @@ V12TypeLowering15AssocTypeStruct
 // CHECK-32-NEXT:             (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
 // CHECK-32-NEXT:               (field name=value offset=0
 // CHECK-32-NEXT:                 (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
-// CHECK-32-NEXT:                   (field offset=0
+// CHECK-32-NEXT:                   (field name=_value offset=0
 // CHECK-32-NEXT:                     (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))))
 // CHECK-32-NEXT:           (field offset=2
 // CHECK-32-NEXT:             (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
 // CHECK-32-NEXT:               (field name=value offset=0
 // CHECK-32-NEXT:                 (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
-// CHECK-32-NEXT:                   (field offset=0
+// CHECK-32-NEXT:                   (field name=_value offset=0
 // CHECK-32-NEXT:                     (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0)))))))))))
 
 TGV12TypeLowering3BoxVs5Int16_Vs5Int32_
@@ -149,11 +149,11 @@ TGV12TypeLowering3BoxVs5Int16_Vs5Int32_
 // CHECK-64-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
 // CHECK-64-NEXT:       (field name=value offset=0
 // CHECK-64-NEXT:         (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
-// CHECK-64-NEXT:           (field offset=0
+// CHECK-64-NEXT:           (field name=_value offset=0
 // CHECK-64-NEXT:             (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))))
 // CHECK-64-NEXT:   (field offset=4
 // CHECK-64-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
-// CHECK-64-NEXT:       (field offset=0
+// CHECK-64-NEXT:       (field name=_value offset=0
 // CHECK-64-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0)))))
 
 // CHECK-32-NEXT: (tuple size=8 alignment=4 stride=8 num_extra_inhabitants=0
@@ -161,11 +161,11 @@ TGV12TypeLowering3BoxVs5Int16_Vs5Int32_
 // CHECK-32-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=value offset=0
 // CHECK-32-NEXT:         (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
-// CHECK-32-NEXT:           (field offset=0
+// CHECK-32-NEXT:           (field name=_value offset=0
 // CHECK-32-NEXT:             (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))))
 // CHECK-32-NEXT:   (field offset=4
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
-// CHECK-32-NEXT:       (field offset=0
+// CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0)))))
 
 

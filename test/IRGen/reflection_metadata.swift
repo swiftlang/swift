@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -enable-reflection-metadata -enable-reflection-names -emit-ir %s | FileCheck %s
-// RUN: %target-swift-frontend -enable-reflection-metadata -emit-ir %s | FileCheck %s --check-prefix=STRIP_REFLECTION_NAMES
-// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s --check-prefix=STRIP_REFLECTION_METADATA
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -disable-reflection-names -emit-ir %s | FileCheck %s --check-prefix=STRIP_REFLECTION_NAMES
+// RUN: %target-swift-frontend -disable-reflection-metadata -emit-ir %s | FileCheck %s --check-prefix=STRIP_REFLECTION_METADATA
 
 // STRIP_REFLECTION_NAMES_DAG: {{.*}}swift3_reflect
 // STRIP_REFLECTION_NAMES_DAG: {{.*}}swift3_fieldmd
