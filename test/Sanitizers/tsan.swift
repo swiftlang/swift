@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: CPU=x86_64
+// REQUIRES: tsan_runtime
 // XFAIL: linux
 
 // Test ThreadSanitizer execution end-to-end.
