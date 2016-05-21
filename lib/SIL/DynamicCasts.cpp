@@ -367,6 +367,37 @@ swift::classifyDynamicCast(Module *M,
   auto targetClass = target.getClassOrBoundGenericClass();
   if (sourceClass) {
     if (targetClass) {
+      // Imported Objective-C generics don't check the generic parameters, which
+      // are lost at runtime.
+      if (sourceClass->usesObjCGenericsModel()) {
+      
+        if (sourceClass == targetClass)
+          return DynamicCastFeasibility::WillSucceed;
+        
+        if (targetClass->usesObjCGenericsModel()) {
+          // If both classes are ObjC generics, the cast may succeed if the
+          // classes are related, irrespective of their generic parameters.
+          auto isDeclSuperclass = [&](ClassDecl *proposedSuper,
+                                      ClassDecl *proposedSub) -> bool {
+            do {
+              if (proposedSuper == proposedSub)
+                return true;
+            } while ((proposedSub = proposedSub->getSuperclassDecl()));
+            
+            return false;
+          };
+          
+          if (isDeclSuperclass(sourceClass, targetClass))
+            return DynamicCastFeasibility::MaySucceed;
+          
+          if (isDeclSuperclass(targetClass, sourceClass)) {
+            return DynamicCastFeasibility::WillSucceed;
+          }          
+          return DynamicCastFeasibility::WillFail;
+        }
+      }
+
+
       if (target->isExactSuperclassOf(source, nullptr))
         return DynamicCastFeasibility::WillSucceed;
       if (target->isBindableToSuperclassOf(source, nullptr))
