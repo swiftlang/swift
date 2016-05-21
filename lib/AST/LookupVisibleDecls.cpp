@@ -119,8 +119,10 @@ static bool areTypeDeclsVisibleInLookupMode(LookupState LS) {
 static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
                                       const DeclContext *FromContext,
                                       LazyResolver *TypeResolver) {
-  if (TypeResolver)
+  if (TypeResolver) {
     TypeResolver->resolveDeclSignature(Member);
+    TypeResolver->resolveAccessibility(Member);
+  }
 
   // Check accessibility when relevant.
   if (!Member->getDeclContext()->isLocalContext() &&
