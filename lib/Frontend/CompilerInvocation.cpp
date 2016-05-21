@@ -1266,11 +1266,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.Sanitize = parseSanitizerArgValues(A, Triple, Diags);
   }
 
-  if (Args.hasArg(OPT_enable_reflection_metadata)) {
-    Opts.EnableReflectionMetadata = true;
-    if (Args.hasArg(OPT_enable_reflection_names)) {
-      Opts.EnableReflectionNames = true;
-    }
+  if (Args.hasArg(OPT_disable_reflection_metadata)) {
+    Opts.EnableReflectionMetadata = false;
+    Opts.EnableReflectionNames = false;
+  }
+
+  if (Args.hasArg(OPT_disable_reflection_names)) {
+    Opts.EnableReflectionNames = false;
   }
 
   return false;

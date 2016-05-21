@@ -168,7 +168,7 @@ public:
                    EmitStackPromotionChecks(false), GenerateProfile(false),
                    PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
                    HasValueNamesSetting(false), ValueNames(false),
-                   EnableReflectionMetadata(false), EnableReflectionNames(false),
+                   EnableReflectionMetadata(true), EnableReflectionNames(true),
                    UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
                    CmdArgs()
                    {}
