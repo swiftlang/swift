@@ -629,8 +629,7 @@ public:
                                              CanSILFunctionType origCalleeType,
                                              CanSILFunctionType substCalleeType,
                                              ArrayRef<Substitution> subs,
-                                             HeapLayout &layout,
-                                             unsigned firstCaptureIndex);
+                                             HeapLayout &layout);
   std::string getBuiltinTypeMetadataSectionName();
   std::string getFieldTypeMetadataSectionName();
   std::string getAssociatedTypeMetadataSectionName();
