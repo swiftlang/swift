@@ -1,7 +1,7 @@
 
 var x: Int
 
-// RUN: %sourcekitd-test -req=interface-gen -module Swift -check-interface-ascii > %t.response
+// RUN: %sourcekitd-test -req=interface-gen -module Swift > %t.response
 // RUN: FileCheck -check-prefix=CHECK-STDLIB -input-file %t.response %s
 // RUN: FileCheck -check-prefix=CHECK-MUTATING-ATTR -input-file %t.response %s
 // RUN: FileCheck -check-prefix=CHECK-HIDE-ATTR -input-file %t.response %s
