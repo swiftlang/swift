@@ -5,7 +5,8 @@ add_swift_executable(sil-opt
     swiftIRGen
     swiftSILGen
     swiftSILOptimizer
-    LLVMDebugInfoCodeView
+  COMPONENT_DEPENDS
+    DebugInfoCodeView
 )
 
 swift_install_in_component(tools

@@ -6,7 +6,8 @@ add_swift_executable(sil-extract
     swiftSILOptimizer
     swiftSerialization
     swiftClangImporter
-    LLVMDebugInfoCodeView
+  COMPONENT_DEPENDS
+    DebugInfoCodeView
 )
 
 swift_install_in_component(tools
