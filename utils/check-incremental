@@ -19,74 +19,73 @@
 #
 # ----------------------------------------------------------------------------
 
-import subprocess
 import os
+import subprocess
 import sys
-import time
 
 
 def main():
-  verbose = False
-  num_iterations = 4
+    verbose = False
+    num_iterations = 4
 
-  write_obj_file = False
-  next_arg_is_output = False
-  compare_time = True
-  output_file = None
+    write_obj_file = False
+    next_arg_is_output = False
+    compare_time = True
+    output_file = None
 
-  for arg in sys.argv:
-    if next_arg_is_output:
-      output_file = arg
-      next_arg_is_output = False
-    elif arg == '-c':
-      write_obj_file = True
-    elif arg == '-disable-incremental-llvm-codegen':
-      compare_time = False
-    elif arg == '-o':
-      next_arg_is_output = True
+    for arg in sys.argv:
+        if next_arg_is_output:
+            output_file = arg
+            next_arg_is_output = False
+        elif arg == '-c':
+            write_obj_file = True
+        elif arg == '-disable-incremental-llvm-codegen':
+            compare_time = False
+        elif arg == '-o':
+            next_arg_is_output = True
 
-  if not write_obj_file or output_file is None:
-    return
+    if not write_obj_file or output_file is None:
+        return
 
-  new_args = sys.argv[1:]
-  subprocess.check_call(new_args)
-
-  if verbose:
-    print "Reference compilation of " + output_file + ":"
-
-  reference_md5 = subprocess.check_output(["md5", "-q", output_file])
-  reference_time = os.path.getmtime(output_file)
-
-  if verbose:
-    print "  time = {}".format(reference_time)
-    print "  md5 = " + reference_md5
-
-  subprocess.check_call(["cp", output_file, output_file + ".ref.o"])
-
-  for iteration in range(0, num_iterations):
-
-    if verbose:
-      print "Iteration {}:".format(iteration)
-
+    new_args = sys.argv[1:]
     subprocess.check_call(new_args)
 
-    second_md5 = subprocess.check_output(["md5", "-q", output_file])
-    second_time = os.path.getmtime(output_file)
+    if verbose:
+        print "Reference compilation of " + output_file + ":"
+
+    reference_md5 = subprocess.check_output(["md5", "-q", output_file])
+    reference_time = os.path.getmtime(output_file)
 
     if verbose:
-      print "  time = {}".format(second_time)
-      print "  md5 = " + second_md5
+        print "  time = {}".format(reference_time)
+        print "  md5 = " + reference_md5
 
-    # This is the most important check: is the output file exactly the same.
-    if reference_md5 != second_md5:
-      sys.exit("non-determinism when generating: " + output_file)
+    subprocess.check_call(["cp", output_file, output_file + ".ref.o"])
 
-    # This is the bonus check: does the compiler not re-write the output file.
-    # (For compilations < 1sec this check may succeed even if the file was
-    # overwritten).
-    if compare_time and reference_time != second_time:
-      sys.exit("file re-written: " + output_file)
+    for iteration in range(0, num_iterations):
+
+        if verbose:
+            print "Iteration {}:".format(iteration)
+
+        subprocess.check_call(new_args)
+
+        second_md5 = subprocess.check_output(["md5", "-q", output_file])
+        second_time = os.path.getmtime(output_file)
+
+        if verbose:
+            print "  time = {}".format(second_time)
+            print "  md5 = " + second_md5
+
+        # This is the most important check: is the output file exactly the
+        # same.
+        if reference_md5 != second_md5:
+            sys.exit("non-determinism when generating: " + output_file)
+
+        # This is the bonus check: does the compiler not re-write the output
+        # file. (For compilations < 1sec this check may succeed even if the
+        # file was overwritten).
+        if compare_time and reference_time != second_time:
+            sys.exit("file re-written: " + output_file)
 
 
 main()
-
