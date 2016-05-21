@@ -443,7 +443,7 @@ endfunction()
 function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_options
       SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
-      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
+      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE TARGET_LIBRARY)
   cmake_parse_arguments(SWIFTLIB_SINGLE
     "${SWIFTLIB_SINGLE_options}"
     "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_IOS"
@@ -603,7 +603,7 @@ function(_add_swift_library_single target name)
         SUFFIX ${LLVM_PLUGIN_EXT})
   endif()
 
-  if(SWIFTLIB_SINGLE_IS_STDLIB)
+  if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
     # Install runtime libraries to lib/swift instead of lib. This works around
     # the fact that -isysroot prevents linking to libraries in the system
     # /usr/lib if Swift is installed in /usr.
@@ -984,7 +984,7 @@ endfunction()
 function(add_swift_library name)
   set(SWIFTLIB_options
       SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY TARGET_LIBRARY IS_HOST
-      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
+      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE HAS_SWIFT_CONTENT)
   cmake_parse_arguments(SWIFTLIB
     "${SWIFTLIB_options}"
     "INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_IOS"
@@ -995,6 +995,7 @@ function(add_swift_library name)
   # Infer arguments.
 
   if(SWIFTLIB_IS_SDK_OVERLAY)
+    set(SWIFTLIB_HAS_SWIFT_CONTENT TRUE)
     set(SWIFTLIB_SHARED TRUE)
     set(SWIFTLIB_IS_STDLIB TRUE)
     set(SWIFTLIB_TARGET_LIBRARY TRUE)
@@ -1005,6 +1006,7 @@ function(add_swift_library name)
 
   # Standard library is always a target library.
   if(SWIFTLIB_IS_STDLIB)
+    set(SWIFTLIB_HAS_SWIFT_CONTENT TRUE)
     set(SWIFTLIB_TARGET_LIBRARY TRUE)
   endif()
 
@@ -1019,7 +1021,7 @@ function(add_swift_library name)
 
   # All Swift code depends on the standard library, except for the standard
   # library itself.
-  if(SWIFTLIB_TARGET_LIBRARY AND NOT SWIFTLIB_IS_STDLIB_CORE)
+  if(SWIFTLIB_TARGET_LIBRARY AND SWIFTLIB_HAS_SWIFT_CONTENT AND NOT SWIFTLIB_IS_STDLIB_CORE)
     list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS Core)
   endif()
 
@@ -1164,6 +1166,7 @@ function(add_swift_library name)
           ${SWIFTLIB_IS_STDLIB_keyword}
           ${SWIFTLIB_IS_STDLIB_CORE_keyword}
           ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
+          ${SWIFTLIB_TARGET_LIBRARY_keyword}
           INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
           DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
         )
