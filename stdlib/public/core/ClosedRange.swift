@@ -407,3 +407,14 @@ public func ... <
   return CountableClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
 }
 
+extension ClosedRange {
+  @available(*, unavailable, renamed: "lowerBound")
+  public var startIndex: Bound {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "upperBound")
+  public var endIndex: Bound {
+    Builtin.unreachable()
+  }
+}
