@@ -158,8 +158,11 @@ public:
       Data[i].Score = score;
       Data[i].Value = std::move(value);
     } else {
-      if (Data.size() == MaxSize)
+      if (Data.size() == MaxSize) {
         Data.pop_back();
+        if (EndOfAccepted == MaxSize)
+          EndOfAccepted--;
+      }
       Data.insert(Data.begin() + i, { score, std::move(value) });
     }
 
