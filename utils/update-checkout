@@ -47,6 +47,7 @@ MASTER_BRANCHES = {
     'cmark': 'master',
     'llbuild': 'master',
     'swiftpm': 'master',
+    'compiler-rt': 'stable',
     'swift-corelibs-xctest': 'master',
     'swift-corelibs-foundation': 'master',
     'swift-corelibs-libdispatch': 'master',
@@ -61,6 +62,7 @@ NEXT_BRANCHES = {
     'cmark': 'master',
     'llbuild': 'master',
     'swiftpm': 'master',
+    'compiler-rt': 'stable-next',
     'swift-corelibs-xctest': 'master',
     'swift-corelibs-foundation': 'master',
     'swift-corelibs-libdispatch': 'master',
@@ -75,11 +77,11 @@ SWIFT_3_0_PREVIEW_1_BRANCHES = {
     'cmark': 'swift-3.0-preview-1-branch',
     'llbuild': 'swift-3.0-preview-1-branch',
     'swiftpm': 'swift-3.0-preview-1-branch',
+    'compiler-rt': 'swift-3.0-branch',
     'swift-corelibs-xctest': 'swift-3.0-preview-1-branch',
     'swift-corelibs-foundation': 'swift-3.0-preview-1-branch',
     'swift-corelibs-libdispatch': 'swift-3.0-preview-1-branch',
     'swift-integration-tests': 'swift-3.0-preview-1-branch',
-    'compiler-rt': 'swift-3.0-branch',
 }
 
 
