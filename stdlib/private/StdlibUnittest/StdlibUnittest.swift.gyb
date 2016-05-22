@@ -707,8 +707,8 @@ struct _ParentProcess {
   }
 
   internal mutating func _readFromChild(
-    onStdoutLine: (String) -> Bool,
-    onStderrLine: (String) -> Bool
+    onStdoutLine: (String) -> (done: Bool, Void),
+    onStderrLine: (String) -> (done: Bool, Void)
   ) {
     var readfds = _stdlib_fd_set()
     var writefds = _stdlib_fd_set()
@@ -735,14 +735,14 @@ struct _ParentProcess {
       if readfds.isset(_childStdout.fd) || errorfds.isset(_childStdout.fd) {
         _childStdout.read()
         while let line = _childStdout.getline() {
-          done = onStdoutLine(line)
+          (done: done, ()) = onStdoutLine(line)
         }
         continue
       }
       if readfds.isset(_childStderr.fd) || errorfds.isset(_childStderr.fd) {
         _childStderr.read()
         while let line = _childStderr.getline() {
-          done = onStderrLine(line)
+          (done: done, ()) = onStderrLine(line)
         }
         continue
       }
@@ -784,7 +784,7 @@ struct _ParentProcess {
     var capturedCrashStderr: [String] = []
     var anyExpectFailedInChild = false
 
-    func processLine(_ line: String, isStdout: Bool) -> Bool {
+    func processLine(_ line: String, isStdout: Bool) -> (done: Bool, Void) {
       var line = line
       if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
         let controlMessage =
@@ -809,7 +809,7 @@ struct _ParentProcess {
         }
         line = line[line.startIndex..<index]
         if line.isEmpty {
-          return stdoutEnd && stderrEnd
+          return (done: stdoutEnd && stderrEnd, ())
         }
       }
       if isStdout {
@@ -829,7 +829,7 @@ struct _ParentProcess {
       } else {
         print("stderr>>> \(line)")
       }
-      return stdoutEnd && stderrEnd
+      return (done: stdoutEnd && stderrEnd, ())
     }
 
     _readFromChild(
