@@ -8,7 +8,7 @@ _setOverrideOSVersion(.osx(major: 10, minor: 9, bugFix: 3))
 _setTestSuiteFailedCallback() { print("abort()") }
 
 //
-// Test that harness aborts when a test crashes
+// Test that harness aborts when a test crashes during a test run.
 //
 
 var TestSuiteCrashes = TestSuite("TestSuiteCrashes")
