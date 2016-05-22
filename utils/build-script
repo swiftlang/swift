@@ -1129,7 +1129,7 @@ details of the setups of other systems or automated environments.""")
         args.skip_build_ios_device = True
         args.skip_build_ios_simulator = True
 
-    if not args.watchos or args.skip_build_watchos:
+    if not args.tvos or args.skip_build_tvos:
         args.skip_build_tvos_device = True
         args.skip_build_tvos_simulator = True
 
