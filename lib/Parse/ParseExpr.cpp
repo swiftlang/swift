@@ -566,12 +566,30 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   }
   SourceLoc lParenLoc = consumeToken(tok::l_paren);
 
-  // Parse the sequence of unqualified-names.
+  // Handle code completion.
   SmallVector<Identifier, 4> names;
   SmallVector<SourceLoc, 4> nameLocs;
+  auto handleCodeCompletion = [&](bool hasDot) -> ParserResult<Expr> {
+    ObjCKeyPathExpr *expr = nullptr;
+    if (!names.empty()) {
+      expr = ObjCKeyPathExpr::create(Context, keywordLoc, lParenLoc, names,
+                                     nameLocs, Tok.getLoc());
+    }
+
+    if (CodeCompletion)
+      CodeCompletion->completeExprKeyPath(expr, hasDot);
+
+    // Eat the code completion token because we handled it.
+    consumeToken(tok::code_complete);
+    return makeParserCodeCompletionResult(expr);
+  };
+
+  // Parse the sequence of unqualified-names.
   ParserStatus status;
   while (true) {
-    // FIXME: Code completion.
+    // Handle code completion.
+    if (Tok.is(tok::code_complete))
+      return handleCodeCompletion(!names.empty());
 
     // Parse the next name.
     DeclNameLoc nameLoc;
@@ -594,6 +612,10 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     // Record the name we parsed.
     names.push_back(name.getBaseName());
     nameLocs.push_back(nameLoc.getBaseNameLoc());
+
+    // Handle code completion.
+    if (Tok.is(tok::code_complete))
+      return handleCodeCompletion(false);
 
     // Parse the next period to continue the path.
     if (consumeIf(tok::period))
