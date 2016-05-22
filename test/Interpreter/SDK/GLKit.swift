@@ -5,7 +5,7 @@
 
 // On i386, it seems to work optimized mode, but fails in non-optimized.
 // rdar://problem/26392402
-// UNSUPPORTED: i386
+// UNSUPPORTED: CPU=i386
 // REQUIRES: objc_interop
 
 import GLKit
