@@ -390,28 +390,77 @@ function(check_working_std_regex result_var_name)
     # Apple operating systems use libc++, which has a working std::regex.
     set("${result_var_name}" TRUE PARENT_SCOPE)
   else()
-    # libstdc++ 4.8 has an incomplete std::regex implementation, and crashes
-    # on many regexes.
-    # libstdc++ 4.9 works.
-    set(std_regex_test_source
-"
-#include <regex>
-const std::regex broken_regex{
-  \"([a]+)\",
-  std::regex::ECMAScript | std::regex::nosubs};
-
-int main() {}
-")
-
-    check_cxx_source_runs("${std_regex_test_source}" "${result_var_name}_TEST")
-    if ("${${result_var_name}_TEST}")
-      set("${result_var_name}" TRUE PARENT_SCOPE)
-    else()
+    if(CMAKE_CROSSCOMPILING)
+      # Can't run C source when cross-compiling; assume false until we have a static check.
       set("${result_var_name}" FALSE PARENT_SCOPE)
+    else()
+      # libstdc++ 4.8 has an incomplete std::regex implementation, and crashes
+      # on many regexes.
+      # libstdc++ 4.9 works.
+      set(std_regex_test_source
+  "
+  #include <regex>
+  const std::regex broken_regex{
+    \"([a]+)\",
+    std::regex::ECMAScript | std::regex::nosubs};
+
+  int main() {}
+  ")
+
+      check_cxx_source_runs("${std_regex_test_source}" "${result_var_name}_TEST")
+      if ("${${result_var_name}_TEST}")
+        set("${result_var_name}" TRUE PARENT_SCOPE)
+      else()
+        set("${result_var_name}" FALSE PARENT_SCOPE)
+      endif()
     endif()
   endif()
 endfunction()
 check_working_std_regex(SWIFT_HAVE_WORKING_STD_REGEX)
+
+# If SWIFT_HOST_VARIANT_SDK not given, try to detect from the CMAKE_SYSTEM_NAME.
+if(SWIFT_HOST_VARIANT_SDK)
+  set(SWIFT_HOST_VARIANT_SDK_default "${SWIFT_HOST_VARIANT_SDK}")
+else()
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+    set(SWIFT_HOST_VARIANT_SDK_default "LINUX")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+    set(SWIFT_HOST_VARIANT_SDK_default "FREEBSD")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
+    set(SWIFT_HOST_VARIANT_SDK_default "CYGWIN")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+    set(SWIFT_HOST_VARIANT_SDK_default "OSX")
+  else()
+    message(FATAL_ERROR "Unable to detect SDK for host system: ${CMAKE_SYSTEM_NAME}")
+  endif()
+endif()
+
+# If SWIFT_HOST_VARIANT_ARCH not given, try to detect from the CMAKE_SYSTEM_PROCESSOR.
+if(SWIFT_HOST_VARIANT_ARCH)
+  set(SWIFT_HOST_VARIANT_ARCH_default, "${SWIFT_HOST_VARIANT_ARCH}")
+else()
+  if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+    set(SWIFT_HOST_VARIANT_ARCH_default "x86_64")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
+    set(SWIFT_HOST_VARIANT_ARCH_default "aarch64")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64")
+    set(SWIFT_HOST_VARIANT_ARCH_default "powerpc64")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64le")
+    set(SWIFT_HOST_VARIANT_ARCH_default "powerpc64le")
+  # FIXME: Only matches v6l/v7l - by far the most common variants
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv6l")
+    set(SWIFT_HOST_VARIANT_ARCH_default "armv6")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv7l")
+    set(SWIFT_HOST_VARIANT_ARCH_default "armv7")
+  else()
+    message(FATAL_ERROR "Unrecognized architecture on host system: ${CMAKE_SYSTEM_PROCESSOR}")
+  endif()
+endif()
+
+set(SWIFT_HOST_VARIANT_SDK "${SWIFT_HOST_VARIANT_SDK_default}" CACHE STRING
+    "Deployment sdk for Swift host tools (the compiler).")
+set(SWIFT_HOST_VARIANT_ARCH "${SWIFT_HOST_VARIANT_ARCH_default}" CACHE STRING
+    "Deployment arch for Swift host tools (the compiler).")
 
 #
 # Enable additional warnings.
@@ -439,113 +488,94 @@ function(is_sdk_requested name result_var_name)
   endif()
 endfunction()
 
-# FIXME: separate the notions of SDKs used for compiler tools and target
-# binaries.
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-  set(CMAKE_EXECUTABLE_FORMAT "ELF")
+# FIXME: the parameters we specify in SWIFT_SDKS are lacking architecture specifics,
+# so we need to hard-code it. For example, the SDK for Android is just 'ANDROID', 
+# which we assume below to be armv7. 
+# The iOS SDKs all have their architectures hardcoded because they are just specified by name (e.g. 'IOS' or 'WATCHOS').
+# We can't cross-compile the standard library for another linux architecture,
+# because the SDK list would just be 'LINUX' and we couldn't disambiguate it from the host.
+# 
+# To fix it, we would need to append the architecture to the SDKs,
+# for example: 'OSX-x86_64;IOS-armv7;...etc'.
+# We could easily do that - we have all of that information in build-script-impl.
+# Also, we would need to be provided with the sysroot for each SDK (see SWIFT_ANDROID_SDK_PATH/SWIFT_SDK_ANDROID_PATH).
+# Darwin targets cheat and use `xcrun`.
 
+if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
+  
+  set(CMAKE_EXECUTABLE_FORMAT "ELF")
   set(SWIFT_HOST_VARIANT "linux" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [linux].")
 
-  set(SWIFT_HOST_VARIANT_SDK "LINUX")
-  set(SWIFT_PRIMARY_VARIANT_SDK_default "LINUX")
-
-  # FIXME: This will not work while trying to cross-compile.
-  if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
-    set(SWIFT_HOST_VARIANT_ARCH "x86_64")
-    set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
-
-    if("${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-      set(swift_can_crosscompile_stdlib FALSE)
+  # Calculate the host triple
+  if("${SWIFT_HOST_TRIPLE}" STREQUAL "")
+    if("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "x86_64")
+      set(SWIFT_HOST_TRIPLE "x86_64-unknown-linux-gnu")
+    elseif("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "aarch64")
+      set(SWIFT_HOST_TRIPLE "aarch64-unknown-linux-gnu")
+    elseif("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "(powerpc64|powerpc64le)")
+      set(SWIFT_HOST_TRIPLE "${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu")
+    elseif("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "(armv6|armv7)")
+      set(SWIFT_HOST_TRIPLE "${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnueabihf")
     else()
-      set(swift_can_crosscompile_stdlib TRUE)
+      message(FATAL_ERROR "Unable to calculate triple for linux host on ${SWIFT_HOST_VARIANT_ARCH}")
     endif()
+  endif()
 
-    is_sdk_requested(LINUX swift_build_linux)
-    if(swift_build_linux)
-      configure_sdk_unix(LINUX "Linux" "linux" "linux" "x86_64" "x86_64-unknown-linux-gnu")
-      set(SWIFT_PRIMARY_VARIANT_SDK_default "LINUX")
-      set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
-    endif()
+  # Should we build the standard library for the host?
+  is_sdk_requested(LINUX swift_build_linux)
+  if(swift_build_linux)
+    configure_sdk_unix(LINUX "Linux" "linux" "${SWIFT_HOST_VARIANT}" "${SWIFT_HOST_VARIANT_ARCH}" "${SWIFT_HOST_TRIPLE}" "/")
+    set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
+    set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
+  endif()
 
-    is_sdk_requested(ANDROID swift_build_android)
-    if(swift_build_android AND ${swift_can_crosscompile_stdlib})
-      configure_sdk_unix(ANDROID "Android" "android" "android" "armv7" "armv7-none-linux-androideabi")
-      # This must be set, as variables such as "${SWIFT_SDK_${sdk}_PATH}" are
-      # referenced in several other locations.
-      set(SWIFT_SDK_ANDROID_PATH "${SWIFT_ANDROID_SDK_PATH}")
+  # Compatible cross-compile SDKS for LINUX: ANDROID (arch always armv7)
+  is_sdk_requested(ANDROID swift_build_android)
+  if("${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+    set(swift_can_crosscompile_stdlib_android FALSE)
+  else()
+    set(swift_can_crosscompile_stdlib_android TRUE)
+  endif()
 
+  if(swift_build_android AND ${swift_can_crosscompile_stdlib_android})
+    configure_sdk_unix(ANDROID "Android" "android" "android" "armv7" "armv7-none-linux-androideabi" "${SWIFT_ANDROID_SDK_PATH}")
+    # If we're not building for the host, the cross-compiled target should be the 'primary variant'.
+    if("${swift_build_linux}" STREQUAL "FALSE")
       set(SWIFT_PRIMARY_VARIANT_SDK_default "ANDROID")
       set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")
     endif()
-
-  # FIXME: This only matches ARMv6l (by far the most common variant).
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv6l")
-    configure_sdk_unix(LINUX "Linux" "linux" "linux" "armv6" "armv6-unknown-linux-gnueabihf")
-    set(SWIFT_HOST_VARIANT_ARCH "armv6")
-    set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv6")
-  # FIXME: This only matches ARMv7l (by far the most common variant).
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv7l")
-    configure_sdk_unix(LINUX "Linux" "linux" "linux" "armv7" "armv7-unknown-linux-gnueabihf")
-    set(SWIFT_HOST_VARIANT_ARCH "armv7")
-    set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
-    configure_sdk_unix(LINUX "Linux" "linux" "linux" "aarch64" "aarch64-unknown-linux-gnu")
-    set(SWIFT_HOST_VARIANT_ARCH "aarch64")
-    set(SWIFT_PRIMARY_VARIANT_ARCH_default "aarch64")
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64")
-    configure_sdk_unix(LINUX "Linux" "linux" "linux" "powerpc64" "powerpc64-unknown-linux-gnu")
-    set(SWIFT_HOST_VARIANT_ARCH "powerpc64")
-    set(SWIFT_PRIMARY_VARIANT_ARCH_default "powerpc64")
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64le")
-    configure_sdk_unix(LINUX "Linux" "linux" "linux" "powerpc64le" "powerpc64le-unknown-linux-gnu")
-    set(SWIFT_HOST_VARIANT_ARCH "powerpc64le")
-    set(SWIFT_PRIMARY_VARIANT_ARCH_default "powerpc64le")
-  else()
-    message(FATAL_ERROR "Unknown or unsupported architecture: ${CMAKE_SYSTEM_PROCESSOR}")
   endif()
 
-elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
+  
+  set(CMAKE_EXECUTABLE_FORMAT "ELF")
+  set(SWIFT_HOST_VARIANT "freebsd" CACHE STRING
+      "Deployment OS for Swift host tools (the compiler) [freebsd].")
+
   # FIXME: Using the host OS version won't produce correct results for
   # cross-compilation.
   string(REPLACE "[-].*" "" FREEBSD_SYSTEM_VERSION ${CMAKE_SYSTEM_VERSION})
   message(STATUS "FreeBSD Version: ${FREEBSD_SYSTEM_VERSION}")
   configure_sdk_unix(FREEBSD "FreeBSD" "freebsd" "freebsd" "x86_64"
-    "x86_64-unknown-freebsd${FREEBSD_SYSTEM_VERSION}")
-
-  set(CMAKE_EXECUTABLE_FORMAT "ELF")
-
-  set(SWIFT_HOST_VARIANT "freebsd" CACHE STRING
-      "Deployment OS for Swift host tools (the compiler) [freebsd].")
-
-  set(SWIFT_HOST_VARIANT_SDK "FREEBSD")
-  set(SWIFT_HOST_VARIANT_ARCH "x86_64")
-
-  set(SWIFT_PRIMARY_VARIANT_SDK_default "FREEBSD")
+    "x86_64-unknown-freebsd${FREEBSD_SYSTEM_VERSION}" "/")
+  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
-elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
-  configure_sdk_unix(CYGWIN "Cygwin" "windows" "cygwin" "x86_64" "x86_64-unknown-windows-cygnus")
-
-#  set(CMAKE_EXECUTABLE_FORMAT "ELF")
-
+  
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
+  
+  # set(CMAKE_EXECUTABLE_FORMAT "ELF")
   set(SWIFT_HOST_VARIANT "windows" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [windows].")
-
-  set(SWIFT_HOST_VARIANT_SDK "CYGWIN")
-  set(SWIFT_HOST_VARIANT_ARCH "x86_64")
   
-  set(SWIFT_PRIMARY_VARIANT_SDK_default "CYGWIN")
+  configure_sdk_unix(CYGWIN "Cygwin" "windows" "cygwin" "windows" "x86_64-unknown-windows-cygnus" "/")
+  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
-elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-  # Set defaults.
+
+elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
 
   set(SWIFT_HOST_VARIANT "macosx" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [macosx, iphoneos].")
-
-  set(SWIFT_HOST_VARIANT_SDK "OSX" CACHE STRING
-      "Deployment sdk for Swift host tools (the compiler).")
-  set(SWIFT_HOST_VARIANT_ARCH "x86_64" CACHE STRING
-      "Deployment arch for Swift host tools (the compiler).")
 
   # Display Xcode toolchain version. 
   # The SDK configuration below prints each SDK version.
@@ -566,6 +596,9 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     configure_target_variant(OSX-RA "OS X Release+Asserts" OSX RA "Release+Asserts")
     configure_target_variant(OSX-R  "OS X Release"         OSX R  "Release")
   endif()
+
+  # Compatible cross-compile SDKS for Darwin OSes: IOS, IOS_SIMULATOR, TVOS,
+  #   TVOS_SIMULATOR, WATCHOS, WATCHOS_SIMULATOR (archs hardcoded below).
 
   if(XCODE)
     # FIXME: Cannot cross-compile stdlib using Xcode.  Xcode insists on
@@ -654,9 +687,10 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   # set(SWIFT_PRIMARY_VARIANT ${SWIFT_PRIMARY_VARIANT_GUESS} CACHE STRING
   #    "[OSX-DA, OSX-RA, OSX-R, IOS-DA, IOS-RA, IOS-R, IOS_SIMULATOR-DA, IOS_SIMULATOR-RA, IOS_SIMULATOR-R]")
   #
-  # FIXME: hardcode OS X as the default variant for now.
+  # Primary variant is always OSX; even on iOS hosts.
   set(SWIFT_PRIMARY_VARIANT_SDK_default "OSX")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+
 endif()
 
 if("${SWIFT_PRIMARY_VARIANT_SDK}" STREQUAL "")
