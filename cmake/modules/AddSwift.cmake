@@ -443,7 +443,8 @@ endfunction()
 function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_options
       SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
-      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE TARGET_LIBRARY)
+      TARGET_LIBRARY HOST_LIBRARY
+      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
   cmake_parse_arguments(SWIFTLIB_SINGLE
     "${SWIFTLIB_SINGLE_options}"
     "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_IOS"
@@ -980,7 +981,8 @@ endfunction()
 #   Sources to add into this library.
 function(add_swift_library name)
   set(SWIFTLIB_options
-      SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY TARGET_LIBRARY IS_HOST
+      SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
+      TARGET_LIBRARY HOST_LIBRARY
       API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE HAS_SWIFT_CONTENT)
   cmake_parse_arguments(SWIFTLIB
     "${SWIFTLIB_options}"
@@ -1061,8 +1063,10 @@ function(add_swift_library name)
     # SDKs building the variants of this library.
     list_intersect(
         "${SWIFTLIB_TARGET_SDKS}" "${SWIFT_SDKS}" SWIFTLIB_TARGET_SDKS)
-    if(SWIFTLIB_IS_HOST)
-      list_union("${SWIFTLIB_TARGET_SDKS}" "${SWIFT_HOST_VARIANT_SDK}" SWIFTLIB_TARGET_SDKS)
+    if(SWIFTLIB_HOST_LIBRARY)
+      list_union(
+          "${SWIFTLIB_TARGET_SDKS}" "${SWIFT_HOST_VARIANT_SDK}"
+          SWIFTLIB_TARGET_SDKS)
     endif()
     foreach(sdk ${SWIFTLIB_TARGET_SDKS})
       set(THIN_INPUT_TARGETS)
