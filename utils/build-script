@@ -635,6 +635,10 @@ details of the setups of other systems or automated environments.""")
         help="run the Swift Benchmark Suite after building",
         action="store_true")
     run_tests_group.add_argument(
+        "--skip-test-osx",
+        help="skip testing Swift stdlibs for Mac OS X",
+        action="store_true")
+    run_tests_group.add_argument(
         "--skip-test-linux",
         help="skip testing Swift stdlibs for Linux",
         action="store_true")
@@ -669,6 +673,60 @@ details of the setups of other systems or automated environments.""")
     run_build_group.add_argument(
         "--skip-build-cygwin",
         help="skip building Swift stdlibs for Cygwin",
+        action="store_true")
+    run_build_group.add_argument(
+        "--skip-build-osx",
+        help="skip building Swift stdlibs for MacOSX",
+        action="store_true")
+
+    run_build_group.add_argument(
+        "--skip-build-ios",
+        help="skip building Swift stdlibs for iOS",
+        action="store_true")
+    run_build_group.add_argument(
+        "--skip-build-ios-device",
+        help="skip building Swift stdlibs for iOS devices "
+             "(i.e. build simulators only)",
+        action="store_true")
+    run_build_group.add_argument(
+        "--skip-build-ios-simulator",
+        help="skip building Swift stdlibs for iOS simulator "
+             "(i.e. build devices only)",
+        action="store_true")
+
+    run_build_group.add_argument(
+        "--skip-build-tvos",
+        help="skip building Swift stdlibs for tvOS",
+        action="store_true")
+    run_build_group.add_argument(
+        "--skip-build-tvos-device",
+        help="skip building Swift stdlibs for tvOS devices "
+             "(i.e. build simulators only)",
+        action="store_true")
+    run_build_group.add_argument(
+        "--skip-build-tvos-simulator",
+        help="skip building Swift stdlibs for tvOS simulator "
+             "(i.e. build devices only)",
+        action="store_true")
+
+    run_build_group.add_argument(
+        "--skip-build-watchos",
+        help="skip building Swift stdlibs for watchOS",
+        action="store_true")
+    run_build_group.add_argument(
+        "--skip-build-watchos-device",
+        help="skip building Swift stdlibs for watchOS devices "
+             "(i.e. build simulators only)",
+        action="store_true")
+    run_build_group.add_argument(
+        "--skip-build-watchos-simulator",
+        help="skip building Swift stdlibs for watchOS simulator "
+             "(i.e. build devices only)",
+        action="store_true")
+
+    run_build_group.add_argument(
+        "--skip-build-android",
+        help="skip building Swift stdlibs for Android",
         action="store_true")
 
     run_build_group.add_argument(
@@ -726,18 +784,33 @@ details of the setups of other systems or automated environments.""")
         help="also build for iOS, but disallow tests that require an iOS "
              "device",
         action="store_true")
+    parser.add_argument(
+        "--skip-ios",
+        help="set to skip everything iOS-related",
+        dest="ios",
+        action="store_false")
 
     parser.add_argument(
         "--tvos",
         help="also build for tvOS, but disallow tests that require a tvos "
              "device",
         action="store_true")
+    parser.add_argument(
+        "--skip-tvos",
+        help="set to skip everything tvOS-related",
+        dest="tvos",
+        action="store_false")
 
     parser.add_argument(
         "--watchos",
         help="also build for watchOS, but disallow tests that require an "
              "watchOS device",
         action="store_true")
+    parser.add_argument(
+        "--skip-watchos",
+        help="set to skip everything watchOS-related",
+        dest="watchos",
+        action="store_false")
 
     parser.add_argument(
         "--android",
@@ -982,10 +1055,10 @@ details of the setups of other systems or automated environments.""")
     if args.build_variant is None:
         args.build_variant = "Debug"
 
+    # Propagate the default build variant.
     if args.cmark_build_variant is None:
         args.cmark_build_variant = args.build_variant
 
-    # Propagate the default build variant.
     if args.llvm_build_variant is None:
         args.llvm_build_variant = args.build_variant
 
@@ -1025,6 +1098,48 @@ details of the setups of other systems or automated environments.""")
     if args.cmake_generator is None:
         args.cmake_generator = "Ninja"
 
+    # SwiftPM and XCTest have a dependency on Foundation.
+    # On OS X, Foundation is built automatically using xcodebuild.
+    # On Linux, we must ensure that it is built manually.
+    if ((args.build_swiftpm or args.build_xctest) and
+            platform.system() != "Darwin"):
+        args.build_foundation = True
+
+    # Propagate global --skip-build
+    if args.skip_build:
+        args.skip_build_linux = True
+        args.skip_build_freebsd = True
+        args.skip_build_cygwin = True
+        args.skip_build_osx = True
+        args.skip_build_ios = True
+        args.skip_build_tvos = True
+        args.skip_build_watchos = True
+        args.skip_build_android = True
+        args.skip_build_benchmarks = True
+        args.build_lldb = False
+        args.build_llbuild = False
+        args.build_swiftpm = False
+        args.build_xctest = False
+        args.build_foundation = False
+        args.build_libdispatch = False
+
+    # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
+    # merely shorthands for --skip-build-{**os}-{device,simulator}
+    if not args.ios or args.skip_build_ios:
+        args.skip_build_ios_device = True
+        args.skip_build_ios_simulator = True
+
+    if not args.watchos or args.skip_build_watchos:
+        args.skip_build_tvos_device = True
+        args.skip_build_tvos_simulator = True
+
+    if not args.watchos or args.skip_build_watchos:
+        args.skip_build_watchos_device = True
+        args.skip_build_watchos_simulator = True
+
+    if not args.android or args.skip_build_android:
+        args.skip_build_android = True
+
     # --validation-test implies --test.
     if args.validation_test:
         args.test = True
@@ -1033,12 +1148,15 @@ details of the setups of other systems or automated environments.""")
     if args.test_optimized:
         args.test = True
 
-    # SwiftPM and XCTest have a dependency on Foundation.
-    # On OS X, Foundation is built automatically using xcodebuild.
-    # On Linux, we must ensure that it is built manually.
-    if (args.build_swiftpm or args.build_xctest) and \
-            platform.system() != "Darwin":
-        args.build_foundation = True
+    # If none of tests specified skip swift stdlib test on all platforms
+    if not args.test and not args.validation_test and not args.long_test:
+        args.skip_test_linux = True
+        args.skip_test_freebsd = True
+        args.skip_test_cygwin = True
+        args.skip_test_osx = True
+        args.skip_test_ios = True
+        args.skip_test_tvos = True
+        args.skip_test_watchos = True
 
     # --skip-test-ios is merely a shorthand for host and simulator tests.
     if args.skip_test_ios:
@@ -1053,156 +1171,27 @@ details of the setups of other systems or automated environments.""")
         args.skip_test_watchos_host = True
         args.skip_test_watchos_simulator = True
 
-    build_script_impl_inferred_args = []
+    # --skip-build-{ios,tvos,watchos}-{device,simulator} implies
+    # --skip-test-{ios,tvos,watchos}-{host,simulator}
+    if args.skip_build_ios_device:
+        args.skip_test_ios_host = True
+    if args.skip_build_ios_simulator:
+        args.skip_test_ios_simulator = True
 
-    if not args.test and not args.validation_test and not args.long_test:
-        build_script_impl_inferred_args += [
-            "--skip-test-swift",
-            "--skip-test-linux",
-            "--skip-test-freebsd",
-            "--skip-test-cygwin",
-            "--skip-test-osx",
-            "--skip-test-ios-simulator",
-            "--skip-test-ios-host",
-            "--skip-test-tvos-simulator",
-            "--skip-test-tvos-host",
-            "--skip-test-watchos-simulator",
-            "--skip-test-watchos-host",
-        ]
+    if args.skip_build_tvos_device:
+        args.skip_test_tvos_host = True
+    if args.skip_build_tvos_simulator:
+        args.skip_test_tvos_simulator = True
 
-    if not args.test:
-        build_script_impl_inferred_args += [
-            "--skip-test-cmark",
-            "--skip-test-lldb",
-            "--skip-test-llbuild",
-            "--skip-test-swiftpm",
-            "--skip-test-xctest",
-            "--skip-test-foundation",
-            "--skip-test-libdispatch",
-        ]
-
-    if args.validation_test:
-        build_script_impl_inferred_args += [
-            "--validation-test"
-        ]
-
-    if args.long_test:
-        build_script_impl_inferred_args += [
-            "--long-test"
-        ]
+    if args.skip_build_watchos_device:
+        args.skip_test_watchos_host = True
+    if args.skip_build_watchos_simulator:
+        args.skip_test_watchos_simulator = True
 
     if not args.host_test:
-        build_script_impl_inferred_args += [
-            "--skip-test-ios-host",
-            "--skip-test-tvos-host",
-            "--skip-test-watchos-host",
-        ]
-
-    if not args.benchmark:
-        build_script_impl_inferred_args += [
-            "--skip-test-benchmarks"
-        ]
-
-    if not args.test_optimized:
-        build_script_impl_inferred_args += [
-            "--skip-test-optimized"
-        ]
-
-    if not args.ios:
-        build_script_impl_inferred_args += [
-            "--skip-build-ios",
-            "--skip-test-ios-simulator",
-            "--skip-test-ios-host",
-        ]
-
-    if not args.tvos:
-        build_script_impl_inferred_args += [
-            "--skip-build-tvos",
-            "--skip-test-tvos-simulator",
-            "--skip-test-tvos-host",
-        ]
-
-    if not args.watchos:
-        build_script_impl_inferred_args += [
-            "--skip-build-watchos",
-            "--skip-test-watchos-simulator",
-            "--skip-test-watchos-host",
-        ]
-
-    if not args.android:
-        build_script_impl_inferred_args += [
-            "--skip-build-android",
-        ]
-
-    if not args.build_lldb:
-        build_script_impl_inferred_args += [
-            "--skip-build-lldb"
-        ]
-
-    if not args.build_llbuild:
-        build_script_impl_inferred_args += [
-            "--skip-build-llbuild"
-        ]
-
-    if not args.build_swiftpm:
-        build_script_impl_inferred_args += [
-            "--skip-build-swiftpm"
-        ]
-
-    if not args.build_xctest:
-        build_script_impl_inferred_args += [
-            "--skip-build-xctest"
-        ]
-
-    if not args.build_foundation:
-        build_script_impl_inferred_args += [
-            "--skip-build-foundation"
-        ]
-
-    if not args.build_libdispatch:
-        build_script_impl_inferred_args += [
-            "--skip-build-libdispatch"
-        ]
-
-    if args.skip_build_benchmarks:
-        build_script_impl_inferred_args += [
-            "--skip-build-benchmarks"
-        ]
-
-    if args.skip_build:
-        build_script_impl_inferred_args += [
-            "--skip-build-cmark",
-            "--skip-build-llvm",
-            "--skip-build-swift",
-            "--skip-build-linux",
-            "--skip-build-freebsd",
-            "--skip-build-cygwin",
-            "--skip-build-osx",
-            "--skip-build-ios",
-            "--skip-build-ios-device",
-            "--skip-build-ios-simulator",
-            "--skip-build-tvos",
-            "--skip-build-tvos-device",
-            "--skip-build-tvos-simulator",
-            "--skip-build-watchos",
-            "--skip-build-watchos-device",
-            "--skip-build-watchos-simulator",
-            "--skip-build-android",
-            "--skip-build-lldb",
-            "--skip-build-llbuild",
-            "--skip-build-swiftpm",
-            "--skip-build-xctest",
-            "--skip-build-foundation",
-            "--skip-build-libdispatch",
-            "--skip-build-benchmarks",
-        ]
-
-    if platform.system() == 'Darwin':
-        build_script_impl_inferred_args += [
-            "--toolchain-prefix",
-            swift_build_support.targets.darwin_toolchain_prefix(
-                args.install_prefix),
-        ]
+        args.skip_test_ios_host = True
+        args.skip_test_tvos_host = True
+        args.skip_test_watchos_host = True
 
     if args.build_subdir is None:
         args.build_subdir = compute_build_subdir(args)
@@ -1233,6 +1222,7 @@ details of the setups of other systems or automated environments.""")
         "--swift-build-type", args.swift_build_variant,
         "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
         "--lldb-build-type", args.lldb_build_variant,
+        "--foundation-build-type", args.foundation_build_variant,
         "--llvm-enable-assertions", str(args.llvm_assertions).lower(),
         "--swift-enable-assertions", str(args.swift_assertions).lower(),
         "--swift-stdlib-enable-assertions", str(
@@ -1266,12 +1256,27 @@ details of the setups of other systems or automated environments.""")
         build_script_impl_args += [
             "--install-symroot", os.path.abspath(args.install_symroot)
         ]
-    if args.build_foundation:
-        build_script_impl_args += [
-            "--foundation-build-type", args.foundation_build_variant
-        ]
     if args.cmake_generator == 'Ninja' and toolchain.ninja is None:
         build_script_impl_args += ["--build-ninja"]
+
+    if args.skip_build:
+        build_script_impl_args += ["--skip-build-cmark",
+                                   "--skip-build-llvm",
+                                   "--skip-build-swift"]
+    if args.skip_build_benchmarks:
+        build_script_impl_args += ["--skip-build-benchmarks"]
+    if not args.build_foundation:
+        build_script_impl_args += ["--skip-build-foundation"]
+    if not args.build_xctest:
+        build_script_impl_args += ["--skip-build-xctest"]
+    if not args.build_lldb:
+        build_script_impl_args += ["--skip-build-lldb"]
+    if not args.build_llbuild:
+        build_script_impl_args += ["--skip-build-llbuild"]
+    if not args.build_libdispatch:
+        build_script_impl_args += ["--skip-build-libdispatch"]
+    if not args.build_swiftpm:
+        build_script_impl_args += ["--skip-build-swiftpm"]
 
     if args.skip_build_linux:
         build_script_impl_args += ["--skip-build-linux"]
@@ -1279,12 +1284,41 @@ details of the setups of other systems or automated environments.""")
         build_script_impl_args += ["--skip-build-freebsd"]
     if args.skip_build_cygwin:
         build_script_impl_args += ["--skip-build-cygwin"]
+    if args.skip_build_osx:
+        build_script_impl_args += ["--skip-build-osx"]
+    if args.skip_build_ios_device:
+        build_script_impl_args += ["--skip-build-ios-device"]
+    if args.skip_build_ios_simulator:
+        build_script_impl_args += ["--skip-build-ios-simulator"]
+    if args.skip_build_tvos_device:
+        build_script_impl_args += ["--skip-build-tvos-device"]
+    if args.skip_build_tvos_simulator:
+        build_script_impl_args += ["--skip-build-tvos-simulator"]
+    if args.skip_build_watchos_device:
+        build_script_impl_args += ["--skip-build-watchos-device"]
+    if args.skip_build_watchos_simulator:
+        build_script_impl_args += ["--skip-build-watchos-simulator"]
+    if args.skip_build_android:
+        build_script_impl_args += ["--skip-build-android"]
+
+    if not args.test and not args.long_test:
+        build_script_impl_args += ["--skip-test-swift"]
+    if not args.test:
+        build_script_impl_args += ["--skip-test-cmark",
+                                   "--skip-test-lldb",
+                                   "--skip-test-llbuild",
+                                   "--skip-test-swiftpm",
+                                   "--skip-test-xctest",
+                                   "--skip-test-foundation",
+                                   "--skip-test-libdispatch"]
     if args.skip_test_linux:
         build_script_impl_args += ["--skip-test-linux"]
     if args.skip_test_freebsd:
         build_script_impl_args += ["--skip-test-freebsd"]
     if args.skip_test_cygwin:
         build_script_impl_args += ["--skip-test-cygwin"]
+    if args.skip_test_osx:
+        build_script_impl_args += ["--skip-test-osx"]
     if args.skip_test_ios_host:
         build_script_impl_args += ["--skip-test-ios-host"]
     if args.skip_test_ios_simulator:
@@ -1299,6 +1333,14 @@ details of the setups of other systems or automated environments.""")
         build_script_impl_args += ["--skip-test-watchos-simulator"]
     if args.build_runtime_with_host_compiler:
         build_script_impl_args += ["--build-runtime-with-host-compiler"]
+    if args.validation_test:
+        build_script_impl_args += ["--validation-test"]
+    if args.long_test:
+        build_script_impl_args += ["--long-test"]
+    if not args.benchmark:
+        build_script_impl_args += ["--skip-test-benchmarks"]
+    if not args.test_optimized:
+        build_script_impl_args += ["--skip-test-optimized"]
 
     if args.android:
         build_script_impl_args += [
@@ -1312,7 +1354,12 @@ details of the setups of other systems or automated environments.""")
             "--android-icu-i18n-include", args.android_icu_i18n_include,
         ]
 
-    build_script_impl_args += build_script_impl_inferred_args
+    if platform.system() == 'Darwin':
+        build_script_impl_args += [
+            "--toolchain-prefix",
+            swift_build_support.targets.darwin_toolchain_prefix(
+                args.install_prefix),
+        ]
 
     # If we have extra_swift_args, combine all of them together and then add
     # them as one command.
