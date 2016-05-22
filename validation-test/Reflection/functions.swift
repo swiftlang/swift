@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-build-swift -Xfrontend -enable-reflection-metadata -Xfrontend -enable-reflection-names -lswiftSwiftReflectionTest %s -o %t/functions
-// RUN: %target-run %target-swift-reflection-test %t/functions 2>&1 | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/functions
+// RUN: %target-run %target-swift-reflection-test %t/functions | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
 
 /*
@@ -23,14 +23,14 @@ func concrete(x: Int, y: Any) {
 // CHECK-32-NEXT: (closure_context size=16 alignment=4 stride=16 num_extra_inhabitants=0
 // CHECK-32-NEXT:   (field offset=12
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
-// CHECK-32-NEXT:       (field offset=0
+// CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0)))))
 
 // CHECK-64:      Type info:
 // CHECK-64-NEXT: (closure_context size=24 alignment=8 stride=24 num_extra_inhabitants=0
 // CHECK-64-NEXT:   (field offset=16
 // CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
-// CHECK-64-NEXT:       (field offset=0
+// CHECK-64-NEXT:       (field name=_value offset=0
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0)))))
 
   // FIXME: Need @box reflection -- here the context is a single boxed value
@@ -61,14 +61,14 @@ func generic<T : P, U, V : C>(x: T, y: U, z: V, i: Int) {
 // CHECK-32-NEXT: (closure_context size=16 alignment=4 stride=16 num_extra_inhabitants=0
 // CHECK-32-NEXT:   (field offset=12
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
-// CHECK-32-NEXT:       (field offset=0
+// CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0)))))
 
 // CHECK-64:      Type info:
 // CHECK-64-NEXT: (closure_context size=24 alignment=8 stride=24 num_extra_inhabitants=0
 // CHECK-64-NEXT:   (field offset=16
 // CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
-// CHECK-64-NEXT:       (field offset=0
+// CHECK-64-NEXT:       (field name=_value offset=0
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0)))))
 
   reflect(function: {print(x); print(y); print(z)})

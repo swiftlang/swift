@@ -226,14 +226,6 @@ function(_compile_swift_files dependency_target_out_var_name)
     list(APPEND swift_flags "-Xfrontend" "-enable-resilience")
   endif()
 
-  if(SWIFT_STDLIB_ENABLE_REFLECTION_METADATA AND SWIFTFILE_IS_STDLIB)
-    list(APPEND swift_flags "-Xfrontend" "-enable-reflection-metadata")
-  endif()
-
-  if(SWIFT_STDLIB_ENABLE_REFLECTION_NAMES AND SWIFTFILE_IS_STDLIB)
-    list(APPEND swift_flags "-Xfrontend" "-enable-reflection-names")
-  endif()
-
   if(SWIFT_EMIT_SORTED_SIL_OUTPUT)
     list(APPEND swift_flags "-Xfrontend" "-emit-sorted-sil")
   endif()
