@@ -1907,8 +1907,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARG
 
         # When we are building LLVM create symlinks to the c++ headers.
         if [[ "${product}" == "llvm" ]]; then
-            set -x
-
             # Find the location of the c++ header dir.
             if [[ "$(uname -s)" == "Darwin" ]] ; then
               HOST_CXX_DIR=$(dirname ${HOST_CXX})
@@ -1922,6 +1920,7 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARG
             BUILT_CXX_INCLUDE_DIR="$llvm_build_dir/include"
 
             echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
+            set -x
             ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
             { set +x; } 2>/dev/null
         fi
