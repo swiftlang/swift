@@ -297,11 +297,31 @@ public protocol _BuiltinUnicodeScalarLiteralConvertible {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32)
 }
 
-/// Conforming types can be initialized with string literals
-/// containing a single [Unicode scalar value](http://www.unicode.org/glossary/#unicode_scalar_value).
+/// A type that can be initialized with a string literal containing a single
+/// Unicode scalar value.
+///
+/// The `String`, `StaticString`, `Character`, and `UnicodeScalar` types all
+/// conform to the `UnicodeScalarLiteralConvertible` protocol. You can
+/// initialize a variable of any of these types using a string literal that
+/// holds a single Unicode scalar.
+///
+///     let ñ: UnicodeScalar = "ñ"
+///     print(ñ)
+///     // Prints "ñ"
+///
+/// Conforming to UnicodeScalarLiteralConvertible
+/// =============================================
+///
+/// To add `UnicodeScalarLiteralConvertible` conformance to your custom type,
+/// implement the required initializer.
 public protocol UnicodeScalarLiteralConvertible {
+  /// A type that can represent a Unicode scalar literal.
+  ///
+  /// Valid types for `UnicodeScalarLiteralType` are `UnicodeScalar`,
+  /// `String`, and `StaticString`.
   associatedtype UnicodeScalarLiteralType : _BuiltinUnicodeScalarLiteralConvertible
-  /// Create an instance initialized to `value`.
+
+  /// Creates an instance initialized to the given value.
   init(unicodeScalarLiteral value: UnicodeScalarLiteralType)
 }
 
@@ -314,14 +334,40 @@ public protocol _BuiltinExtendedGraphemeClusterLiteralConvertible
     isASCII: Builtin.Int1)
 }
 
-/// Conforming types can be initialized with string literals
-/// containing a single [Unicode extended grapheme cluster](http://www.unicode.org/glossary/#extended_grapheme_cluster).
+/// A type that can be initialized with a string literal containing a single
+/// extended grapheme cluster.
+///
+/// An *extended grapheme cluster* is a group of one or more Unicode code
+/// points that approximates a single user-perceived character.  Many
+/// individual characters, such as "é", "김", and "🇮🇳", can be made up of
+/// multiple Unicode code points. These code points are combined by Unicode's
+/// boundary algorithms into extended grapheme clusters.
+///
+/// The `String`, `StaticString`, and `Character` types conform to the
+/// `ExtendedGraphemeClusterLiteralConvertible` protocol. You can initialize a
+/// variable or constant of any of these types using a string literal that
+/// holds a single character.
+///
+///     let snowflake: Character = "❄︎"
+///     print(snowflake)
+///     // Prints "❄︎"
+///
+/// Conforming to ExtendedGraphemeClusterLiteralConvertible
+/// =======================================================
+///
+/// To add `ExtendedGraphemeClusterLiteralConvertible` conformance to your
+/// custom type, implement the required initializer.
 public protocol ExtendedGraphemeClusterLiteralConvertible
   : UnicodeScalarLiteralConvertible {
 
+  /// A type that can represent an extended grapheme cluster literal.
+  ///
+  /// Valid types for `ExtendedGraphemeClusterLiteralType` are `Character`,
+  /// `String`, and `StaticString`.
   associatedtype ExtendedGraphemeClusterLiteralType
     : _BuiltinExtendedGraphemeClusterLiteralConvertible
-  /// Create an instance initialized to `value`.
+  
+  /// Creates an instance initialized to the given value.
   init(extendedGraphemeClusterLiteral value: ExtendedGraphemeClusterLiteralType)
 }
 
@@ -342,14 +388,30 @@ public protocol _BuiltinUTF16StringLiteralConvertible
     utf16CodeUnitCount: Builtin.Word)
 }
 
-/// Conforming types can be initialized with arbitrary string literals.
+/// A type that can be initialized with a string literal.
+///
+/// The `String` and `StaticString` types conform to the
+/// `StringLiteralConvertible` protocol. You can initialize a variable or
+/// constant of either of these types using a string literal of any length.
+///
+///     let picnicGuest = "Deserving porcupine"
+///
+/// Conforming to StringLiteralConvertible
+/// ======================================
+///
+/// To add `StringLiteralConvertible` conformance to your custom type,
+/// implement the required initializer.
 public protocol StringLiteralConvertible
   : ExtendedGraphemeClusterLiteralConvertible {
   // FIXME: when we have default function implementations in protocols, provide
   // an implementation of init(extendedGraphemeClusterLiteral:).
-
+  
+  /// A type that can represent a string literal.
+  ///
+  /// Valid types for `StringLiteralType` are `String` and `StaticString`.
   associatedtype StringLiteralType : _BuiltinStringLiteralConvertible
-  /// Create an instance initialized to `value`.
+  
+  /// Creates an instance initialized to the given string value.
   init(stringLiteral value: StringLiteralType)
 }
 
@@ -537,12 +599,80 @@ public protocol DictionaryLiteralConvertible {
   init(dictionaryLiteral elements: (Key, Value)...)
 }
 
-/// Conforming types can be initialized with string interpolations
-/// containing `\(`...`)` clauses.
+/// A type that can be initialized by string interpolation with a string
+/// literal that includes expressions.
+///
+/// Use string interpolation to include one or more expressions in a string
+/// literal, wrapped in a set of parentheses and prefixed by a backslash. For
+/// example:
+///
+///     let price = 2
+///     let number = 3
+///     let message = "One cookie: $\(price), \(number) cookies: $\(price * number)."
+///     print(message)
+///     // Prints "One cookie: $2, 3 cookies: $6."
+///
+/// Conforming to the StringInterpolationConvertible Protocol
+/// =========================================================
+///
+/// To use string interpolation to initialize instances of your custom type,
+/// implement the required initializers for `StringInterpolationConvertible`
+/// conformance. String interpolation is a multiple-step initialization
+/// process. When you use string interpolation, the following steps occur:
+///
+/// 1. The string literal is broken into pieces. Each segment of the string
+///    literal before, between, and after any included expressions, along with
+///    the individual expressions themselves, are passed to the
+///    `init(stringInterpolationSegment:)` initializer.
+/// 2. The results of those calls are passed to the
+///    `init(stringInterpolation:)` initializer in the order in which they
+///    appear in the string literal.
+///
+/// In other words, initializing the `message` constant in the example above
+/// using string interpolation is equivalent to the following code:
+///
+///     let message = String(stringInterpolation:
+///           String(stringInterpolationSegment: "One cookie: $"),
+///           String(stringInterpolationSegment: price),
+///           String(stringInterpolationSegment: ", "),
+///           String(stringInterpolationSegment: number),
+///           String(stringInterpolationSegment: " cookies: $"),
+///           String(stringInterpolationSegment: price * number),
+///           String(stringInterpolationSegment: "."))
 public protocol StringInterpolationConvertible {
-  /// Create an instance by concatenating the elements of `strings`.
+  /// Creates an instance by concatenating the given values.
+  ///
+  /// Do not call this initializer directly. It is used by the compiler when
+  /// you use string interpolation. For example:
+  ///
+  ///     let s = "\(5) x \(2) = \(5 * 2)"
+  ///     print(s)
+  ///     // Prints "5 x 2 = 10"
+  ///
+  /// After calling `init(stringInterpolationSegment:)` with each segment of
+  /// the string literal, this initializer is called with their string
+  /// representations.
+  ///
+  /// - Parameter strings: An array of instances of the conforming type.
   init(stringInterpolation strings: Self...)
-  /// Create an instance containing `expr`'s `print` representation.
+  
+  /// Creates an instance containing the appropriate representation for the
+  /// given value.
+  ///
+  /// Do not call this initializer directly. It is used by the compiler for
+  /// each string interpolation segment when you use string interpolation. For
+  /// example:
+  ///
+  ///     let s = "\(5) x \(2) = \(5 * 2)"
+  ///     print(s)
+  ///     // Prints "5 x 2 = 10"
+  ///
+  /// This initializer is called five times when processing the string literal
+  /// in the example above; once each for the following: the integer `5`, the
+  /// string `" x "`, the integer `2`, the string `" = "`, and the result of
+  /// the expression `5 * 2`.
+  ///
+  /// - Parameter expr: The expression to represent.
   init<T>(stringInterpolationSegment expr: T)
 }
 

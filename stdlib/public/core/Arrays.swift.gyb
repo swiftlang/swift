@@ -482,8 +482,8 @@ public struct ${Self}<Element>
 %end
   }
 
-  /// The array's "past the end" position, or one greater than the last valid
-  /// subscript argument.
+  /// The array's "past the end" position---that is, the position one greater
+  /// than the last valid subscript argument.
   ///
   /// When you need a range that includes the last element of an array, use the
   /// half-open range operator (`..<`) with `endIndex`. The `..<` operator
@@ -934,7 +934,7 @@ extension ${Self} : ArrayLiteralConvertible {
   // Optimized implementation for Array
   /// Creates an array from the given array literal.
   ///
-  /// Don't directly call this initializer, which is used by the compiler
+  /// Do not call this initializer directly. It is used by the compiler
   /// when you use an array literal. Instead, create a new array by using an
   /// array literal as its value. To do this, enclose a comma-separated list of
   /// values in square brackets.
@@ -951,7 +951,7 @@ extension ${Self} : ArrayLiteralConvertible {
 %else:
   /// Creates an array from the given array literal.
   ///
-  /// Don't directly call this initializer, which is used by the compiler when
+  /// Do not call this initializer directly. It is used by the compiler when
   /// you use an array literal. Instead, create a new array by using an array
   /// literal as its value. To do this, enclose a comma-separated list of
   /// values in square brackets.

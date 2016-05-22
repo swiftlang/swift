@@ -30,8 +30,8 @@ public enum ImplicitlyUnwrappedOptional<Wrapped> : NilLiteralConvertible {
 
   /// Creates an instance initialized with `nil`.
   ///
-  /// Don't use this initializer directly; it is used by the compiler when you
-  /// initialize an `Optional` instance with a `nil` literal. For example:
+  /// Do not call this initializer directly. It is used by the compiler when
+  /// you initialize an `Optional` instance with a `nil` literal. For example:
   ///
   ///     let i: Index! = nil
   @_transparent

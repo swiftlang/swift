@@ -19,13 +19,42 @@
 // allow performance optimizations of linear traversals.
 
 extension String {
-  /// A `String`'s collection of `Character`s ([extended grapheme
-  /// clusters](http://www.unicode.org/glossary/#extended_grapheme_cluster))
-  /// elements.
+  /// A view of a string's contents as a collection of characters.
+  ///
+  /// In Swift, every string provides a view of its contents as characters. In
+  /// this view, many individual characters---for example, "é", "김", and
+  /// "🇮🇳"---can be made up of multiple Unicode code points. These code points
+  /// are combined by Unicode's boundary algorithms into *extended grapheme
+  /// clusters*, represented by the `Character` type. Each element of a
+  /// `CharacterView` collection is a `Character` instance.
+  ///
+  ///     let flowers = "Flowers 💐"
+  ///     for c in flowers {
+  ///         print(c)
+  ///     }
+  ///     // F
+  ///     // l
+  ///     // o
+  ///     // w
+  ///     // e
+  ///     // r
+  ///     // s
+  ///     //
+  ///     // 💐
+  ///
+  /// You can convert a `String.CharacterView` instance back into a string
+  /// using the `String` type's `init(_:)` initializer.
+  ///
+  ///     let name = "Marie Curie"
+  ///     if let firstSpace = name.characters.index(of: " ") {
+  ///         let firstName = String(name.characters.prefix(upTo: firstSpace))
+  ///         print(firstName)
+  ///     }
+  ///     // Prints "Marie"
   public struct CharacterView {
     internal var _core: _StringCore
 
-    /// Create a view of the `Character`s in `text`.
+    /// Creates a view of the given string.
     public init(_ text: String) {
       self._core = text._core
     }
@@ -36,9 +65,7 @@ extension String {
     }
   }
 
-  /// A collection of `Characters` representing the `String`'s
-  /// [extended grapheme
-  /// clusters](http://www.unicode.org/glossary/#extended_grapheme_cluster).
+  /// A view of the string's contents as a collection of characters.
   public var characters: CharacterView {
     get {
       return CharacterView(self)
@@ -48,12 +75,34 @@ extension String {
     }
   }
 
-  /// Efficiently mutate `self` by applying `body` to its `characters`.
+  /// Applies the given closure to a mutable view of the string's characters.
   ///
-  /// - Warning: Do not rely on anything about `self` (the `String`
-  ///   that is the target of this method) during the execution of
-  ///   `body`: it may not appear to have its correct value.  Instead,
-  ///   use only the `String.CharacterView` argument to `body`.
+  /// Do not use the string that is the target of this method inside the
+  /// closure passed to `body`, as it may not have its correct value. 
+  /// Instead, use the closure's `String.CharacterView` argument.
+  ///
+  /// This example below uses the `withMutableCharacters(_:)` method to truncate
+  /// the string `str` at the first space and to return the remainder of the
+  /// string.
+  ///
+  ///     var str = "All this happened, more or less."
+  ///     let afterSpace = str.withMutableCharacters { chars -> String.CharacterView in
+  ///         if let i = chars.index(of: " ") {
+  ///             let result = chars.suffix(from: chars.index(after: i))
+  ///             chars.removeSubrange(i..<chars.endIndex)
+  ///             return result
+  ///         }
+  ///         return String.CharacterView()
+  ///     }
+  ///
+  ///     print(str)
+  ///     // Prints "All"
+  ///     print(String(afterSpace))
+  ///     // Prints "this happened, more or less."
+  ///
+  /// - Parameter body: A closure that takes a character view as its argument.
+  /// - Returns: The return value of the `body` closure, if any, is the return
+  ///   value of this method.
   public mutating func withMutableCharacters<R>(_ body: (inout CharacterView) -> R) -> R {
     // Naively mutating self.characters forces multiple references to
     // exist at the point of mutation. Instead, temporarily move the
@@ -65,8 +114,20 @@ extension String {
     return r
   }
 
-  /// Construct the `String` corresponding to the given sequence of
-  /// Unicode scalars.
+  /// Creates a string from the given character view.
+  ///
+  /// Use this initializer to recover a string after performing a collection
+  /// slicing operation on a character view.
+  ///
+  ///     let poem = "'Twas brillig, and the slithy toves / " +
+  ///                "Did gyre and gimbal in the wabe: / " +
+  ///                "All mimsy were the borogoves / " +
+  ///                "And the mome raths outgrabe."
+  ///     let excerpt = String(poem.characters.prefix(22)) + "..."
+  ///     print(excerpt)
+  ///     // Prints "'Twas brillig, and the..."
+  ///
+  /// - Parameter characters: A character view to convert to a string.
   public init(_ characters: CharacterView) {
     self.init(characters._core)
   }
@@ -79,7 +140,20 @@ extension String.CharacterView : BidirectionalCollection {
     return UnicodeScalarView(_core)
   }
   
-  /// A character position.
+  /// A position in a string's `CharacterView` instance.
+  ///
+  /// You can convert between indices of the different string views by using
+  /// conversion initializers and the `samePosition(in:)` method overloads.
+  /// The following example finds the index of the first space in the string's
+  /// character view and then converts that to the same position in the UTF-8
+  /// view:
+  ///
+  ///     let hearts = "Hearts <3 ♥︎ 💘"
+  ///     if let i = hearts.characters.index(of: " ") {
+  ///         let j = i.samePosition(in: hearts.utf8)
+  ///         print(Array(hearts.utf8.prefix(upTo: j)))
+  ///     }
+  ///     // Prints "[72, 101, 97, 114, 116, 115]"
   public struct Index : Comparable, CustomPlaygroundQuickLookable {
     public // SPI(Foundation)    
     init(_base: String.UnicodeScalarView.Index) {
@@ -198,17 +272,17 @@ extension String.CharacterView : BidirectionalCollection {
 
   public typealias IndexDistance = Int
 
-  /// The position of the first `Character` if `self` is
-  /// non-empty; identical to `endIndex` otherwise.
+  /// The position of the first character in a nonempty character view.
+  /// 
+  /// In an empty character view, `startIndex` is equal to `endIndex`.
   public var startIndex: Index {
     return Index(_base: unicodeScalars.startIndex)
   }
 
-  /// The "past the end" position.
+  /// A character view's "past the end" position---that is, the position one
+  /// greater than the last valid subscript argument.
   ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
-  /// `index(after:)`.
+  /// In an empty character view, `endIndex` is equal to `startIndex`.
   public var endIndex: Index {
     return Index(_base: unicodeScalars.endIndex)
   }
@@ -235,27 +309,44 @@ extension String.CharacterView : BidirectionalCollection {
         i._utf16Index - predecessorLengthUTF16, i._base._core))
   }
 
-  /// Access the `Character` at `position`.
+  /// Accesses the character at the given position.
   ///
-  /// - Precondition: `position` is a valid position in `self` and
-  ///   `position != endIndex`.
+  /// The following example searches a string's character view for a capital
+  /// letter and then prints the character at the found index:
+  ///
+  ///     let greeting = "Hello, friend!"
+  ///     if let i = greeting.characters.index(where: { "A"..."Z" ~= $0 }) {
+  ///         print("First capital letter: \(greeting.characters[i])")
+  ///     }
+  ///     // Prints "First capital letter: H"
+  ///
+  /// - Parameter position: A valid index of the character view. `position`
+  ///   must be less than the view's end index.
   public subscript(i: Index) -> Character {
     return Character(String(unicodeScalars[i._base..<i._endBase]))
   }
 }
 
 extension String.CharacterView : RangeReplaceableCollection {
-  /// Create an empty instance.
+  /// Creates an empty character view.
   public init() {
     self.init("")
   }
 
-  /// Replace the characters within `bounds` with `newElements`.
+  /// Replaces the characters within the specified bounds with the given
+  /// characters.
   ///
-  /// Invalidates all indices with respect to `self`.
+  /// Invalidates all indices with respect to the string.
   ///
-  /// - Complexity: O(`bounds.count`) if `bounds.upperBound
-  ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
+  /// - Parameters:
+  ///   - bounds: The range of characters to replace. The bounds of the range
+  ///     must be valid indices of the character view.
+  ///   - newElements: The new characters to add to the view.
+  ///
+  /// - Complexity: O(*m*), where *m* is the combined length of the character
+  ///   view and `newElements`. If the call to `replaceSubrange(_:with:)`
+  ///   simply removes characters at the end of the view, the complexity is
+  ///   O(*n*), where *n* is equal to `bounds.count`.
   public mutating func replaceSubrange<
     C: Collection where C.Iterator.Element == Character
   >(
@@ -268,16 +359,25 @@ extension String.CharacterView : RangeReplaceableCollection {
     _core.replaceSubrange(rawSubRange, with: lazyUTF16)
   }
 
-  /// Reserve enough space to store `n` ASCII characters.
+  /// Reserves enough space in the character view's underlying storage to store
+  /// the specified number of ASCII characters.
   ///
-  /// - Complexity: O(`n`).
+  /// Because each element of a character view can require more than a single
+  /// ASCII character's worth of storage, additional allocation may be
+  /// necessary when adding characters to the character view after a call to
+  /// `reserveCapacity(_:)`.
+  ///
+  /// - Parameter n: The minimum number of ASCII character's worth of storage
+  ///   to allocate.
+  ///
+  /// - Complexity: O(*n*), where *n* is the capacity being reserved.
   public mutating func reserveCapacity(_ n: Int) {
     _core.reserveCapacity(n)
   }
 
-  /// Append `c` to `self`.
+  /// Appends the given character to the character view.
   ///
-  /// - Complexity: Amortized O(1).
+  /// - Parameter c: The character to append to the character view.
   public mutating func append(_ c: Character) {
     switch c._representation {
     case .small(let _63bits):
@@ -288,7 +388,9 @@ extension String.CharacterView : RangeReplaceableCollection {
     }
   }
 
-  /// Append the elements of `newElements` to `self`.
+  /// Appends the characters in the given sequence to the character view.
+  /// 
+  /// - Parameter newElements: A sequence of characters.
   public mutating func append<
     S : Sequence where S.Iterator.Element == Character
   >(contentsOf newElements: S) {
@@ -298,7 +400,10 @@ extension String.CharacterView : RangeReplaceableCollection {
     }
   }
 
-  /// Create an instance containing `characters`.
+  /// Creates a new character view containing the characters in the given
+  /// sequence.
+  ///
+  /// - Parameter characters: A sequence of characters.
   public init<
     S : Sequence where S.Iterator.Element == Character
   >(_ characters: S) {
@@ -309,10 +414,19 @@ extension String.CharacterView : RangeReplaceableCollection {
 
 // Algorithms
 extension String.CharacterView {
-  /// Access the characters in `bounds`.
+  /// Accesses the characters in the given range.
   ///
-  /// - Complexity: O(1) unless bridging from Objective-C requires an
-  ///   O(N) conversion.
+  /// The example below uses this subscript to access the characters up to, but
+  /// not including, the first comma (`","`) in the string.
+  ///
+  ///     let str = "All this happened, more or less."
+  ///     let i = str.characters.index(of: ",")!
+  ///     let substring = str.characters[str.characters.startIndex ..< i]
+  ///     print(String(substring))
+  ///     // Prints "All this happened"
+  ///
+  /// - Complexity: O(*n*) if the underlying string is bridged from
+  ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
   public subscript(bounds: Range<Index>) -> String.CharacterView {
     let unicodeScalarRange =
       bounds.lowerBound._base..<bounds.upperBound._base
