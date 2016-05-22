@@ -503,10 +503,10 @@ public struct Set<Element : Hashable> :
     return _variantStorage.startIndex
   }
 
-  /// The "past the end" position for iterating members of the set.
+  /// The "past the end" position for the set---that is, the position one
+  /// greater than the last valid subscript argument.
   ///
-  /// The `endIndex` property is never a valid subscript argument. If the set
-  /// is empty, `endIndex` is equal to `startIndex`.
+  /// If the set is empty, `endIndex` is equal to `startIndex`.
   public var endIndex: Index {
     return _variantStorage.endIndex
   }
@@ -690,7 +690,7 @@ public struct Set<Element : Hashable> :
   //
   /// Creates a set containing the elements of the given array literal.
   ///
-  /// Don't directly call this initializer, which is used by the compiler when
+  /// Do not call this initializer directly. It is used by the compiler when
   /// you use an array literal. Instead, create a new set using an array
   /// literal as its value by enclosing a comma-separated list of values in
   /// square brackets. You can use an array literal anywhere a set is expected
@@ -1105,9 +1105,8 @@ public struct Set<Element : Hashable> :
   /// 
   /// Two sets that are equal will always have equal hash values.
   ///
-  /// - Note: The hash value is not guaranteed to be stable across
-  ///   different invocations of the same program. Do not persist the hash value
-  ///   across program runs.
+  /// Hash values are not guaranteed to be equal across different executions of
+  /// your program. Do not save hash values to use during a future execution.
   public var hashValue: Int {
     // FIXME: <rdar://problem/18915294> Cache Set<T> hashValue
     var result: Int = _mixInt(0)
@@ -1712,7 +1711,8 @@ public struct Dictionary<Key : Hashable, Value> :
     return _variantStorage.startIndex
   }
 
-  /// The dictionary's "past the end" position.
+  /// The dictionary's "past the end" position---that is, the position one
+  /// greater than the last valid subscript argument.
   ///
   /// If the collection is empty, `endIndex` is equal to `startIndex`.
   ///
@@ -1988,7 +1988,7 @@ public struct Dictionary<Key : Hashable, Value> :
 
   /// Creates a dictionary initialized with a dictionary literal.
   ///
-  /// Don't directly call this initializer, which is called by the compiler to
+  /// Do not call this initializer directly. It is called by the compiler to
   /// handle dictionary literals. To use a dictionary literal as the initial
   /// value of a dictionary, enclose a comma-separated list of key-value pairs
   /// in square brackets.

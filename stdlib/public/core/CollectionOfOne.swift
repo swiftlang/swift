@@ -50,10 +50,11 @@ public struct CollectionOfOne<Element>
     return 0
   }
 
-  /// The "past the end" position; always identical to
-  /// `index(after: startIndex)`.
+  /// The "past the end" position---that is, the position one greater than the
+  /// last valid subscript argument.
   ///
-  /// - Note: `endIndex` is not a valid argument to `subscript`.
+  /// In a `CollectionOfOne` instance, `endIndex` is always identical to
+  /// `index(after: startIndex)`.
   public var endIndex: Int {
     return 1
   }

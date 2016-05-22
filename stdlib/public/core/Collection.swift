@@ -38,8 +38,8 @@ public protocol IndexableBase {
   /// If the collection is empty, `startIndex` is equal to `endIndex`.
   var startIndex: Index { get }
 
-  /// The collection's "past the end" position, or one greater than the last
-  /// valid subscript argument.
+  /// The collection's "past the end" position---that is, the position one
+  /// greater than the last valid subscript argument.
   ///
   /// When you need a range that includes the last element of a collection, use
   /// the half-open range operator (`..<`) with `endIndex`. The `..<` operator
@@ -158,8 +158,11 @@ public protocol IndexableBase {
 /// In most cases, it's best to ignore this protocol and use the `Collection`
 /// protocol instead, because it has a more complete interface.
 public protocol Indexable : IndexableBase {
-  /// A type that can represent the number of steps between a pair of
-  /// indices.
+  /// A type used to represent the number of steps between two indices, where
+  /// one value is reachable from the other.
+  ///
+  /// In Swift, *reachability* refers to the ability to produce one value from
+  /// the other through zero or more applications of `index(after:)`.
   associatedtype IndexDistance : SignedInteger = Int
 
   /// Returns an index that is the specified distance from the given index.

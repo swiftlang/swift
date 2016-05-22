@@ -212,8 +212,8 @@ public struct CountableClosedRange<
     return ClosedRangeIndex(lowerBound)
   }
 
-  /// The range's "past the end" position, or one greater than the last valid
-  /// subscript argument.
+  /// The range's "past the end" position---that is, the position one greater
+  /// than the last valid subscript argument.
   public var endIndex: ClosedRangeIndex<Bound> {
     return ClosedRangeIndex()
   }

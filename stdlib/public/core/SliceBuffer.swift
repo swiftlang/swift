@@ -294,11 +294,11 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   /// In an empty collection, `startIndex == endIndex`.
   public var startIndex: Int
 
-  /// The collection's "past the end" position.
+  /// The collection's "past the end" position---that is, the position one
+  /// greater than the last valid subscript argument.
   ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
-  /// `index(after:)`.
+  /// `endIndex` is always reachable from `startIndex` by zero or more
+  /// applications of `index(after:)`.
   public var endIndex: Int {
     get {
       return Int(endIndexAndFlags >> 1)
