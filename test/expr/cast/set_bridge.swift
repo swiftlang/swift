@@ -77,18 +77,18 @@ func testForcedDowncastBridge() {
   let setD = Set<DerivesObjC>()
   let setB = Set<BridgedToObjC>()
 
-  setR as! Set<BridgedToObjC>
-  setO as! Set<BridgedToObjC>
-  setD as! Set<BridgedToObjC> // expected-error {{'ObjC' is not a subtype of 'DerivesObjC'}}
+  _ = setR as! Set<BridgedToObjC>
+  _ = setO as! Set<BridgedToObjC>
+  _ = setD as! Set<BridgedToObjC> // expected-error {{'ObjC' is not a subtype of 'DerivesObjC'}}
   // expected-note @-1 {{in cast from type 'Set<DerivesObjC>' to 'Set<BridgedToObjC>'}}
 
   // TODO: the diagnostic for the below two examples should indicate that 'as'
   // should be used instead of 'as!'
-  setB as! Set<Root> // expected-error {{'Root' is not a subtype of 'BridgedToObjC'}}
+  _ = setB as! Set<Root> // expected-error {{'Root' is not a subtype of 'BridgedToObjC'}}
   // expected-note @-1 {{in cast from type 'Set<BridgedToObjC>' to 'Set<Root>'}}
-  setB as! Set<ObjC> // expected-error {{'ObjC' is not a subtype of 'BridgedToObjC'}}
+  _ = setB as! Set<ObjC> // expected-error {{'ObjC' is not a subtype of 'BridgedToObjC'}}
   // expected-note @-1 {{in cast from type 'Set<BridgedToObjC>' to 'Set<ObjC>'}}
-  setB as! Set<DerivesObjC> // expected-error {{'DerivesObjC' is not a subtype of 'BridgedToObjC'}}
+  _ = setB as! Set<DerivesObjC> // expected-error {{'DerivesObjC' is not a subtype of 'BridgedToObjC'}}
   // expected-note @-1 {{in cast from type 'Set<BridgedToObjC>' to 'Set<DerivesObjC>'}}
 }
 

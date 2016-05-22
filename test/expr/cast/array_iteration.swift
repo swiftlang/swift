@@ -10,7 +10,7 @@ var rootView = View()
 var v = [View(), View()]
 rootView.subviews = v
 
-rootView.subviews as! [View]
+_ = rootView.subviews as! [View]
 
 for view in rootView.subviews as! [View] {
   doFoo()
@@ -22,12 +22,12 @@ for view:View in rootView.subviews { // expected-error{{type 'Array<AnyObject>!'
   doFoo()
 }
 
-(rootView.subviews!) as! [View]
+_ = (rootView.subviews!) as! [View]
 
-(rootView.subviews) as! [View]
+_ = (rootView.subviews) as! [View]
 
 var ao: [AnyObject] = []
-ao as! [View] // works
+_ = ao as! [View] // works
 
 
 var b = Array<(String, Int)>()

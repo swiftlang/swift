@@ -10,7 +10,7 @@ func takesGenericClosure<T>(_ a : Int, _ fn : @noescape () -> T) {}
 func takesNoEscapeClosure(_ fn : @noescape () -> Int) {
   takesNoEscapeClosure { 4 }  // ok
 
-  fn()  // ok
+  _ = fn()  // ok
 
   var x = fn  // expected-error {{@noescape parameter 'fn' may only be called}}
 
@@ -22,7 +22,7 @@ func takesNoEscapeClosure(_ fn : @noescape () -> Int) {
 
   // This is not ok, because it escapes the 'fn' closure.
   func nested_function() {
-    fn()   // expected-error {{declaration closing over @noescape parameter 'fn' may allow it to escape}}
+    _ = fn()   // expected-error {{declaration closing over @noescape parameter 'fn' may allow it to escape}}
   }
 
   takesNoEscapeClosure(fn)  // ok

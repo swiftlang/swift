@@ -52,9 +52,9 @@ func testFunctionsInClass(c1 : C1) {
   C1.f2Class()      // expected-warning {{result of call to 'f2Class()' is unused}}
   _ = C1.f2Class()  // okay
 
-  C1()              // expected-warning {{result of initializer is unused}}
+  C1()              // okay, marked @discardableResult
   _ = C1()          // okay
-  C1(foo: 5)        // expected-warning {{result of call to 'init(foo:)' is unused}}
+  C1(foo: 5)        // expected-warning {{result of 'C1' initializer is unused}}
   _ = C1(foo: 5)    // okay
 
   c1.f1()           // okay
@@ -82,12 +82,27 @@ func testFunctionsInStruct(s1 : S1) {
   S1.f2Static()     // expected-warning {{result of call to 'f2Static()' is unused}}
   _ = S1.f2Static() // okay
 
-  S1()              // expected-warning {{result of initializer is unused}}
+  S1()              // okay, marked @discardableResult
   _ = S1()          // okay
-  S1(foo: 5)        // expected-warning {{result of call to 'init(foo:)' is unused}}
+  S1(foo: 5)        // expected-warning {{result of 'S1' initializer is unused}}
   _ = S1(foo: 5)    // okay
 
   s1.f1()           // okay
   s1.f2()           // expected-warning {{result of call to 'f2()' is unused}}
   _ = s1.f2()       // okay
 }
+
+
+let x = 4
+"Hello \(x+1) world"  // expected-warning {{expression of type 'String' is unused}}
+
+func f(a : () -> Int) {
+  42  // expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
+  
+  4 + 5 // expected-warning {{result of operator '+' is unused}}
+  a() // expected-warning {{result of call is unused, but produces 'Int'}}
+}
+
+
+
+
