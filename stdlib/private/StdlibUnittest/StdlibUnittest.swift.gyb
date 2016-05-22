@@ -670,7 +670,7 @@ func _childProcess() {
 }
 
 struct _ParentProcess {
-  internal var _pid: pid_t = -1
+  internal var _pid: pid_t? = nil
   internal var _childStdin: _FDOutputStream = _FDOutputStream(fd: -1)
   internal var _childStdout: _FDInputStream = _FDInputStream(fd: -1)
   internal var _childStderr: _FDInputStream = _FDInputStream(fd: -1)
@@ -695,8 +695,8 @@ struct _ParentProcess {
   }
 
   mutating func _waitForChild() -> ProcessTerminationStatus {
-    let status = posixWaitpid(_pid)
-    _pid = -1
+    let status = posixWaitpid(_pid!)
+    _pid = nil
     _childStdin.close()
     _childStdout.close()
     _childStderr.close()
@@ -757,7 +757,7 @@ struct _ParentProcess {
   ) -> (anyExpectFailed: Bool, seenExpectCrash: Bool,
         status: ProcessTerminationStatus?,
         crashStdout: [String], crashStderr: [String]) {
-    if _pid <= 0 {
+    if _pid == nil {
       _spawnChild()
     }
 
