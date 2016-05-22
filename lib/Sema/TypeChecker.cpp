@@ -743,9 +743,22 @@ Type swift::lookUpTypeInContext(DeclContext *DC, StringRef Name) {
   }
 }
 
-static Optional<Type> getTypeOfCompletionContextExpr(TypeChecker &TC,
-                                                     DeclContext *DC,
-                                                     Expr *&parsedExpr) {
+static Optional<Type> getTypeOfCompletionContextExpr(
+                        TypeChecker &TC,
+                        DeclContext *DC,
+                        CompletionTypeCheckKind kind,
+                        Expr *&parsedExpr) {
+  switch (kind) {
+  case CompletionTypeCheckKind::Normal:
+    // Handle below.
+    break;
+
+  case CompletionTypeCheckKind::ObjCKeyPath:
+    if (auto keyPath = dyn_cast<ObjCKeyPathExpr>(parsedExpr))
+      return TC.checkObjCKeyPathExpr(DC, keyPath, /*requireResulType=*/true);
+
+    return None;
+  }
 
   CanType originalType = parsedExpr->getType().getCanonicalTypeOrNull();
   if (auto T = TC.getTypeOfExpressionWithoutApplying(parsedExpr, DC,
@@ -764,19 +777,21 @@ static Optional<Type> getTypeOfCompletionContextExpr(TypeChecker &TC,
 
 /// \brief Return the type of an expression parsed during code completion, or
 /// a null \c Type on error.
-Optional<Type> swift::getTypeOfCompletionContextExpr(ASTContext &Ctx,
-                                                     DeclContext *DC,
-                                                     Expr *&parsedExpr) {
+Optional<Type> swift::getTypeOfCompletionContextExpr(
+                        ASTContext &Ctx,
+                        DeclContext *DC,
+                        CompletionTypeCheckKind kind,
+                        Expr *&parsedExpr) {
 
   if (Ctx.getLazyResolver()) {
     TypeChecker *TC = static_cast<TypeChecker *>(Ctx.getLazyResolver());
-    return ::getTypeOfCompletionContextExpr(*TC, DC, parsedExpr);
+    return ::getTypeOfCompletionContextExpr(*TC, DC, kind, parsedExpr);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine diags(Ctx.SourceMgr);
     TypeChecker TC(Ctx, diags);
     // Try to solve for the actual type of the expression.
-    return ::getTypeOfCompletionContextExpr(TC, DC, parsedExpr);
+    return ::getTypeOfCompletionContextExpr(TC, DC, kind, parsedExpr);
   }
 }
 

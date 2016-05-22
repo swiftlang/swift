@@ -165,6 +165,14 @@ public:
   /// a dot.
   virtual void completeExprSuperDot(SuperRefExpr *SRE) = 0;
 
+  /// \brief Complete the argument to an Objective-C #keyPath
+  /// expression.
+  ///
+  /// \param KPE A partial #keyPath expression that can be used to
+  /// provide context. This will be \c NULL if no components of the
+  /// #keyPath argument have been parsed yet.
+  virtual void completeExprKeyPath(ObjCKeyPathExpr *KPE, bool HasDot) = 0;
+
   /// \brief Complete the beginning of type-simple -- no tokens provided
   /// by user.
   virtual void completeTypeSimpleBeginning() = 0;

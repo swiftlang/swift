@@ -1181,7 +1181,10 @@ public:
   bool typeCheckExpressionShallow(Expr *&expr, DeclContext *dc);
 
   /// Check the key-path expression.
-  ObjCKeyPathExpr *checkObjCKeyPathExpr(DeclContext *dc, ObjCKeyPathExpr *expr);
+  ///
+  /// Returns the type of the last component of the key-path.
+  Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, ObjCKeyPathExpr *expr,
+                                      bool requireResultType = false);
 
   /// \brief Type check whether the given type declaration includes members of
   /// unsupported recursive value types.

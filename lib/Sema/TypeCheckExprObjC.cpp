@@ -18,10 +18,11 @@
 #include "swift/Basic/Range.h"
 using namespace swift;
 
-ObjCKeyPathExpr *TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
-                                                   ObjCKeyPathExpr *expr) {
+Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
+                                                 ObjCKeyPathExpr *expr,
+                                                 bool requireResultType) {
   // If there is already a semantic expression, do nothing.
-  if (expr->getSemanticExpr()) return expr;
+  if (expr->getSemanticExpr() && !requireResultType) return None;
 
   // #keyPath only makes sense when we have the Objective-C runtime.
   if (!Context.LangOpts.EnableObjCInterop) {
@@ -30,7 +31,7 @@ ObjCKeyPathExpr *TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     expr->setSemanticExpr(
       new (Context) StringLiteralExpr("", expr->getSourceRange(),
                                       /*Implicit=*/true));
-    return expr;
+    return None;
   }
 
   // The key path string we're forming.
@@ -70,7 +71,7 @@ ObjCKeyPathExpr *TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     anyObjectType = anyObject->getDeclaredInterfaceType();
   } else {
     diagnose(expr->getLoc(), diag::stdlib_anyobject_not_found);
-    return expr;
+    return None;
   }
 
   // Local function to update the state after we've resolved a
@@ -332,10 +333,13 @@ ObjCKeyPathExpr *TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     diagnose(expr->getLoc(), diag::expr_keypath_empty);
 
   // Set the semantic expression.
-  expr->setSemanticExpr(
-    new (Context) StringLiteralExpr(Context.AllocateCopy(keyPathString),
-                                    expr->getSourceRange(),
-                                    /*Implicit=*/true));
-  return expr;
-}
+  if (!expr->getSemanticExpr()) {
+    expr->setSemanticExpr(
+      new (Context) StringLiteralExpr(Context.AllocateCopy(keyPathString),
+                                      expr->getSourceRange(),
+                                      /*Implicit=*/true));
+  }
 
+  if (!currentType) return None;
+  return currentType;
+}
