@@ -693,7 +693,7 @@ function(_add_swift_library_single target name)
 
   # Don't build standard libraries by default.  We will enable building
   # standard libraries that the user requested; the rest can be built on-demand.
-  if(SWIFTLIB_SINGLE_IS_STDLIB)
+  if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
     foreach(t "${target}" ${target_static})
       set_target_properties(${t} PROPERTIES EXCLUDE_FROM_ALL TRUE)
     endforeach()
@@ -1271,7 +1271,7 @@ function(add_swift_library name)
 
       # Add Swift standard library targets as dependencies to the top-level
       # convenience target.
-      if(SWIFTLIB_IS_STDLIB)
+      if(SWIFTLIB_TARGET_LIBRARY)
         foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
           set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
           if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
