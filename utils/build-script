@@ -93,7 +93,7 @@ def argparse_executable(string):
     if os.access(string, os.X_OK):
         return os.path.abspath(string)
     raise argparse.ArgumentTypeError(
-        "%r is not execuable" % string)
+        "%r is not executable" % string)
 
 
 # Main entry point for the preset mode.

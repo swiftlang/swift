@@ -78,7 +78,7 @@ func testKeyPath(a: A, b: B) {
   let _: String = #keyPath(A.propNSDict.anyKeyName)
   let _: String = #keyPath(A.propNSDict.anyKeyName.propA)
 
-  // NSSet property (AnyObject set elemtn).
+  // NSSet property (AnyObject set element).
   let _: String = #keyPath(A.propNSSet)
   let _: String = #keyPath(A.propNSSet.URLsInText)
 

@@ -4469,7 +4469,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
       SourceRange DoubleIdentifierRange(NameLoc, Tok.getLoc());
 
-      // Provide two fix-its: a direct concatentation of the two identifiers
+      // Provide two fix-its: a direct concatenation of the two identifiers
       // and a camel-cased version.
 
       auto DirectConcatenation = NameTok.getText().str() + Tok.getText().str();
