@@ -645,6 +645,12 @@ func _childProcess() {
 
   while let line = _stdlib_getline() {
     let parts = line._split(separator: ";")
+
+    if parts[0] == _stdlibUnittestStreamPrefix {
+      precondition(parts[1] == "shutdown")
+      return
+    }
+
     let testSuiteName = parts[0]
     let testName = parts[1]
     var testParameter: Int?
@@ -865,6 +871,42 @@ struct _ParentProcess {
       capturedCrashStdout, capturedCrashStderr)
   }
 
+  internal mutating func _shutdownChild() -> (failed: Bool, Void) {
+    if _pid == nil {
+      // The child process is not running.  Report that it didn't fail during
+      // shutdown.
+      return (failed: false, ())
+    }
+    print("\(_stdlibUnittestStreamPrefix);shutdown", to: &_childStdin)
+
+    var childCrashed = false
+
+    func processLine(_ line: String, isStdout: Bool) -> (done: Bool, Void) {
+      if isStdout {
+        print("stdout>>> \(line)")
+      } else {
+        if findSubstring(line, _crashedPrefix) != nil {
+          childCrashed = true
+        }
+        print("stderr>>> \(line)")
+      }
+      return (done: false, ())
+    }
+
+    _readFromChild(
+      onStdoutLine: { processLine($0, isStdout: true) },
+      onStderrLine: { processLine($0, isStdout: false) })
+
+    let status = _waitForChild()
+    switch status {
+    case .exit(0):
+      return (failed: childCrashed, ())
+    default:
+      print("Abnormal child process termination: \(status).")
+      return (failed: true, ())
+    }
+  }
+
   internal enum _TestStatus {
     case skip([TestRunPredicate])
     case pass
@@ -1023,6 +1065,11 @@ struct _ParentProcess {
       } else {
         print("\(testSuite.name): All tests passed")
       }
+    }
+    let (failed: failedOnShutdown, ()) = _shutdownChild()
+    if failedOnShutdown {
+      print("The child process failed during shutdown, aborting.")
+      _testSuiteFailedCallback()
     }
   }
 }
