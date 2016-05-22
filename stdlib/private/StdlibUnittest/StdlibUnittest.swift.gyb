@@ -706,6 +706,49 @@ struct _ParentProcess {
     return status
   }
 
+  internal mutating func _readFromChild(
+    onStdoutLine: (String) -> Bool,
+    onStderrLine: (String) -> Bool
+  ) {
+    var readfds = _stdlib_fd_set()
+    var writefds = _stdlib_fd_set()
+    var errorfds = _stdlib_fd_set()
+    var done = false
+    while !((_childStdout.isEOF && _childStderr.isEOF) || done) {
+      readfds.zero()
+      errorfds.zero()
+      if !_childStdout.isEOF {
+        readfds.set(_childStdout.fd)
+        errorfds.set(_childStdout.fd)
+      }
+      if !_childStderr.isEOF {
+        readfds.set(_childStderr.fd)
+        errorfds.set(_childStderr.fd)
+      }
+      var ret: CInt
+      repeat {
+        ret = _stdlib_select(&readfds, &writefds, &errorfds, nil)
+      } while ret == -1  &&  errno == EINTR
+      if ret <= 0 {
+        fatalError("select() returned an error")
+      }
+      if readfds.isset(_childStdout.fd) || errorfds.isset(_childStdout.fd) {
+        _childStdout.read()
+        while let line = _childStdout.getline() {
+          done = onStdoutLine(line)
+        }
+        continue
+      }
+      if readfds.isset(_childStderr.fd) || errorfds.isset(_childStderr.fd) {
+        _childStderr.read()
+        while let line = _childStderr.getline() {
+          done = onStderrLine(line)
+        }
+        continue
+      }
+    }
+  }
+
   /// Returns the values of the corresponding variables in the child process.
   internal mutating func _runTestInChild(
     _ testSuite: TestSuite,
@@ -733,9 +776,6 @@ struct _ParentProcess {
       _childStdin.close()
     }
 
-    var readfds = _stdlib_fd_set()
-    var writefds = _stdlib_fd_set()
-    var errorfds = _stdlib_fd_set()
     var stdoutSeenCrashDelimiter = false
     var stderrSeenCrashDelimiter = false
     var stdoutEnd = false
@@ -743,84 +783,58 @@ struct _ParentProcess {
     var capturedCrashStdout: [String] = []
     var capturedCrashStderr: [String] = []
     var anyExpectFailedInChild = false
-    while !((_childStdout.isEOF && _childStderr.isEOF) ||
-      (stdoutEnd && stderrEnd)) {
 
-      readfds.zero()
-      errorfds.zero()
-      if !_childStdout.isEOF {
-        readfds.set(_childStdout.fd)
-        errorfds.set(_childStdout.fd)
-      }
-      if !_childStderr.isEOF {
-        readfds.set(_childStderr.fd)
-        errorfds.set(_childStderr.fd)
-      }
-      var ret: CInt
-      repeat {
-        ret = _stdlib_select(&readfds, &writefds, &errorfds, nil)
-      } while ret == -1  &&  errno == EINTR
-      if ret <= 0 {
-        fatalError("select() returned an error")
-      }
-      if readfds.isset(_childStdout.fd) || errorfds.isset(_childStdout.fd) {
-        _childStdout.read()
-        while var line = _childStdout.getline() {
-          if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
-            let controlMessage =
-                line[index..<line.endIndex]._split(separator: ";")
-            switch controlMessage[1] {
-            case "expectCrash":
-              stdoutSeenCrashDelimiter = true
-              anyExpectFailedInChild = controlMessage[2] == "true"
-            case "end":
-              stdoutEnd = true
-              anyExpectFailedInChild = controlMessage[2] == "true"
-            default:
-              fatalError("unexpected message")
-            }
-            line = line[line.startIndex..<index]
-            if line.isEmpty {
-              continue
-            }
+    func processLine(_ line: String, isStdout: Bool) -> Bool {
+      var line = line
+      if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
+        let controlMessage =
+            line[index..<line.endIndex]._split(separator: ";")
+        switch controlMessage[1] {
+        case "expectCrash":
+          if isStdout {
+            stdoutSeenCrashDelimiter = true
+            anyExpectFailedInChild = controlMessage[2] == "true"
+          } else {
+            stderrSeenCrashDelimiter = true
           }
-          if stdoutSeenCrashDelimiter {
-            capturedCrashStdout.append(line)
+        case "end":
+          if isStdout {
+            stdoutEnd = true
+            anyExpectFailedInChild = controlMessage[2] == "true"
+          } else {
+            stderrEnd = true
           }
-          print("stdout>>> \(line)")
+        default:
+          fatalError("unexpected message")
         }
-        continue
-      }
-      if readfds.isset(_childStderr.fd) || errorfds.isset(_childStderr.fd) {
-        _childStderr.read()
-        while var line = _childStderr.getline() {
-          if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
-            let controlMessage =
-                line[index..<line.endIndex]._split(separator: ";")
-            switch controlMessage[1] {
-            case "expectCrash":
-              stderrSeenCrashDelimiter = true
-            case "end":
-              stderrEnd = true
-            default:
-              fatalError("unexpected message")
-            }
-            line = line[line.startIndex..<index]
-            if line.isEmpty {
-              continue
-            }
-          }
-          if stderrSeenCrashDelimiter {
-            capturedCrashStderr.append(line)
-            if findSubstring(line, _crashedPrefix) != nil {
-              line = "OK: saw expected \"\(line.lowercased())\""
-            }
-          }
-          print("stderr>>> \(line)")
+        line = line[line.startIndex..<index]
+        if line.isEmpty {
+          return stdoutEnd && stderrEnd
         }
-        continue
       }
+      if isStdout {
+        if stdoutSeenCrashDelimiter {
+          capturedCrashStdout.append(line)
+        }
+      } else {
+        if stderrSeenCrashDelimiter {
+          capturedCrashStderr.append(line)
+          if findSubstring(line, _crashedPrefix) != nil {
+            line = "OK: saw expected \"\(line.lowercased())\""
+          }
+        }
+      }
+      if isStdout {
+        print("stdout>>> \(line)")
+      } else {
+        print("stderr>>> \(line)")
+      }
+      return stdoutEnd && stderrEnd
     }
+
+    _readFromChild(
+      onStdoutLine: { processLine($0, isStdout: true) },
+      onStderrLine: { processLine($0, isStdout: false) })
 
     // Check if the child has sent us "end" markers for the current test.
     if stdoutEnd && stderrEnd {
