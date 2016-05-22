@@ -77,7 +77,7 @@ SILFunctionType::getSILArgumentConvention(unsigned index) const {
 
 enum class InoutAliasingAssumption {
   /// Assume that an inout indirect parameter may alias other objects.
-  /// This is the safe assumption an optimizations should make if it may break
+  /// This is the safe assumption an optimization should make if it may break
   /// memory safety in case the inout aliasing rule is violation.
   Aliasing,
 

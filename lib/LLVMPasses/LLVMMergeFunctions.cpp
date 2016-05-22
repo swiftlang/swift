@@ -205,7 +205,7 @@ private:
   /// Let's explain the order. Float numbers will be less than integers, just
   /// because of cmpType terms: FloatTyID < IntegerTyID.
   /// Floats (with same fltSemantics) are sorted according to their value.
-  /// Then you can see integers, and they are, like a floats,
+  /// Then you can see integers, and they are, like floats, which
   /// could be easy sorted among each others.
   /// The structures. Structures are grouped at the tail, again because of their
   /// TypeID: StructTyID > IntegerTyID > FloatTyID.
