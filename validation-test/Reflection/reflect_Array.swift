@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-build-swift -Xfrontend -enable-reflection-metadata -Xfrontend -enable-reflection-names -lswiftSwiftReflectionTest %s -o %t/reflect_Array
+// RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_Array
 // RUN: %target-run %target-swift-reflection-test %t/reflect_Array 2>&1 | FileCheck %s --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
 
@@ -25,11 +25,11 @@ reflect(object: obj)
 // CHECK-64: (class_instance size=24 alignment=16 stride=32 num_extra_inhabitants=0
 // CHECK-64:   (field name=t offset=16
 // CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1
-// CHECK-64:       (field offset=0
+// CHECK-64:       (field name=_buffer offset=0
 // CHECK-64:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1
-// CHECK-64:           (field offset=0
+// CHECK-64:           (field name=_storage offset=0
 // CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1
-// CHECK-64:               (field offset=0
+// CHECK-64:               (field name=rawValue offset=0
 // CHECK-64:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1)))))))))
 
 // CHECK-32: Reflecting an object.
@@ -41,11 +41,11 @@ reflect(object: obj)
 // CHECK-32: (class_instance size=16 alignment=16 stride=16 num_extra_inhabitants=0
 // CHECK-32:   (field name=t offset=12
 // CHECK-32:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
-// CHECK-32:       (field offset=0
+// CHECK-32:       (field name=_buffer offset=0
 // CHECK-32:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
-// CHECK-32:           (field offset=0
+// CHECK-32:           (field name=_storage offset=0
 // CHECK-32:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
-// CHECK-32:               (field offset=0
+// CHECK-32:               (field name=rawValue offset=0
 // CHECK-32:                 (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1)))))))))
 
 reflect(any: obj)
