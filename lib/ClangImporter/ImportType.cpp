@@ -63,7 +63,7 @@ namespace {
       /// The source type is 'Boolean'.
       Boolean,
 
-      /// The source type an Objective-C class type bridged to a Swift
+      /// The source type is an Objective-C class type bridged to a Swift
       /// type.
       ObjCBridged,
 
@@ -565,6 +565,15 @@ namespace {
           hint = ImportHint::SwiftNewtypeFromCFPointer;
         else
           hint = ImportHint::SwiftNewtype;
+
+        // If the underlying type was bridged, the wrapper type is
+        // only useful in bridged cases.
+        auto underlying = Visit(type->getDecl()->getUnderlyingType());
+        if (underlying.Hint == ImportHint::ObjCBridged) {
+          return { underlying.AbstractType,
+                   ImportHint(ImportHint::ObjCBridged, mappedType) };
+        }
+
       // For certain special typedefs, we don't want to use the imported type.
       } else if (auto specialKind = Impl.getSpecialTypedefKind(type->getDecl())) {
         switch (specialKind.getValue()) {
@@ -1187,7 +1196,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   }
 
   // For types we import as new types in Swift, if the use is CF un-audited,
-  // then we have to for it to be unmanaged
+  // then we have to force it to be unmanaged
   if (hint == ImportHint::SwiftNewtypeFromCFPointer &&
       !isCFAudited(importKind)) {
     auto underlyingType = importedType->getSwiftNewtypeUnderlyingType();
