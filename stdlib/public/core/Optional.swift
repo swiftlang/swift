@@ -514,3 +514,15 @@ public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T?)
     return try defaultValue()
   }
 }
+
+extension Optional {
+  @available(*, unavailable, renamed: "none")
+  public static var None: Optional<Wrapped> {
+    Builtin.unreachable()
+  }
+  @available(*, unavailable, renamed: "some")
+  public static func Some(_: Wrapped) -> Optional<Wrapped> {
+    Builtin.unreachable()
+  }
+
+}
