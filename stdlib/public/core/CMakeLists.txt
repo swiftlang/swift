@@ -114,6 +114,7 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeScalar.swift
   UnicodeTrie.swift.gyb
   Unmanaged.swift
+  UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
   UnsafePointer.swift.gyb
   WriteBackMutableSlice.swift
