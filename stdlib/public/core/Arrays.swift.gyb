@@ -1306,7 +1306,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// to an array of integers.
   ///
   ///     var numbers = [1, 2, 3, 4, 5]
-  ///     numbers.appendContents(of: 10...15)
+  ///     numbers.append(contentsOf: 10...15)
   ///     print(numbers)
   ///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
   ///
@@ -1340,7 +1340,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// to an array of integers.
   ///
   ///     var numbers = [1, 2, 3, 4, 5]
-  ///     numbers.appendContents(of: 10...15)
+  ///     numbers.append(contentsOf: 10...15)
   ///     print(numbers)
   ///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
   ///
