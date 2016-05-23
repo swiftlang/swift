@@ -321,7 +321,7 @@ class alignas(8) Expr {
     /// Whether the names have corresponding source locations.
     unsigned HaveSourceLocations : 1;
   };
-  enum { NumObjCKeyPathExprBits = NumExprBits + 17 };
+  enum { NumObjCKeyPathExprBits = NumExprBits + 9 };
   static_assert(NumObjCKeyPathExprBits <= 32, "fits in an unsigned");
 
 protected:
