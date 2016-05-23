@@ -27,7 +27,7 @@ internal struct _UnsafeBitMap {
     return UInt(bitPattern: i) % UInt(UInt._sizeInBits)
   }
 
-  internal static func sizeInWords(forCapacity bitCount: Int) -> Int {
+  internal static func sizeInWords(forSizeInBits bitCount: Int) -> Int {
     return bitCount + Int._sizeInBytes - 1 / Int._sizeInBytes
   }
 
@@ -37,7 +37,7 @@ internal struct _UnsafeBitMap {
   }
 
   internal var numberOfWords: Int {
-    return _UnsafeBitMap.sizeInWords(forCapacity: bitCount)
+    return _UnsafeBitMap.sizeInWords(forSizeInBits: bitCount)
   }
 
   internal func initializeToZero() {

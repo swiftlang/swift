@@ -2490,7 +2490,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   /// Returns the bytes necessary to store a bit map of 'capacity' bytes and
   /// padding to align the start to word alignment.
   internal static func bytesForBitMap(capacity: Int) -> Int {
-    let numWords = _UnsafeBitMap.sizeInWords(forCapacity: capacity)
+    let numWords = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
     return numWords * strideof(UInt) + alignof(UInt)
   }
 
@@ -2554,7 +2554,9 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 
   internal var _keys: UnsafeMutablePointer<Key> {
     let bitMapSizeInBytes =
-      _unsafeMultiply(_UnsafeBitMap.sizeInWords(forCapacity: _capacity), strideof(UInt))
+      _unsafeMultiply(
+        _UnsafeBitMap.sizeInWords(forSizeInBits: _capacity),
+        strideof(UInt))
     let start =
       UnsafeMutablePointer<UInt8>(_initializedHashtableEntriesBitMapStorage)
       + bitMapSizeInBytes
