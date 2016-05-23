@@ -77,10 +77,20 @@ namespace swift {
   /// \returns True on applied, false on not applied.
   bool isExtensionApplied(DeclContext &DC, Type Ty, const ExtensionDecl *ED);
 
+/// The kind of type checking to perform for code completion.
+  enum class CompletionTypeCheckKind {
+    /// Type check the expression as normal.
+    Normal,
+
+    /// Type check the argument to an Objective-C #keyPath.
+    ObjCKeyPath,
+  };
+
   /// \brief Return the type of an expression parsed during code completion, or
   /// None on error.
   Optional<Type> getTypeOfCompletionContextExpr(ASTContext &Ctx,
                                                 DeclContext *DC,
+                                                CompletionTypeCheckKind kind,
                                                 Expr *&parsedExpr);
 
   /// Typecheck the sequence expression \p parsedExpr for code completion.

@@ -487,6 +487,8 @@ enum class CompletionKind {
   PostfixExprParen,
   SuperExpr,
   SuperExprDot,
+  KeyPathExpr,
+  KeyPathExprDot,
   TypeSimpleBeginning,
   TypeIdentifierWithDot,
   TypeIdentifierWithoutDot,
