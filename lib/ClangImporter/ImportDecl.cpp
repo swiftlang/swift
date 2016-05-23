@@ -1351,14 +1351,14 @@ namespace {
                              DeclContext *dc, Identifier name) {
       // The only (current) difference between swift_newtype(struct) and
       // swift_newtype(enum), until we can get real enum support, is that enums
-      // have no un-labeld inits(). This is because enums are to be considered
+      // have no un-labeled inits(). This is because enums are to be considered
       // closed, and if constructed from a rawValue, should be very explicit.
       bool unlabeledCtor = false;
 
       switch (newtypeAttr->getNewtypeKind()) {
       case clang::SwiftNewtypeAttr::NK_Enum:
         unlabeledCtor = false;
-        // TODO: import as closed enum instead
+        // TODO: import as enum instead
         break;
 
       case clang::SwiftNewtypeAttr::NK_Struct:
@@ -1805,10 +1805,10 @@ namespace {
 
       //
       // Create a computed value variable
-      auto computedVar =
-          new (cxt) VarDecl(/*static*/ false,
-                            /*IsLet*/ false, SourceLoc(), computedVarName,
-                            bridgedType, structDecl);
+      auto computedVar = new (cxt) VarDecl(/*static*/ false,
+                                           /*IsLet*/ false, SourceLoc(),
+                                           computedVarName, bridgedType,
+                                           structDecl);
       computedVar->setImplicit();
       computedVar->setAccessibility(Accessibility::Public);
       computedVar->setSetterAccessibility(Accessibility::Private);
@@ -1823,15 +1823,19 @@ namespace {
           cxt, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
           computedVarPattern, nullptr, structDecl);
 
+      // Don't bother synthesizing the body if we've already finished
+      // type-checking.
+      bool wantBody = !Impl.hasFinishedTypeChecking();
+
       auto init = createRawValueBridgingConstructor(
           structDecl, computedVar, storedVar,
-          /*wantLabel*/ true, !Impl.hasFinishedTypeChecking());
+          /*wantLabel*/ true, wantBody);
 
       ConstructorDecl *unlabeledCtor = nullptr;
       if (makeUnlabeledValueInit)
         unlabeledCtor = createRawValueBridgingConstructor(
             structDecl, computedVar, storedVar,
-            /*wantLabel*/ false, !Impl.hasFinishedTypeChecking());
+            /*wantLabel*/ false, wantBody);
 
       structDecl->setHasDelayedMembers();
       if (unlabeledCtor)
