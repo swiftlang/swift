@@ -113,6 +113,9 @@ static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
 
 static bool canUseStaticDispatch(SILGenFunction &gen,
                                  SILDeclRef constant) {
+  if (constant.isForeign)
+    return false;
+
   auto *funcDecl = cast<AbstractFunctionDecl>(constant.getDecl());
   auto thisModule = gen.SGM.M.getSwiftModule();
   return funcDecl->isFinal() || (thisModule == funcDecl->getModuleContext());
@@ -335,6 +338,9 @@ public:
                                SILDeclRef name,
                                CanAnyFunctionType substFormalType,
                                SILLocation l) {
+    while (auto *UI = dyn_cast<UpcastInst>(selfValue))
+      selfValue = UI->getOperand();
+
     return Callee(Kind::SuperMethod, gen, selfValue, name,
                   substFormalType, l);
   }
@@ -1296,14 +1302,9 @@ public:
     setSelfParam(ArgumentSource(arg, RValue(SGF, apply, superFormalType, super)),
                  apply);
 
-    if (constant.isForeign || !canUseStaticDispatch(SGF, constant)) {
-      // All Objective-C methods and
-      // non-final native Swift methods use dynamic dispatch.
-      SILValue Input = super.getValue();
-      while (auto *UI = dyn_cast<UpcastInst>(Input))
-        Input = UI->getOperand();
+    if (!canUseStaticDispatch(SGF, constant)) {
       // ObjC super calls require dynamic dispatch.
-      setCallee(Callee::forSuperMethod(SGF, Input, constant,
+      setCallee(Callee::forSuperMethod(SGF, super.getValue(), constant,
                                        getSubstFnType(), fn));
     } else {
       // Native Swift super calls to final methods are direct.
@@ -4375,16 +4376,12 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
   // perform a dynamic dispatch.
   auto self = selfValue.forceAndPeekRValue(gen).peekScalarValue();
   if (!isSuper)
-    return Callee::forClassMethod(gen, self, constant, substAccessorType,
-                                  loc);
+    return Callee::forClassMethod(gen, self, constant, substAccessorType, loc);
 
   // If this is a "super." dispatch, we do a dynamic dispatch for objc methods
   // or non-final native Swift methods.
-  while (auto *upcast = dyn_cast<UpcastInst>(self))
-    self = upcast->getOperand();
-
-  if (constant.isForeign || !canUseStaticDispatch(gen, constant))
-    return Callee::forSuperMethod(gen, self, constant, substAccessorType,loc);
+  if (!canUseStaticDispatch(gen, constant))
+    return Callee::forSuperMethod(gen, self, constant, substAccessorType, loc);
 
   return Callee::forDirect(gen, constant, substAccessorType, loc);
 }
