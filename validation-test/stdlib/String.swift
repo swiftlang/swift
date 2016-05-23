@@ -205,6 +205,22 @@ StringTests.test("ForeignIndexes/subscript(Index)/OutOfBoundsTrap") {
   acceptor[i]
 }
 
+StringTests.test("String/subscript(_:Range)") {
+  let s = "foobar"
+  let from = s.startIndex
+  let to = s.index(before: s.endIndex)
+  let actual = s[from..<to]
+  expectEqual("fooba", actual)
+}
+
+StringTests.test("String/subscript(_:ClosedRange)") {
+  let s = "foobar"
+  let from = s.startIndex
+  let to = s.index(before: s.endIndex)
+  let actual = s[from...to]
+  expectEqual(s, actual)
+}
+
 StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/1") {
   let donor = "abcdef"
   let acceptor = "uvw"
