@@ -128,7 +128,7 @@ func missingControllingExprInRepeatWhile() {
   }
 
   repeat {
-  } while { true }() // expected-error{{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{10-10=;}}
+  } while { true }() // expected-error{{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{10-10=;}} expected-warning {{result of call is unused, but produces 'Bool'}}
 }
 
 // SR-165
@@ -405,6 +405,7 @@ struct MissingInitializer1 {
 
 func exprPostfix1(x : Int) {
   x. // expected-error {{expected member name following '.'}}
+    // expected-warning @-1 {{expression of type 'Int' is unused}}
 }
 
 func exprPostfix2() {
@@ -623,6 +624,7 @@ func test23086402(a: A23086402) {
 func test23719432() {
   var x = 42
   &(Int:x)  // expected-error {{'&' can only appear immediately in a call argument list}}
+  // expected-warning @-1 {{expression of type 'inout (Int: Int)' is unused}}
 }
 
 // <rdar://problem/19911096> QoI: terrible recovery when using '·' for an operator
@@ -644,6 +646,7 @@ func postfixDot(a : String) {
   _ = a.   utf8  // expected-error {{extraneous whitespace after '.' is not permitted}} {{9-12=}}
   _ = a.       // expected-error {{expected member name following '.'}}
     a.         // expected-error {{expected member name following '.'}}
+  // expected-warning @-1 {{expression of type 'String' is unused}}
 }
 
 // <rdar://problem/23036383> QoI: Invalid trailing closures in stmt-conditions produce lowsy diagnostics

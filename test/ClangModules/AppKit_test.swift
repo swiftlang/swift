@@ -15,8 +15,8 @@ class MyDocument : NSDocument {
 }
 
 func test(_ URL: NSURL, controller: NSDocumentController) {
-  try! NSDocument(contentsOf: URL, ofType: "") // expected-warning{{unused}}
-  try! MyDocument(contentsOf: URL, ofType: "")
+  try! NSDocument(contentsOf: URL, ofType: "") // expected-warning{{result of 'NSDocument' initializer is unused}}
+  try! MyDocument(contentsOf: URL, ofType: "") // expected-warning {{expression of type 'MyDocument' is unused}}
 
   try! controller.makeDocument(withContentsOf: URL, ofType: "")
 }

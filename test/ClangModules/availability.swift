@@ -14,6 +14,7 @@ func test_unavailable_instance_method(_ x : NSObject) -> Bool {
 }
 
 func test_unavailable_method_in_protocol(_ x : NSObjectProtocol) {
+  // expected-warning @+1 {{expression of type 'NSObjectProtocol' is unused}}
   x.retain() // expected-error {{'retain()' is unavailable}}
 }
 func test_unavailable_method_in_protocol_use_class_instance(_ x : NSObject) {
@@ -34,8 +35,8 @@ func test_NSInvocation(_ x: NSInvocation,         // expected-error {{'NSInvocat
 
 func test_class_avail(_ x:NSObject, obj: AnyObject) {
   x.`class`() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}} expected-warning {{result of call to 'class()' is unused}}
-  NSObject.`class`() // expected-error {{'class()' is unavailable in Swift: use 'self' instead}} expected-warning {{result of call to 'class()' is unused}}
-  obj.`class`!() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}}
+  _ = NSObject.`class`() // expected-error {{'class()' is unavailable in Swift: use 'self' instead}}
+  _ = obj.`class`!() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}}
 }
 
 func test_unavailable_app_extension() {
@@ -100,7 +101,7 @@ func test_DistributedObjects(_ o: NSObject,
 
   let ca = NSConnectionDidDieNotification // expected-error {{'NSConnectionDidDieNotification' is unavailable in Swift: Use NSXPCConnection instead}}
   let cc = NSConnectionReplyMode // expected-error {{'NSConnectionReplyMode' is unavailable in Swift: Use NSXPCConnection instead}}
-  o.classForPortCoder // expected-error {{'classForPortCoder' is unavailable in Swift: Use NSXPCConnection instead}}
+  _ = o.classForPortCoder // expected-error {{'classForPortCoder' is unavailable in Swift: Use NSXPCConnection instead}}
 }
 
 func test_NSCalendarDate(_ o: NSCalendarDate) {} // expected-error {{'NSCalendarDate' is unavailable in Swift: Use NSCalendar and NSDateComponents and NSDateFormatter instead}}

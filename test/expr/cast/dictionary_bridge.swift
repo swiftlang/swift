@@ -111,19 +111,19 @@ func testDowncastBridge() {
   let dictOB = Dictionary<ObjC, BridgedToObjC>()
 
   // Downcast to bridged value types.
-  dictRR as! Dictionary<BridgedToObjC, BridgedToObjC>
-  dictRR as! Dictionary<BridgedToObjC, ObjC>
-  dictRR as! Dictionary<ObjC, BridgedToObjC>
+  _ = dictRR as! Dictionary<BridgedToObjC, BridgedToObjC>
+  _ = dictRR as! Dictionary<BridgedToObjC, ObjC>
+  _ = dictRR as! Dictionary<ObjC, BridgedToObjC>
 
-  dictRO as! Dictionary<BridgedToObjC, BridgedToObjC>
-  dictRO as! Dictionary<BridgedToObjC, ObjC>
-  dictRO as! Dictionary<ObjC, BridgedToObjC>
+  _ = dictRO as! Dictionary<BridgedToObjC, BridgedToObjC>
+  _ = dictRO as! Dictionary<BridgedToObjC, ObjC>
+  _ = dictRO as! Dictionary<ObjC, BridgedToObjC>
 
-  dictBO as! Dictionary<BridgedToObjC, BridgedToObjC>
-  dictOB as! Dictionary<BridgedToObjC, BridgedToObjC>
+  _ = dictBO as! Dictionary<BridgedToObjC, BridgedToObjC>
+  _ = dictOB as! Dictionary<BridgedToObjC, BridgedToObjC>
 
   // We don't do mixed down/upcasts.
-  dictDO as! Dictionary<BridgedToObjC, BridgedToObjC> // expected-error{{'Dictionary<DerivesObjC, ObjC>' is not convertible to 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
+  _ = dictDO as! Dictionary<BridgedToObjC, BridgedToObjC> // expected-error{{'Dictionary<DerivesObjC, ObjC>' is not convertible to 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
 }
 
 func testConditionalDowncastBridge() {

@@ -328,7 +328,7 @@ func testMyEnumWithCaseLabels(_ a : MyEnumWithCaseLabels) {
 func test_defer(_ a : Int) {
   
   defer { VoidReturn1() }
-  defer { breakContinue(1)+42 } // expected-warning {{result of call to '+' is unused}}
+  defer { breakContinue(1)+42 } // expected-warning {{result of operator '+' is unused}}
   
   // Ok:
   defer { while false { break } }

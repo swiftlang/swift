@@ -45,6 +45,8 @@ class C {
 	var a = A()
 
 	func act() {
-		a.dispatch({() -> Void in self.prop})
+		a.dispatch({() -> Void in
+                  self.prop // expected-warning {{expression of type 'Int' is unused}}
+                })
 	}
 }

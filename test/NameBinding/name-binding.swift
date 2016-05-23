@@ -225,7 +225,7 @@ struct Matrix4<T: FloatingPoint> {
 func r19558785() {
   let b = 10
   for b in 0...b {
-    b
+    _ = b
   }
 }
 

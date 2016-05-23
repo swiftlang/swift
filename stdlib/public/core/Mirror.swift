@@ -821,7 +821,7 @@ extension DictionaryLiteral : RandomAccessCollection {
   /// `endIndex`.
   public var startIndex: Int { return 0 }
 
-  /// The collection's "past the end" position, or one
+  /// The collection's "past the end" position---that is, the position one
   /// greater than the last valid subscript argument.
   ///
   /// If the `DictionaryLiteral` instance is empty, `endIndex` is equal to
@@ -845,16 +845,44 @@ extension DictionaryLiteral : RandomAccessCollection {
 }
 
 extension String {
-  /// Initialize `self` with the textual representation of `instance`.
+  /// Creates a string representing the given value.
   ///
-  /// * If `Subject` conforms to `Streamable`, the result is obtained by
-  ///   calling `instance.write(to: s)` on an empty string `s`.
-  /// * Otherwise, if `Subject` conforms to `CustomStringConvertible`, the
-  ///   result is `instance`'s `description`
-  /// * Otherwise, if `Subject` conforms to `CustomDebugStringConvertible`,
-  ///   the result is `instance`'s `debugDescription`
-  /// * Otherwise, an unspecified result is supplied automatically by
-  ///   the Swift standard library.
+  /// Use this initializer to convert an instance of any type to its preferred
+  /// representation as a `String` instance. The initializer creates the
+  /// string representation of `instance` in one of the following ways,
+  /// depending on its protocol conformance:
+  ///
+  /// - If `instance` conforms to the `Streamable` protocol, the result is
+  ///   obtained by calling `instance.write(to: s)` on an empty string `s`.
+  /// - If `instance` conforms to the `CustomStringConvertible` protocol, the
+  ///   result is `instance.description`.
+  /// - If `instance` conforms to the `CustomDebugStringConvertible` protocol,
+  ///   the result is `instance.debugDescription`.
+  /// - An unspecified result is supplied automatically by the Swift standard
+  ///   library.
+  ///
+  /// For example, this custom `Point` struct uses the default representation
+  /// supplied by the standard library.
+  ///
+  ///     struct Point {
+  ///         let x: Int, y: Int
+  ///     }
+  ///
+  ///     let p = Point(x: 21, y: 30)
+  ///     print(String(p))
+  ///     // Prints "Point(x: 21, y: 30)"
+  ///
+  /// After adding `CustomStringConvertible` conformance by implementing the
+  /// `description` property, `Point` provides its own custom representation.
+  ///
+  ///     extension Point: CustomStringConvertible {
+  ///         var description: String {
+  ///             return "(\(x), \(y))"
+  ///         }
+  ///     }
+  ///
+  ///     print(String(p))
+  ///     // Prints "(21, 30)"
   ///
   /// - SeeAlso: `String.init<Subject>(reflecting: Subject)`
   public init<Subject>(_ instance: Subject) {
@@ -862,20 +890,49 @@ extension String {
     _print_unlocked(instance, &self)
   }
 
-  /// Initialize `self` with a detailed textual representation of
-  /// `subject`, suitable for debugging.
+  /// Creates a string with a detailed representation of the given value,
+  /// suitable for debugging.
   ///
-  /// * If `Subject` conforms to `CustomDebugStringConvertible`, the result
-  ///   is `subject`'s `debugDescription`.
+  /// Use this initializer to convert an instance of any type to its custom
+  /// debugging representation. The initializer creates the string
+  /// representation of `instance` in one of the following ways, depending on
+  /// its protocol conformance:
   ///
-  /// * Otherwise, if `Subject` conforms to `CustomStringConvertible`,
-  ///   the result is `subject`'s `description`.
-  ///
-  /// * Otherwise, if `Subject` conforms to `Streamable`, the result is
+  /// - If `subject` conforms to the `CustomDebugStringConvertible` protocol,
+  ///   the result is `subject.debugDescription`.
+  /// - If `subject` conforms to the `CustomStringConvertible` protocol, the
+  ///   result is `subject.description`.
+  /// - If `subject` conforms to the `Streamable` protocol, the result is
   ///   obtained by calling `subject.write(to: s)` on an empty string `s`.
+  /// - An unspecified result is supplied automatically by the Swift standard
+  ///   library.
   ///
-  /// * Otherwise, an unspecified result is supplied automatically by
-  ///   the Swift standard library.
+  /// For example, this custom `Point` struct uses the default representation
+  /// supplied by the standard library.
+  ///
+  ///     struct Point {
+  ///         let x: Int, y: Int
+  ///     }
+  ///
+  ///     let p = Point(x: 21, y: 30)
+  ///     print(String(reflecting: p))
+  ///     // Prints "p: Point = {
+  ///     //           x = 21
+  ///     //           y = 30
+  ///     //         }"
+  ///
+  /// After adding `CustomDebugStringConvertible` conformance by implementing
+  /// the `debugDescription` property, `Point` provides its own custom
+  /// debugging representation.
+  ///
+  ///     extension Point: CustomDebugStringConvertible {
+  ///         var debugDescription: String {
+  ///             return "Point(x: \(x), y: \(y))"
+  ///         }
+  ///     }
+  ///
+  ///     print(String(reflecting: p))
+  ///     // Prints "Point(x: 21, y: 30)"
   ///
   /// - SeeAlso: `String.init<Subject>(Subject)`
   public init<Subject>(reflecting subject: Subject) {

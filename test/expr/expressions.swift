@@ -229,6 +229,7 @@ func test_lambda() {
 }
 
 func test_lambda2() {
+  // expected-warning @+1 {{result of call is unused}}
   { () -> protocol<Int> in // expected-error {{non-protocol type 'Int' cannot be used within 'protocol<...>'}}
     return 1
   }()
@@ -406,7 +407,7 @@ func stringliterals(_ d: [String: Int]) {
 
   // rdar://11385385
   let x = 4
-  "Hello \(x+1) world"
+  "Hello \(x+1) world"  // expected-warning {{expression of type 'String' is unused}}
   
   "Error: \(x+1"; // expected-error {{unterminated string literal}}
   
@@ -610,7 +611,7 @@ func lvalue_processing() {
 
   var n = 42
   fn(n, 12)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{6-6=&}}
-  fn(&n, 12)
+  fn(&n, 12) // expected-warning {{result of call is unused, but produces 'Int'}}
 
   n +-+= 12
 
@@ -691,11 +692,11 @@ nil != Int.self // expected-error {{binary operator '!=' cannot be applied to op
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
-  a?    // expected-error {{optional chain has no effect, expression already produces 'Int?'}} {{4-5=}}
-  a?.customMirror
+  _ = a?    // expected-error {{optional chain has no effect, expression already produces 'Int?'}} {{8-9=}}
+  _ = a?.customMirror
 
-  b?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
-  b?.customMirror
+  _ = b?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
+  _ = b?.customMirror
 
   var _: Int? = c?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
 }
@@ -750,6 +751,7 @@ public struct TestPropMethodOverloadGroup {
 func inoutTests(_ arr: inout Int) {
   var x = 1, y = 2
   (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
+  // expected-warning @-1 {{expression of type 'inout Int' is unused}}
   let a = (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
   // expected-error @-1 {{type 'inout Int' of variable is not materializable}}
 

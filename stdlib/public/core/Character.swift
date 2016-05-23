@@ -10,9 +10,56 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// `Character` represents some Unicode grapheme cluster as
-/// defined by a canonical, localized, or otherwise tailored
-/// segmentation algorithm.
+/// A single extended grapheme cluster, which approximates a user-perceived
+/// character.
+///
+/// The `Character` type represents a character made up of one or more Unicode
+/// scalar values, grouped by a Unicode boundary algorithm. Generally, a
+/// `Character` instance matches what the reader of a string will perceive as
+/// a single character. The number of visible characters is generally the most
+/// natural way to count the length of a string.
+///
+///     let greeting = "Hello! 🐥"
+///     print("Character count: \(greeting.characters.count)")
+///     // Prints "Character count: 8"
+///
+/// Because each character in a string can be made up of one or more Unicode
+/// code points, the number of characters in a string may not match the length
+/// of the Unicode code point representation or the length of the string in a
+/// particular binary representation.
+///
+///     print("Unicode code point count: \(greeting.unicodeScalars.count)")
+///     // Prints "Unicode code point count: 15"
+///
+///     print("UTF-8 representation count: \(greeting.utf8.count)")
+///     // Prints "UTF-8 representation count: 18"
+///
+/// Every `Character` instance is composed of one or more Unicode code points
+/// that are grouped together as an *extended grapheme cluster*. The way these
+/// code points are grouped is defined by a canonical, localized, or otherwise
+/// tailored Unicode segmentation algorithm.
+///
+/// For example, a country's Unicode flag character is made up of two regional
+/// indicator code points that correspond to that country's ISO 3166-1 alpha-2
+/// code. The alpha-2 code for The United States is "US", so its flag
+/// character is made up of the Unicode code points `"\u{1F1FA}"` (REGIONAL
+/// INDICATOR SYMBOL LETTER U) and `"\u{1F1F8}"` (REGIONAL INDICATOR SYMBOL
+/// LETTER S). When placed next to each other in a Swift string literal, these
+/// two code points are combined into a single grapheme cluster, represented
+/// by a `Character` instance in Swift.
+///
+///     let usFlag: Character = "\u{1F1FA}\u{1F1F8}"
+///     print(usFlag)
+///     // Prints "🇺🇸"
+///
+/// For more information about the Unicode terms used in this discussion, see
+/// the [Unicode.org glossary][glossary]. In particular, this discussion
+/// mentions [extended grapheme clusters][clusters] and [Unicode scalar
+/// values][scalars].
+///
+/// [glossary]: http://www.unicode.org/glossary/
+/// [clusters]: http://www.unicode.org/glossary/#extended_grapheme_cluster
+/// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 public struct Character :
   _BuiltinExtendedGraphemeClusterLiteralConvertible,
   ExtendedGraphemeClusterLiteralConvertible, Equatable, Hashable, Comparable {
@@ -33,7 +80,9 @@ public struct Character :
     case small(Builtin.Int63)
   }
 
-  /// Construct a `Character` containing just the given `scalar`.
+  /// Creates a character containing the given Unicode scalar value.
+  ///
+  /// - Parameter scalar: The Unicode scalar value to convert into a character.
   public init(_ scalar: UnicodeScalar) {
     var asInt: UInt64 = 0
     var shift: UInt64 = 0
@@ -55,7 +104,17 @@ public struct Character :
         UTF32.self, input: CollectionOfOne(UInt32(value))))
   }
 
-  /// Create an instance initialized to `value`.
+  /// Creates a character with the specified value.
+  ///
+  /// Don't call this initializer directly. It is used by the compiler when you
+  /// use a string literal to initialize a `Character` instance. For example:
+  ///
+  ///     let snowflake: Character = "❄︎"
+  ///     print(snowflake)
+  ///     // Prints "❄︎"
+  ///
+  /// The assignment to the `snowflake` constant calls this initializer behind
+  /// the scenes.
   public init(unicodeScalarLiteral value: Character) {
     self = value
   }
@@ -73,14 +132,31 @@ public struct Character :
         isASCII: isASCII))
   }
 
-  /// Create an instance initialized to `value`.
+  /// Creates a character with the specified value.
+  ///
+  /// Don't call this initializer directly. It is used by the compiler when you
+  /// use a string literal to initialize a `Character` instance. For example:
+  ///
+  ///     let oBreve: Character = "o\u{306}"
+  ///     print(oBreve)
+  ///     // Prints "ŏ"
+  ///
+  /// The assignment to the `oBreve` constant calls this initializer behind the
+  /// scenes.
   public init(extendedGraphemeClusterLiteral value: Character) {
     self = value
   }
 
-  /// Create an instance from a single-character `String`.
+  /// Creates a character from a single-character string.
   ///
-  /// - Precondition: `s` contains exactly one extended grapheme cluster.
+  /// The following example creates a new character from the uppercase version
+  /// of a string that only holds one character.
+  ///
+  ///     let a = "a"
+  ///     let capitalA = Character(a.uppercased())
+  ///
+  /// - Parameter s: The single-character string to convert to a `Character`
+  ///   instance. `s` must contain exactly one extended grapheme cluster.
   public init(_ s: String) {
     // The small representation can accept up to 8 code units as long
     // as the last one is a continuation.  Since the high bit of the
@@ -260,13 +336,10 @@ public struct Character :
     var data: UInt64
   }
 
-  /// The hash value.
+  /// The character's hash value.
   ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
-  ///
-  /// - Note: The hash value is not guaranteed to be stable across
-  ///   different invocations of the same program.  Do not persist the
-  ///   hash value across program runs.
+  /// Hash values are not guaranteed to be equal across different executions of
+  /// your program. Do not save hash values to use during a future execution.
   public var hashValue: Int {
     // FIXME(performance): constructing a temporary string is extremely
     // wasteful and inefficient.
@@ -283,14 +356,16 @@ public struct Character :
 }
 
 extension Character : CustomDebugStringConvertible {
-  /// A textual representation of `self`, suitable for debugging.
+  /// A textual representation of the character, suitable for debugging.
   public var debugDescription: String {
     return String(self).debugDescription
   }
 }
 
 extension String {
-  /// Construct an instance containing just the given `Character`.
+  /// Creates a string containing the given character.
+  ///
+  /// - Parameter c: The character to convert to a string.
   public init(_ c: Character) {
     switch c._representation {
     case let .small(_63bits):

@@ -24,7 +24,7 @@ func generic<T>(_ x: T) {}
 var a, b, c, d : Int
 
 _ = a < b
-(a < b, c > d)
+_ = (a < b, c > d)
 // Parses as generic because of lparen after '>'
 (a < b, c > (d)) // expected-error{{use of undeclared type 'b'}}
 // Parses as generic because of lparen after '>'
@@ -67,6 +67,6 @@ meta2(A<B>.C<D>.self, 0)
 A<B, D>.c() // expected-error{{generic type 'A' specialized with too many type parameters (got 2, but expected 1)}}
 
 A<B?>(x: 0) // parses as type // expected-warning{{unused}}
-a < b ? c : d
+_ = a < b ? c : d
 
 A<(B) throws -> D>(x: 0) // expected-warning{{unused}}

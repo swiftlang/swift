@@ -116,10 +116,12 @@ func notHashableArray<T>(_ x: [T]) {
 }
 
 func hashableArray<T : Hashable>(_ x: [T]) {
+  // expected-warning @+1 {{unused}}
   x.worseHashEver // okay
 }
 
 func intArray(_ x: [Int]) {
+  // expected-warning @+1 {{unused}}
   x.worseHashEver
 }
 

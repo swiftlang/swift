@@ -400,7 +400,7 @@ extension SetAlgebra {
 
   /// Creates a set containing the elements of the given array literal.
   ///
-  /// Don't directly call this initializer, which is used by the compiler when
+  /// Do not call this initializer directly. It is used by the compiler when
   /// you use an array literal. Instead, create a new set using an array
   /// literal as its value by enclosing a comma-separated list of values in
   /// square brackets. You can use an array literal anywhere a set is expected

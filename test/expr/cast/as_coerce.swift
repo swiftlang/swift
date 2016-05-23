@@ -59,7 +59,7 @@ if let p = cc as? P {
 
 // Test that 'as?' coercion fails.
 let strImplicitOpt: String! = nil
-strImplicitOpt as? String // expected-warning{{conditional cast from 'String!' to 'String' always succeeds}}
+_ = strImplicitOpt as? String // expected-warning{{conditional cast from 'String!' to 'String' always succeeds}}
 
 class C3 {}
 class C4 : C3 {}
@@ -92,7 +92,7 @@ Double(1) as Double as String // expected-error{{cannot convert value of type 'D
 [(1, (1, 1))] as! [(Int, (String, Int))] // expected-error{{'[(Int, (Int, Int))]' is not convertible to '[(Int, (String, Int))]'}}
 
 // <rdar://problem/19495253> Incorrect diagnostic for explicitly casting to the same type
-"hello" as! String // expected-warning{{forced cast of 'String' to same type has no effect}} {{9-20=}}
+_ = "hello" as! String // expected-warning{{forced cast of 'String' to same type has no effect}} {{13-24=}}
 
 // <rdar://problem/19499340> QoI: Nimble as -> as! changes not covered by Fix-Its
 func f(_ x : String) {}

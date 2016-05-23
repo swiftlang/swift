@@ -151,7 +151,7 @@ struct RDar16603812 {
    init() {}
    func foo() {
       self.init() // expected-error {{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{11-11=.dynamicType}}
-      self.dynamicType.init() // expected-warning{{result of call to 'init()' is unused}}
+      self.dynamicType.init() // expected-warning{{result of 'RDar16603812' initializer is unused}}
    }
 }
 
@@ -343,7 +343,7 @@ class TestNestedExpr {
   }
 
   convenience init(c: Int) {
-    ((), self.init()) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+    _ = ((), self.init()) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
   }
 
   convenience init(d: Int) {
@@ -357,7 +357,7 @@ class TestNestedExpr {
   }
 
   convenience init(f: Int) {
-    ((), self.init(fail: true)!) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+    _ = ((), self.init(fail: true)!) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
   }
 
   convenience init(g: Int) {
@@ -371,7 +371,7 @@ class TestNestedExpr {
   }
 
   convenience init(i: Int) {
-    ((), try! self.init(error: true)) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+    _ = ((), try! self.init(error: true)) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
   }
 }
 
@@ -387,7 +387,7 @@ class TestNestedExprSub : TestNestedExpr {
   }
 
   init(c: Int) {
-    ((), super.init()) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+    _ = ((), super.init()) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
   }
 
   init(d: Int) {
@@ -401,7 +401,7 @@ class TestNestedExprSub : TestNestedExpr {
   }
 
   init(f: Int) {
-    ((), super.init(fail: true)!) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+    _ = ((), super.init(fail: true)!) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
   }
 
   init(g: Int) {
@@ -415,7 +415,7 @@ class TestNestedExprSub : TestNestedExpr {
   }
 
   init(i: Int) {
-    ((), try! super.init(error: true)) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+    _ = ((), try! super.init(error: true)) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
   }
 }
 

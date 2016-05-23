@@ -79,7 +79,7 @@ extension Bool : _BuiltinBooleanLiteralConvertible, BooleanLiteralConvertible {
 
   /// Creates an instance initialized to the specified Boolean literal.
   ///
-  /// Don't directly call this initializer, which is used by the compiler when
+  /// Do not call this initializer directly. It is used by the compiler when
   /// you use a Boolean literal. Instead, create a new `Bool` instance by
   /// using one of the Boolean literals `true` and `false`.
   ///
