@@ -1439,7 +1439,7 @@ namespace {
 
       ConcreteDeclRef fnSpecRef(tc.Context, fn, Subs);
       Expr *fnRef = new (tc.Context) DeclRefExpr(fnSpecRef,
-                                                 DeclNameLoc(object->getLoc()),
+                                                 DeclNameLoc(object->getStartLoc()),
                                                  /*Implicit=*/true);
       TypeSubstitutionMap subMap;
       auto genericParam = fnGenericParams[0];
