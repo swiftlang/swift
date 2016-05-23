@@ -111,14 +111,32 @@ static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
   return replaceSelfTypeForDynamicLookup(ctx, methodTy, selfTy, methodName);
 }
 
+/// Check if we can perform a dynamic dispatch on a super method call.
 static bool canUseStaticDispatch(SILGenFunction &gen,
                                  SILDeclRef constant) {
+  auto *funcDecl = cast<AbstractFunctionDecl>(constant.getDecl());
+
+  if (funcDecl->isFinal())
+    return true;
+
+  // We cannot form a direct reference to a method body defined in
+  // Objective-C.
   if (constant.isForeign)
     return false;
 
-  auto *funcDecl = cast<AbstractFunctionDecl>(constant.getDecl());
+  // If we cannot form a direct reference due to resilience constraints,
+  // we have to dynamic dispatch.
+  if (gen.F.isFragile() && !constant.isFragile())
+    return false;
+
+  // If the method is defined in the same module, we can reference it
+  // directly.
   auto thisModule = gen.SGM.M.getSwiftModule();
-  return funcDecl->isFinal() || (thisModule == funcDecl->getModuleContext());
+  if (thisModule == funcDecl->getModuleContext())
+    return true;
+
+  // Otherwise, we must dynamic dispatch.
+  return false;
 }
 
 namespace {
