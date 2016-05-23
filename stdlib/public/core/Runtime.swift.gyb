@@ -23,16 +23,16 @@ import SwiftShims
 @_transparent
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtrImpl(
-  object target: UnsafeMutablePointer<OpaquePointer?>,
-  expected: UnsafeMutablePointer<OpaquePointer?>,
-  desired: OpaquePointer?) -> Bool {
+  object target: UnsafeMutablePointer<UnsafeMutablePointer<Void>?>,
+  expected: UnsafeMutablePointer<UnsafeMutablePointer<Void>?>,
+  desired: UnsafeMutablePointer<Void>?) -> Bool {
 
   // We use Builtin.Word here because Builtin.RawPointer can't be nil.
   let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
     target._rawValue,
     UInt(bitPattern: expected.pointee)._builtinWordValue,
     UInt(bitPattern: desired)._builtinWordValue)
-  expected.pointee = OpaquePointer(bitPattern: Int(oldValue))
+  expected.pointee = UnsafeMutablePointer(bitPattern: Int(oldValue))
   return Bool(won)
 }
 
@@ -72,7 +72,7 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
   return _stdlib_atomicCompareExchangeStrongPtrImpl(
     object: UnsafeMutablePointer(target),
     expected: UnsafeMutablePointer(expected),
-    desired: OpaquePointer(desired))
+    desired: UnsafeMutablePointer(desired))
 }
 
 @_transparent
@@ -81,8 +81,8 @@ public // @testable
 func _stdlib_atomicInitializeARCRef(
   object target: UnsafeMutablePointer<AnyObject?>,
   desired: AnyObject) -> Bool {
-  var expected: OpaquePointer? = nil
-  let desiredPtr = OpaquePointer(bitPattern: Unmanaged.passRetained(desired))
+  var expected: UnsafeMutablePointer<Void>? = nil
+  let desiredPtr = Unmanaged.passRetained(desired).toOpaque()
   let wonRace = _stdlib_atomicCompareExchangeStrongPtrImpl(
     object: UnsafeMutablePointer(target),
     expected: &expected,
@@ -243,7 +243,8 @@ func _stdlib_atomicLoadARCRef(
   let result = _swift_stdlib_atomicLoadPtrImpl(
     object: UnsafeMutablePointer(target))
   if let unwrapped = result {
-    return Unmanaged<AnyObject>.fromOpaque(unwrapped).takeUnretainedValue()
+    return Unmanaged<AnyObject>.fromOpaque(
+      UnsafePointer(unwrapped)).takeUnretainedValue()
   }
   return nil
 }

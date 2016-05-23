@@ -130,19 +130,6 @@ public struct OpaquePointer : Equatable, Hashable {
     self.init(unwrapped)
   }
 
-  /// Unsafely convert an unmanaged class reference to an opaque
-  /// C pointer.
-  ///
-  /// This operation does not change reference counts.
-  ///
-  ///     let str0: CFString = "boxcar"
-  ///     let bits = OpaquePointer(bitPattern: Unmanaged(withoutRetaining: str0))
-  ///     let str1 = Unmanaged<CFString>(bitPattern: bits).object
-  @_transparent
-  public init<T>(bitPattern bits: Unmanaged<T>) {
-    self = unsafeBitCast(bits._value, to: OpaquePointer.self)
-  }
-
   /// The hash value.
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
@@ -212,3 +199,11 @@ func _memcpy(
 
 @available(*, unavailable, renamed: "OpaquePointer")
 public struct COpaquePointer {}
+
+extension OpaquePointer {
+  @available(*, unavailable, 
+    message:"use 'Unmanaged.toOpaque()' instead")
+  public init<T>(bitPattern bits: Unmanaged<T>) {
+    Builtin.unreachable()
+  }
+}
