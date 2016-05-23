@@ -1616,7 +1616,7 @@ public:
   bool diagnoseExplicitUnavailability(const ValueDecl *D,
                                       SourceRange R,
                                       const DeclContext *DC,
-                                      const CallExpr *CE);
+                                      const ApplyExpr *call);
 
   /// Emit a diagnostic for references to declarations that have been
   /// marked as unavailable, either through "unavailable" or "obsoleted:".
@@ -1829,7 +1829,7 @@ public:
                           const DeclContext *ReferenceDC,
                           const AvailableAttr *Attr,
                           DeclName Name,
-                          const CallExpr *CE);
+                          const ApplyExpr *Call);
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
