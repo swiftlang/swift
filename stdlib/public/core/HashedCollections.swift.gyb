@@ -2490,7 +2490,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   /// Returns the bytes necessary to store a bit map of 'capacity' bytes and
   /// padding to align the start to word alignment.
   internal static func bytesForBitMap(capacity: Int) -> Int {
-    let numWords = _BitMap.sizeInWords(forCapacity: capacity)
+    let numWords = _UnsafeBitMap.sizeInWords(forCapacity: capacity)
     return numWords * strideof(UInt) + alignof(UInt)
   }
 
@@ -2554,7 +2554,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 
   internal var _keys: UnsafeMutablePointer<Key> {
     let bitMapSizeInBytes =
-      _unsafeMultiply(_BitMap.sizeInWords(forCapacity: _capacity), strideof(UInt))
+      _unsafeMultiply(_UnsafeBitMap.sizeInWords(forCapacity: _capacity), strideof(UInt))
     let start =
       UnsafeMutablePointer<UInt8>(_initializedHashtableEntriesBitMapStorage)
       + bitMapSizeInBytes
@@ -2582,7 +2582,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
       return _HashedContainerStorageHeader(capacity: capacity)
     }
     let storage = r as! StorageImpl
-    let initializedEntries = _BitMap(
+    let initializedEntries = _UnsafeBitMap(
         storage: storage._initializedHashtableEntriesBitMapStorage,
         bitCount: capacity)
     initializedEntries.initializeToZero()
@@ -2591,7 +2591,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 
   deinit {
     let capacity = _capacity
-    let initializedEntries = _BitMap(
+    let initializedEntries = _UnsafeBitMap(
         storage: _initializedHashtableEntriesBitMapStorage, bitCount: capacity)
     let keys = _keys
 %if Self == 'Dictionary':
@@ -2641,7 +2641,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   internal let buffer: StorageImpl
 
-  internal let initializedEntries: _BitMap
+  internal let initializedEntries: _UnsafeBitMap
   internal let keys: UnsafeMutablePointer<Key>
 %if Self == 'Dictionary':
   internal let values: UnsafeMutablePointer<Value>
@@ -2649,7 +2649,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   internal init(capacity: Int) {
     buffer = StorageImpl.create(capacity: capacity)
-    initializedEntries = _BitMap(
+    initializedEntries = _UnsafeBitMap(
       storage: buffer._initializedHashtableEntriesBitMapStorage,
       bitCount: capacity)
     keys = buffer._keys
@@ -3055,7 +3055,7 @@ internal struct _BridgedNative${Self}Storage {
   internal typealias SequenceElement = ${AnySequenceType}
 
   internal let buffer: StorageImpl
-  internal let initializedEntries: _BitMap
+  internal let initializedEntries: _UnsafeBitMap
   internal let keys: UnsafeMutablePointer<AnyObject>
 %if Self == 'Dictionary':
   internal let values: UnsafeMutablePointer<AnyObject>
@@ -3063,7 +3063,7 @@ internal struct _BridgedNative${Self}Storage {
 
   internal init(buffer: StorageImpl) {
     self.buffer = buffer
-    initializedEntries = _BitMap(
+    initializedEntries = _UnsafeBitMap(
       storage: buffer._initializedHashtableEntriesBitMapStorage,
       bitCount: buffer._capacity)
     keys = buffer._keys

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A wrapper around a bitmap storage with room for at least `bitCount` bits.
-internal struct _BitMap {
+internal struct _UnsafeBitMap {
   internal let values: UnsafeMutablePointer<UInt>
   internal let bitCount: Int
 
@@ -37,7 +37,7 @@ internal struct _BitMap {
   }
 
   internal var numberOfWords: Int {
-    return _BitMap.sizeInWords(forCapacity: bitCount)
+    return _UnsafeBitMap.sizeInWords(forCapacity: bitCount)
   }
 
   internal func initializeToZero() {
@@ -47,14 +47,14 @@ internal struct _BitMap {
   internal subscript(i: Int) -> Bool {
     get {
       _sanityCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
-      let word = values[_BitMap.wordIndex(i)]
-      let bit = word & (1 << _BitMap.bitIndex(i))
+      let word = values[_UnsafeBitMap.wordIndex(i)]
+      let bit = word & (1 << _UnsafeBitMap.bitIndex(i))
       return bit != 0
     }
     nonmutating set {
       _sanityCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
-      let wordIdx = _BitMap.wordIndex(i)
-      let bitMask = 1 << _BitMap.bitIndex(i)
+      let wordIdx = _UnsafeBitMap.wordIndex(i)
+      let bitMask = 1 << _UnsafeBitMap.bitIndex(i)
       if newValue {
         values[wordIdx] = values[wordIdx] | bitMask
       } else {
