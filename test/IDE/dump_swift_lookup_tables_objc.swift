@@ -44,8 +44,6 @@
 // CHECK-NEXT:     TU: SNSomeProtocol
 // CHECK:        UIActionSheet:
 // CHECK-NEXT:     TU: UIActionSheet
-// CHECK-NEXT:   __CCItem:
-// CHECK-NEXT:     TU: __CCItem
 // CHECK-NEXT:   __swift:
 // CHECK-NEXT:     TU: __swift
 // CHECK-NEXT:   accessibilityFloat:
