@@ -2255,7 +2255,7 @@ public:
   bool isObjC() const {
     return getAttrs().hasAttribute<ObjCAttr>();
   }
-
+  
   void setIsObjC(bool Value);
 
   /// Is this declaration marked with 'final'?
@@ -3342,6 +3342,13 @@ public:
   static bool classof(const IterableDeclContext *C) {
     auto NTD = dyn_cast<NominalTypeDecl>(C);
     return NTD && classof(NTD);
+  }
+  
+  /// Returns true if the decl uses the Objective-C generics model.
+  ///
+  /// This is true of imported Objective-C classes.
+  bool usesObjCGenericsModel() const {
+    return isObjC() && hasClangNode() && isGenericContext();
   }
 };
 
