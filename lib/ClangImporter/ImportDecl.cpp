@@ -1328,11 +1328,20 @@ namespace {
     Decl *importSwiftNewtype(const clang::TypedefNameDecl *decl,
                              clang::SwiftNewtypeAttr *newtypeAttr,
                              DeclContext *dc, Identifier name) {
+      // The only (current) difference between swift_newtype(struct) and
+      // swift_newtype(enum), until we can get real enum support, is that enums
+      // have no un-labeld inits(). This is because enums are to be considered
+      // closed, and if constructed from a rawValue, should be very explicit.
+      bool unlabeledCtor = false;
+
       switch (newtypeAttr->getNewtypeKind()) {
       case clang::SwiftNewtypeAttr::NK_Enum:
-      // TODO: import as closed enum instead
-      // For now, fall through and treat as a struct
+        unlabeledCtor = false;
+        // TODO: import as closed enum instead
+        break;
+
       case clang::SwiftNewtypeAttr::NK_Struct:
+        unlabeledCtor = true;
         break;
       // No other cases yet
       }
@@ -1421,13 +1430,15 @@ namespace {
         // Simple, our stored type is equivalent to our computed
         // type.
         makeStructRawValued(structDecl, storedUnderlyingType,
-                            synthesizedProtocols, protocols);
+                            synthesizedProtocols, protocols,
+                            /*makeUnlabeledValueInit=*/unlabeledCtor);
       } else {
         // We need to make a stored rawValue or storage type, and a
         // computed one of bridged type.
         makeStructRawValuedWithBridge(structDecl, storedUnderlyingType,
                                       computedPropertyUnderlyingType,
-                                      synthesizedProtocols, protocols);
+                                      synthesizedProtocols, protocols,
+                                      /*makeUnlabeledValueInit=*/unlabeledCtor);
       }
 
       Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}] =
@@ -1706,9 +1717,9 @@ namespace {
         Type underlyingType,
         ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
         ArrayRef<ProtocolDecl *> protocols,
+        bool makeUnlabeledValueInit = false,
         Accessibility setterAccessibility = Accessibility::Private,
         bool isLet = true,
-        bool makeUnlabeledValueInit = false,
         bool isImplicit = true) {
       auto &cxt = Impl.SwiftContext;
       addProtocolsToStruct(structDecl, synthesizedProtocolAttrs, protocols);
@@ -1753,14 +1764,12 @@ namespace {
     /// over a bridged type that will cast to the stored type, as appropriate.
     ///
     void makeStructRawValuedWithBridge(
-        StructDecl *structDecl,
-        Type storedUnderlyingType,
-        Type bridgedType,
+        StructDecl *structDecl, Type storedUnderlyingType, Type bridgedType,
         ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-        ArrayRef<ProtocolDecl *> protocols) {
+        ArrayRef<ProtocolDecl *> protocols,
+        bool makeUnlabeledValueInit = false) {
       auto &cxt = Impl.SwiftContext;
-      addProtocolsToStruct(structDecl, synthesizedProtocolAttrs,
-                           protocols);
+      addProtocolsToStruct(structDecl, synthesizedProtocolAttrs, protocols);
 
       auto storedVarName = cxt.getIdentifier("_rawValue");
       auto computedVarName = cxt.Id_rawValue;
@@ -1774,19 +1783,17 @@ namespace {
 
       //
       // Create a computed value variable
-      auto computedVar = new (cxt) VarDecl(/*static*/ false,
-                                           /*IsLet*/ false,
-                                           SourceLoc(), computedVarName,
-                                           bridgedType, structDecl);
+      auto computedVar =
+          new (cxt) VarDecl(/*static*/ false,
+                            /*IsLet*/ false, SourceLoc(), computedVarName,
+                            bridgedType, structDecl);
       computedVar->setImplicit();
       computedVar->setAccessibility(Accessibility::Public);
       computedVar->setSetterAccessibility(Accessibility::Private);
 
       // Create the getter for the computed value variable.
-      auto computedVarGetter = makeNewtypeBridgedRawValueGetter(Impl,
-                                                                structDecl,
-                                                                computedVar,
-                                                                storedVar);
+      auto computedVarGetter = makeNewtypeBridgedRawValueGetter(
+          Impl, structDecl, computedVar, storedVar);
 
       // Create a pattern binding to describe the variable.
       Pattern *computedVarPattern = createTypedNamedPattern(computedVar);
@@ -1794,26 +1801,52 @@ namespace {
           cxt, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
           computedVarPattern, nullptr, structDecl);
 
-      auto init = createValueConstructor(structDecl, computedVar,
-                                         /*wantCtorParamNames=*/true,
+      auto init = createRawValueBridgingConstructor(
+          structDecl, computedVar, storedVar,
+          /*wantLabel*/ true, !Impl.hasFinishedTypeChecking());
+
+      ConstructorDecl *unlabeledCtor = nullptr;
+      if (makeUnlabeledValueInit)
+        unlabeledCtor = createRawValueBridgingConstructor(
+            structDecl, computedVar, storedVar,
+            /*wantLabel*/ false, !Impl.hasFinishedTypeChecking());
+
+      structDecl->setHasDelayedMembers();
+      if (unlabeledCtor)
+        structDecl->addMember(unlabeledCtor);
+      structDecl->addMember(init);
+      structDecl->addMember(storedPatternBinding);
+      structDecl->addMember(storedVar);
+      structDecl->addMember(computedPatternBinding);
+      structDecl->addMember(computedVar);
+      structDecl->addMember(computedVarGetter);
+    }
+
+    /// Create a rawValue-ed constructor that bridges to its underlying storage.
+    ConstructorDecl *createRawValueBridgingConstructor(
+        StructDecl *structDecl, VarDecl *computedRawValue,
+        VarDecl *storedRawValue, bool wantLabel, bool wantBody) {
+      auto &cxt = Impl.SwiftContext;
+      auto init = createValueConstructor(structDecl, computedRawValue,
+                                         /*wantCtorParamNames=*/wantLabel,
                                          /*wantBody=*/false);
       // Insert our custom init body
-      if (!Impl.hasFinishedTypeChecking()) {
+      if (wantBody) {
         auto selfDecl = init->getParameterList(0)->get(0);
 
         // Construct left-hand side.
         Expr *lhs = new (cxt) DeclRefExpr(selfDecl, DeclNameLoc(),
                                           /*Implicit=*/true);
-        lhs = new (cxt) MemberRefExpr(lhs, SourceLoc(), storedVar,
+        lhs = new (cxt) MemberRefExpr(lhs, SourceLoc(), storedRawValue,
                                       DeclNameLoc(), /*Implicit=*/true);
 
         // Construct right-hand side.
         // FIXME: get the parameter from the init, and plug it in here.
         auto rhs = new (cxt)
-            CoerceExpr(new (cxt) DeclRefExpr(
-                        init->getParameterList(1)->get(0), 
-                        DeclNameLoc(),
-                        /*Implicit=*/true), {}, {nullptr, storedUnderlyingType});
+            CoerceExpr(new (cxt) DeclRefExpr(init->getParameterList(1)->get(0),
+                                             DeclNameLoc(),
+                                             /*Implicit=*/true),
+                       {}, {nullptr, storedRawValue->getType()});
 
         // Add assignment.
         auto assign = new (cxt) AssignExpr(lhs, SourceLoc(), rhs,
@@ -1822,13 +1855,7 @@ namespace {
         init->setBody(body);
       }
 
-      structDecl->setHasDelayedMembers();
-      structDecl->addMember(init);
-      structDecl->addMember(storedPatternBinding);
-      structDecl->addMember(storedVar);
-      structDecl->addMember(computedPatternBinding);
-      structDecl->addMember(computedVar);
-      structDecl->addMember(computedVarGetter);
+      return init;
     }
 
     /// \brief Create a constructor that initializes a struct from its members.
@@ -2178,9 +2205,9 @@ namespace {
              cxt.getProtocol(KnownProtocolKind::Equatable)};
         makeStructRawValued(structDecl, underlyingType,
                             {KnownProtocolKind::RawRepresentable}, protocols,
+                            /*makeUnlabeledValueInit=*/true,
                             /*setterAccessibility=*/Accessibility::Public,
                             /*isLet=*/false,
-                            /*makeUnlabeledValueInit=*/true,
                             /*isImplicit=*/false);
 
         result = structDecl;

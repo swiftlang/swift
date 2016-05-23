@@ -5,7 +5,7 @@
 // RUN: %target-run %t/a.out | FileCheck %s
 
 // REQUIRES: swift_interpreter
-// REQUIRES: macosx
+// REQUIRES: OS=macosx
 
 import ImportAsMember
 
