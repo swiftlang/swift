@@ -1193,8 +1193,12 @@ namespace {
           baseTy = baseTy->getLValueOrInOutObjectType();
         }
         
-        if (auto arraySliceTy = dyn_cast<ArraySliceType>(baseTy.getPointer())) {
-          baseTy = arraySliceTy->getDesugaredType();
+        if (CS.isArrayType(baseTy.getPointer())) {
+
+          if (auto arraySliceTy = 
+                dyn_cast<ArraySliceType>(baseTy.getPointer())) {
+            baseTy = arraySliceTy->getDesugaredType();
+          }
           
           auto indexExpr = subscriptExpr->getIndex();
           
