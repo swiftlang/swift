@@ -64,13 +64,34 @@ namespace inferred_attributes {
 }
 }
 
+namespace {
+enum class MakeStructRawValuedFlags {
+  /// whether to also create an unlabeled init
+  MakeUnlabeledValueInit = 0x01,
+
+  /// whether the raw value should be a let
+  IsLet = 0x02,
+
+  /// whether to mark the rawValue as implicit
+  IsImplicit = 0x04,
+};
+using MakeStructRawValuedOptions = OptionSet<MakeStructRawValuedFlags>;
+}
+
+static MakeStructRawValuedOptions
+getDefaultMakeStructRawValuedOptions() {
+  MakeStructRawValuedOptions opts;
+  opts -= MakeStructRawValuedFlags::MakeUnlabeledValueInit; // default off
+  opts |= MakeStructRawValuedFlags::IsLet;                  // default on
+  opts |= MakeStructRawValuedFlags::IsImplicit;             // default on
+  return opts;
+}
 
 static bool isInSystemModule(DeclContext *D) {
   if (cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule())
     return true;
   return false;
 }
-
 
 /// Create a typedpattern(namedpattern(decl))
 static Pattern *createTypedNamedPattern(VarDecl *decl) {
@@ -1429,9 +1450,12 @@ namespace {
       if (!isBridged) {
         // Simple, our stored type is equivalent to our computed
         // type.
+        auto options = getDefaultMakeStructRawValuedOptions();
+        if (unlabeledCtor)
+          options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
+
         makeStructRawValued(structDecl, storedUnderlyingType,
-                            synthesizedProtocols, protocols,
-                            /*makeUnlabeledValueInit=*/unlabeledCtor);
+                            synthesizedProtocols, protocols, options);
       } else {
         // We need to make a stored rawValue or storage type, and a
         // computed one of bridged type.
@@ -1703,9 +1727,6 @@ namespace {
     /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
     /// \param protocols the protocols to make this struct conform to
     /// \param setterAccessibility the accessibility of the raw value's setter
-    /// \param isLet whether the raw value should be a let
-    /// \param makeUnlabeledValueInit whether to also create an unlabeled init
-    /// \param isImplicit whether to mark the rawValue as implicit
     ///
     /// This will perform most of the work involved in making a new Swift struct
     /// be backed by a raw value. This will populated derived protocols and
@@ -1713,29 +1734,30 @@ namespace {
     /// create the inits parameterized over a raw value
     ///
     void makeStructRawValued(
-        StructDecl *structDecl,
-        Type underlyingType,
+        StructDecl *structDecl, Type underlyingType,
         ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
         ArrayRef<ProtocolDecl *> protocols,
-        bool makeUnlabeledValueInit = false,
-        Accessibility setterAccessibility = Accessibility::Private,
-        bool isLet = true,
-        bool isImplicit = true) {
+        MakeStructRawValuedOptions options =
+            getDefaultMakeStructRawValuedOptions(),
+        Accessibility setterAccessibility = Accessibility::Private) {
       auto &cxt = Impl.SwiftContext;
       addProtocolsToStruct(structDecl, synthesizedProtocolAttrs, protocols);
 
       // Create a variable to store the underlying value.
       VarDecl *var;
       PatternBindingDecl *patternBinding;
-      std::tie(var, patternBinding) =
-          createVarWithPattern(cxt, structDecl, cxt.Id_rawValue, underlyingType,
-                               isLet, isImplicit, setterAccessibility);
+      std::tie(var, patternBinding) = createVarWithPattern(
+          cxt, structDecl, cxt.Id_rawValue, underlyingType,
+          options.contains(MakeStructRawValuedFlags::IsLet),
+          options.contains(MakeStructRawValuedFlags::IsImplicit),
+          setterAccessibility);
 
       structDecl->setHasDelayedMembers();
 
       // Create constructors to initialize that value from a value of the
       // underlying type.
-      if (makeUnlabeledValueInit)
+      if (options.contains(
+              MakeStructRawValuedFlags::MakeUnlabeledValueInit))
         structDecl->addMember(createValueConstructor(
             structDecl, var,
             /*wantCtorParamNames=*/false,
@@ -2203,12 +2225,16 @@ namespace {
         ProtocolDecl *protocols[]
           = {cxt.getProtocol(KnownProtocolKind::RawRepresentable),
              cxt.getProtocol(KnownProtocolKind::Equatable)};
+
+        auto options = getDefaultMakeStructRawValuedOptions();
+        options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
+        options -= MakeStructRawValuedFlags::IsLet;
+        options -= MakeStructRawValuedFlags::IsImplicit;
+
         makeStructRawValued(structDecl, underlyingType,
                             {KnownProtocolKind::RawRepresentable}, protocols,
-                            /*makeUnlabeledValueInit=*/true,
-                            /*setterAccessibility=*/Accessibility::Public,
-                            /*isLet=*/false,
-                            /*isImplicit=*/false);
+                            options,
+                            /*setterAccessibility=*/Accessibility::Public);
 
         result = structDecl;
         break;
