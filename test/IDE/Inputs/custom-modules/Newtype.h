@@ -33,6 +33,12 @@ extern const MyFloat globalFloat;
 extern const MyFloat kPI;
 extern const MyFloat kVersion;
 
+typedef int MyInt __attribute((swift_newtype(struct)));
+extern const MyInt kMyIntZero;
+extern const MyInt kMyIntOne;
+extern const int kRawInt;
+extern void takesMyInt(MyInt);
+
 typedef NSString * NSURLResourceKey __attribute((swift_newtype(struct)));
 extern NSURLResourceKey const NSURLIsRegularFileKey;
 extern NSURLResourceKey const NSURLIsDirectoryKey;

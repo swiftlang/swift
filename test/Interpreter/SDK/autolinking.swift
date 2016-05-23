@@ -14,7 +14,7 @@
 // This is specifically testing autolinking for immediate mode. Please do not
 // change it to use %target-build/%target-run
 // REQUIRES: swift_interpreter
-// REQUIRES: macosx
+// REQUIRES: OS=macosx
 
 
 import Darwin
