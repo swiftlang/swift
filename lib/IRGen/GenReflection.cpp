@@ -525,7 +525,6 @@ class CaptureDescriptorBuilder : public ReflectionMetadataBuilder {
   CanSILFunctionType SubstCalleeType;
   ArrayRef<Substitution> Subs;
   HeapLayout &Layout;
-  unsigned FirstCaptureIndex;
 public:
   CaptureDescriptorBuilder(IRGenModule &IGM,
                            llvm::SetVector<CanType> &BuiltinTypes,
@@ -533,12 +532,11 @@ public:
                            CanSILFunctionType OrigCalleeType,
                            CanSILFunctionType SubstCalleeType,
                            ArrayRef<Substitution> Subs,
-                           HeapLayout &Layout,
-                           unsigned FirstCaptureIndex)
+                           HeapLayout &Layout)
     : ReflectionMetadataBuilder(IGM, BuiltinTypes),
       Caller(Caller), OrigCalleeType(OrigCalleeType),
       SubstCalleeType(SubstCalleeType), Subs(Subs),
-      Layout(Layout), FirstCaptureIndex(FirstCaptureIndex) {}
+      Layout(Layout) {}
 
   using MetadataSourceMap
     = std::vector<std::pair<CanType, const reflection::MetadataSource*>>;
@@ -617,15 +615,6 @@ public:
         // dereferencing an isa pointer or a generic argument). Record
         // the path. We assume captured values map 1-1 with function
         // parameters.
-        auto ParamIndex = ConventionSource.getParamIndex();
-        auto Index = ParamIndex - FirstCaptureIndex;
-
-        auto ParamType = SubstCalleeType->getParameters()[ParamIndex].getSILType();
-        auto CaptureType = getElementTypes()[Index];
-        assert(ParamType == CaptureType);
-        (void) ParamType;
-        (void) CaptureType;
-
         auto Root = ConventionSource.getMetadataSource(SourceBuilder);
         auto Src = Fulfillment->Path.getMetadataSource(SourceBuilder, Root);
 
@@ -772,15 +761,14 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
                                         CanSILFunctionType OrigCalleeType,
                                         CanSILFunctionType SubstCalleeType,
                                         ArrayRef<Substitution> Subs,
-                                        HeapLayout &Layout,
-                                        unsigned FirstCaptureIndex) {
+                                        HeapLayout &Layout) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
   llvm::SetVector<CanType> BuiltinTypes;
   CaptureDescriptorBuilder builder(*this, BuiltinTypes, Caller,
                                    OrigCalleeType, SubstCalleeType, Subs,
-                                   Layout, FirstCaptureIndex);
+                                   Layout);
 
   auto var = builder.emit();
   if (var)
