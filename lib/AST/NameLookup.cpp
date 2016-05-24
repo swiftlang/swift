@@ -154,17 +154,17 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     // types well.
     CanType signature;
 
-    // FIXME: Egregious hack to avoid failing when there are no declared types.
-    if (!decl->hasType() || isa<TypeAliasDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) {
-      // FIXME: Pass this down instead of getting it from the ASTContext.
-      if (typeResolver && !decl->isBeingTypeChecked())
-        typeResolver->resolveDeclSignature(decl);
-      if (!decl->hasType())
+    if (typeResolver)
+      typeResolver->resolveDeclSignature(decl);
+
+    if (!decl->hasType())
+      continue;
+    if (auto aliasType = dyn_cast<TypeAliasDecl>(decl))
+      if (!aliasType->hasUnderlyingType())
         continue;
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
-        if (!assocType->getArchetype())
-          continue;
-    }
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
+      if (!assocType->getArchetype())
+        continue;
     
     // If the decl is currently being validated, this is likely a recursive
     // reference and we'll want to skip ahead so as to avoid having its type
