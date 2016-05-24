@@ -2455,64 +2455,6 @@ collections = [
 ]
 }%
 
-/// A wrapper around a bitmap storage with room for at least `bitCount` bits.
-internal struct _BitMap {
-  internal let values: UnsafeMutablePointer<UInt>
-  internal let bitCount: Int
-
-  // Note: We use UInt here to get unsigned math (shifts).
-  internal static func wordIndex(_ i: UInt) -> UInt {
-    return i / UInt._sizeInBits
-  }
-
-  internal static func bitIndex(_ i: UInt) -> UInt {
-    return i % UInt._sizeInBits
-  }
-
-  internal static func wordsFor(_ bitCount: Int) -> Int {
-    return bitCount + Int._sizeInBytes - 1 / Int._sizeInBytes
-  }
-
-  internal init(storage: UnsafeMutablePointer<UInt>, bitCount: Int) {
-    self.bitCount = bitCount
-    self.values = storage
-  }
-
-  internal var numberOfWords: Int {
-    get {
-      return _BitMap.wordsFor(bitCount)
-    }
-  }
-
-  internal func initializeToZero() {
-    for i in 0 ..< numberOfWords {
-      (values + i).initialize(with: 0)
-    }
-  }
-
-  internal subscript(i: Int) -> Bool {
-    get {
-      _sanityCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
-      let idx = UInt(i)
-      let word = values[Int(_BitMap.wordIndex(idx))]
-      let bit = word & (1 << _BitMap.bitIndex(idx))
-      return bit != 0
-    }
-    nonmutating set {
-      _sanityCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
-      let idx = UInt(i)
-      let wordIdx = _BitMap.wordIndex(idx)
-      if newValue {
-        values[Int(wordIdx)] =
-            values[Int(wordIdx)] | (1 << _BitMap.bitIndex(idx))
-      } else {
-        values[Int(wordIdx)] =
-            values[Int(wordIdx)] & ~(1 << _BitMap.bitIndex(idx))
-      }
-    }
-  }
-}
-
 /// Header part of the native storage.
 internal struct _HashedContainerStorageHeader {
   internal init(capacity: Int) {
@@ -2548,8 +2490,8 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   /// Returns the bytes necessary to store a bit map of 'capacity' bytes and
   /// padding to align the start to word alignment.
   internal static func bytesForBitMap(capacity: Int) -> Int {
-    let numWords = _BitMap.wordsFor(capacity)
-    return numWords * sizeof(UInt) + alignof(UInt)
+    let numWords = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
+    return numWords * strideof(UInt) + alignof(UInt)
   }
 
   /// Returns the bytes necessary to store 'capacity' keys and padding to align
@@ -2560,12 +2502,11 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     return strideof(Key.self) * capacity + padding
   }
 
+%if Self == 'Dictionary':
   /// Returns the bytes necessary to store 'capacity' values and padding to
   /// align the start to the alignment of the 'Value' type assuming a base
   /// address aligned to the maximum of the alignment of the 'Key' type and the
   /// alignment of a word.
-
-%if Self == 'Dictionary':
   internal static func bytesForValues(capacity: Int) -> Int {
     let maxPrevAlignment = max(alignof(Key.self), alignof(UInt))
     let padding = max(0, alignof(Value.self) - maxPrevAlignment)
@@ -2574,9 +2515,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 %end
 
   internal var buffer: BufferPointer {
-    get {
-      return BufferPointer(self)
-    }
+    return BufferPointer(self)
   }
 
   // All underscored functions are unsafe and need a _fixLifetime in the caller.
@@ -2591,9 +2530,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 
   @_versioned
   internal var _capacity: Int {
-    get {
-      return _body.capacity
-    }
+    return _body.capacity
   }
 
   @_versioned
@@ -2607,45 +2544,30 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   }
 
   internal var _maxLoadFactorInverse : Double {
-    get {
-      return _body.maxLoadFactorInverse
-    }
+    return _body.maxLoadFactorInverse
   }
 
   internal
   var _initializedHashtableEntriesBitMapStorage: UnsafeMutablePointer<UInt> {
-    get {
-      let start = UInt(Builtin.ptrtoint_Word(buffer._elementPointer._rawValue))
-      let alignment = UInt(alignof(UInt))
-      let alignMask = alignment &- UInt(1)
-      return UnsafeMutablePointer<UInt>(
-          bitPattern:(start &+ alignMask) & ~alignMask)!
-    }
+    return _roundUp(buffer._elementPointer, toAlignmentOf: UInt.self)
   }
 
   internal var _keys: UnsafeMutablePointer<Key> {
-    get {
-      let start =
-          UInt(Builtin.ptrtoint_Word(
-              _initializedHashtableEntriesBitMapStorage._rawValue)) &+
-          UInt(_BitMap.wordsFor(_capacity)) &* UInt(strideof(UInt))
-      let alignment = UInt(alignof(Key))
-      let alignMask = alignment &- UInt(1)
-      return UnsafeMutablePointer<Key>(
-          bitPattern:(start &+ alignMask) & ~alignMask)!
-    }
+    let bitMapSizeInBytes =
+      _unsafeMultiply(
+        _UnsafeBitMap.sizeInWords(forSizeInBits: _capacity),
+        strideof(UInt))
+    let start =
+      UnsafeMutablePointer<UInt8>(_initializedHashtableEntriesBitMapStorage)
+      + bitMapSizeInBytes
+    return _roundUp(start, toAlignmentOf: Key.self)
   }
 
 %if Self == 'Dictionary':
   internal var _values: UnsafeMutablePointer<Value> {
-    get {
-      let start = UInt(Builtin.ptrtoint_Word(_keys._rawValue)) &+
-        UInt(_capacity) &* UInt(strideof(Key.self))
-      let alignment = UInt(alignof(Value))
-      let alignMask = alignment &- UInt(1)
-      return UnsafeMutablePointer<Value>(
-          bitPattern:(start &+ alignMask) & ~alignMask)!
-    }
+    let keysSizeInBytes = _unsafeMultiply(_capacity, strideof(Key.self))
+    let start = UnsafeMutablePointer<UInt8>(_keys) + keysSizeInBytes
+    return _roundUp(start, toAlignmentOf: Value.self)
   }
 %end
 
@@ -2655,14 +2577,14 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     let requiredCapacity =
       bytesForBitMap(capacity: capacity) + bytesForKeys(capacity: capacity)
 %if Self == 'Dictionary':
-        + bytesForValues(capacity: capacity)
+      + bytesForValues(capacity: capacity)
 %end
 
     let r = super.create(minimumCapacity: requiredCapacity) { _ in
       return _HashedContainerStorageHeader(capacity: capacity)
     }
     let storage = r as! StorageImpl
-    let initializedEntries = _BitMap(
+    let initializedEntries = _UnsafeBitMap(
         storage: storage._initializedHashtableEntriesBitMapStorage,
         bitCount: capacity)
     initializedEntries.initializeToZero()
@@ -2671,7 +2593,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 
   deinit {
     let capacity = _capacity
-    let initializedEntries = _BitMap(
+    let initializedEntries = _UnsafeBitMap(
         storage: _initializedHashtableEntriesBitMapStorage, bitCount: capacity)
     let keys = _keys
 %if Self == 'Dictionary':
@@ -2721,7 +2643,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   internal let buffer: StorageImpl
 
-  internal let initializedEntries: _BitMap
+  internal let initializedEntries: _UnsafeBitMap
   internal let keys: UnsafeMutablePointer<Key>
 %if Self == 'Dictionary':
   internal let values: UnsafeMutablePointer<Value>
@@ -2729,9 +2651,9 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   internal init(capacity: Int) {
     buffer = StorageImpl.create(capacity: capacity)
-    initializedEntries = _BitMap(
-        storage: buffer._initializedHashtableEntriesBitMapStorage,
-        bitCount: capacity)
+    initializedEntries = _UnsafeBitMap(
+      storage: buffer._initializedHashtableEntriesBitMapStorage,
+      bitCount: capacity)
     keys = buffer._keys
 %if Self == 'Dictionary':
     values = buffer._values
@@ -2754,11 +2676,9 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   public // @testable
   var capacity: Int {
-    get {
-      let result = buffer._capacity
-      _fixLifetime(buffer)
-      return result
-    }
+    let result = buffer._capacity
+    _fixLifetime(buffer)
+    return result
   }
 
   @_versioned
@@ -2777,11 +2697,9 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   @_transparent
   internal var maxLoadFactorInverse: Double {
-    get {
-      let result = buffer._maxLoadFactorInverse
-      _fixLifetime(buffer)
-      return result
-    }
+    let result = buffer._maxLoadFactorInverse
+    _fixLifetime(buffer)
+    return result
   }
 
   @_versioned
@@ -3139,16 +3057,15 @@ internal struct _BridgedNative${Self}Storage {
   internal typealias SequenceElement = ${AnySequenceType}
 
   internal let buffer: StorageImpl
-  internal let initializedEntries: _BitMap
+  internal let initializedEntries: _UnsafeBitMap
   internal let keys: UnsafeMutablePointer<AnyObject>
 %if Self == 'Dictionary':
   internal let values: UnsafeMutablePointer<AnyObject>
 %end
 
-
   internal init(buffer: StorageImpl) {
     self.buffer = buffer
-    initializedEntries = _BitMap(
+    initializedEntries = _UnsafeBitMap(
       storage: buffer._initializedHashtableEntriesBitMapStorage,
       bitCount: buffer._capacity)
     keys = buffer._keys
@@ -3160,11 +3077,9 @@ internal struct _BridgedNative${Self}Storage {
 
   @_transparent
   internal var capacity: Int {
-    get {
-      let result = buffer._capacity
-      _fixLifetime(buffer)
-      return result
-    }
+    let result = buffer._capacity
+    _fixLifetime(buffer)
+    return result
   }
 
   @_versioned

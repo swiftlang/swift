@@ -701,6 +701,14 @@ internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
 #endif
 }
 
+internal func _unsafeMultiply(_ lhs: Int, _ rhs: Int) -> Int {
+#if INTERNAL_CHECKS_ENABLED
+  return lhs * rhs
+#else
+  return lhs &* rhs
+#endif
+}
+
 @available(*, unavailable, renamed: "Integer")
 public typealias IntegerType = Integer
 

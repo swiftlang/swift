@@ -140,5 +140,6 @@
     "Process.swift",
     "Tuple.swift",
     "NewtypeWrapper.swift",
+    "UnsafeBitMap.swift"
   ]
 }
