@@ -120,6 +120,9 @@ Classes:
   - Selector: 'importStoreWithIdentifier:fromExternalRecordsDirectory:toURL:options:withType:error:'
     SwiftName: 'importStore(withIdentifier:fromExternalRecordsDirectoryAt:to:options:ofType:)'
     MethodKind: Instance
+  - Selector: 'performBlockAndWait:'
+    SwiftName: 'performAndWait(_:)'
+    MethodKind: Instance
 - Name: NSSaveChangesRequest
   Methods:
   - Selector: 'initWithInsertedObjects:updatedObjects:deletedObjects:lockedObjects:'
