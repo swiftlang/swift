@@ -810,6 +810,13 @@ public:
   ABIDifference checkFunctionForABIDifferences(SILFunctionType *fnTy1,
                                                SILFunctionType *fnTy2);
 
+
+  /// Lower the function type as a possible substitution for the type of
+  /// \p constant. The result is not cached as part of the constant's normal
+  /// ConstantInfo.
+  CanSILFunctionType
+  getUncachedSILFunctionTypeForConstant(SILDeclRef constant,
+                                  CanAnyFunctionType origInterfaceType);
 private:
   Type getLoweredCBridgedType(AbstractionPattern pattern, Type t,
                               bool canBridgeBool,
