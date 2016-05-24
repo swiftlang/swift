@@ -52,7 +52,6 @@
 
 using namespace swift;
 using namespace irgen;
-using clang::CodeGen::CodeGenABITypes;
 using llvm::Attribute;
 
 const unsigned DefaultAS = 0;
@@ -387,8 +386,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     RegisterPreservingCC = DefaultCC;
   }
 
-  ABITypes = new CodeGenABITypes(clangASTContext, Module);
-
   if (IRGen.Opts.DebugInfoKind != IRGenDebugInfoKind::None) {
     DebugInfo = new IRGenDebugInfo(IRGen.Opts, *CI, *this, Module, SF);
   }
@@ -399,9 +396,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 IRGenModule::~IRGenModule() {
   destroyClangTypeConverter();
   delete &Types;
-  if (DebugInfo)
-    delete DebugInfo;
-  delete ABITypes;
+  delete DebugInfo;
 }
 
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);

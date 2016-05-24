@@ -308,3 +308,11 @@ class SwiftConcreteSubclassC<T>: GenericClass<NSString> {
   override func arrayOfThings() -> [NSString] {}
 }
 
+// FIXME: Some generic ObjC APIs rely on covariance. We don't handle this well
+// in Swift yet, but ensure we don't emit spurious warnings when
+// `as!` is used to force types to line up.
+func foo(x: GenericClass<NSMutableString>) {
+  let x2 = x as! GenericClass<NSString>
+  takeGenericClass(x2)
+  takeGenericClass(unsafeBitCast(x, to: GenericClass<NSString>.self))
+}

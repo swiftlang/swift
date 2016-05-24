@@ -33,16 +33,16 @@ public func fooLazy() {
 // CHECK:         load i8*, i8** @OBJC_SELECTOR_REFERENCES_
 // CHECK:         ret
 
-// CHECK-LABEL: define internal i8* @giveMeAMetaclass()
+// CHECK-LABEL: define internal {{.*}}* @giveMeANumber()
 // CHECK:         [[CLASS:%.*]] = load %struct._class_t*, %struct._class_t**
-// CHECK:         [[SELECTOR:%.*]] = load i8*, i8** @OBJC_SELECTOR_REFERENCES_
+// CHECK:         [[SELECTOR:%.*]] = load i8*, i8** @OBJC_SELECTOR_REFERENCES_.{{.*}}
 // CHECK:         bitcast %struct._class_t* [[CLASS]] to i8*
 // CHECK:         call {{.*}} @objc_msgSend
 // CHECK:         ret
 
-// CHECK-LABEL: define internal {{.*}}* @giveMeANumber()
+// CHECK-LABEL: define internal i8* @giveMeAMetaclass()
 // CHECK:         [[CLASS:%.*]] = load %struct._class_t*, %struct._class_t**
-// CHECK:         [[SELECTOR:%.*]] = load i8*, i8** @OBJC_SELECTOR_REFERENCES_.{{.*}}
+// CHECK:         [[SELECTOR:%.*]] = load i8*, i8** @OBJC_SELECTOR_REFERENCES_
 // CHECK:         bitcast %struct._class_t* [[CLASS]] to i8*
 // CHECK:         call {{.*}} @objc_msgSend
 // CHECK:         ret

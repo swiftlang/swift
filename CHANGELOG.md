@@ -219,6 +219,11 @@ Swift 3.0
     let sel2 = #selector(setter: UIView.backgroundColor) // sel2 has type Selector
     ```
 
+* [SE-0062](https://github.com/apple/swift-evolution/blob/master/proposals/0062-objc-keypaths.md): A key-path can now be formed with `#keyPath`. For example:
+
+    ```swift
+    person.valueForKeyPath(#keyPath(Person.bestFriend.lastName))
+    ```
 
 Swift 2.2
 ---------
