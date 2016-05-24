@@ -536,12 +536,26 @@ class FormatWalker : public SourceEntityWalker {
 
       // Array/Dictionary elements are siblings to align with each other.
       if (auto AE = dyn_cast_or_null<CollectionExpr>(Node.dyn_cast<Expr *>())) {
-        SourceLoc LBracketLoc = AE->getLBracketLoc();
+        // The following check ends-up creating too much indentation,
+        // for example:
+        //   let something = [
+        //                       a
+        //   ]
+        //
+        // Disabling the check gets us back to the Swift2.2 behavior:
+        //   let something = [
+        //       a
+        //   ]
+        //
+        // FIXME: We are going to revisit the behavior and the indentation we
+        // want for dictionary/array literals.
+        //
+        /* SourceLoc LBracketLoc = AE->getLBracketLoc();
         if (isTargetImmediateAfter(LBracketLoc) &&
             !sameLineWithTarget(LBracketLoc)) {
           FoundSibling = LBracketLoc;
           NeedExtraIndentation = true;
-        }
+        }*/
         for (unsigned I = 0, N = AE->getNumElements(); I < N;  I ++) {
           addPair(AE->getElement(I)->getEndLoc(),
                   FindAlignLoc(AE->getElement(I)->getStartLoc()), tok::comma);
