@@ -138,7 +138,7 @@ extension String {
     guard let cString = cString else {
       return nil
     }
-    let len = Int(_swift_stdlib_strlen(UnsafePointer(cString)))
+    let len = encoding._nullCodeUnitOffset(in: cString)
     let buffer = UnsafeBufferPointer<Encoding.CodeUnit>(
       start: cString, count: len)
 
