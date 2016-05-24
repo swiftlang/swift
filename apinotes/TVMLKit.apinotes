@@ -32,10 +32,10 @@ Classes:
     SwiftName: children
   Methods:
   - Selector: 'dispatchEventOfType:canBubble:cancellable:extraInfo:completion:'
-    SwiftName: 'dispatchEvent(type:canBubble:cancellable:extraInfo:completion:Bool):)'
+    SwiftName: 'dispatchEvent(type:canBubble:cancellable:extraInfo:completion:)'
     MethodKind: Instance
   - Selector: 'dispatchEventWithName:canBubble:cancellable:extraInfo:completion:'
-    SwiftName: 'dispatchEvent(name:canBubble:cancellable:extraInfo:completion:Bool):)'
+    SwiftName: 'dispatchEvent(name:canBubble:cancellable:extraInfo:completion:)'
     MethodKind: Instance
 - Name: TVViewElementStyle
   Methods:
