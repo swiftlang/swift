@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
 
 // Conversions between different Unicode encodings.  Note that UTF-16 and
 // UTF-32 decoding are *not* currently resilient to erroneous data.
@@ -132,6 +133,12 @@ public protocol UnicodeCodec {
     _ input: UnicodeScalar,
     sendingOutputTo processCodeUnit: @noescape (CodeUnit) -> Void
   )
+
+  /// Searches for the first occurrence of a `CodeUnit` that is equal to 0.
+  ///
+  /// Is an equivalent of `strlen` for C-strings.
+  /// - Complexity: O(n)
+  static func _nullCodeUnitOffset(_ input: UnsafePointer<CodeUnit>) -> Int
 }
 
 /// A codec for translating between Unicode scalar values and UTF-8 code
@@ -427,6 +434,10 @@ public struct UTF8 : UnicodeCodec {
   /// - Returns: `true` if `byte` is a continuation byte; otherwise, `false`.
   public static func isContinuation(_ byte: CodeUnit) -> Bool {
     return byte & 0b11_00__0000 == 0b10_00__0000
+  }
+
+  public static func _nullCodeUnitOffset(_ input: UnsafePointer<CodeUnit>) -> Int {
+    return Int(_swift_stdlib_strlen(UnsafePointer(input)))
   }
 }
 
@@ -1146,6 +1157,24 @@ extension UnicodeScalar {
     _sanityCheck(value <= 0x10FFFF, "value is outside of Unicode codespace")
 
     self._value = value
+  }
+}
+
+extension UnicodeCodec where CodeUnit : UnsignedInteger {
+  public static func _nullCodeUnitOffset(_ input: UnsafePointer<CodeUnit>) -> Int {
+    var input = input
+    var length = 0
+    while input.pointee != 0 {
+      input = input.successor()
+      length += 1
+    }
+    return length
+  }
+}
+
+extension UnicodeCodec {
+  public static func _nullCodeUnitOffset(_ input: UnsafePointer<CodeUnit>) -> Int {
+    fatalError("_nullCodeUnitOffset implementation should be provided")
   }
 }
 
