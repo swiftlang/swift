@@ -2,6 +2,7 @@
 // RUN: mkdir -p %t
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir -enable-swift-newtype | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir -enable-swift-newtype -O | FileCheck %s -check-prefix=OPT
 import CoreFoundation
 import Foundation
 import Newtype
@@ -99,4 +100,33 @@ public func compareABIs() {
   //
   // CHECK: declare void @takeMyABINewTypeNonNullNS(%0*) #0
   // CHECK: declare void @takeMyABIOldTypeNonNullNS(%0*) #0
+}
+
+// OPT-LABEL: define i1 @_TF7newtype12compareInitsFT_Sb
+public func compareInits() -> Bool {
+  let mf = MyInt(rawValue: 1)
+  let mfNoLabel = MyInt(1)
+  let res = mf.rawValue == MyInt.one.rawValue 
+        && mfNoLabel.rawValue == MyInt.one.rawValue
+  // OPT:  [[ONE:%.*]] = load i32, i32*{{.*}}@kMyIntOne{{.*}}, align 4
+  // OPT-NEXT: [[COMP:%.*]] = icmp eq i32 [[ONE]], 1
+
+  takesMyInt(mf)
+  takesMyInt(mfNoLabel)
+  takesMyInt(MyInt(rawValue: kRawInt))
+  takesMyInt(MyInt(kRawInt))
+  // OPT: tail call void @takesMyInt(i32 1)
+  // OPT-NEXT: tail call void @takesMyInt(i32 1)
+  // OPT-NEXT: [[RAWINT:%.*]] = load i32, i32*{{.*}} @kRawInt{{.*}}, align 4
+  // OPT-NEXT: tail call void @takesMyInt(i32 [[RAWINT]])
+  // OPT-NEXT: tail call void @takesMyInt(i32 [[RAWINT]])
+
+  return res
+  // OPT-NEXT: ret i1 [[COMP]]
+}
+
+// CHECK-LABEL: anchor
+// OPT-LABEL: anchor
+public func anchor() -> Bool {
+  return false
 }

@@ -7,6 +7,7 @@
 // REQUIRES: objc_interop
 
 // PRINT-LABEL: struct ErrorDomain : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
+// PRINT-NEXT:    init(_ rawValue: String)
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
@@ -36,11 +37,13 @@
 // PRINT-NEXT:    static let thirdEntry: ClosedEnum
 // PRINT-NEXT:  }
 // PRINT-NEXT:  struct IUONewtype : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
+// PRINT-NEXT:    init(_ rawValue: String)
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
 // PRINT-NEXT:  }
 // PRINT-NEXT:  struct MyFloat : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable {
+// PRINT-NEXT:    init(_ rawValue: Float)
 // PRINT-NEXT:    init(rawValue: Float)
 // PRINT-NEXT:    let rawValue: Float
 // PRINT-NEXT:  }
@@ -49,6 +52,18 @@
 // PRINT-NEXT:    static let PI: MyFloat
 // PRINT-NEXT:    static let version: MyFloat
 // PRINT-NEXT:  }
+//
+// PRINT-LABEL: struct MyInt : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable {
+// PRINT-NEXT:    init(_ rawValue: Int32)
+// PRINT-NEXT:    init(rawValue: Int32)
+// PRINT-NEXT:    let rawValue: Int32
+// PRINT-NEXT:  }
+// PRINT-NEXT:  extension MyInt {
+// PRINT-NEXT:    static let zero: MyInt!
+// PRINT-NEXT:    static let one: MyInt!
+// PRINT-NEXT:  }
+// PRINT-NEXT:  let kRawInt: Int32
+// PRINT-NEXT:  func takesMyInt(_: MyInt!)
 //
 // PRINT-LABEL: extension NSURLResourceKey {
 // PRINT-NEXT:    static let isRegularFileKey: NSURLResourceKey
@@ -65,6 +80,7 @@
 // PRINT-NEXT:  let swiftNamedNotification: String
 //
 // PRINT-LABEL: struct CFNewType : RawRepresentable, _SwiftNewtypeWrapper {
+// PRINT-NEXT:    init(_ rawValue: CFString)
 // PRINT-NEXT:    init(rawValue: CFString)
 // PRINT-NEXT:    let rawValue: CFString
 // PRINT-NEXT:  }
