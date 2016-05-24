@@ -41,8 +41,7 @@ UnsafeBitMapTests.test("wordIndex(_:), bitIndex(_:)") {
 #endif
 }
 
-UnsafeBitMapTests.test("sizeInWords(forSizeInBits:)")
-  .xfail(.always("the API is buggy")).code {
+UnsafeBitMapTests.test("sizeInWords(forSizeInBits:)") {
   expectEqual(0, _UnsafeBitMap.sizeInWords(forSizeInBits: 0))
 #if arch(i386) || arch(arm)
   for i in 1...32 {

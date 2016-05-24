@@ -35,7 +35,7 @@ struct _UnsafeBitMap {
 
   public // @testable
   static func sizeInWords(forSizeInBits bitCount: Int) -> Int {
-    return bitCount + Int._sizeInBytes - 1 / Int._sizeInBytes
+    return (bitCount + Int._sizeInBits - 1) / Int._sizeInBits
   }
 
   public // @testable
