@@ -112,7 +112,7 @@ struct MinimalCollectionWith${Implementation}Filter<Element>
   }
 
   func filter(
-    @noescape _ transform: (Element) throws -> Bool
+    _ transform: @noescape (Element) throws -> Bool
   ) rethrows -> [Element] {
     MinimalCollectionWithCustomFilter.timesFilterWasCalled += 1
     return try _data.filter(transform)
@@ -126,7 +126,7 @@ struct MinimalCollectionWith${Implementation}Filter<Element>
 
 func callStaticCollectionFilter(
   _ sequence: MinimalCollectionWithDefaultFilter<OpaqueValue<Int>>,
-  @noescape includeElement: (OpaqueValue<Int>) -> Bool
+  includeElement: @noescape (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
   var result = sequence.filter(includeElement)
   expectType([OpaqueValue<Int>].self, &result)
@@ -135,7 +135,7 @@ func callStaticCollectionFilter(
 
 func callStaticCollectionFilter(
   _ sequence: MinimalCollectionWithCustomFilter<OpaqueValue<Int>>,
-  @noescape includeElement: (OpaqueValue<Int>) -> Bool
+  includeElement: @noescape (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
   var result = sequence.filter(includeElement)
   expectType([OpaqueValue<Int>].self, &result)
@@ -144,7 +144,7 @@ func callStaticCollectionFilter(
 
 func callGenericCollectionFilter<S : Collection>(
   _ sequence: S,
-  @noescape includeElement: (S.Iterator.Element) -> Bool
+  includeElement: @noescape (S.Iterator.Element) -> Bool
 ) -> [S.Iterator.Element] {
   var result = sequence.filter(includeElement)
   expectType(Array<S.Iterator.Element>.self, &result)
@@ -249,7 +249,7 @@ struct MinimalCollectionWith${Implementation}Map<Element>
   }
 
   func map<T>(
-    @noescape _ transform: (Element) throws -> T
+    _ transform: @noescape (Element) throws -> T
   ) rethrows -> [T] {
     MinimalCollectionWithCustomMap.timesMapWasCalled += 1
     return try _data.map(transform)
@@ -263,7 +263,7 @@ struct MinimalCollectionWith${Implementation}Map<Element>
 
 func callStaticCollectionMap<T>(
   _ collection: MinimalCollectionWithDefaultMap<OpaqueValue<Int>>,
-  @noescape transform: (OpaqueValue<Int>) -> T
+  transform: @noescape (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = collection.map(transform)
   expectType([T].self, &result)
@@ -272,7 +272,7 @@ func callStaticCollectionMap<T>(
 
 func callStaticCollectionMap<T>(
   _ collection: MinimalCollectionWithCustomMap<OpaqueValue<Int>>,
-  @noescape transform: (OpaqueValue<Int>) -> T
+  transform: @noescape (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = collection.map(transform)
   expectType([T].self, &result)
@@ -281,7 +281,7 @@ func callStaticCollectionMap<T>(
 
 func callGenericCollectionMap<C : Collection, T>(
   _ collection: C,
-  @noescape transform: (C.Iterator.Element) -> T
+  transform: @noescape (C.Iterator.Element) -> T
 ) -> [T] {
   var result = collection.map(transform)
   expectType([T].self, &result)
@@ -750,7 +750,7 @@ CollectionTypeTests.test("index(of:)/ContinueSearch") {
 
 CollectionTypeTests.test("Collection/split/dispatch") {
   var tester = CollectionLog.dispatchTester([OpaqueValue(1)])
-  tester.split { $0.value == 1 }
+  _ = tester.split { $0.value == 1 }
   expectCustomizable(tester, tester.log.split)
 }
 
@@ -760,7 +760,7 @@ CollectionTypeTests.test("Collection/split/dispatch") {
 
 CollectionTypeTests.test("Collection/prefix(through:)/dispatch") {
   var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
-  tester.prefix(through: 1)
+  _ = tester.prefix(through: 1)
   expectCustomizable(tester, tester.log.prefixThrough)
 }
 
@@ -770,7 +770,7 @@ CollectionTypeTests.test("Collection/prefix(through:)/dispatch") {
 
 CollectionTypeTests.test("Collection/prefix(upTo:)/dispatch") {
   var tester = CollectionLog.dispatchTester([OpaqueValue(1)])
-  tester.prefix(upTo: 1)
+  _ = tester.prefix(upTo: 1)
   expectCustomizable(tester, tester.log.prefixUpTo)
 }
 
@@ -780,7 +780,7 @@ CollectionTypeTests.test("Collection/prefix(upTo:)/dispatch") {
 
 CollectionTypeTests.test("Collection/suffix(from:)/dispatch") {
   var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
-  tester.suffix(from: 1)
+  _ = tester.suffix(from: 1)
   expectCustomizable(tester, tester.log.suffixFrom)
 }
 
