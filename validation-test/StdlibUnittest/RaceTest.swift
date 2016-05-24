@@ -92,6 +92,16 @@ RaceTestSuite.test("fails") {
 // CHECK: stdout>>> Failure: 1 times
 // CHECK: stdout>>> Failure (65534): 3 times
 // CHECK: [     FAIL ] Race.fails
+
+RaceTestSuite.test("closure") {
+  let count = _stdlib_AtomicInt(0)
+  runRaceTest(trials: 10) {
+    _ = count.fetchAndAdd(1)
+  }
+  expectNotEqual(0, count.load())
+}
+// CHECK: [ RUN      ] Race.closure
+// CHECK: [       OK ] Race.closure
 // CHECK: Race: Some tests failed, aborting
 
 runAllTests()
