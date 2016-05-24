@@ -1028,14 +1028,16 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
 
     const Expr *argExpr = CE->getArg();
     if (auto args = dyn_cast<TupleExpr>(argExpr)) {
-      if (selfIndex >= args->getNumElements())
+      size_t numElementsWithinParens = args->getNumElements();
+      numElementsWithinParens -= args->hasTrailingClosure();
+      if (selfIndex >= numElementsWithinParens)
         return;
 
       if (parsed.IsGetter) {
-        if (args->getNumElements() != 1)
+        if (numElementsWithinParens != 1)
           return;
       } else if (parsed.IsSetter) {
-        if (args->getNumElements() != 2)
+        if (numElementsWithinParens != 2)
           return;
       } else {
         if (parsed.ArgumentLabels.size() != args->getNumElements() - 1)
@@ -1044,7 +1046,7 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
 
       selfExpr = args->getElement(selfIndex);
 
-      if (selfIndex + 1 == args->getNumElements()) {
+      if (selfIndex + 1 == numElementsWithinParens) {
         if (selfIndex > 0) {
           // Remove from the previous comma to the close-paren (half-open).
           removeRangeStart = args->getElement(selfIndex-1)->getEndLoc();
@@ -1055,7 +1057,12 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
           removeRangeStart = Lexer::getLocForEndOfToken(sourceMgr,
                                                         argExpr->getStartLoc());
         }
-        removeRangeEnd = args->getEndLoc();
+
+        // Prefer the r-paren location, so that we get the right behavior when
+        // there's a trailing closure, but handle some implicit cases too.
+        removeRangeEnd = args->getRParenLoc();
+        if (removeRangeEnd.isInvalid())
+          removeRangeEnd = args->getEndLoc();
 
       } else {
         // Remove from the label to the start of the next argument (half-open).
