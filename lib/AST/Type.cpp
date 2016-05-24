@@ -1639,7 +1639,7 @@ bool TypeBase::isExactSuperclassOf(Type ty, LazyResolver *resolver) {
 }
 
 /// Returns true if type `a` has archetypes that can be bound to form `b`.
-static bool isBindableTo(Type a, Type b, LazyResolver *resolver) {
+bool TypeBase::isBindableTo(Type b, LazyResolver *resolver) {
   class IsBindableVisitor : public TypeVisitor<IsBindableVisitor, bool, CanType>
   {
     llvm::DenseMap<ArchetypeType *, CanType> Bindings;
@@ -1655,11 +1655,24 @@ static bool isBindableTo(Type a, Type b, LazyResolver *resolver) {
       if (bound != Bindings.end()) {
         return bound->second->isEqual(subst);
       }
+      
+      auto canBindClassConstrainedArchetype = [](CanType t) -> bool {
+        // Classes and class-constrained archetypes.
+        if (t->mayHaveSuperclass())
+          return true;
+        
+        // Pure @objc existentials.
+        if (t->isObjCExistentialType())
+          return true;
+        
+        return false;
+      };
+      
       // Check that the archetype isn't constrained in a way that makes the
       // binding impossible.
       // For instance, if the archetype is class-constrained, and the binding
       // is not a class, it can never be bound.
-      if (orig->requiresClass() && !subst->mayHaveSuperclass())
+      if (orig->requiresClass() && !canBindClassConstrainedArchetype(subst))
         return false;
       
       // TODO: If the archetype has a superclass constraint, check that the
@@ -1750,6 +1763,46 @@ static bool isBindableTo(Type a, Type b, LazyResolver *resolver) {
       return false;
     }
     
+    bool visitSILFunctionType(SILFunctionType *func,
+                              CanType subst) {
+      if (auto substFunc = dyn_cast<SILFunctionType>(subst)) {
+        if (func->getExtInfo() != substFunc->getExtInfo())
+          return false;
+        
+        // TODO: Generic signatures
+        if (func->getGenericSignature() || substFunc->getGenericSignature())
+          return false;
+        
+        if (func->getParameters().size() != substFunc->getParameters().size())
+          return false;
+        if (func->getAllResults().size() != substFunc->getAllResults().size())
+          return false;
+        
+        for (unsigned i : indices(func->getParameters())) {
+          if (func->getParameters()[i].getConvention()
+                != substFunc->getParameters()[i].getConvention())
+            return false;
+          if (!visit(func->getParameters()[i].getType(),
+                     substFunc->getParameters()[i].getType()))
+            return false;
+        }
+        
+        for (unsigned i : indices(func->getAllResults())) {
+          if (func->getAllResults()[i].getConvention()
+                != substFunc->getAllResults()[i].getConvention())
+            return false;
+          
+          if (!visit(func->getAllResults()[i].getType(),
+                     substFunc->getAllResults()[i].getType()))
+            return false;
+        }
+        
+        return true;
+      }
+      
+      return false;
+    }
+    
     bool visitBoundGenericType(BoundGenericType *bgt, CanType subst) {
       if (auto substBGT = dyn_cast<BoundGenericType>(subst)) {
         if (bgt->getDecl() != substBGT->getDecl())
@@ -1798,7 +1851,7 @@ static bool isBindableTo(Type a, Type b, LazyResolver *resolver) {
     }
   };
   
-  return IsBindableVisitor(resolver).visit(a->getCanonicalType(),
+  return IsBindableVisitor(resolver).visit(getCanonicalType(),
                                            b->getCanonicalType());
 }
 
@@ -1822,7 +1875,7 @@ bool TypeBase::isBindableToSuperclassOf(Type ty, LazyResolver *resolver) {
     return true;
   
   do {
-    if (isBindableTo(this, ty, resolver))
+    if (isBindableTo(ty, resolver))
       return true;
     if (ty->getAnyNominal() && ty->getAnyNominal()->isInvalid())
       return false;

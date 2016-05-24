@@ -1495,7 +1495,8 @@ getSILFunctionTypeForSelectorFamily(SILModule &M, SelectorFamily family,
 }
 
 static CanSILFunctionType
-getUncachedSILFunctionTypeForConstant(SILModule &M, SILDeclRef constant,
+getUncachedSILFunctionTypeForConstant(SILModule &M,
+                                  SILDeclRef constant,
                                   CanAnyFunctionType origLoweredInterfaceType) {
   assert(origLoweredInterfaceType->getExtInfo().getSILRepresentation()
            != SILFunctionTypeRepresentation::Thick
@@ -1505,7 +1506,7 @@ getUncachedSILFunctionTypeForConstant(SILModule &M, SILDeclRef constant,
   auto extInfo = origLoweredInterfaceType->getExtInfo();
 
   if (!constant.isForeign) {
-    return getNativeSILFunctionType(M,
+    return ::getNativeSILFunctionType(M,
                   AbstractionPattern(origLoweredInterfaceType),
                   origLoweredInterfaceType,
                   extInfo,
@@ -1536,6 +1537,16 @@ getUncachedSILFunctionTypeForConstant(SILModule &M, SILDeclRef constant,
                                              origLoweredInterfaceType,
                                              origLoweredInterfaceType,
                                              extInfo, foreignError);
+}
+
+CanSILFunctionType TypeConverter::
+getUncachedSILFunctionTypeForConstant(SILDeclRef constant,
+                                      CanAnyFunctionType origInterfaceType) {
+  auto origLoweredInterfaceType = getLoweredASTFunctionType(origInterfaceType,
+                                                            constant.uncurryLevel,
+                                                            constant);
+  return ::getUncachedSILFunctionTypeForConstant(M, constant,
+                                                 origLoweredInterfaceType);
 }
 
 static bool isClassOrProtocolMethod(ValueDecl *vd) {
@@ -1620,8 +1631,8 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
 
   // The SIL type encodes conventions according to the original type.
   CanSILFunctionType silFnType =
-    getUncachedSILFunctionTypeForConstant(M, constant,
-                                          loweredInterfaceType);
+    ::getUncachedSILFunctionTypeForConstant(M, constant,
+                                            loweredInterfaceType);
 
   DEBUG(llvm::dbgs() << "lowering type for constant ";
         constant.print(llvm::dbgs());

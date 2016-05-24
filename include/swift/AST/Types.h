@@ -656,6 +656,10 @@ public:
   ///          of \c ty.
   bool isBindableToSuperclassOf(Type ty, LazyResolver *resolver);
 
+  /// True if this type contains archetypes that could be substituted with
+  /// concrete types to form the argument type.
+  bool isBindableTo(Type ty, LazyResolver *resolver);
+
   /// \brief Determines whether this type is permitted as a method override
   /// of the \p other.
   bool canOverride(Type other, OverrideMatchMode matchMode,
