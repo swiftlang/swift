@@ -154,7 +154,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     // types well.
     CanType signature;
 
-    if (typeResolver)
+    if (typeResolver && !decl->isBeingTypeChecked())
       typeResolver->resolveDeclSignature(decl);
 
     if (!decl->hasType())
