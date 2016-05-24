@@ -77,8 +77,6 @@ KNOWN_SETTINGS=(
     llvm-enable-lto             "0"              "enable LTO compilation of LLVM/Clang."
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
-    swift-stdlib-enable-reflection-metadata "1"  "build the Swift stdlib and overlays with remote reflection metadata"
-    swift-stdlib-enable-reflection-names "0"     "build the Swift stdlib and overlays with names of struct stored properties and enum cases"
     swift-stdlib-enable-resilience "0"           "build the Swift stdlib and overlays with resilience enabled"
     swift-stdlib-sil-serialize-all "1"           "build the Swift stdlib and overlays with all method bodies serialized"
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
@@ -1634,8 +1632,6 @@ for deployment_target in "${HOST_TARGET}" "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARG
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
-                    -DSWIFT_STDLIB_ENABLE_REFLECTION_METADATA:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_REFLECTION_METADATA}")
-                    -DSWIFT_STDLIB_ENABLE_REFLECTION_NAMES:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_REFLECTION_NAMES}")
                     -DSWIFT_STDLIB_ENABLE_RESILIENCE:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_RESILIENCE}")
                     -DSWIFT_STDLIB_SIL_SERIALIZE_ALL:BOOL=$(true_false "${SWIFT_STDLIB_SIL_SERIALIZE_ALL}")
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"

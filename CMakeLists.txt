@@ -230,14 +230,6 @@ option(SWIFT_STDLIB_ENABLE_RESILIENCE
     "Build the standard libraries and overlays with resilience enabled; see docs/LibraryEvolution.rst"
     FALSE)
 
-option(SWIFT_STDLIB_ENABLE_REFLECTION_METADATA
-    "Build the standard libraries and overlays with remote reflection metadata; see docs/proposals/RemoteMirrors.rst"
-    TRUE)
-
-option(SWIFT_STDLIB_ENABLE_REFLECTION_NAMES
-    "Build the standard libraries and overlays with remote reflection names; see docs/proposals/RemoteMirrors.rst"
-    FALSE)
-
 option(SWIFT_STDLIB_SIL_SERIALIZE_ALL
     "Build the standard libraries and overlays serializing all method bodies"
     TRUE)
