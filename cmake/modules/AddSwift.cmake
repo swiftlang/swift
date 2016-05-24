@@ -1224,7 +1224,7 @@ function(add_swift_library name)
         message(FATAL_ERROR "internal error: the variable should be non-empty")
       endif()
 
-      if(SWIFTLIB_IS_STDLIB)
+      if(SWIFTLIB_TARGET_LIBRARY)
         if(SWIFTLIB_SHARED)
           set(resource_dir "swift")
           set(file_permissions
