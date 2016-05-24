@@ -126,11 +126,10 @@ public struct Unsafe${Mutable}BufferPointer<Element>
 
   /// The number of elements in the buffer.
   public var count: Int {
-    if _position == nil {
-      _sanityCheck(_end == nil)
-      return 0
+    if let pos = _position {
+      return _end! - pos
     }
-    return _end! - _position!
+    return 0
   }
 
   let _position, _end: Unsafe${Mutable}Pointer<Element>?
