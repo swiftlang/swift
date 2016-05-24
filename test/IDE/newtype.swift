@@ -85,7 +85,7 @@ func tests() {
 	fooErr.process()
 	Food().process() // expected-error{{value of type 'Food' has no member 'process'}}
 
-	let thirdEnum = ClosedEnum.thirdEntry!
+	let thirdEnum = ClosedEnum.thirdEntry
 	thirdEnum.process()
 	  // expected-error@-1{{value of type 'ClosedEnum' has no member 'process'}}
 
