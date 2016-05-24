@@ -658,8 +658,6 @@ public struct ${Self}<Element>
 
   public typealias Indices = CountableRange<Int>
 
-%{
-SubscriptDocComment="""\
   /// Accesses the element at the specified position.
   ///
   /// For example:
@@ -674,19 +672,11 @@ SubscriptDocComment="""\
   ///
   /// - Complexity: Reading an element from an array is O(1). Writing is O(1)
   ///   unless the array's storage is shared with another array, in which case
-  ///   writing is O(*n*), where *n* is the length of the array.""" + ("""
+  ///   writing is O(*n*), where *n* is the length of the array.
+%if Self == 'Array':
   ///   If the array uses a bridged `NSArray` instance as its storage, the
-  ///   efficiency is unspecified.""" if Self == 'Array' else '')
-}%
-
-#if _runtime(_ObjC)
-  // FIXME: Code is duplicated here between the Objective-C and non-Objective-C
-  // runtimes because config blocks can't appear inside a subscript function
-  // without causing parse errors. When this is fixed, they should be merged
-  // as described in the comment below.
-  // rdar://problem/19553956
-
-${SubscriptDocComment}
+  ///   efficiency is unspecified.
+%end
   public subscript(index: Int) -> Element {
     get {
       // This call may be hoisted or eliminated by the optimizer.  If
@@ -709,34 +699,6 @@ ${SubscriptDocComment}
       return (_getElementAddress(index), Builtin.tryPin(_getOwner_native()))
     }
   }
-#else
-${SubscriptDocComment}
-  public subscript(index: Int) -> Element {
-    get {
-      // This call may be hoisted or eliminated by the optimizer.  If
-      // there is an inout violation, this value may be stale so needs to be
-      // checked again below.
-      let wasNativeTypeChecked = _hoistableIsNativeTypeChecked()
-
-      // Make sure the index is in range and wasNativeTypeChecked is
-      // still valid.
-      let token = _checkSubscript(
-        index, wasNativeTypeChecked: wasNativeTypeChecked)
-
-      return _getElement(
-        index, wasNativeTypeChecked: wasNativeTypeChecked,
-        matchingSubscriptCheck: token)
-    }
-
-    mutableAddressWithPinnedNativeOwner {
-      _makeMutableAndUniqueOrPinned()
-      _checkSubscript_native(index)
-      return (
-        _getElementAddress(index),
-        Builtin.tryPin(_getOwner_native()))
-    }
-  }
-#endif
 
   /// Accesses a contiguous subrange of the array's elements.
   ///
