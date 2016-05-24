@@ -4235,11 +4235,11 @@ static unsigned scorePotentiallyMatchingNames(DeclName lhs, DeclName rhs,
 }
 
 /// Apply omit-needless-words to the given declaration, if possible.
-static Optional<DeclName> omitNeedlessWords(ValueDecl *value) {
+static Optional<DeclName> omitNeedlessWords(TypeChecker &tc, ValueDecl *value) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(value))
-    return swift::omitNeedlessWords(func);
+    return tc.omitNeedlessWords(func);
   if (auto var = dyn_cast<VarDecl>(value)) {
-    if (auto newName = swift::omitNeedlessWords(var))
+    if (auto newName = tc.omitNeedlessWords(var))
       return DeclName(*newName);
     return None;
   }
@@ -4247,15 +4247,15 @@ static Optional<DeclName> omitNeedlessWords(ValueDecl *value) {
 }
 
 /// Determine the score between two potentially-matching declarations.
-static unsigned scorePotentiallyMatching(ValueDecl *req, ValueDecl *witness,
-                                         unsigned limit) {
+static unsigned scorePotentiallyMatching(TypeChecker &tc, ValueDecl *req,
+                                         ValueDecl *witness, unsigned limit) {
   DeclName reqName = req->getFullName();
   DeclName witnessName = witness->getFullName();
 
   // Apply the omit-needless-words heuristics to both names.
-  if (auto adjustedReqName = ::omitNeedlessWords(req))
+  if (auto adjustedReqName = ::omitNeedlessWords(tc, req))
     reqName = *adjustedReqName;
-  if (auto adjustedWitnessName = ::omitNeedlessWords(witness))
+  if (auto adjustedWitnessName = ::omitNeedlessWords(tc, witness))
     witnessName = *adjustedWitnessName;
 
   return scorePotentiallyMatchingNames(reqName, witnessName, isa<FuncDecl>(req),
@@ -4576,7 +4576,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         if (req->getAttrs().isUnavailable(Context)) continue;
 
         // Score this particular optional requirement.
-        auto score = scorePotentiallyMatching(req, value, bestScore);
+        auto score = scorePotentiallyMatching(*this, req, value, bestScore);
 
         // If the score is better than the best we've seen, update the best
         // and clear out the list.
