@@ -72,10 +72,10 @@ protocol SomeProt {
   func protMeth(p: Int)
 }
 class Test2 : SomeProt {
-  func protMeth(_ p: Int)
+  func protMeth(_ p: Int) {}
 
-  func instMeth(p: Int)
-  func instMeth2(p: Int, p2: Int)
+  func instMeth(p: Int) {}
+  func instMeth2(p: Int, p2: Int) {}
 }
 Test2().instMeth(0)
 Test2().instMeth2(0, p2:1)
