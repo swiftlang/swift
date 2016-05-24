@@ -149,7 +149,7 @@ class alignas(8) Expr {
     unsigned IsSingleUnicodeScalar : 1;
     unsigned IsSingleExtendedGraphemeCluster : 1;
   };
-  enum { NumStringLiteralExprBits = NumLiteralExprBits + 2 };
+  enum { NumStringLiteralExprBits = NumLiteralExprBits + 4 };
   static_assert(NumStringLiteralExprBits <= 32, "fits in an unsigned");
 
   class DeclRefExprBitfields {
@@ -271,6 +271,7 @@ class alignas(8) Expr {
     unsigned IsSourceScalar : 1;
   };
   enum { NumTupleShuffleExprBits = NumImplicitConversionExprBits + 1 };
+  static_assert(NumTupleShuffleExprBits <= 32, "fits in an unsigned");
 
   class ApplyExprBitfields {
     friend class ApplyExpr;
@@ -287,7 +288,7 @@ class alignas(8) Expr {
     unsigned : NumExprBits;
     unsigned CastKind : NumCheckedCastKindBits;
   };
-  enum { NumCheckedCastExprBits = NumExprBits + 4 };
+  enum { NumCheckedCastExprBits = NumExprBits + NumCheckedCastKindBits };
   static_assert(NumCheckedCastExprBits <= 32, "fits in an unsigned");
   static_assert(unsigned(CheckedCastKind::Last_CheckedCastKind)
                   < (1 << NumCheckedCastKindBits),
