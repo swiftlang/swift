@@ -108,7 +108,7 @@ public func compareInits() -> Bool {
   let mfNoLabel = MyInt(1)
   let res = mf.rawValue == MyInt.one.rawValue 
         && mfNoLabel.rawValue == MyInt.one.rawValue
-  // OPT:  [[ONE:%.*]] = load i32, i32* @kMyIntOne, align 4
+  // OPT:  [[ONE:%.*]] = load i32, i32*{{.*}}@kMyIntOne{{.*}}, align 4
   // OPT-NEXT: [[COMP:%.*]] = icmp eq i32 [[ONE]], 1
 
   takesMyInt(mf)
