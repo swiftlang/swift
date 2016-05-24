@@ -170,6 +170,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_1 | FileCheck %s -check-prefix=GENERIC_TYPEALIAS_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_2 | FileCheck %s -check-prefix=GENERIC_TYPEALIAS_2
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPRECATED_1 | FileCheck %s -check-prefix=DEPRECATED_1
+
 // Test code completion of expressions that produce a value.
 
 struct FooStruct {
@@ -1882,3 +1884,11 @@ func testGenericTypealias2() {
   Enclose.#^GENERIC_TYPEALIAS_2^#
 }
 // GENERIC_TYPEALIAS_2: Decl[TypeAlias]/CurrNominal:        MyPair[#(T, T)#];
+
+struct Deprecated {
+  @available(*, deprecated)
+  func deprecated(x: Deprecated) {
+    x.#^DEPRECATED_1^#
+  }
+}
+// DEPRECATED_1: Decl[InstanceMethod]/CurrNominal/NotRecommended: deprecated({#x: Deprecated#})[#Void#];

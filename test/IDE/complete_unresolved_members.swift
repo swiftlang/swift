@@ -34,6 +34,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_29 | FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_30 | FileCheck %s -check-prefix=UNRESOLVED_2
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_AVAIL_1 | FileCheck %s -check-prefix=ENUM_AVAIL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OPTIONS_AVAIL_1 | FileCheck %s -check-prefix=OPTIONS_AVAIL_1
+
 enum SomeEnum1 {
   case South
   case North
@@ -66,6 +69,19 @@ struct SomeOptions2 : OptionSet {
   static let Option4 = SomeOptions2(rawValue: 1 << 1)
   static let Option5 = SomeOptions2(rawValue: 1 << 2)
   static let Option6 = SomeOptions2(rawValue: 1 << 3)
+}
+
+enum EnumAvail1 {
+  case aaa
+  @available(*, unavailable) case AAA
+  @available(*, deprecated) case BBB
+}
+
+struct OptionsAvail1 : OptionSet {
+  let rawValue: Int
+  static let aaa = OptionsAvail1(rawValue: 1 << 0)
+  @available(*, unavailable) static let AAA = OptionsAvail1(rawValue: 1 << 0)
+  @available(*, deprecated) static let BBB = OptionsAvail1(rawValue: 1 << 1)
 }
 
 func OptionSetTaker1(Op : SomeOptions1) {}
@@ -232,3 +248,23 @@ let TopLevelVar1 = OptionSetTaker7([.#^UNRESOLVED_28^#], Op2: [.Option4])
 let TopLevelVar2 = OptionSetTaker1([.#^UNRESOLVED_29^#])
 
 let TopLevelVar3 = OptionSetTaker7([.Option1], Op2: [.#^UNRESOLVED_30^#])
+
+func testAvail1(x: EnumAvail1) {
+  testAvail1(.#^ENUM_AVAIL_1^#)
+}
+// ENUM_AVAIL_1: Begin completions, 2 items
+// ENUM_AVAIL_1-NOT: AAA
+// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific:     aaa[#EnumAvail1#];
+// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific/NotRecommended: BBB[#EnumAvail1#];
+// ENUM_AVAIL_1-NOT: AAA
+// ENUM_AVAIL_1: End completions
+
+func testAvail2(x: OptionsAvail1) {
+  testAvail2(.#^OPTIONS_AVAIL_1^#)
+}
+// OPTIONS_AVAIL_1: Begin completions, 2 items
+// ENUM_AVAIL_1-NOT: AAA
+// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal:        aaa[#OptionsAvail1#];
+// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal/NotRecommended: BBB[#OptionsAvail1#];
+// ENUM_AVAIL_1-NOT: AAA
+// OPTIONS_AVAIL_1: End completions
