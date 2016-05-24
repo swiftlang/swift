@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -enable-reflection-metadata -enable-reflection-names -emit-ir %s | FileCheck %s
-// RUN: %target-swift-frontend -enable-reflection-metadata -emit-ir %s | FileCheck %s --check-prefix=STRIP_REFLECTION_NAMES
-// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s --check-prefix=STRIP_REFLECTION_METADATA
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -disable-reflection-names -emit-ir %s | FileCheck %s --check-prefix=STRIP_REFLECTION_NAMES
+// RUN: %target-swift-frontend -disable-reflection-metadata -emit-ir %s | FileCheck %s --check-prefix=STRIP_REFLECTION_METADATA
 
 // STRIP_REFLECTION_NAMES_DAG: {{.*}}swift3_reflect
 // STRIP_REFLECTION_NAMES_DAG: {{.*}}swift3_fieldmd
@@ -38,7 +38,9 @@
 // CHECK-DAG: private constant [3 x i8] c"GS\00", section "{{[^"]*}}swift3_reflstr{{[^"]*}}"
 // CHECK-DAG: private constant [3 x i8] c"GE\00", section "{{[^"]*}}swift3_reflstr{{[^"]*}}"
 
-// CHECK: @"\01l__swift3_reflection_metadata{{.*}}" = private constant <{ {{.*}} }>
+// CHECK-DAG: @"\01l__swift3_capture_descriptor" = private constant <{ {{.*}} }> <{ i32 1, i32 1, i32 2, {{.*}} }>
+
+// CHECK-DAG: @"\01l__swift3_reflection_metadata{{.*}}" = private constant <{ {{.*}} }>
 
 public protocol MyProtocol {
   associatedtype Inner
@@ -101,7 +103,6 @@ public enum MyGenericEnum<T : MyProtocol> {
   case I(Int)
 }
 
-public func makeSomeClosures<T, U>(t: T, x: Int, y: MyGenericStruct<U>)
-    -> (() -> (), () -> (), () -> ()) {
-  return ({ _ = t }, { _ = x }, { _ = y })
+public func makeSomeClosures<T : MyProtocol>(t: T) -> (() -> ()) {
+  return { _ = t }
 }

@@ -467,6 +467,22 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
 
   SILValue CastedValue;
 
+  if (SrcTy.isAddress() && DestTy.isAddress()) {
+    // Cast between two addresses and that's it.
+    if (CheckOnly)
+      return Value;
+    CastedValue = B->createUncheckedAddrCast(Loc, Value, DestTy);
+    return CastedValue;
+  }
+
+  if (SrcTy.isAddress() != DestTy.isAddress()) {
+    // Addresses aren't compatible with values.
+    if (CheckOnly)
+      return None;
+    llvm_unreachable("Addresses aren't compatible with values");
+    return SILValue();
+  }
+
   auto &M = B->getModule();
   OptionalTypeKind SrcOTK;
   OptionalTypeKind DestOTK;
@@ -603,6 +619,18 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
       return Value;
     CastedValue = B->createUpcast(Loc, Value, DestTy);
     return CastedValue;
+  }
+
+  if (auto mt1 = dyn_cast<AnyMetatypeType>(SrcTy.getSwiftRValueType())) {
+    if (auto mt2 = dyn_cast<AnyMetatypeType>(DestTy.getSwiftRValueType())) {
+      if (mt1->getRepresentation() == mt2->getRepresentation()) {
+        // Cast between two metatypes and that's it.
+        if (CheckOnly)
+          return Value;
+        CastedValue = B->createUncheckedBitCast(Loc, Value, DestTy);
+        return CastedValue;
+      }
+    }
   }
 
   if (SrcTy.isAddress() && DestTy.isAddress()) {

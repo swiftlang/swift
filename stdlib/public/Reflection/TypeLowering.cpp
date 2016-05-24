@@ -110,17 +110,23 @@ public:
       case RecordKind::ThickFunction:
         printHeader("thick_function");
         break;
-      case RecordKind::Existential:
-        printHeader("existential");
+      case RecordKind::OpaqueExistential:
+        printHeader("opaque_existential");
         break;
       case RecordKind::ClassExistential:
         printHeader("class_existential");
+        break;
+      case RecordKind::ErrorExistential:
+        printHeader("error_existential");
         break;
       case RecordKind::ExistentialMetatype:
         printHeader("existential_metatype");
         break;
       case RecordKind::ClassInstance:
         printHeader("class_instance");
+        break;
+      case RecordKind::ClosureContext:
+        printHeader("closure_context");
         break;
       }
       printBasic(TI);
@@ -172,137 +178,94 @@ void TypeInfo::dump(std::ostream &OS, unsigned Indent) const {
   OS << '\n';
 }
 
+BuiltinTypeInfo::BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor)
+  : TypeInfo(TypeInfoKind::Builtin,
+             descriptor->Size, descriptor->Alignment,
+             descriptor->Stride, descriptor->NumExtraInhabitants),
+    Name(descriptor->getMangledTypeName()) {}
+
 namespace {
-
-class BuiltinTypeInfo : public TypeInfo {
-public:
-  BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor)
-    : TypeInfo(TypeInfoKind::Builtin,
-               descriptor->Size, descriptor->Alignment,
-               descriptor->Stride, descriptor->NumExtraInhabitants) {}
-
-  static bool classof(const TypeInfo *TI) {
-    return TI->getKind() == TypeInfoKind::Builtin;
-  }
-};
-
-/// Utility class for performing universal layout for types such as
-/// tuples, structs, thick functions, etc.
-class RecordTypeInfoBuilder {
-  TypeConverter &TC;
-  unsigned Size, Alignment, Stride, NumExtraInhabitants;
-  RecordKind Kind;
-  std::vector<FieldInfo> Fields;
-  bool Invalid;
-
-public:
-  RecordTypeInfoBuilder(TypeConverter &TC, RecordKind Kind)
-    : TC(TC), Size(0), Alignment(1), Stride(0), NumExtraInhabitants(0),
-      Kind(Kind), Invalid(false) {}
-
-  unsigned addField(unsigned fieldSize, unsigned fieldAlignment) {
-    // Align the current size appropriately
-    Size = ((Size + fieldAlignment - 1) & ~(fieldAlignment - 1));
-
-    // Record the offset
-    unsigned offset = Size;
-
-    // Update the aggregate size
-    Size += fieldSize;
-
-    // Update the aggregate alignment
-    Alignment = std::max(Alignment, fieldAlignment);
-
-    // Re-calculate the stride
-    Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
-
-    return offset;
-  }
-
-  void addField(const std::string &Name, const TypeRef *TR) {
-    const TypeInfo *TI = TC.getTypeInfo(TR);
-    if (TI == nullptr) {
-      Invalid = true;
-      return;
-    }
-
-    // FIXME: I just made this up
-    if (Size == 0)
-      NumExtraInhabitants = TI->getNumExtraInhabitants();
-    else
-      NumExtraInhabitants = 0;
-
-    unsigned fieldSize = TI->getSize();
-    unsigned fieldAlignment = TI->getAlignment();
-
-    unsigned fieldOffset = addField(fieldSize, fieldAlignment);
-    Fields.push_back({Name, fieldOffset, TR, *TI});
-  }
-
-  const RecordTypeInfo *build() {
-    if (Invalid)
-      return nullptr;
-
-    return TC.makeTypeInfo<RecordTypeInfo>(
-        Size, Alignment, Stride,
-        NumExtraInhabitants, Kind, Fields);
-  }
-};
 
 /// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {
   TypeConverter &TC;
+  ExistentialTypeRepresentation Representation;
+  std::vector<const ProtocolTypeRef *> Protocols;
   bool ObjC;
-  bool Class;
   unsigned WitnessTableCount;
   bool Invalid;
 
+  bool isSingleErrorProtocol() const {
+    if (Protocols.size() != 1)
+      return false;
+
+    for (auto *P : Protocols) {
+      if (P->isErrorProtocol())
+        return true;
+    }
+    return false;
+  }
+
+  void examineProtocols() {
+    if (isSingleErrorProtocol()) {
+      Representation = ExistentialTypeRepresentation::ErrorProtocol;
+      // No extra witness table for protocol<ErrorProtocol>
+      return;
+    }
+
+    for (auto *P : Protocols) {
+      // FIXME: AnyObject should go away
+      if (P->isAnyObject()) {
+        Representation = ExistentialTypeRepresentation::Class;
+        // No extra witness table for AnyObject
+        continue;
+      }
+
+      const FieldDescriptor *FD = TC.getBuilder().getFieldTypeInfo(P);
+      if (FD == nullptr) {
+        Invalid = true;
+        continue;
+      }
+
+      switch (FD->Kind) {
+        case FieldDescriptorKind::ObjCProtocol:
+          // Objective-C protocols do not have any witness tables.
+          ObjC = true;
+          continue;
+        case FieldDescriptorKind::ClassProtocol:
+          Representation = ExistentialTypeRepresentation::Class;
+          WitnessTableCount++;
+          continue;
+        case FieldDescriptorKind::Protocol:
+          WitnessTableCount++;
+          continue;
+        case FieldDescriptorKind::Imported:
+        case FieldDescriptorKind::ObjCClass:
+        case FieldDescriptorKind::Struct:
+        case FieldDescriptorKind::Enum:
+        case FieldDescriptorKind::Class:
+          Invalid = true;
+          continue;
+      }
+    }
+  }
+
 public:
   ExistentialTypeInfoBuilder(TypeConverter &TC)
-    : TC(TC), ObjC(false), Class(false), WitnessTableCount(0),
-      Invalid(false) {}
+    : TC(TC), Representation(ExistentialTypeRepresentation::Opaque),
+      ObjC(false), WitnessTableCount(0), Invalid(false) {}
 
   void addProtocol(const TypeRef *TR) {
-    auto *P = dyn_cast<ProtocolTypeRef>(TR);
-    if (P == nullptr) {
+    if (auto *P = dyn_cast<const ProtocolTypeRef>(TR)) {
+      Protocols.push_back(P);
+    } else {
       Invalid = true;
-      return;
-    }
-
-    // FIXME: AnyObject should go away
-    if (P->getMangledName() == "Ps9AnyObject_") {
-      // No witness table for AnyObject
-      Class = true;
-      return;
-    }
-
-    const FieldDescriptor *FD = TC.getBuilder().getFieldTypeInfo(TR);
-    if (FD == nullptr) {
-      Invalid = true;
-      return;
-    }
-
-    switch (FD->Kind) {
-    case FieldDescriptorKind::ObjCProtocol:
-      // Objective-C protocols do not have any witness tables.
-      ObjC = true;
-      break;
-    case FieldDescriptorKind::ClassProtocol:
-      Class = true;
-      WitnessTableCount++;
-      break;
-    case FieldDescriptorKind::Protocol:
-      WitnessTableCount++;
-      break;
-    case FieldDescriptorKind::Struct:
-    case FieldDescriptorKind::Enum:
-    case FieldDescriptorKind::Class:
-      Invalid = true;
-      break;
     }
   }
 
   const TypeInfo *build() {
+    examineProtocols();
+
     if (Invalid)
       return nullptr;
 
@@ -314,22 +277,38 @@ public:
                                      ReferenceCounting::Unknown);
     }
 
-    RecordTypeInfoBuilder builder(TC,
-                                  Class
-                                    ? RecordKind::ClassExistential
-                                    : RecordKind::Existential);
+    RecordKind Kind;
+    switch (Representation) {
+    case ExistentialTypeRepresentation::Class:
+      Kind = RecordKind::ClassExistential;
+      break;
+    case ExistentialTypeRepresentation::Opaque:
+      Kind = RecordKind::OpaqueExistential;
+      break;
+    case ExistentialTypeRepresentation::ErrorProtocol:
+      Kind = RecordKind::ErrorExistential;
+      break;
+    }
 
-    if (Class) {
+    RecordTypeInfoBuilder builder(TC, Kind);
+
+    switch (Representation) {
+    case ExistentialTypeRepresentation::Class:
       // Class existentials consist of a single retainable pointer
       // followed by witness tables.
       builder.addField("object", TC.getUnknownObjectTypeRef());
-    } else {
+      break;
+    case ExistentialTypeRepresentation::Opaque:
       // Non-class existentials consist of a three-word buffer and
       // value metadata, followed by witness tables.
       builder.addField("value", TC.getRawPointerTypeRef());
       builder.addField("value", TC.getRawPointerTypeRef());
       builder.addField("value", TC.getRawPointerTypeRef());
       builder.addField("metadata", TC.getRawPointerTypeRef());
+      break;
+    case ExistentialTypeRepresentation::ErrorProtocol:
+      builder.addField("error", TC.getUnknownObjectTypeRef());
+      break;
     }
 
     for (unsigned i = 0; i < WitnessTableCount; i++)
@@ -339,6 +318,8 @@ public:
   }
 
   const TypeInfo *buildMetatype() {
+    examineProtocols();
+
     if (Invalid)
       return nullptr;
 
@@ -359,6 +340,56 @@ public:
   }
 };
 
+}
+
+unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
+                                         unsigned fieldAlignment) {
+  // Align the current size appropriately
+  Size = ((Size + fieldAlignment - 1) & ~(fieldAlignment - 1));
+
+  // Record the offset
+  unsigned offset = Size;
+
+  // Update the aggregate size
+  Size += fieldSize;
+
+  // Update the aggregate alignment
+  Alignment = std::max(Alignment, fieldAlignment);
+
+  // Re-calculate the stride
+  Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+
+  return offset;
+}
+
+void RecordTypeInfoBuilder::addField(const std::string &Name,
+                                     const TypeRef *TR) {
+  const TypeInfo *TI = TC.getTypeInfo(TR);
+  if (TI == nullptr) {
+    Invalid = true;
+    return;
+  }
+
+  // FIXME: I just made this up
+  if (Size == 0)
+    NumExtraInhabitants = TI->getNumExtraInhabitants();
+  else
+    NumExtraInhabitants = 0;
+
+  unsigned fieldSize = TI->getSize();
+  unsigned fieldAlignment = TI->getAlignment();
+
+  unsigned fieldOffset = addField(fieldSize, fieldAlignment);
+  Fields.push_back({Name, fieldOffset, TR, *TI});
+}
+
+const RecordTypeInfo *RecordTypeInfoBuilder::build() {
+  if (Invalid)
+    return nullptr;
+
+  return TC.makeTypeInfo<RecordTypeInfo>(
+      Size, Alignment, Stride,
+      NumExtraInhabitants, Kind, Fields);
 }
 
 const ReferenceTypeInfo *
@@ -454,6 +485,111 @@ enum class MetatypeRepresentation : unsigned {
   Unknown
 };
 
+/// Visitor class to determine if a type has a fixed size.
+///
+/// Conservative approximation.
+class HasFixedSize
+  : public TypeRefVisitor<HasFixedSize, bool> {
+
+public:
+  HasFixedSize() {}
+
+  using TypeRefVisitor<HasFixedSize, bool>::visit;
+
+  bool visitBuiltinTypeRef(const BuiltinTypeRef *B) {
+    return true;
+  }
+
+  bool visitNominalTypeRef(const NominalTypeRef *N) {
+    return true;
+  }
+
+  bool visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
+    if (BG->isClass())
+      return true;
+    for (auto Arg : BG->getGenericParams()) {
+      if (!visit(Arg))
+        return false;
+    }
+    return true;
+  }
+
+  bool visitTupleTypeRef(const TupleTypeRef *T) {
+    for (auto Element : T->getElements())
+      if (!visit(Element))
+        return false;
+    return true;
+  }
+
+  bool visitFunctionTypeRef(const FunctionTypeRef *F) {
+    return true;
+  }
+
+  bool visitProtocolTypeRef(const ProtocolTypeRef *P) {
+    return true;
+  }
+
+  bool
+  visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    return true;
+  }
+
+  bool visitMetatypeTypeRef(const MetatypeTypeRef *M) {
+    return true;
+  }
+
+  bool
+  visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
+    return true;
+  }
+
+  bool
+  visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
+    return true;
+  }
+
+  bool
+  visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
+    return true;
+  }
+
+  bool visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
+    return true;
+  }
+
+  bool
+  visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
+    return true;
+  }
+
+  bool visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
+    return true;
+  }
+
+  bool
+  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
+    return true;
+  }
+
+  bool
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
+    return false;
+  }
+
+  bool
+  visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
+    return false;
+  }
+
+  bool visitOpaqueTypeRef(const OpaqueTypeRef *O) {
+    return false;
+  }
+};
+
+bool TypeConverter::hasFixedSize(const TypeRef *TR) {
+  return HasFixedSize().visit(TR);
+}
+
 MetatypeRepresentation combineRepresentations(MetatypeRepresentation rep1,
                                               MetatypeRepresentation rep2) {
   if (rep1 == rep2)
@@ -477,10 +613,9 @@ MetatypeRepresentation combineRepresentations(MetatypeRepresentation rep1,
 /// MetatypeTypeRefs.
 class HasSingletonMetatype
   : public TypeRefVisitor<HasSingletonMetatype, MetatypeRepresentation> {
-  TypeRefBuilder &Builder;
 
 public:
-  HasSingletonMetatype(TypeRefBuilder &Builder) : Builder(Builder) {}
+  HasSingletonMetatype() {}
 
   using TypeRefVisitor<HasSingletonMetatype, MetatypeRepresentation>::visit;
 
@@ -488,34 +623,16 @@ public:
     return MetatypeRepresentation::Thin;
   }
 
-  MetatypeRepresentation visitAnyNominalTypeRef(const TypeRef *TR) {
-    const FieldDescriptor *FD = Builder.getFieldTypeInfo(TR);
-    if (FD == nullptr)
-      return MetatypeRepresentation::Unknown;
-
-    switch (FD->Kind) {
-    case FieldDescriptorKind::Class:
-      // Classes can have subclasses, so the metatype is always thick.
-      return MetatypeRepresentation::Thick;
-
-    case FieldDescriptorKind::Struct:
-    case FieldDescriptorKind::Enum:
-      return MetatypeRepresentation::Thin;
-
-    case FieldDescriptorKind::ObjCProtocol:
-    case FieldDescriptorKind::ClassProtocol:
-    case FieldDescriptorKind::Protocol:
-      // Invalid field descriptor.
-      return MetatypeRepresentation::Unknown;
-    }
-  }
-
   MetatypeRepresentation visitNominalTypeRef(const NominalTypeRef *N) {
-    return visitAnyNominalTypeRef(N);
+    if (N->isClass())
+      return MetatypeRepresentation::Thick;
+    return MetatypeRepresentation::Thin;
   }
 
   MetatypeRepresentation visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
-    return visitAnyNominalTypeRef(BG);
+    if (BG->isClass())
+      return MetatypeRepresentation::Thick;
+    return MetatypeRepresentation::Thin;
   }
 
   MetatypeRepresentation visitTupleTypeRef(const TupleTypeRef *T) {
@@ -634,8 +751,6 @@ public:
     switch (FD->Kind) {
     case FieldDescriptorKind::Class:
       // A value of class type is a single retainable pointer.
-      //
-      // FIXME: need to know if this is a NativeObject or UnknownObject
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                      ReferenceCounting::Native);
     case FieldDescriptorKind::Struct: {
@@ -686,6 +801,18 @@ public:
 
       return nullptr;
     }
+    case FieldDescriptorKind::Imported:
+      // Imported types are represented as a builtin type, an opaque blob with
+      // some size, alignment, etc. If we find it in the builtins, we'll use
+      // that information.
+      //
+      // FIXME: Emit field information for imported record types?
+      if (auto ImportedTypeDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR))
+        return TC.makeTypeInfo<BuiltinTypeInfo>(ImportedTypeDescriptor);
+      return nullptr;
+    case FieldDescriptorKind::ObjCClass:
+      return TC.getReferenceTypeInfo(ReferenceKind::Strong,
+                                     ReferenceCounting::Unknown);
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
     case FieldDescriptorKind::Protocol:
@@ -738,7 +865,7 @@ public:
   }
 
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
-    switch (HasSingletonMetatype(TC.getBuilder()).visit(M)) {
+    switch (HasSingletonMetatype().visit(M)) {
     case MetatypeRepresentation::Unknown:
       return nullptr;
     case MetatypeRepresentation::Thin:
@@ -905,6 +1032,8 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
   case FieldDescriptorKind::ObjCProtocol:
   case FieldDescriptorKind::ClassProtocol:
   case FieldDescriptorKind::Protocol:
+  case FieldDescriptorKind::Imported:
+  case FieldDescriptorKind::ObjCClass:
     // Invalid field descriptor.
     return nullptr;
   }

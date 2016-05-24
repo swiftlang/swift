@@ -409,13 +409,13 @@ func inoutAccessOfClassProperty() {
 // the re-abstraction.
 
 protocol Panda {
-  var x: Self -> Self { get set }
+  var x: (Self) -> Self { get set }
 }
 
 func id<T>(_ t: T) -> T { return t }
 
 extension Panda {
-  var x: Self -> Self {
+  var x: (Self) -> Self {
     get { return id }
     set { }
   }

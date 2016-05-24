@@ -68,14 +68,12 @@ struct _BridgeStorage<
   }
   
   @inline(__always)
-  @warn_unused_result
   public // @testable
   mutating func isUniquelyReferencedNative() -> Bool {
     return _isUnique(&rawValue)
   }
 
   @inline(__always)
-  @warn_unused_result
   public // @testable
   mutating func isUniquelyReferencedOrPinnedNative() -> Bool {
     return _isUniqueOrPinned(&rawValue)
@@ -90,7 +88,6 @@ struct _BridgeStorage<
   }
   
   @inline(__always)
-  @warn_unused_result
   public // @testable
   func isNativeWithClearedSpareBits(_ bits: Int) -> Bool {
     return (_bitPattern(rawValue) &
@@ -123,7 +120,6 @@ struct _BridgeStorage<
   }
   
   @inline(__always)
-  @warn_unused_result
   public // @testable
   mutating func isUniquelyReferenced_native_noSpareBits() -> Bool {
     _sanityCheck(isNative)
@@ -131,7 +127,6 @@ struct _BridgeStorage<
   }
 
   @inline(__always)
-  @warn_unused_result
   public // @testable
   mutating func isUniquelyReferencedOrPinned_native_noSpareBits() -> Bool {
     _sanityCheck(isNative)

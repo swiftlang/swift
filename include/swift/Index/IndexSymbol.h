@@ -19,6 +19,7 @@
 
 namespace swift {
 class Decl;
+class ValueDecl;
 
 namespace index {
 
@@ -92,6 +93,7 @@ using SymbolRole = clang::index::SymbolRole;
 using SymbolRoleSet = clang::index::SymbolRoleSet;
 
 struct IndexSymbol {
+  const ValueDecl *decl;
   SymbolKind kind;
   SymbolSubKindSet subKinds = SymbolSubKindSet(0);
   SymbolRoleSet roles = SymbolRoleSet(0);

@@ -1460,7 +1460,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       auto boundFunctionType = boundType->getAs<AnyFunctionType>();
         
       if (boundFunctionType &&
-          CD->isBodyThrowing() != boundFunctionType->throws()) {
+          CD->hasThrows() != boundFunctionType->throws()) {
         boundType = FunctionType::get(boundFunctionType->getInput(),
                                       boundFunctionType->getResult(),
                                       boundFunctionType->getExtInfo().

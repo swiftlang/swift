@@ -33,8 +33,8 @@ func useContainer() -> () {
   func exists() -> Bool { return true }
 }
 
-func test(a: BadAttributes) -> () {
-  a.exists() // no-warning
+func test(a: BadAttributes) -> () { // expected-note * {{did you mean 'test'?}}
+  _ = a.exists() // no-warning
 }
 
 // Here is an extra random close-brace!
@@ -88,10 +88,10 @@ func missingControllingExprInIf() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}}
+  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
   }
 
-  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-error{{cannot call value of non-function type '()'}}
+  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
   }
 
   // <rdar://problem/18940198>
@@ -110,10 +110,10 @@ func missingControllingExprInWhile() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}}
+  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
   }
 
-  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-error{{cannot call value of non-function type '()'}}
+  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{result of call to 'init(_builtinBooleanLiteral:)' is unused}}
   }
 
   // <rdar://problem/18940198>
@@ -128,7 +128,7 @@ func missingControllingExprInRepeatWhile() {
   }
 
   repeat {
-  } while { true }() // expected-error{{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{10-10=;}}
+  } while { true }() // expected-error{{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{10-10=;}} expected-warning {{result of call is unused, but produces 'Bool'}}
 }
 
 // SR-165
@@ -405,6 +405,7 @@ struct MissingInitializer1 {
 
 func exprPostfix1(x : Int) {
   x. // expected-error {{expected member name following '.'}}
+    // expected-warning @-1 {{expression of type 'Int' is unused}}
 }
 
 func exprPostfix2() {
@@ -487,9 +488,9 @@ public enum TestB {
 class bar {}
 var baz: bar
 // expected-error@+1{{unnamed parameters must be written with the empty name '_'}}
-func foo1(bar!=baz) {}
+func foo1(bar!=baz) {} // expected-note {{did you mean 'foo1'?}}
 // expected-error@+1{{unnamed parameters must be written with the empty name '_'}}
-func foo2(bar! = baz) {}
+func foo2(bar! = baz) {}// expected-note {{did you mean 'foo2'?}}
 
 // rdar://19605567
 // expected-error@+1{{use of unresolved identifier 'esp'}}
@@ -523,12 +524,13 @@ func a(s: S[{{g) -> Int {}  // expected-note {{to match this opening '('}}
 // expected-error@+3{{expected '(' for initializer parameters}}
 // expected-error@+2{{initializers may only be declared within a type}}
 // expected-error@+1{{expected an identifier to name generic parameter}}
-func F() { init<( } )}
+func F() { init<( } )} // expected-note {{did you mean 'F'?}}
 
 // rdar://20337695
 func f1() {
 
-  // expected-error @+5 {{use of unresolved identifier 'C'}}
+  // expected-error @+6 {{use of unresolved identifier 'C'}}
+  // expected-note @+5 {{did you mean 'n'?}}
   // expected-error @+4 {{unary operator cannot be separated from its operand}} {{11-12=}}
   // expected-error @+3 {{'==' is not a prefix unary operator}}
   // expected-error @+2 {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
@@ -616,13 +618,14 @@ protocol B23086402 {
 
 // <rdar://problem/23550816> QoI: Poor diagnostic in argument list of "print" (varargs related)
 func test23086402(a: A23086402) {
-  print(a.b.c + "")  // expected-error {{cannot convert value of type '[String]' to expected argument type 'String'}}
+  print(a.b.c + "")  // expected-error {{binary operator '+' cannot be applied to operands of type '[String]' and 'String'}} expected-note {{expected an argument list of type '(String, String)'}}
 }
 
 // <rdar://problem/23719432> [practicalswift] Compiler crashes on &(Int:_)
 func test23719432() {
   var x = 42
   &(Int:x)  // expected-error {{'&' can only appear immediately in a call argument list}}
+  // expected-warning @-1 {{expression of type 'inout (Int: Int)' is unused}}
 }
 
 // <rdar://problem/19911096> QoI: terrible recovery when using '·' for an operator
@@ -644,6 +647,7 @@ func postfixDot(a : String) {
   _ = a.   utf8  // expected-error {{extraneous whitespace after '.' is not permitted}} {{9-12=}}
   _ = a.       // expected-error {{expected member name following '.'}}
     a.         // expected-error {{expected member name following '.'}}
+  // expected-warning @-1 {{expression of type 'String' is unused}}
 }
 
 // <rdar://problem/23036383> QoI: Invalid trailing closures in stmt-conditions produce lowsy diagnostics

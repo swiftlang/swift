@@ -1,4 +1,4 @@
-add_swift_library(swiftReflection IS_STDLIB IS_HOST
+add_swift_library(swiftReflection TARGET_LIBRARY HOST_LIBRARY
   Demangle.cpp
   MetadataSource.cpp
   Remangle.cpp

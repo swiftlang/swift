@@ -153,7 +153,7 @@ func test11(_ g: Gizmo) -> AnyClass {
 // ObjC blocks should have cdecl calling convention and follow C/ObjC
 // ownership conventions, where the callee, arguments, and return are all +0.
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions10applyBlock
-func applyBlock(_ f: @convention(block) Gizmo -> Gizmo, x: Gizmo) -> Gizmo {
+func applyBlock(_ f: @convention(block) (Gizmo) -> Gizmo, x: Gizmo) -> Gizmo {
   // CHECK:     bb0([[BLOCK:%.*]] : $@convention(block) (Gizmo) -> @autoreleased Gizmo, [[ARG:%.*]] : $Gizmo):
   // CHECK:       [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:       strong_retain [[BLOCK_COPY]]
@@ -167,7 +167,7 @@ func applyBlock(_ f: @convention(block) Gizmo -> Gizmo, x: Gizmo) -> Gizmo {
 }
 
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions15maybeApplyBlock
-func maybeApplyBlock(_ f: (@convention(block) Gizmo -> Gizmo)?, x: Gizmo) -> Gizmo? {
+func maybeApplyBlock(_ f: (@convention(block) (Gizmo) -> Gizmo)?, x: Gizmo) -> Gizmo? {
   // CHECK:     bb0([[BLOCK:%.*]] : $Optional<@convention(block) Gizmo -> Gizmo>, [[ARG:%.*]] : $Gizmo):
   // CHECK:       [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   return f?(x)

@@ -22,8 +22,8 @@
 
 namespace swift {
   class AbstractFunctionDecl;
+  class ApplyExpr;
   class AvailableAttr;
-  class CallExpr;
   class DeclContext;
   class Expr;
   class InFlightDiagnostic;
@@ -61,13 +61,13 @@ bool diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
                                 InFlightDiagnostic *existingDiag = nullptr);
 
 /// Emit fix-its to rename the base name at \p referenceRange based on the
-/// "renamed" argument in \p attr. If \p CE is provided, the argument labels
+/// "renamed" argument in \p attr. If \p call is provided, the argument labels
 /// will also be updated.
 void fixItAvailableAttrRename(TypeChecker &TC,
                               InFlightDiagnostic &diag,
                               SourceRange referenceRange,
                               const AvailableAttr *attr,
-                              const CallExpr *CE);
+                              const ApplyExpr *call);
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

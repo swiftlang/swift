@@ -545,6 +545,12 @@ private:
   /// The index of the next response metavariable to bind to a REPL result.
   unsigned NextResponseVariableIndex = 0;
 
+  /// If non-zero, warn when a function body takes longer than this many
+  /// milliseconds to type-check.
+  ///
+  /// Intended for debugging purposes only.
+  unsigned WarnLongFunctionBodies = 0;
+
   /// If true, the time it takes to type-check each function will be dumped
   /// to llvm::errs().
   bool DebugTimeFunctionBodies = false;
@@ -569,6 +575,14 @@ public:
   /// Dump the time it takes to type-check each function to llvm::errs().
   void enableDebugTimeFunctionBodies() {
     DebugTimeFunctionBodies = true;
+  }
+
+  /// If \p timeInMS is non-zero, warn when a function body takes longer than
+  /// this many milliseconds to type-check.
+  ///
+  /// Intended for debugging purposes only.
+  void setWarnLongFunctionBodies(unsigned timeInMS) {
+    WarnLongFunctionBodies = timeInMS;
   }
 
   bool getInImmediateMode() {
@@ -905,6 +919,11 @@ public:
   bool isProtocolExtensionUsable(DeclContext *dc, Type type,
                                  ExtensionDecl *protocolExtension) override;
 
+  void markInvalidGenericSignature(ValueDecl *VD);
+
+  /// Configure the interface type of a function declaration.
+  void configureInterfaceType(AbstractFunctionDecl *func);
+
   /// Validate the signature of a generic function.
   ///
   /// \param func The generic function.
@@ -1015,6 +1034,13 @@ public:
   /// \brief Add the RawRepresentable, Equatable, and Hashable methods to an
   /// enum with a raw type.
   void addImplicitEnumConformances(EnumDecl *ED);
+
+  /// Ensure that the specified \c storage has accessors.
+  ///
+  /// \param wantMaterializeForSet Whether we need materializeForSet
+  /// synthesized.
+  void synthesizeAccessorsForStorage(AbstractStorageDecl *storage,
+                                     bool wantMaterializeForSet);
 
   /// The specified AbstractStorageDecl \c storage was just found to satisfy
   /// the protocol property \c requirement.  Ensure that it has the full
@@ -1153,6 +1179,12 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpressionShallow(Expr *&expr, DeclContext *dc);
+
+  /// Check the key-path expression.
+  ///
+  /// Returns the type of the last component of the key-path.
+  Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, ObjCKeyPathExpr *expr,
+                                      bool requireResultType = false);
 
   /// \brief Type check whether the given type declaration includes members of
   /// unsupported recursive value types.
@@ -1489,6 +1521,12 @@ public:
   /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
   void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);
 
+  /// If this bound-generic type is bridged, mark any
+  /// _ObjectiveCBridgeable conformances in the generic arguments of
+  /// the given type as "used".
+  void useObjectiveCBridgeableConformancesOfArgs(DeclContext *dc,
+                                                 BoundGenericType *bound);
+
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.
   ///
@@ -1569,12 +1607,24 @@ public:
                                    Identifier name, SourceLoc nameLoc,
                                    LookupTypeResult &lookup);
 
+  void diagnoseUnavailableOverride(ValueDecl *override,
+                                   const ValueDecl *base,
+                                   const AvailableAttr *attr);
+
   /// Emit a diagnostic for references to declarations that have been
   /// marked as unavailable, either through "unavailable" or "obsoleted:".
   bool diagnoseExplicitUnavailability(const ValueDecl *D,
                                       SourceRange R,
                                       const DeclContext *DC,
-                                      const CallExpr *CE);
+                                      const ApplyExpr *call);
+
+  /// Emit a diagnostic for references to declarations that have been
+  /// marked as unavailable, either through "unavailable" or "obsoleted:".
+  bool diagnoseExplicitUnavailability(
+      const ValueDecl *D,
+      SourceRange R,
+      const DeclContext *DC,
+      llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts);
 
   /// @}
 
@@ -1621,6 +1671,9 @@ public:
   ProtocolDecl *getLiteralProtocol(Expr *expr);
 
   DeclName getObjectLiteralConstructorName(ObjectLiteralExpr *expr);
+
+  Type getObjectLiteralParameterType(ObjectLiteralExpr *expr,
+                                     ConstructorDecl *ctor);
 
   /// Get the module appropriate for looking up standard library types.
   ///
@@ -1776,7 +1829,7 @@ public:
                           const DeclContext *ReferenceDC,
                           const AvailableAttr *Attr,
                           DeclName Name,
-                          const CallExpr *CE);
+                          const ApplyExpr *Call);
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
@@ -1831,6 +1884,18 @@ public:
 
   /// Check for needless words in the member reference.
   void checkOmitNeedlessWords(MemberRefExpr *memberRef);
+
+  /// Check for a typo correction.
+  void performTypoCorrection(DeclContext *DC,
+                             DeclRefKind refKind,
+                             DeclName name,
+                             SourceLoc lookupLoc,
+                             NameLookupOptions lookupOptions,
+                             LookupResult &result,
+                             unsigned maxResults = 4);
+
+  void noteTypoCorrection(DeclName name, DeclNameLoc nameLoc,
+                          const LookupResult::Result &suggestion);
 };
 
 /// \brief RAII object that cleans up the given expression if not explicitly

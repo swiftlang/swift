@@ -12,13 +12,12 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: linux
-
 import StdlibUnittest
 
 
+#if _runtime(_ObjC)
 import Foundation
+#endif
 
 // Check that `NonObjectiveCBase` can be subclassed and the subclass can be
 // created.
@@ -147,7 +146,7 @@ tests.test("basic") {
     let s = TestManagedBuffer<LifetimeTracked>.create(10)
     expectEqual(0, s.count)
     expectLE(10, s.myCapacity)
-    expectGE(12, s.myCapacity)  // allow some over-allocation but not too much
+    expectGE(13, s.myCapacity)  // allow some over-allocation but not too much
     
     expectEqual(1, LifetimeTracked.instances)
     for i in 1..<6 {
@@ -262,8 +261,10 @@ tests.test("isUniquelyReferencedNonObjC") {
   var s2 = s
   expectFalse(isUniquelyReferencedNonObjC(&s))
   expectFalse(isUniquelyReferencedNonObjC(&s2))
+#if _runtime(_ObjC)
   var s3 = NSArray()
   expectFalse(isUniquelyReferencedNonObjC(&s3))
+#endif
   _fixLifetime(s)
   _fixLifetime(s2)
 }

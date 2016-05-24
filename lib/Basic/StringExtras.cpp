@@ -146,7 +146,9 @@ void WordIterator::computeNextPosition() const {
       ++endOfNext;
 
     // If the next word is a plural suffix, add it on.
-    if (i == n || isPluralSuffix(String.slice(i, endOfNext)))
+    if (i == n || 
+        (isPluralSuffix(String.slice(i, endOfNext)) &&
+         String.slice(i-1, endOfNext) != "Is"))
       NextPosition = endOfNext;
     else if (clang::isLowercase(String[i]))
       NextPosition = i-1;

@@ -1709,13 +1709,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     // Bridging from a value type to an Objective-C class type.
     // FIXME: Banned for operator parameters, like user conversions are.
 
+
     // NOTE: The plan for <rdar://problem/18311362> was to make such bridging
     // conversions illegal except when explicitly converting with the 'as'
     // operator. But using a String to subscript an [NSObject : AnyObject] is
     // sufficiently common due to bridging that disallowing such conversions is
     // not yet feasible, and a more targeted fix in the type checker is hard to
     // justify.
-
     if (type1->isPotentiallyBridgedValueType() &&
         type1->getAnyNominal() 
           != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
@@ -2667,6 +2667,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       // FIXME: partial application of properties
       hasInstanceMethods = true;
       hasStaticMembers = true;
+    }
+
+    // If we're at the root of an unevaluated context, we can
+    // reference instance members on the metatype.
+    if (memberLocator &&
+        UnevaluatedRootExprs.count(memberLocator->getAnchor())) {
+      hasInstanceMembers = true;
     }
   } else {
     // Otherwise, we can access all instance members.

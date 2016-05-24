@@ -209,25 +209,25 @@ internal protocol _HashStorage {
   var startIndex: Index { get }
   var endIndex: Index { get }
 
-  @warn_unused_result
   func index(after i: Index) -> Index
 
   func formIndex(after i: inout Index)
 
-  @warn_unused_result
   func index(forKey key: Key) -> Index?
 
-  @warn_unused_result
   func assertingGet(_ i: Index) -> SequenceElement
 
-  @warn_unused_result
   func assertingGet(_ key: Key) -> Value
 
-  @warn_unused_result
   func maybeGet(_ key: Key) -> Value?
 
   @discardableResult
   mutating func updateValue(_ value: Value, forKey key: Key) -> Value?
+
+  @discardableResult
+  mutating func insert(
+    _ value: Value, forKey key: Key
+  ) -> (inserted: Bool, memberAfterInsert: Value)
 
   @discardableResult
   mutating func remove(at index: Index) -> SequenceElement
@@ -240,7 +240,6 @@ internal protocol _HashStorage {
 
   var count: Int { get }
 
-  @warn_unused_result
   static func fromArray(_ elements: [SequenceElementWithoutLabels]) -> Self
 }
 
@@ -321,27 +320,28 @@ internal struct _UnmanagedAnyObjectArray {
 ///
 /// - Use the `contains(_:)` method to test whether a set contains a specific
 ///   element.
-/// - Use the `==` operator to test whether two sets contain the same elements.
+/// - Use the "equal to" operator (`==`) to test whether two sets contain the
+///   same elements.
 /// - Use the `isSubset(of:)` method to test whether a set contains all the
 ///   elements of another set or sequence.
 /// - Use the `isSuperset(of:)` method to test whether all elements of a set
 ///   are contained in another set or sequence.
-/// - Use the `isStrictSubset(of:)` and `isStrictSuperset(of:)` methods to
-///   test whether a set is a subset or superset of, but not equal to, another
-///   set.
-/// - Use the `isDisjoint(with:)` method to test whether a set has any
-///   elements in common with another set.
+/// - Use the `isStrictSubset(of:)` and `isStrictSuperset(of:)` methods to test
+///   whether a set is a subset or superset of, but not equal to, another set.
+/// - Use the `isDisjoint(with:)` method to test whether a set has any elements
+///   in common with another set.
 ///
 /// You can also combine, exclude, or subtract the elements of two sets:
 ///
 /// - Use the `union(_:)` method to create a new set with the elements of a set
 ///   and another set or sequence.
-/// - Use the `intersection(_:)` method to create a new set with only the elements
-///   common to a set and another set or sequence.
-/// - Use the `symmetricDifference(_:)` method to create a new set with the elements
-///   that are in either a set or another set or sequence, but not in both.
-/// - Use the `subtracting(_:)` method to create a new set with the elements of a
-///   set that are not also in another set or sequence.
+/// - Use the `intersection(_:)` method to create a new set with only the
+///   elements common to a set and another set or sequence.
+/// - Use the `symmetricDifference(_:)` method to create a new set with the
+///   elements that are in either a set or another set or sequence, but not in
+///   both.
+/// - Use the `subtracting(_:)` method to create a new set with the elements of
+///   a set that are not also in another set or sequence.
 ///
 /// You can modify a set in place by using these methods' mutating
 /// counterparts: `formUnion(_:)`, `formIntersection(_:)`,
@@ -497,16 +497,15 @@ public struct Set<Element : Hashable> :
     return _variantStorage.startIndex
   }
 
-  /// The "past-the-end" position for iterating members of the set.
+  /// The "past the end" position for the set---that is, the position one
+  /// greater than the last valid subscript argument.
   ///
-  /// The `endIndex` property is never a valid subscript argument. If the set
-  /// is empty, `endIndex` is equal to `startIndex`.
+  /// If the set is empty, `endIndex` is equal to `startIndex`.
   public var endIndex: Index {
     return _variantStorage.endIndex
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(after i: Index) -> Index {
     return i.successor()
   }
@@ -529,7 +528,6 @@ public struct Set<Element : Hashable> :
   ///
   /// - Parameter member: An element to look for in the set.
   /// - Returns: `true` if `member` exists in the set; otherwise, `false`.
-  @warn_unused_result
   public func contains(_ member: Element) -> Bool {
     return _variantStorage.maybeGet(member) != nil
   }
@@ -540,17 +538,16 @@ public struct Set<Element : Hashable> :
   /// - Parameter member: An element to search for in the set.
   /// - Returns: The index of `member` if it exists in the set; otherwise,
   ///   `nil`.
-  @warn_unused_result
   public func index(of member: Element) -> Index? {
     return _variantStorage.index(forKey: member)
   }
 
-  /// If `newMember` is not already contained in `self`, inserts it.
+  /// Inserts the given element in the set if it is not already present.
   ///
-  /// If the element is already contained in the set, this method has no
-  /// effect. In this example, a new element is inserted into `classDays`, a
-  /// set of days of the week. When an existing element is inserted, the
-  /// `classDays` set does not change.
+  /// If an element equal to `newMember` is already contained in the set, this
+  /// method has no effect. In the following example, a new element is
+  /// inserted into `classDays`, a set of days of the week. When an existing
+  /// element is inserted, the `classDays` set does not change.
   ///
   ///     enum DayOfTheWeek: Int {
   ///         case sunday, monday, tuesday, wednesday, thursday,
@@ -568,30 +565,41 @@ public struct Set<Element : Hashable> :
   ///     print(classDays)
   ///     // Prints "[.friday, .wednesday, .monday]"
   ///
-  /// - Returns: `(true, newMember)` if `newMember` was not contained in
-  ///   `self`. Otherwise, returns `(false, oldMember)`, where `oldMember` is
-  ///   the member of `self` equal to `newMember` (which may be
-  ///   distinguishable from `newMember`, e.g. via `===`).
-  ///
-  /// - Postcondition: `self.contains(newMember)`.
+  /// - Parameter newMember: An element to insert into the set.
+  /// - Returns: `(true, newMember)` if `newMember` was not contained in the
+  ///   set. If an element equal to `newMember` was already contained in the
+  ///   set, the method returns `(false, oldMember)`, where `oldMember` is the
+  ///   element that was equal to `newMember`. In some cases, `oldMember` may
+  ///   be distinguishable from `newMember` by identity comparison or some
+  ///   other means.
+  @discardableResult
   public mutating func insert(
     _ newMember: Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
-    // FIXME: optimize this to do just one lookup
-    if let i = index(of: newMember) {
-      return (inserted: false, memberAfterInsert: self[i])
-    }
-    _variantStorage.updateValue(newMember, forKey: newMember)
-    return (inserted: true, memberAfterInsert: newMember)
+    return _variantStorage.insert(newMember, forKey: newMember)
   }
 
-  /// Inserts `newMember` unconditionally.
+  /// Inserts the given element into the set unconditionally.
   ///
-  /// - Returns: the former member of `self` equal to `newMember`
-  ///   (which may be distinguishable from `newMember`, e.g. via
-  ///   `===`), or `nil` if no such element existed.
+  /// If an element equal to `newMember` is already contained in the set,
+  /// `newMember` replaces the existing element. In this example, an existing
+  /// element is inserted into `classDays`, a set of days of the week.
   ///
-  /// - Postcondition: `self.contains(newMember)`
+  ///     enum DayOfTheWeek: Int {
+  ///         case sunday, monday, tuesday, wednesday, thursday,
+  ///             friday, saturday
+  ///     }
+  ///
+  ///     var classDays: Set<DayOfTheWeek> = [.monday, .wednesday, .friday]
+  ///     print(classDays.update(with: .monday))
+  ///     // Prints "Optional(.monday)"
+  ///
+  /// - Parameter newMember: An element to insert into the set.
+  /// - Returns: An element equal to `newMember` if the set already contained
+  ///   such a member; otherwise, `nil`. In some cases, the returned element
+  ///   may be distinguishable from `newMember` by identity comparison or some
+  ///   other means.
+  @discardableResult
   public mutating func update(with newMember: Element) -> Element? {
     return _variantStorage.updateValue(newMember, forKey: newMember)
   }
@@ -610,6 +618,7 @@ public struct Set<Element : Hashable> :
   /// - Parameter member: The element to remove from the set.
   /// - Returns: The value of the `member` parameter if it was a member of the
   ///   set; otherwise, `nil`.
+  @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
     return _variantStorage.removeValue(forKey: member)
   }
@@ -617,7 +626,8 @@ public struct Set<Element : Hashable> :
   /// Removes the element at the given index of the set.
   ///
   /// - Parameter position: The index of the member to remove. `position` must
-  ///   be a valid index of the set.
+  ///   be a valid index of the set, and must not be equal to the set's end
+  ///   index.
   /// - Returns: The element that was removed from the set.
   @discardableResult
   public mutating func remove(at position: Index) -> Element {
@@ -671,7 +681,7 @@ public struct Set<Element : Hashable> :
   //
   /// Creates a set containing the elements of the given array literal.
   ///
-  /// Don't directly call this initializer, which is used by the compiler when
+  /// Do not call this initializer directly. It is used by the compiler when
   /// you use an array literal. Instead, create a new set using an array
   /// literal as its value by enclosing a comma-separated list of values in
   /// square brackets. You can use an array literal anywhere a set is expected
@@ -681,7 +691,7 @@ public struct Set<Element : Hashable> :
   /// strings.
   ///
   ///     let ingredients: Set = ["cocoa beans", "sugar", "cocoa butter", "salt"]
-  ///     if ingredients.isSupersetOf(["sugar", "salt"]) {
+  ///     if ingredients.isSuperset(of: ["sugar", "salt"]) {
   ///         print("Whatever it is, it's bound to be delicious!")
   ///     }
   ///     // Prints "Whatever it is, it's bound to be delicious!"
@@ -773,7 +783,6 @@ public struct Set<Element : Hashable> :
   ///   must be finite.
   /// - Returns: `true` if the set is a subset of `possibleSuperset`;
   ///   otherwise, `false`.
-  @warn_unused_result
   public func isSubset<
     S : Sequence where S.Iterator.Element == Element
   >(of possibleSuperset: S) -> Bool {
@@ -795,14 +804,13 @@ public struct Set<Element : Hashable> :
   ///     // Prints "true"
   ///
   ///     // A set is never a strict subset of itself:
-  ///     print(attendees.isStrictSubsetOf(attendees))
+  ///     print(attendees.isStrictSubset(of: attendees))
   ///     // Prints "false"
   ///
   /// - Parameter possibleStrictSuperset: A sequence of elements.
   ///   `possibleStrictSuperset` must be finite.
   /// - Returns: `true` is the set is strict subset of
   ///   `possibleStrictSuperset`; otherwise, `false`.
-  @warn_unused_result
   public func isStrictSubset<
     S : Sequence where S.Iterator.Element == Element
   >(of possibleStrictSuperset: S) -> Bool {
@@ -826,7 +834,6 @@ public struct Set<Element : Hashable> :
   ///   be finite.
   /// - Returns: `true` if the set is a superset of `possibleSubset`;
   ///   otherwise, `false`.
-  @warn_unused_result
   public func isSuperset<
     S : Sequence where S.Iterator.Element == Element
   >(of possibleSubset: S) -> Bool {
@@ -854,7 +861,6 @@ public struct Set<Element : Hashable> :
   ///   `possibleStrictSubset` must be finite.
   /// - Returns: `true` if the set is a strict superset of
   ///   `possibleStrictSubset`; otherwise, `false`.
-  @warn_unused_result
   public func isStrictSuperset<
     S : Sequence where S.Iterator.Element == Element
   >(of possibleStrictSubset: S) -> Bool {
@@ -875,7 +881,6 @@ public struct Set<Element : Hashable> :
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: `true` if the set has no elements in common with `other`;
   ///   otherwise, `false`.
-  @warn_unused_result
   public func isDisjoint<
     S : Sequence where S.Iterator.Element == Element
   >(with other: S) -> Bool {
@@ -907,7 +912,6 @@ public struct Set<Element : Hashable> :
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set with the unique elements of this set and `other`.
-  @warn_unused_result
   public func union<
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) -> Set<Element> {
@@ -916,7 +920,19 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// Inserts the elements of `other` into `self`.
+  /// Inserts the elements of the given sequence into the set.
+  ///
+  /// If the set already contains one or more elements that are also in
+  /// `other`, the existing members are kept. If `other` contains multiple
+  /// instances of equivalent elements, only the first instance is kept.
+  ///
+  ///     var attendees: Set = ["Alicia", "Bethany", "Diana"]
+  ///     let visitors = ["Diana", ""Marcia", "Nathaniel"]
+  ///     attendees.formUnion(visitors)
+  ///     print(attendees)
+  ///     // Prints "["Diana", "Nathaniel", "Bethany", "Alicia", "Marcia"]"
+  ///
+  /// - Parameter other: A sequence of elements. `other` must be finite.
   public mutating func formUnion<
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) {
@@ -938,7 +954,6 @@ public struct Set<Element : Hashable> :
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
-  @warn_unused_result
   public func subtracting<
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) -> Set<Element> {
@@ -991,7 +1006,6 @@ public struct Set<Element : Hashable> :
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
-  @warn_unused_result
   public func intersection<
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) -> Set<Element> {
@@ -1042,7 +1056,6 @@ public struct Set<Element : Hashable> :
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
-  @warn_unused_result
   public func symmetricDifference<
     S : Sequence where S.Iterator.Element == Element
   >(_ other: S) -> Set<Element> {
@@ -1051,8 +1064,8 @@ public struct Set<Element : Hashable> :
     return newSet
   }
 
-  /// Replace `self` with the elements contained in `self` or `other`,
-  /// but not both.
+  /// Replace this set with the elements contained in this set or the given
+  /// set, but not both.
   ///
   /// For example:
   ///
@@ -1074,9 +1087,8 @@ public struct Set<Element : Hashable> :
   /// 
   /// Two sets that are equal will always have equal hash values.
   ///
-  /// - Note: The hash value is not guaranteed to be stable across
-  ///   different invocations of the same program. Do not persist the hash value
-  ///   across program runs.
+  /// Hash values are not guaranteed to be equal across different executions of
+  /// your program. Do not save hash values to use during a future execution.
   public var hashValue: Int {
     // FIXME: <rdar://problem/18915294> Cache Set<T> hashValue
     var result: Int = _mixInt(0)
@@ -1090,12 +1102,10 @@ public struct Set<Element : Hashable> :
   // `Sequence` conformance
   //
 
-  @warn_unused_result
   public func _customContainsEquatableElement(_ member: Element) -> Bool? {
     return contains(member)
   }
 
-  @warn_unused_result
   public func _customIndexOfEquatableElement(
      _ member: Element
     ) -> Index?? {
@@ -1126,7 +1136,6 @@ public struct Set<Element : Hashable> :
 /// a set and some sequence (which may itself be a `Set`).
 ///
 /// (isSubset: lhs ⊂ rhs, isEqual: lhs ⊂ rhs and |lhs| = |rhs|)
-@warn_unused_result
 internal func _compareSets<Element>(_ lhs: Set<Element>, _ rhs: Set<Element>)
   -> (isSubset: Bool, isEqual: Bool) {
   // FIXME(performance): performance could be better if we start by comparing
@@ -1146,7 +1155,6 @@ internal func _compareSets<Element>(_ lhs: Set<Element>, _ rhs: Set<Element>)
 ///   - rhs: Another set.
 /// - Returns: `true` if the `lhs` and `rhs` have the same elements; otherwise,
 ///   `false`.
-@warn_unused_result
 public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Bool {
   switch (lhs._variantStorage, rhs._variantStorage) {
   case (.native(let lhsNativeOwner), .native(let rhsNativeOwner)):
@@ -1217,7 +1225,6 @@ public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Boo
 }
 
 extension Set : CustomStringConvertible, CustomDebugStringConvertible {
-  @warn_unused_result
   private func makeDescription(isDebug: Bool) -> String {
     var result = isDebug ? "Set([" : "["
     var first = true
@@ -1267,7 +1274,6 @@ internal func _stdlib_NSSet_allObjects(_ nss: _NSSet) ->
 ///
 /// - Precondition: `BaseValue` is a base class or base `@objc`
 ///   protocol (such as `AnyObject`) of `DerivedValue`.
-@warn_unused_result
 public func _setUpCast<DerivedValue, BaseValue>(_ source: Set<DerivedValue>)
   -> Set<BaseValue> {
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
@@ -1286,7 +1292,6 @@ public func _setUpCast<DerivedValue, BaseValue>(_ source: Set<DerivedValue>)
 ///
 /// - Precondition: `SwiftValue` is bridged to Objective-C
 ///   and requires non-trivial bridging.
-@warn_unused_result
 public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
   _ source: Set<SwiftValue>
 ) -> Set<ObjCValue> {
@@ -1319,7 +1324,6 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
 ///
 /// - Precondition: `DerivedValue` is a subtype of `BaseValue` and both
 ///   are reference types.
-@warn_unused_result
 public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
   -> Set<DerivedValue> {
 
@@ -1346,7 +1350,6 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
 ///
 /// - Precondition: `DerivedValue` is a subtype of `BaseValue` and both
 ///   are reference types.
-@warn_unused_result
 public func _setDownCastConditional<BaseValue, DerivedValue>(
   _ source: Set<BaseValue>
 ) -> Set<DerivedValue>? {
@@ -1368,7 +1371,6 @@ public func _setDownCastConditional<BaseValue, DerivedValue>(
 ///
 /// - Precondition: At least one of `SwiftValue` is a bridged value
 ///   type, and the corresponding `ObjCValue` is a reference type.
-@warn_unused_result
 public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
   _ source: Set<ObjCValue>
 ) -> Set<SwiftValue> {
@@ -1384,7 +1386,6 @@ public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
 ///
 /// - Precondition: At least one of `SwiftValue` is a bridged value
 ///   type, and the corresponding `ObjCValue` is a reference type.
-@warn_unused_result
 public func _setBridgeFromObjectiveCConditional<
   ObjCValue, SwiftValue
 >(
@@ -1423,10 +1424,182 @@ public func _setBridgeFromObjectiveCConditional<
 
 //===--- APIs unique to Dictionary<Key, Value> ----------------------------===//
 
-/// A mapping from `Key` to `Value`.
+/// A collection whose elements are key-value pairs.
 ///
-/// The order of elements in a dictionary is stable between mutations
-/// but otherwise unpredictable.
+/// A dictionary is a type of hash table, providing fast access to the entries
+/// it contains. Each entry in the table is identified using its key, which is
+/// a hashable type such as a string or number. You use that key to retrieve
+/// the corresponding value, which can be any object. In other languages,
+/// similar data types are known as hashes or associated arrays.
+///
+/// Create a new dictionary by using a dictionary literal. A dictionary literal
+/// is a comma-separated list of key-value pairs, in which a colon separates
+/// each key from its associated value, surrounded by square brackets. You can
+/// assign a dictionary literal to a variable or constant or pass it to a
+/// function that expects a dictionary.
+///
+/// Here's how you would create a dictionary of HTTP response codes and their
+/// related messages:
+///
+///     var responseMessages = [200: "OK",
+///                             403: "Access forbidden",
+///                             404: "File not found",
+///                             500: "Internal server error"]
+///
+/// The `responseMessages` variable is inferred to have type `[Int: String]`.
+/// The `Key` type of the dictionary is `Int`, and the `Value` type of the
+/// dictionary is `String`.
+///
+/// To create a dictionary with no key-value pairs, use an empty dictionary
+/// literal (`[:]`).
+///
+///     var emptyDict: [String: String] = [:]
+///
+/// Any type that conforms to the `Hashable` protocol can be used as a
+/// dictionary's `Key` type, including all of Swift's basic types. You can use
+/// your own custom types as dictionary keys by making them conform to the
+/// `Hashable` protocol.
+///
+/// Getting and Setting Dictionary Values
+/// =====================================
+///
+/// The most common way to access values in a dictionary is to use a key as a
+/// subscript. Subscripting with a key takes the following form:
+///
+///     print(responseMessages[200])
+///     // Prints "Optional("OK")"
+///
+/// Subscripting a dictionary with a key returns an optional value, because a
+/// dictionary might not hold a value for the key that you use in the
+/// subscript.
+///
+/// The next example uses key-based subscripting of the `responseMessages`
+/// dictionary with two keys that exist in the dictionary and one that does
+/// not.
+///
+///     let httpResponseCodes = [200, 403, 301]
+///     for code in httpResponseCodes {
+///         if let message = responseMessages[code] {
+///             print("Response \(code): \(message)")
+///         } else {
+///             print("Unknown response \(code)")
+///         }
+///     }
+///     // Prints "Response 200: OK"
+///     // Prints "Response 403: Access Forbidden"
+///     // Prints "Unknown response 301"
+///
+/// You can also update, modify, or remove keys and values from a dictionary
+/// using the key-based subscript. To add a new key-value pair, assign a value
+/// to a key that isn't yet a part of the dictionary.
+///
+///     responseMessages[301] = "Moved permanently"
+///     print(responseMessages[301])
+///     // Prints "Optional("Moved permanently")"
+///
+/// Update an existing value by assigning a new value to a key that already
+/// exists in the dictionary. If you assign `nil` to an existing key, the key
+/// and its associated value are removed. The following example updates the
+/// value for the `404` code to be simply "Not found" and removes the
+/// key-value pair for the `500` code entirely.
+///
+///     responseMessages[404] = "Not found"
+///     responseMessages[500] = nil
+///     print(responseMessages)
+///     // Prints "[301: "Moved permanently", 200: "OK", 403: "Access forbidden", 404: "Not found"]"
+///
+/// In a mutable `Dictionary` instance, you can modify in place a value that
+/// you've accessed through a keyed subscript. The code sample below declares a
+/// dictionary called `interestingNumbers` with string keys and values that
+/// are integer arrays, then sorts each array in-place in descending order.
+///
+///     var interestingNumbers = ["primes": [2, 3, 5, 7, 11, 13, 15],
+///                               "triangular": [1, 3, 6, 10, 15, 21, 28],
+///                               "hexagonal": [1, 6, 15, 28, 45, 66, 91]]
+///     for key in interestingNumbers.keys {
+///         interestingNumbers[key]?.sort(isOrderedBefore: >)
+///     }
+///
+///     print(interestingNumbers["primes"]!)
+///     // Prints "[15, 13, 11, 7, 5, 3, 2]"
+///
+/// Iterating Over the Contents of a Dictionary
+/// ===========================================
+///
+/// Every dictionary is an unordered collection of key-value pairs. You can
+/// iterate over a dictionary using a `for`-`in` loop, decomposing each
+/// key-value pair into the elements of a tuple.
+///
+///     let imagePaths = ["star": "/glyphs/star.png",
+///                       "portrait": "/images/content/portrait.jpg",
+///                       "spacer": "/images/shared/spacer.gif"]
+///
+///     for (name, path) in imagePaths {
+///         print("The path to '\(name)' is '\(path)'.")
+///     }
+///     // Prints "The path to 'star' is '/glyphs/star.png'."
+///     // Prints "The path to 'portrait' is '/images/content/portrait.jpg'."
+///     // Prints "The path to 'spacer' is '/images/shared/spacer.gif'."
+///
+/// The order of key-value pairs in a dictionary is stable between mutations
+/// but is otherwise unpredictable. If you need an ordered collection of
+/// key-value pairs and don't need the fast key lookup that `Dictionary`
+/// provides, see the `DictionaryLiteral` type for an alternative.
+///
+/// You can search a dictionary's contents for a particular value using the
+/// `contains(where:)` or `index(where:)` methods supplied by default
+/// implementation. The following example checks to see if `imagePaths` contains
+/// any paths in the `"/glyphs"` directory:
+///
+///     let glyphIndex = imagePaths.index { $0.value.hasPrefix("/glyphs") }
+///     if let index = glyphIndex {
+///         print("The '\(imagesPaths[index].key)' image is a glyph.")
+///     } else {
+///         print("No glyphs found!")
+///     }
+///     // Prints "The 'star' image is a glyph.")
+///
+/// Note that in this example, `imagePaths` is subscripted using a dictionary
+/// index. Unlike the key-based subscript, the index-based subscript returns
+/// the corresponding key-value pair as a non-optional tuple.
+///
+///     print(imagePaths[glyphIndex!])
+///     // Prints "("star", "/glyphs/star.png")"
+///
+/// A dictionary's indices stay valid across additions to the dictionary as
+/// long as the dictionary has enough capacity to store the added values
+/// without allocating more storage. When a dictionary outgrows its storage,
+/// existing indices may be invalidated without any notification.
+///
+/// When you know how many new values you're adding to a dictionary, use the
+/// `init(minimumCapacity:)` initializer to allocate the correct amount of
+/// storage.
+///
+/// Bridging Between Dictionary and NSDictionary
+/// ============================================
+///
+/// You can bridge between `Dictionary` and `NSDictionary` using the `as`
+/// operator. For bridging to be possible, the `Key` and `Value` types of a
+/// dictionary must be classes, `@objc` protocols, or types that bridge to
+/// Foundation types.
+///
+/// Bridging from `Dictionary` to `NSDictionary` always takes O(1) time and
+/// space. When the dictionary's `Key` and `Value` types are neither classes
+/// nor `@objc` protocols, any required bridging of elements occurs at the
+/// first access of each element. For this reason, the first operation that
+/// uses the contents of the dictionary may take O(*n*).
+///
+/// Bridging from `NSDictionary` to `Dictionary` first calls the `copy(with:)`
+/// method (`- copyWithZone:` in Objective-C) on the dictionary to get an
+/// immutable copy and then performs additional Swift bookkeeping work that
+/// takes O(1) time. For instances of `NSDictionary` that are already
+/// immutable, `copy(with:)` usually returns the same dictionary in O(1) time;
+/// otherwise, the copying performance is unspecified. The instances of
+/// `NSDictionary` and `Dictionary` share storage using the same copy-on-write
+/// optimization that is used when two instances of `Dictionary` share
+/// storage.
+///
+/// - SeeAlso: `Hashable`
 @_fixed_layout
 public struct Dictionary<Key : Hashable, Value> :
   Collection, DictionaryLiteralConvertible {
@@ -1434,19 +1607,31 @@ public struct Dictionary<Key : Hashable, Value> :
   internal typealias _Self = Dictionary<Key, Value>
   internal typealias _VariantStorage = _VariantDictionaryStorage<Key, Value>
   internal typealias _NativeStorage = _NativeDictionaryStorage<Key, Value>
+
+  /// The element type of a dictionary: a tuple containing an individual
+  /// key-value pair.
   public typealias Element = (key: Key, value: Value)
+
+  /// The index type of a dictionary.
   public typealias Index = DictionaryIndex<Key, Value>
 
   internal var _variantStorage: _VariantStorage
 
-  /// Create an empty dictionary.
+  /// Creates an empty dictionary.
   public init() {
     self = Dictionary<Key, Value>(minimumCapacity: 0)
   }
 
-  /// Create a dictionary with at least the given number of
-  /// elements worth of storage.  The actual capacity will be the
-  /// smallest power of 2 that is >= `minimumCapacity`.
+  /// Creates a dictionary with at least the given number of elements worth of
+  /// storage.
+  ///
+  /// Use this initializer to avoid intermediate reallocations when you know
+  /// how many key-value pairs you are adding to a dictionary. The actual
+  /// capacity of the created dictionary is the smallest power of 2 that
+  /// is greater than or equal to `minimumCapacity`.
+  ///
+  /// - Parameter minimumCapacity: The minimum number of key-value pairs to
+  ///   allocate storage for in the new dictionary.
   public init(minimumCapacity: Int) {
     _variantStorage =
       .native(_NativeStorage.Owner(minimumCapacity: minimumCapacity))
@@ -1486,37 +1671,47 @@ public struct Dictionary<Key : Hashable, Value> :
   // additional processing.
   //
 
-  /// The position of the first element in a non-empty dictionary.
+  /// The position of the first element in a nonempty dictionary.
   ///
-  /// Identical to `endIndex` in an empty dictionary.
+  /// If the collection is empty, `startIndex` is equal to `endIndex`.
   ///
-  /// - Complexity: Amortized O(1) if `self` does not wrap a bridged
-  ///   `NSDictionary`, O(N) otherwise.
+  /// - Complexity: Amortized O(1) if the dictionary does not wrap a bridged
+  ///   `NSDictionary`. If the dictionary wraps a bridged `NSDictionary`, the
+  ///   performance is unspecified.
   public var startIndex: Index {
     return _variantStorage.startIndex
   }
 
-  /// The collection's "past the end" position.
+  /// The dictionary's "past the end" position---that is, the position one
+  /// greater than the last valid subscript argument.
   ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
-  /// `index(after:)`.
+  /// If the collection is empty, `endIndex` is equal to `startIndex`.
   ///
-  /// - Complexity: Amortized O(1) if `self` does not wrap a bridged
-  ///   `NSDictionary`, O(N) otherwise.
+  /// - Complexity: Amortized O(1) if the dictionary does not wrap a bridged
+  ///   `NSDictionary`; otherwise, the performance is unspecified.
   public var endIndex: Index {
     return _variantStorage.endIndex
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(after i: Index) -> Index {
     return i.successor()
   }
 
-  /// Returns the `Index` for the given key, or `nil` if the key is not
-  /// present in the dictionary.
-  @warn_unused_result
+  /// Returns the index for the given key.
+  ///
+  /// If the given key is found in the dictionary, this method returns an index
+  /// into the dictionary that corresponds with the key-value pair.
+  ///
+  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+  ///     let index = countryCodes.index(forKey: "JP")
+  ///
+  ///     print("Country code for \(countryCodes[index!].value): '\(countryCodes[index!].key)'.")
+  ///     // Prints "Country code for Japan: 'JP'."
+  ///
+  /// - Parameter key: The key to find in the dictionary.
+  /// - Returns: The index for `key` and its associated value if `key` is in
+  ///   the dictionary; otherwise, `nil`.
   @inline(__always)
   public func index(forKey key: Key) -> Index? {
     // Complexity: amortized O(1) for native storage, O(N) when wrapping an
@@ -1524,18 +1719,79 @@ public struct Dictionary<Key : Hashable, Value> :
     return _variantStorage.index(forKey: key)
   }
 
-  /// Returns the key-value pair at `position`.
+  /// Accesses the key-value pair at the specified position.
   ///
-  /// - Complexity: O(1).
+  /// This subscript takes an index into the dictionary, instead of a key, and
+  /// returns the corresponding key-value pair as a tuple. When performing
+  /// collection-based operations that return an index into a dictionary, use
+  /// this subscript with the resulting value.
+  ///
+  /// For example, to find the key for a particular value in a dictionary, use
+  /// the `index(where:)` method.
+  ///
+  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+  ///     if let index = countryCodes.index(where: { $0.value == "Japan" }) {
+  ///         print(countryCodes[index])
+  ///         print("Japan's country code is '\(countryCodes[index].key)'.")
+  ///     } else {
+  ///         print("Didn't find 'Japan' as a value in the dictionary.")
+  ///     }
+  ///     // Prints "("JP", "Japan")"
+  ///     // Prints "Japan's country code is 'JP'."
+  ///
+  /// - Parameter position: The position of the key-value pair to access.
+  ///   `position` must be a valid index of the dictionary and not equal to
+  ///   `endIndex`.
+  /// - Returns: A two-element tuple with the key and value corresponding to
+  ///   `position`.
   public subscript(position: Index) -> Element {
     return _variantStorage.assertingGet(position)
   }
 
-  /// Access the value associated with the given key.
+  /// Accesses the value associated with the given key for reading and writing.
   ///
-  /// Reading a key that is not present in `self` yields `nil`.
-  /// Writing `nil` as the value for a given key erases that key from
-  /// `self`.
+  /// This *key-based* subscript returns the value for the given key if the key
+  /// is found in the dictionary, or `nil` if the key is not found.
+  ///
+  /// The following example creates a new dictionary and prints the value of a
+  /// key found in the dictionary (`"Coral"`) and a key not found in the
+  /// dictionary (`"Cerise"`).
+  ///
+  ///     var hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
+  ///     print(hues["Coral"])
+  ///     // Prints "Optional(16)"
+  ///     print(hues["Cerise"])
+  ///     // Prints "nil"
+  ///
+  /// When you assign a value for a key and that key already exists, the
+  /// dictionary overwrites the existing value. If the dictionary doesn't
+  /// contain the key, the key and value are added as a new key-value pair.
+  ///
+  /// Here, the value for the key `"Coral"` is updated from `16` to `18` and a
+  /// new key-value pair is added for the key `"Cerise"`.
+  ///
+  ///     hues["Coral"] = 18
+  ///     print(hues["Coral"])
+  ///     // Prints "Optional(18)"
+  ///
+  ///     hues["Cerise"] = 330
+  ///     print(hues["Cerise"])
+  ///     // Prints "Optional(330)"
+  ///
+  /// If you assign `nil` as the value for the given key, the dictionary
+  /// removes that key and its associated value.
+  ///
+  /// In the following example, the key-value pair for the key `"Aquamarine"`
+  /// is removed from the dictionary by assigning `nil` to the key-based
+  /// subscript.
+  ///
+  ///     hues["Aquamarine"] = nil
+  ///     print(hues)
+  ///     // Prints "["Coral": 18, "Heliotrope": 296, "Cerise": 330]"
+  ///
+  /// - Parameter key: The key to find in the dictionary.
+  /// - Returns: The value associated with `key` if `key` is in the dictionary;
+  ///   otherwise, `nil`.
   public subscript(key: Key) -> Value? {
     @inline(__always)
     get {
@@ -1553,11 +1809,39 @@ public struct Dictionary<Key : Hashable, Value> :
     }
   }
 
-  /// Update the value stored in the dictionary for the given key, or, if the
-  /// key does not exist, add a new key-value pair to the dictionary.
+  /// Updates the value stored in the dictionary for the given key, or adds a
+  /// new key-value pair if the key does not exist.
   ///
-  /// Returns the value that was replaced, or `nil` if a new key-value pair
-  /// was added.
+  /// Use this method instead of key-based subscripting when you need to know
+  /// whether the new value supplants the value of an existing key. If the
+  /// value of an existing key is updated, `updateValue(_:forKey:)` returns
+  /// the original value.
+  ///
+  ///     var hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
+  ///
+  ///     if let oldValue = hues.updateValue(18, forKey: "Coral") {
+  ///         print("The old value of \(oldValue) was replaced with a new one.")
+  ///     }
+  ///     // Prints "The old value of 16 was replaced with a new one."
+  ///
+  /// If the given key is not present in the dictionary, this method adds the
+  /// key-value pair and returns `nil`.
+  ///
+  ///     if let oldValue = hues.updateValue(330, forKey: "Cerise") {
+  ///         print("The old value of \(oldValue) was replaced with a new one.")
+  ///     } else {
+  ///         print("No value was found in the dictionary for that key.")
+  ///     }
+  ///     // Prints "No value was found in the dictionary for that key."
+  ///
+  /// - Parameters:
+  ///   - value: The new value to add to the dictionary.
+  ///   - key: The key to associate with `value`. If `key` already exists in
+  ///     the dictionary, `value` replaces the existing associated value. If
+  ///     `key` isn't already a key of the dictionary, the `(key, value)` pair
+  ///     is added.
+  /// - Returns: The value that was replaced, or `nil` if a new key-value pair
+  ///   was added.
   @discardableResult
   public mutating func updateValue(
     _ value: Value, forKey key: Key
@@ -1565,36 +1849,68 @@ public struct Dictionary<Key : Hashable, Value> :
     return _variantStorage.updateValue(value, forKey: key)
   }
 
-  /// Remove and return the key-value pair at `index`.
+  /// Removes and returns the key-value pair at the specified index.
   ///
-  /// Invalidates all indices with respect to `self`.
+  /// Calling this method invalidates any existing indices for use with this
+  /// dictionary.
   ///
-  /// - Complexity: O(`self.count`).
+  /// - Parameter index: The position of the key-value pair to remove. `index`
+  ///   must be a valid index of the dictionary, and must not equal the
+  ///   dictionary's end index.
+  /// - Returns: The key-value pair that correspond to `index`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of key-value pairs in the
+  ///   dictionary.
   @discardableResult
   public mutating func remove(at index: Index) -> Element {
     return _variantStorage.remove(at: index)
   }
 
-  /// Remove a given key and the associated value from the dictionary.
-  /// Returns the value that was removed, or `nil` if the key was not present
-  /// in the dictionary.
+  /// Removes the given key and its associated value from the dictionary.
+  ///
+  /// If the key is found in the dictionary, this method returns the key's
+  /// associated value. On removal, this method invalidates all indices with
+  /// respect to the dictionary.
+  ///
+  ///     var hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
+  ///     if let value = hues.removeValue(forKey: "Coral") {
+  ///         print("The value \(value) was removed.")
+  ///     }
+  ///     // Prints "The value 16 was removed."
+  ///
+  /// If the key isn't found in the dictionary, `removeValue(forKey:)` returns
+  /// `nil`.
+  ///
+  ///     if let value = hues.removeValueForKey("Cerise") {
+  ///         print("The value \(value) was removed.")
+  ///     } else {
+  ///         print("No value found for that key.")
+  ///     }
+  ///     // Prints "No value found for that key.""
+  ///
+  /// - Parameter key: The key to remove along with its associated value.
+  /// - Returns: The value that was removed, or `nil` if the key was not
+  ///   present in the dictionary.
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of key-value pairs in the
+  ///   dictionary.
   @discardableResult
   public mutating func removeValue(forKey key: Key) -> Value? {
     return _variantStorage.removeValue(forKey: key)
   }
 
-  /// Removes all elements.
+  /// Removes all key-value pairs from the dictionary.
   ///
-  /// - Postcondition: `capacity == 0` if `keepingCapacity` is
-  /// `false`, otherwise the capacity will not be decreased.
+  /// Calling this method invalidates all indices with respect to the
+  /// dictionary.
   ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - parameter keepCapacity: If `true`, the operation preserves the
+  /// - Parameter keepCapacity: Whether the dictionary should keep its
+  ///   underlying storage. If you pass `true`, the operation preserves the
   ///   storage capacity that the collection has, otherwise the underlying
   ///   storage is released.  The default is `false`.
   ///
-  /// Complexity: O(`self.count`).
+  /// - Complexity: O(*n*), where *n* is the number of key-value pairs in the
+  ///   dictionary.
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     // The 'will not decrease' part in the documentation comment is worded very
     // carefully.  The capacity can increase if we replace Cocoa storage with
@@ -1602,7 +1918,7 @@ public struct Dictionary<Key : Hashable, Value> :
     _variantStorage.removeAll(keepingCapacity: keepCapacity)
   }
 
-  /// The number of entries in the dictionary.
+  /// The number of key-value pairs in the dictionary.
   ///
   /// - Complexity: O(1).
   public var count: Int {
@@ -1613,9 +1929,23 @@ public struct Dictionary<Key : Hashable, Value> :
   // `Sequence` conformance
   //
 
-  /// Returns an iterator over the `(Key, Value)` pairs.
+  /// Returns an iterator over the dictionary's key-value pairs.
   ///
-  /// - Complexity: O(1).
+  /// Iterating over a dictionary yields the key-value pairs as two-element
+  /// tuples. You can decompose the tuple in a `for`-`in` loop, which calls
+  /// `makeIterator()` behind the scenes, or when calling the iterator's
+  /// `next()` method directly.
+  ///
+  ///     let hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
+  ///     for (name, hueValue) in hues {
+  ///         print("The hue of \(name) is \(hueValue).")
+  ///     }
+  ///     // Prints "The hue of Heliotrope is 296."
+  ///     // Prints "The hue of Coral is 16."
+  ///     // Prints "The hue of Aquamarine is 156."
+  ///
+  /// - Returns: An iterator over the dictionary with elements of type
+  ///   `(key: Key, value: Value)`.
   @inline(__always)
   public func makeIterator() -> DictionaryIterator<Key, Value> {
     return _variantStorage.makeIterator()
@@ -1625,7 +1955,24 @@ public struct Dictionary<Key : Hashable, Value> :
   // DictionaryLiteralConvertible conformance
   //
 
-  /// Create an instance initialized with `elements`.
+  /// Creates a dictionary initialized with a dictionary literal.
+  ///
+  /// Do not call this initializer directly. It is called by the compiler to
+  /// handle dictionary literals. To use a dictionary literal as the initial
+  /// value of a dictionary, enclose a comma-separated list of key-value pairs
+  /// in square brackets.
+  ///
+  /// For example, the code sample below creates a dictionary with string keys
+  /// and values.
+  ///
+  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+  ///     print(countryCodes)
+  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
+  ///
+  /// - Parameter elements: The key-value pairs that will make up the new
+  ///   dictionary. Each key in `elements` must be unique.
+  ///
+  /// - SeeAlso: `DictionaryLiteralConvertible`
   @effects(readonly)
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self.init(_nativeStorage: _NativeDictionaryStorage.fromArray(elements))
@@ -1641,19 +1988,37 @@ public struct Dictionary<Key : Hashable, Value> :
   // API itself.
   //
 
-  /// A collection containing just the keys of `self`.
+  /// A collection containing just the keys of the dictionary.
   ///
-  /// Keys appear in the same order as they occur as the `.key` member
-  /// of key-value pairs in `self`.  Each key in the result has a
-  /// unique value.
+  /// When iterated over, keys appear in this collection in the same order as they
+  /// occur in the dictionary's key-value pairs. Each key in the keys
+  /// collection has a unique value.
+  ///
+  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+  ///     for k in countryCodes.keys {
+  ///         print(k)
+  ///     }
+  ///     // Prints "BR"
+  ///     // Prints "JP"
+  ///     // Prints "GH"
   public var keys: LazyMapCollection<Dictionary, Key> {
     return self.lazy.map { $0.key }
   }
 
-  /// A collection containing just the values of `self`.
+  /// A collection containing just the values of the dictionary.
   ///
-  /// Values appear in the same order as they occur as the `.value` member
-  /// of key-value pairs in `self`.
+  /// When iterated over, values appear in this collection in the same order as they
+  /// occur in the dictionary's key-value pairs.
+  ///
+  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+  ///     print(countryCodes)
+  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
+  ///     for v in countryCodes.values {
+  ///         print(v)
+  ///     }
+  ///     // Prints "Brazil"
+  ///     // Prints "Japan"
+  ///     // Prints "Ghana"
   public var values: LazyMapCollection<Dictionary, Value> {
     return self.lazy.map { $0.value }
   }
@@ -1662,14 +2027,21 @@ public struct Dictionary<Key : Hashable, Value> :
   // Collection conformance
   //
 
-  /// `true` iff `count == 0`.
+  /// A Boolean value that indicates whether the dictionary is empty. (read
+  /// only)
+  ///
+  /// Dictionaries are empty when created with an initializer or an empty
+  /// dictionary literal.
+  ///
+  ///     var frequencies: [String: Int] = [:]
+  ///     print(frequencies.isEmpty)
+  ///     // Prints "true"
   public var isEmpty: Bool {
     return count == 0
   }
 
 }
 
-@warn_unused_result
 public func == <Key : Equatable, Value : Equatable>(
   lhs: [Key : Value],
   rhs: [Key : Value]
@@ -1750,7 +2122,6 @@ public func == <Key : Equatable, Value : Equatable>(
   }
 }
 
-@warn_unused_result
 public func != <Key : Equatable, Value : Equatable>(
   lhs: [Key : Value],
   rhs: [Key : Value]
@@ -1759,7 +2130,6 @@ public func != <Key : Equatable, Value : Equatable>(
 }
 
 extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
-  @warn_unused_result
   internal func _makeDescription() -> String {
     if count == 0 {
       return "[:]"
@@ -1781,12 +2151,13 @@ extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
     return result
   }
 
-  /// A textual representation of `self`.
+  /// A string that represents the contents of the dictionary.
   public var description: String {
     return _makeDescription()
   }
 
-  /// A textual representation of `self`, suitable for debugging.
+  /// A string that represents the contents of the dictionary, suitable for
+  /// debugging.
   public var debugDescription: String {
     return _makeDescription()
   }
@@ -1795,7 +2166,6 @@ extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
 #if _runtime(_ObjC)
 /// Equivalent to `NSDictionary.allKeys`, but does not leave objects on the
 /// autorelease pool.
-@warn_unused_result
 internal func _stdlib_NSDictionary_allKeys(_ nsd: _NSDictionary)
     -> _HeapBuffer<Int, AnyObject> {
   let count = nsd.count
@@ -1815,7 +2185,6 @@ internal func _stdlib_NSDictionary_allKeys(_ nsd: _NSDictionary)
 /// - Precondition: `BaseKey` and `BaseValue` are base classes or base `@objc`
 ///   protocols (such as `AnyObject`) of `DerivedKey` and `DerivedValue`,
 ///   respectively.
-@warn_unused_result
 public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
     _ source: Dictionary<DerivedKey, DerivedValue>
 ) -> Dictionary<BaseKey, BaseValue> {
@@ -1841,7 +2210,6 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
 ///
 /// - Precondition: `SwiftKey` and `SwiftValue` are bridged to Objective-C,
 ///   and at least one of them requires non-trivial bridging.
-@warn_unused_result
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func _dictionaryBridgeToObjectiveC<
@@ -1903,7 +2271,6 @@ public func _dictionaryBridgeToObjectiveC<
 ///
 /// - Precondition: `DerivedKey` is a subtype of `BaseKey`, `DerivedValue` is
 ///   a subtype of `BaseValue`, and all of these types are reference types.
-@warn_unused_result
 public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue> {
@@ -1943,7 +2310,6 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
 ///
 /// - Precondition: `DerivedKey` is a subtype of `BaseKey`, `DerivedValue` is
 ///   a subtype of `BaseValue`, and all of these types are reference types.
-@warn_unused_result
 public func _dictionaryDownCastConditional<
   BaseKey, BaseValue, DerivedKey, DerivedValue
 >(
@@ -1974,7 +2340,6 @@ public func _dictionaryDownCastConditional<
 ///
 /// - Precondition: At least one of `SwiftKey` or `SwiftValue` is a bridged value
 ///   type, and the corresponding `ObjCKey` or `ObjCValue` is a reference type.
-@warn_unused_result
 public func _dictionaryBridgeFromObjectiveC<
   ObjCKey, ObjCValue, SwiftKey, SwiftValue
 >(
@@ -1993,7 +2358,6 @@ public func _dictionaryBridgeFromObjectiveC<
 ///
 /// - Precondition: At least one of `SwiftKey` or `SwiftValue` is a bridged value
 ///   type, and the corresponding `ObjCKey` or `ObjCValue` is a reference type.
-@warn_unused_result
 public func _dictionaryBridgeFromObjectiveCConditional<
   ObjCKey, ObjCValue, SwiftKey, SwiftValue
 >(
@@ -2091,69 +2455,6 @@ collections = [
 ]
 }%
 
-/// A wrapper around a bitmap storage with room for at least `bitCount` bits.
-internal struct _BitMap {
-  internal let values: UnsafeMutablePointer<UInt>
-  internal let bitCount: Int
-
-  // Note: We use UInt here to get unsigned math (shifts).
-  @warn_unused_result
-  internal static func wordIndex(_ i: UInt) -> UInt {
-    return i / UInt._sizeInBits
-  }
-
-  @warn_unused_result
-  internal static func bitIndex(_ i: UInt) -> UInt {
-    return i % UInt._sizeInBits
-  }
-
-  @warn_unused_result
-  internal static func wordsFor(_ bitCount: Int) -> Int {
-    return bitCount + Int._sizeInBytes - 1 / Int._sizeInBytes
-  }
-
-  internal init(storage: UnsafeMutablePointer<UInt>, bitCount: Int) {
-    self.bitCount = bitCount
-    self.values = storage
-  }
-
-  internal var numberOfWords: Int {
-    @warn_unused_result
-    get {
-      return _BitMap.wordsFor(bitCount)
-    }
-  }
-
-  internal func initializeToZero() {
-    for i in 0 ..< numberOfWords {
-      (values + i).initialize(with: 0)
-    }
-  }
-
-  internal subscript(i: Int) -> Bool {
-    @warn_unused_result
-    get {
-      _sanityCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
-      let idx = UInt(i)
-      let word = values[Int(_BitMap.wordIndex(idx))]
-      let bit = word & (1 << _BitMap.bitIndex(idx))
-      return bit != 0
-    }
-    nonmutating set {
-      _sanityCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
-      let idx = UInt(i)
-      let wordIdx = _BitMap.wordIndex(idx)
-      if newValue {
-        values[Int(wordIdx)] =
-            values[Int(wordIdx)] | (1 << _BitMap.bitIndex(idx))
-      } else {
-        values[Int(wordIdx)] =
-            values[Int(wordIdx)] & ~(1 << _BitMap.bitIndex(idx))
-      }
-    }
-  }
-}
-
 /// Header part of the native storage.
 internal struct _HashedContainerStorageHeader {
   internal init(capacity: Int) {
@@ -2188,28 +2489,24 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 
   /// Returns the bytes necessary to store a bit map of 'capacity' bytes and
   /// padding to align the start to word alignment.
-  @warn_unused_result
   internal static func bytesForBitMap(capacity: Int) -> Int {
-    let numWords = _BitMap.wordsFor(capacity)
-    return numWords * sizeof(UInt) + alignof(UInt)
+    let numWords = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
+    return numWords * strideof(UInt) + alignof(UInt)
   }
 
   /// Returns the bytes necessary to store 'capacity' keys and padding to align
   /// the start to the alignment of the 'Key' type assuming a word aligned base
   /// address.
-  @warn_unused_result
   internal static func bytesForKeys(capacity: Int) -> Int {
     let padding = max(0, alignof(Key.self) - alignof(UInt))
     return strideof(Key.self) * capacity + padding
   }
 
+%if Self == 'Dictionary':
   /// Returns the bytes necessary to store 'capacity' values and padding to
   /// align the start to the alignment of the 'Value' type assuming a base
   /// address aligned to the maximum of the alignment of the 'Key' type and the
   /// alignment of a word.
-
-%if Self == 'Dictionary':
-  @warn_unused_result
   internal static func bytesForValues(capacity: Int) -> Int {
     let maxPrevAlignment = max(alignof(Key.self), alignof(UInt))
     let padding = max(0, alignof(Value.self) - maxPrevAlignment)
@@ -2218,10 +2515,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 %end
 
   internal var buffer: BufferPointer {
-    @warn_unused_result
-    get {
-      return BufferPointer(self)
-    }
+    return BufferPointer(self)
   }
 
   // All underscored functions are unsafe and need a _fixLifetime in the caller.
@@ -2236,10 +2530,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 
   @_versioned
   internal var _capacity: Int {
-    @warn_unused_result
-    get {
-      return _body.capacity
-    }
+    return _body.capacity
   }
 
   @_versioned
@@ -2247,56 +2538,36 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     set {
       _body.count = newValue
     }
-    @warn_unused_result
     get {
       return _body.count
     }
   }
 
   internal var _maxLoadFactorInverse : Double {
-    @warn_unused_result
-    get {
-      return _body.maxLoadFactorInverse
-    }
+    return _body.maxLoadFactorInverse
   }
 
   internal
   var _initializedHashtableEntriesBitMapStorage: UnsafeMutablePointer<UInt> {
-    @warn_unused_result
-    get {
-      let start = UInt(Builtin.ptrtoint_Word(buffer._elementPointer._rawValue))
-      let alignment = UInt(alignof(UInt))
-      let alignMask = alignment &- UInt(1)
-      return UnsafeMutablePointer<UInt>(
-          bitPattern:(start &+ alignMask) & ~alignMask)!
-    }
+    return _roundUp(buffer._elementPointer, toAlignmentOf: UInt.self)
   }
 
   internal var _keys: UnsafeMutablePointer<Key> {
-    @warn_unused_result
-    get {
-      let start =
-          UInt(Builtin.ptrtoint_Word(
-              _initializedHashtableEntriesBitMapStorage._rawValue)) &+
-          UInt(_BitMap.wordsFor(_capacity)) &* UInt(strideof(UInt))
-      let alignment = UInt(alignof(Key))
-      let alignMask = alignment &- UInt(1)
-      return UnsafeMutablePointer<Key>(
-          bitPattern:(start &+ alignMask) & ~alignMask)!
-    }
+    let bitMapSizeInBytes =
+      _unsafeMultiply(
+        _UnsafeBitMap.sizeInWords(forSizeInBits: _capacity),
+        strideof(UInt))
+    let start =
+      UnsafeMutablePointer<UInt8>(_initializedHashtableEntriesBitMapStorage)
+      + bitMapSizeInBytes
+    return _roundUp(start, toAlignmentOf: Key.self)
   }
 
 %if Self == 'Dictionary':
   internal var _values: UnsafeMutablePointer<Value> {
-    @warn_unused_result
-    get {
-      let start = UInt(Builtin.ptrtoint_Word(_keys._rawValue)) &+
-        UInt(_capacity) &* UInt(strideof(Key.self))
-      let alignment = UInt(alignof(Value))
-      let alignMask = alignment &- UInt(1)
-      return UnsafeMutablePointer<Value>(
-          bitPattern:(start &+ alignMask) & ~alignMask)!
-    }
+    let keysSizeInBytes = _unsafeMultiply(_capacity, strideof(Key.self))
+    let start = UnsafeMutablePointer<UInt8>(_keys) + keysSizeInBytes
+    return _roundUp(start, toAlignmentOf: Value.self)
   }
 %end
 
@@ -2306,14 +2577,14 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     let requiredCapacity =
       bytesForBitMap(capacity: capacity) + bytesForKeys(capacity: capacity)
 %if Self == 'Dictionary':
-        + bytesForValues(capacity: capacity)
+      + bytesForValues(capacity: capacity)
 %end
 
     let r = super.create(minimumCapacity: requiredCapacity) { _ in
       return _HashedContainerStorageHeader(capacity: capacity)
     }
     let storage = r as! StorageImpl
-    let initializedEntries = _BitMap(
+    let initializedEntries = _UnsafeBitMap(
         storage: storage._initializedHashtableEntriesBitMapStorage,
         bitCount: capacity)
     initializedEntries.initializeToZero()
@@ -2322,7 +2593,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 
   deinit {
     let capacity = _capacity
-    let initializedEntries = _BitMap(
+    let initializedEntries = _UnsafeBitMap(
         storage: _initializedHashtableEntriesBitMapStorage, bitCount: capacity)
     let keys = _keys
 %if Self == 'Dictionary':
@@ -2372,7 +2643,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   internal let buffer: StorageImpl
 
-  internal let initializedEntries: _BitMap
+  internal let initializedEntries: _UnsafeBitMap
   internal let keys: UnsafeMutablePointer<Key>
 %if Self == 'Dictionary':
   internal let values: UnsafeMutablePointer<Value>
@@ -2380,9 +2651,9 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   internal init(capacity: Int) {
     buffer = StorageImpl.create(capacity: capacity)
-    initializedEntries = _BitMap(
-        storage: buffer._initializedHashtableEntriesBitMapStorage,
-        bitCount: capacity)
+    initializedEntries = _UnsafeBitMap(
+      storage: buffer._initializedHashtableEntriesBitMapStorage,
+      bitCount: capacity)
     keys = buffer._keys
 %if Self == 'Dictionary':
     values = buffer._values
@@ -2405,18 +2676,14 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_transparent
   public // @testable
   var capacity: Int {
-    @warn_unused_result
-    get {
-      let result = buffer._capacity
-      _fixLifetime(buffer)
-      return result
-    }
+    let result = buffer._capacity
+    _fixLifetime(buffer)
+    return result
   }
 
   @_versioned
   @_transparent
   internal var count: Int {
-    @warn_unused_result
     get {
       let result = buffer._count
       _fixLifetime(buffer)
@@ -2430,16 +2697,12 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   @_transparent
   internal var maxLoadFactorInverse: Double {
-    @warn_unused_result
-    get {
-      let result = buffer._maxLoadFactorInverse
-      _fixLifetime(buffer)
-      return result
-    }
+    let result = buffer._maxLoadFactorInverse
+    _fixLifetime(buffer)
+    return result
   }
 
   @_versioned
-  @warn_unused_result
   @inline(__always)
   internal func key(at i: Int) -> Key {
     _precondition(i >= 0 && i < capacity)
@@ -2451,7 +2714,6 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @_versioned
-  @warn_unused_result
   internal func isInitializedEntry(at i: Int) -> Bool {
     _precondition(i >= 0 && i < capacity)
     return initializedEntries[i]
@@ -2516,7 +2778,6 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   @_versioned
   @_transparent
-  @warn_unused_result
   internal func value(at i: Int) -> Value {
     _sanityCheck(isInitializedEntry(at: i))
 
@@ -2545,19 +2806,16 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @_versioned
-  @warn_unused_result
   internal func _bucket(_ k: Key) -> Int {
     return _squeezeHashValue(k.hashValue, 0..<capacity)
   }
 
   @_versioned
-  @warn_unused_result
   internal func _index(after bucket: Int) -> Int {
     // Bucket is within 0 and capacity. Therefore adding 1 does not overflow.
     return (bucket &+ 1) & _bucketMask
   }
 
-  @warn_unused_result
   internal func _prev(_ bucket: Int) -> Int {
     // Bucket is not negative. Therefore subtracting 1 does not overflow.
     return (bucket &- 1) & _bucketMask
@@ -2568,7 +2826,6 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   /// If the key is not present, returns the position where it could be
   /// inserted.
   @_versioned
-  @warn_unused_result
   @inline(__always)
   internal func _find(_ key: Key, startBucket: Int)
     -> (pos: Index, found: Bool) {
@@ -2590,7 +2847,6 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @_transparent
-  @warn_unused_result
   internal static func minimumCapacity(
     minimumCount: Int,
     maxLoadFactorInverse: Double
@@ -2658,7 +2914,6 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @_versioned
-  @warn_unused_result
   internal func index(after i: Index) -> Index {
     return i.successor()
   }
@@ -2668,7 +2923,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     i = i.successor()
   }
 
-  @warn_unused_result
+  @_versioned
   @inline(__always)
   internal func index(forKey key: Key) -> Index? {
     if count == 0 {
@@ -2679,7 +2934,6 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     return found ? i : nil
   }
 
-  @warn_unused_result
   internal func assertingGet(_ i: Index) -> SequenceElement {
     _precondition(
       isInitializedEntry(at: i.offset),
@@ -2693,7 +2947,6 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   }
 
-  @warn_unused_result
   internal func assertingGet(_ key: Key) -> Value {
     let (i, found) = _find(key, startBucket: _bucket(key))
     _precondition(found, "key not found")
@@ -2705,7 +2958,6 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @_versioned
-  @warn_unused_result
   @inline(__always)
   internal func maybeGet(_ key: Key) -> Value? {
     if count == 0 {
@@ -2731,6 +2983,14 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @discardableResult
+  internal mutating func insert(
+    _ value: Value, forKey key: Key
+  ) -> (inserted: Bool, memberAfterInsert: Value) {
+    _sanityCheckFailure(
+      "don't call mutating methods on _Native${Self}Storage")
+  }
+
+  @discardableResult
   internal mutating func remove(at index: Index) -> SequenceElement {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
@@ -2747,7 +3007,6 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
       "don't call mutating methods on _Native${Self}Storage")
   }
 
-  @warn_unused_result
   internal static func fromArray(_ elements: [SequenceElementWithoutLabels])
     -> _Native${Self}Storage<${TypeParameters}> {
 
@@ -2798,16 +3057,15 @@ internal struct _BridgedNative${Self}Storage {
   internal typealias SequenceElement = ${AnySequenceType}
 
   internal let buffer: StorageImpl
-  internal let initializedEntries: _BitMap
+  internal let initializedEntries: _UnsafeBitMap
   internal let keys: UnsafeMutablePointer<AnyObject>
 %if Self == 'Dictionary':
   internal let values: UnsafeMutablePointer<AnyObject>
 %end
 
-
   internal init(buffer: StorageImpl) {
     self.buffer = buffer
-    initializedEntries = _BitMap(
+    initializedEntries = _UnsafeBitMap(
       storage: buffer._initializedHashtableEntriesBitMapStorage,
       bitCount: buffer._capacity)
     keys = buffer._keys
@@ -2819,11 +3077,9 @@ internal struct _BridgedNative${Self}Storage {
 
   @_transparent
   internal var capacity: Int {
-    get {
-      let result = buffer._capacity
-      _fixLifetime(buffer)
-      return result
-    }
+    let result = buffer._capacity
+    _fixLifetime(buffer)
+    return result
   }
 
   @_versioned
@@ -2870,7 +3126,6 @@ internal struct _BridgedNative${Self}Storage {
   }
 
   @_transparent
-  @warn_unused_result
   internal func value(at i: Int) -> AnyObject {
     _sanityCheck(isInitializedEntry(at: i))
     let res = (values + i).pointee
@@ -2879,7 +3134,6 @@ internal struct _BridgedNative${Self}Storage {
   }
 %end
 
-  @warn_unused_result
   internal func assertingGet(_ i: Int) -> SequenceElement {
     _precondition(
       isInitializedEntry(at: i),
@@ -2923,7 +3177,6 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
   //
 
   @objc
-  @warn_unused_result
   internal func nextObject() -> AnyObject? {
     if nextIndex == endIndex {
       return nil
@@ -3024,19 +3277,16 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   }
 
   @objc
-  @warn_unused_result
   internal func member(_ object: AnyObject) -> AnyObject? {
     return bridgingObjectForKey(object)
   }
 
   @objc
-  @warn_unused_result
   internal func objectEnumerator() -> _NSEnumerator {
     return bridgingKeyEnumerator(())
   }
 
   @objc(copyWithZone:)
-  @warn_unused_result
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
     // having `NSSet` type, which is immutable.
@@ -3061,19 +3311,16 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   }
 
   @objc(objectForKey:)
-  @warn_unused_result
   internal func objectFor(_ aKey: AnyObject) -> AnyObject? {
     return bridgingObjectForKey(aKey)
   }
 
   @objc
-  @warn_unused_result
   internal func keyEnumerator() -> _NSEnumerator {
     return bridgingKeyEnumerator(())
   }
 
   @objc(copyWithZone:)
-  @warn_unused_result
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
     // having `NSDictionary` type, which is immutable.
@@ -3098,7 +3345,6 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   /// The storage for bridged ${Self} elements, if present.
   internal var _bridgedBuffer:
     BridgedNativeStorage.StorageImpl? {
-    @warn_unused_result
     get {
       if let ref = _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
         return unsafeDowncast(ref, to: BridgedNativeStorage.StorageImpl.self)
@@ -3127,7 +3373,6 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     return BridgedNativeStorage(buffer: _bridgedBuffer!)
   }
 
-  @warn_unused_result
   internal func _createBridgedNativeStorage(_ capacity: Int) ->
     BridgedNativeStorage {
     let buffer = BridgedNativeStorage.StorageImpl.create(capacity: capacity)
@@ -3164,7 +3409,6 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   // Foundation subclasses (NS${Self}, NSEnumerator), don't access any
   // storage directly, use these functions.
   //
-  @warn_unused_result
   internal func _getBridgedKey(_ i: _Native${Self}Index<${TypeParameters}>) ->
     AnyObject {
     if _fastPath(_isClassOrObjCExistential(Key.self)) {
@@ -3184,7 +3428,6 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
 %if Self == 'Set':
 
-  @warn_unused_result
   internal func _getBridgedValue(_ i: _Native${Self}Index<${TypeParameters}>) ->
     AnyObject {
     if _fastPath(_isClassOrObjCExistential(Value.self)) {
@@ -3196,7 +3439,6 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
 %elif Self == 'Dictionary':
 
-  @warn_unused_result
   internal func _getBridgedValue(_ i: _Native${Self}Index<${TypeParameters}>)
     -> AnyObject {
     if _fastPath(_isClassOrObjCExistential(Value.self)) {
@@ -3260,10 +3502,11 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     return nativeStorage.count
   }
 
-  @warn_unused_result
   internal func bridgingObjectForKey(_ aKey: AnyObject)
     -> AnyObject? {
-    let nativeKey = _forceBridgeFromObjectiveC(aKey, Key.self)
+    guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
+    else { return nil }
+
     let (i, found) = nativeStorage._find(
       nativeKey, startBucket: nativeStorage._bucket(nativeKey))
     if found {
@@ -3272,7 +3515,6 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     return nil
   }
 
-  @warn_unused_result
   internal func bridgingKeyEnumerator() -> _NSEnumerator {
     return _Native${Self}StorageKeyNSEnumerator<${TypeParameters}>(self)
   }
@@ -3340,7 +3582,6 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
   }
 
   @_versioned
-  @warn_unused_result
   internal func index(after i: Index) -> Index {
     return i.successor()
   }
@@ -3350,7 +3591,7 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
     i = i.successor()
   }
 
-  @warn_unused_result
+  @_versioned
   internal func index(forKey key: Key) -> Index? {
     // Fast path that does not involve creating an array of all keys.  In case
     // the key is present, this lookup is a penalty for the slow path, but the
@@ -3377,7 +3618,6 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
     return Index(cocoa${Self}, allKeys, keyIndex)
   }
 
-  @warn_unused_result
   internal func assertingGet(_ i: Index) -> SequenceElement {
 %if Self == 'Set':
     let value: Value? = i.allKeys[i.currentKeyIndex]
@@ -3391,7 +3631,6 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
 
   }
 
-  @warn_unused_result
   internal func assertingGet(_ key: Key) -> Value {
 %if Self == 'Set':
     let value: Value? = cocoa${Self}.member(key)
@@ -3404,7 +3643,6 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
 %end
   }
 
-  @warn_unused_result
   @inline(__always)
   internal func maybeGet(_ key: Key) -> Value? {
       
@@ -3418,6 +3656,13 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
 
   @discardableResult
   internal mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
+    _sanityCheckFailure("cannot mutate NS${Self}")
+  }
+
+  @discardableResult
+  internal mutating func insert(
+    _ value: Value, forKey key: Key
+  ) -> (inserted: Bool, memberAfterInsert: Value) {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
@@ -3439,7 +3684,6 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
     return cocoa${Self}.count
   }
 
-  @warn_unused_result
   internal static func fromArray(_ elements: [SequenceElementWithoutLabels])
     -> _Cocoa${Self}Storage {
 
@@ -3475,7 +3719,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }
 
-  @warn_unused_result
   internal mutating func isUniquelyReferenced() -> Bool {
     if _fastPath(guaranteedNative) {
       return _isUnique_native(&self)
@@ -3649,7 +3892,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 
   @_versioned
-  @warn_unused_result
   func index(after i: Index) -> Index {
     if _fastPath(guaranteedNative) {
       return ._native(asNative.index(after: i._nativeIndex))
@@ -3672,7 +3914,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     i = index(after: i)
   }
 
-  @warn_unused_result
+  @_versioned
   @inline(__always)
   internal func index(forKey key: Key) -> Index? {
     if _fastPath(guaranteedNative) {
@@ -3701,7 +3943,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     }
   }
 
-  @warn_unused_result
   internal func assertingGet(_ i: Index) -> SequenceElement {
     if _fastPath(guaranteedNative) {
       return asNative.assertingGet(i._nativeIndex)
@@ -3729,7 +3970,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     }
   }
 
-  @warn_unused_result
   internal func assertingGet(_ key: Key) -> Value {
     if _fastPath(guaranteedNative) {
       return asNative.assertingGet(key)
@@ -3765,7 +4005,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 #endif
 
   @_versioned
-  @warn_unused_result
   @inline(__always)
   internal func maybeGet(_ key: Key) -> Value? {
     if _fastPath(guaranteedNative) {
@@ -3837,6 +4076,61 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 #if _runtime(_ObjC)
       migrateDataToNativeStorage(cocoaStorage)
       return nativeUpdateValue(value, forKey: key)
+#else
+      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
+#endif
+    }
+  }
+
+  internal mutating func nativeInsert(
+    _ value: Value, forKey key: Key
+  ) -> (inserted: Bool, memberAfterInsert: Value) {
+    var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+
+    if found {
+%if Self == 'Set':
+      return (inserted: false, memberAfterInsert: asNative.key(at: i.offset))
+%elif Self == 'Dictionary':
+      return (inserted: false, memberAfterInsert: asNative.value(at: i.offset))
+%end
+    }
+
+    let minCapacity = NativeStorage.minimumCapacity(
+      minimumCount: asNative.count + 1,
+      maxLoadFactorInverse: asNative.maxLoadFactorInverse)
+
+    let (_, capacityChanged) = ensureUniqueNativeStorage(minCapacity)
+    if capacityChanged {
+      i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+    }
+
+%if Self == 'Set':
+    asNative.initializeKey(key, at: i.offset)
+    asNative.count += 1
+%elif Self == 'Dictionary':
+    asNative.initializeKey(key, value: value, at: i.offset)
+    asNative.count += 1
+%end
+
+    return (inserted: true, memberAfterInsert: value)
+  }
+
+  @discardableResult
+  internal mutating func insert(
+    _ value: Value, forKey key: Key
+  ) -> (inserted: Bool, memberAfterInsert: Value) {
+
+    if _fastPath(guaranteedNative) {
+      return nativeInsert(value, forKey: key)
+    }
+
+    switch self {
+    case .native:
+      return nativeInsert(value, forKey: key)
+    case .cocoa(let cocoaStorage):
+#if _runtime(_ObjC)
+      migrateDataToNativeStorage(cocoaStorage)
+      return nativeInsert(value, forKey: key)
 #else
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
@@ -4106,7 +4400,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     }
   }
 
-  @warn_unused_result
   internal static func fromArray(_ elements: [SequenceElement])
     -> _Variant${Self}Storage<${TypeParameters}> {
 
@@ -4135,7 +4428,6 @@ internal struct _Native${Self}Index<${TypeParametersDecl}> :
   /// Returns the next consecutive value after `self`.
   ///
   /// - Precondition: The next value is representable.
-  @warn_unused_result
   internal func successor() -> NativeIndex {
     // FIXME: swift-3-indexing-model: remove this method.
     var i = offset + 1
@@ -4223,7 +4515,6 @@ internal struct _Cocoa${Self}Index : Comparable {
   /// Returns the next consecutive value after `self`.
   ///
   /// - Precondition: The next value is representable.
-  @warn_unused_result
   internal func successor() -> _Cocoa${Self}Index {
     // FIXME: swift-3-indexing-model: remove this method.
     _precondition(
@@ -4232,7 +4523,6 @@ internal struct _Cocoa${Self}Index : Comparable {
   }
 }
 
-@warn_unused_result
 internal func ==(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
   _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
     "cannot compare indexes pointing to different ${Self}s")
@@ -4242,7 +4532,6 @@ internal func ==(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
   return lhs.currentKeyIndex == rhs.currentKeyIndex
 }
 
-@warn_unused_result
 internal func <(lhs: _Cocoa${Self}Index, rhs: _Cocoa${Self}Index) -> Bool {
   _precondition(lhs.cocoa${Self} === rhs.cocoa${Self},
     "cannot compare indexes pointing to different ${Self}s")
@@ -4367,7 +4656,6 @@ public struct ${Self}Index<${TypeParametersDecl}> :
   }
 }
 
-@warn_unused_result
 public func == <${TypeParametersDecl}> (
   lhs: ${Self}Index<${TypeParameters}>,
   rhs: ${Self}Index<${TypeParameters}>
@@ -4390,7 +4678,6 @@ public func == <${TypeParametersDecl}> (
   }
 }
 
-@warn_unused_result
 public func < <${TypeParametersDecl}> (
   lhs: ${Self}Index<${TypeParameters}>,
   rhs: ${Self}Index<${TypeParameters}>
@@ -4666,7 +4953,6 @@ public struct _${Self}Builder<${TypeParametersDecl}> {
   }
 %end
 
-  @warn_unused_result
   public mutating func take() -> ${Self}<${TypeParameters}> {
     _precondition(_actualCount >= 0,
       "cannot take the result twice")
@@ -4691,12 +4977,17 @@ extension ${Self} {
   ///
   /// - Returns: A member of the set. If the set is empty, returns `nil`.
 %elif Self == 'Dictionary':
-  /// Removes and returns the first element of the dictionary, if the
-  /// dictionary is not empty.
+  /// Removes and returns the first key-value pair of the dictionary if the
+  /// dictionary isn't empty.
   ///
-  /// - Complexity: Amortized O(1)
+  /// The first element of the dictionary is not necessarily the first element
+  /// added. Don't expect any particular ordering of key-value pairs.
+  ///
+  /// - Returns: The first key-value pair of the dictionary if the dictionary
+  ///   is not empty; otherwise, `nil`.
+  ///
+  /// - Complexity: Averages to O(1) over many calls to `popFirst()`.
 %end
-  @warn_unused_result
   public mutating func popFirst() -> Element? {
     guard !isEmpty else { return nil }
     return remove(at: startIndex)
@@ -4707,7 +4998,6 @@ extension ${Self} {
 
 #if _runtime(_ObjC)
 extension ${Self} {
-  @warn_unused_result
   public func _bridgeToObjectiveCImpl() -> _NS${Self}Core {
     switch _variantStorage {
     case _Variant${Self}Storage.native(let nativeOwner):
@@ -4725,7 +5015,6 @@ extension ${Self} {
     }
   }
 
-  @warn_unused_result
   public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
     _ s: AnyObject
   ) -> ${Self}<${TypeParameters}>? {
@@ -4768,14 +5057,13 @@ extension Set {
   ///
   ///     let employees = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let attendees: Set = ["Alicia", "Bethany", "Diana"]
-  ///     print(attendees.isSubsetOf(employees))
+  ///     print(attendees.isSubset(of: employees))
   ///     // Prints "true"
   ///
   /// - Parameter other: A sequence of elements. `possibleSuperset`
   ///   must be finite.
   /// - Returns: `true` if the set is a subset of `possibleSuperset`;
   ///   otherwise, `false`.
-  @warn_unused_result
   public func isSubset(of other: Set<Element>) -> Bool {
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset || isEqual
@@ -4789,13 +5077,12 @@ extension Set {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let attendees: Set = ["Alicia", "Bethany", "Diana"]
-  ///     print(employees.isSupersetOf(attendees))
+  ///     print(employees.isSuperset(of: attendees))
   ///     // Prints "true"
   ///
   /// - Parameter possibleSubset: Another set.
   /// - Returns: `true` if the set is a superset of `possibleSubset`;
   ///   otherwise, `false`.
-  @warn_unused_result
   public func isSuperset(of other: Set<Element>) -> Bool {
     return other.isSubset(of: self)
   }
@@ -4813,7 +5100,6 @@ extension Set {
   /// - Parameter other: Another set.
   /// - Returns: `true` if the set has no elements in common with `other`;
   ///   otherwise, `false`.
-  @warn_unused_result
   public func isDisjoint(with other: Set<Element>) -> Bool {
     for member in self {
       if other.contains(member) {
@@ -4836,7 +5122,6 @@ extension Set {
   ///
   /// - Parameter other: Another set.
   /// - Returns: A new set.
-  @warn_unused_result
   public func subtracting(_ other: Set<Element>) -> Set<Element> {
     return self._subtracting(other)
   }
@@ -4858,7 +5143,6 @@ extension Set {
   /// - Parameter possibleStrictSubset: Another set.
   /// - Returns: `true` if the set is a strict superset of
   ///   `possibleStrictSubset`; otherwise, `false`.
-  @warn_unused_result
   public func isStrictSuperset(of other: Set<Element>) -> Bool {
     return self.isSuperset(of: other) && self != other
   }
@@ -4882,7 +5166,6 @@ extension Set {
   /// - Parameter possibleStrictSuperset: Another set.
   /// - Returns: `true` if the set is a strict subset of
   ///   `possibleStrictSuperset`; otherwise, `false`.
-  @warn_unused_result
   public func isStrictSubset(of other: Set<Element>) -> Bool {
     return other.isStrictSuperset(of: self)
   }
@@ -4900,7 +5183,6 @@ extension Set {
   ///
   /// - Parameter other: Another set.
   /// - Returns: A new set.
-  @warn_unused_result
   public func intersection(_ other: Set<Element>) -> Set<Element> {
     var newSet = Set<Element>()
     for member in self {

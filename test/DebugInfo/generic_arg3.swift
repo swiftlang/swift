@@ -10,7 +10,8 @@ public func f<Type>(_ value : Type)
   // CHECK-SAME:       metadata ![[ARG:.*]], metadata ![[EXPR:.*]])
   // No deref here: The argument is an Archetype and this implicitly indirect.
   // CHECK: ![[EXPR]] = !DIExpression()
+  // CHECK: ![[TY:.*]] = !DICompositeType({{.*}}identifier: "_TtQq_F12generic_arg31furFxT_"
   // CHECK: ![[ARG]] = !DILocalVariable(name: "arg", arg: 1,
-  // CHECK-SAME:     line: [[@LINE+1]], type: !"_TtQq_F12generic_arg31furFxT_")
+  // CHECK-SAME:                        line: [[@LINE+1]], type: ![[TY]])
   apply(value) { arg in return arg }
 }

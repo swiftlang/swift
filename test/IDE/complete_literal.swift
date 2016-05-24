@@ -17,7 +17,6 @@
   1.1.#^LITERAL2^#
 }
 // LITERAL2:         Begin completions
-// LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal:      isSignMinus[#Bool#]; name=isSignMinus{{$}}
 // LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal:      isNormal[#Bool#]; name=isNormal{{$}}
 // LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal:      isFinite[#Bool#]; name=isFinite{{$}}
 // LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal:      isZero[#Bool#]; name=isZero{{$}}

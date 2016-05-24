@@ -18,7 +18,7 @@ var func7 : () -> (Int,Int,Int)              // Takes nothing, returns tuple.
 
 // Top-Level expressions.  These are 'main' content.
 func1()
-4+7
+_ = 4+7
 
 var bind_test1 : () -> () = func1
 var bind_test2 : Int = 4; func1 // expected-error {{expression resolves to an unused l-value}}
@@ -40,18 +40,18 @@ func basictest() {
 
   //var x6 : Float = 4+5
 
-  var x7 = 4; 5   // TODO: 5 should get a "unused expr" warning.
+  var x7 = 4; 5 // expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
 
   // Test implicit conversion of integer literal to non-Int64 type.
   var x8 : Int8 = 4
   x8 = x8 + 1
-  x8 + 1
-  0 + x8
+  _ = x8 + 1
+  _ = 0 + x8
   1.0 + x8 // expected-error{{binary operator '+' cannot be applied to operands of type 'Double' and 'Int8'}}
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
 
 
-  var x9 : Int16 = x8 + 1 // expected-error{{cannot convert value of type 'Int8' to expected argument type 'Int16'}}
+  var x9 : Int16 = x8 + 1 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int8' and 'Int'}} expected-note {{expected an argument list of type '(Int16, Int16)'}}
 
   // Various tuple types.
   var tuple1 : ()
@@ -67,7 +67,7 @@ func basictest() {
   // Brace expressions.
   var brace3 = {
     var brace2 = 42  // variable shadowing.
-    brace2+7
+    _ = brace2+7
   }
 
   // Function calls.
@@ -102,19 +102,19 @@ func funcdecl4(_ a: ((Int) -> Int), b: Int) {}
 func signal(_ sig: Int, f: (Int) -> Void) -> (Int) -> Void {}
 
 // Doing fun things with named arguments.  Basic stuff first.
-func funcdecl6(_ a: Int, b: Int) -> Int { a+b }
+func funcdecl6(_ a: Int, b: Int) -> Int { return a+b }
 
 // Can dive into tuples, 'b' is a reference to a whole tuple, c and d are
 // fields in one.  Cannot dive into functions or through aliases.
 func funcdecl7(_ a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
-  a + b.0 + b.c + third.0 + third.1
+  _ = a + b.0 + b.c + third.0 + third.1
   b.foo // expected-error {{value of tuple type '(c: Int, d: Int)' has no member 'foo'}}
 }
 
 // Error recovery.
 func testfunc2 (_: ((), Int) -> Int) -> Int {}
 func errorRecovery() {
-  testfunc2({ $0 + 1 }) // expected-error{{cannot convert value of type '((), Int)' to expected argument type 'Int'}}
+  testfunc2({ $0 + 1 }) // expected-error {{binary operator '+' cannot be applied to operands of type '((), Int)' and 'Int'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
   enum union1 {
     case bar
@@ -141,8 +141,8 @@ var test1b = { 42 }
 var test1c = { { 42 } }
 var test1d = { { { 42 } } }
 
-func test2(_ a: Int, b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}} {{34-37=}}
- a+b
+func test2(_ a: Int, b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}} {{34-37=}} expected-note {{did you mean 'a'?}} expected-note {{did you mean 'b'?}}
+ _ = a+b
  a+b+c // expected-error{{use of unresolved identifier 'c'}}
  return a+b
 }
@@ -229,6 +229,7 @@ func test_lambda() {
 }
 
 func test_lambda2() {
+  // expected-warning @+1 {{result of call is unused}}
   { () -> protocol<Int> in // expected-error {{non-protocol type 'Int' cannot be used within 'protocol<...>'}}
     return 1
   }()
@@ -406,7 +407,7 @@ func stringliterals(_ d: [String: Int]) {
 
   // rdar://11385385
   let x = 4
-  "Hello \(x+1) world"
+  "Hello \(x+1) world"  // expected-warning {{expression of type 'String' is unused}}
   
   "Error: \(x+1"; // expected-error {{unterminated string literal}}
   
@@ -438,22 +439,22 @@ func stringliterals(_ d: [String: Int]) {
 } // expected-error {{expected ')' in expression list}}
 
 func testSingleQuoteStringLiterals() {
-  'abc' // expected-error{{single-quoted string literal found, use '"'}}{{3-8="abc"}}
+  _ = 'abc' // expected-error{{single-quoted string literal found, use '"'}}{{7-12="abc"}}
   _ = 'abc' + "def" // expected-error{{single-quoted string literal found, use '"'}}{{7-12="abc"}}
 
-  'ab\nc' // expected-error{{single-quoted string literal found, use '"'}}{{3-10="ab\\nc"}}
+  _ = 'ab\nc' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab\\nc"}}
 
-  "abc\('def')" // expected-error{{single-quoted string literal found, use '"'}}{{9-14="def"}}
+  _ = "abc\('def')" // expected-error{{single-quoted string literal found, use '"'}}{{13-18="def"}}
 
-  "abc' // expected-error{{unterminated string literal}}
-  'abc" // expected-error{{unterminated string literal}}
-  "a'c"
+  _ = "abc' // expected-error{{unterminated string literal}}
+  _ = 'abc" // expected-error{{unterminated string literal}}
+  _ = "a'c"
 
-  'ab\'c' // expected-error{{single-quoted string literal found, use '"'}}{{3-10="ab'c"}}
+  _ = 'ab\'c' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab'c"}}
 
-  'ab"c' // expected-error{{single-quoted string literal found, use '"'}}{{3-9="ab\\"c"}}
-  'ab\"c' // expected-error{{single-quoted string literal found, use '"'}}{{3-10="ab\\"c"}}
-  'ab\\"c' // expected-error{{single-quoted string literal found, use '"'}}{{3-11="ab\\\\\\"c"}}
+  _ = 'ab"c' // expected-error{{single-quoted string literal found, use '"'}}{{7-13="ab\\"c"}}
+  _ = 'ab\"c' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab\\"c"}}
+  _ = 'ab\\"c' // expected-error{{single-quoted string literal found, use '"'}}{{7-15="ab\\\\\\"c"}}
 }
 
 // <rdar://problem/17128913>
@@ -599,6 +600,7 @@ func magic_literals() {
 
 
 infix operator +-+= {}
+@discardableResult
 func +-+= (x: inout Int, y: Int) -> Int { return 0}
 
 func lvalue_processing() {
@@ -609,7 +611,7 @@ func lvalue_processing() {
 
   var n = 42
   fn(n, 12)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{6-6=&}}
-  fn(&n, 12)
+  fn(&n, 12) // expected-warning {{result of call is unused, but produces 'Int'}}
 
   n +-+= 12
 
@@ -690,11 +692,11 @@ nil != Int.self // expected-error {{binary operator '!=' cannot be applied to op
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
-  a?    // expected-error {{optional chain has no effect, expression already produces 'Int?'}} {{4-5=}}
-  a?.customMirror
+  _ = a?    // expected-error {{optional chain has no effect, expression already produces 'Int?'}} {{8-9=}}
+  _ = a?.customMirror
 
-  b?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
-  b?.customMirror
+  _ = b?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
+  _ = b?.customMirror
 
   var _: Int? = c?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
 }
@@ -725,11 +727,11 @@ func testOptionalTypeParsing(_ a : AnyObject) -> String {
 func testParenExprInTheWay() {
   let x = 42
   
-  if x & 4.0 {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  if x & 4.0 {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
-  if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  if (x & 4.0) {}   // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
-  if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  if !(x & 4.0) {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
   
   if x & x {} // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
@@ -749,6 +751,7 @@ public struct TestPropMethodOverloadGroup {
 func inoutTests(_ arr: inout Int) {
   var x = 1, y = 2
   (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
+  // expected-warning @-1 {{expression of type 'inout Int' is unused}}
   let a = (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
   // expected-error @-1 {{type 'inout Int' of variable is not materializable}}
 

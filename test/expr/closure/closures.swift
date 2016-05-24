@@ -14,7 +14,7 @@ var closure3a : () -> () -> (Int,Int) = {{ (4, 2) }} // multi-level closing.
 var closure3b : (Int,Int) -> (Int) -> (Int,Int) = {{ (4, 2) }} // expected-error{{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}}  {{52-52=_,_ in }}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int = {
-       $0 + 1.0  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+       $0 + 1.0 // expected-error {{binary operator '+' cannot be applied to two 'Double' operands}} expected-note {{expected an argument list of type '(Int, Int)'}}
 }
 
 var closure6 = $0  // expected-error {{anonymous closure argument not contained in a closure}}
@@ -33,7 +33,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
   
   func6(fn: {$0 + $1})       // Closure with two named anonymous arguments
   func6(fn: {($0) + $1})    // Closure with sequence expr inferred type
-  func6(fn: {($0) + $0})    // expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Int'}}
+  func6(fn: {($0) + $0})    // // expected-error {{binary operator '+' cannot be applied to two '(Int, Int)' operands}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
 
   var testfunc : ((), Int) -> Int
@@ -142,7 +142,7 @@ class ExplicitSelfRequiredTest {
 
     // Methods follow the same rules as properties, uses of 'self' must be marked with "self."
     doStuff { method() }  // expected-error {{call to method 'method' in closure requires explicit 'self.' to make capture semantics explicit}} {{15-15=self.}}
-    doVoidStuff { method() }  // expected-error {{call to method 'method' in closure requires explicit 'self.' to make capture semantics explicit}} {{19-19=self.}}
+    doVoidStuff { _ = method() }  // expected-error {{call to method 'method' in closure requires explicit 'self.' to make capture semantics explicit}} {{23-23=self.}}
     doStuff { self.method() }
 
     // <rdar://problem/18877391> "self." shouldn't be required in the initializer expression in a capture list
@@ -232,7 +232,7 @@ var closureWithObservedProperty: () -> () = {
 
 
 // rdar://19179412 - Crash on valid code.
-func rdar19179412() -> Int -> Int {
+func rdar19179412() -> (Int) -> Int {
   return { x in
     class A {
       let d : Int = 0
@@ -244,7 +244,9 @@ func rdar19179412() -> Int -> Int {
 func takesVoidFunc(_ f: () -> ()) {}
 var i: Int = 1
 
+// expected-warning @+1 {{expression of type 'Int' is unused}}
 takesVoidFunc({i})
+// expected-warning @+1 {{expression of type 'Int' is unused}}
 var f1: () -> () = {i}
 var x = {return $0}(1)
 
@@ -271,7 +273,7 @@ f { $0 && !$1 }
 
 
 // <rdar://problem/18123596> unexpected error on self. capture inside class method
-func TakesIntReturnsVoid(_ fp : (Int -> ())) {}
+func TakesIntReturnsVoid(_ fp : ((Int) -> ())) {}
 
 struct TestStructWithStaticMethod {
   static func myClassMethod(_ count: Int) {

@@ -1,13 +1,14 @@
 // RUN: %target-swift-frontend -emit-silgen -verify %s | FileCheck %s
 
-func values(_ arg: @convention(c) Int -> Int) -> @convention(c) Int -> Int {
+func values(_ arg: @convention(c) (Int) -> Int) -> @convention(c) (Int) -> Int {
   return arg
 }
 // CHECK-LABEL: sil hidden @_TF19c_function_pointers6valuesFcSiSicSiSi
 // CHECK:       bb0(%0 : $@convention(c) (Int) -> Int):
 // CHECK:         return %0 : $@convention(c) (Int) -> Int
 
-func calls(_ arg: @convention(c) Int -> Int, _ x: Int) -> Int {
+@discardableResult
+func calls(_ arg: @convention(c) (Int) -> Int, _ x: Int) -> Int {
   return arg(x)
 }
 // CHECK-LABEL: sil hidden @_TF19c_function_pointers5callsFTcSiSiSi_Si
@@ -15,6 +16,7 @@ func calls(_ arg: @convention(c) Int -> Int, _ x: Int) -> Int {
 // CHECK:         [[RESULT:%.*]] = apply %0(%1)
 // CHECK:         return [[RESULT]]
 
+@discardableResult
 func calls_no_args(_ arg: @convention(c) () -> Int) -> Int {
   return arg()
 }
@@ -49,7 +51,7 @@ func pointers_to_swift_functions(_ x: Int) {
 func unsupported(_ a: Any) -> Int { return 0 }
 
 func pointers_to_bad_swift_functions(_ x: Int) {
-  calls(unsupported, x) // expected-error{{C function pointer signature '(Any) -> Int' is not compatible with expected type '@convention(c) Int -> Int'}}
+  calls(unsupported, x) // expected-error{{C function pointer signature '(Any) -> Int' is not compatible with expected type '@convention(c) (Int) -> Int'}}
 }
 
 // CHECK-LABEL: sil shared @_TFIvV19c_function_pointers22StructWithInitializers3fn1cT_T_iU_FT_T_ : $@convention(thin) () -> () {

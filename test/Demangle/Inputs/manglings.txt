@@ -214,3 +214,4 @@ _TTRXFo_iT__iT_zoPs13ErrorProtocol__XFo__dT_zoPS___ ---> reabstraction thunk hel
 _TFE1a ---> _TFE1a
 _TF21$__lldb_module_for_E0au3$E0Ps13ErrorProtocol_ ---> $__lldb_module_for_E0.$E0.unsafeMutableAddressor : Swift.ErrorProtocol
 _TMps10Comparable ---> protocol descriptor for Swift.Comparable
+_TFC4testP33_83378C430F65473055F1BD53F3ADCDB71C5doFoofT_T_ ---> test.(C in _83378C430F65473055F1BD53F3ADCDB7).doFoo () -> ()

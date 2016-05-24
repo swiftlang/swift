@@ -98,10 +98,10 @@ func badTest3() {
   var _ = Swift. // expected-error {{expected member name following '.'}} expected-error {{expected module member name after module name}}
 }
 func badTest4() {
-  Swift // expected-error {{expected module member name after module name}}
+  _ = Swift // expected-error {{expected module member name after module name}}
 }
 func badTest5() {
-  Swift. // expected-error {{expected module member name after module name}} expected-error {{expected member name following '.'}}
+  _ = Swift. // expected-error {{expected module member name after module name}} expected-error {{expected member name following '.'}}
 }
 func badTest6() {
   _ = { () -> Int in

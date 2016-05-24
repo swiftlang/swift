@@ -84,6 +84,12 @@ static void addSwiftStackPromotionPass(const PassManagerBuilder &Builder,
     PM.add(createSwiftStackPromotionPass());
 }
 
+static void addSwiftMergeFunctionsPass(const PassManagerBuilder &Builder,
+                                       PassManagerBase &PM) {
+  if (Builder.OptLevel > 0)
+    PM.add(createSwiftMergeFunctionsPass());
+}
+
 static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
                                       legacy::PassManagerBase &PM) {
   PM.add(createAddressSanitizerFunctionPass());
@@ -163,6 +169,8 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addThreadSanitizerPass);
   }
+  PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                         addSwiftMergeFunctionsPass);
 
   // Configure the function passes.
   legacy::FunctionPassManager FunctionPasses(Module);
@@ -620,7 +628,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       });
     }
 
-    IGM.finalize();
+    if (!IGM.finalize())
+      return nullptr;
 
     setModuleFlags(IGM);
   }
@@ -813,7 +822,9 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
       updateLinkage(F);
     }
 
-    IGM->finalize();
+    if (!IGM->finalize())
+      return;
+
     setModuleFlags(*IGM);
   }
 

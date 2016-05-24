@@ -509,14 +509,5 @@ MiscTestSuite.test("reversed()") {
     result)
 }
 
-// FIXME: swift-3-indexing-model: this test does not belong in this file.
-MiscTestSuite.test("stride") {
-  var result = [Double]()
-  for i in stride(from: 1.4, through: 3.4, by: 1) {
-    result.append(i)
-  }
-  expectEqual([ 1.4, 2.4, 3.4 ], result)
-}
-
 runAllTests()
 

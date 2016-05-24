@@ -138,6 +138,11 @@ ERROR(cannot_match_expr_pattern_with_value,none,
       "expression pattern of type %0 cannot match values of type %1",
       (Type, Type))
 
+ERROR(cannot_reference_compare_types,none,
+      "cannot check reference equality of functions; operands here have types "
+      "%1 and %2",
+      (StringRef, Type, Type))
+
 ERROR(cannot_apply_binop_to_args,none,
       "binary operator '%0' cannot be applied to operands of type "
       "%1 and %2",
@@ -363,24 +368,62 @@ ERROR(noescape_functiontype_mismatch,none,
       "invalid conversion from non-escaping function of type %0 to "
       "potentially escaping function type %1", (Type, Type))
 
+// Key-path expressions.
+ERROR(expr_keypath_no_objc_runtime,none,
+      "'#keyPath' can only be used with the Objective-C runtime", ())
+ERROR(expression_unused_keypath_result,none,
+      "result of '#keyPath' is unused", ())
+ERROR(expr_keypath_non_objc_property,none,
+      "argument of '#keyPath' refers to non-'@objc' property %0",
+      (DeclName))
+ERROR(stdlib_anyobject_not_found,none,
+      "broken standard library: cannot find 'AnyObject' protocol", ())
+ERROR(expr_keypath_type_of_property,none,
+      "cannot refer to type member %0 within instance of type %1",
+      (DeclName, Type))
+ERROR(expr_keypath_generic_type,none,
+      "'#keyPath' cannot refer to generic type %0", (DeclName))
+ERROR(expr_keypath_not_property,none,
+      "'#keyPath' cannot refer to %0 %1", (DescriptiveDeclKind, DeclName))
+ERROR(expr_keypath_empty,none,
+      "empty '#keyPath' does not refer to a property", ())
+
 // Selector expressions.
 ERROR(expr_selector_no_objc_runtime,none,
       "'#selector' can only be used with the Objective-C runtime", ())
 ERROR(expr_selector_module_missing,none,
       "import the 'ObjectiveC' module to use '#selector'", ())
 ERROR(expr_selector_no_declaration,none,
-      "argument of '#selector' does not refer to an initializer or method", ())
-ERROR(expr_selector_var,none,
-      "argument of '#selector' cannot refer to a %select{property|parameter|variable}0", (int))
-ERROR(expr_selector_not_method_or_init,none,
-      "argument of '#selector' does not refer to a method or initializer", ())
+      "argument of '#selector' does not refer to an '@objc' method, property, "
+      "or initializer", ())
+ERROR(expr_selector_not_method,none,
+      "argument of '#selector' cannot refer to %select{local|global}0 "
+      "function %1", (bool, DeclName))
+ERROR(expr_selector_expected_property,none,
+      "cannot reference %1 %2 as a property; remove '%select{getter|setter}0:'",
+      (bool, DescriptiveDeclKind, DeclName))
+ERROR(expr_selector_not_property,none,
+      "argument of '#selector' cannot refer to %select{variable|parameter}0 %1",
+      (bool, DeclName))
+ERROR(expr_selector_expected_method,none,
+      "use 'getter:'%select{| or 'setter:'}0 to refer to the Objective-C getter"
+      "%select{| or setter}0 of property %1%select{|, respectively}0",
+      (bool, DeclName))
+NOTE(expr_selector_add_modifier,none,
+     "add '%select{getter|setter}0:' to reference the Objective-C "
+     "%select{getter|setter}0 for %1", (bool, DeclName))
+ERROR(expr_selector_property_not_settable,none,
+      "argument of '#selector(setter:)' refers to non-settable %0 %1",
+      (DescriptiveDeclKind, DeclName))
+ERROR(expr_selector_property_setter_inaccessible,none,
+      "setter of %0 %1 is inaccessible", (DescriptiveDeclKind, DeclName))
 ERROR(expr_selector_not_objc,none,
-      "argument of '#selector' refers to %select{a method|an initializer}0 "
-      "that is not exposed to Objective-C",
-      (bool))
-NOTE(expr_selector_make_objc,none,
-     "add '@objc' to expose this %select{method|initializer}0 to Objective-C",
-     (bool))
+      "argument of '#selector' refers to %0 %1 that is not exposed to "
+      "Objective-C",
+      (DescriptiveDeclKind, DeclName))
+NOTE(make_decl_objc,none,
+     "add '@objc' to expose this %0 to Objective-C",
+     (DescriptiveDeclKind))
 
 // Selectors-as-string-literals.
 WARNING(selector_literal_invalid,none,
@@ -462,8 +505,6 @@ ERROR(serialization_target_too_new_repl,none,
 ERROR(reserved_member_name,none,
       "type member may not be named %0, since it would conflict with the"
       " 'foo.%1' expression", (DeclName, StringRef))
-NOTE(backticks_to_escape,none,
-     "backticks can escape this name if it is important to use", ())
 
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 NOTE(invalid_redecl_prev,none,
@@ -508,6 +549,8 @@ ERROR(use_undeclared_type,none,
       "use of undeclared type %0", (Identifier))
 ERROR(use_undeclared_type_did_you_mean,none,
       "use of undeclared type %0; did you mean to use '%1'?", (Identifier, StringRef))
+NOTE(note_typo_candidate,none,
+     "did you mean '%0'?", (StringRef))
 NOTE(note_remapped_type,none,
      "did you mean to use '%0'?", (StringRef))
 ERROR(identifier_init_failure,none,
@@ -911,7 +954,9 @@ ERROR(attribute_does_not_apply_to_type,none,
 ERROR(optional_attribute_non_protocol,none,
       "'optional' can only be applied to protocol members", ())
 ERROR(optional_attribute_non_objc_protocol,none,
-      "'optional' can only be applied to members of an @objc protocol", 
+      "'optional' can only be applied to members of an @objc protocol", ())
+ERROR(optional_attribute_missing_explicit_objc,none,
+      "'optional' requirements are an Objective-C compatibility feature; add '@objc'", 
       ())
 ERROR(optional_attribute_initializer,none,
       "'optional' cannot be applied to an initializer", ())
@@ -1369,8 +1414,12 @@ NOTE(overridden_here_with_type,none,
      "overridden declaration here has type %0", (Type))
 ERROR(missing_override,none,
       "overriding declaration requires an 'override' keyword", ())
+
 ERROR(override_unavailable,none,
       "cannot override %0 which has been marked unavailable", (Identifier))
+ERROR(override_unavailable_msg, none,
+      "cannot override %0 which has been marked unavailable: %1",
+      (Identifier, StringRef))
 
 ERROR(override_less_available,none,
       "overriding %0 must be as available as declaration it overrides",
@@ -2165,15 +2214,16 @@ ERROR(expression_unused_function,none,
       "expression resolves to an unused function", ())
 ERROR(expression_unused_lvalue,none,
       "expression resolves to an unused l-value", ())
-WARNING(expression_unused_result,none,
+WARNING(expression_unused_result_call,none,
         "result of call to %0 is unused", (DeclName))
+WARNING(expression_unused_result_operator,none,
+        "result of operator %0 is unused", (DeclName))
+WARNING(expression_unused_result_unknown, none,
+        "result of call is unused, but produces %0", (Type))
+WARNING(expression_unused_result, none,
+        "expression of type %0 is unused", (Type))
 WARNING(expression_unused_init_result,none,
-        "result of initializer is unused", ())
-WARNING(expression_unused_result_message,none,
-        "result of call to %0 is unused: %1", (DeclName, StringRef))
-WARNING(expression_unused_result_nonmutating,none,
-        "result of call to non-mutating function %0 is unused; "
-        "use %1 to mutate in-place", (DeclName, DeclName))
+        "result of %0 initializer is unused", (Type))
 WARNING(expression_unused_optional_try,none,
         "result of 'try?' is unused", ())
 WARNING(expression_unused_selector_result, none,
@@ -2432,7 +2482,7 @@ ERROR(invalid_ownership_type,none,
       (/*Ownership*/unsigned, Type))
 ERROR(invalid_ownership_protocol_type,none,
       "'%select{strong|weak|unowned|unowned}0' may not be applied to "
-      "non-class-bound protocol %1; consider adding a class bound",
+      "non-class-bound %1; consider adding a protocol conformance that has a class bound",
       (/*Ownership*/unsigned, Type))
 ERROR(invalid_weak_ownership_not_optional,none,
       "'weak' variable should have optional type %0", (Type))
@@ -2574,6 +2624,8 @@ ERROR(objc_invalid_with_generic_params,none,
 ERROR(objc_convention_invalid,none,
       "%0 is not representable in Objective-C, so it cannot be used"
       " with '@convention(%1)'", (Type, StringRef))
+WARNING(function_type_no_parens,none,
+        "single argument function types require parentheses", ())
 NOTE(not_objc_empty_protocol_composition,none,
      "'protocol<>' is not considered '@objc'; use 'AnyObject' instead", ())
 NOTE(not_objc_protocol,none,
@@ -2749,11 +2801,16 @@ ERROR(dynamic_with_final,none,
 ERROR(availability_decl_unavailable, none,
   "%0 is unavailable", (DeclName))
 
+#define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
-      "%0 has been renamed to '%1'", (DeclName, StringRef))
+      "%0 has been %select{renamed to|replaced by}1"
+      "%" REPLACEMENT_DECL_KIND_SELECT "2 '%3'",
+      (DeclName, bool, unsigned, StringRef))
 
 ERROR(availability_decl_unavailable_rename_msg, none,
-      "%0 has been renamed to '%1': %2", (DeclName, StringRef, StringRef))
+      "%0 has been %select{renamed to|replaced by}1"
+      "%" REPLACEMENT_DECL_KIND_SELECT "2 '%3': %4",
+      (DeclName, bool, unsigned, StringRef, StringRef))
 
 ERROR(availability_decl_unavailable_msg, none,
   "%0 is unavailable: %1", (DeclName, StringRef))
@@ -2783,8 +2840,12 @@ WARNING(availability_deprecated_msg, none,
 
 WARNING(availability_deprecated_rename, none,
         "%0 %select{is|%select{is|was}3}1 deprecated"
-        "%select{| %select{on|in}3 %2%select{| %4}3}1: renamed to '%5'",
-        (DeclName, bool, StringRef, bool, clang::VersionTuple, StringRef))
+        "%select{| %select{on|in}3 %2%select{| %4}3}1: "
+        "%select{renamed to|replaced by}5%" REPLACEMENT_DECL_KIND_SELECT "6 "
+        "'%7'",
+        (DeclName, bool, StringRef, bool, clang::VersionTuple, bool, unsigned,
+         StringRef))
+#undef REPLACEMENT_DECL_KIND_SELECT
 
 NOTE(note_deprecated_rename, none,
      "use '%0' instead", (StringRef))
@@ -2895,6 +2956,17 @@ ERROR(circular_reference, none,
       "circular reference", ())
 NOTE(circular_reference_through, none,
      "through reference here", ())
+
+//------------------------------------------------------------------------------
+// Debug diagnostics
+//------------------------------------------------------------------------------
+
+WARNING(debug_long_function_body, none,
+        "%0 %1 took %2ms to type-check (limit: %3ms)",
+        (DescriptiveDeclKind, DeclName, unsigned, unsigned))
+WARNING(debug_long_closure_body, none,
+        "closure took %0ms to type-check (limit: %1ms)",
+        (unsigned, unsigned))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

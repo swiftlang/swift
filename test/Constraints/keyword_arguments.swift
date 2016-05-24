@@ -282,13 +282,13 @@ func intToInt(_ i: Int) -> Int { return i }
 
 func testClosures() {
   let c0 = { (x: Int, y: Int) in x + y }
-  c0(1, 2)
+  _ = c0(1, 2)
 
   let c1 = { x, y in intToInt(x + y) }
-  c1(1, 2)
+  _ = c1(1, 2)
 
   let c2 = { intToInt($0 + $1) }
-  c2(1, 2)
+  _ = c2(1, 2)
 }
 
 func acceptAutoclosure(f: @autoclosure () -> Int) { }
@@ -378,7 +378,7 @@ acceptTuple1(1, false) // expected-error{{extra argument in call}}
 
 func acceptTuple2<T>(_ input : T) -> T { return input }
 var tuple1 = (1, "hello")
-acceptTuple2(tuple1)
-acceptTuple2((1, "hello", 3.14159))
+_ = acceptTuple2(tuple1)
+_ = acceptTuple2((1, "hello", 3.14159))
 
 

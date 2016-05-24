@@ -22,7 +22,8 @@ SWIFT_CLASS("_TtC8comments21A010_AttachToEntities")
 /**
   Aaa.  v2.
 */
-@property (nonatomic, class, readonly) NSInteger v2;
+SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) NSInteger v2;)
++ (NSInteger)v2;
 @end
 
 

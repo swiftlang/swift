@@ -18,6 +18,7 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -1341,6 +1342,10 @@ public:
   // Is a SIL type a potential lowering of a formal type?
   static bool isLoweringOf(SILType loweredType,
                            CanType formalType) {
+    // Dynamic self has the same lowering as its contained type.
+    if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalType))
+      formalType = CanType(dynamicSelf->getSelfType());
+
     // Metatypes preserve their instance type through lowering.
     if (auto loweredMT = loweredType.getAs<MetatypeType>()) {
       if (auto formalMT = dyn_cast<MetatypeType>(formalType)) {
@@ -1704,7 +1709,10 @@ public:
                                      dynResults,
                                      methodTy->getOptionalErrorResult(),
                                      F.getASTContext());
-    return SILType::getPrimitiveObjectType(fnTy);
+    auto boundFnTy = ArchetypeBuilder::mapTypeIntoContext(
+        method.getDecl()->getDeclContext(), fnTy)
+      ->getCanonicalType();
+    return SILType::getPrimitiveObjectType(boundFnTy);
   }
   
   void checkDynamicMethodInst(DynamicMethodInst *EMI) {
@@ -1717,12 +1725,13 @@ public:
               "operand must have metatype type");
       require(operandType.getSwiftType()->castTo<MetatypeType>()
                 ->getInstanceType()->mayHaveSuperclass(),
-              "operand must have metatype of class or class-bound type");
+              "operand must have metatype of class or class-bounded type");
     }
     
-    requireSameType(EMI->getType(),
-                    getDynamicMethodType(operandType, EMI->getMember()),
-                    "result must be of the method's type");
+    require(getDynamicMethodType(operandType, EMI->getMember())
+              .getSwiftRValueType()
+              ->isBindableTo(EMI->getType().getSwiftRValueType(), nullptr),
+            "result must be of the method's type");
   }
 
   void checkClassMethodInst(ClassMethodInst *CMI) {
@@ -2215,10 +2224,18 @@ public:
               "upcast operand must be a class or class metatype instance");
       CanType opInstTy(UI->getOperand()->getType().castTo<MetatypeType>()
                          ->getInstanceType());
-      require(instTy->getClassOrBoundGenericClass(),
+      auto instClass = instTy->getClassOrBoundGenericClass();
+      require(instClass,
               "upcast must convert a class metatype to a class metatype");
-      require(instTy->isExactSuperclassOf(opInstTy, nullptr),
-              "upcast must cast to a superclass or an existential metatype");
+      
+      if (instClass->usesObjCGenericsModel()) {
+        require(instClass->getDeclaredTypeInContext()
+                  ->isBindableToSuperclassOf(opInstTy, nullptr),
+                "upcast must cast to a superclass or an existential metatype");
+      } else {
+        require(instTy->isExactSuperclassOf(opInstTy, nullptr),
+                "upcast must cast to a superclass or an existential metatype");
+      }
       return;
     }
 
@@ -2241,10 +2258,18 @@ public:
           FromTy.getSwiftRValueType().getAnyOptionalObjectType());
     }
 
-    require(ToTy.getClassOrBoundGenericClass(),
+    auto ToClass = ToTy.getClassOrBoundGenericClass();
+    require(ToClass,
             "upcast must convert a class instance to a class type");
-    require(ToTy.isExactSuperclassOf(FromTy),
-            "upcast must cast to a superclass");
+      if (ToClass->usesObjCGenericsModel()) {
+        require(ToClass->getDeclaredTypeInContext()
+                  ->isBindableToSuperclassOf(FromTy.getSwiftRValueType(),
+                                             nullptr),
+                "upcast must cast to a superclass or an existential metatype");
+      } else {
+        require(ToTy.isExactSuperclassOf(FromTy),
+                "upcast must cast to a superclass or an existential metatype");
+      }
   }
 
   void checkIsNonnullInst(IsNonnullInst *II) {
@@ -2671,14 +2696,26 @@ public:
               "no arguments");
   }
 
+  bool verifyBranchArgs(SILValue branchArg, SILArgument *bbArg) {
+    // NOTE: IRGen currently does not support the following method_inst
+    // variants as branch arguments.
+    // Once this is supported, the check can be removed.
+    require(
+        !isa<WitnessMethodInst>(branchArg) &&
+            !(isa<MethodInst>(branchArg) &&
+              cast<MethodInst>(branchArg)->getMember().isForeign),
+        "branch argument cannot be a witness_method or an objc method_inst");
+    return branchArg->getType() == bbArg->getType();
+  }
+
   void checkBranchInst(BranchInst *BI) {
     require(BI->getArgs().size() == BI->getDestBB()->bbarg_size(),
             "branch has wrong number of arguments for dest bb");
     require(std::equal(BI->getArgs().begin(), BI->getArgs().end(),
-                      BI->getDestBB()->bbarg_begin(),
-                      [](SILValue branchArg, SILArgument *bbArg) {
-                        return branchArg->getType() == bbArg->getType();
-                      }),
+                       BI->getDestBB()->bbarg_begin(),
+                       [&](SILValue branchArg, SILArgument *bbArg) {
+                         return verifyBranchArgs(branchArg, bbArg);
+                       }),
             "branch argument types do not match arguments for dest bb");
   }
 
@@ -2700,8 +2737,8 @@ public:
             "identical destinations");
     require(std::equal(CBI->getTrueArgs().begin(), CBI->getTrueArgs().end(),
                       CBI->getTrueBB()->bbarg_begin(),
-                      [](SILValue branchArg, SILArgument *bbArg) {
-                        return branchArg->getType() == bbArg->getType();
+                      [&](SILValue branchArg, SILArgument *bbArg) {
+                        return verifyBranchArgs(branchArg, bbArg);
                       }),
             "true branch argument types do not match arguments for dest bb");
 
@@ -2709,8 +2746,8 @@ public:
             "false branch has wrong number of arguments for dest bb");
     require(std::equal(CBI->getFalseArgs().begin(), CBI->getFalseArgs().end(),
                       CBI->getFalseBB()->bbarg_begin(),
-                      [](SILValue branchArg, SILArgument *bbArg) {
-                        return branchArg->getType() == bbArg->getType();
+                      [&](SILValue branchArg, SILArgument *bbArg) {
+                        return verifyBranchArgs(branchArg, bbArg);
                       }),
             "false branch argument types do not match arguments for dest bb");
   }

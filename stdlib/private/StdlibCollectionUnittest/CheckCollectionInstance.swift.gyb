@@ -23,7 +23,6 @@ public struct CollectionMisuseResiliencyChecks {
     case trap
   }
 
-  public var callNextOnExhaustedGenerator: Bool = true
   public var creatingOutOfBoundsIndicesBehavior: FailureKind = .trap
   public var subscriptOnOutOfBoundsIndicesBehavior: FailureKind = .trap
   public var subscriptRangeOnOutOfBoundsRangesBehavior: FailureKind = .trap
@@ -34,7 +33,6 @@ public struct CollectionMisuseResiliencyChecks {
 
   public static var none: CollectionMisuseResiliencyChecks {
     return CollectionMisuseResiliencyChecks(
-      callNextOnExhaustedGenerator: false,
       creatingOutOfBoundsIndicesBehavior: .none,
       subscriptOnOutOfBoundsIndicesBehavior: .none,
       subscriptRangeOnOutOfBoundsRangesBehavior: .none)
@@ -356,8 +354,8 @@ public func check${Traversal}Collection<
     instances,
     distances: distances,
     of: collection,
-    distanceOracle: { (x:Int,y:Int) in numericCast(y - x) },
-    advanceOracle: { x,y in nextN(distances[y], instances[x]) },
+    distanceOracle: { (x:Int, y:Int) in numericCast(y - x) },
+    advanceOracle: { x, y in nextN(distances[y], instances[x]) },
     startIndex: collection.startIndex,
     endIndex: next5(partWay1), ${trace})
 

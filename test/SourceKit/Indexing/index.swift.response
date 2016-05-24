@@ -36,8 +36,7 @@
       key.name: "Int",
       key.usr: "s:Si",
       key.line: 4,
-      key.column: 12,
-      key.groupname: "Math/Integers"
+      key.column: 12
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -86,24 +85,21 @@
               key.name: "Int",
               key.usr: "s:Si",
               key.line: 10,
-              key.column: 27,
-              key.groupname: "Math/Integers"
+              key.column: 27
             },
             {
               key.kind: source.lang.swift.ref.struct,
               key.name: "Float",
               key.usr: "s:Sf",
               key.line: 10,
-              key.column: 35,
-              key.groupname: "Math/Floating"
+              key.column: 35
             },
             {
               key.kind: source.lang.swift.ref.struct,
               key.name: "Int",
               key.usr: "s:Si",
               key.line: 10,
-              key.column: 45,
-              key.groupname: "Math/Integers"
+              key.column: 45
             }
           ]
         },
@@ -119,24 +115,21 @@
               key.name: "Int",
               key.usr: "s:Si",
               key.line: 13,
-              key.column: 27,
-              key.groupname: "Math/Integers"
+              key.column: 27
             },
             {
               key.kind: source.lang.swift.ref.struct,
               key.name: "Float",
               key.usr: "s:Sf",
               key.line: 13,
-              key.column: 37,
-              key.groupname: "Math/Floating"
+              key.column: 37
             },
             {
               key.kind: source.lang.swift.ref.struct,
               key.name: "Int",
               key.usr: "s:Si",
               key.line: 13,
-              key.column: 47,
-              key.groupname: "Math/Integers"
+              key.column: 47
             }
           ]
         },
@@ -455,8 +448,7 @@
           key.name: "Int",
           key.usr: "s:Si",
           key.line: 52,
-          key.column: 14,
-          key.groupname: "Math/Integers"
+          key.column: 14
         }
       ]
     },
@@ -560,8 +552,7 @@
           key.name: "Int",
           key.usr: "s:Si",
           key.line: 60,
-          key.column: 15,
-          key.groupname: "Math/Integers"
+          key.column: 15
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
@@ -583,8 +574,7 @@
           key.name: "Int",
           key.usr: "s:Si",
           key.line: 70,
-          key.column: 18,
-          key.groupname: "Math/Integers"
+          key.column: 18
         }
       ]
     },
@@ -676,6 +666,11 @@
               key.line: 77,
               key.column: 31
             }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.override
+            }
           ]
         }
       ]
@@ -711,8 +706,7 @@
                   key.name: "+(_:_:)",
                   key.usr: "s:ZFsoi1pFTSiSi_Si",
                   key.line: 86,
-                  key.column: 8,
-                  key.groupname: "Math/Integers"
+                  key.column: 8
                 }
               ]
             }
@@ -797,8 +791,7 @@
           key.name: "++(_:)",
           key.usr: "s:ZFsop2ppFRSiSi",
           key.line: 95,
-          key.column: 3,
-          key.groupname: "Math/Integers"
+          key.column: 3
         },
         {
           key.kind: source.lang.swift.ref.var.instance,
@@ -864,8 +857,7 @@
           key.name: "++(_:)",
           key.usr: "s:ZFsop2ppFRSiSi",
           key.line: 98,
-          key.column: 3,
-          key.groupname: "Math/Integers"
+          key.column: 3
         },
         {
           key.kind: source.lang.swift.ref.function.subscript,
@@ -1052,6 +1044,11 @@
               key.column: 11,
               key.receiver_usr: "s:C5index2B1"
             }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.override
+            }
           ]
         }
       ]
@@ -1216,8 +1213,7 @@
               key.name: "Int",
               key.usr: "s:Si",
               key.line: 154,
-              key.column: 23,
-              key.groupname: "Math/Integers"
+              key.column: 23
             },
             {
               key.kind: source.lang.swift.ref.function.constructor,
@@ -1227,6 +1223,11 @@
               key.column: 10,
               key.receiver_usr: "s:C5index3CC4",
               key.is_dynamic: 1
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.convenience
             }
           ]
         }
@@ -1274,8 +1275,7 @@
               key.name: "Int",
               key.usr: "s:Si",
               key.line: 160,
-              key.column: 11,
-              key.groupname: "Math/Integers"
+              key.column: 11
             },
             {
               key.kind: source.lang.swift.ref.function.constructor,
@@ -1323,6 +1323,11 @@
                   key.line: 169,
                   key.column: 7
                 }
+              ],
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.final
+                }
               ]
             },
             {
@@ -1338,6 +1343,11 @@
                   key.line: 172,
                   key.column: 7
                 }
+              ],
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.final
+                }
               ]
             }
           ]
@@ -1347,8 +1357,7 @@
           key.name: "Int",
           key.usr: "s:Si",
           key.line: 167,
-          key.column: 23,
-          key.groupname: "Math/Integers"
+          key.column: 23
         }
       ]
     },
@@ -1370,7 +1379,12 @@
               key.kind: source.lang.swift.decl.function.accessor.didset,
               key.usr: "s:FC5index12rdar18640140W2S1Si",
               key.line: 186,
-              key.column: 5
+              key.column: 5,
+              key.attributes: [
+                {
+                  key.attribute: source.decl.attribute.final
+                }
+              ]
             }
           ]
         },
@@ -1379,8 +1393,7 @@
           key.name: "Int",
           key.usr: "s:Si",
           key.line: 180,
-          key.column: 11,
-          key.groupname: "Math/Integers"
+          key.column: 11
         }
       ]
     },
@@ -1417,8 +1430,7 @@
           key.name: "Int",
           key.usr: "s:Si",
           key.line: 192,
-          key.column: 11,
-          key.groupname: "Math/Integers"
+          key.column: 11
         }
       ]
     },
@@ -1427,14 +1439,24 @@
       key.name: "ConditionalUnavailableClass1",
       key.usr: "s:C5index28ConditionalUnavailableClass1",
       key.line: 204,
-      key.column: 7
+      key.column: 7,
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.available
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "ConditionalUnavailableClass2",
       key.usr: "s:C5index28ConditionalUnavailableClass2",
       key.line: 208,
-      key.column: 7
+      key.column: 7,
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.available
+        }
+      ]
     }
   ]
 }

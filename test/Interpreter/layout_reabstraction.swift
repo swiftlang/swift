@@ -64,7 +64,7 @@ print(sizeof(ContainsTupleOfTrivialMetatype<Int64>.self))
 print(unspecializedSizeOf(ContainsTupleOfTrivialMetatype<Int64>.self))
 
 struct ContainsTupleOfFunctions<T> {
-  var x: (T, T -> T)
+  var x: (T, (T) -> T)
   
   func apply() -> T {
     return x.1(x.0)
@@ -89,12 +89,12 @@ print(x.apply())
 print(y.apply())
 
 func callAny<T>(_ f: Any, _ x: T) -> T {
-  return (f as! T -> T)(x)
+  return (f as! (T) -> T)(x)
 }
 
 any = {(x: Int) -> Int in x + x}
 // CHECK-NEXT: 24
-print((any as! Int -> Int)(12))
+print((any as! (Int) -> Int)(12))
 // CHECK-NEXT: 24
 let ca = callAny(any, 12)
 print(ca)

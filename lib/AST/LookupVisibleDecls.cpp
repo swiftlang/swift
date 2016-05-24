@@ -48,9 +48,12 @@ private:
 
   unsigned InheritsSuperclassInitializers : 1;
 
+  /// Should instance members be included even if lookup is performed on a type?
+  unsigned IncludeInstanceMembers : 1;
+
   LookupState()
       : IsQualified(0), IsOnMetatype(0), IsOnSuperclass(0),
-        InheritsSuperclassInitializers(0) {}
+        InheritsSuperclassInitializers(0), IncludeInstanceMembers(0) {}
 
 public:
   LookupState(const LookupState &) = default;
@@ -73,6 +76,7 @@ public:
   bool isInheritsSuperclassInitializers() const {
     return InheritsSuperclassInitializers;
   }
+  bool isIncludingInstanceMembers() const { return IncludeInstanceMembers; }
 
   LookupState withOnMetatype() const {
     auto Result = *this;
@@ -97,6 +101,12 @@ public:
     Result.InheritsSuperclassInitializers = 0;
     return Result;
   }
+
+  LookupState withIncludedInstanceMembers() const {
+    auto Result = *this;
+    Result.IncludeInstanceMembers = 1;
+    return Result;
+  }
 };
 } // unnamed namespace
 
@@ -109,8 +119,10 @@ static bool areTypeDeclsVisibleInLookupMode(LookupState LS) {
 static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
                                       const DeclContext *FromContext,
                                       LazyResolver *TypeResolver) {
-  if (TypeResolver)
+  if (TypeResolver) {
     TypeResolver->resolveDeclSignature(Member);
+    TypeResolver->resolveAccessibility(Member);
+  }
 
   // Check accessibility when relevant.
   if (!Member->getDeclContext()->isLocalContext() &&
@@ -136,7 +148,7 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
       return false;
 
     // Cannot use instance properties on metatypes.
-    if (LS.isOnMetatype() && !VD->isStatic())
+    if (LS.isOnMetatype() && !VD->isStatic() && !LS.isIncludingInstanceMembers())
       return false;
 
     return true;
@@ -441,13 +453,17 @@ static void lookupVisibleMemberDeclsImpl(
     // declared type to see what we're dealing with.
     Type Ty = MTT->getInstanceType();
 
+    LookupState subLS = LookupState::makeQualified().withOnMetatype();
+    if (LS.isIncludingInstanceMembers()) {
+      subLS = subLS.withIncludedInstanceMembers();
+    }
+
     // Just perform normal dot lookup on the type see if we find extensions or
     // anything else.  For example, type SomeTy.SomeMember can look up static
     // functions, and can even look up non-static functions as well (thus
     // getting the address of the member).
-    lookupVisibleMemberDeclsImpl(Ty, Consumer, CurrDC,
-                                 LookupState::makeQualified().withOnMetatype(),
-                                 Reason, TypeResolver, Visited);
+    lookupVisibleMemberDeclsImpl(Ty, Consumer, CurrDC, subLS, Reason,
+                                 TypeResolver, Visited);
     return;
   }
 
@@ -605,15 +621,29 @@ public:
   llvm::SetVector<FoundDeclTy> DeclsToReport;
   Type BaseTy;
   const DeclContext *DC;
+  LazyResolver *TypeResolver;
 
-  OverrideFilteringConsumer(Type BaseTy, const DeclContext *DC)
-      : BaseTy(BaseTy->getRValueType()), DC(DC) {
+  OverrideFilteringConsumer(Type BaseTy, const DeclContext *DC,
+                            LazyResolver *resolver)
+      : BaseTy(BaseTy->getRValueType()), DC(DC), TypeResolver(resolver) {
     assert(DC && BaseTy);
   }
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
     if (!AllFoundDecls.insert(VD).second)
       return;
+
+    // If this kind of declaration doesn't participate in overriding, there's
+    // no filtering to do here.
+    if (!isa<AbstractFunctionDecl>(VD) && !isa<AbstractStorageDecl>(VD)) {
+      DeclsToReport.insert(FoundDeclTy(VD, Reason));
+      return;
+    }
+
+    if (TypeResolver) {
+      TypeResolver->resolveDeclSignature(VD);
+      TypeResolver->resolveAccessibility(VD);
+    }
 
     if (VD->isInvalid()) {
       FoundDecls[VD->getName()].insert(VD);
@@ -704,7 +734,7 @@ public:
 static void lookupVisibleMemberDecls(
     Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
     LookupState LS, DeclVisibilityKind Reason, LazyResolver *TypeResolver) {
-  OverrideFilteringConsumer ConsumerWrapper(BaseTy, CurrDC);
+  OverrideFilteringConsumer ConsumerWrapper(BaseTy, CurrDC, TypeResolver);
   VisitedSet Visited;
   lookupVisibleMemberDeclsImpl(BaseTy, ConsumerWrapper, CurrDC, LS, Reason,
                                TypeResolver, Visited);
@@ -838,10 +868,15 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 
 void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
                                      const DeclContext *CurrDC,
-                                     LazyResolver *TypeResolver) {
+                                     LazyResolver *TypeResolver,
+                                     bool includeInstanceMembers) {
   assert(CurrDC);
-  ::lookupVisibleMemberDecls(BaseTy, Consumer, CurrDC,
-                             LookupState::makeQualified(),
+  LookupState ls = LookupState::makeQualified();
+  if (includeInstanceMembers) {
+    ls = ls.withIncludedInstanceMembers();
+  }
+
+  ::lookupVisibleMemberDecls(BaseTy, Consumer, CurrDC, ls,
                              DeclVisibilityKind::MemberOfCurrentNominal,
                              TypeResolver);
 }

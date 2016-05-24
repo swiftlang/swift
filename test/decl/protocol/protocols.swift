@@ -453,7 +453,7 @@ protocol SecondProtocol {
 // <rdar://problem/19495341> Can't upcast to parent types of type constraints without forcing
 class C1 : P2 {}
 func f<T : C1>(_ x : T) {
-  x as P2
+  _ = x as P2
 }
 
 class C2 {}
@@ -463,7 +463,7 @@ func g<T : C2>(_ x : T) {
 
 class C3 : P1 {} // expected-error{{type 'C3' does not conform to protocol 'P1'}}
 func h<T : C3>(_ x : T) {
-  x as P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
+  _ = x as P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
 
 

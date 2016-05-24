@@ -1,6 +1,6 @@
 typedef const void *CFTypeRef __attribute__((objc_bridge(id)));
 
-typedef const struct __attribute__((objc_bridge(id))) __CCPowerSupply *CCPowerSupplyRef;
+typedef const struct __attribute__((objc_bridge(id))) CCPowerSupply *CCPowerSupplyRef;
 typedef const struct __attribute__((objc_bridge(id))) __CCRefrigerator *CCRefrigeratorRef;
 typedef struct __CCRefrigerator *CCMutableRefrigeratorRef;
 

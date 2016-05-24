@@ -116,10 +116,12 @@ func notHashableArray<T>(_ x: [T]) {
 }
 
 func hashableArray<T : Hashable>(_ x: [T]) {
+  // expected-warning @+1 {{unused}}
   x.worseHashEver // okay
 }
 
 func intArray(_ x: [Int]) {
+  // expected-warning @+1 {{unused}}
   x.worseHashEver
 }
 
@@ -130,7 +132,7 @@ extension GenericClass where T : Equatable {
 }
 
 func genericClassEquatable<T : Equatable>(_ gc: GenericClass<T>, x: T, y: T) {
-  gc.foo(x, y: y)
+  _ = gc.foo(x, y: y)
 }
 
 func genericClassNotEquatable<T>(_ gc: GenericClass<T>, x: T, y: T) {

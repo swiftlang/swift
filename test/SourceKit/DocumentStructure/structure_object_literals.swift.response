@@ -11,12 +11,7 @@
       key.length: 65,
       key.typename: "S",
       key.nameoffset: 148,
-      key.namelength: 5,
-      key.attributes: [
-        {
-          key.attribute: source.decl.attribute.__raw_doc_comment
-        }
-      ]
+      key.namelength: 5
     },
     {
       key.kind: source.lang.swift.expr.object_literal,

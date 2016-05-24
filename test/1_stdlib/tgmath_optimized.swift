@@ -27,10 +27,10 @@ func minusOneFloatFunction() -> Float {
 }
 
 TGMathTestSuite.test("sqrt") {
-  expectTrue(isnan(sqrt(minusOneFloat)))
-  expectTrue(isnan(sqrt(minusOneFloatFunction())))
-  expectTrue(isnan(sqrt(minusOneDouble)))
-  expectTrue(isnan(sqrt(minusOneDoubleFunction())))
+  expectTrue(sqrt(minusOneFloat).isNaN)
+  expectTrue(sqrt(minusOneFloatFunction()).isNaN)
+  expectTrue(sqrt(minusOneDouble).isNaN)
+  expectTrue(sqrt(minusOneDoubleFunction()).isNaN)
 }
 
 runAllTests()

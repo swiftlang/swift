@@ -181,7 +181,7 @@ SWIFT_RUNTIME_EXPORT
 extern "C" void swift_willThrow(SwiftError *object);
 SWIFT_RUNTIME_EXPORT
 extern "C" void swift_unexpectedError(SwiftError *object)
-  __attribute__((noreturn));
+    __attribute__((__noreturn__));
 
 #if SWIFT_OBJC_INTEROP
 

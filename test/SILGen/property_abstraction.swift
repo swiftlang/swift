@@ -5,7 +5,7 @@ struct Int {
 }
 
 struct Foo<T, U> {
-  var f: T -> U
+  var f: (T) -> U
 
   var g: T
 }
@@ -17,7 +17,7 @@ struct Foo<T, U> {
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTR
 // CHECK:         [[F_SUBST:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
 // CHECK:         return [[F_SUBST]]
-func getF(_ x: Foo<Int, Int>) -> Int -> Int {
+func getF(_ x: Foo<Int, Int>) -> (Int) -> Int {
   return x.f
 }
 
@@ -26,11 +26,11 @@ func getF(_ x: Foo<Int, Int>) -> Int -> Int {
 // CHECK:         [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]({{%.*}})
 // CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
 // CHECK:         assign [[F_ORIG]] to [[F_ADDR]]
-func setF(_ x: inout Foo<Int, Int>, f: Int -> Int) {
+func setF(_ x: inout Foo<Int, Int>, f: (Int) -> Int) {
   x.f = f
 }
 
-func inOutFunc(_ f: inout (Int -> Int)) { }
+func inOutFunc(_ f: inout ((Int) -> Int)) { }
 
 // CHECK-LABEL: sil hidden @_TF20property_abstraction6inOutF
 // CHECK:         [[INOUTFUNC:%.*]] = function_ref @_TF20property_abstraction9inOutFunc
@@ -63,7 +63,7 @@ func noAbstractionDifference(_ x: Foo<Int, Int>) {
 protocol P {}
 
 struct AddressOnlyLet<T> {
-  let f: T -> T
+  let f: (T) -> T
   let makeAddressOnly: P
 }
 
@@ -73,22 +73,22 @@ struct AddressOnlyLet<T> {
 // CHECK:         [[REABSTRACT:%.*]] = function_ref
 // CHECK:         [[CLOSURE_SUBST:%.*]] = partial_apply [[REABSTRACT]]([[CLOSURE_ORIG]])
 // CHECK:         return [[CLOSURE_SUBST]]
-func getAddressOnlyReabstractedProperty(_ x: AddressOnlyLet<Int>) -> Int -> Int {
+func getAddressOnlyReabstractedProperty(_ x: AddressOnlyLet<Int>) -> (Int) -> Int {
   return x.f
 }
 
 enum Bar<T, U> {
-  case F(T -> U)
+  case F((T) -> U)
 }
 
-func getF(_ x: Bar<Int, Int>) -> Int -> Int {
+func getF(_ x: Bar<Int, Int>) -> (Int) -> Int {
   switch x {
   case .F(var f):
     return f
   }
 }
 
-func makeF(_ f: Int -> Int) -> Bar<Int, Int> {
+func makeF(_ f: (Int) -> Int) -> Bar<Int, Int> {
   return Bar.F(f)
 }
 

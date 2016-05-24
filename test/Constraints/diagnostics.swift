@@ -71,7 +71,7 @@ i.wobble() // expected-error{{value of type 'Int' has no member 'wobble'}}
 // Generic member does not conform.
 extension Int {
   func wibble<T: P2>(_ x: T, _ y: T) -> T { return x }
-  func wubble<T>(_ x: Int -> T) -> T { return x(self) }
+  func wubble<T>(_ x: (Int) -> T) -> T { return x(self) }
 }
 i.wibble(3, 4) // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
 
@@ -84,12 +84,12 @@ for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to proto
 }
 
 // Generic as part of function/tuple types
-func f6<T:P2>(_ g: Void -> T) -> (c: Int, i: T) {
+func f6<T:P2>(_ g: (Void) -> T) -> (c: Int, i: T) {
   return (c: 0, i: g())
 }
 
 func f7() -> (c: Int, v: A) {
-  let g: Void -> A = { return A() }
+  let g: (Void) -> A = { return A() }
   return f6(g) // expected-error {{cannot convert return expression of type '(c: Int, i: A)' to return type '(c: Int, v: A)'}}
 }
 
@@ -346,14 +346,14 @@ func f7(_ a: Int) -> (b: Int) -> Int {
   return { b in a+b }
 }
 
-f7(1)(b: 1)
+_ = f7(1)(b: 1)
 f7(1.0)(2)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 f7(1)(1.0)       // expected-error {{missing argument label 'b:' in call}}
 f7(1)(b: 1.0)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 let f8 = f7(2)
-f8(b: 1)
+_ = f8(b: 1)
 f8(10)          // expected-error {{missing argument label 'b:' in call}} {{4-4=b: }}
 f8(1.0)         // expected-error {{missing argument label 'b:' in call}}
 f8(b: 1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
@@ -506,7 +506,7 @@ let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{'map
 let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}} {{51-51=description: }}
 let _: [Color] = [1,2].map { _ in .Unknown("") }// expected-error {{missing argument label 'description:' in call}} {{44-44=description: }}
 
-let _: Int -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{missing argument label 'description:' in call}} {{46-46=description: }}
+let _: (Int) -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{missing argument label 'description:' in call}} {{48-48=description: }}
 let _: Color = .Unknown("") // expected-error {{missing argument label 'description:' in call}} {{25-25=description: }}
 let _: Color = .Unknown // expected-error {{contextual member 'Unknown' expects argument of type '(description: String)'}}
 let _: Color = .Unknown(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
@@ -583,7 +583,7 @@ func r21684487() {
   var closures = Array<MyClosure>()
   let testClosure = {(list: [Int]) -> Bool in return true}
   
-  let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot convert value of type '([Int]) -> Bool' to expected argument type 'AnyObject?'}}
+  let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot check reference equality of functions; operands here have types '_' and '([Int]) -> Bool'}}
 }
 
 // <rdar://problem/18397777> QoI: special case comparisons with nil
@@ -749,8 +749,8 @@ if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{binary operator '=
 func r24251022() {
   var a = 1
   var b: UInt32 = 2
-  a += a +
-    b // expected-error {{cannot convert value of type 'UInt32' to expected argument type 'Int'}}
+  a += a + // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{expected an argument list of type '(Int, Int)'}}
+    b
 }
 
 func overloadSetResultType(_ a : Int, b : Int) -> Int {

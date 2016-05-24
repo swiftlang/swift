@@ -816,16 +816,16 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
   DeclName name(Context, Context.getIdentifier("$defer"), params);
   auto tempDecl
     = FuncDecl::create(Context,
-                       /*static*/ SourceLoc(),
+                       /*StaticLoc=*/ SourceLoc(),
                        StaticSpellingKind::None,
-                       /*func*/ SourceLoc(),
+                       /*FuncLoc=*/ SourceLoc(),
                        name,
-                       /*name*/ SourceLoc(),
-                       /*throws*/ SourceLoc(), /*Accessor keyword*/SourceLoc(),
+                       /*NameLoc=*/ SourceLoc(),
+                       /*Throws=*/ false, /*ThrowsLoc=*/ SourceLoc(),
+                       /*AccessorKeywordLoc=*/SourceLoc(),
                        /*generic params*/ nullptr,
-                       Type(),
                        params,
-                       /*return type*/ TypeLoc(),
+                       Type(), TypeLoc(),
                        CurDeclContext);
   tempDecl->setImplicit();
   setLocalDiscriminator(tempDecl);

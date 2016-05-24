@@ -206,14 +206,14 @@ public protocol ReabstractSelfBase {
 
 public protocol ReabstractSelfRefined : class, ReabstractSelfBase {
   // A requirement with 'Self' abstracted as a class instance
-  var callback: Self -> Self { get set }
+  var callback: (Self) -> Self { get set }
 }
 
 func id<T>(_ t: T) -> T {}
 
 extension ReabstractSelfBase {
   // A witness for the above requirement, but with 'Self' maximally abstracted
-  public var callback: Self -> Self {
+  public var callback: (Self) -> Self {
     get { return id }
     nonmutating set { }
   }

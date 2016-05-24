@@ -112,7 +112,7 @@ public:
   /// The path to which we should output a Swift reference dependencies file.
   std::string ReferenceDependenciesFilePath;
 
-  /// The path to which we should output a fixits as source edits.
+  /// The path to which we should output fixits as source edits.
   std::string FixitsOutputPath;
 
   /// Arguments which should be passed in immediate mode.
@@ -127,6 +127,12 @@ public:
 
   /// The path to collect the group information for the compiled source files.
   std::string GroupInfoPath;
+
+  /// If non-zero, warn when a function body takes longer than this many
+  /// milliseconds to type-check.
+  ///
+  /// Intended for debugging purposes only.
+  unsigned WarnLongFunctionBodies = 0;
 
   enum ActionType {
     NoneAction, ///< No specific action

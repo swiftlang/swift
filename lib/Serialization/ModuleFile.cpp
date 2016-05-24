@@ -1560,17 +1560,6 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
 
 const static StringRef Separator = "/";
 
-static const Decl* getGroupDecl(const Decl *D) {
-  auto GroupD = D;
-
-  // Extensions always exist in the same group with the nominal.
-  if (auto ED = dyn_cast_or_null<ExtensionDecl>(D->getDeclContext()->
-                                                getInnermostTypeContext())) {
-    GroupD = ED->getExtendedType()->getAnyNominal();
-  }
-  return GroupD;
-}
-
 Optional<StringRef> ModuleFile::getGroupNameById(unsigned Id) const {
   if (!GroupNamesMap || GroupNamesMap->count(Id) == 0)
     return None;
@@ -1596,8 +1585,7 @@ Optional<StringRef> ModuleFile::getSourceFileNameById(unsigned Id) const {
 }
 
 Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) const {
-  auto GroupD = getGroupDecl(D);
-  auto Triple = getCommentForDecl(GroupD);
+  auto Triple = getCommentForDecl(D);
   if (!Triple.hasValue()) {
     return None;
   }
@@ -1607,8 +1595,7 @@ Optional<StringRef> ModuleFile::getGroupNameForDecl(const Decl *D) const {
 
 Optional<StringRef>
 ModuleFile::getSourceFileNameForDecl(const Decl *D) const {
-  auto GroupD = getGroupDecl(D);
-  auto Triple = getCommentForDecl(GroupD);
+  auto Triple = getCommentForDecl(D);
   if (!Triple.hasValue()) {
     return None;
   }

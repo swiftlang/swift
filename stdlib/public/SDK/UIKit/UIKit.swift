@@ -36,7 +36,6 @@ public extension UIOffset {
 //===----------------------------------------------------------------------===//
 
 @_transparent // @fragile
-@warn_unused_result
 public func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
   return lhs.top == rhs.top &&
          lhs.left == rhs.left &&
@@ -47,7 +46,6 @@ public func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
 extension UIEdgeInsets : Equatable {}
 
 @_transparent // @fragile
-@warn_unused_result
 public func == (lhs: UIOffset, rhs: UIOffset) -> Bool {
   return lhs.horizontal == rhs.horizontal &&
          lhs.vertical == rhs.vertical
@@ -85,21 +83,18 @@ public extension UIDeviceOrientation {
   }
 }
 
-@warn_unused_result
 public func UIDeviceOrientationIsLandscape(
   _ orientation: UIDeviceOrientation
 ) -> Bool {
   return orientation.isLandscape
 }
 
-@warn_unused_result
 public func UIDeviceOrientationIsPortrait(
   _ orientation: UIDeviceOrientation
 ) -> Bool {
   return orientation.isPortrait
 }
 
-@warn_unused_result
 public func UIDeviceOrientationIsValidInterfaceOrientation(
   _ orientation: UIDeviceOrientation) -> Bool
 {
@@ -122,13 +117,11 @@ public extension UIInterfaceOrientation {
   }
 }
 
-@warn_unused_result
 public func UIInterfaceOrientationIsPortrait(
   _ orientation: UIInterfaceOrientation) -> Bool {
   return orientation.isPortrait
 }
 
-@warn_unused_result
 public func UIInterfaceOrientationIsLandscape(
   _ orientation: UIInterfaceOrientation
 ) -> Bool {
@@ -187,8 +180,8 @@ internal struct _UIViewQuickLookState {
   static var views = Set<UIView>()
 }
 
-extension UIView : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+extension UIView : _DefaultCustomPlaygroundQuickLookable {
+  public var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
     if _UIViewQuickLookState.views.contains(self) {
       return .view(UIImage())
     } else {
@@ -219,7 +212,8 @@ extension UIView : CustomPlaygroundQuickLookable {
 #endif
 
 extension UIColor : _ColorLiteralConvertible {
-  @nonobjc public required convenience init(red: Float, green: Float,
+  @nonobjc public required convenience init(colorLiteralRed red: Float,
+                                            green: Float,
                                             blue: Float, alpha: Float) {
     self.init(red: CGFloat(red), green: CGFloat(green),
               blue: CGFloat(blue), alpha: CGFloat(alpha))
@@ -233,7 +227,7 @@ extension UIImage : _ImageLiteralConvertible {
     self.init(named: name)
   }
 
-  public required convenience init(resourceName name: String) {
+  public required convenience init(imageLiteralResourceName name: String) {
     self.init(failableImageLiteral: name)
   }
 }

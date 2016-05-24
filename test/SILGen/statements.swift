@@ -132,7 +132,7 @@ func loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
      bar(x);
      continue
     }
-    loop_with_break(x, y, z);
+    _ = loop_with_break(x, y, z);
   }
   bar(x);
 }
@@ -145,7 +145,7 @@ func do_loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
      bar(x);
      continue
     }
-    loop_with_break(x, y, z);
+    _ = loop_with_break(x, y, z);
   }
   while (x > 2);
   bar(x);

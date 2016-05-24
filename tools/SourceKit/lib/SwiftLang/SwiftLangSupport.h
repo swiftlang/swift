@@ -251,6 +251,9 @@ public:
                                            swift::index::SymbolSubKindSet subKinds,
                                            bool isRef);
 
+  static std::vector<UIdent> UIDsFromDeclAttributes(const swift::DeclAttributes &Attrs);
+
+
   static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS);
 
   /// Generate a USR for a Decl, including the prefix.

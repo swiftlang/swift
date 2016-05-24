@@ -365,7 +365,7 @@ class Bas : NSObject {
 }
 
 // CHECK-LABEL: sil hidden @_TF13objc_bridging16applyStringBlock
-func applyStringBlock(_ f: @convention(block) String -> String, x: String) -> String {
+func applyStringBlock(_ f: @convention(block) (String) -> String, x: String) -> String {
   // CHECK: [[BLOCK:%.*]] = copy_block %0
   // CHECK: [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
   // CHECK: [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]

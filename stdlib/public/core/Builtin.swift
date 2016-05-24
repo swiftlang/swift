@@ -21,7 +21,6 @@ import SwiftShims
 /// In particular, `sizeof(X.self)`, when `X` is a class type, is the
 /// same regardless of how many stored properties `X` has.
 @_transparent
-@warn_unused_result
 public func sizeof<T>(_:T.Type) -> Int {
   return Int(Builtin.sizeof(T.self))
 }
@@ -32,21 +31,18 @@ public func sizeof<T>(_:T.Type) -> Int {
 /// In particular, `sizeof(a)`, when `a` is a class instance, is the
 /// same regardless of how many stored properties `a` has.
 @_transparent
-@warn_unused_result
 public func sizeofValue<T>(_:T) -> Int {
   return sizeof(T.self)
 }
 
 /// Returns the minimum memory alignment of `T`.
 @_transparent
-@warn_unused_result
 public func alignof<T>(_:T.Type) -> Int {
   return Int(Builtin.alignof(T.self))
 }
 
 /// Returns the minimum memory alignment of `T`.
 @_transparent
-@warn_unused_result
 public func alignofValue<T>(_:T) -> Int {
   return alignof(T.self)
 }
@@ -54,7 +50,6 @@ public func alignofValue<T>(_:T) -> Int {
 /// Returns the least possible interval between distinct instances of
 /// `T` in memory.  The result is always positive.
 @_transparent
-@warn_unused_result
 public func strideof<T>(_:T.Type) -> Int {
   return Int(Builtin.strideof_nonzero(T.self))
 }
@@ -62,28 +57,53 @@ public func strideof<T>(_:T.Type) -> Int {
 /// Returns the least possible interval between distinct instances of
 /// `T` in memory.  The result is always positive.
 @_transparent
-@warn_unused_result
 public func strideofValue<T>(_:T) -> Int {
   return strideof(T.self)
 }
 
+// This function is the implementation of the `_roundUp` overload set.  It is
+// marked `@inline(__always)` to make primary `_roundUp` entry points seem
+// cheap enough for the inliner.
 @_versioned
-@warn_unused_result
-internal func _roundUp(_ offset: Int, toAlignment alignment: Int) -> Int {
-  _sanityCheck(offset >= 0)
+@inline(__always)
+internal func _roundUpImpl(_ offset: UInt, toAlignment alignment: Int) -> UInt {
   _sanityCheck(alignment > 0)
   _sanityCheck(_isPowerOf2(alignment))
   // Note, given that offset is >= 0, and alignment > 0, we don't
   // need to underflow check the -1, as it can never underflow.
-  let x = (offset + alignment &- 1)
+  let x = offset + UInt(bitPattern: alignment) &- 1
   // Note, as alignment is a power of 2, we'll use masking to efficiently
   // get the aligned value
-  return x & ~(alignment &- 1)
+  return x & ~(UInt(bitPattern: alignment) &- 1)
+}
+
+@_versioned
+internal func _roundUp(_ offset: UInt, toAlignment alignment: Int) -> UInt {
+  return _roundUpImpl(offset, toAlignment: alignment)
+}
+
+@_versioned
+internal func _roundUp(_ offset: Int, toAlignment alignment: Int) -> Int {
+  _sanityCheck(offset >= 0)
+  return Int(_roundUpImpl(UInt(bitPattern: offset), toAlignment: alignment))
+}
+
+@_versioned
+internal func _roundUp<T, DestinationType>(
+  _ pointer: UnsafeMutablePointer<T>,
+  toAlignmentOf destinationType: DestinationType.Type
+) -> UnsafeMutablePointer<DestinationType> {
+  // Note: unsafe unwrap is safe because this operation can only increase the
+  // value, and can not produce a null pointer.
+  return UnsafeMutablePointer<DestinationType>(
+    bitPattern: _roundUpImpl(
+      UInt(bitPattern: pointer),
+      toAlignment: alignof(DestinationType))
+  ).unsafelyUnwrapped
 }
 
 /// Returns a tri-state of 0 = no, 1 = yes, 2 = maybe.
 @_transparent
-@warn_unused_result
 public // @testable
 func _canBeClass<T>(_: T.Type) -> Int8 {
   return Int8(Builtin.canBeClass(T.self))
@@ -96,7 +116,6 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 ///   anything.
 ///
 @_transparent
-@warn_unused_result
 public func unsafeBitCast<T, U>(_ x: T, to: U.Type) -> U {
   _precondition(sizeof(T.self) == sizeof(U.self),
     "can't unsafeBitCast between types of different sizes")
@@ -105,45 +124,38 @@ public func unsafeBitCast<T, U>(_ x: T, to: U.Type) -> U {
 
 /// `unsafeBitCast` something to `AnyObject`.
 @_transparent
-@warn_unused_result
 public func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
   return unsafeBitCast(x, to: AnyObject.self)
 }
 
 @_transparent
-@warn_unused_result
 func ==(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
   return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @_transparent
-@warn_unused_result
 func !=(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
   return !(lhs == rhs)
 }
 
 @_transparent
-@warn_unused_result
 func ==(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @_transparent
-@warn_unused_result
 func !=(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return !(lhs == rhs)
 }
 
 /// Returns `true` iff `t0` is identical to `t1`; i.e. if they are both
 /// `nil` or they both represent the same type.
-@warn_unused_result
 public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
   return unsafeBitCast(t0, to: Int.self) == unsafeBitCast(t1, to: Int.self)
 }
 
 /// Returns `false` iff `t0` is identical to `t1`; i.e. if they are both
 /// `nil` or they both represent the same type.
-@warn_unused_result
 public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
   return !(t0 == t1)
 }
@@ -169,7 +181,6 @@ func _conditionallyUnreachable() {
 }
 
 @_versioned
-@warn_unused_result
 @_silgen_name("_swift_isClassOrObjCExistentialType")
 func _swift_isClassOrObjCExistentialType<T>(_ x: T.Type) -> Bool
 
@@ -177,7 +188,6 @@ func _swift_isClassOrObjCExistentialType<T>(_ x: T.Type) -> Bool
 /// `AnyObject`.
 @_versioned
 @inline(__always)
-@warn_unused_result
 internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
   let tmp = _canBeClass(x)
 
@@ -197,7 +207,6 @@ internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
 /// not much you can do with this other than use it to identify the
 /// object.
 @_transparent
-@warn_unused_result
 public func unsafeAddress(of object: AnyObject) -> UnsafePointer<Void> {
   return UnsafePointer(Builtin.bridgeToRawPointer(object))
 }
@@ -214,7 +223,6 @@ public func unsafeAddressOf(_ object: AnyObject) -> UnsafePointer<Void> {
 /// be either a class or a class protocol. Either T, U, or both may be
 /// optional references.
 @_transparent
-@warn_unused_result
 public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
   return Builtin.castReference(x)
 }
@@ -230,14 +238,12 @@ public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
 ///   `unsafeBitCast` because it's more restrictive, and because
 ///   checking is still performed in debug builds.
 @_transparent
-@warn_unused_result
 public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to: T.Type) -> T {
   _debugPrecondition(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
 }
 
 @inline(__always)
-@warn_unused_result
 public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
   -> UnsafeMutablePointer<UInt8> {
   let storedPropertyOffset = _roundUp(
@@ -258,7 +264,6 @@ public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
 @_versioned
 @_transparent
 @_semantics("branchhint")
-@warn_unused_result
 internal func _branchHint<C : Boolean>(_ actual: C, expected: Bool)
   -> Bool {
   return Bool(Builtin.int_expect_Int1(actual.boolValue._value, expected._value))
@@ -267,7 +272,6 @@ internal func _branchHint<C : Boolean>(_ actual: C, expected: Bool)
 /// Optimizer hint that `x` is expected to be `true`.
 @_transparent
 @_semantics("fastpath")
-@warn_unused_result
 public func _fastPath<C: Boolean>(_ x: C) -> Bool {
   return _branchHint(x.boolValue, expected: true)
 }
@@ -275,7 +279,6 @@ public func _fastPath<C: Boolean>(_ x: C) -> Bool {
 /// Optimizer hint that `x` is expected to be `false`.
 @_transparent
 @_semantics("slowpath")
-@warn_unused_result
 public func _slowPath<C : Boolean>(_ x: C) -> Bool {
   return _branchHint(x.boolValue, expected: false)
 }
@@ -293,7 +296,6 @@ public func _onFastPath() {
 /// Swift reference-counting.
 @_versioned
 @inline(__always)
-@warn_unused_result
 internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool {
 #if _runtime(_ObjC)
   return swift_objc_class_usesNativeSwiftReferenceCounting(
@@ -304,19 +306,16 @@ internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool {
 #endif
 }
 
-@warn_unused_result
 @_silgen_name("swift_class_getInstanceExtents")
 func swift_class_getInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
-@warn_unused_result
 @_silgen_name("swift_objc_class_unknownGetInstanceExtents")
 func swift_objc_class_unknownGetInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
 /// - Returns: 
 @inline(__always)
-@warn_unused_result
 internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)
   return Int(swift_objc_class_unknownGetInstanceExtents(theClass).positive)
@@ -400,7 +399,6 @@ internal var _objCTaggedPointerBits: UInt {
 /// Extract the raw bits of `x`.
 @_versioned
 @inline(__always)
-@warn_unused_result
 internal func _bitPattern(_ x: Builtin.BridgeObject) -> UInt {
   return UInt(Builtin.castBitPatternFromBridgeObject(x))
 }
@@ -408,14 +406,12 @@ internal func _bitPattern(_ x: Builtin.BridgeObject) -> UInt {
 /// Extract the raw spare bits of `x`.
 @_versioned
 @inline(__always)
-@warn_unused_result
 internal func _nonPointerBits(_ x: Builtin.BridgeObject) -> UInt {
   return _bitPattern(x) & _objectPointerSpareBits
 }
 
 @_versioned
 @inline(__always)
-@warn_unused_result
 internal func _isObjCTaggedPointer(_ x: AnyObject) -> Bool {
   return (Builtin.reinterpretCast(x) & _objCTaggedPointerBits) != 0
 }
@@ -430,7 +426,6 @@ internal func _isObjCTaggedPointer(_ x: AnyObject) -> Bool {
 ///   `bits & _objectPointerSpareBits == bits`.
 @_versioned
 @inline(__always)
-@warn_unused_result
 internal func _makeNativeBridgeObject(
   _ nativeObject: AnyObject, _ bits: UInt
 ) -> Builtin.BridgeObject {
@@ -443,7 +438,6 @@ internal func _makeNativeBridgeObject(
 
 /// Create a `BridgeObject` around the given `objCObject`.
 @inline(__always)
-@warn_unused_result
 public // @testable
 func _makeObjCBridgeObject(
   _ objCObject: AnyObject
@@ -464,7 +458,6 @@ func _makeObjCBridgeObject(
 ///      _objectPointerIsObjCBit`.
 @_versioned
 @inline(__always)
-@warn_unused_result
 internal func _makeBridgeObject(
   _ object: AnyObject, _ bits: UInt
 ) -> Builtin.BridgeObject {
@@ -490,7 +483,6 @@ internal func _makeBridgeObject(
 /// Returns the superclass of `t`, if any.  The result is `nil` if `t` is
 /// a root class or class protocol.
 @inline(__always)
-@warn_unused_result
 public // @testable
 func _getSuperclass(_ t: AnyClass) -> AnyClass? {
   return unsafeBitCast(
@@ -501,7 +493,6 @@ func _getSuperclass(_ t: AnyClass) -> AnyClass? {
 /// Returns the superclass of `t`, if any.  The result is `nil` if `t` is
 /// not a class, is a root class, or is a class protocol.
 @inline(__always)
-@warn_unused_result
 public // @testable
 func _getSuperclass(_ t: Any.Type) -> AnyClass? {
   return (t as? AnyClass).flatMap { _getSuperclass($0) }
@@ -529,7 +520,6 @@ func _getSuperclass(_ t: Any.Type) -> AnyClass? {
 /// Returns `true` if `object` is uniquely referenced.
 @_versioned
 @_transparent
-@warn_unused_result
 internal func _isUnique<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUnique(&object))
 }
@@ -537,7 +527,6 @@ internal func _isUnique<T>(_ object: inout T) -> Bool {
 /// Returns `true` if `object` is uniquely referenced or pinned.
 @_versioned
 @_transparent
-@warn_unused_result
 internal func _isUniqueOrPinned<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUniqueOrPinned(&object))
 }
@@ -545,7 +534,6 @@ internal func _isUniqueOrPinned<T>(_ object: inout T) -> Bool {
 /// Returns `true` if `object` is uniquely referenced.
 /// This provides sanity checks on top of the Builtin.
 @_transparent
-@warn_unused_result
 public // @testable
 func _isUnique_native<T>(_ object: inout T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
@@ -562,7 +550,6 @@ func _isUnique_native<T>(_ object: inout T) -> Bool {
 /// Returns `true` if `object` is uniquely referenced or pinned.
 /// This provides sanity checks on top of the Builtin.
 @_transparent
-@warn_unused_result
 public // @testable
 func _isUniqueOrPinned_native<T>(_ object: inout T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
@@ -578,7 +565,6 @@ func _isUniqueOrPinned_native<T>(_ object: inout T) -> Bool {
 /// Returns `true` if type is a POD type. A POD type is a type that does not
 /// require any special handling on copying or destruction.
 @_transparent
-@warn_unused_result
 public // @testable
 func _isPOD<T>(_ type: T.Type) -> Bool {
   return Bool(Builtin.ispod(type))
@@ -586,7 +572,6 @@ func _isPOD<T>(_ type: T.Type) -> Bool {
 
 /// Returns `true` if type is nominally an Optional type.
 @_transparent
-@warn_unused_result
 public // @testable
 func _isOptional<T>(_ type: T.Type) -> Bool {
   return Bool(Builtin.isOptional(type))

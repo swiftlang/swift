@@ -25,7 +25,7 @@
 ///
 /// - Note: Unlike ordinary set types, the `Element` type of an `OptionSet` is
 ///   identical to the `OptionSet` type itself. The `SetAlgebra` protocol is
-///   specifically designed to accomodate both kinds of set.
+///   specifically designed to accommodate both kinds of set.
 ///
 /// Conforming to the SetAlgebra Protocol
 /// =====================================
@@ -89,7 +89,6 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///
   /// - Parameter member: An element to look for in the set.
   /// - Returns: `true` if `member` exists in the set; otherwise, `false`.
-  @warn_unused_result
   func contains(_ member: Element) -> Bool
 
   /// Returns a new set with the elements of both this and the given set.
@@ -116,7 +115,6 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// - Note: if this set and `other` contain elements that are equal but
   ///   distinguishable (e.g. via `===`), which of these elements is present
   ///   in the result is unspecified.
-  @warn_unused_result
   func union(_ other: Self) -> Self
   
   /// Returns a new set with the elements that are common to both this set and
@@ -136,7 +134,6 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// - Note: if this set and `other` contain elements that are equal but
   ///   distinguishable (e.g. via `===`), which of these elements is present
   ///   in the result is unspecified.
-  @warn_unused_result
   func intersection(_ other: Self) -> Self
 
   /// Returns a new set with the elements that are either in this set or in the
@@ -152,15 +149,14 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///
   /// - Parameter other: A set of the same type as the current set.
   /// - Returns: A new set.
-  @warn_unused_result
   func symmetricDifference(_ other: Self) -> Self
 
-  /// If `newMember` is not already contained in `self`, inserts it.
+  /// Inserts the given element in the set if it is not already present.
   ///
-  /// If the element is already contained in the set, this method has no
-  /// effect. In this example, a new element is inserted into `classDays`, a
-  /// set of days of the week. When an existing element is inserted, the
-  /// `classDays` set does not change.
+  /// If an element equal to `newMember` is already contained in the set, this
+  /// method has no effect. In this example, a new element is inserted into
+  /// `classDays`, a set of days of the week. When an existing element is
+  /// inserted, the `classDays` set does not change.
   ///
   ///     enum DayOfTheWeek: Int {
   ///         case sunday, monday, tuesday, wednesday, thursday,
@@ -178,41 +174,58 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///     print(classDays)
   ///     // Prints "[.friday, .wednesday, .monday]"
   ///
-  /// - Returns: `(true, newMember)` if `newMember` was not contained in
-  ///   `self`. Otherwise, returns `(false, oldMember)`, where `oldMember` is
-  ///   the member of `self` equal to `newMember` (which may be
-  ///   distinguishable from `newMember`, e.g. via `===`).
-  ///
-  /// - Postcondition: `self.contains(newMember)`.
+  /// - Parameter newMember: An element to insert into the set.
+  /// - Returns: `(true, newMember)` if `newMember` was not contained in the
+  ///   set. If an element equal to `newMember` was already contained in the
+  ///   set, the method returns `(false, oldMember)`, where `oldMember` is the
+  ///   element that was equal to `newMember`. In some cases, `oldMember` may
+  ///   be distinguishable from `newMember` by identity comparison or some
+  ///   other means.
+  @discardableResult
   mutating func insert(
     _ newMember: Element
   ) -> (inserted: Bool, memberAfterInsert: Element)
   
-  /// If `self` intersects `[e]`, removes and returns an element `r`
-  /// such that `self.intersection([e]) == [r]`; returns `nil`
-  /// otherwise.
+  /// Removes the given element and any elements subsumed by the given element.
   ///
-  /// - Note: for ordinary sets where `Self` is not the same type as
-  ///   `Element`, `s.remove(e)` removes and returns an element equal
-  ///   to `e` (which may be distinguishable from `e`, e.g. via
-  ///   `===`), or returns `nil` if no such element existed.
+  /// - Parameter member: The element of the set to remove.
+  /// - Returns: For ordinary sets, an element equal to `member` if `member` is
+  ///   contained in the set; otherwise, `nil`. In some cases, a returned
+  ///   element may be distinguishable from `newMember` by identity comparison
+  ///   or some other means.
   ///
-  /// - Postcondition: `self.intersection([e]).isEmpty`
-  mutating func remove(_ e: Element) -> Element?
+  ///   For sets where the set type and element type are the same, like
+  ///   `OptionSet` types, this method returns any intersection between the set
+  ///   and `[member]`, or `nil` if the intersection is empty.
+  @discardableResult
+  mutating func remove(_ member: Element) -> Element?
 
-  /// Inserts `e` unconditionally.
+  /// Inserts the given element into the set unconditionally.
   ///
-  /// - Returns: a former member `r` of `self` such that
-  ///   `self.intersection([e]) == [r]` if `self.intersection([e])` was
-  ///   non-empty.  Returns `nil` otherwise.
+  /// If an element equal to `newMember` is already contained in the set,
+  /// `newMember` replaces the existing element. In this example, an existing
+  /// element is inserted into `classDays`, a set of days of the week.
   ///
-  /// - Note: for ordinary sets where `Self` is not the same type as
-  ///   `Element`, `s.update(with: e)` returns an element equal
-  ///   to `e` (which may be distinguishable from `e`, e.g. via
-  ///   `===`), or returns `nil` if no such element existed.
+  ///     enum DayOfTheWeek: Int {
+  ///         case sunday, monday, tuesday, wednesday, thursday,
+  ///             friday, saturday
+  ///     }
   ///
-  /// - Postcondition: `self.contains(e)`
-  mutating func update(with e: Element) -> Element?
+  ///     var classDays: Set<DayOfTheWeek> = [.monday, .wednesday, .friday]
+  ///     print(classDays.update(with: .monday))
+  ///     // Prints "Optional(.monday)"
+  ///
+  /// - Parameter newMember: An element to insert into the set.
+  /// - Returns: For ordinary sets, an element equal to `newMember` if the set
+  ///   already contained such a member; otherwise, `nil`. In some cases, the
+  ///   returned element may be distinguishable from `newMember` by identity
+  ///   comparison or some other means.
+  ///
+  ///   For sets where the set type and element type are the same, like
+  ///   `OptionSet` types, this method returns any intersection between the 
+  ///   set and `[newMember]`, or `nil` if the intersection is empty.
+  @discardableResult
+  mutating func update(with newMember: Element) -> Element?
   
   /// Adds the elements of the given set to the set.
   ///
@@ -276,7 +289,6 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///
   /// - Parameter other: A set of the same type as the current set.
   /// - Returns: A new set.
-  @warn_unused_result
   func subtracting(_ other: Self) -> Self
 
   /// Returns a Boolean value that indicates whether the set is a subset of
@@ -292,7 +304,6 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///
   /// - Parameter other: A set of the same type as the current set.
   /// - Returns: `true` if the set is a subset of `other`; otherwise, `false`.
-  @warn_unused_result
   func isSubset(of other: Self) -> Bool
 
   /// Returns a Boolean value that indicates whether the set has no members in
@@ -308,7 +319,6 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// - Parameter other: A set of the same type as the current set.
   /// - Returns: `true` if the set has no elements in common with `other`;
   ///   otherwise, `false`.
-  @warn_unused_result
   func isDisjoint(with other: Self) -> Bool
 
   /// Returns a Boolean value that indicates whether the set is a superset of
@@ -325,7 +335,6 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// - Parameter other: A set of the same type as the current set.
   /// - Returns: `true` if the set is a superset of `possibleSubset`;
   ///   otherwise, `false`.
-  @warn_unused_result
   func isSuperset(of other: Self) -> Bool
 
   /// A Boolean value that indicates whether the set has no elements.
@@ -383,7 +392,7 @@ extension SetAlgebra {
 
   /// Creates a set containing the elements of the given array literal.
   ///
-  /// Don't directly call this initializer, which is used by the compiler when
+  /// Do not call this initializer directly. It is used by the compiler when
   /// you use an array literal. Instead, create a new set using an array
   /// literal as its value by enclosing a comma-separated list of values in
   /// square brackets. You can use an array literal anywhere a set is expected
@@ -393,7 +402,7 @@ extension SetAlgebra {
   /// strings:
   ///
   ///     let ingredients: Set = ["cocoa beans", "sugar", "cocoa butter", "salt"]
-  ///     if ingredients.isSupersetOf(["sugar", "salt"]) {
+  ///     if ingredients.isSuperset(of: ["sugar", "salt"]) {
   ///         print("Whatever it is, it's bound to be delicious!")
   ///     }
   ///     // Prints "Whatever it is, it's bound to be delicious!"
@@ -431,7 +440,6 @@ extension SetAlgebra {
   ///
   /// - Parameter other: A set of the same type as the current set.
   /// - Returns: `true` if the set is a subset of `other`; otherwise, `false`.
-  @warn_unused_result
   public func isSubset(of other: Self) -> Bool {
     return self.intersection(other) == self
   }
@@ -450,7 +458,6 @@ extension SetAlgebra {
   /// - Parameter other: A set of the same type as the current set.
   /// - Returns: `true` if the set is a superset of `other`; otherwise,
   ///   `false`.
-  @warn_unused_result
   public func isSuperset(of other: Self) -> Bool {
     return other.isSubset(of: self)
   }
@@ -468,7 +475,6 @@ extension SetAlgebra {
   /// - Parameter other: A set of the same type as the current set.
   /// - Returns: `true` if the set has no elements in common with `other`;
   ///   otherwise, `false`.
-  @warn_unused_result
   public func isDisjoint(with other: Self) -> Bool {
     return self.intersection(other).isEmpty
   }
@@ -486,7 +492,6 @@ extension SetAlgebra {
   ///
   /// - Parameter other: A set of the same type as the current set.
   /// - Returns: A new set.
-  @warn_unused_result
   public func subtracting(_ other: Self) -> Self {
     return self.intersection(self.symmetricDifference(other))
   }
@@ -513,7 +518,6 @@ extension SetAlgebra {
   /// - Parameter other: A set of the same type as the current set.
   /// - Returns: `true` if the set is a strict superset of `other`; otherwise,
   ///   `false`.
-  @warn_unused_result
   public func isStrictSuperset(of other: Self) -> Bool {
     return self.isSuperset(of: other) && self != other
   }
@@ -537,7 +541,6 @@ extension SetAlgebra {
   /// - Parameter other: A set of the same type as the current set.
   /// - Returns: `true` if the set is a strict subset of `other`; otherwise,
   ///   `false`.
-  @warn_unused_result
   public func isStrictSubset(of other: Self) -> Bool {
     return other.isStrictSuperset(of: self)
   }
@@ -545,4 +548,61 @@ extension SetAlgebra {
 
 @available(*, unavailable, renamed: "SetAlgebra")
 public typealias SetAlgebraType = SetAlgebra
+
+extension SetAlgebra {
+  @available(*, unavailable, renamed: "intersection")
+  public func intersect(_ other: Self) -> Self {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "symmetricDifference")
+  public func exclusiveOr(_ other: Self) -> Self {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "formUnion")
+  public mutating func unionInPlace(_ other: Self) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "formIntersection")
+  public mutating func intersectInPlace(_ other: Self) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "formSymmetricDifference")
+  public mutating func exclusiveOrInPlace(_ other: Self) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "isSubset(of:)")
+  public func isSubsetOf(_ other: Self) -> Bool {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "isDisjoint(with:)")
+  public func isDisjointWith(_ other: Self) -> Bool {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "isSuperset(of:)")
+  public func isSupersetOf(_ other: Self) -> Bool {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "subtract")
+  public mutating func subtractInPlace(_ other: Self) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "isStrictSuperset(of:)")
+  public func isStrictSupersetOf(_ other: Self) -> Bool {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "isStrictSubset(of:)")
+  public func isStrictSubsetOf(_ other: Self) -> Bool {
+    Builtin.unreachable()
+  }
+}
 

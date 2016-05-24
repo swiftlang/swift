@@ -10,25 +10,31 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// This protocol is an implementation detail of `Integer`; do not use it
+/// directly.
 @_show_in_interface
 public protocol _Incrementable : Equatable {}
 
 @available(*, unavailable, message: "Use \'-= 1\' or call collection.prior(Index)")
+@discardableResult
 public prefix func -- <T : _Incrementable> (i: inout T) -> T {
   Builtin.unreachable()
 }
 
 @available(*, unavailable, message: "Use \'-= 1\' or call collection.prior(Index)")
+@discardableResult
 public postfix func -- <T : _Incrementable> (i: inout T) -> T {
   Builtin.unreachable()
 }
 
 @available(*, unavailable, message: "Use \'+= 1\' or call 'collection.index(after: Index)")
+@discardableResult
 public prefix func ++ <T : _Incrementable> (i: inout T) -> T {
   Builtin.unreachable()
 }
 
 @available(*, unavailable, message: "Use \'+= 1\' or call 'collection.index(after: Index)")
+@discardableResult
 public postfix func ++ <T : _Incrementable> (i: inout T) -> T {
   Builtin.unreachable()
 }

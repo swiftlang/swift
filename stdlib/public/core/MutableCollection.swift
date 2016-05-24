@@ -36,8 +36,8 @@ public protocol MutableIndexable : Indexable {
   /// If the collection is empty, `startIndex` is equal to `endIndex`.
   var startIndex: Index { get }
 
-  /// The collection's "past the end" position, or one greater than the last
-  /// valid subscript argument.
+  /// The collection's "past the end" position---that is, the position one
+  /// greater than the last valid subscript argument.
   ///
   /// When you need a range that includes the last element of a collection, use
   /// the half-open range operator (`..<`) with `endIndex`. The `..<` operator
@@ -83,6 +83,8 @@ public protocol MutableIndexable : Indexable {
   ///   `endIndex` property.
   subscript(position: Index) -> _Element { get set }
 
+  /// A collection that represents a contiguous subrange of the collection's
+  /// elements.
   associatedtype SubSequence
   
   /// Accesses a contiguous subrange of the collection's elements.
@@ -150,13 +152,17 @@ public protocol MutableIndexable : Indexable {
   /// - Complexity: O(1).
   func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>)
 
-  /// Returns the next consecutive `Index` in a discrete sequence of
-  /// `Index` values.
+  /// Returns the position immediately after the given index.
   ///
-  /// - Precondition: `i` has a well-defined successor.
-  @warn_unused_result
+  /// - Parameter i: A valid index of the collection. `i` must be less than
+  ///   `endIndex`.
+  /// - Returns: The index value immediately after `i`.
   func index(after i: Index) -> Index
 
+  /// Replaces the given index with its successor.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be less than
+  ///   `endIndex`.
   func formIndex(after i: inout Index)
 }
 

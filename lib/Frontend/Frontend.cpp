@@ -465,10 +465,10 @@ void CompilerInstance::performSema() {
   if (PrimaryBufferID == NO_SUCH_BUFFER) {
     TypeCheckOptions |= TypeCheckingFlags::DelayWholeModuleChecking;
   }
-  if (Invocation.getFrontendOptions().DebugTimeFunctionBodies) {
+  if (options.DebugTimeFunctionBodies) {
     TypeCheckOptions |= TypeCheckingFlags::DebugTimeFunctionBodies;
   }
-  if (Invocation.getFrontendOptions().actionIsImmediate()) {
+  if (options.actionIsImmediate()) {
     TypeCheckOptions |= TypeCheckingFlags::ForImmediateMode;
   }
 
@@ -497,7 +497,8 @@ void CompilerInstance::performSema() {
                           &PersistentState, DelayedCB.get());
       if (mainIsPrimary) {
         performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
-                            TypeCheckOptions, CurTUElem);
+                            TypeCheckOptions, CurTUElem,
+                            options.WarnLongFunctionBodies);
       }
       CurTUElem = MainFile.Decls.size();
     } while (!Done);
@@ -516,7 +517,8 @@ void CompilerInstance::performSema() {
     if (auto SF = dyn_cast<SourceFile>(File))
       if (PrimaryBufferID == NO_SUCH_BUFFER || SF == PrimarySourceFile)
         performTypeChecking(*SF, PersistentState.getTopLevelContext(),
-                            TypeCheckOptions);
+                            TypeCheckOptions, /*curElem*/0,
+                            options.WarnLongFunctionBodies);
 
   // Even if there were no source files, we should still record known
   // protocols.

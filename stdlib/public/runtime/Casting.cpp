@@ -161,41 +161,19 @@ static void _buildFunctionTypeName(const FunctionTypeMetadata *func,
                                    bool qualified,
                                    std::string &result) {
 
-  if (func->getNumArguments() == 1) {
-    auto firstArgument = func->getArguments()[0].getPointer();
-    bool isInout = func->getArguments()[0].getFlag();
-
-    // This could be a single input tuple, with one or more arguments inside,
-    // but guaranteed to not have inout types.
-    if (auto tupleMetadata = dyn_cast<TupleTypeMetadata>(firstArgument)) {
-          _buildNameForMetadata(tupleMetadata,
-                                TypeSyntaxLevel::TypeSimple,
-                                qualified,
-                                result);
-    } else {
-      if (isInout)
-        result += "inout ";
-
-      _buildNameForMetadata(firstArgument,
-                            TypeSyntaxLevel::TypeSimple,
-                            qualified,
-                            result);
+  result += "(";
+  for (size_t i = 0; i < func->getNumArguments(); ++i) {
+    auto arg = func->getArguments()[i].getPointer();
+    bool isInout = func->getArguments()[i].getFlag();
+    if (isInout)
+      result += "inout ";
+    _buildNameForMetadata(arg, TypeSyntaxLevel::TypeSimple,
+                          qualified, result);
+    if (i < func->getNumArguments() - 1) {
+      result += ", ";
     }
-  } else {
-      result += "(";
-      for (size_t i = 0; i < func->getNumArguments(); ++i) {
-        auto arg = func->getArguments()[i].getPointer();
-        bool isInout = func->getArguments()[i].getFlag();
-        if (isInout)
-          result += "inout ";
-        _buildNameForMetadata(arg, TypeSyntaxLevel::TypeSimple,
-                              qualified, result);
-        if (i < func->getNumArguments() - 1) {
-          result += ", ";
-        }
-      }
-      result += ")";
   }
+  result += ")";
   
   if (func->throws()) {
     result += " throws";

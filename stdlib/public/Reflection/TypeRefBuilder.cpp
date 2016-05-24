@@ -132,6 +132,8 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
   std::string MangledName;
   if (auto B = dyn_cast<BuiltinTypeRef>(TR))
     MangledName = B->getMangledName();
+  else if (auto N = dyn_cast<NominalTypeRef>(TR))
+    MangledName = N->getMangledName();
   else
     return nullptr;
 
@@ -146,6 +148,21 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
       if (MangledName.compare(CandidateMangledName) != 0)
         continue;
       return &BuiltinTypeDescriptor;
+    }
+  }
+
+  return nullptr;
+}
+
+const CaptureDescriptor *
+TypeRefBuilder::getCaptureDescriptor(uintptr_t RemoteAddress) {
+  for (auto Info : ReflectionInfos) {
+    for (auto &CD : Info.capture) {
+      auto OtherAddr = ((uintptr_t) &CD -
+                        Info.LocalStartAddress +
+                        Info.RemoteStartAddress);
+      if (OtherAddr == RemoteAddress)
+        return &CD;
     }
   }
 
@@ -265,7 +282,11 @@ void TypeRefBuilder::dumpBuiltinTypeSection(std::ostream &OS) {
   }
 }
 
-void ClosureContextInfo::dump(std::ostream &OS) {
+void ClosureContextInfo::dump() const {
+  dump(std::cerr);
+}
+
+void ClosureContextInfo::dump(std::ostream &OS) const {
   OS << "- Capture types:\n";
   for (auto *TR : CaptureTypes) {
     if (TR == nullptr)
@@ -280,7 +301,7 @@ void ClosureContextInfo::dump(std::ostream &OS) {
     else
       MS.first->dump(OS);
     if (MS.second == nullptr)
-      OS << "!!! Invalid matadata source\n";
+      OS << "!!! Invalid metadata source\n";
     else
       MS.second->dump(OS);
   }

@@ -889,6 +889,14 @@ bool SKIndexingConsumer::startSourceEntity(const EntityInfo &Info) {
   if (Info.IsTestCandidate)
     Elem.setBool(KeyIsTestCandidate, true);
 
+  if (!Info.Attrs.empty()) {
+    auto AttrArray = Elem.setArray(KeyAttributes);
+    for (auto Attr : Info.Attrs) {
+      auto AttrDict = AttrArray.appendDictionary();
+      AttrDict.set(KeyAttribute, Attr);
+    }
+  }
+
   EntitiesStack.push_back({ Info.Kind, Elem, ResponseBuilder::Array(),
                             ResponseBuilder::Array()});
   return true;

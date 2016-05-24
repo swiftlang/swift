@@ -7,7 +7,7 @@ func test() {
   var z : y   // expected-error {{'y' is not a type}}
 }
 
-var b : Int -> Int = { $0 }
+var b : (Int) -> Int = { $0 }
 
 var c2 : (field : Int)  // expected-error {{cannot create a single-element tuple with an element label}}{{11-19=}}
 
@@ -37,8 +37,8 @@ var h3b : [Int?]?
 var h4 : ([Int])?
 var h5 : ([([[Int??]])?])?
 var h7 : (Int,Int)?
-var h8 : (Int -> Int)?
-var h9 : Int? -> Int?
+var h8 : ((Int) -> Int)?
+var h9 : (Int?) -> Int?
 var h10 : Int?.Type?.Type
 
 var i = Int?(42)
@@ -83,9 +83,9 @@ var y3b : Gen<[Int?]?>
 var y4 : Gen<([Int])?>
 var y5 : Gen<([([[Int??]])?])?>
 var y7 : Gen<(Int,Int)?>
-var y8 : Gen<(Int -> Int)?>
-var y8a : Gen<[[Int]? -> Int]>
-var y9 : Gen<Int? -> Int?>
+var y8 : Gen<((Int) -> Int)?>
+var y8a : Gen<[([Int]?) -> Int]>
+var y9 : Gen<(Int?) -> Int?>
 var y10 : Gen<Int?.Type?.Type>
 var y11 : Gen<Gen<Int>?>
 var y12 : Gen<Gen<Int>?>?
@@ -104,9 +104,9 @@ var z3b = Gen<[Int?]?>()
 var z4 = Gen<([Int])?>()
 var z5 = Gen<([([[Int??]])?])?>()
 var z7 = Gen<(Int,Int)?>()
-var z8 = Gen<(Int -> Int)?>()
-var z8a = Gen<[[Int]? -> Int]>()
-var z9 = Gen<Int? -> Int?>()
+var z8 = Gen<((Int) -> Int)?>()
+var z8a = Gen<[([Int]?) -> Int]>()
+var z9 = Gen<(Int?) -> Int?>()
 var z10 = Gen<Int?.Type?.Type>()
 var z11 = Gen<Gen<Int>?>()
 var z12 = Gen<Gen<Int>?>?()
@@ -154,4 +154,9 @@ r21560309 { x in x }
 class r21949448 {
   var myArray: inout [Int] = []   // expected-error {{'inout' is only valid in parameter lists}}
 }
+
+// SE-0066 - Standardize function type argument syntax to require parentheses
+let _ : Int -> Float // expected-warning {{single argument function types require parentheses}} {{9-9=(}} {{12-12=)}}
+
+
 

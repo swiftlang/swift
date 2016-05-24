@@ -421,7 +421,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 
   Type resultTy = fd->getResultType();
   emitProlog(fd, fd->getParameterLists(), resultTy);
-  prepareEpilog(resultTy, fd->isBodyThrowing(), CleanupLocation(fd));
+  prepareEpilog(resultTy, fd->hasThrows(), CleanupLocation(fd));
 
   emitProfilerIncrement(fd->getBody());
   emitStmt(fd->getBody());
@@ -834,12 +834,11 @@ MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
   case MetatypeRepresentation::Thick:
   case MetatypeRepresentation::ObjC: {
     // Walk the type recursively to look for substitutions we may need.
-    SmallVector<Substitution, 2> subsBuf;
     theMetatype.getInstanceType().findIf([&](Type t) -> bool {
       if (!t->getAnyNominal())
         return false;
 
-      auto subs = t->gatherAllSubstitutions(SGM.SwiftModule, subsBuf, nullptr);
+      auto subs = t->gatherAllSubstitutions(SGM.SwiftModule, nullptr);
       SGM.useConformancesFromSubstitutions(subs);
       return false;
     });
@@ -943,19 +942,4 @@ SILGenBuilder::createAllocExistentialBox(SILLocation Loc,
   return SILBuilder::createAllocExistentialBox(Loc, ExistentialType,
                                                ConcreteType,
                                                Conformances);
-}
-
-void SILGenFunction::checkForImportedUsedConformances(Type type) {
-  // Recognize _BridgedNSError, which must pull in its witness table for
-  // dynamic casts to work
-  if (auto bridgedNSErrorProtocol =
-          getASTContext().getProtocol(KnownProtocolKind::BridgedNSError)) {
-    if (auto nominalDecl = type->getAnyNominal()) {
-      SmallVector<ProtocolConformance *, 4> conformances;
-      if (nominalDecl->lookupConformance(
-              SGM.SwiftModule, bridgedNSErrorProtocol, conformances)) {
-        SGM.useConformance(ProtocolConformanceRef(conformances.front()));
-      }
-    }
-  }
 }

@@ -12,7 +12,7 @@ func test1() {
 
 // Would trigger assertion when AST verifier checks source ranges ("child source range not contained within its parent")
 func test2() { // expected-note {{match}}
-  var a : Int { // expected-note {{match}}
+  var a : Int { // expected-note {{match}} expected-note {{did you mean 'a'?}}
     switch i { // expected-error {{unresolved identifier}}
 } // expected-error {{'switch' statement body must have at least one}}
 // expected-error 2 {{expected '}'}}

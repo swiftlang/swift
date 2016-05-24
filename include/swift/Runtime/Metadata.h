@@ -31,6 +31,7 @@
 #include "swift/Basic/Malloc.h"
 #include "swift/Basic/FlaggedPointer.h"
 #include "swift/Basic/RelativePointer.h"
+#include "../../../stdlib/public/SwiftShims/HeapObject.h"
 
 namespace swift {
 
@@ -1754,71 +1755,6 @@ public:
 };
 using ClassMetadata = TargetClassMetadata<InProcess>;
 
-  /// A key-value pair in a TypeRef -> MetadataSource map.
-  struct GenericMetadataSource {
-    using Key = RelativeDirectPointer<const char>;
-    using Value = Key;
-
-    const Key MangledTypeName;
-    const Value EncodedMetadataSource;
-  };
-
-/// Describes the layout of a heap closure.
-///
-/// For simplicity's sake and other reasons, this shouldn't contain
-/// architecture-specifically sized things like direct pointers, uintptr_t, etc.
-///
-/// Following the CaptureDescriptor are:
-/// - a list of direct relative offsets to the mangled type names of the
-///   captures (these aren't in the DATA segment, however).
-/// - a list of GenericMetadataSource objects - each element is a pair of:
-///   - MangledTypeName (for a GenericTypeParameterTypeRef)
-///   - EncodedMetadataSource (an encoded string like TypeRefs, but describe
-///     the method of crawling to the metadata for that generic type parameter.
-struct CaptureDescriptor {
-public:
-
-  /// The number of captures in the closure and the number of typerefs that
-  /// immediately follow this struct.
-  const uint32_t NumCaptures;
-
-  /// The number of sources of metadata available in the MetadataSourceMap
-  /// directly following the list of capture's typerefs.
-  const uint32_t NumMetadataSources;
-
-  /// The number of items in the NecessaryBindings structure at the head of
-  /// the closure.
-  const uint32_t NumBindings;
-
-  /// Get the key-value pair for the ith generic metadata source.
-  const GenericMetadataSource &getGenericMetadataSource(size_t i) const {
-    assert(i <= NumMetadataSources &&
-           "Generic metadata source index out of range");
-    auto Begin = getGenericMetadataSourceBuffer();
-    return Begin[i];
-  }
-
-  /// Get the typeref (encoded as a mangled type name) of the ith
-  /// closure capture.
-  const RelativeDirectPointer<const char> &
-  getCaptureMangledTypeName(size_t i) const {
-    assert(i <= NumCaptures && "Capture index out of range");
-    auto Begin = getCaptureTypeRefBuffer();
-    return Begin[i];
-  }
-
-private:
-  const GenericMetadataSource *getGenericMetadataSourceBuffer() const {
-    auto BeginTR = reinterpret_cast<const char *>(getCaptureTypeRefBuffer());
-    auto EndTR = BeginTR + NumCaptures * sizeof(GenericMetadataSource);
-    return reinterpret_cast<const GenericMetadataSource *>(EndTR);
-  }
-
-  const RelativeDirectPointer<const char> *getCaptureTypeRefBuffer() const {
-    return reinterpret_cast<const RelativeDirectPointer<const char> *>(this+1);
-  }
-};
-
 /// The structure of metadata for heap-allocated local variables.
 /// This is non-type metadata.
 template <typename Runtime>
@@ -1826,7 +1762,11 @@ struct TargetHeapLocalVariableMetadata
   : public TargetHeapMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   uint32_t OffsetToFirstCapture;
-  TargetPointer<Runtime, CaptureDescriptor> CaptureDescription;
+  TargetPointer<Runtime, const char> CaptureDescription;
+
+  static bool classof(const TargetMetadata<Runtime> *metadata) {
+    return metadata->getKind() == MetadataKind::HeapLocalVariable;
+  }
 };
 using HeapLocalVariableMetadata
   = TargetHeapLocalVariableMetadata<InProcess>;
@@ -2554,6 +2494,63 @@ struct TargetGenericMetadata {
   }
 };
 using GenericMetadata = TargetGenericMetadata<InProcess>;
+
+/// Heap metadata for a box, which may have been generated statically by the
+/// compiler or by the runtime.
+template <typename Runtime>
+struct TargetBoxHeapMetadata : public TargetHeapMetadata<Runtime> {
+  /// The offset from the beginning of a box to its value.
+  unsigned Offset;
+
+  constexpr TargetBoxHeapMetadata(MetadataKind kind, unsigned offset)
+  : TargetHeapMetadata<Runtime>(kind), Offset(offset) {}
+};
+using BoxHeapMetadata = TargetBoxHeapMetadata<InProcess>;
+
+/// Heap metadata for runtime-instantiated generic boxes.
+template <typename Runtime>
+struct TargetGenericBoxHeapMetadata : public TargetBoxHeapMetadata<Runtime> {
+  using super = TargetBoxHeapMetadata<Runtime>;
+  using super::Offset;
+
+  /// The type inside the box.
+  ConstTargetMetadataPointer<Runtime, TargetMetadata> BoxedType;
+
+  constexpr
+  TargetGenericBoxHeapMetadata(MetadataKind kind, unsigned offset,
+    ConstTargetMetadataPointer<Runtime, TargetMetadata> boxedType)
+  : TargetBoxHeapMetadata<Runtime>(kind, offset), BoxedType(boxedType)
+  {}
+
+  static unsigned getHeaderOffset(const Metadata *boxedType) {
+    // Round up the header size to alignment.
+    unsigned alignMask = boxedType->getValueWitnesses()->getAlignmentMask();
+    return (sizeof(HeapObject) + alignMask) & ~alignMask;
+  }
+
+  /// Project the value out of a box of this type.
+  OpaqueValue *project(HeapObject *box) const {
+    auto bytes = reinterpret_cast<char*>(box);
+    return reinterpret_cast<OpaqueValue *>(bytes + Offset);
+  }
+
+  /// Get the allocation size of this box.
+  unsigned getAllocSize() const {
+    return Offset + BoxedType->getValueWitnesses()->getSize();
+  }
+
+  /// Get the allocation alignment of this box.
+  unsigned getAllocAlignMask() const {
+    // Heap allocations are at least pointer aligned.
+    return BoxedType->getValueWitnesses()->getAlignmentMask()
+      | (alignof(void*) - 1);
+  }
+
+  static bool classof(const TargetMetadata<Runtime> *metadata) {
+    return metadata->getKind() == MetadataKind::HeapGenericLocalVariable;
+  }
+};
+using GenericBoxHeapMetadata = TargetGenericBoxHeapMetadata<InProcess>;
 
 /// \brief The control structure of a generic or resilient protocol
 /// conformance.

@@ -23,7 +23,7 @@ func testMap(_ array: [Int]) {
 // Nested single-expression closures -- <rdar://problem/20931915>
 class NestedSingleExpr {
   private var b: Bool = false
-  private func callClosure(_ callback: Void -> Void) {}
+  private func callClosure(_ callback: (Void) -> Void) {}
 
   func call() {
     callClosure { [weak self] in
@@ -41,4 +41,4 @@ func expect<T>(_ expression: @autoclosure () -> T) -> Expectation<T> {
   return Expectation<T>()
 }
 func describe(_ closure: () -> ()) {}
-func f() { describe { expect("what") } }
+func f() { describe { _ = expect("what") } }

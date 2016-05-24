@@ -17,7 +17,7 @@ func test3() {
   undeclared_func( // expected-error {{use of unresolved identifier 'undeclared_func'}} expected-note {{to match this opening '('}} expected-error {{expected ',' separator}} {{19-19=,}}
 } // expected-error {{expected expression in list of expressions}} expected-error {{expected ')' in expression list}}
 
-func runAction() {}
+func runAction() {} // expected-note {{did you mean 'runAction'?}}
 
 // rdar://16601779
 func foo() {
@@ -88,4 +88,37 @@ class VarTester {
     func x(var b: Int) { //expected-error {{parameters may not have the 'var' specifier}} {{12-15=}} {{9-9=var b = b\n        }}
         b += 10
     }
+}
+
+func repeat() {}
+// expected-error @-1 {{keyword 'repeat' cannot be used as an identifier here}}
+// expected-note @-2 {{if this name is unavoidable, use backticks to escape it}} {{6-12=`repeat`}}
+
+let for = 2
+// expected-error @-1 {{keyword 'for' cannot be used as an identifier here}}
+// expected-note @-2 {{if this name is unavoidable, use backticks to escape it}} {{5-8=`for`}}
+
+func dog cow() {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}}
+// expected-note@-1 {{join the identifiers together}} {{6-13=dogcow}}
+// expected-note@-2 {{join the identifiers together with camel-case}} {{6-13=dogCow}}
+func cat Mouse() {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}}
+// expected-note@-1 {{join the identifiers together}} {{6-15=catMouse}}
+func friend ship<T>(x: T) {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}}
+// expected-note@-1 {{join the identifiers together}} {{6-17=friendship}}
+// expected-note@-2 {{join the identifiers together with camel-case}} {{6-17=friendShip}}
+func were
+wolf() {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}}
+// expected-note@-1 {{join the identifiers together}} {{6-5=werewolf}}
+// expected-note@-2 {{join the identifiers together with camel-case}} {{6-5=wereWolf}}
+func hammer
+leavings<T>(x: T) {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}}
+// expected-note@-1 {{join the identifiers together}} {{6-9=hammerleavings}}
+// expected-note@-2 {{join the identifiers together with camel-case}} {{6-9=hammerLeavings}}
+
+prefix operator % {}
+prefix func %<T>(x: T) -> T { return x } // No error expected - the < is considered an identifier but is peeled off by the parser.
+
+struct Weak<T: class> { // expected-error {{'class' constraint can only appear on protocol declarations}}
+  // expected-note@-1 {{did you mean to constrain 'T' with the 'AnyObject' protocol?}} {{16-21=AnyObject}}
+  weak var value: T // expected-error {{'weak' may not be applied to non-class-bound 'T'; consider adding a protocol conformance that has a class bound}}
 }

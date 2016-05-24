@@ -2,20 +2,18 @@
 // RUN: mkdir -p %t
 //
 // RUN: %S/../../utils/gyb %s -o %t/main.swift
-// RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
-// RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Array -Xfrontend -disable-access-control
+// RUN: if [ %target-runtime == "objc" ]; then \
+// RUN:   %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o; \
+// RUN:   %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Array -Xfrontend -disable-access-control; \
+// RUN: else \
+// RUN:   %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Array -Xfrontend -disable-objc-attr-requires-foundation-module -Xfrontend -disable-access-control; \
+// RUN: fi
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-run %t/Array
 // REQUIRES: executable_test
 
-// XFAIL: linux
-
-import Darwin
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-
-import StdlibUnittestFoundationExtras
-import Foundation
 
 %{
 all_array_types = ['ContiguousArray', 'ArraySlice', 'Array']
@@ -56,6 +54,9 @@ func withInoutT<T>(_ x: inout T, body: (x: inout T) -> Void) {
 
 % for element_type in ['TestValueTy', 'TestBridgedValueTy']:
 %   for array_type in all_array_types:
+%     if element_type == 'TestBridgedValueTy':
+#if _runtime(_ObjC)
+%     end
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
   var a: ${array_type}<${array_type}<${element_type}>> = [[
@@ -225,8 +226,16 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
   expectEqual(90, a[0][8].value)
 }
 
+%     if element_type == 'TestBridgedValueTy':
+#endif // _runtime(_ObjC)
+%     end
 %   end
 % end
+
+#if _runtime(_ObjC)
+import Darwin
+import StdlibUnittestFoundationExtras
+import Foundation
 
 // FIXME: all the tests below are applicable to ArraySlice, too.
 
@@ -1139,6 +1148,8 @@ ArrayTestSuite.tearDown {
     expectNoLeaksOfObjCDictionaryKeysValues()
   }
 }
+
+#endif // _runtime(_ObjC)
 
 runAllTests()
 

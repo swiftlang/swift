@@ -2887,3 +2887,51 @@ bb1(%4 : $Builtin.Int32):
 bb2(%5 : $MyErrorType):
   throw %5 : $MyErrorType
 }
+
+protocol PM {
+  var sum: Int { get nonmutating set }
+  func done()
+}
+
+extension PM {
+  func plus() -> Self
+  func minus()
+}
+
+
+public final class VV {
+  @sil_stored final var m: PM { get set }
+  init()
+  deinit
+}
+
+sil @plus : $@convention(method) <Self where Self : PM> (@in_guaranteed Self) -> @out Self
+
+sil @minus : $@convention(method) <Self where Self : PM> (@in_guaranteed Self) -> () 
+
+// CHECK-LABEL: sil @silcombine_dont_change_allocstack_for_opened_archetypes
+// CHECK-NOT: alloc_stack{{.*}}opened
+// CHECK: open_existential_addr {{%[0-9]+}} : $*PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
+// CHECK: return
+sil @silcombine_dont_change_allocstack_for_opened_archetypes : $@convention(thin) (@owned VV) -> () {
+bb0(%0 : $VV):
+  %8 = alloc_stack $PM, let, name "x"
+  %9 = ref_element_addr %0 : $VV, #VV.m
+  %10 = alloc_stack $PM
+  copy_addr %9 to [initialization] %10 : $*PM
+  %12 = open_existential_addr %10 : $*PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
+  %13 = init_existential_addr %8 : $*PM, $@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
+  %14 = function_ref @plus : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %15 = apply %14<@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM>(%13, %12) : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  destroy_addr %12 : $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
+  deinit_existential_addr %10 : $*PM
+  dealloc_stack %10 : $*PM
+  %20 = function_ref @minus : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> ()
+  %21 = apply %20<@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM>(%13) : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %8 : $*PM
+  dealloc_stack %8 : $*PM
+  strong_release %0 : $VV
+  %26 = tuple ()
+  return %26 : $()
+}
+

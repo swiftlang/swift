@@ -81,6 +81,7 @@ public class SequenceLog {
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
   public static var forEach = TypeIndexed(0)
+  public static var first = TypeIndexed(0)
   public static var dropFirst = TypeIndexed(0)
   public static var dropLast = TypeIndexed(0)
   public static var prefixMaxLength = TypeIndexed(0)
@@ -113,7 +114,6 @@ public class CollectionLog : SequenceLog {
   public static var isEmpty = TypeIndexed(0)
   public static var count = TypeIndexed(0)
   public static var _customIndexOfEquatableElement = TypeIndexed(0)
-  public static var first = TypeIndexed(0)
   public static var advance = TypeIndexed(0)
   public static var advanceLimit = TypeIndexed(0)
   public static var distance = TypeIndexed(0)
@@ -221,7 +221,6 @@ public struct ${Self}<
     return base.underestimatedCount
   }
 
-  @warn_unused_result
   public func map<T>(
     _ transform: @noescape (Base.Iterator.Element) throws -> T
   ) rethrows -> [T] {
@@ -229,7 +228,6 @@ public struct ${Self}<
     return try base.map(transform)
   }
 
-  @warn_unused_result
   public func filter(
     _ includeElement: @noescape (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.Iterator.Element] {
@@ -242,6 +240,13 @@ public struct ${Self}<
   ) rethrows {
     Log.forEach[selfType] += 1
     try base.forEach(body)
+  }
+  
+  public func first(
+    where predicate: @noescape (Base.Iterator.Element) throws -> Bool
+  ) rethrows -> Base.Iterator.Element? {
+    Log.first[selfType] += 1
+    return try base.first(where: predicate)
   }
 
   public typealias SubSequence = Base.SubSequence
@@ -360,7 +365,6 @@ public struct ${Self}<
     base._failEarlyRangeCheck(range, bounds: bounds)
   }
 
-  @warn_unused_result
   public func index(after i: Index) -> Index {
     Log.successor[selfType] += 1
     return base.index(after: i)
@@ -417,13 +421,11 @@ public struct ${Self}<
     return base.first
   }
 
-  @warn_unused_result
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     Log.advance[selfType] += 1
     return base.index(i, offsetBy: n)
   }
 
-  @warn_unused_result
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -431,7 +433,6 @@ public struct ${Self}<
     return base.index(i, offsetBy: n, limitedBy: limit)
   }
 
-  @warn_unused_result
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     Log.distance[selfType] += 1
     return base.distance(from: start, to: end)
@@ -548,7 +549,6 @@ public struct ${Self}<
   }
 %     end
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
-  @warn_unused_result
   public func index(before i: Index) -> Index {
     BidirectionalCollectionLog.predecessor[selfType] += 1
     return base.index(before: i)

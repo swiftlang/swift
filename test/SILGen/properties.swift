@@ -1043,3 +1043,27 @@ protocol ProtocolWithReadWriteSubscript {
 struct CrashWithUnnamedSubscript : ProtocolWithReadWriteSubscript {
   subscript(_: Int) -> Int { get { } set { } }
 }
+
+
+/// <rdar://problem/26408353> crash when overriding internal property with
+/// public property
+
+public class BaseClassWithInternalProperty {
+  var x: () = ()
+}
+
+public class DerivedClassWithPublicProperty : BaseClassWithInternalProperty {
+  public override var x: () {
+    didSet {}
+  }
+}
+
+// CHECK-LABEL: sil hidden [transparent] @_TFC10properties29BaseClassWithInternalPropertyg1xT_
+
+// CHECK-LABEL: sil [transparent] [fragile] @_TFC10properties30DerivedClassWithPublicPropertyg1xT_
+// CHECK:       bb0([[SELF:%.*]] : $DerivedClassWithPublicProperty):
+// CHECK:         strong_retain [[SELF]] : $DerivedClassWithPublicProperty
+// CHECK-NEXT:    [[SUPER:%.*]] = upcast [[SELF]] : $DerivedClassWithPublicProperty to $BaseClassWithInternalProperty
+// CHECK-NEXT:    [[METHOD:%.*]] = super_method [[SELF]] : $DerivedClassWithPublicProperty, #BaseClassWithInternalProperty.x!getter.1 : (BaseClassWithInternalProperty) -> () -> () , $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]([[SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
+// CHECK-NEXT:    strong_release [[SUPER]] : $BaseClassWithInternalProperty

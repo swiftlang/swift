@@ -48,11 +48,10 @@ __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
                                            __swift_size_t nitems);
 
 // String handling <string.h>
-__attribute__((pure))
-SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_size_t _swift_stdlib_strlen(const char *s);
+__attribute__((__pure__)) SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
+_swift_stdlib_strlen(const char *s);
 
-__attribute__((pure))
+__attribute__((__pure__))
 SWIFT_RUNTIME_STDLIB_INTERFACE
 int _swift_stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
 
@@ -66,9 +65,8 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 int _swift_stdlib_close(int fd);
 
 // Non-standard extensions
-__attribute__((const))
-SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_size_t _swift_stdlib_malloc_size(const void *ptr);
+__attribute__((__const__)) SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
+_swift_stdlib_malloc_size(const void *ptr);
 
 // Random number <random>
 SWIFT_RUNTIME_STDLIB_INTERFACE

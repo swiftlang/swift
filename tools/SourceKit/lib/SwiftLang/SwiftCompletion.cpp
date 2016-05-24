@@ -16,6 +16,7 @@
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
 
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletionCache.h"
@@ -819,6 +820,40 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   from.valueForOption(KeyTopNonLiteral, to.showTopNonLiteralResults);
 }
 
+/// Canonicalize a name that is in the format of a reference to a function into
+/// the name format used internally for filtering.
+///
+/// Returns true if the name is invalid.
+static bool canonicalizeFilterName(const char *origName,
+                                   SmallVectorImpl<char> &Result) {
+  assert(origName);
+  const char *p = origName;
+  char curr = '\0';
+  char prev;
+
+  // FIXME: disallow unnamed parameters without underscores `foo(::)`.
+  while (true) {
+    prev = curr;
+    curr = *p++;
+    switch (curr) {
+    case '\0':
+      return false; // Done.
+    case '_':
+      // Remove the _ underscore for an unnamed parameter.
+      if (prev == ':' || prev == '(') {
+        char next = *p;
+        if (next == ':' || next == ')')
+          continue;
+      }
+      SWIFT_FALLTHROUGH;
+    default:
+      Result.push_back(curr);
+      continue;
+    }
+  }
+  llvm_unreachable("exit is on null byte");
+}
+
 static void translateFilterRules(ArrayRef<FilterRule> rawFilterRules,
                                  CodeCompletion::FilterRules &filterRules) {
   for (auto &rule : rawFilterRules) {
@@ -828,7 +863,11 @@ static void translateFilterRules(ArrayRef<FilterRule> rawFilterRules,
       break;
     case FilterRule::Identifier:
       for (auto name : rule.names) {
-        filterRules.hideByName[name] = rule.hide;
+        SmallString<128> canonName;
+        // Note: name is null-terminated.
+        if (canonicalizeFilterName(name.data(), canonName))
+          continue;
+        filterRules.hideByName[canonName] = rule.hide;
       }
       break;
     case FilterRule::Module:
@@ -1201,10 +1240,16 @@ void SwiftLangSupport::codeCompleteSetPopularAPI(
   ThreadSafeRefCntPtr<SwiftPopularAPI> newPopularAPI(new SwiftPopularAPI);
   auto &nameToFactor = newPopularAPI->nameToFactor;
   for (unsigned i = 0, n = popularAPI.size(); i < n; ++i) {
-    nameToFactor[popularAPI[i]] = Factor(double(n - i) / n);
+    SmallString<64> name;
+    if (canonicalizeFilterName(popularAPI[i], name))
+      continue;
+    nameToFactor[name] = Factor(double(n - i) / n);
   }
   for (unsigned i = 0, n = unpopularAPI.size(); i < n; ++i) {
-    nameToFactor[unpopularAPI[i]] = Factor(-double(n - i) / n);
+    SmallString<64> name;
+    if (canonicalizeFilterName(unpopularAPI[i], name))
+      continue;
+    nameToFactor[name] = Factor(-double(n - i) / n);
   }
 
   PopularAPI = newPopularAPI; // replace the old popular API.

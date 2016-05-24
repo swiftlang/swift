@@ -36,8 +36,7 @@
               key.name: "String",
               key.usr: "s:SS",
               key.line: 6,
-              key.column: 22,
-              key.groupname: "String"
+              key.column: 22
             }
           ]
         },
@@ -91,8 +90,7 @@
           key.name: "String",
           key.usr: "s:SS",
           key.line: 8,
-          key.column: 15,
-          key.groupname: "String"
+          key.column: 15
         }
       ]
     },

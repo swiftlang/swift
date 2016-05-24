@@ -158,6 +158,22 @@ public:
   virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) = 0;
 };
 
+/// An implementation of VisibleDeclConsumer that's built from a lambda.
+template <class Fn>
+class LambdaDeclConsumer : public VisibleDeclConsumer {
+  Fn Callback;
+public:
+  LambdaDeclConsumer(Fn &&callback) : Callback(std::move(callback)) {}
+
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind reason) {
+    Callback(VD, reason);
+  }
+};
+template <class Fn>
+LambdaDeclConsumer<Fn> makeDeclConsumer(Fn &&callback) {
+  return LambdaDeclConsumer<Fn>(std::move(callback));
+}
+
 /// A consumer that inserts found decls into an externally-owned SmallVector.
 class VectorDeclConsumer : public VisibleDeclConsumer {
   virtual void anchor() override;
@@ -238,7 +254,8 @@ void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               Type BaseTy,
                               const DeclContext *CurrDC,
-                              LazyResolver *typeResolver);
+                              LazyResolver *typeResolver,
+                              bool includeInstanceMembers);
 
 namespace namelookup {
 enum class ResolutionKind {

@@ -17,7 +17,6 @@
 #if _runtime(_ObjC)
 import SwiftShims
 
-@warn_unused_result
 internal func _makeSwiftNSFastEnumerationState()
    -> _SwiftNSFastEnumerationState {
   return _SwiftNSFastEnumerationState(

@@ -14,7 +14,7 @@ func bar() throws -> Int { return 0 }
 var x = try foo() + bar()
 x = try foo() + bar()
 x += try foo() + bar()
-x += try foo() %%%% bar() // expected-error {{'try' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}}
+x += try foo() %%%% bar() // expected-error {{'try' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}} // expected-warning {{result of operator '%%%%' is unused}}
 x += try foo() %%% bar()
 x = foo() + try bar() // expected-error {{'try' cannot appear to the right of a non-assignment operator}} // expected-error {{call can throw but is not marked with 'try'}}
 
@@ -24,7 +24,7 @@ var z = true ? try foo() : try bar() %%% 0 // expected-error {{'try' following c
 var a = try! foo() + bar()
 a = try! foo() + bar()
 a += try! foo() + bar()
-a += try! foo() %%%% bar() // expected-error {{'try!' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}}
+a += try! foo() %%%% bar() // expected-error {{'try!' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}} // expected-warning {{result of operator '%%%%' is unused}}
 a += try! foo() %%% bar()
 a = foo() + try! bar() // expected-error {{'try!' cannot appear to the right of a non-assignment operator}} // expected-error {{call can throw but is not marked with 'try'}}
 
@@ -40,7 +40,7 @@ var i = try? foo() + bar()
 let _: Double = i // expected-error {{cannot convert value of type 'Int?' to specified type 'Double'}}
 i = try? foo() + bar()
 i ?+= try? foo() + bar()
-i ?+= try? foo() %%%% bar() // expected-error {{'try?' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}}
+i ?+= try? foo() %%%% bar() // expected-error {{'try?' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}} // expected-warning {{result of operator '%%%%' is unused}}
 i ?+= try? foo() %%% bar()
 _ = foo() < try? bar() // expected-error {{'try?' cannot appear to the right of a non-assignment operator}} // expected-error {{call can throw but is not marked with 'try'}}
 _ = (try? foo()) < bar() // expected-error {{call can throw but is not marked with 'try'}}
@@ -99,8 +99,8 @@ struct r21432429 {
 }
 
 // <rdar://problem/21427855> Swift 2: Omitting try from call to throwing closure in rethrowing function crashes compiler
-func callThrowingClosureWithoutTry(closure: Int throws -> Int) rethrows {
-  closure(0)  // expected-error {{call can throw but is not marked with 'try'}}
+func callThrowingClosureWithoutTry(closure: (Int) throws -> Int) rethrows {
+  closure(0)  // expected-error {{call can throw but is not marked with 'try'}} expected-warning {{result of call is unused}}
 }
 
 func producesOptional() throws -> Int? { return nil }

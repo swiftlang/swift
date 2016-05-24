@@ -63,7 +63,7 @@ namespace {
       /// The source type is 'Boolean'.
       Boolean,
 
-      /// The source type an Objective-C class type bridged to a Swift
+      /// The source type is an Objective-C class type bridged to a Swift
       /// type.
       ObjCBridged,
 
@@ -90,6 +90,11 @@ namespace {
 
       /// The source type created a new Swift type, using swift_newtype
       SwiftNewtype,
+
+      /// The source type created a new Swift type, using swift_newtype, of an
+      /// original underlying CFPointer. This distinction is necessary to
+      /// trigger audit-checking.
+      SwiftNewtypeFromCFPointer,
     };
 
     ImportHintKind Kind;
@@ -121,7 +126,6 @@ namespace {
     case ImportHint::NSUInteger:
     case ImportHint::Reference:
     case ImportHint::Void:
-    case ImportHint::SwiftNewtype:
       return false;
 
     case ImportHint::Block:
@@ -130,6 +134,8 @@ namespace {
     case ImportHint::ObjCPointer:
     case ImportHint::CFunctionPointer:
     case ImportHint::OtherPointer:
+    case ImportHint::SwiftNewtype:
+    case ImportHint::SwiftNewtypeFromCFPointer:
       return true;
     }
   }
@@ -517,13 +523,15 @@ namespace {
         GenericParamList *genericParams = nullptr;
         if (auto *category =
               dyn_cast<clang::ObjCCategoryDecl>(typeParamContext)) {
-          auto ext = cast_or_null<ExtensionDecl>(Impl.importDecl(category));
+          auto ext = cast_or_null<ExtensionDecl>(Impl.importDecl(category,
+                                                                 false));
           if (!ext)
             return Type();
           genericParams = ext->getGenericParams();
         } else if (auto *interface =
             dyn_cast<clang::ObjCInterfaceDecl>(typeParamContext)) {
-          auto cls = cast_or_null<ClassDecl>(Impl.importDecl(interface));
+          auto cls = cast_or_null<ClassDecl>(Impl.importDecl(interface,
+                                                             false));
           if (!cls)
             return Type();
           genericParams = cls->getGenericParams();
@@ -543,7 +551,8 @@ namespace {
       }
 
       // Import the underlying declaration.
-      auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
+      auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl(),
+                                                             false));
 
       // If that fails, fall back on importing the underlying type.
       if (!decl) return Visit(type->desugar());
@@ -551,9 +560,19 @@ namespace {
       Type mappedType = decl->getDeclaredType();
       ImportHint hint = ImportHint::None;
 
-      if (Impl.HonorSwiftNewtypeAttr &&
-          type->getDecl()->hasAttr<clang::SwiftNewtypeAttr>()) {
-        hint = ImportHint::SwiftNewtype;
+      if (Impl.getSwiftNewtypeAttr(type->getDecl(), /*useSwift2Name=*/false)) {
+        if (ClangImporter::Implementation::isCFTypeDecl(type->getDecl()))
+          hint = ImportHint::SwiftNewtypeFromCFPointer;
+        else
+          hint = ImportHint::SwiftNewtype;
+
+        // If the underlying type was bridged, the wrapper type is
+        // only useful in bridged cases.
+        auto underlying = Visit(type->getDecl()->getUnderlyingType());
+        if (underlying.Hint == ImportHint::ObjCBridged) {
+          return { underlying.AbstractType,
+                   ImportHint(ImportHint::ObjCBridged, mappedType) };
+        }
 
       // For certain special typedefs, we don't want to use the imported type.
       } else if (auto specialKind = Impl.getSpecialTypedefKind(type->getDecl())) {
@@ -646,7 +665,8 @@ namespace {
     }
 
     ImportResult VisitRecordType(const clang::RecordType *type) {
-      auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
+      auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl(),
+                                                             false));
       if (!decl)
         return nullptr;
 
@@ -672,7 +692,8 @@ namespace {
       case EnumKind::Enum:
       case EnumKind::Unknown:
       case EnumKind::Options: {
-        auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(clangDecl));
+        auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(clangDecl,
+                                                               false));
         if (!decl)
           return nullptr;
 
@@ -718,7 +739,8 @@ namespace {
       // If this object pointer refers to an Objective-C class (possibly
       // qualified),
       if (auto objcClass = type->getInterfaceDecl()) {
-        auto imported = cast_or_null<ClassDecl>(Impl.importDecl(objcClass));
+        auto imported = cast_or_null<ClassDecl>(Impl.importDecl(objcClass,
+                                                                false));
         if (!imported)
           return nullptr;
 
@@ -885,7 +907,8 @@ namespace {
         SmallVector<Type, 4> protocols;
         for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
              cp != cpEnd; ++cp) {
-          auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp));
+          auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp,
+                                                                  false));
           if (!proto)
             return Type();
 
@@ -1172,6 +1195,15 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     importedType = getUnmanagedType(impl, importedType);
   }
 
+  // For types we import as new types in Swift, if the use is CF un-audited,
+  // then we have to force it to be unmanaged
+  if (hint == ImportHint::SwiftNewtypeFromCFPointer &&
+      !isCFAudited(importKind)) {
+    auto underlyingType = importedType->getSwiftNewtypeUnderlyingType();
+    if (underlyingType)
+      importedType = getUnmanagedType(impl, underlyingType);
+  }
+
   // If we have a bridged Objective-C type and we are allowed to
   // bridge, do so.
   if (hint == ImportHint::ObjCBridged && canBridgeTypes(importKind) &&
@@ -1255,6 +1287,18 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
                                      optionality);
 }
 
+bool ClangImporter::Implementation::isNSString(const clang::Type *type) {
+  if (auto ptrType = type->getAs<clang::ObjCObjectPointerType>())
+    if (auto interfaceType = ptrType->getInterfaceType())
+      if (interfaceType->getDecl()->getName() == "NSString")
+        return true;
+  return false;
+}
+
+bool ClangImporter::Implementation::isNSString(clang::QualType qt) {
+  return qt.getTypePtrOrNull() && isNSString(qt.getTypePtrOrNull());
+}
+
 bool ClangImporter::Implementation::shouldImportGlobalAsLet(
        clang::QualType type)
 {
@@ -1263,13 +1307,9 @@ bool ClangImporter::Implementation::shouldImportGlobalAsLet(
     return true;
   }
   // Globals of type NSString * should be imported as 'let'.
-  if (auto ptrType = type->getAs<clang::ObjCObjectPointerType>()) {
-    if (auto interfaceType = ptrType->getInterfaceType()) {
-      if (interfaceType->getDecl()->getName() == "NSString") {
-        return true;
-      }
-    }
-  }
+  if (isNSString(type))
+    return true;
+
   return false;
 }
 
@@ -2476,7 +2516,7 @@ Decl *ClangImporter::Implementation::importDeclByName(StringRef name) {
   }
 
   for (auto decl : lookupResult) {
-    if (auto swiftDecl = importDecl(decl->getUnderlyingDecl())) {
+    if (auto swiftDecl = importDecl(decl->getUnderlyingDecl(), false)) {
       return swiftDecl;
     }
   }
@@ -2527,7 +2567,7 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
     return Type();
 
   for (auto decl : lookupResult) {
-    if (auto swiftDecl = impl.importDecl(decl->getUnderlyingDecl())) {
+    if (auto swiftDecl = impl.importDecl(decl->getUnderlyingDecl(), false)) {
       if (auto protoDecl = dyn_cast<ProtocolDecl>(swiftDecl)) {
         return protoDecl->getDeclaredType();
       }

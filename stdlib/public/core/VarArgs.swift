@@ -95,7 +95,6 @@ internal func _withVaList<R>(
 ///   `withVaList`, but occasionally (i.e. in a `class` initializer) you
 ///   may find that the language rules don't allow you to use
 /// `withVaList` as intended.
-@warn_unused_result
 public func getVaList(_ args: [CVarArg]) -> CVaListPointer {
   let builder = _VaListBuilder()
   for a in args {
@@ -108,7 +107,6 @@ public func getVaList(_ args: [CVarArg]) -> CVaListPointer {
 }
 #endif
 
-@warn_unused_result
 public func _encodeBitsAsWords<T : CVarArg>(_ x: T) -> [Int] {
   let result = [Int](
     repeating: 0,
@@ -313,7 +311,6 @@ final internal class _VaListBuilder {
     appendWords(arg._cVarArgEncoding)
   }
 
-  @warn_unused_result
   func va_list() -> CVaListPointer {
     // Use Builtin.addressof to emphasize that we are deliberately escaping this
     // pointer and assuming it is safe to do so.
@@ -351,13 +348,11 @@ final internal class _VaListBuilder {
     }
   }
 
-  @warn_unused_result
   func rawSizeAndAlignment(_ wordCount: Int) -> (Builtin.Word, Builtin.Word) {
     return ((wordCount * strideof(Int.self))._builtinWordValue,
       requiredAlignmentInBytes._builtinWordValue)
   }
 
-  @warn_unused_result
   func allocStorage(wordCount: Int) -> UnsafeMutablePointer<Int> {
     let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
     let rawStorage = Builtin.allocRaw(rawSize, rawAlignment)
@@ -429,7 +424,6 @@ final internal class _VaListBuilder {
     }
   }
 
-  @warn_unused_result
   func va_list() -> CVaListPointer {
     header.reg_save_area = storage._baseAddress
     header.overflow_arg_area

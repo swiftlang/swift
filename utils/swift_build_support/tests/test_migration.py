@@ -63,7 +63,6 @@ class MigrateImplArgsTestCase(unittest.TestCase):
         self.assertIsNone(migration.check_impl_args(build_script_impl,
                                                     ['--reconfigure']))
 
-        # FIXME: self.assertRaises context manager is not py2.6 compatible.
         with self.assertRaises(ValueError) as cm:
             migration.check_impl_args(build_script_impl, ['foo'])
         self.assertIn('foo', str(cm.exception))

@@ -41,7 +41,7 @@ var z : Z = .none
 func acceptZ(_ z: Z) {}
 func acceptString(_ s: String) {}
 
-Point(1, 2)
+Point(1, 2) // expected-warning {{expression of type '(x: Int, y: Int)' is unused}}
 var db : Base = d
 X(i: 1, j: 2) // expected-warning{{unused}}
 Y(1, 2, "hello") // expected-warning{{unused}}
@@ -60,7 +60,7 @@ _ = .none as Optional<Int>
 Optional(.none) // expected-error{{generic parameter 'T' could not be inferred}}
 
 // Interpolation
-"\(hello), \(world) #\(i)!"
+_ = "\(hello), \(world) #\(i)!"
 
 class File {
   init() { 
@@ -86,13 +86,13 @@ extension Foo {
 
 // Downcasting
 var b : Base
-b as! Derived
+_ = b as! Derived
 
 // Construction doesn't permit conversion.
 // NOTE: Int and other integer-literal convertible types
 //  are special cased in the library.
 Int(i) // expected-warning{{unused}}
-i as Int
+_ = i as Int
 Z(z) // expected-error{{cannot invoke initializer for type 'Z' with an argument list of type '(Z)'}}
 // expected-note @-1 {{overloads for 'Z' exist with these partially matching parameter lists: (UnicodeScalar), (String)}}
 
@@ -100,7 +100,7 @@ Z.init(z)  // expected-error {{cannot invoke 'Z.Type.init' with an argument list
 // expected-note @-1 {{overloads for 'Z.Type.init' exist with these partially matching parameter lists: (UnicodeScalar), (String)}}
 
 
-z as Z
+_ = z as Z
 
 // Construction from inouts.
 struct FooRef { }

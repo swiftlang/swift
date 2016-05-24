@@ -80,7 +80,7 @@ LazyTestSuite.test("IteratorOverOne") {
 }
 
 //===----------------------------------------------------------------------===//
-// ColectionOfOne
+// CollectionOfOne
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Element'.

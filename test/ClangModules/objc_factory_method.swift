@@ -98,16 +98,16 @@ func testFactoryMethodBlacklist() {
 
 func test17261609() {
   _ = NSDecimalNumber(mantissa:1, exponent:1, isNegative:true)
-  NSDecimalNumber.withMantissa(1, exponent:1, isNegative:true) // expected-error{{'withMantissa(_:exponent:isNegative:)' is unavailable: use object construction 'NSDecimalNumber(mantissa:exponent:isNegative:)'}}
+  _ = NSDecimalNumber.withMantissa(1, exponent:1, isNegative:true) // expected-error{{'withMantissa(_:exponent:isNegative:)' is unavailable: use object construction 'NSDecimalNumber(mantissa:exponent:isNegative:)'}}
 }
 
 func testURL() {
   let url = NSURL(string: "http://www.llvm.org")
-  NSURL.withString("http://www.llvm.org") // expected-error{{'withString' is unavailable: use object construction 'NSURL(string:)'}}
+  _ = NSURL.withString("http://www.llvm.org") // expected-error{{'withString' is unavailable: use object construction 'NSURL(string:)'}}
 
   NSURLRequest(string: "http://www.llvm.org") // expected-warning{{unused}}
   NSURLRequest(url: url) // expected-warning{{unused}}
 
-  NSURLRequest.withString("http://www.llvm.org") // expected-error{{'withString' is unavailable: use object construction 'NSURLRequest(string:)'}}
-  NSURLRequest.withURL(url) // expected-error{{'withURL' is unavailable: use object construction 'NSURLRequest(url:)'}}
+  _ = NSURLRequest.withString("http://www.llvm.org") // expected-error{{'withString' is unavailable: use object construction 'NSURLRequest(string:)'}}
+  _ = NSURLRequest.withURL(url) // expected-error{{'withURL' is unavailable: use object construction 'NSURLRequest(url:)'}}
 }

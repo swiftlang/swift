@@ -33,7 +33,7 @@ func test1(_ a: A) {
 
 // <rdar://problem/15508756>
 extension Optional {
-  func bind<U>(_ f: Wrapped -> U?) -> U? {
+  func bind<U>(_ f: (Wrapped) -> U?) -> U? {
     switch self {
     case .some(let x):
       return f(x)
@@ -50,13 +50,13 @@ func test4() {
   func foo() -> Int { return 0 }
   func takes_optfn(_ f : () -> Int?) -> Int? { return f() }
 
-  takes_optfn(foo)
+  _ = takes_optfn(foo)
 
   func takes_objoptfn(_ f : () -> AnyObject?) -> AnyObject? { return f() }
   func objFoo() -> AnyObject { return A() }
-  takes_objoptfn(objFoo) // okay
+  _ = takes_objoptfn(objFoo) // okay
   func objBar() -> A { return A() }
-  takes_objoptfn(objBar) // okay
+  _ = takes_objoptfn(objBar) // okay
 }
 
 func test5() -> Int? {
@@ -116,6 +116,6 @@ func testVoidOptional() {
   let noop: () -> Void = {}
   voidOptional(noop)
 
-  let optNoop: ()? -> ()? = { return $0 }
+  let optNoop: (()?) -> ()? = { return $0 }
   voidOptional(optNoop)
 }

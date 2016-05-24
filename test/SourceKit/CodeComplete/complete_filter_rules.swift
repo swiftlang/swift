@@ -6,7 +6,7 @@ import Foo
 struct TestHideName {
   func hideThis1() {}
   func hideThis2(_ x: Int, namedParam2: Int) {}
-  func hideThis3() {}
+  func hideThis3(namedParam1: Int, _ unnamedParam: Int) {}
   func hideThis4(namedParam1 x: Int, namedParam2: Int) {}
   func dontHideThisByName() {}
 

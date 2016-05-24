@@ -111,7 +111,7 @@ var maybeReturns: (Int) -> () = exit // no-error
 var neverReturns1 = exit
 neverReturns1 = printInt // expected-error {{cannot assign value of type '(Int) -> ()' to type '@noreturn (Int) -> ()'}}
 
-var neverReturns2: MethodWithNoreturn -> @noreturn () -> () = MethodWithNoreturn.neverReturns
+var neverReturns2: (MethodWithNoreturn) -> @noreturn () -> () = MethodWithNoreturn.neverReturns
 
 exit(5) // no-error
 

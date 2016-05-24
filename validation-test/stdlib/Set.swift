@@ -2,23 +2,31 @@
 // RUN: mkdir -p %t
 //
 // RUN: %S/../../utils/gyb %s -o %t/main.swift
-// RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
-// RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Set -Xfrontend -disable-access-control
+// RUN: if [ %target-runtime == "objc" ]; then \
+// RUN:   %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o; \
+// RUN:   %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Set -Xfrontend -disable-access-control; \
+// RUN: else \
+// RUN:   %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Set -Xfrontend -disable-access-control -Xfrontend -disable-objc-attr-requires-foundation-module; \
+// RUN: fi
 //
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-run %t/Set
 // REQUIRES: executable_test
-
-// XFAIL: linux
 
 import StdlibUnittest
 import StdlibCollectionUnittest
 
 // For rand32
 import SwiftPrivate
+#if _runtime(_ObjC)
 import Foundation
+#else
+// for random, srandom
+import Glibc
+#endif
 
 // For experimental Set operators
 import SwiftExperimental
+
 
 // Check that the generic parameter is called 'Element'.
 protocol TestProtocol1 {}
@@ -50,12 +58,16 @@ var SetTestSuite = TestSuite("Set")
 
 SetTestSuite.setUp {
   resetLeaksOfDictionaryKeysValues()
+#if _runtime(_ObjC)
   resetLeaksOfObjCDictionaryKeysValues()
+#endif
 }
 
 SetTestSuite.tearDown {
   expectNoLeaksOfDictionaryKeysValues()
+#if _runtime(_ObjC)
   expectNoLeaksOfObjCDictionaryKeysValues()
+#endif
 }
 
 func getCOWFastSet(_ members: [Int] = [1010, 2020, 3030]) -> Set<Int> {
@@ -106,6 +118,12 @@ func pickRandom<T>(_ a: [T]) -> T {
   return a[uniformRandom(a.count)]
 }
 
+func equalsUnordered(_ lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
+  return lhs.sorted().elementsEqual(rhs.sorted()) {
+    $0 == $1
+  }
+}
+
 func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
   switch s._variantStorage {
   case .native:
@@ -115,13 +133,14 @@ func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
   }
 }
 
+#if _runtime(_ObjC)
 func isNativeNSSet(_ s: NSSet) -> Bool {
-  let className: NSString = NSStringFromClass(s.dynamicType)
+  let className: NSString = NSStringFromClass(s.dynamicType) as NSString
   return className.range(of: "NativeSetStorage").length > 0
 }
 
 func isCocoaNSSet(_ s: NSSet) -> Bool {
-  let className: NSString = NSStringFromClass(s.dynamicType)
+  let className: NSString = NSStringFromClass(s.dynamicType) as NSString
   return className.range(of: "NSSet").length > 0 ||
     className.range(of: "NSCFSet").length > 0
 }
@@ -135,15 +154,8 @@ func getBridgedEmptyNSSet() -> NSSet {
   return bridged
 }
 
-
 func isCocoaSet<T : Hashable>(_ s: Set<T>) -> Bool {
   return !isNativeSet(s)
-}
-
-func equalsUnordered(_ lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
-  return lhs.sorted().elementsEqual(rhs.sorted()) {
-    $0 == $1
-  }
 }
 
 /// Get an NSSet of TestObjCKeyTy values
@@ -249,7 +261,7 @@ func getBridgedNSSetOfRefTypesBridgedVerbatim() -> NSSet {
 }
 
 func getBridgedNSSet_ValueTypesCustomBridged(
-  numElements numElements: Int = 3
+  numElements: Int = 3
 ) -> NSSet {
   expectTrue(!_isBridgedVerbatimToObjectiveC(TestBridgedKeyTy.self))
 
@@ -295,6 +307,7 @@ func getBridgedNSSet_MemberTypesCustomBridged() -> NSSet {
 
   return bridged
 }
+#endif // _runtime(_ObjC)
 
 SetTestSuite.test("AssociatedTypes") {
   typealias Collection = Set<MinimalHashableValue>
@@ -1167,6 +1180,7 @@ SetTestSuite.test("deleteChainCollisionRandomized") {
   }
 }
 
+#if _runtime(_ObjC)
 @objc
 class CustomImmutableNSSet : NSSet {
   init(_privateInit: ()) {
@@ -1235,10 +1249,10 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SetIsCopied") {
   expectTrue(isNativeSet(s))
 
   expectTrue(s.contains(TestBridgedKeyTy(1010)))
-  expectNotEmpty(nss.member(TestBridgedKeyTy(1010)))
+  expectNotEmpty(nss.member(TestBridgedKeyTy(1010) as AnyObject))
 
-  nss.remove(TestBridgedKeyTy(1010))
-  expectEmpty(nss.member(TestBridgedKeyTy(1010)))
+  nss.remove(TestBridgedKeyTy(1010) as AnyObject)
+  expectEmpty(nss.member(TestBridgedKeyTy(1010) as AnyObject))
 
   expectTrue(s.contains(TestBridgedKeyTy(1010)))
 }
@@ -1449,7 +1463,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
 
   var members = [Int]()
   for i in s.indices {
-    var foundMember: AnyObject = s[i]
+    var foundMember: AnyObject = s[i] as NSObject
     let member = foundMember as! TestObjCKeyTy
     members.append(member.value)
   }
@@ -1793,11 +1807,11 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     var identity1 = unsafeBitCast(s, to: Int.self)
     expectTrue(isCocoaSet(s))
     expectEqual(3, s.count)
-    expectTrue(s.contains(TestBridgedKeyTy(1010)))
+    expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
 
     s.removeAll()
     expectEqual(0, s.count)
-    expectFalse(s.contains(TestBridgedKeyTy(1010)))
+    expectFalse(s.contains(TestBridgedKeyTy(1010) as NSObject))
   }
 
   do {
@@ -1805,7 +1819,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     var identity1 = unsafeBitCast(s1, to: Int.self)
     expectTrue(isCocoaSet(s1))
     expectEqual(3, s1.count)
-    expectTrue(s1.contains(TestBridgedKeyTy(1010)))
+    expectTrue(s1.contains(TestBridgedKeyTy(1010) as NSObject))
 
     var s2 = s1
     s2.removeAll()
@@ -1813,9 +1827,9 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
     expectNotEqual(identity2, identity1)
     expectEqual(3, s1.count)
-    expectTrue(s1.contains(TestBridgedKeyTy(1010)))
+    expectTrue(s1.contains(TestBridgedKeyTy(1010) as NSObject))
     expectEqual(0, s2.count)
-    expectFalse(s2.contains(TestBridgedKeyTy(1010)))
+    expectFalse(s2.contains(TestBridgedKeyTy(1010) as NSObject))
   }
 
   do {
@@ -1823,7 +1837,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     var identity1 = unsafeBitCast(s1, to: Int.self)
     expectTrue(isCocoaSet(s1))
     expectEqual(3, s1.count)
-    expectTrue(s1.contains(TestBridgedKeyTy(1010)))
+    expectTrue(s1.contains(TestBridgedKeyTy(1010) as NSObject))
 
     var s2 = s1
     s2.removeAll(keepingCapacity: true)
@@ -1831,9 +1845,9 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     expectEqual(identity1, unsafeBitCast(s1, to: Int.self))
     expectNotEqual(identity2, identity1)
     expectEqual(3, s1.count)
-    expectTrue(s1.contains(TestBridgedKeyTy(1010)))
+    expectTrue(s1.contains(TestBridgedKeyTy(1010) as NSObject))
     expectEqual(0 , s2.count)
-    expectFalse(s2.contains(TestBridgedKeyTy(1010)))
+    expectFalse(s2.contains(TestBridgedKeyTy(1010) as NSObject))
   }
 }
 
@@ -2154,12 +2168,37 @@ SetTestSuite.test("BridgedToObjC.Verbatim.Count") {
 }
 
 SetTestSuite.test("BridgedToObjC.Verbatim.Contains") {
-  let nss = getBridgedNSSetOfRefTypesBridgedVerbatim()
+  let s = getBridgedNSSetOfRefTypesBridgedVerbatim()
 
-  expectNotEmpty(nss.member(TestObjCKeyTy(1010)))
-  expectNotEmpty(nss.member(TestObjCKeyTy(2020)))
-  expectNotEmpty(nss.member(TestObjCKeyTy(3030)))
-  expectEmpty(nss.member(TestObjCKeyTy(4040)))
+  var v: AnyObject? = s.member(TestObjCKeyTy(1010))
+  expectEqual(1010, (v as! TestObjCKeyTy).value)
+  let idValue10 = unsafeBitCast(v, to: UInt.self)
+
+  v = s.member(TestObjCKeyTy(2020))
+  expectEqual(2020, (v as! TestObjCKeyTy).value)
+  let idValue20 = unsafeBitCast(v, to: UInt.self)
+
+  v = s.member(TestObjCKeyTy(3030))
+  expectEqual(3030, (v as! TestObjCKeyTy).value)
+  let idValue30 = unsafeBitCast(v, to: UInt.self)
+
+  expectEmpty(s.member(TestObjCKeyTy(4040)))
+
+  // NSSet can store mixed key types.  Swift's Set is typed, but when bridged
+  // to NSSet, it should behave like one, and allow queries for mismatched key
+  // types.
+  expectEmpty(s.member(TestObjCInvalidKeyTy()))
+
+  for i in 0..<3 {
+    expectEqual(idValue10,
+      unsafeBitCast(s.member(TestObjCKeyTy(1010)), to: UInt.self))
+
+    expectEqual(idValue20,
+      unsafeBitCast(s.member(TestObjCKeyTy(2020)), to: UInt.self))
+
+    expectEqual(idValue30,
+      unsafeBitCast(s.member(TestObjCKeyTy(3030)), to: UInt.self))
+  }
 
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
@@ -2382,7 +2421,7 @@ SetTestSuite.test("SetToNSSetConversion") {
   for i in [1010, 2020, 3030] {
     s.insert(TestObjCKeyTy(i))
   }
-  let nss: NSSet = s
+  let nss: NSSet = s as NSSet
 
   expectTrue(equalsUnordered(Array(s).map { $0.value }, [1010, 2020, 3030]))
 }
@@ -2428,18 +2467,18 @@ SetTestSuite.test("SetUpcastBridgedEntryPoint") {
   do {
     var s: Set<NSObject> = _setBridgeToObjectiveC(s)
 
-    expectTrue(s.contains(TestBridgedKeyTy(1010)))
-    expectTrue(s.contains(TestBridgedKeyTy(2020)))
-    expectTrue(s.contains(TestBridgedKeyTy(3030)))
+    expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
+    expectTrue(s.contains(TestBridgedKeyTy(2020) as NSObject))
+    expectTrue(s.contains(TestBridgedKeyTy(3030) as NSObject))
   }
 
   do {
     var s: Set<TestObjCKeyTy> = _setBridgeToObjectiveC(s)
 
     expectEqual(3, s.count)
-    expectTrue(s.contains(TestBridgedKeyTy(1010)))
-    expectTrue(s.contains(TestBridgedKeyTy(2020)))
-    expectTrue(s.contains(TestBridgedKeyTy(3030)))
+    expectTrue(s.contains(TestBridgedKeyTy(1010) as TestObjCKeyTy))
+    expectTrue(s.contains(TestBridgedKeyTy(2020) as TestObjCKeyTy))
+    expectTrue(s.contains(TestBridgedKeyTy(3030) as TestObjCKeyTy))
   }
 }
 
@@ -2453,18 +2492,18 @@ SetTestSuite.test("SetUpcastBridged") {
     var s: Set<NSObject> = s
 
     expectEqual(3, s.count)
-    expectTrue(s.contains(TestBridgedKeyTy(1010)))
-    expectTrue(s.contains(TestBridgedKeyTy(2020)))
-    expectTrue(s.contains(TestBridgedKeyTy(3030)))
+    expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
+    expectTrue(s.contains(TestBridgedKeyTy(2020) as NSObject))
+    expectTrue(s.contains(TestBridgedKeyTy(3030) as NSObject))
   }
 
   do {
     var s: Set<TestObjCKeyTy> = s
 
     expectEqual(3, s.count)
-    expectTrue(s.contains(TestBridgedKeyTy(1010)))
-    expectTrue(s.contains(TestBridgedKeyTy(2020)))
-    expectTrue(s.contains(TestBridgedKeyTy(3030)))
+    expectTrue(s.contains(TestBridgedKeyTy(1010) as TestObjCKeyTy))
+    expectTrue(s.contains(TestBridgedKeyTy(2020) as TestObjCKeyTy))
+    expectTrue(s.contains(TestBridgedKeyTy(3030) as TestObjCKeyTy))
   }
 }
 
@@ -2654,6 +2693,7 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditional") {
     expectTrue(false)
   }
 }
+#endif // _runtime(_ObjC)
 
 // Public API
 
@@ -2908,6 +2948,7 @@ SetTestSuite.test("Equatable.Native.Native") {
   checkEquatable(false, s1, s2)
 }
 
+#if _runtime(_ObjC)
 SetTestSuite.test("Equatable.Native.BridgedVerbatim") {
   let s1 = getNativeBridgedVerbatimSet()
   let bvs1 = getBridgedVerbatimSet()
@@ -2939,6 +2980,7 @@ SetTestSuite.test("Equatable.BridgedNonverbatim.BridgedNonverbatim") {
   checkEquatable(false, bnvs1, bnvsEmpty)
   checkEquatable(false, bnvs2, bnvsEmpty)
 }
+#endif // _runtime(_ObjC)
 
 SetTestSuite.test("isDisjointWith.Set.Set") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
@@ -3453,6 +3495,15 @@ SetTestSuite.test("first") {
   expectEmpty(emptySet.first)
 }
 
+SetTestSuite.test("isEmpty") {
+  let s1 = Set([1010, 2020, 3030])
+  expectFalse(s1.isEmpty)
+
+  let emptySet = Set<Int>()
+  expectTrue(emptySet.isEmpty)
+}
+
+#if _runtime(_ObjC)
 @objc
 class MockSetWithCustomCount : NSSet {
   init(count: Int) {
@@ -3501,7 +3552,7 @@ class MockSetWithCustomCount : NSSet {
   static var timesCountWasCalled = 0
 }
 
-func getMockSetWithCustomCount(count count: Int)
+func getMockSetWithCustomCount(count: Int)
   -> Set<NSObject> {
 
   return MockSetWithCustomCount(count: count) as Set
@@ -3509,14 +3560,6 @@ func getMockSetWithCustomCount(count count: Int)
 
 func callGenericIsEmpty<C : Collection>(_ collection: C) -> Bool {
   return collection.isEmpty
-}
-
-SetTestSuite.test("isEmpty") {
-  let s1 = Set([1010, 2020, 3030])
-  expectFalse(s1.isEmpty)
-
-  let emptySet = Set<Int>()
-  expectTrue(emptySet.isEmpty)
 }
 
 SetTestSuite.test("isEmpty/ImplementationIsCustomized") {
@@ -3546,6 +3589,7 @@ SetTestSuite.test("isEmpty/ImplementationIsCustomized") {
     expectEqual(1, MockSetWithCustomCount.timesCountWasCalled)
   }
 }
+#endif // _runtime(_ObjC)
 
 SetTestSuite.test("count") {
   let s1 = Set([1010, 2020, 3030])

@@ -526,12 +526,14 @@ Type TypeChecker::applyUnboundGenericArguments(
     auto genericSig = unbound->getDecl()->getGenericSignature();
     if (unbound->getDecl()->IsValidatingGenericSignature()) {
       diagnose(loc, diag::recursive_requirement_reference);
-      return BGT;
+      return nullptr;
     }
     assert(genericSig != nullptr);
     if (checkGenericArguments(dc, loc, noteLoc, unbound, genericSig,
                               allGenericArgs))
       return nullptr;
+
+    useObjectiveCBridgeableConformancesOfArgs(dc, BGT);
   }
 
   return BGT;
@@ -1189,10 +1191,12 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
         break;
 
       case UnconditionalAvailabilityKind::Unavailable:
+      case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
         if (!Attr->Rename.empty()) {
           auto diag = TC.diagnose(Loc,
                                   diag::availability_decl_unavailable_rename,
-                                  CI->getIdentifier(), Attr->Rename);
+                                  CI->getIdentifier(), /*"replaced"*/false,
+                                  /*special kind*/0, Attr->Rename);
           fixItAvailableAttrRename(TC, diag, Loc, Attr, /*call*/nullptr);
         } else if (Attr->Message.empty()) {
           TC.diagnose(Loc, diag::availability_decl_unavailable,
@@ -1207,7 +1211,13 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
         break;
 
       case UnconditionalAvailabilityKind::UnavailableInSwift:
-        if (Attr->Message.empty()) {
+        if (!Attr->Rename.empty()) {
+          auto diag = TC.diagnose(Loc,
+                                  diag::availability_decl_unavailable_rename,
+                                  CI->getIdentifier(), /*"replaced"*/false,
+                                  /*special kind*/0, Attr->Rename);
+          fixItAvailableAttrRename(TC, diag, Loc, Attr, /*call*/nullptr);
+        } else if (Attr->Message.empty()) {
           TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift,
                       CI->getIdentifier())
             .highlight(Loc);
@@ -1340,10 +1350,11 @@ Type TypeChecker::resolveIdentifierType(
   return result;
 }
 
-// Returns true if any illegal IUOs were found. If inference of IUO type is disabled, IUOs may only be specified in the following positions:
-//  * outermost type
-//  * function param
-//  * function return type
+/// Returns true if any illegal IUOs were found. If inference of IUO type is
+/// disabled, IUOs may only be specified in the following positions:
+///  * outermost type
+///  * function param
+///  * function return type
 static bool checkForIllegalIUOs(TypeChecker &TC, TypeRepr *Repr,
                                 TypeResolutionOptions Options) {
   class IllegalIUOWalker : public ASTWalker {
@@ -1888,6 +1899,20 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   extInfo = extInfo.withThrows(repr->throws());
 
   ModuleDecl *M = DC->getParentModule();
+  
+  
+  // If this is a function type without parens around the parameter list,
+  // diagnose this and produce a fixit to add them.
+  if (!isa<TupleTypeRepr>(repr->getArgsTypeRepr()) &&
+      !repr->isWarnedAbout()) {
+    auto args = repr->getArgsTypeRepr();
+    TC.diagnose(args->getStartLoc(), diag::function_type_no_parens)
+      .highlight(args->getSourceRange())
+      .fixItInsert(args->getStartLoc(), "(")
+    .fixItInsertAfter(args->getEndLoc(), ")");
+    // Don't emit this warning three times when in generics.
+    repr->setWarned();
+  }
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
   if (auto genericParams = repr->getGenericParams()) {
@@ -2179,6 +2204,9 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   if (!sliceTy)
     return ErrorType::get(Context);
 
+  // Check for _ObjectiveCBridgeable conformances in the element type.
+  TC.useObjectiveCBridgeableConformances(DC, baseTy);
+
   return sliceTy;
 }
 
@@ -2203,6 +2231,11 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
             options.contains(TR_GenericSignature), Resolver)) {
       return ErrorType::get(TC.Context);
     }
+
+    // Check for _ObjectiveCBridgeable conformances in the key and value
+    // types.
+    TC.useObjectiveCBridgeableConformances(DC, keyTy);
+    TC.useObjectiveCBridgeableConformances(DC, valueTy);
 
     return dictTy;
   }
@@ -2519,7 +2552,7 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
     // foreign error convention that replaces NSErrorPointer with ()
     // and this is the replaced parameter.
     AbstractFunctionDecl *overridden;
-    if (param->getType()->isVoid() && AFD->isBodyThrowing() &&
+    if (param->getType()->isVoid() && AFD->hasThrows() &&
         (overridden = AFD->getOverriddenDecl())) {
       auto foreignError = overridden->getForeignErrorConvention();
       if (foreignError &&
@@ -2777,7 +2810,7 @@ bool TypeChecker::isRepresentableInObjC(
   }
 
   // Throwing functions must map to a particular error convention.
-  if (AFD->isBodyThrowing()) {
+  if (AFD->hasThrows()) {
     DeclContext *dc = const_cast<AbstractFunctionDecl *>(AFD);
     SourceLoc throwsLoc;
     Type resultType;

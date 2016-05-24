@@ -14,29 +14,9 @@
 #
 # ----------------------------------------------------------------------------
 
-import platform
 import subprocess
 
 from numbers import Number
-
-from . import xcrun
-from .which import which
-
-
-def host_cmake(xcrun_toolchain):
-    """
-    Return the path to `cmake`, using tools provided by the host platform.
-    If `cmake` cannot be found on OS X, return None.
-    If `cmake` cannot be found on Linux, return a probable path.
-    """
-    if platform.system() == 'Darwin':
-        return xcrun.find(xcrun_toolchain, 'cmake')
-    else:
-        cmake = which('cmake')
-        if cmake:
-            return cmake
-        else:
-            return '/usr/local/bin/cmake'
 
 
 class CMakeOptions(object):
@@ -89,16 +69,15 @@ class CMakeOptions(object):
 
 class CMake(object):
 
-    def __init__(self, args, host_cc, host_cxx, host_distcc):
+    def __init__(self, args, toolchain):
         self.args = args
-        self.host_cc = host_cc
-        self.host_cxx = host_cxx
-        self.host_distcc = host_distcc
+        self.toolchain = toolchain
 
     def common_options(self):
         """Return options used for all products, including LLVM/Clang
         """
         args = self.args
+        toolchain = self.toolchain
         options = CMakeOptions()
         define = options.define
 
@@ -116,13 +95,13 @@ class CMake(object):
             define("CMAKE_EXPORT_COMPILE_COMMANDS", "ON")
 
         if args.distcc:
-            define("CMAKE_C_COMPILER:PATH", self.host_distcc)
-            define("CMAKE_C_COMPILER_ARG1", self.host_cc)
-            define("CMAKE_CXX_COMPILER:PATH", self.host_distcc)
-            define("CMAKE_CXX_COMPILER_ARG1", self.host_cxx)
+            define("CMAKE_C_COMPILER:PATH", toolchain.distcc)
+            define("CMAKE_C_COMPILER_ARG1", toolchain.cc)
+            define("CMAKE_CXX_COMPILER:PATH", toolchain.distcc)
+            define("CMAKE_CXX_COMPILER_ARG1", toolchain.cxx)
         else:
-            define("CMAKE_C_COMPILER:PATH", self.host_cc)
-            define("CMAKE_CXX_COMPILER:PATH", self.host_cxx)
+            define("CMAKE_C_COMPILER:PATH", toolchain.cc)
+            define("CMAKE_CXX_COMPILER:PATH", toolchain.cxx)
 
         if args.cmake_generator == 'Xcode':
             define("CMAKE_CONFIGURATION_TYPES",
@@ -140,10 +119,11 @@ class CMake(object):
         """Return arguments to the build tool used for all products
         """
         args = self.args
+        toolchain = self.toolchain
         jobs = args.build_jobs
         if args.distcc:
-            jobs = str(
-                subprocess.check_output([self.host_distcc, '-j'])).rstrip()
+            jobs = str(subprocess.check_output(
+                [toolchain.distcc, '-j']).decode()).rstrip()
 
         build_args = list(args.build_args)
 

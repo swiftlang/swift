@@ -20,22 +20,7 @@ word_bits = 4
 
 }%
 
-#if arch(i386) || arch(x86_64)
-extension Float80 {
-  public static var infinity: Float80 {
-    return 1.0 / 0.0
-  }
-  public static var quietNaN: Float80 {
-    return 0.0 / 0.0
-  }
-}
-#endif
-
 func getInfiniteOrNaNMessage(_ floatType: String) -> String {
-  // FIXME: <rdar://problem/17958458> Int(Float80.quietNaN) is garbage
-  if floatType == "Float80" {
-    return ""
-  }
   if _isDebugAssertConfiguration() {
     return "either infinite or NaN"
   }
@@ -44,14 +29,14 @@ func getInfiniteOrNaNMessage(_ floatType: String) -> String {
 
 func getTooSmallMessage() -> String {
   if _isDebugAssertConfiguration() {
-    return "it is less than"
+    return "would be less than"
   }
   return ""
 }
 
 func getTooLargeMessage() -> String {
   if _isDebugAssertConfiguration() {
-    return "it is greater than"
+    return "would be greater than"
   }
   return ""
 }
@@ -67,7 +52,6 @@ var FloatingPointConversion = TestSuite("FloatingPointConversion")
 %     end
 
 FloatingPointConversion.test("${FloatSelf}/${IntSelf}/+inf")
-  .xfail(.custom({ "${FloatSelf}" == "Float80" }, reason: "<rdar://problem/17958458> Int(Float80.quietNaN) is garbage"))
   .crashOutputMatches(getInfiniteOrNaNMessage("${FloatSelf}")).code {
   do {
     var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(0.0)))
@@ -85,7 +69,6 @@ FloatingPointConversion.test("${FloatSelf}/${IntSelf}/+inf")
 %     if int_ty.is_signed:
 
 FloatingPointConversion.test("${FloatSelf}/${IntSelf}/-inf")
-  .xfail(.custom({ "${FloatSelf}" == "Float80" }, reason: "<rdar://problem/17958458> Int(Float80.quietNaN) is garbage"))
   .crashOutputMatches(getInfiniteOrNaNMessage("${FloatSelf}")).code {
   do {
     var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(-0.0)))
@@ -103,14 +86,12 @@ FloatingPointConversion.test("${FloatSelf}/${IntSelf}/-inf")
 %     else:
 
 FloatingPointConversion.test("${FloatSelf}/${IntSelf}/negative")
-  .xfail(.custom({ "${FloatSelf}" == "Float80" }, reason: "<rdar://problem/17958458> Int(Float80.quietNaN) is garbage"))
   .crashOutputMatches(getTooSmallMessage()).code {
   expectCrashLater()
   get${IntSelf}(${IntSelf}(get${FloatSelf}(-123.0)))
 }
 
 FloatingPointConversion.test("${FloatSelf}/${IntSelf}/-inf")
-  .xfail(.custom({ "${FloatSelf}" == "Float80" }, reason: "<rdar://problem/17958458> Int(Float80.quietNaN) is garbage"))
   .crashOutputMatches(getInfiniteOrNaNMessage("${FloatSelf}")).code {
   expectCrashLater()
   get${IntSelf}(${IntSelf}(get${FloatSelf}(-${FloatSelf}.infinity)))
@@ -119,10 +100,9 @@ FloatingPointConversion.test("${FloatSelf}/${IntSelf}/-inf")
 %     end
 
 FloatingPointConversion.test("${FloatSelf}/${IntSelf}/NaN")
-  .xfail(.custom({ "${FloatSelf}" == "Float80" }, reason: "<rdar://problem/17958458> Int(Float80.quietNaN) is garbage"))
   .crashOutputMatches(getInfiniteOrNaNMessage("${FloatSelf}")).code {
   expectCrashLater()
-  get${IntSelf}(${IntSelf}(get${FloatSelf}(${FloatSelf}.quietNaN)))
+  get${IntSelf}(${IntSelf}(get${FloatSelf}(${FloatSelf}.nan)))
 }
 
 %     if FloatSelf == 'Float80':

@@ -574,17 +574,6 @@ public:
   /// Gather all of the substitutions used to produce the given specialized type
   /// from its unspecialized type.
   ///
-  /// \param scratchSpace The substitutions will be written into this scratch
-  /// space if a single substitutions array cannot be returned.
-  ArrayRef<Substitution> gatherAllSubstitutions(
-                           ModuleDecl *module,
-                           SmallVectorImpl<Substitution> &scratchSpace,
-                           LazyResolver *resolver,
-                           DeclContext *gpContext = nullptr);
-
-  /// Gather all of the substitutions used to produce the given specialized type
-  /// from its unspecialized type.
-  ///
   /// \returns ASTContext-allocated substitutions.
   ArrayRef<Substitution> gatherAllSubstitutions(
                            ModuleDecl *module,
@@ -667,6 +656,10 @@ public:
   ///          of \c ty.
   bool isBindableToSuperclassOf(Type ty, LazyResolver *resolver);
 
+  /// True if this type contains archetypes that could be substituted with
+  /// concrete types to form the argument type.
+  bool isBindableTo(Type ty, LazyResolver *resolver);
+
   /// \brief Determines whether this type is permitted as a method override
   /// of the \p other.
   bool canOverride(Type other, OverrideMatchMode matchMode,
@@ -712,7 +705,7 @@ public:
   /// Determine whether the given type is representable in the given
   /// foreign language.
   std::pair<ForeignRepresentableKind, ProtocolConformance *>
-  getForeignRepresentableIn(ForeignLanguage language, DeclContext *dc);
+  getForeignRepresentableIn(ForeignLanguage language, const DeclContext *dc);
 
   /// Determines whether the given Swift type is representable within
   /// the given foreign language.
@@ -720,14 +713,14 @@ public:
   /// A given Swift type is representable in the given foreign
   /// language if the Swift type can be used from source code written
   /// in that language.
-  bool isRepresentableIn(ForeignLanguage language, DeclContext *dc);
+  bool isRepresentableIn(ForeignLanguage language, const DeclContext *dc);
 
   /// Determines whether the type is trivially representable within
   /// the foreign language, meaning that it is both representable in
   /// that language and that the runtime representations are
   /// equivalent.
   bool isTriviallyRepresentableIn(ForeignLanguage language,
-                                  DeclContext *dc);
+                                  const DeclContext *dc);
 
   /// \brief Given that this is a nominal type or bound generic nominal
   /// type, return its parent type; this will be a null type if the type
@@ -870,6 +863,10 @@ public:
     OptionalTypeKind ignored;
     return getAnyOptionalObjectType(ignored);
   }
+
+  // Return type underlying type of a swift_newtype annotated imported struct;
+  // otherwise, return the null type.
+  Type getSwiftNewtypeUnderlyingType();
 
   /// Return the type T after looking through all of the optional or
   /// implicitly-unwrapped optional types.

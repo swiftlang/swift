@@ -77,7 +77,7 @@ func func11(_: @autoclosure(escaping) @noescape () -> ()) { } // expected-error{
 
 class Super {
   func f1(_ x: @autoclosure(escaping) () -> ()) { }
-  func f2(_ x: @autoclosure(escaping) () -> ()) { }
+  func f2(_ x: @autoclosure(escaping) () -> ()) { } // expected-note {{potential overridden instance method 'f2' here}}
   func f3(x: @autoclosure () -> ()) { }
 }
 

@@ -47,7 +47,7 @@
 using namespace swift;
 
 #if SWIFT_HAS_ISA_MASKING
-OBJC_EXPORT __attribute__((weak_import))
+OBJC_EXPORT __attribute__((__weak_import__))
 const uintptr_t objc_debug_isa_class_mask;
 
 static uintptr_t computeISAMask() {
@@ -75,9 +75,9 @@ const ClassMetadata *swift::_swift_getClass(const void *object) {
 
 #if SWIFT_OBJC_INTEROP
 struct SwiftObject_s {
-  void *isa  __attribute__((unavailable));
-  uint32_t strongRefCount  __attribute__((unavailable));
-  uint32_t weakRefCount  __attribute__((unavailable));
+  void *isa __attribute__((__unavailable__));
+  uint32_t strongRefCount __attribute__((__unavailable__));
+  uint32_t weakRefCount __attribute__((__unavailable__));
 };
 
 static_assert(sizeof(SwiftObject_s) == sizeof(HeapObject),
@@ -88,10 +88,9 @@ static_assert(std::is_trivially_destructible<SwiftObject_s>::value,
               "SwiftObject must be trivially destructible");
 
 #if __has_attribute(objc_root_class)
-__attribute__((objc_root_class))
+__attribute__((__objc_root_class__))
 #endif
-SWIFT_RUNTIME_EXPORT
-@interface SwiftObject<NSObject> {
+SWIFT_RUNTIME_EXPORT @interface SwiftObject<NSObject> {
   SwiftObject_s header;
 }
 

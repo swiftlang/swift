@@ -621,9 +621,16 @@ enum class MinVersionComparison {
 
 /// Describes the unconditional availability of a declaration.
 enum class UnconditionalAvailabilityKind {
+  /// The declaration is not unconditionally unavailable.
   None,
+  /// The declaration is deprecated, but can still be used.
   Deprecated,
+  /// The declaration is unavailable in Swift, specifically
   UnavailableInSwift,
+  /// The declaration is unavailable in the current version of Swift,
+  /// but was available in previous Swift versions.
+  UnavailableInCurrentSwift,
+  /// The declaration is unavailable for other reasons.
   Unavailable,
 };
 
@@ -1209,6 +1216,10 @@ public:
   bool isUnavailable(const ASTContext &ctx) const {
     return getUnavailable(ctx) != nullptr;
   }
+
+  /// Determine whether there is an "unavailable in current Swift"
+  /// attribute.
+  bool isUnavailableInCurrentSwift() const;
 
   /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or null otherwise.

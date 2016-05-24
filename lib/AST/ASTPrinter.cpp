@@ -1589,6 +1589,10 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
       D->getAttrs().isUnavailable(D->getASTContext()))
     return false;
 
+  // Skip stub declarations used for prior variants of Swift.
+  if (D->getAttrs().isUnavailableInCurrentSwift())
+    return false;
+
   if (Options.ExplodeEnumCaseDecls) {
     if (isa<EnumElementDecl>(D))
       return true;
@@ -2609,7 +2613,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
     });
   }
 
-  if (AFD->isBodyThrowing()) {
+  if (AFD->hasThrows()) {
     if (AFD->getAttrs().hasAttribute<RethrowsAttr>())
       Printer << " " << tok::kw_rethrows;
     else

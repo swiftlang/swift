@@ -823,7 +823,9 @@ ParserResult<Pattern> Parser::parsePattern() {
   default:
     if (Tok.isKeyword() &&
         (peekToken().is(tok::colon) || peekToken().is(tok::equal))) {
-      diagnose(Tok, diag::expected_pattern_is_keyword, Tok.getText());
+      diagnose(Tok, diag::keyword_cant_be_identifier, Tok.getText());
+      diagnose(Tok, diag::backticks_to_escape)
+        .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
       SourceLoc Loc = Tok.getLoc();
       consumeToken();
       return makeParserErrorResult(new (Context) AnyPattern(Loc));

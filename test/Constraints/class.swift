@@ -28,7 +28,7 @@ f0(fi)
 
 // FIXME: Test subtyping of class metatypes.
 
-ternary(true, ef, c)
+_ = ternary(true, ef, c)
 
 
 class X {

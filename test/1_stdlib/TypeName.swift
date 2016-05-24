@@ -50,9 +50,10 @@ typealias F = () -> ()
 typealias F2 = () -> () -> ()
 typealias F3 = (() -> ()) -> ()
 
-printTypeName(F.self) // CHECK-NEXT: () -> ()
-printTypeName(F2.self) // CHECK-NEXT: () -> () -> ()
-printTypeName(F3.self) // CHECK-NEXT: (() -> ()) -> ()
+printTypeName(F.self) // CHECK-NEXT: (()) -> ()
+printTypeName(F2.self) // CHECK-NEXT: (()) -> (()) -> ()
+printTypeName(F3.self) // CHECK-NEXT: (((()) -> ())) -> ()
+
 
 #if _runtime(_ObjC)
 typealias B = @convention(block) () -> ()
@@ -62,15 +63,15 @@ printTypeName(B.self)
 printTypeName(B2.self)
 printTypeName(B3.self)
 #else
-print("@convention(block) () -> ()")
-print("() -> @convention(block) () -> ()")
-print("(@convention(block) () -> ()) -> ()")
+print("@convention(block) (()) -> ()")
+print("(()) -> @convention(block) (()) -> ()")
+print("((@convention(block) (()) -> ())) -> ()")
 #endif
-// CHECK-NEXT: @convention(block) () -> ()
-// CHECK-NEXT: () -> @convention(block) () -> ()
-// CHECK-NEXT: (@convention(block) () -> ()) -> ()
+// CHECK-NEXT: @convention(block) (()) -> ()
+// CHECK-NEXT: (()) -> @convention(block) (()) -> ()
+// CHECK-NEXT: ((@convention(block) (()) -> ())) -> ()
 
-printTypeName(F.Type.self) // CHECK-NEXT: (() -> ()).Type
+printTypeName(F.Type.self) // CHECK-NEXT: ((()) -> ()).Type
 printTypeName(C.Type.self) // CHECK-NEXT: [[THIS]].C.Type
 printTypeName(C.Type.Type.self) // CHECK-NEXT: [[THIS]].C.Type.Type
 printTypeName(Any.Type.self) // CHECK-NEXT: protocol<>.Type
@@ -81,24 +82,24 @@ printTypeName((AnyObject?).self) // CHECK-NEXT: {{^}}Swift.Optional<Swift.AnyObj
 
 printTypeName(Void.self) // CHECK-NEXT: ()
 typealias Tup = (Any, F, C)
-printTypeName(Tup.self) // CHECK-NEXT: (protocol<>, () -> (), [[THIS]].C)
+printTypeName(Tup.self) // CHECK-NEXT: (protocol<>, (()) -> (), [[THIS]].C)
 
-typealias IF = inout Int -> ()
-typealias IF2 = inout Int -> inout Int -> ()
-typealias IF3 = (inout Int -> ()) -> ()
-typealias IF3a = (inout (Int -> ())) -> ()
-typealias IF3b = inout (Int -> ()) -> ()
+typealias IF = (inout Int) -> ()
+typealias IF2 = (inout Int) -> (inout Int) -> ()
+typealias IF3 = ((inout Int) -> ()) -> ()
+typealias IF3a = (inout ((Int) -> ())) -> ()
+typealias IF3b = (inout ((Int) -> ())) -> ()
 typealias IF3c = ((inout Int) -> ()) -> ()
-typealias IF4 = inout (() -> ()) -> ()
+typealias IF4 = (inout (() -> ())) -> ()
 typealias IF5 = (inout Int, Any) -> ()
 
-printTypeName(IF.self) // CHECK-NEXT: inout Swift.Int -> ()
-printTypeName(IF2.self) // CHECK-NEXT: inout Swift.Int -> inout Swift.Int -> ()
-printTypeName(IF3.self) // CHECK-NEXT: inout (Swift.Int -> ()) -> ()
-printTypeName(IF3a.self) // CHECK-NEXT: inout (Swift.Int -> ()) -> ()
-printTypeName(IF3b.self) // CHECK-NEXT: inout (Swift.Int -> ()) -> ()
-printTypeName(IF3c.self) // CHECK-NEXT: (inout Swift.Int -> ()) -> ()
-printTypeName(IF4.self) // CHECK-NEXT: inout (() -> ()) -> ()
+printTypeName(IF.self) // CHECK-NEXT: (inout Swift.Int) -> ()
+printTypeName(IF2.self) // CHECK-NEXT: (inout Swift.Int) -> (inout Swift.Int) -> ()
+printTypeName(IF3.self) // CHECK-NEXT: (((inout Swift.Int) -> ())) -> ()
+printTypeName(IF3a.self) // CHECK-NEXT: (inout ((Swift.Int) -> ())) -> ()
+printTypeName(IF3b.self) // CHECK-NEXT: (inout ((Swift.Int) -> ())) -> ()
+printTypeName(IF3c.self) // CHECK-NEXT: (((inout Swift.Int) -> ())) -> ()
+printTypeName(IF4.self) // CHECK-NEXT: (inout ((()) -> ())) -> ()
 printTypeName(IF5.self) // CHECK-NEXT: (inout Swift.Int, protocol<>) -> ()
 
 func curry1() {
@@ -125,12 +126,12 @@ func curry3Throws() throws -> () throws -> () {
 	return curry1Throws
 }
 
-printTypeName(curry1.dynamicType) // CHECK-NEXT: () -> ()
+printTypeName(curry1.dynamicType) // CHECK-NEXT: (()) -> ()
 
-printTypeName(curry2.dynamicType) // CHECK-NEXT: () -> () -> ()
+printTypeName(curry2.dynamicType) // CHECK-NEXT: (()) -> (()) -> ()
 
-printTypeName(curry2Throws.dynamicType) // CHECK-NEXT: () throws -> () -> ()
+printTypeName(curry2Throws.dynamicType) // CHECK-NEXT: (()) throws -> (()) -> ()
 
-printTypeName(curry3.dynamicType) // CHECK-NEXT: () -> () throws -> ()
+printTypeName(curry3.dynamicType) // CHECK-NEXT: (()) -> (()) throws -> ()
 
-printTypeName(curry3Throws.dynamicType) // CHECK-NEXT: () throws -> () throws -> ()
+printTypeName(curry3Throws.dynamicType) // CHECK-NEXT: (()) throws -> (()) throws -> ()

@@ -55,17 +55,17 @@ import ImportAsMember.A
 import ImportAsMember.B
 
 let iamStructFail = IAMStruct1CreateSimple()
-  // expected-error@-1{{use of unresolved identifier 'IAMStruct1CreateSimple'}}
+  // expected-error@-1{{missing argument for parameter #1 in call}}
 var iamStruct = Struct1(x: 1.0, y: 1.0, z: 1.0)
 
 let gVarFail = IAMStruct1GlobalVar
-  // expected-error@-1{{use of unresolved identifier 'IAMStruct1GlobalVar'}}
+  // expected-error@-1{{IAMStruct1GlobalVar' has been renamed to 'Struct1.globalVar'}}
 let gVar = Struct1.globalVar
 print("\(gVar)")
 
 let iamStructInitFail = IAMStruct1CreateSimple(42)
-  // expected-error@-1{{use of unresolved identifier 'IAMStruct1CreateSimple'}}
-let iamStructInitFail = Struct1(value: 42)
+  // expected-error@-1{{'IAMStruct1CreateSimple' has been replaced by 'Struct1.init(value:)'}}
+let iamStructInitFail2 = Struct1(value: 42)
 
 let gVar2 = Struct1.static2
 

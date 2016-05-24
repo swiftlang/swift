@@ -6,15 +6,16 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: %target-swift-frontend %s -emit-sil -verify
+// RUN: %target-swift-frontend %s -emit-sil
 
 // Issue found by http://github.com/valfer (Valerio Ferrucci)
 
 protocol C {
     static func c(o: AnyObject) -> Self?
 }
-func d<A,B>(_ a : A, _ f : A -> B) -> B {
-} // expected-error {{missing return in a function expected to return 'B'}}
+func d<A,B>(_ a : A, _ f : (A) -> B) -> B {
+  preconditionFailure()
+}
 class D<A:C> {
     func e(o: AnyObject) {
         d(o, A.c)

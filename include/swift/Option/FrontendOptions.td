@@ -193,16 +193,12 @@ def disable_llvm_value_names : Flag<["-"], "disable-llvm-value-names">,
 def enable_llvm_value_names : Flag<["-"], "enable-llvm-value-names">,
   HelpText<"Add names to local values in LLVM IR">;
 
-def enable_reflection_metadata : Flag<["-"], "enable-reflection-metadata">,
-  HelpText<"Enable emission of reflection metadata for nominal types">;
+def disable_reflection_metadata : Flag<["-"], "disable-reflection-metadata">,
+  HelpText<"Disable emission of reflection metadata for nominal types">;
 
-def enable_reflection_names : Flag<["-"], "enable-reflection-names">,
-  HelpText<"Enable emission of names of stored properties and enum cases in"
+def disable_reflection_names : Flag<["-"], "disable-reflection-names">,
+  HelpText<"Disable emission of names of stored properties and enum cases in"
            "reflection metadata">;
-
-def enable_reflection_builtins : Flag<["-"], "enable-reflection-builtins">,
-  HelpText<"Enable emission of reflection metadata for builtin types"
-           " (standard library only)">;
 
 def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
   HelpText<"Emit runtime checks for correct stack promotion of objects.">;
@@ -246,6 +242,12 @@ def enable_strip_ns_prefix :
 def swift3_migration :
   Flag<["-"], "swift3-migration">,
   HelpText<"Enable Fix-It based migration aids for Swift 3">;
+
+def warn_long_function_bodies : Separate<["-"], "warn-long-function-bodies">,
+  MetaVarName<"<n>">,
+  HelpText<"Warns when type-checking a function takes longer than <n> ms">;
+def warn_long_function_bodies_EQ : Joined<["-"], "warn-long-function-bodies=">,
+  Alias<warn_long_function_bodies>;
 
 def warn_omit_needless_words :
   Flag<["-"], "Womit-needless-words">,

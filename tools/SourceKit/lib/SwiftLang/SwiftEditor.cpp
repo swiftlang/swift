@@ -1035,76 +1035,6 @@ inferSetterAccessibility(const AbstractStorageDecl *D) {
     return inferAccessibility(D);
 }
 
-std::vector<UIdent> UIDsFromDeclAttributes(const DeclAttributes &Attrs) {
-  std::vector<UIdent> AttrUIDs;
-
-#define ATTR(X) \
-  if (Attrs.has(AK_##X)) { \
-    static UIdent Attr_##X("source.decl.attribute."#X); \
-    AttrUIDs.push_back(Attr_##X); \
-  }
-#include "swift/AST/Attr.def"
-
-  for (auto Attr : Attrs) {
-    // Check special-case names first.
-    switch (Attr->getKind()) {
-    case DAK_IBAction: {
-      static UIdent Attr_IBAction("source.decl.attribute.ibaction");
-      AttrUIDs.push_back(Attr_IBAction);
-      continue;
-    }
-    case DAK_IBOutlet: {
-      static UIdent Attr_IBOutlet("source.decl.attribute.iboutlet");
-      AttrUIDs.push_back(Attr_IBOutlet);
-      continue;
-    }
-    case DAK_IBDesignable: {
-      static UIdent Attr_IBDesignable("source.decl.attribute.ibdesignable");
-      AttrUIDs.push_back(Attr_IBDesignable);
-      continue;
-    }
-    case DAK_IBInspectable: {
-      static UIdent Attr_IBInspectable("source.decl.attribute.ibinspectable");
-      AttrUIDs.push_back(Attr_IBInspectable);
-      continue;
-    }
-    case DAK_ObjC: {
-      static UIdent Attr_Objc("source.decl.attribute.objc");
-      static UIdent Attr_ObjcNamed("source.decl.attribute.objc.name");
-      if (cast<ObjCAttr>(Attr)->hasName()) {
-        AttrUIDs.push_back(Attr_ObjcNamed);
-      } else {
-        AttrUIDs.push_back(Attr_Objc);
-      }
-      continue;
-    }
-
-    // We handle accessibility explicitly.
-    case DAK_Accessibility:
-    case DAK_SetterAccessibility:
-    // Ignore these.
-    case DAK_ShowInInterface:
-      continue;
-    default:
-      break;
-    }
-
-    switch (Attr->getKind()) {
-    case DAK_Count:
-      break;
-#define DECL_ATTR(X, CLASS, ...)\
-    case DAK_##CLASS: {\
-      static UIdent Attr_##X("source.decl.attribute."#X); \
-      AttrUIDs.push_back(Attr_##X); \
-      break;\
-    }
-#include "swift/AST/Attr.def"
-    }
-  }
-
-  return AttrUIDs;
-}
-
 class SwiftDocumentStructureWalker: public ide::SyntaxModelWalker {
   SourceManager &SrcManager;
   EditorConsumer &Consumer;
@@ -1189,7 +1119,7 @@ public:
     SmallString<64> SelectorNameBuf;
     StringRef SelectorName = getObjCSelectorName(Node.Dcl, SelectorNameBuf);
 
-    std::vector<UIdent> Attrs = UIDsFromDeclAttributes(Node.Attrs);
+    std::vector<UIdent> Attrs = SwiftLangSupport::UIDsFromDeclAttributes(Node.Attrs);
 
     Consumer.beginDocumentSubStructure(StartOffset, EndOffset - StartOffset,
                                        Kind, AccessLevel, SetterAccessLevel,

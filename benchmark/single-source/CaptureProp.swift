@@ -27,6 +27,6 @@ func benchCaptureProp<S : Sequence
 public func run_CaptureProp(_ N: Int) {
   let a = 1...10_000
   for _ in 1...100*N {
-    benchCaptureProp(a, sum)
+    _ = benchCaptureProp(a, sum)
   }
 }

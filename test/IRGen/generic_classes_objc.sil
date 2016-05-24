@@ -32,6 +32,11 @@ bb0(%0 : $GenericInheritsObjC<T>):
   unreachable
 }
 
+sil @_TToFC20generic_classes_objc19GenericInheritsObjCcfT7bellsOnSi_GSQGS0_x__ : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
+bb0(%0 : $Int, %1 : $GenericInheritsObjC<T>):
+  unreachable
+}
+
 // CHECK: @_TMPC20generic_classes_objc20GenericInheritsObjC2
 
 class GenericInheritsObjC2<E> : Gizmo {
@@ -52,5 +57,10 @@ bb0(%0 : $GenericInheritsObjC2<T>):
 // @objc init
 sil @_TToFC20generic_classes_objc20GenericInheritsObjC2cfT_GS0_x_ : $@convention(objc_method) <T> (@owned GenericInheritsObjC2<T>) -> @owned GenericInheritsObjC2<T> {
 bb0(%0 : $GenericInheritsObjC2<T>):
+  unreachable
+}
+
+sil @_TToFC20generic_classes_objc20GenericInheritsObjC2cfT7bellsOnSi_GSQGS0_x__ : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
+bb0(%0 : $Int, %1 : $GenericInheritsObjC<T>):
   unreachable
 }

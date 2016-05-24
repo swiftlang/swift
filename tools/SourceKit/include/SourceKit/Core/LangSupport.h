@@ -39,6 +39,7 @@ struct EntityInfo {
   bool IsTestCandidate = false;
   unsigned Line = 0;
   unsigned Column = 0;
+  ArrayRef<UIdent> Attrs;
 
   EntityInfo() = default;
 };
@@ -156,7 +157,7 @@ struct FilterRule {
   };
   Kind kind;
   bool hide;
-  std::vector<StringRef> names;
+  std::vector<StringRef> names; ///< Must be null-terminated.
   std::vector<UIdent> uids;
 };
 

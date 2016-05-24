@@ -13,8 +13,15 @@
 import SwiftShims
 
 extension String {
-  /// Construct an instance that is the concatenation of `count` copies
-  /// of `repeatedValue`.
+  /// Creates a string representing the given character repeated the specified
+  /// number of times.
+  ///
+  /// For example, use this initializer to create a string with ten `"0"`
+  /// characters in a row.
+  ///
+  ///     let zeroes = String("0" as Character, count: 10)
+  ///     print(zeroes)
+  ///     // Prints "0000000000"
   public init(repeating repeatedValue: Character, count: Int) {
     let s = String(repeatedValue)
     self = String(_storage: _StringBuffer(
@@ -26,8 +33,15 @@ extension String {
     }
   }
 
-  /// Construct an instance that is the concatenation of `count` copies
-  /// of `Character(repeatedValue)`.
+  /// Creates a string representing the given Unicode scalar repeated the
+  /// specified number of times.
+  ///
+  /// For example, use this initializer to create a string with ten `"0"`
+  /// scalars in a row.
+  ///
+  ///     let zeroes = String("0" as UnicodeScalar, count: 10)
+  ///     print(zeroes)
+  ///     // Prints "0000000000"
   public init(repeating repeatedValue: UnicodeScalar, count: Int) {
     self = String._fromWellFormedCodeUnitSequence(
       UTF32.self,
@@ -38,13 +52,12 @@ extension String {
     return _split(separator: "\n")
   }
   
-  @warn_unused_result
   public func _split(separator: UnicodeScalar) -> [String] {
     let scalarSlices = unicodeScalars.split { $0 == separator }
     return scalarSlices.map { String($0) }
   }
 
-  /// `true` iff `self` contains no characters.
+  /// A Boolean value indicating whether a string has no characters.
   public var isEmpty : Bool {
     return _core.count == 0
   }
@@ -73,7 +86,36 @@ func _stdlib_NSStringHasSuffixNFD(_ theString: AnyObject, _ suffix: AnyObject) -
 func _stdlib_NSStringHasSuffixNFDPointer(_ theString: OpaquePointer, _ suffix: OpaquePointer) -> Bool
 
 extension String {
-  /// Returns `true` iff `self` begins with `prefix`.
+  /// Returns a Boolean value indicating whether the string begins with the
+  /// specified prefix.
+  ///
+  /// The comparison is both case sensitive and Unicode safe. The
+  /// case-sensitive comparision will only match strings whose corresponding
+  /// characters have the same case.
+  ///
+  ///     let cafe = "Café du Monde"
+  ///
+  ///     // Case sensitive
+  ///     print(cafe.hasPrefix("café"))
+  ///     // Prints "false"
+  ///
+  /// The Unicode-safe comparison matches Unicode scalar values rather than the
+  /// code points used to compose them. The example below uses two strings
+  /// with different forms of the `"é"` character---the first uses the composed
+  /// form and the second uses the decomposed form.
+  ///
+  ///     // Unicode safe
+  ///     let composedCafe = "Café"
+  ///     let decomposedCafe = "Cafe\u{0301}"
+  ///
+  ///     print(cafe.hasPrefix(composedCafe))
+  ///     // Prints "true"
+  ///     print(cafe.hasPrefix(decomposedCafe))
+  ///     // Prints "true"
+  ///
+  /// - Parameter prefix: A possible prefix to test against this string.
+  ///   Passing an empty string (`""`) as `prefix` always results in `false`.
+  /// - Returns: `true` if the string begins with `prefix`, otherwise, `false`.
   public func hasPrefix(_ prefix: String) -> Bool {
     let selfCore = self._core
     let prefixCore = prefix._core
@@ -97,7 +139,36 @@ extension String {
       self._bridgeToObjectiveCImpl(), prefix._bridgeToObjectiveCImpl())
   }
 
-  /// Returns `true` iff `self` ends with `suffix`.
+  /// Returns a Boolean value indicating whether the string ends with the
+  /// specified suffix.
+  ///
+  /// The comparison is both case sensitive and Unicode safe. The
+  /// case-sensitive comparision will only match strings whose corresponding
+  /// characters have the same case.
+  ///
+  ///     let plans = "Let's meet at the café"
+  ///
+  ///     // Case sensitive
+  ///     print(plans.hasSuffix("Café"))
+  ///     // Prints "false"
+  ///
+  /// The Unicode-safe comparison matches Unicode scalar values rather than the
+  /// code points used to compose them. The example below uses two strings
+  /// with different forms of the `"é"` character---the first uses the composed
+  /// form and the second uses the decomposed form.
+  ///
+  ///     // Unicode safe
+  ///     let composedCafe = "café"
+  ///     let decomposedCafe = "cafe\u{0301}"
+  ///
+  ///     print(plans.hasSuffix(composedCafe))
+  ///     // Prints "true"
+  ///     print(plans.hasSuffix(decomposedCafe))
+  ///     // Prints "true"
+  ///
+  /// - Parameter suffix: A possible suffix to test against this string.
+  ///   Passing an empty string (`""`) as `suffix` always results in `false`.
+  /// - Returns: `true` if the string ends with `suffix`, otherwise, `false`.
   public func hasSuffix(_ suffix: String) -> Bool {
     let selfCore = self._core
     let suffixCore = suffix._core
@@ -134,38 +205,86 @@ extension String {
   // FIXME: can't just use a default arg for radix below; instead we
   // need these single-arg overloads <rdar://problem/17775455>
   
-  /// Create an instance representing `v` in base 10.
+  /// Creates a string representing the given value in base 10.
+  ///
+  /// The following example converts the maximal `Int` value to a string and
+  /// prints its length:
+  ///
+  ///     let max = String(Int.max)
+  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     // Prints "9223372036854775807 has 19 digits."
   public init<T : _SignedInteger>(_ v: T) {
     self = _int64ToString(v.toIntMax())
   }
   
-  /// Create an instance representing `v` in base 10.
+  /// Creates a string representing the given value in base 10.
+  ///
+  /// The following example converts the maximal `UInt` value to a string and
+  /// prints its length:
+  ///
+  ///     let max = String(UInt.max)
+  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     // Prints "18446744073709551615 has 20 digits."
   public init<T : UnsignedInteger>(_ v: T) {
     self = _uint64ToString(v.toUIntMax())
   }
 
-  /// Create an instance representing `v` in the given `radix` (base).
+  /// Creates a string representing the given value in the specified base.
   ///
-  /// Numerals greater than 9 are represented as roman letters,
-  /// starting with `a` if `uppercase` is `false` or `A` otherwise.
+  /// Numerals greater than 9 are represented as Roman letters. These letters
+  /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
+  /// 
+  ///     let v = 999_999
+  ///     print(String(v, radix: 2))
+  ///     // Prints "11110100001000111111"
+  ///
+  ///     print(String(v, radix: 16))
+  ///     // Prints "f423f"
+  ///     print(String(v, radix: 16, uppercase: true))
+  ///     // Prints "F423F"
+  ///
+  /// - Parameters:
+  ///   - value: The value to convert to a string.
+  ///   - radix: The base to use for the string representation. `radix` must be
+  ///     at least 2 and at most 36.
+  ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
+  ///     greater than 9, or `false` to use lowercase letters. The default is
+  ///     `false`.
   public init<T : _SignedInteger>(
-    _ v: T, radix: Int, uppercase: Bool = false
+    _ value: T, radix: Int, uppercase: Bool = false
   ) {
     _precondition(radix > 1, "Radix must be greater than 1")
     self = _int64ToString(
-      v.toIntMax(), radix: Int64(radix), uppercase: uppercase)
+      value.toIntMax(), radix: Int64(radix), uppercase: uppercase)
   }
   
-  /// Create an instance representing `v` in the given `radix` (base).
+  /// Creates a string representing the given value in the specified base.
   ///
-  /// Numerals greater than 9 are represented as roman letters,
-  /// starting with `a` if `uppercase` is `false` or `A` otherwise.
+  /// Numerals greater than 9 are represented as Roman letters. These letters
+  /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
+  ///
+  ///     let v: UInt = 999_999
+  ///     print(String(v, radix: 2))
+  ///     // Prints "11110100001000111111"
+  ///
+  ///     print(String(v, radix: 16))
+  ///     // Prints "f423f"
+  ///     print(String(v, radix: 16, uppercase: true))
+  ///     // Prints "F423F"
+  ///
+  /// - Parameters:
+  ///   - value: The value to convert to a string.
+  ///   - radix: The base to use for the string representation. `radix` must be
+  ///     at least 2 and at most 36.
+  ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
+  ///     greater than 9, or `false` to use lowercase letters. The default is
+  ///     `false`.
   public init<T : UnsignedInteger>(
-    _ v: T, radix: Int, uppercase: Bool = false
+    _ value: T, radix: Int, uppercase: Bool = false
   ) {
     _precondition(radix > 1, "Radix must be greater than 1")
     self = _uint64ToString(
-      v.toUIntMax(), radix: Int64(radix), uppercase: uppercase)
+      value.toUIntMax(), radix: Int64(radix), uppercase: uppercase)
   }
 }
 

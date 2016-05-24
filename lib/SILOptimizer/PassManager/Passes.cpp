@@ -124,6 +124,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
 
 void AddSimplifyCFGSILCombine(SILPassManager &PM) {
   PM.addSimplifyCFG();
+  PM.addConditionForwarding();
   // Jump threading can expose opportunity for silcombine (enum -> is_enum_tag->
   // cond_br).
   PM.addSILCombine();
@@ -251,6 +252,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
     PM.addEarlyCodeMotion();
 
   PM.addRetainSinking();
+  PM.addReleaseHoisting();
   PM.addARCSequenceOpts();
   PM.addRemovePins();
 }

@@ -30,6 +30,9 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclCXX.h"
+#include "clang/AST/GlobalDecl.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/TypeBuilder.h"
 #include "llvm/IR/Value.h"
@@ -838,15 +841,6 @@ void IRGenModule::finishEmitAfterTopLevel() {
                                   AccessPath);
     DebugInfo->emitImport(Imp);
   }
-
-  // Emit external definitions used by this module.
-  for (auto def : Context.ExternalDefinitions) {
-    emitExternalDefinition(def);
-  }
-
-  // Let ClangCodeGen emit its global data structures (llvm.used, debug info,
-  // etc.)
-  finalizeClangCodeGen();
 }
 
 static void emitLazyTypeMetadata(IRGenModule &IGM, CanType type) {
@@ -1481,52 +1475,25 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   llvm_unreachable("bad decl kind!");
 }
 
-void IRGenModule::emitExternalDefinition(Decl *D) {
-  switch (D->getKind()) {
-  case DeclKind::Extension:
-  case DeclKind::PatternBinding:
-  case DeclKind::EnumCase:
-  case DeclKind::EnumElement:
-  case DeclKind::TopLevelCode:
-  case DeclKind::TypeAlias:
-  case DeclKind::GenericTypeParam:
-  case DeclKind::AssociatedType:
-  case DeclKind::Import:
-  case DeclKind::Subscript:
-  case DeclKind::Destructor:
-  case DeclKind::InfixOperator:
-  case DeclKind::PrefixOperator:
-  case DeclKind::PostfixOperator:
-  case DeclKind::IfConfig:
-  case DeclKind::Param:
-  case DeclKind::Module:
-    llvm_unreachable("Not a valid external definition for IRgen");
-
-  case DeclKind::Var:
-    assert(D->getClangDecl() && "Not a valid external var for IRGen");
-    return emitClangDecl(const_cast<clang::Decl *>(D->getClangDecl()));
-
-  case DeclKind::Func:
-    if (auto *clangDecl = D->getClangDecl())
-      emitClangDecl(const_cast<clang::Decl *>(clangDecl));
-    break;
-
-  case DeclKind::Constructor:
-    // Do nothing.
-    break;
-
-  // No need to eagerly emit Swift metadata for external types.
-  case DeclKind::Struct:
-  case DeclKind::Enum:
-  case DeclKind::Class:
-  case DeclKind::Protocol:
-    break;
-  }
-}
-
 Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                                 const TypeInfo &ti,
                                                 ForDefinition_t forDefinition) {
+  if (auto clangDecl = var->getClangDecl()) {
+    auto addr = getAddrOfClangGlobalDecl(cast<clang::VarDecl>(clangDecl),
+                                         forDefinition);
+
+    // If we're not emitting this to define it, make sure we cast it to the
+    // right type.
+    if (!forDefinition) {
+      auto ptrTy = ti.getStorageType()->getPointerTo();
+      addr = llvm::ConstantExpr::getBitCast(addr, ptrTy);
+    }
+
+    auto alignment =
+      Alignment(getClangASTContext().getDeclAlign(clangDecl).getQuantity());
+    return Address(addr, alignment);
+  }
+
   LinkEntity entity = LinkEntity::forSILGlobalVariable(var);
   ResilienceExpansion expansion = getResilienceExpansionForLayout(var);
 
@@ -1609,6 +1576,14 @@ static bool isReadOnlyFunction(SILFunction *f) {
          Eff == EffectsKind::ReadOnly;
 }
 
+static clang::GlobalDecl getClangGlobalDeclForFunction(const clang::Decl *decl) {
+  if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(decl))
+    return clang::GlobalDecl(ctor, clang::Ctor_Complete);
+  if (auto dtor = dyn_cast<clang::CXXDestructorDecl>(decl))
+    return clang::GlobalDecl(dtor, clang::Dtor_Complete);
+  return clang::GlobalDecl(cast<clang::FunctionDecl>(decl));
+}
+
 /// Find the entry point for a SIL function.
 llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
                                                   ForDefinition_t forDefinition) {
@@ -1616,13 +1591,23 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
 
   // Check whether we've created the function already.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
-  llvm::Function *fn = Module.getFunction(f->getName());
+  llvm::Function *fn = Module.getFunction(f->getName());  
   if (fn) {
     if (forDefinition) updateLinkageForDefinition(*this, fn, entity);
     return fn;
   }
 
-  bool hasOrderNumber = f->isDefinition();
+  // If it's a Clang declaration, ask Clang to generate the IR declaration.
+  // This might generate new functions, so we should do it before computing
+  // the insert-before point.
+  llvm::Constant *clangAddr = nullptr;
+  if (auto clangDecl = f->getClangDecl()) {
+    auto globalDecl = getClangGlobalDeclForFunction(clangDecl);
+    clangAddr = getAddrOfClangGlobalDecl(globalDecl, forDefinition);
+  }
+
+  bool isDefinition = f->isDefinition();
+  bool hasOrderNumber = isDefinition;
   unsigned orderNumber = ~0U;
   llvm::Function *insertBefore = nullptr;
 
@@ -1634,18 +1619,35 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     if (auto emittedFunctionIterator
           = EmittedFunctionsByOrder.findLeastUpperBound(orderNumber))
       insertBefore = *emittedFunctionIterator;
-
-    // Also, if we have a lazy definition for it, be sure to queue that up.
-    if (!forDefinition &&
-        !isPossiblyUsedExternally(f->getLinkage(),
-                                  getSILModule().isWholeModule()))
-      IRGen.addLazyFunction(f);
   }
-    
+
+  // If it's a Clang declaration, check whether Clang gave us a declaration.
+  if (clangAddr) {
+    fn = dyn_cast<llvm::Function>(clangAddr->stripPointerCasts());
+
+    // If we have a function, move it to the appropriate position.
+    if (fn) {
+      if (hasOrderNumber) {
+        auto &fnList = Module.getFunctionList();
+        fnList.remove(fn);
+        fnList.insert(llvm::Module::iterator(insertBefore), fn);
+
+        EmittedFunctionsByOrder.insert(orderNumber, fn);
+      }
+      return fn;
+    }
+
+  // Otherwise, if we have a lazy definition for it, be sure to queue that up.
+  } else if (isDefinition && !forDefinition &&
+             !isPossiblyUsedExternally(f->getLinkage(),
+                                       getSILModule().isWholeModule())) {
+    IRGen.addLazyFunction(f);
+  }
+
   llvm::AttributeSet attrs;
   llvm::FunctionType *fnType = getFunctionType(f->getLoweredFunctionType(),
                                                attrs);
-  
+
   auto cc = expandCallingConv(*this, f->getRepresentation());
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 

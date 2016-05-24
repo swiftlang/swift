@@ -42,12 +42,10 @@ public final class LifetimeTracked {
 }
 
 extension LifetimeTracked : Strideable {
-  @warn_unused_result
   public func distance(to other: LifetimeTracked) -> Int {
     return self.value.distance(to: other.value)
   }
 
-  @warn_unused_result
   public func advanced(by n: Int) -> LifetimeTracked {
     return LifetimeTracked(self.value.advanced(by: n))
   }

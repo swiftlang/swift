@@ -64,8 +64,8 @@ func testDeprecatedStringLiteralSelector() {
   _ = sel1
 
   _ = "methodWithValue:label:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{7-43=#selector(Foo.method(_:label:))}}
-  _ = "property" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' or explicitly construct a 'Selector'}}{{7-7=Selector(}}{{17-29=)}}
-  _ = "setProperty:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' or explicitly construct a 'Selector'}}{{7-7=Selector(}}{{21-33=)}}
+  _ = "property" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{7-29=#selector(getter: Foo.property)}}
+  _ = "setProperty:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{7-33=#selector(setter: Foo.property)}}
   _ = "unknownMethodWithValue:label:" as Selector // expected-warning{{no method declared with Objective-C selector 'unknownMethodWithValue:label:'}}{{7-7=Selector(}}{{38-50=)}}
   _ = "badSelector:label" as Selector // expected-warning{{string literal is not a valid Objective-C selector}}
   _ = "method2WithValue:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{7-38=#selector(Foo.method2(_:))}}
@@ -96,6 +96,9 @@ func testDeprecatedStringLiteralSelector() {
 
 func testSelectorConstruction() {
   _ = Selector("methodWithValue:label:") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{7-41=#selector(Foo.method(_:label:))}}
+  _ = Selector("property") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{7-27=#selector(getter: Foo.property)}}
+  _ = Selector("setProperty:") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{7-31=#selector(setter: Foo.property)}}
+
   _ = Selector("unknownMethodWithValue:label:") // expected-warning{{no method declared with Objective-C selector 'unknownMethodWithValue:label:'}}
   // expected-note@-1{{wrap the selector name in parentheses to suppress this warning}}{{16-16=(}}{{47-47=)}}
   _ = Selector(("unknownMethodWithValue:label:"))

@@ -193,6 +193,12 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     The runtime representation of a type, and everything you can do with it.
     Like a ``Class`` in Objective-C, but for any type.
 
+  USR
+    A Unified Symbol Resolution (USR) is a string that identifies a particular
+    entity (function, class, variable, etc.) within a program. USRs can be
+    compared across translation units to determine, e.g., when references in
+    one translation refer to an entity defined in another translation unit.
+
   value witness table
     A runtime structure that describes how to do basic operations on an unknown
     value, like "assign", "copy", and "destroy". (For example, does copying

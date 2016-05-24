@@ -145,8 +145,10 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   auto getter = FuncDecl::create(
       TC.Context, staticLoc, StaticSpellingKind::None, loc, Identifier(), loc,
-      SourceLoc(), SourceLoc(), /*GenericParams=*/nullptr, Type(), getterParams,
-      TypeLoc::withoutLoc(storageType), storage->getDeclContext());
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
+      getterParams, Type(), TypeLoc::withoutLoc(storageType),
+      storage->getDeclContext());
   getter->setImplicit();
 
   if (storage->isGetterMutating())
@@ -187,8 +189,10 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   Type setterRetTy = TupleType::getEmpty(TC.Context);
   FuncDecl *setter = FuncDecl::create(
       TC.Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
-      Identifier(), loc, SourceLoc(), SourceLoc(), /*generic=*/nullptr, Type(),
-      params, TypeLoc::withoutLoc(setterRetTy), storage->getDeclContext());
+      Identifier(), loc, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
+      params, Type(), TypeLoc::withoutLoc(setterRetTy),
+      storage->getDeclContext());
   setter->setImplicit();
 
   if (!storage->isSetterNonMutating())
@@ -259,8 +263,9 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
 
   auto *materializeForSet = FuncDecl::create(
       ctx, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
-      Identifier(), loc, SourceLoc(), SourceLoc(), /*generic=*/nullptr, Type(),
-      params, TypeLoc::withoutLoc(retTy), DC);
+      Identifier(), loc, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
+      params, Type(), TypeLoc::withoutLoc(retTy), DC);
   materializeForSet->setImplicit();
   
   // materializeForSet is mutating and static if the setter is.
@@ -812,31 +817,35 @@ synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
   TC.typeCheckDecl(setter, false);
 }
 
-/// The specified AbstractStorageDecl was just found to satisfy a
-/// protocol property requirement.  Ensure that it has the full
-/// complement of accessors.
-void TypeChecker::synthesizeWitnessAccessorsForStorage(
-                                             AbstractStorageDecl *requirement,
-                                             AbstractStorageDecl *storage) {
+void TypeChecker::synthesizeAccessorsForStorage(AbstractStorageDecl *storage,
+                                                bool wantMaterializeForSet) {
   // If the decl is stored, convert it to StoredWithTrivialAccessors
   // by synthesizing the full set of accessors.
   if (!storage->hasAccessorFunctions()) {
     addTrivialAccessorsToStorage(storage, *this);
     return;
   }
-  
-  // Otherwise, if the requirement is settable, ensure that there's a
-  // materializeForSet function.
-  //
-  // @objc protocols don't need a materializeForSet since ObjC doesn't have
-  // that concept.
-  if (!requirement->isObjC() &&
-      requirement->getSetter() && !storage->getMaterializeForSetFunc()) {
+
+  // If we want wantMaterializeForSet, create it now.
+  if (wantMaterializeForSet && !storage->getMaterializeForSetFunc()) {
     FuncDecl *materializeForSet = addMaterializeForSet(storage, *this);
     synthesizeMaterializeForSet(materializeForSet, storage, *this);
     typeCheckDecl(materializeForSet, false);
   }
-  return;
+}
+
+/// The specified AbstractStorageDecl was just found to satisfy a
+/// protocol property requirement.  Ensure that it has the full
+/// complement of accessors.
+void TypeChecker::synthesizeWitnessAccessorsForStorage(
+                                             AbstractStorageDecl *requirement,
+                                             AbstractStorageDecl *storage) {
+  // @objc protocols don't need a materializeForSet since ObjC doesn't
+  // have that concept.
+  bool wantMaterializeForSet =
+    !requirement->isObjC() && requirement->getSetter();
+
+  synthesizeAccessorsForStorage(storage, wantMaterializeForSet);
 }
 
 void swift::synthesizeMaterializeForSet(FuncDecl *materializeForSet,
@@ -1377,16 +1386,16 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   }
   ParamLists.push_back(ParameterList::create(Context, Params));
 
-  auto *Parameter = FuncDecl::create(Context, SourceLoc(),
-                                     StaticSpellingKind::None,
-                                     SourceLoc(),
-                                     DeclName(Context, ParameterBaseName,
-                                              NameComponents),
-                                     SourceLoc(), SourceLoc(),
-                                     SourceLoc(), nullptr, SubstContextTy,
-                                     ParamLists,
-                                     TypeLoc::withoutLoc(SubstBodyResultTy),
-                                     DC);
+  auto *Parameter =
+    FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+                     /*FuncLoc=*/SourceLoc(),
+                     DeclName(Context, ParameterBaseName, NameComponents),
+                     /*NameLoc=*/SourceLoc(),
+                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                     /*AccessorKeywordLoc=*/SourceLoc(),
+                     /*GenericParams=*/nullptr, ParamLists,
+                     SubstContextTy,
+                     TypeLoc::withoutLoc(SubstBodyResultTy), DC);
 
   Parameter->setInterfaceType(SubstInterfaceTy);
   // Mark the method to be final, implicit, and private.  In a class, this
@@ -1956,9 +1965,12 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   DeclName name(context, context.Id_init, paramList);
   auto *selfParam = ParamDecl::createSelf(Loc, decl,
                                           /*static*/false, /*inout*/true);
-  auto *ctor = new (context) ConstructorDecl(name, Loc, OTK_None, SourceLoc(),
-                                             selfParam, paramList,
-                                             nullptr, SourceLoc(), decl);
+  auto *ctor =
+    new (context) ConstructorDecl(name, Loc,
+                                  OTK_None, /*FailabilityLoc=*/SourceLoc(),
+                                  /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                                  selfParam, paramList,
+                                  nullptr, decl);
 
   // Mark implicit.
   ctor->setImplicit();
@@ -2028,14 +2040,11 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                     ClassDecl *classDecl,
                                     ConstructorDecl *superclassCtor,
                                     DesignatedInitKind kind) {
-  // Determine the initializer parameters.
-  Type superInitType = superclassCtor->getInitializerInterfaceType();
-  if (superInitType->is<GenericFunctionType>() ||
-      classDecl->getGenericParamsOfContext()) {
-    // FIXME: Handle generic initializers as well.
+  // FIXME: Inheriting initializers that have their own generic parameters
+  if (superclassCtor->getGenericParams())
     return nullptr;
-  }
 
+  // Determine the initializer parameters.
   auto &ctx = tc.Context;
 
   // Create the 'self' declaration and patterns.
@@ -2045,28 +2054,70 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   OptionSet<ParameterList::CloneFlags> options = ParameterList::Implicit;
   options |= ParameterList::Inherited;
   auto *bodyParams = superclassCtor->getParameterList(1)->clone(ctx,options);
-  
-  // Create the initializer declaration.
-  auto ctor = new (ctx) ConstructorDecl(superclassCtor->getFullName(), 
-                                        classDecl->getBraces().Start,
-                                        superclassCtor->getFailability(),
-                                        SourceLoc(), selfDecl, bodyParams,
-                                        nullptr, SourceLoc(), classDecl);
+
+  // If the superclass is generic, we need to map the superclass constructor's
+  // parameter types into the generic context of our class.
+  //
+  // We might have to apply substitutions, if for example we have a declaration
+  // like 'class A : B<Int>'.
+  auto superclassTy = classDecl->getSuperclass();
+  auto *superclassDecl = superclassTy->getAnyNominal();
+  if (superclassDecl->isGenericTypeContext()) {
+    if (auto *superclassSig = superclassDecl->getGenericSignatureOfContext()) {
+      auto *moduleDecl = classDecl->getParentModule();
+      auto subs = superclassTy->gatherAllSubstitutions(
+          moduleDecl, nullptr, nullptr);
+      auto subsMap = superclassSig->getSubstitutionMap(subs);
+
+      for (auto *decl : *bodyParams) {
+        // Map the parameter type to an interface type written in terms of
+        // the superclass generic signature.
+        auto paramTy = ArchetypeBuilder::mapTypeOutOfContext(
+            superclassDecl, decl->getType());
+
+        // Apply the superclass substitutions to produce an interface
+        // type in terms of the class generic signature.
+        auto paramSubstTy = paramTy.subst(moduleDecl, subsMap, SubstOptions());
+
+        // Map it to a contextual type in terms of the class's archetypes.
+        decl->overwriteType(ArchetypeBuilder::mapTypeIntoContext(
+            classDecl, paramSubstTy));
+      }
+    }
+  }
+
+  // Create the initializer declaration, inheriting the name,
+  // failability, and throws from the superclass initializer.
+  auto ctor =
+    new (ctx) ConstructorDecl(superclassCtor->getFullName(),
+                              classDecl->getBraces().Start,
+                              superclassCtor->getFailability(),
+                              /*FailabilityLoc=*/SourceLoc(),
+                              /*Throws=*/superclassCtor->hasThrows(),
+                              /*ThrowsLoc=*/SourceLoc(),
+                              selfDecl, bodyParams,
+                              /*GenericParams=*/nullptr, classDecl);
+
   ctor->setImplicit();
   ctor->setAccessibility(std::min(classDecl->getFormalAccess(),
                                   superclassCtor->getFormalAccess()));
 
   // Make sure the constructor is only as available as its superclass's
   // constructor.
-  AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor,
-                                                        ctx);
+  AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor, ctx);
 
   // Configure 'self'.
   auto selfType = configureImplicitSelf(tc, ctor);
 
-  // Set the type of the initializer.
-  configureConstructorType(ctor, selfType, bodyParams->getType(ctx),
-                           superclassCtor->isBodyThrowing());
+  // Set the interface type of the initializer.
+  if (classDecl->isGenericTypeContext()) {
+    ctor->setGenericSignature(classDecl->getGenericSignatureOfContext());
+    tc.configureInterfaceType(ctor);
+  }
+
+  // Set the contextual type of the initializer. This will go away one day.
+  configureConstructorType(ctor, selfType, bodyParams->getType(ctx));
+
   if (superclassCtor->isObjC()) {
     // Inherit the @objc name from the superclass initializer, if it
     // has one.
@@ -2121,7 +2172,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   }
 
   Expr *superCall = new (ctx) CallExpr(ctorRef, ctorArgs, /*Implicit=*/true);
-  if (superclassCtor->isBodyThrowing()) {
+  if (superclassCtor->hasThrows()) {
     superCall = new (ctx) TryExpr(SourceLoc(), superCall, Type(),
                                   /*Implicit=*/true);
   }

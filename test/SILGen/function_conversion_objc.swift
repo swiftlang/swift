@@ -7,10 +7,10 @@ import Foundation
 // ==== Metatype to object conversions
 
 // CHECK-LABEL: sil hidden @_TF24function_conversion_objc20convMetatypeToObjectFFCSo8NSObjectMS0_T_
-func convMetatypeToObject(_ f: NSObject -> NSObject.Type) {
+func convMetatypeToObject(_ f: (NSObject) -> NSObject.Type) {
 // CHECK:         function_ref @_TTRXFo_oCSo8NSObject_dXMTS__XFo_oS__oPs9AnyObject__
 // CHECK:         partial_apply
-  let _: NSObject -> AnyObject = f
+  let _: (NSObject) -> AnyObject = f
 }
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oCSo8NSObject_dXMTS__XFo_oS__oPs9AnyObject__ : $@convention(thin) (@owned NSObject, @owned @callee_owned (@owned NSObject) -> @thick NSObject.Type) -> @owned AnyObject {
@@ -22,10 +22,10 @@ func convMetatypeToObject(_ f: NSObject -> NSObject.Type) {
 @objc protocol NSBurrito {}
 
 // CHECK-LABEL: sil hidden @_TF24function_conversion_objc31convExistentialMetatypeToObjectFFPS_9NSBurrito_PMPS0__T_
-func convExistentialMetatypeToObject(_ f: NSBurrito -> NSBurrito.Type) {
+func convExistentialMetatypeToObject(_ f: (NSBurrito) -> NSBurrito.Type) {
 // CHECK:         function_ref @_TTRXFo_oP24function_conversion_objc9NSBurrito__dXPMTPS0___XFo_oPS0___oPs9AnyObject__
 // CHECK:         partial_apply
-  let _: NSBurrito -> AnyObject = f
+  let _: (NSBurrito) -> AnyObject = f
 }
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oP24function_conversion_objc9NSBurrito__dXPMTPS0___XFo_oPS0___oPs9AnyObject__ : $@convention(thin) (@owned NSBurrito, @owned @callee_owned (@owned NSBurrito) -> @thick NSBurrito.Type) -> @owned AnyObject
@@ -89,7 +89,7 @@ class A : NSObject {}
 class B : A {}
 
 // CHECK-LABEL: sil hidden @_TF24function_conversion_objc18cFuncPtrConversionFcCS_1AT_cCS_1BT_
-func cFuncPtrConversion(_ x: @convention(c) A -> ()) -> @convention(c) B -> () {
+func cFuncPtrConversion(_ x: @convention(c) (A) -> ()) -> @convention(c) (B) -> () {
 // CHECK:         convert_function %0 : $@convention(c) (A) -> () to $@convention(c) (B) -> ()
 // CHECK:         return
   return x
@@ -98,7 +98,7 @@ func cFuncPtrConversion(_ x: @convention(c) A -> ()) -> @convention(c) B -> () {
 func cFuncPtr(_ a: A) {}
 
 // CHECK-LABEL: sil hidden @_TF24function_conversion_objc19cFuncDeclConversionFT_cCS_1BT_
-func cFuncDeclConversion() -> @convention(c) B -> () {
+func cFuncDeclConversion() -> @convention(c) (B) -> () {
 // CHECK:         function_ref @_TToF24function_conversion_objc8cFuncPtrFCS_1AT_ : $@convention(c) (A) -> ()
 // CHECK:         convert_function %0 : $@convention(c) (A) -> () to $@convention(c) (B) -> ()
 // CHECK:         return

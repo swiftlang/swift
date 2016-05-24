@@ -78,4 +78,21 @@ UIKitTests.test("UIOffset") {
   checkEquatable(offsets, oracle: { $0 == $1 })
 }
 
+class TestChildView : UIView, CustomPlaygroundQuickLookable {
+  convenience init() {
+    self.init(frame: CGRect(x: 0, y: 0, width: 10, height: 10))
+  }
+  var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text("child")
+  }
+}
+
+UIKitTests.test("CustomPlaygroundQuickLookable") {
+  switch PlaygroundQuickLook(reflecting: TestChildView()) {
+  case .text("child"): break
+  default: expectUnreachable(
+    "TestChildView custom quicklookable should have been invoked")
+  }
+}
+
 runAllTests()

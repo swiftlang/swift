@@ -133,8 +133,8 @@ extension OptionSet {
   /// Returns a new option set of the elements contained in this set, in the
   /// given set, or in both.
   ///
-  /// This example uses the `union(_:)` method to add two more shipping options to
-  /// the default set.
+  /// This example uses the `union(_:)` method to add two more shipping options
+  /// to the default set.
   ///
   ///     let defaultShipping = ShippingOptions.standard
   ///     let memberShipping = defaultShipping.union([.secondDay, .priority])
@@ -144,7 +144,6 @@ extension OptionSet {
   /// - Parameter other: An option set.
   /// - Returns: A new option set made up of the elements contained in this
   ///   set, in `other`, or in both.
-  @warn_unused_result
   public func union(_ other: Self) -> Self {
     var r: Self = Self(rawValue: self.rawValue)
     r.formUnion(other)
@@ -171,7 +170,6 @@ extension OptionSet {
   /// - Parameter other: An option set.
   /// - Returns: A new option set with only the elements contained in both this
   ///   set and `other`.
-  @warn_unused_result
   public func intersection(_ other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
     r.formIntersection(other)
@@ -184,7 +182,6 @@ extension OptionSet {
   /// - Parameter other: An option set.
   /// - Returns: A new option set with only the elements contained in either
   ///   this set or `other`, but not in both.
-  @warn_unused_result
   public func symmetricDifference(_ other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
     r.formSymmetricDifference(other)
@@ -214,31 +211,28 @@ extension OptionSet where Element == Self {
   /// - Parameter member: The element to look for in the option set.
   /// - Returns: `true` if the option set contains `member`; otherwise,
   ///   `false`.
-  @warn_unused_result
   public func contains(_ member: Self) -> Bool {
     return self.isSuperset(of: member)
   }
   
-  /// Inserts the given element into the option set if it is not already
-  /// a member.
-  /// 
+  /// Inserts the given element into the option set if it is not already a
+  /// member.
+  ///
   /// For example:
   ///
   ///     let purchasePrice = 87.55
   ///
-  ///     var freeOptions: ShippingOptions = [.standard]
+  ///     var freeOptions: ShippingOptions = [.standard, .priority]
   ///     if purchasePrice > 50 {
-  ///         freeOptions.insert(.priority)
+  ///         freeOptions.insert(.secondDay)
   ///     }
-  ///     print(freeOptions.contains(.priority))
+  ///     print(freeOptions.contains(.secondDay))
   ///     // Prints "true"
   ///
   /// - Parameter newMember: The element to insert.
-  /// - Returns: `(true, newMember)` if `e` was not contained in `self`.
-  ///   Otherwise, returns `(false, oldMember)`, where `oldMember` is the
-  ///   member of `self` equal to `newMember`.
-  ///
-  /// - Postcondition: `self.contains(newMember)`.
+  /// - Returns: `(true, newMember)` if `newMember` was not contained in
+  ///   `self`. Otherwise, returns `(false, oldMember)`, where `oldMember` is
+  ///   the member of the set equal to `newMember`.
   public mutating func insert(
     _ newMember: Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
@@ -253,27 +247,33 @@ extension OptionSet where Element == Self {
     return result
   }
   
-  /// Removes a given element if it is contained in the option set; otherwise,
-  /// removes all elements subsumed by the given element.
+  /// Removes the given element and all elements subsumed by the given element.
   ///
-  /// In the following example, removing `.express` empties the option set but
-  /// returns `nil` because the option set doesn't contain all the elements of
-  /// `.express`.
+  /// For example:
   ///
   ///     var options: ShippingOptions = [.secondDay, .priority]
   ///     let priorityOption = options.remove(.priority)
   ///     print(priorityOption == .priority)
   ///     // Prints "true"
   ///
+  ///     print(options.remove(.priority))
+  ///     // Prints "nil"
+  ///
+  /// In the following example, the `.express` element is passed to
+  /// `remove(_:)`. Although `.express` is not a member of `options`,
+  /// `.express` subsumes the remaining `.secondDay` element of the option
+  /// set. Therefore, `options` is emptied and the intersection between
+  /// `.express` and `options` is returned.
+  ///
   ///     let expressOption = options.remove(.express)
   ///     print(expressOption == .express)
   ///     // Prints "false"
-  ///     print(options.isEmpty)
+  ///     print(expressOption == .secondDay)
   ///     // Prints "true"
   ///
   /// - Parameter member: The element of the set to remove.
-  /// - Returns: `member` if it was contained in the set; otherwise, `nil`.
-  /// - Postcondition: `self.intersection([member]).isEmpty`
+  /// - Returns: The intersection of `[member]` and the set if the intersection
+  ///   was nonempty; otherwise, `nil`.
   @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
     let r = isSuperset(of: member) ? Optional(member) : nil
@@ -281,16 +281,22 @@ extension OptionSet where Element == Self {
     return r
   }
 
-  /// Inserts `e` unconditionally.
+  /// Inserts the given element into the set.
   ///
-  /// - Returns: a former member `r` of `self` such that
-  ///   `self.intersection([e]) == [r]` if `self.intersection([e])` was
-  ///   non-empty.  Returns `nil` otherwise.
+  /// If `newMember` is not contained in the set but subsumes current members
+  /// of the set, the subsumed members are returned.
   ///
-  /// - Postcondition: `self.contains(e)`
-  public mutating func update(with e: Element) -> Element? {
-    let r = self.intersection(e)
-    self.formUnion(e)
+  ///     var options: ShippingOptions = [.secondDay, .priority]
+  ///     let replaced = options.update(with: .express)
+  ///     print(replaced == .secondDay)
+  ///     // Prints "true"
+  ///
+  /// - Returns: The intersection of `[newMember]` and the set if the
+  ///   intersection was nonempty; otherwise, `nil`.
+  @discardableResult
+  public mutating func update(with newMember: Element) -> Element? {
+    let r = self.intersection(newMember)
+    self.formUnion(newMember)
     return r.isEmpty ? nil : r
   }
 }
@@ -321,11 +327,10 @@ extension OptionSet where RawValue : BitwiseOperations {
 
   /// Inserts the elements of another set into this option set.
   ///
-  /// This method is implemented as a bitwise `OR` (`|`) operation on the
+  /// This method is implemented as a `|` (bitwise OR) operation on the
   /// two sets' raw values.
   ///
   /// - Parameter other: An option set.
-  /// - Postcondition: `self.isSuperset(of: other)`
   public mutating func formUnion(_ other: Self) {
     self = Self(rawValue: self.rawValue | other.rawValue)
   }
@@ -333,11 +338,10 @@ extension OptionSet where RawValue : BitwiseOperations {
   /// Removes all elements of this option set that are not 
   /// also present in the given set.
   ///
-  /// This method is implemented as a bitwise `AND` (`&`) operation on the
+  /// This method is implemented as a `&` (bitwise AND) operation on the
   /// two sets' raw values.
   ///
   /// - Parameter other: An option set.
-  /// - Postcondition: `self.isSubset(of: other)`
   public mutating func formIntersection(_ other: Self) {
     self = Self(rawValue: self.rawValue & other.rawValue)
   }
@@ -345,8 +349,8 @@ extension OptionSet where RawValue : BitwiseOperations {
   /// Replaces this set with a new set containing all elements 
   /// contained in either this set or the given set, but not in both.
   ///
-  /// This method is implemented as a bitwise `XOR` (`^`)
-  /// operation on the two sets' raw values.
+  /// This method is implemented as a `^` (bitwise XOR) operation on the two
+  /// sets' raw values.
   ///
   /// - Parameter other: An option set.
   public mutating func formSymmetricDifference(_ other: Self) {

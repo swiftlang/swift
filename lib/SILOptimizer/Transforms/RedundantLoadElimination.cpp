@@ -1487,13 +1487,26 @@ bool RLEContext::run() {
   // Finally, perform the redundant load replacements.
   llvm::DenseSet<SILInstruction *> InstsToDelete;
   bool SILChanged = false;
-  for (auto &X : BBToLocState) {
-    for (auto &F : X.second.getRL()) {
-      DEBUG(llvm::dbgs() << "Replacing  " << SILValue(F.first) << "With "
-                         << F.second);
+  for (auto &B : *Fn) {
+    auto &State = BBToLocState[&B];
+    auto &Loads = State.getRL();
+    // Nothing to forward.
+    if (Loads.empty())
+      continue;
+    // We iterate the instructions in the basic block in a deterministic order
+    // and use this order to perform the load forwarding. 
+    //
+    // NOTE: we could end up with different SIL depending on the ordering load
+    // forwarding is performed.
+    for (auto I = B.rbegin(), E = B.rend(); I != E; ++I) {
+      auto Iter = Loads.find(&*I);
+      if (Iter == Loads.end())
+        continue;
+      DEBUG(llvm::dbgs() << "Replacing  " << SILValue(Iter->first) << "With "
+            << Iter->second);
       SILChanged = true;
-      F.first->replaceAllUsesWith(F.second);
-      InstsToDelete.insert(F.first);
+      Iter->first->replaceAllUsesWith(Iter->second);
+      InstsToDelete.insert(Iter->first);
       ++NumForwardedLoads;
     }
   }

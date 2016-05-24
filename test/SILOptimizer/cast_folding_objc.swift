@@ -10,16 +10,6 @@
 
 import Foundation
 
-// FIXME: Should go into the standard library.
-public extension _ObjectiveCBridgeable {
-  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
-      -> Self {
-    var result: Self? = nil
-    _forceBridgeFromObjectiveC(source!, result: &result)
-    return result!
-  }
-}
-
 class ObjCX : NSObject {}
 
 struct CX: _ObjectiveCBridgeable {
@@ -35,6 +25,13 @@ struct CX: _ObjectiveCBridgeable {
 
   static func _conditionallyBridgeFromObjectiveC(_ source: ObjCX, result: inout CX?) -> Bool {
     return false
+  }
+
+  static func _unconditionallyBridgeFromObjectiveC(_ source: ObjCX?)
+      -> CX {
+    var result: CX? = nil
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
   }
 }
 

@@ -1,4 +1,4 @@
-//===--- LazyCollection.swift.gyb -----------------------------------------===//
+//===--- LazyCollection.swift.gyb -----------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -94,6 +94,7 @@ extension ${Self} : Sequence {
     return _base._copyToNativeArrayBuffer()
   }
   
+  @discardableResult
   public func _copyContents(
     initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
   ) -> UnsafeMutablePointer<Base.Iterator.Element> {
@@ -115,11 +116,11 @@ extension ${Self} : ${TraversalCollection} {
     return _base.startIndex
   }
   
-  /// The collection's "past the end" position.
+  /// The collection's "past the end" position---that is, the position one
+  /// greater than the last valid subscript argument.
   ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
-  /// `index(after:)`.
+  /// `endIndex` is always reachable from `startIndex` by zero or more
+  /// applications of `index(after:)`.
   public var endIndex: Base.Index {
     return _base.endIndex
   }
@@ -129,7 +130,6 @@ extension ${Self} : ${TraversalCollection} {
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(after i: Base.Index) -> Base.Index {
     return _base.index(after: i)
   }
@@ -182,13 +182,11 @@ extension ${Self} : ${TraversalCollection} {
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(_ i: Index, offsetBy n: Base.IndexDistance) -> Index {
     return _base.index(i, offsetBy: n)
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func index(
     _ i: Index, offsetBy n: Base.IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -196,14 +194,12 @@ extension ${Self} : ${TraversalCollection} {
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @warn_unused_result
   public func distance(from start: Index, to end: Index) -> Base.IndexDistance {
     return _base.distance(from:start, to: end)
   }
 
 %   if Traversal != 'Forward':
 
-  @warn_unused_result
   public func index(before i: Base.Index) -> Base.Index {
     return _base.index(before: i)
   }

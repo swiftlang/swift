@@ -28,6 +28,7 @@ a.f(1,b: 2)
 var b : Int = SInt.f(1)
 
 struct S2<T> {
+  @discardableResult
   static func f() -> T {
     S2.f()
   }
@@ -191,7 +192,7 @@ func useNested(_ ii: Int, hni: HasNested<Int>,
   typealias InnerF = HasNested<Float>.Inner
   var innerF : InnerF = innerI // expected-error{{cannot convert value of type 'InnerI' (aka 'HasNested<Int>.Inner') to specified type 'InnerF' (aka 'HasNested<Float>.Inner')}}
 
-  innerI.identity(i)
+  _ = innerI.identity(i)
   i = innerI.identity(i)
 
   // Generic function in a generic class
@@ -312,9 +313,7 @@ var y: X5<X4, Int> // expected-error{{'X5' requires the types 'AssocP' (aka 'Int
 
 // Recursive generic signature validation.
 class Top {}
-class Bottom<T : Bottom<Top>> {} // expected-error 2{{type may not reference itself as a requirement}}
-// expected-error@-1{{Bottom' requires that 'Top' inherit from 'Bottom<Top>'}}
-// expected-note@-2{{requirement specified as 'T' : 'Bottom<Top>' [with T = Top]}}
+class Bottom<T : Bottom<Top>> {} // expected-error {{type may not reference itself as a requirement}}
 
 class X6<T> {
   let d: D<T>

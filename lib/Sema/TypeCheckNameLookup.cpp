@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/Basic/TopCollection.h"
 #include <algorithm>
 
 using namespace swift;
@@ -237,7 +238,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
                                        Type type, DeclName name,
                                        NameLookupOptions options) {
   LookupResult result;
-  unsigned subOptions = NL_QualifiedDefault;
+  NLOptions subOptions = NL_QualifiedDefault;
   if (options.contains(NameLookupFlags::KnownPrivate))
     subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::DynamicLookup))
@@ -326,7 +327,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
          
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
-  unsigned subOptions = NL_QualifiedDefault;
+  NLOptions subOptions = NL_QualifiedDefault;
   if (options.contains(NameLookupFlags::KnownPrivate))
     subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::ProtocolMembers))
@@ -414,4 +415,155 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 LookupResult TypeChecker::lookupConstructors(DeclContext *dc, Type type,
                                              NameLookupOptions options) {
   return lookupMember(dc, type, Context.Id_init, options);
+}
+
+enum : unsigned {
+  /// Never consider a candidate that's this distance away or worse.
+  UnreasonableCallEditDistance = 8,
+
+  /// Don't consider candidates that score worse than the given distance
+  /// from the best candidate.
+  MaxCallEditDistanceFromBestCandidate = 1
+};
+
+static unsigned getCallEditDistance(DeclName argName, DeclName paramName,
+                                    unsigned maxEditDistance) {
+  // TODO: consider arguments.
+  // TODO: maybe ignore certain kinds of missing / present labels for the
+  //   first argument label?
+  // TODO: word-based rather than character-based?
+  StringRef argBase = argName.getBaseName().str();
+  StringRef paramBase = paramName.getBaseName().str();
+
+  unsigned distance = argBase.edit_distance(paramBase, maxEditDistance);
+
+  // Bound the distance to UnreasonableCallEditDistance.
+  if (distance >= maxEditDistance ||
+      distance > (paramBase.size() + 2) / 3) {
+    return UnreasonableCallEditDistance;
+  }
+
+  return distance;
+}
+
+static bool isPlausibleTypo(DeclRefKind refKind, DeclName typedName,
+                            ValueDecl *candidate) {
+  // Ignore anonymous declarations.
+  if (!candidate->hasName())
+    return false;
+
+  // An operator / identifier mismatch is never a plausible typo.
+  auto fn = dyn_cast<FuncDecl>(candidate);
+  if (typedName.isOperator() != (fn && fn->isOperator()))
+    return false;
+  if (!typedName.isOperator())
+    return true;
+
+  // TODO: honor ref kind?  This is trickier than it sounds because we
+  // may not have processed attributes and types on the candidate yet.
+  return true;
+}
+
+static bool isLocInVarInit(TypeChecker &TC, VarDecl *var, SourceLoc loc) {
+  auto binding = var->getParentPatternBinding();
+  if (!binding || binding->isImplicit())
+    return false;
+
+  auto initRange = binding->getSourceRange();
+  return TC.Context.SourceMgr.rangeContainsTokenLoc(initRange, loc);
+}
+
+namespace {
+  class TypoCorrectionResolver : public DelegatingLazyResolver {
+    TypeChecker &TC() { return static_cast<TypeChecker&>(Principal); }
+    SourceLoc NameLoc;
+  public:
+    TypoCorrectionResolver(TypeChecker &TC, SourceLoc nameLoc)
+      : DelegatingLazyResolver(TC), NameLoc(nameLoc) {}
+
+    void resolveDeclSignature(ValueDecl *VD) override {
+      if (VD->isInvalid() || VD->hasType()) return;
+
+      // Don't process a variable if we're within its initializer.
+      if (auto var = dyn_cast<VarDecl>(VD)) {
+        if (isLocInVarInit(TC(), var, NameLoc))
+          return;
+      }
+
+      DelegatingLazyResolver::resolveDeclSignature(VD);
+    }
+  };
+}
+
+void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
+                                        DeclName targetDeclName,
+                                        SourceLoc nameLoc,
+                                        NameLookupOptions lookupOptions,
+                                        LookupResult &result,
+                                        unsigned maxResults) {
+  // Fill in a collection of the most reasonable entries.
+  TopCollection<unsigned, ValueDecl*> entries(maxResults);
+  auto consumer = makeDeclConsumer([&](ValueDecl *decl,
+                                       DeclVisibilityKind reason) {
+    // Never match an operator with an identifier or vice-versa; this is
+    // not a plausible typo.
+    if (!isPlausibleTypo(refKind, targetDeclName, decl))
+      return;
+
+    // Don't suggest a variable within its own initializer.
+    if (auto var = dyn_cast<VarDecl>(decl)) {
+      if (isLocInVarInit(*this, var, nameLoc))
+        return;
+    }
+
+    // Don't waste time computing edit distances that are more than
+    // the worst in our collection.
+    unsigned maxDistance =
+      entries.getMinUninterestingScore(UnreasonableCallEditDistance);
+
+    unsigned distance =
+      getCallEditDistance(targetDeclName, decl->getFullName(), maxDistance);
+
+    // Ignore values that are further than a reasonable distance.
+    if (distance >= UnreasonableCallEditDistance)
+      return;
+
+    entries.insert(distance, std::move(decl));
+  });
+
+  TypoCorrectionResolver resolver(*this, nameLoc);
+  lookupVisibleDecls(consumer, DC, &resolver, /*top level*/ true, nameLoc);
+
+  // Impose a maximum distance from the best score.
+  entries.filterMaxScoreRange(MaxCallEditDistanceFromBestCandidate);
+
+  for (auto &entry : entries)
+    result.add({ entry.Value, nullptr });
+}
+
+static InFlightDiagnostic
+diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    // Suggest 'self' at the use point instead of pointing at the start
+    // of the function.
+    if (var->isSelfParameter())
+      return tc.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
+                         decl->getName().str());
+  }
+
+  return tc.diagnose(decl, diag::note_typo_candidate, decl->getName().str());
+}
+
+void TypeChecker::noteTypoCorrection(DeclName writtenName, DeclNameLoc loc,
+                                     const LookupResult::Result &suggestion) {
+  auto decl = suggestion.Decl;
+  auto &&diagnostic = diagnoseTypoCorrection(*this, loc, decl);
+
+  DeclName declName = decl->getFullName();
+
+  if (writtenName.getBaseName() != declName.getBaseName())
+    diagnostic.fixItReplace(loc.getBaseNameLoc(), declName.getBaseName().str());
+
+  // TODO: add fix-its for typo'ed argument labels.  This is trickier
+  // because of the reordering rules.
 }

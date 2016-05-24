@@ -84,6 +84,21 @@ bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) 
   llvm_unreachable("bad DeclKind");
 }
 
+bool DeclAttributes::isUnavailableInCurrentSwift() const {
+  for (auto attr : *this) {
+    if (auto available = dyn_cast<AvailableAttr>(attr)) {
+      if (available->isInvalid())
+        continue;
+
+      if (available->getUnconditionalAvailability() ==
+            UnconditionalAvailabilityKind::UnavailableInCurrentSwift)
+        return true;
+    }
+  }
+
+  return false;
+}
+
 const AvailableAttr *DeclAttributes::getUnavailable(
                           const ASTContext &ctx) const {
   const AvailableAttr *conditional = nullptr;
@@ -703,6 +718,7 @@ bool AvailableAttr::isUnconditionallyUnavailable() const {
 
   case UnconditionalAvailabilityKind::Unavailable:
   case UnconditionalAvailabilityKind::UnavailableInSwift:
+  case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
     return true;
   }
 }
@@ -712,6 +728,7 @@ bool AvailableAttr::isUnconditionallyDeprecated() const {
   case UnconditionalAvailabilityKind::None:
   case UnconditionalAvailabilityKind::Unavailable:
   case UnconditionalAvailabilityKind::UnavailableInSwift:
+  case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
     return false;
 
   case UnconditionalAvailabilityKind::Deprecated:

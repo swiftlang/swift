@@ -6,7 +6,7 @@ var zero = 0
 
 // <rdar://problem/15921334>
 // CHECK-LABEL: sil hidden @_TF8closures46return_local_generic_function_without_captures{{.*}} : $@convention(thin) <A, R> () -> @owned @callee_owned (@in A) -> @out R {
-func return_local_generic_function_without_captures<A, R>() -> A -> R {
+func return_local_generic_function_without_captures<A, R>() -> (A) -> R {
   func f(_: A) -> R {
     Builtin.int_trap()
   }
@@ -16,7 +16,7 @@ func return_local_generic_function_without_captures<A, R>() -> A -> R {
   return f
 }
 
-func return_local_generic_function_with_captures<A, R>(_ a: A) -> A -> R {
+func return_local_generic_function_with_captures<A, R>(_ a: A) -> (A) -> R {
   func f(_: A) -> R {
     _ = a
   }

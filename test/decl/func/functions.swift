@@ -92,8 +92,8 @@ func parenPatternInArg((a): Int) -> Int { // expected-error {{expected parameter
 }
 parenPatternInArg(0)  // expected-error {{argument passed to call that takes no arguments}}
 
-var nullaryClosure: Int -> Int = {_ in 0}
-nullaryClosure(0)
+var nullaryClosure: (Int) -> Int = {_ in 0}
+_ = nullaryClosure(0)
 
 
 // rdar://16737322 - This argument is an unnamed argument that has a labeled
@@ -132,7 +132,7 @@ infix operator !!! {}
 
 func !!!<T>(lhs: Array<T>, rhs: Array<T>) -> Bool { return false }
 func !!!<T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool { return false }
-[1] !!! [1]   // unambiguously picking the array overload.
+_ = [1] !!! [1]   // unambiguously picking the array overload.
 
 
 // <rdar://problem/16786168> Functions currently permit 'var inout' parameters

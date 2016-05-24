@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-struct X { }
+struct X { } // expected-note * {{did you mean 'X'?}}
 
 // Simple examples
 struct X1 {
@@ -136,7 +136,7 @@ subscript(i: Int) -> Int { // expected-error{{'subscript' functions may only be 
   get {}
 }
 
-func f() {
+func f() {  // expected-note * {{did you mean 'f'?}}
   subscript (i: Int) -> Int { // expected-error{{'subscript' functions may only be declared within a type}}
     get {}
   }

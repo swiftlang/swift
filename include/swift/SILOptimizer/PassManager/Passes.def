@@ -69,6 +69,8 @@ PASS(ComputeDominanceInfo, "compute-dominance-info",
 PASS(ComputeLoopInfo, "compute-loop-info",
      "Utility pass that computes loop info for all functions in order to help "
      "test loop info updating")
+PASS(ConditionForwarding, "condition-forwarding",
+     "Forward conditional branch instructions")
 PASS(CopyForwarding, "copy-forwarding",
      "Eliminate redundant copies")
 PASS(EpilogueRetainReleaseMatcherDumper, "sil-epilogue-retain-release-dumper",

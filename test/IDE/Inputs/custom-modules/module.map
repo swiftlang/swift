@@ -16,6 +16,11 @@ module Newtype {
   header "Newtype.h"
 }
 
+module NewtypeObjC {
+  header "NewtypeObjC.h"
+  export *
+}
+
 module ImportAsMember {
   export *
 

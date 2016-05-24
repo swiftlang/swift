@@ -212,6 +212,19 @@ Swift 3.0
     }
     ```
 
+* [SE-0064](https://github.com/apple/swift-evolution/blob/master/proposals/0064-property-selectors.md) The Objective-C selectors for the getter or setter of a property can now be referenced with `#selector`. For example:
+
+    ```swift
+    let sel1 = #selector(getter: UIView.backgroundColor) // sel1 has type Selector
+    let sel2 = #selector(setter: UIView.backgroundColor) // sel2 has type Selector
+    ```
+
+* [SE-0062](https://github.com/apple/swift-evolution/blob/master/proposals/0062-objc-keypaths.md): A key-path can now be formed with `#keyPath`. For example:
+
+    ```swift
+    person.valueForKeyPath(#keyPath(Person.bestFriend.lastName))
+    ```
+
 Swift 2.2
 ---------
 

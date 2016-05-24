@@ -115,3 +115,20 @@ func errorHandler(_ e: ErrorProtocol) throws -> ErrorProtocol {
 //
   return try e.returnOrThrowSelf()
 }
+
+
+// rdar://problem/22003864 -- SIL verifier crash when init_existential_addr
+// references dynamic Self type
+class EraseDynamicSelf {
+  required init() {}
+
+// CHECK-LABEL: sil hidden @_TZFC19existential_erasure16EraseDynamicSelf7factoryfT_DS0_ : $@convention(method) (@thick EraseDynamicSelf.Type) -> @owned EraseDynamicSelf
+// CHECK:  [[ANY:%.*]] = alloc_stack $protocol<>
+// CHECK:  init_existential_addr [[ANY]] : $*protocol<>, $Self
+//
+  class func factory() -> Self {
+    let instance = self.init()
+    let _: Any = instance
+    return instance
+  }
+}

@@ -64,13 +64,12 @@ namespace clang {
   template <class> class CanQual;
   class CodeGenerator;
   class Decl;
+  class GlobalDecl;
   class Type;
   namespace CodeGen {
-    class CodeGenABITypes;
     class CGFunctionInfo;
   }
 }
-using clang::CodeGen::CodeGenABITypes;
 
 namespace swift {
   class ArchetypeBuilder;
@@ -361,9 +360,6 @@ public:
   const SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
   IRGenDebugInfo *DebugInfo;
-  /// A Clang-to-IR-type converter for types appearing in function
-  /// signatures of Objective-C methods and C functions.
-  CodeGenABITypes *ABITypes;
 
   /// A global variable which stores the hash of the module. Used for
   /// incremental compilation.
@@ -629,8 +625,11 @@ public:
   void emitBuiltinReflectionMetadata();
   llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
   llvm::Constant *getAddrOfFieldName(StringRef Name);
-  llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &SILFn,
-                                             HeapLayout &Layout);
+  llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
+                                             CanSILFunctionType origCalleeType,
+                                             CanSILFunctionType substCalleeType,
+                                             ArrayRef<Substitution> subs,
+                                             HeapLayout &layout);
   std::string getBuiltinTypeMetadataSectionName();
   std::string getFieldTypeMetadataSectionName();
   std::string getAssociatedTypeMetadataSectionName();
@@ -644,6 +643,9 @@ public:
                         llvm::function_ref<void(IRGenFunction &IGF)> generate);
 
 private:
+  llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
+                                           ForDefinition_t forDefinition);
+
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
@@ -783,7 +785,12 @@ public:
 
   void emitSourceFile(SourceFile &SF, unsigned StartElem);
   void addLinkLibrary(const LinkLibrary &linkLib);
-  void finalize();
+
+  /// Attempt to finalize the module.
+  ///
+  /// This can fail, in which it will return false and the module will be
+  /// invalid.
+  bool finalize();
 
   llvm::AttributeSet constructInitialAttributes();
 
@@ -800,7 +807,7 @@ public:
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
 
   void emitNestedTypeDecls(DeclRange members);
-  void emitClangDecl(clang::Decl *decl);
+  void emitClangDecl(const clang::Decl *decl);
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
@@ -946,7 +953,6 @@ public:
   void emitTypeVerifier();
 private:
   void emitGlobalDecl(Decl *D);
-  void emitExternalDefinition(Decl *D);
 };
 
 /// Stores a pointer to an IRGenModule.

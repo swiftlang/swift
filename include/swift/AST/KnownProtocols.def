@@ -62,6 +62,7 @@ PROTOCOL_(BridgedNSError)
 
 PROTOCOL_(ObjectiveCBridgeable)
 PROTOCOL_(DestructorSafeContainer)
+PROTOCOL_(SwiftNewtypeWrapper)
 
 LITERAL_CONVERTIBLE_PROTOCOL(ArrayLiteralConvertible)
 LITERAL_CONVERTIBLE_PROTOCOL(BooleanLiteralConvertible)

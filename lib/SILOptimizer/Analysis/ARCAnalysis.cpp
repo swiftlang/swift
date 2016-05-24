@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-arc-analysis"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -721,8 +722,8 @@ void
 ConsumedArgToEpilogueReleaseMatcher::
 processMatchingReleases() {
   llvm::DenseSet<SILArgument *> ArgToRemove;
-  // If we can not find a releases for all parts with reference semantics
-  // that means we did not find all release for the base.
+  // If we can not find a release for all parts with reference semantics
+  // that means we did not find all releases for the base.
   for (auto Arg : ArgInstMap) {
     // If an argument has a single release and it is rc-identical to the
     // SILArgument. Then we do not need to use projection to check for whether
@@ -1023,4 +1024,129 @@ bool swift::isARCInertTrapBB(const SILBasicBlock *BB) {
   // Otherwise, we have an unreachable and every instruction is inert from an
   // ARC perspective in an unreachable BB.
   return true;
+}
+
+//===----------------------------------------------------------------------===//
+//             Analysis of builtin "unsafeGuaranteed" instructions
+//===----------------------------------------------------------------------===//
+std::pair<SILInstruction *, SILInstruction *>
+swift::getSingleUnsafeGuaranteedValueResult(BuiltinInst *BI) {
+  assert(BI->getBuiltinKind() &&
+         *BI->getBuiltinKind() == BuiltinValueKind::UnsafeGuaranteed &&
+         "Expecting a unsafeGuaranteed builtin");
+
+  SILInstruction *GuaranteedValue = nullptr;
+  SILInstruction *Token = nullptr;
+
+  auto Failed = std::make_pair(nullptr, nullptr);
+
+  for (auto *Operand : getNonDebugUses(BI)) {
+    auto *Usr = Operand->getUser();
+    if (isa<ReleaseValueInst>(Usr) || isa<RetainValueInst>(Usr))
+      continue;
+
+    auto *TE = dyn_cast<TupleExtractInst>(Usr);
+    if (!TE || TE->getOperand() != BI)
+      return Failed;
+
+    if (TE->getFieldNo() == 0 && !GuaranteedValue) {
+      GuaranteedValue = TE;
+      continue;
+    }
+    if (TE->getFieldNo() == 1 && !Token) {
+      Token = TE;
+      continue;
+    }
+    return Failed;
+  }
+
+  if (!GuaranteedValue || !Token)
+    return Failed;
+
+  return std::make_pair(GuaranteedValue, Token);
+}
+
+BuiltinInst *swift::getUnsafeGuaranteedEndUser(SILInstruction *UnsafeGuaranteedToken) {
+  BuiltinInst *UnsafeGuaranteedEndI = nullptr;
+
+  for (auto *Operand : getNonDebugUses(UnsafeGuaranteedToken)) {
+    if (UnsafeGuaranteedEndI) {
+      DEBUG(llvm::dbgs() << "  multiple unsafeGuaranteedEnd users\n");
+      UnsafeGuaranteedEndI = nullptr;
+      break;
+    }
+    auto *BI = dyn_cast<BuiltinInst>(Operand->getUser());
+    if (!BI || !BI->getBuiltinKind() ||
+        *BI->getBuiltinKind() != BuiltinValueKind::UnsafeGuaranteedEnd) {
+      DEBUG(llvm::dbgs() << "  wrong unsafeGuaranteed token user "
+            << *Operand->getUser());
+      break;
+    }
+
+    UnsafeGuaranteedEndI = BI;
+  }
+  return UnsafeGuaranteedEndI;
+}
+
+static bool hasUnsafeGuaranteedOperand(SILValue UnsafeGuaranteedValue,
+                                       SILValue UnsafeGuaranteedValueOperand,
+                                       RCIdentityFunctionInfo &RCII,
+                                       SILInstruction &Release) {
+  assert(isa<StrongReleaseInst>(Release) ||
+         isa<ReleaseValueInst>(Release) && "Expecting a release");
+
+  auto RCRoot = RCII.getRCIdentityRoot(Release.getOperand(0));
+
+  return RCRoot == UnsafeGuaranteedValue ||
+         RCRoot == UnsafeGuaranteedValueOperand;
+}
+
+SILInstruction *swift::findReleaseToMatchUnsafeGuaranteedValue(
+    SILInstruction *UnsafeGuaranteedEndI, SILInstruction *UnsafeGuaranteedI,
+    SILValue UnsafeGuaranteedValue, SILBasicBlock &BB,
+    RCIdentityFunctionInfo &RCFI) {
+
+  auto UnsafeGuaranteedRoot = RCFI.getRCIdentityRoot(UnsafeGuaranteedValue);
+  auto UnsafeGuaranteedOpdRoot =
+      RCFI.getRCIdentityRoot(UnsafeGuaranteedI->getOperand(0));
+
+  // Look before the "unsafeGuaranteedEnd".
+  for (auto ReverseIt = SILBasicBlock::reverse_iterator(
+                UnsafeGuaranteedEndI->getIterator()),
+            End = BB.rend();
+       ReverseIt != End; ++ReverseIt) {
+    SILInstruction &CurInst = *ReverseIt;
+
+    // Is this a release?
+    if (isa<ReleaseValueInst>(CurInst) || isa<StrongReleaseInst>(CurInst)) {
+      if (hasUnsafeGuaranteedOperand(UnsafeGuaranteedRoot,
+                                     UnsafeGuaranteedOpdRoot, RCFI, CurInst))
+        return &CurInst;
+      continue;
+    }
+
+    if (CurInst.mayHaveSideEffects() && !isa<DebugValueInst>(CurInst) &&
+        !isa<DebugValueAddrInst>(CurInst))
+      break;
+  }
+
+  // Otherwise, try finding it after the "unsafeGuaranteedEnd".
+  for (auto ForwardIt = std::next(UnsafeGuaranteedEndI->getIterator()),
+            End = BB.end();
+       ForwardIt != End; ++ForwardIt) {
+    SILInstruction &CurInst = *ForwardIt;
+
+    // Is this a release?
+    if (isa<ReleaseValueInst>(CurInst) || isa<StrongReleaseInst>(CurInst)) {
+      if (hasUnsafeGuaranteedOperand(UnsafeGuaranteedRoot,
+                                     UnsafeGuaranteedOpdRoot, RCFI, CurInst))
+        return &CurInst;
+      continue;
+    }
+
+    if (CurInst.mayHaveSideEffects() && !isa<DebugValueInst>(CurInst) &&
+        !isa<DebugValueAddrInst>(CurInst))
+      break;
+  }
+  return nullptr;
 }

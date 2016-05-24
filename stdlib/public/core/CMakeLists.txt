@@ -50,8 +50,8 @@ set(SWIFTLIB_ESSENTIAL
   FlatMap.swift
   Flatten.swift.gyb
   FloatingPoint.swift.gyb
-  FloatingPointOperations.swift.gyb
   FloatingPointParsing.swift.gyb
+  FloatingPointTypes.swift.gyb
   HashedCollections.swift.gyb
   Hashing.swift
   HeapBuffer.swift
@@ -70,6 +70,7 @@ set(SWIFTLIB_ESSENTIAL
   Mirrors.swift.gyb
   Misc.swift
   MutableCollection.swift
+  NewtypeWrapper.swift.gyb
   ObjCMirrors.swift
   Optional.swift
   OptionSet.swift
@@ -113,6 +114,7 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeScalar.swift
   UnicodeTrie.swift.gyb
   Unmanaged.swift
+  UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
   UnsafePointer.swift.gyb
   WriteBackMutableSlice.swift

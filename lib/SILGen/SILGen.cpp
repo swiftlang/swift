@@ -1309,6 +1309,10 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
   SourceFileScope scope(*this, sf);
   for (Decl *D : llvm::makeArrayRef(sf->Decls).slice(startElem))
     visit(D);
+
+  // Mark any conformances as "used".
+  for (auto conformance : sf->getUsedConformances())
+    useConformance(ProtocolConformanceRef(conformance));
 }
 
 //===----------------------------------------------------------------------===//

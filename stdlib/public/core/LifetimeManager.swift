@@ -30,9 +30,16 @@ public func withExtendedLifetime<T, Result>(
 
 extension String {
 
-  /// Invoke `f` on the contents of this string, represented as
-  /// a nul-terminated array of char, ensuring that the array's
-  /// lifetime extends through the execution of `f`.
+  /// Invokes the given closure on the contents of the string, represented as a
+  /// pointer to a null-terminated sequence of UTF-8 code units.
+  ///
+  /// The `withCString(_:)` method ensures that the sequence's lifetime extends
+  /// through the execution of `f`.
+  ///
+  /// - Parameter f: A closure that takes a pointer to the string's UTF-8 code
+  ///   unit sequence as its sole argument. If the closure has a return value,
+  ///   it is used as the return value of the `withCString(_:)` method.
+  /// - Returns: The return value of the `f` closure, if any.
   public func withCString<Result>(
     _ f: @noescape (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {

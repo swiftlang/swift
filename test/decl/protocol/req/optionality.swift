@@ -7,7 +7,7 @@
 // Parameters of IUO type.
 // ------------------------------------------------------------------------
 @objc protocol ParameterIUO1 {
-  optional func f0(_ x: C1!)
+  @objc optional func f0(_ x: C1!)
 }
 
 @objc class ParameterIUO1a : ParameterIUO1 {
@@ -27,7 +27,7 @@
 // ------------------------------------------------------------------------
 
 @objc protocol ParameterOpt1 {
-  optional func f0(_ x: C1?) // expected-note 2{{declared here}}
+  @objc optional func f0(_ x: C1?) // expected-note 2{{declared here}}
 }
 
 @objc class ParameterOpt1a : ParameterOpt1 {
@@ -46,7 +46,7 @@
 // Parameters of non-optional type.
 // ------------------------------------------------------------------------
 @objc protocol ParameterNonOpt1 {
-  optional func f0(_ x: C1) // expected-note 2{{declared here}}
+  @objc optional func f0(_ x: C1) // expected-note 2{{declared here}}
 }
 
 @objc class ParameterNonOpt1a : ParameterNonOpt1 {
@@ -65,7 +65,7 @@
 // Result of IUO type.
 // ------------------------------------------------------------------------
 @objc protocol ResultIUO1 {
-  optional func f0() -> C1!
+  @objc optional func f0() -> C1!
 }
 
 @objc class ResultIUO1a : ResultIUO1 {
@@ -84,7 +84,7 @@
 // Result of optional type.
 // ------------------------------------------------------------------------
 @objc protocol ResultOpt1 {
-  optional func f0() -> C1? // expected-note 2{{declared here}}
+  @objc optional func f0() -> C1? // expected-note 2{{declared here}}
 }
 
 @objc class ResultOpt1a : ResultOpt1 {
@@ -103,7 +103,7 @@
 // Result of non-optional type.
 // ------------------------------------------------------------------------
 @objc protocol ResultNonOpt1 {
-  optional func f0() -> C1 // expected-note 2 {{declared here}}
+  @objc optional func f0() -> C1 // expected-note 2 {{declared here}}
 }
 
 @objc class ResultNonOpt1a : ResultNonOpt1 {
@@ -122,7 +122,7 @@
 // Multiple parameter mismatches
 // ------------------------------------------------------------------------
 @objc protocol MultiParamsOpt1 {
-  optional func f0(_ x: C1?, y: C1) // expected-note{{here}}
+  @objc optional func f0(_ x: C1?, y: C1) // expected-note{{here}}
 }
 
 @objc class MultiParamsOpt1a : MultiParamsOpt1 {
@@ -133,7 +133,7 @@
 // Parameter and result type mismatches
 // ------------------------------------------------------------------------
 @objc protocol ParamAndResult1 {
-  optional func f0(_ x: C1?) -> C1 // expected-note{{here}}
+  @objc optional func f0(_ x: C1?) -> C1 // expected-note{{here}}
 }
 
 @objc class ParamAndResult1a : ParamAndResult1 {

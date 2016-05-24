@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -parse -import-objc-header %S/Inputs/custom-modules/CollisionImportAsMember.h -I %t -I %S/Inputs/custom-modules %s -enable-infer-import-as-member -verify
 // RUN: FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
 
+// REQUIRES: objc_interop
+
 import InferImportAsMember
 let mine = IAMStruct1()
 
@@ -83,7 +85,7 @@ let mine = IAMStruct1()
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension IAMMutableStruct1 {
 // PRINT-NEXT:    init(with withIAMStruct1: IAMStruct1)
-// PRINT-NEXT:    init(withURL url: UnsafePointer<Int8>!)
+// PRINT-NEXT:    init(url url: UnsafePointer<Int8>!)
 // PRINT-NEXT:    func doSomething()
 // PRINT-NEXT:  }
 //
@@ -93,16 +95,12 @@ let mine = IAMStruct1()
 // PRINT-NEXT:    init(x x: Double)
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension TDStruct {
-// PRINT-NEXT:    init(with Float: Float)
+// PRINT-NEXT:    init(float Float: Float)
 // PRINT-NEXT:  }
 //
 // PRINT-LABEL: /// Class
 // PRINT-NEXT:  class IAMClass {
 // PRINT-NEXT:  }
-//
-// PRINT-LABEL: /// Class
-// PRINT-NEXT:  @available(*, unavailable, renamed: "IAMClass", message: "Not available in Swift")
-// PRINT-NEXT:  typealias IAMClassRef = IAMClass
 // PRINT-NEXT:  typealias IAMOtherName = IAMClass
 // PRINT-NEXT:  extension IAMClass {
 // PRINT-NEXT:    class var typeID: UInt32 { get }

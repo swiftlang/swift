@@ -32,7 +32,7 @@ func doSomething() throws -> String {
 public func run_ErrorHandling(_ N: Int) {
   for _ in 1...5000*N {
     do {
-      try doSomething()
+      _ = try doSomething()
     } catch _ {
 
     }

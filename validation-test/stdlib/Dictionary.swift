@@ -2,21 +2,30 @@
 // RUN: mkdir -p %t
 //
 // RUN: %S/../../utils/gyb %s -o %t/main.swift
-// RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
-// RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control
+// RUN: if [ %target-runtime == "objc" ]; then \
+// RUN:   %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o; \
+// RUN:   %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control; \
+// RUN: else \
+// RUN:   %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Dictionary -Xfrontend -disable-access-control -Xfrontend -disable-objc-attr-requires-foundation-module; \
+// RUN: fi
 //
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-run %t/Dictionary
 // REQUIRES: executable_test
 
-// XFAIL: linux
-
+#if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
 import Darwin
+#else
+import Glibc
+#endif
+
 import StdlibUnittest
 import StdlibCollectionUnittest
 
 
+#if _runtime(_ObjC)
 import Foundation
 import StdlibUnittestFoundationExtras
+#endif
 
 // Check that the generic parameters are called 'Key' and 'Value'.
 protocol TestProtocol1 {}
@@ -1142,6 +1151,7 @@ DictionaryTestSuite.test("init(dictionaryLiteral:)") {
   }
 }
 
+#if _runtime(_ObjC)
 //===---
 // NSDictionary -> Dictionary bridging tests.
 //===---
@@ -1386,9 +1396,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
   }
 
   // Delete the key from the NSMutableDictionary.
-  assert(nsd[TestBridgedKeyTy(10)] != nil)
-  nsd.removeObject(forKey: TestBridgedKeyTy(10))
-  assert(nsd[TestBridgedKeyTy(10)] == nil)
+  assert(nsd[TestBridgedKeyTy(10) as NSCopying] != nil)
+  nsd.removeObject(forKey: TestBridgedKeyTy(10) as NSCopying)
+  assert(nsd[TestBridgedKeyTy(10) as NSCopying] == nil)
 
   // Find an existing key, again.
   do {
@@ -1856,7 +1866,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
   let removedElement = d.remove(at: foundIndex1)
   assert(identity1 == unsafeBitCast(d, to: Int.self))
   assert(isNativeDictionary(d))
-  assert(removedElement.0 == TestObjCKeyTy(10))
+  assert(removedElement.0 == TestObjCKeyTy(10) as TestBridgedKeyTy)
   assert(removedElement.1.value == 1010)
   assert(d.count == 2)
   assert(d.index(forKey: TestBridgedKeyTy(10)) == nil)
@@ -2558,6 +2568,11 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.ObjectForKey") {
 
   expectEmpty(d.object(forKey: TestObjCKeyTy(40)))
 
+  // NSDictionary can store mixed key types.  Swift's Dictionary is typed, but
+  // when bridged to NSDictionary, it should behave like one, and allow queries
+  // for mismatched key types.
+  expectEmpty(d.object(forKey: TestObjCInvalidKeyTy()))
+
   for i in 0..<3 {
     expectEqual(idValue10, unsafeBitCast(
       d.object(forKey: TestObjCKeyTy(10)), to: UInt.self))
@@ -2913,11 +2928,11 @@ DictionaryTestSuite.test("DictionaryToNSDictionaryConversion") {
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
-  let nsd: NSDictionary = d
+  let nsd: NSDictionary = d as NSDictionary
 
   checkDictionaryFastEnumerationFromSwift(
     [ (10, 1010), (20, 1020), (30, 1030) ],
-    d, { d },
+    d as NSDictionary, { d as NSDictionary },
     { ($0 as! TestObjCKeyTy).value },
     { ($0 as! TestObjCValueTy).value })
 
@@ -3405,6 +3420,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditional") {
     assert(false)
   }
 }
+#endif // _runtime(_ObjC)
 
 //===---
 // Tests for APIs implemented strictly based on public interface.  We only need
@@ -3421,6 +3437,18 @@ func getDerivedAPIsDictionary() -> Dictionary<Int, Int> {
 
 var DictionaryDerivedAPIs = TestSuite("DictionaryDerivedAPIs")
 
+DictionaryDerivedAPIs.test("isEmpty") {
+  do {
+    var empty = Dictionary<Int, Int>()
+    expectTrue(empty.isEmpty)
+  }
+  do {
+    var d = getDerivedAPIsDictionary()
+    expectFalse(d.isEmpty)
+  }
+}
+
+#if _runtime(_ObjC)
 @objc
 class MockDictionaryWithCustomCount : NSDictionary {
   init(count: Int) {
@@ -3467,21 +3495,10 @@ class MockDictionaryWithCustomCount : NSDictionary {
   static var timesCountWasCalled = 0
 }
 
-func getMockDictionaryWithCustomCount(count count: Int)
+func getMockDictionaryWithCustomCount(count: Int)
   -> Dictionary<NSObject, AnyObject> {
 
   return MockDictionaryWithCustomCount(count: count) as Dictionary
-}
-
-DictionaryDerivedAPIs.test("isEmpty") {
-  do {
-    var empty = Dictionary<Int, Int>()
-    expectTrue(empty.isEmpty)
-  }
-  do {
-    var d = getDerivedAPIsDictionary()
-    expectFalse(d.isEmpty)
-  }
 }
 
 func callGenericIsEmpty<C : Collection>(_ collection: C) -> Bool {
@@ -3515,6 +3532,7 @@ DictionaryDerivedAPIs.test("isEmpty/ImplementationIsCustomized") {
     expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
   }
 }
+#endif // _runtime(_ObjC)
 
 DictionaryDerivedAPIs.test("keys") {
   do {
@@ -3547,6 +3565,7 @@ DictionaryDerivedAPIs.test("values") {
   }
 }
 
+#if _runtime(_ObjC)
 var ObjCThunks = TestSuite("ObjCThunks")
 
 class ObjCThunksHelper : NSObject {
@@ -3690,6 +3709,7 @@ ObjCThunks.test("Dictionary/Return") {
     expectEqual(0, TestBridgedValueTy.bridgeOperations)
   }
 }
+#endif // _runtime(_ObjC)
 
 //===---
 // Check that iterators traverse a snapshot of the collection.
@@ -3817,6 +3837,7 @@ DictionaryTestSuite.test("misc") {
   }
 }
 
+#if _runtime(_ObjC)
 DictionaryTestSuite.test("dropsBridgedCache") {
   // rdar://problem/18544533
   // Previously this code would segfault due to a double free in the Dictionary
@@ -3824,13 +3845,13 @@ DictionaryTestSuite.test("dropsBridgedCache") {
   // This test will only fail in address sanitizer.
   var dict = [0:10]
   do {
-    var bridged: NSDictionary = dict
+    var bridged: NSDictionary = dict as NSDictionary
     expectEqual(10, bridged[0] as! Int)
   }
 
   dict[0] = 11
   do {
-    var bridged: NSDictionary = dict
+    var bridged: NSDictionary = dict as NSDictionary
     expectEqual(11, bridged[0] as! Int)
   }
 }
@@ -3856,6 +3877,7 @@ DictionaryTestSuite.test("getObjects:andKeys:") {
   expectEqual([2, 1] as [NSNumber], Array(keys))
   expectEqual(["two", "one"] as [NSString], Array(values))
 }
+#endif
 
 DictionaryTestSuite.test("popFirst") {
   // Empty
@@ -3904,12 +3926,16 @@ DictionaryTestSuite.test("removeAt") {
 
 DictionaryTestSuite.setUp {
   resetLeaksOfDictionaryKeysValues()
+#if _runtime(_ObjC)
   resetLeaksOfObjCDictionaryKeysValues()
+#endif
 }
 
 DictionaryTestSuite.tearDown {
   expectNoLeaksOfDictionaryKeysValues()
+#if _runtime(_ObjC)
   expectNoLeaksOfObjCDictionaryKeysValues()
+#endif
 }
 
 runAllTests()

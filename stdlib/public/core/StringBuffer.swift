@@ -83,7 +83,6 @@ public struct _StringBuffer {
       = ((_storage._capacity() - capacityBump) << 1) + elementShift
   }
 
-  @warn_unused_result
   static func fromCodeUnits<
     Input : Collection, // Sequence?
     Encoding : UnicodeCodec
@@ -181,7 +180,6 @@ public struct _StringBuffer {
   // reserveCapacity on String and subsequently use that capacity, in
   // two separate phases.  Operations with one-phase growth should use
   // "grow()," below.
-  @warn_unused_result
   func hasCapacity(
     _ cap: Int, forSubRange r: Range<UnsafePointer<_RawByte>>
   ) -> Bool {

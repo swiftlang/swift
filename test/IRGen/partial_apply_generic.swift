@@ -9,8 +9,8 @@ infix operator ~> { precedence 255 }
 
 func ~> <Target, Args, Result> (
   target: Target,
-  method: Target -> Args -> Result)
-  -> Args -> Result
+  method: (Target) -> (Args) -> Result)
+  -> (Args) -> Result
 {
   return method(target)
 }
@@ -25,8 +25,8 @@ struct Spoon: Runcible {
   typealias Element = Mince
 }
 
-func split<Seq: Runcible>(_ seq: Seq) -> (Seq.Element -> Bool) -> () {
-  return {(isSeparator: Seq.Element -> Bool) in
+func split<Seq: Runcible>(_ seq: Seq) -> ((Seq.Element) -> Bool) -> () {
+  return {(isSeparator: (Seq.Element) -> Bool) in
     return ()
   }
 }

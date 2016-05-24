@@ -323,7 +323,8 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
   printSubmoduleInterface(Mod, SplitModuleName,
     Group.hasValue() ? llvm::makeArrayRef(Group.getValue()) : ArrayRef<StringRef>(),
                           TraversalOptions,
-                          Printer, Options, SynthesizedExtensions);
+                          Printer, Options,
+                          Group.hasValue() && SynthesizedExtensions);
 
   Info.Text = OS.str();
   return false;

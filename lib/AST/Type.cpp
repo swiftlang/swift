@@ -24,6 +24,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -330,25 +331,10 @@ ArrayRef<Type> TypeBase::getAllGenericArgs(SmallVectorImpl<Type> &scratch) {
 
 ArrayRef<Substitution>
 TypeBase::gatherAllSubstitutions(Module *module,
-                                 SmallVectorImpl<Substitution> &scratchSpace,
                                  LazyResolver *resolver,
                                  DeclContext *gpContext) {
   Type type(this);
-  SmallVector<ArrayRef<Substitution>, 2> allSubstitutions;
-  scratchSpace.clear();
-
   while (type) {
-    // Record the substitutions in a bound generic type.
-    if (auto boundGeneric = type->getAs<BoundGenericType>()) {
-      allSubstitutions.push_back(boundGeneric->getSubstitutions(module,
-                                                                resolver,
-                                                                gpContext));
-      type = boundGeneric->getParent();
-      if (gpContext)
-        gpContext = gpContext->getParent();
-      continue;
-    }
-
     // Skip to the parent of a nominal type.
     if (auto nominal = type->getAs<NominalType>()) {
       type = nominal->getParent();
@@ -357,35 +343,17 @@ TypeBase::gatherAllSubstitutions(Module *module,
       continue;
     }
 
+    // Return the substitutions in a bound generic type.
+    // This walks any further parent types.
+    if (auto boundGeneric = type->getAs<BoundGenericType>())
+      return boundGeneric->getSubstitutions(module, resolver, gpContext);
+
     llvm_unreachable("Not a nominal or bound generic type");
   }
 
-  // If there are no substitutions, return an empty array.
-  if (allSubstitutions.empty())
-    return { };
-
-  // If there is only one list of substitutions, return it. There's no
-  // need to copy it.
-  if (allSubstitutions.size() == 1)
-    return allSubstitutions.front();
-
-  for (auto substitutions : allSubstitutions)
-    scratchSpace.append(substitutions.begin(), substitutions.end());
-  return scratchSpace;
+  // Not a generic type.
+  return { };
 }
-
-ArrayRef<Substitution> TypeBase::gatherAllSubstitutions(Module *module,
-                                                        LazyResolver *resolver,
-                                                        DeclContext *gpContext){
-  SmallVector<Substitution, 4> scratchSpace;
-  auto subs = gatherAllSubstitutions(module, scratchSpace, resolver,
-                                     gpContext);
-  if (scratchSpace.empty())
-    return subs;
-
-  return getASTContext().AllocateCopy(subs);
-}
-
 
 bool TypeBase::isUnspecializedGeneric() {
   CanType CT = getCanonicalType();
@@ -1671,7 +1639,7 @@ bool TypeBase::isExactSuperclassOf(Type ty, LazyResolver *resolver) {
 }
 
 /// Returns true if type `a` has archetypes that can be bound to form `b`.
-static bool isBindableTo(Type a, Type b, LazyResolver *resolver) {
+bool TypeBase::isBindableTo(Type b, LazyResolver *resolver) {
   class IsBindableVisitor : public TypeVisitor<IsBindableVisitor, bool, CanType>
   {
     llvm::DenseMap<ArchetypeType *, CanType> Bindings;
@@ -1687,11 +1655,24 @@ static bool isBindableTo(Type a, Type b, LazyResolver *resolver) {
       if (bound != Bindings.end()) {
         return bound->second->isEqual(subst);
       }
+      
+      auto canBindClassConstrainedArchetype = [](CanType t) -> bool {
+        // Classes and class-constrained archetypes.
+        if (t->mayHaveSuperclass())
+          return true;
+        
+        // Pure @objc existentials.
+        if (t->isObjCExistentialType())
+          return true;
+        
+        return false;
+      };
+      
       // Check that the archetype isn't constrained in a way that makes the
       // binding impossible.
       // For instance, if the archetype is class-constrained, and the binding
       // is not a class, it can never be bound.
-      if (orig->requiresClass() && !subst->mayHaveSuperclass())
+      if (orig->requiresClass() && !canBindClassConstrainedArchetype(subst))
         return false;
       
       // TODO: If the archetype has a superclass constraint, check that the
@@ -1782,6 +1763,46 @@ static bool isBindableTo(Type a, Type b, LazyResolver *resolver) {
       return false;
     }
     
+    bool visitSILFunctionType(SILFunctionType *func,
+                              CanType subst) {
+      if (auto substFunc = dyn_cast<SILFunctionType>(subst)) {
+        if (func->getExtInfo() != substFunc->getExtInfo())
+          return false;
+        
+        // TODO: Generic signatures
+        if (func->getGenericSignature() || substFunc->getGenericSignature())
+          return false;
+        
+        if (func->getParameters().size() != substFunc->getParameters().size())
+          return false;
+        if (func->getAllResults().size() != substFunc->getAllResults().size())
+          return false;
+        
+        for (unsigned i : indices(func->getParameters())) {
+          if (func->getParameters()[i].getConvention()
+                != substFunc->getParameters()[i].getConvention())
+            return false;
+          if (!visit(func->getParameters()[i].getType(),
+                     substFunc->getParameters()[i].getType()))
+            return false;
+        }
+        
+        for (unsigned i : indices(func->getAllResults())) {
+          if (func->getAllResults()[i].getConvention()
+                != substFunc->getAllResults()[i].getConvention())
+            return false;
+          
+          if (!visit(func->getAllResults()[i].getType(),
+                     substFunc->getAllResults()[i].getType()))
+            return false;
+        }
+        
+        return true;
+      }
+      
+      return false;
+    }
+    
     bool visitBoundGenericType(BoundGenericType *bgt, CanType subst) {
       if (auto substBGT = dyn_cast<BoundGenericType>(subst)) {
         if (bgt->getDecl() != substBGT->getDecl())
@@ -1830,7 +1851,7 @@ static bool isBindableTo(Type a, Type b, LazyResolver *resolver) {
     }
   };
   
-  return IsBindableVisitor(resolver).visit(a->getCanonicalType(),
+  return IsBindableVisitor(resolver).visit(getCanonicalType(),
                                            b->getCanonicalType());
 }
 
@@ -1854,7 +1875,7 @@ bool TypeBase::isBindableToSuperclassOf(Type ty, LazyResolver *resolver) {
     return true;
   
   do {
-    if (isBindableTo(this, ty, resolver))
+    if (isBindableTo(ty, resolver))
       return true;
     if (ty->getAnyNominal() && ty->getAnyNominal()->isInvalid())
       return false;
@@ -1930,8 +1951,8 @@ bool TypeBase::isPotentiallyBridgedValueType() {
 }
 
 /// Determine whether this is a representable Objective-C object type.
-static ForeignRepresentableKind getObjCObjectRepresentable(Type type,
-                                                           DeclContext *dc) {
+static ForeignRepresentableKind
+getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   // @objc metatypes are representable when their instance type is.
   if (auto metatype = type->getAs<AnyMetatypeType>()) {
     // If the instance type is not representable, the metatype is not
@@ -1986,7 +2007,8 @@ static ForeignRepresentableKind getObjCObjectRepresentable(Type type,
 /// to be reflected in PrintAsObjC, so that the Swift type will be
 /// properly printed for (Objective-)C and in SIL's bridging logic.
 static std::pair<ForeignRepresentableKind, ProtocolConformance *>
-getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
+getForeignRepresentable(Type type, ForeignLanguage language,
+                        const DeclContext *dc) {
   // Look through one level of optional type, but remember that we did.
   bool wasOptional = false;
   if (auto valueType = type->getAnyOptionalObjectType()) {
@@ -2089,10 +2111,6 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
 
   ASTContext &ctx = nominal->getASTContext();
 
-  // If the type is @objc, it is trivially representable in Objective-C.
-  if (nominal->isObjC() && language == ForeignLanguage::ObjectiveC)
-    return { ForeignRepresentableKind::Trivial, nullptr };
-
   // Unmanaged<T> can be trivially represented in Objective-C if T
   // is trivially represented in Objective-C.
   if (language == ForeignLanguage::ObjectiveC &&
@@ -2112,23 +2130,27 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
 
   // If the type was imported from Clang, check whether it is
   // representable in the requested language.
-  if (nominal->hasClangNode()) {
+  if (nominal->hasClangNode() || nominal->isObjC()) {
     switch (language) {
     case ForeignLanguage::C:
-      // Imported structs and enums are trivially representable in C.
-      // FIXME: This is not entirely true; we need to check that
-      // all of the exposed parts are representable in C.
-      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
-        return { ForeignRepresentableKind::Trivial, nullptr };
-
-      // Imported classes and protocols are not.
+      // Imported classes and protocols are not representable in C.
       if (isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal))
         return failure();
-
-      llvm_unreachable("Unhandled nominal type declaration");
+      SWIFT_FALLTHROUGH;
 
     case ForeignLanguage::ObjectiveC:
-      // Anything Clang imported is trivially representable in Objective-C.
+      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
+        // Optional structs are not representable in (Objective-)C if they
+        // originally came from C, whether or not they are bridged. If they
+        // are defined in Swift, they are only representable if they are
+        // bridged (checked below).
+        if (wasOptional) {
+          if (nominal->hasClangNode())
+            return failure();
+          break;
+        }
+      }
+
       return { ForeignRepresentableKind::Trivial, nullptr };
     }
   }
@@ -2218,11 +2240,13 @@ getForeignRepresentable(Type type, ForeignLanguage language, DeclContext *dc) {
 }
 
 std::pair<ForeignRepresentableKind, ProtocolConformance *>
-TypeBase::getForeignRepresentableIn(ForeignLanguage language, DeclContext *dc) {
+TypeBase::getForeignRepresentableIn(ForeignLanguage language,
+                                    const DeclContext *dc) {
   return getForeignRepresentable(Type(this), language, dc);
 }
 
-bool TypeBase::isRepresentableIn(ForeignLanguage language, DeclContext *dc) {
+bool TypeBase::isRepresentableIn(ForeignLanguage language,
+                                 const DeclContext *dc) {
   switch (getForeignRepresentableIn(language, dc).first) {
   case ForeignRepresentableKind::None:
     return false;
@@ -2236,7 +2260,7 @@ bool TypeBase::isRepresentableIn(ForeignLanguage language, DeclContext *dc) {
 }
 
 bool TypeBase::isTriviallyRepresentableIn(ForeignLanguage language,
-                                          DeclContext *dc) {
+                                          const DeclContext *dc) {
   switch (getForeignRepresentableIn(language, dc).first) {
   case ForeignRepresentableKind::None:
   case ForeignRepresentableKind::Bridged:

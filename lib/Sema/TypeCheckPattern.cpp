@@ -1575,7 +1575,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
           continue;
         VarDecl *prop = nullptr;
         SmallVector<ValueDecl *, 4> members;
-        unsigned lookupOptions =
+        NLOptions lookupOptions =
             NL_QualifiedDefault | NL_KnownNonCascadingDependency;
         if (!dc->lookupQualified(type, elt.getPropertyName(),
                                  lookupOptions, this, members)) {

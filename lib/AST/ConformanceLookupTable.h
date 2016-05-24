@@ -27,6 +27,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SetVector.h"
+#include <unordered_map>
 
 namespace swift {
 
@@ -67,11 +68,16 @@ class ConformanceLookupTable {
   /// at that stage.
   typedef llvm::PointerIntPair<ExtensionDecl *, 1, bool> LastProcessedEntry;
 
-  /// Array indicating how far we have gotten in processing the
+  /// Array indicating how far we have gotten in processing each
   /// nominal type and list of extensions for each stage of
   /// conformance checking.
-  LastProcessedEntry LastProcessed[NumConformanceStages];
-
+  ///
+  /// Uses std::unordered_map instead of DenseMap so that stable interior
+  /// references can be taken.
+  std::unordered_map<NominalTypeDecl *,
+                     std::array<LastProcessedEntry, NumConformanceStages>>
+  LastProcessed;
+  
   /// The list of parsed extension declarations that have been delayed because
   /// no resolver was available at the time.
   ///

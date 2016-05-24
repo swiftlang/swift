@@ -31,6 +31,7 @@
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Sema/IterativeTypeChecker.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
@@ -729,36 +730,6 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   }
 }
 
-static void markInvalidGenericSignature(ValueDecl *VD, TypeChecker &TC) {
-  GenericParamList *genericParams;
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
-    genericParams = AFD->getGenericParams();
-  else
-    genericParams = cast<GenericTypeDecl>(VD)->getGenericParams();
-  
-  // If there aren't any generic parameters at this level, we're done.
-  if (genericParams == nullptr)
-    return;
-
-  DeclContext *DC = VD->getDeclContext();
-  ArchetypeBuilder builder = TC.createArchetypeBuilder(DC->getParentModule());
-
-  if (auto sig = DC->getGenericSignatureOfContext())
-    builder.addGenericSignature(sig, true);
-  
-  // Visit each of the generic parameters.
-  for (auto param : *genericParams)
-    builder.addGenericParameter(param);
-  
-  // Wire up the archetypes.
-  for (auto GP : *genericParams)
-    GP->setArchetype(builder.getArchetype(GP));
-
-  genericParams->setAllArchetypes(
-      TC.Context.AllocateCopy(builder.getAllArchetypes()));
-}
-
-
 /// Finalize the given generic parameter list, assigning archetypes to
 /// the generic parameters.
 static void finalizeGenericParamList(ArchetypeBuilder &builder,
@@ -1298,8 +1269,7 @@ Type swift::configureImplicitSelf(TypeChecker &tc,
 /// the given constructor.
 void swift::configureConstructorType(ConstructorDecl *ctor,
                                      Type selfType,
-                                     Type argType,
-                                     bool throws) {
+                                     Type argType) {
   Type fnType;
   Type allocFnType;
   Type initFnType;
@@ -1308,7 +1278,9 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
     resultType = OptionalType::get(ctor->getFailability(), resultType);
   }
 
-  auto extInfo = AnyFunctionType::ExtInfo().withThrows(throws);
+  AnyFunctionType::ExtInfo extInfo;
+  if (ctor->hasThrows())
+    extInfo = extInfo.withThrows();
 
   GenericParamList *outerGenericParams =
       ctor->getDeclContext()->getGenericParamsOfContext();
@@ -2366,7 +2338,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
         // adopt it.  Set the foreign error convention for a throwing
         // method.  Note that the foreign error convention affects the
         // selector, so we perform this before inferring a selector.
-        if (method->isBodyThrowing()) {
+        if (method->hasThrows()) {
           if (auto baseErrorConvention
                 = baseMethod->getForeignErrorConvention()) {
             errorConvention = baseErrorConvention;
@@ -2375,7 +2347,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
           assert(errorConvention && "Missing error convention");
           method->setForeignErrorConvention(*errorConvention);
         }
-      } else if (method->isBodyThrowing()) {
+      } else if (method->hasThrows()) {
         // Attach the foreign error convention.
         assert(errorConvention && "Missing error convention");
         method->setForeignErrorConvention(*errorConvention);
@@ -2413,7 +2385,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
       inferObjCName(TC, D);
     }
   } else if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
-    if (method->isBodyThrowing()) {
+    if (method->hasThrows()) {
       // Attach the foreign error convention.
       assert(errorConvention && "Missing error convention");
       method->setForeignErrorConvention(*errorConvention);
@@ -4336,7 +4308,7 @@ public:
       gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
 
       if (TC.validateGenericFuncSignature(FD)) {
-        markInvalidGenericSignature(FD, TC);
+        TC.markInvalidGenericSignature(FD);
       } else {
         // Create a fresh archetype builder.
         ArchetypeBuilder builder =
@@ -4363,7 +4335,7 @@ public:
       }
     } else if (FD->getDeclContext()->isGenericTypeContext()) {
       if (TC.validateGenericFuncSignature(FD)) {
-        markInvalidGenericSignature(FD, TC);
+        TC.markInvalidGenericSignature(FD);
       } else if (!FD->hasType()) {
         // Revert all of the types within the signature of the function.
         TC.revertGenericFuncSignature(FD);
@@ -4448,7 +4420,7 @@ public:
       Optional<ForeignErrorConvention> errorConvention;
       if (TC.isRepresentableInObjC(FD, ObjCReason::ExplicitlyCDecl,
                                    errorConvention)) {
-        if (FD->isBodyThrowing()) {
+        if (FD->hasThrows()) {
           FD->setForeignErrorConvention(*errorConvention);
           TC.diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);
         }
@@ -4788,6 +4760,7 @@ public:
   enum class OverrideCheckingAttempt {
     PerfectMatch,
     MismatchedOptional,
+    MismatchedTypes,
     BaseName,
     BaseNameWithMismatchedOptional,
     Final
@@ -4819,6 +4792,7 @@ public:
                   decl->getFullName());
       break;
     case OverrideCheckingAttempt::MismatchedOptional:
+    case OverrideCheckingAttempt::MismatchedTypes:
     case OverrideCheckingAttempt::BaseNameWithMismatchedOptional:
       if (isa<ConstructorDecl>(decl))
         TC.diagnose(decl, diag::initializer_does_not_override);
@@ -4909,6 +4883,7 @@ public:
     auto superclassMetaTy = MetatypeType::get(superclass);
     DeclName name = decl->getFullName();
     bool hadExactMatch = false;
+    LookupResult members;
 
     do {
       switch (attempt) {
@@ -4919,12 +4894,15 @@ public:
         if (!decl->getAttrs().hasAttribute<OverrideAttr>())
           return false;
         break;
+      case OverrideCheckingAttempt::MismatchedTypes:
+        break;
       case OverrideCheckingAttempt::BaseName:
         // Don't keep looking if this is already a simple name, or if there
         // are no arguments.
         if (name.isSimpleName() || name.getArgumentNames().empty())
           return false;
         name = name.getBaseName();
+        members.clear();
         break;
       case OverrideCheckingAttempt::BaseNameWithMismatchedOptional:
         break;
@@ -4933,11 +4911,12 @@ public:
         return false;
       }
 
-      NameLookupOptions lookupOptions
-        = defaultMemberLookupOptions - NameLookupFlags::DynamicLookup;
-      LookupResult members = TC.lookupMember(decl->getDeclContext(),
-                                             superclassMetaTy, name,
-                                             lookupOptions);
+      if (members.empty()) {
+        NameLookupOptions lookupOptions =
+            defaultMemberLookupOptions - NameLookupFlags::DynamicLookup;
+        members = TC.lookupMember(decl->getDeclContext(), superclassMetaTy,
+                                  name, lookupOptions);
+      }
 
       for (auto memberResult : members) {
         auto member = memberResult.Decl;
@@ -5014,7 +4993,8 @@ public:
         // If this is a property, we accept the match and then reject it below
         // if the types don't line up, since you can't overload properties based
         // on types.
-        if (isa<VarDecl>(parentDecl)) {
+        if (isa<VarDecl>(parentDecl) ||
+            attempt == OverrideCheckingAttempt::MismatchedTypes) {
           matches.push_back({parentDecl, false, parentDeclTy});
           continue;
         }
@@ -5322,7 +5302,7 @@ public:
       // Require 'rethrows' on the override if it was there on the base,
       // unless the override is completely non-throwing.
       if (!Override->getAttrs().hasAttribute<RethrowsAttr>() &&
-          cast<AbstractFunctionDecl>(Override)->isBodyThrowing()) {
+          cast<AbstractFunctionDecl>(Override)->hasThrows()) {
         TC.diagnose(Override, diag::override_rethrows_with_non_rethrows,
                     isa<ConstructorDecl>(Override));
         TC.diagnose(Base, diag::overridden_here);
@@ -5564,15 +5544,15 @@ public:
     // If the overriding declaration is 'throws' but the base is not,
     // complain.
     if (auto overrideFn = dyn_cast<AbstractFunctionDecl>(override)) {
-      if (overrideFn->isBodyThrowing() &&
-          !cast<AbstractFunctionDecl>(base)->isBodyThrowing()) {
+      if (overrideFn->hasThrows() &&
+          !cast<AbstractFunctionDecl>(base)->hasThrows()) {
         TC.diagnose(override, diag::override_throws,
                     isa<ConstructorDecl>(override));
         TC.diagnose(base, diag::overridden_here);
       }
 
-      if (!overrideFn->isBodyThrowing() && base->isObjC() &&
-          cast<AbstractFunctionDecl>(base)->isBodyThrowing()) {
+      if (!overrideFn->hasThrows() && base->isObjC() &&
+          cast<AbstractFunctionDecl>(base)->hasThrows()) {
         TC.diagnose(override, diag::override_throws_objc,
                     isa<ConstructorDecl>(override));
         TC.diagnose(base, diag::overridden_here);
@@ -5580,8 +5560,8 @@ public:
     }
 
     // FIXME: Possibly should extend to more availability checking.
-    if (base->getAttrs().isUnavailable(TC.Context)) {
-      TC.diagnose(override, diag::override_unavailable, override->getName());
+    if (auto *attr = base->getAttrs().getUnavailable(TC.Context)) {
+      TC.diagnoseUnavailableOverride(override, base, attr);
     }
     
     if (!TC.getLangOpts().DisableAvailabilityChecking) {
@@ -5902,7 +5882,7 @@ public:
       gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
 
       if (TC.validateGenericFuncSignature(CD)) {
-        markInvalidGenericSignature(CD, TC);
+        TC.markInvalidGenericSignature(CD);
       } else {
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(CD->getModuleContext());
@@ -5921,7 +5901,7 @@ public:
       }
     } else if (CD->getDeclContext()->isGenericTypeContext()) {
       if (TC.validateGenericFuncSignature(CD)) {
-        CD->setInvalid();
+        TC.markInvalidGenericSignature(CD);
       } else {
         // Revert all of the types within the signature of the constructor.
         TC.revertGenericFuncSignature(CD);
@@ -5934,8 +5914,7 @@ public:
       CD->setInvalid();
     } else {
       configureConstructorType(CD, SelfTy,
-                               CD->getParameterList(1)->getType(TC.Context),
-                               CD->getThrowsLoc().isValid());
+                               CD->getParameterList(1)->getType(TC.Context));
     }
 
     validateAttributes(TC, CD);
@@ -6474,7 +6453,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
       // Validate the generic type parameters.
       if (validateGenericTypeSignature(typeAlias)) {
-        markInvalidGenericSignature(typeAlias, *this);
+        markInvalidGenericSignature(typeAlias);
         return;
       }
       
@@ -6512,7 +6491,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
       // Validate the generic type parameters.
       if (validateGenericTypeSignature(nominal)) {
-        markInvalidGenericSignature(nominal, *this);
+        markInvalidGenericSignature(nominal);
         return;
       }
 
@@ -7467,8 +7446,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
          classDecl->getSuperclass()->getAnyNominal()->isInvalid() ||
          classDecl->getSuperclass()->getAnyNominal()
            ->addedImplicitInitializers());
-  if (classDecl->hasSuperclass() && !classDecl->isGenericContext() &&
-      !classDecl->getSuperclass()->isSpecialized()) {
+  if (classDecl->hasSuperclass()) {
     bool canInheritInitializers = !FoundDesignatedInit;
 
     // We can't define these overrides if we have any uninitialized
@@ -7751,7 +7729,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
             numParameters = 0;  // Something like "init(foo: ())"
 
         // A throwing method has an error parameter.
-        if (func->isBodyThrowing())
+        if (func->hasThrows())
           ++numParameters;
 
         unsigned numArgumentNames = objcName->getNumArgs();
@@ -7763,7 +7741,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
                       numArgumentNames != 1,
                       numParameters,
                       numParameters != 1,
-                      func->isBodyThrowing());
+                      func->hasThrows());
           D->getAttrs().add(
             ObjCAttr::createUnnamed(TC.Context,
                                     objcAttr->AtLoc,
@@ -7816,6 +7794,14 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       TC.diagnose(OA->getLocation(),
                   diag::optional_attribute_initializer);
       D->getAttrs().removeAttribute(OA);
+    } else {
+      auto objcAttr = D->getAttrs().getAttribute<ObjCAttr>();
+      if (!objcAttr || objcAttr->isImplicit()) {
+        auto diag = TC.diagnose(OA->getLocation(),
+                                diag::optional_attribute_missing_explicit_objc);
+        if (auto VD = dyn_cast<ValueDecl>(D))
+          diag.fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
+      }
     }
   }
 

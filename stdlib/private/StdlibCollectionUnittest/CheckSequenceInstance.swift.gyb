@@ -43,12 +43,10 @@ public func checkIterator<
   expectEqualSequence(
     expected, actual, ${trace}, sameValue: sameValue)
 
-  if resiliencyChecks.callNextOnExhaustedGenerator {
-    // Having returned `.None` once, a `IteratorProtocol` should not generate more
-    // elements.
-    for _ in 0..<10 {
-      expectEmpty(mutableGen.next(), ${trace})
-    }
+  // Having returned `.None` once, a `IteratorProtocol` should not generate
+  // more elements.
+  for _ in 0..<10 {
+    expectEmpty(mutableGen.next(), ${trace})
   }
 }
 
@@ -89,7 +87,7 @@ public func checkSequence<
 
   // Check that _copyContents does the right thing if we can do so
   // without destroying the sequence.
-  sequence._preprocessingPass { () -> Void in 
+  _ = sequence._preprocessingPass { () -> Void in
     var count = 0
     for _ in sequence { count += 1 }
     let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: count)

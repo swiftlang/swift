@@ -30,7 +30,7 @@ class G : K {
 }
 
 func caller(_ x: P) throws {
-  try x.buzz()
+  _ = try x.buzz()
 }
 
 @inline(never)

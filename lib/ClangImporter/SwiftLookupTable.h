@@ -119,7 +119,7 @@ public:
   Kind getKind() const { return TheKind; }
 
   /// Retrieve the declaration context.
-  const clang::DeclContext *getAsDeclContext() {
+  const clang::DeclContext *getAsDeclContext() const {
     return getKind() == DeclContext ? DC : nullptr;
   }
 
@@ -146,7 +146,7 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 /// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 13; // swift_newtype(struct)
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 14; // Swift 2 names
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.
@@ -310,6 +310,10 @@ public:
 
   /// Maps a stored entry to an actual Clang AST node.
   SingleEntry mapStored(uintptr_t &entry);
+
+  /// Translate a Clang DeclContext into a context kind and name.
+  static llvm::Optional<StoredContext> translateDeclContext(
+                                         const clang::DeclContext *dc);
 
   /// Translate a Clang effective context into a context kind and name.
   llvm::Optional<StoredContext> translateContext(EffectiveClangContext context);

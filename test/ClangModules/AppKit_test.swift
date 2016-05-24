@@ -15,15 +15,15 @@ class MyDocument : NSDocument {
 }
 
 func test(_ URL: NSURL, controller: NSDocumentController) {
-  try! NSDocument(contentsOf: URL, ofType: "") // expected-warning{{unused}}
-  try! MyDocument(contentsOf: URL, ofType: "")
+  try! NSDocument(contentsOf: URL, ofType: "") // expected-warning{{result of 'NSDocument' initializer is unused}}
+  try! MyDocument(contentsOf: URL, ofType: "") // expected-warning {{expression of type 'MyDocument' is unused}}
 
   try! controller.makeDocument(withContentsOf: URL, ofType: "")
 }
 
 extension NSBox {
   func foo() {
-    print("abc") // expected-warning {{use of 'print' treated as a reference to instance method in class 'NSView'}}
+    print("abc" as NSString) // expected-warning {{use of 'print' treated as a reference to instance method in class 'NSView'}}
     // expected-note@-1 {{use 'self.' to silence this warning}} {{5-5=self.}}
     // expected-note@-2 {{use 'Swift.' to reference the global function}} {{5-5=Swift.}}
   }
@@ -31,7 +31,7 @@ extension NSBox {
 
 class MyView : NSView {
   func foo() {
-    print("abc") // expected-warning {{use of 'print' treated as a reference to instance method in class 'NSView'}}
+    print("abc" as NSString) // expected-warning {{use of 'print' treated as a reference to instance method in class 'NSView'}}
     // expected-note@-1 {{use 'self.' to silence this warning}} {{5-5=self.}}
     // expected-note@-2 {{use 'Swift.' to reference the global function}} {{5-5=Swift.}}
   }

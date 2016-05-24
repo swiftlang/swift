@@ -229,10 +229,12 @@ if True:
 /// array's first and last elements. If the array is empty, these properties
 /// are `nil`.
 ///
-///     print(oddNumbers.first, oddNumbers.last, separator=", ")
+///     if let firstElement = oddNumbers.first, lastElement = oddNumbers.last {
+///         print(firstElement, lastElement, separator: ", ")
+///     }
 ///     // Prints "1, 15"
 ///
-///     print(emptyDoubles.first, emptyDoubles.last, separator=", ")
+///     print(emptyDoubles.first, emptyDoubles.last, separator: ", ")
 ///     // Prints "nil, nil"
 ///
 /// You can access individual array elements through a subscript. The first
@@ -241,7 +243,7 @@ if True:
 /// the count of the array. Using a negative number or an index equal to or
 /// greater than `count` triggers a runtime error. For example:
 ///
-///     print(oddNumbers[0], oddNumbers[3], separator=", ")
+///     print(oddNumbers[0], oddNumbers[3], separator: ", ")
 ///     // Prints "1, 7"
 ///
 ///     print(emptyDoubles[0])
@@ -480,11 +482,11 @@ public struct ${Self}<Element>
 %end
   }
 
-  /// The array's "past-the-end" position, or one greater than the last valid
-  /// subscript argument.
+  /// The array's "past the end" position---that is, the position one greater
+  /// than the last valid subscript argument.
   ///
   /// When you need a range that includes the last element of an array, use the
-  /// `..<` operator with `endIndex`. The half-open range operator (`..<`)
+  /// half-open range operator (`..<`) with `endIndex`. The `..<` operator
   /// creates a range that doesn't include the upper bound, so it's always
   /// safe to use with `endIndex`. For example:
   ///
@@ -503,7 +505,6 @@ public struct ${Self}<Element>
 %end
   }
 
-  @warn_unused_result
   public func index(after i: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for Array performance.  The optimizer is not
@@ -522,7 +523,6 @@ public struct ${Self}<Element>
     i += 1
   }
 
-  @warn_unused_result
   public func index(before i: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for Array performance.  The optimizer is not
@@ -541,7 +541,32 @@ public struct ${Self}<Element>
     i -= 1
   }
 
-  @warn_unused_result
+  /// Returns an index that is the specified distance from the given index.
+  ///
+  /// The following example obtains an index advanced four positions from an
+  /// array's starting index and then prints the element at that position.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     let i = numbers.index(numbers.startIndex, offsetBy: 4)
+  ///     print(numbers[i])
+  ///     // Prints "50"
+  ///
+  /// Advancing an index beyond a collection's ending index or offsetting it
+  /// before a collection's starting index may trigger a runtime error. The
+  /// value passed as `n` must not result in such an operation.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the array.
+  ///   - n: The distance to offset `i`.
+  /// - Returns: An index offset by `n` from the index `i`. If `n` is positive,
+  ///   this is the same value as the result of `n` calls to `index(after:)`.
+  ///   If `n` is negative, this is the same value as the result of `-n` calls
+  ///   to `index(before:)`.
+  ///
+  /// - Precondition:
+  ///   - If `n > 0`, `n <= self.distance(from: i, to: self.endIndex)`
+  ///   - If `n < 0`, `n >= self.distance(from: i, to: self.startIndex)`
+  /// - Complexity: O(1)
   public func index(_ i: Int, offsetBy n: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for Array performance.  The optimizer is not
@@ -551,7 +576,47 @@ public struct ${Self}<Element>
     return i + n
   }
 
-  @warn_unused_result
+  /// Returns an index that is the specified distance from the given index,
+  /// unless that distance is beyond a given limiting index.
+  ///
+  /// The following example obtains an index advanced four positions from an
+  /// array's starting index and then prints the element at that position. The
+  /// operation doesn't require going beyond the limiting `numbers.endIndex`
+  /// value, so it succeeds.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     let i = numbers.index(numbers.startIndex,
+  ///                           offsetBy: 4,
+  ///                           limitedBy: numbers.endIndex)
+  ///     print(numbers[i])
+  ///     // Prints "50"
+  ///
+  /// The next example attempts to retrieve an index ten positions from
+  /// `numbers.startIndex`, but fails, because that distance is beyond the
+  /// index passed as `limit`.
+  ///
+  ///     let j = numbers.index(numbers.startIndex,
+  ///                           offsetBy: 10,
+  ///                           limitedBy: numbers.endIndex)
+  ///     print(j)
+  ///     // Prints "nil"
+  ///
+  /// Advancing an index beyond a collection's ending index or offsetting it
+  /// before a collection's starting index may trigger a runtime error. The
+  /// value passed as `n` must not result in such an operation.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the array.
+  ///   - n: The distance to offset `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
+  ///     `limit` has no effect if it is less than `i`. Likewise, if `n < 0`,
+  ///     `limit` has no effect if it is greater than `i`.
+  /// - Returns: An index offset by `n` from the index `i`, unless that index
+  ///   would be beyond `limit` in the direction of movement. In that case,
+  ///   the method returns `nil`.
+  ///
+  /// - SeeAlso: `index(_:offsetBy:)`, `formIndex(_:offsetBy:limitedBy:)`
+  /// - Complexity: O(1)
   public func index(
     _ i: Int, offsetBy n: Int, limitedBy limit: Int
   ) -> Int? {
@@ -567,7 +632,13 @@ public struct ${Self}<Element>
     return i + n
   }
 
-  @warn_unused_result
+  /// Returns the distance between two indices.
+  ///
+  /// - Parameters:
+  ///   - start: A valid index of the collection.
+  ///   - end: Another valid index of the collection. If `end` is equal to
+  ///     `start`, the result is zero.
+  /// - Returns: The distance between `start` and `end`.
   public func distance(from start: Int, to end: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for Array performance.  The optimizer is not
@@ -716,33 +787,28 @@ ${SubscriptDocComment}
   /// type check.  May be hoisted by the optimizer, which means its
   /// results may be stale by the time they are used if there is an
   /// inout violation in user code.
-  @warn_unused_result
   @_semantics("array.props.isNativeTypeChecked")
   public // @testable
   func _hoistableIsNativeTypeChecked() -> Bool {
    return _buffer.arrayPropertyIsNativeTypeChecked
   }
 
-  @warn_unused_result
   @_semantics("array.get_count")
   internal func _getCount() -> Int {
     return _buffer.count
   }
-  @warn_unused_result
   @_semantics("array.get_capacity")
   internal func _getCapacity() -> Int {
     return _buffer.capacity
   }
 
   /// - Precondition: The array has a native buffer.
-  @warn_unused_result
   @_semantics("array.owner")
   internal func _getOwnerWithSemanticLabel_native() -> Builtin.NativeObject {
     return Builtin.castToNativeObject(_buffer.nativeOwner)
   }
 
   /// - Precondition: The array has a native buffer.
-  @warn_unused_result
   @inline(__always)
   internal func _getOwner_native() -> Builtin.NativeObject {
 #if _runtime(_ObjC)
@@ -791,7 +857,7 @@ ${SubscriptDocComment}
 % if Self != 'Array':
     _buffer._checkValidSubscript(index)
 % else:
-    _checkSubscript(index, wasNativeTypeChecked: true)
+    _ = _checkSubscript(index, wasNativeTypeChecked: true)
 % end
   }
 
@@ -822,7 +888,6 @@ ${SubscriptDocComment}
     _precondition(index >= startIndex, "Negative ${Self} index is out of range")
   }
 
-  @warn_unused_result
   @_semantics("array.get_element")
   @inline(__always)
   public // @testable
@@ -838,7 +903,6 @@ ${SubscriptDocComment}
 #endif
   }
 
-  @warn_unused_result
   @_semantics("array.get_element_address")
   internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
     return _buffer.subscriptBaseAddress + index
@@ -870,7 +934,7 @@ extension ${Self} : ArrayLiteralConvertible {
   // Optimized implementation for Array
   /// Creates an array from the given array literal.
   ///
-  /// Don't directly call this initializer, which is used by the compiler
+  /// Do not call this initializer directly. It is used by the compiler
   /// when you use an array literal. Instead, create a new array by using an
   /// array literal as its value. To do this, enclose a comma-separated list of
   /// values in square brackets.
@@ -887,7 +951,7 @@ extension ${Self} : ArrayLiteralConvertible {
 %else:
   /// Creates an array from the given array literal.
   ///
-  /// Don't directly call this initializer, which is used by the compiler when
+  /// Do not call this initializer directly. It is used by the compiler when
   /// you use an array literal. Instead, create a new array by using an array
   /// literal as its value. To do this, enclose a comma-separated list of
   /// values in square brackets.
@@ -914,7 +978,6 @@ extension ${Self} : ArrayLiteralConvertible {
 /// This function is referenced by the compiler to allocate array literals.
 ///
 /// - Precondition: `storage` is `_ContiguousArrayStorage`.
-@warn_unused_result
 @inline(__always)
 public // COMPILER_INTRINSIC
 func _allocateUninitializedArray<Element>(_  builtinCount: Builtin.Word)
@@ -938,7 +1001,6 @@ func _allocateUninitializedArray<Element>(_  builtinCount: Builtin.Word)
 
 // Referenced by the compiler to deallocate array literals on the
 // error path.
-@warn_unused_result
 @_semantics("array.dealloc_uninitialized")
 public func _deallocateUninitialized${Self}<Element>(
   _ array: ${Self}<Element>
@@ -1011,7 +1073,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// value.
   ///
   /// Here's an example of creating an array initialized with five strings
-  /// containing the letter "Z".
+  /// containing the letter *Z*.
   ///
   ///     let fiveZs = Array(repeating: "Z", count: 5)
   ///     print(fiveZs)
@@ -1060,7 +1122,6 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// Entry point for `Array` literal construction; builds and returns
   /// a ${Self} of `count` uninitialized elements.
   @_versioned
-  @warn_unused_result
   @_semantics("array.uninitialized")
   internal static func _allocateUninitialized(
     _ count: Int
@@ -1077,7 +1138,6 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   ///
   /// - Precondition: `storage is _ContiguousArrayStorage`.
   @_versioned
-  @warn_unused_result
   @_semantics("array.uninitialized")
   internal static func _adoptStorage(
     _ storage: AnyObject, count: Int
@@ -1154,16 +1214,17 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
   /// Reserves enough space to store the specified number of elements.
   ///
-  /// Use this method to avoid multiple reallocations if you will be adding
-  /// a known number of elements to an array. This method ensures that the
-  /// array has unique, mutable, contiguous storage, with space allocated for
-  /// at least the requested number of elements.
+  /// If you are adding a known number of elements to an array, use this method
+  /// to avoid multiple reallocations. This method ensures that the array has
+  /// unique, mutable, contiguous storage, with space allocated for at least
+  /// the requested number of elements.
   ///
-  /// For performance reasons, the newly allocated storage may be larger
-  /// than the requested capacity. Use the array's `capacity` property to
-  /// determine the size of the new storage.
+  /// For performance reasons, the newly allocated storage may be larger than
+  /// the requested capacity. Use the array's `capacity` property to determine
+  /// the size of the new storage.
   ///
   /// - Parameter minimumCapacity: The requested number of elements to store.
+  ///
   /// - Complexity: O(*n*), where *n* is the count of the array.
   @_semantics("array.mutate_unknown")
   public mutating func reserveCapacity(_ minimumCapacity: Int) {
@@ -1245,7 +1306,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// to an array of integers.
   ///
   ///     var numbers = [1, 2, 3, 4, 5]
-  ///     numbers.appendContents(of: 10...15)
+  ///     numbers.append(contentsOf: 10...15)
   ///     print(numbers)
   ///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
   ///
@@ -1279,7 +1340,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// to an array of integers.
   ///
   ///     var numbers = [1, 2, 3, 4, 5]
-  ///     numbers.appendContents(of: 10...15)
+  ///     numbers.append(contentsOf: 10...15)
   ///     print(numbers)
   ///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
   ///
@@ -1398,7 +1459,6 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     }
   }
 
-  @warn_unused_result
   public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
     return _extractOrCopyToNativeArrayBuffer(self._buffer)
   }
@@ -1415,7 +1475,6 @@ extension ${Self} : CustomReflectable {
 }
 
 extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
-  @warn_unused_result
   internal func _makeDescription(isDebug: Bool) -> String {
 %   if Self != 'Array':
     var result = isDebug ? "${Self}([" : "["
@@ -1456,7 +1515,6 @@ extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
 extension ${Self} {
   @_versioned
   @_transparent
-  @warn_unused_result
   internal func _cPointerArgs() -> (AnyObject?, UnsafePointer<Void>?) {
     let p = _baseAddressIfContiguous
     if _fastPath(p != nil || isEmpty) {
@@ -1634,7 +1692,6 @@ internal func _expectEnd<C : Collection>(_ i: C.Index, _ s: C) {
     "invalid Collection: count differed in successive traversals")
 }
 
-@warn_unused_result
 internal func _growArrayCapacity(_ capacity: Int) -> Int {
   return capacity * 2
 }
@@ -1650,10 +1707,10 @@ extension ${Self} {
   /// removed.
   ///
   /// In this example, three elements in the middle of an array of integers are
-  /// replaced by the five elements of a `Repeat<Int>` instance.
+  /// replaced by the five elements of a `Repeated<Int>` instance.
   ///
   ///      var nums = [10, 20, 30, 40, 50]
-  ///      nums.replaceSubrange(1...3, with: Repeat(count: 5, repeatedValue: 1)))
+  ///      nums.replaceSubrange(1...3, with: repeatElement(1, count: 5))
   ///      print(nums)
   ///      // Prints "[10, 1, 1, 1, 1, 1, 50]"
   ///
@@ -2004,7 +2061,6 @@ internal func _arrayAppendSequence<
 // ArraySlice<Int> and Array<Int>.
 
 /// Returns `true` if these arrays contain the same elements.
-@warn_unused_result
 public func == <Element : Equatable>(
   lhs: ${Self}<Element>, rhs: ${Self}<Element>
 ) -> Bool {
@@ -2049,7 +2105,6 @@ public func == <Element : Equatable>(
 }
 
 /// Returns `true` if the arrays do not contain the same elements.
-@warn_unused_result
 public func != <Element : Equatable>(
   lhs: ${Self}<Element>, rhs: ${Self}<Element>
 ) -> Bool {
@@ -2063,7 +2118,6 @@ public func != <Element : Equatable>(
 ///
 /// - Precondition: `Base` is a base class or base `@objc` protocol (such
 ///   as `AnyObject`) of `Derived`.
-@warn_unused_result
 public func _arrayUpCast<Derived, Base>(_ a: Array<Derived>) -> Array<Base> {
   // FIXME: Dynamic casting is currently not possible without the objc runtime:
   // rdar://problem/18801510
@@ -2078,7 +2132,6 @@ extension Array {
   /// Returns `nil` otherwise.
   // Note: this function exists here so that Foundation doesn't have
   // to know Array's implementation details.
-  @warn_unused_result
   public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
     _ source: AnyObject
   ) -> Array? {
@@ -2113,7 +2166,6 @@ extension Array {
   /// - Complexity: O(*n*) if the array is bridged, where *n* is the length
   ///   of the array; otherwise, O(1).
   /// - SeeAlso: `removeLast()`
-  @warn_unused_result
   public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
     return removeLast()
@@ -2128,7 +2180,6 @@ extension ContiguousArray {
   ///
   /// - Complexity: O(1)
   /// - SeeAlso: `removeLast()`
-  @warn_unused_result
   public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
     return removeLast()

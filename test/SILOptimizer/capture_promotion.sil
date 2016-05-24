@@ -120,7 +120,7 @@ bb0(%0 : $@box Foo, %2 : $@box Baz, %4 : $@box Int):
   %7 = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
   %8 = load %1 : $*Foo
   strong_retain %8 : $Foo
-  %10 = class_method %8 : $Foo, #Foo.foo!1 : Foo -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
+  %10 = class_method %8 : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
   %11 = apply %10(%8) : $@convention(method) (@guaranteed Foo) -> Int
   %12 = struct_element_addr %3 : $*Baz, #Baz.x
   %13 = load %12 : $*Int
@@ -162,7 +162,7 @@ bb0(%0 : $@box Foo):
   %7 = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
   %8 = load %1 : $*Foo
   strong_retain %8 : $Foo
-  %10 = class_method %8 : $Foo, #Foo.foo!1 : Foo -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
+  %10 = class_method %8 : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
   %11 = apply %10(%8) : $@convention(method) (@guaranteed Foo) -> Int
   %12 = function_ref @mutate_foo : $@convention(thin) (@inout Foo) -> ()
   %13 = apply %12(%1) : $@convention(thin) (@inout Foo) -> ()

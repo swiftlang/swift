@@ -34,21 +34,21 @@ func setFrame(_ g: Gizmo, frame: NSRect) {
 
 // CHECK: define hidden void @_TF12objc_structs8makeRect{{.*}}([[NSRECT]]* noalias nocapture sret, double, double, double, double)
 func makeRect(_ a: Double, b: Double, c: Double, d: Double) -> NSRect {
-  // CHECK: call void @NSMakeRect([[NSRECT]]* noalias nocapture sret {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}})
+  // CHECK: call void @NSMakeRect(%struct.NSRect* noalias nocapture sret {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}})
   return NSMakeRect(a,b,c,d)
 }
 // CHECK: }
 
 // CHECK: define hidden [[stringLayout:[^@]*]] @_TF12objc_structs14stringFromRect{{.*}}(%VSC6NSRect* noalias nocapture dereferenceable({{.*}})) {{.*}} {
 func stringFromRect(_ r: NSRect) -> String {
-  // CHECK: call [[OPAQUE0:.*]]* @NSStringFromRect([[NSRECT]]* byval align 8 {{.*}})
+  // CHECK: call [[OPAQUE0:.*]]* @NSStringFromRect(%struct.NSRect* byval align 8 {{.*}})
   return NSStringFromRect(r)
 }
 // CHECK: }
 
 // CHECK: define hidden void @_TF12objc_structs9insetRect{{.*}}([[NSRECT]]* noalias nocapture sret, %VSC6NSRect* noalias nocapture dereferenceable({{.*}}), double, double)
 func insetRect(_ r: NSRect, x: Double, y: Double) -> NSRect {
-  // CHECK: call void @NSInsetRect([[NSRECT]]* noalias nocapture sret {{.*}}, [[NSRECT]]* byval align 8 {{.*}}, double {{.*}}, double {{.*}})
+  // CHECK: call void @NSInsetRect(%struct.NSRect* noalias nocapture sret {{.*}}, %struct.NSRect* byval align 8 {{.*}}, double {{.*}}, double {{.*}})
   return NSInsetRect(r, x, y)
 }
 // CHECK: }
@@ -62,7 +62,7 @@ func convertRectFromBase(_ v: NSView, r: NSRect) -> NSRect {
 // CHECK: }
 
 // CHECK: define hidden void @_TF12objc_structs20useStructOfNSStringsFVSC17StructOfNSStringsS0_(%VSC17StructOfNSStrings* noalias nocapture sret, %VSC17StructOfNSStrings* noalias nocapture dereferenceable({{.*}}))
-// CHECK:   call void @useStructOfNSStringsInObjC(%VSC17StructOfNSStrings* noalias nocapture sret {{%.*}}, %VSC17StructOfNSStrings* byval align 8 {{%.*}})
+// CHECK:   call void @useStructOfNSStringsInObjC(%struct.StructOfNSStrings* noalias nocapture sret {{%.*}}, %struct.StructOfNSStrings* byval align 8 {{%.*}})
 func useStructOfNSStrings(_ s: StructOfNSStrings) -> StructOfNSStrings {
   return useStructOfNSStringsInObjC(s)
 }

@@ -30,5 +30,5 @@ func archetype<T: P2>(_ p2 : T) {
 
 func test_subject_ClassConstrainedSubscript() {
   let list: subject_ClassConstrainedSubscript! = test_HasSubscript()
-  list[0]
+  _ = list[0]
 }

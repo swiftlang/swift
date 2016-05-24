@@ -450,11 +450,28 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // If we failed lookup of an operator, check to see it to see if it is
     // because two operators are juxtaposed e.g. (x*-4) that needs whitespace.
     // If so, emit specific diagnostics for it.
-    if (!diagnoseOperatorJuxtaposition(UDRE, DC, *this)) {
-      diagnose(Loc, diag::use_unresolved_identifier, Name,
-               UDRE->getName().isOperator())
-        .highlight(UDRE->getSourceRange());
+    if (diagnoseOperatorJuxtaposition(UDRE, DC, *this)) {
+      return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
+
+    // TODO: Name will be a compound name if it was written explicitly as
+    // one, but we should also try to propagate labels into this.
+    DeclNameLoc nameLoc = UDRE->getNameLoc();
+
+    performTypoCorrection(DC, UDRE->getRefKind(), Name, Loc, LookupOptions,
+                          Lookup);
+
+    diagnose(Loc, diag::use_unresolved_identifier, Name, Name.isOperator())
+      .highlight(UDRE->getSourceRange());
+
+    // Note all the correction candidates.
+    for (auto &result : Lookup) {
+      noteTypoCorrection(Name, nameLoc, result);
+    }
+
+    // TODO: consider recovering from here.  We may want some way to suppress
+    // downstream diagnostics, though.
+
     return new (Context) ErrorExpr(UDRE->getSourceRange());
   }
 
@@ -1324,8 +1341,6 @@ namespace {
     }
   };
 }
-
-
 
 #pragma mark High-level entry points
 bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
@@ -2731,7 +2746,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (toExistential || fromExistential || fromArchetype || toArchetype)
     return CheckedCastKind::ValueCast;
 
-  // Reality check casts between concrete types.
+  // Check for casts between concrete types that cannot succeed.
 
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
   
@@ -2806,14 +2821,25 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // This "always fails" diagnosis makes no sense when paired with the CF
   // one.
   auto clas = toType->getClassOrBoundGenericClass();
-  if (!clas || !clas->isForeign()) {
-    if (suppressDiagnostics) {
-      return CheckedCastKind::Unresolved;
-    }
-    diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
-      .highlight(diagFromRange)
-      .highlight(diagToRange);
+  if (clas && clas->isForeign())
+    return CheckedCastKind::ValueCast;
+  
+  // Don't warn on casts that change the generic parameters of ObjC generic
+  // classes. This may be necessary to force-fit ObjC APIs that depend on
+  // covariance, or for APIs where the generic parameter annotations in the
+  // ObjC headers are inaccurate.
+  if (clas && clas->usesObjCGenericsModel()) {
+    if (fromType->getClassOrBoundGenericClass() == clas)
+      return CheckedCastKind::ValueCast;
   }
+  
+  if (suppressDiagnostics) {
+    return CheckedCastKind::Unresolved;
+  }
+  diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
+    .highlight(diagFromRange)
+    .highlight(diagToRange);
+
   return CheckedCastKind::ValueCast;
 }
 

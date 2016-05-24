@@ -141,9 +141,10 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
                                             ExtensionFunc extensionFunc) {
   assert(static_cast<unsigned>(stage) < NumConformanceStages &&
          "NumConformanceStages has not been updated");
-  LastProcessedEntry &lastProcessed
-    = LastProcessed[static_cast<unsigned>(stage)];
 
+  LastProcessedEntry &lastProcessed
+    = LastProcessed[nominal][static_cast<unsigned>(stage)];
+  
   // Handle the nominal type.
   if (!lastProcessed.getInt()) {
     lastProcessed.setInt(true);
@@ -300,23 +301,26 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
       if (resolver)
         resolver->resolveSuperclass(classDecl);
 
-      if (Type superclass = classDecl->getSuperclass()) {
-        if (auto superclassDecl 
-              = superclass->getClassOrBoundGenericClass()) {
-          // Break infinite recursion when visiting ill-formed classes
-          // with circular inheritance.
-          if (VisitingSuperclass)
-            return;
-          llvm::SaveAndRestore<bool> visiting(VisitingSuperclass, true);
+      if (auto superclassDecl = classDecl->getSuperclassDecl()) {
+        // Break infinite recursion when visiting ill-formed classes
+        // with circular inheritance.
+        if (VisitingSuperclass)
+          return;
+        llvm::SaveAndRestore<bool> visiting(VisitingSuperclass, true);
 
-          // Resolve the conformances of the superclass.
-          superclassDecl->prepareConformanceTable();
-          superclassDecl->ConformanceTable->updateLookupTable(
-            superclassDecl,
-            ConformanceStage::Resolved,
-            resolver);
-          
-          // Expand inherited conformances.
+        // Resolve the conformances of the superclass.
+        superclassDecl->prepareConformanceTable();
+        superclassDecl->ConformanceTable->updateLookupTable(
+          superclassDecl,
+          ConformanceStage::Resolved,
+          resolver);
+        
+        // Expand inherited conformances from all superclasses.
+        // We may have circular inheritance in ill-formed classes, so keep an
+        // eye out for that.
+        auto circularSuperclass = superclassDecl->getSuperclassDecl();
+        
+        do {
           forEachInStage(stage, superclassDecl, resolver,
                          [&](NominalTypeDecl *superclass) {
                            inheritConformances(classDecl, superclassDecl,
@@ -326,7 +330,12 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
                            inheritConformances(classDecl, superclassDecl, ext,
                                                resolver);
                          });
-        }
+          superclassDecl = superclassDecl->getSuperclassDecl();
+          if (circularSuperclass)
+            circularSuperclass = circularSuperclass->getSuperclassDecl();
+          if (circularSuperclass)
+            circularSuperclass = circularSuperclass->getSuperclassDecl();
+        } while (superclassDecl != circularSuperclass);
       }
     }
     break;    
@@ -742,11 +751,11 @@ DeclContext *ConformanceLookupTable::getConformingContext(
       return nullptr;
 
     // If we had a circular dependency, the superclass may not exist.
-    if (!classDecl->getSuperclass())
-      return nullptr;
-        
     auto superclassDecl
-      = classDecl->getSuperclass()->getClassOrBoundGenericClass();
+      = classDecl->getSuperclassDecl();
+    
+    if (!superclassDecl)
+      return nullptr;
 
     if (!classDecl->ConformanceTable->VisitingSuperclass) {
       llvm::SaveAndRestore<bool> visiting(

@@ -104,7 +104,7 @@ func testNSErrorExhaustive() {
     do {
       try ErrorProne.fail()
     } catch let e as NSError {
-      e
+      e // expected-warning {{expression of type 'NSError' is unused}}
     }
   }
 }

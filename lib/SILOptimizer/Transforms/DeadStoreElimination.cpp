@@ -61,7 +61,6 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -320,14 +319,11 @@ private:
   /// Alias Analysis.
   AliasAnalysis *AA;
 
-  /// Escape Analysis.
-  EscapeAnalysis *EA;
-
   /// Type Expansion Analysis.
   TypeExpansionAnalysis *TE;
 
   /// The allocator we are using.
-  llvm::BumpPtrAllocator &BPA;
+  llvm::SpecificBumpPtrAllocator<BlockState> &BPA;
 
   /// The epilogue release matcher we are using.
   ConsumedArgToEpilogueReleaseMatcher& ERM;
@@ -432,10 +428,10 @@ private:
 public:
   /// Constructor.
   DSEContext(SILFunction *F, SILModule *M, SILPassManager *PM,
-             AliasAnalysis *AA, EscapeAnalysis *EA, TypeExpansionAnalysis *TE,
-             llvm::BumpPtrAllocator &BPA,
+             AliasAnalysis *AA, TypeExpansionAnalysis *TE,
+             llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
              ConsumedArgToEpilogueReleaseMatcher &ERM)
-    : Mod(M), F(F), PM(PM), AA(AA), EA(EA), TE(TE), BPA(BPA), ERM(ERM) {}
+    : Mod(M), F(F), PM(PM), AA(AA), TE(TE), BPA(BPA), ERM(ERM) {}
 
   /// Entry point for dead store elimination.
   bool run();
@@ -601,7 +597,7 @@ void DSEContext::processBasicBlockForGenKillSet(SILBasicBlock *BB) {
 
   // Handle SILArgument for base invalidation.
   ArrayRef<SILArgument *> Args = BB->getBBArgs();
-  for(auto &X : Args) {
+  for (auto &X : Args) {
     invalidateBase(X, BBState, DSEKind::BuildGenKillSet);
   }
 }
@@ -644,7 +640,7 @@ void DSEContext::processBasicBlockForDSE(SILBasicBlock *BB, bool Optimistic) {
 
   // Handle SILArgument for base invalidation.
   ArrayRef<SILArgument *> Args = BB->getBBArgs();
-  for(auto &X : Args) {
+  for (auto &X : Args) {
     invalidateBase(X, S, DSEKind::BuildGenKillSet);
   }
 
@@ -1158,7 +1154,7 @@ bool DSEContext::run() {
   // Initialize the BBToLocState mapping.
   unsigned LocationNum = this->getLocationVault().size();
   for (auto &B : *F) {
-    auto *State = new (BPA) BlockState(&B, LocationNum, Optimistic);
+    auto *State = new (BPA.Allocate()) BlockState(&B, LocationNum, Optimistic);
     BBToLocState[&B] = State;
     State->initStoreSetAtEndOfBlock(*this);
   }
@@ -1234,17 +1230,16 @@ public:
     DEBUG(llvm::dbgs() << "*** DSE on function: " << F->getName() << " ***\n");
 
     auto *AA = PM->getAnalysis<AliasAnalysis>();
-    auto *EA = PM->getAnalysis<EscapeAnalysis>();
     auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();
     auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
 
     // The allocator we are using.
-    llvm::BumpPtrAllocator BPA;
+    llvm::SpecificBumpPtrAllocator<BlockState> BPA;
 
     // The epilogue release matcher we are using.
     ConsumedArgToEpilogueReleaseMatcher ERM(RCFI, F);
 
-    DSEContext DSE(F, &F->getModule(), PM, AA, EA, TE, BPA, ERM);
+    DSEContext DSE(F, &F->getModule(), PM, AA, TE, BPA, ERM);
     if (DSE.run()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }

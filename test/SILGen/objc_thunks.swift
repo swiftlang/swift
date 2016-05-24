@@ -276,6 +276,10 @@ class Wotsit<T> : Gizmo {
 
   // Ivar destroyer
   // CHECK: sil hidden @_TToF{{.*}}WotsitE
+
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6WotsitcfT_GSQGS0_x__ : $@convention(objc_method) <T> (@owned Wotsit<T>) -> @owned ImplicitlyUnwrappedOptional<Wotsit<T>>
+
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6WotsitcfT7bellsOnSi_GSQGS0_x__ : $@convention(objc_method) <T> (Int, @owned Wotsit<T>) -> @owned ImplicitlyUnwrappedOptional<Wotsit<T>>
 }
 
 // CHECK-NOT: sil hidden [thunk] @_TToF{{.*}}Wotsit{{.*}}

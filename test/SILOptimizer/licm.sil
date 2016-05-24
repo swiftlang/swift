@@ -204,3 +204,43 @@ bb2:
   %52 = tuple ()
   return %52 : $()
 }
+
+public protocol P : class {
+  func foo() -> Int32
+  func boo() -> Int32
+}
+
+// Check that LICM does not hoist a metatype instruction before
+// the open_existential instruction which creates the archtype,
+// because this would break the dominance relation between them.
+// CHECK-LABEL: sil @dont_hoist_metatype
+// CHECK-NOT: metatype
+// CHECK-NOT: witness_method
+// CHECK: bb1({{%.*}} : $P)
+// CHECK-NOT: metatype
+// CHECK-NOT: witness_method
+// CHECK: open_existential_ref
+// CHECK: metatype
+// CHECK: witness_method
+// CHECK: cond_br
+sil @dont_hoist_metatype : $@convention(thin) (@inout Builtin.Int1, @owned P) -> () {
+bb0(%0 : $*Builtin.Int1, %1 : $P):
+  br bb1(%1 : $P)
+
+// Loop
+bb1(%existential : $P):
+  %2 = open_existential_ref %existential : $P to $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P
+  %3 = metatype $@thick (@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P).Type
+  %4 = witness_method $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P, #P.foo!1, %2 : $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+  %5 = apply %4<@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+  %6 = load %0 : $*Builtin.Int1
+  cond_br %6, bb3, bb1(%existential : $P)
+
+bb3:
+  br bb4
+
+bb4:
+  strong_release %1 : $P
+  %10 = tuple ()
+  return %10 : $()
+}

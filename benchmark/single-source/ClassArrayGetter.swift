@@ -32,6 +32,6 @@ public func run_ClassArrayGetter(_ N: Int) {
     a.append(Box(v:i))
   }
   for _ in 1...N {
-    sumArray(a)
+    _ = sumArray(a)
   }
 }

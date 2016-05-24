@@ -29,36 +29,6 @@ extension Collection {
 // CHECK: 4
 print(["a", "b", "c", "d"].clone().myCount)
 
-/*
-FIXME: <rdar://problem/25665969> swift-3-indexing-model: Interpreter/protocol_extensions.swift fails
-extension Collection {
-  final func indexMatching(_ fn: Iterator.Element -> Bool) -> Index? {
-    for i in myIndices {
-      if fn(self[i]) { return i }
-    }
-    return nil
-  }
-}
-
-// CHECK-FIXME: 2
-print(["a", "b", "c", "d"].indexMatching({$0 == "c"})!)
-
-// Extend certain instances of a collection (those that have equatable
-// element types) with another algorithm.
-extension Collection where Self.Iterator.Element : Equatable {
-  final func myIndexOf(_ element: Iterator.Element) -> Index? {
-    for i in self.indices {
-      if self[i] == element { return i }
-    }
-
-    return nil
-  }
-}
-
-// CHECK-FIXME: 3
-print(["a", "b", "c", "d", "e"].myIndexOf("d")!)
-*/
-
 extension Sequence {
   final public func myEnumerated() -> EnumeratedSequence<Self> {
     return self.enumerated()
@@ -109,19 +79,6 @@ extension MutableCollection
     return self.partition()
   }
 }
-
-/*
-FIXME: <rdar://problem/25665969> swift-3-indexing-model: Interpreter/protocol_extensions.swift fails
-// CHECK-FIXME: 4 3 1 2 | 5 9 8 6 7 6
-var evenOdd = [5, 3, 6, 2, 4, 9, 8, 1, 7, 6]
-var evenOddSplit = evenOdd.myPartition()
-for i in evenOdd.myIndices {
-  if i == evenOddSplit { print(" |", terminator: "") }
-  if i > 0 { print(" ", terminator: "") }
-  print(evenOdd[i], terminator: "")
-}
-print("")
-*/
 
 extension RangeReplaceableCollection {
   public final func myJoin<S : Sequence where S.Iterator.Element == Self>(

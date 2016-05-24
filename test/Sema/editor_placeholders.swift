@@ -20,7 +20,7 @@ f(a2)
 <#T#> // expected-error{{editor placeholder in source file}}
 
 // FIXME: <rdar://problem/22432828> Lexer yields "editor placeholder in source file" error twice when placeholder is first token
-<#T##Int#> // expected-error 2{{editor placeholder in source file}}
+_ = <#T##Int#> // expected-error {{editor placeholder in source file}}
 
 f(<#T#> + 1) // expected-error{{editor placeholder in source file}}
 f(<#T##Int#>) // expected-error{{editor placeholder in source file}}

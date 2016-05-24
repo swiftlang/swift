@@ -11,7 +11,7 @@ b as Derived
 b as! Base
 
 var opti : Int?
-// Don't add bang.
+// Add bang.
 var i : Int = opti
 // But remove unnecessary bang.
 var i2 : Int = i!
@@ -62,3 +62,5 @@ func ftest1() {
   // Don't replace the variable name with '_'
   let myvar = 0
 }
+
+func ftest2(x x: Int -> Int) {}

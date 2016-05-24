@@ -154,13 +154,27 @@ RawComment Decl::getRawComment() const {
   return RawComment();
 }
 
+static const Decl* getGroupDecl(const Decl *D) {
+  auto GroupD = D;
+
+  // Extensions always exist in the same group with the nominal.
+  if (auto ED = dyn_cast_or_null<ExtensionDecl>(D->getDeclContext()->
+                                                getInnermostTypeContext())) {
+    if (auto ExtTy = ED->getExtendedType())
+      GroupD = ExtTy->getAnyNominal();
+  }
+  return GroupD;
+}
+
 Optional<StringRef> Decl::getGroupName() const {
   if (hasClangNode())
     return None;
-  // We can only get group information from deserialized module files.
-  if (auto *Unit =
-      dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
-    return Unit->getGroupNameForDecl(this);
+  if (auto GroupD = getGroupDecl(this)) {
+    // We can only get group information from deserialized module files.
+    if (auto *Unit =
+        dyn_cast<FileUnit>(GroupD->getDeclContext()->getModuleScopeContext())) {
+      return Unit->getGroupNameForDecl(GroupD);
+    }
   }
   return None;
 }
@@ -168,10 +182,12 @@ Optional<StringRef> Decl::getGroupName() const {
 Optional<StringRef> Decl::getSourceFileName() const {
   if (hasClangNode())
     return None;
-  // We can only get group information from deserialized module files.
-  if (auto *Unit =
-      dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
-    return Unit->getSourceFileNameForDecl(this);
+  if (auto GroupD = getGroupDecl(this)) {
+    // We can only get group information from deserialized module files.
+    if (auto *Unit =
+        dyn_cast<FileUnit>(GroupD->getDeclContext()->getModuleScopeContext())) {
+      return Unit->getSourceFileNameForDecl(GroupD);
+    }
   }
   return None;
 }

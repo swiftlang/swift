@@ -12,19 +12,8 @@ import os
 import unittest
 from argparse import Namespace
 
-from swift_build_support.cmake import (
-    CMake,
-    CMakeOptions,
-    host_cmake,
-)
-
-
-class HostCMakeTestCase(unittest.TestCase):
-    def test_cmake_available_on_this_platform(self):
-        # Test that CMake is installed on this platform, as a means of
-        # testing host_cmake().
-        cmake = host_cmake(xcrun_toolchain='default')
-        self.assertEqual(os.path.split(cmake)[-1], 'cmake')
+from swift_build_support.cmake import CMake, CMakeOptions
+from swift_build_support.toolchain import host_toolchain
 
 
 class CMakeTestCase(unittest.TestCase):
@@ -53,13 +42,12 @@ class CMakeTestCase(unittest.TestCase):
     def cmake(self, args):
         """Return new CMake object initialized with given args
         """
-        host_distcc = None
+        toolchain = host_toolchain()
+        toolchain.cc = args.host_cc
+        toolchain.cxx = args.host_cxx
         if args.distcc:
-            host_distcc = self.mock_distcc_path()
-        return CMake(args=args,
-                     host_cc=args.host_cc,
-                     host_cxx=args.host_cxx,
-                     host_distcc=host_distcc)
+            toolchain.distcc = self.mock_distcc_path()
+        return CMake(args=args, toolchain=toolchain)
 
     def test_common_options_defaults(self):
         args = self.default_args()

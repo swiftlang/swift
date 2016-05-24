@@ -89,9 +89,9 @@ public extension PairLike where FirstType : Cacheable {
 public protocol ClassProto : class {}
 
 @objc public protocol ObjCProtoWithOptional {
-  optional func optionalMethod()
-  optional var optionalVar: Int { get }
-  optional subscript (i: Int) -> Int { get }
+  @objc optional func optionalMethod()
+  @objc optional var optionalVar: Int { get }
+  @objc optional subscript (i: Int) -> Int { get }
 }
 
 

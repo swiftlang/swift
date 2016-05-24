@@ -49,9 +49,9 @@ class Y<U> : X<Int> {
 }
 
 func use_d(_ d: D) -> Int {
-  d.b_foo()
-  d.bar(1.0)
-  d.bas()
+  _ = d.b_foo()
+  _ = d.bar(1.0)
+  _ = d.bas()
 
   return d.zippity
 }

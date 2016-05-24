@@ -29,9 +29,20 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @_transparent
-  @warn_unused_result
-  public static func fromOpaque(_ value: OpaquePointer) -> Unmanaged {
+  public static func fromOpaque(_ value: UnsafePointer<Void>) -> Unmanaged {
     return Unmanaged(_private: unsafeBitCast(value, to: Instance.self))
+  }
+
+  /// Unsafely convert an unmanaged class reference to a pointer
+  ///
+  /// This operation does not change reference counts.
+  ///
+  ///     let str0: CFString = "boxcar"
+  ///     let bits = Unmanaged.passUnretained(str0)
+  ///     let str1 = Unmanaged<CFString>(bits).object
+  @_transparent
+  public func toOpaque() -> UnsafeMutablePointer<Void> {
+    return unsafeBitCast(_value, to: UnsafeMutablePointer<Void>.self)
   }
 
   /// Create an unmanaged reference with an unbalanced retain.
@@ -41,7 +52,6 @@ public struct Unmanaged<Instance : AnyObject> {
   /// does not know the ownership rules for, but you know that the
   /// API expects you to pass the object at +1.
   @_transparent
-  @warn_unused_result
   public static func passRetained(_ value: Instance) -> Unmanaged {
     return Unmanaged(_private: value).retain()
   }
@@ -56,7 +66,6 @@ public struct Unmanaged<Instance : AnyObject> {
   ///     CFArraySetValueAtIndex(.passUnretained(array), i,
   ///                            .passUnretained(object))
   @_transparent
-  @warn_unused_result
   public static func passUnretained(_ value: Instance) -> Unmanaged {
     return Unmanaged(_private: value)
   }
@@ -66,7 +75,6 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   /// This is useful when a function returns an unmanaged reference
   /// and you know that you're not responsible for releasing the result.
-  @warn_unused_result
   public func takeUnretainedValue() -> Instance {
     return _value
   }
@@ -76,7 +84,6 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   /// This is useful when a function returns an unmanaged reference
   /// and you know that you're responsible for releasing the result.
-  @warn_unused_result
   public func takeRetainedValue() -> Instance {
     let result = _value
     release()
@@ -144,7 +151,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///    }
   ///  }
   ///
-  /// The last rule applies transitively through a chains of stored references
+  /// The last rule applies transitively through a chain of stored references
   /// and nested structs.
   ///
   /// Examples:
@@ -205,4 +212,18 @@ public struct Unmanaged<Instance : AnyObject> {
     return self
   }
 #endif
+}
+
+extension Unmanaged {
+  @available(*, unavailable, 
+    message:"use 'fromOpaque(_: UnsafePointer<Void>)' instead")
+  public static func fromOpaque(_ value: OpaquePointer) -> Unmanaged {
+    Builtin.unreachable()
+  }
+  
+  @available(*, unavailable, 
+    message:"use 'toOpaque() -> UnsafePointer<Void>' instead")
+  public func toOpaque() -> OpaquePointer {
+    Builtin.unreachable()
+  }
 }

@@ -391,6 +391,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   if (IsKnownNonCascading)
     isCascadingUse = false;
 
+  SmallVector<UnqualifiedLookupResult, 4> UnavailableInnerResults;
+
   // Never perform local lookup for operators.
   if (Name.isOperator()) {
     if (!isCascadingUse.hasValue()) {
@@ -520,7 +522,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         if (TypeResolver)
           TypeResolver->resolveDeclSignature(BaseDecl);
 
-        unsigned options = NL_UnqualifiedDefault;
+        NLOptions options = NL_UnqualifiedDefault;
         if (isCascadingUse.getValue())
           options |= NL_KnownCascadingDependency;
         else
@@ -565,9 +567,25 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         }
 
         if (FoundAny) {
-          if (DebugClient)
-            filterForDiscriminator(Results, DebugClient);
-          return;
+          // Predicate that determines whether a lookup result should
+          // be unavailable except as a last-ditch effort.
+          auto unavailableLookupResult =
+            [&](const UnqualifiedLookupResult &result) {
+            return result.getValueDecl()->getAttrs()
+                     .isUnavailableInCurrentSwift();
+          };
+
+          // If all of the results we found are unavailable, keep looking.
+          if (std::all_of(Results.begin(), Results.end(),
+                          unavailableLookupResult)) {
+            UnavailableInnerResults.append(Results.begin(), Results.end());
+            Results.clear();
+            FoundAny = false;
+          } else {
+            if (DebugClient)
+              filterForDiscriminator(Results, DebugClient);
+            return;
+          }
         }
 
         // Check the generic parameters if our context is a generic type or
@@ -640,6 +658,14 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   // If we've found something, we're done.
   if (!Results.empty())
     return;
+
+  // If we still haven't found anything, but we do have some
+  // declarations that are "unavailable in the current Swift", drop
+  // those in.
+  if (!UnavailableInnerResults.empty()) {
+    Results = std::move(UnavailableInnerResults);
+    return;
+  }
 
   if (!Name.isSimpleName())
     return;
@@ -1024,7 +1050,7 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
 
 bool DeclContext::lookupQualified(Type type,
                                   DeclName member,
-                                  unsigned options,
+                                  NLOptions options,
                                   LazyResolver *typeResolver,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;

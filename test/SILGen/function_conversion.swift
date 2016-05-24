@@ -8,7 +8,7 @@
 // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFtCc_dSi_dSi_XFo_dSi_dSi_
 // CHECK:         [[FUNC:%.*]] = partial_apply [[THUNK]](%0)
 // CHECK:         return [[FUNC]]
-func cToFunc(_ arg: @convention(c) Int -> Int) -> Int -> Int {
+func cToFunc(_ arg: @convention(c) (Int) -> Int) -> (Int) -> Int {
   return arg
 }
 
@@ -17,7 +17,7 @@ func cToFunc(_ arg: @convention(c) Int -> Int) -> Int -> Int {
 // CHECK:         [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]]
 // CHECK:         [[COPY:%.*]] = copy_block [[BLOCK]] : $@convention(block) (Int) -> Int
 // CHECK:         return [[COPY]]
-func cToBlock(_ arg: @convention(c) Int -> Int) -> @convention(block) Int -> Int {
+func cToBlock(_ arg: @convention(c) (Int) -> Int) -> @convention(block) (Int) -> Int {
   return arg
 }
 
@@ -61,7 +61,7 @@ func funcToUpcast(_ x: () -> Domesticated) -> () -> Feral {
 // CHECK-LABEL: sil hidden @_TF19function_conversion12funcToUpcastFFCS_5FeralT_FCS_12DomesticatedT_ : $@convention(thin) (@owned @callee_owned (@owned Feral) -> ()) -> @owned @callee_owned (@owned Domesticated) -> ()
 // CHECK:         [[FUNC:%.*]] = convert_function %0 : $@callee_owned (@owned Feral) -> () to $@callee_owned (@owned Domesticated) -> (){{.*}} // user: %3
 // CHECK:         return [[FUNC]]
-func funcToUpcast(_ x: Feral -> ()) -> Domesticated -> () {
+func funcToUpcast(_ x: (Feral) -> ()) -> (Domesticated) -> () {
   return x
 }
 
@@ -104,14 +104,14 @@ struct AddrOnly {
 }
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion19convOptionalTrivialFFGSqVS_7Trivial_S0_T_
-func convOptionalTrivial(_ t1: Trivial? -> Trivial) {
+func convOptionalTrivial(_ t1: (Trivial?) -> Trivial) {
 // CHECK:         function_ref @_TTRXFo_dGSqV19function_conversion7Trivial__dS0__XFo_dS0__dGSqS0___
 // CHECK:         partial_apply
-  let _: Trivial -> Trivial? = t1
+  let _: (Trivial) -> Trivial? = t1
 
 // CHECK:         function_ref @_TTRXFo_dGSqV19function_conversion7Trivial__dS0__XFo_dGSQS0___dGSqS0___
 // CHECK:         partial_apply
-  let _: Trivial! -> Trivial? = t1
+  let _: (Trivial!) -> Trivial? = t1
 }
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqV19function_conversion7Trivial__dS0__XFo_dS0__dGSqS0___ : $@convention(thin) (Trivial, @owned @callee_owned (Optional<Trivial>) -> Trivial) -> Optional<Trivial>
@@ -127,14 +127,14 @@ func convOptionalTrivial(_ t1: Trivial? -> Trivial) {
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion20convOptionalLoadableFFGSqVS_8Loadable_S0_T_
-func convOptionalLoadable(_ l1: Loadable? -> Loadable) {
+func convOptionalLoadable(_ l1: (Loadable?) -> Loadable) {
 // CHECK:         function_ref @_TTRXFo_oGSqV19function_conversion8Loadable__oS0__XFo_oS0__oGSqS0___
 // CHECK:         partial_apply
-  let _: Loadable -> Loadable? = l1
+  let _: (Loadable) -> Loadable? = l1
 
 // CHECK:         function_ref @_TTRXFo_oGSqV19function_conversion8Loadable__oS0__XFo_oGSQS0___oGSqS0___
 // CHECK:         partial_apply
-  let _: Loadable! -> Loadable? = l1
+  let _: (Loadable!) -> Loadable? = l1
 }
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oGSqV19function_conversion8Loadable__oS0__XFo_oGSQS0___oGSqS0___ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<Loadable>, @owned @callee_owned (@owned Optional<Loadable>) -> @owned Loadable) -> @owned Optional<Loadable>
@@ -144,14 +144,14 @@ func convOptionalLoadable(_ l1: Loadable? -> Loadable) {
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion20convOptionalAddrOnlyFFGSqVS_8AddrOnly_S0_T_
-func convOptionalAddrOnly(_ a1: AddrOnly? -> AddrOnly) {
+func convOptionalAddrOnly(_ a1: (AddrOnly?) -> AddrOnly) {
 // CHECK:         function_ref @_TTRXFo_iGSqV19function_conversion8AddrOnly__iS0__XFo_iGSqS0___iGSqS0___
 // CHECK:         partial_apply
-  let _: AddrOnly? -> AddrOnly? = a1
+  let _: (AddrOnly?) -> AddrOnly? = a1
 
 // CHECK:         function_ref @_TTRXFo_iGSqV19function_conversion8AddrOnly__iS0__XFo_iGSQS0___iGSqS0___
 // CHECK:         partial_apply
-  let _: AddrOnly! -> AddrOnly? = a1
+  let _: (AddrOnly!) -> AddrOnly? = a1
 }
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iGSqV19function_conversion8AddrOnly__iS0__XFo_iGSqS0___iGSqS0___ : $@convention(thin) (@in Optional<AddrOnly>, @owned @callee_owned (@in Optional<AddrOnly>) -> @out AddrOnly) -> @out Optional<AddrOnly>
@@ -191,18 +191,18 @@ extension Loadable : P {}
 extension AddrOnly : P {}
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion22convExistentialTrivialFTFPS_1Q_VS_7Trivial2t3FGSqPS0___S1__T_
-func convExistentialTrivial(_ t2: Q -> Trivial, t3: Q? -> Trivial) {
+func convExistentialTrivial(_ t2: (Q) -> Trivial, t3: (Q?) -> Trivial) {
 // CHECK:         function_ref @_TTRXFo_iP19function_conversion1Q__dVS_7Trivial_XFo_dS1__iPS_1P__
 // CHECK:         partial_apply
-  let _: Trivial -> P = t2
+  let _: (Trivial) -> P = t2
 
 // CHECK:         function_ref @_TTRXFo_iGSqP19function_conversion1Q___dVS_7Trivial_XFo_dGSqS1___iPS_1P__
 // CHECK:         partial_apply
-  let _: Trivial? -> P = t3
+  let _: (Trivial?) -> P = t3
 
 // CHECK:         function_ref @_TTRXFo_iP19function_conversion1Q__dVS_7Trivial_XFo_iPS_1P__iPS2___
 // CHECK:         partial_apply
-  let _: P -> P = t2
+  let _: (P) -> P = t2
 }
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP19function_conversion1Q__dVS_7Trivial_XFo_dS1__iPS_1P__ : $@convention(thin) (Trivial, @owned @callee_owned (@in Q) -> Trivial) -> @out P
@@ -245,18 +245,18 @@ func convExistentialTrivial(_ t2: Q -> Trivial, t3: Q? -> Trivial) {
 // ==== Existential metatypes
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion23convExistentialMetatypeFFGSqPMPS_1Q__MVS_7TrivialT_
-func convExistentialMetatype(_ em: Q.Type? -> Trivial.Type) {
+func convExistentialMetatype(_ em: (Q.Type?) -> Trivial.Type) {
 // CHECK:         function_ref @_TTRXFo_dGSqPMP19function_conversion1Q___dXMtVS_7Trivial_XFo_dXMtS1__dXPMTPS_1P__
 // CHECK:         partial_apply
-  let _: Trivial.Type -> P.Type = em
+  let _: (Trivial.Type) -> P.Type = em
 
 // CHECK:         function_ref @_TTRXFo_dGSqPMP19function_conversion1Q___dXMtVS_7Trivial_XFo_dGSqMS1___dXPMTPS_1P__
 // CHECK:         partial_apply
-  let _: Trivial.Type? -> P.Type = em
+  let _: (Trivial.Type?) -> P.Type = em
 
 // CHECK:         function_ref @_TTRXFo_dGSqPMP19function_conversion1Q___dXMtVS_7Trivial_XFo_dXPMTPS_1P__dXPMTPS2___
 // CHECK:         partial_apply
-  let _: P.Type -> P.Type = em
+  let _: (P.Type) -> P.Type = em
 }
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqPMP19function_conversion1Q___dXMtVS_7Trivial_XFo_dXMtS1__dXPMTPS_1P__ : $@convention(thin) (@thin Trivial.Type, @owned @callee_owned (Optional<Q.Type>) -> @thin Trivial.Type) -> @thick P.Type
@@ -341,10 +341,10 @@ func convUpcastMetatype(_ c4: (Parent.Type, Trivial?) -> Child.Type,
 // ==== Function to existential -- make sure we maximally abstract it
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion19convFuncExistentialFFP_FSiSiT_ : $@convention(thin) (@owned @callee_owned (@in protocol<>) -> @owned @callee_owned (Int) -> Int) -> ()
-func convFuncExistential(_ f1: Any -> Int -> Int) {
+func convFuncExistential(_ f1: (Any) -> (Int) -> Int) {
 // CHECK:         function_ref @_TTRXFo_iP__oXFo_dSi_dSi__XFo_oXFo_dSi_dSi__iP__
 // CHECK:         partial_apply %3(%0)
-  let _: (Int -> Int) -> Any = f1
+  let _: ((Int) -> Int) -> Any = f1
 }
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP__oXFo_dSi_dSi__XFo_oXFo_dSi_dSi__iP__ : $@convention(thin) (@owned @callee_owned (Int) -> Int, @owned @callee_owned (@in protocol<>) -> @owned @callee_owned (Int) -> Int) -> @out protocol<>
@@ -369,10 +369,10 @@ func convFuncExistential(_ f1: Any -> Int -> Int) {
 // ==== Class-bound archetype upcast
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion29convClassBoundArchetypeUpcast
-func convClassBoundArchetypeUpcast<T : Parent>(_ f1: Parent -> (T, Trivial)) {
+func convClassBoundArchetypeUpcast<T : Parent>(_ f1: (Parent) -> (T, Trivial)) {
 // CHECK:         function_ref @_TTRGRxC19function_conversion6ParentrXFo_oS0__oxdVS_7Trivial_XFo_ox_oS0_dGSqS1___
 // CHECK:         partial_apply
-  let _: T -> (Parent, Trivial?) = f1
+  let _: (T) -> (Parent, Trivial?) = f1
 }
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGRxC19function_conversion6ParentrXFo_oS0__oxdVS_7Trivial_XFo_ox_oS0_dGSqS1___ : $@convention(thin) <T where T : Parent> (@owned T, @owned @callee_owned (@owned Parent) -> (@owned T, Trivial)) -> (@owned Parent, Optional<Trivial>)
@@ -386,10 +386,10 @@ func convClassBoundArchetypeUpcast<T : Parent>(_ f1: Parent -> (T, Trivial)) {
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion37convClassBoundMetatypeArchetypeUpcast
-func convClassBoundMetatypeArchetypeUpcast<T : Parent>(_ f1: Parent.Type -> (T.Type, Trivial)) {
+func convClassBoundMetatypeArchetypeUpcast<T : Parent>(_ f1: (Parent.Type) -> (T.Type, Trivial)) {
 // CHECK:         function_ref @_TTRGRxC19function_conversion6ParentrXFo_dXMTS0__dXMTxdVS_7Trivial_XFo_dXMTx_dXMTS0_dGSqS1___
 // CHECK:         partial_apply
-  let _: T.Type -> (Parent.Type, Trivial?) = f1
+  let _: (T.Type) -> (Parent.Type, Trivial?) = f1
 }
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGRxC19function_conversion6ParentrXFo_dXMTS0__dXMTxdVS_7Trivial_XFo_dXMTx_dXMTS0_dGSqS1___ : $@convention(thin) <T where T : Parent> (@thick T.Type, @owned @callee_owned (@thick Parent.Type) -> (@thick T.Type, Trivial)) -> (@thick Parent.Type, Optional<Trivial>)
@@ -413,11 +413,11 @@ func convClassBoundMetatypeArchetypeUpcast<T : Parent>(_ f1: Parent.Type -> (T.T
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqTSiSi____XFo_dSidSi__ : $@convention(thin) (Int, Int, @owned @callee_owned (Optional<(Int, Int)>) -> ()) -> ()
 
-func convTupleScalar(_ f1: Q -> (),
+func convTupleScalar(_ f1: (Q) -> (),
                      f2: (parent: Q) -> (),
                      f3: (tuple: (Int, Int)?) -> ()) {
   let _: (parent: P) -> () = f1
-  let _: P -> () = f2
+  let _: (P) -> () = f2
   let _: (Int, Int) -> () = f3
 }
 

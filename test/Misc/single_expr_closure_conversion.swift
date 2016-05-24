@@ -2,7 +2,7 @@
 
 struct Blob {}
 
-func withBlob(block: Blob -> ()) {}
+func withBlob(block: (Blob) -> ()) {}
 
 protocol Binding {}
 extension Int: Binding {}
@@ -11,14 +11,17 @@ extension String: Binding {}
 extension Blob: Binding {}
 
 struct Stmt {
+  @discardableResult
   func bind(_ values: Binding?...) -> Stmt {
     return self
   }
 
+  @discardableResult
   func bind(_ values: [Binding?]) -> Stmt {
     return self
   }
 
+  @discardableResult
   func bind(_ values: [String: Binding?]) -> Stmt {
     return self
   }
@@ -42,6 +45,8 @@ class C {
 	var a = A()
 
 	func act() {
-		a.dispatch({() -> Void in self.prop})
+		a.dispatch({() -> Void in
+                  self.prop // expected-warning {{expression of type 'Int' is unused}}
+                })
 	}
 }

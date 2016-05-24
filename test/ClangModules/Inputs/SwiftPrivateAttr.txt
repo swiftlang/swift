@@ -95,11 +95,7 @@ struct NSOptions : OptionSet {
   static var __privA: NSOptions { get }
   static var B: NSOptions { get }
 }
-@available(*, unavailable, renamed: "__PrivCFType", message: "Not available in Swift")
-typealias __PrivCFTypeRef = __PrivCFType
 class __PrivCFType {
 }
-@available(*, unavailable, renamed: "__PrivCFSub", message: "Not available in Swift")
-typealias __PrivCFSubRef = __PrivCFSub
 typealias __PrivCFSub = __PrivCFType
 typealias __PrivInt = Int32

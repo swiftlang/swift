@@ -17,6 +17,7 @@
 #include "swift/Runtime/Debug.h"
 #import <Foundation/Foundation.h>
 #include <TargetConditionals.h>
+#include "../SwiftShims/FoundationShims.h"
 
 using namespace swift;
 
@@ -74,8 +75,7 @@ static NSOperatingSystemVersion operatingSystemVersionFromPlist() {
 
 /// Return the version of the operating system currently running for use in
 /// API availability queries.
-SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" NSOperatingSystemVersion _swift_stdlib_operatingSystemVersion() {
+_SwiftNSOperatingSystemVersion swift::_swift_stdlib_operatingSystemVersion() {
   static NSOperatingSystemVersion version = ([]{
     // Use -[NSProcessInfo.operatingSystemVersion] when present
     // (on iOS 8 and OS X 10.10 and above).
@@ -88,5 +88,5 @@ extern "C" NSOperatingSystemVersion _swift_stdlib_operatingSystemVersion() {
     }
   })();
 
-  return version;
+  return { version.majorVersion, version.minorVersion, version.patchVersion };
 }

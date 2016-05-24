@@ -104,6 +104,12 @@ private:
     info.ReceiverUSR = symbol.receiverUSR;
     info.IsDynamic = symbol.roles & (unsigned)SymbolRole::Dynamic;
     info.IsTestCandidate = symbol.subKinds & SymbolSubKind::UnitTest;
+    std::vector<UIdent> uidAttrs;
+    if (!isRef) {
+      uidAttrs =
+        SwiftLangSupport::UIDsFromDeclAttributes(symbol.decl->getAttrs());
+      info.Attrs = uidAttrs;
+    }
     return func(info);
   }
 

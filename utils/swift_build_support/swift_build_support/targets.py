@@ -74,9 +74,9 @@ def stdlib_deployment_targets():
         elif machine == 'aarch64':
             return ['linux-aarch64']
         elif machine == 'ppc64':
-            return ['linux-ppc64']
+            return ['linux-powerpc64']
         elif machine == 'ppc64le':
-            return ['linux-ppc64le']
+            return ['linux-powerpc64le']
     elif system == 'Darwin':
         if machine == 'x86_64':
             return [

@@ -1299,7 +1299,9 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                     /*typeToFill*/ nullptr,
                     std::move(bindings));
 
-  auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, layout);
+  auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, origType,
+                                                       substType, subs,
+                                                       layout);
 
   llvm::Value *data;
   if (layout.isKnownEmpty()) {

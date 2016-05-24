@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | FileCheck %s
 
 @objc protocol P1 {
-  optional func method(_ x: Int)
+  @objc optional func method(_ x: Int)
 
-  optional var prop: Int { get }
+  @objc optional var prop: Int { get }
 
-  optional subscript (i: Int) -> Int { get }
+  @objc optional subscript (i: Int) -> Int { get }
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}optionalMethodGeneric{{.*}} : $@convention(thin) <T where T : P1> (@owned T) -> ()

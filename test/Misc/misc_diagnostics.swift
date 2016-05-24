@@ -13,7 +13,7 @@ if let realRoomName = roomName as! NSString { // expected-error {{initializer fo
 
 var pi = 3.14159265358979
 var d: CGFloat = 2.0
-var dpi:CGFloat = d*pi // expected-error{{cannot convert value of type 'Double' to expected argument type 'CGFloat'}}
+var dpi:CGFloat = d*pi // expected-error{{binary operator '*' cannot be applied to operands of type 'CGFloat' and 'Double'}} // expected-note{{expected an argument list of type '(CGFloat, CGFloat)'}}
 
 let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert value of type 'Float' to specified type 'CGFloat'}}
 
@@ -30,7 +30,7 @@ var b: Int = [1, 2, 3] // expected-error{{contextual type 'Int' cannot be used w
 var f1: Float = 2.0
 var f2: Float = 3.0
 
-var dd: Double = f1 - f2 // expected-error{{cannot convert value of type 'Float' to expected argument type 'Double'}}
+var dd: Double = f1 - f2 // expected-error{{binary operator '-' cannot be applied to two 'Float' operands}} // expected-note{{expected an argument list of type '(Double, Double)'}}
 
 func f() -> Bool {
   return 1 + 1 // expected-error{{no '+' candidates produce the expected contextual result type 'Bool'}}
@@ -60,7 +60,7 @@ func retV() { return true } // expected-error {{unexpected non-void return value
 func retAI() -> Int {
     let a = [""]
     let b = [""]
-    return (a + b) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Int'}}
+    return (a + b) // expected-error{{binary operator '+' cannot be applied to two '[String]' operands}} // expected-note{{expected an argument list of type '(Int, Int)'}}
 }
 
 func bad_return1() {
@@ -81,7 +81,7 @@ class MyBadReturnClass {
 }
 
 func ==(lhs:MyBadReturnClass, rhs:MyBadReturnClass) {
-  return MyBadReturnClass.intProperty == MyBadReturnClass.intProperty  // expected-error {{cannot convert value of type 'Int' to expected argument type 'MyBadReturnClass'}}
+  return MyBadReturnClass.intProperty == MyBadReturnClass.intProperty  // expected-error{{binary operator '==' cannot be applied to two 'Int' operands}} // expected-note{{expected an argument list of type '(MyBadReturnClass, MyBadReturnClass)'}}
 }
 
 

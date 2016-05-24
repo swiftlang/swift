@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-ir -g %s -o %t.ll
-// RUN: FileCheck %s --check-prefix CHECK-HIDDEN < %t.ll
 // RUN: FileCheck %s --check-prefix IMPORT-CHECK < %t.ll
 // RUN: FileCheck %s --check-prefix LOC-CHECK < %t.ll
 // RUN: llc %t.ll -filetype=obj -o %t.o
@@ -7,9 +6,6 @@
 // RUN: dwarfdump --verify %t.o
 
 // REQUIRES: OS=macosx
-
-// CHECK-HIDDEN: @[[HIDDEN_GV:_TWVVSC.*]] = linkonce_odr hidden
-// CHECK-HIDDEN-NOT: !DIGlobalVariable({{.*}}[[HIDDEN_GV]]
 
 import ObjectiveC
 import Foundation
@@ -21,11 +17,9 @@ class MyObject : NSObject {
   // LOC-CHECK: ret
   var MyArr = NSArray()
 // IMPORT-CHECK: filename: "test-foundation.swift"
-// IMPORT-CHECK: [[FOUNDATION:[0-9]+]] = !DIModule({{.*}} name: "Foundation",
-// IMPORT-CHECK-SAME:                              {{.*}} includePath:
-// IMPORT-CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray",
-// IMPORT-CHECK-SAME:             scope: ![[FOUNDATION]]
-// IMPORT-CHECK: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}entity: ![[FOUNDATION]]
+// IMPORT-CHECK-DAG: [[FOUNDATION:[0-9]+]] = !DIModule({{.*}} name: "Foundation",{{.*}} includePath:
+// IMPORT-CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray", scope: ![[FOUNDATION]]
+// IMPORT-CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}entity: ![[FOUNDATION]]
 
   func foo(_ obj: MyObject) {
     return obj.foo(obj)
@@ -35,12 +29,12 @@ class MyObject : NSObject {
 // SANITY-DAG: !DISubprogram(name: "blah",{{.*}} line: [[@LINE+2]],{{.*}} isDefinition: true
 extension MyObject {
   func blah() {
-    MyObject()
+    var _ = MyObject()
   }
 }
 
-// SANITY-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "NSObject",{{.*}} identifier: "_TtCSo8NSObject"
-// SANITY-DAG: !DIGlobalVariable(name: "NsObj",{{.*}} line: [[@LINE+1]],{{.*}} type: !"_TtCSo8NSObject",{{.*}} isDefinition: true
+// SANITY-DAG: ![[NSOBJECT:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "NSObject",{{.*}} identifier: "_TtCSo8NSObject"
+// SANITY-DAG: !DIGlobalVariable(name: "NsObj",{{.*}} line: [[@LINE+1]],{{.*}} type: ![[NSOBJECT]],{{.*}} isDefinition: true
 var NsObj: NSObject
 NsObj = MyObject()
 var MyObj: MyObject
@@ -50,8 +44,8 @@ MyObj.blah()
 public func err() {
   // DWARF-CHECK: DW_AT_name{{.*}}NSError
   // DWARF-CHECK: DW_AT_linkage_name{{.*}}_TtCSo7NSError
-  let error = NSError(domain: "myDomain", code: 4, 
-                      userInfo: ["a":1,"b":2,"c":3])
+  let _ = NSError(domain: "myDomain", code: 4, 
+                  userInfo: ["a":1,"b":2,"c":3])
 }
 
 // LOC-CHECK: define {{.*}}4date

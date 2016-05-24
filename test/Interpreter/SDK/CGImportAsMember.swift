@@ -7,11 +7,11 @@ import CoreGraphics
 
 class Colors {
 	// TODO: when issue is fixed, migrate these to CGColor class properties
-	static var black = CGColor.constantColorForName(CGColor.black)!
-	static var white = CGColor.constantColorForName(CGColor.white)!
+	static var black = CGColor.constantColor(for: CGColor.black)!
+	static var white = CGColor.constantColor(for: CGColor.white)!
 
 	// FIXME: this triggers an assert in SILVerifier
-	static var clear = CGColor.constantColorForName(CGColor.clear)!
+	static var clear = CGColor.constantColor(for: CGColor.clear)!
 
 	class func printColors() {
 		print("Colors") // CHECK: Colors

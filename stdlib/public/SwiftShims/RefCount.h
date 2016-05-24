@@ -20,11 +20,11 @@
 #include "SwiftStdint.h"
 
 typedef struct {
-  __swift_uint32_t refCount __attribute__((unavailable));
+  __swift_uint32_t refCount __attribute__((__unavailable__));
 } StrongRefCount;
 
 typedef struct {
-  __swift_uint32_t weakRefCount __attribute__((unavailable));
+  __swift_uint32_t weakRefCount __attribute__((__unavailable__));
 } WeakRefCount;
 
 // not __cplusplus

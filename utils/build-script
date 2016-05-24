@@ -42,14 +42,14 @@ from SwiftBuildSupport import (
 sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 
 # E402 means module level import not at top of file
-import swift_build_support.toolchain  # noqa (E402)
-import swift_build_support.cmake      # noqa (E402)
+from swift_build_support.toolchain import host_toolchain  # noqa (E402)
 import swift_build_support.debug      # noqa (E402)
 from swift_build_support import migration  # noqa (E402)
-import swift_build_support.ninja      # noqa (E402)
 import swift_build_support.tar        # noqa (E402)
 import swift_build_support.targets    # noqa (E402)
 from swift_build_support.cmake import CMake  # noqa (E402)
+from swift_build_support.workspace import Workspace  # noqa(E402)
+from swift_build_support.workspace import compute_build_subdir  # noqa(E402)
 
 
 # A strict parser for bools (unlike Python's `bool()`, where
@@ -85,6 +85,15 @@ def argparse_clang_compiler_version(string):
         return m.group(1, 2, 3)
     raise argparse.ArgumentTypeError(
         "%r is invalid version value. must be 'MAJOR.MINOR.PATCH'" % string)
+
+
+# Check the string is executable path string.
+# Convert it to absolute path.
+def argparse_executable(string):
+    if os.access(string, os.X_OK):
+        return os.path.abspath(string)
+    raise argparse.ArgumentTypeError(
+        "%r is not executable" % string)
 
 
 # Main entry point for the preset mode.
@@ -150,8 +159,8 @@ def main_preset():
         build_script_args += ["--distcc"]
 
     print_with_argv0(
-        "using preset '" + args.preset + "', which expands to " +
-        quote_shell_command(build_script_args))
+        "using preset '" + args.preset + "', which expands to \n\n" +
+        quote_shell_command(build_script_args) + "\n")
 
     check_call(build_script_args, disable_sleep=True)
 
@@ -626,6 +635,10 @@ details of the setups of other systems or automated environments.""")
         help="run the Swift Benchmark Suite after building",
         action="store_true")
     run_tests_group.add_argument(
+        "--skip-test-osx",
+        help="skip testing Swift stdlibs for Mac OS X",
+        action="store_true")
+    run_tests_group.add_argument(
         "--skip-test-linux",
         help="skip testing Swift stdlibs for Linux",
         action="store_true")
@@ -660,6 +673,60 @@ details of the setups of other systems or automated environments.""")
     run_build_group.add_argument(
         "--skip-build-cygwin",
         help="skip building Swift stdlibs for Cygwin",
+        action="store_true")
+    run_build_group.add_argument(
+        "--skip-build-osx",
+        help="skip building Swift stdlibs for MacOSX",
+        action="store_true")
+
+    run_build_group.add_argument(
+        "--skip-build-ios",
+        help="skip building Swift stdlibs for iOS",
+        action="store_true")
+    run_build_group.add_argument(
+        "--skip-build-ios-device",
+        help="skip building Swift stdlibs for iOS devices "
+             "(i.e. build simulators only)",
+        action="store_true")
+    run_build_group.add_argument(
+        "--skip-build-ios-simulator",
+        help="skip building Swift stdlibs for iOS simulator "
+             "(i.e. build devices only)",
+        action="store_true")
+
+    run_build_group.add_argument(
+        "--skip-build-tvos",
+        help="skip building Swift stdlibs for tvOS",
+        action="store_true")
+    run_build_group.add_argument(
+        "--skip-build-tvos-device",
+        help="skip building Swift stdlibs for tvOS devices "
+             "(i.e. build simulators only)",
+        action="store_true")
+    run_build_group.add_argument(
+        "--skip-build-tvos-simulator",
+        help="skip building Swift stdlibs for tvOS simulator "
+             "(i.e. build devices only)",
+        action="store_true")
+
+    run_build_group.add_argument(
+        "--skip-build-watchos",
+        help="skip building Swift stdlibs for watchOS",
+        action="store_true")
+    run_build_group.add_argument(
+        "--skip-build-watchos-device",
+        help="skip building Swift stdlibs for watchOS devices "
+             "(i.e. build simulators only)",
+        action="store_true")
+    run_build_group.add_argument(
+        "--skip-build-watchos-simulator",
+        help="skip building Swift stdlibs for watchOS simulator "
+             "(i.e. build devices only)",
+        action="store_true")
+
+    run_build_group.add_argument(
+        "--skip-build-android",
+        help="skip building Swift stdlibs for Android",
         action="store_true")
 
     run_build_group.add_argument(
@@ -717,18 +784,33 @@ details of the setups of other systems or automated environments.""")
         help="also build for iOS, but disallow tests that require an iOS "
              "device",
         action="store_true")
+    parser.add_argument(
+        "--skip-ios",
+        help="set to skip everything iOS-related",
+        dest="ios",
+        action="store_false")
 
     parser.add_argument(
         "--tvos",
         help="also build for tvOS, but disallow tests that require a tvos "
              "device",
         action="store_true")
+    parser.add_argument(
+        "--skip-tvos",
+        help="set to skip everything tvOS-related",
+        dest="tvos",
+        action="store_false")
 
     parser.add_argument(
         "--watchos",
         help="also build for watchOS, but disallow tests that require an "
              "watchOS device",
         action="store_true")
+    parser.add_argument(
+        "--skip-watchos",
+        help="set to skip everything watchOS-related",
+        dest="watchos",
+        action="store_false")
 
     parser.add_argument(
         "--android",
@@ -773,7 +855,9 @@ details of the setups of other systems or automated environments.""")
     parser.add_argument(
         "--cmake",
         help="the path to a CMake executable that will be used to build "
-             "Swift")
+             "Swift",
+        type=argparse_executable,
+        metavar="PATH")
     parser.add_argument(
         "--show-sdks",
         help="print installed Xcode and SDK versions",
@@ -828,11 +912,13 @@ details of the setups of other systems or automated environments.""")
         "--host-cc",
         help="the absolute path to CC, the 'clang' compiler for the host "
              "platform. Default is auto detected.",
+        type=argparse_executable,
         metavar="PATH")
     parser.add_argument(
         "--host-cxx",
         help="the absolute path to CXX, the 'clang++' compiler for the host "
              "platform. Default is auto detected.",
+        type=argparse_executable,
         metavar="PATH")
     parser.add_argument(
         "--distcc",
@@ -897,6 +983,35 @@ details of the setups of other systems or automated environments.""")
         if '--check-args-only' in args.build_script_impl_args:
             return 0
 
+    # Prepare and validate toolchain
+    toolchain = host_toolchain(xcrun_toolchain=args.darwin_xcrun_toolchain)
+
+    if args.host_cc is not None:
+        toolchain.cc = args.host_cc
+    if args.host_cxx is not None:
+        toolchain.cxx = args.host_cxx
+    if args.cmake is not None:
+        toolchain.cmake = args.cmake
+
+    if toolchain.cc is None or toolchain.cxx is None:
+        print_with_argv0(
+            "Can't find clang. Please install clang-3.5 or a later version.")
+        return 1
+
+    if toolchain.cmake is None:
+        print_with_argv0("Can't find CMake. Please install CMake.")
+        return 1
+
+    if args.distcc:
+        if toolchain.distcc is None:
+            print_with_argv0(
+                "Can't find distcc. Please install distcc")
+            return 1
+        if toolchain.distcc_pump is None:
+            print_with_argv0(
+                "Can't find distcc-pump. Please install distcc-pump")
+            return 1
+
     if args.host_target is None or args.stdlib_deployment_targets is None:
         print_with_argv0("Unknown operating system.")
         return 1
@@ -940,10 +1055,10 @@ details of the setups of other systems or automated environments.""")
     if args.build_variant is None:
         args.build_variant = "Debug"
 
+    # Propagate the default build variant.
     if args.cmark_build_variant is None:
         args.cmark_build_variant = args.build_variant
 
-    # Propagate the default build variant.
     if args.llvm_build_variant is None:
         args.llvm_build_variant = args.build_variant
 
@@ -983,6 +1098,48 @@ details of the setups of other systems or automated environments.""")
     if args.cmake_generator is None:
         args.cmake_generator = "Ninja"
 
+    # SwiftPM and XCTest have a dependency on Foundation.
+    # On OS X, Foundation is built automatically using xcodebuild.
+    # On Linux, we must ensure that it is built manually.
+    if ((args.build_swiftpm or args.build_xctest) and
+            platform.system() != "Darwin"):
+        args.build_foundation = True
+
+    # Propagate global --skip-build
+    if args.skip_build:
+        args.skip_build_linux = True
+        args.skip_build_freebsd = True
+        args.skip_build_cygwin = True
+        args.skip_build_osx = True
+        args.skip_build_ios = True
+        args.skip_build_tvos = True
+        args.skip_build_watchos = True
+        args.skip_build_android = True
+        args.skip_build_benchmarks = True
+        args.build_lldb = False
+        args.build_llbuild = False
+        args.build_swiftpm = False
+        args.build_xctest = False
+        args.build_foundation = False
+        args.build_libdispatch = False
+
+    # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
+    # merely shorthands for --skip-build-{**os}-{device,simulator}
+    if not args.ios or args.skip_build_ios:
+        args.skip_build_ios_device = True
+        args.skip_build_ios_simulator = True
+
+    if not args.tvos or args.skip_build_tvos:
+        args.skip_build_tvos_device = True
+        args.skip_build_tvos_simulator = True
+
+    if not args.watchos or args.skip_build_watchos:
+        args.skip_build_watchos_device = True
+        args.skip_build_watchos_simulator = True
+
+    if not args.android or args.skip_build_android:
+        args.skip_build_android = True
+
     # --validation-test implies --test.
     if args.validation_test:
         args.test = True
@@ -991,11 +1148,15 @@ details of the setups of other systems or automated environments.""")
     if args.test_optimized:
         args.test = True
 
-    # XCTest has a dependency on Foundation.
-    # On OS X, Foundation is built automatically using xcodebuild.
-    # On Linux, we must ensure that it is built manually.
-    if args.build_xctest and platform.system() != "Darwin":
-        args.build_foundation = True
+    # If none of tests specified skip swift stdlib test on all platforms
+    if not args.test and not args.validation_test and not args.long_test:
+        args.skip_test_linux = True
+        args.skip_test_freebsd = True
+        args.skip_test_cygwin = True
+        args.skip_test_osx = True
+        args.skip_test_ios = True
+        args.skip_test_tvos = True
+        args.skip_test_watchos = True
 
     # --skip-test-ios is merely a shorthand for host and simulator tests.
     if args.skip_test_ios:
@@ -1010,272 +1171,58 @@ details of the setups of other systems or automated environments.""")
         args.skip_test_watchos_host = True
         args.skip_test_watchos_simulator = True
 
-    build_script_impl_inferred_args = []
+    # --skip-build-{ios,tvos,watchos}-{device,simulator} implies
+    # --skip-test-{ios,tvos,watchos}-{host,simulator}
+    if args.skip_build_ios_device:
+        args.skip_test_ios_host = True
+    if args.skip_build_ios_simulator:
+        args.skip_test_ios_simulator = True
 
-    if not args.test and not args.validation_test and not args.long_test:
-        build_script_impl_inferred_args += [
-            "--skip-test-cmark",
-            "--skip-test-lldb",
-            "--skip-test-swift",
-            "--skip-test-llbuild",
-            "--skip-test-swiftpm",
-            "--skip-test-xctest",
-            "--skip-test-foundation",
-            "--skip-test-libdispatch",
-            "--skip-test-linux",
-            "--skip-test-freebsd",
-            "--skip-test-cygwin",
-            "--skip-test-osx",
-            "--skip-test-ios-simulator",
-            "--skip-test-ios-host",
-            "--skip-test-tvos-simulator",
-            "--skip-test-tvos-host",
-            "--skip-test-watchos-simulator",
-            "--skip-test-watchos-host",
-        ]
+    if args.skip_build_tvos_device:
+        args.skip_test_tvos_host = True
+    if args.skip_build_tvos_simulator:
+        args.skip_test_tvos_simulator = True
 
-    if args.validation_test:
-        build_script_impl_inferred_args += [
-            "--validation-test"
-        ]
-
-    if args.long_test:
-        build_script_impl_inferred_args += [
-            "--long-test"
-        ]
+    if args.skip_build_watchos_device:
+        args.skip_test_watchos_host = True
+    if args.skip_build_watchos_simulator:
+        args.skip_test_watchos_simulator = True
 
     if not args.host_test:
-        build_script_impl_inferred_args += [
-            "--skip-test-ios-host",
-            "--skip-test-tvos-host",
-            "--skip-test-watchos-host",
-        ]
-
-    if not args.benchmark:
-        build_script_impl_inferred_args += [
-            "--skip-test-benchmarks"
-        ]
-
-    if not args.test_optimized:
-        build_script_impl_inferred_args += [
-            "--skip-test-optimized"
-        ]
-
-    if not args.ios:
-        build_script_impl_inferred_args += [
-            "--skip-build-ios",
-            "--skip-test-ios-simulator",
-            "--skip-test-ios-host",
-        ]
-
-    if not args.tvos:
-        build_script_impl_inferred_args += [
-            "--skip-build-tvos",
-            "--skip-test-tvos-simulator",
-            "--skip-test-tvos-host",
-        ]
-
-    if not args.watchos:
-        build_script_impl_inferred_args += [
-            "--skip-build-watchos",
-            "--skip-test-watchos-simulator",
-            "--skip-test-watchos-host",
-        ]
-
-    if not args.android:
-        build_script_impl_inferred_args += [
-            "--skip-build-android",
-        ]
-
-    if not args.build_lldb:
-        build_script_impl_inferred_args += [
-            "--skip-build-lldb"
-        ]
-
-    if not args.build_llbuild:
-        build_script_impl_inferred_args += [
-            "--skip-build-llbuild"
-        ]
-
-    if not args.build_swiftpm:
-        build_script_impl_inferred_args += [
-            "--skip-build-swiftpm"
-        ]
-
-    if not args.build_xctest:
-        build_script_impl_inferred_args += [
-            "--skip-build-xctest"
-        ]
-
-    if not args.build_foundation:
-        build_script_impl_inferred_args += [
-            "--skip-build-foundation"
-        ]
-
-    if not args.build_libdispatch:
-        build_script_impl_inferred_args += [
-            "--skip-build-libdispatch"
-        ]
-
-    if args.skip_build_benchmarks:
-        build_script_impl_inferred_args += [
-            "--skip-build-benchmarks"
-        ]
-
-    if args.skip_build:
-        build_script_impl_inferred_args += [
-            "--skip-build-cmark",
-            "--skip-build-llvm",
-            "--skip-build-swift",
-            "--skip-build-linux",
-            "--skip-build-freebsd",
-            "--skip-build-cygwin",
-            "--skip-build-osx",
-            "--skip-build-ios",
-            "--skip-build-ios-device",
-            "--skip-build-ios-simulator",
-            "--skip-build-tvos",
-            "--skip-build-tvos-device",
-            "--skip-build-tvos-simulator",
-            "--skip-build-watchos",
-            "--skip-build-watchos-device",
-            "--skip-build-watchos-simulator",
-            "--skip-build-android",
-            "--skip-build-lldb",
-            "--skip-build-llbuild",
-            "--skip-build-swiftpm",
-            "--skip-build-xctest",
-            "--skip-build-foundation",
-            "--skip-build-libdispatch",
-            "--skip-build-benchmarks",
-        ]
-
-    if platform.system() == 'Darwin':
-        build_script_impl_inferred_args += [
-            "--toolchain-prefix",
-            swift_build_support.targets.darwin_toolchain_prefix(
-                args.install_prefix),
-        ]
+        args.skip_test_ios_host = True
+        args.skip_test_tvos_host = True
+        args.skip_test_watchos_host = True
 
     if args.build_subdir is None:
-        # Create a name for the build directory.
-        args.build_subdir = args.cmake_generator.replace(" ", "_")
-        cmark_build_dir_label = args.cmark_build_variant
-        if args.cmark_assertions:
-            cmark_build_dir_label += "Assert"
+        args.build_subdir = compute_build_subdir(args)
 
-        llvm_build_dir_label = args.llvm_build_variant
-        if args.llvm_assertions:
-            llvm_build_dir_label += "Assert"
+    workspace = Workspace(
+        source_root=SWIFT_SOURCE_ROOT,
+        build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
 
-        swift_build_dir_label = args.swift_build_variant
-        if args.swift_assertions:
-            swift_build_dir_label += "Assert"
-        if args.swift_analyze_code_coverage != "false":
-            swift_build_dir_label += "Coverage"
-
-        swift_stdlib_build_dir_label = args.swift_stdlib_build_variant
-        if args.swift_stdlib_assertions:
-            swift_stdlib_build_dir_label += "Assert"
-
-        # FIXME: mangle LLDB build configuration into the directory name.
-        if (llvm_build_dir_label == swift_build_dir_label and
-                llvm_build_dir_label == swift_stdlib_build_dir_label and
-                llvm_build_dir_label == cmark_build_dir_label):
-            # Use a simple directory name if all projects use the same build
-            # type.
-            args.build_subdir += "-" + llvm_build_dir_label
-        elif (llvm_build_dir_label != swift_build_dir_label and
-                llvm_build_dir_label == swift_stdlib_build_dir_label and
-                llvm_build_dir_label == cmark_build_dir_label):
-            # Swift build type differs.
-            args.build_subdir += "-" + llvm_build_dir_label
-            args.build_subdir += "+swift-" + swift_build_dir_label
-        elif (llvm_build_dir_label == swift_build_dir_label and
-                llvm_build_dir_label != swift_stdlib_build_dir_label and
-                llvm_build_dir_label == cmark_build_dir_label):
-            # Swift stdlib build type differs.
-            args.build_subdir += "-" + llvm_build_dir_label
-            args.build_subdir += "+stdlib-" + swift_stdlib_build_dir_label
-        elif (llvm_build_dir_label == swift_build_dir_label and
-                llvm_build_dir_label == swift_stdlib_build_dir_label and
-                llvm_build_dir_label != cmark_build_dir_label):
-            # cmark build type differs.
-            args.build_subdir += "-" + llvm_build_dir_label
-            args.build_subdir += "+cmark-" + cmark_build_dir_label
-        else:
-            # We don't know how to create a short name, so just mangle in all
-            # the information.
-            args.build_subdir += "+cmark-" + cmark_build_dir_label
-            args.build_subdir += "+llvm-" + llvm_build_dir_label
-            args.build_subdir += "+swift-" + swift_build_dir_label
-            args.build_subdir += "+stdlib-" + swift_stdlib_build_dir_label
-
-    build_dir = os.path.join(SWIFT_BUILD_ROOT, args.build_subdir)
-
-    if args.clean and os.path.isdir(build_dir):
-        shutil.rmtree(build_dir)
-
-    host_clang = swift_build_support.toolchain.host_clang(
-        xcrun_toolchain=args.darwin_xcrun_toolchain)
-    if args.host_cc is None and host_clang is not None:
-        args.host_cc = str(host_clang.cc)
-    if args.host_cxx is None and host_clang is not None:
-        args.host_cxx = str(host_clang.cxx)
-    is_host_clang_ok = (
-        args.host_cc is not None and os.access(args.host_cc, os.X_OK) and
-        args.host_cxx is not None and os.access(args.host_cxx, os.X_OK))
-    if not is_host_clang_ok:
-        print_with_argv0(
-            "Can't find clang. Please install clang-3.5 or a later version.")
-        return 1
-
-    host_cmake = args.cmake
-    if not host_cmake:
-        host_cmake = swift_build_support.cmake.host_cmake(
-            args.darwin_xcrun_toolchain)
-    if not host_cmake:
-        print_with_argv0("Can't find CMake. Please install CMake.")
-        return 1
-
-    # distcc usage.
-    host_distcc = None
-    host_distcc_pump = None
-    if args.distcc:
-        host_distcc = swift_build_support.which('distcc')
-        # On some platforms, 'pump' may be unrelated to distcc, in which case
-        # it's called 'distcc-pump'.
-        host_distcc_pump = swift_build_support.which('distcc-pump')
-        if host_distcc_pump is None:
-            host_distcc_pump = swift_build_support.which('pump')
-
-        if host_distcc is None or host_distcc_pump is None:
-            print_with_argv0(
-                "Can't find distcc. Please install distcc")
-
-        host_distcc = str(host_distcc)
-        host_distcc_pump = str(host_distcc_pump)
+    if args.clean and os.path.isdir(workspace.build_root):
+        shutil.rmtree(workspace.build_root)
 
     cmake = CMake(args=args,
-                  host_cc=args.host_cc,
-                  host_cxx=args.host_cxx,
-                  host_distcc=host_distcc)
+                  toolchain=toolchain)
 
     build_script_impl_args = [
-        "--build-dir", build_dir,
+        "--workspace", workspace.source_root,
+        "--build-dir", workspace.build_root,
         "--install-prefix", os.path.abspath(args.install_prefix),
         "--host-target", args.host_target,
         "--stdlib-deployment-targets",
         " ".join(args.stdlib_deployment_targets),
-        "--host-cc", args.host_cc,
-        "--host-cxx", args.host_cxx,
+        "--host-cc", toolchain.cc,
+        "--host-cxx", toolchain.cxx,
         "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
-        "--cmake", host_cmake,
+        "--cmake", toolchain.cmake,
         "--cmark-build-type", args.cmark_build_variant,
         "--llvm-build-type", args.llvm_build_variant,
         "--swift-build-type", args.swift_build_variant,
         "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
         "--lldb-build-type", args.lldb_build_variant,
+        "--foundation-build-type", args.foundation_build_variant,
         "--llvm-enable-assertions", str(args.llvm_assertions).lower(),
         "--swift-enable-assertions", str(args.swift_assertions).lower(),
         "--swift-stdlib-enable-assertions", str(
@@ -1284,7 +1231,6 @@ details of the setups of other systems or automated environments.""")
             args.swift_analyze_code_coverage).lower(),
         "--cmake-generator", args.cmake_generator,
         "--build-jobs", str(args.build_jobs),
-        "--workspace", SWIFT_SOURCE_ROOT,
         "--common-cmake-options=%s" % ' '.join(
             pipes.quote(opt) for opt in cmake.common_options()),
         "--build-args=%s" % ' '.join(
@@ -1294,7 +1240,7 @@ details of the setups of other systems or automated environments.""")
     if args.distcc:
         build_script_impl_args += [
             "--distcc",
-            "--distcc-pump=%s" % host_distcc_pump
+            "--distcc-pump=%s" % toolchain.distcc_pump
         ]
     if args.enable_asan:
         build_script_impl_args += ["--enable-asan"]
@@ -1310,13 +1256,27 @@ details of the setups of other systems or automated environments.""")
         build_script_impl_args += [
             "--install-symroot", os.path.abspath(args.install_symroot)
         ]
-    if args.build_foundation:
-        build_script_impl_args += [
-            "--foundation-build-type", args.foundation_build_variant
-        ]
-    if args.cmake_generator == 'Ninja' and \
-       not swift_build_support.ninja.is_ninja_installed():
+    if args.cmake_generator == 'Ninja' and toolchain.ninja is None:
         build_script_impl_args += ["--build-ninja"]
+
+    if args.skip_build:
+        build_script_impl_args += ["--skip-build-cmark",
+                                   "--skip-build-llvm",
+                                   "--skip-build-swift"]
+    if args.skip_build_benchmarks:
+        build_script_impl_args += ["--skip-build-benchmarks"]
+    if not args.build_foundation:
+        build_script_impl_args += ["--skip-build-foundation"]
+    if not args.build_xctest:
+        build_script_impl_args += ["--skip-build-xctest"]
+    if not args.build_lldb:
+        build_script_impl_args += ["--skip-build-lldb"]
+    if not args.build_llbuild:
+        build_script_impl_args += ["--skip-build-llbuild"]
+    if not args.build_libdispatch:
+        build_script_impl_args += ["--skip-build-libdispatch"]
+    if not args.build_swiftpm:
+        build_script_impl_args += ["--skip-build-swiftpm"]
 
     if args.skip_build_linux:
         build_script_impl_args += ["--skip-build-linux"]
@@ -1324,12 +1284,41 @@ details of the setups of other systems or automated environments.""")
         build_script_impl_args += ["--skip-build-freebsd"]
     if args.skip_build_cygwin:
         build_script_impl_args += ["--skip-build-cygwin"]
+    if args.skip_build_osx:
+        build_script_impl_args += ["--skip-build-osx"]
+    if args.skip_build_ios_device:
+        build_script_impl_args += ["--skip-build-ios-device"]
+    if args.skip_build_ios_simulator:
+        build_script_impl_args += ["--skip-build-ios-simulator"]
+    if args.skip_build_tvos_device:
+        build_script_impl_args += ["--skip-build-tvos-device"]
+    if args.skip_build_tvos_simulator:
+        build_script_impl_args += ["--skip-build-tvos-simulator"]
+    if args.skip_build_watchos_device:
+        build_script_impl_args += ["--skip-build-watchos-device"]
+    if args.skip_build_watchos_simulator:
+        build_script_impl_args += ["--skip-build-watchos-simulator"]
+    if args.skip_build_android:
+        build_script_impl_args += ["--skip-build-android"]
+
+    if not args.test and not args.long_test:
+        build_script_impl_args += ["--skip-test-swift"]
+    if not args.test:
+        build_script_impl_args += ["--skip-test-cmark",
+                                   "--skip-test-lldb",
+                                   "--skip-test-llbuild",
+                                   "--skip-test-swiftpm",
+                                   "--skip-test-xctest",
+                                   "--skip-test-foundation",
+                                   "--skip-test-libdispatch"]
     if args.skip_test_linux:
         build_script_impl_args += ["--skip-test-linux"]
     if args.skip_test_freebsd:
         build_script_impl_args += ["--skip-test-freebsd"]
     if args.skip_test_cygwin:
         build_script_impl_args += ["--skip-test-cygwin"]
+    if args.skip_test_osx:
+        build_script_impl_args += ["--skip-test-osx"]
     if args.skip_test_ios_host:
         build_script_impl_args += ["--skip-test-ios-host"]
     if args.skip_test_ios_simulator:
@@ -1344,6 +1333,14 @@ details of the setups of other systems or automated environments.""")
         build_script_impl_args += ["--skip-test-watchos-simulator"]
     if args.build_runtime_with_host_compiler:
         build_script_impl_args += ["--build-runtime-with-host-compiler"]
+    if args.validation_test:
+        build_script_impl_args += ["--validation-test"]
+    if args.long_test:
+        build_script_impl_args += ["--long-test"]
+    if not args.benchmark:
+        build_script_impl_args += ["--skip-test-benchmarks"]
+    if not args.test_optimized:
+        build_script_impl_args += ["--skip-test-optimized"]
 
     if args.android:
         build_script_impl_args += [
@@ -1357,7 +1354,12 @@ details of the setups of other systems or automated environments.""")
             "--android-icu-i18n-include", args.android_icu_i18n_include,
         ]
 
-    build_script_impl_args += build_script_impl_inferred_args
+    if platform.system() == 'Darwin':
+        build_script_impl_args += [
+            "--toolchain-prefix",
+            swift_build_support.targets.darwin_toolchain_prefix(
+                args.install_prefix),
+        ]
 
     # If we have extra_swift_args, combine all of them together and then add
     # them as one command.

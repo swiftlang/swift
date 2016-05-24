@@ -144,6 +144,7 @@ HashingTestSuite.test("overridePerExecutionHashSeed/overflow") {
   // Test that we don't use checked arithmetic on the seed.
   _HashingDetail.fixedSeedOverride = UInt64.max
   expectEqual(0x4344_dc3a_239c_3e81, _mixUInt64(0xffff_ffff_ffff_ffff))
+  _HashingDetail.fixedSeedOverride = 0
 }
 
 runAllTests()
