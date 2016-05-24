@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -O -emit-sil %s | FileCheck %s
 // REQUIRES: objc_interop
 
 // Note: no 'import Foundation'

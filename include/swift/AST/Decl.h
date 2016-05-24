@@ -2252,7 +2252,7 @@ public:
   bool isObjC() const {
     return getAttrs().hasAttribute<ObjCAttr>();
   }
-
+  
   void setIsObjC(bool Value);
 
   /// Is this declaration marked with 'final'?
@@ -3203,6 +3203,10 @@ public:
   /// Retrieve the superclass of this class, or null if there is no superclass.
   Type getSuperclass() const { return LazySemanticInfo.Superclass.getPointer(); }
 
+  /// Retrieve the ClassDecl for the superclass of this class, or null if there
+  /// is no superclass.
+  ClassDecl *getSuperclassDecl() const;
+
   /// Set the superclass of this class.
   void setSuperclass(Type superclass) {
     LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
@@ -3335,6 +3339,13 @@ public:
   static bool classof(const IterableDeclContext *C) {
     auto NTD = dyn_cast<NominalTypeDecl>(C);
     return NTD && classof(NTD);
+  }
+  
+  /// Returns true if the decl uses the Objective-C generics model.
+  ///
+  /// This is true of imported Objective-C classes.
+  bool usesObjCGenericsModel() const {
+    return isObjC() && hasClangNode() && isGenericContext();
   }
 };
 

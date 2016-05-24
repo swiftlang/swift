@@ -2224,10 +2224,18 @@ public:
               "upcast operand must be a class or class metatype instance");
       CanType opInstTy(UI->getOperand()->getType().castTo<MetatypeType>()
                          ->getInstanceType());
-      require(instTy->getClassOrBoundGenericClass(),
+      auto instClass = instTy->getClassOrBoundGenericClass();
+      require(instClass,
               "upcast must convert a class metatype to a class metatype");
-      require(instTy->isExactSuperclassOf(opInstTy, nullptr),
-              "upcast must cast to a superclass or an existential metatype");
+      
+      if (instClass->usesObjCGenericsModel()) {
+        require(instClass->getDeclaredTypeInContext()
+                  ->isBindableToSuperclassOf(opInstTy, nullptr),
+                "upcast must cast to a superclass or an existential metatype");
+      } else {
+        require(instTy->isExactSuperclassOf(opInstTy, nullptr),
+                "upcast must cast to a superclass or an existential metatype");
+      }
       return;
     }
 
@@ -2250,10 +2258,18 @@ public:
           FromTy.getSwiftRValueType().getAnyOptionalObjectType());
     }
 
-    require(ToTy.getClassOrBoundGenericClass(),
+    auto ToClass = ToTy.getClassOrBoundGenericClass();
+    require(ToClass,
             "upcast must convert a class instance to a class type");
-    require(ToTy.isExactSuperclassOf(FromTy),
-            "upcast must cast to a superclass");
+      if (ToClass->usesObjCGenericsModel()) {
+        require(ToClass->getDeclaredTypeInContext()
+                  ->isBindableToSuperclassOf(FromTy.getSwiftRValueType(),
+                                             nullptr),
+                "upcast must cast to a superclass or an existential metatype");
+      } else {
+        require(ToTy.isExactSuperclassOf(FromTy),
+                "upcast must cast to a superclass or an existential metatype");
+      }
   }
 
   void checkIsNonnullInst(IsNonnullInst *II) {
