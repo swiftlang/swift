@@ -117,7 +117,7 @@ public func compareInits() -> Bool {
   takesMyInt(MyInt(kRawInt))
   // OPT: tail call void @takesMyInt(i32 1)
   // OPT-NEXT: tail call void @takesMyInt(i32 1)
-  // OPT-NEXT: [[RAWINT:%.*]] = load i32, i32* @kRawInt, align 4
+  // OPT-NEXT: [[RAWINT:%.*]] = load i32, i32*{{.*}} @kRawInt{{.*}}, align 4
   // OPT-NEXT: tail call void @takesMyInt(i32 [[RAWINT]])
   // OPT-NEXT: tail call void @takesMyInt(i32 [[RAWINT]])
 
