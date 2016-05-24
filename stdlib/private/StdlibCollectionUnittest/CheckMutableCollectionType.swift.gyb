@@ -686,6 +686,20 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
 }
 
 //===----------------------------------------------------------------------===//
+// reverse()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).reverse()") {
+  for test in reverseTests {
+    var c = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
+    c.reverse()
+    expectEqual(
+      test.expected, c.map { extractValue($0).value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
 
   } // addMutableBidirectionalCollectionTests
 

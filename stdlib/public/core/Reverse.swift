@@ -1,4 +1,4 @@
-//===--- Reverse.swift - Lazy sequence reversal ---------------------------===//
+//===--- Reverse.swift - Sequence and collection reversal -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,6 +9,28 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+extension MutableCollection where Self : BidirectionalCollection {
+  /// Reverses the elements of the collection in place.
+  ///
+  ///     var characters: [Character] = ["C", "a", "f", "é"]
+  ///     characters.reverse()
+  ///     print(cafe.characters)
+  ///     // Prints "["é", "f", "a", "C"]
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of elements in the
+  ///   collection.
+  public mutating func reverse() {
+    if isEmpty { return }
+    var f = startIndex
+    var l = index(before: endIndex)
+    while f < l {
+      swap(&self[f], &self[l])
+      formIndex(after: &f)
+      formIndex(before: &l)
+    }
+  }
+}
 
 // FIXME(ABI)(compiler limitation): we should have just one type,
 // `ReversedCollection`, that has conditional conformances to
