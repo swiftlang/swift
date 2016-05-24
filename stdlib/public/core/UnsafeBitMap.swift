@@ -11,40 +11,51 @@
 //===----------------------------------------------------------------------===//
 
 /// A wrapper around a bitmap storage with room for at least `bitCount` bits.
-internal struct _UnsafeBitMap {
-  internal let values: UnsafeMutablePointer<UInt>
-  internal let bitCount: Int
+public // @testable
+struct _UnsafeBitMap {
+  public // @testable
+  let values: UnsafeMutablePointer<UInt>
 
-  internal static func wordIndex(_ i: Int) -> Int {
+  public // @testable
+  let bitCount: Int
+
+  public // @testable
+  static func wordIndex(_ i: Int) -> Int {
     // Note: We perform the operation on UInts to get faster unsigned math
     // (shifts).
     return Int(bitPattern: UInt(bitPattern: i) / UInt(UInt._sizeInBits))
   }
 
-  internal static func bitIndex(_ i: Int) -> UInt {
+  public // @testable
+  static func bitIndex(_ i: Int) -> UInt {
     // Note: We perform the operation on UInts to get faster unsigned math
     // (shifts).
     return UInt(bitPattern: i) % UInt(UInt._sizeInBits)
   }
 
-  internal static func sizeInWords(forSizeInBits bitCount: Int) -> Int {
+  public // @testable
+  static func sizeInWords(forSizeInBits bitCount: Int) -> Int {
     return bitCount + Int._sizeInBytes - 1 / Int._sizeInBytes
   }
 
-  internal init(storage: UnsafeMutablePointer<UInt>, bitCount: Int) {
+  public // @testable
+  init(storage: UnsafeMutablePointer<UInt>, bitCount: Int) {
     self.bitCount = bitCount
     self.values = storage
   }
 
-  internal var numberOfWords: Int {
+  public // @testable
+  var numberOfWords: Int {
     return _UnsafeBitMap.sizeInWords(forSizeInBits: bitCount)
   }
 
-  internal func initializeToZero() {
+  public // @testable
+  func initializeToZero() {
     values.initialize(with: 0, count: numberOfWords)
   }
 
-  internal subscript(i: Int) -> Bool {
+  public // @testable
+  subscript(i: Int) -> Bool {
     get {
       _sanityCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
       let word = values[_UnsafeBitMap.wordIndex(i)]
