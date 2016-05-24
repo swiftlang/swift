@@ -52,6 +52,7 @@ func test1() {
 // STMT: if
 // STMT: for
 // STMT: while
+// STMT: return
 // STMT: func
 // STMT: foo(a: Int)
 
@@ -61,14 +62,14 @@ func test5() {
   #^STMT_1,r,ret,retur,return^#
 }
 // STMT_1-LABEL: Results for filterText: r [
+// STMT_1-NEXT:    return
 // STMT_1-NEXT:    retLocal
 // STMT_1-NEXT:    repeat
-// STMT_1-NEXT:    return
 // STMT_1-NEXT:    required
 // STMT_1: ]
 // STMT_1-LABEL: Results for filterText: ret [
-// STMT_1-NEXT:    retLocal
 // STMT_1-NEXT:    return
+// STMT_1-NEXT:    retLocal
 // STMT_1-NEXT:    repeat
 // STMT_1: ]
 // STMT_1-LABEL: Results for filterText: retur [
