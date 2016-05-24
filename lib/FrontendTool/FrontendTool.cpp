@@ -557,6 +557,11 @@ private:
     // Do not add a semi as it is wrong in most cases during migration
     if (Info.ID == diag::statement_same_line_without_semi.ID)
       return false;
+    // The following interact badly with the swift migrator, they are undoing
+    // migration of arguments to preserve the no-label for first argument.
+    if (Info.ID == diag::witness_argument_name_mismatch.ID ||
+      Info.ID == diag::missing_argument_labels.ID)
+      return false;
 
     if (Kind == DiagnosticKind::Error)
       return true;
