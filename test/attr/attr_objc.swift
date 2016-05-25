@@ -1607,6 +1607,20 @@ class HasIBOutlet {
 }
 
 //===---
+//===--- @IBAction implies @objc
+//===---
+
+// CHECK-LABEL: {{^}}class HasIBAction {
+class HasIBAction {
+  @IBAction func goodAction(_ sender: AnyObject?) { }
+  // CHECK: {{^}}  @IBAction @objc func goodAction(_ sender: AnyObject?) {
+
+  @IBAction func badAction(_ sender: PlainStruct?) { }
+  // expected-error@-1{{argument to @IBAction method cannot have non-object type 'PlainStruct?'}}
+  // expected-error@-2{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
+}
+
+//===---
 //===--- @NSManaged implies @objc
 //===---
 

@@ -404,6 +404,7 @@ enum class ObjCReason {
   ExplicitlyDynamic,
   ExplicitlyObjC,
   ExplicitlyIBOutlet,
+  ExplicitlyIBAction,
   ExplicitlyNSManaged,
   MemberOfObjCProtocol,
   ImplicitlyObjC,
