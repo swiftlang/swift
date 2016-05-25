@@ -2291,9 +2291,11 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
   }
 
   if (auto SF = CurDeclContext->getParentSourceFile()) {
-    for (auto Attr : Attributes) {
-      if (isa<ObjCAttr>(Attr) || isa<DynamicAttr>(Attr))
-        SF->AttrsRequiringFoundation.insert({Attr->getKind(), Attr});
+    if (!getScopeInfo().isInactiveConfigBlock()) {
+      for (auto Attr : Attributes) {
+        if (isa<ObjCAttr>(Attr) || isa<DynamicAttr>(Attr))
+          SF->AttrsRequiringFoundation.insert({Attr->getKind(), Attr});
+      }
     }
   }
 
