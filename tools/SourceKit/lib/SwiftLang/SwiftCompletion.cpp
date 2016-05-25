@@ -928,14 +928,24 @@ template <typename Result>
 static std::vector<Result *>
 filterInnerResults(ArrayRef<Result *> results, bool includeInner,
                    bool includeInnerOperators,
-
-                   bool &hasDot, bool &hasQDot, bool &hasInit) {
+                   bool &hasDot, bool &hasQDot, bool &hasInit,
+                   const CodeCompletion::FilterRules &rules) {
   std::vector<Result *> topResults;
   for (auto *result : results) {
     if (!includeInnerOperators && result->isOperator())
       continue;
 
+    llvm::SmallString<64> name;
+    {
+      llvm::raw_svector_ostream OSS(name);
+      CodeCompletion::CompletionBuilder::getFilterName(
+          result->getCompletionString(), OSS);
+    }
+    if (rules.hideCompletion(result, name))
+      continue;
+
     bool inner = checkInnerResult(result, hasDot, hasQDot, hasInit);
+
     if (!inner ||
         (includeInner &&
          result->getSemanticContext() <= SemanticContextKind::CurrentNominal))
@@ -989,13 +999,14 @@ static void transformAndForwardResults(
       options, session->getCompletionKind(),
       session->getCompletionHasExpectedTypes());
 
+  auto &rules = session->getFilterRules();
+
   bool hasEarlyInnerResults =
       session->getCompletionKind() == CompletionKind::PostfixExpr;
 
   if (!hasEarlyInnerResults) {
     organizer.addCompletionsWithFilter(session->getSortedCompletions(),
-                                       filterText, session->getFilterRules(),
-                                       exactMatch);
+                                       filterText, rules, exactMatch);
   }
 
   if (hasEarlyInnerResults &&
@@ -1006,18 +1017,19 @@ static void transformAndForwardResults(
     auto completions = session->getSortedCompletions();
     auto innerResults =
         filterInnerResults(completions, options.addInnerResults,
-                           options.addInnerOperators, hasDot, hasQDot, hasInit);
+                           options.addInnerOperators, hasDot, hasQDot, hasInit,
+                           rules);
     if (options.addInnerOperators) {
-      if (hasInit)
+      if (hasInit && !rules.hideName("("))
         innerResults.insert(innerResults.begin(), buildParen());
-      if (hasDot)
+      if (hasDot && !rules.hideName("."))
         innerResults.insert(innerResults.begin(), buildDot());
-      if (hasQDot)
+      if (hasQDot && !rules.hideName("?."))
         innerResults.insert(innerResults.begin(), buildQDot());
     }
 
     organizer.addCompletionsWithFilter(innerResults, filterText,
-                                       session->getFilterRules(), exactMatch);
+                                       CodeCompletion::FilterRules(), exactMatch);
   }
 
   organizer.groupAndSort(options);
@@ -1033,7 +1045,7 @@ static void transformAndForwardResults(
         SwiftCompletionInfo &info) {
       auto topResults = filterInnerResults(results, options.addInnerResults,
                                            options.addInnerOperators, hasDot,
-                                           hasQDot, hasInit);
+                                           hasQDot, hasInit, rules);
       // FIXME: Overriding the default to context "None" is a hack so that they
       // won't overwhelm other results that also match the filter text.
       innerResults = extendCompletions(
@@ -1063,18 +1075,18 @@ static void transformAndForwardResults(
     }
 
     if (options.addInnerOperators) {
-      if (hasInit)
+      if (hasInit && !rules.hideName("("))
         innerResults.insert(innerResults.begin(), buildParen());
-      if (hasDot)
+      if (hasDot && !rules.hideName("."))
         innerResults.insert(innerResults.begin(), buildDot());
-      if (hasQDot)
+      if (hasQDot && !rules.hideName("?."))
         innerResults.insert(innerResults.begin(), buildQDot());
     }
 
     // Add the inner results (and don't filter them).
     exactMatch = nullptr; // No longer needed.
     organizer.addCompletionsWithFilter(innerResults, filterText,
-                                       session->getFilterRules(), exactMatch);
+                                       CodeCompletion::FilterRules(), exactMatch);
 
     CodeCompletion::Options noGroupOpts = options;
     noGroupOpts.groupStems = false;

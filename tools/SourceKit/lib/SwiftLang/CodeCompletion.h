@@ -234,6 +234,10 @@ struct FilterRules {
   llvm::StringMap<bool> hideByName;
 
   bool hideCompletion(Completion *completion) const;
+  bool hideCompletion(SwiftResult *completion,
+                      StringRef name,
+                      void *customKind = nullptr) const;
+  bool hideName(StringRef name) const;
 };
 
 } // end namespace CodeCompletion

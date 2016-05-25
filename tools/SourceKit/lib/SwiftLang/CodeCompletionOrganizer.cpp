@@ -447,10 +447,21 @@ static bool isHighPriorityKeyword(CodeCompletionKeywordKind kind) {
   }
 }
 
-bool FilterRules::hideCompletion(Completion *completion) const {
+bool FilterRules::hideName(StringRef name) const {
+  auto I = hideByName.find(name);
+  if (I != hideByName.end())
+      return I->getValue();
+  return hideAll;
+}
 
-  if (!completion->getName().empty()) {
-    auto I = hideByName.find(completion->getName());
+bool FilterRules::hideCompletion(Completion *completion) const {
+  return hideCompletion(completion, completion->getName(), completion->getCustomKind());
+}
+
+bool FilterRules::hideCompletion(SwiftResult *completion, StringRef name, void *customKind) const {
+
+  if (!name.empty()) {
+    auto I = hideByName.find(name);
     if (I != hideByName.end())
       return I->getValue();
   }
@@ -468,7 +479,7 @@ bool FilterRules::hideCompletion(Completion *completion) const {
     break;
   }
   case Completion::Pattern: {
-    if (completion->hasCustomKind()) {
+    if (customKind) {
       // FIXME: individual custom completions
       if (hideCustomCompletions)
         return true;
