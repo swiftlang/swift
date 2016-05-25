@@ -1129,3 +1129,8 @@ extension AnyCollectionProtocol {
     Builtin.unreachable()
   }
 }
+
+% for Traversal in TRAVERSALS:
+@available(*, unavailable, renamed: "AnyIndex")
+public typealias Any${Traversal}Index = AnyIndex
+% end
