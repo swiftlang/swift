@@ -500,5 +500,10 @@ include_directories(BEFORE
   ${SOURCEKIT_SOURCE_DIR}/include
 )
 
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+  include_directories(AFTER
+    ${SWIFT_SOURCE_DIR}/../swift-corelibs-libdispatch)
+endif()
+
 add_subdirectory(lib)
 add_subdirectory(tools)
