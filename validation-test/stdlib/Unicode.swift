@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %target-build-swift %s -o %t/a.out -Xfrontend -disable-objc-attr-requires-foundation-module
+// RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
