@@ -25,6 +25,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
@@ -786,6 +787,10 @@ private:
   bool printIfObjCBridgeable(const NominalTypeDecl *nominal,
                              ArrayRef<Type> typeArgs,
                              Optional<OptionalTypeKind> optionalKind) {
+    // Print imported bridgeable decls as their unbridged type.
+    if (nominal->hasClangNode())
+      return false;
+
     auto &ctx = nominal->getASTContext();
 
     // Dig out the ObjectiveCBridgeable protocol.
@@ -956,7 +961,8 @@ private:
     ASTContext &ctx = M.getASTContext();
     auto &clangASTContext = ctx.getClangModuleLoader()->getClangASTContext();
     clang::QualType clangTy = clangASTContext.getTypeDeclType(clangTypeDecl);
-    return clangTy->isPointerType();
+    return clangTy->isPointerType() || clangTy->isBlockPointerType() ||
+      clangTy->isObjCObjectPointerType();
   }
 
   void visitNameAliasType(NameAliasType *aliasTy,
@@ -971,10 +977,8 @@ private:
       auto *clangTypeDecl = cast<clang::TypeDecl>(alias->getClangDecl());
       os << clangTypeDecl->getName();
 
-      if (aliasTy->hasReferenceSemantics() ||
-          isClangPointerType(clangTypeDecl)) {
+      if (isClangPointerType(clangTypeDecl))
         printNullability(optionalKind);
-      }
       return;
     }
 
@@ -1022,6 +1026,11 @@ private:
 
     maybePrintTagKeyword(SD);
     os << getNameForObjC(SD);
+
+    // Handle swift_newtype applied to a pointer type.
+    if (auto *clangDecl = cast_or_null<clang::TypeDecl>(SD->getClangDecl()))
+      if (isClangPointerType(clangDecl))
+        printNullability(optionalKind);
   }
 
   /// Print a collection element type using Objective-C generics syntax.
@@ -1030,12 +1039,22 @@ private:
   void printCollectionElement(Type ty) {
     ASTContext &ctx = M.getASTContext();
 
+    auto isSwiftNewtype = [&ctx](const StructDecl *SD) -> bool {
+      if (!SD)
+        return false;
+      auto *clangDecl = SD->getClangDecl();
+      if (!clangDecl)
+        return false;
+      return clangDecl->hasAttr<clang::SwiftNewtypeAttr>();
+    };
+
     // Use the type as bridged to Objective-C unless the element type is itself
-    // a collection.
+    // an imported type or a collection.
     const StructDecl *SD = ty->getStructOrBoundGenericStruct();
     if (SD != ctx.getArrayDecl() &&
         SD != ctx.getDictionaryDecl() &&
-        SD != ctx.getSetDecl()) {
+        SD != ctx.getSetDecl() &&
+        !isSwiftNewtype(SD)) {
       ty = *ctx.getBridgedToObjC(&M, ty, /*resolver*/nullptr);
     }
 
