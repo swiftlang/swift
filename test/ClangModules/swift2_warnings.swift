@@ -95,3 +95,10 @@ class X : NSDocument {
 }
 
 func makeCopy<T: NSWobbling>(thing: T) {} // expected-error {{'NSWobbling' has been renamed to 'Wobbling'}} {{18-28=Wobbling}} 
+
+func useLowercasedEnumCase(x: RuncingMode) {
+  switch x {
+    case .Mince: return // expected-error {{'Mince' has been renamed to 'mince'}} {{11-16=mince}}
+    case .Quince: return // expected-error {{'Quince' has been renamed to 'quince'}} {{11-17=quince}}
+  }
+}
