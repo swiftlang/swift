@@ -1252,5 +1252,35 @@ StringTests.test("String.append(_: Character)") {
   }
 }
 
-runAllTests()
+internal func decodeCString<
+  C : UnicodeCodec
+  where
+  C.CodeUnit : UnsignedInteger
+>(_ s: String, as codec: C.Type)
+  -> (result: String, repairsMade: Bool)? {
+  let units = s.unicodeScalars.map({ $0.value }) + [0]
+  return units.map({ C.CodeUnit(numericCast($0)) }).withUnsafeBufferPointer {
+    String.decodeCString($0.baseAddress, as: C.self)
+  }
+}
 
+StringTests.test("String.decodeCString/UTF8") {
+  let actual = decodeCString("foobar", as: UTF8.self)
+  expectFalse(actual!.repairsMade)
+  expectEqual("foobar", actual!.result)
+}
+
+StringTests.test("String.decodeCString/UTF16") {
+  let actual = decodeCString("foobar", as: UTF16.self)
+  expectFalse(actual!.repairsMade)
+  expectEqual("foobar", actual!.result)
+}
+
+StringTests.test("String.decodeCString/UTF32") {
+  let actual = decodeCString("foobar", as: UTF32.self)
+  expectFalse(actual!.repairsMade)
+  expectEqual("foobar", actual!.result)
+}
+
+
+runAllTests()
