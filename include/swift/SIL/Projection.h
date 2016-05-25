@@ -808,7 +808,8 @@ class ProjectionTree {
 
   SILModule &Mod;
 
-  llvm::BumpPtrAllocator &Allocator;
+  /// The allocator we use to allocate ProjectionTreeNodes in the tree.
+  llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> Allocator;
 
   // A common pattern is a 3 field struct.
   llvm::SmallVector<ProjectionTreeNode *, 4> ProjectionTreeNodes;
@@ -818,12 +819,10 @@ class ProjectionTree {
 
 public:
   /// Construct a projection tree from BaseTy.
-  ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator,
-                 SILType BaseTy);
+  ProjectionTree(SILModule &Mod, SILType BaseTy);
   /// Construct an uninitialized projection tree, which can then be
   /// initialized by initializeWithExistingTree.
-  ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator) 
-    : Mod(Mod), Allocator(Allocator) {}
+  ProjectionTree(SILModule &Mod) : Mod(Mod)  {}
   ~ProjectionTree();
   ProjectionTree(const ProjectionTree &) = delete;
   ProjectionTree(ProjectionTree &&) = default;
@@ -936,7 +935,7 @@ private:
   void createRoot(SILType BaseTy) {
     assert(ProjectionTreeNodes.empty() &&
            "Should only create root when ProjectionTreeNodes is empty");
-    auto *Node = new (Allocator) ProjectionTreeNode(BaseTy);
+    auto *Node = new (Allocator.Allocate()) ProjectionTreeNode(BaseTy);
     ProjectionTreeNodes.push_back(Node);
   }
 
@@ -944,7 +943,8 @@ private:
                                      SILType BaseTy,
                                      const Projection &P) {
     unsigned Index = ProjectionTreeNodes.size();
-    auto *Node = new (Allocator) ProjectionTreeNode(Parent, Index, BaseTy, P);
+    auto *Node = new (Allocator.Allocate()) ProjectionTreeNode(Parent, Index,
+                                                               BaseTy, P);
     ProjectionTreeNodes.push_back(Node);
     return ProjectionTreeNodes[Index];
   }

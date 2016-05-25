@@ -1142,8 +1142,7 @@ public:
 //===----------------------------------------------------------------------===//
 
 ProjectionTree::
-ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &BPA, SILType BaseTy) 
-  : Mod(Mod), Allocator(BPA) {
+ProjectionTree(SILModule &Mod, SILType BaseTy) : Mod(Mod) {
   DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy);
 
   // Create the root node of the tree with our base type.
@@ -1161,7 +1160,8 @@ void
 ProjectionTree::initializeWithExistingTree(const ProjectionTree &PT) {
   LiveLeafIndices = PT.LiveLeafIndices;
   for (const auto &N : PT.ProjectionTreeNodes) {
-    ProjectionTreeNodes.push_back(new (Allocator) ProjectionTreeNode(*N));
+    ProjectionTreeNodes.push_back(new (Allocator.Allocate())
+                                  ProjectionTreeNode(*N));
   }
 }
 

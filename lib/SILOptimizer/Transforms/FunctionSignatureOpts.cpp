@@ -12,9 +12,9 @@
 ///
 /// \file
 ///
-/// This pass defines function signature related optimizations. Everytime a
-/// function signature optimization is performed, changes are made to the
-/// original function and after all function signature optimizations are
+/// This pass defines function signature related optimizations.
+/// When a function signature optimization is performed, changes are made to
+/// the original function and after all function signature optimizations are
 /// finished, a new function is created and the old function is turned into
 /// a thunk.
 ///
@@ -164,8 +164,9 @@ private:
   /// ----------------------------------------------------------///
   /// Find any dead argument opportunities.
   bool DeadArgumentAnalyzeParameters();
-  /// Do the actual dead argument transformations.
-  void DeadArgumentTransformParameters();
+  /// Modify the current function so that later function signature analysis
+  /// are more effective.
+  void DeadArgumentTransformFunction();
   /// Remove the dead argument once the new function is created.
   void DeadArgumentFinalizeOptimizedFunction();
 
@@ -174,8 +175,11 @@ private:
   /// ----------------------------------------------------------///
   bool OwnedToGuaranteedAnalyzeResults();
   bool OwnedToGuaranteedAnalyzeParameters();
-  void OwnedToGuaranteedTransformResults();
-  void OwnedToGuaranteedTransformParameters();
+
+  /// Modify the current function so that later function signature analysis
+  /// are more effective.
+  void OwnedToGuaranteedTransformFunctionResults();
+  void OwnedToGuaranteedTransformFunctionParameters();
 
   /// Find any owned to guaranteed opportunities.
   bool OwnedToGuaranteedAnalyze() {
@@ -186,8 +190,8 @@ private:
 
   /// Do the actual owned to guaranteeed transformations.
   void OwnedToGuaranteedTransform() {
-    OwnedToGuaranteedTransformResults();
-    OwnedToGuaranteedTransformParameters();
+    OwnedToGuaranteedTransformFunctionResults();
+    OwnedToGuaranteedTransformFunctionParameters();
   }
 
   /// Set up epilogue work for the thunk result based in the given argument.
@@ -274,7 +278,7 @@ public:
     // already created a thunk.
     if ((hasCaller || Changed) && DeadArgumentAnalyzeParameters()) {
       Changed = true;
-      DeadArgumentTransformParameters();
+      DeadArgumentTransformFunction();
     }
 
     // Run ArgumentExplosion transformation. We only specialize
@@ -551,7 +555,7 @@ bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
   return SignatureOptimize;
 }
 
-void FunctionSignatureTransform::DeadArgumentTransformParameters() {
+void FunctionSignatureTransform::DeadArgumentTransformFunction() {
   SILBasicBlock *BB = &*F->begin();
   for (const ArgumentDescriptor &AD : ArgumentDescList) {
     if (!AD.IsEntirelyDead)
@@ -643,20 +647,22 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeResults() {
   return SignatureOptimize;
 }
 
-void FunctionSignatureTransform::OwnedToGuaranteedTransformParameters() {
+void FunctionSignatureTransform::OwnedToGuaranteedTransformFunctionParameters() {
   // And remove all Callee releases that we found and made redundant via owned
   // to guaranteed conversion.
   for (const ArgumentDescriptor &AD : ArgumentDescList) {
     if (!AD.OwnedToGuaranteed)
       continue;
-    for (auto &X : AD.CalleeRelease) 
+    for (auto &X : AD.CalleeRelease) { 
       X->eraseFromParent();
-    for (auto &X : AD.CalleeReleaseInThrowBlock) 
+    }
+    for (auto &X : AD.CalleeReleaseInThrowBlock) { 
       X->eraseFromParent();
+    }
   }
 }
 
-void FunctionSignatureTransform::OwnedToGuaranteedTransformResults() {
+void FunctionSignatureTransform::OwnedToGuaranteedTransformFunctionResults() {
   // And remove all callee retains that we found and made redundant via owned
   // to unowned conversion.
   for (const ResultDescriptor &RD : ResultDescList) {
@@ -852,7 +858,6 @@ public:
     if (!canSpecializeFunction(F))
       return;
 
-    llvm::BumpPtrAllocator BPA;
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
 
@@ -876,7 +881,7 @@ public:
     llvm::SmallVector<ResultDescriptor, 4> ResultDescList;
     ArrayRef<SILArgument *> Args = F->begin()->getBBArgs();
     for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-      ArgumentDescList.emplace_back(BPA, Args[i]);
+      ArgumentDescList.emplace_back(Args[i]);
     }
     for (SILResultInfo IR : F->getLoweredFunctionType()->getAllResults()) {
       ResultDescList.emplace_back(IR);

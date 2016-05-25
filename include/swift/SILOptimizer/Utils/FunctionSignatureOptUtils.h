@@ -76,13 +76,13 @@ struct ArgumentDescriptor {
   /// to the original argument. The reason why we do this is to make sure we
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
-  ArgumentDescriptor(llvm::BumpPtrAllocator &BPA, SILArgument *A)
+  ArgumentDescriptor(SILArgument *A)
       : Arg(A), PInfo(Arg->getKnownParameterInfo()), Index(A->getIndex()),
         Decl(A->getDecl()), IsEntirelyDead(false), Explode(false),
         OwnedToGuaranteed(false),
         IsIndirectResult(A->isIndirectResult()),
         CalleeRelease(), CalleeReleaseInThrowBlock(),
-        ProjTree(A->getModule(), BPA, A->getType())  {}
+        ProjTree(A->getModule(), A->getType())  {}
 
   ArgumentDescriptor(const ArgumentDescriptor &) = delete;
   ArgumentDescriptor(ArgumentDescriptor &&) = default;
