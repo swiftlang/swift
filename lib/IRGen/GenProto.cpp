@@ -1586,12 +1586,11 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (wt->isDeclaration())
     return;
 
-  bool mustEmitDefinition = !isAvailableExternally(wt->getLinkage());
-
-  // Don't emit a witness table that is available externally if we are emitting
-  // code for the JIT. We do not do any optimization for the JIT and it has
-  // problems with external symbols that get merged with non-external symbols.
-  if (IRGen.Opts.UseJIT && !mustEmitDefinition)
+  // Don't emit a witness table that is available externally.
+  // It can end up in having duplicate sumbols for generated associated type
+  // metadata access functions.
+  // Also, it is not a big benefit for LLVM to emit such witness tables.
+  if (isAvailableExternally(wt->getLinkage()))
     return;
 
   // Build the witnesses.
@@ -1614,13 +1613,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   global->setAlignment(getWitnessTableAlignment().getValue());
 
   // FIXME: resilience; this should use the conformance's publishing scope.
-  if (mustEmitDefinition) {
-    wtableBuilder.buildAccessFunction(global);
-  }
-
-  // Build the conformance record, if it lives in this TU.
-  if (!mustEmitDefinition)
-    return;
+  wtableBuilder.buildAccessFunction(global);
 
   // Behavior conformances can't be reflected.
   if (wt->getConformance()->isBehaviorConformance())
