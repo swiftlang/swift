@@ -224,16 +224,9 @@ protected:
   /// we compute the genset and killset.
   llvm::SmallPtrSet<SILBasicBlock *, 8> InterestBlocks;
 
-  /// An RC-identity cache.
-  /// TODO: this should be cached in RCIdentity analysis.
-  llvm::DenseMap<SILValue, SILValue> RCCache;
-
   /// Return the rc-identity root of the SILValue.
   SILValue getRCRoot(SILValue R) {
-    auto Iter = RCCache.find(R);
-    if (Iter != RCCache.end())
-      return Iter->second;
-     return RCCache[R] = RCFI->getRCIdentityRoot(R);
+     return RCFI->getRCIdentityRoot(R);
   }
 
   /// Return the rc-identity root of the RC instruction, i.e.
