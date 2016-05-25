@@ -629,7 +629,11 @@ namespace {
           arguments.push_back(TypeLoc::withoutLoc(
                               replacements[gp->getCanonicalType()]));
         }
-        
+
+        // FIXME: For some reason we can end up with unbound->getDecl()
+        // pointing at a generic TypeAliasDecl here. If we find a way to
+        // handle generic TypeAliases elsewhere, this can just become a
+        // call to BoundGenericType::get().
         return cs.TC.applyUnboundGenericArguments(unbound, SourceLoc(), cs.DC,
                                                   arguments,
                                                   /*isGenericSignature*/false,

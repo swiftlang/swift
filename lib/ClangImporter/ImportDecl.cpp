@@ -1295,10 +1295,19 @@ namespace {
       auto typeDecl = dyn_cast_or_null<TypeDecl>(importedDecl);
       if (!typeDecl) return nullptr;
 
-      // FIXME: We cannot currently handle generic types.
+      // Handle generic types.
+      GenericParamList *genericParams = nullptr;
+      GenericSignature *genericSig = nullptr;
+      auto underlyingType = typeDecl->getDeclaredInterfaceType();
+
       if (auto generic = dyn_cast<GenericTypeDecl>(typeDecl)) {
-        if (generic->getGenericSignature() && !isa<ProtocolDecl>(typeDecl))
-          return nullptr;
+        if (generic->getGenericSignature() && !isa<ProtocolDecl>(typeDecl)) {
+          genericParams = generic->getGenericParams();
+          genericSig = generic->getGenericSignature();
+
+          underlyingType = ArchetypeBuilder::mapTypeIntoContext(
+              generic, underlyingType);
+        }
       }
 
       // Import the declaration context where this name will go. Note that
@@ -1310,15 +1319,15 @@ namespace {
       if (!dc) return nullptr;
 
       // Create the type alias.
-      auto underlyingType = typeDecl->getDeclaredInterfaceType();
       auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
                      decl,
                      Impl.importSourceLoc(decl->getLocStart()),
                      swift2Name.Imported.getBaseName(),
                      Impl.importSourceLoc(decl->getLocation()),
                      TypeLoc::withoutLoc(underlyingType),
-                     /*genericparams*/nullptr, dc);
+                     genericParams, dc);
       alias->computeType();
+      alias->setGenericSignature(genericSig);
 
       // Record that this is the Swift 2 version of this declaration.
       Impl.ImportedDecls[{decl->getCanonicalDecl(), true}] = alias;
