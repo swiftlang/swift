@@ -155,10 +155,6 @@ public struct UTF8 : UnicodeCodec {
   /// The number of bits in `_decodeBuffer` that are current filled.
   internal var _bitsInBuffer: UInt8 = 0
 
-  /// Whether we have exhausted the iterator.  Note that this doesn't mean
-  /// we are done decoding, as there might still be bytes left in the buffer.
-  internal var _didExhaustIterator: Bool = false
-
   /// Starts or continues decoding a UTF-8 sequence.
   ///
   /// To decode a code unit sequence completely, call this method repeatedly
@@ -202,44 +198,40 @@ public struct UTF8 : UnicodeCodec {
   ///   UTF sequence has been fully decoded.
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
-  >(_ next: inout I) -> UnicodeDecodingResult {
+  >(_ input: inout I) -> UnicodeDecodingResult {
 
-    refillBuffer: if !_didExhaustIterator {
-      // Bufferless ASCII fastpath.
-      if _fastPath(_bitsInBuffer == 0) {
-        if let codeUnit = next.next() {
-          if codeUnit & 0x80 == 0 {
-            return .scalarValue(UnicodeScalar(_unchecked: UInt32(codeUnit)))
-          }
-          // Non-ASCII, proceed to buffering mode.
-          _decodeBuffer = UInt32(codeUnit)
-          _bitsInBuffer = 8
-        } else {
-          _didExhaustIterator = true
-          return .emptyInput
-        }
-      } else if (_decodeBuffer & 0x80 == 0) {
-        // ASCII in buffer.  We don't refill the buffer so we can return
-        // to bufferless mode once we've exhausted it.
-        break refillBuffer
+    // Bufferless ASCII fastpath.
+    if _fastPath(_bitsInBuffer == 0) {
+      guard let codeUnit = input.next() else { return .emptyInput }
+      // ASCII, return immediately.
+      if codeUnit & 0x80 == 0 {
+        return .scalarValue(UnicodeScalar(_unchecked: UInt32(codeUnit)))
       }
-      // Buffering mode.
-      // Fill buffer back to 4 bytes (or as many as are left in the iterator).
-      _sanityCheck(_bitsInBuffer < 32)
-      repeat {
-        if let codeUnit = next.next() {
-          // We use & 0x1f to make the compiler omit a bounds check branch.
-          _decodeBuffer |= (UInt32(codeUnit) << UInt32(_bitsInBuffer & 0x1f))
-          _bitsInBuffer = _bitsInBuffer &+ 8
-        } else {
-          _didExhaustIterator = true
-          if _bitsInBuffer == 0 { return .emptyInput }
-          break // We still have some bytes left in our buffer.
-        }
-      } while _bitsInBuffer < 32
-    } else if _bitsInBuffer == 0 {
-      return .emptyInput
+      // Non-ASCII, proceed to buffering mode.
+      _decodeBuffer = UInt32(codeUnit)
+      _bitsInBuffer = 8
+    } else if (_decodeBuffer & 0x80 == 0) {
+      // ASCII in buffer.  We don't refill the buffer so we can return
+      // to bufferless mode once we've exhausted it.
+      let codeUnit = _decodeBuffer & 0xff
+      _decodeBuffer >>= 8
+      _bitsInBuffer = _bitsInBuffer &- 8
+      return .scalarValue(UnicodeScalar(_unchecked: codeUnit))
     }
+    // Buffering mode.
+    // Fill buffer back to 4 bytes (or as many as are left in the iterator).
+    _sanityCheck(_bitsInBuffer < 32)
+    repeat {
+      if let codeUnit = input.next() {
+        // We know _bitsInBuffer < 32 so we use `& 0x1f` (31) to make the
+        // compiler omit a bounds check branch for the bitshift.
+        _decodeBuffer |= (UInt32(codeUnit) << UInt32(_bitsInBuffer & 0x1f))
+        _bitsInBuffer = _bitsInBuffer &+ 8
+      } else {
+        if _bitsInBuffer == 0 { return .emptyInput }
+        break // We still have some bytes left in our buffer.
+      }
+    } while _bitsInBuffer < 32
 
     // Decode one unicode scalar.
     // Note our empty bytes are always 0x00, which is required for this call.
@@ -250,16 +242,13 @@ public struct UTF8 : UnicodeCodec {
     _sanityCheck(1...4 ~= length && bitsConsumed <= _bitsInBuffer)
     // Swift doesn't allow shifts greater than or equal to the type width.
     // _decodeBuffer >>= UInt32(bitsConsumed) // >>= 32 crashes.
-    // Mask with 0x3f to let the compiler omit the '>= 64' bounds check.
+    // Mask with 0x3f (63) to let the compiler omit the '>= 64' bounds check.
     _decodeBuffer = UInt32(truncatingBitPattern:
       UInt64(_decodeBuffer) >> (UInt64(bitsConsumed) & 0x3f))
     _bitsInBuffer = _bitsInBuffer &- bitsConsumed
 
-    if _fastPath(result != nil) {
-      return .scalarValue(UnicodeScalar(_unchecked: result!))
-    } else {
-      return .error // Ill-formed UTF-8 code unit sequence.
-    }
+    guard _fastPath(result != nil) else { return .error }
+    return .scalarValue(UnicodeScalar(_unchecked: result!))
   }
 
   /// Attempts to decode a single UTF-8 code unit sequence starting at the LSB
