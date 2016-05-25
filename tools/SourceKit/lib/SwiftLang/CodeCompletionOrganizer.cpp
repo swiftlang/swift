@@ -439,6 +439,7 @@ static bool isHighPriorityKeyword(CodeCompletionKeywordKind kind) {
   case CodeCompletionKeywordKind::kw_if:
   case CodeCompletionKeywordKind::kw_for:
   case CodeCompletionKeywordKind::kw_while:
+  case CodeCompletionKeywordKind::kw_return:
   case CodeCompletionKeywordKind::kw_func:
     return true;
   default:
@@ -739,6 +740,7 @@ static int compareHighPriorityKeywords(Item &a_, Item &b_) {
     CodeCompletionKeywordKind::kw_if,
     CodeCompletionKeywordKind::kw_for,
     CodeCompletionKeywordKind::kw_while,
+    CodeCompletionKeywordKind::kw_return,
     CodeCompletionKeywordKind::kw_func,
   };
   auto size = sizeof(order) / sizeof(order[0]);
