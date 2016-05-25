@@ -84,6 +84,11 @@ function(add_sourcekit_default_compiler_flags target)
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
     RESULT_VAR_NAME link_flags)
 
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+    list(APPEND c_compile_flags "-fblocks")
+    list(APPEND link_flags "-lBlocksRuntime")
+  endif()
+
   # Convert variables to space-separated strings.
   _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
   _list_escape_for_shell("${link_flags}" link_flags)
