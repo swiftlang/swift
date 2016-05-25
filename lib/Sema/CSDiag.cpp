@@ -3096,6 +3096,68 @@ static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
   return false;
 }
 
+/// Attempts to add a fixit to correct the compiler error.
+///
+/// Corrects the error is "cannot convert value of type <integer> to expected
+/// argument type <RawRepresentable>", by adding a fixit that constructs the
+/// raw-representable type from the value. This helps with SDK changes.
+static void tryConversionFixit(InFlightDiagnostic &diag,
+                               ConstraintSystem *CS,
+                               Diag<Type, Type> diagID,
+                               Type exprType,
+                               Type contextualType,
+                               Expr *expr) {
+  if (!CS || !expr || !exprType || !contextualType)
+    return;
+  if (diagID.ID != diag::cannot_convert_argument_value.ID)
+    return;
+
+  auto integerType =
+    CS->TC.getProtocol(SourceLoc(),
+                       KnownProtocolKind::IntegerLiteralConvertible);
+  if (!integerType) return;
+
+  auto isIntegerType = [&](Type ty) -> bool {
+    return CS->TC.conformsToProtocol(exprType, integerType, CS->DC,
+                                     ConformanceCheckFlags::InExpression);
+  };
+
+  // When the error is "cannot convert value of type <integer> to expected
+  // argument type <RawRepresentable>", add a fixit that constructs the
+  // raw-representable type from the value.
+
+  if (!isIntegerType(exprType))
+    return;
+
+  auto rawReprType =
+    CS->TC.getProtocol(SourceLoc(), KnownProtocolKind::RawRepresentable);
+  if (!rawReprType) return;
+
+  ProtocolConformance *rawReprConformance;
+  if (!CS->TC.conformsToProtocol(contextualType, rawReprType, CS->DC,
+                                 ConformanceCheckFlags::InExpression,
+                                 &rawReprConformance))
+    return;
+
+  Type rawTy = ProtocolConformance::getTypeWitnessByName(contextualType,
+                                                      rawReprConformance,
+                                  CS->getASTContext().getIdentifier("RawValue"),
+                                                      &CS->TC);
+  if (!rawTy || !isIntegerType(rawTy))
+    return;
+
+  std::string convWrapBefore = contextualType.getString();
+  convWrapBefore += "(rawValue: ";
+  std::string convWrapAfter = ")";
+  if (rawTy->getCanonicalType() != exprType->getCanonicalType()) {
+    convWrapBefore += rawTy->getString();
+    convWrapBefore += "(";
+    convWrapAfter += ")";
+  }
+  SourceRange exprRange = expr->getSourceRange();
+  diag.fixItInsert(exprRange.Start, convWrapBefore);
+  diag.fixItInsertAfter(exprRange.End, convWrapAfter);
+}
 
 bool FailureDiagnosis::diagnoseContextualConversionError() {
   // If the constraint system has a contextual type, then we can test to see if
@@ -3325,8 +3387,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
         diagID = diag::noescape_functiontype_mismatch;
     }
 
-  diagnose(expr->getLoc(), diagID, exprType, contextualType)
-    .highlight(expr->getSourceRange());
+  InFlightDiagnostic diag = diagnose(expr->getLoc(), diagID, exprType, contextualType);
+  diag.highlight(expr->getSourceRange());
+  // Attempt to add a fixit for the error.
+  tryConversionFixit(diag, CS, diagID, exprType, contextualType, expr);
   return true;
 }
 
