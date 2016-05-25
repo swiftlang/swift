@@ -467,10 +467,25 @@ _ = -3.1e-5
 
 /** aaa
 
-
  - returns: something
  */
 // CHECK:  - <doc-comment-field>returns</doc-comment-field>: something
+
+let filename = #file
+// CHECK: <kw>let</kw> filename = <kw>#file</kw>
+let line = #line
+// CHECK: <kw>let</kw> line = <kw>#line</kw>
+let column = #column
+// CHECK: <kw>let</kw> column = <kw>#column</kw>
+let function = #function
+// CHECK: <kw>let</kw> function = <kw>#function</kw>
+
+let image = #imageLiteral(resourceName: "cloud.png")
+// CHECK: <kw>let</kw> image = <object-literal>#imageLiteral(resourceName: "cloud.png")</object-literal>
+let file = #fileLiteral(resourceName: "cloud.png")
+// CHECK: <kw>let</kw> file = <object-literal>#fileLiteral(resourceName: "cloud.png")</object-literal>
+let black = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)
+// CHECK: <kw>let</kw> black = <object-literal>#colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)</object-literal>
 
 "--\"\(x) --"
 // CHECK: <str>"--\"</str>\<anchor>(</anchor>x<anchor>)</anchor><str> --"</str>
