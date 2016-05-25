@@ -42,6 +42,11 @@ extension MyCollection {
   func append(element: T) { } // expected-error {{'T' has been renamed to 'Element'}} {{24-25=Element}}
 }
 
+@available(*, unavailable, renamed: "MyCollection")
+typealias YourCollection<Element> = MyCollection<Element> // expected-note {{'YourCollection' has been explicitly marked unavailable here}}
+
+var x : YourCollection<Int> // expected-error {{'YourCollection' has been renamed to 'MyCollection'}}{{9-23=MyCollection}}
+
 var x : int // expected-error {{'int' is unavailable: oh no you don't}}
 var y : float // expected-error {{'float' has been renamed to 'Float'}}{{9-14=Float}}
 
