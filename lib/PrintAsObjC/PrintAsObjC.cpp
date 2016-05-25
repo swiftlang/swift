@@ -73,18 +73,25 @@ namespace {
   };
 }
 
-static Identifier getNameForObjC(const ValueDecl *VD,
-                                 CustomNamesOnly_t customNamesOnly = Normal) {
-  assert(isa<ClassDecl>(VD) || isa<ProtocolDecl>(VD)
-      || isa<EnumDecl>(VD) || isa<EnumElementDecl>(VD));
+static StringRef getNameForObjC(const ValueDecl *VD,
+                                CustomNamesOnly_t customNamesOnly = Normal) {
+  assert(isa<ClassDecl>(VD) || isa<ProtocolDecl>(VD) || isa<StructDecl>(VD) ||
+         isa<EnumDecl>(VD) || isa<EnumElementDecl>(VD));
   if (auto objc = VD->getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = objc->getName()) {
       assert(name->getNumSelectorPieces() == 1);
-      return name->getSelectorPieces().front();
+      return name->getSelectorPieces().front().str();
     }
   }
 
-  return customNamesOnly ? Identifier() : VD->getName();
+  if (customNamesOnly)
+    return StringRef();
+
+  if (auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl()))
+    if (const clang::IdentifierInfo *II = clangDecl->getIdentifier())
+      return II->getName();
+
+  return VD->getName().str();
 }
 
 
@@ -187,7 +194,7 @@ private:
   void visitClassDecl(ClassDecl *CD) {
     printDocumentationComment(CD);
 
-    Identifier customName = getNameForObjC(CD, CustomNamesOnly);
+    StringRef customName = getNameForObjC(CD, CustomNamesOnly);
     if (customName.empty()) {
       llvm::SmallString<32> scratch;
       os << "SWIFT_CLASS(\"" << CD->getObjCRuntimeName(scratch) << "\")\n"
@@ -219,7 +226,7 @@ private:
   void visitProtocolDecl(ProtocolDecl *PD) {
     printDocumentationComment(PD);
 
-    Identifier customName = getNameForObjC(PD, CustomNamesOnly);
+    StringRef customName = getNameForObjC(PD, CustomNamesOnly);
     if (customName.empty()) {
       llvm::SmallString<32> scratch;
       os << "SWIFT_PROTOCOL(\"" << PD->getObjCRuntimeName(scratch) << "\")\n"
@@ -240,7 +247,7 @@ private:
   void visitEnumDecl(EnumDecl *ED) {
     printDocumentationComment(ED);
     os << "typedef ";
-    Identifier customName = getNameForObjC(ED, CustomNamesOnly);
+    StringRef customName = getNameForObjC(ED, CustomNamesOnly);
     if (customName.empty()) {
       os << "SWIFT_ENUM(";
     } else {
@@ -260,7 +267,7 @@ private:
       // Print the cases as the concatenation of the enum name with the case
       // name.
       os << "  ";
-      Identifier customEltName = getNameForObjC(Elt, CustomNamesOnly);
+      StringRef customEltName = getNameForObjC(Elt, CustomNamesOnly);
       if (customEltName.empty()) {
         if (customName.empty()) {
           os << ED->getName();
@@ -1014,7 +1021,7 @@ private:
       return;
 
     maybePrintTagKeyword(SD);
-    os << SD->getName();
+    os << getNameForObjC(SD);
   }
 
   /// Print a collection element type using Objective-C generics syntax.
