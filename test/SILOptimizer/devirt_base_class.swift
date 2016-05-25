@@ -39,8 +39,6 @@ private func foo(_ a: A) -> Int {
 // CHECK-NOT: function_ref
 // CHECK: return
 
-
-
 print("foo(C()) = \(foo(C()))")
 
 private class F1 {
