@@ -2477,11 +2477,11 @@ let NullCodeUnitOffsetTests = TestSuite("NullCodeUnitOffsetTests")
 %   ('UTF32', 'unicodeScalars.map{ $0.value }')
 % ]:
 
-NullCodeUnitOffsetTests.test("${Encoding}._nullCodeUnitOffset") {
+NullCodeUnitOffsetTests.test("${Encoding}._nullCodeUnitOffset(in:)") {
   for test in nullOffsetTests {
     let actual = Array(test.input.${View})
       .withUnsafeBufferPointer { p in
-        ${Encoding}._nullCodeUnitOffset(p.baseAddress!)
+        ${Encoding}._nullCodeUnitOffset(in: p.baseAddress!)
       }
     expectEqual(test.expected, actual)
   }

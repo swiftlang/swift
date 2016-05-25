@@ -138,7 +138,7 @@ public protocol UnicodeCodec {
   ///
   /// Is an equivalent of `strlen` for C-strings.
   /// - Complexity: O(n)
-  static func _nullCodeUnitOffset(_ input: UnsafePointer<CodeUnit>) -> Int
+  static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int
 }
 
 /// A codec for translating between Unicode scalar values and UTF-8 code
@@ -436,7 +436,7 @@ public struct UTF8 : UnicodeCodec {
     return byte & 0b11_00__0000 == 0b10_00__0000
   }
 
-  public static func _nullCodeUnitOffset(_ input: UnsafePointer<CodeUnit>) -> Int {
+  public static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int {
     return Int(_swift_stdlib_strlen(UnsafePointer(input)))
   }
 }
@@ -1161,11 +1161,9 @@ extension UnicodeScalar {
 }
 
 extension UnicodeCodec where CodeUnit : UnsignedInteger {
-  public static func _nullCodeUnitOffset(_ input: UnsafePointer<CodeUnit>) -> Int {
-    var input = input
+  public static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int {
     var length = 0
-    while input.pointee != 0 {
-      input = input.successor()
+    while input[length] != 0 {
       length += 1
     }
     return length
@@ -1173,8 +1171,8 @@ extension UnicodeCodec where CodeUnit : UnsignedInteger {
 }
 
 extension UnicodeCodec {
-  public static func _nullCodeUnitOffset(_ input: UnsafePointer<CodeUnit>) -> Int {
-    fatalError("_nullCodeUnitOffset implementation should be provided")
+  public static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int {
+    fatalError("_nullCodeUnitOffset(in:) implementation should be provided")
   }
 }
 
