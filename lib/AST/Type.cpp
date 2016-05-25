@@ -1723,6 +1723,9 @@ bool TypeBase::isBindableTo(Type b, LazyResolver *resolver) {
     }
     
     bool visitType(TypeBase *orig, CanType subst) {
+      if (CanType(orig) == subst)
+        return true;
+      
       llvm_unreachable("not a valid canonical type substitution");
     }
     

@@ -3120,7 +3120,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
   
   // Add the implicit 'self' to Params, if needed.
   if (Flags & Parser::PD_HasContainerType)
-    Params.push_back(ParameterList::createSelf(DeclLoc, P->CurDeclContext));
+    Params.push_back(ParameterList::createUnboundSelf(DeclLoc, P->CurDeclContext));
   
   // Add the "(value)" and subscript indices parameter clause.
   Params.push_back(ValueArg);
@@ -4539,7 +4539,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   // "(int)->int" on FooTy into "(self: FooTy.Type)->(int)->int".
   // Note that we can't actually compute the type here until Sema.
   if (HasContainerType)
-    BodyParams.push_back(ParameterList::createSelf(NameLoc, CurDeclContext));
+    BodyParams.push_back(ParameterList::createUnboundSelf(NameLoc, CurDeclContext));
 
   DefaultArgumentInfo DefaultArgs(HasContainerType);
   TypeRepr *FuncRetTy = nullptr;
@@ -5374,7 +5374,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Attributes.add(new (Context) RethrowsAttr(throwsLoc));
   }
 
-  auto *SelfDecl = ParamDecl::createSelf(ConstructorLoc, CurDeclContext);
+  auto *SelfDecl = ParamDecl::createUnboundSelf(ConstructorLoc, CurDeclContext);
 
   Scope S2(this, ScopeKind::ConstructorBody);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
@@ -5469,7 +5469,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
   }
 
-  auto *SelfDecl = ParamDecl::createSelf(DestructorLoc, CurDeclContext);
+  auto *SelfDecl = ParamDecl::createUnboundSelf(DestructorLoc, CurDeclContext);
 
   Scope S(this, ScopeKind::DestructorBody);
   auto *DD = new (Context) DestructorDecl(Context.Id_deinit, DestructorLoc,

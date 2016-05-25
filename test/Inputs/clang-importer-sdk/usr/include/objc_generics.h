@@ -8,6 +8,9 @@
 + (__nullable T)classThing;
 - (__nonnull NSArray<T> *)arrayOfThings;
 
+- (T __nonnull)objectAtIndexedSubscript:(uint16_t)i;
+- (void)setObject:(T __nonnull)object atIndexedSubscript:(uint16_t)i;
+
 @property (nonatomic) __nullable T propertyThing;
 @end
 

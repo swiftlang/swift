@@ -360,7 +360,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
     return nullptr;
   }
   
-  auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
+  auto selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), parentDC);
   
   ParameterList *params[] = {
     ParameterList::createWithoutLoc(selfDecl),
