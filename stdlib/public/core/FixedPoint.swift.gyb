@@ -31,7 +31,7 @@ def hexify(n):
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 # Number of bits in integer literals.
-builtinIntLiteralBits = 2048
+builtinIntLiteralBits = 64
 
 def maskBits(n):
     """Return an n-bit mask in hex"""

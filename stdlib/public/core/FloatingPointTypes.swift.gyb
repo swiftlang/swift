@@ -29,7 +29,7 @@ allIntBits = [8, 16, 32, 64, 'Int']
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 # Number of bits in integer literals.
-builtinIntLiteralBits = 2048
+builtinIntLiteralBits = 64
 
 # Mapping from float bits to significand bits
 explicitSignificandBits = { 32:24, 64:53, 80:64 }
