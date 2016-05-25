@@ -1510,7 +1510,7 @@ bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
 
 using ClassExtents = TwoWordPair<size_t, size_t>;
 
-SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 extern "C"
 ClassExtents::Return
 swift_class_getInstanceExtents(const Metadata *c) {

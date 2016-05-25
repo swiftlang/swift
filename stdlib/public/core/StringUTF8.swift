@@ -47,8 +47,10 @@ extension _StringCore {
         src: UnsafeMutablePointer(startASCII + i),
         size: numericCast(utf16Count))
 
-      return (i + utf16Count, result)
+      // Convert the _UTF8Chunk into host endianness.
+      return (i + utf16Count, _UTF8Chunk(littleEndian: result))
     } else if _fastPath(_baseAddress != nil) {
+      // Transcoding should return a _UTF8Chunk in host endianness.
       return _encodeSomeContiguousUTF16AsUTF8(from: i)
     } else {
 #if _runtime(_ObjC)

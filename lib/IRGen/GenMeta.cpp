@@ -4338,16 +4338,20 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
          && "didn't find size or alignment in metadata?!");
   Address metadataAsBytes(IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy),
                           IGF.IGM.getPointerAlignment());
-  auto loadZExtInt32AtOffset = [&](Size offset) {
-    Address slot = IGF.Builder.CreateConstByteArrayGEP(metadataAsBytes, offset);
-    slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int32Ty->getPointerTo());
-    llvm::Value *result = IGF.Builder.CreateLoad(slot);
-    if (IGF.IGM.SizeTy != IGF.IGM.Int32Ty)
-      result = IGF.Builder.CreateZExt(result, IGF.IGM.SizeTy);
-    return result;
-  };
-  llvm::Value *size = loadZExtInt32AtOffset(scanner.InstanceSize);
-  llvm::Value *alignMask = loadZExtInt32AtOffset(scanner.InstanceAlignMask);
+
+  Address slot = IGF.Builder.CreateConstByteArrayGEP(metadataAsBytes,
+                                                     scanner.InstanceSize);
+  slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int32Ty->getPointerTo());
+  llvm::Value *size = IGF.Builder.CreateLoad(slot);
+  if (IGF.IGM.SizeTy != IGF.IGM.Int32Ty)
+    size = IGF.Builder.CreateZExt(size, IGF.IGM.SizeTy);
+
+  slot = IGF.Builder.CreateConstByteArrayGEP(metadataAsBytes,
+                                             scanner.InstanceAlignMask);
+  slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int16Ty->getPointerTo());
+  llvm::Value *alignMask = IGF.Builder.CreateLoad(slot);
+  alignMask = IGF.Builder.CreateZExt(alignMask, IGF.IGM.SizeTy);
+
   return {size, alignMask};
 }
 

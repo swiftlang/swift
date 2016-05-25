@@ -283,6 +283,7 @@ extern "C" long double _swift_fmodl(long double lhs, long double rhs) {
 #if (defined(__linux__) && defined(__x86_64__)) || \
     (defined(__linux__) && defined(__aarch64__)) || \
     (defined(__linux__) && defined(__powerpc64__)) || \
+    (defined(__linux__) && defined(__s390x__)) || \
     (defined(__ANDROID__) && defined(__arm64__))
 
 typedef int ti_int __attribute__((__mode__(TI)));

@@ -38,13 +38,13 @@ public var _stdlib_FD_SETSIZE: CInt {
 }
 
 public struct _stdlib_fd_set {
-  var _data: [UInt32]
+  var _data: [UInt]
   static var _wordBits: Int {
-    return sizeof(UInt32) * 8
+    return sizeof(UInt) * 8
   }
 
   public init() {
-    _data = [UInt32](
+    _data = [UInt](
       repeating: 0,
       count: Int(_stdlib_FD_SETSIZE) / _stdlib_fd_set._wordBits)
   }
@@ -53,20 +53,20 @@ public struct _stdlib_fd_set {
     let fdInt = Int(fd)
     return (
         _data[fdInt / _stdlib_fd_set._wordBits] &
-          UInt32(1 << (fdInt % _stdlib_fd_set._wordBits))
+          UInt(1 << (fdInt % _stdlib_fd_set._wordBits))
       ) != 0
   }
 
   public mutating func set(_ fd: CInt) {
     let fdInt = Int(fd)
     _data[fdInt / _stdlib_fd_set._wordBits] |=
-      UInt32(1 << (fdInt % _stdlib_fd_set._wordBits))
+      UInt(1 << (fdInt % _stdlib_fd_set._wordBits))
   }
 
   public mutating func clear(_ fd: CInt) {
     let fdInt = Int(fd)
     _data[fdInt / _stdlib_fd_set._wordBits] &=
-      ~UInt32(1 << (fdInt % _stdlib_fd_set._wordBits))
+      ~UInt(1 << (fdInt % _stdlib_fd_set._wordBits))
   }
 
   public mutating func zero() {

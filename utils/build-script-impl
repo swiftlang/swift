@@ -30,7 +30,7 @@ umask 0022
 # need to change any of these, you should do so on trunk or in a branch.
 #
 
-LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64;PowerPC"
+LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64;PowerPC;SystemZ"
 
 #
 # End of configurable options.
@@ -345,6 +345,9 @@ function set_deployment_target_based_options() {
         linux-powerpc64le)
             USE_GOLD_LINKER=1
             SWIFT_HOST_VARIANT_ARCH="powerpc64le"
+            ;;
+        linux-s390x)
+            SWIFT_HOST_VARIANT_ARCH="s390x"
             ;;
         cygwin-x86_64)
             SWIFT_HOST_VARIANT_ARCH="x86_64"

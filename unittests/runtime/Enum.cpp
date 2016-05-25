@@ -76,9 +76,15 @@ TEST(EnumTest, getEnumCaseSinglePayload) {
                                                128*1024));
   ASSERT_EQ(-1, test_getEnumCaseSinglePayload({255, 0, 0}, _TMBi8_,
                                                128*1024));
+#if defined(__BIG_ENDIAN__)
+  ASSERT_EQ(65535 - 255,
+            test_getEnumCaseSinglePayload({0, 1, 0}, _TMBi8_,
+                                           128*1024));
+#else
   ASSERT_EQ(65535 - 255,
             test_getEnumCaseSinglePayload({0, 0, 1}, _TMBi8_,
                                            128*1024));
+#endif
 
   // Test with XI.
   ASSERT_EQ(-1, test_getEnumCaseSinglePayload({0}, XI_TMBi8_, 2));
@@ -126,6 +132,16 @@ TEST(EnumTest, storeEnumTagSinglePayload) {
 
   ASSERT_TRUE(test_storeEnumTagSinglePayload({219, 0, 0}, {219, 123, 77},
                                               _TMBi8_, -1, 128*1024));
+#if defined(__BIG_ENDIAN__)
+  ASSERT_TRUE(test_storeEnumTagSinglePayload({0, 0, 1}, {219, 123, 77},
+                                              _TMBi8_, 0, 128*1024));
+  ASSERT_TRUE(test_storeEnumTagSinglePayload({255, 0, 1}, {219, 123, 77},
+                                              _TMBi8_, 255, 128*1024));
+  ASSERT_TRUE(test_storeEnumTagSinglePayload({0, 0, 2}, {219, 123, 77},
+                                              _TMBi8_, 256, 128*1024));
+  ASSERT_TRUE(test_storeEnumTagSinglePayload({255, 2, 0}, {219, 123, 77},
+                                              _TMBi8_, 128*1024 - 1, 128*1024));
+#else
   ASSERT_TRUE(test_storeEnumTagSinglePayload({0, 1, 0}, {219, 123, 77},
                                               _TMBi8_, 0, 128*1024));
   ASSERT_TRUE(test_storeEnumTagSinglePayload({255, 1, 0}, {219, 123, 77},
@@ -134,6 +150,7 @@ TEST(EnumTest, storeEnumTagSinglePayload) {
                                               _TMBi8_, 256, 128*1024));
   ASSERT_TRUE(test_storeEnumTagSinglePayload({255, 0, 2}, {219, 123, 77},
                                               _TMBi8_, 128*1024 - 1, 128*1024));
+#endif
 
   // Test with XI.
   ASSERT_TRUE(test_storeEnumTagSinglePayload({219}, {219},

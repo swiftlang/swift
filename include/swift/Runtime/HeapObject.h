@@ -157,10 +157,12 @@ using BoxPair = TwoWordPair<HeapObject *, OpaqueValue *>;
 /// The heap object has an initial retain count of 1, and its metadata is set
 /// such that destroying the heap object destroys the contained value.
 SWIFT_RUNTIME_EXPORT
-extern "C" BoxPair::Return swift_allocBox(Metadata const *type);
+extern "C" BoxPair::Return swift_allocBox(Metadata const *type)
+           SWIFT_CC(swift);
 
 SWIFT_RUNTIME_EXPORT
-extern "C" BoxPair::Return (*_swift_allocBox)(Metadata const *type);
+extern "C" BoxPair::Return (*_swift_allocBox)(Metadata const *type)
+           SWIFT_CC(swift);
 
 
 // Allocate plain old memory. This is the generalized entry point

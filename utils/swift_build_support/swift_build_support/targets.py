@@ -35,6 +35,8 @@ def host_target():
             return 'linux-powerpc64'
         elif machine == 'ppc64le':
             return 'linux-powerpc64le'
+        elif machine == 's390x':
+            return 'linux-s390x'
 
     elif system == 'Darwin':
         if machine == 'x86_64':
@@ -77,6 +79,8 @@ def stdlib_deployment_targets():
             return ['linux-powerpc64']
         elif machine == 'ppc64le':
             return ['linux-powerpc64le']
+        elif machine == 's390x':
+            return ['linux-s390x']
     elif system == 'Darwin':
         if machine == 'x86_64':
             return [

@@ -13,6 +13,7 @@ import Swift
 // CHECK-armv7:       trap
 // CHECK-powerpc64:   trap
 // CHECK-powerpc64le: trap
+// CHECK-s390x:       trap
 // CHECK-NOT:         .cfi_endproc
 // CHECK-x86_64:      ud2
 // CHECK-i386:        ud2
@@ -20,6 +21,7 @@ import Swift
 // CHECK-armv7:       trap
 // CHECK-powerpc64:   trap
 // CHECK-powerpc64le: trap
+// CHECK-s390x:       trap
 // CHECK:             .cfi_endproc
 sil hidden @test_cond_fail : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
