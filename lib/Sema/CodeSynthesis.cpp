@@ -128,7 +128,7 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   // The implicit 'self' argument if in a type context.
   if (storage->getDeclContext()->isTypeContext())
-    getterParams.push_back(ParameterList::createSelf(loc,
+    getterParams.push_back(ParameterList::createUnboundSelf(loc,
                                                      storage->getDeclContext(),
                                                      /*isStatic*/false));
     
@@ -174,7 +174,7 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   // The implicit 'self' argument if in a type context.
   if (storage->getDeclContext()->isTypeContext()) {
-    params.push_back(ParameterList::createSelf(loc,
+    params.push_back(ParameterList::createUnboundSelf(loc,
                                                storage->getDeclContext(),
                                                /*isStatic*/false));
   }
@@ -240,7 +240,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   //  - The implicit 'self' argument if in a type context.
   auto DC = storage->getDeclContext();
   if (DC->isTypeContext())
-    params.push_back(ParameterList::createSelf(loc, DC, /*isStatic*/false));
+    params.push_back(ParameterList::createUnboundSelf(loc, DC, /*isStatic*/false));
 
   //  - The buffer parameter, (buffer: Builtin.RawPointer,
   //                           inout storage: Builtin.UnsafeValueBuffer,
@@ -1963,7 +1963,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   
   // Create the constructor.
   DeclName name(context, context.Id_init, paramList);
-  auto *selfParam = ParamDecl::createSelf(Loc, decl,
+  auto *selfParam = ParamDecl::createUnboundSelf(Loc, decl,
                                           /*static*/false, /*inout*/true);
   auto *ctor =
     new (context) ConstructorDecl(name, Loc,
@@ -2048,7 +2048,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   auto &ctx = tc.Context;
 
   // Create the 'self' declaration and patterns.
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), classDecl);
+  auto *selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), classDecl);
 
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options = ParameterList::Implicit;
@@ -2188,7 +2188,7 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   if (CD->hasDestructor() || CD->isInvalid())
     return;
 
-  auto *selfDecl = ParamDecl::createSelf(CD->getLoc(), CD);
+  auto *selfDecl = ParamDecl::createUnboundSelf(CD->getLoc(), CD);
 
   auto *DD = new (Context) DestructorDecl(Context.Id_deinit, CD->getLoc(),
                                           selfDecl, CD);

@@ -2363,6 +2363,10 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   typedef AnyFunctionType::ExtInfo ExtInfo;
   PROXY_CAN_TYPE_SIMPLE_GETTER(getInput)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getResult)
+  
+  CanAnyFunctionType withExtInfo(ExtInfo info) const {
+    return CanAnyFunctionType(getPointer()->withExtInfo(info));
+  }
 END_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
 
 /// FunctionType - A monomorphic function type, specified with an arrow.
@@ -2395,6 +2399,10 @@ BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
   static CanFunctionType get(CanType input, CanType result,
                              const ExtInfo &info) {
     return CanFunctionType(FunctionType::get(input, result, info));
+  }
+  
+  CanFunctionType withExtInfo(ExtInfo info) const {
+    return CanFunctionType(cast<FunctionType>(getPointer()->withExtInfo(info)));
   }
 END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
   
@@ -2516,6 +2524,11 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
   
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const {
     return getGenericSignature().getGenericParams();
+  }
+
+  CanGenericFunctionType withExtInfo(ExtInfo info) const {
+    return CanGenericFunctionType(
+                    cast<GenericFunctionType>(getPointer()->withExtInfo(info)));
   }
 END_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 

@@ -4392,9 +4392,22 @@ public:
   /// Note that this decl is created, but it is returned with an incorrect
   /// DeclContext that needs to be set correctly.  This is automatically handled
   /// when a function is created with this as part of its argument list.
+  /// For a generic context, this also gives the parameter an unbound generic
+  /// type with the expectation that type-checking will fill in the context
+  /// generic parameters.
+  static ParamDecl *createUnboundSelf(SourceLoc loc, DeclContext *DC,
+                                      bool isStatic = false,
+                                      bool isInOut = false);
+
+  /// Create an implicit 'self' decl for a method in the specified decl context.
+  /// If 'static' is true, then this is self for a static method in the type.
   ///
+  /// Note that this decl is created, but it is returned with an incorrect
+  /// DeclContext that needs to be set correctly.  This is automatically handled
+  /// when a function is created with this as part of its argument list.
   static ParamDecl *createSelf(SourceLoc loc, DeclContext *DC,
-                               bool isStatic = false, bool isInOut = false);
+                               bool isStatic = false,
+                               bool isInOut = false);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
