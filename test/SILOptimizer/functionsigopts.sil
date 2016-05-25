@@ -42,7 +42,63 @@ struct lotsoffield {
   init()
 }
 
+struct goo {
+  var left : foo
+  var right : foo
+  var top : foo
+  var bottom : foo
+}
+
 sil @use_Int : $@convention(thin) (Int) -> ()
+
+
+// CHECK-LABEL: sil [thunk] [always_inline] @argument_with_incomplete_epilogue_release
+// CHECK: [[IN2:%.*]] = struct_extract [[IN1:%.*]] : $goo, #goo.top
+// CHECK: function_ref @_TTSf4g_n___TTSf4s__argument_with_incomplete_epilogue_release : $@convention(thin) (@guaranteed foo, @owned foo) -> ()
+// CHECK: release_value [[IN2]]
+sil @argument_with_incomplete_epilogue_release : $@convention(thin) (@owned goo) -> () {
+bb0(%0 : $goo):
+  // make inline costs = 2
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+
+
+  %1 = struct_extract %0 : $goo, #goo.top
+  %2 = ref_element_addr %1 : $foo, #foo.a
+  %3 = load %2 : $*Int
+  %4 = function_ref @use_Int : $@convention(thin) (Int) -> ()
+  apply %4(%3) : $@convention(thin) (Int) -> ()
+
+  %5 = struct_extract %0 : $goo, #goo.bottom
+  %6 = ref_element_addr %5 : $foo, #foo.a
+  %7 = load %6 : $*Int
+  apply %4(%7) : $@convention(thin) (Int) -> ()
+
+  release_value %1 : $foo
+  %8 = tuple ()
+  return %8 : $()
+}
 
 // We do this check separately to ensure that this does not occur anywhere in
 // the output for the file. (Maybe this is an interesting enough feature to add to FileCheck?).
@@ -173,6 +229,7 @@ bb0(%0 : $boo):
   %4 = tuple (%2  : $Int, %2 : $Int)
   return %4 : $(Int, Int)
 }
+
 
 // CHECK-LABEL: sil [fragile] @dead_arg_no_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
 // CHECK-NOT: function_ref @_TTSf4d_n__dead_arg_no_callsites
@@ -720,7 +777,13 @@ bb0(%0 : $boo):
   return %5 : $()
 }
 
-
+sil [fragile] @argument_with_incomplete_epilogue_release_callsite : $@convention(thin) (@owned goo) -> () {
+bb0(%0 : $goo):
+  %2 = function_ref @argument_with_incomplete_epilogue_release : $@convention(thin) (@owned goo) -> ()
+  %4 = apply %2(%0) : $@convention(thin) (@owned goo) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
 
 
 //========================================
