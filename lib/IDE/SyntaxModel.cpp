@@ -59,7 +59,6 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
   std::vector<SyntaxNode> Nodes;
   SourceLoc AttrLoc;
   SourceLoc UnaryMinusLoc;
-  auto LiteralStartLoc = Optional<SourceLoc>();
   for (unsigned I = 0, E = Tokens.size(); I != E; ++I) {
     auto &Tok = Tokens[I];
     SyntaxNodeKind Kind;
@@ -83,34 +82,23 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       Loc = Tok.getLoc();
       Length = Tok.getLength();
 
-      if (LiteralStartLoc.hasValue() && Length.hasValue()) {
-        Kind = SyntaxNodeKind::ObjectLiteral;
-        Nodes.emplace_back(Kind, CharSourceRange(SM, LiteralStartLoc.getValue(),
-          Tok.getRange().getEnd()));
-        LiteralStartLoc = Optional<SourceLoc>();
-        continue;
-      }
-
       switch(Tok.getKind()) {
 #define KEYWORD(X) case tok::kw_##X: Kind = SyntaxNodeKind::Keyword; break;
 #include "swift/Parse/Tokens.def"
 #undef KEYWORD
 
-#define POUND_NORMAL_KEYWORD(Name) case tok::pound_##Name:
+#define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) \
+      case tok::pound_##Name:
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:
-#define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) case tok::pound_##Name:
-#include "swift/Parse/Tokens.def"    
+#include "swift/Parse/Tokens.def"
+        Kind = SyntaxNodeKind::ObjectLiteral;
+        break;
+
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto)
+#define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg)
+#define POUND_KEYWORD(Name) case tok::pound_##Name:
+#include "swift/Parse/Tokens.def"
         Kind = SyntaxNodeKind::Keyword;
-        break;
-
-#define POUND_CONFIG(Name) case tok::pound_##Name:
-#include "swift/Parse/Tokens.def"    
-        Kind = SyntaxNodeKind::BuildConfigKeyword;
-        break;
-
-      case tok::pound_line:
-        Kind = Tok.isAtStartOfLine() ? SyntaxNodeKind::BuildConfigKeyword :
-                                       SyntaxNodeKind::Keyword;
         break;
       case tok::identifier:
         if (Tok.getText().startswith("<#"))
