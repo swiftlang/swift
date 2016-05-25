@@ -1040,9 +1040,6 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     };
 
     {
-      GenericContextScope genericScope(SGM.Types,
-                                       foreignFnTy->getGenericSignature());
-
       for (unsigned nativeParamIndex : indices(params)) {
         // Bring the parameter to +1.
         auto paramValue = params[nativeParamIndex];
