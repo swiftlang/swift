@@ -189,7 +189,7 @@ protected:
   bool MultiIteration;
 
   /// The allocator we are currently using.
-  llvm::BumpPtrAllocator &BPA;
+  llvm::SpecificBumpPtrAllocator<BlockState> &BPA;
 
   /// Current function we are analyzing.
   SILFunction *F;
@@ -239,7 +239,7 @@ protected:
 
 public:
   /// Constructor.
-  CodeMotionContext(llvm::BumpPtrAllocator &BPA, SILFunction *F,
+  CodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA, SILFunction *F,
                     PostOrderFunctionInfo *PO, AliasAnalysis *AA,
                     RCIdentityFunctionInfo *RCFI)
     : MultiIteration(true), BPA(BPA), F(F), PO(PO), AA(AA), RCFI(RCFI) {}
@@ -358,9 +358,9 @@ class RetainCodeMotionContext : public CodeMotionContext {
 
 public:
   /// Constructor.
-  RetainCodeMotionContext(llvm::BumpPtrAllocator &BPA, SILFunction *F,
-                          PostOrderFunctionInfo *PO, AliasAnalysis *AA,
-                          RCIdentityFunctionInfo *RCFI)
+  RetainCodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
+                          SILFunction *F, PostOrderFunctionInfo *PO,
+                          AliasAnalysis *AA, RCIdentityFunctionInfo *RCFI)
       : CodeMotionContext(BPA, F, PO, AA, RCFI) {
     MultiIteration = requireIteration();
   }
@@ -430,7 +430,7 @@ void RetainCodeMotionContext::initializeCodeMotionDataFlow() {
 
   // Initialize all the data flow bit vector for all basic blocks.
   for (auto &BB : *F) {
-    BlockStates[&BB] = new (BPA) RetainBlockState(&BB == &*F->begin(),
+    BlockStates[&BB] = new (BPA.Allocate()) RetainBlockState(&BB == &*F->begin(),
                                  RCRootVault.size(), MultiIteration);
   }
 }
@@ -684,9 +684,9 @@ class ReleaseCodeMotionContext : public CodeMotionContext {
 
 public:
   /// Constructor.
-  ReleaseCodeMotionContext(llvm::BumpPtrAllocator &BPA, SILFunction *F,
-                           PostOrderFunctionInfo *PO, AliasAnalysis *AA,
-                           RCIdentityFunctionInfo *RCFI,
+  ReleaseCodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
+                           SILFunction *F, PostOrderFunctionInfo *PO,
+                           AliasAnalysis *AA, RCIdentityFunctionInfo *RCFI,
                            bool FreezeEpilogueReleases,
                            ConsumedArgToEpilogueReleaseMatcher &ERM)
       : CodeMotionContext(BPA, F, PO, AA, RCFI),
@@ -769,8 +769,8 @@ void ReleaseCodeMotionContext::initializeCodeMotionDataFlow() {
   if (Throw != F->end())
     Exits.insert(&*Throw);
   for (auto &BB : *F) {
-    BlockStates[&BB] = new (BPA) ReleaseBlockState(Exits.count(&BB),
-                                 RCRootVault.size(), MultiIteration);
+    BlockStates[&BB] = new (BPA.Allocate()) ReleaseBlockState(Exits.count(&BB),
+                                            RCRootVault.size(), MultiIteration);
   }
 }
 
@@ -1047,7 +1047,7 @@ public:
     // to create critical edges.
     bool EdgeChanged = splitAllCriticalEdges(*F, false, nullptr, nullptr);
 
-    llvm::BumpPtrAllocator BPA;
+    llvm::SpecificBumpPtrAllocator<BlockState> BPA;
     auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
