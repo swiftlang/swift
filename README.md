@@ -25,7 +25,7 @@ modules, eliminating the need for headers and the code duplication they entail.
 To read the documentation, start by installing the
 [Sphinx](http://sphinx-doc.org) documentation generator tool by running the command:
 
-`easy_install -U Sphinx==1.3.4`
+`$ easy_install -U Sphinx==1.3.4`
 
 More recent versions are currently **not supported.**
 
@@ -58,7 +58,7 @@ For OS X, you need [the latest Xcode](https://developer.apple.com/xcode/download
 
 For Ubuntu, you'll need the following development dependencies:
 
-    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config
+    $ sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config
 
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.
@@ -66,25 +66,25 @@ with version 2 shipped with Ubuntu.
 If you are building on Ubuntu 14.04 LTS, you'll need to upgrade your clang
 compiler for C++14 support and create a symlink:
 
-    sudo apt-get install clang-3.6
-    sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-3.6 100
-    sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6 100
+    $ sudo apt-get install clang-3.6
+    $ sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-3.6 100
+    $ sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6 100
 
 ### Getting Sources for Swift and Related Projects
 
 **Via HTTPS**  For those checking out sources as read-only, HTTPS works best:
 
-    git clone https://github.com/apple/swift.git
-    cd swift
-    ./utils/update-checkout --clone
+    $ git clone https://github.com/apple/swift.git
+    $ cd swift
+    $ ./utils/update-checkout --clone
 
 **Via SSH**  For those who plan on regularly making direct commits,
 cloning over SSH may provide a better experience (which requires
 uploading SSH keys to GitHub):
 
-    git clone git@github.com:apple/swift.git
-    cd swift
-    ./utils/update-checkout --clone-with-ssh
+    $ git clone git@github.com:apple/swift.git
+    $ cd swift
+    $ ./utils/update-checkout --clone-with-ssh
 
 #### CMake
 [CMake](http://cmake.org) is the core infrastructure used to configure builds of
@@ -94,7 +94,7 @@ On OS X, you can download the [CMake Binary Distribution](https://cmake.org/down
 bundled as an application, copy it to `/Applications`, and add the embedded
 command line tools to your `PATH`:
 
-    export PATH=/Applications/CMake.app/Contents/bin:$PATH
+    $ export PATH=/Applications/CMake.app/Contents/bin:$PATH
 
 #### Ninja
 [Ninja](https://ninja-build.org) is the current recommended build system
@@ -105,25 +105,25 @@ it next to the other projects and it will be bootstrapped automatically:
 ##### Build from source
 **Via HTTPS**
 
-    git clone https://github.com/ninja-build/ninja.git && cd ninja
-    git checkout release
-    cat README
+    $ git clone https://github.com/ninja-build/ninja.git && cd ninja
+    $ git checkout release
+    $ cat README
 
 **Via SSH**
 
-    git clone git@github.com:ninja-build/ninja.git && cd ninja
-    git checkout release
-    cat README
+    $ git clone git@github.com:ninja-build/ninja.git && cd ninja
+    $ git checkout release
+    $ cat README
 
 #### Install via third-party packaging tool (OS X only)
 
 **[Homebrew](http://brew.sh/)**
 
-    brew install cmake ninja
+    $ brew install cmake ninja
 
 **[MacPorts](https://macports.org)**
 
-    sudo port install cmake ninja
+    $ sudo port install cmake ninja
 
 ### Building Swift
 
@@ -134,7 +134,7 @@ supports presets which you can define for common combinations of build options.
 
 To find out more:
 
-    utils/build-script -h
+    $ utils/build-script -h
 
 Note: Arguments after "--" above are forwarded to `build-script-impl`, which is
 the ultimate shell script that invokes the actual build and test commands.
@@ -142,13 +142,13 @@ the ultimate shell script that invokes the actual build and test commands.
 A basic command to build Swift with optimizations and run basic tests with
 Ninja:
 
-    utils/build-script -r -t
+    $ utils/build-script -r -t
 
 ## Developing Swift in Xcode
 
 `build-script` can also generate Xcode projects:
 
-    utils/build-script -x
+    $ utils/build-script -x
 
 The Xcode IDE can be used to edit the Swift source code, but it is not currently
 fully supported as a build environment for SDKs other than OS X. If you need to
