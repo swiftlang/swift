@@ -1060,7 +1060,7 @@ bool DeclContext::lookupQualified(Type type,
     return false;
 
   auto checkLookupCascading = [this, options]() -> Optional<bool> {
-    switch (options & NL_KnownDependencyMask) {
+    switch (static_cast<unsigned>(options & NL_KnownDependencyMask)) {
     case 0:
       return isCascadingContextForLookup(/*excludeFunctions=*/false);
     case NL_KnownNonCascadingDependency:
