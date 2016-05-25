@@ -440,14 +440,7 @@ public struct UTF16 : UnicodeCodec {
   public init() {}
 
   /// A lookahead buffer for one UTF-16 code unit.
-  internal var _decodeLookahead: UInt32 = 0
-
-  /// Flags with layout: `0b0000_00xy`.
-  ///
-  /// `y` is the EOF flag.
-  ///
-  /// `x` is set when `_decodeLookahead` contains a code unit.
-  internal var _lookaheadFlags: UInt8 = 0
+  internal var _decodeLookahead: UInt32?
 
   /// Starts or continues decoding a UTF-16 sequence.
   ///
@@ -493,76 +486,45 @@ public struct UTF16 : UnicodeCodec {
   public mutating func decode<
     I : IteratorProtocol where I.Element == CodeUnit
   >(_ input: inout I) -> UnicodeDecodingResult {
-    if _lookaheadFlags & 0b01 != 0 {
-      return .emptyInput
-    }
-
     // Note: maximal subpart of ill-formed sequence for UTF-16 can only have
     // length 1.  Length 0 does not make sense.  Neither does length 2 -- in
     // that case the sequence is valid.
 
-    var unit0: UInt32
-    if _fastPath(_lookaheadFlags & 0b10 == 0) {
-      if let first = input.next() {
-        unit0 = UInt32(first)
-      } else {
-        // Set EOF flag.
-        _lookaheadFlags |= 0b01
-        return .emptyInput
-      }
-    } else {
-      // Fetch code unit from the lookahead buffer and note this fact in flags.
-      unit0 = _decodeLookahead
-      _lookaheadFlags &= 0b01
+    let unit0: UInt32
+    if _fastPath(_decodeLookahead == nil) {
+      guard let next = input.next() else { return .emptyInput }
+      unit0 = UInt32(next)
+    } else { // Consume lookahead first.
+      unit0 = _decodeLookahead!
+      _decodeLookahead = nil
     }
 
     // A well-formed pair of surrogates looks like this:
-    // [1101 10ww wwxx xxxx] [1101 11xx xxxx xxxx]
+    //     high-surrogate        low-surrogate
+    // [1101 10xx xxxx xxxx] [1101 11xx xxxx xxxx]
 
+    // Common case first, non-surrogate -- just a sequence of 1 code unit.
     if _fastPath((unit0 >> 11) != 0b1101_1) {
-      // Neither high-surrogate, nor low-surrogate -- sequence of 1 code unit,
-      // decoding is trivial.
-      return .scalarValue(UnicodeScalar(unit0))
+      return .scalarValue(UnicodeScalar(_unchecked: unit0))
     }
 
-    if _slowPath((unit0 >> 10) == 0b1101_11) {
-      // `unit0` is a low-surrogate.  We have an ill-formed sequence.
+    // Ensure `unit0` is a high-surrogate.
+    guard _fastPath((unit0 >> 10) == 0b1101_10) else { return .error }
+
+    // We already have a high-surrogate, so there should be a next code unit.
+    guard let next = input.next() else { return .error }
+    let unit1 = UInt32(next)
+
+    // `unit0` is a high-surrogate, so `unit1` should be a low-surrogate.
+    guard _fastPath((unit1 >> 10) == 0b1101_11) else {
+      // Invalid sequence, discard `unit0` and store `unit1` for the next call.
+      _decodeLookahead = unit1
       return .error
     }
 
-    // At this point we know that `unit0` is a high-surrogate.
-
-    var unit1: UInt32
-    if let second = input.next() {
-      unit1 = UInt32(second)
-    } else {
-      // EOF reached.  Set EOF flag.
-      _lookaheadFlags |= 0b01
-
-      // We have seen a high-surrogate and EOF, so we have an ill-formed
-      // sequence.
-      return .error
-    }
-
-    if _fastPath((unit1 >> 10) == 0b1101_11) {
-      // `unit1` is a low-surrogate.  We have a well-formed surrogate pair.
-
-      let result = 0x10000 + (((unit0 & 0x03ff) << 10) | (unit1 & 0x03ff))
-      return .scalarValue(UnicodeScalar(result))
-    }
-
-    // Otherwise, we have an ill-formed sequence.  These are the possible
-    // cases:
-    //
-    // * `unit1` is a high-surrogate, so we have a pair of two high-surrogates.
-    //
-    // * `unit1` is not a surrogate.  We have an ill-formed sequence:
-    //   high-surrogate followed by a non-surrogate.
-
-    // Save the second code unit in the lookahead buffer.
-    _decodeLookahead = unit1
-    _lookaheadFlags |= 0b10
-    return .error
+    // We have a well-formed surrogate pair, decode it.
+    let result = 0x10000 + (((unit0 & 0x03ff) << 10) | (unit1 & 0x03ff))
+    return .scalarValue(UnicodeScalar(_unchecked: result))
   }
 
   /// Try to decode one Unicode scalar, and return the actual number of code
