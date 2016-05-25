@@ -33,12 +33,12 @@ using namespace swift;
 static EnumElementDecl *
 extractEnumElement(TypeChecker &TC, SourceLoc UseLoc, const VarDecl *constant) {
   if (auto Attr = AvailableAttr::isUnavailable(constant)) {
-    auto Kind = Attr->getUnconditionalAvailability();
-    if (Kind == UnconditionalAvailabilityKind::UnavailableInCurrentSwift) {
-      auto diag = TC.diagnose(UseLoc, diag::availability_decl_unavailable_rename,
-                              constant->getName(), /*"replaced"*/false,
-                              /*special kind*/0, Attr->Rename);
-      diag.fixItReplace(UseLoc, Attr->Rename);
+    auto Rename = Attr->Rename;
+    if (!Rename.empty()) {
+      TC.diagnose(UseLoc, diag::availability_decl_unavailable_rename,
+                  constant->getName(), /*replaced*/false,
+                  /*special kind*/0, Attr->Rename)
+        .fixItReplace(UseLoc, Rename);
     }
   }
 
