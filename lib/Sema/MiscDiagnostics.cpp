@@ -3186,8 +3186,11 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   return "";
 }
 
-Optional<DeclName> swift::omitNeedlessWords(AbstractFunctionDecl *afd) {
+Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
+
+  if (!afd->hasType())
+    validateDecl(afd);
 
   if (afd->isInvalid() || isa<DestructorDecl>(afd))
     return None;
@@ -3275,10 +3278,13 @@ Optional<DeclName> swift::omitNeedlessWords(AbstractFunctionDecl *afd) {
   return DeclName(Context, newBaseName, newArgNames);
 }
 
-Optional<Identifier> swift::omitNeedlessWords(VarDecl *var) {
+Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   auto &Context = var->getASTContext();
 
-  if (var->isInvalid())
+  if (!var->hasType())
+    validateDecl(var);
+
+  if (var->isInvalid() || !var->hasType())
     return None;
 
   if (var->getName().empty())
@@ -3311,9 +3317,9 @@ Optional<Identifier> swift::omitNeedlessWords(VarDecl *var) {
   StringScratchSpace scratch;
   OmissionTypeName typeName = getTypeNameForOmission(var->getType());
   OmissionTypeName contextTypeName = getTypeNameForOmission(contextType);
-  if (omitNeedlessWords(name, { }, "", typeName, contextTypeName, { },
-                        /*returnsSelf=*/false, true, allPropertyNames,
-                        scratch)) {
+  if (::omitNeedlessWords(name, { }, "", typeName, contextTypeName, { },
+                          /*returnsSelf=*/false, true, allPropertyNames,
+                          scratch)) {
     return Context.getIdentifier(name);
   }
 
