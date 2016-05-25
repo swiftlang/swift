@@ -266,7 +266,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   }
 
   Type enumType = parentDC->getDeclaredTypeInContext();
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
+  auto *selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), parentDC,
                                          /*static*/false, /*inout*/true);
 
   auto *rawDecl = new (C) ParamDecl(/*IsLet*/true, SourceLoc(), SourceLoc(),

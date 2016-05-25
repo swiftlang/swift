@@ -2768,9 +2768,11 @@ public:
     require(DMBI->getHasMethodBB()->bbarg_size() == 1,
             "true bb for dynamic_method_br must take an argument");
     
-    requireSameType(DMBI->getHasMethodBB()->bbarg_begin()[0]->getType(),
-                    getDynamicMethodType(operandType, DMBI->getMember()),
-              "bb argument for dynamic_method_br must be of the method's type");
+    auto bbArgTy = DMBI->getHasMethodBB()->bbarg_begin()[0]->getType();
+    require(getDynamicMethodType(operandType, DMBI->getMember())
+              .getSwiftRValueType()
+              ->isBindableTo(bbArgTy.getSwiftRValueType(), nullptr),
+            "bb argument for dynamic_method_br must be of the method's type");
   }
   
   void checkProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {

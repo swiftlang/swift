@@ -94,8 +94,9 @@ static Type getExistentialArchetype(SILValue existential) {
 
 /// Retrieve the type to use for a method found via dynamic lookup.
 static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
-                                                      SILValue proto,
-                                                      SILDeclRef methodName) {
+                                           SILValue proto,
+                                           SILDeclRef methodName,
+                                           CanAnyFunctionType substMemberTy) {
   auto &ctx = gen.getASTContext();
 
   // Determine the opaque 'self' parameter type.
@@ -107,7 +108,11 @@ static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
   }
 
   // Replace the 'self' parameter type in the method type with it.
-  auto methodTy = gen.SGM.getConstantType(methodName).castTo<SILFunctionType>();
+  auto objcFormalTy = substMemberTy.withExtInfo(substMemberTy->getExtInfo()
+             .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod));
+
+  auto methodTy = gen.SGM.M.Types
+    .getUncachedSILFunctionTypeForConstant(methodName, objcFormalTy);
   return replaceSelfTypeForDynamicLookup(ctx, methodTy, selfTy, methodName);
 }
 
@@ -575,9 +580,9 @@ public:
       auto constant = Constant.atUncurryLevel(level);
       // Lower the substituted type from the AST, which should have any generic
       // parameters in the original signature erased to their upper bounds.
-      auto objcFormalType = CanAnyFunctionType(SubstFormalType->withExtInfo(
+      auto objcFormalType = SubstFormalType.withExtInfo(
          SubstFormalType->getExtInfo()
-           .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod)));
+           .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod));
       auto fnType = gen.SGM.M.Types
         .getUncachedSILFunctionTypeForConstant(constant, objcFormalType);
 
@@ -4890,14 +4895,8 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
 
   // Retain 'self' because the partial apply will take ownership.
   // We can't simply forward 'self' because the partial apply is conditional.
-#if 0
-  auto CMV = ConsumableManagedValue(ManagedValue::forUnmanaged(self),
-                                    CastConsumptionKind::CopyOnSuccess);
-  self = gen.getManagedValue(loc, CMV).forward(gen);
-#else
   if (!self->getType().isAddress())
     gen.B.emitRetainValueOperation(loc, self);
-#endif
 
   SILValue result = gen.B.createPartialApply(loc, method, method->getType(), {},
                                              self, partialApplyTy);
@@ -4937,6 +4936,8 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   SILBasicBlock *hasMemberBB = createBasicBlock();
 
   // The continuation block
+  auto memberMethodTy = e->getType()->getAnyOptionalObjectType();
+  
   const TypeLowering &optTL = getTypeLowering(e->getType());
   auto loweredOptTy = optTL.getLoweredType();
 
@@ -4944,9 +4945,11 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
 
   // Create the branch.
   FuncDecl *memberFunc;
-  if (auto *VD = dyn_cast<VarDecl>(e->getMember().getDecl()))
+  if (auto *VD = dyn_cast<VarDecl>(e->getMember().getDecl())) {
     memberFunc = VD->getGetter();
-  else
+    memberMethodTy = FunctionType::get(getASTContext().TheEmptyTupleType,
+                                       memberMethodTy);
+  } else
     memberFunc = cast<FuncDecl>(e->getMember().getDecl());
   SILDeclRef member(memberFunc, SILDeclRef::Kind::Func,
                     SILDeclRef::ConstructAtBestResilienceExpansion,
@@ -4969,7 +4972,12 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
       methodTy = CanFunctionType::get(TupleType::getEmpty(getASTContext()),
                                       methodTy);
 
-    auto dynamicMethodTy = getDynamicMethodLoweredType(*this, operand, member);
+    auto memberFnTy = CanFunctionType::get(
+                                       operand->getType().getSwiftRValueType(),
+                                       memberMethodTy->getCanonicalType());
+
+    auto dynamicMethodTy = getDynamicMethodLoweredType(*this, operand, member,
+                                                       memberFnTy);
     auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
     SILValue memberArg = new (F.getModule()) SILArgument(hasMemberBB,
                                                          loweredMethodTy);
@@ -5048,11 +5056,16 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     FullExpr hasMemberScope(Cleanups, CleanupLocation(e));
 
     // The argument to the has-member block is the uncurried method.
+    // Build the substituted getter type from the AST nodes.
     auto valueTy = e->getType()->getCanonicalType().getAnyOptionalObjectType();
-    auto methodTy =
-      subscriptDecl->getGetter()->getType()->castTo<AnyFunctionType>()
-                      ->getResult()->getCanonicalType();
-    auto dynamicMethodTy = getDynamicMethodLoweredType(*this, base, member);
+    auto indexTy = e->getIndex()->getType()->getCanonicalType();
+    auto methodTy = CanFunctionType::get(indexTy,
+                                         valueTy);
+    
+    auto functionTy = CanFunctionType::get(base->getType().getSwiftRValueType(),
+                                           methodTy);
+    auto dynamicMethodTy = getDynamicMethodLoweredType(*this, base, member,
+                                                       functionTy);
     auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
     SILValue memberArg = new (F.getModule()) SILArgument(hasMemberBB,
                                                          loweredMethodTy);
