@@ -31,6 +31,18 @@ func supported() -> MyMask {
   return Int(MyMask.Bingo.rawValue)
 }
 
+struct MyEventMask2 : OptionSet {
+  init(rawValue: UInt64) {}
+  var rawValue: UInt64 { return 0 }
+}
+func sendIt(_: MyEventMask2) {}
+func testMask1(a: Int) {
+  sendIt(a)
+}
+func testMask2(a: UInt64) {
+  sendIt(a)
+}
+
 func goo(var e : ErrorProtocol) {
 }
 func goo2(var e: ErrorProtocol) {}
