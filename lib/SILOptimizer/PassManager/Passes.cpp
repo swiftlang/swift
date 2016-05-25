@@ -240,6 +240,9 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
 
   PM.addEarlyCodeMotion();
   PM.addReleaseHoisting();
+  PM.addReleaseHoisting();
+  PM.addReleaseHoisting();
+  PM.addReleaseHoisting();
   PM.addARCSequenceOpts();
 
   PM.addSimplifyCFG();

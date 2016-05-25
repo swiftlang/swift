@@ -95,6 +95,8 @@ STATISTIC(NumReleasesHoisted, "Number of releases hoisted");
 
 llvm::cl::opt<bool> DisableRRCodeMotion("disable-rr-cm", llvm::cl::init(false));
 
+#define GET_MIN(a, b) (a < b ? a : b)
+
 //===----------------------------------------------------------------------===//
 //                             Utility 
 //===----------------------------------------------------------------------===//
@@ -176,6 +178,17 @@ struct BlockState {
   /// NOTE: this vector contains an approximation of whether there will be a
   /// retain or release to a certain point of a basic block.
   llvm::SmallBitVector BBMaxSet;
+
+  /// Keeps track of how many roots we generate in the basic block.
+  llvm::SmallVector<uint32_t, 1> BBGenCount;
+
+  /// Keeps track of how many retain/release there are on the rc root in the
+  /// beginning of the block.
+  llvm::SmallVector<uint32_t, 1> BBCountIn;
+
+  /// Keeps track of how many retain/release there are on the rc root in the
+  /// end of the block.
+  llvm::SmallVector<uint32_t, 1> BBCountOut;
 };
 
 /// CodeMotionContext - This is the base class which retain code motion and
@@ -227,6 +240,8 @@ protected:
   /// An RC-identity cache.
   /// TODO: this should be cached in RCIdentity analysis.
   llvm::DenseMap<SILValue, SILValue> RCCache;
+
+  llvm::SmallDenseMap<SILValue, unsigned> RCInstCount;
 
   /// Return the rc-identity root of the SILValue.
   SILValue getRCRoot(SILValue R) {
@@ -316,10 +331,10 @@ class RetainBlockState : public BlockState {
 public:
   /// Check whether the BBSetOut has changed. If it does, we need to rerun
   /// the data flow on this block's successors to reach fixed point.
-  bool updateBBSetOut(llvm::SmallBitVector &X) {
-    if (BBSetOut == X)
+  bool updateBBSetOut(llvm::SmallVector<uint32_t, 1> &C) {
+    if (BBCountOut == C)
       return false;
-    BBSetOut = X;
+    BBCountOut = C;
     return true;
   }
 
@@ -328,11 +343,14 @@ public:
     // Iterative forward data flow.
     BBSetIn.resize(size, false);
     BBSetOut.resize(size, MultiIteration);
+    BBCountIn.resize(size, 0);
+    BBCountOut.resize(size, 0);
     BBMaxSet.resize(size, !IsEntry && MultiIteration);
   
     // Genset and Killset are initially empty.
     BBGenSet.resize(size, false);
     BBKillSet.resize(size, false);
+    BBGenCount.resize(size, 0);
   }
 };
 
@@ -348,10 +366,6 @@ class RetainCodeMotionContext : public CodeMotionContext {
     //
     // These terminator instructions block.
     if (isa<ReturnInst>(II) || isa<ThrowInst>(II) || isa<UnreachableInst>(II))
-      return true;
-    // Identical RC root blocks code motion, we will be able to move this retain
-    // further once we move the blocking retain.
-    if (isRetainInstruction(II) && getRCRoot(II) == Ptr)
       return true;
     // Ref count checks do not have side effects, but are barriers for retains.
     if (mayCheckRefCount(II))
@@ -369,7 +383,7 @@ public:
                           PostOrderFunctionInfo *PO, AliasAnalysis *AA,
                           RCIdentityFunctionInfo *RCFI)
       : CodeMotionContext(BPA, F, PO, AA, RCFI) {
-    MultiIteration = requireIteration();
+    ///MultiIteration = requireIteration();
   }
 
   /// virtual destructor.
@@ -421,6 +435,7 @@ bool RetainCodeMotionContext::requireIteration() {
 }
 
 void RetainCodeMotionContext::initializeCodeMotionDataFlow() {
+  bool CanHandle = true;
   // Find all the RC roots in the function.
   for (auto &BB : *F) {
     for (auto &II : BB) {
@@ -428,6 +443,7 @@ void RetainCodeMotionContext::initializeCodeMotionDataFlow() {
         continue;
       RCInstructions.insert(&II);
       SILValue Root = getRCRoot(&II);
+      CanHandle = RCInstCount[Root]++ < 255;
       if (RCRootIndex.find(Root) != RCRootIndex.end())
         continue;
       RCRootIndex[Root] = RCRootVault.size();
@@ -474,22 +490,21 @@ void RetainCodeMotionContext::computeCodeMotionGenKillSet() {
     auto *State = BlockStates[BB];
     bool InterestBlock = false; 
     for (auto &I : *BB) {
+      // If this is a retain instruction, it also generates.
+      if (isRetainInstruction(&I)) {
+        unsigned idx = RCRootIndex[getRCRoot(&I)];
+        State->BBGenCount[idx]++;
+        InterestBlock = true;
+        continue;
+      }
       // Check whether this instruction blocks any RC root code motion.
       for (unsigned i = 0; i < RCRootVault.size(); ++i) {
         if (!State->BBMaxSet.test(i) || !mayBlockCodeMotion(&I, RCRootVault[i]))
           continue;
-        // This is a blocking instruction for the rcroot.
+        // This is a blocking instruction for the rc root.
         InterestBlock = true;
         State->BBKillSet.set(i);
-        State->BBGenSet.reset(i);
-      }
-      // If this is a retain instruction, it also generates.
-      if (isRetainInstruction(&I)) {
-        unsigned idx = RCRootIndex[getRCRoot(&I)];
-        State->BBGenSet.set(idx);
-        assert(State->BBKillSet.test(idx) && "Killset computed incorrectly");
-        State->BBKillSet.reset(idx);
-        InterestBlock = true;
+        State->BBGenCount[i] = 0;
       }
     }
 
@@ -523,17 +538,21 @@ bool RetainCodeMotionContext::performCodeMotion() {
 
 void RetainCodeMotionContext::mergeBBDataFlowStates(SILBasicBlock *BB) {
   BlockState *State = BlockStates[BB];
-  State->BBSetIn.reset();
+  State->BBCountIn.assign(State->BBCountIn.size(), 0);
   // If basic block has no predecessor, simply reset and return.
   if (BB->pred_empty())
     return;
 
   // Intersect in all predecessors' BBSetOuts.
   auto Iter = BB->pred_begin();
-  State->BBSetIn = BlockStates[*Iter]->BBSetOut;
+  State->BBCountIn = BlockStates[*Iter]->BBCountOut;
   Iter = std::next(Iter);
   for (auto E = BB->pred_end(); Iter != E; ++Iter) {
-    State->BBSetIn &= BlockStates[*Iter]->BBSetOut;
+    auto &OutC = BlockStates[*Iter]->BBCountOut;
+    // Get the minimum of all the BBCountOut from all predecessors.
+    for (unsigned i = 0; i < State->BBCountOut.size(); ++i) {
+      State->BBCountIn[i] = GET_MIN(State->BBCountIn[i], OutC[i]);
+    }
   }
 }
 
@@ -542,12 +561,14 @@ bool RetainCodeMotionContext::processBBWithGenKillSet(SILBasicBlock *BB) {
   // Compute the BBSetOut at the end of the basic block.
   mergeBBDataFlowStates(BB);
 
-  // Compute the BBSetIn at the beginning of the basic block.
-  State->BBSetIn.reset(State->BBKillSet);
-  State->BBSetIn |= State->BBGenSet;
+  // Compute the BBCountIn at the end of the basic block.
+  for (unsigned i = 0; i < State->BBKillSet.size(); ++i) {
+    State->BBCountIn[i] = State->BBKillSet[i] ? 0 : State->BBCountIn[i];
+    State->BBCountIn[i] += State->BBGenCount[i];
+  }
  
   // If BBSetIn changes, then keep iterating until reached a fixed point.
-  return State->updateBBSetOut(State->BBSetIn);
+  return State->updateBBSetOut(State->BBCountIn);
 }
 
 void RetainCodeMotionContext::convergeCodeMotionDataFlow() {
@@ -585,17 +606,17 @@ void RetainCodeMotionContext::computeCodeMotionInsertPoints() {
     RetainBlockState *S = BlockStates[BB];
 
     // Compute insertion point generated by the edge value transition.
-    // If there is a transition from 1 to 0, that means we have a partial
-    // merge, which means the retain can NOT be sunk to the current block,
-    // so place it at the end of the predecessors.
+    // If the predecessors BBCountOut is different from this block's BBCountIn
+    // that means we have a partial merge, which means some retains have to be
+    // anchored in the predecessors.
     for (unsigned i = 0; i < RCRootVault.size(); ++i) {
-      if (S->BBSetIn[i])
-        continue;
+      unsigned C = S->BBCountIn[i];
       for (auto Pred : BB->getPreds()) {
         BlockState *PBB = BlockStates[Pred];
-        if (!PBB->BBSetOut[i])
-          continue;
-        InsertPoints[RCRootVault[i]].push_back(Pred->getTerminator());
+        assert(PBB->BBCountOut[i] >= C && "Invalid merge performed");
+        for (unsigned X = PBB->BBCountOut[i]; X > C; --X) { 
+          InsertPoints[RCRootVault[i]].push_back(Pred->getTerminator());
+        }
       }
     }
 
@@ -607,25 +628,28 @@ void RetainCodeMotionContext::computeCodeMotionInsertPoints() {
       continue;
 
     // Compute insertion point within the basic block. Process instructions in
-    // the basic block in reverse post-order fashion.
+    // the basic block in reverse post-order.
     for (auto I = BB->begin(), E = BB->end(); I != E; ++I) {
-      for (unsigned i = 0; i < RCRootVault.size(); ++i) {
-        if (!S->BBSetIn[i] || !mayBlockCodeMotion(&*I, RCRootVault[i]))
-          continue;
-        S->BBSetIn.reset(i);
-        InsertPoints[RCRootVault[i]].push_back(&*I);
-      }
-
       // If this is a retain instruction, it also generates.
       if (isRetainInstruction(&*I)) {
-        S->BBSetIn.set(RCRootIndex[getRCRoot(&*I)]);
+        S->BBCountIn[RCRootIndex[getRCRoot(&*I)]]++;
+        continue;
+      }
+      for (unsigned i = 0; i < RCRootVault.size(); ++i) {
+        if (!S->BBCountIn[i] || !mayBlockCodeMotion(&*I, RCRootVault[i]))
+          continue;
+        // OK. all these retains are blocked at this point.
+        for (unsigned k = 0; k < S->BBCountIn[i]; ++k) {
+          InsertPoints[RCRootVault[i]].push_back(&*I);
+        }
+        S->BBCountIn[i] = 0;
       }
     }
 
     // Lastly update the BBSetOut, only necessary when we are running a single
     // iteration dataflow.
     if (!MultiIteration) {
-      S->updateBBSetOut(S->BBSetIn);
+      S->updateBBSetOut(S->BBCountIn);
     }
   }
 }
@@ -638,10 +662,10 @@ class ReleaseBlockState : public BlockState {
 public:
   /// Check whether the BBSetIn has changed. If it does, we need to rerun
   /// the data flow on this block's predecessors to reach fixed point.
-  bool updateBBSetIn(llvm::SmallBitVector &X) {
-    if (BBSetIn == X)
+  bool updateBBSetIn(llvm::SmallVector<uint32_t, 1> &X) {
+    if (BBCountIn == X)
       return false;
-    BBSetIn = X;
+    BBCountIn = X;
     return true;
   }
 
@@ -651,10 +675,13 @@ public:
     BBSetIn.resize(size, MultiIteration);
     BBSetOut.resize(size, false);
     BBMaxSet.resize(size, !IsExit && MultiIteration);
+    BBCountIn.resize(size, 0);
+    BBCountOut.resize(size, 0);
   
     // Genset and Killset are initially empty.
     BBGenSet.resize(size, false);
     BBKillSet.resize(size, false);
+    BBGenCount.resize(size, 0);
   }
 };
 
@@ -678,10 +705,9 @@ class ReleaseCodeMotionContext : public CodeMotionContext {
     // released value.
     if (II == Ptr)
       return true;
-    // Identical RC root blocks code motion, we will be able to move this release
-    // further once we move the blocking release.
+    // Identical RC root DOES NOT block code motion.
     if (isReleaseInstruction(II) && getRCRoot(II) == Ptr)
-      return true;
+      return false;
     // Stop at may interfere.
     if (mayHaveSymmetricInterference(II, Ptr, AA))
       return true;
@@ -820,7 +846,7 @@ void ReleaseCodeMotionContext::computeCodeMotionGenKillSet() {
         // This instruction blocks this RC root.
         InterestBlock = true;
         State->BBKillSet.set(i);
-        State->BBGenSet.reset(i);
+        State->BBGenCount[i] = 0;
       }
 
       // If this is an epilogue release and we are freezing epilogue release
@@ -831,9 +857,7 @@ void ReleaseCodeMotionContext::computeCodeMotionGenKillSet() {
       // If this is a release instruction, it also generates.
       if (isReleaseInstruction(&*I)) {
         unsigned idx = RCRootIndex[getRCRoot(&*I)];
-        State->BBGenSet.set(idx);
-        assert(State->BBKillSet.test(idx) && "Killset computed incorrectly");
-        State->BBKillSet.reset(idx);
+        State->BBGenCount[idx]++;
         InterestBlock = true;
       }
     }
@@ -845,7 +869,7 @@ void ReleaseCodeMotionContext::computeCodeMotionGenKillSet() {
         continue;
       InterestBlock = true;
       State->BBKillSet.set(i);
-      State->BBGenSet.reset(i);
+      State->BBGenCount[i] = 0;
     }
 
     // Is this interesting to the last iteration of the data flow.
@@ -857,17 +881,21 @@ void ReleaseCodeMotionContext::computeCodeMotionGenKillSet() {
 
 void ReleaseCodeMotionContext::mergeBBDataFlowStates(SILBasicBlock *BB) {
   BlockState *State = BlockStates[BB];
-  State->BBSetOut.reset();
+  State->BBCountOut.assign(State->BBCountOut.size(), 0);
   // If basic block has no successor, simply reset and return.
   if (BB->succ_empty())
     return;
 
   // Intersect in all successors' BBSetIn.
   auto Iter = BB->succ_begin();
-  State->BBSetOut = BlockStates[*Iter]->BBSetIn;
+  State->BBCountOut = BlockStates[*Iter]->BBCountIn;
   Iter = std::next(Iter);
   for (auto E = BB->succ_end(); Iter != E; ++Iter) {
-    State->BBSetOut &= BlockStates[*Iter]->BBSetIn;
+    auto &InC = BlockStates[*Iter]->BBCountIn;
+    // Get the minimum of all the BBCountOut from all predecessors.
+    for (unsigned i = 0; i < State->BBCountIn.size(); ++i) {
+      State->BBCountOut[i] = GET_MIN(State->BBCountOut[i], InC[i]);
+    }
   }
 }
 
@@ -896,12 +924,14 @@ bool ReleaseCodeMotionContext::processBBWithGenKillSet(SILBasicBlock *BB) {
   // Compute the BBSetOut at the end of the basic block.
   mergeBBDataFlowStates(BB);
 
-  // Compute the BBSetIn at the beginning of the basic block.
-  State->BBSetOut.reset(State->BBKillSet);
-  State->BBSetOut |= State->BBGenSet;
- 
+  // Compute the BBCountIn at the end of the basic block.
+  for (unsigned i = 0; i < State->BBKillSet.size(); ++i) {
+    State->BBCountOut[i] = State->BBKillSet[i] ? 0 : State->BBCountOut[i];
+    State->BBCountOut[i] += State->BBGenCount[i];
+  }
+
   // If BBSetIn changes, then keep iterating until reached a fixed point.
-  return State->updateBBSetIn(State->BBSetOut);
+  return State->updateBBSetIn(State->BBCountOut);
 }
 
 void ReleaseCodeMotionContext::convergeCodeMotionDataFlow() {
@@ -944,13 +974,12 @@ void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
     // merge, which means the release can NOT be hoisted to the current block.
     // place it at the successors.
     for (unsigned i = 0; i < RCRootVault.size(); ++i) {  
-      if (S->BBSetOut[i])
-        continue;
+      unsigned C = S->BBCountOut[i];
       for (auto &Succ : BB->getSuccessors()) {
         BlockState *SBB = BlockStates[Succ];
-        if (!SBB->BBSetIn[i])
-          continue;
-        InsertPoints[RCRootVault[i]].push_back(&*(*Succ).begin());
+        for (unsigned X = SBB->BBCountIn[i]; X > C; --X) { 
+          InsertPoints[RCRootVault[i]].push_back(&*(*Succ).begin());
+        }
       }
     }
 
@@ -963,26 +992,29 @@ void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
     // choice but to anchor the release instructions in the successor blocks.
     for (unsigned i = 0; i < RCRootVault.size(); ++i) {
       SILInstruction *Term = BB->getTerminator();
-      if (!S->BBSetOut[i] || !mayBlockCodeMotion(Term, RCRootVault[i]))
+      if (!S->BBCountOut[i] || !mayBlockCodeMotion(Term, RCRootVault[i]))
         continue;
+      unsigned C = S->BBCountOut[i];
       for (auto &Succ : BB->getSuccessors()) {
         BlockState *SBB = BlockStates[Succ];
-        if (!SBB->BBSetIn[i])
-          continue;
-        InsertPoints[RCRootVault[i]].push_back(&*(*Succ).begin());
+        for (unsigned X = C; X > 0; --X) { 
+          InsertPoints[RCRootVault[i]].push_back(&*(*Succ).begin());
+        }
       }
-      S->BBSetOut.reset(i);
+      S->BBCountOut[i] = 0;
     }
 
     // Compute insertion point generated within the basic block. Process
     // instructions in post-order fashion.
     for (auto I = std::next(BB->rbegin()), E = BB->rend(); I != E; ++I) {
       for (unsigned i = 0; i < RCRootVault.size(); ++i) {
-        if (!S->BBSetOut[i] || !mayBlockCodeMotion(&*I, RCRootVault[i]))
+        if (!S->BBCountOut[i] || !mayBlockCodeMotion(&*I, RCRootVault[i]))
           continue;
         auto *InsertPt = &*std::next(SILBasicBlock::iterator(&*I));
-        InsertPoints[RCRootVault[i]].push_back(InsertPt);
-        S->BBSetOut.reset(i);
+        for (unsigned X = 0; X < S->BBCountOut[i]; ++X) {
+          InsertPoints[RCRootVault[i]].push_back(InsertPt);
+        }
+        S->BBCountOut[i] = 0;
       }
 
       // If we are freezing this epilogue release. Simply continue.
@@ -991,26 +1023,28 @@ void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
 
       // This release generates.
       if (isReleaseInstruction(&*I)) {
-        S->BBSetOut.set(RCRootIndex[getRCRoot(&*I)]);
+        S->BBCountOut[RCRootIndex[getRCRoot(&*I)]]++;
       }
     }
 
     // Compute insertion point generated by SILArgument. SILArgument blocks if
     // it defines the released value.
     for (unsigned i = 0; i < RCRootVault.size(); ++i) {
-      if (!S->BBSetOut[i]) 
+      if (!S->BBCountOut[i]) 
         continue;
       SILArgument *A = dyn_cast<SILArgument>(RCRootVault[i]);
       if (!A || A->getParent() != BB)
         continue;
-      InsertPoints[RCRootVault[i]].push_back(&*BB->begin());
-      S->BBSetOut.reset(i);
+      for (unsigned X = 0; X < S->BBCountOut[i]; ++X) {
+        InsertPoints[RCRootVault[i]].push_back(&*BB->begin());
+      }
+      S->BBCountOut[i] = 0;
     }
    
     // Lastly update the BBSetIn, only necessary when we are running a single
     // iteration dataflow.
     if (!MultiIteration) {
-      S->updateBBSetIn(S->BBSetOut);
+      S->updateBBSetIn(S->BBCountOut);
     }
   }
 }
@@ -1070,10 +1104,12 @@ public:
                                      FreezeEpilogueReleases, ERM); 
       // Run release hoisting.
       InstChanged |= RelCM.run();
+      F->verify();
     } else {
       RetainCodeMotionContext RetCM(BPA, F, PO, AA, RCFI);
       // Run retain sinking.
       InstChanged |= RetCM.run();
+      F->verify();
     }
 
     if (EdgeChanged) {
