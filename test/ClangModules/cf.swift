@@ -144,3 +144,8 @@ func nameCollisions() {
   np = np2
   np2 = np
 }
+
+func testNonConstVoid() {
+  let value: Unmanaged<CFNonConstVoidRef> = CFNonConstBottom()!
+  assertUnmanaged(value)
+}

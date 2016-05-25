@@ -472,7 +472,7 @@ private:
               typedefType->getDecl()->getCanonicalDecl())) {
         if (pointeeInfo.isRecord() || pointeeInfo.isTypedef())
           return {typedefType->getDecl()->getCanonicalDecl()};
-        assert(pointeeInfo.isConstVoid() && "no other type");
+        assert(pointeeInfo.isVoid() && "no other type");
         return {};
       }
       qt = qt.getSingleStepDesugaredType(clangSema.getASTContext());
