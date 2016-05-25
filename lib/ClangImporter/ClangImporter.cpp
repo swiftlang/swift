@@ -363,7 +363,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       "-DSWIFT_SDK_OVERLAY2_SPRITEKIT_EPOCH=1",
 
       // Request new APIs from CoreImage.
-      "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=1",
+      "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=2",
 
       // Request new APIs from libdispatch.
       "-DSWIFT_SDK_OVERLAY_DISPATCH_EPOCH=0",
