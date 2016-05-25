@@ -2108,6 +2108,10 @@ getForeignRepresentable(Type type, ForeignLanguage language,
              nullptr };
   }
 
+  // In Objective-C, type parameters are always objects.
+  if (type->isTypeParameter() && language == ForeignLanguage::ObjectiveC)
+    return { ForeignRepresentableKind::Object, nullptr };
+
   auto nominal = type->getAnyNominal();
   if (!nominal)
     return failure();
