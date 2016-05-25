@@ -629,11 +629,11 @@ public struct UTF32 : UnicodeCodec {
     I : IteratorProtocol where I.Element == CodeUnit
   >(_ input: inout I) -> UnicodeDecodingResult {
     guard let x = input.next() else { return .emptyInput }
-    if _fastPath((x >> 11) != 0b1101_1 && x <= 0x10ffff) {
-      return .scalarValue(UnicodeScalar(x))
-    } else {
-      return .error
-    }
+    // Check code unit is valid: not surrogate-reserved and within range.
+    guard _fastPath((x >> 11) != 0b1101_1 && x <= 0x10ffff)
+      else { return .error }
+    // x is a valid scalar.
+    return .scalarValue(UnicodeScalar(_unchecked: x))
   }
 
   /// Encodes a Unicode scalar as a UTF-32 code unit by calling the given
