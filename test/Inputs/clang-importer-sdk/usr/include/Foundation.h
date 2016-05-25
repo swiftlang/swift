@@ -1015,5 +1015,9 @@ extern NSString *NSHTTPRequestKey;
 -(void)messageSomeObject:(nonnull id)object selector:(SEL)selector;
 @end
 
+@interface NSSoapDispenser<Fragrance> : NSObject
+
+@end
+
 #define NSTimeIntervalSince1970 978307200.0
 #define NS_DO_SOMETHING 17

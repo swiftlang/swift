@@ -503,7 +503,15 @@ Type TypeChecker::applyUnboundGenericArguments(
       subs.push_back(Substitution(t.getType(), {}));
   
     auto subst = TAD->getGenericParams()->getSubstitutionMap(subs);
-    return TAD->getUnderlyingType().subst(TAD->getParentModule(), subst, None);
+
+    // FIXME: return a SubstitutedType to preserve the fact that
+    // we resolved a generic TypeAlias, for availability diagnostics.
+    // A better fix might be to introduce a BoundGenericAliasType
+    // which desugars as appropriate.
+    return SubstitutedType::get(
+        TAD->getDeclaredType(),
+        TAD->getUnderlyingType().subst(TAD->getParentModule(), subst, None),
+        Context);
   }
   
   // Form the bound generic type.
