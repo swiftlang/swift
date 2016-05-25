@@ -3096,6 +3096,11 @@ static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
   return false;
 }
 
+/// Attempts to add a fixit to correct the compiler error.
+///
+/// Corrects the error is "cannot convert value of type <integer> to expected
+/// argument type <RawRepresentable>", by adding a fixit that constructs the
+/// raw-representable type from the value. This helps with SDK changes.
 static void tryConversionFixit(InFlightDiagnostic &diag,
                                ConstraintSystem *CS,
                                Diag<Type, Type> diagID,
@@ -3119,7 +3124,7 @@ static void tryConversionFixit(InFlightDiagnostic &diag,
 
   // When the error is "cannot convert value of type <integer> to expected
   // argument type <RawRepresentable>", add a fixit that constructs the
-  // raw-representable type from the value. This helps with SDK changes.
+  // raw-representable type from the value.
 
   if (!isIntegerType(exprType))
     return;
@@ -3384,6 +3389,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
 
   InFlightDiagnostic diag = diagnose(expr->getLoc(), diagID, exprType, contextualType);
   diag.highlight(expr->getSourceRange());
+  // Attempt to add a fixit for the error.
   tryConversionFixit(diag, CS, diagID, exprType, contextualType, expr);
   return true;
 }
