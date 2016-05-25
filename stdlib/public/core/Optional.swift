@@ -521,7 +521,7 @@ extension Optional {
     return .none
   }
   @available(*, unavailable, renamed: "some")
-  public static func Some(x: Wrapped) -> Optional<Wrapped> {
+  public static func Some(_ x: Wrapped) -> Optional<Wrapped> {
     return .some(x)
   }
 
