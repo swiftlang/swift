@@ -3,12 +3,12 @@
 // XFAIL: broken_std_regex
 
 #line 17 "abc.swift"
-// CHECK: <#kw>#line</#kw> <int>17</int> <str>"abc.swift"</str>
+// CHECK: <kw>#line</kw> <int>17</int> <str>"abc.swift"</str>
 
 @available(iOS 8.0, OSX 10.10, *)
 // CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <float>8.0</float>, <kw>OSX</kw> <float>10.10</float>, *)
 func foo() {
-// CHECK: <kw>if</kw> <#kw>#available</#kw> (<kw>OSX</kw> <float>10.10</float>, <kw>iOS</kw> <float>8.01</float>, *) {<kw>let</kw> <kw>_</kw> = <str>"iOS"</str>}
+// CHECK: <kw>if</kw> <kw>#available</kw> (<kw>OSX</kw> <float>10.10</float>, <kw>iOS</kw> <float>8.01</float>, *) {<kw>let</kw> <kw>_</kw> = <str>"iOS"</str>}
   if #available (OSX 10.10, iOS 8.01, *) {let _ = "iOS"}
 }
 
@@ -261,7 +261,7 @@ func test3(o: AnyObject) {
 
 // CHECK: <kw>func</kw> test4(<kw>inout</kw> a: <type>Int</type>) {{{$}}
 func test4(inout a: Int) {
-  // CHECK: <kw>if</kw> <#kw>#available</#kw> (<kw>OSX</kw> >= <float>10.10</float>, <kw>iOS</kw> >= <float>8.01</float>) {<kw>let</kw> OSX = <str>"iOS"</str>}}{{$}}
+  // CHECK: <kw>if</kw> <kw>#available</kw> (<kw>OSX</kw> >= <float>10.10</float>, <kw>iOS</kw> >= <float>8.01</float>) {<kw>let</kw> OSX = <str>"iOS"</str>}}{{$}}
   if #available (OSX >= 10.10, iOS >= 8.01) {let OSX = "iOS"}}
 
 // CHECK: <kw>class</kw> MySubClass : <type>MyCls</type> {
