@@ -617,6 +617,8 @@ public:
                                 llvm::Function *fn);
   llvm::Constant *emitProtocolConformances();
   llvm::Constant *emitTypeMetadataRecords();
+
+  // Remote reflection metadata
   void emitReflectionMetadata(const NominalTypeDecl *Decl);
   void emitAssociatedTypeMetadataRecord(const NominalTypeDecl *Decl);
   void emitAssociatedTypeMetadataRecord(const ExtensionDecl *Ext);
@@ -628,7 +630,8 @@ public:
                                              CanSILFunctionType origCalleeType,
                                              CanSILFunctionType substCalleeType,
                                              ArrayRef<Substitution> subs,
-                                             HeapLayout &layout);
+                                             const HeapLayout &layout);
+  llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
   std::string getBuiltinTypeMetadataSectionName();
   std::string getFieldTypeMetadataSectionName();
   std::string getAssociatedTypeMetadataSectionName();
