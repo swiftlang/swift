@@ -25,6 +25,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
@@ -73,18 +74,25 @@ namespace {
   };
 }
 
-static Identifier getNameForObjC(const ValueDecl *VD,
-                                 CustomNamesOnly_t customNamesOnly = Normal) {
-  assert(isa<ClassDecl>(VD) || isa<ProtocolDecl>(VD)
-      || isa<EnumDecl>(VD) || isa<EnumElementDecl>(VD));
+static StringRef getNameForObjC(const ValueDecl *VD,
+                                CustomNamesOnly_t customNamesOnly = Normal) {
+  assert(isa<ClassDecl>(VD) || isa<ProtocolDecl>(VD) || isa<StructDecl>(VD) ||
+         isa<EnumDecl>(VD) || isa<EnumElementDecl>(VD));
   if (auto objc = VD->getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = objc->getName()) {
       assert(name->getNumSelectorPieces() == 1);
-      return name->getSelectorPieces().front();
+      return name->getSelectorPieces().front().str();
     }
   }
 
-  return customNamesOnly ? Identifier() : VD->getName();
+  if (customNamesOnly)
+    return StringRef();
+
+  if (auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl()))
+    if (const clang::IdentifierInfo *II = clangDecl->getIdentifier())
+      return II->getName();
+
+  return VD->getName().str();
 }
 
 
@@ -187,7 +195,7 @@ private:
   void visitClassDecl(ClassDecl *CD) {
     printDocumentationComment(CD);
 
-    Identifier customName = getNameForObjC(CD, CustomNamesOnly);
+    StringRef customName = getNameForObjC(CD, CustomNamesOnly);
     if (customName.empty()) {
       llvm::SmallString<32> scratch;
       os << "SWIFT_CLASS(\"" << CD->getObjCRuntimeName(scratch) << "\")\n"
@@ -219,7 +227,7 @@ private:
   void visitProtocolDecl(ProtocolDecl *PD) {
     printDocumentationComment(PD);
 
-    Identifier customName = getNameForObjC(PD, CustomNamesOnly);
+    StringRef customName = getNameForObjC(PD, CustomNamesOnly);
     if (customName.empty()) {
       llvm::SmallString<32> scratch;
       os << "SWIFT_PROTOCOL(\"" << PD->getObjCRuntimeName(scratch) << "\")\n"
@@ -240,7 +248,7 @@ private:
   void visitEnumDecl(EnumDecl *ED) {
     printDocumentationComment(ED);
     os << "typedef ";
-    Identifier customName = getNameForObjC(ED, CustomNamesOnly);
+    StringRef customName = getNameForObjC(ED, CustomNamesOnly);
     if (customName.empty()) {
       os << "SWIFT_ENUM(";
     } else {
@@ -260,7 +268,7 @@ private:
       // Print the cases as the concatenation of the enum name with the case
       // name.
       os << "  ";
-      Identifier customEltName = getNameForObjC(Elt, CustomNamesOnly);
+      StringRef customEltName = getNameForObjC(Elt, CustomNamesOnly);
       if (customEltName.empty()) {
         if (customName.empty()) {
           os << ED->getName();
@@ -779,6 +787,10 @@ private:
   bool printIfObjCBridgeable(const NominalTypeDecl *nominal,
                              ArrayRef<Type> typeArgs,
                              Optional<OptionalTypeKind> optionalKind) {
+    // Print imported bridgeable decls as their unbridged type.
+    if (nominal->hasClangNode())
+      return false;
+
     auto &ctx = nominal->getASTContext();
 
     // Dig out the ObjectiveCBridgeable protocol.
@@ -949,7 +961,8 @@ private:
     ASTContext &ctx = M.getASTContext();
     auto &clangASTContext = ctx.getClangModuleLoader()->getClangASTContext();
     clang::QualType clangTy = clangASTContext.getTypeDeclType(clangTypeDecl);
-    return clangTy->isPointerType();
+    return clangTy->isPointerType() || clangTy->isBlockPointerType() ||
+      clangTy->isObjCObjectPointerType();
   }
 
   void visitNameAliasType(NameAliasType *aliasTy,
@@ -964,10 +977,8 @@ private:
       auto *clangTypeDecl = cast<clang::TypeDecl>(alias->getClangDecl());
       os << clangTypeDecl->getName();
 
-      if (aliasTy->hasReferenceSemantics() ||
-          isClangPointerType(clangTypeDecl)) {
+      if (isClangPointerType(clangTypeDecl))
         printNullability(optionalKind);
-      }
       return;
     }
 
@@ -1014,7 +1025,12 @@ private:
       return;
 
     maybePrintTagKeyword(SD);
-    os << SD->getName();
+    os << getNameForObjC(SD);
+
+    // Handle swift_newtype applied to a pointer type.
+    if (auto *clangDecl = cast_or_null<clang::TypeDecl>(SD->getClangDecl()))
+      if (isClangPointerType(clangDecl))
+        printNullability(optionalKind);
   }
 
   /// Print a collection element type using Objective-C generics syntax.
@@ -1023,12 +1039,22 @@ private:
   void printCollectionElement(Type ty) {
     ASTContext &ctx = M.getASTContext();
 
+    auto isSwiftNewtype = [&ctx](const StructDecl *SD) -> bool {
+      if (!SD)
+        return false;
+      auto *clangDecl = SD->getClangDecl();
+      if (!clangDecl)
+        return false;
+      return clangDecl->hasAttr<clang::SwiftNewtypeAttr>();
+    };
+
     // Use the type as bridged to Objective-C unless the element type is itself
-    // a collection.
+    // an imported type or a collection.
     const StructDecl *SD = ty->getStructOrBoundGenericStruct();
     if (SD != ctx.getArrayDecl() &&
         SD != ctx.getDictionaryDecl() &&
-        SD != ctx.getSetDecl()) {
+        SD != ctx.getSetDecl() &&
+        !isSwiftNewtype(SD)) {
       ty = *ctx.getBridgedToObjC(&M, ty, /*resolver*/nullptr);
     }
 
