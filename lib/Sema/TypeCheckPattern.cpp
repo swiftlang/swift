@@ -32,7 +32,10 @@ using namespace swift;
 /// This requires the getter's body to have a certain syntactic form. It should
 /// be kept in sync with importEnumCaseAlias in the ClangImporter library.
 static EnumElementDecl *
-extractEnumElement(const VarDecl *constant) {
+extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
+                   const VarDecl *constant) {
+  TC.diagnoseExplicitUnavailability(constant, UseLoc, DC, nullptr);
+
   const FuncDecl *getter = constant->getGetter();
   if (!getter)
     return nullptr;
@@ -62,7 +65,8 @@ extractEnumElement(const VarDecl *constant) {
 /// If there are no enum elements but there are properties, attempts to map
 /// an arbitrary property to an enum element using extractEnumElement.
 static EnumElementDecl *
-filterForEnumElement(LookupResult foundElements) {
+filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
+                     LookupResult foundElements) {
   EnumElementDecl *foundElement = nullptr;
   VarDecl *foundConstant = nullptr;
 
@@ -86,7 +90,7 @@ filterForEnumElement(LookupResult foundElements) {
   }
 
   if (!foundElement && foundConstant && foundConstant->hasClangNode())
-    foundElement = extractEnumElement(foundConstant);
+    foundElement = extractEnumElement(TC, DC, UseLoc, foundConstant);
 
   return foundElement;
 }
@@ -94,24 +98,24 @@ filterForEnumElement(LookupResult foundElements) {
 /// Find an unqualified enum element.
 static EnumElementDecl *
 lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
-                                   Identifier name) {
+                                   Identifier name, SourceLoc UseLoc) {
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
   auto lookup = TC.lookupUnqualified(DC, name, SourceLoc(), lookupOptions);
-  return filterForEnumElement(lookup);
+  return filterForEnumElement(TC, DC, UseLoc, lookup);
 }
 
 /// Find an enum element in an enum type.
 static EnumElementDecl *
 lookupEnumMemberElement(TypeChecker &TC, DeclContext *DC, Type ty,
-                        Identifier name) {
+                        Identifier name, SourceLoc UseLoc) {
   assert(ty->getAnyNominal());
   // Look up the case inside the enum.
   // FIXME: We should be able to tell if this is a private lookup.
   NameLookupOptions lookupOptions
     = defaultMemberLookupOptions - NameLookupFlags::DynamicLookup;
   LookupResult foundElements = TC.lookupMember(DC, ty, name, lookupOptions);
-  return filterForEnumElement(foundElements);
+  return filterForEnumElement(TC, DC, UseLoc, foundElements);
 }
 
 namespace {
@@ -436,7 +440,8 @@ public:
 
     // FIXME: Argument labels?
     EnumElementDecl *referencedElement
-      = lookupEnumMemberElement(TC, DC, ty, ude->getName().getBaseName());
+      = lookupEnumMemberElement(TC, DC, ty, ude->getName().getBaseName(),
+                                ude->getLoc());
     
     // Build a TypeRepr from the head of the full path.
     // FIXME: Compound names.
@@ -474,7 +479,8 @@ public:
     // Try looking up an enum element in context.
     if (EnumElementDecl *referencedElement
         = lookupUnqualifiedEnumMemberElement(TC, DC,
-                                             ude->getName().getBaseName())) {
+                                             ude->getName().getBaseName(),
+                                             ude->getLoc())) {
       auto *enumDecl = referencedElement->getParentEnum();
       auto enumTy = enumDecl->getDeclaredTypeInContext();
       TypeLoc loc = TypeLoc::withoutLoc(enumTy);
@@ -558,7 +564,8 @@ public:
     if (auto compId = dyn_cast<ComponentIdentTypeRepr>(repr)) {
       // Try looking up an enum element in context.
       EnumElementDecl *referencedElement
-        = lookupUnqualifiedEnumMemberElement(TC, DC, compId->getIdentifier());
+        = lookupUnqualifiedEnumMemberElement(TC, DC, compId->getIdentifier(),
+                                             repr->getLoc());
       
       if (!referencedElement)
         return nullptr;
@@ -596,7 +603,8 @@ public:
     auto tailComponent = compoundR->Components.back();
 
     EnumElementDecl *referencedElement
-      = lookupEnumMemberElement(TC, DC, enumTy, tailComponent->getIdentifier());
+      = lookupEnumMemberElement(TC, DC, enumTy, tailComponent->getIdentifier(),
+                                tailComponent->getLoc());
     if (!referencedElement)
       return nullptr;
     
@@ -1382,8 +1390,10 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     
     Type enumTy;
     if (!elt) {
-      if (type->getAnyNominal())
-        elt = lookupEnumMemberElement(*this, dc, type, EEP->getName());
+      if (type->getAnyNominal()) {
+        elt = lookupEnumMemberElement(*this, dc, type, EEP->getName(),
+                                      EEP->getLoc());
+      }
       if (!elt) {
         if (!type->is<ErrorType>()) {
           // Lowercasing of Swift.Optional's cases is handled in the
@@ -1513,7 +1523,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     // If the element decl was not resolved (because it was spelled without a
     // type as `.Foo`), resolve it now that we have a type.
     if (!OP->getElementDecl()) {
-      auto *element = lookupEnumMemberElement(*this, dc, type, Context.Id_some);
+      auto *element = lookupEnumMemberElement(*this, dc, type, Context.Id_some,
+                                              OP->getLoc());
       if (!element) {
         diagnose(OP->getLoc(), diag::enum_element_pattern_member_not_found,
                  "Some", type);
