@@ -240,12 +240,17 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
       return false;
     };
 
+    Conformance->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
+
+    // If there are no associated types, don't bother emitting any
+    // metadata.
+    if (AssociatedTypes.empty())
+      return;
+
     addTypeRef(ModuleContext, ConformingType);
 
     auto ProtoTy = Conformance->getProtocol()->getDeclaredType();
     addTypeRef(ModuleContext, ProtoTy->getCanonicalType());
-
-    Conformance->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
 
     addConstantInt32(AssociatedTypes.size());
     addConstantInt32(AssociatedTypeRecordSize);
