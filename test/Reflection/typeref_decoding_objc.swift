@@ -17,6 +17,8 @@
 // CHECK-32: integer: Swift.Int
 // CHECK-32: (struct Swift.Int)
 
+// CHECK-32: __ObjC.NSBundle
+// CHECK-32: ---------------
 // CHECK-32: __ObjC.NSURL
 // CHECK-32: ------------
 
@@ -25,6 +27,12 @@
 
 // CHECK-32: BUILTIN TYPES:
 // CHECK-32: ==============
+
+// CHECK-32: - __ObjC.NSBundle:
+// CHECK-32: Size: 4
+// CHECK-32: Alignment: 4
+// CHECK-32: Stride: 4
+// CHECK-32: NumExtraInhabitants: 4096
 
 // CHECK-32: - __ObjC.NSURL:
 // CHECK-32: Size: 4
@@ -88,6 +96,9 @@
 // CHECK-64: integer: Swift.Int
 // CHECK-64: (struct Swift.Int)
 
+// CHECK-64: __ObjC.NSBundle
+// CHECK-64: ------------
+
 // CHECK-64: __ObjC.NSURL
 // CHECK-64: ------------
 
@@ -96,6 +107,12 @@
 
 // CHECK-64: BUILTIN TYPES:
 // CHECK-64: ==============
+
+// CHECK-64: - __ObjC.NSBundle:
+// CHECK-64: Size: 8
+// CHECK-64: Alignment: 8
+// CHECK-64: Stride: 8
+// CHECK-64: NumExtraInhabitants: 2147483647
 
 // CHECK-64: - __ObjC.NSURL:
 // CHECK-64: Size: 8

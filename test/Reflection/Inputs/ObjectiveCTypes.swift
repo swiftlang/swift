@@ -28,3 +28,6 @@ public class HasObjCClasses {
   let integer = NSInteger()
 }
 
+public func closureHasObjCClasses(b: NSBundle) -> () -> () {
+  return { _ = b }
+}
