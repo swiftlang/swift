@@ -131,6 +131,7 @@ set(SWIFTLIB_SOURCES
   Process.swift
   SliceBuffer.swift
   Tuple.swift.gyb
+  UnfoldSequence.swift
   VarArgs.swift
   Zip.swift
   )
