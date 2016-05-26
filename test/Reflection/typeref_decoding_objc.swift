@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %S/Inputs/ObjectiveCTypes.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/libTypesToReflect.%target-dylib-extension
-// RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension | FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension | FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
 // REQUIRES: objc_interop
 
 // CHECK: FIELDS:
@@ -54,11 +54,16 @@
 // CHECK: BUILTIN TYPES:
 // CHECK: ==============
 
-// CHECK: - __C.CGRect:
-// CHECK: Size: 32
-// CHECK: Alignment: 8
-// CHECK: Stride: 32
-// CHECK: NumExtraInhabitants: 0
+// CHECK-32: - __C.CGRect:
+// CHECK-32: Size: 16
+// CHECK-32: Alignment: 4
+// CHECK-32: Stride: 16
+// CHECK-32: NumExtraInhabitants: 0
+
+// CHECK-64: Size: 32
+// CHECK-64: Alignment: 8
+// CHECK-64: Stride: 32
+// CHECK-64: NumExtraInhabitants: 0
 
 // CHECK: CAPTURE DESCRIPTORS:
 // CHECK: ====================

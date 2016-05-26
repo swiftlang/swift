@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 public class OC : NSObject {
   public let nsObject: NSObject
@@ -26,7 +27,7 @@ public class GenericOC<T> : NSObject {
 public class HasObjCClasses {
   let url = NSURL()
   let integer = NSInteger()
-  let rect = NSRect(x: 0, y: 1, width: 2, height: 3)
+  let rect = CGRect(x: 0, y: 1, width: 2, height: 3)
 }
 
 public func closureHasObjCClasses(b: NSBundle, c: NSCoding) -> () -> () {
