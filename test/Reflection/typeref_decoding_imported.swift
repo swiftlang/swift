@@ -18,15 +18,6 @@
 // CHECK-32: mcsbf: __C.MyCStructWithBitfields
 // CHECK-32: (struct __C.MyCStructWithBitfields)
 
-// CHECK-32: __C.MyCStruct
-// CHECK-32: -------------
-// CHECK-32: __C.MyCEnum
-// CHECK-32: -----------
-// CHECK-32: __C.MyCUnion
-// CHECK-32: ------------
-// CHECK-32: __C.MyCStructWithBitfields
-// CHECK-32: --------------------------
-
 // CHECK-32: ASSOCIATED TYPES:
 // CHECK-32: =================
 
@@ -82,15 +73,6 @@
 
 // CHECK-64: mcsbf: __C.MyCStructWithBitfields
 // CHECK-64: (struct __C.MyCStructWithBitfields)
-
-// CHECK-64: __C.MyCStruct
-// CHECK-64: -------------
-// CHECK-64: __C.MyCEnum
-// CHECK-64: -----------
-// CHECK-64: __C.MyCUnion
-// CHECK-64: ------------
-// CHECK-64: __C.MyCStructWithBitfields
-// CHECK-64: --------------------------
 
 // CHECK-64: ASSOCIATED TYPES:
 // CHECK-64: =================
