@@ -86,5 +86,8 @@ class Test2 : SomeProt {
   func instMeth(p: Int) {}
   func instMeth2(p: Int, p2: Int) {}
 }
+class SubTest2 : Test2 {
+  override func instMeth(_ p: Int) {}
+}
 Test2().instMeth(0)
 Test2().instMeth2(0, p2:1)
