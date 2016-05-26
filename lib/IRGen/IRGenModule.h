@@ -619,27 +619,6 @@ public:
   llvm::Constant *emitProtocolConformances();
   llvm::Constant *emitTypeMetadataRecords();
 
-  // Remote reflection metadata
-  void emitReflectionMetadata(const NominalTypeDecl *Decl);
-  void emitAssociatedTypeMetadataRecord(const NominalTypeDecl *Decl);
-  void emitAssociatedTypeMetadataRecord(const ExtensionDecl *Ext);
-  void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
-  void emitBuiltinReflectionMetadata();
-  llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
-  llvm::Constant *getAddrOfFieldName(StringRef Name);
-  llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
-                                             CanSILFunctionType origCalleeType,
-                                             CanSILFunctionType substCalleeType,
-                                             ArrayRef<Substitution> subs,
-                                             const HeapLayout &layout);
-  llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
-  std::string getBuiltinTypeMetadataSectionName();
-  std::string getFieldTypeMetadataSectionName();
-  std::string getAssociatedTypeMetadataSectionName();
-  std::string getCaptureDescriptorMetadataSectionName();
-  std::string getReflectionStringsSectionName();
-  std::string getReflectionTypeRefSectionName();
-
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
                                             llvm::Type *resultType,
                                             ArrayRef<llvm::Type*> paramTypes,
@@ -694,9 +673,6 @@ private:
   SmallVector<NormalProtocolConformance *, 4> ProtocolConformances;
   /// List of nominal types to generate type metadata records for.
   SmallVector<CanType, 4> RuntimeResolvableTypes;
-  /// Builtin types referenced by types in this module when emitting
-  /// reflection metadata.
-  llvm::SetVector<CanType> BuiltinTypes;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
@@ -736,6 +712,36 @@ private:
   void emitGlobalLists();
   void emitAutolinkInfo();
   void cleanupClangCodeGenMetadata();
+
+//--- Remote reflection metadata --------------------------------------------
+public:
+  /// Builtin types referenced by types in this module when emitting
+  /// reflection metadata.
+  llvm::SetVector<CanType> BuiltinTypes;
+  /// Imported classes referenced by types in this module when emitting
+  /// reflection metadata.
+  llvm::SetVector<ClassDecl *> ImportedClasses;
+
+  llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
+  llvm::Constant *getAddrOfFieldName(StringRef Name);
+  llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
+                                             CanSILFunctionType origCalleeType,
+                                             CanSILFunctionType substCalleeType,
+                                             ArrayRef<Substitution> subs,
+                                             const HeapLayout &layout);
+  llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
+
+  void emitReflectionMetadata(const NominalTypeDecl *Decl);
+  void emitAssociatedTypeMetadataRecord(const NominalTypeDecl *Decl);
+  void emitAssociatedTypeMetadataRecord(const ExtensionDecl *Ext);
+  void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
+  void emitBuiltinReflectionMetadata();
+  std::string getBuiltinTypeMetadataSectionName();
+  std::string getFieldTypeMetadataSectionName();
+  std::string getAssociatedTypeMetadataSectionName();
+  std::string getCaptureDescriptorMetadataSectionName();
+  std::string getReflectionStringsSectionName();
+  std::string getReflectionTypeRefSectionName();
 
 //--- Runtime ---------------------------------------------------------------
 public:

@@ -26,6 +26,7 @@ public class GenericOC<T> : NSObject {
 public class HasObjCClasses {
   let url = NSURL()
   let integer = NSInteger()
+  let rect = NSRect(x: 0, y: 1, width: 2, height: 3)
 }
 
 public func closureHasObjCClasses(b: NSBundle) -> () -> () {

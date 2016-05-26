@@ -174,20 +174,28 @@ public:
 
 class ReflectionMetadataBuilder : public ConstantBuilder<> {
 protected:
-  llvm::SetVector<CanType> &BuiltinTypes;
 
   // Collect any builtin types referenced from this type.
   void addBuiltinTypeRefs(CanType type) {
     type.visit([&](Type t) {
       if (t->is<BuiltinType>())
-        BuiltinTypes.insert(CanType(t));
+        IGM.BuiltinTypes.insert(CanType(t));
 
-      // We need at least size/alignment information for types imported by
-      // clang, so we'll treat them as a builtin type, essentially an
-      // opaque blob.
+      // We need size/alignment information for imported value types,
+      // so emit builtin descriptors for them.
+      //
+      // In effect they're treated like an opaque blob, which is OK
+      // for now, at least until we want to import C++ types or
+      // something like that.
+      //
+      // Classes go down a different path.
       if (auto Nominal = t->getAnyNominal())
-        if (Nominal->hasClangNode())
-          BuiltinTypes.insert(CanType(t));
+        if (Nominal->hasClangNode()) {
+          if (auto CD = dyn_cast<ClassDecl>(Nominal))
+            IGM.ImportedClasses.insert(CD);
+          else
+            IGM.BuiltinTypes.insert(CanType(t));
+        }
     });
   }
 
@@ -210,9 +218,8 @@ protected:
   }
 
 public:
-  ReflectionMetadataBuilder(IRGenModule &IGM,
-                            llvm::SetVector<CanType> &BuiltinTypes)
-    : ConstantBuilder(IGM), BuiltinTypes(BuiltinTypes) {}
+  ReflectionMetadataBuilder(IRGenModule &IGM)
+    : ConstantBuilder(IGM) {}
 };
 
 class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
@@ -294,15 +301,11 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
   }
 
 public:
-  AssociatedTypeMetadataBuilder(IRGenModule &IGM, const NominalTypeDecl *Decl,
-                                llvm::SetVector<CanType> &BuiltinTypes)
-    : ReflectionMetadataBuilder(IGM, BuiltinTypes),
-      NominalOrExtensionDecl(Decl) {}
+  AssociatedTypeMetadataBuilder(IRGenModule &IGM, const NominalTypeDecl *Decl)
+    : ReflectionMetadataBuilder(IGM), NominalOrExtensionDecl(Decl) {}
 
-  AssociatedTypeMetadataBuilder(IRGenModule &IGM, const ExtensionDecl *Decl,
-                                llvm::SetVector<CanType> &BuiltinTypes)
-    : ReflectionMetadataBuilder(IGM, BuiltinTypes),
-      NominalOrExtensionDecl(Decl) {}
+  AssociatedTypeMetadataBuilder(IRGenModule &IGM, const ExtensionDecl *Decl)
+    : ReflectionMetadataBuilder(IGM), NominalOrExtensionDecl(Decl) {}
 
 
   llvm::GlobalVariable *emit() {
@@ -362,12 +365,6 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     addConstantInt32(0);
   }
 
-  void addImportedRecord() {
-    addConstantInt16(uint16_t(FieldDescriptorKind::Imported));
-    addConstantInt16(0);
-    addConstantInt32(0);
-  }
-
   void layout() {
     using swift::reflection::FieldDescriptorKind;
 
@@ -383,10 +380,8 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
       }
     }
 
-    if (NTD->hasClangNode()) {
-      addImportedRecord();
+    if (NTD->hasClangNode())
       return;
-    }
 
     switch (NTD->getKind()) {
       case DeclKind::Class:
@@ -442,10 +437,8 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
 
 public:
   FieldTypeMetadataBuilder(IRGenModule &IGM,
-                           const NominalTypeDecl * NTD,
-                           llvm::SetVector<CanType> &BuiltinTypes)
-    : ReflectionMetadataBuilder(IGM, BuiltinTypes),
-      NTD(NTD) {}
+                           const NominalTypeDecl * NTD)
+    : ReflectionMetadataBuilder(IGM), NTD(NTD) {}
 
   llvm::GlobalVariable *emit() {
 
@@ -487,15 +480,14 @@ class BuiltinTypeMetadataBuilder : public ReflectionMetadataBuilder {
   }
 
   void layout() {
-    for (auto builtinType : BuiltinTypes) {
+    for (auto builtinType : IGM.BuiltinTypes) {
       addBuiltinType(builtinType);
     }
   }
 
 public:
-  BuiltinTypeMetadataBuilder(IRGenModule &IGM,
-                             llvm::SetVector<CanType> &BuiltinTypes)
-    : ReflectionMetadataBuilder(IGM, BuiltinTypes) {}
+  BuiltinTypeMetadataBuilder(IRGenModule &IGM)
+    : ReflectionMetadataBuilder(IGM) {}
 
   llvm::GlobalVariable *emit() {
 
@@ -531,11 +523,8 @@ public:
 class BoxDescriptorBuilder : public ReflectionMetadataBuilder {
   CanType BoxedType;
 public:
-  BoxDescriptorBuilder(IRGenModule &IGM,
-                       llvm::SetVector<CanType> &BuiltinTypes,
-                       CanType BoxedType)
-    : ReflectionMetadataBuilder(IGM, BuiltinTypes),
-      BoxedType(BoxedType) {}
+  BoxDescriptorBuilder(IRGenModule &IGM, CanType BoxedType)
+    : ReflectionMetadataBuilder(IGM), BoxedType(BoxedType) {}
 
   void layout() {
     addConstantInt32(1);
@@ -585,13 +574,12 @@ class CaptureDescriptorBuilder : public ReflectionMetadataBuilder {
   const HeapLayout &Layout;
 public:
   CaptureDescriptorBuilder(IRGenModule &IGM,
-                           llvm::SetVector<CanType> &BuiltinTypes,
                            SILFunction &Caller,
                            CanSILFunctionType OrigCalleeType,
                            CanSILFunctionType SubstCalleeType,
                            ArrayRef<Substitution> Subs,
                            const HeapLayout &Layout)
-    : ReflectionMetadataBuilder(IGM, BuiltinTypes),
+    : ReflectionMetadataBuilder(IGM),
       Caller(Caller), OrigCalleeType(OrigCalleeType),
       SubstCalleeType(SubstCalleeType), Subs(Subs),
       Layout(Layout) {}
@@ -819,7 +807,7 @@ IRGenModule::getAddrOfBoxDescriptor(CanType BoxedType) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
-  BoxDescriptorBuilder builder(*this, BuiltinTypes, BoxedType);
+  BoxDescriptorBuilder builder(*this, BoxedType);
 
   auto var = builder.emit();
   if (var)
@@ -837,7 +825,7 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
   if (!IRGen.Opts.EnableReflectionMetadata)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
-  CaptureDescriptorBuilder builder(*this, BuiltinTypes, Caller,
+  CaptureDescriptorBuilder builder(*this, Caller,
                                    OrigCalleeType, SubstCalleeType, Subs,
                                    Layout);
 
@@ -860,7 +848,7 @@ void IRGenModule::emitAssociatedTypeMetadataRecord(const NominalTypeDecl *Decl){
   if (!IRGen.Opts.EnableReflectionMetadata)
     return;
 
-  AssociatedTypeMetadataBuilder builder(*this, Decl, BuiltinTypes);
+  AssociatedTypeMetadataBuilder builder(*this, Decl);
   auto var = builder.emit();
   if (var)
     addUsedGlobal(var);
@@ -870,7 +858,7 @@ void IRGenModule::emitAssociatedTypeMetadataRecord(const ExtensionDecl *Ext) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return;
 
-  AssociatedTypeMetadataBuilder builder(*this, Ext, BuiltinTypes);
+  AssociatedTypeMetadataBuilder builder(*this, Ext);
   auto var = builder.emit();
   if (var)
     addUsedGlobal(var);
@@ -885,12 +873,10 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
     BuiltinTypes.insert(Context.TheUnsafeValueBufferType);
   }
 
-  for (auto Ty : BuiltinTypes)
-    if (auto Nominal = Ty.getAnyNominal())
-      if (Nominal->hasClangNode())
-        emitFieldMetadataRecord(Nominal);
+  for (auto CD : ImportedClasses)
+    emitFieldMetadataRecord(CD);
 
-  BuiltinTypeMetadataBuilder builder(*this, BuiltinTypes);
+  BuiltinTypeMetadataBuilder builder(*this);
   auto var = builder.emit();
   if (var)
     addUsedGlobal(var);
@@ -900,7 +886,7 @@ void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return;
 
-  FieldTypeMetadataBuilder builder(*this, Decl, BuiltinTypes);
+  FieldTypeMetadataBuilder builder(*this, Decl);
   auto var = builder.emit();
   if (var)
     addUsedGlobal(var);
