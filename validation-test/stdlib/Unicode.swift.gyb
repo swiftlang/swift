@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/Unicode.swift
+// RUN: %S/../../utils/line-directive %t/Unicode.swift -- %target-build-swift %t/Unicode.swift -o %t/a.out -Xfrontend -disable-objc-attr-requires-foundation-module
+// RUN: %S/../../utils/line-directive %t/Unicode.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
@@ -2460,6 +2462,32 @@ StringTests.test("StreamableConformance") {
     expectEqual(expected, actual)
   }
 }
+
+let nullOffsetTests = [
+  (input: "\0", expected: 0),
+  (input: "a\0", expected: 1),
+  (input: "foobar\0", expected: 6)
+]
+
+let NullCodeUnitOffsetTests = TestSuite("NullCodeUnitOffsetTests")
+
+% for (Encoding, View) in [
+%   ('UTF8', 'utf8'),
+%   ('UTF16', 'utf16'),
+%   ('UTF32', 'unicodeScalars.map{ $0.value }')
+% ]:
+
+NullCodeUnitOffsetTests.test("${Encoding}._nullCodeUnitOffset(in:)") {
+  for test in nullOffsetTests {
+    let actual = Array(test.input.${View})
+      .withUnsafeBufferPointer { p in
+        ${Encoding}._nullCodeUnitOffset(in: p.baseAddress!)
+      }
+    expectEqual(test.expected, actual)
+  }
+}
+
+% end
 
 runAllTests()
 
