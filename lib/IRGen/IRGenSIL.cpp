@@ -3589,7 +3589,11 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 # endif
 
   auto boxTy = i->getType().castTo<SILBoxType>();
-  OwnedAddress boxWithAddr = emitAllocateBox(*this, boxTy, DbgName);
+  auto boxInterfaceTy = cast<SILBoxType>(
+      CurSILFn->mapTypeOutOfContext(boxTy)
+          ->getCanonicalType());
+  OwnedAddress boxWithAddr = emitAllocateBox(*this, boxTy, boxInterfaceTy,
+                                             DbgName);
   setLoweredBox(i, boxWithAddr);
 
   if (IGM.DebugInfo && Decl) {

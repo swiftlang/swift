@@ -116,8 +116,12 @@ void emitDeallocatePartialClassInstance(IRGenFunction &IGF,
                                         llvm::Value *alignMask);
 
 /// Allocate a boxed value.
+///
+/// The interface type is required for emitting reflection metadata.
 OwnedAddress
-emitAllocateBox(IRGenFunction &IGF, CanSILBoxType boxType,
+emitAllocateBox(IRGenFunction &IGF,
+                CanSILBoxType boxType,
+                CanSILBoxType boxInterfaceType,
                 const llvm::Twine &name);
 
 /// Deallocate a box whose value is uninitialized.

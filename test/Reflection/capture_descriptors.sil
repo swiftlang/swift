@@ -30,6 +30,12 @@ bb0(%i: $Int, %p: $@thick P.Type):
   return %c : $@callee_owned () -> ()
 }
 
+// This is the descriptor for '@box Int' above
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (struct Swift.Int)
+// CHECK-NEXT: - Metadata sources:
+
 // CHECK:      - Capture types:
 // CHECK-NEXT: (struct Swift.Int)
 // CHECK-NEXT: (sil_box
@@ -59,6 +65,12 @@ bb0:
   dealloc_stack %i : $*Int
   return %c : $@callee_owned () -> ()
 }
+
+// This is the descriptor for '@box String' above
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (struct Swift.String)
+// CHECK-NEXT: - Metadata sources:
 
 // CHECK:      - Capture types:
 // CHECK-NEXT: (struct Swift.Int)

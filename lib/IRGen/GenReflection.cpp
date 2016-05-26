@@ -195,6 +195,11 @@ protected:
   /// in the typeref reflection section.
   void addTypeRef(Module *ModuleContext, CanType type) {
     assert(type);
+
+    // Generic parameters should be written in terms of interface types
+    // for the purposes of reflection metadata
+    assert(!type->hasArchetype() && "Forgot to map typeref out of context");
+
     Mangle::Mangler mangler(/*DWARFMangling*/false,
                             /*usePunyCode*/ true,
                             /*OptimizeProtocolNames*/ false);
@@ -515,6 +520,54 @@ public:
   }
 };
 
+/// Builds a constant LLVM struct describing the layout of a fixed-size
+/// SIL @box. These look like closure contexts, but without any necessary
+/// bindings or metadata sources, and only a single captured value.
+class BoxDescriptorBuilder : public ReflectionMetadataBuilder {
+  CanType BoxedType;
+public:
+  BoxDescriptorBuilder(IRGenModule &IGM,
+                       llvm::SetVector<CanType> &BuiltinTypes,
+                       CanType BoxedType)
+    : ReflectionMetadataBuilder(IGM, BuiltinTypes),
+      BoxedType(BoxedType) {}
+
+  void layout() {
+    addConstantInt32(1);
+    addConstantInt32(0); // Number of sources
+    addConstantInt32(0); // Number of generic bindings
+
+    addTypeRef(IGM.getSILModule().getSwiftModule(), BoxedType);
+    addBuiltinTypeRefs(BoxedType);
+  }
+
+  llvm::GlobalVariable *emit() {
+    auto tempBase = std::unique_ptr<llvm::GlobalVariable>(
+      new llvm::GlobalVariable(IGM.Int8Ty, /*isConstant*/ true,
+                               llvm::GlobalValue::PrivateLinkage));
+    setRelativeAddressBase(tempBase.get());
+
+    layout();
+    auto init = getInit();
+
+    if (!init)
+      return nullptr;
+
+    auto var = new llvm::GlobalVariable(*IGM.getModule(), init->getType(),
+                                        /*isConstant*/ true,
+                                        llvm::GlobalValue::PrivateLinkage,
+                                        init,
+                                        "\x01l__swift3_box_descriptor");
+    var->setSection(IGM.getCaptureDescriptorMetadataSectionName());
+    var->setAlignment(4);
+
+    auto replacer = llvm::ConstantExpr::getBitCast(var, IGM.Int8PtrTy);
+    tempBase->replaceAllUsesWith(replacer);
+
+    return var;
+  }
+};
+
 /// Builds a constant LLVM struct describing the layout of a heap closure,
 /// the types of its captures, and the sources of metadata if any of the
 /// captures are generic.
@@ -524,7 +577,7 @@ class CaptureDescriptorBuilder : public ReflectionMetadataBuilder {
   CanSILFunctionType OrigCalleeType;
   CanSILFunctionType SubstCalleeType;
   ArrayRef<Substitution> Subs;
-  HeapLayout &Layout;
+  const HeapLayout &Layout;
 public:
   CaptureDescriptorBuilder(IRGenModule &IGM,
                            llvm::SetVector<CanType> &BuiltinTypes,
@@ -532,7 +585,7 @@ public:
                            CanSILFunctionType OrigCalleeType,
                            CanSILFunctionType SubstCalleeType,
                            ArrayRef<Substitution> Subs,
-                           HeapLayout &Layout)
+                           const HeapLayout &Layout)
     : ReflectionMetadataBuilder(IGM, BuiltinTypes),
       Caller(Caller), OrigCalleeType(OrigCalleeType),
       SubstCalleeType(SubstCalleeType), Subs(Subs),
@@ -650,7 +703,7 @@ public:
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
-      addTypeRef(Caller.getModule().getSwiftModule(), CaptureType);
+      addTypeRef(IGM.getSILModule().getSwiftModule(), CaptureType);
       addBuiltinTypeRefs(CaptureType);
     }
 
@@ -757,11 +810,26 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef Str) {
 }
 
 llvm::Constant *
+IRGenModule::getAddrOfBoxDescriptor(CanType BoxedType) {
+  if (!IRGen.Opts.EnableReflectionMetadata)
+    return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
+
+  llvm::SetVector<CanType> BuiltinTypes;
+  BoxDescriptorBuilder builder(*this, BuiltinTypes, BoxedType);
+
+  auto var = builder.emit();
+  if (var)
+    addUsedGlobal(var);
+
+  return llvm::ConstantExpr::getBitCast(var, CaptureDescriptorPtrTy);
+}
+
+llvm::Constant *
 IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
                                         CanSILFunctionType OrigCalleeType,
                                         CanSILFunctionType SubstCalleeType,
                                         ArrayRef<Substitution> Subs,
-                                        HeapLayout &Layout) {
+                                        const HeapLayout &Layout) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
