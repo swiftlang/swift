@@ -338,7 +338,7 @@ static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
 // be analyzed by this pass.
 static bool mayHaveUnknownUses(VarDecl *Property, SILModule *Module) {
   if (Property->getDeclContext()->getParentModule() !=
-      Module->getAssociatedContext()->getParentModule()) {
+      Module->getSwiftModule()) {
     DEBUG(llvm::dbgs() << "Property " << *Property
                        << " is defined in a different module\n");
     // We don't see the bodies of initializers from a different module
