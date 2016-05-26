@@ -6,7 +6,7 @@
 import SwiftReflectionTest
 import Foundation
 
-func capturesImportedClass(x: Int, n: NSURLX, r: NSRect) {
+func capturesImportedClass(x: Int, n: NSURL, r: NSRect) {
   reflect(function: {print(x); print(n); print(r)})
 
 // CHECK-32:      Type reference:
