@@ -742,7 +742,9 @@ clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
       // FIXME: Handle _Bool and DarwinBoolean.
       auto &ctx = IGM.getClangASTContext();
       auto &TI = ctx.getTargetInfo();
-      if (TI.useSignedCharForObjCBool()) {
+      // FIXME: Figure out why useSignedCharForObjCBool() returns
+      // 'true' on Linux
+      if (IGM.ObjCInterop && TI.useSignedCharForObjCBool()) {
         return ctx.SignedCharTy;
       }
     }
