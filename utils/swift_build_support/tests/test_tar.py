@@ -9,20 +9,46 @@
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 import os
+import sys
 import subprocess
 import tempfile
 import unittest
+import platform
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 from swift_build_support.tar import tar
 
 
 class TarTestCase(unittest.TestCase):
+    def setUp(self):
+        self._orig_stdout = sys.stdout
+        self._orig_stderr = sys.stderr
+        self.stdout = StringIO()
+        self.stderr = StringIO()
+        sys.stdout = self.stdout
+        sys.stderr = self.stderr
+
+    def tearDown(self):
+        sys.stdout = self._orig_stdout
+        sys.stderr = self._orig_stderr
 
     def test_tar_this_file_succeeds(self):
         # `tar` complains about absolute paths, so use a relative path here.
         source = os.path.relpath(__file__)
         _, destination = tempfile.mkstemp()
         tar(source=source, destination=destination)
+
+        if platform.system() == "Darwin":
+            expect = "+ tar -c -z -f {dest} {source}\n"
+        else:
+            expect = "+ tar -c -z -f {dest} --owner=0 --group=0 {source}\n"
+
+        self.assertEqual(self.stdout.getvalue(), "")
+        self.assertEqual(self.stderr.getvalue(),
+                         expect.format(dest=destination, source=source))
 
     def test_tar_nonexistent_file_raises(self):
         with self.assertRaises(subprocess.CalledProcessError):

@@ -43,3 +43,18 @@ def find(tool, sdk=None, toolchain=None):
         return str(out.rstrip().decode())
     except subprocess.CalledProcessError:
         return None
+
+
+@cache_util.cached
+def sdk_path(sdk):
+    """
+    Return the path string for given SDK, according to `xcrun --show-sdk-path`.
+
+    If `xcrun --show-sdk-path` cannot find the SDK, return None.
+    """
+    command = ['xcrun', '--sdk', sdk, '--show-sdk-path']
+    try:
+        out = subprocess.check_output(command)
+        return str(out.rstrip().decode())
+    except subprocess.CalledProcessError:
+        return None

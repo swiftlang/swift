@@ -37,7 +37,8 @@ class CMakeTestCase(unittest.TestCase):
                          clang_compiler_version=None,
                          build_jobs=8,
                          build_args=[],
-                         verbose_build=False)
+                         verbose_build=False,
+                         build_ninja=False)
 
     def cmake(self, args):
         """Return new CMake object initialized with given args
@@ -47,6 +48,8 @@ class CMakeTestCase(unittest.TestCase):
         toolchain.cxx = args.host_cxx
         if args.distcc:
             toolchain.distcc = self.mock_distcc_path()
+        if args.build_ninja:
+            toolchain.ninja = '/path/to/built/ninja'
         return CMake(args=args, toolchain=toolchain)
 
     def test_common_options_defaults(self):
@@ -140,6 +143,17 @@ class CMakeTestCase(unittest.TestCase):
              "-DLLVM_VERSION_MINOR:STRING=8",
              "-DLLVM_VERSION_PATCH:STRING=0"])
 
+    def test_common_options_build_ninja(self):
+        args = self.default_args()
+        args.build_ninja = True
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.common_options()),
+            ["-G", "Ninja",
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_MAKE_PROGRAM=/path/to/built/ninja"])
+
     def test_common_options_full(self):
         args = self.default_args()
         args.enable_asan = True
@@ -148,6 +162,7 @@ class CMakeTestCase(unittest.TestCase):
         args.distcc = True
         args.cmake_generator = 'Xcode'
         args.clang_compiler_version = ("3", "8", "0")
+        args.build_ninja = True
         cmake = self.cmake(args)
         self.assertEqual(
             list(cmake.common_options()),
@@ -163,6 +178,8 @@ class CMakeTestCase(unittest.TestCase):
              "-DLLVM_VERSION_MAJOR:STRING=3",
              "-DLLVM_VERSION_MINOR:STRING=8",
              "-DLLVM_VERSION_PATCH:STRING=0"])
+        # NOTE: No "-DCMAKE_MAKE_PROGRAM=/path/to/built/ninja" because
+        #       cmake_generator is 'Xcode'
 
     def test_build_args_ninja(self):
         args = self.default_args()

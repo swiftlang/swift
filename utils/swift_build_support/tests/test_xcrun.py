@@ -28,6 +28,13 @@ class XCRunTestCase(unittest.TestCase):
                                    sdk='macosx',
                                    toolchain='default').endswith('/clang'))
 
+    def test_sdk_path(self):
+        # Unknown SDK
+        self.assertIsNone(xcrun.sdk_path('not-a-sdk'))
+
+        # Available SDK
+        self.assertIsNotNone(xcrun.sdk_path('macosx'))
+
 
 if __name__ == '__main__':
     unittest.main()
