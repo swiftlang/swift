@@ -31,6 +31,32 @@
 using namespace swift;
 using namespace swift::PatternMatch;
 
+//===----------------------------------------------------------------------===//
+//                             Utility 
+//===----------------------------------------------------------------------===//
+
+static bool isRetainInstruction(SILInstruction *I) {
+  return isa<RetainValueInst>(I) || isa<StrongRetainInst>(I);
+}
+
+/// Return the first retain instruction on the \p Ptr, return nullptr if a
+/// blocking operation for retain \p Ptr is encountered. 
+static SILInstruction *findRetainInstructionUnblocked(SILValue Ptr,
+                                                      SILBasicBlock *Pred,
+                                                      AliasAnalysis *AA) {
+  for (auto II = Pred->rbegin(), IE = Pred->rend(); II!=IE; ++II) {
+    if (mayDecrementRefCount(&*II, Ptr, AA)) 
+      return nullptr;
+    if (isRetainInstruction(&*II) && II->getOperand(0) == Ptr)
+      return &*II;
+  } 
+  return nullptr;
+}
+
+//===----------------------------------------------------------------------===//
+//                        SILCombine optimizations. 
+//===----------------------------------------------------------------------===//
+
 SILInstruction*
 SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
 
@@ -549,6 +575,47 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
       }
   }
 
+  // We want to be able to sink the 2 retains in bb0 and bb1 to a single retain
+  // in bb2.
+  //
+  // bb0:
+  // strong_retain %0
+  // br bb2
+  //
+  // bb1:
+  // strong_retain %1
+  // br bb2
+  //
+  // bb2:
+  // %3 = phi(%0, %1)
+  //
+  if (auto *SA = dyn_cast<SILArgument>(Operand)) {
+    if (!SA->isFunctionArg()) {
+      // Check all predecessors and all of them have a retain on the incoming
+      // value, try to pull them down.
+      llvm::SmallVector<SILValue, 2> OutArray;
+      if (!SA->getIncomingValues(OutArray))
+        return nullptr;
+
+      llvm::SmallVector<SILInstruction *, 2> RetainArray;
+      auto *ThisBlock = SA->getParent();
+      auto Pred = ThisBlock->getPreds().begin();
+      for (unsigned i : indices(OutArray)) {
+        // Find the retain in the predecessor.
+        SILInstruction *Rn = findRetainInstructionUnblocked(OutArray[i], *Pred, AA);
+        Pred++;
+        if (!Rn)
+          return nullptr;
+        RetainArray.push_back(Rn);
+      } 
+
+      // Erase the retains in the predecessors and generate the retains in the
+      // successor using the phi-value.
+      for (auto &R : RetainArray)
+        eraseInstFromFunction(*R);
+      createIncrementBefore(SA, &*ThisBlock->begin());
+    }
+  }
   return nullptr;
 }
 
@@ -626,6 +693,49 @@ SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
         return eraseInstFromFunction(*SRI);
       }
   }
+
+  // We want to be able to sink the 2 retains in bb0 and bb1 to a single retain
+  // in bb2.
+  //
+  // bb0:
+  // strong_retain %0
+  // br bb2
+  //
+  // bb1:
+  // strong_retain %1
+  // br bb2
+  //
+  // bb2:
+  // %3 = phi(%0, %1)
+  //
+  if (auto *SA = dyn_cast<SILArgument>(SRI->getOperand())) {
+    if (!SA->isFunctionArg()) {
+      // Check all predecessors and all of them have a retain on the incoming
+      // value, try to pull them down.
+      llvm::SmallVector<SILValue, 2> OutArray;
+      if (!SA->getIncomingValues(OutArray))
+        return nullptr;
+
+      llvm::SmallVector<SILInstruction *, 2> RetainArray;
+      auto *ThisBlock = SA->getParent();
+      auto Pred = ThisBlock->getPreds().begin();
+      for (unsigned i : indices(OutArray)) {
+        // Find the retain in the predecessor.
+        SILInstruction *Rn = findRetainInstructionUnblocked(OutArray[i], *Pred, AA);
+        Pred++;
+        if (!Rn)
+          return nullptr;
+        RetainArray.push_back(Rn);
+      } 
+
+      // Erase the retains in the predecessors and generate the retains in the
+      // successor using the phi-value.
+      for (auto &R : RetainArray)
+        eraseInstFromFunction(*R);
+      createIncrementBefore(SA, &*ThisBlock->begin());
+    }
+  }
+
 
   return nullptr;
 }
