@@ -31,16 +31,9 @@ using namespace swift;
 /// This requires the getter's body to have a certain syntactic form. It should
 /// be kept in sync with importEnumCaseAlias in the ClangImporter library.
 static EnumElementDecl *
-extractEnumElement(TypeChecker &TC, SourceLoc UseLoc, const VarDecl *constant) {
-  if (auto Attr = AvailableAttr::isUnavailable(constant)) {
-    auto Rename = Attr->Rename;
-    if (!Rename.empty()) {
-      TC.diagnose(UseLoc, diag::availability_decl_unavailable_rename,
-                  constant->getName(), /*replaced*/false,
-                  /*special kind*/0, Attr->Rename)
-        .fixItReplace(UseLoc, Rename);
-    }
-  }
+extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
+                   const VarDecl *constant) {
+  TC.diagnoseExplicitUnavailability(constant, UseLoc, DC, nullptr);
 
   const FuncDecl *getter = constant->getGetter();
   if (!getter)
@@ -71,7 +64,7 @@ extractEnumElement(TypeChecker &TC, SourceLoc UseLoc, const VarDecl *constant) {
 /// If there are no enum elements but there are properties, attempts to map
 /// an arbitrary property to an enum element using extractEnumElement.
 static EnumElementDecl *
-filterForEnumElement(TypeChecker &TC, SourceLoc UseLoc,
+filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
                      LookupResult foundElements) {
   EnumElementDecl *foundElement = nullptr;
   VarDecl *foundConstant = nullptr;
@@ -96,7 +89,7 @@ filterForEnumElement(TypeChecker &TC, SourceLoc UseLoc,
   }
 
   if (!foundElement && foundConstant && foundConstant->hasClangNode())
-    foundElement = extractEnumElement(TC, UseLoc, foundConstant);
+    foundElement = extractEnumElement(TC, DC, UseLoc, foundConstant);
 
   return foundElement;
 }
@@ -108,7 +101,7 @@ lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
   auto lookup = TC.lookupUnqualified(DC, name, SourceLoc(), lookupOptions);
-  return filterForEnumElement(TC, UseLoc, lookup);
+  return filterForEnumElement(TC, DC, UseLoc, lookup);
 }
 
 /// Find an enum element in an enum type.
@@ -121,7 +114,7 @@ lookupEnumMemberElement(TypeChecker &TC, DeclContext *DC, Type ty,
   NameLookupOptions lookupOptions
     = defaultMemberLookupOptions - NameLookupFlags::DynamicLookup;
   LookupResult foundElements = TC.lookupMember(DC, ty, name, lookupOptions);
-  return filterForEnumElement(TC, UseLoc, foundElements);
+  return filterForEnumElement(TC, DC, UseLoc, foundElements);
 }
 
 namespace {
