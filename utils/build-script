@@ -1236,6 +1236,8 @@ details of the setups of other systems or automated environments.""")
                              "(tried %s)" % (workspace.source_dir("ninja")))
             return 1
 
+    os.umask(0o022)
+
     # Unset environment variables that might affect how tools behave.
     for v in [
             'MAKEFLAGS',
