@@ -39,9 +39,9 @@ internal func _writeBackMutableSlice<
 
   _precondition(
     selfElementIndex == selfElementsEndIndex,
-    "Cannot replace a slice of a MutableCollection with a slice of a larger size")
+    "Cannot replace a slice of a MutableCollection with a slice of a smaller size")
   _precondition(
     newElementIndex == newElementsEndIndex,
-    "Cannot replace a slice of a MutableCollection with a slice of a smaller size")
+    "Cannot replace a slice of a MutableCollection with a slice of a larger size")
 }
 
