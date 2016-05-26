@@ -127,9 +127,6 @@ let _: Int
 @available(*, renamed: "bad name") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
 let _: Int
 
-@available(*, renamed: "Overly.Nested.Name") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
-let _: Int
-
 @available(*, renamed: "_") // expected-error{{'renamed' argument of 'available' attribute must be an operator, identifier, or full function name, optionally prefixed by a type name}}
 let _: Int
 
@@ -249,6 +246,8 @@ func testOperators(x: DummyType, y: DummyType) {
 func unavailableMember() {} // expected-note {{here}}
 @available(*, deprecated, renamed: "DummyType.bar")
 func deprecatedMember() {}
+@available(*, unavailable, renamed: "DummyType.Inner.foo")
+func unavailableNestedMember() {} // expected-note {{here}}
 
 @available(*, unavailable, renamed: "DummyType.Foo")
 struct UnavailableType {} // expected-note {{here}}
@@ -258,6 +257,7 @@ typealias DeprecatedType = Int
 func testGlobalToMembers() {
   unavailableMember() // expected-error {{'unavailableMember()' has been renamed to 'DummyType.foo'}} {{3-20=DummyType.foo}}
   deprecatedMember() // expected-warning {{'deprecatedMember()' is deprecated: renamed to 'DummyType.bar'}} expected-note {{use 'DummyType.bar' instead}} {{3-19=DummyType.bar}}
+  unavailableNestedMember() // expected-error {{'unavailableNestedMember()' has been renamed to 'DummyType.Inner.foo'}} {{3-26=DummyType.Inner.foo}}
   let x: UnavailableType? = nil // expected-error {{'UnavailableType' has been renamed to 'DummyType.Foo'}} {{10-25=DummyType.Foo}}
   _ = x
   let y: DeprecatedType? = nil // expected-warning {{'DeprecatedType' is deprecated: renamed to 'DummyType.Bar'}} expected-note {{use 'DummyType.Bar' instead}} {{10-24=DummyType.Bar}}
@@ -303,6 +303,8 @@ func unavailableMultiNewlyUnnamed(a: Int, b: Int) {} // expected-note {{here}}
 
 @available(*, unavailable, renamed: "Int.init(other:)")
 func unavailableInit(a: Int) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "Foo.Bar.init(other:)")
+func unavailableNestedInit(a: Int) {} // expected-note 2 {{here}}
 
 
 func testArgNames() {
@@ -329,6 +331,10 @@ func testArgNames() {
   unavailableInit(a: 0) // expected-error {{'unavailableInit(a:)' has been replaced by 'Int.init(other:)'}} {{3-18=Int}} {{19-20=other}}
   let fn = unavailableInit // expected-error {{'unavailableInit(a:)' has been replaced by 'Int.init(other:)'}} {{12-27=Int.init}}
   fn(a: 1)
+
+  unavailableNestedInit(a: 0) // expected-error {{'unavailableNestedInit(a:)' has been replaced by 'Foo.Bar.init(other:)'}} {{3-24=Foo.Bar}} {{25-26=other}}
+  let fn2 = unavailableNestedInit // expected-error {{'unavailableNestedInit(a:)' has been replaced by 'Foo.Bar.init(other:)'}} {{13-34=Foo.Bar.init}}
+  fn2(a: 1)
 }
 
 @available(*, unavailable, renamed: "shinyLabeledArguments()")
@@ -368,6 +374,9 @@ func deprecatedInstance(a: Int) {}
 @available(*, deprecated, renamed: "Int.foo(self:)", message: "blah")
 func deprecatedInstanceMessage(a: Int) {}
 
+@available(*, unavailable, renamed: "Foo.Bar.foo(self:)")
+func unavailableNestedInstance(a: Int) {} // expected-note {{here}}
+
 func testRenameInstance() {
   unavailableInstance(a: 0) // expected-error{{'unavailableInstance(a:)' has been replaced by instance method 'Int.foo()'}} {{3-22=0.foo}} {{23-27=}}
   unavailableInstanceUnlabeled(0) // expected-error{{'unavailableInstanceUnlabeled' has been replaced by instance method 'Int.foo()'}} {{3-31=0.foo}} {{32-33=}}
@@ -380,6 +389,8 @@ func testRenameInstance() {
   unavailableInstanceMessage(a: 0) // expected-error{{'unavailableInstanceMessage(a:)' has been replaced by instance method 'Int.foo()': blah}} {{3-29=0.foo}} {{30-34=}}
   deprecatedInstance(a: 0) // expected-warning{{'deprecatedInstance(a:)' is deprecated: replaced by instance method 'Int.foo()'}} expected-note{{use 'Int.foo()' instead}} {{3-21=0.foo}} {{22-26=}}
   deprecatedInstanceMessage(a: 0) // expected-warning{{'deprecatedInstanceMessage(a:)' is deprecated: blah}} expected-note{{use 'Int.foo()' instead}} {{3-28=0.foo}} {{29-33=}}
+
+  unavailableNestedInstance(a: 0) // expected-error{{'unavailableNestedInstance(a:)' has been replaced by instance method 'Foo.Bar.foo()'}} {{3-28=0.foo}} {{29-33=}}
 }
 
 @available(*, unavailable, renamed: "Int.shinyLabeledArguments(self:)")
