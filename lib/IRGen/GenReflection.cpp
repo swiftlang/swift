@@ -372,25 +372,33 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     auto type = NTD->getDeclaredType()->getCanonicalType();
     addTypeRef(NTD->getModuleContext(), type);
 
-    if (auto CD = dyn_cast<ClassDecl>(NTD)) {
-      auto RC = getReferenceCountingForClass(IGM, const_cast<ClassDecl *>(CD));
-      if (RC == ReferenceCounting::ObjC || CD->hasClangNode()) {
-        addObjCClassRecord();
-        return;
-      }
-    }
-
-    if (NTD->hasClangNode())
+    if (NTD->hasClangNode() && !isa<ClassDecl>(NTD))
       return;
 
     switch (NTD->getKind()) {
       case DeclKind::Class:
       case DeclKind::Struct: {
-        auto properties = NTD->getStoredProperties();
-        addConstantInt16(uint16_t(isa<StructDecl>(NTD)
-                                  ? FieldDescriptorKind::Struct
-                                  : FieldDescriptorKind::Class));
+        auto kind = FieldDescriptorKind::Struct;
+
+        if (auto CD = dyn_cast<ClassDecl>(NTD)) {
+          auto RC = getReferenceCountingForClass(IGM, const_cast<ClassDecl *>(CD));
+          if (RC == ReferenceCounting::ObjC)
+            kind = FieldDescriptorKind::ObjCClass;
+          else
+            kind = FieldDescriptorKind::Class;
+        }
+
+        addConstantInt16(uint16_t(kind));
         addConstantInt16(fieldRecordSize);
+
+        // Imported classes don't need field descriptors
+        if (NTD->hasClangNode()) {
+          assert(isa<ClassDecl>(NTD));
+          addConstantInt32(0);
+          break;
+        }
+
+        auto properties = NTD->getStoredProperties();
         addConstantInt32(std::distance(properties.begin(), properties.end()));
         for (auto property : properties)
           addFieldDecl(property,
