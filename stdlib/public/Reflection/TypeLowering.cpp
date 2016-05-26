@@ -239,7 +239,6 @@ class ExistentialTypeInfoBuilder {
         case FieldDescriptorKind::Protocol:
           WitnessTableCount++;
           continue;
-        case FieldDescriptorKind::Imported:
         case FieldDescriptorKind::ObjCClass:
         case FieldDescriptorKind::Struct:
         case FieldDescriptorKind::Enum:
@@ -745,8 +744,16 @@ public:
 
   const TypeInfo *visitAnyNominalTypeRef(const TypeRef *TR) {
     const FieldDescriptor *FD = TC.getBuilder().getFieldTypeInfo(TR);
-    if (FD == nullptr)
+    if (FD == nullptr) {
+      // Maybe this type is opaque -- look for a builtin
+      // descriptor to see if we at least know its size
+      // and alignment.
+      if (auto ImportedTypeDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR))
+        return TC.makeTypeInfo<BuiltinTypeInfo>(ImportedTypeDescriptor);
+
+      // Otherwise, we're out of luck.
       return nullptr;
+    }
 
     switch (FD->Kind) {
     case FieldDescriptorKind::Class:
@@ -801,15 +808,6 @@ public:
 
       return nullptr;
     }
-    case FieldDescriptorKind::Imported:
-      // Imported types are represented as a builtin type, an opaque blob with
-      // some size, alignment, etc. If we find it in the builtins, we'll use
-      // that information.
-      //
-      // FIXME: Emit field information for imported record types?
-      if (auto ImportedTypeDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR))
-        return TC.makeTypeInfo<BuiltinTypeInfo>(ImportedTypeDescriptor);
-      return nullptr;
     case FieldDescriptorKind::ObjCClass:
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                      ReferenceCounting::Unknown);
@@ -1032,7 +1030,6 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
   case FieldDescriptorKind::ObjCProtocol:
   case FieldDescriptorKind::ClassProtocol:
   case FieldDescriptorKind::Protocol:
-  case FieldDescriptorKind::Imported:
   case FieldDescriptorKind::ObjCClass:
     // Invalid field descriptor.
     return nullptr;
