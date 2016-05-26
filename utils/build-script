@@ -171,6 +171,10 @@ def main_preset():
 def main_normal():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        usage="""
+  %(prog)s [-h | --help] [OPTION ...]
+  %(prog)s --preset=NAME [SUBSTITUTION ...]
+""",
         description="""
 Use this tool to build, test, and prepare binary distribution archives of Swift
 and related tools.
