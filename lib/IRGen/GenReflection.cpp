@@ -227,39 +227,24 @@ public:
 class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
   static const uint32_t AssociatedTypeRecordSize = 8;
 
-  llvm::PointerUnion<const NominalTypeDecl *, const ExtensionDecl *>
-  NominalOrExtensionDecl;
+  const ProtocolConformance *Conformance;
+  ArrayRef<std::pair<StringRef, CanType>> AssociatedTypes;
 
-  void addConformance(Module *ModuleContext,
-                      CanType ConformingType,
-                      const ProtocolConformance *Conformance) {
-    SmallVector<std::pair<StringRef, CanType>, 2> AssociatedTypes;
+  void layout() {
+    // If the conforming type is generic, we just want to emit the
+    // unbound generic type here.
+    auto *Nominal = Conformance->getInterfaceType()->getAnyNominal();
+    assert(Nominal && "Structural conformance?");
 
-    auto collectTypeWitness = [&](const AssociatedTypeDecl *AssocTy,
-                                  const Substitution &Sub,
-                                  const TypeDecl *TD) -> bool {
+    PrettyStackTraceDecl DebugStack("emitting associated type metadata",
+                                    Nominal);
 
-      auto Subst = ArchetypeBuilder::mapTypeOutOfContext(
-        Conformance->getDeclContext(), Sub.getReplacement());
+    auto *M = IGM.getSILModule().getSwiftModule();
 
-      AssociatedTypes.push_back({
-        AssocTy->getNameStr(),
-        Subst->getCanonicalType()
-      });
-      return false;
-    };
-
-    Conformance->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
-
-    // If there are no associated types, don't bother emitting any
-    // metadata.
-    if (AssociatedTypes.empty())
-      return;
-
-    addTypeRef(ModuleContext, ConformingType);
+    addTypeRef(M, Nominal->getDeclaredType()->getCanonicalType());
 
     auto ProtoTy = Conformance->getProtocol()->getDeclaredType();
-    addTypeRef(ModuleContext, ProtoTy->getCanonicalType());
+    addTypeRef(M, ProtoTy->getCanonicalType());
 
     addConstantInt32(AssociatedTypes.size());
     addConstantInt32(AssociatedTypeRecordSize);
@@ -268,47 +253,16 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
       auto NameGlobal = IGM.getAddrOfStringForTypeRef(AssocTy.first);
       addRelativeAddress(NameGlobal);
       addBuiltinTypeRefs(AssocTy.second);
-      addTypeRef(ModuleContext, AssocTy.second);
-    }
-  }
-
-  const NominalTypeDecl *getNominalTypeDecl() const {
-    return NominalOrExtensionDecl.dyn_cast<const NominalTypeDecl *>();
-  }
-
-  const ExtensionDecl *getExtensionDecl() const {
-    return NominalOrExtensionDecl.dyn_cast<const ExtensionDecl *>();
-  }
-
-  void layout() {
-    if (auto Decl = getNominalTypeDecl()) {
-      PrettyStackTraceDecl DebugStack("emitting associated type metadata",
-                                      Decl);
-      for (auto Conformance : Decl->getAllConformances()) {
-        if (Conformance->isIncomplete())
-          continue;
-        addConformance(Decl->getModuleContext(),
-                       Decl->getDeclaredType()->getCanonicalType(),
-                       Conformance);
-      }
-    } else if (auto Ext = getExtensionDecl()) {
-      PrettyStackTraceDecl DebugStack("emitting associated type metadata", Ext);
-      for (auto Conformance : Ext->getLocalConformances()) {
-        auto Decl = Ext->getExtendedType()->getNominalOrBoundGenericNominal();
-        addConformance(Ext->getDeclContext()->getParentModule(),
-                       Decl->getDeclaredType()->getCanonicalType(),
-                       Conformance);
-      }
+      addTypeRef(M, AssocTy.second);
     }
   }
 
 public:
-  AssociatedTypeMetadataBuilder(IRGenModule &IGM, const NominalTypeDecl *Decl)
-    : ReflectionMetadataBuilder(IGM), NominalOrExtensionDecl(Decl) {}
-
-  AssociatedTypeMetadataBuilder(IRGenModule &IGM, const ExtensionDecl *Decl)
-    : ReflectionMetadataBuilder(IGM), NominalOrExtensionDecl(Decl) {}
-
+  AssociatedTypeMetadataBuilder(IRGenModule &IGM,
+                                const ProtocolConformance *Conformance,
+                                ArrayRef<std::pair<StringRef, CanType>> AssociatedTypes)
+    : ReflectionMetadataBuilder(IGM), Conformance(Conformance),
+      AssociatedTypes(AssociatedTypes) {}
 
   llvm::GlobalVariable *emit() {
     auto tempBase = std::unique_ptr<llvm::GlobalVariable>(
@@ -848,29 +802,35 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
   return llvm::ConstantExpr::getBitCast(var, CaptureDescriptorPtrTy);
 }
 
-void IRGenModule::emitReflectionMetadata(const NominalTypeDecl *Decl) {
+void IRGenModule::
+emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return;
 
-  emitFieldMetadataRecord(Decl);
-  emitAssociatedTypeMetadataRecord(Decl);
-}
+  SmallVector<std::pair<StringRef, CanType>, 2> AssociatedTypes;
 
-void IRGenModule::emitAssociatedTypeMetadataRecord(const NominalTypeDecl *Decl){
-  if (!IRGen.Opts.EnableReflectionMetadata)
+  auto collectTypeWitness = [&](const AssociatedTypeDecl *AssocTy,
+                                const Substitution &Sub,
+                                const TypeDecl *TD) -> bool {
+
+    auto Subst = ArchetypeBuilder::mapTypeOutOfContext(
+      Conformance->getDeclContext(), Sub.getReplacement());
+
+    AssociatedTypes.push_back({
+      AssocTy->getNameStr(),
+      Subst->getCanonicalType()
+    });
+    return false;
+  };
+
+  Conformance->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
+
+  // If there are no associated types, don't bother emitting any
+  // metadata.
+  if (AssociatedTypes.empty())
     return;
 
-  AssociatedTypeMetadataBuilder builder(*this, Decl);
-  auto var = builder.emit();
-  if (var)
-    addUsedGlobal(var);
-}
-
-void IRGenModule::emitAssociatedTypeMetadataRecord(const ExtensionDecl *Ext) {
-  if (!IRGen.Opts.EnableReflectionMetadata)
-    return;
-
-  AssociatedTypeMetadataBuilder builder(*this, Ext);
+  AssociatedTypeMetadataBuilder builder(*this, Conformance, AssociatedTypes);
   auto var = builder.emit();
   if (var)
     addUsedGlobal(var);

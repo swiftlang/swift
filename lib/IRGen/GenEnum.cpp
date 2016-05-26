@@ -5562,7 +5562,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
 void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
   emitEnumMetadata(*this, theEnum);
   emitNestedTypeDecls(theEnum->getMembers());
-  emitReflectionMetadata(theEnum);
+  emitFieldMetadataRecord(theEnum);
 }
 
 void irgen::emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,
