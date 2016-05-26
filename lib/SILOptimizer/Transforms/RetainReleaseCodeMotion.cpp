@@ -107,41 +107,6 @@ static bool isReleaseInstruction(SILInstruction *I) {
   return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I);
 }
 
-/// Creates an increment on \p Ptr before insertion point \p InsertPt that
-/// creates a strong_retain if \p Ptr has reference semantics itself or a
-/// retain_value if \p Ptr is a non-trivial value without reference-semantics.
-static SILInstruction *
-createIncrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
-  // Set up the builder we use to insert at our insertion point.
-  SILBuilder B(InsertPt);
-  auto Loc = RegularLocation(SourceLoc());
-
-  // If Ptr is refcounted itself, create the strong_retain and
-  // return.
-  if (Ptr->getType().isReferenceCounted(B.getModule()))
-    return B.createStrongRetain(Loc, Ptr, Atomicity::Atomic);
-
-  // Otherwise, create the retain_value.
-  return B.createRetainValue(Loc, Ptr, Atomicity::Atomic);
-}
-
-/// Creates a decrement on \p Ptr before insertion point \p InsertPt that
-/// creates a strong_release if \p Ptr has reference semantics itself or
-/// a release_value if \p Ptr is a non-trivial value without reference-semantics.
-static SILInstruction *
-createDecrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
-  // Setup the builder we will use to insert at our insertion point.
-  SILBuilder B(InsertPt);
-  auto Loc = RegularLocation(SourceLoc());
-
-  // If Ptr has reference semantics itself, create a strong_release.
-  if (Ptr->getType().isReferenceCounted(B.getModule()))
-    return B.createStrongRelease(Loc, Ptr, Atomicity::Atomic);
-
-  // Otherwise create a release value.
-  return B.createReleaseValue(Loc, Ptr, Atomicity::Atomic);
-}
-
 //===----------------------------------------------------------------------===//
 //                             Block State 
 //===----------------------------------------------------------------------===//

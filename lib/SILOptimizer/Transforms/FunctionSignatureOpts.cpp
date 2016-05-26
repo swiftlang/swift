@@ -88,22 +88,6 @@ static std::string getUniqueName(std::string Name, SILModule &M) {
   return getUniqueName(Name + "_unique_suffix", M);
 }
 
-/// Creates a decrement on \p Ptr at insertion point \p InsertPt that creates a
-/// strong_release if \p Ptr has reference semantics itself or a release_value
-/// if \p Ptr is a non-trivial value without reference-semantics.
-static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
-  // Setup the builder we will use to insert at our insertion point.
-  SILBuilder B(InsertPt);
-  auto Loc = RegularLocation(SourceLoc());
-
-  // If Ptr has reference semantics itself, create a strong_release.
-  if (Ptr->getType().isReferenceCounted(B.getModule()))
-    return B.createStrongRelease(Loc, Ptr, Atomicity::Atomic);
-
-  // Otherwise create a release value.
-  return B.createReleaseValue(Loc, Ptr, Atomicity::Atomic);
-}
-
 //===----------------------------------------------------------------------===//
 //                     Function Signature Transformation 
 //===----------------------------------------------------------------------===//
@@ -675,7 +659,7 @@ void FunctionSignatureTransform::OwnedToGuaranteedTransformFunctionResults() {
       }
       // Create a release to balance it out.
       assert(isa<ApplyInst>(X) && "Unknown epilogue retain");
-      createDecrement(X, dyn_cast<ApplyInst>(X)->getParent()->getTerminator());
+      createDecrementBefore(X, dyn_cast<ApplyInst>(X)->getParent()->getTerminator());
     }
   }
 }
