@@ -1386,9 +1386,14 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         elt = lookupEnumMemberElement(*this, dc, type, EEP->getName());
       if (!elt) {
         if (!type->is<ErrorType>()) {
+          // Lowercasing of Swift.Optional's cases is handled in the
+          // standard library itself, not through the clang importer,
+          // so we have to do this check here. Additionally, .Some
+          // isn't a static VarDecl, so the existing mechanics in
+          // extractEnumElement won't work.
           if (type->getAnyNominal() == Context.getOptionalDecl()) {
-            if (EEP->getName().str().compare("None") == 0 ||
-                EEP->getName().str().compare("Some") == 0) {
+            if (EEP->getName().str() == "None" ||
+                EEP->getName().str() == "Some") {
               SmallString<4> Rename;
               camel_case::toLowercaseWord(EEP->getName().str(), Rename);
               diagnose(EEP->getLoc(), diag::availability_decl_unavailable_rename,
