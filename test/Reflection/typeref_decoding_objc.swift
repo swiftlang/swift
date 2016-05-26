@@ -45,6 +45,8 @@
 // CHECK: ---------------
 // CHECK: __ObjC.NSURL
 // CHECK: ------------
+// CHECK: __ObjC.NSCoding
+// CHECK: ---------------
 
 // CHECK: ASSOCIATED TYPES:
 // CHECK: =================
@@ -70,6 +72,23 @@
 // CHECK: - Capture types:
 // CHECK: (function
 // CHECK:   (tuple))
+// CHECK: - Metadata sources:
+
+// CHECK: - Capture types:
+// CHECK: (struct Swift.StaticString)
+// CHECK: (struct Swift.StaticString)
+// CHECK: (struct Swift.UInt)
+// CHECK: (struct Swift.UInt)
+// CHECK: - Metadata sources:
+
+// CHECK: - Capture types:
+// CHECK: (function
+// CHECK:   (tuple))
+// CHECK: - Metadata sources:
+
+// CHECK: - Capture types:
+// CHECK: (class __ObjC.NSBundle)
+// CHECK: (protocol __ObjC.NSCoding)
 // CHECK: - Metadata sources:
 
 // CHECK: - Capture types:
