@@ -52,3 +52,13 @@ typedef CF_ENUM(UInt32, AU3DMixerAttenuationCurve) {
   k3DMixerAttenuationCurve_Inverse = 2,
   k3DMixerAttenuationCurve_Linear = 3
 };
+
+typedef CF_OPTIONS(UInt32, EmptySet1) {
+  kEmptySet1DefaultOptions __attribute__((swift_name("default")))
+};
+typedef CF_OPTIONS(UInt32, EmptySet2) {
+  kEmptySet2None __attribute__((swift_name("none")))
+};
+typedef CF_OPTIONS(UInt32, EmptySet3) {
+  kEmptySet3None __attribute__((swift_name("None")))
+};

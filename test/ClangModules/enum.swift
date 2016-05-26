@@ -179,3 +179,14 @@ let audioComponentFlags2: FakeAudioComponentFlags = [.loadOutOfProcess]
 let objcFlags: objc_flags = [.taggedPointer, .swiftRefcount]
 
 let optionsWithSwiftName: NSOptionsAlsoGetSwiftName = .Case
+
+// <rdar://problem/25168818> Don't import None members in NS_OPTIONS types
+#if !IRGEN
+let _ = NSRuncingOptions.none // expected-error {{'none' is unavailable: use [] to construct an empty option set}}
+#endif
+// ...but do if they have a custom name
+_ = EmptySet1.default
+// ...even if the custom name is the same as the name they would have had
+_ = EmptySet2.none
+// ...or the original name.
+_ = EmptySet3.None

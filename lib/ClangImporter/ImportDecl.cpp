@@ -2066,7 +2066,8 @@ namespace {
                                const clang::EnumDecl *clangEnum,
                                NominalTypeDecl *theStruct) {
       Optional<ImportedName> swift3Name;
-      auto name = importFullName(decl, swift3Name).Imported.getBaseName();
+      ImportedName nameInfo = importFullName(decl, swift3Name);
+      Identifier name = nameInfo.Imported.getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -2083,7 +2084,8 @@ namespace {
       // NS_OPTIONS members that have a value of 0 (typically named "None") do
       // not operate as a set-like member.  Mark them unavailable with a message
       // that says that they should be used as [].
-      if (!decl->getInitVal() && !CD->getAttrs().hasAttribute<AvailableAttr>()){
+      if (decl->getInitVal() == 0 && !nameInfo.HasCustomName &&
+          !CD->getAttrs().isUnavailable(Impl.SwiftContext)) {
         /// Create an AvailableAttr that indicates specific availability
         /// for all platforms.
         auto attr =
