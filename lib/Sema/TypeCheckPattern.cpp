@@ -17,6 +17,7 @@
 
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -1384,9 +1385,29 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       if (type->getAnyNominal())
         elt = lookupEnumMemberElement(*this, dc, type, EEP->getName());
       if (!elt) {
-        if (!type->is<ErrorType>())
+        if (!type->is<ErrorType>()) {
+          // Lowercasing of Swift.Optional's cases is handled in the
+          // standard library itself, not through the clang importer,
+          // so we have to do this check here. Additionally, .Some
+          // isn't a static VarDecl, so the existing mechanics in
+          // extractEnumElement won't work.
+          if (type->getAnyNominal() == Context.getOptionalDecl()) {
+            if (EEP->getName().str() == "None" ||
+                EEP->getName().str() == "Some") {
+              SmallString<4> Rename;
+              camel_case::toLowercaseWord(EEP->getName().str(), Rename);
+              diagnose(EEP->getLoc(), diag::availability_decl_unavailable_rename,
+                          EEP->getName(), /*replaced*/false,
+                          /*special kind*/0, Rename.str())
+                .fixItReplace(EEP->getLoc(), Rename.str());
+
+            }
+            return true;
+          }
+
           diagnose(EEP->getLoc(), diag::enum_element_pattern_member_not_found,
                    EEP->getName().str(), type);
+        }
         return true;
       }
       enumTy = type;
