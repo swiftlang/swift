@@ -734,9 +734,7 @@ public:
                                              const HeapLayout &layout);
   llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
 
-  void emitReflectionMetadata(const NominalTypeDecl *Decl);
-  void emitAssociatedTypeMetadataRecord(const NominalTypeDecl *Decl);
-  void emitAssociatedTypeMetadataRecord(const ExtensionDecl *Ext);
+  void emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance);
   void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
   void emitBuiltinReflectionMetadata();
   std::string getBuiltinTypeMetadataSectionName();
