@@ -29,6 +29,6 @@ public class HasObjCClasses {
   let rect = NSRect(x: 0, y: 1, width: 2, height: 3)
 }
 
-public func closureHasObjCClasses(b: NSBundle) -> () -> () {
-  return { _ = b }
+public func closureHasObjCClasses(b: NSBundle, c: NSCoding) -> () -> () {
+  return { _ = b; _ = c }
 }

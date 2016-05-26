@@ -188,11 +188,13 @@ protected:
       // for now, at least until we want to import C++ types or
       // something like that.
       //
-      // Classes go down a different path.
+      // Classes and protocols go down a different path.
       if (auto Nominal = t->getAnyNominal())
         if (Nominal->hasClangNode()) {
           if (auto CD = dyn_cast<ClassDecl>(Nominal))
             IGM.ImportedClasses.insert(CD);
+          else if (auto PD = dyn_cast<ProtocolDecl>(Nominal))
+            IGM.ImportedProtocols.insert(PD);
           else
             IGM.BuiltinTypes.insert(CanType(t));
         }
@@ -372,7 +374,9 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     auto type = NTD->getDeclaredType()->getCanonicalType();
     addTypeRef(NTD->getModuleContext(), type);
 
-    if (NTD->hasClangNode() && !isa<ClassDecl>(NTD))
+    if (NTD->hasClangNode() &&
+        !isa<ClassDecl>(NTD) &&
+        !isa<ProtocolDecl>(NTD))
       return;
 
     switch (NTD->getKind()) {
@@ -883,6 +887,9 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
 
   for (auto CD : ImportedClasses)
     emitFieldMetadataRecord(CD);
+
+  for (auto PD : ImportedProtocols)
+    emitFieldMetadataRecord(PD);
 
   BuiltinTypeMetadataBuilder builder(*this);
   auto var = builder.emit();

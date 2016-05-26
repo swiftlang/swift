@@ -717,6 +717,9 @@ public:
   /// Imported classes referenced by types in this module when emitting
   /// reflection metadata.
   llvm::SetVector<ClassDecl *> ImportedClasses;
+  /// Imported protocols referenced by types in this module when emitting
+  /// reflection metadata.
+  llvm::SetVector<ProtocolDecl *> ImportedProtocols;
 
   llvm::Constant *getAddrOfStringForTypeRef(StringRef Str);
   llvm::Constant *getAddrOfFieldName(StringRef Name);
