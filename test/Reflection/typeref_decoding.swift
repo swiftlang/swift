@@ -582,15 +582,10 @@
 
 // CHECK: ASSOCIATED TYPES:
 // CHECK: =================
-// CHECK: - TypesToReflect.Box : Swift.AnyObject
-// CHECK: - TypesToReflect.C : Swift.AnyObject
-// CHECK: - TypesToReflect.C1 : Swift.AnyObject
 // CHECK: - TypesToReflect.C1 : TypesToReflect.ClassBoundP
 // CHECK: typealias Inner = A
 // CHECK: (generic_type_parameter depth=0 index=0)
 
-// CHECK: - TypesToReflect.C2 : Swift.AnyObject
-// CHECK: - TypesToReflect.C3 : Swift.AnyObject
 // CHECK: - TypesToReflect.C4 : TypesToReflect.P1
 // CHECK: typealias Inner = A
 // CHECK: (generic_type_parameter depth=0 index=0)

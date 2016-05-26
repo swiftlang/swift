@@ -22,21 +22,6 @@
 
 // CHECK-32: ASSOCIATED TYPES:
 // CHECK-32: =================
-// CHECK-32: - TypesToReflect.OC : Swift.AnyObject
-// CHECK-32: - TypesToReflect.OC : __ObjC.NSObjectProtocol
-// CHECK-32: - TypesToReflect.OC : Swift.Equatable
-// CHECK-32: - TypesToReflect.OC : Swift.Hashable
-// CHECK-32: - TypesToReflect.OC : Swift.CVarArg
-// CHECK-32: - TypesToReflect.OC : Swift.CustomStringConvertible
-// CHECK-32: - TypesToReflect.OC : Swift.CustomDebugStringConvertible
-// CHECK-32: - TypesToReflect.GenericOC : Swift.AnyObject
-// CHECK-32: - TypesToReflect.GenericOC : __ObjC.NSObjectProtocol
-// CHECK-32: - TypesToReflect.GenericOC : Swift.Equatable
-// CHECK-32: - TypesToReflect.GenericOC : Swift.Hashable
-// CHECK-32: - TypesToReflect.GenericOC : Swift.CVarArg
-// CHECK-32: - TypesToReflect.GenericOC : Swift.CustomStringConvertible
-// CHECK-32: - TypesToReflect.GenericOC : Swift.CustomDebugStringConvertible
-// CHECK-32: - TypesToReflect.HasObjCClasses : Swift.AnyObject
 
 // CHECK-32: BUILTIN TYPES:
 // CHECK-32: ==============
@@ -108,21 +93,6 @@
 
 // CHECK-64: ASSOCIATED TYPES:
 // CHECK-64: =================
-// CHECK-64: - TypesToReflect.OC : Swift.AnyObject
-// CHECK-64: - TypesToReflect.OC : __ObjC.NSObjectProtocol
-// CHECK-64: - TypesToReflect.OC : Swift.Equatable
-// CHECK-64: - TypesToReflect.OC : Swift.Hashable
-// CHECK-64: - TypesToReflect.OC : Swift.CVarArg
-// CHECK-64: - TypesToReflect.OC : Swift.CustomStringConvertible
-// CHECK-64: - TypesToReflect.OC : Swift.CustomDebugStringConvertible
-// CHECK-64: - TypesToReflect.GenericOC : Swift.AnyObject
-// CHECK-64: - TypesToReflect.GenericOC : __ObjC.NSObjectProtocol
-// CHECK-64: - TypesToReflect.GenericOC : Swift.Equatable
-// CHECK-64: - TypesToReflect.GenericOC : Swift.Hashable
-// CHECK-64: - TypesToReflect.GenericOC : Swift.CVarArg
-// CHECK-64: - TypesToReflect.GenericOC : Swift.CustomStringConvertible
-// CHECK-64: - TypesToReflect.GenericOC : Swift.CustomDebugStringConvertible
-// CHECK-64: - TypesToReflect.HasObjCClasses : Swift.AnyObject
 
 // CHECK-64: BUILTIN TYPES:
 // CHECK-64: ==============
