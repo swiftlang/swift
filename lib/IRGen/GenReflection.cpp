@@ -819,7 +819,6 @@ IRGenModule::getAddrOfBoxDescriptor(CanType BoxedType) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
-  llvm::SetVector<CanType> BuiltinTypes;
   BoxDescriptorBuilder builder(*this, BuiltinTypes, BoxedType);
 
   auto var = builder.emit();
@@ -838,7 +837,6 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
   if (!IRGen.Opts.EnableReflectionMetadata)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
-  llvm::SetVector<CanType> BuiltinTypes;
   CaptureDescriptorBuilder builder(*this, BuiltinTypes, Caller,
                                    OrigCalleeType, SubstCalleeType, Subs,
                                    Layout);
