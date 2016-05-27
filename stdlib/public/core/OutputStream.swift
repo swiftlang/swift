@@ -276,7 +276,7 @@ extension String : OutputStreamType {
 
 extension String : Streamable {
   /// Write a textual representation of `self` into `target`.
-  swift3_migration(renamed="write(to:)")
+  @swift3_migration(renamed="write(to:)")
   public func writeTo<Target : OutputStreamType>(inout target: Target) {
     target.write(self)
   }
