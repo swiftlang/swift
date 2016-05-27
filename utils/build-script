@@ -47,6 +47,7 @@ from swift_build_support import products  # noqa (E402)
 from swift_build_support import shell  # noqa (E402)
 import swift_build_support.tar        # noqa (E402)
 import swift_build_support.targets    # noqa (E402)
+from swift_build_support.targets import StdlibDeploymentTarget  # noqa (E402)
 from swift_build_support.cmake import CMake  # noqa (E402)
 from swift_build_support.workspace import Workspace  # noqa(E402)
 from swift_build_support.workspace import compute_build_subdir  # noqa(E402)
@@ -353,13 +354,13 @@ details of the setups of other systems or automated environments.""")
         help="The host target. LLVM, Clang, and Swift will be built for this "
              "target. The built LLVM and Clang will be used to compile Swift "
              "for the cross-compilation targets.",
-        default=swift_build_support.targets.host_target())
+        default=StdlibDeploymentTarget.host_target())
     targets_group.add_argument(
         "--stdlib-deployment-targets",
         help="list of targets to compile or cross-compile the Swift standard "
              "library for. %(default)s by default.",
         nargs="*",
-        default=swift_build_support.targets.stdlib_deployment_targets())
+        default=StdlibDeploymentTarget.default_stdlib_deployment_targets())
 
     projects_group = parser.add_argument_group(
         title="Options to select projects")
@@ -1225,6 +1226,11 @@ details of the setups of other systems or automated environments.""")
 
     if args.build_subdir is None:
         args.build_subdir = compute_build_subdir(args)
+
+    # Add optional stdlib-deployment-targets
+    if args.android:
+        args.stdlib_deployment_targets.append(
+            StdlibDeploymentTarget.Android.armv7)
 
     workspace = Workspace(
         source_root=SWIFT_SOURCE_ROOT,

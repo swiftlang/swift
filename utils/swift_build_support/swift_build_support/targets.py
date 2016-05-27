@@ -12,98 +12,127 @@ import os
 import platform
 
 
-def host_target():
-    """
-    Return the build target for the current host machine, if it is one of the
-    recognized targets. Otherwise, return None.
-    """
-    system = platform.system()
-    machine = platform.machine()
+class StdlibDeploymentTarget(object):
 
-    if system == 'Linux':
-        if machine == 'x86_64':
-            return 'linux-x86_64'
-        elif machine.startswith('armv7'):
-            # linux-armv7* is canonicalized to 'linux-armv7'
-            return 'linux-armv7'
-        elif machine.startswith('armv6'):
-            # linux-armv6* is canonicalized to 'linux-armv6'
-            return 'linux-armv6'
-        elif machine == 'aarch64':
-            return 'linux-aarch64'
-        elif machine == 'ppc64':
-            return 'linux-powerpc64'
-        elif machine == 'ppc64le':
-            return 'linux-powerpc64le'
-        elif machine == 's390x':
-            return 'linux-s390x'
+    class OSX(object):
+        x86_64 = 'macosx-x86_64'
+        allArchs = [x86_64]
 
-    elif system == 'Darwin':
-        if machine == 'x86_64':
-            return 'macosx-x86_64'
+    class iOS(object):
+        armv7 = 'iphoneos-armv7'
+        armv7s = 'iphoneos-armv7s'
+        arm64 = 'iphoneos-arm64'
+        allArchs = [armv7, armv7s, arm64]
 
-    elif system == 'FreeBSD':
-        if machine == 'amd64':
-            return 'freebsd-x86_64'
+    class iOSSimulator(object):
+        i386 = 'iphonesimulator-i386'
+        x86_64 = 'iphonesimulator-x86_64'
+        allArchs = [i386, x86_64]
 
-    elif system == 'CYGWIN_NT-10.0':
-        if machine == 'x86_64':
-            return 'cygwin-x86_64'
+    class AppleTV(object):
+        arm64 = 'appletvos-arm64'
+        allArchs = [arm64]
 
-    return None
+    class AppleTVSimulator(object):
+        x86_64 = 'appletvsimulator-x86_64'
+        allArchs = [x86_64]
 
+    class AppleWatch(object):
+        armv7k = 'watchos-armv7k'
+        allArchs = [armv7k]
 
-def stdlib_deployment_targets():
-    """
-    Return deployment targets for the Swift stdlib, based on the host machine.
-    If the host machine is not one of the recognized ones, return None.
-    """
-    system = platform.system()
-    machine = platform.machine()
+    class AppleWatchSimulator(object):
+        i386 = 'watchsimulator-i386'
+        allArchs = [i386]
 
-    if system == 'Linux':
-        if machine == 'x86_64':
-            return [
-                'linux-x86_64',
-                'android-armv7',
-            ]
-        elif machine.startswith('armv6'):
-            # linux-armv6* is canonicalized to 'linux-armv6'
-            return ['linux-armv6']
-        elif machine.startswith('armv7'):
-            # linux-armv7* is canonicalized to 'linux-armv7'
-            return ['linux-armv7']
-        elif machine == 'aarch64':
-            return ['linux-aarch64']
-        elif machine == 'ppc64':
-            return ['linux-powerpc64']
-        elif machine == 'ppc64le':
-            return ['linux-powerpc64le']
-        elif machine == 's390x':
-            return ['linux-s390x']
-    elif system == 'Darwin':
-        if machine == 'x86_64':
-            return [
-                'macosx-x86_64',
-                'iphonesimulator-i386',
-                'iphonesimulator-x86_64',
-                'appletvsimulator-x86_64',
-                'watchsimulator-i386',
-                # Put iOS native targets last so that we test them last
-                # (it takes a long time).
-                'iphoneos-arm64',
-                'iphoneos-armv7',
-                'appletvos-arm64',
-                'watchos-armv7k',
-            ]
-    elif system == 'FreeBSD':
-        if machine == 'amd64':
-            return ['freebsd-x86_64']
-    elif system == 'CYGWIN_NT-10.0':
-        if machine == 'x86_64':
-            return ['cygwin-x86_64']
+    class Linux(object):
+        x86_64 = 'linux-x86_64'
+        armv6 = 'linux-armv6'
+        armv7 = 'linux-armv7'
+        aarch64 = 'linux-aarch64'
+        ppc64 = 'linux-ppc64'
+        ppc64le = 'linux-ppc64le'
+        s390x = 'linux-s390x'
+        allArchs = [x86_64, armv6, armv7, aarch64, ppc64, ppc64le, s390x]
 
-    return None
+    class FreeBSD(object):
+        amd64 = 'freebsd-x86_64'
+        allArchs = [amd64]
+
+    class Cygwin(object):
+        x86_64 = 'cygwin-x86_64'
+        allArchs = [x86_64]
+
+    class Android(object):
+        armv7 = 'android-armv7'
+        allArchs = [armv7]
+
+    @staticmethod
+    def host_target():
+        """
+        Return the host target for the build machine, if it is one of
+        the recognized targets. Otherwise, return None.
+        """
+        system = platform.system()
+        machine = platform.machine()
+
+        if system == 'Linux':
+            if machine == 'x86_64':
+                return StdlibDeploymentTarget.Linux.x86_64
+            elif machine.startswith('armv7'):
+                # linux-armv7* is canonicalized to 'linux-armv7'
+                return StdlibDeploymentTarget.Linux.armv7
+            elif machine.startswith('armv6'):
+                # linux-armv6* is canonicalized to 'linux-armv6'
+                return StdlibDeploymentTarget.Linux.armv6
+            elif machine == 'aarch64':
+                return StdlibDeploymentTarget.Linux.aarch64
+            elif machine == 'ppc64':
+                return StdlibDeploymentTarget.Linux.ppc64
+            elif machine == 'ppc64le':
+                return StdlibDeploymentTarget.Linux.ppc64le
+            elif machine == 's390x':
+                return StdlibDeploymentTarget.Linux.s390x
+
+        elif system == 'Darwin':
+            if machine == 'x86_64':
+                return StdlibDeploymentTarget.OSX.x86_64
+
+        elif system == 'FreeBSD':
+            if machine == 'amd64':
+                return StdlibDeploymentTarget.FreeBSD.amd64
+
+        elif system == 'CYGWIN_NT-10.0':
+            if machine == 'x86_64':
+                return StdlibDeploymentTarget.Cygwin.x86_64
+
+        return None
+
+    @staticmethod
+    def default_stdlib_deployment_targets():
+        """
+        Return targets for the Swift stdlib, based on the build machine.
+        If the build machine is not one of the recognized ones, return None.
+        """
+
+        host_target = StdlibDeploymentTarget.host_target()
+        if host_target is None:
+            return None
+
+        # OSX build machines configure all Darwin platforms by default.
+        # Put iOS native targets last so that we test them last
+        # (it takes a long time).
+        if host_target == StdlibDeploymentTarget.OSX.x86_64:
+            return [host_target] + \
+                StdlibDeploymentTarget.iOSSimulator.allArchs + \
+                StdlibDeploymentTarget.AppleTVSimulator.allArchs + \
+                StdlibDeploymentTarget.AppleWatchSimulator.allArchs + \
+                StdlibDeploymentTarget.iOS.allArchs + \
+                StdlibDeploymentTarget.AppleTV.allArchs + \
+                StdlibDeploymentTarget.AppleWatch.allArchs
+        else:
+            # All other machines only configure their host stdlib by default.
+            return [host_target]
 
 
 def install_prefix():

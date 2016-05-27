@@ -10,12 +10,12 @@
 
 import unittest
 
-from swift_build_support.targets import host_target
+from swift_build_support.targets import StdlibDeploymentTarget
 
 
 class HostTargetTestCase(unittest.TestCase):
     def test_is_not_none_on_this_platform(self):
-        self.assertIsNotNone(host_target())
+        self.assertIsNotNone(StdlibDeploymentTarget.host_target())
 
 
 if __name__ == '__main__':
