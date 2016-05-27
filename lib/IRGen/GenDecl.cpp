@@ -2053,6 +2053,8 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
 
   SmallVector<llvm::Constant*, 8> elts;
   for (auto *conformance : ProtocolConformances) {
+    emitAssociatedTypeMetadataRecord(conformance);
+
     auto descriptorRef = getAddrOfLLVMVariableOrGOTEquivalent(
                   LinkEntity::forProtocolDescriptor(conformance->getProtocol()),
                   getPointerAlignment(), ProtocolDescriptorStructTy);
@@ -2755,7 +2757,6 @@ static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
 }
 
 void IRGenModule::emitExtension(ExtensionDecl *ext) {
-  emitAssociatedTypeMetadataRecord(ext);
   emitNestedTypeDecls(ext->getMembers());
 
   // Generate a category if the extension either introduces a

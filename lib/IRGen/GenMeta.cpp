@@ -5690,7 +5690,7 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   var->setConstant(true);
   var->setInitializer(init);
 
-  emitReflectionMetadata(protocol);
+  emitFieldMetadataRecord(protocol);
 }
 
 /// \brief Load a reference to the protocol descriptor for the given protocol.

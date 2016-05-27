@@ -1,6 +1,10 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/functions
 // RUN: %target-run %target-swift-reflection-test %t/functions | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
+// FIXME: Should not require objc_interop -- please put Objective-C-specific
+// testcases in functions_objc.swift
+
 // REQUIRES: objc_interop
 
 /*
@@ -33,16 +37,36 @@ func concrete(x: Int, y: Any) {
 // CHECK-64-NEXT:       (field name=_value offset=0
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0)))))
 
-  // FIXME: Need @box reflection -- here the context is a single boxed value
+  // Here the context is a single boxed value
   reflect(function: {print(y)})
 // CHECK:         Type reference:
 // CHECK-NEXT:    (builtin Builtin.NativeObject)
 
 // CHECK-32:      Type info:
-// CHECK-32-NEXT: <null type info>
+// CHECK-32-NEXT: (closure_context size=28 alignment=4 stride=28 num_extra_inhabitants=0
+// CHECK-32-NEXT:   (field offset=12
+// CHECK-32-NEXT:     (opaque_existential size=16 alignment=4 stride=16 num_extra_inhabitants=0
+// CHECK-32-NEXT:       (field name=value offset=0
+// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1))
+// CHECK-32-NEXT:       (field name=value offset=4
+// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1))
+// CHECK-32-NEXT:       (field name=value offset=8
+// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1))
+// CHECK-32-NEXT:       (field name=metadata offset=12
+// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1)))))
 
 // CHECK-64:      Type info:
-// CHECK-64-NEXT: <null type info>
+// CHECK-64-NEXT: (closure_context size=48 alignment=8 stride=48 num_extra_inhabitants=0
+// CHECK-64-NEXT:   (field offset=16
+// CHECK-64-NEXT:     (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=0
+// CHECK-64-NEXT:       (field name=value offset=0
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
+// CHECK-64-NEXT:       (field name=value offset=8
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
+// CHECK-64-NEXT:       (field name=value offset=16
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))
+// CHECK-64-NEXT:       (field name=metadata offset=24
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1)))))
 }
 
 concrete(x: 10, y: true)
