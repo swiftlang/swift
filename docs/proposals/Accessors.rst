@@ -555,7 +555,7 @@ get- and setForMutation
 Some collections need finer-grained control over the entire mutation
 process. For instance, to support divide-and-conquer algorithms using
 slices, sliceable collections must "pin" and "unpin" their buffers
-while a slice is being mutation to grant permission for the slice
+while a slice is being mutated to grant permission for the slice
 to mutate the collection in-place while sharing ownership. This
 flexibility can be exposed by a pair of accessors that are called
 before and after a mutation. The "get" stage produces both the
