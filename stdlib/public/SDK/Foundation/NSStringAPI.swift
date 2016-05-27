@@ -434,7 +434,7 @@ extension String {
   /// Returns a representation of the `String` as a C string
   /// using a given encoding.
   @warn_unused_result
-  @swift3_migration(renamed="cString(usingEncoding:)")
+  @swift3_migration(renamed="cString(using:)")
   public func cStringUsingEncoding(encoding: NSStringEncoding) -> [CChar]? {
     return withExtendedLifetime(_ns) {
       (s: NSString) -> [CChar]? in
@@ -451,7 +451,7 @@ extension String {
   /// Returns an `NSData` object containing a representation of
   /// the `String` encoded using a given encoding.
   @warn_unused_result
-  @swift3_migration(renamed="data(usingEncoding:allowLossyConversion:)")
+  @swift3_migration(renamed="data(using:allowLossyConversion:)")
   public func dataUsingEncoding(
     encoding: NSStringEncoding,
     allowLossyConversion: Bool = false
@@ -1009,7 +1009,7 @@ extension String {
   /// Returns the number of bytes required to store the
   /// `String` in a given encoding.
   @warn_unused_result
-  @swift3_migration(renamed="lengthOfBytes(usingEncoding:)")
+  @swift3_migration(renamed="lengthOfBytes(using:)")
   public func lengthOfBytesUsingEncoding(encoding: NSStringEncoding) -> Int {
     return _ns.lengthOfBytesUsingEncoding(encoding)
   }
@@ -1113,7 +1113,7 @@ extension String {
   /// Returns the maximum number of bytes needed to store the
   /// `String` in a given encoding.
   @warn_unused_result
-  @swift3_migration(renamed="maximumLengthOfBytes(usingEncoding:)")
+  @swift3_migration(renamed="maximumLengthOfBytes(using:)")
   public
   func maximumLengthOfBytesUsingEncoding(encoding: NSStringEncoding) -> Int {
     return _ns.maximumLengthOfBytesUsingEncoding(encoding)
@@ -1362,7 +1362,7 @@ extension String {
   /// encoding to determine the percent escapes necessary to convert
   /// the `String` into a legal URL string.
   @available(*, deprecated, message="Use stringByAddingPercentEncodingWithAllowedCharacters(_:) instead, which always uses the recommended UTF-8 encoding, and which encodes for a specific URL component or subcomponent since each URL component or subcomponent has different rules for what characters are valid.")
-  @swift3_migration(renamed="addingPercentEscapes(usingEncoding:)")
+  @swift3_migration(renamed="addingPercentEscapes(using:)")
   public func stringByAddingPercentEscapesUsingEncoding(
     encoding: NSStringEncoding
   ) -> String? {
@@ -1533,7 +1533,7 @@ extension String {
   /// all percent escapes with the matching characters as determined
   /// by a given encoding.
   @available(*, deprecated, message="Use stringByRemovingPercentEncoding instead, which always uses the recommended UTF-8 encoding.")
-  @swift3_migration(renamed="replacingPercentEscapes(usingEncoding:)")
+  @swift3_migration(renamed="replacingPercentEscapes(using:)")
   public func stringByReplacingPercentEscapesUsingEncoding(
     encoding: NSStringEncoding
   ) -> String? {
