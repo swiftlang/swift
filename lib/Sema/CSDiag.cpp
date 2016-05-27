@@ -3076,87 +3076,110 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
 }
 
 
-/// Return true if the conversion from fromType to toType is an invalid string
-/// index operation.
-static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
-                                             ConstraintSystem *CS) {
+/// Return true if the given type conforms to a known protocol type.
+static bool isLiteralConvertibleType(Type fromType,
+                                     KnownProtocolKind kind,
+                                     ConstraintSystem *CS) {
   auto integerType =
-    CS->TC.getProtocol(SourceLoc(),
-                       KnownProtocolKind::IntegerLiteralConvertible);
-  if (!integerType) return false;
+    CS->TC.getProtocol(SourceLoc(), kind);
+  if (!integerType)
+    return false;
 
-  // If the from type is an integer type, and the to type is
-  // String.CharacterView.Index, then we found one.
   if (CS->TC.conformsToProtocol(fromType, integerType, CS->DC,
                                 ConformanceCheckFlags::InExpression)) {
-    if (toType->getCanonicalType().getString() == "String.CharacterView.Index")
-      return true;
+    return true;
   }
 
   return false;
 }
 
-/// Attempts to add a fixit to correct the compiler error.
-///
-/// Corrects the error is "cannot convert value of type <integer> to expected
-/// argument type <RawRepresentable>", by adding a fixit that constructs the
-/// raw-representable type from the value. This helps with SDK changes.
-static void tryConversionFixit(InFlightDiagnostic &diag,
-                               ConstraintSystem *CS,
-                               Diag<Type, Type> diagID,
-                               Type exprType,
-                               Type contextualType,
-                               Expr *expr) {
-  if (!CS || !expr || !exprType || !contextualType)
-    return;
-  if (diagID.ID != diag::cannot_convert_argument_value.ID)
-    return;
-
-  auto integerType =
-    CS->TC.getProtocol(SourceLoc(),
-                       KnownProtocolKind::IntegerLiteralConvertible);
-  if (!integerType) return;
-
-  auto isIntegerType = [&](Type ty) -> bool {
-    return CS->TC.conformsToProtocol(exprType, integerType, CS->DC,
-                                     ConformanceCheckFlags::InExpression);
-  };
-
-  // When the error is "cannot convert value of type <integer> to expected
-  // argument type <RawRepresentable>", add a fixit that constructs the
-  // raw-representable type from the value.
-
-  if (!isIntegerType(exprType))
-    return;
-
+/// Return true if the given type conforms to RawRepresentable, with an
+/// underlying type conforming to the given known protocol.
+static Type isRawRepresentable(Type fromType,
+                               KnownProtocolKind kind,
+                               ConstraintSystem *CS) {
   auto rawReprType =
     CS->TC.getProtocol(SourceLoc(), KnownProtocolKind::RawRepresentable);
-  if (!rawReprType) return;
+  if (!rawReprType)
+    return Type();
 
-  ProtocolConformance *rawReprConformance;
-  if (!CS->TC.conformsToProtocol(contextualType, rawReprType, CS->DC,
+  ProtocolConformance *conformance;
+  if (!CS->TC.conformsToProtocol(fromType, rawReprType, CS->DC,
                                  ConformanceCheckFlags::InExpression,
-                                 &rawReprConformance))
-    return;
+                                 &conformance))
+    return Type();
 
-  Type rawTy = ProtocolConformance::getTypeWitnessByName(contextualType,
-                                                      rawReprConformance,
+  Type rawTy = ProtocolConformance::getTypeWitnessByName(fromType,
+                                                         conformance,
                                   CS->getASTContext().getIdentifier("RawValue"),
-                                                      &CS->TC);
-  if (!rawTy || !isIntegerType(rawTy))
-    return;
+                                                         &CS->TC);
+  if (!rawTy || !isLiteralConvertibleType(rawTy, kind, CS))
+    return Type();
 
-  std::string convWrapBefore = contextualType.getString();
-  convWrapBefore += "(rawValue: ";
-  std::string convWrapAfter = ")";
-  if (rawTy->getCanonicalType() != exprType->getCanonicalType()) {
-    convWrapBefore += rawTy->getString();
-    convWrapBefore += "(";
-    convWrapAfter += ")";
+  return rawTy;
+}
+
+/// Return true if the conversion from fromType to toType is an invalid string
+/// index operation.
+static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
+                                             ConstraintSystem *CS) {
+  auto kind = KnownProtocolKind::IntegerLiteralConvertible;
+  return (isLiteralConvertibleType(fromType, kind, CS) &&
+          toType->getCanonicalType().getString() == "String.CharacterView.Index");
+}
+
+/// Attempts to add fix-its for these two mistakes:
+///
+/// - Passing an integer where a type conforming to RawRepresentable is
+///   expected, by wrapping the expression in a call to the contextual
+///   type's initializer
+///
+/// - Passing a type conforming to RawRepresentable where an integer is
+///   expected, by wrapping the expression in a call to the rawValue
+///   accessor
+///
+/// This helps migration with SDK changes.
+static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
+                                      ConstraintSystem *CS,
+                                      Diag<Type, Type> diagID,
+                                      Type fromType,
+                                      Type toType,
+                                      KnownProtocolKind kind,
+                                      Expr *expr) {
+  if (isLiteralConvertibleType(fromType, kind, CS)) {
+    if (auto rawTy = isRawRepresentable(toType, kind, CS)) {
+      // Produce before/after strings like 'Result(rawValue: RawType(<expr>))'
+      // or just 'Result(rawValue: <expr>)'.
+      std::string convWrapBefore = toType.getString();
+      convWrapBefore += "(rawValue: ";
+      std::string convWrapAfter = ")";
+      if (rawTy->getCanonicalType() != fromType->getCanonicalType()) {
+        convWrapBefore += rawTy->getString();
+        convWrapBefore += "(";
+        convWrapAfter += ")";
+      }
+      SourceRange exprRange = expr->getSourceRange();
+      diag.fixItInsert(exprRange.Start, convWrapBefore);
+      diag.fixItInsertAfter(exprRange.End, convWrapAfter);
+      return;
+    }
   }
-  SourceRange exprRange = expr->getSourceRange();
-  diag.fixItInsert(exprRange.Start, convWrapBefore);
-  diag.fixItInsertAfter(exprRange.End, convWrapAfter);
+
+  if (auto rawTy = isRawRepresentable(fromType, kind, CS)) {
+    if (isLiteralConvertibleType(toType, kind, CS)) {
+      std::string convWrapBefore;
+      std::string convWrapAfter = ".rawValue";
+      if (rawTy->getCanonicalType() != toType->getCanonicalType()) {
+        convWrapBefore += rawTy->getString();
+        convWrapBefore += "(";
+        convWrapAfter += ")";
+      }
+      SourceRange exprRange = expr->getSourceRange();
+      diag.fixItInsert(exprRange.Start, convWrapBefore);
+      diag.fixItInsertAfter(exprRange.End, convWrapAfter);
+      return;
+    }
+  }
 }
 
 bool FailureDiagnosis::diagnoseContextualConversionError() {
@@ -3387,10 +3410,29 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
         diagID = diag::noescape_functiontype_mismatch;
     }
 
-  InFlightDiagnostic diag = diagnose(expr->getLoc(), diagID, exprType, contextualType);
+  InFlightDiagnostic diag = diagnose(expr->getLoc(), diagID,
+                                     exprType, contextualType);
   diag.highlight(expr->getSourceRange());
+
   // Attempt to add a fixit for the error.
-  tryConversionFixit(diag, CS, diagID, exprType, contextualType, expr);
+  switch (CS->getContextualTypePurpose()) {
+  case CTP_CallArgument:
+  case CTP_ArrayElement:
+  case CTP_DictionaryKey:
+  case CTP_DictionaryValue:
+    tryRawRepresentableFixIts(diag, CS, diagID, exprType, contextualType,
+                              KnownProtocolKind::IntegerLiteralConvertible,
+                              expr);
+    tryRawRepresentableFixIts(diag, CS, diagID, exprType, contextualType,
+                              KnownProtocolKind::StringLiteralConvertible,
+                              expr);
+    break;
+
+  default:
+    // FIXME: Other contextual conversions too?
+    break;
+  }
+
   return true;
 }
 
