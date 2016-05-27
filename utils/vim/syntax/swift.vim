@@ -13,38 +13,38 @@ syn match swiftImportModule /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swi
 syn match swiftImportComponent /\.\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 
 syn keyword swiftKeyword
+      \ associatedtype
       \ break
       \ case
       \ continue
+      \ convenience
       \ default
+      \ defer
       \ do
       \ else
+      \ extension
+      \ final
       \ for
       \ guard
       \ if
       \ in
-      \ static
-      \ switch
-      \ repeat
-      \ return
-      \ where
-      \ while
-      \ public
       \ internal
-      \ private
+      \ let
       \ mutating
       \ nonmutating
-      \ var
-      \ let
-      \ typealias
-      \ protocol
-      \ extension
-      \ associatedtype
       \ override
+      \ private
+      \ protocol
+      \ public
+      \ repeat
       \ required
-      \ convenience
-      \ final
-      \ defer
+      \ return
+      \ static
+      \ switch
+      \ typealias
+      \ var
+      \ where
+      \ while
 
 syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName
 syn region swiftTypeAttributes start="\[" end="\]" skipwhite contained nextgroup=swiftTypeName
