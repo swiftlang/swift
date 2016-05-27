@@ -526,6 +526,13 @@ extension ${Self} {
     self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(value._value)
   }
 
+  /// Creates a ${Self} whose value is `value` if no rounding is necessary, nil otherwise.
+  @_transparent
+  public init?(exactly value: ${Src}) {
+    if value.isFinite == false || value < ${str(lower)}.0 || value > ${str(upper)}.0 {
+      return nil
+    }
+    self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(value._value)
   }
 %     if srcBits == 80:
 #endif
