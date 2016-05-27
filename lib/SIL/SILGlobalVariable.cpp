@@ -129,6 +129,7 @@ static bool analyzeStaticInitializer(SILFunction *F, SILInstruction *&Val,
       if (I.getKind() != ValueKind::ReturnInst &&
           I.getKind() != ValueKind::StructInst &&
           I.getKind() != ValueKind::TupleInst &&
+          I.getKind() != ValueKind::DebugValueInst &&
           I.getKind() != ValueKind::IntegerLiteralInst &&
           I.getKind() != ValueKind::FloatLiteralInst)
         return false;
