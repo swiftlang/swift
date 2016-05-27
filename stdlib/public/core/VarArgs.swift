@@ -72,7 +72,7 @@ public func withVaList<R>(args: [CVarArgType],
 }
 
 /// Invoke `f` with a C `va_list` argument derived from `builder`.
-@swift3_migration(message="it will be removed in Swift 3")
+@swift3_migration(message="Unavailable in Swift 3")
 @available(*, deprecated, message="it will be removed in Swift 3")
 public func withVaList<R>(builder: VaListBuilder,
   @noescape _ f: CVaListPointer -> R) -> R {
@@ -286,7 +286,7 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAlignedType {
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
-@swift3_migration(message="it will be removed in Swift 3")
+@swift3_migration(message="Unavailable in Swift 3")
 @available(*, deprecated, message="it will be removed in Swift 3")
 final public class VaListBuilder {
 
@@ -382,7 +382,7 @@ final public class VaListBuilder {
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
-@swift3_migration(message="it will be removed in Swift 3")
+@swift3_migration(message="Unavailable in Swift 3")
 @available(*, deprecated, message="it will be removed in Swift 3")
 final public class VaListBuilder {
 

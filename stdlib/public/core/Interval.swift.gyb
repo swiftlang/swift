@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// An interval over a `Comparable` type.
-@swift3_migration(renamed="Interval")
+@swift3_migration(message="IntevalType has been removed in Swift 3. Please use ranges instead.")
 public protocol IntervalType {
   /// The type of the `Interval`'s endpoints.
   associatedtype Bound : Comparable
@@ -58,6 +58,7 @@ selfDocComment += """
 }%
 
 ${selfDocComment}
+@swift3_migration(message="${Self} has been removed in Swift 3. Please use ${Kind}Range instead.")
 public struct ${Self}<Bound : Comparable>
   : IntervalType, Equatable, CustomStringConvertible, CustomDebugStringConvertible, _Reflectable {
 

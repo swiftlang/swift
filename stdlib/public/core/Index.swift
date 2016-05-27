@@ -92,7 +92,7 @@ public postfix func ++ <T : _Incrementable> (inout i: T) -> T {
 /// Represents a discrete value in a series, where a value's
 /// successor, if any, is reachable by applying the value's
 /// `successor()` method.
-@swift3_migration(renamed="ForwardIndex")
+@swift3_migration(message="ForwardIndex methods are now available from the Collection protocol.")
 public protocol ForwardIndexType : _Incrementable {
   /// A type that can represent the number of steps between pairs of
   /// `Self` values where one value is reachable from the other.
@@ -162,7 +162,7 @@ public protocol ForwardIndexType : _Incrementable {
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessIndexType`
   ///   - O(`abs(n)`) otherwise
-  @swift3_migration(renamed="advanced(by:)")
+  @swift3_migration(message="Please use Collection.index(_:offsetBy:) instead.")
   @warn_unused_result
   func advancedBy(n: Distance) -> Self
 
@@ -181,7 +181,7 @@ public protocol ForwardIndexType : _Incrementable {
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessIndexType`
   ///   - O(`abs(n)`) otherwise
-  @swift3_migration(renamed="advanced(by:limit:)")
+  @swift3_migration(message="Please use Collection.index(_:offsetBy:limitedBy:)")
   @warn_unused_result
   func advancedBy(n: Distance, limit: Self) -> Self
 
@@ -195,7 +195,7 @@ public protocol ForwardIndexType : _Incrementable {
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessIndexType`
   ///   - O(`n`) otherwise, where `n` is the function's result.
-  @swift3_migration(renamed="distance(to:)")
+  @swift3_migration(message="Please use Collection.distance(from:to:) instead.")
   @warn_unused_result
   func distanceTo(end: Self) -> Distance
 }
@@ -244,19 +244,19 @@ extension ForwardIndexType {
     return p
   }
 
-  @swift3_migration(renamed="advanced(by:)")
+  @swift3_migration(message="Please use Collection.index(_:offsetBy:) instead.")
   @warn_unused_result
   public func advancedBy(n: Distance) -> Self {
     return self._advanceForward(n)
   }
 
-  @swift3_migration(renamed="advanced(by:limit:)")
+  @swift3_migration(message="Please use Collection.index(_:offsetBy:limitedBy:) instead.")
   @warn_unused_result
   public func advancedBy(n: Distance, limit: Self) -> Self {
     return self._advanceForward(n, limit)
   }
 
-  @swift3_migration(renamed="distance(to:)")
+  @swift3_migration(message="Please use Collection.distance(from:to:) instead.")
   @warn_unused_result
   public func distanceTo(end: Self) -> Distance {
     var p = self
@@ -275,7 +275,7 @@ extension ForwardIndexType {
 
 /// An index that can step backwards via application of its
 /// `predecessor()` method.
-@swift3_migration(renamed="BidirectionalIndex")
+@swift3_migration(message="BidirectionalIndex methods are now available from the BidirectionalCollection protocol.")
 public protocol BidirectionalIndexType : ForwardIndexType {
   /// Returns the previous consecutive value in a discrete sequence.
   ///
@@ -297,7 +297,7 @@ extension BidirectionalIndexType {
     self = self.predecessor()
   }
 
-  @swift3_migration(renamed="advanced(by:)")
+  @swift3_migration(message="Please use BidirectionalCollection.index(_:offsetBy:) instead.")
   @warn_unused_result
   public func advancedBy(n: Distance) -> Self {
     if n >= 0 {
@@ -312,7 +312,7 @@ extension BidirectionalIndexType {
     return p
   }
 
-  @swift3_migration(renamed="advanced(by:limit:)")
+  @swift3_migration(message="Please use BidirectionalCollection.index(_:offsetBy:limitedBy:) instead.")
   @warn_unused_result
   public func advancedBy(n: Distance, limit: Self) -> Self {
     if n >= 0 {
@@ -358,7 +358,7 @@ public protocol _RandomAccessAmbiguity {
 }
 
 extension _RandomAccessAmbiguity {
-  @swift3_migration(renamed="advanced(by:)")
+  @swift3_migration(message="Please use RandomAccessCollection.index(_:offsetBy:) instead.")
   @warn_unused_result
   public func advancedBy(n: Distance) -> Self {
     fatalError("advancedBy(n) not implemented")
@@ -367,19 +367,19 @@ extension _RandomAccessAmbiguity {
 
 /// An index that can be offset by an arbitrary number of positions,
 /// and can measure the distance to any reachable value, in O(1).
-@swift3_migration(renamed="RandomAccessIndex")
+@swift3_migration(message="RandomAccessIndex methods are now available from the RandomAccessCollection protocol.")
 public protocol RandomAccessIndexType : BidirectionalIndexType, Strideable,
   _RandomAccessAmbiguity {
 
-  @swift3_migration(renamed="distance(to:)")
+  @swift3_migration(message="Please use RandomAccessCollection.distance(from:to:) instead.")
   @warn_unused_result
   func distanceTo(other: Self) -> Distance
 
-  @swift3_migration(renamed="advanced(by:)")
+  @swift3_migration(message="Please use RandomAccessCollection.index(_:offsetBy:) instead.")
   @warn_unused_result
   func advancedBy(n: Distance) -> Self
 
-  @swift3_migration(renamed="advanced(by:limit:)")
+  @swift3_migration(message="Please use RandomAccessCollection.index(_:offsetBy:limitedBy:) instead.")
   @warn_unused_result
   func advancedBy(n: Distance, limit: Self) -> Self
 }
@@ -414,7 +414,7 @@ extension RandomAccessIndexType {
       "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
   }
 
-  @swift3_migration(renamed="advanced(by:limit:)")
+  @swift3_migration(message="Please use RandomAccessCollection.index(_:offsetBy:limitedBy:) instead.")
   @_transparent
   @warn_unused_result
   public func advancedBy(n: Distance, limit: Self) -> Self {

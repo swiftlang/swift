@@ -131,7 +131,7 @@ public struct StaticString
 
   /// Returns a `String` representing the same sequence of Unicode
   /// scalar values as `self` does.
-  @swift3_migration(message="use the 'String(_:)' initializer")
+  @swift3_migration(message="Use the 'String(_:)' initializer")
   @_transparent
   public var stringValue: String {
     return withUTF8Buffer {

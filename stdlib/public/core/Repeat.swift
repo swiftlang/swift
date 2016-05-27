@@ -25,7 +25,7 @@ public struct Repeat<Element> : CollectionType {
 
   /// Construct an instance that contains `count` elements having the
   /// value `repeatedValue`.
-  @swift3_migration(renamed="repeatElement")
+  @swift3_migration(renamed="repeatElement(_:count:)")
   public init(count: Int, repeatedValue: Element) {
     self.count = count
     self.repeatedValue = repeatedValue

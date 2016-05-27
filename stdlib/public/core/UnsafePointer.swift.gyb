@@ -50,7 +50,7 @@ public struct ${Self}<@swift3_migration(renamed="Pointee") Memory>
 
   /// Construct a null pointer.
   @available(*, deprecated, message="${Self}() initializer will be removed in Swift 3.  Use `nil` instead")
-  @swift3_migration(message="use `nil` instead")
+  @swift3_migration(message="Use `nil` instead")
   @_transparent
   public init() {
     self._rawValue = _nilRawPointer
@@ -517,7 +517,7 @@ public func -= <Memory>(inout lhs: ${Self}<Memory>, rhs: Int) {
 /// any other types; it makes a decent parameter to
 /// `UnsafeMutablePointer<Memory>` when you just want to do bytewise
 /// pointer arithmetic.
-@swift3_migration(message="it will be removed in Swift 3")
+@swift3_migration(message="Unavailable in Swift 3")
 @available(*, deprecated, message="it will be removed in Swift 3")
 public struct RawByte {
   let _inaccessible: UInt8

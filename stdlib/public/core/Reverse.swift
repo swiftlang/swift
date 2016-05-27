@@ -12,7 +12,7 @@
 
 /// An index that traverses the same positions as an underlying index,
 /// with inverted traversal direction.
-@swift3_migration(renamed="ReverseIndexProtocol")
+@swift3_migration(message="ReverseIndeType is no longer available in Swift 3.")
 public protocol ReverseIndexType : BidirectionalIndexType {
   associatedtype Base : BidirectionalIndexType
   
@@ -152,7 +152,7 @@ public struct ReverseCollection<
   /// reverse order.
   ///
   /// - Complexity: O(1)
-  @swift3_migration(message="use the 'reversed()' method on the collection")
+  @swift3_migration(message="Use the 'reversed()' method on the collection")
   @available(*, deprecated, message="it will be removed in Swift 3.  Use the 'reverse()' method on the collection.")
   public init(_ base: Base) {
     self._base = base
@@ -187,7 +187,7 @@ public struct ReverseRandomAccessCollection<
   /// reverse order.
   ///
   /// - Complexity: O(1)
-  @swift3_migration(message="use the 'reversed()' method on the collection")
+  @swift3_migration(message="Use the 'reversed()' method on the collection")
   @available(*, deprecated, message="it will be removed in Swift 3.  Use the 'reverse()' method on the collection.")
   public init(_ base: Base) {
     self._base = base
