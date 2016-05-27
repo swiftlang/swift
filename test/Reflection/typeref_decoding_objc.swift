@@ -20,8 +20,6 @@
 // CHECK: (function convention=block
 // CHECK:   (tuple))
 
-// CHECK: TypesToReflect.GenericOC
-// CHECK: ------------------------
 // CHECK: ocnss: TypesToReflect.GenericOC<__ObjC.NSString>
 // CHECK: (bound_generic_class TypesToReflect.GenericOC
 // CHECK:   (class __ObjC.NSString))
@@ -29,6 +27,9 @@
 // CHECK: occfs: TypesToReflect.GenericOC<__ObjC.CFString>
 // CHECK: (bound_generic_class TypesToReflect.GenericOC
 // CHECK:   (class __ObjC.CFString))
+
+// CHECK: TypesToReflect.GenericOC
+// CHECK: ------------------------
 
 // CHECK: TypesToReflect.HasObjCClasses
 // CHECK: -----------------------------
@@ -60,65 +61,16 @@
 // CHECK-32: Stride: 16
 // CHECK-32: NumExtraInhabitants: 0
 
+// CHECK-64: - __C.CGRect:
 // CHECK-64: Size: 32
 // CHECK-64: Alignment: 8
 // CHECK-64: Stride: 32
 // CHECK-64: NumExtraInhabitants: 0
 
-// CHECK: CAPTURE DESCRIPTORS:
-// CHECK: ====================
-// CHECK: - Capture types:
-// CHECK: (struct Swift.StaticString)
-// CHECK: (struct Swift.StaticString)
-// CHECK: (struct Swift.UInt)
-// CHECK: (struct Swift.UInt)
-// CHECK: - Metadata sources:
+// CHECK:      CAPTURE DESCRIPTORS:
+// CHECK-NEXT: ====================
 
-// CHECK: - Capture types:
-// CHECK: (function
-// CHECK:   (tuple))
-// CHECK: - Metadata sources:
-
-// CHECK: - Capture types:
-// CHECK: (struct Swift.StaticString)
-// CHECK: (struct Swift.StaticString)
-// CHECK: (struct Swift.UInt)
-// CHECK: (struct Swift.UInt)
-// CHECK: - Metadata sources:
-
-// CHECK: - Capture types:
-// CHECK: (function
-// CHECK:   (tuple))
-// CHECK: - Metadata sources:
-
-// CHECK: - Capture types:
-// CHECK: (class __ObjC.NSBundle)
-// CHECK: (protocol __ObjC.NSCoding)
-// CHECK: - Metadata sources:
-
-// CHECK: - Capture types:
-// CHECK: (struct Swift.StaticString)
-// CHECK: (bound_generic_struct Swift.UnsafeBufferPointer
-// CHECK:   (struct Swift.UInt8))
-// CHECK: (struct Swift.UInt)
-// CHECK: (struct Swift.UInt)
-// CHECK: - Metadata sources:
-
-// CHECK: - Capture types:
-// CHECK: (function
-// CHECK:   (tuple))
-// CHECK: - Metadata sources:
-
-// CHECK: - Capture types:
-// CHECK: (bound_generic_struct Swift.UnsafeBufferPointer
-// CHECK:   (struct Swift.UInt8))
-// CHECK: (bound_generic_struct Swift.UnsafeBufferPointer
-// CHECK:   (struct Swift.UInt8))
-// CHECK: (struct Swift.UInt)
-// CHECK: (struct Swift.UInt)
-// CHECK: - Metadata sources:
-
-// CHECK: - Capture types:
-// CHECK: (function
-// CHECK:   (tuple))
-// CHECK: - Metadata sources:
+// CHECK:      - Capture types:
+// CHECK-NEXT: (class __ObjC.NSBundle)
+// CHECK-NEXT: (protocol __ObjC.NSCoding)
+// CHECK-NEXT: - Metadata sources:
