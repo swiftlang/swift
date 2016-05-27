@@ -1284,14 +1284,15 @@ namespace {
 
     /// Mark the given declaration as the Swift 2 variant of a Swift 3
     /// declaration with the given name.
-    static void markAsSwift2Variant(Decl *decl, ImportedName swift3Name) {
+    void markAsSwift2Variant(Decl *decl, ImportedName swift3Name,
+                             DeclContext *newDC = nullptr) {
       ASTContext &ctx = decl->getASTContext();
 
       llvm::SmallString<64> renamed;
       {
         // Render a swift_name string.
         llvm::raw_svector_ostream os(renamed);
-        swift3Name.printSwiftName(os);
+        Impl.printSwiftName(swift3Name, os);
       }
 
       auto attr = AvailableAttr::createUnconditional(

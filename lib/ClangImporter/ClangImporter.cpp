@@ -1891,12 +1891,48 @@ namespace {
   typedef ClangImporter::Implementation::ImportedName ImportedName;
 }
 
-void ClangImporter::Implementation::ImportedName::printSwiftName(
-       llvm::raw_ostream &os) const {
+/// Will recursively print out the fully qualified context for the given name.
+/// Ends with a trailing "."
+static void
+printFullContextPrefix(ClangImporter::Implementation::ImportedName name,
+                       llvm::raw_ostream &os,
+                       ClangImporter::Implementation &Impl) {
+  const clang::NamedDecl *newDeclContextNamed = nullptr;
+  switch (name.EffectiveContext.getKind()) {
+  case EffectiveClangContext::UnresolvedContext:
+    os << name.EffectiveContext.getUnresolvedName() << ".";
+    // And we're done!
+    return;
+
+  case EffectiveClangContext::DeclContext: {
+    auto namedDecl =
+        dyn_cast<clang::NamedDecl>(name.EffectiveContext.getAsDeclContext());
+    if (!namedDecl) {
+      // We're done
+      return;
+    }
+    newDeclContextNamed = cast<clang::NamedDecl>(namedDecl);
+    break;
+  }
+
+  case EffectiveClangContext::TypedefContext:
+    newDeclContextNamed = name.EffectiveContext.getTypedefName();
+    break;
+  }
+
+  // Now, let's print out the parent
+  assert(newDeclContextNamed && "should of been set");
+  auto parentName = Impl.importFullName(newDeclContextNamed);
+  printFullContextPrefix(parentName, os, Impl);
+  os << parentName.Imported << ".";
+}
+
+void ClangImporter::Implementation::printSwiftName(ImportedName name,
+                                                   llvm::raw_ostream &os) {
   // Property accessors.
   bool isGetter = false;
   bool isSetter = false;
-  switch (AccessorKind) {
+  switch (name.AccessorKind) {
   case ImportedAccessorKind::None:
     break;
 
@@ -1915,43 +1951,27 @@ void ClangImporter::Implementation::ImportedName::printSwiftName(
 
   // If we're importing a global as a member, we need to provide the
   // effective context.
-  if (ImportAsMember) {
-    switch (EffectiveContext.getKind()) {
-    case EffectiveClangContext::DeclContext:
-      os << SwiftLookupTable::translateDeclContext(
-              EffectiveContext.getAsDeclContext())->second;
-      break;
-
-    case EffectiveClangContext::TypedefContext:
-      os << EffectiveContext.getTypedefName()->getName();
-      break;
-
-    case EffectiveClangContext::UnresolvedContext:
-      os << EffectiveContext.getUnresolvedName();
-      break;
-    }
-
-    os << ".";
-  }
+  if (name.ImportAsMember)
+    printFullContextPrefix(name, os, *this);
 
   // Base name.
-  os << Imported.getBaseName().str();
+  os << name.Imported.getBaseName().str();
 
   // Determine the number of argument labels we'll be producing.
-  auto argumentNames = Imported.getArgumentNames();
+  auto argumentNames = name.Imported.getArgumentNames();
   unsigned numArguments = argumentNames.size();
-  if (SelfIndex) ++numArguments;
+  if (name.SelfIndex) ++numArguments;
   if (isSetter) ++numArguments;
 
   // If the result is a simple name that is not a getter, we're done.
-  if (numArguments == 0 && Imported.isSimpleName() && !isGetter) return;
+  if (numArguments == 0 && name.Imported.isSimpleName() && !isGetter) return;
 
   // We need to produce a function name.
   os << "(";
   unsigned currentArgName = 0;
   for (unsigned i = 0; i != numArguments; ++i) {
     // The "self" parameter.
-    if (SelfIndex && *SelfIndex == i) {
+    if (name.SelfIndex && *name.SelfIndex == i) {
       os << "self:";
       continue;
     }
@@ -2355,6 +2375,7 @@ auto ClangImporter::Implementation::importFullName(
   // Import onto a swift_newtype if present
   } else if (auto newtypeDecl = findSwiftNewtype(D, clangSema, swift2Name)) {
     result.EffectiveContext = newtypeDecl;
+    result.ImportAsMember = true;
   // Everything else goes into its redeclaration context.
   } else {
     result.EffectiveContext = dc->getRedeclContext();
