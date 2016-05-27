@@ -213,7 +213,7 @@ class r20201968C {
 
 // <rdar://problem/21459429> QoI: Poor compilation error calling assert
 func r21459429(_ a : Int) {
-  assert(a != nil, "ASSERT COMPILATION ERROR") // expected-error {{value of type 'Int' can never be nil, comparison isn't allowed}}
+  assert(a != nil, "ASSERT COMPILATION ERROR") // expected-error {{type 'Int' is not optional, value can never be nil}}
 }
 
 
@@ -590,7 +590,7 @@ func r21684487() {
 func r18397777(_ d : r21447318?) {
   let c = r21447318()
 
-  if c != nil { // expected-error {{value of type 'r21447318' can never be nil, comparison isn't allowed}}
+  if c != nil { // expected-error {{type 'r21447318' is not optional, value can never be nil}}
   }
   
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
@@ -762,6 +762,19 @@ func overloadSetResultType(_ a : Int, b : Int) -> Int {
 func r21523291(_ bytes : UnsafeMutablePointer<UInt8>) {
   let i = 42   // expected-note {{change 'let' to 'var' to make it mutable}}
   let r = bytes[i++]  // expected-error {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
+}
+
+
+// SR-1594: Wrong error description when using === on non-class types
+class SR1594 {
+  func sr1594(bytes : UnsafeMutablePointer<Int>, _ i : Int?) {
+    _ = (i === nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15===}}
+    _ = (bytes === nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
+    _ = (self === nil) // expected-error {{type 'SR1594' is not optional, value can never be nil}}
+    _ = (i !== nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15=!=}}
+    _ = (bytes !== nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
+    _ = (self !== nil) // expected-error {{type 'SR1594' is not optional, value can never be nil}}
+  }
 }
 
 

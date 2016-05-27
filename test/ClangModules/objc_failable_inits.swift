@@ -7,7 +7,7 @@ import Foundation
 func testDictionary() {
   // -[NSDictionary init] returns non-nil.
   var dictNonOpt = NSDictionary()
-  if dictNonOpt == nil { } // expected-error{{value of type 'NSDictionary' can never be nil, comparison isn't allowed}}
+  if dictNonOpt == nil { } // expected-error{{type 'NSDictionary' is not optional, value can never be nil}}
 }
 
 func testString() throws {
