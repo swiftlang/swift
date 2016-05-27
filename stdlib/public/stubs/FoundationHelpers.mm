@@ -71,8 +71,9 @@ swift::_swift_stdlib_CFStringCreateWithSubstring(
 }
 
 _swift_shims_UniChar
-swift::_swift_stdlib_CFStringGetCharacterAtIndex(_swift_shims_CFStringRef theString,
-                                                 _swift_shims_CFIndex idx) {
+swift::_swift_stdlib_CFStringGetCharacterAtIndex(
+                                         _swift_shims_CFStringRef theString,
+                                         _swift_shims_CFIndex idx) {
   return CFStringGetCharacterAtIndex(cast(theString), idx);
 }
 
@@ -98,11 +99,11 @@ swift::_swift_stdlib_CFStringCompare(_swift_shims_CFStringRef theString1,
 
 _swift_shims_Boolean
 swift::_swift_stdlib_CFStringFindWithOptions(
-                                      _swift_shims_CFStringRef theString,
-                                      _swift_shims_CFStringRef stringToFind,
-                                      _swift_shims_CFRange rangeToSearch,
-                                      _swift_shims_CFStringCompareFlags searchOptions,
-                                      _swift_shims_CFRange *result) {
+                                _swift_shims_CFStringRef theString,
+                                _swift_shims_CFStringRef stringToFind,
+                                _swift_shims_CFRange rangeToSearch,
+                                _swift_shims_CFStringCompareFlags searchOptions,
+                                _swift_shims_CFRange *result) {
   return CFStringFindWithOptions(cast(theString), cast(stringToFind),
                                  cast(rangeToSearch), cast(searchOptions),
                                  cast(result));
