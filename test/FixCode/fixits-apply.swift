@@ -80,11 +80,21 @@ func ftest2(x x: Int -> Int) {}
 protocol SomeProt {
   func protMeth(p: Int)
 }
-class Test2 : SomeProt {
+@objc protocol SomeObjCProt {
+  func objcprotMeth(p: Int)
+}
+class Test2 : SomeProt, SomeObjCProt {
   func protMeth(_ p: Int) {}
 
   func instMeth(p: Int) {}
   func instMeth2(p: Int, p2: Int) {}
+  func objcprotMeth(_ p: Int) {}
+}
+@objc class Test3 : SomeObjCProt {
+  func objcprotMeth(_ p: Int) {}
+}
+class SubTest2 : Test2 {
+  override func instMeth(_ p: Int) {}
 }
 Test2().instMeth(0)
 Test2().instMeth2(0, p2:1)
