@@ -2386,7 +2386,8 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
     if [[ "${TEST_INSTALLABLE_PACKAGE}" ]] ; then
         PKG_TESTS_SOURCE_DIR="${WORKSPACE}/swift-integration-tests"
         PKG_TESTS_SANDBOX_PARENT="$(build_directory swift_package_sandbox none)"
-
+        PKG_TESTS_TEMPS="${PKG_TESTS_SANDBOX_PARENT}"/"tests"
+        
         if [[ "$(uname -s)" == "Darwin" ]] ; then
             PKG_TESTS_SANDBOX="${PKG_TESTS_SANDBOX_PARENT}"/"${TOOLCHAIN_PREFIX}"
         else # Linux
@@ -2404,7 +2405,7 @@ if [[ "${INSTALLABLE_PACKAGE}" ]] ; then
         popd
 
         (cd "${PKG_TESTS_SOURCE_DIR}" &&
-                python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param filecheck="${FILECHECK_EXECUTABLE_PATH}")
+                python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param filecheck="${FILECHECK_EXECUTABLE_PATH}" --param test-exec-root="${PKG_TESTS_TEMPS}")
         { set +x; } 2>/dev/null
     fi
 fi
