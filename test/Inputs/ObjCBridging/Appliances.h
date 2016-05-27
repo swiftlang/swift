@@ -12,3 +12,8 @@
 @interface APPHouse : NSObject
 @property (nonatomic,nonnull,copy) APPRefrigerator *fridge;
 @end
+
+
+@interface APPManufacturerInfo <DataType> : NSObject
+@property (nonatomic,nonnull,readonly) DataType value;
+@end

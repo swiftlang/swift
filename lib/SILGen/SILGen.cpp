@@ -241,7 +241,7 @@ SILGenModule::getBridgedObjectiveCTypeRequirement(SILLocation loc) {
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
   AssociatedTypeDecl *found = nullptr;
-  DeclName name(ctx.getIdentifier("_ObjectiveCType"));
+  DeclName name(ctx.Id_ObjectiveCType);
   for (auto member : proto->lookupDirect(name, true)) {
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
       found = assocType;

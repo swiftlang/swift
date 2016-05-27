@@ -540,7 +540,6 @@
       key.name: "Qtys",
       key.offset: 1030,
       key.length: 15,
-      key.typename: "Qtys",
       key.nameoffset: 1040,
       key.namelength: 4
     },
@@ -787,7 +786,6 @@
       key.name: "myArray",
       key.offset: 1286,
       key.length: 23,
-      key.typename: "myArray",
       key.nameoffset: 1290,
       key.namelength: 7
     },
@@ -823,7 +821,6 @@
       key.name: "myDict",
       key.offset: 1310,
       key.length: 28,
-      key.typename: "myDict",
       key.nameoffset: 1314,
       key.namelength: 6
     },
