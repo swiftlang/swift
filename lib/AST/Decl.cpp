@@ -1736,6 +1736,42 @@ Optional<ObjCSelector> ValueDecl::getObjCRuntimeName() const {
   return None;
 }
 
+bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
+  // Only makes sense for a requirement of an @objc protocol.
+  auto proto = cast<ProtocolDecl>(requirement->getDeclContext());
+  if (!proto->isObjC()) return false;
+
+  // Only makes sense when this declaration is within a nominal type
+  // or extension thereof.
+  auto nominal =
+    getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (!nominal) return false;
+
+  // If there is already an @objc attribute with an explicit name, we
+  // can't infer a name (it's already there).
+  if (auto objcAttr = getAttrs().getAttribute<ObjCAttr>()) {
+    if (!objcAttr->isNameImplicit()) return false;
+  }
+
+  // If the nominal type doesn't conform to the protocol at all, we
+  // cannot infer @objc no matter what we do.
+  SmallVector<ProtocolConformance *, 1> conformances;
+  if (!nominal->lookupConformance(getModuleContext(), proto, conformances))
+    return false;
+
+  // If any of the conformances is attributed to the context in which
+  // this declaration resides, we can infer @objc or the Objective-C
+  // name.
+  auto dc = getDeclContext();
+  for (auto conformance : conformances) {
+    if (conformance->getDeclContext() == dc)
+      return true;
+  }
+
+  // Nothing to infer from.
+  return false;
+}
+
 SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
   if (auto var = dyn_cast<VarDecl>(this)) {
     if (auto pbd = var->getParentPatternBinding()) {
