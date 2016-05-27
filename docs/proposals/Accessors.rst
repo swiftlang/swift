@@ -559,7 +559,7 @@ while a slice is being mutated to grant permission for the slice
 to mutate the collection in-place while sharing ownership. This
 flexibility can be exposed by a pair of accessors that are called
 before and after a mutation. The "get" stage produces both the
-value to mutate, and a state value (whose type must be declared) to
+value to mutate and a state value (whose type must be declared) to
 forward to the "set" stage. A pinning accessor can then look something
 like this::
 
@@ -585,7 +585,8 @@ like this::
   }
 
 ``getForMutation`` and ``setForMutation`` must appear as a pair;
-neither one is valid on its own.
+neither one is valid on its own. A ``get`` and ``set`` accessor
+should also still be provided for simple read and write operations.
 When the compiler has visibility that storage is implemented in
 terms of ``getForMutation`` and ``setForMutation``, it lowers a mutable
 projection using those accessors as follows::
