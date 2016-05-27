@@ -453,33 +453,40 @@ extension ${Self} {
 %    Src = src_ty.stdlib_name
 %    (srcSign, srcExt) = ('s', 'sext') if srcSigned else ('u', 'zext')
 %    if Self != Src:
-  public init(_ v: ${Src}) {
+  @_transparent
+  public init(_ value: ${Src}) {
+    self.init(exactly: value)!
+  }
+    
+% if srcBits <= bits and (srcSign == sign or not signed): 
+  @available(*, message: "Converting ${Src} to ${Self} will always succeed.")
+% end
+  @_transparent 
+  public init?(exactly value: ${Src}) {
 %
-    let srcNotWord = v._value
+    let srcNotWord = value._value
 %
 %       if srcBits == bits and srcSign == sign:
-    let dstNotWord = srcNotWord
+    let result = (srcNotWord, false)
 %
 %       elif srcBits == bits:
-    let tmp = Builtin.${srcSign}_to_${sign}_checked_conversion_Int${srcBits}(srcNotWord)
-    Builtin.condfail(tmp.1)
-    let dstNotWord = tmp.0
+    let result = Builtin.${srcSign}_to_${sign}_checked_conversion_Int${srcBits}(srcNotWord)
 %
 %       elif srcBits > bits:
-    let tmp = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(srcNotWord)
-    Builtin.condfail(tmp.1)
-    let dstNotWord = tmp.0
+    let result = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(srcNotWord)
 %
 %       elif srcSigned and not signed:
     let tmp = Builtin.s_to_u_checked_conversion_Int${srcBits}(srcNotWord)
-    Builtin.condfail(tmp.1)
-    let dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(tmp.0)
+    let result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(tmp.0), false)
 %
 %       else:
-    let dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(srcNotWord)
+    let result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(srcNotWord), false)
 %       end
 %
-    self._value = dstNotWord
+    if Bool(result.1) == false {
+      return nil
+    }
+    self._value = result.0
   }
 %    end
 
