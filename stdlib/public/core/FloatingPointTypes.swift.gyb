@@ -80,6 +80,8 @@ extension UInt${bits} {
 %{
 Self = floatName[bits]
 SignificandSize = {32:32, 64:64, 80:64}[bits]
+SignificandBitCount = {32:23, 64:52, 80:63}[bits]
+ExponentBitCount = {32:8, 64:11, 80:15}[bits]
 RawSignificand = 'UInt' + str(SignificandSize)
 
 if Self == 'Float':
@@ -146,11 +148,11 @@ extension ${Self}: BinaryFloatingPoint {
   public typealias RawSignificand = ${RawSignificand}
 
   public static var exponentBitCount: Int {
-    return ${{32:8, 64:11, 80:15}[bits]}
+    return ${ExponentBitCount}
   }
 
   public static var significandBitCount: Int {
-    return ${{32:23, 64:52, 80:63}[bits]}
+    return ${SignificandBitCount}
   }
 
   //  Implementation details.
@@ -752,6 +754,20 @@ extension ${Self} {
   public init(_ v: ${That}) {
     _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
   }
+  
+% if srcBits <= SignificandBitCount:
+@available(*, message: "Converting ${That} to ${Self} will always succeed.")
+% end
+  public init?(exactly value: ${That}) {
+    _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(value._value)
+
+% if srcBits > SignificandBitCount:
+    if ${ "abs" if srcSigned else "" }(value) > ${2**SignificandBitCount - 1} && ${That}(self) != value {
+      return nil
+    }
+% end
+  }
+  
 % end
 }
 

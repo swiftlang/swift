@@ -60,6 +60,14 @@ public struct CGFloat {
   @_transparent public init(_ value: ${src_ty.stdlib_name}) {
     self.native = NativeType(value)
   }
+  
+  @_transparent public init?(exactly value: ${src_ty.stdlib_name}) {
+    if let unwrapped = NativeType(exactly: value) {
+      self.native = unwrapped
+    } else {
+      return nil
+    }
+  }
 
 % end
 
