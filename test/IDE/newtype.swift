@@ -91,6 +91,52 @@
 // PRINT-NEXT:  }
 // PRINT-NEXT:  func FooAudited() -> CFNewType
 // PRINT-NEXT:  func FooUnaudited() -> Unmanaged<CFString>
+//
+// PRINT-NEXT:  struct MyABINewType : RawRepresentable, _SwiftNewtypeWrapper {
+// PRINT-NEXT:    init(_ rawValue: CFString)
+// PRINT-NEXT:    init(rawValue: CFString)
+// PRINT-NEXT:    let rawValue: CFString
+// PRINT-NEXT:  }
+// PRINT-NEXT:  typealias MyABIOldType = CFString
+// PRINT-NEXT:  extension MyABINewType {
+// PRINT-NEXT:    static let global: MyABINewType!
+// PRINT-NEXT:  }
+// PRINT-NEXT:  let kMyABIOldTypeGlobal: MyABIOldType!
+// PRINT-NEXT:  func getMyABINewType() -> MyABINewType!
+// PRINT-NEXT:  func getMyABIOldType() -> MyABIOldType!
+// PRINT-NEXT:  func takeMyABINewType(_: MyABINewType!)
+// PRINT-NEXT:  func takeMyABIOldType(_: MyABIOldType!)
+// PRINT-NEXT:  func takeMyABINewTypeNonNull(_: MyABINewType)
+// PRINT-NEXT:  func takeMyABIOldTypeNonNull(_: MyABIOldType)
+// PRINT-NEXT:  struct MyABINewTypeNS : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
+// PRINT-NEXT:    init(_ rawValue: String)
+// PRINT-NEXT:    init(rawValue: String)
+// PRINT-NEXT:    var _rawValue: NSString
+// PRINT-NEXT:    var rawValue: String { get }
+// PRINT-NEXT:  }
+// PRINT-NEXT:  typealias MyABIOldTypeNS = NSString
+// PRINT-NEXT:  func getMyABINewTypeNS() -> MyABINewTypeNS!
+// PRINT-NEXT:  func getMyABIOldTypeNS() -> String!
+// PRINT-NEXT:  func takeMyABINewTypeNonNullNS(_: MyABINewTypeNS)
+// PRINT-NEXT:  func takeMyABIOldTypeNonNullNS(_: String)
+//
+// PRINT-NEXT:  struct NSSomeContext {
+// PRINT-NEXT:    var i: Int32
+// PRINT-NEXT:    init()
+// PRINT-NEXT:    init(i: Int32)
+// PRINT-NEXT:  }
+// PRINT-NEXT:  extension NSSomeContext {
+// PRINT-NEXT:    struct Name : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
+// PRINT-NEXT:      init(_ rawValue: String)
+// PRINT-NEXT:      init(rawValue: String)
+// PRINT-NEXT:      var _rawValue: NSString
+// PRINT-NEXT:      var rawValue: String { get }
+// PRINT-NEXT:    }
+// PRINT-NEXT:  }
+// PRINT-NEXT:  extension NSSomeContext.Name {
+// PRINT-NEXT:    static let myContextName: NSSomeContext.Name
+// PRINT-NEXT:  }
+
 import Newtype
 
 func tests() {
@@ -128,4 +174,10 @@ func testConformances(ed: ErrorDomain) {
   acceptHashable(ed)
   acceptComparable(ed)
   acceptObjectiveCBridgeable(ed)
+}
+
+func testFixit() {
+	let _ = NSMyContextName
+	  // expected-error@-1{{'NSMyContextName' has been renamed to 'NSSomeContext.Name.myContextName'}}
+
 }

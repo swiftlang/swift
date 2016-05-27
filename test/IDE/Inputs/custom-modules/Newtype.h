@@ -94,3 +94,11 @@ extern MyABIOldTypeNS getMyABIOldTypeNS(void);
 extern void takeMyABINewTypeNonNullNS(__nonnull MyABINewTypeNS);
 extern void takeMyABIOldTypeNonNullNS(__nonnull MyABIOldTypeNS);
 
+// Nested types
+typedef struct {int i;} NSSomeContext;
+
+typedef NSString *NSSomeContextName __attribute((swift_newtype(struct)))
+__attribute((swift_name("NSSomeContext.Name")));
+
+extern const NSSomeContextName NSMyContextName;
+
