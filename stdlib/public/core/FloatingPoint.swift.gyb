@@ -606,6 +606,7 @@ extension ${Self} : Strideable {
   /// `other`.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="distance(to:)")
   @_transparent public
   func distanceTo(other: ${Self}) -> ${Self} {
     return other - self
@@ -615,6 +616,7 @@ extension ${Self} : Strideable {
   /// `n`.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="advanced(by:)")
   @_transparent public
   func advancedBy(amount: ${Self}) -> ${Self} {
     return self + amount

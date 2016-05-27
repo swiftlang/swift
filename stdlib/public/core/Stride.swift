@@ -25,6 +25,7 @@ public protocol Strideable : Comparable {
   ///
   /// - SeeAlso: `RandomAccessIndexType`'s `distanceTo`, which provides a
   ///   stronger semantic guarantee.
+  @swift3_migration(renamed="distance(to:)")
   @warn_unused_result
   func distanceTo(other: Self) -> Stride
 
@@ -35,6 +36,7 @@ public protocol Strideable : Comparable {
   ///
   /// - SeeAlso: `RandomAccessIndexType`'s `advancedBy`, which
   ///   provides a stronger semantic guarantee.
+  @swift3_migration(renamed="advanced(by:)")
   @warn_unused_result
   func advancedBy(n: Stride) -> Self
 }
