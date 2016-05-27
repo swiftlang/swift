@@ -613,3 +613,12 @@ extension Range {
     Builtin.unreachable()
   }
 }
+
+@available(*, unavailable, message: "IntervalType has been removed in Swift 3. Use ranges instead.")
+public typealias IntervalType = Void
+
+@available(*, unavailable, renamed: "Range")
+public struct HalfOpenInterval<Bound> {}
+
+@available(*, unavailable, renamed: "ClosedRange")
+public struct ClosedInterval<Bound> {}
