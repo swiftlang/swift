@@ -178,6 +178,5 @@ func testConformances(ed: ErrorDomain) {
 
 func testFixit() {
 	let _ = NSMyContextName
-	  // expected-error@-1{{'NSMyContextName' has been renamed to 'NSSomeContext.Name.myContextName'}}
-
+	  // expected-error@-1{{'NSMyContextName' has been renamed to 'NSSomeContext.Name.myContextName'}} {{10-25=NSSomeContext.Name.myContextName}}
 }
