@@ -180,7 +180,8 @@ function(_add_variant_swift_compile_flags
 
   list(APPEND result
       "-sdk" "${SWIFT_SDK_${sdk}_PATH}"
-      "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
+      "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}"
+      "-resource-dir" "${SWIFTLIB_DIR}")
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     list(APPEND result
