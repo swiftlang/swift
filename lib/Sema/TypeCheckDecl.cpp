@@ -4783,6 +4783,158 @@ public:
       type = fnType->withExtInfo(extInfo);
   }
 
+  /// Attempt to fix the type of \p decl so that it's a valid override for
+  /// \p base...but only if we're highly confident that we know what the user
+  /// should have written.
+  ///
+  /// \returns true iff any fix-its were attached to \p diag.
+  static bool fixOverrideDeclarationTypes(InFlightDiagnostic &diag,
+                                          TypeChecker &TC,
+                                          ValueDecl *decl,
+                                          const ValueDecl *base) {
+    // For now, just rewrite cases where the base uses a value type and the
+    // override uses a reference type, and the value type is bridged to the
+    // reference type. This is a way to migrate code that makes use of types
+    // that previously were not bridged to value types.
+    auto checkType = [&](Type overrideTy, Type baseTy,
+                         SourceRange typeRange) -> bool {
+      if (typeRange.isInvalid())
+        return false;
+
+      auto normalizeType = [](Type ty) -> Type {
+        ty = ty->getInOutObjectType();
+        if (Type unwrappedTy = ty->getAnyOptionalObjectType())
+          ty = unwrappedTy;
+        return ty;
+      };
+
+      // Is the base type bridged?
+      Type normalizedBaseTy = normalizeType(baseTy);
+      const DeclContext *DC = decl->getDeclContext();
+      Optional<Type> maybeBridged =
+          TC.Context.getBridgedToObjC(DC, normalizedBaseTy, &TC);
+
+      // ...and just knowing that it's bridged isn't good enough if we don't
+      // know what it's bridged /to/. Also, don't do this check for trivial
+      // bridging---that doesn't count.
+      Type bridged = maybeBridged.getValueOr(Type());
+      if (!bridged || bridged->isEqual(normalizedBaseTy))
+        return false;
+
+      // ...and is it bridged to the overridden type?
+      Type normalizedOverrideTy = normalizeType(overrideTy);
+      if (!bridged->isEqual(normalizedOverrideTy)) {
+        // If both are nominal types, check again, ignoring generic arguments.
+        auto *overrideNominal = normalizedOverrideTy->getAnyNominal();
+        if (!overrideNominal || bridged->getAnyNominal() != overrideNominal) {
+          return false;
+        }
+      }
+
+      Type newOverrideTy = baseTy;
+
+      // Preserve optionality if we're dealing with a simple type.
+      OptionalTypeKind OTK;
+      if (Type unwrappedTy = newOverrideTy->getAnyOptionalObjectType())
+        newOverrideTy = unwrappedTy;
+      if (overrideTy->getAnyOptionalObjectType(OTK))
+        newOverrideTy = OptionalType::get(OTK, newOverrideTy);
+
+      SmallString<32> baseTypeBuf;
+      llvm::raw_svector_ostream baseTypeStr(baseTypeBuf);
+      PrintOptions options;
+      options.SynthesizeSugarOnTypes = true;
+
+      newOverrideTy->print(baseTypeStr, options);
+      diag.fixItReplace(typeRange, baseTypeStr.str());
+      return true;
+    };
+
+    if (auto *var = dyn_cast<VarDecl>(decl)) {
+      SourceRange typeRange = var->getTypeSourceRangeForDiagnostics();
+      return checkType(var->getType(), base->getType(), typeRange);
+    }
+
+    if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
+      auto *baseFn = cast<AbstractFunctionDecl>(base);
+      bool fixedAny = false;
+      if (fn->getParameterLists().back()->size() ==
+          baseFn->getParameterLists().back()->size()) {
+        for_each(*fn->getParameterLists().back(),
+                 *baseFn->getParameterLists().back(),
+                 [&](ParamDecl *param, const ParamDecl *baseParam) {
+          fixedAny |= fixOverrideDeclarationTypes(diag, TC, param, baseParam);
+        });
+      }
+      if (auto *method = dyn_cast<FuncDecl>(decl)) {
+        auto *baseMethod = cast<FuncDecl>(base);
+        fixedAny |= checkType(method->getBodyResultType(),
+                              baseMethod->getBodyResultType(),
+                              method->getBodyResultTypeLoc().getSourceRange());
+      }
+      return fixedAny;
+    }
+
+    if (auto *subscript = dyn_cast<SubscriptDecl>(decl)) {
+      auto *baseSubscript = cast<SubscriptDecl>(base);
+      bool fixedAny = false;
+      for_each(*subscript->getIndices(),
+               *baseSubscript->getIndices(),
+               [&](ParamDecl *param, const ParamDecl *baseParam) {
+        fixedAny |= fixOverrideDeclarationTypes(diag, TC, param, baseParam);
+      });
+      fixedAny |= checkType(subscript->getElementType(),
+                            baseSubscript->getElementType(),
+                            subscript->getElementTypeLoc().getSourceRange());
+      return fixedAny;
+    }
+
+    llvm_unreachable("unknown overridable member");
+  }
+
+  /// If the difference between the types of \p decl and \p base is something
+  /// we feel confident about fixing (even partially), emit a note with fix-its
+  /// attached. Otherwise, no note will be emitted.
+  ///
+  /// \returns true iff a diagnostic was emitted.
+  static bool noteFixableMismatchedTypes(TypeChecker &TC, ValueDecl *decl,
+                                         const ValueDecl *base) {
+    DiagnosticTransaction tentativeDiags(TC.Diags);
+
+    {
+      Type baseTy = base->getType();
+      if (baseTy->is<ErrorType>())
+        return false;
+
+      Optional<InFlightDiagnostic> activeDiag;
+      if (auto *baseInit = dyn_cast<ConstructorDecl>(base)) {
+        // Special-case initializers, whose "type" isn't useful besides the
+        // input arguments.
+        baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
+        Type argTy = baseTy->getAs<AnyFunctionType>()->getInput();
+        auto diagKind = diag::override_type_mismatch_with_fixits_init;
+        unsigned numArgs = baseInit->getParameters()->size();
+        activeDiag.emplace(TC.diagnose(decl, diagKind,
+                                       /*plural*/std::min(numArgs, 2U),
+                                       argTy));
+      } else {
+        if (isa<AbstractFunctionDecl>(base))
+          baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
+
+        activeDiag.emplace(TC.diagnose(decl,
+                                       diag::override_type_mismatch_with_fixits,
+                                       base->getDescriptiveKind(), baseTy));
+      }
+
+      if (fixOverrideDeclarationTypes(*activeDiag, TC, decl, base))
+        return true;
+    }
+
+    // There weren't any fixes we knew how to make. Drop this diagnostic.
+    tentativeDiags.abort();
+    return false;
+  }
+
   enum class OverrideCheckingAttempt {
     PerfectMatch,
     MismatchedOptional,
@@ -5156,9 +5308,21 @@ public:
         // Nothing to do.
         
       } else if (method) {
-        // Private migration help for overrides of Objective-C methods.
-        if ((!isa<FuncDecl>(method) || !cast<FuncDecl>(method)->isAccessor()) &&
-            (matchDecl->isObjC() || mayHaveMismatchedOptionals)) {
+        if (attempt == OverrideCheckingAttempt::MismatchedTypes) {
+          auto diagKind = diag::method_does_not_override;
+          if (ctor)
+            diagKind = diag::initializer_does_not_override;
+          TC.diagnose(decl, diagKind);
+          noteFixableMismatchedTypes(TC, decl, matchDecl);
+          TC.diagnose(matchDecl, diag::overridden_near_match_here,
+                      matchDecl->getDescriptiveKind(),
+                      matchDecl->getFullName());
+          emittedMatchError = true;
+
+        } else if ((!isa<FuncDecl>(method) ||
+                    !cast<FuncDecl>(method)->isAccessor()) &&
+                   (matchDecl->isObjC() || mayHaveMismatchedOptionals)) {
+          // Private migration help for overrides of Objective-C methods.
           TypeLoc resultTL;
           if (auto *methodAsFunc = dyn_cast<FuncDecl>(method))
             resultTL = methodAsFunc->getBodyResultTypeLoc();
@@ -5180,7 +5344,15 @@ public:
           return true;
         }
 
-        if (mayHaveMismatchedOptionals) {
+        if (attempt == OverrideCheckingAttempt::MismatchedTypes) {
+          TC.diagnose(decl, diag::subscript_does_not_override);
+          noteFixableMismatchedTypes(TC, decl, matchDecl);
+          TC.diagnose(matchDecl, diag::overridden_near_match_here,
+                      matchDecl->getDescriptiveKind(),
+                      matchDecl->getFullName());
+          emittedMatchError = true;
+
+        } else if (mayHaveMismatchedOptionals) {
           emittedMatchError |=
               diagnoseMismatchedOptionals(TC, subscript,
                                           subscript->getIndices(),
@@ -5198,6 +5370,7 @@ public:
                                      &TC)) {
           TC.diagnose(property, diag::override_property_type_mismatch,
                       property->getName(), propertyTy, parentPropertyTy);
+          noteFixableMismatchedTypes(TC, decl, matchDecl);
           TC.diagnose(matchDecl, diag::property_override_here);
           return true;
         }

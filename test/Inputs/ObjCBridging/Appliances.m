@@ -22,5 +22,7 @@
   }
   return self;
 }
+@end
 
+@implementation APPManufacturerInfo
 @end

@@ -4193,7 +4193,8 @@ public:
     return VarDeclBits.IsUserAccessible;
   }
 
-  /// \brief Retrieve the source range of the variable type.
+  /// Retrieve the source range of the variable type, or an invalid range if the
+  /// variable's type is not explicitly written in the source.
   ///
   /// Only for use in diagnostics.  It is not always possible to always
   /// precisely point to the variable type because of type aliases.

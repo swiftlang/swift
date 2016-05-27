@@ -3988,9 +3988,9 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
 
   // Find the type we bridge to.
   return ProtocolConformance::getTypeWitnessByName(type,
-                                               conformance->getConcrete(),
-                                               getIdentifier("_ObjectiveCType"),
-                                               resolver);
+                                                   conformance->getConcrete(),
+                                                   Id_ObjectiveCType,
+                                                   resolver);
 }
 
 std::pair<ArchetypeBuilder *, ArchetypeBuilder::PotentialArchetype *>
