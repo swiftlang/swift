@@ -41,8 +41,8 @@ namespace {
     bool mayAppear = false;
       
     // This is true if a '{{none}}' is present to mark that there should be no
-    // fixits at all.
-    bool noFixitsMayAppear = false;
+    // extra fixits.
+    bool noExtraFixitsMayAppear = false;
 
     // This is the raw input buffer for the message text, the part in the
     // {{...}}
@@ -364,7 +364,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       
       // Special case for specifying no fixits should appear.
       if (FixItStr == "none") {
-        Expected.noFixitsMayAppear = true;
+        Expected.noExtraFixitsMayAppear = true;
         continue;
       }
         
@@ -459,6 +459,9 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       if (!checkForFixIt(fixit, FoundDiagnostic, InputFile))
         IncorrectFixit = fixit.StartLoc;
     }
+
+    bool matchedAllFixIts =
+      expected.Fixits.size() == FoundDiagnostic.getFixIts().size();
     
     // If we have any expected fixits that didn't get matched, then they are
     // wrong.  Replace the failed fixit with what actually happened.
@@ -476,8 +479,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
         addError(IncorrectFixit,
                  "expected fix-it not seen; actual fix-its: " + actual, fix);
       }
-    } else if (expected.noFixitsMayAppear &&
-               !FoundDiagnostic.getFixIts().empty() &&
+    } else if (expected.noExtraFixitsMayAppear &&
+               !matchedAllFixIts &&
                !expected.mayAppear) {
       // If there was no fixit specification, but some were produced, add a
       // fixit to add them in.

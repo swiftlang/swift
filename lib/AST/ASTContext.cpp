@@ -2478,8 +2478,9 @@ bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
       fixDeclarationName(diag, conflicts[0], req->getFullName());
 
       // Fix the '@objc' attribute, if needed.
-      fixDeclarationObjCName(diag, conflicts[0], req->getObjCRuntimeName(),
-                             /*ignoreImpliedName=*/true);
+      if (!conflicts[0]->canInferObjCFromRequirement(req))
+        fixDeclarationObjCName(diag, conflicts[0], req->getObjCRuntimeName(),
+                               /*ignoreImpliedName=*/true);
     }
 
     // @nonobjc will silence this warning.
