@@ -42,6 +42,12 @@ func testMask1(a: Int) {
 func testMask2(a: UInt64) {
   sendIt(MyEventMask2(rawValue: a))
 }
+func testMask3(a: MyEventMask2) {
+  testMask1(a: UInt64(a.rawValue))
+}
+func testMask4(a: MyEventMask2) {
+  testMask2(a: a.rawValue)
+}
 
 func goo(e : ErrorProtocol) {
     var e = e
