@@ -20,6 +20,7 @@
 #include "ImportEnumInfo.h"
 #include "SwiftLookupTable.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
@@ -65,7 +66,6 @@ class TypedefNameDecl;
 namespace swift {
 
 class ASTContext;
-class ClangModuleUnit;
 class ClassDecl;
 class ConstructorDecl;
 class Decl;
