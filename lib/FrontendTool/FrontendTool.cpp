@@ -563,6 +563,11 @@ private:
       Info.ID == diag::missing_argument_labels.ID ||
       Info.ID == diag::override_argument_name_mismatch.ID)
       return false;
+    // This also interacts badly with the swift migrator, it unnecessary adds
+    // @objc(selector) attributes triggered by the mismatched label changes.
+    if (Info.ID == diag::objc_witness_selector_mismatch.ID ||
+        Info.ID == diag::witness_non_objc.ID)
+      return false;
 
     if (Kind == DiagnosticKind::Error)
       return true;
