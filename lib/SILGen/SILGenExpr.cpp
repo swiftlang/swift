@@ -2304,9 +2304,11 @@ static bool isNullableTypeInC(SILModule &M, Type ty) {
     return true;
 
   // Other types like UnsafePointer can also be nullable.
+  const DeclContext *DC = M.getAssociatedContext();
+  if (!DC)
+    DC = M.getSwiftModule();
   ty = OptionalType::get(ty);
-  return ty->isTriviallyRepresentableIn(ForeignLanguage::C,
-                                        M.getAssociatedContext());
+  return ty->isTriviallyRepresentableIn(ForeignLanguage::C, DC);
 }
 
 /// Determine whether the given declaration returns a non-optional object that
