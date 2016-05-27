@@ -542,7 +542,7 @@ extension ${Self} {
 // Construction of integers from floating point numbers.
 %   for srcBits in allFloatBits:
 %     Src = floatName[srcBits]
-%     (lower, upper) = getFtoIBounds(srcBits, int(bits), signed)
+%     (lower, upper) = getFtoIBounds(floatBits=srcBits, intBits=int(bits), signed=signed)
 
 %     if srcBits == 80:
 #if !os(Windows) && (arch(i386) || arch(x86_64))
@@ -560,6 +560,14 @@ extension ${Self} {
     self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(value._value)
   }
 
+  /// Creates a ${Self} whose value is `value`
+  /// if no rounding is necessary, nil otherwise.
+  @inline(__always)
+  public init?(exactly value: ${Src}) {
+    self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(value._value)
+    if ${Src}(self) != value {
+      return nil
+    }
   }
 %     if srcBits == 80:
 #endif
