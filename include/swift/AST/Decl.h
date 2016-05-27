@@ -2415,7 +2415,7 @@ public:
     ValidatingGenericSignature = ivgs;
   }
   
-  bool IsValidatingGenericSignature() {
+  bool isValidatingGenericSignature() const {
     return ValidatingGenericSignature;
   }
   

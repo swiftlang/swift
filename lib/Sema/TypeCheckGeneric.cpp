@@ -772,7 +772,7 @@ GenericSignature *TypeChecker::validateGenericSignature(
 
 bool TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   bool invalid = false;
-  if (!typeDecl->IsValidatingGenericSignature()) {
+  if (!typeDecl->isValidatingGenericSignature()) {
     typeDecl->setIsValidatingGenericSignature();
     auto sig = validateGenericSignature(typeDecl->getGenericParams(),
                                         typeDecl->getDeclContext(),
