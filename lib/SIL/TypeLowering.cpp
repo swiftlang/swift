@@ -1773,33 +1773,41 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
   CanGenericSignature genericSig = getEffectiveGenericSignature(theClosure,
                                                                 captureInfo);
 
+  auto innerExtInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
+                                               funcType->isNoReturn(),
+                                               funcType->throws());
+
   // If we don't have any local captures (including function captures),
   // there's no context to apply.
   if (!theClosure.getCaptureInfo().hasLocalCaptures()) {
     if (!genericSig)
-      return adjustFunctionType(funcType,
-                                FunctionType::Representation::Thin);
+      return CanFunctionType::get(funcType.getInput(),
+                                  funcType.getResult(),
+                                  innerExtInfo);
     
-    auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                            funcType->isNoReturn(),
-                                            funcType->throws());
-
     return CanGenericFunctionType::get(genericSig,
                                        funcType.getInput(),
                                        funcType.getResult(),
-                                       extInfo);
+                                       innerExtInfo);
   }
+
+  // Strip the generic signature off the inner type; we will add it to the
+  // outer type with captures.
+  funcType = CanFunctionType::get(funcType.getInput(),
+                                  funcType.getResult(),
+                                  innerExtInfo);
 
   // Add an extra empty tuple level to represent the captures. We'll append the
   // lowered capture types here.
   auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
                                           /*noreturn*/ false,
-                                          funcType->throws());
+                                          /*throws*/ false);
 
-  if (genericSig)
+  if (genericSig) {
     return CanGenericFunctionType::get(genericSig,
                                        Context.TheEmptyTupleType, funcType,
                                        extInfo);
+  }
   
   return CanFunctionType::get(Context.TheEmptyTupleType, funcType, extInfo);
 }
