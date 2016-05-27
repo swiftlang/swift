@@ -3653,6 +3653,7 @@ void ConformanceChecker::checkConformance() {
 
       // Objective-C checking for @objc requirements.
       if (requirement->isObjC() &&
+          requirement->getFullName() == witness->getFullName() &&
           !requirement->getAttrs().isUnavailable(TC.Context)) {
         // The witness must also be @objc.
         if (!witness->isObjC()) {
