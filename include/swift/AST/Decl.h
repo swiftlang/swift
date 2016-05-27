@@ -2144,6 +2144,10 @@ public:
   /// first slot.
   Optional<ObjCSelector> getObjCRuntimeName() const;
 
+  /// Determine whether the given declaration can infer @objc, or the
+  /// Objective-C name, if used to satisfy the given requirement.
+  bool canInferObjCFromRequirement(ValueDecl *requirement);
+
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
