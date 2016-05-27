@@ -16,6 +16,7 @@ syn keyword swiftKeyword
       \ associatedtype
       \ break
       \ case
+      \ catch
       \ continue
       \ convenience
       \ default
@@ -41,6 +42,7 @@ syn keyword swiftKeyword
       \ return
       \ static
       \ switch
+      \ try
       \ typealias
       \ var
       \ where
