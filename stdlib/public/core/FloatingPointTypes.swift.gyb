@@ -31,8 +31,7 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
 
-# Mapping from float bits to significand bits
-explicitSignificandBits = { 32:24, 64:53, 80:64 }
+cFunctionSuffix = { 32:'f', 64:'', 80:'l' } 
 
 def allInts():
     for bits in allIntBits:
@@ -919,45 +918,3 @@ public postfix func --(lhs: inout ${Self}) -> ${Self} {
 #endif
 % end
 % end # for bits in allFloatBits
-
-// Construction of integers from floating point numbers.
-%{
-def getFtoIBounds(floatBits, intBits, signed):
-  if not signed:
-    return (-1, 1 << intBits)
-  upper = 1 << intBits - 1
-  if intBits <= explicitSignificandBits[floatBits]:
-    return (-upper - 1, upper)
-  ulp = 1 << intBits - explicitSignificandBits[floatBits]
-  return (-upper - ulp, upper)
-}%
-% for (bits, signed) in allInts():
-%   sign = 's' if signed else 'u'
-%   Self = intName(bits, signed)
-%   BuiltinName = builtinIntName(bits)
-%   intBits = intFormatFix(bits)
-@_transparent
-extension ${Self} {
-%   for srcBits in allFloatBits:
-%     That = floatName[srcBits]
-
-%     if srcBits == 80:
-#if !os(Windows) && (arch(i386) || arch(x86_64))
-%     end
-  /// Creates a ${Self} whose value is `other` rounded towards zero.
-  public init(_ other: ${That}) {
-    _precondition(other.isFinite,
-      "${That} value cannot be converted to ${Self} because it is either infinite or NaN")
-%     (lower, upper) = getFtoIBounds(srcBits, int(intBits), signed)
-    _precondition(other > ${str(lower)}.0,
-      "${That} value cannot be converted to ${Self} because the result would be less than ${Self}.min")
-    _precondition(other < ${str(upper)}.0,
-      "${That} value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
-    self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(other._value)
-  }
-%     if srcBits == 80:
-#endif
-%     end
-%   end
-}
-% end # for (bits, signed) in allInts()

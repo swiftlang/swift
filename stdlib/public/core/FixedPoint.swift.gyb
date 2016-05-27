@@ -33,6 +33,21 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
 
+# Mapping from float bits to significand bits
+allFloatBits = [32, 64, 80]
+floatName = { 32:'Float', 64:'Double', 80:'Float80' }
+explicitFloatSignificandBits = { 32:24, 64:53, 80:64 }
+
+
+def getFtoIBounds(floatBits, intBits, signed):
+  if not signed:
+    return (-1, 1 << intBits)
+  upper = 1 << intBits - 1
+  if intBits <= explicitFloatSignificandBits[floatBits]:
+    return (-upper - 1, upper)
+  ulp = 1 << intBits - explicitFloatSignificandBits[floatBits]
+  return (-upper - ulp, upper)
+
 def maskBits(n):
     """Return an n-bit mask in hex"""
     return hexify((1 << n) - 1)
@@ -489,6 +504,33 @@ extension ${Self} {
 
 %    end
 % end
+
+// Construction of integers from floating point numbers.
+%   for srcBits in allFloatBits:
+%     Src = floatName[srcBits]
+%     (lower, upper) = getFtoIBounds(srcBits, int(bits), signed)
+
+%     if srcBits == 80:
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+%     end
+
+  /// Creates a ${Self} whose value is `value` rounded towards zero.
+  @_transparent
+  public init(_ value: ${Src}) {
+    _precondition(value.isFinite,
+      "${Src} value cannot be converted to ${Self} because it is either infinite or NaN")
+    _precondition(value > ${str(lower)}.0,
+      "${Src} value cannot be converted to ${Self} because the result would be less than ${Self}.min")
+    _precondition(value < ${str(upper)}.0,
+      "${Src} value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
+    self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(value._value)
+  }
+
+  }
+%     if srcBits == 80:
+#endif
+%     end
+%   end
 
   /// Construct a `${Self}` having the same memory representation as
   /// the `${OtherSelf}` `bitPattern`.  No range or overflow checking
