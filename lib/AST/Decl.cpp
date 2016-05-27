@@ -3369,13 +3369,14 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   
   Pattern *Pat = getParentPattern();
   if (!Pat || Pat->isImplicit())
-    return getSourceRange();
+    return SourceRange();
 
   if (auto *VP = dyn_cast<VarPattern>(Pat))
     Pat = VP->getSubPattern();
   if (auto *TP = dyn_cast<TypedPattern>(Pat))
     return TP->getTypeLoc().getTypeRepr()->getSourceRange();
-  return getSourceRange();
+
+  return SourceRange();
 }
 
 static bool isVarInPattern(const VarDecl *VD, Pattern *P) {

@@ -76,7 +76,6 @@
       key.name: "myArray",
       key.offset: 225,
       key.length: 36,
-      key.typename: "myArray",
       key.nameoffset: 229,
       key.namelength: 7
     },

@@ -1422,7 +1422,7 @@ namespace {
 
       // Add substitution for the dependent type T._ObjectiveCType.
       if (conformsToBridgedToObjectiveC) {
-        auto objcTypeId = tc.Context.getIdentifier("_ObjectiveCType");
+        auto objcTypeId = tc.Context.Id_ObjectiveCType;
         auto objcAssocType = cast<AssociatedTypeDecl>(
                                conformance->getProtocol()->lookupDirect(
                                  objcTypeId).front());
