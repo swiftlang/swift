@@ -37,6 +37,21 @@ public func genericPropertyOnAnyObject(o: AnyObject, b: Bool) -> AnyObject?? {
   return o.propertyThing
 }
 
+protocol ThingHolder {
+  associatedtype Thing
+
+  init!(thing: Thing!)
+  func thing() -> Thing?
+  func arrayOfThings() -> [Thing]
+  func setArrayOfThings(_: [Thing])
+  static func classThing() -> Thing?
+
+  var propertyThing: Thing? { get set }
+  var propertyArrayOfThings: [Thing]? { get set }
+}
+
+extension GenericClass: ThingHolder {}
+
 // CHECK-LABEL: sil @_TF21objc_imported_generic26genericPropertyOnAnyObject
 // CHECK:         dynamic_method_br %4 : $@opened([[TAG:.*]]) AnyObject, #GenericClass.propertyThing!getter.1.foreign, bb1
 // CHECK:       bb1({{%.*}} : $@convention(objc_method) (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):

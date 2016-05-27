@@ -3631,16 +3631,16 @@ namespace {
       // Add the implicit 'self' parameter patterns.
       SmallVector<ParameterList *, 4> bodyParams;
       auto selfVar =
-        ParamDecl::createUnboundSelf(SourceLoc(), dc, /*isStatic*/!isInstance);
+        ParamDecl::createSelf(SourceLoc(), dc, /*isStatic*/!isInstance);
       bodyParams.push_back(ParameterList::createWithoutLoc(selfVar));
-      Type selfInterfaceType;
+      Type selfContextType;
       if (dc->getAsProtocolOrProtocolExtensionContext()) {
-        selfInterfaceType = dc->getProtocolSelf()->getArchetype();
+        selfContextType = dc->getProtocolSelf()->getArchetype();
       } else {
-        selfInterfaceType = dc->getDeclaredInterfaceType();
+        selfContextType = dc->getDeclaredTypeInContext();
       }
       if (!isInstance) {
-        selfInterfaceType = MetatypeType::get(selfInterfaceType);
+        selfContextType = MetatypeType::get(selfContextType);
       }
 
       SpecialMethodKind kind = SpecialMethodKind::Regular;
@@ -3725,7 +3725,7 @@ namespace {
       }
 
       // Add the 'self' parameter to the function type.
-      type = FunctionType::get(selfInterfaceType, type);
+      type = FunctionType::get(selfContextType, type);
 
       if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
         std::tie(type, interfaceType)
