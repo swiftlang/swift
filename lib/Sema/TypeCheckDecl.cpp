@@ -2269,18 +2269,42 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
   // When no override determined the Objective-C name, look for
   // requirements for which this declaration is a witness.
   Optional<ObjCSelector> requirementObjCName;
+  ValueDecl *firstReq = nullptr;
   for (auto req : tc.findWitnessedObjCRequirements(decl,
                                                    /*onlyFirst=*/false)) {
     // If this is the first requirement, take its name.
     if (!requirementObjCName) {
       requirementObjCName = req->getObjCRuntimeName();
+      firstReq = req;
       continue;
     }
 
     // If this requirement has a different name from one we've seen,
-    // bail out and let protocol-conformance diagnostics handle this.
-    if (*requirementObjCName != *req->getObjCRuntimeName())
-      return;
+    // note the ambiguity.
+    if (*requirementObjCName != *req->getObjCRuntimeName()) {
+      tc.diagnose(decl, diag::objc_ambiguous_inference,
+                  decl->getDescriptiveKind(), decl->getFullName(),
+                  *requirementObjCName, *req->getObjCRuntimeName());
+      
+      // Note the candidates and what Objective-C names they provide.
+      auto diagnoseCandidate = [&](ValueDecl *req) {
+        auto proto = cast<ProtocolDecl>(req->getDeclContext());
+        auto diag = tc.diagnose(decl,
+                                diag::objc_ambiguous_inference_candidate,
+                                req->getFullName(),
+                                proto->getFullName(),
+                                *req->getObjCRuntimeName());
+        fixDeclarationObjCName(diag, decl, req->getObjCRuntimeName());
+      };
+      diagnoseCandidate(firstReq);
+      diagnoseCandidate(req);
+
+      // Suggest '@nonobjc' to suppress this error, and not try to
+      // infer @objc for anything.
+      tc.diagnose(decl, diag::optional_req_near_match_nonobjc, true)
+        .fixItInsert(decl->getAttributeInsertionLoc(false), "@nonobjc ");
+      break;
+    }
   }
 
   // If we have a name, install it via an @objc attribute.

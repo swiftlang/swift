@@ -2701,6 +2701,13 @@ ERROR(objc_override_property_name_mismatch,none,
       "Objective-C property has a different name from the "
       "property it overrides (%0 vs. %1)", (Identifier, Identifier))
 
+ERROR(objc_ambiguous_inference,none,
+      "ambiguous inference of Objective-C name for %0 %1 (%2 vs %3)",
+      (DescriptiveDeclKind, DeclName, ObjCSelector, ObjCSelector))
+NOTE(objc_ambiguous_inference_candidate,none,
+     "%0 (in protocol %1) provides Objective-C name %2",
+     (DeclName, DeclName, ObjCSelector))
+
 ERROR(nonlocal_bridged_to_objc,none,
       "conformance of %0 to %1 can only be written in module %2",
       (Identifier, Identifier, Identifier))
