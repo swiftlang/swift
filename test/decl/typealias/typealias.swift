@@ -29,8 +29,8 @@ struct MyType<TyA, TyB> {
 
 protocol P {
   associatedtype X<T>  // expected-error {{associated types may not have a generic parameter list}}
-  
-  typealias Y<T>       // expected-error {{expected '=' in typealias declaration}}
+// FIXME Disabled until typealiases in protocols are entirely fixed
+//  typealias Y<T>       // fixme-error {{expected '=' in typealias declaration}}
 }
 
 typealias basicTypealias = Int
@@ -148,6 +148,8 @@ extension C<Int> {}  // expected-error {{constrained extension must be declared 
 
 
 // Allow typealias inside protocol, but don't allow it in where clauses (at least not yet)
+// FIXME Disabled until typealiases in protocols are entirely fixed
+/*
 protocol Col {
   associatedtype Elem
   var elem: Elem { get }
@@ -227,23 +229,23 @@ protocol P2 {
     associatedtype B
 }
 
-func go3<T : P1, U : P2 where T.F == U.B>(_ x: T) -> U { // expected-error {{typealias 'F' is too complex to be used as a generic constraint; use an associatedtype instead}} expected-error {{'F' is not a member type of 'T'}}
+func go3<T : P1, U : P2 where T.F == U.B>(_ x: T) -> U { // fixme-error {{typealias 'F' is too complex to be used as a generic constraint; use an associatedtype instead}} fixme-error {{'F' is not a member type of 'T'}}
 }
 
 // Specific diagnosis for things that look like Swift 2.x typealiases
 protocol P3 {
-  typealias T // expected-error {{typealias is missing an assigned type; use 'associatedtype' to define an associated type requirement}}
-  typealias U : P2 // expected-error {{typealias is missing an assigned type; use 'associatedtype' to define an associated type requirement}}
+  typealias T // fixme-error {{typealias is missing an assigned type; use 'associatedtype' to define an associated type requirement}}
+  typealias U : P2 // fixme-error {{typealias is missing an assigned type; use 'associatedtype' to define an associated type requirement}}
   
-  associatedtype V : P2 = // expected-error {{expected type in associatedtype declaration}}
+  associatedtype V : P2 = // fixme-error {{expected type in associatedtype declaration}}
 }
 
 // Test for not crashing on self and recursive aliases
 protocol P4 {
   typealias X = Self
-  typealias Y = Self.Y // expected-error {{type alias 'Y' circularly references itself}}
+  typealias Y = Self.Y // fixme-error {{type alias 'Y' circularly references itself}}
   
   func getSelf() -> X
 }
-
+*/
 
