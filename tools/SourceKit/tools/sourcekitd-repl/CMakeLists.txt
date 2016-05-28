@@ -1,6 +1,12 @@
+if(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
+  set(SOURCEKITD_REPL_DEPEND sourcekitdInProc)
+else()
+  set(SOURCEKITD_REPL_DEPEND sourcekitd)
+endif()
+
 add_sourcekit_executable(sourcekitd-repl
   sourcekitd-repl.cpp
-  DEPENDS sourcekitd edit
+  DEPENDS ${SOURCEKITD_REPL_DEPEND} edit
   COMPONENT_DEPENDS support
 )
 
