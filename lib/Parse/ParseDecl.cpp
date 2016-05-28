@@ -2175,11 +2175,7 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
       break;
     }
     case tok::kw_typealias:
-      if (Flags.contains(PD_InProtocol)) {
-        DeclResult = parseDeclAssociatedType(Flags, Attributes);
-      } else {
-        DeclResult = parseDeclTypeAlias(Flags, Attributes);
-      }
+      DeclResult = parseDeclTypeAlias(Flags, Attributes);
       Status = DeclResult;
       break;
     case tok::kw_associatedtype:
@@ -3025,7 +3021,7 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   // ask us to fix up leftover Swift 2 code intending to be an associatedtype.
   if (Tok.is(tok::kw_typealias)) {
     AssociatedTypeLoc = consumeToken(tok::kw_typealias);
-    diagnose(AssociatedTypeLoc, diag::typealias_in_protocol_deprecated)
+    diagnose(AssociatedTypeLoc, diag::typealias_inside_protocol_without_type)
         .fixItReplace(AssociatedTypeLoc, "associatedtype");
   } else {
     AssociatedTypeLoc = consumeToken(tok::kw_associatedtype);
