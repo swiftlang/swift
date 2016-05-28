@@ -13,8 +13,8 @@
 import SwiftShims
 
 internal class _Box<T> {
-  var value = [String]()
-  init(_ value : [String]) { self.value = value }
+  var value = [T]()
+  init(_ value : T) { self.value = [value] }
 }
 
 /// Command-line arguments for the current process.
@@ -32,11 +32,56 @@ public enum Process {
     return result 
   }
 
+  /// Return an array of strings containing the list of environment variables
+  /// with which the current process was invoked.
+  internal static func _computeEnvironment() -> [String:String] {
+    var result: [String:String] = [:]
+    let envp = unsafeEnvp
+    var i = 0
+    while true {
+      if let envVar = envp[i] {
+        var key = [Int8]()
+        var value = [Int8]()
+        var processingValue = false
+        var j = 0
+        while true {
+          let char = envVar[j]
+          if !processingValue {
+            if char == 0x3d {
+              processingValue = true
+            } else {
+              key.append(char)
+            }
+          } else {
+            value.append(char)
+          }
+          if char == 0 {
+            break
+          }
+          j += 1
+        }
+        key.append(0)
+        let convertedKey = String(cString: key)
+        let convertedValue = String(cString: value)
+        result[convertedKey] = convertedValue
+      } else {
+        break
+      }
+      i += 1
+    }
+    return result 
+  }
+
   @_versioned
   internal static var _argc: CInt = CInt()
 
   @_versioned
   internal static var _unsafeArgv:
+    UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>?
+    = nil
+
+  @_versioned
+  internal static var _unsafeEnvp:
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>?
     = nil
 
@@ -52,6 +97,13 @@ public enum Process {
     return _unsafeArgv!
   }
 
+  /// Access to the raw envp value from C. Accessing the environment vector
+  /// through this pointer is unsafe.
+  public static var unsafeEnvp:
+    UnsafeMutablePointer<UnsafeMutablePointer<Int8>?> {
+    return _unsafeEnvp!
+  }
+
   /// Access to the swift arguments, also use lazy initialization of static
   /// properties to safely initialize the swift arguments.
   ///
@@ -64,13 +116,28 @@ public enum Process {
 
     // Check whether argument has been initialized.
     if let arguments = _stdlib_atomicLoadARCRef(object: argumentsPtr) {
-      return (arguments as! _Box<[String]>).value
+      return (arguments as! _Box<[String]>).value[0]
     }
 
     let arguments = _Box<[String]>(_computeArguments())
     _stdlib_atomicInitializeARCRef(object: argumentsPtr, desired: arguments)
 
-    return arguments.value
+    return arguments.value[0]
+  } 
+
+  public static var environment: [String:String] {
+    let environmentPtr = UnsafeMutablePointer<AnyObject?>(
+      Builtin.addressof(&_swift_stdlib_ProcessEnvironment))
+
+    // Check whether argument has been initialized.
+    if let environment = _stdlib_atomicLoadARCRef(object: environmentPtr) {
+      return (environment as! _Box<[String:String]>).value[0]
+    }
+
+    let environment = _Box<[String:String]>(_computeEnvironment())
+    _stdlib_atomicInitializeARCRef(object: environmentPtr, desired: environment)
+
+    return environment.value[0]
   } 
 }
 
@@ -78,10 +145,13 @@ public enum Process {
 @_transparent
 public // COMPILER_INTRINSIC
 func _stdlib_didEnterMain(
-  argc: Int32, argv: UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
+  argc: Int32,
+  argv: UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>,
+  envp: UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
 ) {
   // Initialize the Process.argc and Process.unsafeArgv variables with the
   // values that were passed in to main.
   Process._argc = CInt(argc)
   Process._unsafeArgv = argv
+  Process._unsafeEnvp = envp
 }
