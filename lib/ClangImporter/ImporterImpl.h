@@ -912,9 +912,6 @@ public:
       }
     }
 
-    /// Print this imported name as a string suitable for the swift_name
-    /// attribute.
-    void printSwiftName(llvm::raw_ostream &os) const;
   };
 
   /// Flags that control the import of names in importFullName.
@@ -942,6 +939,9 @@ public:
   Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
                              const clang::MacroInfo *macro,
                              clang::ASTContext &clangCtx);
+
+  /// Print an imported name as a string suitable for the swift_name attribute.
+  void printSwiftName(ImportedName, llvm::raw_ostream &os);
 
   /// Retrieve the property type as determined by the given accessor.
   static clang::QualType
