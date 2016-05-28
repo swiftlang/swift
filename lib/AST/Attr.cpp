@@ -446,27 +446,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
     break;
   }
 
-  case DAK_WarnUnusedResult: {
-    Printer.printAttrName("@warn_unused_result");
-    auto *attr = cast<WarnUnusedResultAttr>(this);
-    bool printedParens = false;
-    if (!attr->getMessage().empty()) {
-      Printer << "(message: \"" << attr->getMessage() << "\"";
-      printedParens = true;
-    }
-    if (!attr->getMutableVariant().empty()) {
-      if (printedParens)
-        Printer << ", ";
-      else
-        Printer << "(";
-      Printer << "mutable_variant: \"" << attr->getMutableVariant() << "\"";
-      printedParens = true;
-    }
-    if (printedParens)
-      Printer << ")";
-    break;
-  }
-
   case DAK_Specialize: {
     Printer << "@" << getAttrName() << "(";
     auto *attr = cast<SpecializeAttr>(this);
@@ -585,8 +564,6 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<synthesized protocol>>";
   case DAK_Swift3Migration:
     return "swift3_migration";
-  case DAK_WarnUnusedResult:
-    return "warn_unused_result";
   case DAK_Specialize:
     return "_specialize";
   }

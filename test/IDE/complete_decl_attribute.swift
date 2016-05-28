@@ -43,7 +43,7 @@ func method(@#^KEYWORD1^#) {}
 @#^KEYWORD2^#
 func method(){}
 
-// KEYWORD2:                  Begin completions, 11 items
+// KEYWORD2:                  Begin completions, 10 items
 // KEYWORD2-NEXT:             Keyword/None:                       available[#Func Attribute#]; name=available{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       objc[#Func Attribute#]; name=objc{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       swift3_migration[#Func Attribute#]; name=swift3_migration{{$}}
@@ -52,7 +52,6 @@ func method(){}
 // KEYWORD2-NEXT:             Keyword/None:                       NSManaged[#Func Attribute#]; name=NSManaged{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       inline[#Func Attribute#]; name=inline{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       nonobjc[#Func Attribute#]; name=nonobjc{{$}}
-// KEYWORD2-NEXT:             Keyword/None:                       warn_unused_result[#Func Attribute#]; name=warn_unused_result{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       warn_unqualified_access[#Func Attribute#]; name=warn_unqualified_access{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       discardableResult[#Func Attribute#]; name=discardableResult
 // KEYWORD2-NEXT:             End completions
@@ -90,7 +89,7 @@ struct S{}
 
 @#^KEYWORD_LAST^#
 
-// KEYWORD_LAST:                  Begin completions, 21 items
+// KEYWORD_LAST:                  Begin completions, 20 items
 // KEYWORD_LAST-NEXT:             Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       swift3_migration[#Declaration Attribute#]; name=swift3_migration{{$}}
@@ -109,7 +108,6 @@ struct S{}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       nonobjc[#Declaration Attribute#]; name=nonobjc{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       NSApplicationMain[#Declaration Attribute#]; name=NSApplicationMain{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc_non_lazy_realization[#Declaration Attribute#]; name=objc_non_lazy_realization{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       warn_unused_result[#Declaration Attribute#]; name=warn_unused_result
 // KEYWORD_LAST-NEXT:             Keyword/None:                       warn_unqualified_access[#Declaration Attribute#]; name=warn_unqualified_access
 // KEYWORD_LAST-NEXT:             Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
 // KEYWORD_LAST-NEXT:             End completions

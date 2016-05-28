@@ -103,6 +103,4 @@ func f(a : () -> Int) {
   a() // expected-warning {{result of call is unused, but produces 'Int'}}
 }
 
-
-
-
+@warn_unused_result func g() -> Int { } // expected-warning {{'warn_unused_result' attribute behavior is now the default}} {{1-21=}}

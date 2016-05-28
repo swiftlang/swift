@@ -2075,22 +2075,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         break;
       }
 
-      case decls_block::WarnUnusedResult_DECL_ATTR: {
-        bool isImplicit;
-        uint64_t endOfMessageIndex;
-        serialization::decls_block::WarnUnusedResultDeclAttrLayout::readRecord(
-          scratch, isImplicit, endOfMessageIndex);
-
-        StringRef message = blobData.substr(0, endOfMessageIndex);
-        StringRef mutableVariant = blobData.substr(endOfMessageIndex);
-        Attr = new (ctx) WarnUnusedResultAttr(SourceLoc(), SourceLoc(),
-                                              SourceLoc(),
-                                              ctx.AllocateCopy(message),
-                                              ctx.AllocateCopy(mutableVariant),
-                                              SourceLoc(), isImplicit);
-        break;
-      }
-
       case decls_block::Specialize_DECL_ATTR: {
         ArrayRef<uint64_t> rawTypeIDs;
         serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
