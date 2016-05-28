@@ -49,6 +49,7 @@
     "Indices.swift",
     "Existential.swift",
     "WriteBackMutableSlice.swift",
+    "UnfoldSequence.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"
