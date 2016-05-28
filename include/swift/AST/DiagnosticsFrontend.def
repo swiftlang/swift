@@ -58,6 +58,13 @@ ERROR(error_unsupported_opt_for_target, none,
 ERROR(error_argument_not_allowed_with, none,
   "argument '%0' is not allowed with '%1'", (StringRef, StringRef))
 
+ERROR(error_option_requires_sanitizer, none,
+  "option '%0' requires a sanitizer to be enabled. Use -sanitize= to enable a"
+  " sanitizer", (StringRef))
+
+ERROR(error_option_missing_required_argument, none,
+  "option '%0' is missing a required argument (%1)", (StringRef, StringRef))
+
 ERROR(cannot_open_file,none,
   "cannot open file '%0' (%1)", (StringRef, StringRef))
 ERROR(cannot_open_serialized_file,none,
