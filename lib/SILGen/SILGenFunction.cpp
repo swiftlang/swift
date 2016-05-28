@@ -207,27 +207,11 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
                          methodTy, subs);
 }
 
-ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
-                                             SILDeclRef constant,
-                                             SILConstantInfo constantInfo) {
-  // If the function has captures, apply them.
-  if (auto fn = constant.getAnyFunctionRef()) {
-    if (fn->getCaptureInfo().hasLocalCaptures() ||
-        fn->getCaptureInfo().hasGenericParamCaptures()) {
-      return emitClosureValue(loc, constant, *fn);
-    }
-  }
-
-  // Otherwise, use a global FunctionRefInst.
-  SILValue c = emitGlobalFunctionRef(loc, constant, constantInfo);
-  return ManagedValue::forUnmanaged(c);
-}
-
 void SILGenFunction::emitCaptures(SILLocation loc,
-                                  AnyFunctionRef TheClosure,
+                                  AnyFunctionRef closure,
                                   CaptureEmission purpose,
                                   SmallVectorImpl<ManagedValue> &capturedArgs) {
-  auto captureInfo = SGM.Types.getLoweredLocalCaptures(TheClosure);
+  auto captureInfo = SGM.Types.getLoweredLocalCaptures(closure);
   // For boxed captures, we need to mark the contained variables as having
   // escaped for DI diagnostics.
   SmallVector<SILValue, 2> escapesToMark;
@@ -349,31 +333,38 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
 ManagedValue
 SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
-                                 AnyFunctionRef TheClosure) {
+                                 CanType expectedType,
+                                 ArrayRef<Substitution> subs) {
+  auto closure = *constant.getAnyFunctionRef();
+  auto captureInfo = closure.getCaptureInfo();
+
   assert(((constant.uncurryLevel == 1 &&
-           TheClosure.getCaptureInfo().hasLocalCaptures()) ||
+           captureInfo.hasLocalCaptures()) ||
           (constant.uncurryLevel == 0 &&
-           !TheClosure.getCaptureInfo().hasLocalCaptures())) &&
+           !captureInfo.hasLocalCaptures())) &&
          "curried local functions not yet supported");
 
   auto constantInfo = getConstantInfo(constant);
   SILValue functionRef = emitGlobalFunctionRef(loc, constant, constantInfo);
   SILType functionTy = functionRef->getType();
 
-  auto expectedType =
-    cast<FunctionType>(TheClosure.getType()->getCanonicalType());
-
-  // Forward substitutions from the outer scope.
-
+  // Apply substitutions.
   auto pft = constantInfo.SILFnType;
 
-  auto forwardSubs = constantInfo.getForwardingSubstitutions(getASTContext());
-
   bool wasSpecialized = false;
-  if (pft->isPolymorphic() && !forwardSubs.empty()) {
+  if (pft->isPolymorphic()) {
+    // If the lowered function type is generic but Sema did not hand us any
+    // substitutions, the function is a local function that appears in a
+    // generic context but does not have a generic parameter list of its own;
+    // just use our forwarding substitutions.
+    if (subs.empty()) {
+      assert(closure.getAsDeclContext()->isLocalContext() &&
+             "cannot reference generic global function without substitutions");
+      subs = getForwardingSubstitutions();
+    }
     auto specialized = pft->substGenericArgs(F.getModule(),
                                              F.getModule().getSwiftModule(),
-                                             forwardSubs);
+                                             subs);
     functionTy = SILType::getPrimitiveObjectType(specialized);
     wasSpecialized = true;
   }
@@ -382,11 +373,11 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   // globals, but we still need to mark them as escaping so that DI can flag
   // uninitialized uses.
   if (this == SGM.TopLevelSGF) {
-    SGM.emitMarkFunctionEscapeForTopLevelCodeGlobals(loc,
-                                                   TheClosure.getCaptureInfo());
+    SGM.emitMarkFunctionEscapeForTopLevelCodeGlobals(
+        loc, captureInfo);
   }
 
-  if (!TheClosure.getCaptureInfo().hasLocalCaptures() && !wasSpecialized) {
+  if (!captureInfo.hasLocalCaptures() && !wasSpecialized) {
     auto result = ManagedValue::forUnmanaged(functionRef);
     return emitOrigToSubstValue(loc, result,
                                 AbstractionPattern(expectedType),
@@ -394,7 +385,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   }
 
   SmallVector<ManagedValue, 4> capturedArgs;
-  emitCaptures(loc, TheClosure, CaptureEmission::PartialApplication,
+  emitCaptures(loc, closure, CaptureEmission::PartialApplication,
                capturedArgs);
 
   // The partial application takes ownership of the context parameters.
@@ -405,15 +396,42 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   SILType closureTy =
     SILGenBuilder::getPartialApplyResultType(functionRef->getType(),
                                              capturedArgs.size(), SGM.M,
-                                             forwardSubs);
+                                             subs);
   auto toClosure =
     B.createPartialApply(loc, functionRef, functionTy,
-                         forwardSubs, forwardedArgs, closureTy);
+                         subs, forwardedArgs, closureTy);
   auto result = emitManagedRValueWithCleanup(toClosure);
 
-  return emitOrigToSubstValue(loc, result,
-                              AbstractionPattern(expectedType),
-                              expectedType);
+  // Get the lowered AST types:
+  //  - the original type
+  auto origLoweredFormalType =
+      AbstractionPattern(constantInfo.LoweredInterfaceType);
+  if (captureInfo.hasLocalCaptures()) {
+    // Get the unlowered formal type of the constant, stripping off
+    // the first level of function application, which applies captures.
+    origLoweredFormalType =
+      AbstractionPattern(constantInfo.FormalInterfaceType)
+          .getFunctionResultType();
+
+    // Lower it, being careful to use the right generic signature.
+    origLoweredFormalType =
+      AbstractionPattern(
+          origLoweredFormalType.getGenericSignature(),
+          SGM.Types.getLoweredASTFunctionType(
+              cast<FunctionType>(origLoweredFormalType.getType()),
+              0, constant));
+  }
+
+  // - the substituted type
+  auto substFormalType = cast<FunctionType>(expectedType);
+  auto substLoweredFormalType =
+    SGM.Types.getLoweredASTFunctionType(substFormalType, 0, constant);
+
+  // Generalize if necessary.
+  result = emitOrigToSubstValue(loc, result, origLoweredFormalType,
+                                substLoweredFormalType);
+
+  return result;
 }
 
 void SILGenFunction::emitFunction(FuncDecl *fd) {
