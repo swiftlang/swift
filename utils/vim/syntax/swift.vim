@@ -49,27 +49,27 @@ syn keyword swiftKeyword
       \ while
 
 syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName
-syn region swiftTypeAttributes start="\[" end="\]" skipwhite contained nextgroup=swiftTypeName
+syn region swiftTypeAttributes start="\[" end="\]" contained skipwhite nextgroup=swiftTypeName
 syn match swiftTypeName /\<[A-Za-z_][A-Za-z_0-9\.]*\>/ contained nextgroup=swiftTypeParameters
 
-syn region swiftTypeParameters start="<" end=">" skipwhite contained
+syn region swiftTypeParameters start="<" end=">" contained
 
 syn keyword swiftMutating mutating skipwhite nextgroup=swiftFuncDefinition
 syn keyword swiftFuncDefinition func skipwhite nextgroup=swiftFuncAttributes,swiftFuncName,swiftOperator
-syn region swiftFuncAttributes start="\[" end="\]" skipwhite contained nextgroup=swiftFuncName,swiftOperator
-syn match swiftFuncName /\<[A-Za-z_][A-Za-z_0-9]*\>/ skipwhite contained nextgroup=swiftTypeParameters
+syn region swiftFuncAttributes start="\[" end="\]" contained skipwhite nextgroup=swiftFuncName,swiftOperator
+syn match swiftFuncName /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained skipwhite nextgroup=swiftTypeParameters
 syn keyword swiftFuncKeyword subscript init destructor nextgroup=swiftTypeParameters
 
 syn keyword swiftVarDefinition var skipwhite nextgroup=swiftVarName
 syn keyword swiftVarDefinition let skipwhite nextgroup=swiftVarName
-syn match swiftVarName /\<[A-Za-z_][A-Za-z_0-9]*\>/ skipwhite contained
+syn match swiftVarName /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained
 
 syn keyword swiftDefinitionModifier static public internal private
 
 syn match swiftImplicitVarName /\$\<[A-Za-z_0-9]\+\>/
 
-syn match swiftTypeDeclaration /:/ nextgroup=swiftTypeAttributes,swiftTypeName skipwhite
-syn match swiftTypeDeclaration /->/ nextgroup=swiftTypeAttributes,swiftTypeName skipwhite
+syn match swiftTypeDeclaration /:/ skipwhite nextgroup=swiftTypeAttributes,swiftTypeName
+syn match swiftTypeDeclaration /->/ skipwhite nextgroup=swiftTypeAttributes,swiftTypeName
 
 syn keyword swiftIdentifierKeyword metatype super self Self
 
@@ -97,7 +97,7 @@ syn keyword swiftLabel get set
 syn match swiftPreproc /^\s*#\(\<if\>\|\<else\>\|\<elseif\>\|\<endif\>\)/
 syn region swiftPreprocFalse start="^\s*#\<if\>\s\+\<false\>" end="^\s*#\(\<else\>\|\<elseif\>\|\<endif\>\)"
 
-syn match swiftAttribute /@\<\w\+\>/ skipwhite
+syn match swiftAttribute /@\<\w\+\>/
 
 syn keyword swiftTodo TODO FIXME contained
 syn keyword swiftNil nil
