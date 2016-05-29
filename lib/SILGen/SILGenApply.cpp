@@ -1157,16 +1157,9 @@ public:
 
     // Otherwise, we have a statically-dispatched call.
     CanFunctionType substFnType = getSubstFnType();
-    ArrayRef<Substitution> subs;
-    
+
     auto afd = dyn_cast<AbstractFunctionDecl>(e->getDecl());
     if (afd) {
-      auto constantInfo = SGF.getConstantInfo(constant);
-
-      // Forward local substitutions to a non-generic local function.
-      if (afd->getParent()->isLocalContext() && !afd->getGenericParams())
-        subs = constantInfo.getForwardingSubstitutions(SGF.getASTContext());
-
       // If there are captures, put the placeholder curry level in the formal
       // type.
       // TODO: Eliminate the need for this.
@@ -1174,13 +1167,12 @@ public:
         substFnType = CanFunctionType::get(
           SGF.getASTContext().TheEmptyTupleType, substFnType);
     }
-    
+
+    ArrayRef<Substitution> subs;
     if (e->getDeclRef().isSpecialized()) {
-      assert(subs.empty() && "nested local generics not yet supported");
       subs = e->getDeclRef().getSubstitutions();
     }
-    
-    
+
     // Enum case constructor references are open-coded.
     if (isa<EnumElementDecl>(e->getDecl()))
       setCallee(Callee::forEnumElement(SGF, constant, substFnType, e));
@@ -1189,21 +1181,20 @@ public:
     
     // If the decl ref requires captures, emit the capture params.
     if (afd) {
+      // FIXME: We should be checking hasLocalCaptures() on the lowered
+      // captures in the constant info too, to generate more efficient
+      // code for mutually recursive local functions which otherwise
+      // capture no state.
       if (afd->getCaptureInfo().hasLocalCaptures()) {
-        assert(!e->getDeclRef().isSpecialized()
-               && "generic local fns not implemented");
-        
         SmallVector<ManagedValue, 4> captures;
         SGF.emitCaptures(e, afd, CaptureEmission::ImmediateApplication,
                          captures);
         ApplyCallee->setCaptures(std::move(captures));
       }
-      
-      // FIXME: We should be checking hasLocalCaptures() on the lowered
-      // captures in the constant info too, to generate more efficient
-      // code for mutually recursive local functions which otherwise
-      // capture no state.
-      
+
+      if (subs.empty() && afd->getCaptureInfo().hasGenericParamCaptures()) {
+        subs = SGF.getForwardingSubstitutions();
+      }
     }
 
     // If there are substitutions, add them, always at depth 0.
@@ -1227,14 +1218,15 @@ public:
     SILDeclRef constant(e);
 
     ArrayRef<Substitution> subs;
+    if (e->getCaptureInfo().hasGenericParamCaptures())
+      subs = SGF.getForwardingSubstitutions();
+
     CanFunctionType substFnType = getSubstFnType();
     
     // FIXME: We should be checking hasLocalCaptures() on the lowered
     // captures in the constant info above, to generate more efficient
     // code for mutually recursive local functions which otherwise
     // capture no state.
-    auto constantInfo = SGF.getConstantInfo(constant);
-    subs = constantInfo.getForwardingSubstitutions(SGF.getASTContext());
 
     // If there are captures, put the placeholder curry level in the formal
     // type.

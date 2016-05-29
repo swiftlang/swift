@@ -217,6 +217,10 @@ func outer_generic<T>(t: T, i: Int) {
   // CHECK: [[THUNK_CLOSURE:%.*]] = partial_apply [[THUNK]]<T>([[CLOSURE]])
   // CHECK: strong_release [[THUNK_CLOSURE]]
 
+  // CHECK: [[FN:%.*]] = function_ref @_TFF16generic_closures13outer_genericurFT1tx1iSi_T_L_23inner_generic_nocaptureu__rFT1uqd___qd__ : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0) -> @out τ_1_0
+  // CHECK: [[RESULT:%.*]] = apply [[FN]]<T, T>({{.*}}) : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0) -> @out τ_1_0
+  _ = inner_generic_nocapture(u: t)
+
   // CHECK: [[FN:%.*]] = function_ref @_TFF16generic_closures13outer_genericurFT1tx1iSi_T_L_14inner_generic1u__rfT1uqd___Si : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0, Int) -> Int
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[FN]]<T, ()>(%1) : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0, Int) -> Int
   // CHECK: [[THUNK:%.*]] = function_ref @_TTRGrXFo_iT__dSi_XFo__dSi_
@@ -224,12 +228,20 @@ func outer_generic<T>(t: T, i: Int) {
   // CHECK: strong_release [[THUNK_CLOSURE]]
   let _: () -> Int = inner_generic1
 
+  // CHECK: [[FN:%.*]] = function_ref @_TFF16generic_closures13outer_genericurFT1tx1iSi_T_L_14inner_generic1u__rfT1uqd___Si : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0, Int) -> Int
+  // CHECK: [[RESULT:%.*]] = apply [[FN]]<T, T>({{.*}}) : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0, Int) -> Int
+  _ = inner_generic1(u: t)
+
   // CHECK: [[FN:%.*]] = function_ref @_TFF16generic_closures13outer_genericurFT1tx1iSi_T_L_14inner_generic2u__rfT1uqd___x : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0, @owned @box τ_0_0) -> @out τ_0_0
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[FN]]<T, ()>([[ARG:%.*]]) : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0, @owned @box τ_0_0) -> @out τ_0_0
   // CHECK: [[THUNK:%.*]] = function_ref @_TTRGrXFo_iT__ix_XFo__ix_
   // CHECK: [[THUNK_CLOSURE:%.*]] = partial_apply [[THUNK]]<T>([[CLOSURE]])
   // CHECK: strong_release [[THUNK_CLOSURE]]
   let _: () -> T = inner_generic2
+
+  // CHECK: [[FN:%.*]] = function_ref @_TFF16generic_closures13outer_genericurFT1tx1iSi_T_L_14inner_generic2u__rfT1uqd___x : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0, @owned @box τ_0_0) -> @out τ_0_0
+  // CHECK: [[RESULT:%.*]] = apply [[FN]]<T, T>({{.*}}) : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0, @owned @box τ_0_0) -> @out τ_0_0
+  _ = inner_generic2(u: t)
 }
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures14outer_concreteFT1iSi_T_ : $@convention(thin) (Int) -> ()
@@ -249,10 +261,18 @@ func outer_concrete(i: Int) {
   // CHECK: strong_release [[THUNK_CLOSURE]]
   let _: () -> () = inner_generic_nocapture
 
+  // CHECK: [[FN:%.*]] = function_ref @_TFF16generic_closures14outer_concreteFT1iSi_T_L_23inner_generic_nocaptureurFT1ux_x : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  // CHECK: [[RESULT:%.*]] = apply [[FN]]<Int>({{.*}}) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  _ = inner_generic_nocapture(u: i)
+
   // CHECK: [[FN:%.*]] = function_ref @_TFF16generic_closures14outer_concreteFT1iSi_T_L_13inner_genericurfT1ux_Si : $@convention(thin) <τ_0_0> (@in τ_0_0, Int) -> Int
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[FN]]<()>(%0) : $@convention(thin) <τ_0_0> (@in τ_0_0, Int) -> Int
   // CHECK: [[THUNK:%.*]] = function_ref @_TTRXFo_iT__dSi_XFo__dSi_
   // CHECK: [[THUNK_CLOSURE:%.*]] = partial_apply [[THUNK]]([[CLOSURE]])
   // CHECK: strong_release [[THUNK_CLOSURE]]
   let _: () -> Int = inner_generic
+
+  // CHECK: [[FN:%.*]] = function_ref @_TFF16generic_closures14outer_concreteFT1iSi_T_L_13inner_genericurfT1ux_Si : $@convention(thin) <τ_0_0> (@in τ_0_0, Int) -> Int
+  // CHECK: [[RESULT:%.*]] = apply [[FN]]<Int>({{.*}}) : $@convention(thin) <τ_0_0> (@in τ_0_0, Int) -> Int
+  _ = inner_generic(u: i)
 }
