@@ -69,7 +69,7 @@ syn keyword swiftFuncKeyword nextgroup=swiftTypeParameters
 
 syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName
 
-syn match swiftTypeName /\<[A-Za-z_][A-Za-z_0-9\.]*\>/ contained nextgroup=swiftTypeParameters
+syn match swiftTypeName /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/ contained nextgroup=swiftTypeParameters
 syn region swiftArrayType start=/\[/ end=/\]/ contained skipwhite nextgroup=swiftTypeName
 
 syn region swiftTypeParameters start="<" end=">" contained
