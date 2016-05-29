@@ -72,10 +72,33 @@ syn keyword swiftFuncKeyword nextgroup=swiftTypeParameters
 syn keyword swiftScope
       \ autoreleasepool
 
-syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName
+syn keyword swiftTypeDefinition skipwhite nextgroup=swiftTypeName
+      \ class
+      \ enum
+      \ extension
+      \ protocol
+      \ struct
+      \ typealias
 
-syn match swiftTypeName /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/ contained nextgroup=swiftTypeParameters
-syn region swiftArrayType start=/\[/ end=/\]/ contained skipwhite nextgroup=swiftTypeName
+syn keyword swiftNew skipwhite nextgroup=swiftTypeName
+      \ new
+
+syn match swiftTypeName contained nextgroup=swiftTypeParameters
+      \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>/
+
+" TypeName[Optionality]?
+syn match swiftType contained nextgroup=swiftTypeParameters
+      \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
+" [Type:Type] (dictionary) or [Type] (array)
+syn region swiftType contained contains=swiftTypePair,swiftType
+      \ start=/\[/ end=/\]/
+syn match swiftTypePair contained nextgroup=swiftTypeParameters,swiftTypeDeclaration
+      \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
+" (Type[, Type]) (tuple)
+syn region swiftType contained contains=swiftType,swiftParamDelim
+      \ start="[^@](" end=")"
+syn match swiftParamDelim contained
+      \ /,/
 
 syn region swiftTypeParameters start="<" end=">" contained
 
@@ -89,11 +112,8 @@ syn match swiftVarName /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained
 
 syn match swiftImplicitVarName /\$\<[A-Za-z_0-9]\+\>/
 
-syn match swiftTypeDeclaration /:/ skipwhite nextgroup=swiftTypeName
-syn match swiftTypeDeclaration /->/ skipwhite nextgroup=swiftTypeName
-
-
-syn keyword swiftNew new skipwhite nextgroup=swiftTypeName
+syn match swiftTypeDeclaration /:/ skipwhite nextgroup=swiftType
+syn match swiftTypeDeclaration /->/ skipwhite nextgroup=swiftType
 
 syn keyword swiftBoolean true false
 
@@ -122,7 +142,7 @@ syn match swiftAttribute /@\<\w\+\>/
 syn keyword swiftTodo TODO FIXME contained
 syn keyword swiftNil nil
 
-syn match swiftCastOp "\<as\>[!?]\?" skipwhite nextgroup=swiftTypeName,swiftArrayType
+syn match swiftCastOp "\<as\>[!?]\?" skipwhite nextgroup=swiftType
 
 syn match swiftNilOps "??"
 
@@ -131,8 +151,9 @@ hi def link swiftImportModule Title
 hi def link swiftImportComponent Identifier
 hi def link swiftKeyword Statement
 hi def link swiftTypeDefinition Define
-hi def link swiftTypeName Type
-hi def link swiftArrayType Type
+hi def link swiftType Type
+hi def link swiftTypePair Type
+hi def link swiftTypeName Function
 hi def link swiftTypeParameters Special
 hi def link swiftFuncDefinition Define
 hi def link swiftDefinitionModifier Define
