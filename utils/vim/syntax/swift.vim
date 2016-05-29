@@ -64,9 +64,11 @@ syn keyword swiftIdentifierKeyword
       \ self
       \ super
 
-syn keyword swiftFuncKeyword nextgroup=swiftTypeParameters
-      \ deinit
+syn keyword swiftFuncKeywordGeneral skipwhite nextgroup=swiftTypeParameters
       \ init
+
+syn keyword swiftFuncKeyword
+      \ deinit
       \ subscript
 
 syn keyword swiftScope
@@ -159,6 +161,7 @@ hi def link swiftFuncDefinition Define
 hi def link swiftDefinitionModifier Define
 hi def link swiftFuncName Function
 hi def link swiftFuncKeyword Function
+hi def link swiftFuncKeywordGeneral Function
 hi def link swiftVarDefinition Define
 hi def link swiftVarName Identifier
 hi def link swiftImplicitVarName Identifier
