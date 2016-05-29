@@ -104,7 +104,7 @@ syn match swiftParamDelim contained
 " <Generic Clause> (generics)
 syn region swiftTypeParameters contained contains=swiftArchetype,swiftConstraint
       \ start="<" end=">"
-syn match swiftArchetype contained skipwhite nextgroup=swiftColonType
+syn match swiftArchetype contained skipwhite nextgroup=swiftTypeDeclaration
       \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
 syn keyword swiftConstraint contained
       \ where
@@ -144,7 +144,7 @@ syn keyword swiftLabel get set
 syn match swiftPreproc /^\s*#\(\<if\>\|\<else\>\|\<elseif\>\|\<endif\>\)/
 syn region swiftPreprocFalse start="^\s*#\<if\>\s\+\<false\>" end="^\s*#\(\<else\>\|\<elseif\>\|\<endif\>\)"
 
-syn match swiftAttribute /@\<\w\+\>/
+syn match swiftAttribute /@\<\w\+\>/ skipwhite nextgroup=swiftType
 
 syn keyword swiftTodo TODO FIXME contained
 syn keyword swiftNil nil
