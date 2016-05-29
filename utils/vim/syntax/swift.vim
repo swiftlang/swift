@@ -42,6 +42,7 @@ syn keyword swiftKeyword
       \ return
       \ static
       \ switch
+      \ throw
       \ try
       \ typealias
       \ var
