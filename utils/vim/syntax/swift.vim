@@ -56,7 +56,9 @@ syn keyword swiftIdentifierKeyword
       \ super
 
 syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName
+
 syn match swiftTypeName /\<[A-Za-z_][A-Za-z_0-9\.]*\>/ contained nextgroup=swiftTypeParameters
+syn region swiftArrayType start=/\[/ end=/\]/ contained skipwhite nextgroup=swiftTypeName
 
 syn region swiftTypeParameters start="<" end=">" contained
 
@@ -105,7 +107,7 @@ syn match swiftAttribute /@\<\w\+\>/
 syn keyword swiftTodo TODO FIXME contained
 syn keyword swiftNil nil
 
-syn match swiftCastOp "\<as\>[!?]\?" skipwhite nextgroup=swiftTypeName
+syn match swiftCastOp "\<as\>[!?]\?" skipwhite nextgroup=swiftTypeName,swiftArrayType
 
 syn match swiftNilOps "??"
 
@@ -115,6 +117,7 @@ hi def link swiftImportComponent Identifier
 hi def link swiftKeyword Statement
 hi def link swiftTypeDefinition Define
 hi def link swiftTypeName Type
+hi def link swiftArrayType Type
 hi def link swiftTypeParameters Special
 hi def link swiftFuncDefinition Define
 hi def link swiftDefinitionModifier Define
