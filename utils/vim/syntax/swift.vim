@@ -154,6 +154,9 @@ syn match swiftCastOp "\<as\>[!?]\?" skipwhite nextgroup=swiftType
 
 syn match swiftNilOps "??"
 
+syn region swiftReservedIdentifier oneline
+      \ start=/`/ end=/`/
+
 hi def link swiftImport Include
 hi def link swiftImportModule Title
 hi def link swiftImportComponent Identifier
