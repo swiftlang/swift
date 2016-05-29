@@ -69,6 +69,9 @@ syn keyword swiftFuncKeyword nextgroup=swiftTypeParameters
       \ init
       \ subscript
 
+syn keyword swiftScope
+      \ autoreleasepool
+
 syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName
 
 syn match swiftTypeName /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/ contained nextgroup=swiftTypeParameters
@@ -161,5 +164,6 @@ hi def link swiftTodo Todo
 hi def link swiftNil Constant
 hi def link swiftCastOp Operator
 hi def link swiftNilOps Operator
+hi def link swiftScope PreProc
 
 let b:current_syntax = "swift"
