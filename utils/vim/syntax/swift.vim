@@ -104,7 +104,9 @@ syn match swiftAttribute /@\<\w\+\>/
 
 syn keyword swiftTodo TODO FIXME contained
 syn keyword swiftNil nil
-syn match swiftNilOps "\<as?\?\>"
+
+syn match swiftCastOp "\<as\>[!?]\?" skipwhite nextgroup=swiftTypeName
+
 syn match swiftNilOps "??"
 
 hi def link swiftImport Include
@@ -142,6 +144,7 @@ hi def link swiftPreprocFalse Comment
 hi def link swiftAttribute Type
 hi def link swiftTodo Todo
 hi def link swiftNil Constant
+hi def link swiftCastOp Operator
 hi def link swiftNilOps Operator
 
 let b:current_syntax = "swift"
