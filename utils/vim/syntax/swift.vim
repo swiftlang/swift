@@ -55,6 +55,7 @@ syn keyword swiftDefinitionModifier
       \ private
       \ public
       \ static
+      \ throws
 
 syn keyword swiftIdentifierKeyword
       \ Self
