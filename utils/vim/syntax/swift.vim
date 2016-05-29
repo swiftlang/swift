@@ -54,6 +54,7 @@ syn keyword swiftDefinitionModifier
       \ internal
       \ private
       \ public
+      \ rethrows
       \ static
       \ throws
 
