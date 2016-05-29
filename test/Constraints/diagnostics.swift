@@ -764,4 +764,7 @@ func r21523291(_ bytes : UnsafeMutablePointer<UInt8>) {
   let r = bytes[i++]  // expected-error {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
 }
 
-
+// SR-1594 wrong error description when using === on comparison to nil
+func sr1594(a: Int?) {
+  _ = a === nil // expected-error {{cannot check reference equality of nil; use normal comparison instead}}{{9-12===}}
+}
