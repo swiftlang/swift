@@ -195,6 +195,10 @@ public:
 
 } // anonymous namespace.
 
+//===----------------------------------------------------------------------===//
+// Internal API
+//===----------------------------------------------------------------------===//
+
 void sourcekitd::printRequestObject(sourcekitd_object_t Obj, raw_ostream &OS) {
   if (!Obj) {
     OS << "<<NULL>>";
@@ -203,10 +207,6 @@ void sourcekitd::printRequestObject(sourcekitd_object_t Obj, raw_ostream &OS) {
 
   SKDObjectPrinter(OS).visit(Obj);
 }
-
-//===----------------------------------------------------------------------===//
-// Internal API
-//===----------------------------------------------------------------------===//
 
 ResponseBuilder::ResponseBuilder() {
   Impl = xpc_dictionary_create(nullptr, nullptr, 0);
