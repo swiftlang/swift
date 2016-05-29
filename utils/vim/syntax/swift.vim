@@ -101,8 +101,13 @@ syn region swiftType contained contains=swiftType,swiftParamDelim
       \ start="[^@](" end=")"
 syn match swiftParamDelim contained
       \ /,/
-
-syn region swiftTypeParameters start="<" end=">" contained
+" <Generic Clause> (generics)
+syn region swiftTypeParameters contained contains=swiftArchetype,swiftConstraint
+      \ start="<" end=">"
+syn match swiftArchetype contained skipwhite nextgroup=swiftColonType
+      \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
+syn keyword swiftConstraint contained
+      \ where
 
 syn keyword swiftMutating mutating skipwhite nextgroup=swiftFuncDefinition
 syn keyword swiftFuncDefinition func skipwhite nextgroup=swiftFuncName,swiftOperator
@@ -156,7 +161,8 @@ hi def link swiftTypeDefinition Define
 hi def link swiftType Type
 hi def link swiftTypePair Type
 hi def link swiftTypeName Function
-hi def link swiftTypeParameters Special
+hi def link swiftArchetype Identifier
+hi def link swiftConstraint Special
 hi def link swiftFuncDefinition Define
 hi def link swiftDefinitionModifier Define
 hi def link swiftFuncName Function
@@ -167,6 +173,7 @@ hi def link swiftVarName Identifier
 hi def link swiftImplicitVarName Identifier
 hi def link swiftIdentifierKeyword Identifier
 hi def link swiftTypeDeclaration Delimiter
+hi def link swiftTypeParameters Delimiter
 hi def link swiftBoolean Boolean
 hi def link swiftString String
 hi def link swiftInterpolation Special
