@@ -48,6 +48,13 @@ syn keyword swiftKeyword
       \ where
       \ while
 
+syn keyword swiftIdentifierKeyword
+      \ Self
+      \ dynamicType
+      \ metatype
+      \ self
+      \ super
+
 syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName
 syn match swiftTypeName /\<[A-Za-z_][A-Za-z_0-9\.]*\>/ contained nextgroup=swiftTypeParameters
 
@@ -63,13 +70,11 @@ syn keyword swiftVarDefinition let skipwhite nextgroup=swiftVarName
 syn match swiftVarName /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained
 
 syn keyword swiftDefinitionModifier static public internal private
-
 syn match swiftImplicitVarName /\$\<[A-Za-z_0-9]\+\>/
 
 syn match swiftTypeDeclaration /:/ skipwhite nextgroup=swiftTypeName
 syn match swiftTypeDeclaration /->/ skipwhite nextgroup=swiftTypeName
 
-syn keyword swiftIdentifierKeyword metatype super self Self
 
 syn keyword swiftNew new skipwhite nextgroup=swiftTypeName
 
