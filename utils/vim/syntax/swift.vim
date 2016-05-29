@@ -62,6 +62,11 @@ syn keyword swiftIdentifierKeyword
       \ self
       \ super
 
+syn keyword swiftFuncKeyword nextgroup=swiftTypeParameters
+      \ deinit
+      \ init
+      \ subscript
+
 syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName
 
 syn match swiftTypeName /\<[A-Za-z_][A-Za-z_0-9\.]*\>/ contained nextgroup=swiftTypeParameters
@@ -72,7 +77,6 @@ syn region swiftTypeParameters start="<" end=">" contained
 syn keyword swiftMutating mutating skipwhite nextgroup=swiftFuncDefinition
 syn keyword swiftFuncDefinition func skipwhite nextgroup=swiftFuncName,swiftOperator
 syn match swiftFuncName /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained skipwhite nextgroup=swiftTypeParameters
-syn keyword swiftFuncKeyword subscript init destructor nextgroup=swiftTypeParameters
 
 syn keyword swiftVarDefinition var skipwhite nextgroup=swiftVarName
 syn keyword swiftVarDefinition let skipwhite nextgroup=swiftVarName
