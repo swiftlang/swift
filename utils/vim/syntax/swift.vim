@@ -42,36 +42,56 @@ syn keyword swiftKeyword
       \ return
       \ static
       \ switch
+      \ throw
       \ try
       \ typealias
       \ var
       \ where
       \ while
 
+syn keyword swiftDefinitionModifier
+      \ dynamic
+      \ internal
+      \ private
+      \ public
+      \ static
+      \ throws
+
+syn keyword swiftIdentifierKeyword
+      \ Self
+      \ dynamicType
+      \ metatype
+      \ self
+      \ super
+
+syn keyword swiftFuncKeyword nextgroup=swiftTypeParameters
+      \ deinit
+      \ init
+      \ subscript
+
+syn keyword swiftScope
+      \ autoreleasepool
+
 syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName
-syn region swiftTypeAttributes start="\[" end="\]" contained skipwhite nextgroup=swiftTypeName
-syn match swiftTypeName /\<[A-Za-z_][A-Za-z_0-9\.]*\>/ contained nextgroup=swiftTypeParameters
+
+syn match swiftTypeName /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/ contained nextgroup=swiftTypeParameters
+syn region swiftArrayType start=/\[/ end=/\]/ contained skipwhite nextgroup=swiftTypeName
 
 syn region swiftTypeParameters start="<" end=">" contained
 
 syn keyword swiftMutating mutating skipwhite nextgroup=swiftFuncDefinition
-syn keyword swiftFuncDefinition func skipwhite nextgroup=swiftFuncAttributes,swiftFuncName,swiftOperator
-syn region swiftFuncAttributes start="\[" end="\]" contained skipwhite nextgroup=swiftFuncName,swiftOperator
+syn keyword swiftFuncDefinition func skipwhite nextgroup=swiftFuncName,swiftOperator
 syn match swiftFuncName /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained skipwhite nextgroup=swiftTypeParameters
-syn keyword swiftFuncKeyword subscript init destructor nextgroup=swiftTypeParameters
 
 syn keyword swiftVarDefinition var skipwhite nextgroup=swiftVarName
 syn keyword swiftVarDefinition let skipwhite nextgroup=swiftVarName
 syn match swiftVarName /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained
 
-syn keyword swiftDefinitionModifier static public internal private
-
 syn match swiftImplicitVarName /\$\<[A-Za-z_0-9]\+\>/
 
-syn match swiftTypeDeclaration /:/ skipwhite nextgroup=swiftTypeAttributes,swiftTypeName
-syn match swiftTypeDeclaration /->/ skipwhite nextgroup=swiftTypeAttributes,swiftTypeName
+syn match swiftTypeDeclaration /:/ skipwhite nextgroup=swiftTypeName
+syn match swiftTypeDeclaration /->/ skipwhite nextgroup=swiftTypeName
 
-syn keyword swiftIdentifierKeyword metatype super self Self
 
 syn keyword swiftNew new skipwhite nextgroup=swiftTypeName
 
@@ -101,7 +121,9 @@ syn match swiftAttribute /@\<\w\+\>/
 
 syn keyword swiftTodo TODO FIXME contained
 syn keyword swiftNil nil
-syn match swiftNilOps "\<as?\?\>"
+
+syn match swiftCastOp "\<as\>[!?]\?" skipwhite nextgroup=swiftTypeName,swiftArrayType
+
 syn match swiftNilOps "??"
 
 hi def link swiftImport Include
@@ -110,12 +132,11 @@ hi def link swiftImportComponent Identifier
 hi def link swiftKeyword Statement
 hi def link swiftTypeDefinition Define
 hi def link swiftTypeName Type
+hi def link swiftArrayType Type
 hi def link swiftTypeParameters Special
-hi def link swiftTypeAttributes PreProc
 hi def link swiftFuncDefinition Define
 hi def link swiftDefinitionModifier Define
 hi def link swiftFuncName Function
-hi def link swiftFuncAttributes PreProc
 hi def link swiftFuncKeyword Function
 hi def link swiftVarDefinition Define
 hi def link swiftVarName Identifier
@@ -141,6 +162,8 @@ hi def link swiftPreprocFalse Comment
 hi def link swiftAttribute Type
 hi def link swiftTodo Todo
 hi def link swiftNil Constant
+hi def link swiftCastOp Operator
 hi def link swiftNilOps Operator
+hi def link swiftScope PreProc
 
 let b:current_syntax = "swift"
