@@ -48,6 +48,13 @@ syn keyword swiftKeyword
       \ where
       \ while
 
+syn keyword swiftDefinitionModifier
+      \ dynamic
+      \ internal
+      \ private
+      \ public
+      \ static
+
 syn keyword swiftIdentifierKeyword
       \ Self
       \ dynamicType
@@ -71,7 +78,6 @@ syn keyword swiftVarDefinition var skipwhite nextgroup=swiftVarName
 syn keyword swiftVarDefinition let skipwhite nextgroup=swiftVarName
 syn match swiftVarName /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained
 
-syn keyword swiftDefinitionModifier static public internal private
 syn match swiftImplicitVarName /\$\<[A-Za-z_0-9]\+\>/
 
 syn match swiftTypeDeclaration /:/ skipwhite nextgroup=swiftTypeName
