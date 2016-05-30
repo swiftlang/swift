@@ -16,8 +16,6 @@ import multiprocessing
 import os
 import pipes
 import platform
-import re
-import shlex
 import sys
 
 # FIXME: Instead of modifying the system path in order to enable imports from
@@ -40,6 +38,7 @@ from SwiftBuildSupport import (
 sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 
 # E402 means module level import not at top of file
+from swift_build_support import arguments  # noqa (E402)
 from swift_build_support.toolchain import host_toolchain  # noqa (E402)
 import swift_build_support.debug      # noqa (E402)
 from swift_build_support import migration  # noqa (E402)
@@ -50,50 +49,6 @@ import swift_build_support.targets    # noqa (E402)
 from swift_build_support.cmake import CMake  # noqa (E402)
 from swift_build_support.workspace import Workspace  # noqa(E402)
 from swift_build_support.workspace import compute_build_subdir  # noqa(E402)
-
-
-# A strict parser for bools (unlike Python's `bool()`, where
-# `bool('False')` is `True`).
-#
-# This function can be passed as `type=` argument to argparse to parse values
-# passed to command line arguments.
-def argparse_bool(string):
-    if string in ['0', 'false', 'False']:
-        return False
-    if string in ['1', 'true', 'True']:
-        return True
-    raise argparse.ArgumentTypeError("%r is not a boolean value" % string)
-
-
-# Parse and split shell arguments string into a list of shell arguments.
-# Recognize `,` as a separator as well as white spaces.
-# string: -BAR="foo bar" -BAZ='foo,bar',-QUX 42
-# into
-# ['-BAR=foo bar', '-BAZ=foo,bar', "-QUX", "42"]
-def argparse_shell_split(string):
-    lex = shlex.shlex(string, posix=True)
-    lex.whitespace_split = True
-    lex.whitespace += ','
-    return list(lex)
-
-
-# Parse version string and split into a tuple of strings (major, minor, patch)
-# Support only "MAJOR.MINOR.PATCH" format.
-def argparse_clang_compiler_version(string):
-    m = re.match(r'([0-9]*)\.([0-9]*)\.([0-9]*)', string)
-    if m is not None:
-        return m.group(1, 2, 3)
-    raise argparse.ArgumentTypeError(
-        "%r is invalid version value. must be 'MAJOR.MINOR.PATCH'" % string)
-
-
-# Check the string is executable path string.
-# Convert it to absolute path.
-def argparse_executable(string):
-    if os.access(string, os.X_OK):
-        return os.path.abspath(string)
-    raise argparse.ArgumentTypeError(
-        "%r is not executable" % string)
 
 
 # Main entry point for the preset mode.
@@ -595,7 +550,7 @@ details of the setups of other systems or automated environments.""")
         help="test Swift after building",
         metavar="BOOL",
         nargs='?',
-        type=argparse_bool,
+        type=arguments.type.bool,
         default=False,
         const=True)
     run_tests_group.add_argument(
@@ -609,7 +564,7 @@ details of the setups of other systems or automated environments.""")
         help="run the validation test suite (implies --test)",
         metavar="BOOL",
         nargs='?',
-        type=argparse_bool,
+        type=arguments.type.bool,
         default=False,
         const=True)
     run_tests_group.add_argument(
@@ -623,7 +578,7 @@ details of the setups of other systems or automated environments.""")
         help="run the test suite in optimized mode too (implies --test)",
         metavar="BOOL",
         nargs='?',
-        type=argparse_bool,
+        type=arguments.type.bool,
         default=False,
         const=True)
     run_tests_group.add_argument(
@@ -631,7 +586,7 @@ details of the setups of other systems or automated environments.""")
         help="run the long test suite",
         metavar="BOOL",
         nargs='?',
-        type=argparse_bool,
+        type=arguments.type.bool,
         default=False,
         const=True)
     run_tests_group.add_argument(
@@ -864,7 +819,7 @@ details of the setups of other systems or automated environments.""")
         "--cmake",
         help="the path to a CMake executable that will be used to build "
              "Swift",
-        type=argparse_executable,
+        type=arguments.type.executable,
         metavar="PATH")
     parser.add_argument(
         "--show-sdks",
@@ -920,13 +875,13 @@ details of the setups of other systems or automated environments.""")
         "--host-cc",
         help="the absolute path to CC, the 'clang' compiler for the host "
              "platform. Default is auto detected.",
-        type=argparse_executable,
+        type=arguments.type.executable,
         metavar="PATH")
     parser.add_argument(
         "--host-cxx",
         help="the absolute path to CXX, the 'clang++' compiler for the host "
              "platform. Default is auto detected.",
-        type=argparse_executable,
+        type=arguments.type.executable,
         metavar="PATH")
     parser.add_argument(
         "--distcc",
@@ -943,7 +898,7 @@ details of the setups of other systems or automated environments.""")
     parser.add_argument(
         "--clang-compiler-version",
         help="string that indicates a compiler version for Clang",
-        type=argparse_clang_compiler_version,
+        type=arguments.type.clang_compiler_version,
         metavar="MAJOR.MINOR.PATCH")
 
     parser.add_argument(
@@ -973,7 +928,7 @@ details of the setups of other systems or automated environments.""")
              "separated options '-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp'. Can be "
              "called multiple times to add multiple such options.",
         action="append",
-        type=argparse_shell_split,
+        type=arguments.type.shell_split,
         default=[])
 
     parser.add_argument(
@@ -981,7 +936,7 @@ details of the setups of other systems or automated environments.""")
         help="arguments to the build tool. This would be prepended to the "
              "default argument that is '-j8' when CMake generator is "
              "\"Ninja\".",
-        type=argparse_shell_split,
+        type=arguments.type.shell_split,
         default=[])
 
     parser.add_argument(
@@ -989,7 +944,7 @@ details of the setups of other systems or automated environments.""")
         help="print the commands executed during the build",
         metavar="BOOL",
         nargs='?',
-        type=argparse_bool,
+        type=arguments.type.bool,
         default=False,
         const=True)
 
