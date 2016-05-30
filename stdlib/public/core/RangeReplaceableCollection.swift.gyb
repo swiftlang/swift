@@ -903,7 +903,6 @@ extension RangeReplaceableCollection
     _ subrange: ${Range}<Index>,
     with newElements: C
   ) where C : Collection, C.Iterator.Element == Iterator.Element {
-    // FIXME: swift-3-indexing-model: tests.
     self.replaceSubrange(_makeHalfOpen(subrange), with: newElements)
   }
 

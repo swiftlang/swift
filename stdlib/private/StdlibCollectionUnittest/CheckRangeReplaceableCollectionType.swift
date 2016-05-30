@@ -12,40 +12,6 @@
 
 import StdlibUnittest
 
-internal enum RangeSelection {
-  case emptyRange
-  case leftEdge
-  case rightEdge
-  case middle
-  case leftHalf
-  case rightHalf
-  case offsets(Range<Int>)
-
-  internal func range<C : Collection>(in c: C) -> Range<C.Index> {
-    switch self {
-      case .emptyRange: return c.endIndex..<c.endIndex
-      case .leftEdge: return c.startIndex..<c.startIndex
-      case .rightEdge: return c.endIndex..<c.endIndex
-      case .middle:
-        let start = c.index(c.startIndex, offsetBy: c.count / 4)
-        let end = c.index(c.startIndex, offsetBy: 3 * c.count / 4 + 1)
-        return start..<end
-      case .leftHalf:
-        let start = c.startIndex
-        let end = c.index(start, offsetBy: c.count / 2)
-        return start..<end
-      case .rightHalf:
-        let start = c.index(c.startIndex, offsetBy: c.count / 2)
-        let end = c.endIndex
-        return start..<end
-      case .offsets(let offsets):
-        let start = c.index(c.startIndex, offsetBy: numericCast(offsets.lowerBound))
-        let end = c.index(c.startIndex, offsetBy: numericCast(offsets.upperBound))
-        return start..<end
-    }
-  }
-}
-
 internal enum IndexSelection {
   case start
   case middle
@@ -62,22 +28,24 @@ internal enum IndexSelection {
   }
 }
 
-internal struct ReplaceSubrangeTest {
-  let collection: [OpaqueValue<Int>]
-  let newElements: [OpaqueValue<Int>]
-  let rangeSelection: RangeSelection
-  let expected: [Int]
-  let loc: SourceLoc
+public struct ReplaceSubrangeTest {
+  public let collection: [OpaqueValue<Int>]
+  public let newElements: [OpaqueValue<Int>]
+  public let rangeSelection: RangeSelection
+  public let expected: [Int]
+  public let closedExpected: [Int]?  // Expected array for closed ranges
+  public let loc: SourceLoc
 
   internal init(
     collection: [Int], newElements: [Int],
-    rangeSelection: RangeSelection, expected: [Int],
+    rangeSelection: RangeSelection, expected: [Int], closedExpected: [Int]? = nil,
     file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
     self.newElements = newElements.map(OpaqueValue.init)
     self.rangeSelection = rangeSelection
     self.expected = expected
+    self.closedExpected = closedExpected
     self.loc = SourceLoc(file, line, comment: "replaceSubrange() test data")
   }
 }
@@ -335,7 +303,9 @@ let appendContentsOfTests: [AppendContentsOfTest] = [
     expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080]),
 ]
 
-let replaceRangeTests: [ReplaceSubrangeTest] = [
+// Also used in RangeReplaceable.swift.gyb to test `replaceSubrange()`
+// overloads with the countable range types.
+public let replaceRangeTests: [ReplaceSubrangeTest] = [
   ReplaceSubrangeTest(
     collection: [],
     newElements: [],
@@ -358,55 +328,70 @@ let replaceRangeTests: [ReplaceSubrangeTest] = [
     collection: [4040],
     newElements: [1010, 2020, 3030],
     rangeSelection: .leftEdge,
-    expected: [1010, 2020, 3030, 4040]),
+    expected: [1010, 2020, 3030, 4040],
+    closedExpected: [1010, 2020, 3030]),
+
+  ReplaceSubrangeTest(
+    collection: [1010, 2020, 3030],
+    newElements: [4040],
+    rangeSelection: .leftEdge,
+    expected: [4040, 1010, 2020, 3030],
+    closedExpected: [4040, 2020, 3030]),
 
   ReplaceSubrangeTest(
     collection: [1010],
     newElements: [2020, 3030, 4040],
     rangeSelection: .rightEdge,
-    expected: [1010, 2020, 3030, 4040]),
+    expected: [1010, 2020, 3030, 4040],
+    closedExpected: [2020, 3030, 4040]),
 
   ReplaceSubrangeTest(
     collection: [1010, 2020, 3030],
     newElements: [4040],
     rangeSelection: .rightEdge,
-    expected: [1010, 2020, 3030, 4040]),
+    expected: [1010, 2020, 3030, 4040],
+    closedExpected: [1010, 2020, 4040]),
 
   ReplaceSubrangeTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     newElements: [9090],
-    rangeSelection: .offsets(1..<1),
-    expected: [1010, 9090, 2020, 3030, 4040, 5050]),
+    rangeSelection: .offsets(1, 1),
+    expected: [1010, 9090, 2020, 3030, 4040, 5050],
+    closedExpected: [1010, 9090, 3030, 4040, 5050]),
 
   ReplaceSubrangeTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     newElements: [9090],
-    rangeSelection: .offsets(1..<2),
-    expected: [1010, 9090, 3030, 4040, 5050]),
+    rangeSelection: .offsets(1, 2),
+    expected: [1010, 9090, 3030, 4040, 5050],
+    closedExpected: [1010, 9090, 4040, 5050]),
 
   ReplaceSubrangeTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     newElements: [9090],
-    rangeSelection: .offsets(1..<3),
-    expected: [1010, 9090, 4040, 5050]),
+    rangeSelection: .offsets(1, 3),
+    expected: [1010, 9090, 4040, 5050],
+    closedExpected: [1010, 9090, 5050]),
 
   ReplaceSubrangeTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     newElements: [9090],
-    rangeSelection: .offsets(1..<4),
-    expected: [1010, 9090, 5050]),
+    rangeSelection: .offsets(1, 4),
+    expected: [1010, 9090, 5050],
+    closedExpected: [1010, 9090]),
 
   ReplaceSubrangeTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     newElements: [9090],
-    rangeSelection: .offsets(1..<5),
+    rangeSelection: .offsets(1, 5),
     expected: [1010, 9090]),
 
   ReplaceSubrangeTest(
     collection: [1010, 2020, 3030],
     newElements: [8080, 9090],
-    rangeSelection: .offsets(1..<2),
-    expected: [1010, 8080, 9090, 3030]),
+    rangeSelection: .offsets(1, 2),
+    expected: [1010, 8080, 9090, 3030],
+    closedExpected: [1010, 8080, 9090]),
 ]
 
 extension TestSuite {
@@ -499,7 +484,7 @@ self.test("\(testNamePrefix).init(Sequence)/semantics") {
 // replaceSubrange()
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).replaceSubrange()/semantics") {
+self.test("\(testNamePrefix).replaceSubrange()/range/semantics") {
   for test in replaceRangeTests {
     var c = makeWrappedCollection(test.collection)
     let rangeToReplace = test.rangeSelection.range(in: c)
@@ -508,6 +493,20 @@ self.test("\(testNamePrefix).replaceSubrange()/semantics") {
     c.replaceSubrange(rangeToReplace, with: newElements)
     expectEqualSequence(
       test.expected,
+      c.map { extractValue($0).value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+self.test("\(testNamePrefix).replaceSubrange()/closedRange/semantics") {
+  for test in replaceRangeTests {
+    guard let closedExpected = test.closedExpected else { continue }
+    var c = makeWrappedCollection(test.collection)
+    let rangeToReplace = test.rangeSelection.closedRange(in: c)
+    let newElements = makeWrappedCollection(test.newElements)
+    c.replaceSubrange(rangeToReplace, with: newElements)
+    expectEqualSequence(
+      closedExpected,
       c.map { extractValue($0).value },
       stackTrace: SourceLocStack().with(test.loc))
   }
