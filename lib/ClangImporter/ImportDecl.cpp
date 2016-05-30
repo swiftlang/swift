@@ -2943,6 +2943,7 @@ namespace {
             getProtocolMethodType(proto, fnType->castTo<AnyFunctionType>());
         result->setType(fnType);
         result->setInterfaceType(interfaceType);
+        result->setGenericSignature(proto->getGenericSignature());
       } else {
         result->setType(fnType);
       }
@@ -3740,6 +3741,7 @@ namespace {
       result->setBodyResultType(resultTy);
       result->setType(type);
       result->setInterfaceType(interfaceType);
+      result->setGenericSignature(dc->getGenericSignatureOfContext());
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
@@ -4215,6 +4217,7 @@ namespace {
 
         result->setInitializerInterfaceType(interfaceInitType);
         result->setInterfaceType(interfaceAllocType);
+        result->setGenericSignature(dc->getGenericSignatureOfContext());
       } else if (dc->isGenericContext()) {
         Type interfaceAllocType;
         Type interfaceInitType;
@@ -4225,6 +4228,7 @@ namespace {
 
         result->setInitializerInterfaceType(interfaceInitType);
         result->setInterfaceType(interfaceAllocType);
+        result->setGenericSignature(dc->getGenericSignatureOfContext());
         selfVar->overwriteType(initType->castTo<AnyFunctionType>()->getInput());
       }
 
@@ -4407,6 +4411,7 @@ namespace {
           getter->getClangNode());
       thunk->setBodyResultType(elementTy);
       thunk->setInterfaceType(interfaceType);
+      thunk->setGenericSignature(dc->getGenericSignatureOfContext());
       thunk->setAccessibility(Accessibility::Public);
 
       auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>();
@@ -4482,6 +4487,7 @@ namespace {
           setter->getClangNode());
       thunk->setBodyResultType(TupleType::getEmpty(C));
       thunk->setInterfaceType(interfaceType);
+      thunk->setGenericSignature(dc->getGenericSignatureOfContext());
       thunk->setAccessibility(Accessibility::Public);
 
       auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>();

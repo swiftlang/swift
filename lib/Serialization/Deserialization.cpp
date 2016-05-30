@@ -3226,7 +3226,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     dtor->setSelfDecl(selfParams->get(0));
 
     dtor->setType(getType(signatureID));
-    dtor->setInterfaceType(getType(interfaceID));
+
+    auto interfaceType = getType(interfaceID);
+    if (auto genericFnType = interfaceType->getAs<GenericFunctionType>())
+      dtor->setGenericSignature(genericFnType->getGenericSignature());
+    dtor->setInterfaceType(interfaceType);
+
     if (isImplicit)
       dtor->setImplicit();
 

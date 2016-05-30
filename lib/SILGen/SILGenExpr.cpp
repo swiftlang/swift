@@ -445,57 +445,9 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   }
 
   auto silDeclRef = SILDeclRef(decl, ResilienceExpansion::Minimal, uncurryLevel);
-  auto constantInfo = getConstantInfo(silDeclRef);
 
-  ManagedValue result = emitFunctionRef(loc, silDeclRef, constantInfo);
-
-  // Get the lowered AST types:
-  //  - the original type
-  auto origLoweredFormalType =
-      AbstractionPattern(constantInfo.LoweredInterfaceType);
-  if (hasLocalCaptures) {
-    // Get the unlowered formal type of the constant, stripping off
-    // the first level of function application, which applies captures.
-    origLoweredFormalType =
-      AbstractionPattern(constantInfo.FormalInterfaceType)
-          .getFunctionResultType();
-
-    // Lower it, being careful to use the right generic signature.
-    origLoweredFormalType =
-      AbstractionPattern(
-          origLoweredFormalType.getGenericSignature(),
-          SGM.Types.getLoweredASTFunctionType(
-              cast<FunctionType>(origLoweredFormalType.getType()),
-              0, silDeclRef));
-  }
-
-  // - the substituted type
-  auto substFormalType = cast<AnyFunctionType>(refType);
-  auto substLoweredFormalType =
-    SGM.Types.getLoweredASTFunctionType(substFormalType, 0, silDeclRef);
-
-  // If the declaration reference is specialized, create the partial
-  // application.
-  if (declRef.isSpecialized()) {
-    // Substitute the function type.
-    auto origFnType = result.getType().castTo<SILFunctionType>();
-    auto substFnType = origFnType->substGenericArgs(
-                                                    SGM.M, SGM.SwiftModule,
-                                                    declRef.getSubstitutions());
-    auto closureType = adjustFunctionType(substFnType,
-                                        SILFunctionType::Representation::Thick);
-
-    SILValue spec = B.createPartialApply(loc, result.forward(*this),
-                                SILType::getPrimitiveObjectType(substFnType),
-                                         declRef.getSubstitutions(),
-                                         { },
-                                SILType::getPrimitiveObjectType(closureType));
-    result = emitManagedRValueWithCleanup(spec);
-  }
-
-  // Generalize if necessary.
-  result = emitOrigToSubstValue(loc, result, origLoweredFormalType,
-                                substLoweredFormalType);
+  ManagedValue result = emitClosureValue(loc, silDeclRef, refType,
+                                         declRef.getSubstitutions());
   return RValue(*this, loc, refType, result);
 }
 
@@ -1965,9 +1917,16 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
   // Emit the closure body.
   SGF.SGM.emitClosure(e);
 
+  ArrayRef<Substitution> subs;
+  if (e->getCaptureInfo().hasGenericParamCaptures())
+    subs = SGF.getForwardingSubstitutions();
+
   // Generate the closure value (if any) for the closure expr's function
   // reference.
-  return RValue(SGF, e, SGF.emitClosureValue(e, SILDeclRef(e), e));
+  auto refType = e->getType()->getCanonicalType();
+  ManagedValue result = SGF.emitClosureValue(e, SILDeclRef(e),
+                                             refType, subs);
+  return RValue(SGF, e, refType, result);
 }
 
 RValue RValueEmitter::

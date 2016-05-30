@@ -6659,7 +6659,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       // If we're already validating the type declaration's generic signature,
       // avoid a potential infinite loop by not re-validating the generic
       // parameter list.
-      if (!typeAlias->IsValidatingGenericSignature()) {
+      if (!typeAlias->isValidatingGenericSignature()) {
         revertGenericParamList(gp);
         
         auto builder = createArchetypeBuilder(typeAlias->getModuleContext());
@@ -6697,7 +6697,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       // If we're already validating the type declaration's generic signature,
       // avoid a potential infinite loop by not re-validating the generic
       // parameter list.
-      if (!nominal->IsValidatingGenericSignature()) {
+      if (!nominal->isValidatingGenericSignature()) {
         revertGenericParamList(gp);
 
         ArchetypeBuilder builder =

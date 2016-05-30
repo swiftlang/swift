@@ -1304,7 +1304,9 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   auto ParameterTy = BehaviorParameter->getInterfaceType()
     ->castTo<AnyFunctionType>()
     ->getResult();
-  
+
+  GenericSignature *genericSig = nullptr;
+
   TypeSubstitutionMap interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
   auto SubstInterfaceTy = ParameterTy.subst(VD->getModuleContext(),
                                             interfaceMap, SubstOptions());
@@ -1321,7 +1323,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   // Add the Self type back to the interface and context types.
   if (DC->isTypeContext()) {
     if (DC->isGenericContext()) {
-      auto genericSig = DC->getGenericSignatureOfContext();
+      genericSig = DC->getGenericSignatureOfContext();
       SubstInterfaceTy = GenericFunctionType::get(genericSig,
                                                   DC->getSelfInterfaceType(),
                                                   SubstInterfaceTy,
@@ -1398,6 +1400,8 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                      TypeLoc::withoutLoc(SubstBodyResultTy), DC);
 
   Parameter->setInterfaceType(SubstInterfaceTy);
+  Parameter->setGenericSignature(genericSig);
+
   // Mark the method to be final, implicit, and private.  In a class, this
   // prevents it from being dynamically dispatched.
   if (DC->getAsClassOrClassExtensionContext())

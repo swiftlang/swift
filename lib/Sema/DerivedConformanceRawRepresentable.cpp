@@ -326,6 +326,8 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   Type allocIfaceType;
   Type initIfaceType;
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
+    initDecl->setGenericSignature(sig);
+
     allocIfaceType = GenericFunctionType::get(sig, selfInterfaceType,
                                               interfaceType,
                                               FunctionType::ExtInfo());
