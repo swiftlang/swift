@@ -4311,8 +4311,15 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     if (isa<NilLiteralExpr>(rhsExpr->getValueProvidingExpr()) &&
         !isUnresolvedOrTypeVarType(lhsType)) {
       if (isNameOfStandardComparisonOperator(overloadName)) {
-        diagnose(callExpr->getLoc(), diag::comparison_with_nil_illegal, lhsType)
-          .highlight(lhsExpr->getSourceRange());
+        if (lhsType->getAnyOptionalObjectType() &&
+            (overloadName == "===" || overloadName == "!==")) {
+          diagnose(callExpr->getLoc(), diag::reference_comparison_with_nil_illegal)
+            .fixItReplace(callExpr->getFn()->getSourceRange(),
+                          overloadName.substr(0,2));
+        } else {
+          diagnose(callExpr->getLoc(), diag::comparison_with_nil_illegal, lhsType)
+            .highlight(lhsExpr->getSourceRange());
+        }
         return true;
       }
     }
