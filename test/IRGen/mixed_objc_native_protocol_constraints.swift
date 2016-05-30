@@ -5,5 +5,5 @@
 
 protocol Fooable { func foo() }
 
-class A<B: Fooable where B: AnyObject> {
+class A<B: Fooable> where B: AnyObject{
 }

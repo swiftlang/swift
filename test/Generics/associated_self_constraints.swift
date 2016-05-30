@@ -63,7 +63,7 @@ protocol P {
 struct IP<T> : P {
     typealias A = T
 
-    init<O:P where O.A == IP.A>(x:O) {
+    init<O:P>(x:O) where O.A == IP.A {
        _onNext = { (item: A) in x.onNext(item) }
     }
 
