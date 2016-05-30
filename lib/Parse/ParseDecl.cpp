@@ -2930,10 +2930,10 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 ///
 /// \verbatim
 ///   decl-typealias:
-///     'typealias' identifier generic-params? '=' type
+///     'typealias' identifier generic-params? '=' type requirement-clause?
 /// \endverbatim
-ParserResult<TypeDecl> Parser::parseDeclTypeAlias(Parser::ParseDeclOptions Flags,
-                                                  DeclAttributes &Attributes) {
+ParserResult<TypeDecl> Parser::
+parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   ParserPosition startPosition = getParserPosition();
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   Identifier Id;
@@ -2991,6 +2991,13 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(Parser::ParseDeclOptions Flags
   if (UnderlyingTy.isNull())
     return Status;
 
+  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  if (Tok.is(tok::kw_where)) {
+    auto whereStatus = parseFreestandingGenericWhereClause(genericParams);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+  }
+  
   auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc,
                                           UnderlyingTy.getPtrOrNull(),
                                           genericParams, CurDeclContext);
@@ -4409,7 +4416,8 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 /// \verbatim
 ///   decl-func:
 ///     attribute-list? ('static' | 'class')? 'mutating'? 'func' 
-///               any-identifier generic-params? func-signature stmt-brace?
+///               any-identifier generic-params? func-signature where-clause?
+///               stmt-brace?
 /// \endverbatim
 ///
 /// \note The caller of this method must ensure that the next token is 'func'.
@@ -4558,6 +4566,13 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     return SignatureStatus;
   }
   
+  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  if (Tok.is(tok::kw_where)) {
+    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+  }
+  
   // Protocol method arguments may not have default values.
   if (Flags.contains(PD_InProtocol) && DefaultArgs.HasDefaultArgument) {
     diagnose(FuncLoc, diag::protocol_method_argument_init);
@@ -4689,7 +4704,7 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
 /// \verbatim
 ///   decl-enum:
 ///      'enum' attribute-list identifier generic-params? inheritance?
-///          '{' decl-enum-body '}'
+///          where-clause? '{' decl-enum-body '}'
 ///   decl-enum-body:
 ///      decl*
 /// \endverbatim
@@ -4731,6 +4746,14 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
     SmallVector<TypeLoc, 2> Inherited;
     Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
     UD->setInherited(Context.AllocateCopy(Inherited));
+  }
+  
+  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  if (Tok.is(tok::kw_where)) {
+    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+    UD->setGenericParams(GenericParams);
   }
 
   SourceLoc LBLoc, RBLoc;
@@ -4969,7 +4992,7 @@ bool Parser::parseNominalDeclMembers(SourceLoc LBLoc, SourceLoc &RBLoc,
 /// \verbatim
 ///   decl-struct:
 ///      'struct' attribute-list identifier generic-params? inheritance?
-///          '{' decl-struct-body '}
+///          where-clause? '{' decl-struct-body '}
 ///   decl-struct-body:
 ///      decl*
 /// \endverbatim
@@ -5015,6 +5038,14 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
     SD->setInherited(Context.AllocateCopy(Inherited));
   }
+  
+  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  if (Tok.is(tok::kw_where)) {
+    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+    SD->setGenericParams(GenericParams);
+  }
 
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
@@ -5050,7 +5081,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
 /// \verbatim
 ///   decl-class:
 ///      'class' attribute-list identifier generic-params? inheritance?
-///          '{' decl-class-body '}
+///          where-clause? '{' decl-class-body '}
 ///   decl-class-body:
 ///      decl*
 /// \endverbatim
@@ -5094,6 +5125,14 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
     SmallVector<TypeLoc, 2> Inherited;
     Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
     CD->setInherited(Context.AllocateCopy(Inherited));
+  }
+
+  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  if (Tok.is(tok::kw_where)) {
+    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+    CD->setGenericParams(GenericParams);
   }
 
   SourceLoc LBLoc, RBLoc;
@@ -5379,6 +5418,13 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Attributes.add(new (Context) RethrowsAttr(throwsLoc));
   }
 
+  // Parse a 'where' clause if present, adding it to our GenericParamList.
+  if (Tok.is(tok::kw_where)) {
+    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
+  }
+  
   auto *SelfDecl = ParamDecl::createUnboundSelf(ConstructorLoc, CurDeclContext);
 
   Scope S2(this, ScopeKind::ConstructorBody);
