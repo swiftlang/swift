@@ -93,7 +93,7 @@ def type_executable(string):
 
     Convert it to absolute path.
     """
-    if os.access(string, os.X_OK):
+    if os.path.isfile(string) and os.access(string, os.X_OK):
         return os.path.abspath(string)
     raise argparse.ArgumentTypeError(
         "%r is not executable" % string)
