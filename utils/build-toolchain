@@ -13,6 +13,12 @@
 cd "$(dirname $0)/.." || exit
 SRC_DIR=$PWD
 
+DRY_RUN=
+if [[ "$1" == "-n" || "$1" == "--dry-run" ]] ; then
+    DRY_RUN="-n"
+    shift
+fi
+
 YEAR=$(date +"%Y")
 MONTH=$(date +"%m")
 DAY=$(date +"%d")
@@ -37,7 +43,7 @@ else
     SWIFT_PACKAGE=buildbot_linux
 fi
 
-./utils/build-script --preset="${SWIFT_PACKAGE}" \
+./utils/build-script ${DRY_RUN} --preset="${SWIFT_PACKAGE}" \
         install_destdir="${SWIFT_INSTALL_DIR}" \
         installable_package="${SWIFT_INSTALLABLE_PACKAGE}" \
         install_toolchain_dir="${SWIFT_TOOLCHAIN_DIR}" \

@@ -55,6 +55,7 @@ LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64;PowerPC;SystemZ"
 # referred to as `SWIFT_INSTALL_COMPONENTS` in the remainder of this script.
 KNOWN_SETTINGS=(
     # name                      default          description
+    dry-run                     ""               "print the commands that would be executed, but do not execute them"
     build-args                  ""               "arguments to the build tool; defaults to -j8 when CMake generator is \"Unix Makefiles\""
     build-dir                   ""               "out-of-tree build directory; default is in-tree. **This argument is required**"
     host-cc                     ""               "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
@@ -222,22 +223,41 @@ KNOWN_SETTINGS=(
 # Centalized access point for traced command invocation.
 # Every operation that might mutates file system should be called via
 # these functions.
+
 function call() {
-    { set -x; } 2>/dev/null
-    "$@"
-    { set +x; } 2>/dev/null
+    if [[ ${DRY_RUN} ]]; then
+        echo "${PS4}"$(quoted_print "$@")
+    else
+        { set -x; } 2>/dev/null
+        "$@"
+        { set +x; } 2>/dev/null
+    fi
 }
 
 function with_pushd() {
     local dir=$1
     shift
-    set -x
-    pushd "${dir}"
-    "$@"
-    { set -x; } 2>/dev/null # because $@ might includes { set +x; }
-    popd
-    { set +x; } 2>/dev/null
+    if [[ "$1" == "call" ]]; then
+        shift
+    fi
+    if [[ ${DRY_RUN} ]]; then
+        echo ${PS4}pushd "${dir}"
+        echo "${PS4}"$(quoted_print "$@")
+        echo ${PS4}popd
+    else
+        set -x
+        pushd "${dir}"
+        "$@"
+        { set -x; } 2>/dev/null # because $@ might includes { set +x; }
+        popd
+        { set +x; } 2>/dev/null
+    fi
 }
+
+function quoted_print() {
+    python -c 'import pipes; import sys; print(" ".join(pipes.quote(arg) for arg in sys.argv[1:]))' "$@"
+}
+
 
 function toupper() {
     echo "$@" | tr '[:lower:]' '[:upper:]'
@@ -1434,7 +1454,7 @@ function set_swiftpm_bootstrap_command() {
             XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
         fi
     fi
-    if [ ! -e "${LLBUILD_BIN}" ]; then
+    if [ "${SKIP_BUILD_LLBUILD}" ]; then
         echo "Error: Cannot build swiftpm without llbuild (swift-build-tool)."
         exit 1
     fi
@@ -2334,7 +2354,11 @@ for host in "${ALL_HOSTS[@]}"; do
             if [[ "${target}" != "" ]]; then
                 echo "--- ${target} ---"
                 trap "tests_busted ${product} '(${target})'" ERR
-                if [[ "${CMAKE_GENERATOR}" == Ninja ]] && !( "${build_cmd[@]}" --version 2>&1 | grep -i -q llbuild ); then
+
+                # NOTE: In dry-run mode, build_dir might not exist yet. In that
+                #       case, -n query will fail. So, in dry-run mode,
+                #       we don't expand test script.
+                if [[ ! "${DRY_RUN}" && "${CMAKE_GENERATOR}" == Ninja ]] && !( "${build_cmd[@]}" --version 2>&1 | grep -i -q llbuild ); then
                     # Ninja buffers command output to avoid scrambling the output
                     # of parallel jobs, which is awesome... except that it
                     # interferes with the progress meter when testing.  Instead of
@@ -2530,29 +2554,38 @@ for host in "${ALL_HOSTS[@]}"; do
     done
 
     if [[ "${DARWIN_INSTALL_EXTRACT_SYMBOLS}" ]] && [[ $(host_has_darwin_symbols ${host}) ]]; then
-        set -x
-        # Copy executables and shared libraries from the `host_install_destdir` to
-        # INSTALL_SYMROOT and run dsymutil on them.
-        (cd "${host_install_destdir}" &&
-         find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | cpio -pdm "${INSTALL_SYMROOT}")
+        echo "--- Extracting symbols ---"
 
-        # Run dsymutil on executables and shared libraries.
-        #
-        # Exclude shell scripts.
-        (cd "${INSTALL_SYMROOT}" &&
-         find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | \
-           grep -v swift-stdlib-tool | \
-           grep -v crashlog.py | \
-           grep -v symbolication.py | \
-           xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool dsymutil))
+        # FIXME: Since it's hard to trace output pipe call,
+        #        For now, We don't support dry-run trace for this block
+        #        Instead, just echo we do "darwin_intall_extract_symbols".
+        if [[ "${DRY_RUN}" ]]; then
+            call darwin_install_extract_symbols
+        else
+            set -x
+            # Copy executables and shared libraries from the `host_install_destdir` to
+            # INSTALL_SYMROOT and run dsymutil on them.
+            (cd "${host_install_destdir}" &&
+             find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | cpio -pdm "${INSTALL_SYMROOT}")
 
-        # Strip executables, shared libraries and static libraries in
-        # `host_install_destdir`.
-        find "${host_install_destdir}${TOOLCHAIN_PREFIX}/" \
-          -perm -0111 -or -name "*.a" -type f -print | \
-          xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
+            # Run dsymutil on executables and shared libraries.
+            #
+            # Exclude shell scripts.
+            (cd "${INSTALL_SYMROOT}" &&
+             find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | \
+               grep -v swift-stdlib-tool | \
+               grep -v crashlog.py | \
+               grep -v symbolication.py | \
+               xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool dsymutil))
 
-        { set +x; } 2>/dev/null
+            # Strip executables, shared libraries and static libraries in
+            # `host_install_destdir`.
+            find "${host_install_destdir}${TOOLCHAIN_PREFIX}/" \
+              -perm -0111 -or -name "*.a" -type f -print | \
+              xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
+
+            { set +x; } 2>/dev/null
+        fi
     fi
 done
 # Everything is 'installed', but some products may be awaiting lipo.
