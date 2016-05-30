@@ -188,9 +188,9 @@ class Missile {
 }
 
 func checkPointerCorrectness(_ check: Check,
+  _ withMissiles: Bool = false,
   _ f: (UnsafeMutablePointer<Missile>) ->
-    (UnsafeMutablePointer<Missile>, count: Int) -> Void,
-  _ withMissiles: Bool = false) {
+    (UnsafeMutablePointer<Missile>, count: Int) -> Void) {
   let ptr = UnsafeMutablePointer<Missile>(allocatingCapacity: 4)
   switch check {
   case .RightOverlap:
@@ -235,9 +235,23 @@ func checkPointerCorrectness(_ check: Check,
   }
 }
 
-let checkPtr: (((UnsafeMutablePointer<Missile>) ->
-  (UnsafeMutablePointer<Missile>, count: Int) -> Void), Bool) -> (Check) -> Void
-  = { (f, m) in return { checkPointerCorrectness($0, f, m) } }
+func checkPtr(
+  _ f: ((UnsafeMutablePointer<Missile>) -> (UnsafeMutablePointer<Missile>, count: Int) -> Void), 
+  _ m: Bool
+) -> (Check) -> Void {
+  return { checkPointerCorrectness($0, m, f) }
+}
+
+func checkPtr(
+  _ f: ((UnsafeMutablePointer<Missile>) -> (UnsafePointer<Missile>, count: Int) -> Void), 
+  _ m: Bool
+) -> (Check) -> Void {
+  return {
+    checkPointerCorrectness($0, m) { destPtr in 
+      return { f(destPtr)(UnsafeMutablePointer($0), count: $1) }
+    } 
+  }
+}
 
 UnsafeMutablePointerTestSuite.test("moveInitializeBackwardFrom") {
   let check = checkPtr(UnsafeMutablePointer.moveInitializeBackwardFrom, false)
@@ -321,6 +335,41 @@ UnsafeMutablePointerTestSuite.test("initializeFrom.Right") {
     check(Check.RightOverlap)
   }
 }
+
+UnsafeMutablePointerTestSuite.test("initializeFrom/immutable") {  
+  var ptr = UnsafeMutablePointer<Missile>(allocatingCapacity: 3)
+  defer {
+    ptr.deinitialize(count: 3)
+    ptr.deallocateCapacity(3)
+  }
+  let source = (0..<3).map(Missile.init)
+  source.withUnsafeBufferPointer { bufferPtr in
+    ptr.initializeFrom(bufferPtr.baseAddress!, count: 3)
+    expectEqual(0, ptr[0].number)
+    expectEqual(1, ptr[1].number)
+    expectEqual(2, ptr[2].number)
+  }
+}
+
+% for assign in ['assignFrom', 'assignBackwardFrom']:
+
+UnsafeMutablePointerTestSuite.test("${assign}/immutable") {  
+  var ptr = UnsafeMutablePointer<Missile>(allocatingCapacity: 2)
+  defer {
+    ptr.deinitialize(count: 2)
+    ptr.deallocateCapacity(2)
+  }
+  ptr.initialize(with: Missile(1))
+  (ptr + 1).initialize(with: Missile(2))
+  let source = (3..<5).map(Missile.init)
+  source.withUnsafeBufferPointer { bufferPtr in
+    ptr.${assign}(bufferPtr.baseAddress!, count: 2)
+    expectEqual(3, ptr[0].number)
+    expectEqual(4, ptr[1].number)
+  }
+}
+
+% end
 
 UnsafePointerTestSuite.test("customMirror") {
   // Ensure that the custom mirror works properly, including when the raw value
