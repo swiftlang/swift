@@ -194,6 +194,35 @@ def get_preset_options(substitutions, preset_file_names, preset_name):
                          "': " + ", ".join(missing_opts))
         sys.exit(1)
 
+    # Migrate 'swift-sdks' parameter to 'stdlib-deployment-targets'
+    for opt in build_script_impl_opts:
+        if opt.startswith("--swift-sdks"):
+            sdksToConfigure = opt.split("=")[1].split(";")
+            tgts = []
+            # Expand SDKs in to their deployment targets
+            from swift_build_support.targets import StdlibDeploymentTarget
+            for sdk in sdksToConfigure:
+                if sdk == "OSX":
+                    tgts += StdlibDeploymentTarget.OSX.allArchs
+                elif sdk == "IOS":
+                    tgts += StdlibDeploymentTarget.iOS.allArchs
+                elif sdk == "IOS_SIMULATOR":
+                    tgts += StdlibDeploymentTarget.iOSSimulator.allArchs
+                elif sdk == "TVOS":
+                    tgts += StdlibDeploymentTarget.AppleTV.allArchs
+                elif sdk == "TVOS_SIMULATOR":
+                    tgts += StdlibDeploymentTarget.AppleTVSimulator.allArchs
+                elif sdk == "WATCHOS":
+                    tgts += StdlibDeploymentTarget.AppleWatch.allArchs
+                elif sdk == "WATCHOS_SIMULATOR":
+                    tgts += StdlibDeploymentTarget.AppleWatchSimulator.allArchs
+
+            build_script_opts.append("--stdlib-deployment-targets=" +
+                                     " ".join(tgts))
+    # Filter the swift-sdks parameter
+    build_script_impl_opts = [opt for opt in build_script_impl_opts
+                              if not opt.startswith("--swift-sdks")]
+
     return build_script_opts + ["--"] + build_script_impl_opts
 
 
