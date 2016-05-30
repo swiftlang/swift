@@ -78,7 +78,7 @@ def type_clang_compiler_version(string):
 
     Support only "MAJOR.MINOR.PATCH" format.
     """
-    m = re.match(r'([0-9]*)\.([0-9]*)\.([0-9]*)', string)
+    m = re.match(r'^([0-9]+)\.([0-9]+)\.([0-9]+)$', string)
     if m is not None:
         return m.group(1, 2, 3)
     raise argparse.ArgumentTypeError(

@@ -50,12 +50,18 @@ class ArgumentsTypeTestCase(unittest.TestCase):
             argparse.ArgumentTypeError,
             argtype.clang_compiler_version,
             "1.beta2.3")
-        self.assertEqual(
-            argtype.clang_compiler_version("1.2.preview3"),
-            ("1", "2", ""))
-        self.assertEqual(
-            argtype.clang_compiler_version("1.2.3-rc4"),
-            ("1", "2", "3"))
+        self.assertRaises(
+            argparse.ArgumentTypeError,
+            argtype.clang_compiler_version,
+            "1.2.preview3")
+        self.assertRaises(
+            argparse.ArgumentTypeError,
+            argtype.clang_compiler_version,
+            "1.2.3-rc4")
+        self.assertRaises(
+            argparse.ArgumentTypeError,
+            argtype.clang_compiler_version,
+            "1..2")
 
     def test_executable(self):
         python = sys.executable
