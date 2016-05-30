@@ -1032,17 +1032,25 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
   assert(!hasGuard || !clauses[row].isIrrefutable());
 
   auto stmt = clauses[row].getClientData<CaseStmt>();
-  ArrayRef<CaseLabelItem> labelItems = stmt->getCaseLabelItems();
-  bool hasMultipleItems = labelItems.size() > 1;
+  bool hasMultipleItems = false;
+  if (stmt->getKind() == StmtKind::Case) {
+    ArrayRef<CaseLabelItem> labelItems = stmt->getCaseLabelItems();
+    hasMultipleItems = labelItems.size() > 1;
+  }
   
   // Bind the rest of the patterns.
   bindIrrefutablePatterns(clauses[row], args, !hasGuard, hasMultipleItems);
 
   // Emit the guard branch, if it exists.
   if (guardExpr) {
-    SGF.usingImplicitVariablesForPattern(clauses[row].getCasePattern(), stmt, [&]{
-      this->emitGuardBranch(guardExpr, guardExpr, failure);
-    });
+    if (stmt->getKind() == StmtKind::Case) {
+      SGF.usingImplicitVariablesForPattern(clauses[row].getCasePattern(), stmt, [&]{
+        this->emitGuardBranch(guardExpr, guardExpr, failure);
+      });
+    } else {
+      assert(stmt->getKind() == StmtKind::Catch);
+      emitGuardBranch(guardExpr, guardExpr, failure);
+    }
   }
 
   // Enter the row.
