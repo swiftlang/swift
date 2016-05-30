@@ -178,16 +178,15 @@ public protocol IteratorProtocol {
   /// The type of element traversed by the iterator.
   associatedtype Element
 
-  /// Advances and returns the next element of the underlying sequence, or
-  /// `nil` if no next element exists.
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// Repeatedly calling this method returns, in order, all the elements of the
-  /// underlying sequence. After the sequence has run out of elements, the
-  /// `next()` method returns `nil`.
+  /// underlying sequence.  As soon as the sequence has run out of elements, all
+  /// subsequent calls return `nil`.
   ///
-  /// You must not call this method if it has previously returned `nil` or if
-  /// any other copy of this iterator has been advanced with a call to its
-  /// `next()` method.
+  /// You must not call this method if any other copy of this iterator has been
+  /// advanced with a call to its `next()` method.
   ///
   /// The following example shows how an iterator can be used explicitly to
   /// emulate a `for`-`in` loop. First, retrieve a sequence's iterator, and
@@ -1196,12 +1195,13 @@ public struct IteratorSequence<
     _base = base
   }
 
-  /// Advances to the next element and returns it, or `nil` if no next
-  /// element exists.
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
-  ///   since the copy was made, and no preceding call to `self.next()`
-  ///   has returned `nil`.
+  ///   since the copy was made.
   public mutating func next() -> Base.Element? {
     return _base.next()
   }

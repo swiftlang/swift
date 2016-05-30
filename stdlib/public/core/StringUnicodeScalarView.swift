@@ -245,13 +245,13 @@ extension String {
         }
       }
 
-      /// Advances to the next element and returns it.
+      /// Advances to the next element and returns it, or `nil` if no next
+      /// element exists.
       ///
-      /// Do not call this method if a copy of the iterator has been advanced.
+      /// Once `nil` has been returned, all subsequent calls return `nil`.
       ///
-      /// - Returns: The next element in the collection if an element is
-      ///   available; otherwise, `nil`. After returning `nil` once, this
-      ///   method returns `nil` on every subsequent call.
+      /// - Precondition: `next()` has not been applied to a copy of `self`
+      ///   since the copy was made.
       public mutating func next() -> UnicodeScalar? {
         var result: UnicodeDecodingResult
         if _baseSet {

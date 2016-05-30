@@ -31,12 +31,13 @@ public struct Zip2Iterator<
     (_baseStream1, _baseStream2) = (iterator1, iterator2)
   }
 
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
-  ///   since the copy was made, and no preceding call to `self.next()`
-  ///   has returned `nil`.
+  ///   since the copy was made.
   public mutating func next() -> Element? {
     // The next() function needs to track if it has reached the end. If we
     // didn't, and the first sequence is longer than the second, then when we

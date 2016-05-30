@@ -36,8 +36,10 @@ public struct JoinedIterator<
     self._separatorData = ContiguousArray(separator)
   }
 
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Base.Element.Iterator.Element? {
     repeat {
       switch _state {
