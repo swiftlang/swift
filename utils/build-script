@@ -1136,98 +1136,49 @@ details of the setups of other systems or automated environments.""")
             platform.system() != "Darwin"):
         args.build_foundation = True
 
-    # Propagate global --skip-build
-    if args.skip_build:
-        args.skip_build_linux = True
-        args.skip_build_freebsd = True
-        args.skip_build_cygwin = True
-        args.skip_build_osx = True
-        args.skip_build_ios = True
-        args.skip_build_tvos = True
-        args.skip_build_watchos = True
-        args.skip_build_android = True
-        args.skip_build_benchmarks = True
-        args.build_lldb = False
-        args.build_llbuild = False
-        args.build_swiftpm = False
-        args.build_xctest = False
-        args.build_foundation = False
-        args.build_libdispatch = False
-
-    # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
-    # merely shorthands for --skip-build-{**os}-{device,simulator}
-    if not args.ios or args.skip_build_ios:
-        args.skip_build_ios_device = True
-        args.skip_build_ios_simulator = True
-
-    if not args.tvos or args.skip_build_tvos:
-        args.skip_build_tvos_device = True
-        args.skip_build_tvos_simulator = True
-
-    if not args.watchos or args.skip_build_watchos:
-        args.skip_build_watchos_device = True
-        args.skip_build_watchos_simulator = True
-
-    if not args.android or args.skip_build_android:
-        args.skip_build_android = True
-
     # --validation-test implies --test.
     if args.validation_test:
+        args.test = True
+
+    # --long-test implies --test.
+    if args.long_test:
         args.test = True
 
     # --test-optimized implies --test.
     if args.test_optimized:
         args.test = True
 
-    # If none of tests specified skip swift stdlib test on all platforms
-    if not args.test and not args.validation_test and not args.long_test:
-        args.skip_test_linux = True
-        args.skip_test_freebsd = True
-        args.skip_test_cygwin = True
-        args.skip_test_osx = True
-        args.skip_test_ios = True
-        args.skip_test_tvos = True
-        args.skip_test_watchos = True
+    # Expand iOS skip_build/test arguments for both device and simulator.
+    if args.skip_build_ios:
+        args.skip_build_ios_device = True
+        args.skip_build_ios_simulator = True
 
-    # --skip-test-ios is merely a shorthand for host and simulator tests.
+    if args.skip_build_tvos:
+        args.skip_build_tvos_device = True
+        args.skip_build_tvos_simulator = True
+
+    if args.skip_build_watchos:
+        args.skip_build_watchos_device = True
+        args.skip_build_watchos_simulator = True
+
     if args.skip_test_ios:
         args.skip_test_ios_host = True
         args.skip_test_ios_simulator = True
-    # --skip-test-tvos is merely a shorthand for host and simulator tests.
+
     if args.skip_test_tvos:
         args.skip_test_tvos_host = True
         args.skip_test_tvos_simulator = True
-    # --skip-test-watchos is merely a shorthand for host and simulator tests.
+
     if args.skip_test_watchos:
         args.skip_test_watchos_host = True
         args.skip_test_watchos_simulator = True
 
-    # --skip-build-{ios,tvos,watchos}-{device,simulator} implies
-    # --skip-test-{ios,tvos,watchos}-{host,simulator}
-    if args.skip_build_ios_device:
-        args.skip_test_ios_host = True
-    if args.skip_build_ios_simulator:
-        args.skip_test_ios_simulator = True
-
-    if args.skip_build_tvos_device:
-        args.skip_test_tvos_host = True
-    if args.skip_build_tvos_simulator:
-        args.skip_test_tvos_simulator = True
-
-    if args.skip_build_watchos_device:
-        args.skip_test_watchos_host = True
-    if args.skip_build_watchos_simulator:
-        args.skip_test_watchos_simulator = True
-
-    if not args.host_test:
-        args.skip_test_ios_host = True
-        args.skip_test_tvos_host = True
-        args.skip_test_watchos_host = True
-
     if args.build_subdir is None:
         args.build_subdir = compute_build_subdir(args)
 
-    # Add optional stdlib-deployment-targets
+    # Configure additional selected stdlib-deployment-targets
+    # (we do not need to configure iOS targets, they are part of the default
+    # list).
     if args.android:
         args.stdlib_deployment_targets.append(
             StdlibDeploymentTarget.Android.armv7)
@@ -1338,10 +1289,61 @@ details of the setups of other systems or automated environments.""")
             "--install-symroot", os.path.abspath(args.install_symroot)
         ]
 
+    # Create the build target list.
+    #
+    # Take all of the configured stdlib-deployment-targets
+    # and subtract any we've been told to skip.
+
+    skipped_targets = []
+    if args.skip_build_linux:
+        skipped_targets += StdlibDeploymentTarget.Linux.allArchs
+    if args.skip_build_freebsd:
+        skipped_targets += StdlibDeploymentTarget.FreeBSD.allArchs
+    if args.skip_build_cygwin:
+        skipped_targets += StdlibDeploymentTarget.Cygwin.allArchs
+    if args.skip_build_android:
+        skipped_targets += StdlibDeploymentTarget.Android.allArchs
+    if args.skip_build_osx:
+        skipped_targets += StdlibDeploymentTarget.OSX.allArchs
+
+    # iOS targets are special: they are configured by default, but only built
+    # if the appropriate '--ios'/'--tvos'/... flag is given.
+    if args.skip_build_ios_device or not args.ios:
+        skipped_targets += StdlibDeploymentTarget.iOS.allArchs
+    if args.skip_build_ios_simulator or not args.ios:
+        skipped_targets += StdlibDeploymentTarget.iOSSimulator.allArchs
+    if args.skip_build_tvos_device or not args.tvos:
+        skipped_targets += StdlibDeploymentTarget.AppleTV.allArchs
+    if args.skip_build_tvos_simulator or not args.tvos:
+        skipped_targets += StdlibDeploymentTarget.AppleTVSimulator.allArchs
+    if args.skip_build_watchos_device or not args.watchos:
+        skipped_targets += StdlibDeploymentTarget.AppleWatch.allArchs
+    if args.skip_build_watchos_simulator or not args.watchos:
+        skipped_targets += StdlibDeploymentTarget.AppleWatchSimulator.allArchs
+
+    build_stdlib_deployment_targets = [
+        x for x in args.stdlib_deployment_targets
+        if x not in skipped_targets]
+
+    if args.skip_build or len(build_stdlib_deployment_targets) == 0:
+        build_stdlib_deployment_targets = ['none']
+
+    build_script_impl_args += ["--build-stdlib-deployment-targets",
+                               " ".join(build_stdlib_deployment_targets)]
+
+    # Decide which products to build.
     if args.skip_build:
         build_script_impl_args += ["--skip-build-cmark",
                                    "--skip-build-llvm",
                                    "--skip-build-swift"]
+        args.skip_build_benchmarks = True
+        args.build_lldb = False
+        args.build_llbuild = False
+        args.build_swiftpm = False
+        args.build_xctest = False
+        args.build_foundation = False
+        args.build_libdispatch = False
+
     if args.skip_build_benchmarks:
         build_script_impl_args += ["--skip-build-benchmarks"]
     if not args.build_foundation:
@@ -1357,29 +1359,46 @@ details of the setups of other systems or automated environments.""")
     if not args.build_swiftpm:
         build_script_impl_args += ["--skip-build-swiftpm"]
 
-    if args.skip_build_linux:
-        build_script_impl_args += ["--skip-build-linux"]
-    if args.skip_build_freebsd:
-        build_script_impl_args += ["--skip-build-freebsd"]
-    if args.skip_build_cygwin:
-        build_script_impl_args += ["--skip-build-cygwin"]
-    if args.skip_build_osx:
-        build_script_impl_args += ["--skip-build-osx"]
-    if args.skip_build_ios_device:
-        build_script_impl_args += ["--skip-build-ios-device"]
-    if args.skip_build_ios_simulator:
-        build_script_impl_args += ["--skip-build-ios-simulator"]
-    if args.skip_build_tvos_device:
-        build_script_impl_args += ["--skip-build-tvos-device"]
-    if args.skip_build_tvos_simulator:
-        build_script_impl_args += ["--skip-build-tvos-simulator"]
-    if args.skip_build_watchos_device:
-        build_script_impl_args += ["--skip-build-watchos-device"]
-    if args.skip_build_watchos_simulator:
-        build_script_impl_args += ["--skip-build-watchos-simulator"]
-    if args.skip_build_android:
-        build_script_impl_args += ["--skip-build-android"]
+    # Create the test target list.
+    #
+    # Take all of the stdlib-deployment-targets that we're actually building,
+    # and subtract any we've been told to skip.
 
+    skip_test_tgts = []
+    if args.skip_test_linux:
+        skip_test_tgts += StdlibDeploymentTarget.Linux.allArchs
+    if args.skip_test_freebsd:
+        skip_test_tgts += StdlibDeploymentTarget.FreeBSD.allArchs
+    if args.skip_test_cygwin:
+        skip_test_tgts += StdlibDeploymentTarget.Cygwin.allArchs
+    if args.skip_test_osx:
+        skip_test_tgts += StdlibDeploymentTarget.OSX.allArchs
+    if args.skip_test_ios_simulator:
+        skip_test_tgts += StdlibDeploymentTarget.iOSSimulator.allArchs
+    if args.skip_test_tvos_simulator:
+        skip_test_tgts += StdlibDeploymentTarget.AppleTVSimulator.allArchs
+    if args.skip_test_watchos_simulator:
+        skip_test_tgts += StdlibDeploymentTarget.AppleWatchSimulator.allArchs
+    if args.skip_test_ios_host or not args.host_test:
+        skip_test_tgts += StdlibDeploymentTarget.iOS.allArchs
+    if args.skip_test_tvos_host or not args.host_test:
+        skip_test_tgts += StdlibDeploymentTarget.AppleTV.allArchs
+    if args.skip_test_watchos_host or not args.host_test:
+        skip_test_tgts += StdlibDeploymentTarget.AppleWatch.allArchs
+
+    # The tests do not work on Android yet.
+    skip_test_tgts += StdlibDeploymentTarget.Android.allArchs
+
+    if args.test:
+        test_deployment_targets = [
+            x for x in build_stdlib_deployment_targets
+            if x not in skip_test_tgts]
+
+        if len(test_deployment_targets) > 0:
+            build_script_impl_args += ["--test-stdlib-deployment-targets",
+                                       " ".join(test_deployment_targets)]
+
+    # Decide which products to test
     if not args.test and not args.long_test:
         build_script_impl_args += ["--skip-test-swift"]
     if not args.test:
@@ -1390,26 +1409,7 @@ details of the setups of other systems or automated environments.""")
                                    "--skip-test-xctest",
                                    "--skip-test-foundation",
                                    "--skip-test-libdispatch"]
-    if args.skip_test_linux:
-        build_script_impl_args += ["--skip-test-linux"]
-    if args.skip_test_freebsd:
-        build_script_impl_args += ["--skip-test-freebsd"]
-    if args.skip_test_cygwin:
-        build_script_impl_args += ["--skip-test-cygwin"]
-    if args.skip_test_osx:
-        build_script_impl_args += ["--skip-test-osx"]
-    if args.skip_test_ios_host:
-        build_script_impl_args += ["--skip-test-ios-host"]
-    if args.skip_test_ios_simulator:
-        build_script_impl_args += ["--skip-test-ios-simulator"]
-    if args.skip_test_tvos_host:
-        build_script_impl_args += ["--skip-test-tvos-host"]
-    if args.skip_test_tvos_simulator:
-        build_script_impl_args += ["--skip-test-tvos-simulator"]
-    if args.skip_test_watchos_host:
-        build_script_impl_args += ["--skip-test-watchos-host"]
-    if args.skip_test_watchos_simulator:
-        build_script_impl_args += ["--skip-test-watchos-simulator"]
+
     if args.build_runtime_with_host_compiler:
         build_script_impl_args += ["--build-runtime-with-host-compiler"]
     if args.validation_test:
@@ -1421,6 +1421,7 @@ details of the setups of other systems or automated environments.""")
     if not args.test_optimized:
         build_script_impl_args += ["--skip-test-optimized"]
 
+    # Other arguments
     if args.android:
         build_script_impl_args += [
             "--android-ndk", args.android_ndk,

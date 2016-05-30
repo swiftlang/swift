@@ -105,17 +105,6 @@ KNOWN_SETTINGS=(
     skip-build-cmark            ""               "set to skip building CommonMark"
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
     skip-build-swift            ""               "set to skip building Swift"
-    skip-build-linux            ""               "set to skip building Swift stdlibs for Linux"
-    skip-build-freebsd          ""               "set to skip building Swift stdlibs for FreeBSD"
-    skip-build-cygwin           ""               "set to skip building Swift stdlibs for Cygwin"
-    skip-build-osx              ""               "set to skip building Swift stdlibs for OSX"
-    skip-build-ios-device       ""               "set to skip building Swift stdlibs for iOS devices (i.e. build simulators only)"
-    skip-build-ios-simulator    ""               "set to skip building Swift stdlibs for iOS simulators (i.e. build devices only)"
-    skip-build-tvos-device      ""               "set to skip building Swift stdlibs for tvOS devices (i.e. build simulators only)"
-    skip-build-tvos-simulator   ""               "set to skip building Swift stdlibs for tvOS simulators (i.e. build devices only)"
-    skip-build-watchos-device   ""               "set to skip building Swift stdlibs for Apple watchOS devices (i.e. build simulators only)"
-    skip-build-watchos-simulator ""              "set to skip building Swift stdlibs for Apple watchOS simulators (i.e. build devices only)"
-    skip-build-android          ""               "set to skip building Swift stdlibs for Android"
     skip-build-lldb             ""               "set to skip building LLDB"
     skip-build-llbuild          ""               "set to skip building llbuild"
     skip-build-swiftpm          ""               "set to skip building swiftpm"
@@ -131,16 +120,6 @@ KNOWN_SETTINGS=(
     skip-test-xctest            ""               "set to skip testing xctest"
     skip-test-foundation        ""               "set to skip testing foundation"
     skip-test-libdispatch       ""               "set to skip testing libdispatch"
-    skip-test-linux             ""               "set to skip testing Swift stdlibs for Linux"
-    skip-test-freebsd           ""               "set to skip testing Swift stdlibs for FreeBSD"
-    skip-test-cygwin            ""               "set to skip testing Swift stdlibs for Cygwin"
-    skip-test-osx               ""               "set to skip testing Swift stdlibs for OSX"
-    skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
-    skip-test-ios-host          ""               "set to skip testing the host parts of the iOS toolchain"
-    skip-test-tvos-simulator    ""               "set to skip testing Swift stdlibs for tvOS simulators (i.e. test devices only)"
-    skip-test-tvos-host         ""               "set to skip testing the host parts of the tvOS toolchain"
-    skip-test-watchos-simulator  ""              "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
-    skip-test-watchos-host      ""               "set to skip testing the host parts of the watchOS toolchain"
     validation-test             "0"              "set to run the validation test suite"
     long-test                   "0"              "set to run the long test suite"
     skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
@@ -181,7 +160,8 @@ KNOWN_SETTINGS=(
     darwin-install-extract-symbols ""            "whether to extract symbols with dsymutil during installations"
     host-target                 ""               "The host target. LLVM, Clang, and Swift will be built for this target. The built LLVM and Clang will be used to compile Swift for the cross-compilation targets. **This argument is required**"
     stdlib-deployment-targets   ""               "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
-    build-stdlib-deployment-targets "all"        "space-separated list that filters which of the configured targets to build the Swift standard library for, or 'all'"
+    build-stdlib-deployment-targets "all"        "space-separated list that determines which of the configured targets to build the Swift standard library for, or 'all' (default) or 'none'"
+    test-stdlib-deployment-targets   "none"      "space-separated list that determines which of the configured targets to build the Swift standard library tests for, or 'all' or 'none' (default)"
     cross-compile-hosts         ""               "space-separated list of targets to cross-compile host Swift tools for"
     cross-compile-with-host-tools  ""            "set to use the clang we build for the host to then build the cross-compile hosts"
     cross-compile-install-prefixes      ""       "semicolon-separated list of install prefixes to use for the cross-compiled hosts. The list expands, so if there are more cross-compile hosts than prefixes, unmatched hosts use the last prefix in the list"
@@ -973,8 +953,11 @@ function get_stdlib_targets_for_host() {
 function should_build_stdlib_target() {
     local stdlib_target=$1
     local host=$2
+
     if [[ "${BUILD_STDLIB_DEPLOYMENT_TARGETS}" == "all" ]]; then
         echo 1
+    elif [[ "${BUILD_STDLIB_DEPLOYMENT_TARGETS}" == "none" ]]; then
+        return
     else
         # Only build the stdlib targets in 'build-stdlib-deployment-targets'
         local build_list=($BUILD_STDLIB_DEPLOYMENT_TARGETS)
@@ -986,6 +969,31 @@ function should_build_stdlib_target() {
         # As with 'stdlib-deployment-targets', 'build-stdlib-deployment-targets'
         # only applies to the LOCAL_HOST. For cross-tools hosts, always allow
         # their one-and-only stdlib-target to build.
+        if [[ $(is_cross_tools_host ${host}) ]] && [[ "${stdlib_target}" == "${host}" ]]; then
+            echo 1
+        fi
+    fi
+}
+
+function should_test_stdlib_target() {
+    local stdlib_target=$1
+    local host=$2
+
+    if [[ "${TEST_STDLIB_DEPLOYMENT_TARGETS}" == "all" ]]; then
+        echo 1
+    elif [[ "${TEST_STDLIB_DEPLOYMENT_TARGETS}" == "none" ]]; then
+        return
+    else
+        # Only test the stdlib targets in 'test-stdlib-deployment-targets'
+        local test_list=($TEST_STDLIB_DEPLOYMENT_TARGETS)
+        for t in "${test_list[@]}"; do
+            if [[ "${t}" == "${stdlib_target}" ]]; then
+                echo 1
+            fi
+        done
+        # As with 'stdlib-deployment-targets', 'test-stdlib-deployment-targets'
+        # only applies to the LOCAL_HOST. For cross-tools hosts, always test
+        # their one-and-only stdlib-target.
         if [[ $(is_cross_tools_host ${host}) ]] && [[ "${stdlib_target}" == "${host}" ]]; then
             echo 1
         fi
@@ -1096,91 +1104,61 @@ function calculate_targets_for_host() {
     for stdlib_deployment_target in "${stdlib_targets[@]}"; do
         local swift_sdk=
         local is_in_build_list=$(should_build_stdlib_target ${stdlib_deployment_target} ${host})
-        local build_for_this_target=1
-        local test_this_target=1
+        local is_in_test_list=$(should_test_stdlib_target ${stdlib_deployment_target} ${host})
         local test_host_only=
-        local build_benchmark_this_target=
-        local test_benchmark_this_target=
+        local supports_benchmarks=
 
         case ${stdlib_deployment_target} in
             linux-*)
                 swift_sdk="LINUX"
-                build_for_this_target=$(not ${SKIP_BUILD_LINUX})
-                test_this_target=$(not ${SKIP_TEST_LINUX})
                 ;;
             freebsd-*)
                 swift_sdk="FREEBSD"
-                build_for_this_target=$(not ${SKIP_BUILD_FREEBSD})
-                test_this_target=$(not ${SKIP_TEST_FREEBSD})
                 ;;
             cygwin-*)
                 swift_sdk="CYGWIN"
-                build_for_this_target=$(not ${SKIP_BUILD_CYGWIN})
-                test_this_target=$(not ${SKIP_TEST_CYGWIN})
                 ;;
             macosx-*)
                 swift_sdk="OSX"
-                build_for_this_target=$(not ${SKIP_BUILD_OSX})
-                test_this_target=$(not ${SKIP_TEST_OSX})
-                build_benchmark_this_target=$(not ${SKIP_BUILD_OSX})
-                test_benchmark_this_target=$(not ${SKIP_BUILD_OSX})
+                supports_benchmarks=1
                 ;;
             iphoneos-*)
                 swift_sdk="IOS"
-                build_for_this_target=$(not ${SKIP_BUILD_IOS_DEVICE})
-                if [[ ! "${SKIP_TEST_IOS_HOST}" ]] ; then
+                if [[ "${is_in_test_list}" ]] ; then
                     test_host_only=1
-                else
-                    test_this_target=
                 fi
-                build_benchmark_this_target=$(not ${SKIP_BUILD_IOS_DEVICE})
+                supports_benchmarks=1
 
                 # Never build iOS armv7s benchmarks.
                 if [[ "${stdlib_deployment_target}" == "iphoneos-armv7s" ]]; then
-                    build_benchmark_this_target=
+                    supports_benchmarks=
                 fi
                 ;;
             iphonesimulator-*)
                 swift_sdk="IOS_SIMULATOR"
-                build_for_this_target=$(not ${SKIP_BUILD_IOS_SIMULATOR})
-                test_this_target=$(not ${SKIP_TEST_IOS_SIMULATOR})
                 ;;
             appletvos-*)
                 swift_sdk="TVOS"
-                build_for_this_target=$(not ${SKIP_BUILD_TVOS_DEVICE})
-                if [[ ! "${SKIP_TEST_TVOS_HOST}" ]] ; then
+                if [[ "${is_in_test_list}" ]] ; then
                     test_host_only=1
-                else
-                    test_this_target=
                 fi
-                build_benchmark_this_target=$(not ${SKIP_BUILD_TVOS_DEVICE})
+                supports_benchmarks=1
                 ;;
             appletvsimulator-*)
                 swift_sdk="TVOS_SIMULATOR"
-                build_for_this_target=$(not ${SKIP_BUILD_TVOS_SIMULATOR})
-                test_this_target=$(not ${SKIP_TEST_TVOS_SIMULATOR})
                 ;;
             watchos-*)
                 swift_sdk="WATCHOS"
-                build_for_this_target=$(not ${SKIP_BUILD_WATCHOS_DEVICE})
-                if [[ ! "${SKIP_TEST_WATCHOS_HOST}" ]] ; then
+                if [[ "${is_in_test_list}" ]] ; then
                     test_host_only=1
-                else
-                    test_this_target=
                 fi
-                build_benchmark_this_target=$(not ${SKIP_BUILD_WATCHOS_DEVICE})
+                supports_benchmarks=1
                 ;;
             watchsimulator-*)
                 swift_sdk="WATCHOS_SIMULATOR"
-                build_for_this_target=$(not ${SKIP_BUILD_WATCHOS_SIMULATOR})
-                test_this_target=$(not ${SKIP_TEST_WATCHOS_SIMULATOR})
                 ;;
             android-*)
                 swift_sdk="ANDROID"
-                build_for_this_target=$(not ${SKIP_BUILD_ANDROID})
-                # FIXME: Allow Android host tests to be enabled/disabled by the
-                #        build script.
-                test_this_target=
                 ;;
             *)
                 echo "Unknown compiler deployment target: ${stdlib_deployment_target}"
@@ -1190,7 +1168,7 @@ function calculate_targets_for_host() {
 
         SWIFT_SDKS+=("${swift_sdk}")
 
-        if [[ "${build_for_this_target}" ]] && [[ "${is_in_build_list}" ]]; then
+        if [[ "${is_in_build_list}" ]]; then
 
             if [[ "${BUILD_SWIFT_STDLIB_UNITTEST_EXTRA}" == "1" ]] ; then
                 SWIFT_STDLIB_TARGETS+=("swift-stdlib-${stdlib_deployment_target}")
@@ -1201,34 +1179,34 @@ function calculate_targets_for_host() {
                     SWIFT_STDLIB_TARGETS+=("swift-test-stdlib-${stdlib_deployment_target}")
                 fi
             fi
-        fi
-        if [[ "${build_benchmark_this_target}" ]] && [[ "${is_in_build_list}" ]]; then
-            SWIFT_BENCHMARK_TARGETS+=("swift-benchmark-${stdlib_deployment_target}")
-            if [[ $(not ${SKIP_TEST_BENCHMARK}) ]] ; then
-              SWIFT_RUN_BENCHMARK_TARGETS+=("check-swift-benchmark-${stdlib_deployment_target}")
+            if [[ "${supports_benchmarks}" ]]; then
+                SWIFT_BENCHMARK_TARGETS+=("swift-benchmark-${stdlib_deployment_target}")
+                if [[ $(not ${SKIP_TEST_BENCHMARK}) ]] ; then
+                  SWIFT_RUN_BENCHMARK_TARGETS+=("check-swift-benchmark-${stdlib_deployment_target}")
+                fi
             fi
-        fi
-        if [[ "${test_this_target}" ]] && [[ "${is_in_build_list}" ]]; then
-            test_target_suffix=""
-            if [[ -n "${test_host_only}" ]] ; then
-                test_target_suffix="-non-executable"
-            fi
+            if [[ "${is_in_test_list}" ]]; then
+                test_target_suffix=""
+                if [[ -n "${test_host_only}" ]] ; then
+                    test_target_suffix="-non-executable"
+                fi
 
-            test_subset_target_suffix=""
-            if [[ "${VALIDATION_TEST}" == "1" ]] ; then
-                if [[ "${LONG_TEST}" == "1" ]] ; then
-                    test_subset_target_suffix="-all"
+                test_subset_target_suffix=""
+                if [[ "${VALIDATION_TEST}" == "1" ]] ; then
+                    if [[ "${LONG_TEST}" == "1" ]] ; then
+                        test_subset_target_suffix="-all"
+                    else
+                        test_subset_target_suffix="-validation"
+                    fi
                 else
-                    test_subset_target_suffix="-validation"
+                    if [[ "${LONG_TEST}" == "1" ]] ; then
+                        test_subset_target_suffix="-only_long"
+                    fi
                 fi
-            else
-                if [[ "${LONG_TEST}" == "1" ]] ; then
-                    test_subset_target_suffix="-only_long"
+                SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}${test_target_suffix}-${stdlib_deployment_target}")
+                if [[ $(not ${SKIP_TEST_OPTIMIZED}) && ! -n "${test_host_only}" ]] ; then
+                    SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize-${stdlib_deployment_target}")
                 fi
-            fi
-            SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}${test_target_suffix}-${stdlib_deployment_target}")
-            if [[ $(not ${SKIP_TEST_OPTIMIZED}) && ! -n "${test_host_only}" ]] ; then
-                SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize-${stdlib_deployment_target}")
             fi
         fi
     done
@@ -1446,6 +1424,8 @@ function set_swiftpm_bootstrap_command() {
 #
 # Start with native deployment targets because the resulting tools are used during cross-compilation.
 
+echo "=============================="
+echo -e "Building the Swift compiler for: ${ALL_HOSTS[@]}"
 
 for host in "${ALL_HOSTS[@]}"; do
 
@@ -1453,15 +1433,23 @@ for host in "${ALL_HOSTS[@]}"; do
 
     set_build_options_for_host $host
 
-    echo "Building the standard library for: ${SWIFT_STDLIB_TARGETS[@]}"
+    # Print a summary of the calculated targets
+    configured_targets=(`echo $(get_stdlib_targets_for_host ${host})`)
+    echo "=============================="
+    echo "* Host target: ${host}"
+    echo "* Standard Library targets:"
+    echo -e "    - Configured         [${#configured_targets[@]}]:\t ${configured_targets[@]}"
+    echo -e "    - Build targets      [${#SWIFT_STDLIB_TARGETS[@]}]:\t ${SWIFT_STDLIB_TARGETS[@]}"
+    echo -e "    - Benchmark targets  [${#SWIFT_BENCHMARK_TARGETS[@]}]:\t ${SWIFT_BENCHMARK_TARGETS[@]}"
     if [[ "${SWIFT_TEST_TARGETS[@]}" ]] && ! [[ "${SKIP_TEST_SWIFT}" ]]; then
-        echo "Running Swift tests for: ${SWIFT_TEST_TARGETS[@]}"
+    echo -e "* Running tests for      [${#SWIFT_TEST_TARGETS[@]}]:\t ${SWIFT_TEST_TARGETS[@]}"
     fi
     if ! [[ "${SKIP_TEST_BENCHMARKS}" ]] &&
        [[ "${SWIFT_RUN_BENCHMARK_TARGETS[@]}" ]] &&
        ! [[ "${SKIP_TEST_BENCHMARK}" ]]; then
-        echo "Running Swift benchmarks for: ${SWIFT_RUN_BENCHMARK_TARGETS[@]}"
+    echo -e "* Running benchmarks for [${#SWIFT_RUN_BENCHMARK_TARGETS[@]}]:\t ${SWIFT_RUN_BENCHMARK_TARGETS[@]}"
     fi
+    echo "=============================="
 
     case "${COMPILER_VENDOR}" in
         none)
@@ -1671,7 +1659,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ ! "${SKIP_BUILD_ANDROID}" ]]; then
+                # FIXME: Need a better test to see if we're building for Android
+                if [[ "$(should_build_stdlib_target 'android-armv7' ${host})" ]]; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
