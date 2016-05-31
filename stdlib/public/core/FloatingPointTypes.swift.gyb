@@ -472,6 +472,9 @@ extension ${Self}: BinaryFloatingPoint {
           exponentBitPattern: exponentBitPattern - 1,
           significandBitPattern: ${Self}._significandMask)
       }
+      return ${Self}(sign: .minus,
+        exponentBitPattern: exponentBitPattern,
+        significandBitPattern: significandBitPattern - 1)
     }
     if isInfinite { return self }
     if significandBitPattern == ${Self}._significandMask {
