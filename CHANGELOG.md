@@ -3,6 +3,32 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* Nested generic functions may now capture bindings from the environment, for example:
+
+    ```swift
+    func outer<T>(t: T) -> T {
+      func inner<U>(u: U) -> (T, U) {
+        return (t, u)
+      }
+      return inner(u: (t, t)).0
+    }
+    ```
+
+* Initializers are now inherited even if the base class or derived class is generic:
+
+    ```swift
+    class Base<T> {
+      let t: T
+
+      init(t: T) {
+        self.t = t
+      }
+    }
+
+    case Derived<T> : Base<T> {
+      // init(t: T) is now synthesized to call super.init(t: t)
+    }```
+
 * [SE-0081](https://github.com/apple/swift-evolution/blob/master/proposals/0081-move-where-expression.md)
   "Move 'where' clause to end of declaration" is implemented, allowing you to 
   write 'where' clauses after the signature for a declaration, but before its
