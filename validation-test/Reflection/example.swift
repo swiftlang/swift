@@ -2,6 +2,7 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/example
 // RUN: %target-run %target-swift-reflection-test %t/example | FileCheck %s --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
+// REQUIRES: executable_test
 
 import SwiftReflectionTest
 

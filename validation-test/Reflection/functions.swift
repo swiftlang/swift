@@ -6,6 +6,7 @@
 // testcases in functions_objc.swift
 
 // REQUIRES: objc_interop
+// REQUIRES: executable_test
 
 /*
    This file pokes at the swift_reflection_infoForInstance() API
