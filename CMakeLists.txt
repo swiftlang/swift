@@ -478,6 +478,13 @@ function(is_sdk_requested name result_var_name)
   endif()
 endfunction()
 
+if(XCODE)
+  # FIXME: Cannot cross-compile the standard library using Xcode.  Xcode
+  # insists on passing -mmacosx-version-min to the compiler, and we need
+  # to pass -mios-version-min.  Clang sees both options and complains.
+  set(SWIFT_SDKS "OSX")
+endif()
+
 # FIXME: the parameters we specify in SWIFT_SDKS are lacking architecture specifics,
 # so we need to hard-code it. For example, the SDK for Android is just 'ANDROID', 
 # which we assume below to be armv7. 
@@ -592,17 +599,8 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   # Compatible cross-compile SDKS for Darwin OSes: IOS, IOS_SIMULATOR, TVOS,
   #   TVOS_SIMULATOR, WATCHOS, WATCHOS_SIMULATOR (archs hardcoded below).
 
-  if(XCODE)
-    # FIXME: Cannot cross-compile stdlib using Xcode.  Xcode insists on
-    # passing -mmacosx-version-min to the compiler, and we want to pass
-    # -mios-version-min.  Clang sees both options and complains.
-    set(swift_can_crosscompile_stdlib FALSE)
-  else()
-    set(swift_can_crosscompile_stdlib TRUE)
-  endif()
-
   is_sdk_requested(IOS swift_build_ios)
-  if(swift_build_ios AND ${swift_can_crosscompile_stdlib})
+  if(swift_build_ios)
     configure_sdk_darwin(
         IOS "iOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}"
         iphoneos ios ios "armv7;armv7s;arm64")
@@ -612,7 +610,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   endif()
 
   is_sdk_requested(IOS_SIMULATOR swift_build_ios_simulator)
-  if(swift_build_ios_simulator AND ${swift_can_crosscompile_stdlib})
+  if(swift_build_ios_simulator)
     configure_sdk_darwin(
         IOS_SIMULATOR "iOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}"
         iphonesimulator ios-simulator ios "i386;x86_64")
@@ -625,7 +623,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   endif()
 
   is_sdk_requested(TVOS swift_build_tvos)
-  if(swift_build_tvos AND ${swift_can_crosscompile_stdlib})
+  if(swift_build_tvos)
     configure_sdk_darwin(
         TVOS "tvOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}"
         appletvos tvos tvos "arm64")
@@ -635,7 +633,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   endif()
 
   is_sdk_requested(TVOS_SIMULATOR swift_build_tvos_simulator)
-  if(swift_build_tvos_simulator AND ${swift_can_crosscompile_stdlib})
+  if(swift_build_tvos_simulator)
     configure_sdk_darwin(
         TVOS_SIMULATOR "tvOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}"
         appletvsimulator tvos-simulator tvos "x86_64")
@@ -648,7 +646,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   endif()
 
   is_sdk_requested(WATCHOS swift_build_watchos)
-  if(swift_build_watchos AND ${swift_can_crosscompile_stdlib})
+  if(swift_build_watchos)
     configure_sdk_darwin(
         WATCHOS "watchOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
         watchos watchos watchos "armv7k")
@@ -658,7 +656,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   endif()
 
   is_sdk_requested(WATCHOS_SIMULATOR swift_build_watchos_simulator)
-  if(swift_build_watchos_simulator AND ${swift_can_crosscompile_stdlib})
+  if(swift_build_watchos_simulator)
     configure_sdk_darwin(
         WATCHOS_SIMULATOR "watchOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
         watchsimulator watchos-simulator watchos "i386")
