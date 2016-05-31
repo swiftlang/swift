@@ -386,6 +386,10 @@ public:
                  SmallVector<std::pair<clang::MacroInfo *, ValueDecl *>, 2>>
     ImportedMacros;
 
+  // Mapping from macro to value for macros that expand to constant values.
+  llvm::DenseMap<const clang::MacroInfo *, std::pair<clang::APValue, Type>>
+    ImportedMacroConstants;
+
   /// Keeps track of active selector-based lookups, so that we don't infinitely
   /// recurse when checking whether a method with a given selector has already
   /// been imported.
