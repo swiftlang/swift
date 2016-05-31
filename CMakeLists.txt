@@ -774,12 +774,6 @@ include("${SWIFT_API_NOTES_PATH}/CMakeLists.txt")
 if(NOT DEFINED SWIFT_API_NOTES_INPUTS)
   message(FATAL_ERROR "API notes are not available in ${SWIFT_API_NOTES_PATH}")
 endif()
-#
-# file(GLOB SWIFT_API_NOTES_INPUT_FILES "${SWIFT_API_NOTES_PATH}/*.apinotes")
-# foreach(file ${SWIFT_API_NOTES_INPUT_FILES})
-#   get_filename_component(name "${file}" NAME_WE)
-#   list(APPEND SWIFT_API_NOTES_INPUTS ${name})
-# endforeach()
 
 # Add all of the subdirectories, where we actually do work.
 if(SWIFT_BUILD_TOOLS)
