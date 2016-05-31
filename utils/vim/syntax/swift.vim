@@ -77,7 +77,7 @@ syn keyword swiftScope
 
 syn keyword swiftMutating skipwhite nextgroup=swiftFuncDefinition
       \ mutating
-syn keyword swiftFuncDefinition skipwhite nextgroup=swiftFuncName,swiftOperator
+syn keyword swiftFuncDefinition skipwhite nextgroup=swiftTypeName,swiftOperator
       \ func
 
 syn keyword swiftTypeDefinition skipwhite nextgroup=swiftTypeName
@@ -94,6 +94,10 @@ syn keyword swiftVarDefinition skipwhite nextgroup=swiftVarName
 
 syn match swiftTypeName contained nextgroup=swiftTypeParameters
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>/
+syn match swiftVarName contained skipwhite nextgroup=swiftTypeDeclaration
+      \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
+syn match swiftImplicitVarName
+      \ /\$\<[A-Za-z_0-9]\+\>/
 
 " TypeName[Optionality]?
 syn match swiftType contained nextgroup=swiftTypeParameters
@@ -116,16 +120,10 @@ syn match swiftArchetype contained skipwhite nextgroup=swiftTypeDeclaration
 syn keyword swiftConstraint contained
       \ where
 
-syn match swiftFuncName contained skipwhite nextgroup=swiftTypeParameters
-      \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
-
-syn match swiftVarName contained
-      \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
-syn match swiftImplicitVarName
-      \ /\$\<[A-Za-z_0-9]\+\>/
-
-syn match swiftTypeDeclaration /:/ skipwhite nextgroup=swiftType
-syn match swiftTypeDeclaration /->/ skipwhite nextgroup=swiftType
+syn match swiftTypeDeclaration skipwhite nextgroup=swiftType
+      \ /:/
+syn match swiftTypeDeclaration skipwhite nextgroup=swiftType
+      \ /->/
 
 syn keyword swiftBoolean true false
 
@@ -173,7 +171,6 @@ hi def link swiftArchetype Identifier
 hi def link swiftConstraint Special
 hi def link swiftFuncDefinition Define
 hi def link swiftDefinitionModifier Define
-hi def link swiftFuncName Function
 hi def link swiftFuncKeyword Function
 hi def link swiftFuncKeywordGeneral Function
 hi def link swiftVarDefinition Define
