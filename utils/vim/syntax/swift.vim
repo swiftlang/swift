@@ -75,6 +75,11 @@ syn keyword swiftFuncKeyword
 syn keyword swiftScope
       \ autoreleasepool
 
+syn keyword swiftMutating skipwhite nextgroup=swiftFuncDefinition
+      \ mutating
+syn keyword swiftFuncDefinition skipwhite nextgroup=swiftFuncName,swiftOperator
+      \ func
+
 syn keyword swiftTypeDefinition skipwhite nextgroup=swiftTypeName
       \ class
       \ enum
@@ -82,6 +87,10 @@ syn keyword swiftTypeDefinition skipwhite nextgroup=swiftTypeName
       \ protocol
       \ struct
       \ typealias
+
+syn keyword swiftVarDefinition skipwhite nextgroup=swiftVarName
+      \ let
+      \ var
 
 syn match swiftTypeName contained nextgroup=swiftTypeParameters
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>/
@@ -107,15 +116,13 @@ syn match swiftArchetype contained skipwhite nextgroup=swiftTypeDeclaration
 syn keyword swiftConstraint contained
       \ where
 
-syn keyword swiftMutating mutating skipwhite nextgroup=swiftFuncDefinition
-syn keyword swiftFuncDefinition func skipwhite nextgroup=swiftFuncName,swiftOperator
-syn match swiftFuncName /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained skipwhite nextgroup=swiftTypeParameters
+syn match swiftFuncName contained skipwhite nextgroup=swiftTypeParameters
+      \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
 
-syn keyword swiftVarDefinition var skipwhite nextgroup=swiftVarName
-syn keyword swiftVarDefinition let skipwhite nextgroup=swiftVarName
-syn match swiftVarName /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained
-
-syn match swiftImplicitVarName /\$\<[A-Za-z_0-9]\+\>/
+syn match swiftVarName contained
+      \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
+syn match swiftImplicitVarName
+      \ /\$\<[A-Za-z_0-9]\+\>/
 
 syn match swiftTypeDeclaration /:/ skipwhite nextgroup=swiftType
 syn match swiftTypeDeclaration /->/ skipwhite nextgroup=swiftType
