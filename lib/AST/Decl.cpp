@@ -2333,7 +2333,7 @@ static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
 
     NominalTypeDecl *NTD = const_cast<NominalTypeDecl*>(nominal);
     if (isa<ClassDecl>(nominal)) {
-      mangler.mangleNominalType(NTD, Mangle::Mangler::BindGenerics::None);
+      mangler.mangleNominalType(NTD);
     } else {
       mangler.mangleProtocolDecl(cast<ProtocolDecl>(NTD));
     }

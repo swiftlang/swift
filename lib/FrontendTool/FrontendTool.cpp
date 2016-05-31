@@ -176,7 +176,7 @@ static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
   Mangle::Mangler mangler(/*debug style=*/false, /*Unicode=*/true);
-  mangler.mangleContext(type, Mangle::Mangler::BindGenerics::None);
+  mangler.mangleContext(type);
   return mangler.finalize();
 }
 

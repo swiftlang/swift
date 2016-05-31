@@ -148,15 +148,13 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   //   global ::= 'Mm' type                       // class metaclass
   case Kind::SwiftMetaclassStub:
     mangler.append("_TMm");
-    mangler.mangleNominalType(cast<ClassDecl>(getDecl()),
-                              Mangler::BindGenerics::None);
+    mangler.mangleNominalType(cast<ClassDecl>(getDecl()));
     return mangler.finalize(buffer);
 
   //   global ::= 'Mn' type                       // nominal type descriptor
   case Kind::NominalTypeDescriptor:
     mangler.append("_TMn");
-    mangler.mangleNominalType(cast<NominalTypeDecl>(getDecl()),
-                              Mangler::BindGenerics::None);
+    mangler.mangleNominalType(cast<NominalTypeDecl>(getDecl()));
     return mangler.finalize(buffer);
 
   //   global ::= 'Mp' type                       // protocol descriptor
@@ -272,7 +270,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
     mangler.append("_T");
     if (auto type = dyn_cast<NominalTypeDecl>(getDecl())) {
-      mangler.mangleNominalType(type, Mangler::BindGenerics::None);
+      mangler.mangleNominalType(type);
     } else if (auto ctor = dyn_cast<ConstructorDecl>(getDecl())) {
       // FIXME: Hack. LinkInfo should be able to refer to the allocating
       // constructor rather than inferring it here.

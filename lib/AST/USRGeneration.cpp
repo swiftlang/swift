@@ -72,15 +72,18 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
 
   OS << getUSRSpacePrefix();
   Mangler Mangler;
+
+  Mangler.bindGenericParameters(VD->getDeclContext());
+
   if (auto Ctor = dyn_cast<ConstructorDecl>(VD)) {
     Mangler.mangleConstructorEntity(Ctor, /*isAllocating=*/false,
                                     /*uncurryingLevel=*/0);
   } else if (auto Dtor = dyn_cast<DestructorDecl>(VD)) {
     Mangler.mangleDestructorEntity(Dtor, /*isDeallocating=*/false);
   } else if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    Mangler.mangleNominalType(NTD, Mangler::BindGenerics::None);
+    Mangler.mangleNominalType(NTD);
   } else if (isa<TypeAliasDecl>(VD) || isa<AssociatedTypeDecl>(VD)) {
-    Mangler.mangleContextOf(VD, Mangler::BindGenerics::None);
+    Mangler.mangleContextOf(VD);
     Mangler.mangleDeclName(VD);
   } else {
     Mangler.mangleEntity(VD, /*uncurryingLevel=*/0);
