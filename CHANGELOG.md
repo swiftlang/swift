@@ -246,6 +246,9 @@ Swift 3.0
     `NS[Mutable]Dictionary` are still imported as nongeneric classes for
     the time being.
 
+* [SE-0036](https://github.com/apple/swift-evolution/blob/master/proposals/0036-enum-dot.md): 
+  Enum elements can no longer be accessed as instance members in instance methods.
+
 * As part of the changes for SE-0055 (see below), the *pointee* types of
   imported pointers (e.g. the `id` in `id *`) are no longer assumed to always
   be `_Nullable` even if annotated otherwise. However, an implicit or explicit

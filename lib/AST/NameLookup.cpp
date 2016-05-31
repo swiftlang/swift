@@ -563,7 +563,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             if (FD->isStatic() && !isMetatypeType)
               continue;
           } else if (isa<EnumElementDecl>(Result)) {
-            Results.push_back(UnqualifiedLookupResult(MetaBaseDecl, Result));
+            Results.push_back(UnqualifiedLookupResult(BaseDecl, Result));
             continue;
           }
 
