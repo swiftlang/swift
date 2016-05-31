@@ -83,9 +83,6 @@ syn keyword swiftTypeDefinition skipwhite nextgroup=swiftTypeName
       \ struct
       \ typealias
 
-syn keyword swiftNew skipwhite nextgroup=swiftTypeName
-      \ new
-
 syn match swiftTypeName contained nextgroup=swiftTypeParameters
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>/
 
@@ -190,7 +187,6 @@ hi def link swiftBin Number
 hi def link swiftOperator Function
 hi def link swiftChar Character
 hi def link swiftLabel Operator
-hi def link swiftNew Operator
 hi def link swiftMutating Statement
 hi def link swiftPreproc PreCondit
 hi def link swiftPreprocFalse Comment
