@@ -2018,8 +2018,8 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
   out << "\n";
 }
 
-Type ArchetypeBuilder::mapTypeIntoContext(DeclContext *dc, Type type,
-                                         LazyResolver *resolver) {
+Type ArchetypeBuilder::mapTypeIntoContext(const DeclContext *dc, Type type,
+                                          LazyResolver *resolver) {
   // If the type is not dependent, there's nothing to map.
   if (!type->hasTypeParameter())
     return type;
@@ -2081,7 +2081,7 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
 }
 
 Type
-ArchetypeBuilder::mapTypeOutOfContext(DeclContext *dc, Type type) {
+ArchetypeBuilder::mapTypeOutOfContext(const DeclContext *dc, Type type) {
   GenericParamList *genericParams = dc->getGenericParamsOfContext();
   return mapTypeOutOfContext(dc->getParentModule(), genericParams, type);
 }

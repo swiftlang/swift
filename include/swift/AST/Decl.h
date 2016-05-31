@@ -667,7 +667,7 @@ public:
   /// Retrieve the innermost declaration context corresponding to this
   /// declaration, which will either be the declaration itself (if it's
   /// also a declaration context) or its declaration context.
-  DeclContext *getInnermostDeclContext();
+  DeclContext *getInnermostDeclContext() const;
 
   /// \brief Retrieve the module in which this declaration resides.
   ModuleDecl *getModuleContext() const;
