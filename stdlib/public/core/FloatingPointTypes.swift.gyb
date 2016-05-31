@@ -313,7 +313,7 @@ extension ${Self}: BinaryFloatingPoint {
     // bit set.
     return _representation.explicitSignificand >= Float80._explicitBitMask
   }
-  %end
+%end
 
   public static var infinity: ${Self} {
     return ${Self}(sign: .plus,
