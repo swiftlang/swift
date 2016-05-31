@@ -19,7 +19,6 @@
 #include <string.h>
 #include <stdint.h>
 #include <unistd.h>
-#include <pthread.h>
 #include <stdarg.h>
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"

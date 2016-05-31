@@ -34,8 +34,6 @@
 #include <link.h>
 #endif
 
-#include <dlfcn.h>
-
 using namespace swift;
 using namespace Demangle;
 

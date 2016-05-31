@@ -24,7 +24,6 @@
 #include <cstring>
 #include <new>
 #include <string>
-#include <dlfcn.h>
 
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
