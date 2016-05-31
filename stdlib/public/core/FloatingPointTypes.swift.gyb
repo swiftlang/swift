@@ -215,12 +215,14 @@ extension ${Self}: BinaryFloatingPoint {
               exponentBitPattern: UInt,
               significandBitPattern: ${RawSignificand}) {
     let signShift = ${Self}.significandBitCount + ${Self}.exponentBitCount
-    let sign = ${RawSignificand}(sign == .minus ? 1 : 0)
-    let exponent = ${RawSignificand}(exponentBitPattern &
-      ${Self}._infinityExponent)
-    let significand = significandBitPattern & ${Self}._significandMask
-    self.init(bitPattern: sign << ${RawSignificand}(signShift) |
-      exponent << ${RawSignificand}(${Self}.significandBitCount) |
+    let sign = UInt${bits}(sign == .minus ? 1 : 0)
+    let exponent = UInt${bits}(
+      exponentBitPattern & ${Self}._infinityExponent)
+    let significand = UInt${bits}(
+      significandBitPattern & ${Self}._significandMask)
+    self.init(bitPattern:
+      sign << UInt${bits}(signShift) |
+      exponent << UInt${bits}(${Self}.significandBitCount) |
       significand)
   }
 
