@@ -210,7 +210,7 @@ Swift 3.0
 * Generic signatures can now contain superclass requirements with generic
   parameter types, for example:
 
-  ```
+  ```swift
   func f<Food : Chunks<Meat>, Meat : Molerat>(f: Food, m: Meat) {}
   ```
 
