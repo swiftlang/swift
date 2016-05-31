@@ -54,6 +54,7 @@ syn keyword swiftDefinitionModifier
       \ internal
       \ private
       \ public
+      \ rethrows
       \ static
       \ throws
 
@@ -64,20 +65,50 @@ syn keyword swiftIdentifierKeyword
       \ self
       \ super
 
-syn keyword swiftFuncKeyword nextgroup=swiftTypeParameters
-      \ deinit
+syn keyword swiftFuncKeywordGeneral skipwhite nextgroup=swiftTypeParameters
       \ init
+
+syn keyword swiftFuncKeyword
+      \ deinit
       \ subscript
 
 syn keyword swiftScope
       \ autoreleasepool
 
-syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName
+syn keyword swiftTypeDefinition skipwhite nextgroup=swiftTypeName
+      \ class
+      \ enum
+      \ extension
+      \ protocol
+      \ struct
+      \ typealias
 
-syn match swiftTypeName /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/ contained nextgroup=swiftTypeParameters
-syn region swiftArrayType start=/\[/ end=/\]/ contained skipwhite nextgroup=swiftTypeName
+syn keyword swiftNew skipwhite nextgroup=swiftTypeName
+      \ new
 
-syn region swiftTypeParameters start="<" end=">" contained
+syn match swiftTypeName contained nextgroup=swiftTypeParameters
+      \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>/
+
+" TypeName[Optionality]?
+syn match swiftType contained nextgroup=swiftTypeParameters
+      \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
+" [Type:Type] (dictionary) or [Type] (array)
+syn region swiftType contained contains=swiftTypePair,swiftType
+      \ start=/\[/ end=/\]/
+syn match swiftTypePair contained nextgroup=swiftTypeParameters,swiftTypeDeclaration
+      \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
+" (Type[, Type]) (tuple)
+syn region swiftType contained contains=swiftType,swiftParamDelim
+      \ start="[^@](" end=")"
+syn match swiftParamDelim contained
+      \ /,/
+" <Generic Clause> (generics)
+syn region swiftTypeParameters contained contains=swiftArchetype,swiftConstraint
+      \ start="<" end=">"
+syn match swiftArchetype contained skipwhite nextgroup=swiftTypeDeclaration
+      \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
+syn keyword swiftConstraint contained
+      \ where
 
 syn keyword swiftMutating mutating skipwhite nextgroup=swiftFuncDefinition
 syn keyword swiftFuncDefinition func skipwhite nextgroup=swiftFuncName,swiftOperator
@@ -89,11 +120,8 @@ syn match swiftVarName /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained
 
 syn match swiftImplicitVarName /\$\<[A-Za-z_0-9]\+\>/
 
-syn match swiftTypeDeclaration /:/ skipwhite nextgroup=swiftTypeName
-syn match swiftTypeDeclaration /->/ skipwhite nextgroup=swiftTypeName
-
-
-syn keyword swiftNew new skipwhite nextgroup=swiftTypeName
+syn match swiftTypeDeclaration /:/ skipwhite nextgroup=swiftType
+syn match swiftTypeDeclaration /->/ skipwhite nextgroup=swiftType
 
 syn keyword swiftBoolean true false
 
@@ -117,32 +145,39 @@ syn keyword swiftLabel get set
 syn match swiftPreproc /^\s*#\(\<if\>\|\<else\>\|\<elseif\>\|\<endif\>\)/
 syn region swiftPreprocFalse start="^\s*#\<if\>\s\+\<false\>" end="^\s*#\(\<else\>\|\<elseif\>\|\<endif\>\)"
 
-syn match swiftAttribute /@\<\w\+\>/
+syn match swiftAttribute /@\<\w\+\>/ skipwhite nextgroup=swiftType
 
 syn keyword swiftTodo TODO FIXME contained
 syn keyword swiftNil nil
 
-syn match swiftCastOp "\<as\>[!?]\?" skipwhite nextgroup=swiftTypeName,swiftArrayType
+syn match swiftCastOp "\<as\>[!?]\?" skipwhite nextgroup=swiftType
 
 syn match swiftNilOps "??"
+
+syn region swiftReservedIdentifier oneline
+      \ start=/`/ end=/`/
 
 hi def link swiftImport Include
 hi def link swiftImportModule Title
 hi def link swiftImportComponent Identifier
 hi def link swiftKeyword Statement
 hi def link swiftTypeDefinition Define
-hi def link swiftTypeName Type
-hi def link swiftArrayType Type
-hi def link swiftTypeParameters Special
+hi def link swiftType Type
+hi def link swiftTypePair Type
+hi def link swiftTypeName Function
+hi def link swiftArchetype Identifier
+hi def link swiftConstraint Special
 hi def link swiftFuncDefinition Define
 hi def link swiftDefinitionModifier Define
 hi def link swiftFuncName Function
 hi def link swiftFuncKeyword Function
+hi def link swiftFuncKeywordGeneral Function
 hi def link swiftVarDefinition Define
 hi def link swiftVarName Identifier
 hi def link swiftImplicitVarName Identifier
 hi def link swiftIdentifierKeyword Identifier
 hi def link swiftTypeDeclaration Delimiter
+hi def link swiftTypeParameters Delimiter
 hi def link swiftBoolean Boolean
 hi def link swiftString String
 hi def link swiftInterpolation Special
