@@ -48,7 +48,6 @@ function (swift_benchmark_compile_archopts)
       "-F" "${sdk}/../../../Developer/Library/Frameworks"
       "-${BENCH_COMPILE_ARCHOPTS_OPT}"
       "-D" "INTERNAL_CHECKS_ENABLED"
-      "-D" "SWIFT_ENABLE_OBJECT_LITERALS"
       "-no-link-objc-runtime"
       "-I" "${srcdir}/utils/ObjectiveCTests")
 
@@ -64,7 +63,6 @@ function (swift_benchmark_compile_archopts)
       "-F" "${sdk}/../../../Developer/Library/Frameworks"
       "-${driver_opt}"
       "-D" "INTERNAL_CHECKS_ENABLED"
-      "-D" "SWIFT_ENABLE_OBJECT_LITERALS"
       "-no-link-objc-runtime")
 
   set(bench_library_objects)
