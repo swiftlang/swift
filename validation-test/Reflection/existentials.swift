@@ -2,6 +2,7 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/existentials
 // RUN: %target-run %target-swift-reflection-test %t/existentials | FileCheck %s --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
+// REQUIRES: executable_test
 
 /*
    This file pokes at the swift_reflection_projectExistential API

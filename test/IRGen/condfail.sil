@@ -11,6 +11,7 @@ import Swift
 // CHECK-i386:        ud2
 // CHECK-arm64:       brk
 // CHECK-armv7:       trap
+// CHECK-armv7s:      trap
 // CHECK-powerpc64:   trap
 // CHECK-powerpc64le: trap
 // CHECK-s390x:       trap
@@ -19,6 +20,7 @@ import Swift
 // CHECK-i386:        ud2
 // CHECK-arm64:       brk
 // CHECK-armv7:       trap
+// CHECK-armv7s:      trap
 // CHECK-powerpc64:   trap
 // CHECK-powerpc64le: trap
 // CHECK-s390x:       trap
