@@ -7,6 +7,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// REQUIRES: rdar26561954
 
 /*
    This file pokes at the swift_reflection_infoForInstance() API
