@@ -58,6 +58,12 @@ def main_preset():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""Builds Swift using a preset.""")
     parser.add_argument(
+        "-n", "--dry-run",
+        help="print the commands that would be executed, but do not execute "
+             "them",
+        action="store_true",
+        default=False)
+    parser.add_argument(
         "--preset-file",
         help="load presets from the specified file",
         metavar="PATH",
@@ -110,6 +116,8 @@ def main_preset():
         args.preset_substitutions, args.preset_file_names, args.preset)
 
     build_script_args = [sys.argv[0]]
+    if args.dry_run:
+        build_script_args += ["--dry-run"]
     build_script_args += preset_args
     if args.distcc:
         build_script_args += ["--distcc"]
@@ -305,6 +313,13 @@ to build Swift.  This is not a technical limitation of the Swift build system.
 It is a policy decision aimed at making the builds uniform across all
 environments and easily reproducible by engineers who are not familiar with the
 details of the setups of other systems or automated environments.""")
+
+    parser.add_argument(
+        "-n", "--dry-run",
+        help="print the commands that would be executed, but do not execute "
+             "them",
+        action="store_true",
+        default=False)
 
     targets_group = parser.add_argument_group(
         title="Host and cross-compilation targets")
@@ -968,6 +983,8 @@ details of the setups of other systems or automated environments.""")
         if '--check-args-only' in args.build_script_impl_args:
             return 0
 
+    shell.dry_run = args.dry_run
+
     # Prepare and validate toolchain
     toolchain = host_toolchain(xcrun_toolchain=args.darwin_xcrun_toolchain)
 
@@ -1418,6 +1435,9 @@ details of the setups of other systems or automated environments.""")
         ]
 
     build_script_impl_args += args.build_script_impl_args
+
+    if args.dry_run:
+        build_script_impl_args += ["--dry-run"]
 
     check_call([build_script_impl] + build_script_impl_args,
                disable_sleep=True)

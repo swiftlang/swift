@@ -37,5 +37,6 @@ def print_xcodebuild_versions(file=sys.stdout):
     print(u'--- SDK versions ---', file=file)
     print(u'{}\n'.format(_output(['xcodebuild', '-version', '-sdk'])),
           file=file)
+    file.flush()
     # You can't test beyond this because each developer's machines may have
     # a different set of SDKs installed.

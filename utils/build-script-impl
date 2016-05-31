@@ -55,6 +55,7 @@ LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64;PowerPC;SystemZ"
 # referred to as `SWIFT_INSTALL_COMPONENTS` in the remainder of this script.
 KNOWN_SETTINGS=(
     # name                      default          description
+    dry-run                     ""               "print the commands that would be executed, but do not execute them"
     build-args                  ""               "arguments to the build tool; defaults to -j8 when CMake generator is \"Unix Makefiles\""
     build-dir                   ""               "out-of-tree build directory; default is in-tree. **This argument is required**"
     host-cc                     ""               "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
@@ -218,6 +219,45 @@ KNOWN_SETTINGS=(
     # TODO: Remove this some time later.
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
 )
+
+# Centalized access point for traced command invocation.
+# Every operation that might mutates file system should be called via
+# these functions.
+
+function call() {
+    if [[ ${DRY_RUN} ]]; then
+        echo "${PS4}"$(quoted_print "$@")
+    else
+        { set -x; } 2>/dev/null
+        "$@"
+        { set +x; } 2>/dev/null
+    fi
+}
+
+function with_pushd() {
+    local dir=$1
+    shift
+    if [[ "$1" == "call" ]]; then
+        shift
+    fi
+    if [[ ${DRY_RUN} ]]; then
+        echo ${PS4}pushd "${dir}"
+        echo "${PS4}"$(quoted_print "$@")
+        echo ${PS4}popd
+    else
+        set -x
+        pushd "${dir}"
+        "$@"
+        { set -x; } 2>/dev/null # because $@ might includes { set +x; }
+        popd
+        { set +x; } 2>/dev/null
+    fi
+}
+
+function quoted_print() {
+    python -c 'import pipes; import sys; print(" ".join(pipes.quote(arg) for arg in sys.argv[1:]))' "$@"
+}
+
 
 function toupper() {
     echo "$@" | tr '[:lower:]' '[:upper:]'
@@ -829,9 +869,7 @@ function cmake_needs_to_specify_standard_computed_defaults() {
 function copy_swift_stdlib_tool_substitute() {
     if [ ! -f "$1" ] ; then
         echo "--- Copy swift-stdlib-tool ---"
-        set -x
-        cp "${SWIFT_SOURCE_DIR}/utils/swift-stdlib-tool-substitute" "$1"
-        { set +x; } 2>/dev/null
+        call cp "${SWIFT_SOURCE_DIR}/utils/swift-stdlib-tool-substitute" "$1"
     fi
 }
 
@@ -840,7 +878,7 @@ function make_relative_symlink() {
     local TARGET=$2
     local TARGET_DIR=$(dirname $2)
     local RELATIVE_SOURCE=$(python -c "import os.path; print(os.path.relpath(\""${SOURCE}"\", \""${TARGET_DIR}"\"))")
-    ln -sf "${RELATIVE_SOURCE}" "${TARGET}"
+    call ln -sf "${RELATIVE_SOURCE}" "${TARGET}"
 }
 
 # Sanitize the list of cross-compilation targets.
@@ -1416,7 +1454,7 @@ function set_swiftpm_bootstrap_command() {
             XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
         fi
     fi
-    if [ ! -e "${LLBUILD_BIN}" ]; then
+    if [ "${SKIP_BUILD_LLBUILD}" ]; then
         echo "Error: Cannot build swiftpm without llbuild (swift-build-tool)."
         exit 1
     fi
@@ -1934,9 +1972,8 @@ for host in "${ALL_HOSTS[@]}"; do
                             )
                         fi
                         set_lldb_build_mode
-                        pushd ${source_dir}
-                        xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
-                        popd
+                        with_pushd ${source_dir} \
+                            call xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
                         continue
                         ;;
                 esac
@@ -1956,9 +1993,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
             swiftpm)
                 set_swiftpm_bootstrap_command
-                set -x
-                "${swiftpm_bootstrap_command[@]}"
-                { set +x; } 2>/dev/null
+                call "${swiftpm_bootstrap_command[@]}"
                 
                 # swiftpm installs itself with a bootstrap method. No further cmake building is performed.
                 continue
@@ -1976,14 +2011,12 @@ for host in "${ALL_HOSTS[@]}"; do
                     copy_swift_stdlib_tool_substitute "$(build_directory_bin ${host} swift)/swift-stdlib-tool"
                 fi
 
-                set -x
                 # FIXME: Use XCTEST_BUILD_TYPE (which is never properly
                 #        set) to build either --debug or --release.
-                "${XCTEST_SOURCE_DIR}"/build_script.py \
+                call "${XCTEST_SOURCE_DIR}"/build_script.py \
                     --swiftc="${SWIFTC_BIN}" \
                     --build-dir="${XCTEST_BUILD_DIR}" \
                     --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation"
-                { set +x; } 2>/dev/null
 
                 # XCTest builds itself and doesn't rely on cmake
                 continue
@@ -2026,13 +2059,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
     
-                set -x
-                pushd "${FOUNDATION_SOURCE_DIR}"
-                SWIFTC="${SWIFTC_BIN}" CLANG="${LLVM_BIN}"/clang SWIFT="${SWIFT_BIN}" \
+                with_pushd "${FOUNDATION_SOURCE_DIR}" \
+                    call env SWIFTC="${SWIFTC_BIN}" CLANG="${LLVM_BIN}"/clang SWIFT="${SWIFT_BIN}" \
                       SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" DSTROOT="$(get_host_install_destdir ${host})" PREFIX="$(get_host_install_prefix ${host})" ./configure "${FOUNDATION_BUILD_TYPE}" ${FOUNDATION_BUILD_ARGS[@]} -DXCTEST_BUILD_DIR=${XCTEST_BUILD_DIR} $LIBDISPATCH_BUILD_ARGS
-                ${NINJA_BIN}
-                popd
-                { set +x; } 2>/dev/null
+                with_pushd "${FOUNDATION_SOURCE_DIR}" \
+                    call ${NINJA_BIN}
 
                 # Foundation builds itself and doesn't use cmake
                 continue
@@ -2041,23 +2072,18 @@ for host in "${ALL_HOSTS[@]}"; do
                 LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
                 SWIFT_BUILD_PATH="$(build_directory ${host} swift)"
 
-                set -x
                 if [[ ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
                     # First time building; need to run autotools and configure
-                    mkdir -p "${LIBDISPATCH_BUILD_DIR}"
-                    pushd "${LIBDISPATCH_SOURCE_DIR}"
-                    autoreconf -fvi
-                    popd
-                    pushd "${LIBDISPATCH_BUILD_DIR}"
-                    "${LIBDISPATCH_SOURCE_DIR}"/configure --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})" --with-swift-toolchain="${SWIFT_BUILD_PATH}"
-                    popd
+                    call mkdir -p "${LIBDISPATCH_BUILD_DIR}"
+                    with_pushd "${LIBDISPATCH_SOURCE_DIR}" \
+                        call autoreconf -fvi
+                    with_pushd "${LIBDISPATCH_BUILD_DIR}" \
+                        call "${LIBDISPATCH_SOURCE_DIR}"/configure --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})" --with-swift-toolchain="${SWIFT_BUILD_PATH}"
                 fi
-                pushd "${LIBDISPATCH_BUILD_DIR}"
-                make
-                cd tests
-                make build-tests
-                popd
-                { set +x; } 2>/dev/null
+                with_pushd "${LIBDISPATCH_BUILD_DIR}" \
+                    call make
+                with_pushd "${LIBDISPATCH_BUILD_DIR}/tests" \
+                    call make build-tests
 
                 # libdispatch builds itself and doesn't use cmake
                 continue
@@ -2069,8 +2095,8 @@ for host in "${ALL_HOSTS[@]}"; do
         esac
 
         # Clean the product-local module cache.
-        rm -rf "${module_cache}"
-        mkdir -p "${module_cache}"
+        call rm -rf "${module_cache}"
+        call mkdir -p "${module_cache}"
 
         # Compute the generator output file to check for, to determine if we
         # must reconfigure. We only handle Ninja for now.
@@ -2086,13 +2112,12 @@ for host in "${ALL_HOSTS[@]}"; do
         cmake_cache_path="${build_dir}/CMakeCache.txt"
         if [[  "${RECONFIGURE}" || ! -f "${cmake_cache_path}" || \
                     ( ! -z "${generator_output_path}" && ! -f "${generator_output_path}" ) ]] ; then
-            set -x
-            mkdir -p "${build_dir}"
+            call mkdir -p "${build_dir}"
             if [[ -n "${DISTCC}" ]]; then
                 EXTRA_DISTCC_OPTIONS=("DISTCC_HOSTS=localhost,lzo,cpp")
             fi
-            (cd "${build_dir}" && env "${EXTRA_DISTCC_OPTIONS[@]}" "${CMAKE}" "${cmake_options[@]}" "${EXTRA_CMAKE_OPTIONS[@]}" "${source_dir}")
-            { set +x; } 2>/dev/null
+            with_pushd "${build_dir}" \
+                call env "${EXTRA_DISTCC_OPTIONS[@]}" "${CMAKE}" "${cmake_options[@]}" "${EXTRA_CMAKE_OPTIONS[@]}" "${source_dir}"
         fi
 
         # When we are building LLVM create symlinks to the c++ headers. We need
@@ -2115,9 +2140,7 @@ for host in "${ALL_HOSTS[@]}"; do
             BUILT_CXX_INCLUDE_DIR="$llvm_build_dir/include"
 
             echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
-            set -x
-            ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
-            { set +x; } 2>/dev/null
+            call ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
         fi
 
         # Build.
@@ -2130,14 +2153,10 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 # Xcode can't restart itself if it turns out we need to reconfigure.
                 # Do an advance build to handle that.
-                set -x
-                ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product})
-                { set +x; } 2>/dev/null
+                call ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product})
             fi
 
-            set -x
-            ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
-            { set +x; } 2>/dev/null
+            call ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
         fi
     done
 done
@@ -2210,8 +2229,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 results_dir="${lldb_build_dir}/test-results"
-                mkdir -p "${results_dir}"
-                pushd "${results_dir}"
 
                 # Handle test results formatter
                 if [[ "${LLDB_TEST_WITH_CURSES}" ]]; then
@@ -2245,8 +2262,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLDB_DOTEST_CC_OPTS="-C $(build_directory $LOCAL_HOST llvm)"/bin/clang
                 fi
                 
-                SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" SWIFTLIBS="${swift_build_dir}/lib/swift" "${LLDB_SOURCE_DIR}"/test/dotest.py --executable "${lldb_executable}" --rerun-all-issues ${LLDB_DOTEST_CC_OPTS} ${LLDB_FORMATTER_OPTS}
-                popd
+                call mkdir -p "${results_dir}"
+                with_pushd "${results_dir}" \
+                    call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" SWIFTLIBS="${swift_build_dir}/lib/swift" "${LLDB_SOURCE_DIR}"/test/dotest.py --executable "${lldb_executable}" --rerun-all-issues ${LLDB_DOTEST_CC_OPTS} ${LLDB_FORMATTER_OPTS}
                 continue
                 ;;
             llbuild)
@@ -2261,9 +2279,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
                 echo "--- Running tests for ${product} ---"
-                set -x
-                "${swiftpm_bootstrap_command[@]}" test
-                { set +x; } 2>/dev/null
+                call "${swiftpm_bootstrap_command[@]}" test
                 # As swiftpm tests itself, we break early here.
                 continue
                 ;;
@@ -2275,12 +2291,10 @@ for host in "${ALL_HOSTS[@]}"; do
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
                 XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
-                set -x
-                "${XCTEST_SOURCE_DIR}"/build_script.py test \
+                call "${XCTEST_SOURCE_DIR}"/build_script.py test \
                     --swiftc="${SWIFTC_BIN}" \
                     --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation" \
                     "${XCTEST_BUILD_DIR}"
-                { set +x; } 2>/dev/null
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
@@ -2294,14 +2308,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
                 echo "--- Running tests for ${product} ---"
-                set -x
                 build_dir=$(build_directory ${host} ${product})
                 XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
-                pushd "${FOUNDATION_SOURCE_DIR}"
-                ${NINJA_BIN} TestFoundation
-                LD_LIBRARY_PATH="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"/lib/swift/:"${build_dir}/Foundation":"${XCTEST_BUILD_DIR}":${LD_LIBRARY_PATH} "${build_dir}"/TestFoundation/TestFoundation
-                popd
-                { set +x; } 2>/dev/null
+                with_pushd "${FOUNDATION_SOURCE_DIR}" \
+                    call ${NINJA_BIN} TestFoundation
+                call env LD_LIBRARY_PATH="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"/lib/swift/:"${build_dir}/Foundation":"${XCTEST_BUILD_DIR}":${LD_LIBRARY_PATH} "${build_dir}"/TestFoundation/TestFoundation
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
@@ -2311,11 +2322,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
                 echo "--- Running tests for ${product} ---"
-                set -x
-                pushd "${LIBDISPATCH_BUILD_DIR}"
-                make check
-                popd
-                { set +x; } 2>/dev/null
+                with_pushd "${LIBDISPATCH_BUILD_DIR}" \
+                    call make check
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
@@ -2331,9 +2339,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
         if [[ "${executable_target}" != "" ]]; then
             echo "--- Building tests for ${product} ---"
-            set -x
-            ${DISTCC_PUMP} "${build_cmd[@]}" ${BUILD_TARGET_FLAG} "${executable_target}"
-            { set +x; } 2>/dev/null
+            call ${DISTCC_PUMP} "${build_cmd[@]}" ${BUILD_TARGET_FLAG} "${executable_target}"
         fi
 
         # We can only run tests built for the host machine, because
@@ -2348,7 +2354,11 @@ for host in "${ALL_HOSTS[@]}"; do
             if [[ "${target}" != "" ]]; then
                 echo "--- ${target} ---"
                 trap "tests_busted ${product} '(${target})'" ERR
-                if [[ "${CMAKE_GENERATOR}" == Ninja ]] && !( "${build_cmd[@]}" --version 2>&1 | grep -i -q llbuild ); then
+
+                # NOTE: In dry-run mode, build_dir might not exist yet. In that
+                #       case, -n query will fail. So, in dry-run mode,
+                #       we don't expand test script.
+                if [[ ! "${DRY_RUN}" && "${CMAKE_GENERATOR}" == Ninja ]] && !( "${build_cmd[@]}" --version 2>&1 | grep -i -q llbuild ); then
                     # Ninja buffers command output to avoid scrambling the output
                     # of parallel jobs, which is awesome... except that it
                     # interferes with the progress meter when testing.  Instead of
@@ -2357,9 +2367,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     # shell to execute that.
                     sh -e -x -c "$("${build_cmd[@]}" -n -v ${target} | sed -e 's/[^]]*] //')"
                 else
-                    set -x
-                    "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${target}
-                    { set +x; } 2>/dev/null
+                    call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${target}
                 fi
                 echo "-- ${target} finished --"
             fi
@@ -2433,9 +2441,8 @@ for host in "${ALL_HOSTS[@]}"; do
                         ;;
                     macosx-*)
                         set_lldb_build_mode
-                        pushd ${LLDB_SOURCE_DIR}
-                        xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install ${lldb_xcodebuild_options[@]} DSTROOT="${host_install_destdir}" LLDB_TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX}"
-                        popd
+                        with_pushd ${LLDB_SOURCE_DIR} \
+                            call xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install ${lldb_xcodebuild_options[@]} DSTROOT="${host_install_destdir}" LLDB_TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX}"
                         continue
                         ;;
                 esac
@@ -2450,9 +2457,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 echo "--- Installing ${product} ---"
-                set -x
-                "${swiftpm_bootstrap_command[@]}" --prefix="${host_install_destdir}${host_install_prefix}" install
-                { set +x; } 2>/dev/null
+                call "${swiftpm_bootstrap_command[@]}" --prefix="${host_install_destdir}${host_install_prefix}" install
                 # As swiftpm bootstraps the installation itself, we break early here.
                 continue
                 ;;
@@ -2486,12 +2491,10 @@ for host in "${ALL_HOSTS[@]}"; do
                 XCTEST_INSTALL_PREFIX="${host_install_destdir}${host_install_prefix}/lib/swift/${LIB_TARGET}"
                 # Note that installing directly to /usr/lib/swift usually
                 # requires root permissions.
-                set -x
-                "${XCTEST_SOURCE_DIR}"/build_script.py install \
+                call "${XCTEST_SOURCE_DIR}"/build_script.py install \
                     --library-install-path="${XCTEST_INSTALL_PREFIX}" \
                     --module-install-path="${XCTEST_INSTALL_PREFIX}"/"${SWIFT_HOST_VARIANT_ARCH}" \
                     "${XCTEST_BUILD_DIR}"
-                { set +x; } 2>/dev/null
 
                 # As XCTest installation is self-contained, we break early here.
                 continue
@@ -2511,11 +2514,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 echo "--- Installing ${product} ---"
                 build_dir=$(build_directory ${host} ${product})
-                set -x
-                pushd "${FOUNDATION_SOURCE_DIR}"
-                ${NINJA_BIN} install
-                popd
-                { set +x; } 2>/dev/null
+                with_pushd "${FOUNDATION_SOURCE_DIR}" \
+                    call ${NINJA_BIN} install
 
                 # As foundation installation is self-contained, we break early here.
                 continue
@@ -2530,11 +2530,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 echo "--- Installing ${product} ---"
                 LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
-                set -x
-                pushd "${LIBDISPATCH_BUILD_DIR}"
-                make install
-                popd
-                { set +x; } 2>/dev/null
+                with_pushd "${LIBDISPATCH_BUILD_DIR}" \
+                    call make install
 
                 # As libdispatch installation is self-contained, we break early here.
                 continue
@@ -2553,36 +2550,42 @@ for host in "${ALL_HOSTS[@]}"; do
         echo "--- Installing ${product} ---"
         build_dir=$(build_directory ${host} ${product})
 
-        set -x
-
-        DESTDIR="${host_install_destdir}" "${CMAKE}" --build "${build_dir}" -- ${INSTALL_TARGETS}
-        { set +x; } 2>/dev/null
+        call env DESTDIR="${host_install_destdir}" "${CMAKE}" --build "${build_dir}" -- ${INSTALL_TARGETS}
     done
 
     if [[ "${DARWIN_INSTALL_EXTRACT_SYMBOLS}" ]] && [[ $(host_has_darwin_symbols ${host}) ]]; then
-        set -x
-        # Copy executables and shared libraries from the `host_install_destdir` to
-        # INSTALL_SYMROOT and run dsymutil on them.
-        (cd "${host_install_destdir}" &&
-         find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | cpio -pdm "${INSTALL_SYMROOT}")
+        echo "--- Extracting symbols ---"
 
-        # Run dsymutil on executables and shared libraries.
-        #
-        # Exclude shell scripts.
-        (cd "${INSTALL_SYMROOT}" &&
-         find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | \
-           grep -v swift-stdlib-tool | \
-           grep -v crashlog.py | \
-           grep -v symbolication.py | \
-           xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool dsymutil))
+        # FIXME: Since it's hard to trace output pipe call,
+        #        For now, We don't support dry-run trace for this block
+        #        Instead, just echo we do "darwin_intall_extract_symbols".
+        if [[ "${DRY_RUN}" ]]; then
+            call darwin_install_extract_symbols
+        else
+            set -x
+            # Copy executables and shared libraries from the `host_install_destdir` to
+            # INSTALL_SYMROOT and run dsymutil on them.
+            (cd "${host_install_destdir}" &&
+             find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | cpio -pdm "${INSTALL_SYMROOT}")
 
-        # Strip executables, shared libraries and static libraries in
-        # `host_install_destdir`.
-        find "${host_install_destdir}${TOOLCHAIN_PREFIX}/" \
-          -perm -0111 -or -name "*.a" -type f -print | \
-          xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
+            # Run dsymutil on executables and shared libraries.
+            #
+            # Exclude shell scripts.
+            (cd "${INSTALL_SYMROOT}" &&
+             find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | \
+               grep -v swift-stdlib-tool | \
+               grep -v crashlog.py | \
+               grep -v symbolication.py | \
+               xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool dsymutil))
 
-        { set +x; } 2>/dev/null
+            # Strip executables, shared libraries and static libraries in
+            # `host_install_destdir`.
+            find "${host_install_destdir}${TOOLCHAIN_PREFIX}/" \
+              -perm -0111 -or -name "*.a" -type f -print | \
+              xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
+
+            { set +x; } 2>/dev/null
+        fi
     fi
 done
 # Everything is 'installed', but some products may be awaiting lipo.
@@ -2628,47 +2631,47 @@ function build_and_test_installable_package() {
           DARWIN_TOOLCHAIN_CREATED_DATE="$(date -u +'%a %b %d %T GMT %Y')"
 
           echo "-- Removing: ${DARWIN_TOOLCHAIN_INFO_PLIST}"
-          rm -f ${DARWIN_TOOLCHAIN_INFO_PLIST}
+          call rm -f ${DARWIN_TOOLCHAIN_INFO_PLIST}
 
-          ${PLISTBUDDY_BIN} -c "Add DisplayName string '${DARWIN_TOOLCHAIN_DISPLAY_NAME}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-          ${PLISTBUDDY_BIN} -c "Add ShortDisplayName string '${DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-          ${PLISTBUDDY_BIN} -c "Add CreatedDate date '${DARWIN_TOOLCHAIN_CREATED_DATE}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-          ${PLISTBUDDY_BIN} -c "Add CompatibilityVersion integer ${COMPATIBILITY_VERSION}" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-          ${PLISTBUDDY_BIN} -c "Add Version string '${DARWIN_TOOLCHAIN_VERSION}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-          ${PLISTBUDDY_BIN} -c "Add CFBundleIdentifier string '${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-          ${PLISTBUDDY_BIN} -c "Add ReportProblemURL string '${DARWIN_TOOLCHAIN_REPORT_URL}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-          ${PLISTBUDDY_BIN} -c "Add Aliases array" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-          ${PLISTBUDDY_BIN} -c "Add Aliases:0 string '${DARWIN_TOOLCHAIN_ALIAS}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-          ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings dict" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-          ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:ENABLE_BITCODE string 'NO'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-          ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_DISABLE_REQUIRED_ARCLITE string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-          ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_LINK_OBJC_RUNTIME string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add DisplayName string '${DARWIN_TOOLCHAIN_DISPLAY_NAME}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add ShortDisplayName string '${DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add CreatedDate date '${DARWIN_TOOLCHAIN_CREATED_DATE}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add CompatibilityVersion integer ${COMPATIBILITY_VERSION}" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add Version string '${DARWIN_TOOLCHAIN_VERSION}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add CFBundleIdentifier string '${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add ReportProblemURL string '${DARWIN_TOOLCHAIN_REPORT_URL}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add Aliases array" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add Aliases:0 string '${DARWIN_TOOLCHAIN_ALIAS}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings dict" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:ENABLE_BITCODE string 'NO'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_DISABLE_REQUIRED_ARCLITE string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_LINK_OBJC_RUNTIME string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 
-          chmod a+r "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+          call chmod a+r "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 
           if [[ "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" ]] ; then
             echo "-- Codesign xctoolchain --"
-            "${SWIFT_SOURCE_DIR}/utils/toolchain-codesign" "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" "${host_install_destdir}${TOOLCHAIN_PREFIX}/" 
+            call "${SWIFT_SOURCE_DIR}/utils/toolchain-codesign" "${DARWIN_TOOLCHAIN_APPLICATION_CERT}" "${host_install_destdir}${TOOLCHAIN_PREFIX}/" 
           fi
           if [[ "${DARWIN_TOOLCHAIN_INSTALLER_PACKAGE}" ]] ; then
             echo "-- Create Installer --"
-            "${SWIFT_SOURCE_DIR}/utils/toolchain-installer" "${host_install_destdir}${TOOLCHAIN_PREFIX}/" "${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}" \
-            "${DARWIN_TOOLCHAIN_INSTALLER_CERT}" "${DARWIN_TOOLCHAIN_INSTALLER_PACKAGE}" "${DARWIN_TOOLCHAIN_INSTALL_LOCATION}" \
-            "${DARWIN_TOOLCHAIN_VERSION}" "${SWIFT_SOURCE_DIR}/utils/darwin-installer-scripts"
+            call "${SWIFT_SOURCE_DIR}/utils/toolchain-installer" "${host_install_destdir}${TOOLCHAIN_PREFIX}/" "${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}" \
+                "${DARWIN_TOOLCHAIN_INSTALLER_CERT}" "${DARWIN_TOOLCHAIN_INSTALLER_PACKAGE}" "${DARWIN_TOOLCHAIN_INSTALL_LOCATION}" \
+                "${DARWIN_TOOLCHAIN_VERSION}" "${SWIFT_SOURCE_DIR}/utils/darwin-installer-scripts"
           fi 
 
           # host_install_destdir contains the toolchain prefix.
           # We want to create the package in host_install_destdir_nonprefixed.
-          (cd "${host_install_destdir}" &&
-            tar -c -z -f "${package_for_host}" "${TOOLCHAIN_PREFIX/#\/}")
+          with_pushd "${host_install_destdir}" \
+              call tar -c -z -f "${package_for_host}" "${TOOLCHAIN_PREFIX/#\/}"
         else
             # tar on OSX doesn't support --owner/--group.
             if [[ "$(uname -s)" == "Darwin" ]] ; then
-                (cd "${host_install_destdir}" &&
-                        tar -c -z -f "${package_for_host}" "${host_install_prefix/#\/}")
+                with_pushd "${host_install_destdir}" \
+                    tar -c -z -f "${package_for_host}" "${host_install_prefix/#\/}"
             else
-                (cd "${host_install_destdir}" &&
-                        tar -c -z -f "${package_for_host}" --owner=0 --group=0 "${host_install_prefix/#\/}")
+                with_pushd "${host_install_destdir}" \
+                    tar -c -z -f "${package_for_host}" --owner=0 --group=0 "${host_install_prefix/#\/}"
             fi
         fi
         if [[ "${TEST_INSTALLABLE_PACKAGE}" ]] ; then
@@ -2685,16 +2688,13 @@ function build_and_test_installable_package() {
             LIT_EXECUTABLE_PATH="${LLVM_SOURCE_DIR}/utils/lit/lit.py"
             FILECHECK_EXECUTABLE_PATH="$(build_directory_bin ${LOCAL_HOST} llvm)/FileCheck"
             echo "-- Test Installable Package --"
-            set -x
-            rm -rf "${PKG_TESTS_SANDBOX_PARENT}"
-            mkdir -p "${PKG_TESTS_SANDBOX}"
-            pushd "${PKG_TESTS_SANDBOX_PARENT}"
-            tar xzf "${package_for_host}"
-            popd
+            call rm -rf "${PKG_TESTS_SANDBOX_PARENT}"
+            call mkdir -p "${PKG_TESTS_SANDBOX}"
+            with_pushd "${PKG_TESTS_SANDBOX_PARENT}" \
+                call tar xzf "${package_for_host}"
 
-            (cd "${PKG_TESTS_SOURCE_DIR}" &&
-                    python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param filecheck="${FILECHECK_EXECUTABLE_PATH}" --param test-exec-root="${PKG_TESTS_TEMPS}")
-            { set +x; } 2>/dev/null
+            with_pushd "${PKG_TESTS_SOURCE_DIR}" \
+                call python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param filecheck="${FILECHECK_EXECUTABLE_PATH}" --param test-exec-root="${PKG_TESTS_TEMPS}"
         fi
     fi
 }
@@ -2716,7 +2716,7 @@ if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]]; then
     # This is from multiple hosts; Which host should we say it is? 
     # Let's call it 'merged-hosts' so that we can identify it.
     mergedHost="merged-hosts"
-    "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=$(xcrun_find_tool lipo) --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
+    call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=$(xcrun_find_tool lipo) --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
 
     # Build and test the lipo-ed package.
     build_and_test_installable_package ${mergedHost}
