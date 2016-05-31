@@ -283,18 +283,17 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
   llvm_unreachable("bad StaticSpellingKind");
 }
 
-DeclContext *Decl::getInnermostDeclContext() {
+DeclContext *Decl::getInnermostDeclContext() const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
-    return func;
+    return const_cast<AbstractFunctionDecl*>(func);
   if (auto nominal = dyn_cast<NominalTypeDecl>(this))
-    return nominal;
+    return const_cast<NominalTypeDecl*>(nominal);
   if (auto ext = dyn_cast<ExtensionDecl>(this))
-    return ext;
+    return const_cast<ExtensionDecl*>(ext);
   if (auto topLevel = dyn_cast<TopLevelCodeDecl>(this))
-    return topLevel;
+    return const_cast<TopLevelCodeDecl*>(topLevel);
 
   return getDeclContext();
-
 }
 
 DeclContext *Decl::getDeclContextForModule() const {
