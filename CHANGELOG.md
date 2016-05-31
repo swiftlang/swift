@@ -21,7 +21,7 @@ Swift 3.0
 
     ```swift
     func anyCommonElements<T : SequenceType, U : SequenceType>(lhs: T, _ rhs: U) -> Bool
-        where T.Generator.Element: Equatable, T.Generator.Element == U.Generator.Element>
+        where T.Generator.Element: Equatable, T.Generator.Element == U.Generator.Element
     {
         ...
     }
