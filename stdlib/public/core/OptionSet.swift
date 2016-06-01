@@ -115,11 +115,10 @@ public protocol OptionSet : SetAlgebra, RawRepresentable {
   ///     print(extraOptions.isStrictSuperset(of: .all))
   ///     // Prints "true"
   ///
-  /// - Parameter rawValue: The raw value of the option set to create.
-  /// - Returns: A new option set with the given raw value. Each bit of the raw
-  ///   value potentially represents an element of the option set, though raw
-  ///   values may include bits that are not defined as distinct values of the
-  ///   `OptionSet` type.
+  /// - Parameter rawValue: The raw value of the option set to create. Each bit
+  ///   of `rawValue` potentially represents an element of the option set,
+  ///   though raw values may include bits that are not defined as distinct
+  ///   values of the `OptionSet` type.
   init(rawValue: RawValue)
 }
 
@@ -319,8 +318,6 @@ extension OptionSet where RawValue : BitwiseOperations {
   /// Creates an empty option set.
   ///
   /// This initializer creates an option set with a raw value of zero.
-  ///
-  /// - Returns: An option set that contains no elements.
   public init() {
     self.init(rawValue: .allZeros)
   }

@@ -5580,7 +5580,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "init()",
         key.usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_cFT_x::SYNTHESIZED::c:@E@FooRuncingOptions",
         key.original_usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_cFT_x",
-        key.doc.full_as_xml: "<Function><Name>init()</Name><USR>s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_cFT_x</USR><Declaration>convenience init()</Declaration><Abstract><Para>Creates an empty option set.</Para></Abstract><ResultDiscussion><Para>An option set that contains no elements.</Para></ResultDiscussion><Discussion><Para>This initializer creates an option set with a raw value of zero.</Para></Discussion></Function>",
+        key.doc.full_as_xml: "<Function><Name>init()</Name><USR>s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_cFT_x</USR><Declaration>convenience init()</Declaration><Abstract><Para>Creates an empty option set.</Para></Abstract><Discussion><Para>This initializer creates an option set with a raw value of zero.</Para></Discussion></Function>",
         key.offset: 1933,
         key.length: 18,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>()</decl.function.constructor>"
