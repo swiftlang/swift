@@ -65,7 +65,7 @@ set(LLVM_OPTIONAL_SOURCES
     ${swift_runtime_objc_sources}
     ${swift_runtime_leaks_sources})
 
-add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
+add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}

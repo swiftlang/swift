@@ -13,7 +13,6 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     # some stdlib hooks to implement SwiftObject.
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
       ${FOUNDATION_LIBRARY}
-      swiftCore${SWIFT_PRIMARY_VARIANT_SUFFIX}
       swiftStdlibUnittest${SWIFT_PRIMARY_VARIANT_SUFFIX}
       )
   elseif(SWIFT_HOST_VARIANT STREQUAL "freebsd")
@@ -29,14 +28,16 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     Enum.cpp
     Refcounting.cpp
     ${PLATFORM_SOURCES}
+
+    # The runtime tests link to internal runtime symbols, which aren't exported
+    # from the swiftCore dylib, so we need to link to both the runtime archive
+    # and the stdlib.
+    $<TARGET_OBJECTS:swiftRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}>
     )
 
-  # The runtime tests link to internal runtime symbols, which aren't exported
-  # from the swiftCore dylib, so we need to link to both the runtime archive
-  # and the stdlib.
   # FIXME: cross-compile for all variants.
   target_link_libraries(SwiftRuntimeTests
-    swiftRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}
+    swiftCore${SWIFT_PRIMARY_VARIANT_SUFFIX}
     ${PLATFORM_TARGET_LINK_LIBRARIES}
     )
 endif()

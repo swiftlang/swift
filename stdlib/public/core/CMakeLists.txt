@@ -143,7 +143,6 @@ set(swift_core_private_link_libraries)
 set(swift_stdlib_compile_flags)
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   list(APPEND swift_core_link_flags "-all_load")
-  list(APPEND swift_core_private_link_libraries swiftRuntime swiftStdlibStubs)
   list(APPEND swift_core_framework_depends Foundation)
   list(APPEND swift_core_framework_depends CoreFoundation)
 else()
@@ -158,10 +157,11 @@ else()
   # effort has been completed.
   #set(LINK_FLAGS
   #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
-  list(APPEND swift_core_private_link_libraries swiftRuntime swiftStdlibStubs)
   find_package(ICU REQUIRED COMPONENTS uc i18n)
   list(APPEND swift_core_private_link_libraries
       ${ICU_UC_LIBRARY} ${ICU_I18N_LIBRARY})
+  include_directories(
+      ${ICU_UC_INCLUDE_DIR} ${ICU_I18N_INCLUDE_DIR})
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
@@ -205,5 +205,6 @@ add_swift_library(swiftCore SHARED IS_STDLIB IS_STDLIB_CORE
   SWIFT_COMPILE_FLAGS ${swift_stdlib_compile_flags}
   LINK_FLAGS ${swift_core_link_flags}
   PRIVATE_LINK_LIBRARIES ${swift_core_private_link_libraries}
+  INCORPORATE_OBJECT_LIBRARIES swiftRuntime swiftStdlibStubs
   FRAMEWORK_DEPENDS ${swift_core_framework_depends}
   INSTALL_IN_COMPONENT stdlib)
