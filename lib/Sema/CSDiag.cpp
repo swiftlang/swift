@@ -3093,6 +3093,12 @@ static bool isLiteralConvertibleType(Type fromType,
   return false;
 }
 
+static bool isIntegerType(Type fromType, ConstraintSystem *CS) {
+  return isLiteralConvertibleType(fromType,
+                                  KnownProtocolKind::IntegerLiteralConvertible,
+                                  CS);
+}
+
 /// Return true if the given type conforms to RawRepresentable, with an
 /// underlying type conforming to the given known protocol.
 static Type isRawRepresentable(Type fromType,
@@ -3141,7 +3147,6 @@ static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
 /// This helps migration with SDK changes.
 static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
                                       ConstraintSystem *CS,
-                                      Diag<Type, Type> diagID,
                                       Type fromType,
                                       Type toType,
                                       KnownProtocolKind kind,
@@ -3180,6 +3185,54 @@ static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
       return;
     }
   }
+}
+
+/// Attempts to add fix-its for these two mistakes:
+///
+/// - Passing an integer with the right type but which is getting wrapped with a
+///   different integer type unnecessarily. The fixit removes the cast.
+///
+/// - Passing an integer but expecting different integer type. The fixit adds
+///   a wrapping cast.
+///
+/// This helps migration with SDK changes.
+static void tryIntegerCastFixIts(InFlightDiagnostic &diag,
+                                 ConstraintSystem *CS,
+                                 Type fromType,
+                                 Type toType,
+                                 Expr *expr) {
+  if (!isIntegerType(fromType, CS) || !isIntegerType(toType, CS))
+    return;
+
+  auto getInnerCastedExpr = [&]() -> Expr* {
+    CallExpr *CE = dyn_cast<CallExpr>(expr);
+    if (!CE)
+      return nullptr;
+    if (!isa<ConstructorRefCallExpr>(CE->getFn()))
+      return nullptr;
+    ParenExpr *parenE = dyn_cast<ParenExpr>(CE->getArg());
+    if (!parenE)
+      return nullptr;
+    return parenE->getSubExpr();
+  };
+
+  if (Expr *innerE = getInnerCastedExpr()) {
+    Type innerTy = innerE->getType();
+    if (CS->TC.isConvertibleTo(innerTy, toType, CS->DC)) {
+      // Remove the unnecessary cast.
+      diag.fixItRemoveChars(expr->getLoc(), innerE->getStartLoc())
+        .fixItRemove(expr->getEndLoc());
+      return;
+    }
+  }
+
+  // Add a wrapping integer cast.
+  std::string convWrapBefore = toType.getString();
+  convWrapBefore += "(";
+  std::string convWrapAfter = ")";
+  SourceRange exprRange = expr->getSourceRange();
+  diag.fixItInsert(exprRange.Start, convWrapBefore);
+  diag.fixItInsertAfter(exprRange.End, convWrapAfter);
 }
 
 bool FailureDiagnosis::diagnoseContextualConversionError() {
@@ -3420,12 +3473,13 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   case CTP_ArrayElement:
   case CTP_DictionaryKey:
   case CTP_DictionaryValue:
-    tryRawRepresentableFixIts(diag, CS, diagID, exprType, contextualType,
+    tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
                               KnownProtocolKind::IntegerLiteralConvertible,
                               expr);
-    tryRawRepresentableFixIts(diag, CS, diagID, exprType, contextualType,
+    tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
                               KnownProtocolKind::StringLiteralConvertible,
                               expr);
+    tryIntegerCastFixIts(diag, CS, exprType, contextualType, expr);
     break;
 
   default:
