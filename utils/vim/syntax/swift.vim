@@ -90,6 +90,17 @@ syn keyword swiftVarDefinition skipwhite nextgroup=swiftVarName
       \ let
       \ var
 
+syn keyword swiftLabel
+      \ get
+      \ set
+
+syn keyword swiftBoolean
+      \ false
+      \ true
+
+syn keyword swiftNil
+      \ nil
+
 syn match swiftImportModule contained nextgroup=swiftImportComponent
       \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
 syn match swiftImportComponent contained nextgroup=swiftImportComponent
@@ -128,8 +139,6 @@ syn match swiftTypeDeclaration skipwhite nextgroup=swiftType
 syn match swiftTypeDeclaration skipwhite nextgroup=swiftType
       \ /->/
 
-syn keyword swiftBoolean true false
-
 syn region swiftString start=/"/ skip=/\\\\\|\\"/ end=/"/ contains=swiftInterpolation
 syn region swiftInterpolation start=/\\(/ end=/)/ contained
 syn region swiftComment start="/\*" end="\*/" contains=swiftComment,swiftLineComment,swiftTodo
@@ -145,15 +154,12 @@ syn match swiftOperator "\.\.[<.]" skipwhite nextgroup=swiftTypeParameters
 
 syn match swiftChar /'\([^'\\]\|\\\(["'tnr0\\]\|x[0-9a-fA-F]\{2}\|u[0-9a-fA-F]\{4}\|U[0-9a-fA-F]\{8}\)\)'/
 
-syn keyword swiftLabel get set
-
 syn match swiftPreproc /^\s*#\(\<if\>\|\<else\>\|\<elseif\>\|\<endif\>\)/
 syn region swiftPreprocFalse start="^\s*#\<if\>\s\+\<false\>" end="^\s*#\(\<else\>\|\<elseif\>\|\<endif\>\)"
 
 syn match swiftAttribute /@\<\w\+\>/ skipwhite nextgroup=swiftType
 
 syn keyword swiftTodo TODO FIXME contained
-syn keyword swiftNil nil
 
 syn match swiftCastOp "\<as\>[!?]\?" skipwhite nextgroup=swiftType
 
