@@ -56,7 +56,6 @@ STATISTIC(NumOwnedConvertedToNotOwnedResult, "Total owned result -> not owned re
 STATISTIC(NumSROAArguments, "Total SROA arguments optimized");
 
 using SILParameterInfoList = llvm::SmallVector<SILParameterInfo, 8>;
-using SILResultInfoList =  llvm::SmallVector<SILResultInfo, 8>;
 using ArgumentIndexMap = llvm::SmallDenseMap<int, int>;
 
 //===----------------------------------------------------------------------===//
