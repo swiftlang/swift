@@ -111,17 +111,18 @@ syn match swiftType contained nextgroup=swiftTypeParameters
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " [Type:Type] (dictionary) or [Type] (array)
 syn region swiftType contained contains=swiftTypePair,swiftType
-      \ start=/\[/ end=/\]/
+      \ matchgroup=Delimiter start=/\[/ end=/\]/
 syn match swiftTypePair contained nextgroup=swiftTypeParameters,swiftTypeDeclaration
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " (Type[, Type]) (tuple)
+" FIXME: we should be able to use skip="," and drop swiftParamDelim
 syn region swiftType contained contains=swiftType,swiftParamDelim
-      \ start="[^@](" end=")"
+      \ matchgroup=Delimiter start="[^@](" end=")" matchgroup=NONE skip=","
 syn match swiftParamDelim contained
       \ /,/
 " <Generic Clause> (generics)
 syn region swiftTypeParameters contained contains=swiftVarName,swiftConstraint
-      \ start="<" end=">"
+      \ matchgroup=Delimiter start="<" end=">" matchgroup=NONE skip=","
 syn keyword swiftConstraint contained
       \ where
 
