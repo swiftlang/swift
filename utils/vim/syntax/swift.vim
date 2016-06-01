@@ -152,6 +152,7 @@ syn match swiftAttribute /@\<\w\+\>/ skipwhite nextgroup=swiftType
 
 syn keyword swiftTodo TODO FIXME contained
 
+syn match swiftCastOp "\<is\>" skipwhite nextgroup=swiftType
 syn match swiftCastOp "\<as\>[!?]\?" skipwhite nextgroup=swiftType
 
 syn match swiftNilOps "??"
