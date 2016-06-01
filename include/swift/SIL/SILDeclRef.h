@@ -375,6 +375,7 @@ struct SILDeclRef {
   /// True if the referenced entity is emitted by Clang on behalf of the Clang
   /// importer.
   bool isClangGenerated() const;
+  static bool isClangGenerated(ClangNode node);
 
   bool isImplicit() const {
     if (hasDecl())

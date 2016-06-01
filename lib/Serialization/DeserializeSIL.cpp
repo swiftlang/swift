@@ -376,6 +376,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   assert(kind == SIL_FUNCTION && "expect a sil function");
   (void)kind;
 
+  DeclID clangNodeOwnerID;
   TypeID funcTyID;
   unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
     inlineStrategy, effect, numSpecAttrs;
@@ -383,7 +384,8 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   // TODO: read fragile
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isFragile,
                                 isThunk, isGlobal, inlineStrategy, effect,
-                                numSpecAttrs, funcTyID, SemanticsIDs);
+                                numSpecAttrs, funcTyID, clangNodeOwnerID,
+                                SemanticsIDs);
 
   if (funcTyID == 0) {
     DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
@@ -403,6 +405,16 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
                        << " for SILFunction\n");
     MF->error();
     return nullptr;
+  }
+
+  ValueDecl *clangNodeOwner = nullptr;
+  if (clangNodeOwnerID != 0) {
+    clangNodeOwner = dyn_cast_or_null<ValueDecl>(MF->getDecl(clangNodeOwnerID));
+    if (!clangNodeOwner) {
+      DEBUG(llvm::dbgs() << "invalid clang node owner for SILFunction\n");
+      MF->error();
+      return nullptr;
+    }
   }
 
   // If we weren't handed a function, check for an existing
@@ -436,6 +448,8 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
         SILFunction::NotRelevant, (Inline_t)inlineStrategy);
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind((EffectsKind)effect);
+    if (clangNodeOwner)
+      fn->setClangNodeOwner(clangNodeOwner);
     for (auto ID : SemanticsIDs) {
       fn->addSemanticsAttr(MF->getIdentifier(ID).str());
     }
@@ -1837,13 +1851,15 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   // Read function properties only, e.g. its linkage and other attributes.
   // TODO: If this results in any noticeable performance problems, Cache the
   // linkage to avoid re-reading it from the bitcode each time?
+  DeclID clangOwnerID;
   TypeID funcTyID;
   unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
     inlineStrategy, effect, numSpecAttrs;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isFragile,
                                 isThunk, isGlobal, inlineStrategy, effect,
-                                numSpecAttrs, funcTyID, SemanticsIDs);
+                                numSpecAttrs, funcTyID, clangOwnerID,
+                                SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
@@ -1909,8 +1925,8 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   TypeID TyID;
   DeclID dID;
   unsigned rawLinkage, isFragile, IsDeclaration, IsLet;
-  GlobalVarLayout::readRecord(scratch, rawLinkage, isFragile, TyID, dID,
-                              IsDeclaration, IsLet);
+  SILGlobalVarLayout::readRecord(scratch, rawLinkage, isFragile,
+                                 IsDeclaration, IsLet, TyID, dID);
   if (TyID == 0) {
     DEBUG(llvm::dbgs() << "SILGlobalVariable typeID is 0.\n");
     return nullptr;

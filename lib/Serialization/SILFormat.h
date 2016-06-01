@@ -228,14 +228,14 @@ namespace sil_block {
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY
   >;
 
-  using GlobalVarLayout = BCRecordLayout<
+  using SILGlobalVarLayout = BCRecordLayout<
     SIL_GLOBALVAR,
     SILLinkageField,
-    BCFixed<1>,        // fragile
-    TypeIDField,
-    DeclIDField,
+    BCFixed<1>,          // fragile
     BCFixed<1>,          // Is this a declaration.
-    BCFixed<1>           // Is this a let variable.
+    BCFixed<1>,          // Is this a let variable.
+    TypeIDField,
+    DeclIDField
   >;
 
   using SILFunctionLayout =
@@ -247,7 +247,8 @@ namespace sil_block {
                      BCFixed<2>, // inlineStrategy
                      BCFixed<2>, // side effect info.
                      BCFixed<2>, // number of specialize attributes
-                     TypeIDField,
+                     TypeIDField,// SILFunctionType
+                     DeclIDField,// ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute
                      // followed by specialize attributes
                      // followed by generic param list, if any
