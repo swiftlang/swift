@@ -1659,19 +1659,46 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                # FIXME: Need a better test to see if we're building for Android
-                if [[ "$(should_build_stdlib_target 'android-armv7' ${host})" ]]; then
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
-                        -DSWIFT_ANDROID_NDK_GCC_VERSION:STRING="${ANDROID_NDK_GCC_VERSION}"
-                        -DSWIFT_ANDROID_SDK_PATH:STRING="${ANDROID_NDK}/platforms/android-${ANDROID_API_LEVEL}/arch-arm"
-                        -DSWIFT_ANDROID_ICU_UC:STRING="${ANDROID_ICU_UC}"
-                        -DSWIFT_ANDROID_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
-                        -DSWIFT_ANDROID_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
-                        -DSWIFT_ANDROID_ICU_I18N_INCLUDE:STRING="${ANDROID_ICU_I18N_INCLUDE}"
-                    )
-                fi
+                # Configure every cross-compiled stdlib-deployment-target.
+                # That is, every stdlib-deployment-target where (Target != Host).
+
+                configured_targets=(`echo $(get_stdlib_targets_for_host ${host})`)
+                for stdlib_deployment_target in "${configured_targets[@]}"; do
+
+                    # We don't need to configure host's sysroot/toolchain etc
+                    if [[ "${stdlib_deployment_target}" == "${host}" ]]; then
+                        continue
+                    fi
+                    if [[ ! "$(should_build_stdlib_target ${stdlib_deployment_target} ${host})" ]]; then
+                        continue
+                    fi
+
+                    case ${stdlib_deployment_target} in
+                        # We don't need to set up any variables to cross-compile the stdlib for Darwin targets.
+                        # 'xcrun' will detect everything on the CMake side.
+                        macosx-* | iphone* | appletv* | watch* )
+                            continue
+                            ;;
+                        # android-armv7 is the only other cross-compilable stdlib target we support right now.
+                        # Set sysroot/toolchain-related variables.
+                        android-armv7)
+                            cmake_options=(
+                                "${cmake_options[@]}"
+                                -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
+                                -DSWIFT_ANDROID_NDK_GCC_VERSION:STRING="${ANDROID_NDK_GCC_VERSION}"
+                                -DSWIFT_ANDROID_SDK_PATH:STRING="${ANDROID_NDK}/platforms/android-${ANDROID_API_LEVEL}/arch-arm"
+                                -DSWIFT_ANDROID_ICU_UC:STRING="${ANDROID_ICU_UC}"
+                                -DSWIFT_ANDROID_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
+                                -DSWIFT_ANDROID_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
+                                -DSWIFT_ANDROID_ICU_I18N_INCLUDE:STRING="${ANDROID_ICU_I18N_INCLUDE}"
+                            )
+                            ;;
+                        *)
+                            echo "Unsupported stdlib-deployment-target to cross-compile: ${stdlib_deployment_target}"
+                            exit 1
+                            ;;
+                    esac
+                done
 
                 native_llvm_tools_path=""
                 native_clang_tools_path=""
