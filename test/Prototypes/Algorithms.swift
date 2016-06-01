@@ -237,8 +237,8 @@ extension MutableCollection where Self: BidirectionalCollection {
     // actually faster.  The other one sometimes does more swaps, but
     // has better locality properties.  Similarly, we've omitted a
     // specialization of rotate for RandomAccessCollection that uses
-    // cycles per section 11.4 in “From Mathematics to Generic
-    // Programming” by A. Stepanov because it has *much* worse
+    // cycles per section 11.4 in "From Mathematics to Generic
+    // Programming" by A. Stepanov because it has *much* worse
     // locality properties than either of the other implementations.
     // Benchmarks should be performed for that algorithm too, just to
     // be sure.
