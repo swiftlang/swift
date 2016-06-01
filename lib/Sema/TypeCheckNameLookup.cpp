@@ -103,7 +103,12 @@ namespace {
     ///
     /// \param foundInType The type through which we found the
     /// declaration.
-    void add(ValueDecl *found, ValueDecl *base, Type foundInType) {
+    ///
+    /// \param promotedInstanceRef true if the lookup result to be added was
+    /// actually looked up on an instance but promted to a type to look up an
+    /// enum element
+    void add(ValueDecl *found, ValueDecl *base, Type foundInType,
+             bool promotedInstanceRef = false) {
       // If we only want types, AST name lookup should not yield anything else.
       assert(!Options.contains(NameLookupFlags::OnlyTypes) ||
              isa<TypeDecl>(found));
@@ -139,7 +144,7 @@ namespace {
           isa<GenericTypeParamDecl>(found) ||
           (isa<FuncDecl>(found) && cast<FuncDecl>(found)->isOperator())) {
         if (Known.insert({{found, base}, false}).second) {
-          Result.add({found, base});
+          Result.add({found, base, promotedInstanceRef});
           FoundDecls.push_back(found);
         }
         return;
@@ -172,7 +177,7 @@ namespace {
         // default implementations in protocols.
         if (witness && !isa<ProtocolDecl>(witness->getDeclContext())) {
           if (Known.insert({{witness, base}, false}).second) {
-            Result.add({witness, base});
+            Result.add({witness, base, promotedInstanceRef});
             FoundDecls.push_back(witness);
           }
         }
@@ -229,7 +234,8 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
       assert(foundInType && "bogus base declaration?");
     }
 
-    builder.add(found.getValueDecl(), found.getBaseDecl(), foundInType);
+    builder.add(found.getValueDecl(), found.getBaseDecl(), foundInType,
+                found.IsPromotedInstanceRef);
   }
   return result;
 }
@@ -566,7 +572,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
   entries.filterMaxScoreRange(MaxCallEditDistanceFromBestCandidate);
 
   for (auto &entry : entries)
-    result.add({ entry.Value, nullptr });
+    result.add({ entry.Value, nullptr, false });
 }
 
 static InFlightDiagnostic

@@ -93,6 +93,10 @@ ERROR(could_not_use_type_member,none,
 ERROR(could_not_use_type_member_on_instance,none,
       "static member %1 cannot be used on instance of type %0",
       (Type, DeclName))
+WARNING(could_not_use_enum_element_on_instance,none,
+      "referencing enum element %0 as instance member is deprecated and will "
+      "be removed in Swift 3",
+      (DeclName))
 ERROR(could_not_use_type_member_on_existential,none,
       "static member %1 cannot be used on protocol metatype %0",
       (Type, DeclName))

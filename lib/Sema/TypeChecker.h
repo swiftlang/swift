@@ -63,6 +63,13 @@ public:
     /// The base declaration through which we found the declaration.
     ValueDecl *Base;
 
+    /// Whether this should actually reference an instance but has been promoted
+    /// to a type reference to access an enum element
+    ///
+    /// This is purely transitional and will be removed when referencing enum
+    /// elements on instance members becomes an error
+    bool IsPromotedInstanceRef;
+
     operator ValueDecl*() const { return Decl; }
     ValueDecl *operator->() const { return Decl; }
   };
