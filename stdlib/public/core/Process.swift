@@ -60,7 +60,7 @@ public enum Process {
   /// and argv.
   public static var arguments: [String] {
     let argumentsPtr = UnsafeMutablePointer<AnyObject?>(
-      Builtin.addressof(&_swift_stdlib_ProcessArguments))
+      withUnsafeMutablePointer(&_swift_stdlib_ProcessArguments) {$0})
 
     // Check whether argument has been initialized.
     if let arguments = _stdlib_atomicLoadARCRef(object: argumentsPtr) {
