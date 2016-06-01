@@ -22,6 +22,8 @@
 
 #if (defined(__APPLE__) || defined(__linux__) || defined(__CYGWIN__) || defined(__FreeBSD__))
 #include "swift/Runtime/MutexPThread.h"
+#elif defined(_MSC_VER)
+#include "swift/Runtime/MutexWin32.h"
 #else
 #error "Implement equivalent of MutexPThread.h/cpp for your platform."
 #endif
