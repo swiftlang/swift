@@ -7,11 +7,6 @@ if exists("b:current_syntax")
     finish
 endif
 
-syn keyword swiftImport import skipwhite nextgroup=swiftImportModule
-
-syn match swiftImportModule /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
-syn match swiftImportComponent /\.\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
-
 syn keyword swiftKeyword
       \ associatedtype
       \ break
@@ -48,6 +43,9 @@ syn keyword swiftKeyword
       \ var
       \ where
       \ while
+
+syn keyword swiftImport skipwhite nextgroup=swiftImportModule
+      \ import
 
 syn keyword swiftDefinitionModifier
       \ dynamic
@@ -91,6 +89,11 @@ syn keyword swiftTypeDefinition skipwhite nextgroup=swiftTypeName
 syn keyword swiftVarDefinition skipwhite nextgroup=swiftVarName
       \ let
       \ var
+
+syn match swiftImportModule contained nextgroup=swiftImportComponent
+      \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
+syn match swiftImportComponent contained nextgroup=swiftImportComponent
+      \ /\.\<[A-Za-z_][A-Za-z_0-9]*\>/
 
 syn match swiftTypeName contained nextgroup=swiftTypeParameters
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>/
