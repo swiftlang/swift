@@ -923,6 +923,9 @@ extension NSRange {
     length = x.count
   }
 
+  // FIXME(ABI)(compiler limitation): this API should be an extension on Range.
+  // Can't express it now because the compiler does not support conditional
+  // extensions with type equality constraints.
   public func toRange() -> Range<Int>? {
     if location == NSNotFound { return nil }
     return location..<(location+length)
