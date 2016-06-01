@@ -17,6 +17,6 @@ Protocols:
   - Selector: 'locationManager:didEnterRegion:'
     SwiftName: 'locationManager(_:didEnterRegion:)'
     MethodKind: Instance
-  - Selector: 'locationManager:didChangeAuthorization:'
+  - Selector: 'locationManager:didChangeAuthorizationStatus:'
     SwiftName: 'locationManager(_:didChangeAuthorization:)'
     MethodKind: Instance
