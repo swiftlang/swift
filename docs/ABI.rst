@@ -1016,6 +1016,7 @@ mangled in to disambiguate.
   impl-function-attribute ::= 'Cw'            // compatible with protocol witness
   impl-function-attribute ::= 'N'             // noreturn
   impl-function-attribute ::= 'G'             // generic
+  impl-function-attribute ::= 'g'             // pseudogeneric
   impl-parameter ::= impl-convention type
   impl-result ::= impl-convention type
 
@@ -1025,7 +1026,8 @@ implementation details of a function type.
 
 Any ``<impl-function-attribute>`` productions must appear in the order
 in which they are specified above: e.g. a noreturn C function is
-mangled with ``CcN``.
+mangled with ``CcN``.  ``g`` and ``G`` are exclusive and mark the presence
+of a generic signature immediately following.
 
 Note that the convention and function-attribute productions do not
 need to be disambiguated from the start of a ``<type>``.

@@ -188,4 +188,10 @@ ImportedObjCGenerics.test("InheritInSwift") {
   expectEqual(sup.object, "ALOHA")
 }
 
+ImportedObjCGenerics.test("BridgedInitializer") {
+  let strings: [String] = ["hello", "world"]
+  let s = BridgedInitializer(array: strings)
+  expectEqual(s.count, 2)
+}
+
 runAllTests()

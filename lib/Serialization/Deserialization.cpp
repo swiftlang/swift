@@ -3909,6 +3909,7 @@ Type ModuleFile::getType(TypeID TID) {
     uint8_t rawCalleeConvention;
     uint8_t rawRepresentation;
     bool noreturn = false;
+    bool pseudogeneric = false;
     bool hasErrorResult;
     unsigned numParams;
     unsigned numResults;
@@ -3918,6 +3919,7 @@ Type ModuleFile::getType(TypeID TID) {
                                              rawCalleeConvention,
                                              rawRepresentation,
                                              noreturn,
+                                             pseudogeneric,
                                              hasErrorResult,
                                              numParams,
                                              numResults,
@@ -3930,7 +3932,7 @@ Type ModuleFile::getType(TypeID TID) {
       error();
       return nullptr;
     }
-    SILFunctionType::ExtInfo extInfo(*representation, noreturn);
+    SILFunctionType::ExtInfo extInfo(*representation, noreturn, pseudogeneric);
 
     // Process the callee convention.
     auto calleeConvention = getActualParameterConvention(rawCalleeConvention);
