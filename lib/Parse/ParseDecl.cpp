@@ -2526,6 +2526,28 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
       continue;
     }
 
+    // Provide a nice error if protocol composition is used.
+    if (Tok.is(tok::kw_protocol) && startsWithLess(peekToken())) {
+      auto compositionResult = parseTypeComposition();
+      Status |= compositionResult;
+      if (auto composition = compositionResult.getPtrOrNull()) {
+        // Record the protocols inside the composition.
+        Inherited.append(composition->getProtocols().begin(),
+                         composition->getProtocols().end());
+
+        // Provide fixits to remove the composition, leaving the types intact.
+        auto angleRange = composition->getAngleBrackets();
+        diagnose(composition->getProtocolLoc(),
+                 diag::disallowed_protocol_composition)
+            .fixItRemove({composition->getProtocolLoc(), angleRange.Start})
+            .fixItRemove(startsWithGreater(L->getTokenAt(angleRange.End))
+                             ? angleRange.End
+                             : SourceLoc());
+      }
+
+      continue;
+    }
+
     // Parse the inherited type (which must be a protocol).
     ParserResult<TypeRepr> Ty = parseTypeIdentifier();
     Status |= Ty;
