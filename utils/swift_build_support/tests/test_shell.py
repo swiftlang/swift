@@ -42,6 +42,9 @@ class ShellTestCase(unittest.TestCase):
         if os.path.exists(self.tmpdir):
             shutil.rmtree(self.tmpdir)
 
+    def test_quote_command(self):
+        self.assertEqual(shell.quote_command(["a b", "", "c"]), "'a b' '' c")
+
     def test_call(self):
         shell.dry_run = False
         foo_file = os.path.join(self.tmpdir, 'foo.txt')

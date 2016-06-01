@@ -18,10 +18,14 @@ except ImportError:
     import configparser as ConfigParser
 
 import os
-import pipes
 import platform
 import subprocess
 import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
+
+# E402 means module level import not at top of file
+from swift_build_support import shell  # noqa (E402)
 
 
 HOME = os.environ.get("HOME", "/")
@@ -70,10 +74,6 @@ def print_with_argv0(message):
     sys.stdout.flush()
 
 
-def quote_shell_command(args):
-    return " ".join([pipes.quote(a) for a in args])
-
-
 def check_call(args, print_command=False, verbose=False, disable_sleep=False):
     if disable_sleep:
         if platform.system() == 'Darwin':
@@ -82,7 +82,7 @@ def check_call(args, print_command=False, verbose=False, disable_sleep=False):
             args.insert(0, "caffeinate")
 
     if print_command:
-        print(os.getcwd() + "$ " + quote_shell_command(args))
+        print(os.getcwd() + "$ " + shell.quote_command(args))
         sys.stdout.flush()
     try:
         return subprocess.check_call(args)
@@ -94,7 +94,7 @@ def check_call(args, print_command=False, verbose=False, disable_sleep=False):
         sys.exit(1)
     except OSError as e:
         print_with_argv0(
-            "could not execute '" + quote_shell_command(args) +
+            "could not execute '" + shell.quote_command(args) +
             "': " + e.strerror)
         sys.stdout.flush()
         sys.exit(1)
@@ -102,7 +102,7 @@ def check_call(args, print_command=False, verbose=False, disable_sleep=False):
 
 def check_output(args, print_command=False, verbose=False):
     if print_command:
-        print(os.getcwd() + "$ " + quote_shell_command(args))
+        print(os.getcwd() + "$ " + shell.quote_command(args))
         sys.stdout.flush()
     try:
         return subprocess.check_output(args)
@@ -114,7 +114,7 @@ def check_output(args, print_command=False, verbose=False):
         sys.exit(1)
     except OSError as e:
         print_with_argv0(
-            "could not execute '" + quote_shell_command(args) +
+            "could not execute '" + shell.quote_command(args) +
             "': " + e.strerror)
         sys.stdout.flush()
         sys.exit(1)
