@@ -892,7 +892,7 @@ function make_relative_symlink() {
 CROSS_COMPILE_HOSTS=($CROSS_COMPILE_HOSTS)
 for t in ${CROSS_COMPILE_HOSTS} ; do
     case ${t} in
-        iphone* | appletv* | watchos* | linux-armv6 | linux-armv7 )
+        iphone* | appletv* | watch* | linux-armv6 | linux-armv7 )
             ;;
         *)
             echo "Unknown host to cross-compile for: ${t}"
@@ -980,7 +980,7 @@ function should_include_host_in_lipo() {
     local host="$1"
     if [[ $(has_cross_compile_hosts) ]] && [[ -z "${SKIP_MERGE_LIPO_CROSS_COMPILE_TOOLS}" ]]; then
         case ${host} in 
-            iphone* | appletv* | watchos* )
+            iphone* | appletv* | watch* )
                 echo 1
                 ;;
         esac
@@ -990,7 +990,7 @@ function should_include_host_in_lipo() {
 function host_has_darwin_symbols() {
     local host="$1"
     case ${host} in 
-        macosx* | iphone* | appletv* | watchos* )
+        macosx* | iphone* | appletv* | watch* )
             echo 1
             ;;
     esac
