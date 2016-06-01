@@ -5827,6 +5827,42 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                     covariantResultType);
     }
 
+    // Extract all arguments.
+    auto *CEA = arg;
+    if (auto *TSE = dyn_cast<TupleShuffleExpr>(CEA))
+      CEA = TSE->getSubExpr();
+    // The argument is either a ParenExpr or TupleExpr.
+    ArrayRef<Expr *> arguments;
+    ArrayRef<TypeBase *> types;
+
+    if (auto *TE = dyn_cast<TupleExpr>(CEA))
+      arguments = TE->getElements();
+    else if (auto *PE = dyn_cast<ParenExpr>(CEA))
+      arguments = PE->getSubExpr();
+    else
+      arguments = apply->getArg();
+
+    for (auto arg: arguments) {
+      bool isNoEscape = false;
+      while (1) {
+        if (auto AFT = arg->getType()->getAs<AnyFunctionType>()) {
+          isNoEscape = isNoEscape || AFT->isNoEscape();
+        }
+
+        if (auto conv = dyn_cast<ImplicitConversionExpr>(arg))
+          arg = conv->getSubExpr();
+        else if (auto *PE = dyn_cast<ParenExpr>(arg))
+          arg = PE->getSubExpr();
+        else
+          break;
+      }
+      if (!isNoEscape) {
+        if (auto DRE = dyn_cast<DeclRefExpr>(arg))
+          if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
+            tc.addEscapingFunctionAsArgument(FD, apply);
+          }
+      }
+    }
     return result;
   }
 

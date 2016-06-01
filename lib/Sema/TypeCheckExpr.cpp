@@ -973,6 +973,25 @@ namespace {
       if (!validateForwardCapture(DRE->getDecl()))
         return { false, DRE };
 
+      bool isInOut = D->hasInterfaceType()
+                     && isa<InOutType>(D->getInterfaceType().getPointer());
+      bool isNested = false;
+      if (auto f = AFR.getAbstractFunctionDecl()) {
+           isNested = f->getDeclContext()->getContextKind() ==
+        DeclContextKind::AbstractFunctionDecl;
+      }
+
+      if (isInOut && !AFR.isKnownNoEscape() && !isNested) {
+        if (D->getNameStr() == "self") {
+          TC.diagnose(DRE->getLoc(),
+            diag::closure_implicit_capture_mutating_self);
+        } else {
+          TC.diagnose(DRE->getLoc(),
+            diag::closure_implicit_capture_without_noescape);
+        }
+        return { false, DRE };
+      }
+
       // We're going to capture this, compute flags for the capture.
       unsigned Flags = 0;
 
@@ -1214,6 +1233,28 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   SourceLoc GenericParamCaptureLoc;
   FindCapturedVars finder(*this, Captures, GenericParamCaptureLoc, AFR);
   AFR.getBody()->walk(finder);
+
+  unsigned inoutCount = 0;
+  for (auto C: Captures) {
+    if (auto type = C.getDecl()->getInterfaceType())
+      if (isa<InOutType>(type.getPointer()))
+        inoutCount++;
+  }
+
+  if (inoutCount > 0) {
+    if (auto e = AFR.getAbstractFunctionDecl()) {
+      for (auto returnOccurance: getEscapingFunctionAsReturnValue(e)) {
+        diagnose(returnOccurance->getReturnLoc(),
+          diag::nested_function_escaping_inout_capture);
+      }
+      auto occurances = getEscapingFunctionAsArgument(e);
+      for (auto occurance: occurances) {
+        diagnose(occurance->getLoc(),
+          diag::nested_function_with_implicit_capture_argument,
+          inoutCount > 1);
+      }
+    }
+  }
 
   if (AFR.hasType() && !AFR.isObjC()) {
     finder.checkType(AFR.getType(), AFR.getLoc());
