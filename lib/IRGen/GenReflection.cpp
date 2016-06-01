@@ -705,47 +705,52 @@ public:
 };
 
 static std::string getReflectionSectionName(IRGenModule &IGM,
-                                            std::string Base) {
+                                            StringRef LongName,
+                                            StringRef FourCC) {
   SmallString<50> SectionName;
   llvm::raw_svector_ostream OS(SectionName);
   switch (IGM.TargetInfo.OutputObjectFormat) {
-    case llvm::Triple::MachO:
-      assert(Base.size() <= 7
-             && "Mach-O section name length must be <= 16 characters");
-      OS << "__TEXT, __swift3_" << Base << ", regular, no_dead_strip";
-      break;
-    case llvm::Triple::ELF:
-      OS << ".swift3_" << Base;
-      break;
-    default:
-      llvm_unreachable("Don't know how to emit field name table for "
-                       "the selected object format.");
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("unknown object format");
+  case llvm::Triple::COFF:
+    assert(FourCC.size() <= 4 &&
+           "COFF section name length must be <= 8 characters");
+    OS << ".sw3" << FourCC;
+    break;
+  case llvm::Triple::ELF:
+    OS << ".swift3_" << LongName;
+    break;
+  case llvm::Triple::MachO:
+    assert(LongName.size() <= 7 &&
+           "Mach-O section name length must be <= 16 characters");
+    OS << "__TEXT,__swift3_" << LongName << ", regular, no_dead_strip";
+    break;
   }
   return OS.str();
 }
 
 std::string IRGenModule::getFieldTypeMetadataSectionName() {
-  return getReflectionSectionName(*this, "fieldmd");
+  return getReflectionSectionName(*this, "fieldmd", "flmd");
 }
 
 std::string IRGenModule::getBuiltinTypeMetadataSectionName() {
-  return getReflectionSectionName(*this, "builtin");
+  return getReflectionSectionName(*this, "builtin", "bltn");
 }
 
 std::string IRGenModule::getAssociatedTypeMetadataSectionName() {
-  return getReflectionSectionName(*this, "assocty");
+  return getReflectionSectionName(*this, "assocty", "asty");
 }
 
 std::string IRGenModule::getCaptureDescriptorMetadataSectionName() {
-  return getReflectionSectionName(*this, "capture");
+  return getReflectionSectionName(*this, "capture", "cptr");
 }
 
 std::string IRGenModule::getReflectionStringsSectionName() {
-  return getReflectionSectionName(*this, "reflstr");
+  return getReflectionSectionName(*this, "reflstr", "rfst");
 }
 
 std::string IRGenModule::getReflectionTypeRefSectionName() {
-  return getReflectionSectionName(*this, "typeref");
+  return getReflectionSectionName(*this, "typeref", "tyrf");
 }
 
 llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
