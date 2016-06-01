@@ -105,6 +105,7 @@ def update_working_copy(repo_path, branch):
         # http://stackoverflow.com/a/30209750/125349
         check_call(["git", "fetch"])
         check_call(["git", "rebase", "FETCH_HEAD"])
+        check_call(["git", "submodule", "update", "--recursive"])
 
 
 def obtain_additional_swift_sources(
