@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 2.8.12)
 
+if(POLICY CMP0051)
+  cmake_policy(SET CMP0051 NEW)
+endif()
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
