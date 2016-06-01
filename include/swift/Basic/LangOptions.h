@@ -157,6 +157,9 @@ namespace swift {
     /// Enable the Swift 3 migration via Fix-Its.
     bool Swift3Migration = false;
 
+    /// Enable typealiases in protocols.
+    bool EnableProtocolTypealiases = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///

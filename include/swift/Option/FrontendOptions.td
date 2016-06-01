@@ -341,4 +341,7 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 def group_info_path : Separate<["-"], "group-info-path">,
   HelpText<"The path to collect the group information of the compiled module">;
 
+def enable_protocol_typealiases: Flag<["-"], "enable-protocol-typealiases">,
+  HelpText<"Enable typealiases inside protocol declarations">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

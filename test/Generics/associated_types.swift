@@ -173,7 +173,7 @@ struct C<a : B> : B { // expected-error {{type 'C<a>' does not conform to protoc
 
 // SR-511
 protocol sr511 {
-  typealias Foo // expected-error {{typealias is missing an assigned type; use 'associatedtype' to define an associated type requirement}} 
+  typealias Foo // expected-warning {{use of 'typealias' to declare associated types is deprecated; use 'associatedtype' instead}} 
 }
 
 associatedtype Foo = Int // expected-error {{associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement}}
