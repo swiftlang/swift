@@ -25,7 +25,7 @@ Swift 3.0
       }
     }
 
-    case Derived<T> : Base<T> {
+    class Derived<T> : Base<T> {
       // init(t: T) is now synthesized to call super.init(t: t)
     }```
 
