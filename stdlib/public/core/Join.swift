@@ -19,19 +19,15 @@ internal enum _JoinIteratorState {
 
 /// An iterator that presents the elements of the sequences traversed
 /// by `Base`, concatenated using a given separator.
-public struct JoinedIterator<
-  Base : IteratorProtocol where Base.Element : Sequence
-> : IteratorProtocol {
+public struct JoinedIterator<Base : IteratorProtocol> : IteratorProtocol
+  where Base.Element : Sequence {
 
   /// Creates an iterator that presents the elements of the sequences
   /// traversed by `base`, concatenated using `separator`.
   ///
   /// - Complexity: O(`separator.count`).
-  public init<
-    Separator : Sequence
-    where
-    Separator.Iterator.Element == Base.Element.Iterator.Element
-  >(base: Base, separator: Separator) {
+  public init<Separator : Sequence>(base: Base, separator: Separator)
+    where Separator.Iterator.Element == Base.Element.Iterator.Element {
     self._base = base
     self._separatorData = ContiguousArray(separator)
   }
@@ -92,19 +88,15 @@ public struct JoinedIterator<
 
 /// A sequence that presents the elements of the `Base` sequences
 /// concatenated using a given separator.
-public struct JoinedSequence<
-  Base : Sequence where Base.Iterator.Element : Sequence
-> : Sequence {
+public struct JoinedSequence<Base : Sequence> : Sequence
+  where Base.Iterator.Element : Sequence {
 
   /// Creates a sequence that presents the elements of `base` sequences
   /// concatenated using `separator`.
   ///
   /// - Complexity: O(`separator.count`).
-  public init<
-    Separator : Sequence
-    where
-    Separator.Iterator.Element == Base.Iterator.Element.Iterator.Element
-  >(base: Base, separator: Separator) {
+  public init<Separator : Sequence>(base: Base, separator: Separator)
+    where Separator.Iterator.Element == Base.Iterator.Element.Iterator.Element {
     self._base = base
     self._separator = ContiguousArray(separator)
   }
@@ -177,19 +169,17 @@ extension Sequence where Iterator.Element : Sequence {
   /// - Returns: The joined sequence of elements.
   ///
   /// - SeeAlso: `flatten()`
-  public func joined<
-    Separator : Sequence
-    where
-    Separator.Iterator.Element == Iterator.Element.Iterator.Element
-  >(separator: Separator) -> JoinedSequence<Self> {
+  public func joined<Separator : Sequence>(
+    separator: Separator
+  ) -> JoinedSequence<Self>
+    where Separator.Iterator.Element == Iterator.Element.Iterator.Element {
     return JoinedSequence(base: self, separator: separator)
   }
 }
 
 @available(*, unavailable, renamed: "JoinedIterator")
-public struct JoinGenerator<
-  Base : IteratorProtocol where Base.Element : Sequence
-> {}
+public struct JoinGenerator<Base : IteratorProtocol>
+  where Base.Element : Sequence {}
 
 extension JoinedSequence {
   @available(*, unavailable, renamed: "makeIterator")
@@ -200,11 +190,10 @@ extension JoinedSequence {
 
 extension Sequence where Iterator.Element : Sequence {
   @available(*, unavailable, renamed: "joined")
-  public func joinWithSeparator<
-    Separator : Sequence
-    where
-    Separator.Iterator.Element == Iterator.Element.Iterator.Element
-  >(_ separator: Separator) -> JoinedSequence<Self> {
+  public func joinWithSeparator<Separator : Sequence>(
+    _ separator: Separator
+  ) -> JoinedSequence<Self>
+    where Separator.Iterator.Element == Iterator.Element.Iterator.Element {
     Builtin.unreachable()
   }
 }

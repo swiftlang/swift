@@ -76,13 +76,12 @@ struct _SliceBuffer<Element> : _ArrayBufferProtocol, RandomAccessCollection {
   /// - Precondition: This buffer is backed by a uniquely-referenced
   ///   `_ContiguousArrayBuffer` and
   ///   `insertCount <= numericCast(newValues.count)`.
-  public mutating func replace<
-    C : Collection where C.Iterator.Element == Element
-  >(
+  public mutating func replace<C>(
     subRange: Range<Int>,
     with insertCount: Int,
     elementsOf newValues: C
-  ) {
+  ) where C : Collection, C.Iterator.Element == Element {
+
     _invariantCheck()
     _sanityCheck(insertCount <= numericCast(newValues.count))
 

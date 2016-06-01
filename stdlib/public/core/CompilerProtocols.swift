@@ -195,9 +195,8 @@ public protocol RawRepresentable {
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-public func == <
-  T : RawRepresentable where T.RawValue : Equatable
->(lhs: T, rhs: T) -> Bool {
+public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
+  where T.RawValue : Equatable {
   return lhs.rawValue == rhs.rawValue
 }
 
@@ -206,9 +205,8 @@ public func == <
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-public func != <
-  T : RawRepresentable where T.RawValue : Equatable
->(lhs: T, rhs: T) -> Bool {
+public func != <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
+  where T.RawValue : Equatable {
   return lhs.rawValue != rhs.rawValue
 }
 
@@ -219,9 +217,8 @@ public func != <
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-public func != <
-  T : Equatable where T : RawRepresentable, T.RawValue : Equatable
->(lhs: T, rhs: T) -> Bool {
+public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
+  where T : RawRepresentable, T.RawValue : Equatable {
   return lhs.rawValue != rhs.rawValue
 }
 

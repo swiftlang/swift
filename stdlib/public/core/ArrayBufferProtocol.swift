@@ -71,11 +71,11 @@ public protocol _ArrayBufferProtocol
   ///
   /// - Precondition: This buffer is backed by a uniquely-referenced
   /// `_ContiguousArrayBuffer`.
-  mutating func replace<C : Collection where C.Iterator.Element == Element>(
+  mutating func replace<C>(
     subRange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
-  )
+  ) where C : Collection, C.Iterator.Element == Element
 
   /// Returns a `_SliceBuffer` containing the elements in `bounds`.
   subscript(bounds: Range<Int>) -> _SliceBuffer<Element> { get }
@@ -131,13 +131,11 @@ extension _ArrayBufferProtocol where Index == Int {
     return firstElementAddress
   }
 
-  public mutating func replace<
-    C : Collection where C.Iterator.Element == Element
-  >(
+  public mutating func replace<C>(
     subRange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
-  ) {
+  ) where C : Collection, C.Iterator.Element == Element {
     _sanityCheck(startIndex == 0, "_SliceBuffer should override this function.")
     let oldCount = self.count
     let eraseCount = subRange.count

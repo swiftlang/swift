@@ -25,14 +25,14 @@ def cmp(a, b, p):
 % preds = [True, False]
 % for p in preds:
 
-func _insertionSort<
-  C : protocol<MutableCollection, BidirectionalCollection>
-  ${"" if p else "where C.Iterator.Element : Comparable"}
->(
+func _insertionSort<C>(
   _ elements: inout C,
-  subRange range: Range<C.Index> ${"," if p else ""}
-  ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
-) {
+  subRange range: Range<C.Index>
+  ${", isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
+) where
+  C : protocol<MutableCollection, BidirectionalCollection>
+  ${"" if p else ", C.Iterator.Element : Comparable"} {
+
   if !range.isEmpty {
     let start = range.lowerBound
 
@@ -72,14 +72,15 @@ func _insertionSort<
   }
 }
 
-func _partition<
-  C : protocol<MutableCollection, RandomAccessCollection>
-  ${"" if p else "where C.Iterator.Element : Comparable"}
->(
+func _partition<C>(
   _ elements: inout C,
-  subRange range: Range<C.Index> ${"," if p else ""}
-  ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
-) -> C.Index {
+  subRange range: Range<C.Index>
+  ${", isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
+) -> C.Index
+  where
+  C : protocol<MutableCollection, RandomAccessCollection>
+  ${"" if p else ", C.Iterator.Element : Comparable"} {
+
   var lo = range.lowerBound
   var hi = range.upperBound
 
@@ -127,14 +128,14 @@ Loop: while true {
 }
 
 public // @testable
-func _introSort<
-  C : protocol<MutableCollection, RandomAccessCollection>
-  ${"" if p else "where C.Iterator.Element : Comparable"}
->(
+func _introSort<C>(
   _ elements: inout C,
-  subRange range: Range<C.Index> ${"," if p else ""}
-  ${"isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
-) {
+  subRange range: Range<C.Index>
+  ${", isOrderedBefore: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
+) where
+  C : protocol<MutableCollection, RandomAccessCollection>
+  ${"" if p else ", C.Iterator.Element : Comparable"} {
+
 %   if p:
   var isOrderedBeforeVar = isOrderedBefore
 %   end
@@ -153,15 +154,15 @@ func _introSort<
     depthLimit: depthLimit)
 }
 
-func _introSortImpl<
-  C : protocol<MutableCollection, RandomAccessCollection>
-  ${"" if p else "where C.Iterator.Element : Comparable"}
->(
+func _introSortImpl<C>(
   _ elements: inout C,
-  subRange range: Range<C.Index> ${"," if p else ""}
-  ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""},
+  subRange range: Range<C.Index>
+  ${", isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""},
   depthLimit: Int
-) {
+) where
+  C : protocol<MutableCollection, RandomAccessCollection>
+  ${"" if p else ", C.Iterator.Element : Comparable"} {
+
   // Insertion sort is better at handling smaller regions.
   if elements.distance(from: range.lowerBound, to: range.upperBound) < 20 {
     _insertionSort(
@@ -197,15 +198,15 @@ func _introSortImpl<
     depthLimit: depthLimit &- 1)
 }
 
-func _siftDown<
-  C : protocol<MutableCollection, RandomAccessCollection>
-  ${"" if p else "where C.Iterator.Element : Comparable"}
->(
+func _siftDown<C>(
   _ elements: inout C,
   index: C.Index,
-  subRange range: Range<C.Index> ${"," if p else ""}
-  ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
-) {
+  subRange range: Range<C.Index>
+  ${", isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
+) where
+  C : protocol<MutableCollection, RandomAccessCollection>
+  ${"" if p else ", C.Iterator.Element : Comparable"} {
+
   let countToIndex = elements.distance(from: range.lowerBound, to: index)
   let countFromIndex = elements.distance(from: index, to: range.upperBound)
   // Check if left child is within bounds. If not, return, because there are
@@ -236,14 +237,13 @@ func _siftDown<
       ${", isOrderedBefore: &isOrderedBefore" if p else ""})
   }
 }
-func _heapify<
-  C : protocol<MutableCollection, RandomAccessCollection>
-  ${"" if p else "where C.Iterator.Element : Comparable"}
->(
+func _heapify<C>(
   _ elements: inout C,
-  subRange range: Range<C.Index> ${"," if p else ""}
-  ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
-) {
+  subRange range: Range<C.Index>
+  ${", isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
+) where
+  C : protocol<MutableCollection, RandomAccessCollection>
+  ${"" if p else ", C.Iterator.Element : Comparable"} {
   // Here we build a heap starting from the lowest nodes and moving to the root.
   // On every step we sift down the current node to obey the max-heap property:
   //   parent >= max(leftChild, rightChild)
@@ -265,14 +265,13 @@ func _heapify<
       ${", isOrderedBefore: &isOrderedBefore" if p else ""})
   }
 }
-func _heapSort<
-  C : protocol<MutableCollection, RandomAccessCollection>
-  ${"" if p else "where C.Iterator.Element : Comparable"}
->(
+func _heapSort<C>(
   _ elements: inout C,
-  subRange range: Range<C.Index> ${"," if p else ""}
-  ${"isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
-) {
+  subRange range: Range<C.Index>
+  ${", isOrderedBefore: inout (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
+) where
+  C : protocol<MutableCollection, RandomAccessCollection>
+  ${"" if p else ", C.Iterator.Element : Comparable"} {
   var hi = range.upperBound
   let lo = range.lowerBound
   _heapify(

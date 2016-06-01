@@ -13,10 +13,11 @@
 // FIXME: swift-3-indexing-model: Generalize all tests to check both
 // [Closed]Range and [Closed]CountableRange.
 
-// WORKAROUND rdar://25214598 - should be Bound : Strideable
-internal enum _ClosedRangeIndexRepresentation<
-  Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
-> {
+internal enum _ClosedRangeIndexRepresentation<Bound>
+  where
+  // WORKAROUND rdar://25214598 - should be Bound : Strideable
+  Bound : protocol<_Strideable, Comparable>,
+  Bound.Stride : Integer {
   case pastEnd
   case inRange(Bound)
 }
@@ -24,13 +25,14 @@ internal enum _ClosedRangeIndexRepresentation<
 // FIXME(ABI)(compiler limitation): should be a nested type in
 // `ClosedRange`.
 /// A position in a `CountableClosedRange` instance.
-public struct ClosedRangeIndex<
+public struct ClosedRangeIndex<Bound> : Comparable
+  where
   // WORKAROUND rdar://25214598 - should be Bound : Strideable
-  Bound : Comparable where Bound : _Strideable, Bound.Stride : Integer
   // swift-3-indexing-model: should conform to _Strideable, otherwise
   // CountableClosedRange is not interchangeable with CountableRange in all
   // contexts.
-> : Comparable {
+  Bound : protocol<_Strideable, Comparable>,
+  Bound.Stride : Integer {
   /// Creates the "past the end" position.
   internal init() { _value = .pastEnd }
 
@@ -101,11 +103,11 @@ public func < <B>(lhs: ClosedRangeIndex<B>, rhs: ClosedRangeIndex<B>) -> Bool {
 
 // WORKAROUND: needed because of rdar://25584401
 /// An iterator over the elements of a `CountableClosedRange` instance.
-public struct ClosedRangeIterator<
-  Bound : protocol<_Strideable, Comparable>
+public struct ClosedRangeIterator<Bound> : IteratorProtocol, Sequence
   where
-  Bound.Stride : SignedInteger
-> : IteratorProtocol, Sequence {
+  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
+  Bound : protocol<_Strideable, Comparable>,
+  Bound.Stride : SignedInteger {
 
   internal init(_range r: CountableClosedRange<Bound>) {
     _nextResult = r.lowerBound
@@ -175,12 +177,11 @@ public struct ClosedRangeIterator<
 /// `stride(from:through:by:)` function.
 ///
 /// - SeeAlso: `CountableRange`, `ClosedRange`, `Range`
-public struct CountableClosedRange<
-  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : protocol<_Strideable, Comparable>
+public struct CountableClosedRange<Bound> : RandomAccessCollection
   where
-  Bound.Stride : SignedInteger
-> : RandomAccessCollection {
+  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
+  Bound : protocol<_Strideable, Comparable>,
+  Bound.Stride : SignedInteger {
 
   /// The range's lower bound.
   public let lowerBound: Bound
@@ -387,14 +388,13 @@ public func ... <Bound : Comparable> (minimum: Bound, maximum: Bound)
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
 @_transparent
-public func ... <
-  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : protocol<_Strideable, Comparable>
-  where
-  Bound.Stride : SignedInteger
-> (
+public func ... <Bound> (
   minimum: Bound, maximum: Bound
-) -> CountableClosedRange<Bound> {
+) -> CountableClosedRange<Bound>
+  where
+  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
+  Bound : protocol<_Strideable, Comparable>,
+  Bound.Stride : SignedInteger {
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(
     minimum <= maximum, "Can't form Range with upperBound < lowerBound")
