@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-parse-verify-swift -enable-protocol-typealiases
 
 typealias rgb = Int32 // expected-note {{declared here}}
 var rgb : rgb? // expected-error {{invalid redeclaration of 'rgb'}}
@@ -29,7 +29,6 @@ struct MyType<TyA, TyB> {
 
 protocol P {
   associatedtype X<T>  // expected-error {{associated types may not have a generic parameter list}}
-  
   typealias Y<T>       // expected-error {{expected '=' in typealias declaration}}
 }
 
@@ -150,7 +149,7 @@ extension C<T> {}  // expected-error {{use of undeclared type 'T'}}
 extension C<Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'MyType' with constraints specified by a 'where' clause}}
 
 
-// Allow typealias inside protocol, but don't allow it in where clauses (at least not yet)
+// Allow typealias inside protocol
 protocol Col {
   associatedtype Elem
   var elem: Elem { get }
