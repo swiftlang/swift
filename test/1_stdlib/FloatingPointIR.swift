@@ -1,5 +1,7 @@
 // RUN: %target-build-swift -emit-ir %s | FileCheck -check-prefix=%target-cpu %s
-// REQUIRES: executable_test
+// RUN: %target-build-swift -O -emit-ir %s | FileCheck -check-prefix=%target-cpu %s
+// RUN: %target-build-swift -Ounchecked -emit-ir %s | FileCheck -check-prefix=%target-cpu %s
+
 var globalFloat32 : Float32 = 0.0
 var globalFloat64 : Float64 = 0.0
 #if arch(i386) || arch(x86_64)
@@ -41,6 +43,9 @@ func testConstantFoldFloatLiterals() {
 
 // armv7: call void @{{.*}}_TF15FloatingPointIR13acceptFloat32FSfT_(float 1.000000e+00)
 // armv7: call void @{{.*}}_TF15FloatingPointIR13acceptFloat64FSdT_(double 1.000000e+00)
+
+// armv7s: call void @{{.*}}_TF15FloatingPointIR13acceptFloat32FSfT_(float 1.000000e+00)
+// armv7s: call void @{{.*}}_TF15FloatingPointIR13acceptFloat64FSdT_(double 1.000000e+00)
 
 // armv7k: call void @{{.*}}_TF15FloatingPointIR13acceptFloat32FSfT_(float 1.000000e+00)
 // armv7k: call void @{{.*}}_TF15FloatingPointIR13acceptFloat64FSdT_(double 1.000000e+00)
