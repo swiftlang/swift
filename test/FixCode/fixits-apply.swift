@@ -104,3 +104,11 @@ class SubTest2 : Test2 {
 }
 Test2().instMeth(0)
 Test2().instMeth2(0, p2:1)
+
+func recit(_: Int32) {}
+func ftest3(_ fd: CInt) {
+  recit(UInt(fd))
+}
+func ftest4(_ fd: UInt) {
+  recit(fd)
+}
