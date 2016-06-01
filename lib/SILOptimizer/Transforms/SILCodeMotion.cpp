@@ -34,6 +34,7 @@
 STATISTIC(NumSunk, "Number of instructions sunk");
 STATISTIC(NumRefCountOpsSimplified, "Number of enum ref count ops simplified");
 STATISTIC(NumHoisted, "Number of instructions hoisted");
+STATISTIC(NumSILArgumentReleaseHoisted, "Number of silargument release instructions hoisted");
 
 llvm::cl::opt<bool> DisableSILRRCodeMotion("disable-sil-cm-rr-cm", llvm::cl::init(true));
 
@@ -44,6 +45,10 @@ namespace {
 //===----------------------------------------------------------------------===//
 //                                  Utility
 //===----------------------------------------------------------------------===//
+
+static bool isReleaseInstruction(SILInstruction *I) {
+  return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I);
+}
 
 static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
                                        EnumElementDecl *EnumDecl,
@@ -105,6 +110,47 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
 //===----------------------------------------------------------------------===//
 //                            Generic Sinking Code
 //===----------------------------------------------------------------------===//
+
+/// \brief Hoist release on a SILArgument to its predecessors.
+static bool hoistSILArgumentReleaseInst(SILBasicBlock *BB) {
+  // There is no block to hoist releases to.
+  if (BB->pred_empty())
+    return false;
+
+  // Only try to hoist the first instruction. RRCM should have hoisted the release
+  // to the beginning of the block if it can.
+  auto Head = &*BB->begin();
+  // Make sure it is a release instruction.
+  if (!isReleaseInstruction(&*Head))
+    return false;
+
+  // Make sure it is a release on a SILArgument of the current basic block..
+  SILArgument *SA = dyn_cast<SILArgument>(Head->getOperand(0));
+  if (!SA || SA->getParent() != BB)
+    return false;
+
+  // Make sure the release will not be blocked by the terminator instructions
+  // Make sure the terminator does not block, nor is a branch with multiple targets.
+  for (auto P : BB->getPreds()) {
+    if (!isa<BranchInst>(P->getTerminator()))
+      return false;
+  }
+
+  // Make sure we can get all the incoming values.
+  llvm::SmallVector<SILValue , 4> PredValues;
+  if (!SA->getIncomingValues(PredValues))
+    return false;
+
+  // Ok, we can get all the incoming values and create releases for them.
+  unsigned indices = 0;
+  for (auto P : BB->getPreds()) {
+    createDecrementBefore(PredValues[indices++], P->getTerminator());
+  }
+  // Erase the old instruction.
+  Head->eraseFromParent();
+  ++NumSILArgumentReleaseHoisted;
+  return true;
+}
 
 static const int SinkSearchWindow = 6;
 
@@ -1716,6 +1762,8 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     Changed |= sinkCodeFromPredecessors(State.getBB());
     Changed |= sinkArgumentsFromPredecessors(State.getBB());
     Changed |= sinkLiteralsFromPredecessors(State.getBB());
+    // Try to hoist release of a SILArgument to predecessors.
+    Changed |= hoistSILArgumentReleaseInst(State.getBB());
 
     // Then perform the dataflow.
     DEBUG(llvm::dbgs() << "    Performing the dataflow!\n");
