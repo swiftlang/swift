@@ -44,6 +44,8 @@ enum ThreeCaseAbstractionDifference {
   case C(S)
 }
 
+class X {}
+
 sil @user : $@convention(thin) (Builtin.NativeObject) -> ()
 sil @use_C2 : $@convention(thin) (C2) -> ()
 sil @optional_user : $@convention(thin) (FakeOptional<Builtin.Int32>) -> ()
@@ -1820,4 +1822,32 @@ bb3:
   strong_release %0 : $Builtin.NativeObject
   %5 = tuple()
   return %5 : $()
+}
+
+// CHECK-LABEL: sil @hoist_silargument_release
+// CHECK: bb1
+// CHECK: release
+// CHECK: br
+// CHECK: bb2
+// CHECK: release
+// CHECK: br
+// CHECK: bb3
+sil @hoist_silargument_release : $@convention(thin) (@owned X, @owned X) -> () {
+bb0(%0 : $X, %1 : $X):
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $X
+  %5 = function_ref @blocker : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  br bb3(%0 : $X)
+
+bb2:
+  strong_retain %1 : $X
+  br bb3(%1 : $X)
+
+bb3(%3 : $X):
+  strong_release %3 : $X
+  %23 = tuple ()
+  return %23 : $()
 }
