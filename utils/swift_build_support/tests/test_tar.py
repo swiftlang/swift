@@ -9,11 +9,11 @@
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 import os
-import sys
+import platform
 import subprocess
+import sys
 import tempfile
 import unittest
-import platform
 try:
     from StringIO import StringIO
 except ImportError:

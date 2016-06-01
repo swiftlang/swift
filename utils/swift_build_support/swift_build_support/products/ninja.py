@@ -18,8 +18,8 @@ import os.path
 import platform
 import sys
 
-from .. import shell
 from .. import cache_util
+from .. import shell
 
 
 class Ninja(object):

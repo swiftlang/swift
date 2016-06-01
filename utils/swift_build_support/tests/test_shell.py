@@ -9,12 +9,12 @@
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 # ----------------------------------------------------------------------------
 
-import unittest
-import sys
 import os
 import os.path
 import shutil
+import sys
 import tempfile
+import unittest
 try:
     # py2
     from StringIO import StringIO
