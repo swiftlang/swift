@@ -985,9 +985,10 @@ public:
 
   InitBlockStorageHeaderInst *
   createInitBlockStorageHeader(SILLocation Loc, SILValue BlockStorage,
-                               SILValue InvokeFunction, SILType BlockType) {
-    return insert(new (F.getModule()) InitBlockStorageHeaderInst(
-        getSILDebugLocation(Loc), BlockStorage, InvokeFunction, BlockType));
+                               SILValue InvokeFunction, SILType BlockType,
+                               ArrayRef<Substitution> Subs) {
+    return insert(InitBlockStorageHeaderInst::create(F,
+      getSILDebugLocation(Loc), BlockStorage, InvokeFunction, BlockType, Subs));
   }
 
   MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype) {

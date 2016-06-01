@@ -1348,8 +1348,10 @@ public:
   }
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *IBSHI) {
     *this << "init_block_storage_header " << getIDAndType(IBSHI->getBlockStorage())
-       << ", invoke " << getIDAndType(IBSHI->getInvokeFunction())
-       << ", type " << IBSHI->getType();
+       << ", invoke " << getID(IBSHI->getInvokeFunction());
+    printSubstitutions(IBSHI->getSubstitutions());
+    *this << " : " << IBSHI->getInvokeFunction()->getType()
+          << ", type " << IBSHI->getType();
   }
   void visitValueMetatypeInst(ValueMetatypeInst *MI) {
     *this << "value_metatype " << MI->getType() << ", "
