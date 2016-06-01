@@ -45,6 +45,15 @@ namespace {
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
+static bool isReleaseInstruction(SILInstruction *I) {
+  return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I);
+}
+
+static bool isTrivialTerminator(SILInstruction *I) {
+  // Only try apply can block a release.
+  return !isa<TryApplyInst>(I);
+}
+
 static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
                                        EnumElementDecl *EnumDecl,
                                        SILValue DefOfEnum = SILValue()) {
@@ -105,6 +114,45 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
 //===----------------------------------------------------------------------===//
 //                            Generic Sinking Code
 //===----------------------------------------------------------------------===//
+
+/// \brief Hoist release on a SILArgument to its predecessors.
+static bool hoistSILArgumentReleaseInst(SILBasicBlock *BB) {
+  // There is no block to hoist releases to.
+  if (BB->pred_empty())
+    return false;
+
+  // Only try to hoist the first instruction. RRCM should have hoisted the release
+  // to the beginning of the block if it can.
+  auto Head = &*BB->begin();
+  // Make sure it is a release instruction.
+  if (!isReleaseInstruction(&*Head))
+    return false;
+
+  // Make sure it is a release on a SILArgument of the current basic block..
+  SILArgument *SA = dyn_cast<SILArgument>(Head->getOperand(0));
+  if (!SA || SA->getParent() != BB)
+    return false;
+
+  // Make sure we can get all the incoming values.
+  llvm::SmallVector<SILValue , 4> PredValues;
+  if (!SA->getIncomingValues(PredValues))
+    return false;
+
+  // Make sure the release will not be blocked by the terminator instructions
+  for (auto P : BB->getPreds()) {
+    if (!isTrivialTerminator(P->getTerminator()))
+      return false;
+  }
+
+  // Ok, we can get all the incoming values.
+  Head->eraseFromParent();
+  unsigned indices = 0;
+  for (auto P : BB->getPreds()) {
+    createDecrementBefore(PredValues[indices++], P->getTerminator());
+  }
+  return true;
+}
+
 
 static const int SinkSearchWindow = 6;
 
@@ -1716,6 +1764,10 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     Changed |= sinkCodeFromPredecessors(State.getBB());
     Changed |= sinkArgumentsFromPredecessors(State.getBB());
     Changed |= sinkLiteralsFromPredecessors(State.getBB());
+
+    // Try to hoist release of a SILArgument to predecessors.
+    if (HoistReleases)
+      Changed |= hoistSILArgumentReleaseInst(State.getBB());
 
     // Then perform the dataflow.
     DEBUG(llvm::dbgs() << "    Performing the dataflow!\n");
