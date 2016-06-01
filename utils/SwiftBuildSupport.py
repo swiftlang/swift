@@ -233,20 +233,3 @@ def get_all_preset_names(preset_file_names):
     config = _load_preset_files_impl(preset_file_names)
     return [name[len(_PRESET_PREFIX):] for name in config.sections()
             if name.startswith(_PRESET_PREFIX)]
-
-
-# A context manager for changing the current working directory.
-#
-#     with WorkingDirectory('/tmp'):
-#         ... do work in /tmp...
-class WorkingDirectory(object):
-
-    def __init__(self, new_cwd):
-        self.new_cwd = new_cwd
-
-    def __enter__(self):
-        self.old_cwd = os.getcwd()
-        os.chdir(self.new_cwd)
-
-    def __exit__(self, type, value, traceback):
-        os.chdir(self.old_cwd)
