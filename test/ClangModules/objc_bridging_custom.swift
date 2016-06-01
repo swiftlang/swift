@@ -85,3 +85,125 @@ class Sub : Base {
     return super.prop // expected-error {{return type}}
   }
 }
+
+protocol TestProto {
+  func test(a: Refrigerator, b: Refrigerator) -> Refrigerator? // expected-note {{protocol requires}} {{none}}
+  func testGeneric(a: ManufacturerInfo<NSString>, b: ManufacturerInfo<NSString>) -> ManufacturerInfo<NSString>? // expected-note {{protocol requires}} {{none}}
+  static func testInout(_: inout Refrigerator) // expected-note {{protocol requires}} {{none}}
+  func testUnmigrated(a: NSRuncingMode, b: Refrigerator, c: NSCoding) // expected-note {{protocol requires}} {{none}}
+  func testPartialMigrated(a: NSRuncingMode, b: Refrigerator) // expected-note {{protocol requires}} {{none}}
+
+  subscript(a a: Refrigerator, b b: Refrigerator) -> Refrigerator? { get } // expected-note {{protocol requires}} {{none}}
+  subscript(generic a: ManufacturerInfo<NSString>, b b: ManufacturerInfo<NSString>) -> ManufacturerInfo<NSString>? { get } // expected-note {{protocol requires}} {{none}}
+
+  init?(a: Refrigerator, b: Refrigerator) // expected-note {{protocol requires}} {{none}}
+  init?(generic: ManufacturerInfo<NSString>, b: ManufacturerInfo<NSString>) // expected-note {{protocol requires}} {{none}}
+  init(singleArgument: Refrigerator) // expected-note {{protocol requires}} {{none}}
+
+  var prop: Refrigerator? { get } // expected-note {{protocol requires}} {{none}}
+  var propGeneric: ManufacturerInfo<NSString>? { get } // expected-note {{protocol requires}} {{none}}
+}
+
+class TestProtoImpl : NSObject, TestProto { // expected-error {{type 'TestProtoImpl' does not conform to protocol 'TestProto'}}
+  // expected-note@+1 {{candidate has non-matching type '(a: APPRefrigerator, b: APPRefrigerator?) -> APPRefrigerator'}} {{16-31=Refrigerator}} {{36-52=Refrigerator?}} {{57-72=Refrigerator}}
+  func test(a: APPRefrigerator, b: APPRefrigerator?) -> APPRefrigerator {
+    return a
+  }
+  // expected-note@+1 {{candidate has non-matching type '(a: APPManufacturerInfo<AnyObject>, b: APPManufacturerInfo<AnyObject>?) -> APPManufacturerInfo<AnyObject>'}} {{23-53=ManufacturerInfo<NSString>}} {{58-89=ManufacturerInfo<NSString>?}} {{94-124=ManufacturerInfo<NSString>}}
+  func testGeneric(a: APPManufacturerInfo<AnyObject>, b: APPManufacturerInfo<AnyObject>?) -> APPManufacturerInfo<AnyObject> {
+    return a
+  }
+  // expected-note@+1 {{candidate has non-matching type '(inout APPRefrigerator) -> ()'}} {{27-48=inout Refrigerator}}
+  class func testInout(_: inout APPRefrigerator) {}
+
+  // expected-note@+1 {{candidate has non-matching type '(a: NSObject, b: NSObject, c: NSObject) -> ()'}}
+  func testUnmigrated(a: NSObject, b: NSObject, c: NSObject) {}
+
+  // expected-note@+1 {{candidate has non-matching type '(a: NSObject, b: APPRefrigerator) -> ()'}} {{44-59=Refrigerator}}
+  func testPartialMigrated(a: NSObject, b: APPRefrigerator) {}
+
+  // expected-note@+1 {{candidate has non-matching type '(a: APPRefrigerator, b: APPRefrigerator?) -> APPRefrigerator'}} {{18-33=Refrigerator}} {{40-56=Refrigerator?}} {{61-76=Refrigerator}}
+  subscript(a a: APPRefrigerator, b b: APPRefrigerator?) -> APPRefrigerator {
+    return a
+  }
+  // expected-note@+1 {{candidate has non-matching type '(generic: APPManufacturerInfo<AnyObject>, b: APPManufacturerInfo<AnyObject>?) -> APPManufacturerInfo<AnyObject>'}} {{24-54=ManufacturerInfo<NSString>}} {{61-92=ManufacturerInfo<NSString>?}} {{97-127=ManufacturerInfo<NSString>}}
+  subscript(generic a: APPManufacturerInfo<AnyObject>, b b: APPManufacturerInfo<AnyObject>?) -> APPManufacturerInfo<AnyObject> {
+    return a
+  }
+
+  // expected-note@+1 {{candidate has non-matching type '(a: APPRefrigerator, b: APPRefrigerator?)'}} {{11-26=Refrigerator}} {{31-47=Refrigerator?}}
+  init(a: APPRefrigerator, b: APPRefrigerator?) {}
+  // expected-note@+1 {{candidate has non-matching type '(generic: APPManufacturerInfo<AnyObject>, b: APPManufacturerInfo<AnyObject>?)'}} {{19-49=ManufacturerInfo<NSString>}} {{54-85=ManufacturerInfo<NSString>?}}
+  init(generic a: APPManufacturerInfo<AnyObject>, b: APPManufacturerInfo<AnyObject>?) {}
+  // expected-note@+1 {{candidate has non-matching type '(singleArgument: APPRefrigerator)'}} {{24-39=Refrigerator}}
+  init(singleArgument: APPRefrigerator) {}
+
+  // expected-note@+1 {{candidate has non-matching type 'APPRefrigerator?'}} {{13-29=Refrigerator?}} {{none}}
+  var prop: APPRefrigerator? {
+    return nil
+  }
+  // expected-note@+1 {{candidate has non-matching type 'APPManufacturerInfo<AnyObject>?'}} {{20-51=ManufacturerInfo<NSString>?}}
+  var propGeneric: APPManufacturerInfo<AnyObject>? {
+    return nil
+  }
+}
+
+
+@objc protocol TestObjCProto {
+  @objc optional func test(a: Refrigerator, b: Refrigerator) -> Refrigerator? // expected-note {{here}} {{none}}
+  @objc optional func testGeneric(a: ManufacturerInfo<NSString>, b: ManufacturerInfo<NSString>) -> ManufacturerInfo<NSString>? // expected-note {{here}} {{none}}
+  @objc optional func testUnmigrated(a: NSRuncingMode, b: Refrigerator, c: NSCoding) // expected-note {{here}} {{none}}
+  @objc optional func testPartialMigrated(a: NSRuncingMode, b: Refrigerator) // expected-note {{here}} {{none}}
+
+  @objc optional subscript(a a: Refrigerator) -> Refrigerator? { get } // expected-note {{here}} {{none}}
+  @objc optional subscript(generic a: ManufacturerInfo<NSString>) -> ManufacturerInfo<NSString>? { get } // expected-note {{here}} {{none}}
+
+  @objc optional var prop: Refrigerator? { get } // expected-note {{here}} {{none}}
+  @objc optional var propGeneric: ManufacturerInfo<NSString>? { get } // expected-note {{here}} {{none}}
+}
+
+class TestObjCProtoImpl : NSObject, TestObjCProto {
+  // expected-note@+2 {{private}} expected-note@+2 {{@nonobjc}} expected-note@+2 {{extension}}
+  // expected-note@+1 {{candidate has non-matching type '(a: APPRefrigerator, b: APPRefrigerator?) -> APPRefrigerator'}} {{16-31=Refrigerator}} {{36-52=Refrigerator?}} {{57-72=Refrigerator}}
+  func test(a: APPRefrigerator, b: APPRefrigerator?) -> APPRefrigerator { // expected-warning {{instance method 'test(a:b:)' nearly matches optional requirement 'test(a:b:)' of protocol 'TestObjCProto'}}
+    return a
+  }
+  // expected-note@+2 {{private}} expected-note@+2 {{@nonobjc}} expected-note@+2 {{extension}}
+  // expected-note@+1 {{candidate has non-matching type '(a: APPManufacturerInfo<AnyObject>, b: APPManufacturerInfo<AnyObject>?) -> APPManufacturerInfo<AnyObject>'}} {{23-53=ManufacturerInfo<NSString>}} {{58-89=ManufacturerInfo<NSString>?}} {{94-124=ManufacturerInfo<NSString>}}
+  func testGeneric(a: APPManufacturerInfo<AnyObject>, b: APPManufacturerInfo<AnyObject>?) -> APPManufacturerInfo<AnyObject> { // expected-warning {{instance method 'testGeneric(a:b:)' nearly matches optional requirement 'testGeneric(a:b:)' of protocol 'TestObjCProto'}} {{none}}
+    return a
+  }
+
+  // expected-note@+2 {{private}} expected-note@+2 {{@nonobjc}} expected-note@+2 {{extension}}
+  // expected-note@+1 {{candidate has non-matching type '(a: NSObject, b: NSObject, c: NSObject) -> ()'}} {{none}}
+  func testUnmigrated(a: NSObject, b: NSObject, c: NSObject) {} // expected-warning {{instance method 'testUnmigrated(a:b:c:)' nearly matches optional requirement 'testUnmigrated(a:b:c:)' of protocol 'TestObjCProto'}}
+
+  // expected-note@+2 {{private}} expected-note@+2 {{@nonobjc}} expected-note@+2 {{extension}}
+  // expected-note@+1 {{candidate has non-matching type '(a: NSObject, b: APPRefrigerator) -> ()'}} {{44-59=Refrigerator}}
+  func testPartialMigrated(a: NSObject, b: APPRefrigerator) {} // expected-warning {{instance method 'testPartialMigrated(a:b:)' nearly matches optional requirement 'testPartialMigrated(a:b:)' of protocol 'TestObjCProto'}} {{none}}
+
+  // expected-note@+2 {{private}} expected-note@+2 {{@nonobjc}} expected-note@+2 {{extension}}
+  // expected-note@+1 {{candidate has non-matching type '(a: APPRefrigerator?) -> APPRefrigerator'}} {{18-34=Refrigerator?}} {{39-54=Refrigerator}}
+  subscript(a a: APPRefrigerator?) -> APPRefrigerator { // expected-warning {{subscript 'subscript(a:)' nearly matches optional requirement 'subscript(a:)' of protocol 'TestObjCProto'}} {{none}}
+  // expected-note@-1 {{here}}
+    return a!
+  }
+  // expected-note@+2 {{private}} expected-note@+2 {{@nonobjc}} expected-note@+2 {{extension}}
+  // expected-note@+1 {{candidate has non-matching type '(generic: APPManufacturerInfo<AnyObject>?) -> APPManufacturerInfo<AnyObject>'}} {{24-55=ManufacturerInfo<NSString>?}} {{60-90=ManufacturerInfo<NSString>}}
+  subscript(generic a: APPManufacturerInfo<AnyObject>?) -> APPManufacturerInfo<AnyObject> { // expected-warning {{subscript 'subscript(generic:)' nearly matches optional requirement 'subscript(generic:)' of protocol 'TestObjCProto'}} {{none}}
+  // expected-error@-1 {{subscript getter with Objective-C selector 'objectForKeyedSubscript:' conflicts with previous declaration with the same Objective-C selector}}
+    return a!
+  }
+
+  // expected-note@+2 {{private}} expected-note@+2 {{@nonobjc}} expected-note@+2 {{extension}}
+  // expected-note@+1 {{candidate has non-matching type 'APPRefrigerator?'}} {{13-29=Refrigerator?}}
+  var prop: APPRefrigerator? { // expected-warning {{var 'prop' nearly matches optional requirement 'prop' of protocol 'TestObjCProto'}} {{none}}
+    return nil
+  }
+
+  // expected-note@+2 {{private}} expected-note@+2 {{@nonobjc}} expected-note@+2 {{extension}}
+  // expected-note@+1 {{candidate has non-matching type 'APPManufacturerInfo<AnyObject>?'}} {{20-51=ManufacturerInfo<NSString>?}}
+  var propGeneric: APPManufacturerInfo<AnyObject>? { // expected-warning {{var 'propGeneric' nearly matches optional requirement 'propGeneric' of protocol 'TestObjCProto'}} {{none}}
+    return nil
+  }
+}

@@ -997,6 +997,115 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
   return true;
 }
 
+bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
+                                          InFlightDiagnostic &diag,
+                                          ValueDecl *decl,
+                                          const ValueDecl *base) {
+  // For now, just rewrite cases where the base uses a value type and the
+  // override uses a reference type, and the value type is bridged to the
+  // reference type. This is a way to migrate code that makes use of types
+  // that previously were not bridged to value types.
+  auto checkType = [&](Type overrideTy, Type baseTy,
+                       SourceRange typeRange) -> bool {
+    if (typeRange.isInvalid())
+      return false;
+    if (!baseTy) {
+      decl->dump();
+      base->dump();
+    }
+
+    auto normalizeType = [](Type ty) -> Type {
+      ty = ty->getInOutObjectType();
+      if (Type unwrappedTy = ty->getAnyOptionalObjectType())
+        ty = unwrappedTy;
+      return ty;
+    };
+
+    // Is the base type bridged?
+    Type normalizedBaseTy = normalizeType(baseTy);
+    const DeclContext *DC = decl->getDeclContext();
+    Optional<Type> maybeBridged =
+        TC.Context.getBridgedToObjC(DC, normalizedBaseTy, &TC);
+
+    // ...and just knowing that it's bridged isn't good enough if we don't
+    // know what it's bridged /to/. Also, don't do this check for trivial
+    // bridging---that doesn't count.
+    Type bridged = maybeBridged.getValueOr(Type());
+    if (!bridged || bridged->isEqual(normalizedBaseTy))
+      return false;
+
+    // ...and is it bridged to the overridden type?
+    Type normalizedOverrideTy = normalizeType(overrideTy);
+    if (!bridged->isEqual(normalizedOverrideTy)) {
+      // If both are nominal types, check again, ignoring generic arguments.
+      auto *overrideNominal = normalizedOverrideTy->getAnyNominal();
+      if (!overrideNominal || bridged->getAnyNominal() != overrideNominal) {
+        return false;
+      }
+    }
+
+    Type newOverrideTy = baseTy;
+
+    // Preserve optionality if we're dealing with a simple type.
+    OptionalTypeKind OTK;
+    if (Type unwrappedTy = newOverrideTy->getAnyOptionalObjectType())
+      newOverrideTy = unwrappedTy;
+    if (overrideTy->getAnyOptionalObjectType(OTK))
+      newOverrideTy = OptionalType::get(OTK, newOverrideTy);
+
+    SmallString<32> baseTypeBuf;
+    llvm::raw_svector_ostream baseTypeStr(baseTypeBuf);
+    PrintOptions options;
+    options.SynthesizeSugarOnTypes = true;
+
+    newOverrideTy->print(baseTypeStr, options);
+    diag.fixItReplace(typeRange, baseTypeStr.str());
+    return true;
+  };
+
+  if (auto *var = dyn_cast<VarDecl>(decl)) {
+    SourceRange typeRange = var->getTypeSourceRangeForDiagnostics();
+    return checkType(var->getType(), base->getType(), typeRange);
+  }
+
+  if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
+    auto *baseFn = cast<AbstractFunctionDecl>(base);
+    bool fixedAny = false;
+    if (fn->getParameterLists().back()->size() ==
+        baseFn->getParameterLists().back()->size()) {
+      for_each(*fn->getParameterLists().back(),
+               *baseFn->getParameterLists().back(),
+               [&](ParamDecl *param, const ParamDecl *baseParam) {
+        fixedAny |= fixItOverrideDeclarationTypes(TC, diag, param, baseParam);
+      });
+    }
+    if (auto *method = dyn_cast<FuncDecl>(decl)) {
+      auto *baseMethod = cast<FuncDecl>(base);
+      fixedAny |= checkType(method->getBodyResultType(),
+                            baseMethod->getResultType(),
+                            method->getBodyResultTypeLoc().getSourceRange());
+    }
+    return fixedAny;
+  }
+
+  if (auto *subscript = dyn_cast<SubscriptDecl>(decl)) {
+    auto *baseSubscript = cast<SubscriptDecl>(base);
+    bool fixedAny = false;
+    for_each(*subscript->getIndices(),
+             *baseSubscript->getIndices(),
+             [&](ParamDecl *param, const ParamDecl *baseParam) {
+      fixedAny |= fixItOverrideDeclarationTypes(TC, diag, param, baseParam);
+    });
+    fixedAny |= checkType(subscript->getElementType(),
+                          baseSubscript->getElementType(),
+                          subscript->getElementTypeLoc().getSourceRange());
+    return fixedAny;
+  }
+
+  llvm_unreachable("unknown overridable member");
+}
+
+
 
 //===----------------------------------------------------------------------===//
 // Diagnose availability.
