@@ -25,6 +25,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 
 # E402 means module level import not at top of file
+from swift_build_support import diagnostics  # noqa (E402)
 from swift_build_support import shell  # noqa (E402)
 
 
@@ -69,11 +70,6 @@ SWIFT_BUILD_ROOT = os.environ.get(
     "SWIFT_BUILD_ROOT", os.path.join(SWIFT_SOURCE_ROOT, "build"))
 
 
-def print_with_argv0(message):
-    print(sys.argv[0] + ": " + message)
-    sys.stdout.flush()
-
-
 def check_call(args, print_command=False, verbose=False, disable_sleep=False):
     if disable_sleep:
         if platform.system() == 'Darwin':
@@ -87,17 +83,13 @@ def check_call(args, print_command=False, verbose=False, disable_sleep=False):
     try:
         return subprocess.check_call(args)
     except subprocess.CalledProcessError as e:
-        print_with_argv0(
+        diagnostics.fatal(
             "command terminated with a non-zero exit status " +
             str(e.returncode) + ", aborting")
-        sys.stdout.flush()
-        sys.exit(1)
     except OSError as e:
-        print_with_argv0(
+        diagnostics.fatal(
             "could not execute '" + shell.quote_command(args) +
             "': " + e.strerror)
-        sys.stdout.flush()
-        sys.exit(1)
 
 
 def check_output(args, print_command=False, verbose=False):
@@ -107,25 +99,20 @@ def check_output(args, print_command=False, verbose=False):
     try:
         return subprocess.check_output(args)
     except subprocess.CalledProcessError as e:
-        print_with_argv0(
+        diagnostics.fatal(
             "command terminated with a non-zero exit status " +
             str(e.returncode) + ", aborting")
-        sys.stdout.flush()
-        sys.exit(1)
     except OSError as e:
-        print_with_argv0(
+        diagnostics.fatal(
             "could not execute '" + shell.quote_command(args) +
             "': " + e.strerror)
-        sys.stdout.flush()
-        sys.exit(1)
 
 
 def _load_preset_files_impl(preset_file_names, substitutions={}):
     config = ConfigParser.SafeConfigParser(substitutions, allow_no_value=True)
     if config.read(preset_file_names) == []:
-        print_with_argv0(
+        diagnostics.fatal(
             "preset file not found (tried " + str(preset_file_names) + ")")
-        sys.exit(1)
     return config
 
 
@@ -190,12 +177,10 @@ def get_preset_options(substitutions, preset_file_names, preset_name):
     (build_script_opts, build_script_impl_opts, missing_opts) = \
         _get_preset_options_impl(config, substitutions, preset_name)
     if not build_script_opts and not build_script_impl_opts:
-        print_with_argv0("preset '" + preset_name + "' not found")
-        sys.exit(1)
+        diagnostics.fatal("preset '" + preset_name + "' not found")
     if missing_opts:
-        print_with_argv0("missing option(s) for preset '" + preset_name +
-                         "': " + ", ".join(missing_opts))
-        sys.exit(1)
+        diagnostics.fatal("missing option(s) for preset '" + preset_name +
+                          "': " + ", ".join(missing_opts))
 
     # Migrate 'swift-sdks' parameter to 'stdlib-deployment-targets'
     for opt in build_script_impl_opts:
