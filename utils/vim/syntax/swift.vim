@@ -13,29 +13,17 @@ syn keyword swiftKeyword
       \ case
       \ catch
       \ continue
-      \ convenience
       \ default
       \ defer
       \ do
       \ else
-      \ extension
-      \ final
       \ for
       \ guard
       \ if
       \ in
-      \ internal
       \ let
-      \ mutating
-      \ nonmutating
-      \ override
-      \ private
-      \ protocol
-      \ public
       \ repeat
-      \ required
       \ return
-      \ static
       \ switch
       \ throw
       \ try
@@ -48,10 +36,15 @@ syn keyword swiftImport skipwhite nextgroup=swiftImportModule
       \ import
 
 syn keyword swiftDefinitionModifier
+      \ convenience
       \ dynamic
+      \ final
       \ internal
+      \ nonmutating
+      \ override
       \ private
       \ public
+      \ required
       \ rethrows
       \ static
       \ throws
