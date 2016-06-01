@@ -682,10 +682,10 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
-Int.self == nil // expected-error {{value of type 'Int.Type' can never be nil, comparison isn't allowed}}
+Int.self == nil // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
 nil == Int.self // expected-error {{binary operator '==' cannot be applied to operands}}
 // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists}}
-Int.self != nil // expected-error {{value of type 'Int.Type' can never be nil, comparison isn't allowed}}
+Int.self != nil // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
 nil != Int.self // expected-error {{binary operator '!=' cannot be applied to operands}}
 // expected-note @-1 {{overloads for '!=' exist with these partially matching parameter lists}}
 

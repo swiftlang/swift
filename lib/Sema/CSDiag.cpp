@@ -4311,8 +4311,25 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     if (isa<NilLiteralExpr>(rhsExpr->getValueProvidingExpr()) &&
         !isUnresolvedOrTypeVarType(lhsType)) {
       if (isNameOfStandardComparisonOperator(overloadName)) {
-        diagnose(callExpr->getLoc(), diag::comparison_with_nil_illegal, lhsType)
-          .highlight(lhsExpr->getSourceRange());
+        // Regardless of whether the type has reference or value semantics,
+        // comparison with nil is illegal, albeit for different reasons spelled
+        // out by the diagnosis.
+        if (lhsType->getAnyOptionalObjectType() &&
+                   (overloadName == "!==" || overloadName == "===")) {
+          auto revisedName = overloadName;
+          revisedName.pop_back();
+          // If we made it here, then we're trying to perform a comparison with
+          // reference semantics rather than value semantics.  The fixit will
+          // lop off the extra '=' in the operator.
+          diagnose(callExpr->getLoc(),
+                   diag::value_type_comparison_with_nil_illegal_did_you_mean,
+                   lhsType)
+            .fixItReplace(callExpr->getLoc(), revisedName);
+        } else {
+          diagnose(callExpr->getLoc(),
+                   diag::value_type_comparison_with_nil_illegal, lhsType)
+            .highlight(lhsExpr->getSourceRange());
+        }
         return true;
       }
     }
