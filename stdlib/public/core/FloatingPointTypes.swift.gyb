@@ -17,13 +17,12 @@ import SwiftShims
 # Utility code for later in this template
 #
 
+from SwiftIntTypes import all_integer_types
+
 # // Bit counts for all floating point types. 
 # // 80-bit floating point types are only permitted on x86 architectures. This
 # // restriction is handled via #if's in the generated code.
 allFloatBits = [32, 64, 80]
-
-# Bit counts for all int types
-allIntBits = [8, 16, 32, 64, 'Int']
 
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
@@ -32,20 +31,6 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 builtinIntLiteralBits = 2048
 
 cFunctionSuffix = { 32:'f', 64:'', 80:'l' } 
-
-def allInts():
-    for bits in allIntBits:
-        for signed in False, True:
-            yield bits, signed
-
-def baseIntName(name):
-    return 'Int' if name == 'Int' else 'Int' + str(name)
-
-def builtinIntName(name):
-    return 'Int' + str(word_bits) if name == 'Int' else 'Int' + str(name)
-
-def intName(name, signed):
-    return ('' if signed else 'U') + baseIntName(name)
 
 floatName = { 32:'Float', 64:'Double', 80:'Float80' }
 
@@ -751,14 +736,16 @@ public prefix func -(x: ${Self}) -> ${Self} {
 // Construction from integers.
 @_transparent
 extension ${Self} {
-% for (srcBits, srcSigned) in allInts():
-%    That = intName(srcBits, srcSigned)
-%    ThatBuiltinName = builtinIntName(srcBits)
-%    sign = 's' if srcSigned else 'u'
+% for that_ty in all_integer_types(word_bits):
+%   srcBits = that_ty.bits
+%   srcSigned = that_ty.is_signed
+%   srcSign = 's' if srcSigned else 'u'
+%   That = that_ty.stdlib_name
+%   ThatBuiltinName = that_ty.builtin_name
 
   @_transparent
   public init(_ v: ${That}) {
-    _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
+    _value = Builtin.${srcSign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
   }
   
 % if srcBits <= SignificandBitCount:
@@ -766,10 +753,16 @@ extension ${Self} {
 % end
   @_transparent
   public init?(exactly value: ${That}) {
-    _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(value._value)
+% if srcBits > SignificandBitCount:
+    if ${ "abs" if srcSigned else "" }(value) > ${2**SignificandBitCount - 1} {
+      return nil
+    }
+% end  
+
+    _value = Builtin.${srcSign}itofp_${ThatBuiltinName}_FPIEEE${bits}(value._value)
 
 % if srcBits > SignificandBitCount:
-    if ${ "abs" if srcSigned else "" }(value) > ${2**SignificandBitCount - 1} && ${That}(self) != value {
+    if ${That}(self) != value {
       return nil
     }
 % end
