@@ -957,6 +957,11 @@ function get_host_install_prefix() {
         local host_install_prefix="${INSTALL_PREFIX}"
     fi
 
+    # Should always begin with a '/'; otherwise CMake will expand it as a relative path from the build folder.
+    if [[ "${host_install_prefix:0:1}" != "/" ]]; then
+        host_install_prefix="/${host_install_prefix}"
+    fi
+
     echo "${host_install_prefix}/" # Should always end in a '/'; it's a directory.
 }
 
