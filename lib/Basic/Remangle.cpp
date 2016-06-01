@@ -305,7 +305,6 @@ namespace {
     void mangleEntityContext(Node *node, EntityContext &ctx);
     void mangleEntityType(Node *node, EntityContext &ctx);
     void mangleEntityGenericType(Node *node, EntityContext &ctx);
-    void mangleGenerics(Node *node, EntityContext &ctx);
 
     bool trySubstitution(Node *node, SubstitutionEntry &entry);
     void addSubstitution(const SubstitutionEntry &entry);
@@ -955,9 +954,6 @@ void Remangler::mangleEntityType(Node *node, EntityContext &ctx) {
 
   // Expand certain kinds of type within the entity context.
   switch (node->getKind()) {
-  case Node::Kind::GenericType:
-    mangleEntityGenericType(node, ctx);
-    return;
   case Node::Kind::FunctionType:
   case Node::Kind::UncurriedFunctionType: {
     Out << (node->getKind() == Node::Kind::FunctionType ? 'F' : 'f');
@@ -1109,9 +1105,12 @@ void Remangler::mangleImplFunctionType(Node *node) {
          i->get()->getKind() == Node::Kind::ImplFunctionAttribute; ++i) {
     mangle(i->get()); // impl function attribute
   }
-  EntityContext ctx(*this);
-  if (i != e && i->get()->getKind() == Node::Kind::Generics) {
-    mangleGenerics((i++)->get(), ctx);
+  if (i != e &&
+      (i->get()->getKind() == Node::Kind::DependentGenericSignature ||
+       i->get()->getKind() == Node::Kind::DependentPseudogenericSignature)) {
+    Out << (i->get()->getKind() == Node::Kind::DependentGenericSignature
+              ? 'G' : 'g');
+    mangleDependentGenericSignature((i++)->get());
   }
   Out << '_';
   for (; i != e && i->get()->getKind() == Node::Kind::ImplParameter; ++i) {
@@ -1294,19 +1293,8 @@ void Remangler::mangleDependentGenericType(Node *node) {
   mangleChildNodes(node); // generic signature, type
 }
 
-void Remangler::mangleGenericType(Node *node) {
-  EntityContext ctx(*this);
-  mangleEntityGenericType(node, ctx);
-}
-
-void Remangler::mangleEntityGenericType(Node *node, EntityContext &ctx) {
-  assert(node->getKind() == Node::Kind::GenericType);
-
-  Out << 'U';
-  assert(node->getNumChildren() == 2);
-
-  mangleGenerics(node->begin()[0].get(), ctx);
-  mangleEntityType(node->begin()[1].get(), ctx);
+void Remangler::mangleDependentPseudogenericSignature(Node *node) {
+  mangleDependentGenericSignature(node);
 }
 
 void Remangler::mangleDependentGenericSignature(Node *node) {
@@ -1375,31 +1363,6 @@ void Remangler::mangleConstrainedType(Node *node) {
     mangleDependentGenericParamIndex(node->getFirstChild().get());
   } else {
     mangle(node);
-  }
-}
-
-void Remangler::mangleGenerics(Node *node) {
-  unreachable("found independent generics node?");
-}
-
-void Remangler::mangleGenerics(Node *node, EntityContext &ctx) {
-  assert(node->getKind() == Node::Kind::Generics);
-
-  unsigned absoluteDepth = ++AbsoluteArchetypeDepth;
-
-  auto i = node->begin(), e = node->end();
-  unsigned index = 0;
-  for (; i != e && i->get()->getKind() == Node::Kind::Archetype; ++i) {
-    auto child = i->get();
-    Archetypes[child->getText()] = ArchetypeInfo{index++, absoluteDepth};
-    mangle(child); // archetype
-  }
-  if (i != e) {
-    Out << 'U';
-    mangleNodes(i, e); // associated types
-    Out << '_';
-  } else {
-    Out << '_';
   }
 }
 

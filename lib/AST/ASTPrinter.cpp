@@ -3721,6 +3721,9 @@ public:
       }
     }
 
+    if (info.isPseudogeneric())
+      Printer << "@pseudogeneric ";
+
     if (info.isNoReturn())
       Printer << "@noreturn ";
   }

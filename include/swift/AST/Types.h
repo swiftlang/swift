@@ -2869,11 +2869,12 @@ public:
     // you'll need to adjust both the Bits field below and
     // BaseType::AnyFunctionTypeBits.
 
-    //   |representation|noReturn|
-    //   |    0 .. 3    |   4    |
+    //   |representation|noReturn|pseudogeneric|
+    //   |    0 .. 3    |   4    |      5      |
     //
     enum : uint16_t { RepresentationMask = 0x00F };
     enum : uint16_t { NoReturnMask       = 0x010 };
+    enum : uint16_t { PseudogenericMask  = 0x020 };
 
     uint16_t Bits;
 
@@ -2886,12 +2887,20 @@ public:
     ExtInfo() : Bits(0) { }
 
     // Constructor for polymorphic type.
-    ExtInfo(Representation Rep, bool IsNoReturn) {
-      Bits = ((unsigned) Rep) |
-             (IsNoReturn ? NoReturnMask : 0);
+    ExtInfo(Representation rep, bool isNoReturn, bool isPseudogeneric) {
+      Bits = ((unsigned) rep) |
+             (isNoReturn ? NoReturnMask : 0) |
+             (isPseudogeneric ? PseudogenericMask : 0);
     }
 
+    /// Is this function pseudo-generic?  A pseudo-generic function
+    /// is not permitted to dynamically depend on its type arguments.
+    bool isPseudogeneric() const { return Bits & PseudogenericMask; }
+
+    /// Do functions of this type return normally?
     bool isNoReturn() const { return Bits & NoReturnMask; }
+
+    /// What is the abstract representation of this function value?
     Representation getRepresentation() const {
       return Representation(Bits & RepresentationMask);
     }
@@ -2953,6 +2962,12 @@ public:
         return ExtInfo(Bits | NoReturnMask);
       else
         return ExtInfo(Bits & ~NoReturnMask);
+    }
+    ExtInfo withIsPseudogeneric(bool isPseudogeneric = true) const {
+      if (isPseudogeneric)
+        return ExtInfo(Bits | PseudogenericMask);
+      else
+        return ExtInfo(Bits & ~PseudogenericMask);
     }
 
     uint16_t getFuncAttrKey() const {
@@ -3195,6 +3210,10 @@ public:
 
   bool isNoReturn() const {
     return getExtInfo().isNoReturn();
+  }
+
+  bool isPseudogeneric() const {
+    return getExtInfo().isPseudogeneric();
   }
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,

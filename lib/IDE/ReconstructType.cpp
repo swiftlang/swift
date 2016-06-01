@@ -805,46 +805,6 @@ static void VisitNodeAddressor(
   result._types.push_back(swift_can_func_type.getPointer());
 }
 
-static void VisitNodeGenerics(
-    ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
-    Demangle::NodePointer &cur_node, VisitNodeResult &result,
-    const VisitNodeResult &generic_context) { // set by GenericType case
-  SmallVector<Type, 4> nested_types;
-  VisitNodeResult associated_type_result;
-  VisitNodeResult archetype_ref_result;
-  VisitNodeResult archetype_type_result;
-  for (Demangle::Node::iterator pos = cur_node->begin(), end = cur_node->end();
-       pos != end; ++pos) {
-    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
-    switch (child_node_kind) {
-    case Demangle::Node::Kind::ArchetypeRef:
-      nodes.push_back(*pos);
-      VisitNode(ast, nodes, archetype_ref_result, generic_context);
-      break;
-    case Demangle::Node::Kind::Archetype:
-      nodes.push_back(*pos);
-      VisitNode(ast, nodes, archetype_type_result, generic_context);
-      break;
-    case Demangle::Node::Kind::AssociatedType:
-      nodes.push_back(*pos);
-      VisitNode(ast, nodes, associated_type_result, generic_context);
-      if (associated_type_result.HasSingleType())
-        nested_types.push_back(associated_type_result.GetFirstType());
-      break;
-    default:
-      result._error =
-          stringWithFormat("%s encountered in generics children",
-                           SwiftDemangleNodeKindToCString(child_node_kind));
-      break;
-    }
-  }
-
-  if (archetype_ref_result.HasAnyDecls() || archetype_ref_result.HasAnyTypes())
-    result = archetype_ref_result;
-  else
-    result = archetype_type_result;
-}
-
 static void VisitNodeArchetype(
     ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
     Demangle::NodePointer &cur_node, VisitNodeResult &result,
@@ -1185,7 +1145,7 @@ static void VisitNodeDeclContext(
     if (generics->getChild(0) == nullptr)
       break;
     generics = generics->getFirstChild();
-    if (generics->getKind() != Demangle::Node::Kind::GenericType)
+    if (generics->getKind() != Demangle::Node::Kind::DependentGenericType)
       break;
     if (generics->getChild(0) == nullptr)
       break;
@@ -1560,34 +1520,6 @@ static void VisitNodeFunctionType(
     result._types.push_back(
         FunctionType::get(arg_clang_type, return_clang_type,
                           FunctionType::ExtInfo().withThrows(throws)));
-  }
-}
-
-static void VisitNodeGenericType(
-    ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
-    Demangle::NodePointer &cur_node, VisitNodeResult &result,
-    const VisitNodeResult &generic_context) { // set by GenericType case
-  VisitNodeResult new_generic_context;
-  std::copy(generic_context._types.begin(), generic_context._types.end(),
-            back_inserter(new_generic_context._types));
-  for (Demangle::Node::iterator pos = cur_node->begin(), end = cur_node->end();
-       pos != end; ++pos) {
-    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
-    switch (child_node_kind) {
-    case Demangle::Node::Kind::Generics:
-      nodes.push_back(*pos);
-      VisitNode(ast, nodes, new_generic_context, generic_context);
-      break;
-    case Demangle::Node::Kind::Type:
-      nodes.push_back(*pos);
-      VisitNode(ast, nodes, result, new_generic_context);
-      break;
-    default:
-      result._error =
-          stringWithFormat("%s encountered in generic type children",
-                           SwiftDemangleNodeKindToCString(child_node_kind));
-      break;
-    }
   }
 }
 
@@ -2217,10 +2149,6 @@ static void visitNodeImpl(
     VisitNodeAddressor(ast, nodes, node, result, genericContext);
     break;
 
-  case Demangle::Node::Kind::Generics:
-    VisitNodeGenerics(ast, nodes, node, result, genericContext);
-    break;
-
   case Demangle::Node::Kind::ArchetypeRef:
     VisitNodeArchetypeRef(ast, nodes, node, result, genericContext);
     break;
@@ -2294,10 +2222,6 @@ static void visitNodeImpl(
   case Demangle::Node::Kind::UncurriedFunctionType: // Out of order on
                                                     // purpose.
     VisitNodeFunctionType(ast, nodes, node, result, genericContext);
-    break;
-
-  case Demangle::Node::Kind::GenericType:
-    VisitNodeGenericType(ast, nodes, node, result, genericContext);
     break;
 
   case Demangle::Node::Kind::DidSet:

@@ -57,6 +57,7 @@ TYPE_ATTR(callee_guaranteed)
 TYPE_ATTR(objc_metatype)
 TYPE_ATTR(opened)
 TYPE_ATTR(deallocating)
+TYPE_ATTR(pseudogeneric)
 
 // SIL metatype attributes.
 TYPE_ATTR(thin)

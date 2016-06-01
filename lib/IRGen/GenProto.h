@@ -282,9 +282,8 @@ namespace irgen {
   private:
     void initGenerics();
     void considerNewTypeSource(SourceKind kind, unsigned paramIndex,
-                               CanType type, IsExact_t isExact,
-                               bool isSelfParameter);
-    bool considerType(CanType type, IsExact_t isExact, bool isSelfParameter,
+                               CanType type, IsExact_t isExact);
+    bool considerType(CanType type, IsExact_t isExact,
                       unsigned sourceIndex, MetadataPath &&path);
 
     /// Testify to generic parameters in the Self type of a protocol
@@ -300,6 +299,8 @@ namespace irgen {
 
     void addSelfMetadataFulfillment(CanType arg);
     void addSelfWitnessTableFulfillment(CanType arg, ProtocolDecl *proto);
+
+    void addPseudogenericFulfillments();
   };
 
   /// A class for binding type parameters of a generic function.

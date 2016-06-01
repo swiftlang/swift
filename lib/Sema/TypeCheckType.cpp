@@ -1704,7 +1704,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Pass down the variable function type attributes to the
   // function-type creator.
   static const TypeAttrKind FunctionAttrs[] = {
-    TAK_convention, TAK_noreturn,
+    TAK_convention, TAK_noreturn, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure
   };
 
@@ -1782,7 +1782,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
     // Resolve the function type directly with these attributes.
     SILFunctionType::ExtInfo extInfo(rep,
-                                     attrs.has(TAK_noreturn));
+                                     attrs.has(TAK_noreturn),
+                                     attrs.has(TAK_pseudogeneric));
 
     ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
     if (!ty || ty->is<ErrorType>()) return ty;
