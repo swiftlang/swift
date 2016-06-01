@@ -141,7 +141,7 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
       if (!ChildBinary) {
         Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
                                      BinaryFileName,
-                                     ChildBinary.getError().message());
+                                     toString(ChildBinary.takeError()));
         return true;
       }
       if (extractLinkerFlags(ChildBinary->get(), Instance, BinaryFileName,
