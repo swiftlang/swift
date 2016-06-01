@@ -1733,11 +1733,14 @@ diagnoseMatch(TypeChecker &tc, Module *module,
     // about them.
     break;
 
-  case MatchKind::TypeConflict:
-    tc.diagnose(match.Witness, diag::protocol_witness_type_conflict,
-                getTypeForDisplay(tc, module, match.Witness),
-                withAssocTypes);
+  case MatchKind::TypeConflict: {
+    auto diag = tc.diagnose(match.Witness, diag::protocol_witness_type_conflict,
+                            getTypeForDisplay(tc, module, match.Witness),
+                            withAssocTypes);
+    if (!isa<TypeDecl>(req))
+      fixItOverrideDeclarationTypes(tc, diag, match.Witness, req);
     break;
+  }
 
   case MatchKind::ThrowsConflict:
     tc.diagnose(match.Witness, diag::protocol_witness_throws_conflict);

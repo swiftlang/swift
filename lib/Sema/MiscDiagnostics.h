@@ -68,6 +68,16 @@ void fixItAvailableAttrRename(TypeChecker &TC,
                               SourceRange referenceRange,
                               const AvailableAttr *attr,
                               const CallExpr *CE);
+
+/// Attempt to fix the type of \p decl so that it's a valid override for
+/// \p base...but only if we're highly confident that we know what the user
+/// should have written.
+///
+/// \returns true iff any fix-its were attached to \p diag.
+bool fixItOverrideDeclarationTypes(TypeChecker &TC,
+                                   InFlightDiagnostic &diag,
+                                   ValueDecl *decl,
+                                   const ValueDecl *base);
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H
