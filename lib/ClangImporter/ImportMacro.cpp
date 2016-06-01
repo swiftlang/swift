@@ -175,9 +175,11 @@ static bool isStringToken(const clang::Token &tok) {
          tok.is(clang::tok::utf8_string_literal);
 }
 
-static bool isBitwiseOperator(const clang::Token &tok) {
+static bool isBinaryOperator(const clang::Token &tok) {
   return tok.is(clang::tok::amp) ||
-         tok.is(clang::tok::pipe);
+         tok.is(clang::tok::pipe) ||
+         tok.is(clang::tok::ampamp) ||
+         tok.is(clang::tok::pipepipe);
 }
 
 // Describes the kind of string literal we're importing.
@@ -356,9 +358,10 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                                  clang::APValue(value),
                                  ConstantConvertKind::Coerce, /*static=*/false,
                                  ClangN);
-    // Check for a expression of the form (FLAG1 | FLAG2) or (FLAG1 & FLAG2)
+    // Check for a expression of the form (FLAG1 | FLAG2), (FLAG1 & FLAG2),
+    // (FLAG1 || FLAG2), or (FLAG1 || FLAG2)
     } else if (tokenI[0].is(clang::tok::identifier) &&
-               isBitwiseOperator(tokenI[1]) &&
+               isBinaryOperator(tokenI[1]) &&
                tokenI[2].is(clang::tok::identifier)) {
       auto firstID = tokenI[0].getIdentifierInfo();
       auto secondID = tokenI[2].getIdentifierInfo();
@@ -391,8 +394,22 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         clang::APValue value;
         if (tokenI[1].is(clang::tok::pipe)) {
           value = clang::APValue(firstInteger | secondInteger);
-        } else {
+        } else if (tokenI[1].is(clang::tok::amp)) {
           value = clang::APValue(firstInteger & secondInteger);
+        } else if (tokenI[1].is(clang::tok::pipepipe)) {
+          auto firstBool = firstInteger.getBoolValue();
+          auto secondBool = firstInteger.getBoolValue();
+          auto result = firstBool || secondBool;
+          value = clang::APValue(result ?
+                                 llvm::APSInt::get(1) : llvm::APSInt::get(0));
+        } else if (tokenI[1].is(clang::tok::ampamp)) {
+          auto firstBool = firstInteger.getBoolValue();
+          auto secondBool = firstInteger.getBoolValue();
+          auto result = firstBool && secondBool;
+          value = clang::APValue(result ?
+                                 llvm::APSInt::get(1) : llvm::APSInt::get(0));
+        } else {
+          return nullptr;
         }
         return createMacroConstant(impl, macro, name, DC, type,
                                    value,
