@@ -30,3 +30,11 @@ func testObjCClass() {
 func testGlobalVariable() {
   let i = weak_variable
 }
+
+
+@available(OSX 10.51, *)
+func wrapWeakFunction() {
+  // CHECK-10_50: declare extern_weak void @future_function_should_be_weak()
+  // CHECK-10_51: declare void @future_function_should_be_weak()
+  future_function_should_be_weak()
+}
