@@ -1031,7 +1031,7 @@ function(add_swift_library name)
 
   # All Swift code depends on the standard library, except for the standard
   # library itself.
-  if(SWIFTLIB_TARGET_LIBRARY AND SWIFTLIB_HAS_SWIFT_CONTENT AND NOT SWIFTLIB_IS_STDLIB_CORE)
+  if(SWIFTLIB_HAS_SWIFT_CONTENT AND NOT SWIFTLIB_IS_STDLIB_CORE)
     list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS Core)
   endif()
 
@@ -1041,11 +1041,11 @@ function(add_swift_library name)
         Core)
   endif()
 
-  is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" optimized)
-  if(NOT optimized)
+  if(SWIFTLIB_HAS_SWIFT_CONTENT AND NOT SWIFTLIB_IS_STDLIB_CORE)
     # All Swift code depends on the SwiftOnoneSupport in non-optimized mode,
     # except for the standard library itself.
-    if(SWIFTLIB_TARGET_LIBRARY AND NOT SWIFTLIB_IS_STDLIB_CORE)
+    is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" optimized)
+    if(NOT optimized)
       list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS SwiftOnoneSupport)
     endif()
   endif()
