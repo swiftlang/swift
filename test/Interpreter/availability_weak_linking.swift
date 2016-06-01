@@ -140,6 +140,11 @@ func useUnavailableObjCClass() {
   }
 }
 
+@available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *)
+func wrapUnavailableFunction() {
+  someFunction()
+}
+
 useUnavailableObjCClass()
 
 // Allow extending a weakly-linked class to conform to a protocol.
