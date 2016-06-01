@@ -13,6 +13,9 @@
 - (T __nonnull)objectAtIndexedSubscript:(uint16_t)i;
 - (void)setObject:(T __nonnull)object atIndexedSubscript:(uint16_t)i;
 
+- (void)performBlockOnThings: (T __nonnull (^ __nonnull)(T __nonnull))block;
+- (T __nonnull (^ __nonnull)(T __nonnull))blockForPerformingOnThings;
+
 @property (nonatomic) __nullable T propertyThing;
 @property (nonatomic) __nullable NSArray<T> *propertyArrayOfThings;
 @end

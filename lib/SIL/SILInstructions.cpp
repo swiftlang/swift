@@ -184,6 +184,20 @@ BuiltinInst::BuiltinInst(SILDebugLocation Loc, Identifier Name,
          sizeof(Substitution) * Subs.size());
 }
 
+InitBlockStorageHeaderInst *
+InitBlockStorageHeaderInst::create(SILFunction &F,
+                               SILDebugLocation DebugLoc, SILValue BlockStorage,
+                               SILValue InvokeFunction, SILType BlockType,
+                               ArrayRef<Substitution> Subs) {
+  void *Buffer = F.getModule().allocateInst(
+    sizeof(InitBlockStorageHeaderInst) + sizeof(Substitution) * Subs.size(),
+    alignof(InitBlockStorageHeaderInst));
+  
+  return ::new (Buffer) InitBlockStorageHeaderInst(DebugLoc, BlockStorage,
+                                                   InvokeFunction, BlockType,
+                                                   Subs);
+}
+
 ApplyInst::ApplyInst(SILDebugLocation Loc, SILValue Callee,
                      SILType SubstCalleeTy, SILType Result,
                      ArrayRef<Substitution> Subs, ArrayRef<SILValue> Args,
