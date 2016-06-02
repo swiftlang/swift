@@ -696,9 +696,9 @@ ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
 
 AvailableAttr *
 AvailableAttr::createUnconditional(ASTContext &C,
-                                      StringRef Message,
-                                      StringRef Rename,
-                                      UnconditionalAvailabilityKind Reason) {
+                                   StringRef Message,
+                                   StringRef Rename,
+                                   UnconditionalAvailabilityKind Reason) {
   assert(Reason != UnconditionalAvailabilityKind::None);
   clang::VersionTuple NoVersion;
   return new (C) AvailableAttr(

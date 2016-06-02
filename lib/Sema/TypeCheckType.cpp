@@ -1200,25 +1200,10 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
 
       case UnconditionalAvailabilityKind::Unavailable:
       case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
-        if (!Attr->Rename.empty()) {
-          auto diag = TC.diagnose(Loc,
-                                  diag::availability_decl_unavailable_rename,
-                                  CI->getIdentifier(), /*"replaced"*/false,
-                                  /*special kind*/0, Attr->Rename);
-          fixItAvailableAttrRename(TC, diag, Loc, Attr, /*call*/nullptr);
-        } else if (Attr->Message.empty()) {
-          TC.diagnose(Loc, diag::availability_decl_unavailable,
-                      CI->getIdentifier())
-            .highlight(Loc);
-        } else {
-          EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-          TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
-                      CI->getIdentifier(), EncodedMessage.Message)
-            .highlight(Loc);
-        }
-        break;
+      case UnconditionalAvailabilityKind::UnavailableInSwift: {
+        bool inSwift = (Attr->getUnconditionalAvailability() ==
+                        UnconditionalAvailabilityKind::UnavailableInSwift);
 
-      case UnconditionalAvailabilityKind::UnavailableInSwift:
         if (!Attr->Rename.empty()) {
           auto diag = TC.diagnose(Loc,
                                   diag::availability_decl_unavailable_rename,
@@ -1226,16 +1211,21 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
                                   /*special kind*/0, Attr->Rename);
           fixItAvailableAttrRename(TC, diag, Loc, Attr, /*call*/nullptr);
         } else if (Attr->Message.empty()) {
-          TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift,
+          TC.diagnose(Loc,
+                      inSwift ? diag::availability_decl_unavailable_in_swift
+                              : diag::availability_decl_unavailable,
                       CI->getIdentifier())
             .highlight(Loc);
         } else {
           EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-          TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift_msg,
+          TC.diagnose(Loc,
+                      inSwift ? diag::availability_decl_unavailable_in_swift_msg
+                              : diag::availability_decl_unavailable_msg,
                       CI->getIdentifier(), EncodedMessage.Message)
             .highlight(Loc);
         }
         break;
+      }
       }
 
       auto DLoc = TypeDecl->getLoc();
