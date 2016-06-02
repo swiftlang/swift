@@ -96,7 +96,7 @@ bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
 
 // Specialization getGenericContainer<S, X>
 //
-// CHECK-LABEL: sil shared @_TTSg5V4main1SS0_S_6HasEltS__VS_1XS2_S_5AnEltS____TF16eager_specialize19getGenericContaineruRxS_6HasEltwx3EltS_5AnEltrFTGVS_1Gx_1ewxS1__x : $@convention(thin) (G<S>, X) -> S {
+// CHECK-LABEL: sil shared @_TTSg5V4main1SS0_S_6HasEltS____TF16eager_specialize19getGenericContaineruRxS_6HasEltwx3EltS_5AnEltrFTGVS_1Gx_1ewxS1__x : $@convention(thin) (G<S>, X) -> S {
 // CHECK: bb0(%0 : $G<S>, %1 : $X):
 // CHECK:   return %{{.*}} : $S
 
@@ -126,7 +126,7 @@ bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
 // CHECK:   %16 = unchecked_addr_cast %2 : $*T.Elt to $*X
 // CHECK:   %17 = load %16 : $*X
   // function_ref specialized getGenericContainer<A where ...> (G<A>, e : A.Elt) -> A
-// CHECK:   %18 = function_ref @_TTSg5V4main1SS0_S_6HasEltS__VS_1XS2_S_5AnEltS____TF16eager_specialize19getGenericContaineruRxS_6HasEltwx3EltS_5AnEltrFTGVS_1Gx_1ewxS1__x : $@convention(thin) (G<S>, X) -> S
+// CHECK:   %18 = function_ref @_TTSg5V4main1SS0_S_6HasEltS____TF16eager_specialize19getGenericContaineruRxS_6HasEltwx3EltS_5AnEltrFTGVS_1Gx_1ewxS1__x : $@convention(thin) (G<S>, X) -> S
 // CHECK:   %19 = apply %18(%15, %17) : $@convention(thin) (G<S>, X) -> S
 // CHECK:   store %19 to %14 : $*S
 // CHECK:   %21 = tuple ()
@@ -196,7 +196,7 @@ bb2:                                              // Preds: bb0
 }
 
 // specialized divideNum<A where ...> (A, den : A) throws -> A
-// CHECK-LABEL: sil shared @_TTSg5SiSis13SignedIntegers_SiSis33_BuiltinIntegerLiteralConvertibles_SiSis12SignedNumbers_SiSiS0_s_Si___TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) (Int, Int) -> (Int, @error ErrorProtocol) {
+// CHECK-LABEL: sil shared @_TTSg5SiSis13SignedIntegers___TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) (Int, Int) -> (Int, @error ErrorProtocol) {
 // CHECK: bb0(%0 : $Int, %1 : $Int):
 // CHECK: return %{{.*}}
 // CHECK: throw %{{.*}}
@@ -238,7 +238,7 @@ bb2:                                              // Preds: bb0
 // CHECK:   %{{.*}} = unchecked_addr_cast %2 : $*T to $*Int
 // CHECK:   %{{.*}} = load %{{.*}} : $*Int
 // CHECK:   // function_ref specialized divideNum<A where ...> (A, den : A) throws -> A
-// CHECK:   %{{.*}} = function_ref @_TTSg5SiSis13SignedIntegers_SiSis33_BuiltinIntegerLiteralConvertibles_SiSis12SignedNumbers_SiSiS0_s_Si___TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) (Int, Int) -> (Int, @error ErrorProtocol)
+// CHECK:   %{{.*}} = function_ref @_TTSg5SiSis13SignedIntegers___TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) (Int, Int) -> (Int, @error ErrorProtocol)
 // CHECK:   try_apply %{{.*}}(%{{.*}}, %{{.*}}) : $@convention(thin) (Int, Int) -> (Int, @error ErrorProtocol), normal bb8, error bb7
 
 // CHECK: bb7(%{{.*}} : $ErrorProtocol):                        // Preds: bb6
