@@ -1930,6 +1930,7 @@ printFullContextPrefix(ClangImporter::Implementation::ImportedName name,
 }
 
 void ClangImporter::Implementation::printSwiftName(ImportedName name,
+                                                   bool fullyQualified,
                                                    llvm::raw_ostream &os) {
   // Property accessors.
   bool isGetter = false;
@@ -1951,9 +1952,7 @@ void ClangImporter::Implementation::printSwiftName(ImportedName name,
     break;
   }
 
-  // If we're importing a global as a member, we need to provide the
-  // effective context.
-  if (name.ImportAsMember)
+  if (fullyQualified)
     printFullContextPrefix(name, os, *this);
 
   // Base name.

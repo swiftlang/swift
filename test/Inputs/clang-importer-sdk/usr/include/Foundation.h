@@ -1021,3 +1021,11 @@ extern NSString *NSHTTPRequestKey;
 
 #define NSTimeIntervalSince1970 978307200.0
 #define NS_DO_SOMETHING 17
+
+typedef NS_ENUM(NSUInteger, NSClothingStyle) {
+  NSClothingStyleFormal = 0,
+  NSClothingStyleSemiFormal,
+  NSClothingStyleHipster,
+  NSClothingStyleHippie
+};
+static const NSClothingStyle NSClothingStyleOfficeCasual __attribute__((availability(swift,unavailable,replacement="NSClothingStyleSemiFormal"))) = NSClothingStyleSemiFormal;

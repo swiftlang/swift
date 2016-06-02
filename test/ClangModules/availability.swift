@@ -115,3 +115,8 @@ func testImportAsMember() {
   _ = CGColorCreateGenericGray(0.5, 1.0) // expected-error {{'CGColorCreateGenericGray' has been replaced by 'CGColor.init(gray:alpha:)'}} {{7-31=CGColor}} {{32-32=gray: }} {{37-37=alpha: }}
   _ = CGColor(gray: 0.5, alpha: 1.0)
 }
+
+func testUnavailableRenamedEnum() {
+  _ = NSClothingStyle.hipster
+  _ = NSClothingStyleOfficeCasual // expected-error{{'NSClothingStyleOfficeCasual' has been renamed to 'NSClothingStyle.semiFormal'}} {{7-34=NSClothingStyle.semiFormal}}
+}

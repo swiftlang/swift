@@ -1553,6 +1553,10 @@ bool TypeChecker::diagnoseExplicitUnavailability(
   case UnconditionalAvailabilityKind::None:
   case UnconditionalAvailabilityKind::Unavailable:
   case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
+  case UnconditionalAvailabilityKind::UnavailableInSwift: {
+    bool inSwift = (Attr->getUnconditionalAvailability() ==
+                    UnconditionalAvailabilityKind::UnavailableInSwift);
+
     if (!Attr->Rename.empty()) {
       SmallString<32> newNameBuf;
       Optional<ReplacementDeclKind> replaceKind =
@@ -1567,31 +1571,24 @@ bool TypeChecker::diagnoseExplicitUnavailability(
                              newName);
         attachRenameFixIts(diag);
       } else {
-        auto diag = diagnose(Loc,diag::availability_decl_unavailable_rename_msg,
+        auto diag = diagnose(Loc, diag::availability_decl_unavailable_rename_msg,
                              Name, replaceKind.hasValue(), rawReplaceKind,
                              newName, Attr->Message);
         attachRenameFixIts(diag);
       }
     } else if (Attr->Message.empty()) {
-      diagnose(Loc, diag::availability_decl_unavailable, Name).highlight(R);
+      diagnose(Loc, inSwift ? diag::availability_decl_unavailable_in_swift
+                            : diag::availability_decl_unavailable,
+               Name).highlight(R);
     } else {
       EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-      diagnose(Loc, diag::availability_decl_unavailable_msg, Name,
-               EncodedMessage.Message)
+      diagnose(Loc, inSwift ? diag::availability_decl_unavailable_in_swift_msg
+                            : diag::availability_decl_unavailable_msg,
+               Name, EncodedMessage.Message)
         .highlight(R);
     }
     break;
-
-  case UnconditionalAvailabilityKind::UnavailableInSwift:
-    if (Attr->Message.empty()) {
-      diagnose(Loc, diag::availability_decl_unavailable_in_swift, Name)
-        .highlight(R);
-    } else {
-      EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-      diagnose(Loc, diag::availability_decl_unavailable_in_swift_msg, Name,
-                  EncodedMessage.Message).highlight(R);
-    }
-    break;
+  }
   }
 
   auto MinVersion = Context.LangOpts.getMinPlatformVersion();
