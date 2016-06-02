@@ -806,7 +806,7 @@ void Lexer::lexOperatorIdentifier() {
   return formToken(leftBound ? tok::oper_postfix : tok::oper_prefix, TokStart);
 }
 
-/// lexDollarIdent - Match $[0-9a-zA-Z_$]*
+/// lexDollarIdent - Match $[0-9a-zA-Z_$]+
 void Lexer::lexDollarIdent() {
   const char *tokStart = CurPtr-1;
   assert(*tokStart == '$');
@@ -827,10 +827,15 @@ void Lexer::lexDollarIdent() {
     }
   }
 
-  // It's always an error to see a standalone $, and we reserve
-  // $nonNumeric for persistent bindings in the debugger.
-  if (CurPtr == tokStart + 1 || !isAllDigits) {
-    if (!isAllDigits && !LangOpts.EnableDollarIdentifiers)
+  // It's always an error to see a standalone $
+  if (CurPtr == tokStart + 1) {
+    diagnose(tokStart, diag::expected_dollar_numeric);
+    return formToken(tok::unknown, TokStart);
+  }
+
+  // We reserve $nonNumeric for persistent bindings in the debugger.
+  if(!isAllDigits) {
+    if (!LangOpts.EnableDollarIdentifiers)
       diagnose(tokStart, diag::expected_dollar_numeric);
 
     // Even if we diagnose, we go ahead and form an identifier token,
