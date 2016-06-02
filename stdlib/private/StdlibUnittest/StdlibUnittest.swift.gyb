@@ -238,25 +238,25 @@ public func expectOptionalEqual${Generic}(
 
 %end
 
-public func expectLT(_ lhs: Int, _ rhs: Int, ${TRACE}) {
+public func expectLT<T : Comparable>(_ lhs: T, _ rhs: T, ${TRACE}) {
   if !(lhs < rhs) {
     expectationFailure("\(lhs) < \(rhs)", trace: ${trace})
   }
 }
 
-public func expectLE(_ lhs: Int, _ rhs: Int, ${TRACE}) {
+public func expectLE<T : Comparable>(_ lhs: T, _ rhs: T, ${TRACE}) {
   if !(lhs <= rhs) {
     expectationFailure("\(lhs) <= \(rhs)", trace: ${trace})
   }
 }
 
-public func expectGT(_ lhs: Int, _ rhs: Int, ${TRACE}) {
+public func expectGT<T : Comparable>(_ lhs: T, _ rhs: T, ${TRACE}) {
   if !(lhs > rhs) {
     expectationFailure("\(lhs) > \(rhs)", trace: ${trace})
   }
 }
 
-public func expectGE(_ lhs: Int, _ rhs: Int, ${TRACE}) {
+public func expectGE<T : Comparable>(_ lhs: T, _ rhs: T, ${TRACE}) {
   if !(lhs >= rhs) {
     expectationFailure("\(lhs) >= \(rhs)", trace: ${trace})
   }
