@@ -924,7 +924,7 @@ static void sortTopN(const Options &options, Group *group,
     if (!beginNewIndex)
       return;
 
-    assert(endNewIndex > beginNewIndex && endNewIndex < contents.size());
+    assert(endNewIndex > beginNewIndex && endNewIndex <= contents.size());
 
     // Temporarily copy the first result to temporary storage.
     SmallVector<Item *, 16> firstResults;
@@ -938,6 +938,7 @@ static void sortTopN(const Options &options, Group *group,
       contents[ci] = std::unique_ptr<Item>(firstResults[i]);
     }
     unsigned topN = endNewIndex - beginNewIndex;
+    assert(topN <= options.showTopNonLiteralResults);
     for (unsigned ci = topN, i = 0; i < beginNewIndex; ++i, ++ci) {
       assert(ci < contents.size() && !contents[ci]);
       contents[ci] = std::unique_ptr<Item>(firstResults[i]);

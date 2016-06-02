@@ -118,6 +118,15 @@ func test3(x: Int) {
 // EXPR_TOP_1: z
 // EXPR_TOP_1: zzz
 
+// Test where there are fewer results than 'top'.
+// RUN: %complete-test -top=1000 -tok=FEW_1 %s | FileCheck %s -check-prefix=FEW_1
+func test3b() -> Int {
+  return #^FEW_1^#
+}
+// FEW_1: test3b()
+// FEW_1: Int
+// FEW_1: 0
+
 // Top 3
 // RUN: %complete-test -top=3 -tok=EXPR_2 %s | FileCheck %s -check-prefix=EXPR_TOP_3
 func test4(x: Int) {
