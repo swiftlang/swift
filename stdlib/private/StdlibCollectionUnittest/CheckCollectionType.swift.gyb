@@ -451,8 +451,7 @@ internal func _product<C1 : Collection, C2 : Collection>(
   def testConstraints(protocol):
     return '''    
     C : %(protocol)s,
-    CollectionWithEquatableElement : %(protocol)s
-  where
+    CollectionWithEquatableElement : %(protocol)s,
     C.SubSequence : %(protocol)s,
     C.SubSequence.Iterator.Element == C.Iterator.Element,
     C.SubSequence.Index == C.Index,
@@ -495,8 +494,12 @@ internal func _product<C1 : Collection, C2 : Collection>(
 }% 
 extension TestSuite {
   public func addCollectionTests<
-    ${testConstraints('Collection')}
-  >(${testParams} = false) {
+    C, CollectionWithEquatableElement
+  >(
+    ${testParams} = false
+  ) where
+    ${testConstraints('Collection')} {
+
     var testNamePrefix = testNamePrefix
 
     if checksAdded.contains(#function) {
@@ -1161,8 +1164,12 @@ extension TestSuite {
   } // addCollectionTests
 
   public func addBidirectionalCollectionTests<
-    ${testConstraints('BidirectionalCollection')}
-  >(${testParams} = true) {
+    C, CollectionWithEquatableElement
+  >(
+    ${testParams} = true
+  ) where
+    ${testConstraints('BidirectionalCollection')} {
+
     var testNamePrefix = testNamePrefix
     if checksAdded.contains(#function) {
       return
@@ -1473,8 +1480,12 @@ extension TestSuite {
   } // addBidirectionalCollectionTests
 
   public func addRandomAccessCollectionTests<
-    ${testConstraints('RandomAccessCollection')}
-  >(${testParams} = true) {
+    C, CollectionWithEquatableElement
+  >(
+    ${testParams} = true
+  ) where
+    ${testConstraints('RandomAccessCollection')} {
+
     var testNamePrefix = testNamePrefix
 
     if checksAdded.contains(#function) {
@@ -1524,8 +1535,12 @@ extension TestSuite {
 
 % for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
   func addCommonTests<
-    ${testConstraints(collectionForTraversal(Traversal))}
-  >(${testParams}) {
+    C, CollectionWithEquatableElement
+  >(
+    ${testParams}
+  ) where
+    ${testConstraints(collectionForTraversal(Traversal))} {
+
     if checksAdded.contains(#function) {
       return
     }

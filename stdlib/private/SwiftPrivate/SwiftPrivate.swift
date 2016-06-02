@@ -19,11 +19,8 @@ public func asHex<T : Integer>(_ x: T) -> String {
 
 /// Convert the given sequence of numeric values to a string representing
 /// their hexadecimal values.
-public func asHex<
-  S: Sequence
-where
-  S.Iterator.Element : Integer
->(_ x: S) -> String {
+public func asHex<S: Sequence>(_ x: S) -> String
+  where S.Iterator.Element : Integer {
   return "[ " + x.lazy.map { asHex($0) }.joined(separator: ", ") + " ]"
 }
 
@@ -53,14 +50,10 @@ public func randomShuffle<T>(_ a: [T]) -> [T] {
   return result
 }
 
-public func gather<
-  C : Collection,
-  IndicesSequence : Sequence
-  where
-  IndicesSequence.Iterator.Element == C.Index
->(
+public func gather<C : Collection, IndicesSequence : Sequence>(
   _ collection: C, _ indices: IndicesSequence
-) -> [C.Iterator.Element] {
+) -> [C.Iterator.Element]
+  where IndicesSequence.Iterator.Element == C.Index {
   return Array(indices.map { collection[$0] })
 }
 
