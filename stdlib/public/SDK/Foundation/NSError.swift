@@ -59,10 +59,8 @@ public protocol __BridgedNSError : RawRepresentable, ErrorProtocol {
 }
 
 // Allow two bridged NSError types to be compared.
-public func ==<T: __BridgedNSError where T.RawValue: SignedInteger>(
-  lhs: T,
-  rhs: T
-) -> Bool {
+public func ==<T: __BridgedNSError>(lhs: T, rhs: T ) -> Bool
+  where T.RawValue: SignedInteger {
   return lhs.rawValue.toIntMax() == rhs.rawValue.toIntMax()
 }
 
@@ -86,10 +84,8 @@ public extension __BridgedNSError where RawValue: SignedInteger {
 }
 
 // Allow two bridged NSError types to be compared.
-public func ==<T: __BridgedNSError where T.RawValue: UnsignedInteger>(
-  lhs: T,
-  rhs: T
-) -> Bool {
+public func ==<T: __BridgedNSError>(lhs: T, rhs: T) -> Bool
+  where T.RawValue: UnsignedInteger {
   return lhs.rawValue.toUIntMax() == rhs.rawValue.toUIntMax()
 }
 

@@ -1239,7 +1239,10 @@ internal func resolveError(_ error: NSError?) throws {
 }
 
 extension NSCoder {
-  public func decodeObjectOfClass<DecodedObjectType: NSCoding where DecodedObjectType: NSObject>(_ cls: DecodedObjectType.Type, forKey key: String) -> DecodedObjectType? {
+  public func decodeObjectOfClass<DecodedObjectType>(
+    _ cls: DecodedObjectType.Type, forKey key: String
+  ) -> DecodedObjectType?
+    where DecodedObjectType : NSCoding, DecodedObjectType : NSObject {
     let result = NS_Swift_NSCoder_decodeObjectOfClassForKey(self as AnyObject, cls as AnyObject, key as AnyObject, nil)
     return result as! DecodedObjectType?
   }
@@ -1273,7 +1276,10 @@ extension NSCoder {
   }
 
   @available(OSX 10.11, iOS 9.0, *)
-  public func decodeTopLevelObjectOfClass<DecodedObjectType: NSCoding where DecodedObjectType: NSObject>(_ cls: DecodedObjectType.Type, forKey key: String) throws -> DecodedObjectType? {
+  public func decodeTopLevelObjectOfClass<DecodedObjectType>(
+    _ cls: DecodedObjectType.Type, forKey key: String
+  ) throws -> DecodedObjectType?
+    where DecodedObjectType : NSCoding, DecodedObjectType : NSObject {
     var error: NSError?
     let result = NS_Swift_NSCoder_decodeObjectOfClassForKey(self as AnyObject, cls as AnyObject, key as AnyObject, &error)
     try resolveError(error)
