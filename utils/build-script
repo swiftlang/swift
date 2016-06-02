@@ -31,14 +31,13 @@ from SwiftBuildSupport import (
     check_call,
     get_all_preset_names,
     get_preset_options,
-    print_with_argv0,
-    quote_shell_command,
 )  # noqa (E402 module level import not at top of file)
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 
 # E402 means module level import not at top of file
 from swift_build_support import arguments  # noqa (E402)
+from swift_build_support import diagnostics  # noqa (E402)
 from swift_build_support.toolchain import host_toolchain  # noqa (E402)
 import swift_build_support.debug      # noqa (E402)
 from swift_build_support import migration  # noqa (E402)
@@ -103,8 +102,7 @@ def main_preset():
         return 0
 
     if not args.preset:
-        print_with_argv0("Missing --preset option")
-        return 1
+        diagnostics.fatal("missing --preset option")
 
     args.preset_substitutions = {}
 
@@ -122,9 +120,9 @@ def main_preset():
     if args.distcc:
         build_script_args += ["--distcc"]
 
-    print_with_argv0(
+    diagnostics.note(
         "using preset '" + args.preset + "', which expands to \n\n" +
-        quote_shell_command(build_script_args) + "\n")
+        shell.quote_command(build_script_args) + "\n")
 
     check_call(build_script_args, disable_sleep=True)
 
@@ -996,27 +994,22 @@ details of the setups of other systems or automated environments.""")
         toolchain.cmake = args.cmake
 
     if toolchain.cc is None or toolchain.cxx is None:
-        print_with_argv0(
-            "Can't find clang. Please install clang-3.5 or a later version.")
-        return 1
+        diagnostics.fatal(
+            "can't find clang (please install clang-3.5 or a later version)")
 
     if toolchain.cmake is None:
-        print_with_argv0("Can't find CMake. Please install CMake.")
-        return 1
+        diagnostics.fatal("can't find CMake (please install CMake)")
 
     if args.distcc:
         if toolchain.distcc is None:
-            print_with_argv0(
-                "Can't find distcc. Please install distcc")
-            return 1
+            diagnostics.fatal(
+                "can't find distcc (please install distcc)")
         if toolchain.distcc_pump is None:
-            print_with_argv0(
-                "Can't find distcc-pump. Please install distcc-pump")
-            return 1
+            diagnostics.fatal(
+                "can't find distcc-pump (please install distcc-pump)")
 
     if args.host_target is None or args.stdlib_deployment_targets is None:
-        print_with_argv0("Unknown operating system.")
-        return 1
+        diagnostics.fatal("unknown operating system")
 
     if args.symbols_package:
         if not os.path.isabs(args.symbols_package):
@@ -1025,10 +1018,9 @@ details of the setups of other systems or automated environments.""")
                 '(was \'{}\')'.format(args.symbols_package))
             return 1
         if not args.install_symroot:
-            print_with_argv0(
+            diagnostics.fatal(
                 "--install-symroot is required when specifying "
                 "--symbols-package.")
-            return 1
 
     if args.android:
         if args.android_ndk is None or \
@@ -1037,12 +1029,11 @@ details of the setups of other systems or automated environments.""")
                 args.android_icu_uc_include is None or \
                 args.android_icu_i18n is None or \
                 args.android_icu_i18n_include is None:
-            print_with_argv0("When building for Android, --android-ndk, "
-                             "--android-ndk-version, --android-icu-uc, "
-                             "--android-icu-uc-include, --android-icu-i18n, "
-                             "and --android-icu-i18n-include must be "
-                             "specified.")
-            return 1
+            diagnostics.fatal("when building for Android, --android-ndk, "
+                              "--android-ndk-version, --android-icu-uc, "
+                              "--android-icu-uc-include, --android-icu-i18n, "
+                              "and --android-icu-i18n-include must be "
+                              "specified")
 
     # Build cmark if any cmark-related options were specified.
     if (args.cmark_build_variant is not None):
@@ -1214,9 +1205,8 @@ details of the setups of other systems or automated environments.""")
 
     if args.build_ninja:
         if not os.path.exists(workspace.source_dir("ninja")):
-            print_with_argv0("Can't find source directory for ninja "
-                             "(tried %s)" % (workspace.source_dir("ninja")))
-            return 1
+            diagnostics.fatal("can't find source directory for ninja "
+                              "(tried %s)" % (workspace.source_dir("ninja")))
 
     os.umask(0o022)
 
@@ -1465,17 +1455,15 @@ details of the setups of other systems or automated environments.""")
 
 def main():
     if not SWIFT_SOURCE_ROOT:
-        print_with_argv0(
-            "Could not infer source root directory.  " +
-            "Forgot to set $SWIFT_SOURCE_ROOT environment variable?")
-        return 1
+        diagnostics.fatal(
+            "could not infer source root directory " +
+            "(forgot to set $SWIFT_SOURCE_ROOT environment variable?)")
 
     if not os.path.isdir(SWIFT_SOURCE_ROOT):
-        print_with_argv0(
-            "Source root directory \'" + SWIFT_SOURCE_ROOT +
-            "\' does not exist.  " +
-            "Forgot to set $SWIFT_SOURCE_ROOT environment variable?")
-        return 1
+        diagnostics.fatal(
+            "source root directory \'" + SWIFT_SOURCE_ROOT +
+            "\' does not exist " +
+            "(forgot to set $SWIFT_SOURCE_ROOT environment variable?)")
 
     # Determine if we are invoked in the preset mode and dispatch accordingly.
     if any([(opt.startswith("--preset") or opt == "--show-presets")
