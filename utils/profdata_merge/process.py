@@ -24,8 +24,9 @@ parent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 sys.path.append(parent_dir)
 support_dir = os.path.join(parent_dir, 'swift_build_support')
 sys.path.append(support_dir)
+from swift_build_support import shell  # noqa (E402)
 from swift_build_support.toolchain import host_toolchain  # noqa (E402)
-from SwiftBuildSupport import check_output, check_call  # noqa (E402)
+from SwiftBuildSupport import check_output  # noqa (E402)
 
 toolchain = host_toolchain()
 LLVM_PROFDATA_PATH = toolchain.llvm_profdata
@@ -65,7 +66,7 @@ class ProfdataMergerProcess(Process):
             llvm_cmd.append("-sparse")
         llvm_cmd += cleaned_files
         self.report(llvm_cmd)
-        ret = check_call(llvm_cmd)
+        ret = shell.call(llvm_cmd, print_command=False)
         if ret != 0:
             self.report("llvm profdata command failed -- Exited with code %d"
                         % ret, level=logging.ERROR)
