@@ -243,11 +243,11 @@ public struct ${Self}
 % if self_ty.is_word:
   @_transparent
   public // @testable
-  init(_ v: Builtin.Word) {
+  init(_ _v: Builtin.Word) {
 % if BuiltinName == 'Int32':
-    self._value = Builtin.truncOrBitCast_Word_Int32(v)
+    self._value = Builtin.truncOrBitCast_Word_Int32(_v)
 % elif BuiltinName == 'Int64':
-    self._value = Builtin.zextOrBitCast_Word_Int64(v)
+    self._value = Builtin.zextOrBitCast_Word_Int64(_v)
 % end
   }
 
