@@ -236,14 +236,16 @@ ${equivalenceExplanation}
   ///
   /// - SeeAlso: `starts(with:isEquivalent:)`
 %   end
-  public func starts<
-    PossiblePrefix : Sequence where PossiblePrefix.${GElement} == ${GElement}
-  >(
+  public func starts<PossiblePrefix>(
     with possiblePrefix: PossiblePrefix${"," if preds else ""}
 %   if preds:
     isEquivalent: @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
-  ) ${rethrows_}-> Bool {
+  ) ${rethrows_}-> Bool
+    where
+    PossiblePrefix : Sequence,
+    PossiblePrefix.${GElement} == ${GElement} {
+
     var possiblePrefixIterator = possiblePrefix.makeIterator()
     for e0 in self {
       if let e1 = possiblePrefixIterator.next() {
@@ -310,14 +312,16 @@ ${equivalenceExplanation}
   ///
   /// - SeeAlso: `elementsEqual(_:isEquivalent:)`
 %   end
-  public func elementsEqual<
-    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
-  >(
+  public func elementsEqual<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
     isEquivalent: @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
-  ) ${rethrows_}-> Bool {
+  ) ${rethrows_}-> Bool
+    where
+    OtherSequence: Sequence,
+    OtherSequence.${GElement} == ${GElement} {
+
     var iter1 = self.makeIterator()
     var iter2 = other.makeIterator()
     while true {
@@ -393,14 +397,16 @@ ${orderingExplanation}
   ///   perform localized comparison.
   /// - SeeAlso: `lexicographicallyPrecedes(_:isOrderedBefore:)`
 %   end
-  public func lexicographicallyPrecedes<
-    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
-  >(
+  public func lexicographicallyPrecedes<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
     isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
-  ) ${rethrows_}-> Bool {
+  ) ${rethrows_}-> Bool
+    where
+    OtherSequence : Sequence,
+    OtherSequence.${GElement} == ${GElement} {
+
     var iter1 = self.makeIterator()
     var iter2 = other.makeIterator()
     while true {
@@ -685,22 +691,26 @@ extension Sequence {
   }
 
   @available(*, unavailable, renamed: "starts")
-  public func startsWith<
-    PossiblePrefix : Sequence where PossiblePrefix.Iterator.Element == Iterator.Element
-  >(
+  public func startsWith<PossiblePrefix>(
     with possiblePrefix: PossiblePrefix,
     isEquivalent: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
-  ) rethrows-> Bool {
+  ) rethrows-> Bool
+    where
+    PossiblePrefix : Sequence,
+    PossiblePrefix.Iterator.Element == Iterator.Element {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "lexicographicallyPrecedes")
   public func lexicographicalCompare<
-    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
+    OtherSequence
   >(
     _ other: OtherSequence,
     isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
-  ) rethrows -> Bool {
+  ) rethrows -> Bool
+    where
+    OtherSequence : Sequence,
+    OtherSequence.${GElement} == ${GElement} {
     Builtin.unreachable()
   }
 }
@@ -717,20 +727,22 @@ extension Sequence where Iterator.Element : Comparable {
   }
 
   @available(*, unavailable, renamed: "starts")
-  public func startsWith<
-    PossiblePrefix : Sequence where PossiblePrefix.${GElement} == ${GElement}
-  >(
+  public func startsWith<PossiblePrefix>(
     with possiblePrefix: PossiblePrefix
-  ) -> Bool {
+  ) -> Bool
+    where
+    PossiblePrefix : Sequence,
+    PossiblePrefix.${GElement} == ${GElement} {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "lexicographicallyPrecedes")
-  public func lexicographicalCompare<
-    OtherSequence : Sequence where OtherSequence.${GElement} == ${GElement}
-  >(
+  public func lexicographicalCompare<OtherSequence>(
     _ other: OtherSequence
-  ) -> Bool {
+  ) -> Bool
+    where
+    OtherSequence : Sequence,
+    OtherSequence.${GElement} == ${GElement} {
     Builtin.unreachable()
   }
 }

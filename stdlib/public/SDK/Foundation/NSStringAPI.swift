@@ -753,11 +753,9 @@ extension String {
 
   /// Produces an initialized `NSString` object equivalent to the given
   /// `bytes` interpreted in the given `encoding`.
-  public init? <
-    S: Sequence where S.Iterator.Element == UInt8
-  >(
-    bytes: S, encoding: NSStringEncoding
-  ) {
+  public init? <S: Sequence>(bytes: S, encoding: NSStringEncoding)
+    where S.Iterator.Element == UInt8 {
+
     let byteArray = Array(bytes)
     if let ns = NSString(
       bytes: byteArray, length: byteArray.count, encoding: encoding) {

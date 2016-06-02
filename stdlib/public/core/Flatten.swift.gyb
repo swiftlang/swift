@@ -26,9 +26,8 @@ from gyb_stdlib_support import (
 ///
 /// - Note: This is the `IteratorProtocol` used by `FlattenSequence`,
 ///   `FlattenCollection`, and `BidirectionalFlattenCollection`.
-public struct FlattenIterator<
-  Base : IteratorProtocol where Base.Element : Sequence
-> : IteratorProtocol, Sequence {
+public struct FlattenIterator<Base : IteratorProtocol> : IteratorProtocol, Sequence
+  where Base.Element : Sequence {
 
   /// Construct around a `base` iterator.
   internal init(_base: Base) {
@@ -78,9 +77,8 @@ public struct FlattenIterator<
 /// * `s.lazy.flatten().map(f)` maps lazily and returns a `LazyMapSequence`
 ///
 /// - See also: `FlattenCollection`
-public struct FlattenSequence<
-  Base : Sequence where Base.Iterator.Element : Sequence
-> : Sequence {
+public struct FlattenSequence<Base : Sequence> : Sequence
+  where Base.Iterator.Element : Sequence {
 
   /// Creates a concatenation of the elements of the elements of `base`.
   ///
@@ -152,11 +150,10 @@ extension LazySequenceProtocol
 %   Index = Collection + 'Index'
 %   Slice = sliceTypeName(traversal=traversal, mutable=False, rangeReplaceable=False)
 /// A position in a `${Collection}`.
-public struct ${Index}<
-  BaseElements : ${collectionForTraversal(traversal)}
+public struct ${Index}<BaseElements> : Comparable
   where
-  ${constraints % {'Base': 'BaseElements.'}}
-> : Comparable {
+  BaseElements : ${collectionForTraversal(traversal)},
+  ${constraints % {'Base': 'BaseElements.'}} {
 
   internal init(
     _ _outer: BaseElements.Index,
@@ -227,11 +224,10 @@ public func < <BaseElements> (
 ///   documented complexity.
 ///
 /// - See also: `FlattenSequence`
-public struct ${Collection}<
-  Base : ${collectionForTraversal(traversal)}
+public struct ${Collection}<Base> : ${collectionForTraversal(traversal)}
   where
-  ${constraints % {'Base': 'Base.'}}
-> : ${collectionForTraversal(traversal)} {
+  Base : ${collectionForTraversal(traversal)},
+  ${constraints % {'Base': 'Base.'}} {
   // FIXME: swift-3-indexing-model: check test coverage for collection.
 
   /// A type that represents a valid position in the collection.

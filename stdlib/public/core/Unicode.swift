@@ -108,9 +108,9 @@ public protocol UnicodeCodec {
   /// - Returns: A `UnicodeDecodingResult` instance, representing the next
   ///   Unicode scalar, an indication of an error, or an indication that the
   ///   UTF sequence has been fully decoded.
-  mutating func decode<
-    I : IteratorProtocol where I.Element == CodeUnit
-  >(_ next: inout I) -> UnicodeDecodingResult
+  mutating func decode<I : IteratorProtocol>(
+    _ next: inout I
+  ) -> UnicodeDecodingResult where I.Element == CodeUnit
 
   /// Encodes a Unicode scalar as a series of code units by calling the given
   /// closure on each code unit.
@@ -207,9 +207,9 @@ public struct UTF8 : UnicodeCodec {
   /// - Returns: A `UnicodeDecodingResult` instance, representing the next
   ///   Unicode scalar, an indication of an error, or an indication that the
   ///   UTF sequence has been fully decoded.
-  public mutating func decode<
-    I : IteratorProtocol where I.Element == CodeUnit
-  >(_ next: inout I) -> UnicodeDecodingResult {
+  public mutating func decode<I : IteratorProtocol>(
+    _ next: inout I
+  ) -> UnicodeDecodingResult where I.Element == CodeUnit {
 
     refillBuffer: if !_didExhaustIterator {
       // Bufferless ASCII fastpath.
@@ -501,9 +501,9 @@ public struct UTF16 : UnicodeCodec {
   /// - Returns: A `UnicodeDecodingResult` instance, representing the next
   ///   Unicode scalar, an indication of an error, or an indication that the
   ///   UTF sequence has been fully decoded.
-  public mutating func decode<
-    I : IteratorProtocol where I.Element == CodeUnit
-  >(_ input: inout I) -> UnicodeDecodingResult {
+  public mutating func decode<I : IteratorProtocol>(
+    _ input: inout I
+  ) -> UnicodeDecodingResult where I.Element == CodeUnit {
     if _lookaheadFlags & 0b01 != 0 {
       return .emptyInput
     }
@@ -580,9 +580,9 @@ public struct UTF16 : UnicodeCodec {
   /// units it spanned in the input.  This function may consume more code
   /// units than required for this scalar.
   @_versioned
-  internal mutating func _decodeOne<
-    I : IteratorProtocol where I.Element == CodeUnit
-  >(_ input: inout I) -> (UnicodeDecodingResult, Int) {
+  internal mutating func _decodeOne<I : IteratorProtocol>(
+    _ input: inout I
+  ) -> (UnicodeDecodingResult, Int) where I.Element == CodeUnit {
     let result = decode(&input)
     switch result {
     case .scalarValue(let us):
@@ -679,15 +679,15 @@ public struct UTF32 : UnicodeCodec {
   /// - Returns: A `UnicodeDecodingResult` instance, representing the next
   ///   Unicode scalar, an indication of an error, or an indication that the
   ///   UTF sequence has been fully decoded.
-  public mutating func decode<
-    I : IteratorProtocol where I.Element == CodeUnit
-  >(_ input: inout I) -> UnicodeDecodingResult {
+  public mutating func decode<I : IteratorProtocol>(
+    _ input: inout I
+  ) -> UnicodeDecodingResult where I.Element == CodeUnit {
     return UTF32._decode(&input)
   }
 
-  internal static func _decode<
-    I : IteratorProtocol where I.Element == CodeUnit
-  >(_ input: inout I) -> UnicodeDecodingResult {
+  internal static func _decode<I : IteratorProtocol>(
+    _ input: inout I
+  ) -> UnicodeDecodingResult where I.Element == CodeUnit {
     guard let x = input.next() else { return .emptyInput }
     if _fastPath((x >> 11) != 0b1101_1 && x <= 0x10ffff) {
       return .scalarValue(UnicodeScalar(x))
@@ -755,18 +755,18 @@ public struct UTF32 : UnicodeCodec {
 ///     unit at a time.
 /// - Returns: `true` if the translation detected encoding errors in `input`;
 ///   otherwise, `false`.
-public func transcode<
-  Input : IteratorProtocol,
-  InputEncoding : UnicodeCodec,
-  OutputEncoding : UnicodeCodec
-  where InputEncoding.CodeUnit == Input.Element
->(
+public func transcode<Input, InputEncoding, OutputEncoding>(
   _ input: Input,
   from inputEncoding: InputEncoding.Type,
   to outputEncoding: OutputEncoding.Type,
   stoppingOnError stopOnError: Bool,
   sendingOutputTo processCodeUnit: @noescape (OutputEncoding.CodeUnit) -> Void
-) -> Bool {
+) -> Bool
+  where
+  Input : IteratorProtocol,
+  InputEncoding : UnicodeCodec,
+  OutputEncoding : UnicodeCodec,
+  InputEncoding.CodeUnit == Input.Element {
   var input = input
 
   // NB.  It is not possible to optimize this routine to a memcpy if
@@ -797,12 +797,13 @@ public func transcode<
 ///
 /// Returns the index of the first unhandled code unit and the UTF-8 data
 /// that was encoded.
-internal func _transcodeSomeUTF16AsUTF8<
-  Input : Collection
-  where
-  Input.Iterator.Element == UInt16>(
+internal func _transcodeSomeUTF16AsUTF8<Input>(
   _ input: Input, _ startIndex: Input.Index
-) -> (Input.Index, _StringCore._UTF8Chunk) {
+) -> (Input.Index, _StringCore._UTF8Chunk)
+  where
+  Input : Collection,
+  Input.Iterator.Element == UInt16 {
+
   typealias _UTF8Chunk = _StringCore._UTF8Chunk
 
   let endIndex = input.endIndex
@@ -1111,14 +1112,16 @@ extension UTF16 {
   ///   contained only ASCII characters. If `repairingIllFormedSequences` is
   ///   `false` and an ill-formed sequence is detected, this method returns
   ///   `nil`.
-  public static func transcodedLength<
-    Encoding : UnicodeCodec, Input : IteratorProtocol
-    where Encoding.CodeUnit == Input.Element
-  >(
+  public static func transcodedLength<Input, Encoding>(
     of input: Input,
     decodedAs sourceEncoding: Encoding.Type,
     repairingIllFormedSequences: Bool
-  ) -> (count: Int, isASCII: Bool)? {
+  ) -> (count: Int, isASCII: Bool)?
+    where
+    Input : IteratorProtocol,
+    Encoding : UnicodeCodec,
+    Encoding.CodeUnit == Input.Element {
+
     var input = input
     var count = 0
     var isAscii = true
@@ -1180,27 +1183,28 @@ extension UnicodeCodec {
 public typealias UnicodeCodecType = UnicodeCodec
 
 @available(*, unavailable, message: "use 'transcode(_:from:to:stoppingOnError:sendingOutputTo:)'")
-public func transcode<
-  Input : IteratorProtocol,
-  InputEncoding : UnicodeCodec,
-  OutputEncoding : UnicodeCodec
-  where InputEncoding.CodeUnit == Input.Element
->(
+public func transcode<Input, InputEncoding, OutputEncoding>(
   _ inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
   _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
   stoppingOnError stopOnError: Bool
-) -> Bool {
+) -> Bool
+  where
+  Input : IteratorProtocol,
+  InputEncoding : UnicodeCodec,
+  OutputEncoding : UnicodeCodec,
+  InputEncoding.CodeUnit == Input.Element {
   Builtin.unreachable()
 }
 
 extension UTF16 {
   @available(*, unavailable, message: "use 'transcodedLength(of:decodedAs:repairingIllFormedSequences:)'")
-  public static func measure<
-    Encoding : UnicodeCodec, Input : IteratorProtocol
-    where Encoding.CodeUnit == Input.Element
-  >(
+  public static func measure<Encoding, Input>(
     _: Encoding.Type, input: Input, repairIllFormedSequences: Bool
-  ) -> (Int, Bool)? {
+  ) -> (Int, Bool)?
+    where
+    Encoding : UnicodeCodec,
+    Input : IteratorProtocol,
+    Encoding.CodeUnit == Input.Element {
     Builtin.unreachable()
   }
 }

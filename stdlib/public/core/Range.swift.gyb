@@ -78,12 +78,11 @@ public enum _DisabledRangeIndex_ {}
 ///     // Prints "0"
 ///
 /// - SeeAlso: `CountableClosedRange`, `Range`, `ClosedRange`
-public struct CountableRange<
-  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : protocol<_Strideable, Comparable>
+public struct CountableRange<Bound> : RandomAccessCollection
   where
-  Bound.Stride : SignedInteger
-> : RandomAccessCollection {
+  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
+  Bound : protocol<_Strideable, Comparable>,
+  Bound.Stride : SignedInteger {
 
   /// The range's lower bound.
   ///
@@ -574,12 +573,14 @@ public func ..< <Bound : Comparable> (minimum: Bound, maximum: Bound)
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
 @_transparent
-// WORKAROUND rdar://25214598 - should be just Bound : Strideable
-public func ..< <
-  Bound : _Strideable where Bound : Comparable, Bound.Stride : Integer
-> (
+public func ..< <Bound>(
   minimum: Bound, maximum: Bound
-) -> CountableRange<Bound> {
+) -> CountableRange<Bound>
+  where
+  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
+  Bound : protocol<_Strideable, Comparable>,
+  Bound.Stride : Integer {
+
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(minimum <= maximum,
     "Can't form Range with upperBound < lowerBound")

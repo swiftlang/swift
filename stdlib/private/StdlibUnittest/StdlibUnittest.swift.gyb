@@ -321,19 +321,18 @@ public func expectTrapping<Bound>(
 public func expectType<T>(_: T.Type, _ x: inout T) {}
 public func expectEqualType<T>(_: T.Type, _: T.Type) {}
 
-public func expectSequenceType<
-  X : Sequence
+public func expectSequenceType<X : Sequence>(_ x: X) -> X
   where
   X.SubSequence : Sequence,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
-  X.SubSequence.SubSequence == X.SubSequence
->(_ x: X) -> X { return x }
+  X.SubSequence.SubSequence == X.SubSequence {
+  return x
+}
 
 % for Mutable in ['', 'Mutable']:
-public func expect${Mutable}CollectionType<
-  X : ${Mutable}Collection
-  where
-
+public func expect${Mutable}CollectionType<X : ${Mutable}Collection>(
+  _ x: X.Type
+) where
   // FIXME(ABI)(compiler limitation): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
   X.SubSequence : Collection,
@@ -344,50 +343,45 @@ public func expect${Mutable}CollectionType<
   X.Indices : Collection,
   X.Indices.Iterator.Element == X.Index,
   X.Indices.Index == X.Index,
-  X.Indices.SubSequence == X.Indices
->(_ x: X.Type) {}
+  X.Indices.SubSequence == X.Indices {}
 % end
 
 /// A slice is a `Collection` that when sliced returns an instance of
 /// itself.
-public func expectSliceType<
-  X : Collection
-  where
-  X.SubSequence == X
->(_ sliceType: X.Type) {}
+public func expectSliceType<X : Collection>(
+  _ sliceType: X.Type
+) where X.SubSequence == X {}
 
 /// A mutable slice is a `MutableCollection` that when sliced returns an
 /// instance of itself.
-public func expectMutableSliceType<
-  X : MutableCollection
-  where
-  X.SubSequence == X
->(_ mutableSliceType: X.Type) {}
+public func expectMutableSliceType<X : MutableCollection>(
+  _ mutableSliceType: X.Type
+) where X.SubSequence == X {}
 
 /// Check that all associated types of a `Sequence` are what we expect them
 /// to be.
-public func expectSequenceAssociatedTypes<
-  X : Sequence
-  where
-
+public func expectSequenceAssociatedTypes<X : Sequence>(
+  sequenceType: X.Type,
+  iteratorType: X.Iterator.Type,
+  subSequenceType: X.SubSequence.Type
+) where
   // FIXME(ABI)(compiler limitation): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
   X.SubSequence : Sequence,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
   // X.SubSequence.Indices == X.Indices, // FIXME(ABI): can't have this constraint now.
-  X.SubSequence.SubSequence == X.SubSequence
->(
-  sequenceType: X.Type,
-  iteratorType: X.Iterator.Type,
-  subSequenceType: X.SubSequence.Type
-) {}
+  X.SubSequence.SubSequence == X.SubSequence {}
 
 /// Check that all associated types of a `Collection` are what we expect them
 /// to be.
-public func expectCollectionAssociatedTypes<
-  X : Collection
-  where
-
+public func expectCollectionAssociatedTypes<X : Collection>(
+  collectionType: X.Type,
+  iteratorType: X.Iterator.Type,
+  subSequenceType: X.SubSequence.Type,
+  indexType: X.Index.Type,
+  indexDistanceType: X.IndexDistance.Type,
+  indicesType: X.Indices.Type
+) where
   // FIXME(ABI)(compiler limitation): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
   X._Element == X.Iterator.Element,
@@ -399,22 +393,18 @@ public func expectCollectionAssociatedTypes<
   X.Indices : Collection,
   X.Indices.Iterator.Element == X.Index,
   X.Indices.Index == X.Index,
-  X.Indices.SubSequence == X.Indices
->(
+  X.Indices.SubSequence == X.Indices {}
+
+/// Check that all associated types of a `BidirectionalCollection` are what we
+/// expect them to be.
+public func expectBidirectionalCollectionAssociatedTypes<X : BidirectionalCollection>(
   collectionType: X.Type,
   iteratorType: X.Iterator.Type,
   subSequenceType: X.SubSequence.Type,
   indexType: X.Index.Type,
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
-) {}
-
-/// Check that all associated types of a `BidirectionalCollection` are what we
-/// expect them to be.
-public func expectBidirectionalCollectionAssociatedTypes<
-  X : BidirectionalCollection
-  where
-
+) where
   // FIXME(ABI)(compiler limitation): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
   X._Element == X.Iterator.Element,
@@ -426,22 +416,18 @@ public func expectBidirectionalCollectionAssociatedTypes<
   X.Indices : BidirectionalCollection,
   X.Indices.Iterator.Element == X.Index,
   X.Indices.Index == X.Index,
-  X.Indices.SubSequence == X.Indices
->(
+  X.Indices.SubSequence == X.Indices {}
+
+/// Check that all associated types of a `RandomAccessCollection` are what we
+/// expect them to be.
+public func expectRandomAccessCollectionAssociatedTypes<X : RandomAccessCollection>(
   collectionType: X.Type,
   iteratorType: X.Iterator.Type,
   subSequenceType: X.SubSequence.Type,
   indexType: X.Index.Type,
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
-) {}
-
-/// Check that all associated types of a `RandomAccessCollection` are what we
-/// expect them to be.
-public func expectRandomAccessCollectionAssociatedTypes<
-  X : RandomAccessCollection
-  where
-
+) where
   // FIXME(ABI)(compiler limitation): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
   X._Element == X.Iterator.Element,
@@ -453,16 +439,8 @@ public func expectRandomAccessCollectionAssociatedTypes<
   X.Indices : RandomAccessCollection,
   X.Indices.Iterator.Element == X.Index,
   X.Indices.Index == X.Index,
-  X.Indices.SubSequence == X.Indices
->(
-  collectionType: X.Type,
-  iteratorType: X.Iterator.Type,
-  subSequenceType: X.SubSequence.Type,
-  indexType: X.Index.Type,
-  indexDistanceType: X.IndexDistance.Type,
-  indicesType: X.Indices.Type
-) {}
-
+  X.Indices.SubSequence == X.Indices {}
+  
 public func expectIsBooleanType<X : Boolean>(_ x: inout X) -> X { return x }
 
 public struct AssertionResult : CustomStringConvertible, Boolean {
@@ -1891,19 +1869,16 @@ public enum TestRunPredicate : CustomStringConvertible {
 ///
 /// - Note: `oracle` is also checked for conformance to the
 ///   laws.
-public func checkEquatable<
-  Instances : Collection
-  where
-  Instances.Iterator.Element : Equatable,
-
-  // FIXME(compiler limitation): these constraints should be applied to
-  // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index
->(
+public func checkEquatable<Instances : Collection>(
   _ instances: Instances,
   oracle: (Instances.Index, Instances.Index) -> Bool,
   ${TRACE}
-) {
+) where
+  Instances.Iterator.Element : Equatable,
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  Instances.Indices.Iterator.Element == Instances.Index {
+
   // TODO: swift-3-indexing-model: add tests for this function.
   for i in instances.indices {
     expectTrue(oracle(i, i), "bad oracle: broken reflexivity at index \(i)")
@@ -1954,19 +1929,16 @@ public func checkEquatable<T : Equatable>(
 /// Test that the elements of `instances` satisfy the semantic
 /// requirements of `Hashable`, using `equalityOracle` to generate
 /// equality expectations from pairs of positions in `instances`.
-public func checkHashable<
-  Instances : Collection
-  where
-  Instances.Iterator.Element : Hashable,
-
-  // FIXME(compiler limitation): these constraints should be applied to
-  // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index
->(
+public func checkHashable<Instances : Collection>(
   _ instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   ${TRACE}
-) {
+) where
+  Instances.Iterator.Element : Hashable,
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  Instances.Indices.Iterator.Element == Instances.Index {
+  
   checkEquatable(instances, oracle: equalityOracle, ${trace})
   
   for x in instances {
@@ -2043,19 +2015,16 @@ extension ExpectedComparisonResult : CustomStringConvertible {
 ///
 /// - Note: `oracle` is also checked for conformance to the
 ///   laws.
-public func checkComparable<
-  Instances : Collection
-  where
-  Instances.Iterator.Element : Comparable,
-
-  // FIXME(compiler limitation): these constraints should be applied to
-  // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index
->(
+public func checkComparable<Instances : Collection>(
   _ instances: Instances,
   oracle: (Instances.Index, Instances.Index) -> ExpectedComparisonResult,
   ${TRACE}
-) {
+) where
+  Instances.Iterator.Element : Comparable,
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  Instances.Indices.Iterator.Element == Instances.Index {
+  
   // Also checks that equality is consistent with comparison and that
   // the oracle obeys the equality laws
   checkEquatable(instances, oracle: { oracle($0, $1).isEQ() }, ${trace})
@@ -2116,25 +2085,21 @@ public func checkComparable<T : Comparable>(
 ///
 /// - Note: `oracle` is also checked for conformance to the
 ///   laws.
-public func checkStrideable<
-  Instances : Collection,
-  Strides : Collection
-  where
-  Instances.Iterator.Element : Strideable,
-  Instances.Iterator.Element.Stride == Strides.Iterator.Element,
-
-  // FIXME(compiler limitation): these constraints should be applied to
-  // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index,
-  Strides.Indices.Iterator.Element == Strides.Index
->(
+public func checkStrideable<Instances : Collection, Strides : Collection>(
   _ instances: Instances, strides: Strides,
   distanceOracle:
     (Instances.Index, Instances.Index) -> Strides.Iterator.Element,
   advanceOracle:
     (Instances.Index, Strides.Index) -> Instances.Iterator.Element,
   ${TRACE}
-) {
+) where
+  Instances.Iterator.Element : Strideable,
+  Instances.Iterator.Element.Stride == Strides.Iterator.Element,
+  // FIXME(compiler limitation): these constraints should be applied to
+  // associated types of Collection.
+  Instances.Indices.Iterator.Element == Instances.Index,
+  Strides.Indices.Iterator.Element == Strides.Index {
+
   checkComparable(
     instances,
     oracle: {
@@ -2170,10 +2135,12 @@ public func nth<C: Collection>(_ x: C, _ n: Int) -> C.Iterator.Element {
 public func expectEqualSequence<
   Expected: Sequence,
   Actual: Sequence
-  where
+>(
+  _ expected: Expected, _ actual: Actual, ${TRACE}
+) where
   Expected.Iterator.Element == Actual.Iterator.Element,
-  Expected.Iterator.Element : Equatable
->(_ expected: Expected, _ actual: Actual, ${TRACE}) {
+  Expected.Iterator.Element : Equatable {
+  
   expectEqualSequence(expected, actual, ${trace}) { $0 == $1 }
 }
 
@@ -2182,10 +2149,12 @@ public func expectEqualSequence<
   Actual : Sequence,
   T : Equatable,
   U : Equatable
-  where
+>(
+  _ expected: Expected, _ actual: Actual, ${TRACE}
+) where
   Expected.Iterator.Element == Actual.Iterator.Element,
-  Expected.Iterator.Element == (T, U)
->(_ expected: Expected, _ actual: Actual, ${TRACE}) {
+  Expected.Iterator.Element == (T, U) {
+
   expectEqualSequence(
     expected, actual, ${trace}) {
     (lhs: (T, U), rhs: (T, U)) -> Bool in
@@ -2196,10 +2165,11 @@ public func expectEqualSequence<
 public func expectEqualSequence<
   Expected: Sequence,
   Actual: Sequence
-  where
-  Expected.Iterator.Element == Actual.Iterator.Element
->(_ expected: Expected, _ actual: Actual, ${TRACE},
-  sameValue: (Expected.Iterator.Element, Expected.Iterator.Element) -> Bool) {
+>(
+  _ expected: Expected, _ actual: Actual, ${TRACE},
+  sameValue: (Expected.Iterator.Element, Expected.Iterator.Element) -> Bool
+) where
+  Expected.Iterator.Element == Actual.Iterator.Element {
 
   if !expected.elementsEqual(actual, isEquivalent: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
@@ -2211,13 +2181,13 @@ public func expectEqualSequence<
 public func expectEqualsUnordered<
   Expected : Sequence,
   Actual : Sequence
-  where
-  Expected.Iterator.Element == Actual.Iterator.Element
 >(
   _ expected: Expected, _ actual: Actual, ${TRACE},
   compare: (Expected.Iterator.Element, Expected.Iterator.Element)
     -> ExpectedComparisonResult
-) {
+) where
+  Expected.Iterator.Element == Actual.Iterator.Element {
+  
   let x: [Expected.Iterator.Element] =
     expected.sorted(isOrderedBefore: compose(compare, { $0.isLT() }))
   let y: [Actual.Iterator.Element] =
@@ -2229,12 +2199,12 @@ public func expectEqualsUnordered<
 public func expectEqualsUnordered<
   Expected : Sequence,
   Actual : Sequence
-  where
-  Expected.Iterator.Element == Actual.Iterator.Element,
-  Expected.Iterator.Element : Comparable
 >(
   _ expected: Expected, _ actual: Actual, ${TRACE}
-) {
+) where
+  Expected.Iterator.Element == Actual.Iterator.Element,
+  Expected.Iterator.Element : Comparable {
+
   expectEqualsUnordered(expected, actual, ${trace}) {
     $0 < $1 ? .lt : $0 == $1 ? .eq : .gt
   }
@@ -2249,10 +2219,10 @@ public func expectEqualsUnordered<T : Comparable>(
 }
 
 public func expectEqualsUnordered<
-  T : Strideable where T.Stride : SignedInteger
+  T : Strideable
 >(
   _ expected: Range<T>, _ actual: [T], ${TRACE}
-) {
+) where T.Stride : SignedInteger {
   expectEqualsUnordered(
     CountableRange(uncheckedBounds:
       (lower: expected.lowerBound, upper: expected.upperBound)),
@@ -2304,15 +2274,15 @@ func < <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
 }
 
 public func expectEqualsUnordered<
-    Expected : Sequence,
-    Actual : Sequence,
-    T : Comparable
-    where
-    Actual.Iterator.Element == (key: T, value: T),
-    Expected.Iterator.Element == (T, T)
+  Expected : Sequence,
+  Actual : Sequence,
+  T : Comparable
 >(
   _ expected: Expected, _ actual: Actual, ${TRACE}
-) {
+) where
+  Actual.Iterator.Element == (key: T, value: T),
+  Expected.Iterator.Element == (T, T) {
+
   func comparePairLess(_ lhs: (T, T), rhs: (T, T)) -> Bool {
     return [lhs.0, lhs.1].lexicographicallyPrecedes([rhs.0, rhs.1])
   }

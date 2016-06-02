@@ -42,7 +42,7 @@ internal class _MinimalIteratorSharedState<T> {
 ///
 /// This generator will return `nil` only once.
 public struct MinimalIterator<T> : IteratorProtocol {
-  public init<S : Sequence where S.Iterator.Element == T>(_ s: S) {
+  public init<S : Sequence>(_ s: S) where S.Iterator.Element == T {
     self._sharedState = _MinimalIteratorSharedState(Array(s))
   }
 
@@ -93,10 +93,10 @@ public enum UnderestimatedCountBehavior {
 ///
 /// This sequence is consumed when its generator is advanced.
 public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
-  public init<S : Sequence where S.Iterator.Element == T>(
+  public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) {
+  ) where S.Iterator.Element == T {
     let data = Array(elements)
     self._sharedState = _MinimalIteratorSharedState(data)
 
@@ -522,10 +522,10 @@ Int64 distances.
 public struct ${Self}<T> : ${SelfProtocols} {
   /// Creates a collection with given contents, but a unique modification
   /// history.  No other instance has the same modification history.
-  public init<S : Sequence where S.Iterator.Element == T>(
+  public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) {
+  ) where S.Iterator.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -558,9 +558,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
       _CollectionState(name: "\(self.dynamicType)", elementCount: 0)
   }
 
-  public init<
-    S : Sequence where S.Iterator.Element == T
-  >(_ elements: S) {
+  public init<S : Sequence>(_ elements: S) where S.Iterator.Element == T {
     self.underestimatedCount = 0
     self._elements = Array(elements)
     self._collectionState =
@@ -728,20 +726,18 @@ public struct ${Self}<T> : ${SelfProtocols} {
     _elements.append(x)
   }
 
-  public mutating func append<
-    S : Sequence where S.Iterator.Element == T
-  >(contentsOf newElements: S) {
+  public mutating func append<S : Sequence>(contentsOf newElements: S)
+    where S.Iterator.Element == T {
     let oldCount = count
     _elements.append(contentsOf: newElements)
     let newCount = count
     _willMutate(.appendContentsOf(count: newCount - oldCount))
   }
 
-  public mutating func replaceSubrange<
-    C : Collection where C.Iterator.Element == T
-  >(
-    _ subRange: Range<${Index}>, with newElements: C
-  ) {
+  public mutating func replaceSubrange<C>(
+    _ subRange: Range<${Index}>,
+    with newElements: C
+  ) where C : Collection, C.Iterator.Element == T {
     let oldCount = count
     _elements.replaceSubrange(
       subRange.lowerBound.position..<subRange.upperBound.position,
@@ -759,9 +755,9 @@ public struct ${Self}<T> : ${SelfProtocols} {
     _elements.insert(newElement, at: i.position)
   }
 
-  public mutating func insert<
-    S : Collection where S.Iterator.Element == T
-  >(contentsOf newElements: S, at i: ${Index}) {
+  public mutating func insert<S : Collection>(
+    contentsOf newElements: S, at i: ${Index}
+  ) where S.Iterator.Element == T {
     let oldCount = count
     _elements.insert(contentsOf: newElements, at: i.position)
     let newCount = count
@@ -836,10 +832,10 @@ public struct DefaultedSequence<Element> : Sequence {
     self.base = base
   }
 
-  public init<S : Sequence where S.Iterator.Element == Element>(
+  public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) {
+  ) where S.Iterator.Element == Element {
     self.init(base: MinimalSequence(
       elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -899,10 +895,10 @@ public struct ${Self}<Element> : ${SelfProtocols} {
     self.base = Base(elements: elements)
   }
 
-  public init<S : Sequence where S.Iterator.Element == Element>(
+  public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) {
+  ) where S.Iterator.Element == Element {
     self.init(base:
       ${Base}(elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -994,12 +990,10 @@ public struct ${Self}<Element> : ${SelfProtocols} {
     base = Base()
   }
 
-  public mutating func replaceSubrange<
-    C : Collection where C.Iterator.Element == Element
-  >(
+  public mutating func replaceSubrange<C>(
     _ subRange: Range<${Self}<Element>.Index>,
     with newElements: C
-  ) {
+  ) where C : Collection, C.Iterator.Element == Element {
     base.replaceSubrange(subRange, with: newElements)
   }
 %   end

@@ -747,9 +747,8 @@ public struct Set<Element : Hashable> :
   ///     // Prints "[17, 19, 23, 11, 13]"
   ///
   /// - Parameter sequence: The elements to use as members of the new set.
-  public init<
-    Source : Sequence where Source.Iterator.Element == Element
-  >(_ sequence: Source) {
+  public init<Source : Sequence>(_ sequence: Source)
+    where Source.Iterator.Element == Element {
     self.init()
     if let s = sequence as? Set<Element> {
       // If this sequence is actually a native `Set`, then we can quickly
@@ -783,9 +782,8 @@ public struct Set<Element : Hashable> :
   ///   must be finite.
   /// - Returns: `true` if the set is a subset of `possibleSuperset`;
   ///   otherwise, `false`.
-  public func isSubset<
-    S : Sequence where S.Iterator.Element == Element
-  >(of possibleSuperset: S) -> Bool {
+  public func isSubset<S : Sequence>(of possibleSuperset: S) -> Bool
+    where S.Iterator.Element == Element {
     // FIXME(performance): isEmpty fast path, here and elsewhere.
     let other = Set(possibleSuperset)
     return isSubset(of: other)
@@ -811,9 +809,8 @@ public struct Set<Element : Hashable> :
   ///   `possibleStrictSuperset` must be finite.
   /// - Returns: `true` is the set is strict subset of
   ///   `possibleStrictSuperset`; otherwise, `false`.
-  public func isStrictSubset<
-    S : Sequence where S.Iterator.Element == Element
-  >(of possibleStrictSuperset: S) -> Bool {
+  public func isStrictSubset<S : Sequence>(of possibleStrictSuperset: S) -> Bool
+    where S.Iterator.Element == Element {
     // FIXME: code duplication.
     let other = Set(possibleStrictSuperset)
     return isStrictSubset(of: other)
@@ -834,9 +831,8 @@ public struct Set<Element : Hashable> :
   ///   be finite.
   /// - Returns: `true` if the set is a superset of `possibleSubset`;
   ///   otherwise, `false`.
-  public func isSuperset<
-    S : Sequence where S.Iterator.Element == Element
-  >(of possibleSubset: S) -> Bool {
+  public func isSuperset<S : Sequence>(of possibleSubset: S) -> Bool
+    where S.Iterator.Element == Element {
     // FIXME(performance): Don't build a set; just ask if every element is in
     // `self`.
     let other = Set(possibleSubset)
@@ -861,9 +857,8 @@ public struct Set<Element : Hashable> :
   ///   `possibleStrictSubset` must be finite.
   /// - Returns: `true` if the set is a strict superset of
   ///   `possibleStrictSubset`; otherwise, `false`.
-  public func isStrictSuperset<
-    S : Sequence where S.Iterator.Element == Element
-  >(of possibleStrictSubset: S) -> Bool {
+  public func isStrictSuperset<S : Sequence>(of possibleStrictSubset: S) -> Bool
+    where S.Iterator.Element == Element {
     let other = Set(possibleStrictSubset)
     return other.isStrictSubset(of: self)
   }
@@ -881,9 +876,8 @@ public struct Set<Element : Hashable> :
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: `true` if the set has no elements in common with `other`;
   ///   otherwise, `false`.
-  public func isDisjoint<
-    S : Sequence where S.Iterator.Element == Element
-  >(with other: S) -> Bool {
+  public func isDisjoint<S : Sequence>(with other: S) -> Bool
+    where S.Iterator.Element == Element {
     // FIXME(performance): Don't need to build a set.
     let otherSet = Set(other)
     return isDisjoint(with: otherSet)
@@ -912,9 +906,8 @@ public struct Set<Element : Hashable> :
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set with the unique elements of this set and `other`.
-  public func union<
-    S : Sequence where S.Iterator.Element == Element
-  >(_ other: S) -> Set<Element> {
+  public func union<S : Sequence>(_ other: S) -> Set<Element>
+    where S.Iterator.Element == Element {
     var newSet = self
     newSet.formUnion(other)
     return newSet
@@ -933,9 +926,8 @@ public struct Set<Element : Hashable> :
   ///     // Prints "["Diana", "Nathaniel", "Bethany", "Alicia", "Marcia"]"
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
-  public mutating func formUnion<
-    S : Sequence where S.Iterator.Element == Element
-  >(_ other: S) {
+  public mutating func formUnion<S : Sequence>(_ other: S)
+    where S.Iterator.Element == Element {
     for item in other {
       insert(item)
     }
@@ -954,15 +946,13 @@ public struct Set<Element : Hashable> :
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
-  public func subtracting<
-    S : Sequence where S.Iterator.Element == Element
-  >(_ other: S) -> Set<Element> {
+  public func subtracting<S : Sequence>(_ other: S) -> Set<Element>
+    where S.Iterator.Element == Element {
     return self._subtracting(other)
   }
 
-  internal func _subtracting<
-    S : Sequence where S.Iterator.Element == Element
-  >(_ other: S) -> Set<Element> {
+  internal func _subtracting<S : Sequence>(_ other: S) -> Set<Element>
+    where S.Iterator.Element == Element {
     var newSet = self
     newSet.subtract(other)
     return newSet
@@ -979,15 +969,13 @@ public struct Set<Element : Hashable> :
   ///     // Prints "["Chris", "Diana", "Alicia"]"
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
-  public mutating func subtract<
-    S : Sequence where S.Iterator.Element == Element
-  >(_ other: S) {
+  public mutating func subtract<S : Sequence>(_ other: S)
+    where S.Iterator.Element == Element {
     _subtract(other)
   }
 
-  internal mutating func _subtract<
-    S : Sequence where S.Iterator.Element == Element
-  >(_ other: S) {
+  internal mutating func _subtract<S : Sequence>(_ other: S)
+    where S.Iterator.Element == Element {
     for item in other {
       remove(item)
     }
@@ -1006,9 +994,8 @@ public struct Set<Element : Hashable> :
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
-  public func intersection<
-    S : Sequence where S.Iterator.Element == Element
-  >(_ other: S) -> Set<Element> {
+  public func intersection<S : Sequence>(_ other: S) -> Set<Element>
+    where S.Iterator.Element == Element {
     let otherSet = Set(other)
     return intersection(otherSet)
   }
@@ -1024,9 +1011,8 @@ public struct Set<Element : Hashable> :
   ///     // Prints "["Bethany", "Eric"]"
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
-  public mutating func formIntersection<
-    S : Sequence where S.Iterator.Element == Element
-  >(_ other: S) {
+  public mutating func formIntersection<S : Sequence>(_ other: S)
+    where S.Iterator.Element == Element {
     // Because `intersect` needs to both modify and iterate over
     // the left-hand side, the index may become invalidated during
     // traversal so an intermediate set must be created.
@@ -1056,9 +1042,8 @@ public struct Set<Element : Hashable> :
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
-  public func symmetricDifference<
-    S : Sequence where S.Iterator.Element == Element
-  >(_ other: S) -> Set<Element> {
+  public func symmetricDifference<S : Sequence>(_ other: S) -> Set<Element>
+    where S.Iterator.Element == Element {
     var newSet = self
     newSet.formSymmetricDifference(other)
     return newSet
@@ -1076,9 +1061,8 @@ public struct Set<Element : Hashable> :
   ///     // Prints "["Diana", "Forlani", "Alicia"]"
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
-  public mutating func formSymmetricDifference<
-    S : Sequence where S.Iterator.Element == Element
-  >(_ other: S) {
+  public mutating func formSymmetricDifference<S : Sequence>(_ other: S)
+    where S.Iterator.Element == Element {
     let otherSet = Set(other)
     formSymmetricDifference(otherSet)
   }

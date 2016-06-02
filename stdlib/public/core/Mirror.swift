@@ -208,12 +208,13 @@ public struct Mirror {
   /// `Mirror`'s `children` may be upgraded later.  See the failable
   /// initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.
-  public init<
-    Subject,
-    C : Collection
-    where
+  public init<Subject, C : Collection>(
+    _ subject: Subject,
+    children: C,
+    displayStyle: DisplayStyle? = nil,
+    ancestorRepresentation: AncestorRepresentation = .generated
+  ) where
     C.Iterator.Element == Child,
-
     // FIXME(ABI)(compiler limitation): these constraints should be applied to
     // associated types of Collection.
     C.SubSequence : Collection,
@@ -227,13 +228,8 @@ public struct Mirror {
     C.Indices : Collection,
     C.Indices.Iterator.Element == C.Index,
     C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices
-  >(
-    _ subject: Subject,
-    children: C,
-    displayStyle: DisplayStyle? = nil,
-    ancestorRepresentation: AncestorRepresentation = .generated
-  ) {
+    C.Indices.SubSequence == C.Indices {
+
     self.subjectType = Subject.self
     self._makeSuperclassMirror = Mirror._superclassIterator(
       subject, ancestorRepresentation)
@@ -274,11 +270,12 @@ public struct Mirror {
   /// `Mirror`'s `children` may be upgraded later.  See the failable
   /// initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.
-  public init<
-    Subject,
-    C : Collection
-    where
-
+  public init<Subject, C : Collection>(
+    _ subject: Subject,
+    unlabeledChildren: C,
+    displayStyle: DisplayStyle? = nil,
+    ancestorRepresentation: AncestorRepresentation = .generated
+  ) where
     // FIXME(ABI)(compiler limitation): these constraints should be applied to
     // associated types of Collection.
     C.SubSequence : Collection,
@@ -286,13 +283,8 @@ public struct Mirror {
     C.Indices : Collection,
     C.Indices.Iterator.Element == C.Index,
     C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices
-  >(
-    _ subject: Subject,
-    unlabeledChildren: C,
-    displayStyle: DisplayStyle? = nil,
-    ancestorRepresentation: AncestorRepresentation = .generated
-  ) {
+    C.Indices.SubSequence == C.Indices {
+
     self.subjectType = Subject.self
     self._makeSuperclassMirror = Mirror._superclassIterator(
       subject, ancestorRepresentation)

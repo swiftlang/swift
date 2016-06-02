@@ -346,9 +346,8 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The `Pointee`s at `self..<self + count` are
   ///   initialized.
-  public func initializeFrom<
-    C : Collection where C.Iterator.Element == Pointee
-  >(_ source: C) {
+  public func initializeFrom<C : Collection>(_ source: C)
+    where C.Iterator.Element == Pointee {
     source._copyContents(initializing: self)
   }
 
