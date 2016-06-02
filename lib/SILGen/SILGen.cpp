@@ -311,6 +311,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   SILParameterInfo params[] = {
     SILParameterInfo(Int32Ty, ParameterConvention::Direct_Unowned),
     SILParameterInfo(PtrPtrInt8Ty, ParameterConvention::Direct_Unowned),
+    SILParameterInfo(PtrPtrInt8Ty, ParameterConvention::Direct_Unowned),
   };
 
   CanSILFunctionType topLevelType = SILFunctionType::get(nullptr, extInfo,
@@ -1121,6 +1122,8 @@ static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
                                   entry, FnTy->getParameters()[0].getSILType());
   auto argv = new (gen.F.getModule()) SILArgument(
                                   entry, FnTy->getParameters()[1].getSILType());
+  auto envp = new (gen.F.getModule()) SILArgument(
+                                  entry, FnTy->getParameters()[2].getSILType());
 
   // If the standard library provides a _stdlib_didEnterMain intrinsic, call it
   // first thing.
@@ -1128,6 +1131,7 @@ static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
     ManagedValue params[] = {
       ManagedValue::forUnmanaged(argc),
       ManagedValue::forUnmanaged(argv),
+      ManagedValue::forUnmanaged(envp),
     };
     (void) gen.emitApplyOfLibraryIntrinsic(loc, didEnterMain, {}, params,
                                            SGFContext());
