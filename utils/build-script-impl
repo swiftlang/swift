@@ -1506,12 +1506,14 @@ for host in "${ALL_HOSTS[@]}"; do
         echo "Running Swift benchmarks for: ${SWIFT_RUN_BENCHMARK_TARGETS[@]}"
     fi
 
+    common_cmake_options_host=("${COMMON_CMAKE_OPTIONS[@]}")
+
     if [[ $(is_cross_tools_host ${host}) ]] ; then
 
         if [[ "${CROSS_COMPILE_WITH_HOST_TOOLS}" ]]; then
             # Optionally use the freshly-built host copy of clang to build
             # for foreign hosts.
-            COMMON_CMAKE_OPTIONS+=(
+            common_cmake_options_host+=(
                 -DCMAKE_C_COMPILER="$(build_directory ${LOCAL_HOST} llvm)/bin/clang"
                 -DCMAKE_CXX_COMPILER="$(build_directory ${LOCAL_HOST} llvm)/bin/clang++"
             )
@@ -1520,7 +1522,7 @@ for host in "${ALL_HOSTS[@]}"; do
         # CMake can't relink when using Ninja, but that's okay -
         # we don't need a build-local rpath because we can't run cross-compiled products
         if [[ "${CMAKE_GENERATOR}" == "Ninja" ]]; then
-            COMMON_CMAKE_OPTIONS+=(
+            common_cmake_options_host+=(
                 -DCMAKE_BUILD_WITH_INSTALL_RPATH="1"
             )
         fi
@@ -1627,7 +1629,7 @@ for host in "${ALL_HOSTS[@]}"; do
         build_dir=$(build_directory ${host} ${product})
         build_targets=(all)
 
-        cmake_options=("${COMMON_CMAKE_OPTIONS[@]}")
+        cmake_options=("${common_cmake_options_host[@]}")
 
         # Add in gold linker support if requested.
         if [[ "${USE_GOLD_LINKER}" ]]; then
@@ -1702,7 +1704,6 @@ for host in "${ALL_HOSTS[@]}"; do
 
             swift)
 
-                cmake_options=("${COMMON_CMAKE_OPTIONS[@]}")
                 if [[ "${USE_GOLD_LINKER}" ]]; then
                     # Swift will selectively use the gold linker on all
                     # parts except building the standard library.  We
