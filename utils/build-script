@@ -62,7 +62,7 @@ def call_without_sleeping(command, dry_run=False):
         # Don't mutate the caller's copy of the arguments.
         command = ["caffeinate"] + list(command)
 
-    shell.call(command, dry_run=dry_run, print_command=False)
+    shell.call(command, dry_run=dry_run, echo=False)
 
 
 # Main entry point for the preset mode.
