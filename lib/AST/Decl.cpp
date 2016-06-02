@@ -4600,11 +4600,18 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
       return false;
     }
 
+    bool walkToDeclPre(class Decl *D) override {
+      // Don't walk into further nominal decls.
+      if (isa<NominalTypeDecl>(D))
+        return false;
+      return true;
+    }
+    
     std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
       // Don't walk into closures.
       if (isa<ClosureExpr>(E))
         return { false, E };
-
+      
       // Look for calls of a constructor on self or super.
       auto apply = dyn_cast<ApplyExpr>(E);
       if (!apply)
@@ -4676,7 +4683,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   if (Kind == BodyInitKind::None && getAttrs().hasAttribute<ConvenienceAttr>())
     Kind = BodyInitKind::Delegating;
 
-  // If wes till don't know, check whether we have a class with a superclass: it
+  // If we still don't know, check whether we have a class with a superclass: it
   // gets an implicit chained initializer.
   if (Kind == BodyInitKind::None) {
     if (auto classDecl = getDeclContext()->getAsClassOrClassExtensionContext()) {
