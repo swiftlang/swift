@@ -3487,15 +3487,22 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     Identifier invoke, type;
     SourceLoc invokeLoc, typeLoc;
     
-    SILValue invokeVal;
+    UnresolvedValueName invokeName;
+    SILType invokeTy;
+    GenericParamList *invokeGenericParams;
     
     SILType blockType;
+    SmallVector<ParsedSubstitution, 4> parsedSubs;
+
     
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILIdentifier(invoke, invokeLoc,
                            diag::expected_tok_in_sil_instr, "invoke") ||
-        parseTypedValueRef(invokeVal, B) ||
+        parseValueName(invokeName) ||
+        parseApplySubstitutions(parsedSubs) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(invokeTy, invokeGenericParams) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILIdentifier(type, typeLoc,
                            diag::expected_tok_in_sil_instr, "type") ||
@@ -3512,8 +3519,21 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     
+    auto invokeVal = getLocalValue(invokeName, invokeTy, InstLoc, B);
+    
+    SmallVector<Substitution, 4> subs;
+    if (!parsedSubs.empty()) {
+      if (!invokeGenericParams) {
+        P.diagnose(typeLoc, diag::sil_substitutions_on_non_polymorphic_type);
+        return true;
+      }
+      if (getApplySubstitutionsFromParsed(*this, invokeGenericParams,
+                                          parsedSubs, subs))
+        return true;
+    }
+    
     ResultVal = B.createInitBlockStorageHeader(InstLoc, Val, invokeVal,
-                                               blockType);
+                                               blockType, subs);
     break;
   }
   }

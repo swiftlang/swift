@@ -1532,12 +1532,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(
        S.addTypeRef(IBSHI->getInvokeFunction()->getType().getSwiftRValueType()));
     // Always a value, don't need to save category
+    ListOfValues.push_back(IBSHI->getSubstitutions().size());
     
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
              S.addTypeRef(IBSHI->getType().getSwiftRValueType()),
              (unsigned)IBSHI->getType().getCategory(),
              ListOfValues);
+    S.writeSubstitutions(IBSHI->getSubstitutions(), SILAbbrCodes);
+
     break;
   }
   case ValueKind::MarkUninitializedBehaviorInst:

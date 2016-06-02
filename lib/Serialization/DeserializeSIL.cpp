@@ -1760,8 +1760,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   case ValueKind::InitBlockStorageHeaderInst: {
-    assert(ListOfValues.size() == 4 &&
-           "expected 6 values for InitBlockStorageHeader");
+    assert(ListOfValues.size() == 5 &&
+           "expected 5 values for InitBlockStorageHeader");
     SILType blockTy
       = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
 
@@ -1774,9 +1774,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                   SILValueCategory::Object);
     SILValue invoke
       = getLocalValue(ListOfValues[2], invokeTy);
+    
+    unsigned NumSub = ListOfValues[4];
 
+    SmallVector<Substitution, 4> Substitutions;
+    while (NumSub--) {
+      auto sub = MF->maybeReadSubstitution(SILCursor);
+      assert(sub.hasValue() && "missing substitution");
+      Substitutions.push_back(*sub);
+    }
+    
     ResultVal = Builder.createInitBlockStorageHeader(Loc, storage, invoke,
-                                                     blockTy);
+                                                     blockTy, Substitutions);
     break;
   }
   case ValueKind::UnreachableInst: {

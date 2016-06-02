@@ -2805,9 +2805,26 @@ public:
             "invoke function operand must be a c function");
     require(invokeTy->getParameters().size() >= 1,
             "invoke function must take at least one parameter");
+    require(!invokeTy->getGenericSignature() ||
+            invokeTy->getExtInfo().isPseudogeneric(),
+            "invoke function must not take reified generic parameters");
+    
+    if (auto sig = invokeTy->getGenericSignature()) {
+      require(sig->getGenericParams().size() ==
+                IBSHI->getSubstitutions().size(),
+              "instruction must provide substitutions matching invoke "
+              "function");
+      invokeTy = invokeTy->substGenericArgs(F.getModule(), M,
+                                            IBSHI->getSubstitutions());
+    } else {
+      require(IBSHI->getSubstitutions().empty(),
+              "instruction must not provide substitutions for non-polymorphic "
+              "invoke fn");
+    }
+    
     auto storageParam = invokeTy->getParameters()[0];
     require(storageParam.getConvention() ==
-              ParameterConvention::Indirect_InoutAliasable,
+            ParameterConvention::Indirect_InoutAliasable,
             "invoke function must take block storage as @inout_aliasable "
             "parameter");
     require(storageParam.getType() == storageTy,
