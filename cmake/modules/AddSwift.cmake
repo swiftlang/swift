@@ -488,6 +488,10 @@ function(_add_swift_library_single target name)
 
     file(GLOB_RECURSE SWIFTLIB_SINGLE_TDS
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.td)
+
+    set_source_files_properties(${SWIFTLIB_SINGLE_HEADERS} ${SWIFTLIB_SINGLE_TDS}
+      PROPERTIES
+      HEADER_FILE_ONLY true)
     source_group("TableGen descriptions" FILES ${SWIFTLIB_SINGLE_TDS})
 
     set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_SOURCES} ${SWIFTLIB_SINGLE_HEADERS} ${SWIFTLIB_SINGLE_TDS})
