@@ -646,26 +646,58 @@ function set_build_options_for_host() {
     )
 }
 
-# Set up an "associative array" of settings for error checking, and set
-# (or unset) each corresponding variable to its default value
-# If the Mac's bash were not stuck in the past, we could "declare -A" an
-# associative array, but instead we have to hack it by defining variables
-# declare -A IS_KNOWN_SETTING
-for ((i = 0; i < ${#KNOWN_SETTINGS[@]}; i += 3)); do
-    setting="${KNOWN_SETTINGS[i]}"
+# get_setting_varname(setting-name) -> variable-name
+#
+# Converts a known setting name, like "install-prefix" to an internal variable
+# name, like "INSTALL_PREFIX".
+#
+# \returns Empty if the setting is not a known one.
+function get_setting_varname() {
+    local setting="$1"
+    # Look up in the associative array built by configure_default_options().
+    local setting_varname_var="${setting//-/_}_VARNAME"
+    echo ${!setting_varname_var}
+}
 
-    default_value="${KNOWN_SETTINGS[$((i+1))]}"
+function configure_default_options() {
+    # Build a table of all of the known setting variables names.
+    #
+    # This is an optimization to do the argument to variable conversion (which is
+    # slow) in a single pass.
+    local all_settings=()
+    for ((i = 0; i < ${#KNOWN_SETTINGS[@]}; i += 3)); do
+        all_settings+=("${KNOWN_SETTINGS[i]}")
+    done
+    local known_setting_varnames=($(to_varname "${all_settings[*]}"))
 
-    varname="$(to_varname "${setting}")"    # upcase the setting name to get the variable
-    eval "${varname}_IS_KNOWN_SETTING=1"
+    # Build up an "associative array" mapping setting names to variable names
+    # (we use this for error checking to identify "known options", and as a fast
+    # way to map the setting name to a variable name). See get_setting_varname().
+    #
+    # This loop also sets (or unsets) each corresponding variable to its default
+    # value.
+    #
+    # NOTE: If the Mac's bash were not stuck in the past, we could "declare -A"
+    # an associative array, but instead we have to hack it by defining variables.
+    for ((i = 0; i < ${#KNOWN_SETTINGS[@]}; i += 3)); do
+        local setting="${KNOWN_SETTINGS[i]}"
+        local default_value="${KNOWN_SETTINGS[$((i+1))]}"
 
-    if [[ "${default_value}" ]] ; then
-        # For an explanation of the backslash see http://stackoverflow.com/a/9715377
-        eval ${varname}=$\default_value
-    else
-        unset ${varname}
-    fi
-done
+        # Find the variable name in our lookup table.
+        local varname="${known_setting_varnames[$((i/3))]]}"
+
+        # Establish the associative array mapping.
+        eval "${setting//-/_}_VARNAME=${varname}"
+
+        if [[ "${default_value}" ]] ; then
+            # For an explanation of the backslash see http://stackoverflow.com/a/9715377
+            eval ${varname}=$\default_value
+        else
+            unset ${varname}
+        fi
+    done
+}
+configure_default_options
 
 COMMAND_NAME="$(basename "$0")"
 
@@ -728,12 +760,11 @@ while [[ "$1" ]] ; do
             setting="${dashless%%=*}"
 
             # compute the variable to set
-            varname="$(to_varname "${setting}")"
+            varname=$(get_setting_varname $setting)
 
             # check to see if this is a known option
-            known_var_name="${varname}_IS_KNOWN_SETTING"
-            if [[ ! "${!known_var_name}" ]] ; then
-                echo "Error: Unknown setting: ${setting}" 1>&2
+            if [[ "${varname}" = "" ]] ; then
+                echo "error: unknown setting: ${setting}" 1>&2
                 usage 1>&2
                 exit 1
             fi
