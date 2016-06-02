@@ -3,6 +3,7 @@ func test(_ b : BaseInHead) {
   b.doIt(0);
 }
 
+// REQUIRES: objc_interop
 // RUN: %swift -parse %s %mcp_opt -module-name Mixed -import-objc-header %S/Inputs/header.h 2> %t.diags
 // RUN: FileCheck -input-file %t.diags %s -check-prefix=DIAG
 // DIAG: warning: using the result of an assignment

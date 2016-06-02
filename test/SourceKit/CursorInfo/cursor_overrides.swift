@@ -16,6 +16,7 @@ func goo(x: SubCls) {
   x.meth()
 }
 
+// REQUIRES: objc_interop
 // RUN: %sourcekitd-test -req=cursor -pos=16:7 %s -- -embed-bitcode -I %S/Inputs/cursor-overrides %mcp_opt %s | FileCheck -check-prefix=CHECK1 %s
 // CHECK1: source.lang.swift.ref.function.method.instance (12:8-12:14)
 // CHECK1: s:FC16cursor_overrides6SubCls4methFT_T_
