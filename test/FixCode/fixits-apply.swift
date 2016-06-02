@@ -112,3 +112,13 @@ func ftest3(_ fd: CInt) {
 func ftest4(_ fd: UInt) {
   recit(fd)
 }
+
+func letToVar1() {
+  let x = 1
+  if x == 2 {
+    x += 3
+  }
+  let y = ""
+  y.append("as")
+  y.append("df")
+}
