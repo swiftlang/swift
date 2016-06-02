@@ -19,18 +19,16 @@ import sys
 from multiprocessing import Process
 
 
-# hack to import SwiftBuildSupport and swift_build_support
-parent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-sys.path.append(parent_dir)
-support_dir = os.path.join(parent_dir, 'swift_build_support')
-sys.path.append(support_dir)
+# Allow importing swift_build_support.
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..',
+                             'swift_build_support'))
 from swift_build_support import shell  # noqa (E402)
 from swift_build_support.toolchain import host_toolchain  # noqa (E402)
-from SwiftBuildSupport import check_output  # noqa (E402)
 
 toolchain = host_toolchain()
 LLVM_PROFDATA_PATH = toolchain.llvm_profdata
-_profdata_help = check_output([LLVM_PROFDATA_PATH, 'merge', '-help'])
+_profdata_help = shell.capture([LLVM_PROFDATA_PATH, 'merge', '-help'],
+                               print_command=False)
 LLVM_PROFDATA_SUPPORTS_SPARSE = 'sparse' in _profdata_help
 
 

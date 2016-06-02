@@ -19,7 +19,6 @@ sys.path.append(os.path.dirname(__file__))
 
 from SwiftBuildSupport import (
     SWIFT_SOURCE_ROOT,
-    check_output,
 )  # noqa (E402 module level import not at top of file)
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
@@ -95,7 +94,8 @@ def update_working_copy(repo_path, branch):
     print("--- Updating '" + repo_path + "' ---")
     with shell.pushd(repo_path, dry_run=False, print_command=False):
         if branch:
-            status = check_output(['git', 'status', '--porcelain'])
+            status = shell.capture(['git', 'status', '--porcelain'],
+                                   print_command=False)
             if status:
                 print("Please, commit your changes.")
                 print(status)
