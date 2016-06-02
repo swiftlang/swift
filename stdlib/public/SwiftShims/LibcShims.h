@@ -31,6 +31,8 @@ namespace swift { extern "C" {
 // the current platform in the runtime code.
 #if defined(__linux__) && defined (__arm__) && !defined(__android__)
 typedef      int __swift_ssize_t;
+#elif defined(_MSC_VER)
+typedef long long __swift_ssize_t;
 #else
 typedef long int __swift_ssize_t;
 #endif
