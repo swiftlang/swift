@@ -76,7 +76,13 @@ concrete(x: 10, y: true)
 protocol P {}
 extension Int : P {}
 
-class C {}
+class C {
+  func captureWeakSelf() -> () -> () {
+    return { [weak self] in
+      print(self)
+    }
+  }
+}
 
 func generic<T : P, U, V : C>(x: T, y: U, z: V, i: Int) {
   reflect(function: {print(i)})
@@ -476,5 +482,26 @@ _ = cc.arity0Capture2()
 _ = cc.arity1Capture2()
 _ = cc.arity2Capture2()
 _ = cc.arity3Capture2()
+
+reflect(function: C().captureWeakSelf())
+// CHECK-64: Reflecting an object.
+// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK-64: Type reference:
+// CHECK-64: (builtin Builtin.NativeObject)
+
+// CHECK-64:        Type info:
+// CHECK-64:        (closure_context size=24 alignment=8 stride=24 num_extra_inhabitants=0
+// CHECK-64-NEXT:   (field offset=16
+// CHECK-64-NEXT:     (reference kind=weak refcounting=native)))
+
+// CHECK-32: Reflecting an object.
+// CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK-32: Type reference:
+// CHECK-32: (builtin Builtin.NativeObject)
+
+// CHECK-32:        Type info:
+// CHECK-32:        (closure_context size=16 alignment=4 stride=16 num_extra_inhabitants=0
+// CHECK-32-NEXT:   (field offset=12
+// CHECK-32-NEXT:     (reference kind=weak refcounting=native)))
 
 doneReflecting()
