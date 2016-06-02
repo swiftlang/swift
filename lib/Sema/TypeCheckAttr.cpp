@@ -1560,7 +1560,7 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
     return;
 
   // This decl attribute has been moved to being a type attribute.
-  auto text = attr->isEscaping() ? "@autoclosure(escaping)" : "@autoclosure";
+  auto text = attr->isEscaping() ? "@autoclosure(escaping) " : "@autoclosure ";
   diagnose(attr->getLocation(), diag::attr_decl_attr_now_on_type,
            "@autoclosure")
     .fixItRemove(attr->getRangeWithAt())
@@ -1608,10 +1608,18 @@ void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
   if (FTy->isNoEscape())
     return;
 
+  // This range can be implicit e.g. if we're in the middle of diagnosing
+  // @autoclosure.
+  auto attrRemovalRange = attr->getRangeWithAt();
+  if (attrRemovalRange.isValid()) {
+    // Take the attribute, the '@', and the trailing space.
+    attrRemovalRange.End = attrRemovalRange.End.getAdvancedLoc(1);
+  }
+  
   // This decl attribute has been moved to being a type attribute.
   diagnose(attr->getLocation(), diag::attr_decl_attr_now_on_type, "@noescape")
-    .fixItRemove(attr->getRangeWithAt())
-    .fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@noescape");
+    .fixItRemove(attrRemovalRange) 
+    .fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@noescape ");
 
   // Change the type to include the noescape bit.
   PD->overwriteType(FunctionType::get(FTy->getInput(), FTy->getResult(),
