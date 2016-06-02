@@ -1189,12 +1189,17 @@ public:
   /// events in the type checking of this expression, and which can introduce
   /// additional constraints.
   ///
+  /// \param baseCS If this type checking process is the simplification of
+  /// another constraint system, set the original constraint system. \c null
+  /// otherwise
+  ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            TypeLoc convertType = TypeLoc(),
                            ContextualTypePurpose convertTypePurpose =CTP_Unused,
                            TypeCheckExprOptions options =TypeCheckExprOptions(),
-                           ExprTypeCheckListener *listener = nullptr);
+                           ExprTypeCheckListener *listener = nullptr,
+                           constraints::ConstraintSystem *baseCS = nullptr);
 
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            ExprTypeCheckListener *listener) {

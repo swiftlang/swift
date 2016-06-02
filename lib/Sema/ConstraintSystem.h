@@ -895,6 +895,9 @@ public:
   /// Note: this is only used to support ObjCSelectorExpr at the moment.
   llvm::SmallPtrSet<Expr *, 2> UnevaluatedRootExprs;
 
+  /// The original CS if this CS was created as a simplification of another CS
+  ConstraintSystem *baseCS = nullptr;
+
 private:
 
   /// \brief Allocator used for all of the related constraint systems.
@@ -1242,6 +1245,10 @@ public:
 
   TypeLoc getContextualTypeLoc() const {
     return contextualType;
+  }
+
+  const Expr *getContextualTypeNode() const {
+    return contextualTypeNode;
   }
 
   ContextualTypePurpose getContextualTypePurpose() const {
