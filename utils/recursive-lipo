@@ -93,7 +93,7 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
                 else:
                     print("-- Running lipo %s" % dest_path)
                 shell.call(lipo_cmd + ["-output", dest_path] + file_paths,
-                           print_command=verbose)
+                           echo=verbose)
             else:
                 # Multiple instances are different, and they're not executable.
                 print(

@@ -92,23 +92,23 @@ def update_working_copy(repo_path, branch):
         return
 
     print("--- Updating '" + repo_path + "' ---")
-    with shell.pushd(repo_path, dry_run=False, print_command=False):
+    with shell.pushd(repo_path, dry_run=False, echo=False):
         if branch:
             status = shell.capture(['git', 'status', '--porcelain'],
-                                   print_command=False)
+                                   echo=False)
             if status:
                 print("Please, commit your changes.")
                 print(status)
                 exit(1)
-            shell.call(['git', 'checkout', branch], print_command=False)
+            shell.call(['git', 'checkout', branch], echo=False)
 
         # Prior to Git 2.6, this is the way to do a "git pull
         # --rebase" that respects rebase.autostash.  See
         # http://stackoverflow.com/a/30209750/125349
-        shell.call(["git", "fetch"], print_command=False)
-        shell.call(["git", "rebase", "FETCH_HEAD"], print_command=False)
+        shell.call(["git", "fetch"], echo=False)
+        shell.call(["git", "rebase", "FETCH_HEAD"], echo=False)
         shell.call(["git", "submodule", "update", "--recursive"],
-                   print_command=False)
+                   echo=False)
 
 
 def obtain_additional_swift_sources(
@@ -118,7 +118,7 @@ def obtain_additional_swift_sources(
             print("--- Skipping '" + dir_name + "' ---")
             continue
         with shell.pushd(SWIFT_SOURCE_ROOT, dry_run=False,
-                         print_command=False):
+                         echo=False):
             if not os.path.isdir(os.path.join(dir_name, ".git")):
                 print("--- Cloning '" + dir_name + "' ---")
                 if with_ssh is True:
@@ -127,10 +127,10 @@ def obtain_additional_swift_sources(
                     remote = "https://github.com/" + repo + '.git'
                 if skip_history:
                     shell.call(['git', 'clone', '--recursive', '--depth', '1',
-                                remote, dir_name], print_command=False)
+                                remote, dir_name], echo=False)
                 else:
                     shell.call(['git', 'clone', '--recursive', remote,
-                                dir_name], print_command=False)
+                                dir_name], echo=False)
                 if branch:
                     if branch == "master" or branch == "stable":
                         repo_branch = MASTER_BRANCHES[dir_name]
@@ -145,7 +145,7 @@ def obtain_additional_swift_sources(
                         ".git"
                     shell.call(['git', '--git-dir', src_path, '--work-tree',
                                 os.path.join(SWIFT_SOURCE_ROOT, dir_name),
-                                'checkout', repo_branch], print_command=False)
+                                'checkout', repo_branch], echo=False)
 
 
 def main():

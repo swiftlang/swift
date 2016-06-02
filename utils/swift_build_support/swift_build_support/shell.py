@@ -47,7 +47,7 @@ def _coerce_dry_run(dry_run_override):
         return dry_run_override
 
 
-def _print_command(dry_run, command, env=None, prompt="+ "):
+def _echo_command(dry_run, command, env=None, prompt="+ "):
     output = []
     if env is not None:
         output += ['env'] + [_quote("%s=%s" % (k, v)) for k, v in env]
@@ -59,7 +59,7 @@ def _print_command(dry_run, command, env=None, prompt="+ "):
     file.flush()
 
 
-def call(command, stderr=None, env=None, dry_run=None, print_command=True):
+def call(command, stderr=None, env=None, dry_run=None, echo=True):
     """
     call(command, ...) -> str
 
@@ -68,8 +68,8 @@ def call(command, stderr=None, env=None, dry_run=None, print_command=True):
     This function will raise an exception on any command failure.
     """
     dry_run = _coerce_dry_run(dry_run)
-    if dry_run or print_command:
-        _print_command(dry_run, command, env=env)
+    if dry_run or echo:
+        _echo_command(dry_run, command, env=env)
     if dry_run:
         return
     _env = None
@@ -88,7 +88,7 @@ def call(command, stderr=None, env=None, dry_run=None, print_command=True):
             "': " + e.strerror)
 
 
-def capture(command, stderr=None, env=None, dry_run=None, print_command=True):
+def capture(command, stderr=None, env=None, dry_run=None, echo=True):
     """
     capture(command, ...) -> str
 
@@ -97,8 +97,8 @@ def capture(command, stderr=None, env=None, dry_run=None, print_command=True):
     This function will raise an exception on any command failure.
     """
     dry_run = _coerce_dry_run(dry_run)
-    if dry_run or print_command:
-        _print_command(dry_run, command, env=env)
+    if dry_run or echo:
+        _echo_command(dry_run, command, env=env)
     if dry_run:
         return
     _env = None
@@ -118,44 +118,44 @@ def capture(command, stderr=None, env=None, dry_run=None, print_command=True):
 
 
 @contextmanager
-def pushd(path, dry_run=None, print_command=True):
+def pushd(path, dry_run=None, echo=True):
     dry_run = _coerce_dry_run(dry_run)
     old_dir = os.getcwd()
-    if dry_run or print_command:
-        _print_command(dry_run, ["pushd", path])
+    if dry_run or echo:
+        _echo_command(dry_run, ["pushd", path])
     if not dry_run:
         os.chdir(path)
     yield
-    if dry_run or print_command:
-        _print_command(dry_run, ["popd"])
+    if dry_run or echo:
+        _echo_command(dry_run, ["popd"])
     if not dry_run:
         os.chdir(old_dir)
 
 
-def makedirs(path, dry_run=None, print_command=True):
+def makedirs(path, dry_run=None, echo=True):
     dry_run = _coerce_dry_run(dry_run)
-    if dry_run or print_command:
-        _print_command(dry_run, ['mkdir', '-p', path])
+    if dry_run or echo:
+        _echo_command(dry_run, ['mkdir', '-p', path])
     if dry_run:
         return
     if not os.path.isdir(path):
         os.makedirs(path)
 
 
-def rmtree(path, dry_run=None, print_command=True):
+def rmtree(path, dry_run=None, echo=True):
     dry_run = _coerce_dry_run(dry_run)
-    if dry_run or print_command:
-        _print_command(dry_run, ['rm', '-rf', path])
+    if dry_run or echo:
+        _echo_command(dry_run, ['rm', '-rf', path])
     if dry_run:
         return
     if os.path.exists(path):
         shutil.rmtree(path)
 
 
-def copytree(src, dest, dry_run=None, print_command=True):
+def copytree(src, dest, dry_run=None, echo=True):
     dry_run = _coerce_dry_run(dry_run)
-    if dry_run or print_command:
-        _print_command(dry_run, ['cp', '-r', src, dest])
+    if dry_run or echo:
+        _echo_command(dry_run, ['cp', '-r', src, dest])
     if dry_run:
         return
     shutil.copytree(src, dest)

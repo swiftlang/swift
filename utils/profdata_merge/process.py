@@ -28,7 +28,7 @@ from swift_build_support.toolchain import host_toolchain  # noqa (E402)
 toolchain = host_toolchain()
 LLVM_PROFDATA_PATH = toolchain.llvm_profdata
 _profdata_help = shell.capture([LLVM_PROFDATA_PATH, 'merge', '-help'],
-                               print_command=False)
+                               echo=False)
 LLVM_PROFDATA_SUPPORTS_SPARSE = 'sparse' in _profdata_help
 
 
@@ -64,7 +64,7 @@ class ProfdataMergerProcess(Process):
             llvm_cmd.append("-sparse")
         llvm_cmd += cleaned_files
         self.report(llvm_cmd)
-        ret = shell.call(llvm_cmd, print_command=False)
+        ret = shell.call(llvm_cmd, echo=False)
         if ret != 0:
             self.report("llvm profdata command failed -- Exited with code %d"
                         % ret, level=logging.ERROR)
