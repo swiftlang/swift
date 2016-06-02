@@ -1,4 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen %s | FileCheck %s
+// For integration testing, ensure we get through IRGen too.
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -verify -DIRGEN_INTEGRATION_TEST %s
+
 // REQUIRES: objc_interop
 
 import objc_generics
@@ -54,7 +57,13 @@ protocol ThingHolder {
   var propertyArrayOfThings: [Thing]? { get set }
 }
 
+// TODO: Crashes in IRGen because the type metadata for `T` is not found in
+// the witness thunk to satisfy the associated type requirement. This could be
+// addressed by teaching IRGen to fulfill erased type parameters from protocol
+// witness tables (rdar://problem/26602097).
+#if !IRGEN_INTEGRATION_TEST
 extension GenericClass: ThingHolder {}
+#endif
 
 public func genericBlockBridging<T: AnyObject>(x: GenericClass<T>) {
   let block = x.blockForPerformingOnThings()
