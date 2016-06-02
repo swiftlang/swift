@@ -22,6 +22,8 @@ import subprocess
 import sys
 from contextlib import contextmanager
 
+from . import diagnostics
+
 dry_run = False
 
 
@@ -66,7 +68,16 @@ def call(command, stderr=None, env=None, dry_run=None):
     if env is not None:
         _env = dict(os.environ)
         _env.update(env)
-    subprocess.check_call(command, env=_env, stderr=stderr)
+    try:
+        subprocess.check_call(command, env=_env, stderr=stderr)
+    except subprocess.CalledProcessError as e:
+        diagnostics.fatal(
+            "command terminated with a non-zero exit status " +
+            str(e.returncode) + ", aborting")
+    except OSError as e:
+        diagnostics.fatal(
+            "could not execute '" + quote_command(command) +
+            "': " + e.strerror)
 
 
 @contextmanager

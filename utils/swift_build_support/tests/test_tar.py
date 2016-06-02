@@ -51,7 +51,7 @@ class TarTestCase(unittest.TestCase):
                          expect.format(dest=destination, source=source))
 
     def test_tar_nonexistent_file_raises(self):
-        with self.assertRaises(subprocess.CalledProcessError):
+        with self.assertRaises(SystemExit):
             tar(source='/path/to/something/that/surely/doesnt/exist',
                 destination='/another/path/that/shouldnt/exist')
 
