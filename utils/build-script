@@ -32,7 +32,6 @@ from SwiftBuildSupport import (
     get_all_preset_names,
     get_preset_options,
     print_with_argv0,
-    quote_shell_command,
 )  # noqa (E402 module level import not at top of file)
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
@@ -124,7 +123,7 @@ def main_preset():
 
     print_with_argv0(
         "using preset '" + args.preset + "', which expands to \n\n" +
-        quote_shell_command(build_script_args) + "\n")
+        shell.quote_command(build_script_args) + "\n")
 
     check_call(build_script_args, disable_sleep=True)
 

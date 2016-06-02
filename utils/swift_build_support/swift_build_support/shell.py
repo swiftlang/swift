@@ -29,6 +29,15 @@ def _quote(arg):
     return pipes.quote(str(arg))
 
 
+def quote_command(args):
+    """
+    quote_command(args) -> str
+
+    Quote the command for passing to a shell.
+    """
+    return ' '.join([_quote(a) for a in args])
+
+
 def _coerce_dry_run(dry_run_override):
     if dry_run_override is None:
         return dry_run
