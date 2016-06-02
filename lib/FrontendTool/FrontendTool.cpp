@@ -575,6 +575,7 @@ private:
         Info.ID == diag::forced_downcast_noop.ID ||
         Info.ID == diag::variable_never_mutated.ID ||
         Info.ID == diag::function_type_no_parens.ID ||
+        Info.ID == diag::convert_let_to_var.ID ||
         Info.ID == diag::parameter_extraneous_double_up.ID)
       return true;
     return false;
