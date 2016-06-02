@@ -1292,7 +1292,12 @@ namespace {
       {
         // Render a swift_name string.
         llvm::raw_svector_ostream os(renamed);
-        Impl.printSwiftName(swift3Name, os);
+
+        // If we're importing a global as a member, we need to provide the
+        // effective context.
+        Impl.printSwiftName(swift3Name,
+                            /*fullyQualified=*/swift3Name.ImportAsMember,
+                            os);
       }
 
       auto attr = AvailableAttr::createUnconditional(
@@ -6093,6 +6098,38 @@ clang::SwiftNewtypeAttr *ClangImporter::Implementation::getSwiftNewtypeAttr(
   return decl->getAttr<clang::SwiftNewtypeAttr>();
 }
 
+StringRef ClangImporter::Implementation::
+getSwiftNameFromClangName(StringRef replacement) {
+  auto &clangSema = getClangSema();
+
+  clang::IdentifierInfo *identifier =
+      &clangSema.getASTContext().Idents.get(replacement);
+  clang::LookupResult lookupResult(clangSema, identifier,
+                                   clang::SourceLocation(),
+                                   clang::Sema::LookupOrdinaryName);
+  if (!clangSema.LookupName(lookupResult, nullptr))
+    return "";
+
+  auto clangDecl = lookupResult.getAsSingle<clang::NamedDecl>();
+  if (!clangDecl)
+    return "";
+
+  auto importedName = importFullName(clangDecl, None, &clangSema);
+  if (!importedName)
+    return "";
+
+  llvm::SmallString<64> renamed;
+  {
+    // Render a swift_name string.
+    llvm::raw_svector_ostream os(renamed);
+    printSwiftName(importedName,
+                   /*fullyQualified=*/true,
+                   os);
+  }
+
+  return SwiftContext.AllocateCopy(StringRef(renamed));
+}
+
 /// Import Clang attributes as Swift attributes.
 void ClangImporter::Implementation::importAttributes(
     const clang::NamedDecl *ClangDecl,
@@ -6111,7 +6148,7 @@ void ClangImporter::Implementation::importAttributes(
   for (clang::NamedDecl::attr_iterator AI = ClangDecl->attr_begin(),
        AE = ClangDecl->attr_end(); AI != AE; ++AI) {
     //
-    // __attribute__((unavailable)
+    // __attribute__((unavailable))
     //
     // Mapping: @available(*,unavailable)
     //
@@ -6157,8 +6194,13 @@ void ClangImporter::Implementation::importAttributes(
 
       // Is this our special "availability(swift, unavailable)" attribute?
       if (Platform == "swift") {
+        auto replacement = avail->getReplacement();
+        StringRef swiftReplacement = "";
+        if (!replacement.empty())
+          swiftReplacement = getSwiftNameFromClangName(replacement);
+
         auto attr = AvailableAttr::createUnconditional(
-            C, avail->getMessage(), /*renamed*/"",
+            C, avail->getMessage(), swiftReplacement,
             UnconditionalAvailabilityKind::UnavailableInSwift);
         MappedDecl->getAttrs().add(attr);
         AnyUnavailable = true;
@@ -6211,12 +6253,17 @@ void ClangImporter::Implementation::importAttributes(
 
       const auto &obsoleted = avail->getObsoleted();
       const auto &introduced = avail->getIntroduced();
+      const auto &replacement = avail->getReplacement();
+
+      StringRef swiftReplacement = "";
+      if (!replacement.empty())
+        swiftReplacement = getSwiftNameFromClangName(replacement);
 
       auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
-                                             platformK.getValue(),
-                                             message, /*rename*/StringRef(),
-                                             introduced, deprecated, obsoleted,
-                                             Unconditional, /*implicit=*/false);
+                                          platformK.getValue(),
+                                          message, swiftReplacement,
+                                          introduced, deprecated, obsoleted,
+                                          Unconditional, /*implicit=*/false);
 
       MappedDecl->getAttrs().add(AvAttr);
     }
