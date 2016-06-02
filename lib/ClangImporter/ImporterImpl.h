@@ -940,8 +940,9 @@ public:
                              const clang::MacroInfo *macro,
                              clang::ASTContext &clangCtx);
 
-  /// Print an imported name as a string suitable for the swift_name attribute.
-  void printSwiftName(ImportedName, llvm::raw_ostream &os);
+  /// Print an imported name as a string suitable for the swift_name attribute,
+  /// or the 'Rename' field of AvailableAttr.
+  void printSwiftName(ImportedName, bool fullyQualified, llvm::raw_ostream &os);
 
   /// Retrieve the property type as determined by the given accessor.
   static clang::QualType
@@ -986,6 +987,9 @@ public:
   clang::SwiftNewtypeAttr *getSwiftNewtypeAttr(
       const clang::TypedefNameDecl *decl,
       bool useSwift2Name);
+
+  /// Map a Clang identifier name to its imported Swift equivalent.
+  StringRef getSwiftNameFromClangName(StringRef name);
 
   /// Import attributes from the given Clang declaration to its Swift
   /// equivalent.
