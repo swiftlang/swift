@@ -49,7 +49,7 @@ set(swift_runtime_sources
     Casting.cpp
     Demangle.cpp
     Enum.cpp
-    ErrorObject.cpp
+    ErrorObjectNative.cpp
     Errors.cpp
     Heap.cpp
     HeapObject.cpp
@@ -59,9 +59,9 @@ set(swift_runtime_sources
     Once.cpp
     Portability.cpp
     ProtocolConformance.cpp
-    Reflection.cpp
+    ReflectionNative.cpp
     RuntimeEntrySymbols.cpp
-    SwiftObject.cpp)
+    SwiftObjectNative.cpp)
 
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
