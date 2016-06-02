@@ -14,7 +14,17 @@ if(APPLE)
   list(APPEND SourceKitSupport_sources ${SourceKitSupport_Darwin_sources})
 endif()
 
+set(SOURCEKIT_SUPPORT_DEPEND swiftBasic clangBasic clangRewrite)
+if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
+  list(APPEND SOURCEKIT_SUPPORT_DEPEND dispatch)
+endif()
+
+set(SOURCEKIT_SUPPORT_DEPEND swiftBasic clangBasic clangRewrite)
+if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
+  list(APPEND SOURCEKIT_SUPPORT_DEPEND dispatch BlocksRuntime)
+endif()
+
 add_sourcekit_library(SourceKitSupport
   ${SourceKitSupport_sources}
-  DEPENDS swiftBasic clangBasic clangRewrite
+  DEPENDS ${SOURCEKIT_SUPPORT_DEPEND}
 )
