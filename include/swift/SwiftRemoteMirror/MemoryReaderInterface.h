@@ -26,17 +26,21 @@
 extern "C" {
 #endif
 
-typedef uint64_t addr_t;
+// They would think the type 'addr_t' is defined in the standard library
+// because it has the same name format with the types in <cstdint>. In
+// addition, the definition conflicts in Cygwin which defines it differently
+// in the system library, so we use 'swift_addr_t'.
+typedef uint64_t swift_addr_t;
 
 typedef uint8_t (*PointerSizeFunction)(void *reader_context);
 typedef uint8_t (*SizeSizeFunction)(void *reader_context);
-typedef int (*ReadBytesFunction)(void *reader_context, addr_t address,
-                                  void *dest, uint64_t size);
+typedef int (*ReadBytesFunction)(void *reader_context, swift_addr_t address,
+                                 void *dest, uint64_t size);
 typedef uint64_t (*GetStringLengthFunction)(void *reader_context,
-                                            addr_t address);
-typedef addr_t (*GetSymbolAddressFunction)(void *reader_context,
-                                           const char *name,
-                                           uint64_t name_length);
+                                            swift_addr_t address);
+typedef swift_addr_t (*GetSymbolAddressFunction)(void *reader_context,
+                                                 const char *name,
+                                                 uint64_t name_length);
 
 typedef struct MemoryReaderImpl {
   /// An opaque context that the implementor can specify to
