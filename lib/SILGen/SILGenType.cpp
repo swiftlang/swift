@@ -91,9 +91,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
   SILLocation loc(derivedDecl);
   auto thunk =
-      M.createFunction(makeModuleFragile
-                           ? SILLinkage::Public
-                           : SILLinkage::Private,
+      M.createFunction(SILLinkage::Private,
                        name, overrideInfo.SILFnType,
                        derivedDecl->getGenericParams(), loc, IsBare,
                        IsNotTransparent, IsNotFragile);

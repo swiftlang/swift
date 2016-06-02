@@ -875,9 +875,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
   auto *f =
-      M.createFunction(makeModuleFragile
-                           ? SILLinkage::Public
-                           : SILLinkage::Private,
+      M.createFunction(SILLinkage::Private,
                        funcName, initSILType, nullptr,
                        SILLocation(binding), IsNotBare, IsNotTransparent,
                        makeModuleFragile
