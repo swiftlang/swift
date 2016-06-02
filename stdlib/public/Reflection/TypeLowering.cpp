@@ -1013,7 +1013,8 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
     return nullptr;
 
   switch (FD->Kind) {
-  case FieldDescriptorKind::Class: {
+  case FieldDescriptorKind::Class:
+  case FieldDescriptorKind::ObjCClass: {
     // Lower the class's fields using substitutions from the
     // TypeRef to make field types concrete.
     RecordTypeInfoBuilder builder(*this, RecordKind::ClassInstance);
@@ -1030,7 +1031,6 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
   case FieldDescriptorKind::ObjCProtocol:
   case FieldDescriptorKind::ClassProtocol:
   case FieldDescriptorKind::Protocol:
-  case FieldDescriptorKind::ObjCClass:
     // Invalid field descriptor.
     return nullptr;
   }
