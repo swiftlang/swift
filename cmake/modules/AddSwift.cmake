@@ -579,11 +579,20 @@ function(_add_swift_library_single target name)
         $<TARGET_OBJECTS:${object_library}${VARIANT_SUFFIX}>)
   endforeach()
 
+  set(SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES)
+  if(XCODE AND SWIFTLIB_SINGLE_TARGET_LIBRARY)
+    set(SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES
+        # Note: the dummy.cpp source file provides no definitions. However,
+        # it forces Xcode to properly link the static library.
+        ${SWIFT_SOURCE_DIR}/cmake/dummy.cpp)
+  endif()
+
   add_library("${target}" ${libkind}
       ${SWIFT_SECTIONS_OBJECT_BEGIN}
       ${SWIFTLIB_SINGLE_SOURCES}
       ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
       ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
+      ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES}
       ${SWIFT_SECTIONS_OBJECT_END})
 
   # The section metadata objects are generated sources, and we need to tell CMake
@@ -665,10 +674,7 @@ function(_add_swift_library_single target name)
     add_library(${target_static} STATIC
         ${SWIFTLIB_SINGLE_SOURCES}
         ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
-
-        # Note: the dummy.c source file provides no definitions. However,
-        # it forces Xcode to properly link the static library.
-        ${SWIFT_SOURCE_DIR}/cmake/dummy.c)
+        ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
 
     set_output_directory(${target_static}
         BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
