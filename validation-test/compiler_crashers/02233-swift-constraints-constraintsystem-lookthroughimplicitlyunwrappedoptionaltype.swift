@@ -5,11 +5,15 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
-struct e {
-func a<T) -> String {
+// RUN: not --crash %target-swift-frontend %s -parse
+struct D : Collection where h: s {
+func b: P {
 }
-struct e where I.h: T) -> Any {
 }
-struct B<T where B == b: NSObject {
-let h = B
+protocol b : d {
+func a)
+var b {
+class A : b> k -> T where T where H) -> Any, Bool][self] = T.Iterator.A.c {
+}
+}
+typealias A : A

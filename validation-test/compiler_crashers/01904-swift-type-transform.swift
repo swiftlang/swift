@@ -5,15 +5,17 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
-struct D : Collection where h: s {
-func b: P {
+// RUN: not --crash %target-swift-frontend %s -parse
+func g<T) {
+enum a<C: B.C<T>(t: C: k) -> String {
+[0] {
+class A, Any) -> String {
+}
+func g<f = i(A, Any) -> Any] as Boolean>(n: d<T>(Range<h>) -> U) -> Any) -> {
 }
 }
-protocol b : d {
-func a)
-var b {
-class A : b> k -> T where T where H) -> Any, Bool][self] = T.Iterator.A.c {
+class c : a {
+class A where T : Sequence where S<d.Iterator.startIndex, V, f<(false)) -> T -> {
 }
-}
-typealias A : A
+protocol a {
+protocol a {

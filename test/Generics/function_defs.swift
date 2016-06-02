@@ -189,9 +189,8 @@ func testOrdered<T : Ordered>(_ x: T, y: Int) {
 //===----------------------------------------------------------------------===//
 // Requires clauses
 //===----------------------------------------------------------------------===//
-func conformanceViaRequires<T 
-       where T : EqualComparable, T : MethodLessComparable
-     >(_ t1: T, t2: T) -> Bool {
+func conformanceViaRequires<T>(_ t1: T, t2: T) -> Bool
+    where T : EqualComparable, T : MethodLessComparable {
   let b1 = t1.isEqual(t2)
   if b1 || t1.isLess(t2) {
     return true
@@ -208,7 +207,8 @@ protocol AcceptsAnElement {
   func accept(_ e : Element)
 }
 
-func impliedSameType<T : GeneratesAnElement where T : AcceptsAnElement>(_ t: T) {
+func impliedSameType<T : GeneratesAnElement>(_ t: T)
+    where T : AcceptsAnElement {
   t.accept(t.makeIterator())
   let e = t.makeIterator(), e2 = t.makeIterator()
   if e.isEqual(e2) || e.isLess(e2) {
@@ -226,10 +226,9 @@ protocol GeneratesAssoc2 {
   func get() -> Assoc2
 }
 
-func simpleSameType
-       <T : GeneratesAssoc1, U : GeneratesAssoc2 where T.Assoc1 == U.Assoc2>
-       (_ t: T, u: U) -> Bool
-{
+func simpleSameType<T : GeneratesAssoc1, U : GeneratesAssoc2>
+  (_ t: T, u: U) -> Bool
+   where T.Assoc1 == U.Assoc2 {
   return t.get().isEqual(u.get()) || u.get().isLess(t.get())
 }
 
@@ -244,9 +243,9 @@ protocol GeneratesMetaAssoc2 {
 }
 
 func recursiveSameType
-       <T : GeneratesMetaAssoc1, U : GeneratesMetaAssoc2, V : GeneratesAssoc1
-        where T.MetaAssoc1 == V.Assoc1, V.Assoc1 == U.MetaAssoc2>
+       <T : GeneratesMetaAssoc1, U : GeneratesMetaAssoc2, V : GeneratesAssoc1>
        (_ t: T, u: U)
+  where T.MetaAssoc1 == V.Assoc1, V.Assoc1 == U.MetaAssoc2
 {
   t.get().accept(t.get().makeIterator())
   let e = t.get().makeIterator(), e2 = t.get().makeIterator()
@@ -265,12 +264,9 @@ protocol P2 {
   func getAssocP1() -> AssocP1
 }
 
-func beginsWith2<
-     E0: P1, E1: P1
-     where 
-       E0.Element == E1.Element, 
-       E0.Element : EqualComparable
-     >(_ e0: E0, _ e1: E1) -> Bool
+func beginsWith2<E0: P1, E1: P1>(_ e0: E0, _ e1: E1) -> Bool
+where E0.Element == E1.Element,
+      E0.Element : EqualComparable
 {
 }
 

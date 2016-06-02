@@ -63,9 +63,9 @@ struct formattedTestS<T : MyFormattedPrintable> {
   }
 }
 
-struct GenericReq<
-  T : IteratorProtocol, U : IteratorProtocol where T.Element == U.Element
-> {}
+struct GenericReq<T : IteratorProtocol, U : IteratorProtocol>
+  where T.Element == U.Element {
+}
 
 func getFirst<R : IteratorProtocol>(_ r: R) -> R.Element {
   var r = r
@@ -138,11 +138,8 @@ var d2 : Dictionary<String, Int>
 d1["hello"] = d2["world"]
 i = d2["blarg"]
 
-struct RangeOfPrintables<
-  R : Sequence
-  where
-  R.Iterator.Element : MyFormattedPrintable
-> {
+struct RangeOfPrintables<R : Sequence>
+  where R.Iterator.Element : MyFormattedPrintable {
   var r : R
 
   func format() -> String {
@@ -307,7 +304,7 @@ struct X4 : P, Q {
   typealias AssocQ = String
 }
 
-struct X5<T, U where T: P, T: Q, T.AssocP == T.AssocQ> { } // expected-note{{requirement specified as 'T.AssocP' == 'T.AssocQ' [with T = X4]}}
+struct X5<T, U> where T: P, T: Q, T.AssocP == T.AssocQ { } // expected-note{{requirement specified as 'T.AssocP' == 'T.AssocQ' [with T = X4]}}
 
 var y: X5<X4, Int> // expected-error{{'X5' requires the types 'AssocP' (aka 'Int') and 'AssocQ' (aka 'String') be equivalent}}
 
@@ -334,4 +331,4 @@ struct UnsolvableInheritance2<T : U.A, U : T.A> {}
 // expected-error@-1 {{inheritance from non-protocol, non-class type 'U.A'}}
 // expected-error@-2 {{inheritance from non-protocol, non-class type 'T.A'}}
 
-enum X7<T where X7.X : G> { case X } // expected-error{{'X' is not a member type of 'X7<T>'}}
+enum X7<T> where X7.X : G { case X } // expected-error{{'X' is not a member type of 'X7<T>'}}
