@@ -18,8 +18,6 @@ except ImportError:
     import configparser as ConfigParser
 
 import os
-import platform
-import subprocess
 import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
@@ -68,44 +66,6 @@ SWIFT_SOURCE_ROOT = os.environ.get(
 # for each build configuration
 SWIFT_BUILD_ROOT = os.environ.get(
     "SWIFT_BUILD_ROOT", os.path.join(SWIFT_SOURCE_ROOT, "build"))
-
-
-def check_call(args, print_command=False, verbose=False, disable_sleep=False):
-    if disable_sleep:
-        if platform.system() == 'Darwin':
-            # Don't mutate the caller's copy of the arguments.
-            args = list(args)
-            args.insert(0, "caffeinate")
-
-    if print_command:
-        print(os.getcwd() + "$ " + shell.quote_command(args))
-        sys.stdout.flush()
-    try:
-        return subprocess.check_call(args)
-    except subprocess.CalledProcessError as e:
-        diagnostics.fatal(
-            "command terminated with a non-zero exit status " +
-            str(e.returncode) + ", aborting")
-    except OSError as e:
-        diagnostics.fatal(
-            "could not execute '" + shell.quote_command(args) +
-            "': " + e.strerror)
-
-
-def check_output(args, print_command=False, verbose=False):
-    if print_command:
-        print(os.getcwd() + "$ " + shell.quote_command(args))
-        sys.stdout.flush()
-    try:
-        return subprocess.check_output(args)
-    except subprocess.CalledProcessError as e:
-        diagnostics.fatal(
-            "command terminated with a non-zero exit status " +
-            str(e.returncode) + ", aborting")
-    except OSError as e:
-        diagnostics.fatal(
-            "could not execute '" + shell.quote_command(args) +
-            "': " + e.strerror)
 
 
 def _load_preset_files_impl(preset_file_names, substitutions={}):

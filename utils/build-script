@@ -28,7 +28,6 @@ from SwiftBuildSupport import (
     HOME,
     SWIFT_BUILD_ROOT,
     SWIFT_SOURCE_ROOT,
-    check_call,
     get_all_preset_names,
     get_preset_options,
 )  # noqa (E402 module level import not at top of file)
@@ -49,6 +48,21 @@ from swift_build_support.targets import StdlibDeploymentTarget  # noqa (E402)
 from swift_build_support.cmake import CMake  # noqa (E402)
 from swift_build_support.workspace import Workspace  # noqa(E402)
 from swift_build_support.workspace import compute_build_subdir  # noqa(E402)
+
+
+def call_without_sleeping(command, dry_run=False):
+    """
+    Execute a command during which system sleep is disabled.
+
+    By default, this ignores the state of the `shell.dry_run` flag.
+    """
+
+    # Disable system sleep, if possible.
+    if platform.system() == 'Darwin':
+        # Don't mutate the caller's copy of the arguments.
+        command = ["caffeinate"] + list(command)
+
+    shell.call(command, dry_run=dry_run, print_command=False)
 
 
 # Main entry point for the preset mode.
@@ -124,7 +138,7 @@ def main_preset():
         "using preset '" + args.preset + "', which expands to \n\n" +
         shell.quote_command(build_script_args) + "\n")
 
-    check_call(build_script_args, disable_sleep=True)
+    call_without_sleeping(build_script_args)
 
     return 0
 
@@ -1435,8 +1449,7 @@ details of the setups of other systems or automated environments.""")
     if args.dry_run:
         build_script_impl_args += ["--dry-run"]
 
-    check_call([build_script_impl] + build_script_impl_args,
-               disable_sleep=True)
+    call_without_sleeping([build_script_impl] + build_script_impl_args)
 
     if args.symbols_package:
         print('--- Creating symbols package ---')
