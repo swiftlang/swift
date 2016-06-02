@@ -60,6 +60,13 @@ def _print_command(dry_run, command, env=None, prompt="+ "):
 
 
 def call(command, stderr=None, env=None, dry_run=None, print_command=True):
+    """
+    call(command, ...) -> str
+
+    Execute the given command.
+
+    This function will raise an exception on any command failure.
+    """
     dry_run = _coerce_dry_run(dry_run)
     if dry_run or print_command:
         _print_command(dry_run, command, env=env)
@@ -71,6 +78,35 @@ def call(command, stderr=None, env=None, dry_run=None, print_command=True):
         _env.update(env)
     try:
         subprocess.check_call(command, env=_env, stderr=stderr)
+    except subprocess.CalledProcessError as e:
+        diagnostics.fatal(
+            "command terminated with a non-zero exit status " +
+            str(e.returncode) + ", aborting")
+    except OSError as e:
+        diagnostics.fatal(
+            "could not execute '" + quote_command(command) +
+            "': " + e.strerror)
+
+
+def capture(command, stderr=None, env=None, dry_run=None, print_command=True):
+    """
+    capture(command, ...) -> str
+
+    Execute the given command and return the standard output.
+
+    This function will raise an exception on any command failure.
+    """
+    dry_run = _coerce_dry_run(dry_run)
+    if dry_run or print_command:
+        _print_command(dry_run, command, env=env)
+    if dry_run:
+        return
+    _env = None
+    if env is not None:
+        _env = dict(os.environ)
+        _env.update(env)
+    try:
+        return subprocess.check_output(command, env=_env, stderr=stderr)
     except subprocess.CalledProcessError as e:
         diagnostics.fatal(
             "command terminated with a non-zero exit status " +

@@ -63,6 +63,12 @@ class ShellTestCase(unittest.TestCase):
 + cp {foo_file} {bar_file}
 '''.format(foo_file=foo_file, bar_file=bar_file))
 
+    def test_capture(self):
+        self.assertEqual(shell.capture(["echo", "hi"]), "hi\n")
+
+        with self.assertRaises(SystemExit):
+            shell.capture(["false"])
+
     def test_rmtree(self):
         shell.dry_run = False
         path = os.path.join(self.tmpdir, 'foo', 'bar')
