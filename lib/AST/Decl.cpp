@@ -424,6 +424,9 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
     for (auto param : *params) {
       if (param->hasName() && param->getNameStr().startswith("_"))
         return true;
+      auto argName = param->getArgumentName();
+      if (!argName.empty() && argName.str().startswith("_"))
+        return true;
     }
     return false;
   };
