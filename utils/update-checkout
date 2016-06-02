@@ -94,7 +94,7 @@ def update_working_copy(repo_path, branch):
         return
 
     print("--- Updating '" + repo_path + "' ---")
-    with shell.pushd(repo_path, dry_run=False):
+    with shell.pushd(repo_path, dry_run=False, print_command=False):
         if branch:
             status = check_output(['git', 'status', '--porcelain'])
             if status:
@@ -117,7 +117,7 @@ def obtain_additional_swift_sources(
         if dir_name in skip_repositories:
             print("--- Skipping '" + dir_name + "' ---")
             continue
-        with shell.pushd(SWIFT_SOURCE_ROOT, dry_run=False):
+        with shell.pushd(SWIFT_SOURCE_ROOT, dry_run=False, print_command=False):
             if not os.path.isdir(os.path.join(dir_name, ".git")):
                 print("--- Cloning '" + dir_name + "' ---")
                 if with_ssh is True:
