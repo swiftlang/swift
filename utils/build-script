@@ -980,6 +980,7 @@ details of the setups of other systems or automated environments.""")
         # Explicitly unavailable options here.
         "--build-jobs",
         "--common-cmake-options",
+        "--only-execute",
         action=arguments.action.unavailable)
 
     args = migration.parse_args(parser, sys.argv[1:])
