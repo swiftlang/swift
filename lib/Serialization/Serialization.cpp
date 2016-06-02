@@ -3064,6 +3064,7 @@ void Serializer::writeType(Type ty) {
           stableCalleeConvention,
           stableRepresentation,
           fnTy->isNoReturn(),
+          fnTy->isPseudogeneric(),
           fnTy->hasErrorResult(),
           fnTy->getParameters().size(),
           fnTy->getNumAllResults(),

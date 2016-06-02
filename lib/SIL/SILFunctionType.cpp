@@ -572,6 +572,35 @@ enum class ConventionsKind : uint8_t {
   };
 }
 
+static bool isPseudogeneric(SILDeclRef c) {
+  // FIXME: should this be integrated in with the Sema check that prevents
+  // illegal use of type arguments in pseudo-generic method bodies?
+
+  // The implicitly-generated native initializer thunks for imported
+  // initializers are never pseudo-generic, because they may need
+  // to use their type arguments to bridge their value arguments.
+  if (!c.isForeign &&
+      (c.kind == SILDeclRef::Kind::Allocator ||
+       c.kind == SILDeclRef::Kind::Initializer) &&
+      c.getDecl()->hasClangNode())
+    return false;
+
+  // Otherwise, we have to look at the entity's context.
+  DeclContext *dc;
+  if (c.hasDecl()) {
+    dc = c.getDecl()->getDeclContext();
+  } else if (auto closure = c.getAbstractClosureExpr()) {
+    dc = closure->getParent();
+  } else {
+    return false;
+  }
+  dc = dc->getInnermostTypeContext();
+  if (!dc) return false;
+
+  auto classDecl = dc->getAsClassOrClassExtensionContext();
+  return (classDecl && classDecl->usesObjCGenericsModel());
+}
+
 /// Create the appropriate SIL function type for the given formal type
 /// and conventions.
 ///
@@ -763,11 +792,14 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   if (extInfo.hasContext())
     calleeConvention = conventions.getCallee();
 
+  bool pseudogeneric = (constant ? isPseudogeneric(*constant) : false);
+
   // Always strip the auto-closure and no-escape bit.
   // TODO: The noescape bit could be of interest to SIL optimizations.
   //   We should bring it back when we have those optimizations.
   auto silExtInfo = SILFunctionType::ExtInfo()
     .withRepresentation(extInfo.getSILRepresentation())
+    .withIsPseudogeneric(pseudogeneric)
     .withIsNoReturn(extInfo.isNoReturn());
   
   return SILFunctionType::get(genericSig,
@@ -1290,13 +1322,14 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
                                CanAnyFunctionType origType,
                                CanAnyFunctionType substInterfaceType,
                                AnyFunctionType::ExtInfo extInfo,
-                         const Optional<ForeignErrorConvention> &foreignError) {
+                         const Optional<ForeignErrorConvention> &foreignError,
+                               Optional<SILDeclRef> constant) {
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
     auto origPattern =
       AbstractionPattern::getObjCMethod(origType, method, foreignError);
     return getSILFunctionType(M, origPattern, substInterfaceType,
                               extInfo, ObjCMethodConventions(method),
-                              foreignError, None);
+                              foreignError, constant);
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
@@ -1304,7 +1337,7 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
                                    func->getType().getTypePtr());
     return getSILFunctionType(M, origPattern, substInterfaceType,
                               extInfo, CFunctionConventions(func),
-                              foreignError, None);
+                              foreignError, constant);
   }
 
   llvm_unreachable("call to unknown kind of C function");
@@ -1486,12 +1519,13 @@ getSILFunctionTypeForSelectorFamily(SILModule &M, SelectorFamily family,
                                     CanAnyFunctionType origType,
                                     CanAnyFunctionType substInterfaceType,
                                     AnyFunctionType::ExtInfo extInfo,
-                     const Optional<ForeignErrorConvention> &foreignError) {
+                     const Optional<ForeignErrorConvention> &foreignError,
+                                    Optional<SILDeclRef> constant) {
   return getSILFunctionType(M, AbstractionPattern(origType),
                             substInterfaceType,
                             extInfo,
                             SelectorFamilyConventions(family),
-                            foreignError, None);
+                            foreignError, constant);
 }
 
 static CanSILFunctionType
@@ -1528,7 +1562,7 @@ getUncachedSILFunctionTypeForConstant(SILModule &M,
       return getSILFunctionTypeForClangDecl(M, clangDecl,
                                             origLoweredInterfaceType,
                                             origLoweredInterfaceType,
-                                            extInfo, foreignError);
+                                            extInfo, foreignError, constant);
   }
 
   // If the decl belongs to an ObjC method family, use that family's
@@ -1536,7 +1570,7 @@ getUncachedSILFunctionTypeForConstant(SILModule &M,
   return getSILFunctionTypeForSelectorFamily(M, getSelectorFamily(constant),
                                              origLoweredInterfaceType,
                                              origLoweredInterfaceType,
-                                             extInfo, foreignError);
+                                             extInfo, foreignError, constant);
 }
 
 CanSILFunctionType TypeConverter::
@@ -1566,14 +1600,18 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     return SILFunctionTypeRepresentation::Thin;
 
   // If this is a foreign thunk, it always has the foreign calling convention.
-  if (c.isForeign)
-    return c.hasDecl() &&
-      !c.getDecl()->isImportAsMember() &&
-      (isClassOrProtocolMethod(c.getDecl()) ||
-       c.kind == SILDeclRef::Kind::IVarInitializer ||
-       c.kind == SILDeclRef::Kind::IVarDestroyer)
-      ? SILFunctionTypeRepresentation::ObjCMethod
-      : SILFunctionTypeRepresentation::CFunctionPointer;
+  if (c.isForeign) {
+    if (!c.hasDecl() ||
+        c.getDecl()->isImportAsMember())
+      return SILFunctionTypeRepresentation::CFunctionPointer;
+
+    if (isClassOrProtocolMethod(c.getDecl()) ||
+        c.kind == SILDeclRef::Kind::IVarInitializer ||
+        c.kind == SILDeclRef::Kind::IVarDestroyer)
+      return SILFunctionTypeRepresentation::ObjCMethod;
+
+    return SILFunctionTypeRepresentation::CFunctionPointer;
+  }
 
   // Anonymous functions currently always have Freestanding CC.
   if (!c.hasDecl())

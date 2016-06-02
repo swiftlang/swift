@@ -1514,8 +1514,11 @@ private:
     return nodeType;
   }
 
-  NodePointer demangleGenericSignature() {
-    auto sig = NodeFactory::create(Node::Kind::DependentGenericSignature);
+  NodePointer demangleGenericSignature(bool isPseudogeneric = false) {
+    auto sig =
+      NodeFactory::create(isPseudogeneric
+                            ? Node::Kind::DependentPseudogenericSignature
+                            : Node::Kind::DependentGenericSignature);
     // First read in the parameter counts at each depth.
     Node::IndexType count = ~(Node::IndexType)0;
     
@@ -2106,8 +2109,10 @@ private:
 
     // Enter a new generic context if this type is generic.
     // FIXME: replace with std::optional, when we have it.
-    if (Mangled.nextIf('G')) {
-      NodePointer generics = demangleGenericSignature();
+    bool isPseudogeneric = false;
+    if (Mangled.nextIf('G') ||
+        (isPseudogeneric = Mangled.nextIf('g'))) {
+      NodePointer generics = demangleGenericSignature(isPseudogeneric);
       if (!generics)
         return nullptr;
       type->addChild(generics);
@@ -2382,6 +2387,7 @@ private:
     case Node::Kind::DependentGenericParamCount:
     case Node::Kind::DependentGenericConformanceRequirement:
     case Node::Kind::DependentGenericSameTypeRequirement:
+    case Node::Kind::DependentPseudogenericSignature:
     case Node::Kind::Destructor:
     case Node::Kind::DidSet:
     case Node::Kind::DirectMethodReferenceAttribute:
@@ -2397,13 +2403,11 @@ private:
     case Node::Kind::FunctionSignatureSpecializationParamKind:
     case Node::Kind::FunctionSignatureSpecializationParamPayload:
     case Node::Kind::FunctionType:
-    case Node::Kind::Generics:
     case Node::Kind::GenericProtocolWitnessTable:
     case Node::Kind::GenericProtocolWitnessTableInstantiationFunction:
     case Node::Kind::GenericSpecialization:
     case Node::Kind::GenericSpecializationNotReAbstracted:
     case Node::Kind::GenericSpecializationParam:
-    case Node::Kind::GenericType:
     case Node::Kind::GenericTypeMetadataPattern:
     case Node::Kind::Getter:
     case Node::Kind::Global:
@@ -2783,8 +2787,7 @@ static bool useColonForEntityType(NodePointer entity, NodePointer type) {
   case Node::Kind::IVarDestroyer: {
     // We expect to see a function type here, but if we don't, use the colon.
     type = type->getChild(0);
-    while (type->getKind() == Node::Kind::GenericType ||
-           type->getKind() == Node::Kind::DependentGenericType)
+    while (type->getKind() == Node::Kind::DependentGenericType)
       type = type->getChild(1)->getChild(0);
     return (type->getKind() != Node::Kind::FunctionType &&
             type->getKind() != Node::Kind::UncurriedFunctionType &&
@@ -2822,8 +2825,7 @@ void NodePrinter::printSimplifiedEntityType(NodePointer context,
   type = type->getChild(0);
 
   NodePointer generics;
-  if (type->getKind() == Node::Kind::GenericType ||
-      type->getKind() == Node::Kind::DependentGenericType) {
+  if (type->getKind() == Node::Kind::DependentGenericType) {
     generics = type->getChild(0);
     type = type->getChild(1)->getChild(0);
   }
@@ -3430,20 +3432,6 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       Printer << ">";
     return;
   }
-  case Node::Kind::Generics: {
-    if (pointer->getNumChildren() == 0)
-      return;
-    Printer << "<";
-    print(pointer->getChild(0));
-    for (unsigned i = 1, e = pointer->getNumChildren(); i != e; ++i) {
-      auto child = pointer->getChild(i);
-      if (child->getKind() != Node::Kind::Archetype) break;
-      Printer << ", ";
-      print(child);
-    }
-    Printer << ">";
-    return;
-  }
   case Node::Kind::Archetype: {
     Printer << pointer->getText();
     if (pointer->hasChildren()) {
@@ -3467,13 +3455,6 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << "(archetype " << number->getIndex() << " of ";
     print(decl_ctx);
     Printer << ")";
-    return;
-  }
-  case Node::Kind::GenericType: {
-    NodePointer atype_list = pointer->getChild(0);
-    NodePointer fct_type = pointer->getChild(1)->getChild(0);
-    print(atype_list);
-    print(fct_type);
     return;
   }
   case Node::Kind::OwningAddressor:
@@ -3576,6 +3557,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << "<ERROR TYPE>";
     return;
       
+  case Node::Kind::DependentPseudogenericSignature:
   case Node::Kind::DependentGenericSignature: {
     Printer << '<';
     
