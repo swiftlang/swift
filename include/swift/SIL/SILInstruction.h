@@ -3336,19 +3336,40 @@ class InitBlockStorageHeaderInst : public SILInstruction {
   friend class SILBuilder;
 
   enum { BlockStorage, InvokeFunction };
+  unsigned NumSubstitutions;
   FixedOperandList<2> Operands;
+  
+  Substitution *getSubstitutionsStorage() {
+    return reinterpret_cast<Substitution*>(Operands.asArray().end());
+  }
+  const Substitution *getSubstitutionsStorage() const {
+    return reinterpret_cast<const Substitution*>(Operands.asArray().end());
+  }
 
   InitBlockStorageHeaderInst(SILDebugLocation DebugLoc, SILValue BlockStorage,
-                             SILValue InvokeFunction, SILType BlockType)
+                             SILValue InvokeFunction, SILType BlockType,
+                             ArrayRef<Substitution> Subs)
       : SILInstruction(ValueKind::InitBlockStorageHeaderInst, DebugLoc,
                        BlockType),
-        Operands(this, BlockStorage, InvokeFunction) {}
-
+        NumSubstitutions(Subs.size()),
+        Operands(this, BlockStorage, InvokeFunction) {
+    memcpy(getSubstitutionsStorage(), Subs.begin(),
+           sizeof(Subs[0]) * Subs.size());
+  }
+  
+  static InitBlockStorageHeaderInst *create(SILFunction &F,
+                              SILDebugLocation DebugLoc, SILValue BlockStorage,
+                              SILValue InvokeFunction, SILType BlockType,
+                              ArrayRef<Substitution> Subs);
 public:
   /// Get the block storage address to be initialized.
   SILValue getBlockStorage() const { return Operands[BlockStorage].get(); }
   /// Get the invoke function to form the block around.
   SILValue getInvokeFunction() const { return Operands[InvokeFunction].get(); }
+
+  ArrayRef<Substitution> getSubstitutions() const {
+    return {getSubstitutionsStorage(), NumSubstitutions};
+  }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
