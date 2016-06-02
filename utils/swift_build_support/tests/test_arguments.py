@@ -14,8 +14,17 @@ import argparse
 import os
 import sys
 import unittest
+try:
+    # py2
+    from StringIO import StringIO
+except ImportError:
+    # py3
+    from io import StringIO
 
-from swift_build_support.arguments import type as argtype
+from swift_build_support.arguments import (
+    type as argtype,
+    action as argaction,
+)
 
 
 class ArgumentsTypeTestCase(unittest.TestCase):
@@ -87,3 +96,41 @@ class ArgumentsTypeTestCase(unittest.TestCase):
         self.assertRaises(
             argparse.ArgumentTypeError,
             argtype.executable, "../example-command-not-exist")
+
+
+class ArgumentsActionTestCase(unittest.TestCase):
+
+    def test_unavailable(self):
+        orig_stderr = sys.stderr
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--foo")
+        parser.add_argument(
+            "--do-not-use",
+            "--never-ever",
+            action=argaction.unavailable)
+
+        args, unknown_args = parser.parse_known_args(
+            ['--foo', 'bar', '--baz', 'qux'])
+
+        self.assertEqual(args.foo, 'bar')
+        self.assertEqual(unknown_args, ['--baz', 'qux'])
+        self.assertFalse(hasattr(args, 'sentinel'))
+
+        stderr = StringIO()
+        sys.stderr = stderr
+        self.assertRaises(
+            SystemExit,
+            parser.parse_known_args,
+            ['--foo', 'bar', '--do-not-use', 'baz'])
+        self.assertIn('--do-not-use', stderr.getvalue())
+
+        stderr = StringIO()
+        sys.stderr = stderr
+        self.assertRaises(
+            SystemExit,
+            parser.parse_known_args,
+            ['--foo', 'bar', '--never-ever=baz'])
+        self.assertIn('--never-ever', stderr.getvalue())
+
+        sys.stderr = orig_stderr

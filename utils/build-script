@@ -962,6 +962,12 @@ details of the setups of other systems or automated environments.""")
         default=False,
         const=True)
 
+    parser.add_argument(
+        # Explicitly unavailable options here.
+        "--build-jobs",
+        "--common-cmake-options",
+        action=arguments.action.unavailable)
+
     args = migration.parse_args(parser, sys.argv[1:])
 
     build_script_impl = os.path.join(
