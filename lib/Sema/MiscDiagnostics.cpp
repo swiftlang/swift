@@ -2830,14 +2830,16 @@ public:
     bool hadParens = false;
     auto lookThroughParens = [&](Expr *arg, bool outermost) -> Expr * {
       if (auto parenExpr = dyn_cast<ParenExpr>(arg)) {
-        if (!outermost) {
+        if (!outermost && !parenExpr->isImplicit()) {
           hadParens = true;
           return parenExpr->getSubExpr()->getSemanticsProvidingExpr();
         }
 
         arg = parenExpr->getSubExpr();
         if (auto innerParenExpr = dyn_cast<ParenExpr>(arg)) {
-          hadParens = true;
+          if (!innerParenExpr->isImplicit())
+            hadParens = true;
+
           arg = innerParenExpr->getSubExpr();
         }
       }
