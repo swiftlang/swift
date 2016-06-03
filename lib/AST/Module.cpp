@@ -26,6 +26,8 @@
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
+#include "swift/AST/SourceEntityWalker.h"
+#include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1625,6 +1627,27 @@ TypeRefinementContext *SourceFile::getTypeRefinementContext() {
 
 void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
   TRC = Root;
+}
+
+void SourceFile::dumpXCTestMethods(llvm::raw_ostream &out) {
+  class XCTestASTWalker : public SourceEntityWalker {
+  llvm::raw_ostream &OS;
+  public:
+    XCTestASTWalker(llvm::raw_ostream &OS) : OS(OS) {}
+  private:
+    bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+      if (auto VD = dyn_cast<ValueDecl>(D)) {
+        if (VD->isTestCandidate()) {
+          ide::printDeclUSR(VD, OS);
+          OS << "\n";
+        }
+      }
+      return true;
+    }
+  };
+
+  XCTestASTWalker walker(out);
+  walker.walk(*this);
 }
 
 //===----------------------------------------------------------------------===//

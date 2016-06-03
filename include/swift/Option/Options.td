@@ -389,6 +389,10 @@ def print_ast : Flag<["-"], "print-ast">,
   HelpText<"Parse and type-check input file(s) and pretty print AST(s)">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def dump_xctest_methods : Flag<["-"], "dump-xctest-methods">,
+  HelpText<"Dump a list of methods that match what XCTest considers a test">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 // Other Modes
 def repl : Flag<["-"], "repl">,

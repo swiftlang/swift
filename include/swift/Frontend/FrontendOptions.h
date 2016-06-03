@@ -145,6 +145,12 @@ public:
     /// Parse, type-check, and dump type refinement context hierarchy
     DumpTypeRefinementContexts,
 
+    /// Parse, type-check, and dump a list of Unified Symbol Resolutions
+    /// (USRs)for each function declaration that matches what XCTest considers
+    /// to be a viable test: a class instance method that takes no parameters,
+    /// returns void, and begins with "test".
+    DumpXCTestMethods,
+
     EmitSILGen, ///< Emit raw SIL
     EmitSIL, ///< Emit canonical SIL
 

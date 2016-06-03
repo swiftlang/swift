@@ -1094,6 +1094,12 @@ public:
     getInterfaceHash(str);
     out << str << '\n';
   }
+
+  /// Outputs Unified Symbol Resolutions (USRs) and a newline for each
+  /// function declaration in this source file that matches what XCTest
+  /// considers to be a viable test: a class instance method that takes no
+  /// parameters, returns void, and begins with "test".
+  void dumpXCTestMethods(llvm::raw_ostream &out);
 };
 
 
