@@ -23,7 +23,7 @@ using namespace swift;
 void ConditionPlatformHelper::wait(CONDITION_VARIABLE &condition,
                                    SRWLOCK &mutex) {
   BOOL result = SleepConditionVariableSRW(&condition, &mutex, INFINITE, 0);
-  if (result == FALSE) {
+  if (!result) {
     DWORD errorcode = GetLastError();
     fatalError(/* flags = */ 0,
                "'SleepConditionVariableSRW()' failed with error code %d\n",
