@@ -2297,7 +2297,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
           .highlight(baseRange).highlight(nameLoc.getSourceRange());
       } else {
         // Otherwise the static member lookup was invalid because it was
-        // called on an instance
+        // called on an instance.
         diagnose(loc, diag::could_not_use_type_member_on_instance,
                  baseObjTy, memberName)
           .highlight(baseRange).highlight(nameLoc.getSourceRange());

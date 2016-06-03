@@ -2935,7 +2935,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       result.markErrorAlreadyDiagnosed();
       return;
     }
-
+    
     // FIXME: Deal with broken recursion
     if (!cand->getInterfaceType())
       return;
@@ -2961,8 +2961,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       }
     }
 
-    // See if we have an instance method, instance member or static method,
-    // and check if it can be accessed on our base type.
+    // See if we have an instance method, instance member, static method,
+    // or constructor, and check if it can be accessed on our base type.
     if (cand->isInstanceMember()) {
       if ((isa<FuncDecl>(cand) && !hasInstanceMethods) ||
           (!isa<FuncDecl>(cand) && !hasInstanceMembers)) {
@@ -2972,6 +2972,11 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       
     } else {
       if (!hasStaticMembers) {
+        if (cand->isImplicit() && isa<ConstructorDecl>(cand)) {
+          result.markErrorAlreadyDiagnosed();
+          return;
+        }
+        
         result.addUnviable(cand, MemberLookupResult::UR_TypeMemberOnInstance);
         return;
       }
