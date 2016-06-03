@@ -110,12 +110,14 @@ public:
 void StmtBuilder::printLiteralString(StringRef Str, SourceLoc Loc) {
   Expr *PrintFn = buildPrintRefExpr(Loc);
   Expr *PrintStr = new (Context) StringLiteralExpr(Str, Loc);
+  PrintStr = ParenExpr::createImplicit(Context, PrintStr);
   addToBody(new (Context) CallExpr(PrintFn, PrintStr, /*Implicit=*/true));
 }
 
 void StmtBuilder::printReplExpr(VarDecl *Arg, SourceLoc Loc) {
   Expr *DebugPrintlnFn = buildDebugPrintlnRefExpr(Loc);
   Expr *ArgRef = TC.buildRefExpr(Arg, DC, DeclNameLoc(Loc), /*Implicit=*/true);
+  ArgRef = ParenExpr::createImplicit(Context, ArgRef);
   addToBody(new (Context) CallExpr(DebugPrintlnFn, ArgRef, /*Implicit=*/true));
 }
 
@@ -268,9 +270,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   // If the caller didn't wrap the argument in parentheses or make it a tuple,
   // add the extra parentheses now.
   Expr *TheArg = E;
-  Type Ty = ParenType::get(TC.Context, TheArg->getType());
-  TheArg = new (TC.Context) ParenExpr(SourceLoc(), TheArg, SourceLoc(), false,
-                                      Ty);
+  TheArg = ParenExpr::createImplicit(TC.Context, TheArg);
 
   Expr *TheCall = new (Context) CallExpr(CE, TheArg, /*Implicit=*/true);
   if (TC.typeCheckExpressionShallow(TheCall, Arg->getDeclContext()))

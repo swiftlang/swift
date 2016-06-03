@@ -922,6 +922,14 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   return ::new(Buffer) SequenceExpr(elements);
 }
 
+ParenExpr *ParenExpr::createImplicit(ASTContext &ctx, Expr *expr) {
+  ParenExpr *result = new (ctx) ParenExpr(SourceLoc(), expr, SourceLoc(),
+                                          /*hasTrailingClosure=*/false,
+                                          expr->getType());
+  result->setImplicit();
+  return result;
+}
+
 SourceLoc TupleExpr::getStartLoc() const {
   if (LParenLoc.isValid()) return LParenLoc;
   if (getNumElements() == 0) return SourceLoc();
@@ -1031,6 +1039,25 @@ static ValueDecl *getCalledValue(Expr *E) {
 
 ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
+}
+
+Expr *CallExpr::getDirectCallee() const {
+  auto fn = getFn();
+  while (true) {
+    fn = fn->getSemanticsProvidingExpr();
+
+    if (auto force = dyn_cast<ForceValueExpr>(fn)) {
+      fn = force->getSubExpr();
+      continue;
+    }
+
+    if (auto bind = dyn_cast<BindOptionalExpr>(fn)) {
+      fn = bind->getSubExpr();
+      continue;
+    }
+
+    return fn;
+  }
 }
 
 RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,

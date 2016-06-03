@@ -777,10 +777,8 @@ namespace {
               continue;
             }
 
-            // Look through identity, force-value, and 'try' expressions.
-            if (isa<IdentityExpr>(ancestor) ||
-                isa<ForceValueExpr>(ancestor) ||
-                isa<AnyTryExpr>(ancestor)) {
+            // Look through force-value, and 'try' expressions.
+            if (isa<ForceValueExpr>(ancestor) || isa<AnyTryExpr>(ancestor)) {
               if (target)
                 target = ancestor;
               continue;

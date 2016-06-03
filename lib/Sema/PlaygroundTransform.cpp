@@ -1036,10 +1036,8 @@ public:
                                                  AccessSemantics::Ordinary,
                                                  Apply->getType());
 
-    ParenExpr *SendDataArgs = new (Context) ParenExpr(SourceLoc(),
-                                                      DRE,
-                                                      SourceLoc(),
-                                                      false);
+    ParenExpr *SendDataArgs = ParenExpr::createImplicit(Context, DRE);
+
     UnresolvedDeclRefExpr *SendDataRef = 
       new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier("$builtin_send_data"),

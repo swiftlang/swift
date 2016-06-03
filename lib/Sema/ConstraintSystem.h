@@ -1042,16 +1042,25 @@ public:
   /// we're exploring. 
   SolverState *solverState = nullptr;
 
+  /// Describes argument labels as they occur in a call.
   struct ArgumentLabelState {
+    /// The actual argument labels provided at the call site.
+    ///
+    /// The contents of this array are only guaranteed to live until
+    /// the constraint system is destroyed.
     ArrayRef<Identifier> Labels;
+
+    /// Whether the last of the arguments was written as a trailing
+    /// closure. It will have an empty Identifier().
     bool HasTrailingClosure;
   };
 
-  /// A mapping from the constraint locators for references to various
-  /// names (e.g., member references, normal name references, possible
-  /// constructions) to the argument labels provided in the call to
-  /// that locator.
-  llvm::DenseMap<ConstraintLocator *, ArgumentLabelState> ArgumentLabels;
+  /// The argument labels that are associated with a given callee.
+  ///
+  /// The argument labels for a particular callee are recorded at the
+  /// time of constraint generation based on the syntactic call
+  /// argument.
+  llvm::DenseMap<ConstraintLocator *, ArgumentLabelState> CalleeArgumentLabels;
 
   /// FIXME: This is a workaround for the way we perform protocol
   /// conformance checking for generic requirements, where we re-use

@@ -4766,6 +4766,10 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
     arg = fromTupleExpr[0];
   } else if (argParen) {
     // If the element changed, rebuild a new ParenExpr.
+    if (!(fromTupleExpr.size() == 1 && fromTupleExpr[0])) {
+      arg->dump();
+    }
+
     assert(fromTupleExpr.size() == 1 && fromTupleExpr[0]);
     if (fromTupleExpr[0] != argParen->getSubExpr()) {
       bool argParenImplicit = argParen->isImplicit();
@@ -5254,6 +5258,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       Expr *fnRef = new (tc.Context) DeclRefExpr(fnDeclRef,
                                                  DeclNameLoc(expr->getLoc()),
                                                  /*Implicit=*/true);
+      expr = ParenExpr::createImplicit(tc.Context, expr);
+
       fnRef->setType(fn->getInterfaceType());
       Expr *call = new (tc.Context) CallExpr(fnRef, expr,
                                              /*implicit*/ true);
@@ -6593,6 +6599,8 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
        argumentNamesMatch(arguments[0], 
                           witness->getFullName().getArgumentNames()))) {
     arg = arguments[0];
+    if (!isa<TupleExpr>(arg) && !isa<ParenExpr>(arg))
+      arg = ParenExpr::createImplicit(Context, arg);
   } else {
     SmallVector<TupleTypeElt, 4> elementTypes;
     auto names = witness->getFullName().getArgumentNames();
@@ -6840,6 +6848,7 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   fnRef->setType(fn->getInterfaceType().subst(
       constraintSystem->DC->getParentModule(), subMap, None));
 
+  expr = ParenExpr::createImplicit(ctx, expr);
   Expr *call = new (ctx) CallExpr(fnRef, expr, /*Implicit=*/true);
 
   bool failed = tc.typeCheckExpressionShallow(call, cs.DC);

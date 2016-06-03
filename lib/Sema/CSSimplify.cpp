@@ -2612,8 +2612,8 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
   if (!parts.empty())
     return None;
 
-  auto known = cs.ArgumentLabels.find(cs.getConstraintLocator(anchor));
-  if (known == cs.ArgumentLabels.end())
+  auto known = cs.CalleeArgumentLabels.find(cs.getConstraintLocator(anchor));
+  if (known == cs.CalleeArgumentLabels.end())
     return None;
 
   return known->second;
