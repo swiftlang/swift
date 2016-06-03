@@ -15,9 +15,9 @@ struct ConformingStruct : ResilientProtocol {
   func defaultB()
 }
 
-// CHECK-LABEL: sil shared @_TTSg5V4main16ConformingStructS0_S_17ResilientProtocolS___defaultA
+// CHECK-LABEL: sil shared @_TTSg5V4main16ConformingStruct_defaultA
 // CHECK:       bb0(%0 : $*ConformingStruct):
-// CHECK:         [[FN:%.*]] = function_ref @_TTSg5V4main16ConformingStructS0_S_17ResilientProtocolS___defaultB
+// CHECK:         [[FN:%.*]] = function_ref @_TTSg5V4main16ConformingStruct_defaultB
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]](%0)
 // CHECK-NEXT:    return [[RESULT]]
 
@@ -28,7 +28,7 @@ bb0(%0 : $*Self):
   return %result : $()
 }
 
-// CHECK-LABEL: sil shared @_TTSg5V4main16ConformingStructS0_S_17ResilientProtocolS___defaultB
+// CHECK-LABEL: sil shared @_TTSg5V4main16ConformingStruct_defaultB
 // CHECK:       bb0(%0 : $*ConformingStruct):
 // CHECK-NEXT:    [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RESULT]]
@@ -41,7 +41,7 @@ bb0(%0 : $*Self):
 
 // CHECK-LABEL: sil hidden @test_specialize_default_witness_method
 // CHECK:       bb0(%0 : $*ConformingStruct):
-// CHECK:         [[FN:%.*]] = function_ref @_TTSg5V4main16ConformingStructS0_S_17ResilientProtocolS___defaultA
+// CHECK:         [[FN:%.*]] = function_ref @_TTSg5V4main16ConformingStruct_defaultA
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]](%0)
 // CHECK-NEXT:    return [[RESULT]]
 

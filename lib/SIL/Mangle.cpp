@@ -44,15 +44,6 @@ using namespace Mangle;
 //                           Generic Specialization
 //===----------------------------------------------------------------------===//
 
-static void mangleSubstitution(Mangler &M, Substitution Sub) {
-  M.mangleType(Sub.getReplacement()->getCanonicalType(), 0);
-  for (auto C : Sub.getConformances()) {
-    if (C.isAbstract())
-      return;
-    M.mangleProtocolConformance(C.getConcrete());
-  }
-}
-
 void GenericSpecializationMangler::mangleSpecialization() {
   Mangler &M = getMangler();
 
@@ -65,8 +56,7 @@ void GenericSpecializationMangler::mangleSpecialization() {
     // dependent types. As all other dependent types are just derived from the
     // primary types, this will give us unique symbol names.
     if (DepType->is<GenericTypeParamType>()) {
-      mangleSubstitution(M, Subs[idx]);
-      M.append('_');
+      M.mangleType(Subs[idx].getReplacement()->getCanonicalType(), 0);
     }
     ++idx;
   }

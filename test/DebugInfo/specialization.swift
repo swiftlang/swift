@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -O %s -disable-llvm-optzns -emit-sil -g -o - | FileCheck %s
 
-// CHECK: sil shared [noinline] @_TTSg5SiSis17IntegerArithmetics__
+// CHECK: sil shared [noinline] @_TTSg5Si
 // CHECK-SAME: _TF14specialization3sumuRxs17IntegerArithmeticrFTxx_x
 // CHECK-SAME: $@convention(thin) (Int, Int) -> Int {
 // CHECK: bb0(%0 : $Int, %1 : $Int):

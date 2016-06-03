@@ -6,7 +6,7 @@
 // CHECK: sil private @top_level_code 
 // CHECK: sil public_external [fragile] @{{.*}}_TFVs1XCfT_S_ 
 // CHECK: sil public_external [fragile] @{{.*}}_TFs17the_thing_it_doesFT1xVs1X_T_ 
-// CHECK: sil shared_external [fragile] [noinline] @{{.*}}_TTSgq5Vs1X___TFs9the_thingurFT1tx_T_
+// CHECK: sil shared_external [fragile] [noinline] @{{.*}}_TTSgq5Vs1X__TFs9the_thingurFT1tx_T_
 
 sil_stage canonical
 

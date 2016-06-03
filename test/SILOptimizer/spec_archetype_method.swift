@@ -29,10 +29,10 @@ func useFoo<T>(x x: T) {
 }
 
 //CHECK-LABEL: sil @_TF21spec_archetype_method21interesting_code_hereFT_T_
-//CHECK: function_ref @_TTSg5C21spec_archetype_method3ABCS0_S_8pingableS____TF21spec_archetype_method12generic_call
+//CHECK: function_ref @_TTSg5C21spec_archetype_method3ABC__TF21spec_archetype_method12generic_call
 //CHECK-NEXT: retain
 //CHECK-NEXT: apply
-//CHECK:  function_ref @_TTSg5C21spec_archetype_method3ABC___TF21spec_archetype_method6useFoo{{.*}} : $@convention(thin) (@owned ABC) -> ()
+//CHECK:  function_ref @_TTSg5C21spec_archetype_method3ABC__TF21spec_archetype_method6useFoo{{.*}} : $@convention(thin) (@owned ABC) -> ()
 //CHECK-NEXT: apply
 //CHECK: return
 public
