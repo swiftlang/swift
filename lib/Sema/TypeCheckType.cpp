@@ -562,11 +562,50 @@ static Type applyGenericTypeReprArgs(TypeChecker &TC, Type type, SourceLoc loc,
 
 /// \brief Diagnose a use of an unbound generic type.
 static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
-  tc.diagnose(loc, diag::generic_type_requires_arguments, ty);
   auto unbound = ty->castTo<UnboundGenericType>();
+  {
+    InFlightDiagnostic diag = tc.diagnose(loc,
+        diag::generic_type_requires_arguments, ty);
+    if (auto *genericD = unbound->getDecl()) {
+
+      // Tries to infer the type arguments to pass.
+      // Currently it only works if all the generic arguments have a super type,
+      // or it requires a class, in which case it infers 'AnyObject'.
+      auto inferGenericArgs = [](GenericTypeDecl *genericD)->std::string {
+        GenericParamList *genParamList = genericD->getGenericParams();
+        if (!genParamList)
+          return std::string();
+        auto params= genParamList->getParams();
+        if (params.empty())
+          return std::string();
+        std::string argsToAdd = "<";
+        for (unsigned i = 0, e = params.size(); i != e; ++i) {
+          auto param = params[i];
+          auto archTy = param->getArchetype();
+          if (!archTy)
+            return std::string();
+          if (auto superTy = archTy->getSuperclass()) {
+            argsToAdd += superTy.getString();
+          } else if (archTy->requiresClass()) {
+            argsToAdd += "AnyObject";
+          } else {
+            return std::string(); // give up.
+          }
+          if (i < e-1)
+            argsToAdd += ", ";
+        }
+        argsToAdd += ">";
+        return argsToAdd;
+      };
+
+      std::string genericArgsToAdd = inferGenericArgs(genericD);
+      if (!genericArgsToAdd.empty()) {
+        diag.fixItInsertAfter(loc, genericArgsToAdd);
+      }
+    }
+  }
   tc.diagnose(unbound->getDecl()->getLoc(), diag::generic_type_declared_here,
               unbound->getDecl()->getName());
-  // TODO: emit fixit for "NSArray" -> "NSArray<AnyObject>", etc.
 }
 
 /// \brief Returns a valid type or ErrorType in case of an error.

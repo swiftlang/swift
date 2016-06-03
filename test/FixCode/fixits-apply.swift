@@ -122,3 +122,18 @@ func letToVar1() {
   y.append("as")
   y.append("df")
 }
+
+class Node  {}
+class Graph<NodeType : Node> {}
+var graph: Graph
+
+class Node2  {}
+class Graph2<NodeType1 : Node, NodeType2 : Node2> {}
+var graph: Graph2
+
+@objc protocol ObjCProt { }
+class Graph3<NodeType : ObjCProt> {}
+var graph: Graph3
+
+class GraphNoFix<NodeType : SomeProt> {}
+var graph: GraphNoFix
