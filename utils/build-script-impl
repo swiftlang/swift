@@ -218,6 +218,7 @@ KNOWN_SETTINGS=(
     common-cmake-options               ""        "CMake options used for all targets, including LLVM/Clang"
     # TODO: Remove this some time later.
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
+    only-execute                       "all"     "Only execute the named action (see implementation)"
 )
 
 # Centalized access point for traced command invocation.
@@ -305,6 +306,51 @@ function float_min() {
         echo ${LHS}
     else
         echo ${RHS}
+    fi
+}
+
+# Support for performing isolated actions.
+#
+# This is part of refactoring more work to be done or controllable via
+# `build-script` itself. For additional information, see:
+# https://bugs.swift.org/browse/SR-237
+#
+# To use this functionality, the script is invoked with:
+#   ONLY_EXECUTE=<action name>
+# where <action name> is one of:
+#   all                          -- execute all actions
+#   ${host}-${product}-build     -- the build of the product
+#   ${host}-${product}-test      -- the test of the product
+#   ${host}-${product}-install   -- the install of the product
+#   ${host}-package              -- the package construction and test
+#   merged-hosts-lipo            -- the lipo step, if used
+# and if used, only the one individual action will be performed.
+#
+# If not set, the default is `all`.
+
+# should_execute_action(name) -> 1 or nil
+#
+# Check if the named action should be run in the given script invocation.
+function should_execute_action() {
+    local name="$1"
+    
+    if [[ "${ONLY_EXECUTE}" = "all" ]] ||
+           [[ "${ONLY_EXECUTE}" = "${name}" ]]; then
+        echo 1
+    fi
+}
+
+# should_execute_host_actions_for_phase(host, phase-name) -> 1 or nil
+#
+# Check if the there are any actions to execute for this host and phase (i.e.,
+# "build", "test", or "install")
+function should_execute_host_actions_for_phase() {
+    local host="$1"
+    local phase_name="$2"
+
+    if [[ "${ONLY_EXECUTE}" = "all" ]] ||
+           [[ "${ONLY_EXECUTE}" == ${host}-*-${phase_name} ]]; then
+        echo 1
     fi
 }
 
@@ -1512,19 +1558,26 @@ function set_swiftpm_bootstrap_command() {
 
 
 for host in "${ALL_HOSTS[@]}"; do
+    # Skip this pass when the only action to execute can't match.
+    if ! [[ $(should_execute_host_actions_for_phase ${host} build) ]]; then
+        continue
+    fi
 
     calculate_targets_for_host $host
 
     set_build_options_for_host $host
 
-    echo "Building the standard library for: ${SWIFT_STDLIB_TARGETS[@]}"
-    if [[ "${SWIFT_TEST_TARGETS[@]}" ]] && ! [[ "${SKIP_TEST_SWIFT}" ]]; then
-        echo "Running Swift tests for: ${SWIFT_TEST_TARGETS[@]}"
-    fi
-    if ! [[ "${SKIP_TEST_BENCHMARKS}" ]] &&
-       [[ "${SWIFT_RUN_BENCHMARK_TARGETS[@]}" ]] &&
-       ! [[ "${SKIP_TEST_BENCHMARK}" ]]; then
-        echo "Running Swift benchmarks for: ${SWIFT_RUN_BENCHMARK_TARGETS[@]}"
+    # Don't echo anything if only executing an individual action.
+    if [[ "${ONLY_EXECUTE}" = "all" ]]; then
+        echo "Building the standard library for: ${SWIFT_STDLIB_TARGETS[@]}"
+        if [[ "${SWIFT_TEST_TARGETS[@]}" ]] && ! [[ "${SKIP_TEST_SWIFT}" ]]; then
+            echo "Running Swift tests for: ${SWIFT_TEST_TARGETS[@]}"
+        fi
+        if ! [[ "${SKIP_TEST_BENCHMARKS}" ]] &&
+                [[ "${SWIFT_RUN_BENCHMARK_TARGETS[@]}" ]] &&
+                ! [[ "${SKIP_TEST_BENCHMARK}" ]]; then
+            echo "Running Swift benchmarks for: ${SWIFT_RUN_BENCHMARK_TARGETS[@]}"
+        fi
     fi
 
     common_cmake_options_host=("${COMMON_CMAKE_OPTIONS[@]}")
@@ -1644,6 +1697,11 @@ for host in "${ALL_HOSTS[@]}"; do
     )
 
     for product in "${PRODUCTS[@]}"; do
+        # Check if we should perform this action.
+        if ! [[ $(should_execute_action "${host}-${product}-build") ]]; then
+            continue
+        fi
+
         unset skip_build
         source_dir_var="$(toupper ${product})_SOURCE_DIR"
         source_dir=${!source_dir_var}
@@ -2198,12 +2256,21 @@ tests_busted ()
 }
 
 for host in "${ALL_HOSTS[@]}"; do
+    # Skip this pass when the only action to execute can't match.
+    if ! [[ $(should_execute_host_actions_for_phase ${host} test) ]]; then
+        continue
+    fi
 
     # Calculate test targets
     calculate_targets_for_host $host
 
     # Run the tests for each product
     for product in "${PRODUCTS[@]}"; do
+        # Check if we should perform this action.
+        if ! [[ $(should_execute_action "${host}-${product}-test") ]]; then
+            continue
+        fi
+
         case ${product} in
             cmark)
                 if [[ "${SKIP_TEST_CMARK}" ]]; then
@@ -2410,6 +2477,10 @@ done
 LIPO_SRC_DIRS=()
 
 for host in "${ALL_HOSTS[@]}"; do
+    # Skip this pass when the only action to execute can't match.
+    if ! [[ $(should_execute_host_actions_for_phase ${host} install) ]]; then
+        continue
+    fi
 
     # Calculate the directory to install products in to.
     host_install_destdir=$(get_host_install_destdir ${host})
@@ -2423,6 +2494,10 @@ for host in "${ALL_HOSTS[@]}"; do
     set_build_options_for_host $host
 
     for product in "${PRODUCTS[@]}"; do
+        # Check if we should perform this action.
+        if ! [[ $(should_execute_action "${host}-${product}-install") ]]; then
+            continue
+        fi
 
         INSTALL_TARGETS="install"
 
@@ -2729,6 +2804,11 @@ function build_and_test_installable_package() {
 # Build and test packages.
 for host in "${ALL_HOSTS[@]}"; do
     
+    # Check if we should perform this action.
+    if ! [[ $(should_execute_action "${host}-package") ]]; then
+        continue
+    fi
+    
     if [[ $(should_include_host_in_lipo ${host}) ]]; then
             continue
     fi    
@@ -2738,11 +2818,17 @@ done
 
 # Lipo those products which require it, optionally build and test an installable package.
 if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]]; then
-    echo "--- Merging and running lipo ---"
-    
     # This is from multiple hosts; Which host should we say it is? 
     # Let's call it 'merged-hosts' so that we can identify it.
     mergedHost="merged-hosts"
+    
+    # Check if we should perform this action.
+    if ! [[ $(should_execute_action "${mergedHost}-lipo") ]]; then
+        continue
+    fi
+    
+    echo "--- Merging and running lipo ---"
+    
     call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=$(xcrun_find_tool lipo) --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
 
     # Build and test the lipo-ed package.
