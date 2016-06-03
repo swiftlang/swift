@@ -4766,10 +4766,6 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
     arg = fromTupleExpr[0];
   } else if (argParen) {
     // If the element changed, rebuild a new ParenExpr.
-    if (!(fromTupleExpr.size() == 1 && fromTupleExpr[0])) {
-      arg->dump();
-    }
-
     assert(fromTupleExpr.size() == 1 && fromTupleExpr[0]);
     if (fromTupleExpr[0] != argParen->getSubExpr()) {
       bool argParenImplicit = argParen->isImplicit();

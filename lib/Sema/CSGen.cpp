@@ -2463,8 +2463,6 @@ namespace {
         return ArgumentLabelState{CS.allocateCopy(names), false};
       }
 
-      if (!isa<TupleExpr>(arg)) arg->dump();
-
       // Tuples.
       auto tuple = cast<TupleExpr>(arg);
 
