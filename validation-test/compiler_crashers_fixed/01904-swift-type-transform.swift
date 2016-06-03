@@ -5,22 +5,17 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-func g<d.Type) -> {
-class C(object1, a
-typealias F>(a("
-class B : C {
-func g(b.endIndex - range.e> String {
+// RUN: not %target-swift-frontend %s -parse
+func g<T) {
+enum a<C: B.C<T>(t: C: k) -> String {
+[0] {
+class A, Any) -> String {
+}
+func g<f = i(A, Any) -> Any] as Boolean>(n: d<T>(Range<h>) -> U) -> Any) -> {
 }
 }
-enum A : Collection where B : Array) -> : AnyObject.e = f.join() -> T>(A<T ->) { c()
-typealias B {
-typealias e = D>) {
-})
-var f: Sequence> Int {
-func c, T where B == true }
-class A {
+class c : a {
+class A where T : Sequence where S<d.Iterator.startIndex, V, f<(false)) -> T -> {
 }
-}
-}
-map(x) {
+protocol a {
+protocol a {

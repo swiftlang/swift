@@ -5,11 +5,22 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-struct e {
-func a<T) -> String {
+// RUN: not %target-swift-frontend %s -parse
+func g<d.Type) -> {
+class C(object1, a
+typealias F>(a("
+class B : C {
+func g(b.endIndex - range.e> String {
 }
-struct e where I.h: T) -> Any {
 }
-struct B<T where B == b: NSObject {
-let h = B
+enum A : Collection where B : Array) -> : AnyObject.e = f.join() -> T>(A<T ->) { c()
+typealias B {
+typealias e = D>) {
+})
+var f: Sequence> Int {
+func c, T where B == true }
+class A {
+}
+}
+}
+map(x) {
