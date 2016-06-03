@@ -15,12 +15,12 @@ class C<T> {}
 
 sil_vtable C {}
 
-sil @make_some_boxes : $@convention(thin) <T> () -> () {
+sil @make_some_boxes : $@convention(thin) <T> () -> (@box Int, @box (Int, Int), @box C<T>) {
   %a = alloc_box $Int
   %b = alloc_box $(Int, Int)
   %c = alloc_box $C<T>
-  %result = tuple ()
-  return %result : $()
+  %result = tuple (%a : $@box Int, %b : $@box (Int, Int), %c : $@box C<T>)
+  return %result : $(@box Int, @box (Int, Int), @box C<T>)
 }
 
 // CHECK:      - Capture types:
