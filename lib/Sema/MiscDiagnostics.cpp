@@ -102,6 +102,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// Keep track of InOutExprs
     SmallPtrSet<InOutExpr*, 2> AcceptableInOutExprs;
 
+    /// Keep track of the arguments to CallExprs.
+    SmallPtrSet<Expr *, 2> CallArgs;
+
     bool IsExprStmt;
 
   public:
@@ -223,6 +226,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       auto Base = E;
       while (auto Conv = dyn_cast<ImplicitConversionExpr>(Base))
         Base = Conv->getSubExpr();
+
+      // Record call arguments.
+      if (auto Call = dyn_cast<CallExpr>(Base)) {
+        CallArgs.insert(Call->getArg());
+      }
 
       if (auto *DRE = dyn_cast<DeclRefExpr>(Base)) {
         // Verify metatype uses.
@@ -485,6 +493,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             isa<OpenExistentialExpr>(ParentExpr)) {
           return;
         }
+
+        // FIXME: As a specific hack, we white-list parenthesized
+        // expressions that are call arguments.  This allows some
+        // ill-formed code to omit ".self" due to a historical bug. We
+        // keep that code working until we have a decision on SE-0090,
+        // rather than potentially breaking code twice.
+        if (isa<ParenExpr>(ParentExpr) && CallArgs.count(ParentExpr) > 0)
+          return;
       }
 
       // Is this a protocol metatype?

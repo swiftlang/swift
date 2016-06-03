@@ -638,12 +638,27 @@ namespace {
     /// node when visited.
     Expr *UnresolvedCtorRebindTarget = nullptr;
 
+    /// The expressions that are direct arguments of call expressions.
+    llvm::SmallPtrSet<Expr *, 4> CallArgs;
+
   public:
     PreCheckExpression(TypeChecker &tc, DeclContext *dc) : TC(tc), DC(dc) { }
 
     bool walkToClosureExprPre(ClosureExpr *expr);
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // If this is a call, record the argument expression.
+      if (auto call = dyn_cast<CallExpr>(expr)) {
+        CallArgs.insert(call->getArg());
+      }
+
+      // If this is an unresolved member with a call argument (e.g.,
+      // .some(x)), record the argument expression.
+      if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(expr)) {
+        if (auto arg = unresolvedMember->getArgument())
+          CallArgs.insert(arg);
+      }
+
       // Local function used to finish up processing before returning. Every
       // return site should call through here.
       auto finish = [&](bool recursive, Expr *expr) {
@@ -875,6 +890,9 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
 TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
+  // Don't try simplifying a call argument, because we don't want to
+  // simplify away the required ParenExpr/TupleExpr.
+  if (CallArgs.count(E) > 0) return nullptr;
 
   // Fold 'T.Type' or 'T.Protocol' into a metatype when T is a TypeExpr.
   if (auto *MRE = dyn_cast<UnresolvedDotExpr>(E)) {
