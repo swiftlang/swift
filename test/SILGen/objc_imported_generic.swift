@@ -41,7 +41,7 @@ public func genericPropertyOnAnyObject(o: AnyObject, b: Bool) -> AnyObject?? {
 // CHECK:         dynamic_method_br %4 : $@opened([[TAG:.*]]) AnyObject, #GenericClass.propertyThing!getter.1.foreign, bb1
 // CHECK:       bb1({{%.*}} : $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
 
-protocol ThingHolder {
+public protocol ThingHolder {
   associatedtype Thing
 
   init!(thing: Thing!)
@@ -56,16 +56,20 @@ protocol ThingHolder {
 
 extension GenericClass: ThingHolder {}
 
-public func genericBlockBridging<T: AnyObject>(x: GenericClass<T>) {
+public protocol Ansible: class {
+  associatedtype Anser: ThingHolder
+}
+
+public func genericBlockBridging<T: Ansible>(x: GenericClass<T>) {
   let block = x.blockForPerformingOnThings()
   x.performBlock(onThings: block)
 }
 
 // CHECK-LABEL: sil @_TF21objc_imported_generic20genericBlockBridging
-// CHECK:         [[BLOCK_TO_FUNC:%.*]] = function_ref @_TTRGRxs9AnyObjectrXFdCb_dx_ax_XFo_ox_ox_
-// CHECK:         partial_apply [[BLOCK_TO_FUNC]]<T>
-// CHECK:         [[FUNC_TO_BLOCK:%.*]] = function_ref @_TTRGRxs9AnyObjectrXFo_ox_ox_XFdCb_dx_ax_
-// CHECK:         init_block_storage_header {{.*}} invoke [[FUNC_TO_BLOCK]]<T>
+// CHECK:         [[BLOCK_TO_FUNC:%.*]] = function_ref @_TTRGRxs9AnyObjectx21objc_imported_generic7AnsiblerXFdCb_dx_ax_XFo_ox_ox_
+// CHECK:         partial_apply [[BLOCK_TO_FUNC]]<T, {{.*}}>
+// CHECK:         [[FUNC_TO_BLOCK:%.*]] = function_ref @_TTRGRxs9AnyObjectx21objc_imported_generic7AnsiblerXFo_ox_ox_XFdCb_dx_ax_
+// CHECK:         init_block_storage_header {{.*}} invoke [[FUNC_TO_BLOCK]]<T,{{.*}}>
 
 // CHECK-LABEL: sil @_TF21objc_imported_generic20arraysOfGenericParam
 public func arraysOfGenericParam<T: AnyObject>(y: Array<T>) {
