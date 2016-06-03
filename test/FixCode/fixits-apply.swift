@@ -49,6 +49,11 @@ func testMask4(a: MyEventMask2) {
   testMask2(a: a)
 }
 
+enum MyEnumType : UInt32 {
+  case invalid
+}
+_ = MyEnumType(MyEnumType.invalid)
+
 func goo(var e : ErrorProtocol) {
 }
 func goo2(var e: ErrorProtocol) {}
