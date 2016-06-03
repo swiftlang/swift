@@ -518,7 +518,7 @@ class FormatWalker : public SourceEntityWalker {
         // Generic type params are siblings to align.
         if (auto GPL = AFD->getGenericParams()) {
           const auto Params = GPL->getParams();
-          for (unsigned I = 0, N = Params.size(); I < N; I ++) {
+          for (unsigned I = 0, N = Params.size(); I < N; I++) {
             addPair(Params[I]->getEndLoc(), FindAlignLoc(Params[I]->getStartLoc()),
                     tok::comma);
           }
@@ -556,7 +556,7 @@ class FormatWalker : public SourceEntityWalker {
           FoundSibling = LBracketLoc;
           NeedExtraIndentation = true;
         }*/
-        for (unsigned I = 0, N = AE->getNumElements(); I < N;  I ++) {
+        for (unsigned I = 0, N = AE->getNumElements(); I < N; I++) {
           addPair(AE->getElement(I)->getEndLoc(),
                   FindAlignLoc(AE->getElement(I)->getStartLoc()), tok::comma);
         }
@@ -639,7 +639,7 @@ class FormatWalker : public SourceEntityWalker {
       return;
     for (auto InValid = Loc.isInvalid(); CurrentTokIt != Tokens.end() &&
          (InValid || SM.isBeforeInBuffer(CurrentTokIt->getLoc(), Loc));
-         CurrentTokIt ++) {
+         CurrentTokIt++) {
       if (CurrentTokIt->getKind() == tok::comment) {
         auto StartLine = SM.getLineNumber(CurrentTokIt->getRange().getStart());
         auto EndLine = SM.getLineNumber(CurrentTokIt->getRange().getEnd());

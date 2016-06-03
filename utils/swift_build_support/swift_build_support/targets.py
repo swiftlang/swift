@@ -119,7 +119,7 @@ class StdlibDeploymentTarget(object):
         if host_target is None:
             return None
 
-        # OSX build machines configure all Darwin platforms by default.
+        # OS X build machines configure all Darwin platforms by default.
         # Put iOS native targets last so that we test them last
         # (it takes a long time).
         if host_target == StdlibDeploymentTarget.OSX.x86_64:

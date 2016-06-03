@@ -82,7 +82,7 @@ struct ArgumentDescriptor {
         OwnedToGuaranteed(false),
         IsIndirectResult(A->isIndirectResult()),
         CalleeRelease(), CalleeReleaseInThrowBlock(),
-        ProjTree(A->getModule(), A->getType())  {}
+        ProjTree(A->getModule(), A->getType()) {}
 
   ArgumentDescriptor(const ArgumentDescriptor &) = delete;
   ArgumentDescriptor(ArgumentDescriptor &&) = default;
