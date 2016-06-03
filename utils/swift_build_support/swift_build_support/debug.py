@@ -28,11 +28,9 @@ def print_xcodebuild_versions(file=sys.stdout):
     information for all available SDKs.
     """
     version = shell.capture(
-        ['xcodebuild', '-version'],
-        dry_run=False, echo=False, optional=True).rstrip()
+        ['xcodebuild', '-version'], dry_run=False, echo=False).rstrip()
     sdks = shell.capture(
-        ['xcodebuild', '-version', '-sdk'],
-        dry_run=False, echo=False, optional=True).rstrip()
+        ['xcodebuild', '-version', '-sdk'], dry_run=False, echo=False).rstrip()
     fmt = """\
 {version}
 
