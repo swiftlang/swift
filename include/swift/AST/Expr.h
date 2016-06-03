@@ -1621,9 +1621,6 @@ public:
   /// \brief Whether this expression has a trailing closure as its argument.
   bool hasTrailingClosure() const { return HasTrailingClosure; }
 
-  /// Create a new, implicit parenthesized expression.
-  static ParenExpr *createImplicit(ASTContext &ctx, Expr *expr);
-
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Paren; }
 };
   
@@ -3198,15 +3195,7 @@ public:
     SourceLoc FnLoc = getFn()->getLoc(); 
     return FnLoc.isValid() ? FnLoc : getArg()->getLoc();
   }
-
-  /// Retrieve the expression that direct represents the callee.
-  ///
-  /// The "direct" callee is the expression representing the callee
-  /// after looking through top-level constructs that don't affect the
-  /// identity of the callee, e.g., extra parentheses, optional
-  /// unwrapping (?)/forcing (!), etc.
-  Expr *getDirectCallee() const;
-
+  
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Call; }
 };
   

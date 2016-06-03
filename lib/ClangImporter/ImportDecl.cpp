@@ -380,11 +380,8 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
     return ctorDecl;
   
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
-  Expr *paramRef = new (C) DeclRefExpr(param, DeclNameLoc(),
-                                       /*implicit*/ true);
-  paramRef = ParenExpr::createImplicit(C, paramRef);
-  paramRef->setImplicit();
-
+  auto paramRef = new (C) DeclRefExpr(param, DeclNameLoc(),
+                                      /*implicit*/ true);
   auto reinterpretCast
     = cast<FuncDecl>(getBuiltinValueDecl(C,C.getIdentifier("reinterpretCast")));
   auto reinterpretCastRef
@@ -443,11 +440,7 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   if (Impl.hasFinishedTypeChecking())
     return getterDecl;
   
-  Expr *selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                      /*implicit*/true);
-  selfRef = ParenExpr::createImplicit(C, selfRef);
-  selfRef->setImplicit();
-
+  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
   auto reinterpretCast
     = cast<FuncDecl>(getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
   auto reinterpretCastRef
@@ -623,11 +616,8 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
   {
     auto selfDecl = getterDecl->getImplicitSelfDecl();
 
-    Expr *selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                        /*implicit*/ true);
-    selfRef = ParenExpr::createImplicit(C, selfRef);
-    selfRef->setImplicit();
-
+    auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                       /*implicit*/ true);
     auto reinterpretCast = cast<FuncDecl>(getBuiltinValueDecl(
         C, C.getIdentifier("reinterpretCast")));
     auto reinterpretCastRef
@@ -648,10 +638,8 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
 
     auto inoutSelfRef = new (C) DeclRefExpr(inoutSelfDecl, DeclNameLoc(),
                                             /*implicit*/ true);
-    Expr *inoutSelf = new (C) InOutExpr(SourceLoc(), inoutSelfRef,
+    auto inoutSelf = new (C) InOutExpr(SourceLoc(), inoutSelfRef,
       InOutType::get(importedUnionDecl->getType()), /*implicit*/ true);
-    inoutSelf = ParenExpr::createImplicit(C, inoutSelf);
-    inoutSelf->setImplicit();
 
     auto newValueDecl = setterDecl->getParameterList(1)->get(0);
 

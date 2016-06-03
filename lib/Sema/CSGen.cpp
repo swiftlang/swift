@@ -2429,69 +2429,11 @@ namespace {
       return expr->getType();
     }
 
-    using ArgumentLabelState = ConstraintSystem::ArgumentLabelState;
-
-    /// Extract argument labels from the given call argument.
-    ArgumentLabelState getArgumentLabelsForCallArgument(Expr *arg) {
-      // Parentheses.
-      if (auto paren = dyn_cast<ParenExpr>(arg)) {
-        return ArgumentLabelState{
-                 CS.allocateCopy(llvm::makeArrayRef(Identifier())),
-                 paren->hasTrailingClosure() };
-      }
-
-      // Type representations.
-      // FIXME: This should never happen, but
-      // PreCheckExpression::simplifyTypeExpr() tends to pull in the
-      // parentheses of call arguments overly eagerly, and the fix
-      // implies enforcing ".self" more rigorously than we do now,
-      // which is at odds with the expected direction of SE-0090.
-      if (auto typeExpr = dyn_cast<TypeExpr>(arg)) {
-        auto typeRepr = typeExpr->getTypeRepr();
-        auto tupleType = cast<TupleTypeRepr>(typeRepr);
-
-        // Collect the names.
-        SmallVector<Identifier, 4> names;
-        names.reserve(tupleType->getElements().size());
-        for (auto elt : tupleType->getElements()) {
-          if (auto named = dyn_cast<NamedTypeRepr>(elt))
-            names.push_back(named->getName());
-          else
-            names.push_back(Identifier());
-        }
-
-        return ArgumentLabelState{CS.allocateCopy(names), false};
-      }
-
-      // Tuples.
-      auto tuple = cast<TupleExpr>(arg);
-
-      // If we have element names, use 'em.
-      if (tuple->hasElementNames()) {
-        return ArgumentLabelState{tuple->getElementNames(),
-                                  tuple->hasTrailingClosure()};
-      }
-
-      // Otherwise, there are no argument labels.
-      llvm::SmallVector<Identifier, 4> names(tuple->getNumElements(),
-                                             Identifier());
-      return ArgumentLabelState{CS.allocateCopy(names),
-                                tuple->hasTrailingClosure()};
-    }
-
     Type visitApplyExpr(ApplyExpr *expr) {
       Type outputTy;
       
       auto fnExpr = expr->getFn();
-
-      // Identify and record the argument labels for a call.
-      if (auto call = dyn_cast<CallExpr>(expr)) {
-        auto argumentLabels = getArgumentLabelsForCallArgument(expr->getArg());
-        auto callee = call->getDirectCallee();
-        CS.CalleeArgumentLabels[CS.getConstraintLocator(callee)] =
-          argumentLabels;
-      }
-
+      
       if (isa<DeclRefExpr>(fnExpr)) {
         if (auto fnType = fnExpr->getType()->getAs<AnyFunctionType>()) {
           outputTy = fnType->getResult();
@@ -2594,7 +2536,7 @@ namespace {
       FunctionType::ExtInfo extInfo;
       if (isa<ClosureExpr>(fnExpr->getSemanticsProvidingExpr()))
         extInfo = extInfo.withNoEscape();
-
+      
       auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy,
                                       extInfo);
 
@@ -3057,11 +2999,86 @@ namespace {
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
+
+  /// AST walker that records the keyword arguments provided at each
+  /// call site.
+  class ArgumentLabelWalker : public ASTWalker {
+    ConstraintSystem &CS;
+    llvm::DenseMap<Expr *, Expr *> ParentMap;
+
+  public:
+    ArgumentLabelWalker(ConstraintSystem &cs, Expr *expr) 
+      : CS(cs), ParentMap(expr->getParentMap()) { }
+
+    using State = ConstraintSystem::ArgumentLabelState;
+
+    void associateArgumentLabels(Expr *arg, State labels,
+                                 bool labelsArePermanent) {
+      // Our parent must be a call.
+      auto call = dyn_cast_or_null<CallExpr>(ParentMap[arg]);
+      if (!call) 
+        return;
+
+      // We must have originated at the call argument.
+      if (arg != call->getArg())
+        return;
+
+      // Dig out the function, looking through, parentheses, ?, and !.
+      auto fn = call->getFn();
+      do {
+        fn = fn->getSemanticsProvidingExpr();
+
+        if (auto force = dyn_cast<ForceValueExpr>(fn)) {
+          fn = force->getSubExpr();
+          continue;
+        }
+
+        if (auto bind = dyn_cast<BindOptionalExpr>(fn)) {
+          fn = bind->getSubExpr();
+          continue;
+        }
+
+        break;
+      } while (true);
+
+      // Record the labels.
+      if (!labelsArePermanent)
+        labels.Labels = CS.allocateCopy(labels.Labels);
+      CS.ArgumentLabels[CS.getConstraintLocator(fn)] = labels;
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      if (auto tuple = dyn_cast<TupleExpr>(expr)) {
+        if (tuple->hasElementNames())
+          associateArgumentLabels(expr,
+                                  { tuple->getElementNames(),
+                                    tuple->hasTrailingClosure() },
+                                  /*labelsArePermanent*/ true);
+        else {
+          llvm::SmallVector<Identifier, 4> names(tuple->getNumElements(),
+                                                 Identifier()); 
+          associateArgumentLabels(expr, { names, tuple->hasTrailingClosure() },
+                                  /*labelsArePermanent*/ false);
+        }
+      } else if (auto paren = dyn_cast<ParenExpr>(expr)) {
+        associateArgumentLabels(paren,
+                                { { Identifier() },
+                                  paren->hasTrailingClosure() },
+                                /*labelsArePermanent*/ false);
+      }
+
+      return { true, expr };
+    }
+  };
+
 } // end anonymous namespace
 
 Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   // Remove implicit conversions from the expression.
   expr = expr->walk(SanitizeExpr(getTypeChecker()));
+
+  // Walk the expression to associate labeled arguments.
+  expr->walk(ArgumentLabelWalker(*this, expr));
 
   // Walk the expression, generating constraints.
   ConstraintGenerator cg(*this);

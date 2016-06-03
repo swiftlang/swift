@@ -359,11 +359,15 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
   
   // A single unlabelled value is not a tuple.
   if (args.size() == 1 && labels[0].empty())
-    return ParenExpr::createImplicit(ctx, args[0]);
+    return args[0];
   
   return TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
                            SourceLoc(), false, IsImplicit);
 }
+
+
+
+
 
 /// Build a reference to the subscript index variables for this subscript
 /// accessor.
@@ -915,10 +919,8 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   //   (call_expr (decl_ref_expr(willSet)), (declrefexpr(value)))
   if (auto willSet = VD->getWillSetFunc()) {
     Expr *Callee = new (Ctx) DeclRefExpr(willSet, DeclNameLoc(), /*imp*/true);
-    Expr *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(),
+    auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(),
                                            /*imp*/true);
-    ValueDRE = ParenExpr::createImplicit(Ctx, ValueDRE);
-
     if (SelfDecl) {
       auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, DeclNameLoc(),
                                             /*imp*/true);
@@ -943,10 +945,8 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   // or:
   //   (call_expr (decl_ref_expr(didSet)), (decl_ref_expr(tmp)))
   if (auto didSet = VD->getDidSetFunc()) {
-    Expr *OldValueExpr = new (Ctx) DeclRefExpr(OldValue, DeclNameLoc(),
+    auto *OldValueExpr = new (Ctx) DeclRefExpr(OldValue, DeclNameLoc(),
                                                /*impl*/true);
-    OldValueExpr = ParenExpr::createImplicit(Ctx, OldValueExpr);
-
     Expr *Callee = new (Ctx) DeclRefExpr(didSet, DeclNameLoc(), /*imp*/true);
     if (SelfDecl) {
       auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, DeclNameLoc(),
@@ -1231,7 +1231,7 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
       // Type-check the expression.
       typeCheckExpression(InitValue, DC);
 
-      InitStorageParam = ParenExpr::createImplicit(Context, InitValue);
+      InitStorageParam = InitValue;
     } else {
       InitStorageParam = TupleExpr::createEmpty(Context,
                                                 SourceLoc(), SourceLoc(),
