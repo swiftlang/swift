@@ -2,6 +2,9 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/inherits_NSObject
 // RUN: %target-run %target-swift-reflection-test %t/inherits_NSObject | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
+// REQUIRES: objc_interop
+// REQUIRES: executable_test
+
 import Foundation
 
 import SwiftReflectionTest
@@ -37,7 +40,7 @@ reflect(object: inheritsNSObject)
 // CHECK-32: (class inherits_NSObject.InheritsNSObject)
 
 // CHECK-32: Type info:
-// CHECK-32: (class_instance size=4 alignment=8 stride=8 num_extra_inhabitants=0)
+// CHECK-32: (class_instance size=4 alignment=16 stride=16 num_extra_inhabitants=0)
 
 let sc = ContainsInheritsNSObject()
 reflect(object: sc)
@@ -58,7 +61,7 @@ reflect(object: sc)
 // CHECK-32: (class inherits_NSObject.ContainsInheritsNSObject)
 
 // CHECK-32:        Type info:
-// CHECK-32:        (class_instance size=12 alignment=8 stride=16 num_extra_inhabitants=0
+// CHECK-32:        (class_instance size=12 alignment=16 stride=16 num_extra_inhabitants=0
 // CHECK-32-NEXT:   (field name=a offset=4
 // CHECK-32-NEXT:     (reference kind=strong refcounting=unknown))
 // CHECK-32-NEXT:   (field name=_b offset=8
