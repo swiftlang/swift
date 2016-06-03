@@ -752,6 +752,9 @@ ERROR(instance_member_in_initializer,none,
       "cannot use instance member %0 within property initializer; "
       "property initializers run before 'self' is available", (DeclName))
 
+ERROR(invalid_initialization_parameter_same_type,none,
+      "invalid initializer call with same type %0 as parameter", (Type))
+
 ERROR(missing_argument_named,none,
       "missing argument for parameter %0 in call", (Identifier))
 ERROR(missing_argument_positional,none,

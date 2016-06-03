@@ -3099,10 +3099,8 @@ static bool isIntegerType(Type fromType, ConstraintSystem *CS) {
                                   CS);
 }
 
-/// Return true if the given type conforms to RawRepresentable, with an
-/// underlying type conforming to the given known protocol.
+/// Return true if the given type conforms to RawRepresentable.
 static Type isRawRepresentable(Type fromType,
-                               KnownProtocolKind kind,
                                ConstraintSystem *CS) {
   auto rawReprType =
     CS->TC.getProtocol(SourceLoc(), KnownProtocolKind::RawRepresentable);
@@ -3119,6 +3117,15 @@ static Type isRawRepresentable(Type fromType,
                                                          conformance,
                                   CS->getASTContext().getIdentifier("RawValue"),
                                                          &CS->TC);
+  return rawTy;
+}
+
+/// Return true if the given type conforms to RawRepresentable, with an
+/// underlying type conforming to the given known protocol.
+static Type isRawRepresentable(Type fromType,
+                               KnownProtocolKind kind,
+                               ConstraintSystem *CS) {
+  Type rawTy = isRawRepresentable(fromType, CS);
   if (!rawTy || !isLiteralConvertibleType(rawTy, kind, CS))
     return Type();
 
@@ -3798,6 +3805,45 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
           .highlight(UDE->getBase()->getSourceRange());
         return true;
       }
+  }
+
+  // Check the case where a raw-representable type is constructed from an
+  // argument with the same type:
+  //
+  //    MyEnumType(MyEnumType.foo)
+  //
+  // This is missing 'rawValue:' label, but a better fix is to just remove the
+  // unnecessary constructor call:
+  //
+  //    MyEnumType.foo
+  //
+  if (params.size() == 1 && args.size() == 1 &&
+      candidate.getDecl() && isa<ConstructorDecl>(candidate.getDecl()) &&
+      candidate.level == 1) {
+    CallArgParam &arg = args[0];
+    auto resTy = candidate.getResultType();
+    if (auto unwrappedOpt = resTy->getOptionalObjectType())
+      resTy = unwrappedOpt;
+    auto rawTy = isRawRepresentable(resTy, CCI.CS);
+    if (rawTy && resTy->getCanonicalType() == arg.Ty.getCanonicalTypeOrNull()) {
+      auto getInnerExpr = [](Expr *E) -> Expr* {
+        ParenExpr *parenE = dyn_cast<ParenExpr>(E);
+        if (!parenE)
+          return nullptr;
+        return parenE->getSubExpr();
+      };
+      Expr *innerE = getInnerExpr(argExpr);
+
+      InFlightDiagnostic diag = TC.diagnose(fnExpr->getLoc(),
+          diag::invalid_initialization_parameter_same_type, resTy);
+      diag.highlight((innerE ? innerE : argExpr)->getSourceRange());
+      if (innerE) {
+        // Remove the unnecessary constructor call.
+        diag.fixItRemoveChars(fnExpr->getLoc(), innerE->getStartLoc())
+          .fixItRemove(argExpr->getEndLoc());
+      }
+      return true;
+    }
   }
 
   // We only handle structural errors here.
