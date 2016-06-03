@@ -600,6 +600,13 @@ public:
     if (Cached != TypeCache.end())
       return Cached->second;
 
+    // If we see garbage data in the process of building a BuiltType, and get
+    // the same metadata address again, we will hit an infinite loop.
+    // Insert a negative result into the cache now so that, if we recur with
+    // the same address, we will return the negative result with the check
+    // just above.
+    TypeCache.insert({MetadataAddress, BuiltType()});
+
     auto Meta = readMetadata(MetadataAddress);
     if (!Meta) return BuiltType();
 
@@ -639,8 +646,10 @@ public:
           !Reader->readString(RemoteAddress(tupleMeta->Labels), labels))
         return BuiltType();
 
-      return Builder.createTupleType(elementTypes, std::move(labels),
-                                     /*variadic*/ false);
+      auto BuiltTuple = Builder.createTupleType(elementTypes, std::move(labels),
+                                                /*variadic*/ false);
+      TypeCache[MetadataAddress] = BuiltTuple;
+      return BuiltTuple;
     }
     case MetadataKind::Function: {
       auto Function = cast<TargetFunctionTypeMetadata<Runtime>>(Meta);
@@ -673,8 +682,11 @@ public:
 
       auto flags = FunctionTypeFlags().withConvention(Function->getConvention())
                                       .withThrows(Function->throws());
-      return Builder.createFunctionType(Arguments, ArgumentIsInOut,
-                                        Result, flags);
+      auto BuiltFunction = Builder.createFunctionType(Arguments,
+                                                      ArgumentIsInOut,
+                                                      Result, flags);
+      TypeCache[MetadataAddress] = BuiltFunction;
+      return BuiltFunction;
     }
     case MetadataKind::Existential: {
       auto Exist = cast<TargetExistentialTypeMetadata<Runtime>>(Meta);
@@ -684,7 +696,7 @@ public:
         auto ProtocolDescriptor = readProtocolDescriptor(ProtocolAddress);
         if (!ProtocolDescriptor)
           return BuiltType();
-        
+
         std::string MangledName;
         if (!Reader->readString(RemoteAddress(ProtocolDescriptor->Name),
                                 MangledName))
@@ -696,13 +708,17 @@ public:
 
         Protocols.push_back(Protocol);
       }
-      return Builder.createProtocolCompositionType(Protocols);
+      auto BuiltExist = Builder.createProtocolCompositionType(Protocols);
+      TypeCache[MetadataAddress] = BuiltExist;
+      return BuiltExist;
     }
     case MetadataKind::Metatype: {
       auto Metatype = cast<TargetMetatypeMetadata<Runtime>>(Meta);
       auto Instance = readTypeFromMetadata(Metatype->InstanceType);
       if (!Instance) return BuiltType();
-      return Builder.createMetatypeType(Instance);
+      auto BuiltMetatype = Builder.createMetatypeType(Instance);
+      TypeCache[MetadataAddress] = BuiltMetatype;
+      return BuiltMetatype;
     }
     case MetadataKind::ObjCClassWrapper: {
       auto objcWrapper = cast<TargetObjCClassWrapperMetadata<Runtime>>(Meta);
@@ -712,13 +728,17 @@ public:
       if (!readObjCClassName(classAddress, className))
         return BuiltType();
 
-      return Builder.createObjCClassType(std::move(className));
+      auto BuiltObjCClass = Builder.createObjCClassType(std::move(className));
+      TypeCache[MetadataAddress] = BuiltObjCClass;
+      return BuiltObjCClass;
     }
     case MetadataKind::ExistentialMetatype: {
       auto Exist = cast<TargetExistentialMetatypeMetadata<Runtime>>(Meta);
       auto Instance = readTypeFromMetadata(Exist->InstanceType);
       if (!Instance) return BuiltType();
-      return Builder.createExistentialMetatypeType(Instance);
+      auto BuiltExist = Builder.createExistentialMetatypeType(Instance);
+      TypeCache[MetadataAddress] = BuiltExist;
+      return BuiltExist;
     }
     case MetadataKind::ForeignClass: {
       auto namePtrAddress =
@@ -730,15 +750,20 @@ public:
       std::string name;
       if (!Reader->readString(RemoteAddress(namePtr), name))
         return BuiltType();
-      return Builder.createForeignClassType(std::move(name));
+      auto BuiltForeign = Builder.createForeignClassType(std::move(name));
+      TypeCache[MetadataAddress] = BuiltForeign;
+      return BuiltForeign;
     }
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
       // Treat these all as Builtin.NativeObject for type lowering purposes.
       return Builder.createBuiltinType("Bo");
-    case MetadataKind::Opaque:
-      return Builder.getOpaqueType();
+    case MetadataKind::Opaque: {
+      auto BuiltOpaque = Builder.getOpaqueType();
+      TypeCache[MetadataAddress] = BuiltOpaque;
+      return BuiltOpaque;
+    }
     }
   }
 
@@ -1165,7 +1190,7 @@ private:
     }
     if (!nominal) return BuiltType();
 
-    TypeCache.insert({metadata.getAddress(), nominal});
+    TypeCache[metadata.getAddress()] = nominal;
     return nominal;
   }
 
