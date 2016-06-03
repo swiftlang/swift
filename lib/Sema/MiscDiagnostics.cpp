@@ -1009,10 +1009,6 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
                        SourceRange typeRange) -> bool {
     if (typeRange.isInvalid())
       return false;
-    if (!baseTy) {
-      decl->dump();
-      base->dump();
-    }
 
     auto normalizeType = [](Type ty) -> Type {
       ty = ty->getInOutObjectType();
