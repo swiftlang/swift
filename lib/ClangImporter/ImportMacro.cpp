@@ -92,7 +92,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
                                        const clang::Token *signTok,
                                        const clang::Token &tok,
                                        const clang::MacroInfo *ClangN,
-                                       clang::QualType *castType) {
+                                       const clang::QualType *castType) {
   assert(tok.getKind() == clang::tok::numeric_constant &&
          "not a numeric token");
   {
@@ -225,11 +225,12 @@ static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,
                                 const clang::MacroInfo *MI,
                                 Identifier name,
                                 const clang::Token &tok,
-                                const clang::MacroInfo *ClangN) {
+                                const clang::MacroInfo *ClangN,
+                                const clang::QualType *castType = nullptr) {
   switch (tok.getKind()) {
   case clang::tok::numeric_constant:
     return importNumericLiteral(Impl, DC, MI, name, /*signTok*/nullptr, tok,
-                                ClangN, /*castType*/nullptr);
+                                ClangN, castType);
 
   case clang::tok::string_literal:
   case clang::tok::utf8_string_literal:
@@ -262,7 +263,8 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                               DeclContext *DC,
                               Identifier name,
                               const clang::MacroInfo *macro,
-                              const clang::MacroInfo *ClangN) {
+                              const clang::MacroInfo *ClangN,
+                              clang::QualType *castType = nullptr) {
   if (name.empty()) return nullptr;
 
   auto numTokens = macro->getNumTokens();
@@ -277,6 +279,37 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     numTokens -= 2;
   }
 
+  // Handle tokens starting with a type cast
+  bool castTypeIsId = false;
+  clang::QualType castClangType;
+  if (numTokens > 3 &&
+      tokenI[0].is(clang::tok::l_paren) &&
+      tokenI[1].is(clang::tok::identifier) &&
+      tokenI[2].is(clang::tok::r_paren)) {
+    if (castType) {
+      // this is a nested cast
+      return nullptr;
+    }
+
+    auto identifierInfo = tokenI[1].getIdentifierInfo();
+    if (identifierInfo->isStr("id")) {
+      castTypeIsId = true;
+    }
+    auto identifierName = identifierInfo->getName();
+    auto &identifier = impl.getClangASTContext().Idents.get(identifierName);
+    auto parsedType = impl.getClangSema().getTypeName(identifier,
+                                                    clang::SourceLocation(),
+                                                    /*scope*/nullptr);
+    if (parsedType) {
+      castClangType = parsedType.get();
+      castType = &castClangType;
+    } else {
+      return nullptr;
+    }
+    tokenI += 3;
+    numTokens -= 3;
+  }
+
   // FIXME: Ask Clang to try to parse and evaluate the expansion as a constant
   // expression instead of doing these special-case pattern matches.
   switch (numTokens) {
@@ -285,9 +318,16 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     // TODO: or <identifier>.
     const clang::Token &tok = *tokenI;
 
+    if (castTypeIsId && tok.is(clang::tok::numeric_constant)) {
+      auto *integerLiteral =
+        parseNumericLiteral<clang::IntegerLiteral>(impl, tok);
+      if (integerLiteral && integerLiteral->getValue() == 0)
+        return importNil(impl, DC, name, ClangN);
+    }
+
     // If it's a literal token, we might be able to translate the literal.
     if (tok.isLiteral()) {
-      return importLiteral(impl, DC, macro, name, tok, ClangN);
+      return importLiteral(impl, DC, macro, name, tok, ClangN, castType);
     }
 
     if (tok.is(clang::tok::identifier)) {
@@ -324,7 +364,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
     if (isSignToken(first) && second.is(clang::tok::numeric_constant))
       return importNumericLiteral(impl, DC, macro, name, &first, second, ClangN,
-                                  /*casttype*/ nullptr);
+                                  castType);
 
     // We also allow @"string".
     if (first.is(clang::tok::at) && isStringToken(second))
@@ -428,29 +468,6 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         tokenI[3].is(clang::tok::r_paren)) {
       return importStringLiteral(impl, DC, macro, name, tokenI[2],
                                  MappedStringLiteralKind::CFString, ClangN);
-    // Check for literals with a cast, e.g. "(cpu_type_t) 1"
-    } else if (tokenI[0].is(clang::tok::l_paren) &&
-               tokenI[1].is(clang::tok::identifier) &&
-               tokenI[2].is(clang::tok::r_paren) &&
-               tokenI[3].is(clang::tok::numeric_constant)) {
-      auto identifierInfo = tokenI[1].getIdentifierInfo();
-      if (identifierInfo->isStr("id")) {
-        auto *integerLiteral =
-          parseNumericLiteral<clang::IntegerLiteral>(impl, tokenI[3]);
-        if (!integerLiteral || integerLiteral->getValue() != 0)
-          break;
-        return importNil(impl, DC, name, ClangN);
-      }
-      auto identifierName = identifierInfo->getName();
-      auto &identifier = impl.getClangASTContext().Idents.get(identifierName);
-      auto castType = impl.getClangSema().getTypeName(identifier,
-                                                      clang::SourceLocation(),
-                                                      /*scope*/nullptr);
-      if (castType) {
-        auto clangTy = castType.get();
-        return importNumericLiteral(impl, DC, macro, name, /*signTok*/nullptr,
-                                    tokenI[3], ClangN, &clangTy);
-      }
     }
     break;
   }
@@ -467,22 +484,6 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       if (!integerLiteral || integerLiteral->getValue() != 0)
         break;
       return importNil(impl, DC, name, ClangN);
-    // Check for literals with a cast, e.g. "(cpu_type_t) -1"
-    } else if (tokenI[0].is(clang::tok::l_paren) &&
-               tokenI[1].is(clang::tok::identifier) &&
-               tokenI[2].is(clang::tok::r_paren) &&
-               isSignToken(tokenI[3]) &&
-               tokenI[4].is(clang::tok::numeric_constant)) {
-      auto identifierName = tokenI[1].getIdentifierInfo()->getName();
-      auto &identifier = impl.getClangASTContext().Idents.get(identifierName);
-      auto castType = impl.getClangSema().getTypeName(identifier,
-                                                      clang::SourceLocation(),
-                                                      /*scope*/nullptr);
-      if (castType) {
-        auto clangTy = castType.get();
-        return importNumericLiteral(impl, DC, macro, name, &tokenI[3],
-                                    tokenI[4], ClangN, &clangTy);
-      }
     }
     break;
   default:
