@@ -24,6 +24,9 @@ from contextlib import contextmanager
 
 from . import diagnostics
 
+
+DEVNULL = getattr(subprocess, 'DEVNULL', subprocess.PIPE)
+
 dry_run = False
 
 
@@ -88,7 +91,8 @@ def call(command, stderr=None, env=None, dry_run=None, echo=True):
             "': " + e.strerror)
 
 
-def capture(command, stderr=None, env=None, dry_run=None, echo=True):
+def capture(command, stderr=None, env=None, dry_run=None, echo=True,
+            optional=False):
     """
     capture(command, ...) -> str
 
@@ -106,8 +110,12 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True):
         _env = dict(os.environ)
         _env.update(env)
     try:
-        return subprocess.check_output(command, env=_env, stderr=stderr)
+        out = subprocess.check_output(command, env=_env, stderr=stderr)
+        # Coerce to `str` hack. not py3 `byte`, not py2 `unicode`.
+        return str(out.decode())
     except subprocess.CalledProcessError as e:
+        if optional:
+            return None
         diagnostics.fatal(
             "command terminated with a non-zero exit status " +
             str(e.returncode) + ", aborting")

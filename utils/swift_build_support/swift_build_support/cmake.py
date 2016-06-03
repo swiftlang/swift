@@ -14,9 +14,11 @@
 #
 # ----------------------------------------------------------------------------
 
-import subprocess
+from __future__ import absolute_import
 
 from numbers import Number
+
+from . import shell
 
 
 class CMakeOptions(object):
@@ -125,8 +127,8 @@ class CMake(object):
         toolchain = self.toolchain
         jobs = args.build_jobs
         if args.distcc:
-            jobs = str(subprocess.check_output(
-                [toolchain.distcc, '-j']).decode()).rstrip()
+            jobs = shell.capture([toolchain.distcc, '-j'],
+                                 dry_run=False, echo=False).rstrip()
 
         build_args = list(args.build_args)
 

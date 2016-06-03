@@ -22,8 +22,8 @@ except ImportError:
     from io import StringIO
 
 from swift_build_support.arguments import (
-    type as argtype,
     action as argaction,
+    type as argtype,
 )
 
 
