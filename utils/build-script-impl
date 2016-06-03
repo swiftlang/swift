@@ -1138,6 +1138,19 @@ if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swiftpm)
 fi
 
+# get_host_specific_variable(host, name)
+#
+# Get the value of a host-specific variable expected to have been passed by the
+# `build-script`.
+#
+# This is a total hack, and is part of the SR-237 migration.
+function get_host_specific_variable() {
+    local host="$1"
+    local name="$2"
+    local envvar_name="HOST_VARIABLE_${host//-/_}__${name}"
+    echo "${!envvar_name}"
+}
+
 function calculate_targets_for_host() {
     local host=$1
     
