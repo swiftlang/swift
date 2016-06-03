@@ -554,7 +554,7 @@ private:
     if (FixitAll)
       return true;
 
-    // Do not add a semi as it is wrong in most cases during migration
+    // Do not add a semi or comma as it is wrong in most cases during migration
     if (Info.ID == diag::statement_same_line_without_semi.ID ||
         Info.ID == diag::expected_separator.ID)
       return false;
