@@ -78,8 +78,7 @@ class OuterNonGenericClass {
       init(t: T) { super.init(); self.t = t }
     }
 
-    class InnerGenericClass<U> : OuterNonGenericClass // expected-error {{type 'InnerGenericClass' nested in generic function}}
-        where U : Racoon, U.Stripes == T {
+    class InnerGenericClass<U where U : Racoon, U.Stripes == T> : OuterNonGenericClass { // expected-error {{type 'InnerGenericClass' nested in generic function}}
       let t: T
 
       init(t: T) { super.init(); self.t = t }
@@ -152,8 +151,7 @@ class OuterGenericClass<T> {
       init(t: T) { super.init(); self.t = t }
     }
 
-    class InnerGenericClass<U> : OuterGenericClass<U> // expected-error {{type 'InnerGenericClass' nested in generic function}}
-      where U : Racoon, U.Stripes == T {
+    class InnerGenericClass<U where U : Racoon, U.Stripes == T> : OuterGenericClass<U> { // expected-error {{type 'InnerGenericClass' nested in generic function}}
       let t: T
 
       init(t: T) { super.init(); self.t = t }
