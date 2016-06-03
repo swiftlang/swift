@@ -142,3 +142,9 @@ var graph: Graph3
 
 class GraphNoFix<NodeType : SomeProt> {}
 var graph: GraphNoFix
+
+func evilCommas(s: String) {
+  _ = s[s.startIndex..<<#editorplaceholder#>]
+  _ = true ? s[s.startIndex..<<#editorplaceholder#>] : ""
+  _ = [s.startIndex..<<#editorplaceholder#>]
+}
