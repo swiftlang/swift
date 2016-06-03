@@ -2138,9 +2138,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                # FIXME: Foundation doesn't build from the script on OSX
+                # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
-                    echo "Skipping Foundation on OSX -- use the XCode project instead"
+                    echo "Skipping Foundation on OS X -- use the XCode project instead"
                     continue
                 fi
     
@@ -2393,9 +2393,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 continue
                 ;;
             foundation)
-                # FIXME: Foundation doesn't build from the script on OSX
+                # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
-                    echo "Skipping Foundation on OSX -- use the XCode project instead"
+                    echo "Skipping Foundation on OS X -- use the XCode project instead"
                     continue
                 fi
                 if [[ "${SKIP_TEST_FOUNDATION}" ]]; then
@@ -2602,9 +2602,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 continue
                 ;;
             foundation)
-                # FIXME: Foundation doesn't build from the script on OSX
+                # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
-                    echo "Skipping Foundation on OSX -- use the XCode project instead"
+                    echo "Skipping Foundation on OS X -- use the XCode project instead"
                     continue
                 fi
                 if [[ -z "${INSTALL_FOUNDATION}" ]] ; then
@@ -2767,7 +2767,7 @@ function build_and_test_installable_package() {
           with_pushd "${host_install_destdir}" \
               call tar -c -z -f "${package_for_host}" "${TOOLCHAIN_PREFIX/#\/}"
         else
-            # tar on OSX doesn't support --owner/--group.
+            # tar on OS X doesn't support --owner/--group.
             if [[ "$(uname -s)" == "Darwin" ]] ; then
                 with_pushd "${host_install_destdir}" \
                     tar -c -z -f "${package_for_host}" "${host_install_prefix/#\/}"

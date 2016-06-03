@@ -3857,7 +3857,7 @@ shouldApplyAddingLabelFixit(TuplePattern *tuplePattern, TupleType *fromTuple,
     if (curFrom->getElements().size() != n ||
         curTo->getElements().size() != n)
       return false;
-    for (unsigned i = 0; i < n; i ++) {
+    for (unsigned i = 0; i < n; i++) {
       Pattern* subPat = curPattern->getElement(i).getPattern();
       const TupleTypeElt &subFrom = curFrom->getElement(i);
       const TupleTypeElt &subTo = curTo->getElement(i);

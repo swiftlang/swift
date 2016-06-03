@@ -820,7 +820,7 @@ public:
   ProjectionTree(SILModule &Mod, SILType BaseTy);
   /// Construct an uninitialized projection tree, which can then be
   /// initialized by initializeWithExistingTree.
-  ProjectionTree(SILModule &Mod) : Mod(Mod)  {}
+  ProjectionTree(SILModule &Mod) : Mod(Mod) {}
   ~ProjectionTree();
   ProjectionTree(const ProjectionTree &) = delete;
   ProjectionTree(ProjectionTree &&) = default;

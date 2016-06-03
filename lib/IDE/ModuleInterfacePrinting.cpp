@@ -292,7 +292,7 @@ void swift::ide::printSubmoduleInterface(
   if (InterestingClangModule) {
     // Assume all submodules are missing.
     for (auto It =InterestingClangModule->submodule_begin();
-         It != InterestingClangModule->submodule_end(); It ++) {
+         It != InterestingClangModule->submodule_end(); It++) {
       NoImportSubModules.insert(*It);
     }
   }

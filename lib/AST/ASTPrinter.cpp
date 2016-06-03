@@ -68,7 +68,7 @@ collectNameTypeMap(Type Ty, const DeclContext *DC) {
     assert(ParamDecls.size() == Args.size());
 
     // Map type parameter names with their instantiating arguments.
-    for (unsigned I = 0, N = ParamDecls.size(); I < N; I ++) {
+    for (unsigned I = 0, N = ParamDecls.size(); I < N; I++) {
       (*IdMap)[ParamDecls[I]->getName().str()] = Args[I];
     }
   } while ((BaseTy = BaseTy->getSuperclass(nullptr)));
