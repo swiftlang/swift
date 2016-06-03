@@ -135,7 +135,7 @@ macro(add_sourcekit_library name)
         ${SOURCEKIT_SOURCE_DIR}/include/SourceKit/${lib_path}/*.td
       )
       source_group("TableGen descriptions" FILES ${tds})
-      set_source_files_properties(${tds}} PROPERTIES HEADER_FILE_ONLY ON)
+      set_source_files_properties(${tds} PROPERTIES HEADER_FILE_ONLY ON)
 
       set(srcs ${srcs} ${headers} ${tds})
     endif()
