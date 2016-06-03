@@ -18,9 +18,8 @@
 
 from __future__ import absolute_import
 
-import subprocess
-
 from . import cache_util
+from . import shell
 
 
 @cache_util.cached
@@ -35,8 +34,8 @@ def which(cmd):
     We provide our own implementation because shutil.which() has not
     been backported to Python 2.7, which we support.
     """
-    try:
-        ret = subprocess.check_output(['which', cmd])
-        return str(ret.rstrip().decode())
-    except subprocess.CalledProcessError:
+    out = shell.capture(['which', cmd],
+                        dry_run=False, echo=False, optional=True)
+    if out is None:
         return None
+    return out.rstrip()

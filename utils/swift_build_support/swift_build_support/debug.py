@@ -14,18 +14,12 @@
 #
 # ----------------------------------------------------------------------------
 
+from __future__ import absolute_import
 from __future__ import print_function
 
-import subprocess
 import sys
 
-
-def _output(args):
-    try:
-        out = subprocess.check_output(args, stderr=subprocess.PIPE)
-        return out.rstrip().decode()
-    except subprocess.CalledProcessError:
-        return None
+from . import shell
 
 
 def print_xcodebuild_versions(file=sys.stdout):
@@ -33,10 +27,16 @@ def print_xcodebuild_versions(file=sys.stdout):
     Print the host machine's `xcodebuild` version, as well as version
     information for all available SDKs.
     """
-    print(u'{}\n'.format(_output(['xcodebuild', '-version'])), file=file)
-    print(u'--- SDK versions ---', file=file)
-    print(u'{}\n'.format(_output(['xcodebuild', '-version', '-sdk'])),
-          file=file)
+    version = shell.capture(
+        ['xcodebuild', '-version'], dry_run=False, echo=False).rstrip()
+    sdks = shell.capture(
+        ['xcodebuild', '-version', '-sdk'], dry_run=False, echo=False).rstrip()
+    fmt = """\
+{version}
+
+--- SDK versions ---
+{sdks}
+
+"""
+    print(fmt.format(version=version, sdks=sdks), file=file)
     file.flush()
-    # You can't test beyond this because each developer's machines may have
-    # a different set of SDKs installed.

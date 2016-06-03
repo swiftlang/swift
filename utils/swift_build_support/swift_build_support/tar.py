@@ -11,7 +11,6 @@
 from __future__ import absolute_import
 
 import platform
-import subprocess
 
 from . import shell
 
@@ -29,7 +28,7 @@ def tar(source, destination):
     if platform.system() != 'Darwin':
         args += ['--owner=0', '--group=0']
 
-    # Capture stderr output such as 'tar: Failed to open ...'. We'll detect
-    # these cases using the exit code, which should cause 'check_call' to
+    # Discard stderr output such as 'tar: Failed to open ...'. We'll detect
+    # these cases using the exit code, which should cause 'shell.call' to
     # raise.
-    shell.call(args + [source], stderr=subprocess.PIPE)
+    shell.call(args + [source], stderr=shell.DEVNULL)

@@ -69,6 +69,11 @@ class ShellTestCase(unittest.TestCase):
         with self.assertRaises(SystemExit):
             shell.capture(["false"])
 
+        self.assertIsNone(shell.capture(["false"], optional=True))
+
+        with self.assertRaises(SystemExit):
+            shell.capture(["**not-a-command**"], optional=True)
+
     def test_rmtree(self):
         shell.dry_run = False
         path = os.path.join(self.tmpdir, 'foo', 'bar')
