@@ -374,6 +374,10 @@ class BuildScriptInvocation(object):
                 pipes.quote(arg) for arg in cmake.build_args()),
         ]
 
+        if args.cross_compile_hosts:
+            impl_args += [
+                "--cross-compile-hosts", " ".join(args.cross_compile_hosts)]
+        
         if toolchain.ninja:
             impl_args += ["--ninja-bin=%s" % toolchain.ninja]
         if args.distcc:
@@ -815,6 +819,12 @@ details of the setups of other systems or automated environments.""")
              "target. The built LLVM and Clang will be used to compile Swift "
              "for the cross-compilation targets.",
         default=StdlibDeploymentTarget.host_target())
+    targets_group.add_argument(
+        "--cross-compile-hosts",
+        help="A space separated list of targets to cross-compile host Swift "
+             "tools for. Can be used multiple times.",
+        action=arguments.action.concat, type=arguments.type.shell_split,
+        default=[])
     targets_group.add_argument(
         "--stdlib-deployment-targets",
         help="list of targets to compile or cross-compile the Swift standard "
