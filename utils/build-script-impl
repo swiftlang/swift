@@ -646,19 +646,6 @@ function set_build_options_for_host() {
     )
 }
 
-# get_setting_varname(setting-name) -> variable-name
-#
-# Converts a known setting name, like "install-prefix" to an internal variable
-# name, like "INSTALL_PREFIX".
-#
-# \returns Empty if the setting is not a known one.
-function get_setting_varname() {
-    local setting="$1"
-    # Look up in the associative array built by configure_default_options().
-    local setting_varname_var="${setting//-/_}_VARNAME"
-    echo ${!setting_varname_var}
-}
-
 function configure_default_options() {
     # Build a table of all of the known setting variables names.
     #
@@ -672,7 +659,8 @@ function configure_default_options() {
 
     # Build up an "associative array" mapping setting names to variable names
     # (we use this for error checking to identify "known options", and as a fast
-    # way to map the setting name to a variable name). See get_setting_varname().
+    # way to map the setting name to a variable name). See the code for scanning
+    # command line arguments.
     #
     # This loop also sets (or unsets) each corresponding variable to its default
     # value.
@@ -759,8 +747,10 @@ while [[ "$1" ]] ; do
             # drop suffix beginning with the first "="
             setting="${dashless%%=*}"
 
-            # compute the variable to set
-            varname=$(get_setting_varname $setting)
+            # compute the variable to set, using the cached map set up by
+            # configure_default_options().
+            varname_var="${setting//-/_}_VARNAME"
+            varname=${!varname_var}
 
             # check to see if this is a known option
             if [[ "${varname}" = "" ]] ; then
