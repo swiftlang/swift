@@ -1,4 +1,4 @@
-//===--- ErrorObject.cpp - Recoverable error object -----------------------===//
+//===--- ErrorObjectNative.cpp - Recoverable error object -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
