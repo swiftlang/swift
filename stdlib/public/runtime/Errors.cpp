@@ -14,6 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(_MSC_VER)
+#  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
+#else
+#  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,9 +28,6 @@
 #include <io.h>
 #else
 #include <unistd.h>
-#endif
-#if !defined(_MSC_VER)
-#include <pthread.h>
 #endif
 #include <stdarg.h>
 #include "swift/Runtime/Debug.h"
@@ -35,7 +38,7 @@
 #if !defined(_MSC_VER)
 #include <cxxabi.h>
 #endif
-#if !defined(__CYGWIN__) && !defined(__ANDROID__) && !defined(_MSC_VER)
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
 
 // execinfo.h is not available on Android. Checks in this file ensure that
 // fatalError behaves as expected, but without stack traces.
@@ -57,7 +60,7 @@ enum: uint32_t {
 
 using namespace swift;
 
-#if !defined(__CYGWIN__) && !defined(__ANDROID__) && !defined(_MSC_VER)
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
 
 static bool getSymbolNameAddr(llvm::StringRef libraryName, Dl_info dlinfo,
                               std::string &symbolName, uintptr_t &addrOut) {
@@ -203,7 +206,7 @@ reportNow(uint32_t flags, const char *message)
 #ifdef __APPLE__
   asl_log(NULL, NULL, ASL_LEVEL_ERR, "%s", message);
 #endif
-#if !defined(__CYGWIN__) && !defined(__ANDROID__) && !defined(_MSC_VER)
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   if (flags & FatalErrorFlags::ReportBacktrace) {
     fputs("Current stack trace:\n", stderr);
     constexpr unsigned maxSupportedStackDepth = 128;
@@ -225,6 +228,26 @@ void swift::swift_reportError(uint32_t flags,
   reportOnCrash(flags, message);
 }
 
+static int swift_vasprintf(char **strp, const char *fmt, va_list ap) {
+#if defined(_MSC_VER)
+  int len = _vscprintf(fmt, ap);
+  if (len < 0)
+    return -1;
+  char *buffer = reinterpret_cast<char *>(malloc(len + 1));
+  if (!buffer)
+    return -1;
+  int result = vsprintf(*strp, fmt, ap);
+  if (result < 0) {
+    free(buffer);
+    return -1;
+  }
+  *strp = buffer;
+  return result;
+#else
+  return vasprintf(strp, fmt, ap);
+#endif
+}
+
 // Report a fatal error to system console, stderr, and crash logs, then abort.
 LLVM_ATTRIBUTE_NORETURN
 void
@@ -234,13 +257,7 @@ swift::fatalError(uint32_t flags, const char *format, ...)
   va_start(args, format);
 
   char *log;
-#if defined(_MSC_VER)
-  int len = _vscprintf(format, args) + 1;
-  log = reinterpret_cast<char *>(malloc(len));
-  vsprintf(log, format, args);
-#else
-  vasprintf(&log, format, args);
-#endif
+  swift_vasprintf(&log, format, args);
 
   swift_reportError(flags, log);
   abort();

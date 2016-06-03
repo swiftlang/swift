@@ -34,12 +34,6 @@
 #include <link.h>
 #endif
 
-#if defined(_MSC_VER)
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
-
 using namespace swift;
 using namespace Demangle;
 

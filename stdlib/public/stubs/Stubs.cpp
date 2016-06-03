@@ -265,7 +265,7 @@ ssize_t swift::swift_stdlib_readLine_stdin(char **LinePtr) {
   if (LinePtr == nullptr)
     return -1;
 
-  int Capacity = 0;
+  ssize_t Capacity = 0;
   ssize_t Pos = 0;
   char *ReadBuf = nullptr;
 
