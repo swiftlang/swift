@@ -209,10 +209,10 @@ let floatNextUpDownTests: [(Float, Float)] = [
 FloatingPoint.test("Float.nextUp, .nextDown")
   .forEach(in: floatNextUpDownTests) {
   (prev, succ) in
-  expectEqual(succ.bitPattern, prev.nextUp.bitPattern)
-  expectEqual(prev.bitPattern, succ.nextDown.bitPattern)
-  expectEqual((-succ).bitPattern, (-prev).nextDown.bitPattern)
-  expectEqual((-prev).bitPattern, (-succ).nextUp.bitPattern)  
+  expectBitwiseEqual(succ, prev.nextUp)
+  expectBitwiseEqual(prev, succ.nextDown)
+  expectBitwiseEqual(-succ, (-prev).nextDown)
+  expectBitwiseEqual(-prev, (-succ).nextUp)
 }
 
 let doubleNextUpDownTests: [(Double, Double)] = [
@@ -227,10 +227,10 @@ let doubleNextUpDownTests: [(Double, Double)] = [
 FloatingPoint.test("Double.nextUp, .nextDown")
   .forEach(in: doubleNextUpDownTests) {
   (prev, succ) in
-  expectEqual(succ.bitPattern, prev.nextUp.bitPattern)
-  expectEqual(prev.bitPattern, succ.nextDown.bitPattern)
-  expectEqual((-succ).bitPattern, (-prev).nextDown.bitPattern)
-  expectEqual((-prev).bitPattern, (-succ).nextUp.bitPattern)  
+  expectBitwiseEqual(succ, prev.nextUp)
+  expectBitwiseEqual(prev, succ.nextDown)
+  expectBitwiseEqual(-succ, (-prev).nextDown)
+  expectBitwiseEqual(-prev, (-succ).nextUp)
 }
 
 #if arch(i386) || arch(x86_64)
