@@ -504,7 +504,7 @@ class FormatWalker : public SourceEntityWalker {
       if (auto TE = dyn_cast_or_null<TupleExpr>(Node.dyn_cast<Expr *>())) {
         // Trailing closures are not considered siblings to other args.
         unsigned EndAdjust = TE->hasTrailingClosure() ? 1 : 0;
-        for (unsigned I = 0, N = TE->getNumElements() - EndAdjust; I < N; I ++) {
+        for (unsigned I = 0, N = TE->getNumElements() - EndAdjust; I < N; I++) {
           auto EleStart = TE->getElementNameLoc(I);
           if (EleStart.isInvalid()) {
             EleStart = TE->getElement(I)->getStartLoc();
