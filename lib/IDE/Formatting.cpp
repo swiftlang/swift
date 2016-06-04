@@ -550,18 +550,19 @@ class FormatWalker : public SourceEntityWalker {
         // FIXME: We are going to revisit the behavior and the indentation we
         // want for dictionary/array literals.
         //
-        /* SourceLoc LBracketLoc = AE->getLBracketLoc();
+#ifdef 0
+        SourceLoc LBracketLoc = AE->getLBracketLoc();
         if (isTargetImmediateAfter(LBracketLoc) &&
             !sameLineWithTarget(LBracketLoc)) {
           FoundSibling = LBracketLoc;
           NeedExtraIndentation = true;
-        }*/
+        }
+#endif
         for (unsigned I = 0, N = AE->getNumElements(); I < N; I++) {
           addPair(AE->getElement(I)->getEndLoc(),
                   FindAlignLoc(AE->getElement(I)->getStartLoc()), tok::comma);
         }
       }
-
       // Case label items in a case statement are siblings.
       if (auto CS = dyn_cast_or_null<CaseStmt>(Node.dyn_cast<Stmt *>())) {
         for (const CaseLabelItem& Item : CS->getCaseLabelItems()) {
