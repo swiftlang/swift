@@ -2143,7 +2143,7 @@ ERROR(closure_implicit_capture_mutating_self,none,
       "closure cannot implicitly capture a mutating self parameter",
       ())
 ERROR(nested_function_with_implicit_capture_argument,none,
-      "nested function with %select{a |}0implicitly captured inout "
+      "nested function with %select{an |}0implicitly captured inout "
       "parameter%select{|s}0 can only be used as a @noescape argument", (bool))
 ERROR(nested_function_escaping_inout_capture,none,
       "nested function cannot capture inout parameter and escape", ())
