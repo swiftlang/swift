@@ -484,6 +484,13 @@ extension ${Self}: BinaryFloatingPoint {
         exponentBitPattern: exponentBitPattern + 1,
         significandBitPattern: 0)
     }
+#if arch(arm)
+    // On arm, subnormals are skipped.
+    if exponentBitPattern == 0 {
+      _sanityCheck(self < .leastNonzeroMagnitude, "subnormal out of range")
+      return .leastNonzeroMagnitude
+    }
+#endif
     return ${Self}(sign: .plus,
       exponentBitPattern: exponentBitPattern,
       significandBitPattern: significandBitPattern + 1)
