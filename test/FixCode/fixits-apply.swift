@@ -36,6 +36,7 @@ struct MyEventMask2 : OptionSet {
   var rawValue: UInt64 { return 0 }
 }
 func sendIt(_: MyEventMask2) {}
+func sendItOpt(_: MyEventMask2?) {}
 func testMask1(a: Int) {
   sendIt(a)
 }
@@ -47,6 +48,9 @@ func testMask3(a: MyEventMask2) {
 }
 func testMask4(a: MyEventMask2) {
   testMask2(a: a)
+}
+func testMask5(a: Int) {
+  sendItOpt(a)
 }
 
 enum MyEnumType : UInt32 {
