@@ -1306,6 +1306,40 @@ function calculate_targets_for_host() {
     # Filter duplicate SWIFT_SDKs
     # We will get them if building for multiple architecture variants
     SWIFT_SDKS=(`echo "${SWIFT_SDKS[@]}" | tr " " "\n" | sort -u | tr "\n" " "`)
+
+    # Get the values passed by `build-script`.
+    LEGACY_SWIFT_STDLIB_TARGETS=(${SWIFT_STDLIB_TARGETS[@]})
+    LEGACY_SWIFT_SDKS=(${SWIFT_SDKS[@]})
+    LEGACY_SWIFT_BENCHMARK_TARGETS=(${SWIFT_BENCHMARK_TARGETS[@]})
+    LEGACY_SWIFT_RUN_BENCHMARK_TARGETS=(${SWIFT_RUN_BENCHMARK_TARGETS[@]})
+    LEGACY_SWIFT_TEST_TARGETS=(${SWIFT_TEST_TARGETS[@]})
+    SWIFT_STDLIB_TARGETS=($(get_host_specific_variable ${host} SWIFT_STDLIB_TARGETS))
+    SWIFT_SDKS=($(get_host_specific_variable ${host} SWIFT_SDKS))
+    SWIFT_BENCHMARK_TARGETS=($(get_host_specific_variable ${host} SWIFT_BENCHMARK_TARGETS))
+    SWIFT_RUN_BENCHMARK_TARGETS=($(get_host_specific_variable ${host} SWIFT_RUN_BENCHMARK_TARGETS))
+    SWIFT_TEST_TARGETS=($(get_host_specific_variable ${host} SWIFT_TEST_TARGETS))
+
+    # Validate the parameters match.
+    if [[ "${SWIFT_STDLIB_TARGETS[*]}" != "${LEGACY_SWIFT_STDLIB_TARGETS[*]}" ]]; then
+        printf "error: invalid build-script refactor for 'SWIFT_STDLIB_TARGETS': '%s' vs '%s'\n" "${SWIFT_STDLIB_TARGETS[*]}" "${LEGACY_SWIFT_STDLIB_TARGETS[*]}"
+        exit 1
+    fi
+    if [[ "${SWIFT_SDKS[*]}" != "${LEGACY_SWIFT_SDKS[*]}" ]]; then
+        printf "error: invalid build-script for 'SWIFT_SDKS' refactor: '%s' vs '%s'\n" "${SWIFT_SDKS[*]}" "${LEGACY_SWIFT_SDKS[*]}"
+        exit 1
+    fi
+    if [[ "${SWIFT_BENCHMARK_TARGETS[*]}" != "${LEGACY_SWIFT_BENCHMARK_TARGETS[*]}" ]]; then
+        printf "error: invalid build-script refactor for 'SWIFT_BENCHMARK_TARGETS': '%s' vs '%s'\n" "${SWIFT_BENCHMARK_TARGETS[*]}" "${LEGACY_SWIFT_BENCHMARK_TARGETS[*]}"
+        exit 1
+    fi
+    if [[ "${SWIFT_RUN_BENCHMARK_TARGETS[*]}" != "${LEGACY_SWIFT_RUN_BENCHMARK_TARGETS[*]}" ]]; then
+        printf "error: invalid build-script refactor for 'SWIFT_RUN_BENCHMARK_TARGETS': '%s' vs '%s'\n" "${SWIFT_RUN_BENCHMARK_TARGETS[*]}" "${LEGACY_SWIFT_RUN_BENCHMARK_TARGETS[*]}"
+        exit 1
+    fi
+    if [[ "${SWIFT_TEST_TARGETS[*]}" != "${LEGACY_SWIFT_TEST_TARGETS[*]}" ]]; then
+        printf "error: invalid build-script refactor for 'SWIFT_TEST_TARGETS': '%s' vs '%s'\n" "${SWIFT_TEST_TARGETS[*]}" "${LEGACY_SWIFT_TEST_TARGETS[*]}"
+        exit 1
+    fi
 }
 
 

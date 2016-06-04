@@ -65,6 +65,118 @@ def call_without_sleeping(command, env=None, dry_run=False):
     shell.call(command, env=env, dry_run=dry_run)
 
 
+class HostSpecificConfiguration(object):
+    """Configuration information for an individual host."""
+
+    def __init__(self, host_target, invocation):
+        """Initialize for the given `host_target`."""
+
+        # Compute the set of deployment targets to configure/build.
+        args = invocation.args
+        if host_target == args.host_target:
+            # This host is the user's desired product, so honor the requested
+            # set of targets to configure/build.
+            stdlib_targets_to_configure = args.stdlib_deployment_targets
+            if "all" in args.build_stdlib_deployment_targets:
+                stdlib_targets_to_build = set(stdlib_targets_to_configure)
+            else:
+                stdlib_targets_to_build = set(
+                    args.build_stdlib_deployment_targets).intersect(
+                        set(args.stdlib_deployment_targets))
+        else:
+            # Otherwise, this is a host we are building as part of
+            # cross-compiling, so we only need the target itself.
+            stdlib_targets_to_configure = [host_target]
+            stdlib_targets_to_build = set(stdlib_targets_to_configure)
+
+        # Compute the lists of **CMake** targets for each use case (configure
+        # vs. build vs. run) and the SDKs to configure with.
+        self.sdks_to_configure = set()
+        self.swift_stdlib_build_targets = []
+        self.swift_test_run_targets = []
+        self.swift_benchmark_build_targets = []
+        self.swift_benchmark_run_targets = []
+        for deployment_target_name in stdlib_targets_to_configure:
+            # Get the target object.
+            deployment_target = StdlibDeploymentTarget.get_target_for_name(
+                deployment_target_name)
+            if deployment_target is None:
+                diagnostics.fatal("unknown target: %r" % (
+                    deployment_target_name,))
+
+            # Add the SDK to use.
+            deployment_platform = deployment_target.platform
+            self.sdks_to_configure.add(deployment_platform.sdk_name)
+
+            # If we aren't actually building this target (only configuring
+            # it), do nothing else.
+            if deployment_target_name not in stdlib_targets_to_build:
+                continue
+
+            # Compute which actions are desired.
+            build = deployment_platform not in \
+                    invocation.platforms_to_skip_build
+            test = deployment_platform not in \
+                   invocation.platforms_to_skip_test
+            test_host_only = None
+            build_benchmark = build and deployment_target.supports_benchmark
+            # FIXME: Note, `build-script-impl` computed a property here
+            # w.r.t. testing, but it was actually unused.
+
+            # For platforms which normally require a connected device to
+            # test, the default behavior is to run tests that only require
+            # the host (i.e., they do not attempt to execute).
+            if deployment_platform.is_darwin and \
+               deployment_platform.is_embedded and \
+               not deployment_platform.is_simulator:
+                if deployment_platform not in \
+                       invocation.platforms_to_skip_test_host:
+                    test_host_only = True
+                    test = True
+                else:
+                    test = False
+
+            name = deployment_target.name
+            if build:
+                # Validation and long tests require building the full standard
+                # library, whereas the other targets can build a slightly
+                # smaller subset which is faster to build.
+                if args.build_swift_stdlib_unittest_extra or \
+                       args.validation_test or args.long_test:
+                    self.swift_stdlib_build_targets.append(
+                        "swift-stdlib-" + name)
+                else:
+                    self.swift_stdlib_build_targets.append(
+                        "swift-test-stdlib-" + name)
+            if build_benchmark:
+                self.swift_benchmark_build_targets.append(
+                    "swift-benchmark-" + name)
+                # FIXME: This probably should respect `args.benchmark`, but
+                # a typo in build-script-impl meant we always would do this.
+                self.swift_benchmark_run_targets.append(
+                    "check-swift-benchmark-" + name)
+            if test:
+                if test_host_only:
+                    suffix = "-non-executable"
+                else:
+                    suffix = ""
+                subset_suffix = ""
+                if args.validation_test and args.long_test:
+                    subset_suffix = "-all"
+                elif args.validation_test:
+                    subset_suffix = "-validation"
+                elif args.long_test:
+                    subset_suffix = "-only_long"
+                else:
+                    subset_suffix = ""
+                self.swift_test_run_targets.append("check-swift{}{}-{}".format(
+                    subset_suffix, suffix, name))
+                if args.test_optimized and not test_host_only:
+                    self.swift_test_run_targets.append(
+                        "check-swift{}-optimize-{}".format(
+                            subset_suffix, name))
+
+
 class BuildScriptInvocation(object):
     """Represent a single build script invocation."""
 
@@ -291,6 +403,77 @@ class BuildScriptInvocation(object):
             source_root=SWIFT_SOURCE_ROOT,
             build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
 
+        # Compute derived information from the arguments.
+        #
+        # FIXME: We should move the platform-derived arguments to be entirely
+        # data driven, so that we can eliminate this code duplication and just
+        # iterate over all supported platforms.
+
+        self.platforms_to_skip_build = set()
+        if args.skip_build_linux:
+            self.platforms_to_skip_build.add(StdlibDeploymentTarget.Linux)
+        if args.skip_build_freebsd:
+            self.platforms_to_skip_build.add(StdlibDeploymentTarget.FreeBSD)
+        if args.skip_build_cygwin:
+            self.platforms_to_skip_build.add(StdlibDeploymentTarget.Cygwin)
+        if args.skip_build_osx:
+            self.platforms_to_skip_build.add(StdlibDeploymentTarget.OSX)
+        if args.skip_build_ios_device:
+            self.platforms_to_skip_build.add(StdlibDeploymentTarget.iOS)
+        if args.skip_build_ios_simulator:
+            self.platforms_to_skip_build.add(
+                StdlibDeploymentTarget.iOSSimulator)
+        if args.skip_build_tvos_device:
+            self.platforms_to_skip_build.add(StdlibDeploymentTarget.AppleTV)
+        if args.skip_build_tvos_simulator:
+            self.platforms_to_skip_build.add(
+                StdlibDeploymentTarget.AppleTVSimulator)
+        if args.skip_build_watchos_device:
+            self.platforms_to_skip_build.add(StdlibDeploymentTarget.AppleWatch)
+        if args.skip_build_watchos_simulator:
+            self.platforms_to_skip_build.add(
+                StdlibDeploymentTarget.AppleWatchSimulator)
+        if args.skip_build_android:
+            self.platforms_to_skip_build.add(StdlibDeploymentTarget.Android)
+
+        self.platforms_to_skip_test = set()
+        if args.skip_test_linux:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.Linux)
+        if args.skip_test_freebsd:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.FreeBSD)
+        if args.skip_test_cygwin:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.Cygwin)
+        if args.skip_test_osx:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.OSX)
+        if args.skip_test_ios_host:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
+        if args.skip_test_ios_simulator:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.iOSSimulator)
+        if args.skip_test_tvos_host:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
+        if args.skip_test_tvos_simulator:
+            self.platforms_to_skip_test.add(
+                StdlibDeploymentTarget.AppleTVSimulator)
+        if args.skip_test_watchos_host:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
+        if args.skip_test_watchos_simulator:
+            self.platforms_to_skip_test.add(
+                StdlibDeploymentTarget.AppleWatchSimulator)
+        # We never allow testing Android, currently.
+        #
+        # FIXME: Allow Android host tests to be enabled/disabled by the build
+        # script.
+        self.platforms_to_skip_test.add(StdlibDeploymentTarget.Android)
+
+        self.platforms_to_skip_test_host = set()
+        if args.skip_test_ios_host:
+            self.platforms_to_skip_test_host.add(StdlibDeploymentTarget.iOS)
+        if args.skip_test_tvos_host:
+            self.platforms_to_skip_test_host.add(StdlibDeploymentTarget.AppleTV)
+        if args.skip_test_watchos_host:
+            self.platforms_to_skip_test_host.add(
+                StdlibDeploymentTarget.AppleWatch)
+
     def initialize_runtime_environment(self):
         """Change the program environment for building."""
 
@@ -381,7 +564,7 @@ class BuildScriptInvocation(object):
         if args.cross_compile_hosts:
             impl_args += [
                 "--cross-compile-hosts", " ".join(args.cross_compile_hosts)]
-        
+
         if toolchain.ninja:
             impl_args += ["--ninja-bin=%s" % toolchain.ninja]
         if args.distcc:
@@ -565,7 +748,29 @@ class BuildScriptInvocation(object):
         Compute the host-specific options, organized as a dictionary keyed by
         host of options.
         """
-        return {}
+
+        args = self.args
+
+        options = {}
+        for host in [args.host_target] + args.cross_compile_hosts:
+            # Compute the host specific configuration.
+            config = HostSpecificConfiguration(host, self)
+
+            # Convert into `build-script-impl` style variables.
+            options[host] = {
+                "SWIFT_SDKS": " ".join(sorted(
+                    config.sdks_to_configure)),
+                "SWIFT_STDLIB_TARGETS": " ".join(
+                    config.swift_stdlib_build_targets),
+                "SWIFT_BENCHMARK_TARGETS": " ".join(
+                    config.swift_benchmark_build_targets),
+                "SWIFT_RUN_BENCHMARK_TARGETS": " ".join(
+                    config.swift_benchmark_run_targets),
+                "SWIFT_TEST_TARGETS": " ".join(
+                    config.swift_test_run_targets),
+            }
+
+        return options
 
 
 # Main entry point for the preset mode.
@@ -850,6 +1055,7 @@ details of the setups of other systems or automated environments.""")
              "tools for. Can be used multiple times.",
         action=arguments.action.concat, type=arguments.type.shell_split,
         default=[])
+    stdlib_targets = StdlibDeploymentTarget.default_stdlib_deployment_targets()
     targets_group.add_argument(
         "--stdlib-deployment-targets",
         help="list of targets to compile or cross-compile the Swift standard "
@@ -857,8 +1063,7 @@ details of the setups of other systems or automated environments.""")
         nargs="*",
         default=[
             target.name
-            for target in
-                StdlibDeploymentTarget.default_stdlib_deployment_targets()])
+            for target in stdlib_targets])
     targets_group.add_argument(
         "--build-stdlib-deployment-targets",
         help="A space-separated list that filters which of the configured "
@@ -1527,6 +1732,7 @@ details of the setups of other systems or automated environments.""")
         "--build-jobs",
         "--common-cmake-options",
         "--only-execute",
+        "--skip-test-optimized",
         action=arguments.action.unavailable)
 
     args = migration.parse_args(parser, sys.argv[1:])
