@@ -31,6 +31,8 @@ syn keyword swiftKeyword
       \ var
       \ where
       \ while
+syn match swiftMultiwordKeyword
+      \ "indirect case"
 
 syn keyword swiftImport skipwhite nextgroup=swiftImportModule
       \ import
@@ -166,6 +168,7 @@ hi def link swiftImport Include
 hi def link swiftImportModule Title
 hi def link swiftImportComponent Identifier
 hi def link swiftKeyword Statement
+hi def link swiftMultiwordKeyword Statement
 hi def link swiftTypeDefinition Define
 hi def link swiftType Type
 hi def link swiftTypePair Type
