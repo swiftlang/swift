@@ -2048,6 +2048,21 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   if (superclassCtor->getGenericParams())
     return nullptr;
 
+  // Lookup will sometimes give us initializers that are from the ancestors of
+  // our immediate superclass.  So, from the superclass constructor, we look 
+  // one level up to the enclosing type context which will either be a class 
+  // or an extension.  We can use the type declared in that context to check
+  // if it's our immediate superclass and give up if we didn't.
+  // 
+  // FIXME: Remove this when lookup of initializers becomes restricted to our
+  // immediate superclass.
+  Type superclassTyInCtor = superclassCtor->getDeclContext()->getDeclaredTypeInContext();
+  Type superclassTy = classDecl->getSuperclass();
+  NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
+  if (superclassTyInCtor->getAnyNominal() != superclassDecl) {
+    return nullptr;
+  }
+
   // Determine the initializer parameters.
   auto &ctx = tc.Context;
 
@@ -2064,8 +2079,6 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   //
   // We might have to apply substitutions, if for example we have a declaration
   // like 'class A : B<Int>'.
-  auto superclassTy = classDecl->getSuperclass();
-  auto *superclassDecl = superclassTy->getAnyNominal();
   if (superclassDecl->isGenericTypeContext()) {
     if (auto *superclassSig = superclassDecl->getGenericSignatureOfContext()) {
       auto *moduleDecl = classDecl->getParentModule();
