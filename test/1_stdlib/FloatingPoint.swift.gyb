@@ -19,7 +19,7 @@ struct Float80Bits : Equatable, CustomStringConvertible {
   }
 
   var description: String {
-    return "(\(String(signAndExponent, radix: 16)) \(String(significand, radix: 16))))"
+    return "(\(String(signAndExponent, radix: 16)) \(String(significand, radix: 16)))"
   }
 }
 
