@@ -91,6 +91,29 @@ FloatingPoint.test("Float/IntegerLiteralConvertible") {
   expectEqual(negativeOne(), -1.0 as Float)
 }
 
+FloatingPoint.test("Float/FloatLiteralConvertible") {
+  let x: Float = -0.0
+  expectBitwiseEqual(bitPattern: 0x8000_0000, x)
+}
+
+FloatingPoint.test("Float/staticProperties") {
+  typealias Ty = Float
+  // From the FloatingPoint protocol.
+  expectEqual(2, Ty.radix)
+  expectBitwiseEqual(bitPattern: 0x7fc0_0000, Ty.nan)
+  expectBitwiseEqual(bitPattern: 0x7fa0_0000, Ty.signalingNaN)
+  expectBitwiseEqual(bitPattern: 0x7f80_0000, Ty.infinity)
+  expectBitwiseEqual(0x1.ffff_fe__p127, Ty.greatestFiniteMagnitude)
+  expectBitwiseEqual(0x1.921f_b6__p1, Ty.pi)
+  expectBitwiseEqual(0x1.0p-23, Ty.ulpOfOne)
+  expectBitwiseEqual(0x1.0p-126, Ty.leastNormalMagnitude)
+  expectBitwiseEqual(0x1.0p-149, Ty.leastNonzeroMagnitude)
+
+  // From the BinaryFloatingPoint protocol.
+  expectEqual(8, Ty.exponentBitCount)
+  expectEqual(23, Ty.significandBitCount)
+}
+
 // Tests the float and int conversions work correctly. Each case is special.
 FloatingPoint.test("Float/UInt8") {
   expectEqual(UInt8.min, UInt8(Float(UInt8.min)))
@@ -139,6 +162,29 @@ FloatingPoint.test("Float/Int64") {
 FloatingPoint.test("Double/IntegerLiteralConvertible") {
   expectEqual(positiveOne(),  1.0 as Double)
   expectEqual(negativeOne(), -1.0 as Double)
+}
+
+FloatingPoint.test("Double/FloatLiteralConvertible") {
+  let x: Double = -0.0
+  expectBitwiseEqual(bitPattern: 0x8000_0000_0000_0000, x)
+}
+
+FloatingPoint.test("Double/staticProperties") {
+  typealias Ty = Double
+  // From the FloatingPoint protocol.
+  expectEqual(2, Ty.radix)
+  expectBitwiseEqual(bitPattern: 0x7ff8_0000_0000_0000, Ty.nan)
+  expectBitwiseEqual(bitPattern: 0x7ff4_0000_0000_0000, Ty.signalingNaN)
+  expectBitwiseEqual(bitPattern: 0x7ff0_0000_0000_0000, Ty.infinity)
+  expectBitwiseEqual(0x1.ffff_ffff_ffff_f__p1023, Ty.greatestFiniteMagnitude)
+  expectBitwiseEqual(0x1.921f_b544_42d1_8__p1, Ty.pi)
+  expectBitwiseEqual(0x1.0p-52, Ty.ulpOfOne)
+  expectBitwiseEqual(0x1.0p-1022, Ty.leastNormalMagnitude)
+  expectBitwiseEqual(0x1.0p-1074, Ty.leastNonzeroMagnitude)
+
+  // From the BinaryFloatingPoint protocol.
+  expectEqual(11, Ty.exponentBitCount)
+  expectEqual(52, Ty.significandBitCount)
 }
 
 FloatingPoint.test("Double/UInt8") {
@@ -236,6 +282,29 @@ FloatingPoint.test("Double.nextUp, .nextDown")
 FloatingPoint.test("Float80/IntegerLiteralConvertible") {
   expectEqual(positiveOne(),  1.0 as Float80)
   expectEqual(negativeOne(), -1.0 as Float80)
+}
+
+FloatingPoint.test("Float80/FloatLiteralConvertible") {
+  let x: Float80 = -0.0
+  expectBitwiseEqual(bitPattern: Float80Bits(0x8000, 0), x)
+}
+
+FloatingPoint.test("Float80/staticProperties") {
+  typealias Ty = Double
+  // From the FloatingPoint protocol.
+  expectEqual(2, Ty.radix)
+  expectBitwiseEqual(bitPattern: 0x7ff8_0000_0000_0000, Ty.nan)
+  expectBitwiseEqual(bitPattern: 0x7ff4_0000_0000_0000, Ty.signalingNaN)
+  expectBitwiseEqual(bitPattern: 0x7ff0_0000_0000_0000, Ty.infinity)
+  expectBitwiseEqual(0x1.ffff_ffff_ffff_f__p1023, Ty.greatestFiniteMagnitude)
+  expectBitwiseEqual(0x1.921f_b544_42d1_8__p1, Ty.pi)
+  expectBitwiseEqual(0x1.0p-52, Ty.ulpOfOne)
+  expectBitwiseEqual(0x1.0p-1022, Ty.leastNormalMagnitude)
+  expectBitwiseEqual(0x1.0p-1074, Ty.leastNonzeroMagnitude)
+
+  // From the BinaryFloatingPoint protocol.
+  expectEqual(11, Ty.exponentBitCount)
+  expectEqual(52, Ty.significandBitCount)
 }
 
 FloatingPoint.test("Float80/HashValueZero") {
