@@ -374,6 +374,10 @@ class BuildScriptInvocation(object):
                 pipes.quote(arg) for arg in cmake.build_args()),
         ]
 
+        if args.build_stdlib_deployment_targets:
+            impl_args += [
+                "--build-stdlib-deployment-targets", " ".join(
+                    args.build_stdlib_deployment_targets)]
         if args.cross_compile_hosts:
             impl_args += [
                 "--cross-compile-hosts", " ".join(args.cross_compile_hosts)]
@@ -419,6 +423,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-libdispatch"]
         if not args.build_swiftpm:
             impl_args += ["--skip-build-swiftpm"]
+        if args.build_swift_stdlib_unittest_extra:
+            impl_args += ["--build-swift-stdlib-unittest-extra"]
 
         if args.skip_build_linux:
             impl_args += ["--skip-build-linux"]
@@ -853,6 +859,11 @@ details of the setups of other systems or automated environments.""")
             target.name
             for target in
                 StdlibDeploymentTarget.default_stdlib_deployment_targets()])
+    targets_group.add_argument(
+        "--build-stdlib-deployment-targets",
+        help="A space-separated list that filters which of the configured "
+             "targets to build the Swift standard library for, or 'all'.",
+        type=arguments.type.shell_split, default=["all"])
 
     projects_group = parser.add_argument_group(
         title="Options to select projects")
@@ -1151,6 +1162,10 @@ details of the setups of other systems or automated environments.""")
         "--build-runtime-with-host-compiler",
         help="Use the host compiler, not the self-built one to compile the "
              "Swift runtime",
+        action="store_true")
+    parser.add_argument(
+        "--build-swift-stdlib-unittest-extra",
+        help="Build optional StdlibUnittest components",
         action="store_true")
 
     run_build_group = parser.add_argument_group(
