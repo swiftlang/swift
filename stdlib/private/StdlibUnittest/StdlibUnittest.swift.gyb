@@ -143,6 +143,13 @@ public func expectEqual<T : Equatable, U : Equatable>(
   expectEqual(expected.1, actual.1, ${trace}, showFrame: false) {$0 == $1}
 }
 
+public func expectEqual<T : Equatable, U : Equatable, V : Equatable>(
+  _ expected: (T, U, V), _ actual: (T, U, V), ${TRACE}) {
+  expectEqual(expected.0, actual.0, ${trace}, showFrame: false) {$0 == $1}
+  expectEqual(expected.1, actual.1, ${trace}, showFrame: false) {$0 == $1}
+  expectEqual(expected.2, actual.2, ${trace}, showFrame: false) {$0 == $1}
+}
+
 public func expectationFailure(
   _ reason: String,
   trace message: String,
