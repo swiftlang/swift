@@ -3,6 +3,8 @@
 .. @raise litre.TestsAreMissing
 .. ConcurrencyModel:
 
+*Note*: This document is **not an accepted Swift proposal**. It does not describe Swift's concurrency mechanisms as they currently exist, nor is it a roadmap for the addition of concurrency mechanisms in future versions of Swift.
+
 Swift Thread Safety
 ===================
 
