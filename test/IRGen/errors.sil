@@ -14,7 +14,7 @@ entry:
   unreachable
 }
 
-// CHECK: define{{( protected)?}} void @throws(%swift.refcounted*, %swift.error**) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} void @throws(%swift.refcounted*, %swift.error**) {{.*}} {
 sil @throws : $@convention(thin) () -> @error ErrorProtocol {
   // CHECK: [[T0:%.*]] = call %swift.error* @create_error()
   %0 = function_ref @create_error : $@convention(thin) () -> @owned ErrorProtocol
@@ -27,7 +27,7 @@ sil @throws : $@convention(thin) () -> @error ErrorProtocol {
   throw %1 : $ErrorProtocol
 }
 
-// CHECK: define{{( protected)?}} void @doesnt_throw(%swift.refcounted*, %swift.error**) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} void @doesnt_throw(%swift.refcounted*, %swift.error**) {{.*}} {
 sil @doesnt_throw : $@convention(thin) () -> @error ErrorProtocol {
   //   We don't have to do anything here because the caller always
   //   zeroes the error slot before a call.
@@ -39,8 +39,8 @@ sil @doesnt_throw : $@convention(thin) () -> @error ErrorProtocol {
 
 sil @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error ErrorProtocol)
 
-// CHECK-objc: define{{( protected)?}} void @try_apply(%objc_object*)
-// CHECK-native: define{{( protected)?}} void @try_apply(%swift.refcounted*)
+// CHECK-objc-LABEL: define{{( protected)?}} void @try_apply(%objc_object*)
+// CHECK-native-LABEL: define{{( protected)?}} void @try_apply(%swift.refcounted*)
 sil @try_apply : $@convention(thin) (@owned AnyObject) -> () {
 entry(%0 : $AnyObject):
   // CHECK:      [[ERRORSLOT:%.*]] = alloca %swift.error*, align
