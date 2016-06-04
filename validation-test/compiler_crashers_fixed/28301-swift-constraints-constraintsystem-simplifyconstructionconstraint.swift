@@ -5,6 +5,5 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// DUPLICATE-OF: 01766-swift-typechecker-validatedecl.swift
-// RUN: not --crash %target-swift-frontend %s -parse
-protocol A{class A}protocol a:A{protocol P{associatedtype e:A}}a
+// RUN: not %target-swift-frontend %s -parse
+class n{var d={}class A typealias d<T>:A let a=d{
