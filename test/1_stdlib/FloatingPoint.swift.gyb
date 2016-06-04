@@ -3,9 +3,12 @@
 // RUN: %S/../../utils/line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
+%{
+from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
+}%
+
 import Swift
 import StdlibUnittest
-
 
 #if arch(i386) || arch(x86_64)
 
@@ -50,6 +53,29 @@ extension Float80 {
 }
 
 #endif
+
+% for (FloatTy, BitPatternTy) in [
+%   ('Float', 'UInt32'),
+%   ('Double', 'UInt64'),
+%   ('Float80', 'Float80Bits')
+% ]:
+%   if FloatTy == 'Float80':
+#if arch(i386) || arch(x86_64)
+%   end
+func expectBitwiseEqual(
+  _ expected: ${FloatTy}, _ actual: ${FloatTy}, ${TRACE}
+) {
+  expectEqual(expected.bitPattern, actual.bitPattern, ${trace})
+}
+func expectBitwiseEqual(
+  bitPattern expected: ${BitPatternTy}, _ actual: ${FloatTy}, ${TRACE}
+) {
+  expectBitwiseEqual(${FloatTy}(bitPattern: expected), actual, ${trace})
+}
+%   if FloatTy == 'Float80':
+#endif
+%   end
+% end
 
 var FloatingPoint = TestSuite("FloatingPoint")
 
