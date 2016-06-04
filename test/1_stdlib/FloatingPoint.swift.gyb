@@ -200,10 +200,9 @@ FloatingPoint.test("Double/HashValueZero") {
 let floatNextUpDownTests: [(Float, Float)] = [
   (.nan, .nan),
   (.greatestFiniteMagnitude, .infinity),
-  (-.infinity, -.greatestFiniteMagnitude),
-  (0x1.fffffep-1, 1.0), (1.0, 0x1.000002p+0),
-  (-0x1p-149, -0.0), (0.0, 0x1p-149),
-  (0x1.effffep-1, 0.96875), (0.96875, 0x1.f00002p-1),
+  (0x1.ffff_fe__p-1, 1.0), (1.0, 0x1.0000_02__p+0),
+  (0.0, .leastNonzeroMagnitude),
+  (0x1.efff_fe__p-1, 0x1.fp-1), (0x1.fp-1, 0x1.f000_02__p-1),
 ]
 
 FloatingPoint.test("Float.nextUp, .nextDown")
@@ -218,10 +217,9 @@ FloatingPoint.test("Float.nextUp, .nextDown")
 let doubleNextUpDownTests: [(Double, Double)] = [
   (.nan, .nan),
   (.greatestFiniteMagnitude, .infinity),
-  (-.infinity, -.greatestFiniteMagnitude),
-  (0x1.fffffffffffffp-1, 1.0), (1.0, 0x1.0000000000001p+0),
-  (-0x1p-1074, -0.0), (0.0, 0x1p-1074),
-  (0x1.effffffffffffp-1, 0.96875), (0.96875, 0x1.f000000000001p-1),
+  (0x1.ffff_ffff_ffff_fp-1, 1.0), (1.0, 0x1.0000_0000_0000_1p+0),
+  (0.0, .leastNonzeroMagnitude),
+  (0x1.efff_ffff_ffff_fp-1, 0x1.fp-1), (0x1.fp-1, 0x1.f000_0000_0000_1p-1),
 ]
 
 FloatingPoint.test("Double.nextUp, .nextDown")
