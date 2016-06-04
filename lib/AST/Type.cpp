@@ -2925,7 +2925,6 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
 
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
-    substitutions[dc->getProtocolSelf()->getArchetype()] = baseTy;
     substitutions[dc->getProtocolSelf()->getDeclaredType()
                     ->getCanonicalType()->castTo<GenericTypeParamType>()]
       = baseTy;

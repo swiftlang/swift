@@ -5,13 +5,7 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-protocol a {
-protocol A {
-}
-}
-protocol b : a {
-protocol c : A {
-}
-}
-for b
+// RUN: not %target-swift-frontend %s -parse
+struct B<T{protocol A{
+class B<T
+associatedtype e:B<T>
