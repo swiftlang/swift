@@ -859,12 +859,9 @@ void IRGenModule::emitAutolinkInfo() {
 
   // Collect the linker options already in the module (from ClangCodeGen).
   auto *LinkerOptions = Module.getModuleFlag(LinkerOptionsFlagName);
-  if (LinkerOptions) {
-    for (auto &LinkOption : cast<llvm::MDNode>(LinkerOptions)->operands()) {
-      LinkOption->dump();
+  if (LinkerOptions)
+    for (const auto &LinkOption : cast<llvm::MDNode>(LinkerOptions)->operands())
       AutolinkEntries.push_back(LinkOption);
-    }
-  }
 
   // Remove duplicates.
   llvm::SmallPtrSet<llvm::Metadata*, 4> knownAutolinkEntries;
