@@ -3158,6 +3158,9 @@ static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
                                       Type toType,
                                       KnownProtocolKind kind,
                                       Expr *expr) {
+  // The following fixes apply for optional destination types as well.
+  toType = toType->lookThroughAllAnyOptionalTypes();
+
   if (isLiteralConvertibleType(fromType, kind, CS)) {
     if (auto rawTy = isRawRepresentable(toType, kind, CS)) {
       // Produce before/after strings like 'Result(rawValue: RawType(<expr>))'
@@ -3821,9 +3824,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
       candidate.getDecl() && isa<ConstructorDecl>(candidate.getDecl()) &&
       candidate.level == 1) {
     CallArgParam &arg = args[0];
-    auto resTy = candidate.getResultType();
-    if (auto unwrappedOpt = resTy->getOptionalObjectType())
-      resTy = unwrappedOpt;
+    auto resTy = candidate.getResultType()->lookThroughAllAnyOptionalTypes();
     auto rawTy = isRawRepresentable(resTy, CCI.CS);
     if (rawTy && resTy->getCanonicalType() == arg.Ty.getCanonicalTypeOrNull()) {
       auto getInnerExpr = [](Expr *E) -> Expr* {
