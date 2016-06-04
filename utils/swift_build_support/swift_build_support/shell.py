@@ -92,7 +92,7 @@ def call(command, stderr=None, env=None, dry_run=None, echo=True):
 
 
 def capture(command, stderr=None, env=None, dry_run=None, echo=True,
-            optional=False):
+            optional=False, allow_non_zero_exit=False):
     """
     capture(command, ...) -> str
 
@@ -114,6 +114,8 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True,
         # Coerce to `str` hack. not py3 `byte`, not py2 `unicode`.
         return str(out.decode())
     except subprocess.CalledProcessError as e:
+        if allow_non_zero_exit:
+            return e.output
         if optional:
             return None
         diagnostics.fatal(
