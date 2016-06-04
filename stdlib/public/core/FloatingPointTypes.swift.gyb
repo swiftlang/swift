@@ -34,8 +34,6 @@ builtinIntLiteralBits = 2048
 # Mapping from float bits to significand bits
 explicitSignificandBits = { 32:24, 64:53, 80:64 }
 
-cFunctionSuffix = { 32:'f', 64:'', 80:'l' }
-
 def allInts():
     for bits in allIntBits:
         for signed in False, True:
