@@ -30,7 +30,7 @@ def print_xcodebuild_versions(file=sys.stdout):
     version = shell.capture(
         ['xcodebuild', '-version'], dry_run=False, echo=False).rstrip()
     # Allow non-zero exit codes.  Under certain obscure circumstances
-    # xcodebuild can exit with an non-zero exit code even when the SDK is
+    # xcodebuild can exit with a non-zero exit code even when the SDK is
     # usable.
     sdks = shell.capture(
         ['xcodebuild', '-version', '-sdk'], dry_run=False, echo=False,

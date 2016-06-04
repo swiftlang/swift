@@ -20,7 +20,7 @@ func remember(line: inout String) -> () -> Void {
         line = "I'm your man"
     }
     no_escape(despite_our_estrangement)
-    do_escape(despite_our_estrangement) // expected-error {{nested function with a implicitly captured inout parameter can only be used as a @noescape argument}}
+    do_escape(despite_our_estrangement) // expected-error {{nested function with an implicitly captured inout parameter can only be used as a @noescape argument}}
 
     return despite_our_estrangement // expected-error {{nested function cannot capture inout parameter and escape}}
 }
