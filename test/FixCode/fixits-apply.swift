@@ -37,6 +37,7 @@ struct MyEventMask2 : OptionSet {
 }
 func sendIt(_: MyEventMask2) {}
 func sendItOpt(_: MyEventMask2?) {}
+func sendItOpt3(_: MyEventMask2???) {}
 func testMask1(a: Int) {
   sendIt(a)
 }
@@ -50,6 +51,9 @@ func testMask4(a: MyEventMask2) {
   testMask2(a: a)
 }
 func testMask5(a: Int) {
+  sendItOpt(a)
+}
+func testMask6(a: Int) {
   sendItOpt(a)
 }
 
