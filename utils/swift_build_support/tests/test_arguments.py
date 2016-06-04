@@ -134,3 +134,44 @@ class ArgumentsActionTestCase(unittest.TestCase):
         self.assertIn('--never-ever', stderr.getvalue())
 
         sys.stderr = orig_stderr
+
+    def test_concat(self):
+        # Has default
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--str-opt",
+            action=argaction.concat,
+            default="def")
+        parser.add_argument(
+            "--list-opt",
+            action=argaction.concat,
+            type=argtype.shell_split,
+            default=["def"])
+
+        self.assertEqual(
+            parser.parse_args(['--str-opt', '12', '--str-opt=42']),
+            argparse.Namespace(str_opt="def1242", list_opt=["def"]))
+
+        self.assertEqual(
+            parser.parse_args(['--list-opt', 'foo 12', '--list-opt=bar 42']),
+            argparse.Namespace(
+                str_opt="def", list_opt=["def", "foo", "12", "bar", "42"]))
+
+        # Default less
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--str-opt",
+            action=argaction.concat)
+        parser.add_argument(
+            "--list-opt",
+            action=argaction.concat,
+            type=argtype.shell_split)
+
+        self.assertEqual(
+            parser.parse_args(['--str-opt', '12', '--str-opt=42']),
+            argparse.Namespace(str_opt="1242", list_opt=None))
+
+        self.assertEqual(
+            parser.parse_args(['--list-opt', 'foo 12', '--list-opt=bar 42']),
+            argparse.Namespace(
+                str_opt=None, list_opt=["foo", "12", "bar", "42"]))

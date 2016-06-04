@@ -955,7 +955,7 @@ details of the setups of other systems or automated environments.""")
         help="Pass through extra options to CMake in the form of comma "
              "separated options '-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp'. Can be "
              "called multiple times to add multiple such options.",
-        action="append",
+        action=arguments.action.concat,
         type=arguments.type.shell_split,
         default=[])
 
@@ -1436,13 +1436,10 @@ details of the setups of other systems or automated environments.""")
 
     # If we have extra_cmake_options, combine all of them together and then add
     # them as one command.
-    # Note that args.extra_cmake_options is a list of lists of options.
     if args.extra_cmake_options:
         build_script_impl_args += [
             "--extra-cmake-options=%s" % ' '.join(
-                pipes.quote(opt)
-                for options in args.extra_cmake_options
-                for opt in options)
+                pipes.quote(opt) for opt in args.extra_cmake_options)
         ]
 
     build_script_impl_args += args.build_script_impl_args
