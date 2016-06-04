@@ -314,6 +314,25 @@ FloatingPoint.test("Float80/HashValueZero") {
   expectEqual(zero.hashValue, negativeZero.hashValue)
 }
 
+let float80NextUpDownTests: [(Float80, Float80)] = [
+  (.nan, .nan),
+  (.greatestFiniteMagnitude, .infinity),
+  (0x1.ffff_ffff_ffff_fffep-1, 1.0), (1.0, 0x1.0000_0000_0000_0002p+0),
+  (0.0, .leastNonzeroMagnitude),
+  (0x1.efff_ffff_ffff_fffep-1, 0x1.fp-1),
+  (0x1.fp-1, 0x1.f000_0000_0000_0002p-1),
+]
+
+FloatingPoint.test("Float80.nextUp, .nextDown")
+  .forEach(in: float80NextUpDownTests) {
+  (prev, succ) in
+
+  expectBitwiseEqual(succ, prev.nextUp)
+  expectBitwiseEqual(prev, succ.nextDown)
+  expectBitwiseEqual(-succ, (-prev).nextDown)
+  expectBitwiseEqual(-prev, (-succ).nextUp)
+}
+
 #endif
 
 % for FloatSelf in ['Float32', 'Float64']:
