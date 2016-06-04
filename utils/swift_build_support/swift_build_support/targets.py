@@ -12,60 +12,61 @@ import os
 import platform
 
 
+class Platform(object):
+    """
+    Abstract representation of a platform Swift can run on.
+    """
+
+    def __init__(self, name, archs):
+        """
+        Create a platform with the given name and list of architectures.
+        """
+        self.name = name
+        self.targets = [Target(self, arch) for arch in archs]
+
+        # Add a property for each arch.
+        for target in self.targets:
+            setattr(self, target.arch, target)
+
+
+class Target(object):
+    """
+    Abstract representation of a target Swift can run on.
+    """
+
+    def __init__(self, platform, arch):
+        self.platform = platform
+        self.arch = arch
+
+    @property
+    def name(self):
+        return "{}-{}".format(self.platform.name, self.arch)
+
+
 class StdlibDeploymentTarget(object):
+    OSX = Platform("macosx", archs=["x86_64"])
 
-    class OSX(object):
-        x86_64 = 'macosx-x86_64'
-        allArchs = [x86_64]
+    iOS = Platform("iphoneos", archs=["armv7", "armv7s", "arm64"])
+    iOSSimulator = Platform("iphonesimulator", archs=["i386", "x86_64"])
 
-    class iOS(object):  # noqa
-        armv7 = 'iphoneos-armv7'
-        armv7s = 'iphoneos-armv7s'
-        arm64 = 'iphoneos-arm64'
-        allArchs = [armv7, armv7s, arm64]
+    AppleTV = Platform("appletvos", archs=["arm64"])
+    AppleTVSimulator = Platform("appletvsimulator", archs=["x86_64"])
 
-    class iOSSimulator(object):  # noqa
-        i386 = 'iphonesimulator-i386'
-        x86_64 = 'iphonesimulator-x86_64'
-        allArchs = [i386, x86_64]
+    AppleWatch = Platform("watchos", archs=["armv7k"])
+    AppleWatchSimulator = Platform("watchsimulator", archs=["i386"])
 
-    class AppleTV(object):
-        arm64 = 'appletvos-arm64'
-        allArchs = [arm64]
+    Linux = Platform("linux", archs=[
+        "x86_64",
+        "armv6",
+        "armv7",
+        "aarch64",
+        "ppc64",
+        "ppc64le",
+        "s390x"])
 
-    class AppleTVSimulator(object):
-        x86_64 = 'appletvsimulator-x86_64'
-        allArchs = [x86_64]
+    FreeBSD = Platform("freebsd", archs=["x86_64"])
 
-    class AppleWatch(object):
-        armv7k = 'watchos-armv7k'
-        allArchs = [armv7k]
-
-    class AppleWatchSimulator(object):
-        i386 = 'watchsimulator-i386'
-        allArchs = [i386]
-
-    class Linux(object):
-        x86_64 = 'linux-x86_64'
-        armv6 = 'linux-armv6'
-        armv7 = 'linux-armv7'
-        aarch64 = 'linux-aarch64'
-        ppc64 = 'linux-ppc64'
-        ppc64le = 'linux-ppc64le'
-        s390x = 'linux-s390x'
-        allArchs = [x86_64, armv6, armv7, aarch64, ppc64, ppc64le, s390x]
-
-    class FreeBSD(object):
-        amd64 = 'freebsd-x86_64'
-        allArchs = [amd64]
-
-    class Cygwin(object):
-        x86_64 = 'cygwin-x86_64'
-        allArchs = [x86_64]
-
-    class Android(object):
-        armv7 = 'android-armv7'
-        allArchs = [armv7]
+    Cygwin = Platform("cygwin", archs=["x86_64"])
 
     @staticmethod
     def host_target():
@@ -124,12 +125,12 @@ class StdlibDeploymentTarget(object):
         # (it takes a long time).
         if host_target == StdlibDeploymentTarget.OSX.x86_64:
             return [host_target] + \
-                StdlibDeploymentTarget.iOSSimulator.allArchs + \
-                StdlibDeploymentTarget.AppleTVSimulator.allArchs + \
-                StdlibDeploymentTarget.AppleWatchSimulator.allArchs + \
-                StdlibDeploymentTarget.iOS.allArchs + \
-                StdlibDeploymentTarget.AppleTV.allArchs + \
-                StdlibDeploymentTarget.AppleWatch.allArchs
+                StdlibDeploymentTarget.iOSSimulator.targets + \
+                StdlibDeploymentTarget.AppleTVSimulator.targets + \
+                StdlibDeploymentTarget.AppleWatchSimulator.targets + \
+                StdlibDeploymentTarget.iOS.targets + \
+                StdlibDeploymentTarget.AppleTV.targets + \
+                StdlibDeploymentTarget.AppleWatch.targets
         else:
             # All other machines only configure their host stdlib by default.
             return [host_target]

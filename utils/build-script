@@ -837,7 +837,7 @@ details of the setups of other systems or automated environments.""")
         help="The host target. LLVM, Clang, and Swift will be built for this "
              "target. The built LLVM and Clang will be used to compile Swift "
              "for the cross-compilation targets.",
-        default=StdlibDeploymentTarget.host_target())
+        default=StdlibDeploymentTarget.host_target().name)
     targets_group.add_argument(
         "--cross-compile-hosts",
         help="A space separated list of targets to cross-compile host Swift "
@@ -849,7 +849,10 @@ details of the setups of other systems or automated environments.""")
         help="list of targets to compile or cross-compile the Swift standard "
              "library for. %(default)s by default.",
         nargs="*",
-        default=StdlibDeploymentTarget.default_stdlib_deployment_targets())
+        default=[
+            target.name
+            for target in
+                StdlibDeploymentTarget.default_stdlib_deployment_targets()])
 
     projects_group = parser.add_argument_group(
         title="Options to select projects")
