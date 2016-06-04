@@ -17,16 +17,46 @@ class Platform(object):
     Abstract representation of a platform Swift can run on.
     """
 
-    def __init__(self, name, archs):
+    def __init__(self, name, archs, sdk_name=None):
         """
         Create a platform with the given name and list of architectures.
         """
         self.name = name
         self.targets = [Target(self, arch) for arch in archs]
+        # FIXME: Eliminate this argument; apparently the SDK names are
+        # internally a private implementation detail of the build script, so we
+        # should just make them the same as the platform name.
+        self.sdk_name = name.upper() if sdk_name is None else sdk_name
 
         # Add a property for each arch.
         for target in self.targets:
             setattr(self, target.arch, target)
+
+    @property
+    def is_darwin(self):
+        """Convenience function for checking if this is a Darwin platform."""
+        return isinstance(self, DarwinPlatform)
+
+    @property
+    def supports_benchmark(self):
+        # By default, we don't support benchmarks on most platforms.
+        return False
+
+
+class DarwinPlatform(Platform):
+    def __init__(self, name, archs, sdk_name=None, is_simulator=False):
+        super(DarwinPlatform, self).__init__(name, archs, sdk_name)
+        self.is_simulator = is_simulator
+        
+    @property
+    def is_embedded(self):
+        """Check if this is a Darwin platform for embedded devices."""
+        return self.name != "macosx"
+
+    @property
+    def supports_benchmark(self):
+        # By default, on Darwin we support benchmarks.
+        return True
 
 
 class Target(object):
@@ -37,6 +67,8 @@ class Target(object):
     def __init__(self, platform, arch):
         self.platform = platform
         self.arch = arch
+        # Delegate to the platform, this is usually not arch specific.
+        self.supports_benchmark = self.platform.supports_benchmark
 
     @property
     def name(self):
@@ -44,16 +76,29 @@ class Target(object):
 
 
 class StdlibDeploymentTarget(object):
-    OSX = Platform("macosx", archs=["x86_64"])
+    OSX = DarwinPlatform("macosx", archs=["x86_64"],
+                         sdk_name="OSX")
 
-    iOS = Platform("iphoneos", archs=["armv7", "armv7s", "arm64"])
-    iOSSimulator = Platform("iphonesimulator", archs=["i386", "x86_64"])
+    iOS = DarwinPlatform("iphoneos", archs=["armv7", "armv7s", "arm64"],
+                         sdk_name="IOS")
+    iOSSimulator = DarwinPlatform("iphonesimulator", archs=["i386", "x86_64"],
+                                  sdk_name="IOS_SIMULATOR",
+                                  is_simulator=True)
 
-    AppleTV = Platform("appletvos", archs=["arm64"])
-    AppleTVSimulator = Platform("appletvsimulator", archs=["x86_64"])
+    # Never build/test benchmarks on iOS armv7s.
+    iOS.armv7s.supports_benchmark = False
 
-    AppleWatch = Platform("watchos", archs=["armv7k"])
-    AppleWatchSimulator = Platform("watchsimulator", archs=["i386"])
+    AppleTV = DarwinPlatform("appletvos", archs=["arm64"],
+                             sdk_name="TVOS")
+    AppleTVSimulator = DarwinPlatform("appletvsimulator", archs=["x86_64"],
+                                      sdk_name="TVOS_SIMULATOR",
+                                      is_simulator=True)
+
+    AppleWatch = DarwinPlatform("watchos", archs=["armv7k"],
+                                sdk_name="WATCHOS")
+    AppleWatchSimulator = DarwinPlatform("watchsimulator", archs=["i386"],
+                                         sdk_name="WATCHOS_SIMULATOR",
+                                         is_simulator=True)
 
     Linux = Platform("linux", archs=[
         "x86_64",
@@ -67,6 +112,24 @@ class StdlibDeploymentTarget(object):
     FreeBSD = Platform("freebsd", archs=["x86_64"])
 
     Cygwin = Platform("cygwin", archs=["x86_64"])
+
+    Android = Platform("android", archs=["armv7"])
+
+    # The list of known platforms.
+    known_platforms = [
+        OSX,
+        iOS, iOSSimulator,
+        AppleTV, AppleTVSimulator,
+        AppleWatch, AppleWatchSimulator,
+        Linux,
+        FreeBSD,
+        Cygwin,
+        Android]
+
+    # Cache of targets by name.
+    _targets_by_name = dict((target.name, target)
+                            for platform in known_platforms
+                            for target in platform.targets)
 
     @staticmethod
     def host_target():
@@ -134,6 +197,10 @@ class StdlibDeploymentTarget(object):
         else:
             # All other machines only configure their host stdlib by default.
             return [host_target]
+
+    @classmethod
+    def get_target_for_name(klass, name):
+        return klass._targets_by_name.get(name)
 
 
 def install_prefix():
