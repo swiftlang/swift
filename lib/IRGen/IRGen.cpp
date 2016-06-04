@@ -912,7 +912,6 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   auto targetMachine = irgen.createTargetMachine();
   if (!targetMachine) return;
 
-  const llvm::Triple &Triple = Ctx.LangOpts.Target;
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, VMContext,
                   OutputPath, Opts.getSingleOutputFilename());
   initLLVMModule(IGM);
@@ -924,13 +923,19 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
                                           llvm::GlobalVariable::InternalLinkage,
                                           Data, "__Swift_AST");
   std::string Section;
-  if (Triple.isOSBinFormatMachO())
-    Section = std::string(MachOASTSegmentName) + "," + MachOASTSectionName;
-  else if (Triple.isOSBinFormatCOFF())
+  switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("unknown object format");
+  case llvm::Triple::COFF:
     Section = COFFASTSectionName;
-  else
+    break;
+  case llvm::Triple::ELF:
     Section = ELFASTSectionName;
-
+    break;
+  case llvm::Triple::MachO:
+    Section = std::string(MachOASTSegmentName) + "," + MachOASTSectionName;
+    break;
+  }
   ASTSym->setSection(Section);
   ASTSym->setAlignment(8);
   ::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, IGM.getModule(),
