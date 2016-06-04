@@ -58,7 +58,7 @@ extension String.Index {
   /// specified `UTF16View` position.
   ///
   /// The following example finds the position of a space in a string's `utf16`
-  /// view and then converts that position to an index in the the string's
+  /// view and then converts that position to an index in the string's
   /// `characters` view. The value `32` is the UTF-16 encoded value of a space
   /// character.
   ///

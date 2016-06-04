@@ -485,7 +485,7 @@ extension String.UTF8View.Index {
   /// specified `UTF16View` position.
   ///
   /// The following example finds the position of a space in a string's `utf16`
-  /// view and then converts that position to an index in the the string's
+  /// view and then converts that position to an index in the string's
   /// `utf8` view.
   ///
   ///     let cafe = "Café 🍵"
