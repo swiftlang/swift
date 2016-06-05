@@ -211,7 +211,7 @@ public func modf(_ value: ${T}) -> (${T}, ${T}) {
 % for T, CT, f in AllFloatTypes():
 @_transparent
 public func ldexp(_ x: ${T}, _ n: Int) -> ${T} {
-  return ${T}(ldexp${f}(${CT}(x), CInt(n)))
+  return ${T}(ldexp${f}(${CT}(x), Int32(n)))
 }
 
 % end
@@ -220,7 +220,7 @@ public func ldexp(_ x: ${T}, _ n: Int) -> ${T} {
 % for T, CT, f in AllFloatTypes():
 @_transparent
 public func frexp(_ value: ${T}) -> (${T}, Int) {
-  var exp = CInt(0)
+  var exp = Int32(0)
   let frac = frexp${f}(${CT}(value), &exp)
   return (${T}(frac), Int(exp))
 }
@@ -231,7 +231,7 @@ public func frexp(_ value: ${T}) -> (${T}, Int) {
 % for T, CT, f in AllFloatTypes():
 @_transparent
 public func ilogb(_ x: ${T}) -> Int {
-  return Int(ilogb${f}(${CT}(x)) as CInt)
+  return Int(ilogb${f}(${CT}(x)) as Int32)
 }
 
 % end
@@ -240,7 +240,7 @@ public func ilogb(_ x: ${T}) -> Int {
 % for T, CT, f in AllFloatTypes():
 @_transparent
 public func scalbn(_ x: ${T}, _ n: Int) -> ${T} {
-  return ${T}(scalbn${f}(${CT}(x), CInt(n)))
+  return ${T}(scalbn${f}(${CT}(x), Int32(n)))
 }
 
 % end
@@ -250,7 +250,7 @@ public func scalbn(_ x: ${T}, _ n: Int) -> ${T} {
 #if os(Linux) || os(FreeBSD) || os(Android) || os(Windows)
 @_transparent
 public func lgamma(_ x: ${T}) -> (${T}, Int) {
-  var sign = CInt(0)
+  var sign = Int32(0)
   let value = lgamma${f}_r(${CT}(x), &sign)
   return (${T}(value), Int(sign))
 }
@@ -260,13 +260,13 @@ public func lgamma(_ x: ${T}) -> (${T}, Int) {
 @_versioned
 @_silgen_name("_swift_Darwin_lgamma${f}_r")
 func _swift_Darwin_lgamma${f}_r(_: ${CT},
-                                _: UnsafeMutablePointer<CInt>) -> ${CT}
+                                _: UnsafeMutablePointer<Int32>) -> ${CT}
 
 @_transparent
 public func lgamma(_ x: ${T}) -> (${T}, Int) {
-  var sign = CInt(0)
+  var sign = Int32(0)
   let value = withUnsafeMutablePointer(&sign) { 
-    (signp: UnsafeMutablePointer<CInt>) -> ${CT} in
+    (signp: UnsafeMutablePointer<Int32>) -> ${CT} in
     return _swift_Darwin_lgamma${f}_r(${CT}(x), signp)
   }
   return (${T}(value), Int(sign))
@@ -279,7 +279,7 @@ public func lgamma(_ x: ${T}) -> (${T}, Int) {
 % for T, CT, f in AllFloatTypes():
 @_transparent
 public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
-  var quo = CInt(0)
+  var quo = Int32(0)
   let rem = remquo${f}(${CT}(x), ${CT}(y), &quo)
   return (${T}(rem), Int(quo))
 }
@@ -305,12 +305,12 @@ public func fma(_ x: ${T}, _ y: ${T}, _ z: ${T}) -> ${T} {
 % # These C functions only support double. The overlay fixes the Int parameter.
 @_transparent
 public func jn(_ n: Int, _ x: Double) -> Double {
-  return jn(CInt(n), x)
+  return jn(Int32(n), x)
 }
 
 @_transparent
 public func yn(_ n: Int, _ x: Double) -> Double {
-  return yn(CInt(n), x)
+  return yn(Int32(n), x)
 }
 
 % end
