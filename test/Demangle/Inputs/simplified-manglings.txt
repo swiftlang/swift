@@ -142,10 +142,8 @@ _TFIvVs8_Process10_argumentsGSaSS_iU_FT_GSaSS_ ---> _Process.(_arguments).(varia
 _TFCSo1AE ---> A.__ivar_destroyer
 _TFCSo1Ae ---> A.__ivar_initializer
 _TTWC13call_protocol1CS_1PS_FS1_3foofT_Si ---> protocol witness for P.foo() -> Int in conformance C
-_TTSg5Si___TFSqcfT_GSqx_ ---> specialized Optional.init() -> A?
-_TTSg5SiSis3Foos_Sf___TFSqcfT_GSqx_ ---> specialized Optional.init() -> A?
-_TTSg5Si_Sf___TFSqcfT_GSqx_ ---> specialized Optional.init() -> A?
-_TTSg5Si_Sf___TFSqcfT_GSqx_ ---> specialized Optional.init() -> A?
+_TTSg5Si__TFSqcfT_GSqx_ ---> specialized Optional.init() -> A?
+_TTSg5SiSf__TFSqcfT_GSqx_ ---> specialized Optional.init() -> A?
 _TTSgS ---> _TTSgS
 _TTSg5S ---> _TTSg5S
 _TTSgSi ---> _TTSgSi
@@ -154,8 +152,8 @@ _TTSgSi_ ---> _TTSgSi_
 _TTSgSi__ ---> _TTSgSi__
 _TTSgSiS_ ---> _TTSgSiS_
 _TTSgSi__xyz ---> _TTSgSi__xyz
-_TTSg5Si___TTSg5Si___TFSqcfT_GSqx_ ---> specialized specialized Optional.init() -> A?
-_TTSg5Vs5UInt8___TFV10specialize3XXXcfT1tx_GS0_x_ ---> specialized XXX.init(t : A) -> XXX<A>
+_TTSg5Si__TTSg5Si__TFSqcfT_GSqx_ ---> specialized specialized Optional.init() -> A?
+_TTSg5Vs5UInt8__TFV10specialize3XXXcfT1tx_GS0_x_ ---> specialized XXX.init(t : A) -> XXX<A>
 _TPA__TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_31 ---> partial apply for thunk
 _TiC4Meow5MyCls9subscriptFT1iSi_Sf ---> MyCls.subscript(i : Int) -> Float
 _TF8manglingX22egbpdajGbuEbxfgehfvwxnFT_T_ ---> ليهمابتكلموشعربي؟() -> ()
@@ -174,8 +172,8 @@ _TFCs13_NSSwiftArrayg17staticElementTypePMP_ ---> _NSSwiftArray.staticElementTyp
 _TFCs17_DictionaryMirrorg9valueTypePMP_ ---> _DictionaryMirror.valueType.getter
 _TPA__TFFVs11GeneratorOfcuRd__s13GeneratorTyperFqd__GS_x_U_FT_GSqQd___ ---> partial apply for GeneratorOf.(init<A where ...> (A1) -> GeneratorOf<A>).(closure #1)
 _TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized take_closure((Int, Int) -> ()) -> ()
-_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TTSg5Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized specialized take_closure((Int, Int) -> ()) -> ()
-_TTSg5Si___TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized specialized take_closure((Int, Int) -> ()) -> ()
+_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TTSg5Si__TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized specialized take_closure((Int, Int) -> ()) -> ()
+_TTSg5Si__TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized specialized take_closure((Int, Int) -> ()) -> ()
 _TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_dT__XFo_iSi_dT__ ---> specialized thunk
 _TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_DT__XFo_iSi_DT__ ---> specialized thunk
 _TTSf1cpi0_cpfl0_cpse0v4u123_cpg53globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8_cpfr36_TFtest_capture_propagation2_closure___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized take_closure((Int, Int) -> ()) -> ()

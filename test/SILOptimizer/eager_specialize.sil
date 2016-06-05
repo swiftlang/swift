@@ -96,7 +96,7 @@ bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
 
 // Specialization getGenericContainer<S, X>
 //
-// CHECK-LABEL: sil shared @_TTSg5V4main1SS0_S_6HasEltS____TF16eager_specialize19getGenericContaineruRxS_6HasEltwx3EltS_5AnEltrFTGVS_1Gx_1ewxS1__x : $@convention(thin) (G<S>, X) -> S {
+// CHECK-LABEL: sil shared @_TTSg5V4main1S__TF16eager_specialize19getGenericContaineruRxS_6HasEltwx3EltS_5AnEltrFTGVS_1Gx_1ewxS1__x : $@convention(thin) (G<S>, X) -> S {
 // CHECK: bb0(%0 : $G<S>, %1 : $X):
 // CHECK:   return %{{.*}} : $S
 
@@ -126,7 +126,7 @@ bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
 // CHECK:   %16 = unchecked_addr_cast %2 : $*T.Elt to $*X
 // CHECK:   %17 = load %16 : $*X
   // function_ref specialized getGenericContainer<A where ...> (G<A>, e : A.Elt) -> A
-// CHECK:   %18 = function_ref @_TTSg5V4main1SS0_S_6HasEltS____TF16eager_specialize19getGenericContaineruRxS_6HasEltwx3EltS_5AnEltrFTGVS_1Gx_1ewxS1__x : $@convention(thin) (G<S>, X) -> S
+// CHECK:   %18 = function_ref @_TTSg5V4main1S__TF16eager_specialize19getGenericContaineruRxS_6HasEltwx3EltS_5AnEltrFTGVS_1Gx_1ewxS1__x : $@convention(thin) (G<S>, X) -> S
 // CHECK:   %19 = apply %18(%15, %17) : $@convention(thin) (G<S>, X) -> S
 // CHECK:   store %19 to %14 : $*S
 // CHECK:   %21 = tuple ()
@@ -196,7 +196,7 @@ bb2:                                              // Preds: bb0
 }
 
 // specialized divideNum<A where ...> (A, den : A) throws -> A
-// CHECK-LABEL: sil shared @_TTSg5SiSis13SignedIntegers___TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) (Int, Int) -> (Int, @error ErrorProtocol) {
+// CHECK-LABEL: sil shared @_TTSg5Si__TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) (Int, Int) -> (Int, @error ErrorProtocol) {
 // CHECK: bb0(%0 : $Int, %1 : $Int):
 // CHECK: return %{{.*}}
 // CHECK: throw %{{.*}}
@@ -238,7 +238,7 @@ bb2:                                              // Preds: bb0
 // CHECK:   %{{.*}} = unchecked_addr_cast %2 : $*T to $*Int
 // CHECK:   %{{.*}} = load %{{.*}} : $*Int
 // CHECK:   // function_ref specialized divideNum<A where ...> (A, den : A) throws -> A
-// CHECK:   %{{.*}} = function_ref @_TTSg5SiSis13SignedIntegers___TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) (Int, Int) -> (Int, @error ErrorProtocol)
+// CHECK:   %{{.*}} = function_ref @_TTSg5Si__TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) (Int, Int) -> (Int, @error ErrorProtocol)
 // CHECK:   try_apply %{{.*}}(%{{.*}}, %{{.*}}) : $@convention(thin) (Int, Int) -> (Int, @error ErrorProtocol), normal bb8, error bb7
 
 // CHECK: bb7(%{{.*}} : $ErrorProtocol):                        // Preds: bb6
@@ -280,13 +280,13 @@ bb0(%0 : $*T):
 }
 
 // CHECK-LABEL: // specialized voidReturn<A> (A) -> ()
-// CHECK: sil shared @_TTSg5Sf___TF16eager_specialize10voidReturnurFxT_ : $@convention(thin) (Float) -> () {
+// CHECK: sil shared @_TTSg5Sf__TF16eager_specialize10voidReturnurFxT_ : $@convention(thin) (Float) -> () {
 // %0                                             // user: %2
 // CHECK: bb0(%0 : $Float):
 // CHECK:   return %5 : $()
 
 // CHECK-LABEL: // specialized voidReturn<A> (A) -> ()
-// CHECK: sil shared @_TTSg5Vs5Int64___TF16eager_specialize10voidReturnurFxT_ : $@convention(thin) (Int64) -> () {
+// CHECK: sil shared @_TTSg5Vs5Int64__TF16eager_specialize10voidReturnurFxT_ : $@convention(thin) (Int64) -> () {
 // CHECK: bb0(%0 : $Int64):
 // CHECK:   return %5 : $()
 
@@ -312,7 +312,7 @@ bb0(%0 : $*T):
 // CHECK:   return
 
 // CHECK: bb4:                                              // Preds: bb1
-// CHECK:   function_ref @_TTSg5Sf___TF16eager_specialize10voidReturnurFxT_ : $@convention(thin) (Float) -> ()
+// CHECK:   function_ref @_TTSg5Sf__TF16eager_specialize10voidReturnurFxT_ : $@convention(thin) (Float) -> ()
 // CHECK:   br bb3
 
 // CHECK: bb5:                                              // Preds: bb0
@@ -332,12 +332,12 @@ bb0(%0 : $*T):
 }
 
 // CHECK-LABEL: // specialized nonvoidReturn<A> (A) -> Int64
-// CHECK: sil shared @_TTSg5Sf___TF16eager_specialize13nonvoidReturnurFxVs5Int64 : $@convention(thin) (Float) -> Int64 {
+// CHECK: sil shared @_TTSg5Sf__TF16eager_specialize13nonvoidReturnurFxVs5Int64 : $@convention(thin) (Float) -> Int64 {
 // CHECK: bb0(%0 : $Float):
 // CHECK:   return %4 : $Int64
 
 // CHECK-LABEL: // specialized nonvoidReturn<A> (A) -> Int64
-// CHECK: sil shared @_TTSg5Vs5Int64___TF16eager_specialize13nonvoidReturnurFxVs5Int64 : $@convention(thin) (Int64) -> Int64 {
+// CHECK: sil shared @_TTSg5Vs5Int64__TF16eager_specialize13nonvoidReturnurFxVs5Int64 : $@convention(thin) (Int64) -> Int64 {
 // CHECK: bb0(%0 : $Int64):
 // CHECK:   return %4 : $Int64
 

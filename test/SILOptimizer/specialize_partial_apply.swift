@@ -17,8 +17,8 @@ struct MyError : ErrorProtocol {
 // We need a reabstraction thunk to convert from direct args/result to indirect
 // args/result, which is expected in the returned closure.
 
-// CHECK-LABEL: sil shared [noinline] @_TTSg5Si___TF4test16generic_get_funcurFTxSb_Fxx : $@convention(thin) (Int, Bool) -> @owned @callee_owned (@in Int) -> @out Int {
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSr5Si___TFF4test16generic_get_funcurFTxSb_FxxL_7genericfQ_Q_ : $@convention(thin) (@in Int, Bool, @owned @box Int) -> @out Int
+// CHECK-LABEL: sil shared [noinline] @_TTSg5Si__TF4test16generic_get_funcurFTxSb_Fxx : $@convention(thin) (Int, Bool) -> @owned @callee_owned (@in Int) -> @out Int {
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSr5Si__TFF4test16generic_get_funcurFTxSb_FxxL_7genericfQ_Q_ : $@convention(thin) (@in Int, Bool, @owned @box Int) -> @out Int
 // CHECK: [[PA:%[0-9]+]] = partial_apply [[F]](%1, %{{[0-9]+}}) : $@convention(thin) (@in Int, Bool, @owned @box Int) -> @out Int
 // CHECK: return [[PA]] : $@callee_owned (@in Int) -> @out Int
 @inline(never)
@@ -33,7 +33,7 @@ func generic_get_func<T>(_ t1: T, _ b: Bool) -> (T) -> T {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_TF4test7testit1FSbFSiSi : $@convention(thin) (Bool) -> @owned @callee_owned (Int) -> Int {
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si___TF4test16generic_get_funcurFTxSb_Fxx : $@convention(thin) (Int, Bool) -> @owned @callee_owned (@in Int) -> @out Int
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si__TF4test16generic_get_funcurFTxSb_Fxx : $@convention(thin) (Int, Bool) -> @owned @callee_owned (@in Int) -> @out Int
 // CHECK: [[CL:%[0-9]+]] = apply [[F]](%{{[0-9]+}}, %0) : $@convention(thin) (Int, Bool) -> @owned @callee_owned (@in Int) -> @out Int
 // CHECK: [[TH:%[0-9]+]] = function_ref @_TTRXFo_iSi_iSi_XFo_dSi_dSi_ : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> @out Int) -> Int
 // CHECK: [[RET:%[0-9]+]] = partial_apply [[TH]]([[CL]]) : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> @out Int) -> Int
@@ -53,7 +53,7 @@ func generic2<T>(_ t1: T, t2: T, b: Bool) -> T {
 // args/result anyway.
 
 // CHECK-LABEL: sil hidden [noinline] @_TF4test17concrete_get_funcFT_FTSiSiSb_Si : $@convention(thin) () -> @owned @callee_owned (Int, Int, Bool) -> Int {
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si___TF4test8generic2urFTx2t2x1bSb_x : $@convention(thin) (Int, Int, Bool) -> Int
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si__TF4test8generic2urFTx2t2x1bSb_x : $@convention(thin) (Int, Int, Bool) -> Int
 // CHECK: [[RET:%[0-9]+]] = thin_to_thick_function [[F]] : $@convention(thin) (Int, Int, Bool) -> Int to $@callee_owned (Int, Int, Bool) -> Int
 // CHECK: return [[RET]] : $@callee_owned (Int, Int, Bool) -> Int
 @inline(never)
@@ -75,7 +75,7 @@ func generic3<T>(_ t1: T, _ t2: T, _ b: Bool) -> T {
 // No reabstraction thunk is needed because we directly apply the returned closure.
 
 // CHECK-LABEL: sil hidden [noinline] @_TF4test7testit3FSbSi : $@convention(thin) (Bool) -> Int {
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si___TF4test8generic3urFTxxSb_x : $@convention(thin) (Int, Int, Bool) -> Int
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si__TF4test8generic3urFTxxSb_x : $@convention(thin) (Int, Int, Bool) -> Int
 // CHECK: [[RET:%[0-9]+]] = apply [[F]]({{.*}}) : $@convention(thin) (Int, Int, Bool) -> Int
 // CHECK: return [[RET]] : $Int
 @inline(never)
@@ -88,8 +88,8 @@ func testit3(_ b: Bool) -> Int {
 // We need a reabstraction thunk to convert from direct args/result to indirect
 // args/result, which is expected in the returned closure.
 
-// CHECK-LABEL: sil shared [noinline] @_TTSg5Si___TF4test25generic_get_func_throwingurFSbFzxx : $@convention(thin) (Bool) -> @owned @callee_owned (@in Int) -> (@out Int, @error ErrorProtocol) {
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSr5Si___TFF4test25generic_get_func_throwingurFSbFzxxL_7genericfzQ_Q_ : $@convention(thin) (@in Int, Bool) -> (@out Int, @error ErrorProtocol)
+// CHECK-LABEL: sil shared [noinline] @_TTSg5Si__TF4test25generic_get_func_throwingurFSbFzxx : $@convention(thin) (Bool) -> @owned @callee_owned (@in Int) -> (@out Int, @error ErrorProtocol) {
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSr5Si__TFF4test25generic_get_func_throwingurFSbFzxxL_7genericfzQ_Q_ : $@convention(thin) (@in Int, Bool) -> (@out Int, @error ErrorProtocol)
 // CHECK: [[PA:%[0-9]+]] = partial_apply [[F]](%0) : $@convention(thin) (@in Int, Bool) -> (@out Int, @error ErrorProtocol)
 // CHECK: return [[PA]] : $@callee_owned (@in Int) -> (@out Int, @error ErrorProtocol)
 @inline(never)
@@ -107,7 +107,7 @@ func generic_get_func_throwing<T>(_ b: Bool) -> (T) throws -> T {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_TF4test16testit1_throwingFSbFzSiSi : $@convention(thin) (Bool) -> @owned @callee_owned (Int) -> (Int, @error ErrorProtocol) {
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si___TF4test25generic_get_func_throwingurFSbFzxx : $@convention(thin) (Bool) -> @owned @callee_owned (@in Int) -> (@out Int, @error ErrorProtocol)
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si__TF4test25generic_get_func_throwingurFSbFzxx : $@convention(thin) (Bool) -> @owned @callee_owned (@in Int) -> (@out Int, @error ErrorProtocol)
 // CHECK: [[CL:%[0-9]+]] = apply [[F]](%0) : $@convention(thin) (Bool) -> @owned @callee_owned (@in Int) -> (@out Int, @error ErrorProtocol)
 // CHECK: [[TH:%[0-9]+]] = function_ref @_TTRXFo_iSi_iSizoPs13ErrorProtocol__XFo_dSi_dSizoPS___ : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> (@out Int, @error ErrorProtocol)) -> (Int, @error ErrorProtocol)
 // CHECK: [[RET:%[0-9]+]] = partial_apply [[TH]]([[CL]]) : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> (@out Int, @error ErrorProtocol)) -> (Int, @error ErrorProtocol)
@@ -130,7 +130,7 @@ func generic2_throwing<T>(_ t1: T, b: Bool) throws -> T {
 // args/result anyway.
 
 // CHECK-LABEL: sil hidden [noinline] @_TF4test26concrete_get_func_throwingFT_FzTSiSb_Si : $@convention(thin) () -> @owned @callee_owned (Int, Bool) -> (Int, @error ErrorProtocol) {
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si___TF4test17generic2_throwingurFzTx1bSb_x : $@convention(thin) (Int, Bool) -> (Int, @error ErrorProtocol)
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si__TF4test17generic2_throwingurFzTx1bSb_x : $@convention(thin) (Int, Bool) -> (Int, @error ErrorProtocol)
 // CHECK: [[RET:%[0-9]+]] = thin_to_thick_function [[F]] : $@convention(thin) (Int, Bool) -> (Int, @error ErrorProtocol) to $@callee_owned (Int, Bool) -> (Int, @error ErrorProtocol)
 // CHECK: return [[RET]] : $@callee_owned (Int, Bool) -> (Int, @error ErrorProtocol)
 @inline(never)
@@ -156,7 +156,7 @@ func generic3_throwing<T>(_ t1: T, _ b: Bool) throws -> T {
 // No reabstraction thunk is needed because we directly apply the returned closure.
 
 // CHECK-LABEL: sil hidden [noinline] @_TF4test16testit3_throwingFSbSi : $@convention(thin) (Bool) -> Int {
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si___TF4test17generic3_throwingurFzTxSb_x : $@convention(thin) (Int, Bool) -> (Int, @error ErrorProtocol)
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si__TF4test17generic3_throwingurFzTxSb_x : $@convention(thin) (Int, Bool) -> (Int, @error ErrorProtocol)
 // CHECK: try_apply [[F]](%{{[0-9]+}}, %0) : $@convention(thin) (Int, Bool) -> (Int, @error ErrorProtocol), normal bb{{[0-9]+}}, error bb{{[0-9]+}}
 // CHECK: }
 @inline(never)
@@ -168,18 +168,18 @@ func testit3_throwing(_ b: Bool) -> Int {
 	}
 }
 
-// CHECK-LABEL: sil shared [transparent] [thunk] @_TTSr5Si___TFF4test16generic_get_funcurFTxSb_FxxL_7genericfQ_Q_ : $@convention(thin) (@in Int, Bool, @owned @box Int) -> @out Int {
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TTSr5Si__TFF4test16generic_get_funcurFTxSb_FxxL_7genericfQ_Q_ : $@convention(thin) (@in Int, Bool, @owned @box Int) -> @out Int {
 // CHECK: bb0(%0 : $*Int, %1 : $*Int, %2 : $Bool, %3 : $@box Int):
 // CHECK: [[LD:%[0-9]+]] = load %1 : $*Int
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si___TFF4test16generic_get_funcurFTxSb_FxxL_7genericfQ_Q_ : $@convention(thin) (Int, Bool, @owned @box Int) -> Int
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si__TFF4test16generic_get_funcurFTxSb_FxxL_7genericfQ_Q_ : $@convention(thin) (Int, Bool, @owned @box Int) -> Int
 // CHECK: [[RET:%[0-9]+]] = apply [[F]]([[LD]], %2, %3) : $@convention(thin) (Int, Bool, @owned @box Int) -> Int
 // CHECK: store [[RET]] to %0 : $*Int
 // CHECK: return %{{[0-9]*}} : $()
 
-// CHECK-LABEL: sil shared [transparent] [thunk] @_TTSr5Si___TFF4test25generic_get_func_throwingurFSbFzxxL_7genericfzQ_Q_ : $@convention(thin) (@in Int, Bool) -> (@out Int, @error ErrorProtocol) {
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TTSr5Si__TFF4test25generic_get_func_throwingurFSbFzxxL_7genericfzQ_Q_ : $@convention(thin) (@in Int, Bool) -> (@out Int, @error ErrorProtocol) {
 // CHECK: bb0(%0 : $*Int, %1 : $*Int, %2 : $Bool):
 // CHECK: [[LD:%[0-9]+]] = load %1 : $*Int
-// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si___TFF4test25generic_get_func_throwingurFSbFzxxL_7genericfzQ_Q_ : $@convention(thin) (Int, Bool) -> (Int, @error ErrorProtocol)
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSg5Si__TFF4test25generic_get_func_throwingurFSbFzxxL_7genericfzQ_Q_ : $@convention(thin) (Int, Bool) -> (Int, @error ErrorProtocol)
 // CHECK: try_apply [[F]]([[LD]], %2) : $@convention(thin) (Int, Bool) -> (Int, @error ErrorProtocol), normal bb1, error bb2
 // CHECK: bb1([[NORMAL:%[0-9]+]] : $Int):
 // CHECK: store [[NORMAL]] to %0 : $*Int

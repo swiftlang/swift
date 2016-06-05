@@ -9,8 +9,8 @@ import Builtin
 import Swift
 
 // Check that this recursive function is specialized only for Int32.
-// CHECK-LABEL: sil shared [noinline] @_TTSg5Vs5Int32___TF29specialize_recursive_generics18recursive_genericsU__FQ_T_
-// CHECK: function_ref @_TTSg5Vs5Int32___TF29specialize_recursive_generics18recursive_genericsU__FQ_T_
+// CHECK-LABEL: sil shared [noinline] @_TTSg5Vs5Int32__TF29specialize_recursive_generics18recursive_genericsU__FQ_T_
+// CHECK: function_ref @_TTSg5Vs5Int32__TF29specialize_recursive_generics18recursive_genericsU__FQ_T_
 // CHECK: return
 sil [noinline] @_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_ : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
@@ -28,12 +28,12 @@ bb0(%0 : $*T):
 
 // Check that this recursive function is specialized twice: for (Int, Double) and for (Double, Int).
 
-// CHECK-LABEL: sil shared [noinline] @_TTSg5Sd_Vs5Int32___TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
-// CHECK: function_ref @_TTSg5Vs5Int32_Sd___TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
+// CHECK-LABEL: sil shared [noinline] @_TTSg5SdVs5Int32__TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
+// CHECK: function_ref @_TTSg5Vs5Int32Sd__TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
 // CHECK: return
 
-// CHECK-LABEL: sil shared [noinline] @_TTSg5Vs5Int32_Sd___TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
-// CHECK: function_ref @_TTSg5Sd_Vs5Int32___TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
+// CHECK-LABEL: sil shared [noinline] @_TTSg5Vs5Int32Sd__TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
+// CHECK: function_ref @_TTSg5SdVs5Int32__TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
 // CHECK: return
 
 
@@ -118,10 +118,10 @@ bb3(%15 : $Optional<C>):
   return %15 : $Optional<C>
 }
 
-// CHECK-LABEL: sil shared @_TTSg5C4main1CS0_S_1PS___lookup
+// CHECK-LABEL: sil shared @_TTSg5C4main1C_lookup
 sil @lookup : $@convention(method) <Self where Self : P> (@owned C, @in_guaranteed Self) -> @owned Optional<C> {
 bb0(%0 : $C, %1 : $*Self):
-  // CHECK: [[HELPER:%.*]] = function_ref @_TTSg5Vs5Int32__helper
+  // CHECK: [[HELPER:%.*]] = function_ref @_TTSg5Vs5Int32_helper
   %4 = function_ref @helper : $@convention(thin) <τ_0_0> (@in τ_0_0, @in P) -> @owned Optional<C>
   %5 = integer_literal $Builtin.Int32, 1
   %6 = struct $Int32 (%5 : $Builtin.Int32)
@@ -136,7 +136,7 @@ bb0(%0 : $C, %1 : $*Self):
   release_value %12 : $Optional<C>
   dealloc_stack %9 : $*P
   dealloc_stack %7 : $*Int32
-  // CHECK: [[LOOKUP:%.*]] = function_ref @_TTSg5C4main1CS0_S_1PS___lookup
+  // CHECK: [[LOOKUP:%.*]] = function_ref @_TTSg5C4main1C_lookup
   %16 = function_ref @lookup : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned C, @in_guaranteed τ_0_0) -> @owned Optional<C>
   %17 = alloc_stack $C
   store %0 to %17 : $*C

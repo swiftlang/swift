@@ -648,12 +648,6 @@ private:
       NodePointer param = NodeFactory::create(Node::Kind::GenericSpecializationParam);
       DEMANGLE_CHILD_OR_RETURN(param, Type);
 
-      // Then parse any conformances until we find an underscore. Pop off the
-      // underscore since it serves as the end of our mangling list.
-      while (!Mangled.nextIf('_')) {
-        DEMANGLE_CHILD_OR_RETURN(param, ProtocolConformance);
-      }
-
       // Add the parameter to our specialization list.
       specialization->addChild(param);
     }

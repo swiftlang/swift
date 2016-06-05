@@ -22,4 +22,4 @@ public func exercise() {
 }
 
 // CHECK-LABEL: sil @_TF28specialize_property_behavior8exerciseFT_T_
-// CHECK:         function_ref @_TTSg5Si___TF28specialize_property_behavior8whateverurFT_x 
+// CHECK:         function_ref @_TTSg5Si__TF28specialize_property_behavior8whateverurFT_x 

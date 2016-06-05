@@ -464,9 +464,8 @@ void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
   Out << "__T";
 }
 void Remangler::mangleGenericSpecializationParam(Node *node) {
-  // Should be a type followed by a series of protocol conformances.
+  // Should be a type.
   mangleChildNodes(node);
-  Out << '_';
 }
 
 void Remangler::mangleFunctionSignatureSpecialization(Node *node) {
