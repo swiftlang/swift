@@ -1,5 +1,7 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+
+import StdlibUnittest
 
 struct Buffer32 {
   var x0: UInt64 = 0
@@ -22,5 +24,8 @@ func foo() -> UInt64 {
   }
 }
 
-// CHECK: 1
-print(foo())
+TestSuite("AllocRounding").test("Basic") {
+  expectEqual(1, foo())
+}
+
+runAllTests()
