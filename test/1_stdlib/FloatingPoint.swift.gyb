@@ -107,7 +107,9 @@ FloatingPoint.test("Float/staticProperties") {
   expectBitwiseEqual(0x1.921f_b6__p1, Ty.pi)
   expectBitwiseEqual(0x1.0p-23, Ty.ulpOfOne)
   expectBitwiseEqual(0x1.0p-126, Ty.leastNormalMagnitude)
-#if !arch(arm)
+#if arch(arm)
+  expectBitwiseEqual(0x1.0p-126, Ty.leastNonzeroMagnitude)
+#else
   expectBitwiseEqual(0x1.0p-149, Ty.leastNonzeroMagnitude)
 #endif
 
@@ -182,7 +184,9 @@ FloatingPoint.test("Double/staticProperties") {
   expectBitwiseEqual(0x1.921f_b544_42d1_8__p1, Ty.pi)
   expectBitwiseEqual(0x1.0p-52, Ty.ulpOfOne)
   expectBitwiseEqual(0x1.0p-1022, Ty.leastNormalMagnitude)
-#if !arch(arm)
+#if arch(arm)
+  expectBitwiseEqual(0x1.0p-1022, Ty.leastNonzeroMagnitude)
+#else
   expectBitwiseEqual(0x1.0p-1074, Ty.leastNonzeroMagnitude)
 #endif
 
