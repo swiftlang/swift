@@ -550,7 +550,7 @@ class FormatWalker : public SourceEntityWalker {
         // FIXME: We are going to revisit the behavior and the indentation we
         // want for dictionary/array literals.
         //
-#ifdef 0
+#if 0
         SourceLoc LBracketLoc = AE->getLBracketLoc();
         if (isTargetImmediateAfter(LBracketLoc) &&
             !sameLineWithTarget(LBracketLoc)) {
