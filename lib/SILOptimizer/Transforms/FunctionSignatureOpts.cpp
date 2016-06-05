@@ -59,7 +59,7 @@ using SILParameterInfoList = llvm::SmallVector<SILParameterInfo, 8>;
 using ArgumentIndexMap = llvm::SmallDenseMap<int, int>;
 
 //===----------------------------------------------------------------------===//
-//                           Utilties 
+//                           Utilities
 //===----------------------------------------------------------------------===//
 
 /// Return the single apply found in this function.
@@ -112,10 +112,10 @@ class FunctionSignatureTransform {
   // Keep tracks to argument mapping.
   ArgumentIndexMap &AIM;
 
-  // Self arument is modified.
+  // Self argument is modified.
   bool shouldModifySelfArgument;
 
-  /// Keep a "view" of precompiled information on argumentis that we use 
+  /// Keep a "view" of precompiled information on arguments that we use 
   /// during our optimization.
   llvm::SmallVector<ArgumentDescriptor, 4> &ArgumentDescList;
 
@@ -171,7 +171,7 @@ private:
     return Params || Result;
   }
 
-  /// Do the actual owned to guaranteeed transformations.
+  /// Do the actual owned to guaranteed transformations.
   void OwnedToGuaranteedTransform() {
     OwnedToGuaranteedTransformFunctionResults();
     OwnedToGuaranteedTransformFunctionParameters();
@@ -323,7 +323,7 @@ std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
 
 /// Compute what the function interface will look like based on the
 /// optimization we are doing on the given argument descriptor. Default
-/// implemenation simply passes it through.
+/// implementation simply passes it through.
 void
 FunctionSignatureTransform::
 computeOptimizedArgInterface(ArgumentDescriptor &AD, SILParameterInfoList &Out) {

@@ -90,7 +90,7 @@ extension String {
   /// specified prefix.
   ///
   /// The comparison is both case sensitive and Unicode safe. The
-  /// case-sensitive comparision will only match strings whose corresponding
+  /// case-sensitive comparison will only match strings whose corresponding
   /// characters have the same case.
   ///
   ///     let cafe = "Café du Monde"
@@ -143,7 +143,7 @@ extension String {
   /// specified suffix.
   ///
   /// The comparison is both case sensitive and Unicode safe. The
-  /// case-sensitive comparision will only match strings whose corresponding
+  /// case-sensitive comparison will only match strings whose corresponding
   /// characters have the same case.
   ///
   ///     let plans = "Let's meet at the café"

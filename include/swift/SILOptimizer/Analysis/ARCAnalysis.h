@@ -243,7 +243,7 @@ public:
     return false;
   }
 
-  /// Return true if we've found some epilgoue releases for the argument
+  /// Return true if we've found some epilogue releases for the argument
   /// but not all.
   bool hasSomeReleasesForArgument(SILArgument *Arg) {
     return FoundSomeReleases.find(Arg) != FoundSomeReleases.end();

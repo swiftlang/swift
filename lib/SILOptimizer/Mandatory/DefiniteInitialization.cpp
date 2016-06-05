@@ -2413,7 +2413,7 @@ int LifetimeChecker::getAnyUninitializedMemberAtInst(SILInstruction *Inst,
   // Determine the liveness states of the elements that we care about.
   auto Liveness = getLivenessAtInst(Inst, FirstElt, NumElts);
   
-  // Find unintialized member.
+  // Find uninitialized member.
   for (unsigned i = FirstElt, e = i+NumElts; i != e; ++i)
     if (Liveness.get(i) != DIKind::Yes)
       return i;

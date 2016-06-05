@@ -1243,13 +1243,13 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
 
   if (inoutCount > 0) {
     if (auto e = AFR.getAbstractFunctionDecl()) {
-      for (auto returnOccurance: getEscapingFunctionAsReturnValue(e)) {
-        diagnose(returnOccurance->getReturnLoc(),
+      for (auto returnOccurrence: getEscapingFunctionAsReturnValue(e)) {
+        diagnose(returnOccurrence->getReturnLoc(),
           diag::nested_function_escaping_inout_capture);
       }
-      auto occurances = getEscapingFunctionAsArgument(e);
-      for (auto occurance: occurances) {
-        diagnose(occurance->getLoc(),
+      auto occurrences = getEscapingFunctionAsArgument(e);
+      for (auto occurrence: occurrences) {
+        diagnose(occurrence->getLoc(),
           diag::nested_function_with_implicit_capture_argument,
           inoutCount > 1);
       }

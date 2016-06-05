@@ -1226,7 +1226,7 @@ createInPlaceMetadataInitializationFunction(IRGenModule &IGM,
     IGM.DebugInfo->emitArtificialFunction(IGF, fn);
 
   // Skip instrumentation when building for TSan to avoid false positives.
-  // The syncronization for this happens in the Runtime and we do not see it.
+  // The synchronization for this happens in the Runtime and we do not see it.
   if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
     fn->removeFnAttr(llvm::Attribute::SanitizeThread);
 
@@ -2895,7 +2895,7 @@ namespace {
       IRGenFunction IGF(IGM, f);
 
       // Skip instrumentation when building for TSan to avoid false positives.
-      // The syncronization for this happens in the Runtime and we do not see it.
+      // The synchronization for this happens in the Runtime and we do not see it.
       if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
         f->removeFnAttr(llvm::Attribute::SanitizeThread);
 
