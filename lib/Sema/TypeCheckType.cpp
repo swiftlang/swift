@@ -417,9 +417,14 @@ Type TypeChecker::applyGenericArguments(Type type, SourceLoc loc,
 
   auto unbound = type->getAs<UnboundGenericType>();
   if (!unbound) {
-    if (!type->is<ErrorType>())
-      diagnose(loc, diag::not_a_generic_type, type)
-          .fixItRemove(generic->getAngleBrackets());
+    if (!type->is<ErrorType>()) {
+      auto diag = diagnose(loc, diag::not_a_generic_type, type);
+
+      // Don't add fixit on module type; that isn't the right type regardless
+      // of whether it had generic arguments.
+      if (!type->is<ModuleType>())
+        diag.fixItRemove(generic->getAngleBrackets());
+    }
     generic->setInvalid();
     return type;
   }
