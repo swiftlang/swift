@@ -145,11 +145,11 @@ def get_preset_options(substitutions, preset_file_names, preset_name):
     # Migrate 'swift-sdks' parameter to 'stdlib-deployment-targets'
     for opt in build_script_impl_opts:
         if opt.startswith("--swift-sdks"):
-            sdksToConfigure = opt.split("=")[1].split(";")
+            sdks_to_configure = opt.split("=")[1].split(";")
             tgts = []
             # Expand SDKs in to their deployment targets
             from swift_build_support.targets import StdlibDeploymentTarget
-            for sdk in sdksToConfigure:
+            for sdk in sdks_to_configure:
                 if sdk == "OSX":
                     tgts += StdlibDeploymentTarget.OSX.allArchs
                 elif sdk == "IOS":

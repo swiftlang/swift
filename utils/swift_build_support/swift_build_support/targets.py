@@ -18,13 +18,13 @@ class StdlibDeploymentTarget(object):
         x86_64 = 'macosx-x86_64'
         allArchs = [x86_64]
 
-    class iOS(object):
+    class iOS(object):  # noqa
         armv7 = 'iphoneos-armv7'
         armv7s = 'iphoneos-armv7s'
         arm64 = 'iphoneos-arm64'
         allArchs = [armv7, armv7s, arm64]
 
-    class iOSSimulator(object):
+    class iOSSimulator(object):  # noqa
         i386 = 'iphonesimulator-i386'
         x86_64 = 'iphonesimulator-x86_64'
         allArchs = [i386, x86_64]
