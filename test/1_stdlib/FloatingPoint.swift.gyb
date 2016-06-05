@@ -107,7 +107,11 @@ FloatingPoint.test("Float/staticProperties") {
   expectBitwiseEqual(0x1.921f_b6__p1, Ty.pi)
   expectBitwiseEqual(0x1.0p-23, Ty.ulpOfOne)
   expectBitwiseEqual(0x1.0p-126, Ty.leastNormalMagnitude)
+#if arch(arm)
+  expectBitwiseEqual(0x1.0p-126, Ty.leastNonzeroMagnitude)
+#else
   expectBitwiseEqual(0x1.0p-149, Ty.leastNonzeroMagnitude)
+#endif
 
   // From the BinaryFloatingPoint protocol.
   expectEqual(8, Ty.exponentBitCount)
@@ -180,7 +184,11 @@ FloatingPoint.test("Double/staticProperties") {
   expectBitwiseEqual(0x1.921f_b544_42d1_8__p1, Ty.pi)
   expectBitwiseEqual(0x1.0p-52, Ty.ulpOfOne)
   expectBitwiseEqual(0x1.0p-1022, Ty.leastNormalMagnitude)
+#if arch(arm)
+  expectBitwiseEqual(0x1.0p-1022, Ty.leastNonzeroMagnitude)
+#else
   expectBitwiseEqual(0x1.0p-1074, Ty.leastNonzeroMagnitude)
+#endif
 
   // From the BinaryFloatingPoint protocol.
   expectEqual(11, Ty.exponentBitCount)
@@ -243,6 +251,24 @@ FloatingPoint.test("Double/HashValueZero") {
   expectEqual(zero.hashValue, negativeZero.hashValue)
 }
 
+#if arch(arm)
+% for FloatSelf in ['Float32', 'Float64']:
+func testSubNormalFlush(_ f: ${FloatSelf}) {
+  if !f.isSubnormal {
+    return
+  }
+  switch f.sign {
+  case .plus:
+    expectBitwiseEqual(.leastNonzeroMagnitude, f.nextUp)
+    expectBitwiseEqual(0.0, f.nextDown)
+  case .minus:
+    expectBitwiseEqual(-0.0, f.nextUp)
+    expectBitwiseEqual(-.leastNonzeroMagnitude, f.nextDown)
+  }
+}
+% end
+#endif
+
 let floatNextUpDownTests: [(Float, Float)] = [
   (.nan, .nan),
   (.greatestFiniteMagnitude, .infinity),
@@ -254,6 +280,13 @@ let floatNextUpDownTests: [(Float, Float)] = [
 FloatingPoint.test("Float.nextUp, .nextDown")
   .forEach(in: floatNextUpDownTests) {
   (prev, succ) in
+#if arch(arm)
+  if prev.isSubnormal || succ.isSubnormal {
+    testSubNormalFlush(prev)
+    testSubNormalFlush(succ)
+    return
+  }
+#endif
   expectBitwiseEqual(succ, prev.nextUp)
   expectBitwiseEqual(prev, succ.nextDown)
   expectBitwiseEqual(-succ, (-prev).nextDown)
@@ -271,6 +304,13 @@ let doubleNextUpDownTests: [(Double, Double)] = [
 FloatingPoint.test("Double.nextUp, .nextDown")
   .forEach(in: doubleNextUpDownTests) {
   (prev, succ) in
+#if arch(arm)
+  if prev.isSubnormal || succ.isSubnormal {
+    testSubNormalFlush(prev)
+    testSubNormalFlush(succ)
+    return
+  }
+#endif
   expectBitwiseEqual(succ, prev.nextUp)
   expectBitwiseEqual(prev, succ.nextDown)
   expectBitwiseEqual(-succ, (-prev).nextDown)

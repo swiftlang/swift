@@ -464,6 +464,15 @@ extension ${Self}: BinaryFloatingPoint {
   public var nextUp: ${Self} {
     if isNaN { return self }
     if sign == .minus {
+#if arch(arm)
+      // On arm, subnormals are flushed to zero.
+      if (exponentBitPattern == 1 && significandBitPattern == 0) ||
+         (exponentBitPattern == 0 && significandBitPattern != 0) {
+        return ${Self}(sign: .minus,
+          exponentBitPattern: 0,
+          significandBitPattern: 0)
+      }
+#endif
       if significandBitPattern == 0 {
         if exponentBitPattern == 0 {
           return .leastNonzeroMagnitude
@@ -485,7 +494,6 @@ extension ${Self}: BinaryFloatingPoint {
 #if arch(arm)
     // On arm, subnormals are skipped.
     if exponentBitPattern == 0 {
-      _sanityCheck(self < .leastNonzeroMagnitude, "subnormal out of range")
       return .leastNonzeroMagnitude
     }
 #endif
