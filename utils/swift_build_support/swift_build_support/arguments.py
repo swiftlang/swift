@@ -128,3 +128,16 @@ class _UnavailableAction(argparse.Action):
         parser.error('unknown argument: %s' % arg)
 
 _register(action, 'unavailable', _UnavailableAction)
+
+
+class _ConcatAction(argparse.Action):
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        old_val = getattr(namespace, self.dest)
+        if old_val is None:
+            val = values
+        else:
+            val = old_val + values
+        setattr(namespace, self.dest, val)
+
+_register(action, 'concat', _ConcatAction)
