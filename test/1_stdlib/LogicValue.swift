@@ -1,5 +1,7 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+
+import StdlibUnittest
 
 enum Bewl : Boolean {
   case False, True
@@ -15,36 +17,35 @@ enum Bewl : Boolean {
 }
 
 func truthy() -> Bewl {
-  print("truthy ", terminator: "")
   return .True
 }
 
 func falsy() -> Bewl {
-  print("falsy ", terminator: "")
   return .False
 }
 
-func logicValueTests() {
+let LogicValueTests = TestSuite("LogicValue")
+LogicValueTests.test("Basic") {
   // Logic values should convert to bool.
   struct X : Boolean {
     var boolValue: Bool { return false }
   }
   var anX = X()
-  print("Boolean Bool = \(Bool(anX))")   // CHECK: Boolean Bool = false
+  expectFalse(Bool(anX))
 
-  print("\(!Bewl.True)") // CHECK: false
-  print("\(!Bewl.False)") // CHECK: true
+  expectFalse(!Bewl.True)
+  expectTrue(!Bewl.False)
 
   // Test short-circuiting operators
-  print("\(Bool(truthy() && truthy()))") // CHECK: truthy truthy true
-  print("\(Bool(truthy() && falsy()))") // CHECK: truthy falsy false
-  print("\(Bool(falsy() && truthy()))") // CHECK: falsy false
-  print("\(Bool(falsy() && falsy()))") // CHECK: falsy false
+  expectTrue(Bool(truthy() && truthy()))
+  expectFalse(Bool(truthy() && falsy()))
+  expectFalse(Bool(falsy() && truthy()))
+  expectFalse(Bool(falsy() && falsy()))
 
-  print("\(Bool(truthy() || truthy()))") // CHECK: truthy true
-  print("\(Bool(truthy() || falsy()))") // CHECK: truthy true
-  print("\(Bool(falsy() || truthy()))") // CHECK: falsy truthy true
-  print("\(Bool(falsy() || falsy()))") // CHECK: falsy falsy false
+  expectTrue(Bool(truthy() || truthy()))
+  expectTrue(Bool(truthy() || falsy()))
+  expectTrue(Bool(falsy() || truthy()))
+  expectFalse(Bool(falsy() || falsy()))
 }
 
-logicValueTests()
+runAllTests()
