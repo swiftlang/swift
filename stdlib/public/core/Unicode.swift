@@ -954,7 +954,7 @@ extension UTF16 {
   }
 
   /// Returns the high-surrogate code unit of the surrogate pair representing
-  /// the specifed Unicode scalar.
+  /// the specified Unicode scalar.
   ///
   /// Because a Unicode scalar value can require up to 21 bits to store its
   /// value, some Unicode scalars are represented in UTF-16 by a pair of
@@ -978,7 +978,7 @@ extension UTF16 {
   }
 
   /// Returns the low-surrogate code unit of the surrogate pair representing
-  /// the specifed Unicode scalar.
+  /// the specified Unicode scalar.
   ///
   /// Because a Unicode scalar value can require up to 21 bits to store its
   /// value, some Unicode scalars are represented in UTF-16 by a pair of

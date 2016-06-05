@@ -40,7 +40,7 @@ public protocol MutableCollectionAlgorithms : MutableCollection {
   ) -> Index
 }
 
-// In the stdlib, this conformace wouldn't be needed
+// In the stdlib, this conformance wouldn't be needed
 extension Array : MutableCollectionAlgorithms {  }
 
 /// In the stdlib, this would simply be MutableCollection

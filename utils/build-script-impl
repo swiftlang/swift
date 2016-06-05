@@ -221,7 +221,7 @@ KNOWN_SETTINGS=(
     only-execute                       "all"     "Only execute the named action (see implementation)"
 )
 
-# Centalized access point for traced command invocation.
+# Centralized access point for traced command invocation.
 # Every operation that might mutates file system should be called via
 # these functions.
 

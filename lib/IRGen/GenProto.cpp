@@ -1607,7 +1607,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     return;
 
   // Don't emit a witness table that is available externally.
-  // It can end up in having duplicate sumbols for generated associated type
+  // It can end up in having duplicate symbols for generated associated type
   // metadata access functions.
   // Also, it is not a big benefit for LLVM to emit such witness tables.
   if (isAvailableExternally(wt->getLinkage()))

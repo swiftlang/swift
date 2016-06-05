@@ -40,15 +40,15 @@ foreach(sdk ${SWIFT_SDKS})
       
       # Determine the location of glibc headers based on the target.
       set(GLIBC_SYSROOT_RELATIVE_INCLUDE_PATH "/usr/include")
-      set(GLIBC_SYSROOT_REALTIVE_ARCH_INCLUDE_PATH ${GLIBC_SYSROOT_RELATIVE_INCLUDE_PATH})
+      set(GLIBC_SYSROOT_RELATIVE_ARCH_INCLUDE_PATH ${GLIBC_SYSROOT_RELATIVE_INCLUDE_PATH})
       
       # Some SDKs place their headers in architecture-specific subfolders.
       if((${sdk} STREQUAL "LINUX" OR ${sdk} STREQUAL "FREEBSD") AND CMAKE_LIBRARY_ARCHITECTURE)
-        set(GLIBC_SYSROOT_REALTIVE_ARCH_INCLUDE_PATH "${GLIBC_SYSROOT_REALTIVE_ARCH_INCLUDE_PATH}/${CMAKE_LIBRARY_ARCHITECTURE}")
+        set(GLIBC_SYSROOT_RELATIVE_ARCH_INCLUDE_PATH "${GLIBC_SYSROOT_RELATIVE_ARCH_INCLUDE_PATH}/${CMAKE_LIBRARY_ARCHITECTURE}")
       endif()
 
       set(GLIBC_INCLUDE_PATH "${SWIFT_SDK_${sdk}_PATH}/${GLIBC_SYSROOT_RELATIVE_INCLUDE_PATH}")
-      set(GLIBC_ARCH_INCLUDE_PATH "${SWIFT_SDK_${sdk}_PATH}/${GLIBC_SYSROOT_REALTIVE_ARCH_INCLUDE_PATH}")
+      set(GLIBC_ARCH_INCLUDE_PATH "${SWIFT_SDK_${sdk}_PATH}/${GLIBC_SYSROOT_RELATIVE_ARCH_INCLUDE_PATH}")
 
       set(glibc_modulemap_source "glibc.modulemap.gyb")
       set(glibc_modulemap_out "${module_dir}/glibc.modulemap")
@@ -78,7 +78,7 @@ foreach(sdk ${SWIFT_SDKS})
             FLAGS
                 "-DCMAKE_SDK=${sdk}"
                 "-DGLIBC_INCLUDE_PATH=${GLIBC_SYSROOT_RELATIVE_INCLUDE_PATH}"
-                "-DGLIBC_ARCH_INCLUDE_PATH=${GLIBC_SYSROOT_REALTIVE_ARCH_INCLUDE_PATH}")
+                "-DGLIBC_ARCH_INCLUDE_PATH=${GLIBC_SYSROOT_RELATIVE_ARCH_INCLUDE_PATH}")
 
         list(APPEND glibc_modulemap_target_list ${glibc_modulemap_native_target})
         set(glibc_modulemap_out ${glibc_sysroot_relative_modulemap_out})

@@ -1,4 +1,4 @@
-# swift_build_support/producsts/ninja.py ------------------------*- python -*-
+# swift_build_support/products/ninja.py -------------------------*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #

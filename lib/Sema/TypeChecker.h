@@ -517,15 +517,15 @@ private:
   llvm::DenseMap<AbstractFunctionDecl *, llvm::DenseSet<ReturnStmt *>>
     FunctionAsReturnValue;
 
-  /// Function apply expressions with a certain function as an arugment.
+  /// Function apply expressions with a certain function as an argument.
   llvm::DenseMap<AbstractFunctionDecl *, llvm::DenseSet<ApplyExpr *>>
     FunctionAsEscapingArg;
 
 public:
-  /// Record an occurence of a function that captures inout values as an
+  /// Record an occurrence of a function that captures inout values as an
   /// argument.
   ///
-  /// \param decl the function that occurs as an arugment.
+  /// \param decl the function that occurs as an argument.
   ///
   /// \param apply the expression in which the function appears.
   void addEscapingFunctionAsArgument(AbstractFunctionDecl *decl,
@@ -533,9 +533,9 @@ public:
     FunctionAsEscapingArg[decl].insert(apply);
   }
 
-  /// Find occurences of a function that captures inout values as arguments.
+  /// Find occurrences of a function that captures inout values as arguments.
   ///
-  /// \param decl the function that occurs as an arugment.
+  /// \param decl the function that occurs as an argument.
   ///
   /// \returns Expressions in which the function appears as arguments.
   llvm::DenseSet<ApplyExpr *> &
@@ -543,7 +543,7 @@ public:
     return FunctionAsEscapingArg[decl];
   }
 
-  /// Record an occurence of  a function that captures inout values as a return
+  /// Record an occurrence of  a function that captures inout values as a return
   /// value
   ///
   /// \param decl the function that occurs as a return value.
@@ -554,7 +554,7 @@ public:
     FunctionAsReturnValue[decl].insert(stmt);
   }
 
-  /// Find occurences of a function that captures inout values as return
+  /// Find occurrences of a function that captures inout values as return
   /// values.
   ///
   /// \param decl the function that occurs as a return value.

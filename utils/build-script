@@ -1244,7 +1244,7 @@ details of the setups of other systems or automated environments.""")
     if args.show_sdks:
         swift_build_support.debug.print_xcodebuild_versions()
 
-    # Clean build direcotry if requested.
+    # Clean build directory if requested.
     if args.clean:
         shell.rmtree(workspace.build_root)
 
