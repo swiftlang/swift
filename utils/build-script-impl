@@ -2087,6 +2087,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
                 FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
+                
+                # Staging: require opt-in for building with dispatch
+                if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
+                    LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
+                    LIBDISPATCH_BUILD_ARGS="--libdispatch-src-dir=${LIBDISPATCH_SOURCE_DIR} --libdispatch-build-dir=${LIBDISPATCH_BUILD_DIR}"
+                fi
+                
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                     # xcodebuild requires swift-stdlib-tool to build a Swift
                     # framework. This is normally present when building XCTest
@@ -2101,7 +2108,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 call "${XCTEST_SOURCE_DIR}"/build_script.py \
                     --swiftc="${SWIFTC_BIN}" \
                     --build-dir="${XCTEST_BUILD_DIR}" \
-                    --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation"
+                    --foundation-build-dir="${FOUNDATION_BUILD_DIR}/Foundation" \
+                    $LIBDISPATCH_BUILD_ARGS
 
                 # XCTest builds itself and doesn't rely on cmake
                 continue
