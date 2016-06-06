@@ -79,8 +79,7 @@ function(handle_swift_sources
     # <rdar://problem/15972329>
     list(APPEND swift_compile_flags "-force-single-frontend-invocation")
 
-    # FIXME: Apply this on all platforms where the linker supports it.
-    if(SWIFTSOURCES_IS_STDLIB_CORE AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+    if(SWIFTSOURCES_IS_STDLIB_CORE)
       list(APPEND swift_compile_flags "-Xcc" "-D__SWIFT_CURRENT_DYLIB=swiftCore")
     endif()
 
