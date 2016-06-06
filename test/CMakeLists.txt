@@ -203,26 +203,6 @@ if(PYTHONINTERP_FOUND)
         set(LIT_ARGS "${SWIFT_TEST_EXTRA_ARGS} ${LLVM_LIT_ARGS}")
         separate_arguments(LIT_ARGS)
 
-        if(test_mode STREQUAL "optimize_none")
-          # No special arguments required.
-        elseif(test_mode STREQUAL "optimize")
-          list(APPEND LIT_ARGS "--param" "run_only_tests=executable_tests")
-        elseif(test_mode STREQUAL "optimize_unchecked")
-          list(APPEND LIT_ARGS "--param" "run_only_tests=executable_tests")
-        elseif(test_mode STREQUAL "only_executable")
-          list(APPEND LIT_ARGS "--param" "run_only_tests=executable_tests")
-        elseif(test_mode STREQUAL "only_non_executable")
-          list(APPEND LIT_ARGS "--param" "run_only_tests=non_executable_tests")
-        else()
-          message(FATAL_ERROR "Unknown test mode: ${test_mode}")
-        endif()
-
-        set(test_mode_target_suffix "")
-        if(NOT test_mode STREQUAL "optimize_none")
-          list(APPEND LIT_ARGS "--param" "swift_test_mode=${test_mode}")
-          set(test_mode_target_suffix "-${test_mode}")
-        endif()
-
         if(NOT SWIFT_BUILD_STDLIB)
           list(APPEND LIT_ARGS
               "--param" "test_sdk_overlay_dir=${SWIFTLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
@@ -236,23 +216,6 @@ if(PYTHONINTERP_FOUND)
         endif()
 
         foreach(test_subset ${TEST_SUBSETS})
-          # We will add arguments specific for this subset to LIT_ARGS.  Copy
-          # the original value and restore it later.
-          set(LIT_ARGS_COPY "${LIT_ARGS}")
-
-          set(want_this_combination TRUE)
-          if(test_subset STREQUAL "only_long")
-            # Long tests are only run in 'optimize_none' mode.
-            if(NOT test_mode STREQUAL "optimize_none")
-              set(want_this_combination FALSE)
-            endif()
-
-            list(APPEND LIT_ARGS "--param" "run_only_tests=long_tests")
-          endif()
-          if(test_subset STREQUAL "all")
-            list(APPEND LIT_ARGS "--param" "run_only_tests=all")
-          endif()
-
           set(directories)
           set(dependencies ${test_dependencies})
 
@@ -275,18 +238,25 @@ if(PYTHONINTERP_FOUND)
             set(test_subset_target_suffix "")
           endif()
 
-          if(want_this_combination)
-            add_custom_target("check-swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}"
-                ${command_upload_stdlib}
-                ${command_clean_test_results_dir}
-                ${command_profdata_merge_start}
-                COMMAND ${PYTHON_EXECUTABLE} "${LIT}" ${LIT_ARGS} ${directories}
-                ${command_profdata_merge_stop}
-                DEPENDS ${dependencies}
-                COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE}"
-                ${cmake_3_2_USES_TERMINAL})
+          set(test_mode_target_suffix "")
+          if(NOT test_mode STREQUAL "optimize_none")
+            set(test_mode_target_suffix "-${test_mode}")
           endif()
-          set(LIT_ARGS "${LIT_ARGS_COPY}")
+
+          add_custom_target("check-swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}"
+              ${command_upload_stdlib}
+              ${command_clean_test_results_dir}
+              ${command_profdata_merge_start}
+              COMMAND
+                ${PYTHON_EXECUTABLE} "${LIT}"
+                ${LIT_ARGS}
+                "--param" "swift_test_subset=${test_subset}"
+                "--param" "swift_test_mode=${test_mode}"
+                ${directories}
+              ${command_profdata_merge_stop}
+              DEPENDS ${dependencies}
+              COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE}"
+              ${cmake_3_2_USES_TERMINAL})
         endforeach()
       endforeach()
     endforeach()

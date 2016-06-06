@@ -17,4 +17,5 @@
 // RUN: nm %t/libMultiFile | FileCheck %t/check.txt
 
 // REQUIRES: long_test
+// REQUIRES: executable_test
 

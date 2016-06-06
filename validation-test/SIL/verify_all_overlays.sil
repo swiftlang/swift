@@ -3,3 +3,4 @@
 // CHECK-NOT: Unknown
 
 // REQUIRES: long_test
+// REQUIRES: nonexecutable_test
