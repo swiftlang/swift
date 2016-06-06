@@ -983,10 +983,11 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
 }
 
 
-void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
+void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::Constant *Var,
                                                    StringRef Name,
                                                    StringRef LinkageName,
                                                    DebugTypeInfo DbgTy,
+                                                   bool IsLocalToUnit,
                                                    Optional<SILLocation> Loc) {
   if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
     return;
@@ -1004,7 +1005,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
 
   // Emit it as global variable of the current module.
   DBuilder.createGlobalVariable(MainModule, Name, LinkageName, File, L.Line, Ty,
-                                Var->hasInternalLinkage(), Var, nullptr);
+                                IsLocalToUnit, Var, nullptr);
 }
 
 StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {

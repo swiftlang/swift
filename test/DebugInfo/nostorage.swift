@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o %t
 // RUN: cat %t | FileCheck %s --check-prefix=CHECK1
 // RUN: cat %t | FileCheck %s --check-prefix=CHECK2
+// RUN: cat %t | FileCheck %s --check-prefix=CHECK3
 
 func used<T>(_ t: T) {}
 
@@ -32,3 +33,8 @@ public func app() {
   
   used(at)
 }
+
+public enum empty { case exists }
+public let globalvar = empty.exists
+// CHECK3: !DIGlobalVariable(name: "globalvar", {{.*}}line: [[@LINE-1]],
+// CHECK3-SAME:          isLocal: false, isDefinition: true, variable: i64 0)

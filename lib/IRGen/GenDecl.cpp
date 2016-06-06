@@ -1395,7 +1395,7 @@ llvm::GlobalVariable *LinkInfo::createVariable(IRGenModule &IGM,
   if (IGM.DebugInfo && !DbgTy.isNull() && ForDefinition)
     IGM.DebugInfo->emitGlobalVariableDeclaration(
         var, DebugName.empty() ? getName() : DebugName, getName(), DbgTy,
-        DebugLoc);
+        var->hasInternalLinkage(), DebugLoc);
 
   return var;
 }
