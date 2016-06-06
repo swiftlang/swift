@@ -160,8 +160,6 @@ else()
   find_package(ICU REQUIRED COMPONENTS uc i18n)
   list(APPEND swift_core_private_link_libraries
       ${ICU_UC_LIBRARY} ${ICU_I18N_LIBRARY})
-  include_directories(
-      ${ICU_UC_INCLUDE_DIR} ${ICU_I18N_INCLUDE_DIR})
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
