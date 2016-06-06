@@ -49,6 +49,30 @@ ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
   }
 }
 
+ProtocolConformanceRef
+ProtocolConformanceRef::getInherited(ProtocolDecl *parent) const {
+  assert((getRequirement() == parent ||
+          getRequirement()->inheritsFrom(parent)) &&
+         "not a parent of this protocol");
+  
+  if (parent == getRequirement())
+    return *this;
+  
+  // For an abstract requirement, simply produce a new abstract requirement
+  // for the parent.
+  if (isAbstract()) {
+    return ProtocolConformanceRef(parent);
+  }
+  
+  // Navigate concrete conformances.
+  if (isConcrete()) {
+    return ProtocolConformanceRef(
+      getConcrete()->getInheritedConformance(parent));
+  }
+  
+  llvm_unreachable("unhandled ProtocolConformanceRef");
+}
+
 void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
                                         AllocationArena arena,
                                         unsigned alignment) {

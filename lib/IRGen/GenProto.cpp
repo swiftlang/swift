@@ -2621,9 +2621,9 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                               ProtocolConformanceRef conformance,
                               Explosion &out) {
   auto fn = cast<AbstractFunctionDecl>(member.getDecl());
-
-  assert(cast<ProtocolDecl>(fn->getDeclContext())
-           == conformance.getRequirement());
+  auto fnProto = cast<ProtocolDecl>(fn->getDeclContext());
+  
+  conformance = conformance.getInherited(fnProto);
 
   // Find the witness table.
   // FIXME conformance for concrete type
