@@ -12,6 +12,7 @@
 from __future__ import print_function
 
 import argparse
+import json
 import os
 import sys
 
@@ -21,70 +22,12 @@ from SwiftBuildSupport import (
     SWIFT_SOURCE_ROOT,
 )  # noqa (E402 module level import not at top of file)
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
+SCRIPT_FILE = os.path.abspath(__file__)
+SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
+
+sys.path.append(os.path.join(SCRIPT_DIR, 'swift_build_support'))
 
 from swift_build_support import shell  # noqa (E402)
-
-REPOSITORIES = {
-    'llvm': 'apple/swift-llvm',
-    'clang': 'apple/swift-clang',
-    'swift': 'apple/swift-swift',
-    'lldb': 'apple/swift-lldb',
-    'cmark': 'apple/swift-cmark',
-    'llbuild': 'apple/swift-llbuild',
-    'swiftpm': 'apple/swift-package-manager',
-    'compiler-rt': 'apple/swift-compiler-rt',
-    'swift-corelibs-xctest': 'apple/swift-corelibs-xctest',
-    'swift-corelibs-foundation': 'apple/swift-corelibs-foundation',
-    'swift-corelibs-libdispatch': 'apple/swift-corelibs-libdispatch',
-    'swift-integration-tests': 'apple/swift-integration-tests',
-}
-
-MASTER_BRANCHES = {
-    'llvm': 'stable',
-    'clang': 'stable',
-    'swift': 'master',
-    'lldb': 'master',
-    'cmark': 'master',
-    'llbuild': 'master',
-    'swiftpm': 'master',
-    'compiler-rt': 'stable',
-    'swift-corelibs-xctest': 'master',
-    'swift-corelibs-foundation': 'master',
-    'swift-corelibs-libdispatch': 'master',
-    'swift-integration-tests': 'master',
-}
-
-NEXT_BRANCHES = {
-    'llvm': 'stable-next',
-    'clang': 'stable-next',
-    'compiler-rt': 'stable-next',
-    'swift': 'master-next',
-    'lldb': 'master-next',
-    'cmark': 'master',
-    'llbuild': 'master',
-    'swiftpm': 'master',
-    'compiler-rt': 'stable-next',
-    'swift-corelibs-xctest': 'master',
-    'swift-corelibs-foundation': 'master',
-    'swift-corelibs-libdispatch': 'master',
-    'swift-integration-tests': 'master',
-}
-
-SWIFT_3_0_PREVIEW_1_BRANCHES = {
-    'llvm': 'swift-3.0-branch',
-    'clang': 'swift-3.0-branch',
-    'swift': 'swift-3.0-preview-1-branch',
-    'lldb': 'swift-3.0-preview-1-branch',
-    'cmark': 'swift-3.0-preview-1-branch',
-    'llbuild': 'swift-3.0-preview-1-branch',
-    'swiftpm': 'swift-3.0-preview-1-branch',
-    'compiler-rt': 'swift-3.0-branch',
-    'swift-corelibs-xctest': 'swift-3.0-preview-1-branch',
-    'swift-corelibs-foundation': 'swift-3.0-preview-1-branch',
-    'swift-corelibs-libdispatch': 'swift-3.0-preview-1-branch',
-    'swift-integration-tests': 'swift-3.0-preview-1-branch',
-}
 
 
 def update_working_copy(repo_path, branch):
@@ -112,8 +55,8 @@ def update_working_copy(repo_path, branch):
 
 
 def obtain_additional_swift_sources(
-        with_ssh, branch, skip_history, skip_repositories):
-    for dir_name, repo in REPOSITORIES.items():
+        config, with_ssh, branch, skip_history, skip_repositories):
+    for dir_name, repo in config['repositories'].items():
         if dir_name in skip_repositories:
             print("--- Skipping '" + dir_name + "' ---")
             continue
@@ -133,12 +76,13 @@ def obtain_additional_swift_sources(
                                 dir_name], echo=False)
                 if branch:
                     if branch == "master" or branch == "stable":
-                        repo_branch = MASTER_BRANCHES[dir_name]
+                        repo_branch = config['master-branches'][dir_name]
                     elif branch == "stable-next" or branch == "master-next":
-                        repo_branch = NEXT_BRANCHES[dir_name]
+                        repo_branch = config['next-branches'][dir_name]
                     elif branch == "swift-3.0-branch" or \
                             branch == "swift-3.0-preview-1-branch":
-                        repo_branch = SWIFT_3_0_PREVIEW_1_BRANCHES[dir_name]
+                        repo_branch = \
+                            config["swift-3.0-preview-1-branches"][dir_name]
                     else:
                         repo_branch = branch
                     src_path = SWIFT_SOURCE_ROOT + "/" + dir_name + "/" + \
@@ -176,6 +120,10 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     parser.add_argument(
         "--branch",
         help="Obtain Sources for specific branch")
+    parser.add_argument(
+        "--config",
+        default=os.path.join(SCRIPT_DIR, "update-checkout-config.json"),
+        help="Configuration file to use")
     args = parser.parse_args()
 
     clone = args.clone
@@ -183,23 +131,26 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     skip_history = args.skip_history
     branch = args.branch
 
+    with open(args.config) as f:
+        config = json.load(f)
+
     if clone or clone_with_ssh:
         obtain_additional_swift_sources(
-            clone_with_ssh, branch, skip_history, args.skip_repository)
+            config, clone_with_ssh, branch, skip_history, args.skip_repository)
 
     repo_branch = branch
-    for dir_name, _ in REPOSITORIES.items():
+    for dir_name, _ in config["repositories"].items():
         if dir_name in args.skip_repository:
             print("--- Skipping '" + dir_name + "' ---")
             continue
         if branch:
             if branch == "master" or branch == "stable":
-                repo_branch = MASTER_BRANCHES[dir_name]
+                repo_branch = config["master-branches"][dir_name]
             elif branch == "stable-next" or branch == "master-next":
-                repo_branch = NEXT_BRANCHES[dir_name]
+                repo_branch = config["next-branches"][dir_name]
             elif branch == "swift-3.0-branch" or \
                     branch == "swift-3.0-preview-1-branch":
-                repo_branch = SWIFT_3_0_PREVIEW_1_BRANCHES[dir_name]
+                repo_branch = config["swift-3.0-preview-1-branches"][dir_name]
 
         update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, dir_name),
                             repo_branch)
