@@ -288,7 +288,7 @@ The following changes are permitted:
   source-breaking change`.
 - The ``@noreturn`` attribute may be added to a function. ``@noreturn`` is a
   `versioned attribute`.
-- The ``@warn_unused_result`` and ``@warn_unqualified_access`` attributes may
+- The ``@discardableResult`` and ``@warn_unqualified_access`` attributes may
   be added to a function without any additional versioning information.
 
 No other changes are permitted; the following are particularly of note:
@@ -908,7 +908,7 @@ There are very few safe changes to make to protocols:
   is permitted.
 - Reordering generic requirements is permitted (but not the generic parameters
   themselves).
-- The ``@warn_unused_result`` and ``@warn_unqualified_access`` attributes may
+- The ``@discardableResult`` and ``@warn_unqualified_access`` attributes may
   be added to a function requirement without any additional versioning
   information.
 
@@ -1058,7 +1058,7 @@ top-level functions, but the potential for overrides complicates things a little
 - The ``@noreturn`` attribute may be added to a public method only if it is
   ``final`` or the class is not publicly subclassable. ``@noreturn`` is a
   `versioned attribute`.
-- The ``@warn_unused_result`` and ``@warn_unqualified_access`` attributes may
+- The ``@discardableResult`` and ``@warn_unqualified_access`` attributes may
   be added to a method without any additional versioning information.
 
 Class and instance methods may be marked ``@inlineable``, with the same
