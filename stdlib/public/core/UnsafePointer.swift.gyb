@@ -387,11 +387,13 @@ public struct ${Self}<Pointee>
   ///   initialized.
   ///
   /// - Postcondition: The memory is uninitialized.
-  public func deinitialize(count: Int = 1) {
+  @discardableResult
+  public func deinitialize(count: Int = 1) -> UnsafeMutableRawPointer {
     _debugPrecondition(count >= 0, "${Self}.deinitialize with negative count")
     // FIXME: optimization should be implemented, where if the `count` value
     // is 1, the `Builtin.destroy(Pointee.self, _rawValue)` gets called.
     Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)
+    return UnsafeMutableRawPointer(self)
   }
 %  end
 
