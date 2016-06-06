@@ -68,6 +68,176 @@ def call_without_sleeping(command, dry_run=False):
 class BuildScriptInvocation(object):
     """Represent a single build script invocation."""
 
+    @staticmethod
+    def apply_default_arguments(toolchain, args):
+        """Preprocess an argument set to apply default behaviors."""
+        
+        # Build cmark if any cmark-related options were specified.
+        if (args.cmark_build_variant is not None):
+            args.build_cmark = True
+
+        # Build LLDB if any LLDB-related options were specified.
+        if args.lldb_build_variant is not None or \
+           args.lldb_assertions is not None:
+            args.build_lldb = True
+
+        # Set the default build variant.
+        if args.build_variant is None:
+            args.build_variant = "Debug"
+
+        # Propagate the default build variant.
+        if args.cmark_build_variant is None:
+            args.cmark_build_variant = args.build_variant
+
+        if args.llvm_build_variant is None:
+            args.llvm_build_variant = args.build_variant
+
+        if args.swift_build_variant is None:
+            args.swift_build_variant = args.build_variant
+
+        if args.swift_stdlib_build_variant is None:
+            args.swift_stdlib_build_variant = args.build_variant
+
+        if args.lldb_build_variant is None:
+            args.lldb_build_variant = args.build_variant
+
+        if args.foundation_build_variant is None:
+            args.foundation_build_variant = args.build_variant
+
+        if args.libdispatch_build_variant is None:
+            args.libdispatch_build_variant = args.build_variant
+
+        # Assertions are enabled by default.
+        if args.assertions is None:
+            args.assertions = True
+
+        # Propagate the default assertions setting.
+        if args.cmark_assertions is None:
+            args.cmark_assertions = args.assertions
+
+        if args.llvm_assertions is None:
+            args.llvm_assertions = args.assertions
+
+        if args.swift_assertions is None:
+            args.swift_assertions = args.assertions
+
+        if args.swift_stdlib_assertions is None:
+            args.swift_stdlib_assertions = args.assertions
+
+        # Set the default CMake generator.
+        if args.cmake_generator is None:
+            args.cmake_generator = "Ninja"
+
+        ninja_required = (
+            args.cmake_generator == 'Ninja' or args.build_foundation)
+        if ninja_required and toolchain.ninja is None:
+            args.build_ninja = True
+
+        # SwiftPM and XCTest have a dependency on Foundation.
+        # On OS X, Foundation is built automatically using xcodebuild.
+        # On Linux, we must ensure that it is built manually.
+        if ((args.build_swiftpm or args.build_xctest) and
+                platform.system() != "Darwin"):
+            args.build_foundation = True
+
+        # Propagate global --skip-build
+        if args.skip_build:
+            args.skip_build_linux = True
+            args.skip_build_freebsd = True
+            args.skip_build_cygwin = True
+            args.skip_build_osx = True
+            args.skip_build_ios = True
+            args.skip_build_tvos = True
+            args.skip_build_watchos = True
+            args.skip_build_android = True
+            args.skip_build_benchmarks = True
+            args.build_lldb = False
+            args.build_llbuild = False
+            args.build_swiftpm = False
+            args.build_xctest = False
+            args.build_foundation = False
+            args.build_libdispatch = False
+
+        # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
+        # merely shorthands for --skip-build-{**os}-{device,simulator}
+        if not args.ios or args.skip_build_ios:
+            args.skip_build_ios_device = True
+            args.skip_build_ios_simulator = True
+
+        if not args.tvos or args.skip_build_tvos:
+            args.skip_build_tvos_device = True
+            args.skip_build_tvos_simulator = True
+
+        if not args.watchos or args.skip_build_watchos:
+            args.skip_build_watchos_device = True
+            args.skip_build_watchos_simulator = True
+
+        if not args.android or args.skip_build_android:
+            args.skip_build_android = True
+
+        # --validation-test implies --test.
+        if args.validation_test:
+            args.test = True
+
+        # --test-optimized implies --test.
+        if args.test_optimized:
+            args.test = True
+
+        # If none of tests specified skip swift stdlib test on all platforms
+        if not args.test and not args.validation_test and not args.long_test:
+            args.skip_test_linux = True
+            args.skip_test_freebsd = True
+            args.skip_test_cygwin = True
+            args.skip_test_osx = True
+            args.skip_test_ios = True
+            args.skip_test_tvos = True
+            args.skip_test_watchos = True
+
+        # --skip-test-ios is merely a shorthand for host and simulator tests.
+        if args.skip_test_ios:
+            args.skip_test_ios_host = True
+            args.skip_test_ios_simulator = True
+        # --skip-test-tvos is merely a shorthand for host and simulator tests.
+        if args.skip_test_tvos:
+            args.skip_test_tvos_host = True
+            args.skip_test_tvos_simulator = True
+        # --skip-test-watchos is merely a shorthand for host and simulator
+        # --tests.
+        if args.skip_test_watchos:
+            args.skip_test_watchos_host = True
+            args.skip_test_watchos_simulator = True
+
+        # --skip-build-{ios,tvos,watchos}-{device,simulator} implies
+        # --skip-test-{ios,tvos,watchos}-{host,simulator}
+        if args.skip_build_ios_device:
+            args.skip_test_ios_host = True
+        if args.skip_build_ios_simulator:
+            args.skip_test_ios_simulator = True
+
+        if args.skip_build_tvos_device:
+            args.skip_test_tvos_host = True
+        if args.skip_build_tvos_simulator:
+            args.skip_test_tvos_simulator = True
+
+        if args.skip_build_watchos_device:
+            args.skip_test_watchos_host = True
+        if args.skip_build_watchos_simulator:
+            args.skip_test_watchos_simulator = True
+
+        if not args.host_test:
+            args.skip_test_ios_host = True
+            args.skip_test_tvos_host = True
+            args.skip_test_watchos_host = True
+
+        if args.build_subdir is None:
+            args.build_subdir = \
+                swift_build_support.workspace.compute_build_subdir(args)
+
+        # Add optional stdlib-deployment-targets
+        if args.android:
+            args.stdlib_deployment_targets.append(
+                StdlibDeploymentTarget.Android.armv7)
+    
     def __init__(self, toolchain, args):
         self.toolchain = toolchain
         self.args = args
@@ -1123,171 +1293,9 @@ details of the setups of other systems or automated environments.""")
                               "and --android-icu-i18n-include must be "
                               "specified")
 
-    # Build cmark if any cmark-related options were specified.
-    if (args.cmark_build_variant is not None):
-        args.build_cmark = True
-
-    # Build LLDB if any LLDB-related options were specified.
-    if args.lldb_build_variant is not None or \
-       args.lldb_assertions is not None:
-        args.build_lldb = True
-
-    # Set the default build variant.
-    if args.build_variant is None:
-        args.build_variant = "Debug"
-
-    # Propagate the default build variant.
-    if args.cmark_build_variant is None:
-        args.cmark_build_variant = args.build_variant
-
-    if args.llvm_build_variant is None:
-        args.llvm_build_variant = args.build_variant
-
-    if args.swift_build_variant is None:
-        args.swift_build_variant = args.build_variant
-
-    if args.swift_stdlib_build_variant is None:
-        args.swift_stdlib_build_variant = args.build_variant
-
-    if args.lldb_build_variant is None:
-        args.lldb_build_variant = args.build_variant
-
-    if args.foundation_build_variant is None:
-        args.foundation_build_variant = args.build_variant
-
-    if args.libdispatch_build_variant is None:
-        args.libdispatch_build_variant = args.build_variant
-
-    # Assertions are enabled by default.
-    if args.assertions is None:
-        args.assertions = True
-
-    # Propagate the default assertions setting.
-    if args.cmark_assertions is None:
-        args.cmark_assertions = args.assertions
-
-    if args.llvm_assertions is None:
-        args.llvm_assertions = args.assertions
-
-    if args.swift_assertions is None:
-        args.swift_assertions = args.assertions
-
-    if args.swift_stdlib_assertions is None:
-        args.swift_stdlib_assertions = args.assertions
-
-    # Set the default CMake generator.
-    if args.cmake_generator is None:
-        args.cmake_generator = "Ninja"
-
-    ninja_required = (
-        args.cmake_generator == 'Ninja' or args.build_foundation)
-    if ninja_required and toolchain.ninja is None:
-        args.build_ninja = True
-
-    # SwiftPM and XCTest have a dependency on Foundation.
-    # On OS X, Foundation is built automatically using xcodebuild.
-    # On Linux, we must ensure that it is built manually.
-    if ((args.build_swiftpm or args.build_xctest) and
-            platform.system() != "Darwin"):
-        args.build_foundation = True
-
-    # Propagate global --skip-build
-    if args.skip_build:
-        args.skip_build_linux = True
-        args.skip_build_freebsd = True
-        args.skip_build_cygwin = True
-        args.skip_build_osx = True
-        args.skip_build_ios = True
-        args.skip_build_tvos = True
-        args.skip_build_watchos = True
-        args.skip_build_android = True
-        args.skip_build_benchmarks = True
-        args.build_lldb = False
-        args.build_llbuild = False
-        args.build_swiftpm = False
-        args.build_xctest = False
-        args.build_foundation = False
-        args.build_libdispatch = False
-
-    # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
-    # merely shorthands for --skip-build-{**os}-{device,simulator}
-    if not args.ios or args.skip_build_ios:
-        args.skip_build_ios_device = True
-        args.skip_build_ios_simulator = True
-
-    if not args.tvos or args.skip_build_tvos:
-        args.skip_build_tvos_device = True
-        args.skip_build_tvos_simulator = True
-
-    if not args.watchos or args.skip_build_watchos:
-        args.skip_build_watchos_device = True
-        args.skip_build_watchos_simulator = True
-
-    if not args.android or args.skip_build_android:
-        args.skip_build_android = True
-
-    # --validation-test implies --test.
-    if args.validation_test:
-        args.test = True
-
-    # --test-optimized implies --test.
-    if args.test_optimized:
-        args.test = True
-
-    # If none of tests specified skip swift stdlib test on all platforms
-    if not args.test and not args.validation_test and not args.long_test:
-        args.skip_test_linux = True
-        args.skip_test_freebsd = True
-        args.skip_test_cygwin = True
-        args.skip_test_osx = True
-        args.skip_test_ios = True
-        args.skip_test_tvos = True
-        args.skip_test_watchos = True
-
-    # --skip-test-ios is merely a shorthand for host and simulator tests.
-    if args.skip_test_ios:
-        args.skip_test_ios_host = True
-        args.skip_test_ios_simulator = True
-    # --skip-test-tvos is merely a shorthand for host and simulator tests.
-    if args.skip_test_tvos:
-        args.skip_test_tvos_host = True
-        args.skip_test_tvos_simulator = True
-    # --skip-test-watchos is merely a shorthand for host and simulator tests.
-    if args.skip_test_watchos:
-        args.skip_test_watchos_host = True
-        args.skip_test_watchos_simulator = True
-
-    # --skip-build-{ios,tvos,watchos}-{device,simulator} implies
-    # --skip-test-{ios,tvos,watchos}-{host,simulator}
-    if args.skip_build_ios_device:
-        args.skip_test_ios_host = True
-    if args.skip_build_ios_simulator:
-        args.skip_test_ios_simulator = True
-
-    if args.skip_build_tvos_device:
-        args.skip_test_tvos_host = True
-    if args.skip_build_tvos_simulator:
-        args.skip_test_tvos_simulator = True
-
-    if args.skip_build_watchos_device:
-        args.skip_test_watchos_host = True
-    if args.skip_build_watchos_simulator:
-        args.skip_test_watchos_simulator = True
-
-    if not args.host_test:
-        args.skip_test_ios_host = True
-        args.skip_test_tvos_host = True
-        args.skip_test_watchos_host = True
-
-    if args.build_subdir is None:
-        args.build_subdir = swift_build_support.workspace.compute_build_subdir(
-            args)
-
-    # Add optional stdlib-deployment-targets
-    if args.android:
-        args.stdlib_deployment_targets.append(
-            StdlibDeploymentTarget.Android.armv7)
-
+    # Preprocess the arguments to apply defaults.
+    BuildScriptInvocation.apply_default_arguments(toolchain, args)
+            
     # Create the build script invocation.
     invocation = BuildScriptInvocation(toolchain, args)
 
