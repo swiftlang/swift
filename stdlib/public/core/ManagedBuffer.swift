@@ -117,7 +117,7 @@ public class ManagedBuffer<Header, Element>
   /// Destroy the stored Header.
   deinit {
     ManagedBufferPointer(self).withUnsafeMutablePointerToHeader {
-      $0.deinitialize()
+      _ = $0.deinitialize()
     }
   }
 

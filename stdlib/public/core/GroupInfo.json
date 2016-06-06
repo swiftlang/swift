@@ -115,6 +115,7 @@
   "Pointer": [
     "Pointer.swift",
     "UnsafePointer.swift",
+    "UnsafeRawPointer.swift",
     "UnsafeBufferPointer.swift"
   ],
   "Protocols": [
