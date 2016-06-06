@@ -973,13 +973,10 @@ namespace {
       if (!validateForwardCapture(DRE->getDecl()))
         return { false, DRE };
 
-      bool isInOut = D->hasInterfaceType()
-                     && isa<InOutType>(D->getInterfaceType().getPointer());
+      bool isInOut = D->hasType() && D->getInterfaceType()->is<InOutType>();
       bool isNested = false;
-      if (auto f = AFR.getAbstractFunctionDecl()) {
-           isNested = f->getDeclContext()->getContextKind() ==
-        DeclContextKind::AbstractFunctionDecl;
-      }
+      if (auto f = AFR.getAbstractFunctionDecl())
+        isNested = f->getDeclContext()->isLocalContext();
 
       if (isInOut && !AFR.isKnownNoEscape() && !isNested) {
         if (D->getNameStr() == "self") {
