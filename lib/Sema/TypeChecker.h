@@ -1831,8 +1831,7 @@ public:
   /// Checks an "ignored" expression to see if it's okay for it to be ignored.
   ///
   /// An ignored expression is one that is not nested within a larger
-  /// expression or statement. The warning from the \@warn_unused_result
-  /// attribute is produced here.
+  /// expression or statement.
   void checkIgnoredExpr(Expr *E);
 
   // Emits a diagnostic, if necessary, for a reference to a declaration

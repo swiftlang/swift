@@ -44,7 +44,6 @@ struct CollectionWithDefaultUnderestimatedCount : Collection {
       position: _count, startIndex: 0, endIndex: _count)
   }
 
-  @warn_unused_result
   func index(after i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
       collectionState: _collectionState,
@@ -88,7 +87,6 @@ struct MinimalCollectionWith${Implementation}Filter<Element>
     return _data.endIndex
   }
 
-  @warn_unused_result
   func index(after i: MinimalIndex) -> MinimalIndex {
     return _data.index(after: i)
   }
@@ -225,7 +223,6 @@ struct MinimalCollectionWith${Implementation}Map<Element>
     return _data.endIndex
   }
 
-  @warn_unused_result
   func index(after i: MinimalIndex) -> MinimalIndex {
     return _data.index(after: i)
   }
@@ -390,7 +387,6 @@ struct CollectionWithCustomUnderestimatedCount : Collection {
       position: 0xffff, startIndex: 0, endIndex: 0xffff)
   }
 
-  @warn_unused_result
   func index(after i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
       collectionState: _collectionState,
@@ -444,7 +440,6 @@ struct MinimalCollectionWithDefaultIterator : Collection {
       position: _count, startIndex: 0, endIndex: _count)
   }
 
-  @warn_unused_result
   func index(after i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
       collectionState: _collectionState,
@@ -518,7 +513,6 @@ struct MinimalCollectionWithCustomIterator : Collection {
       position: _count, startIndex: 0, endIndex: _count)
   }
 
-  @warn_unused_result
   func index(after i: MinimalIndex) -> MinimalIndex {
     return MinimalIndex(
       collectionState: _collectionState,

@@ -9,7 +9,6 @@ import StdlibUnittest
 import SwiftShims
 
 
-@warn_unused_result
 @_silgen_name("swift_demangle")
 public
 func _stdlib_demangleImpl(
@@ -20,7 +19,6 @@ func _stdlib_demangleImpl(
   flags: UInt32
 ) -> UnsafeMutablePointer<CChar>?
 
-@warn_unused_result
 func _stdlib_demangleName(_ mangledName: String) -> String {
   return mangledName.nulTerminatedUTF8.withUnsafeBufferPointer {
     (mangledNameUTF8) in
