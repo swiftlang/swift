@@ -243,8 +243,9 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *cd) {
-    // Stub constructors don't get an entry.
-    if (cd->hasStubImplementation())
+    // Stub constructors don't get an entry, unless they were synthesized to
+    // override a non-required designated initializer in the superclass.
+    if (cd->hasStubImplementation() && !cd->getOverriddenDecl())
       return;
 
     // Required constructors (or overrides thereof) have their allocating entry
