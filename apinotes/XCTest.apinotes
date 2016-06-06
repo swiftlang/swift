@@ -1,0 +1,14 @@
+---
+Name: XCTest
+Classes:
+- Name: XCTest
+  Methods:
+  # The abstract base class XCTest declares a (deprecated) method
+  # `-[XCTest run]`. If left to the standard name conversion rules, this
+  # conflicts with `-[XCTest runTest]`. Here we explicitly convert `-runTest`
+  # as `XCTest.runTest()`. See https://bugs.swift.org/browse/SR-1165 for
+  # details.
+  - Selector: 'runTest'
+    SwiftName: 'runTest()'
+    MethodKind: Instance
+
