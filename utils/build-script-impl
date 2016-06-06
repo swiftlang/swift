@@ -1522,6 +1522,10 @@ function set_swiftpm_bootstrap_command() {
     LLBUILD_BIN="$(build_directory_bin ${LOCAL_HOST} llbuild)/swift-build-tool"
     if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
         FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
+        if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
+            LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
+            LIBDISPATCH_BUILD_ARGS="--libdispatch-source-dir=${LIBDISPATCH_SOURCE_DIR} --libdispatch-build-dir=${LIBDISPATCH_BUILD_DIR}"
+        fi
         if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
             XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
         fi
@@ -1544,6 +1548,10 @@ function set_swiftpm_bootstrap_command() {
     if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
         swiftpm_bootstrap_command+=(
             --foundation="${FOUNDATION_BUILD_DIR}/Foundation")
+        if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
+            swiftpm_bootstrap_command+=(
+                $LIBDISPATCH_BUILD_ARGS)
+        fi
         if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
             swiftpm_bootstrap_command+=(
                 --xctest="${XCTEST_BUILD_DIR}")
