@@ -3,7 +3,7 @@
 
 import StdlibUnittest
 
-let iterations = 1_000
+let iterations = 100
 
 class Thing {}
 
