@@ -75,20 +75,39 @@ def obtain_additional_swift_sources(
                     shell.call(['git', 'clone', '--recursive', remote,
                                 dir_name], echo=False)
                 if branch:
-                    if branch == "master" or branch == "stable":
-                        repo_branch = config['master-branches'][dir_name]
-                    elif branch == "stable-next" or branch == "master-next":
-                        repo_branch = config['next-branches'][dir_name]
-                    elif branch == "swift-3.0-branch" or \
-                            branch == "swift-3.0-preview-1-branch":
+                    for config_branch_name in config['branch_names']:
+                        if branch not in config[config_branch_name]['aliases']:
+                            continue
                         repo_branch = \
-                            config["swift-3.0-preview-1-branches"][dir_name]
+                            config[config_branch_name]['repos'][dir_name]
+                        break
                     else:
                         repo_branch = branch
-                    src_path = os.path.join(SWIFT_SOURCE_ROOT, dir_name, ".git")
+                    src_path = os.path.join(SWIFT_SOURCE_ROOT, dir_name,
+                                            ".git")
                     shell.call(['git', '--git-dir', src_path, '--work-tree',
                                 os.path.join(SWIFT_SOURCE_ROOT, dir_name),
                                 'checkout', repo_branch], echo=False)
+
+
+def validate_config(config):
+    # Make sure that our branch_names are unique.
+    if len(config['branch_names']) != len(set(config['branch_names'])):
+        raise RuntimeError('Configuration file has duplicate \'branch_names\'')
+
+    # Then make sure the alias names used by our branches are unique.
+    #
+    # We do this by constructing a list consisting of len(names),
+    # set(names). Then we reduce over that list summing the counts and taking
+    # the union of the sets. We have uniqueness if the length of the union
+    # equals the length of the sum of the counts.
+    data = [(len(config[branch]['aliases']), set(config[branch]['aliases']))
+            for branch in config['branch_names']]
+    result = reduce(lambda acc, x: (acc[0] + x[0], acc[1] | x[1]), data,
+                    (0, set([])))
+    if result[0] == len(result[1]):
+        return
+    raise RuntimeError('Overlapping alias names for two types of branches')
 
 
 def main():
@@ -132,6 +151,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
 
     with open(args.config) as f:
         config = json.load(f)
+    validate_config(config)
 
     if clone or clone_with_ssh:
         obtain_additional_swift_sources(
@@ -143,13 +163,11 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
             print("--- Skipping '" + dir_name + "' ---")
             continue
         if branch:
-            if branch == "master" or branch == "stable":
-                repo_branch = config["master-branches"][dir_name]
-            elif branch == "stable-next" or branch == "master-next":
-                repo_branch = config["next-branches"][dir_name]
-            elif branch == "swift-3.0-branch" or \
-                    branch == "swift-3.0-preview-1-branch":
-                repo_branch = config["swift-3.0-preview-1-branches"][dir_name]
+            for config_branch_name in config['branch_names']:
+                if branch not in config[config_branch_name]['aliases']:
+                    continue
+                repo_branch = config[config_branch_name]['repos'][dir_name]
+                break
 
         update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, dir_name),
                             repo_branch)
