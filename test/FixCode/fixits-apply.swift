@@ -56,6 +56,27 @@ func testMask5(a: Int) {
 func testMask6(a: Int) {
   sendItOpt(a)
 }
+func testMask7(a: Int?) {
+  sendItOpt(a)
+}
+func testMask8(a: UInt64?) {
+  sendItOpt(a)
+}
+func testMask9(a: Any) {
+  sendItOpt(a as? Int)
+}
+func testMask10(a: Int?) {
+  sendIt(a) // no fix, nullability mismatch.
+}
+func testMask11(a: MyEventMask2?) {
+  testMask7(a: a)
+}
+func testMask12(a: MyEventMask2?) {
+  testMask8(a: a)
+}
+func testMask13(a: MyEventMask2?) {
+  testMask1(a: a) // no fix, nullability mismatch.
+}
 
 enum MyEnumType : UInt32 {
   case invalid

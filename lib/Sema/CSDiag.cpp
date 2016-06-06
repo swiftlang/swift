@@ -3159,7 +3159,36 @@ static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
                                       KnownProtocolKind kind,
                                       Expr *expr) {
   // The following fixes apply for optional destination types as well.
+  bool toTypeIsOptional = !toType->getAnyOptionalObjectType().isNull();
   toType = toType->lookThroughAllAnyOptionalTypes();
+
+  Type fromTypeUnwrapped = fromType->getAnyOptionalObjectType();
+  bool fromTypeIsOptional = !fromTypeUnwrapped.isNull();
+  if (fromTypeIsOptional)
+    fromType = fromTypeUnwrapped;
+
+  auto fixIt = [&](StringRef convWrapBefore, StringRef convWrapAfter) {
+    SourceRange exprRange = expr->getSourceRange();
+    if (fromTypeIsOptional && toTypeIsOptional) {
+      // Use optional's map function to convert conditionally, like so:
+      //   expr.map{ T(rawValue: $0) }
+      bool needsParens = !expr->canAppendCallParentheses();
+      std::string mapCodeFix;
+      if (needsParens) {
+        diag.fixItInsert(exprRange.Start, "(");
+        mapCodeFix += ")";
+      }
+      mapCodeFix += ".map { ";
+      mapCodeFix += convWrapBefore;
+      mapCodeFix += "$0";
+      mapCodeFix += convWrapAfter;
+      mapCodeFix += " }";
+      diag.fixItInsertAfter(exprRange.End, mapCodeFix);
+    } else if (!fromTypeIsOptional) {
+      diag.fixItInsert(exprRange.Start, convWrapBefore);
+      diag.fixItInsertAfter(exprRange.End, convWrapAfter);
+    }
+  };
 
   if (isLiteralConvertibleType(fromType, kind, CS)) {
     if (auto rawTy = isRawRepresentable(toType, kind, CS)) {
@@ -3173,9 +3202,7 @@ static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
         convWrapBefore += "(";
         convWrapAfter += ")";
       }
-      SourceRange exprRange = expr->getSourceRange();
-      diag.fixItInsert(exprRange.Start, convWrapBefore);
-      diag.fixItInsertAfter(exprRange.End, convWrapAfter);
+      fixIt(convWrapBefore, convWrapAfter);
       return;
     }
   }
@@ -3189,9 +3216,7 @@ static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
         convWrapBefore += "(";
         convWrapAfter += ")";
       }
-      SourceRange exprRange = expr->getSourceRange();
-      diag.fixItInsert(exprRange.Start, convWrapBefore);
-      diag.fixItInsertAfter(exprRange.End, convWrapAfter);
+      fixIt(convWrapBefore, convWrapAfter);
       return;
     }
   }
