@@ -57,22 +57,22 @@ func testMask6(a: Int) {
   sendItOpt(MyEventMask2(rawValue: UInt64(a)))
 }
 func testMask7(a: Int?) {
-  sendItOpt(a.map{ MyEventMask2(rawValue: UInt64($0)) })
+  sendItOpt(a.map { MyEventMask2(rawValue: UInt64($0)) })
 }
 func testMask8(a: UInt64?) {
-  sendItOpt(a.map{ MyEventMask2(rawValue: $0) })
+  sendItOpt(a.map { MyEventMask2(rawValue: $0) })
 }
 func testMask9(a: Any) {
-  sendItOpt((a as? Int).map{ MyEventMask2(rawValue: UInt64($0)) })
+  sendItOpt((a as? Int).map { MyEventMask2(rawValue: UInt64($0)) })
 }
 func testMask10(a: Int?) {
   sendIt(a) // no fix, nullability mismatch.
 }
 func testMask11(a: MyEventMask2?) {
-  testMask7(a: a.map{ UInt64($0.rawValue) })
+  testMask7(a: a.map { UInt64($0.rawValue) })
 }
 func testMask12(a: MyEventMask2?) {
-  testMask8(a: a.map{ $0.rawValue })
+  testMask8(a: a.map { $0.rawValue })
 }
 func testMask13(a: MyEventMask2?) {
   testMask1(a: a) // no fix, nullability mismatch.
