@@ -17,6 +17,7 @@ syn keyword swiftKeyword
       \ defer
       \ do
       \ else
+      \ fallthrough
       \ for
       \ guard
       \ if
