@@ -949,8 +949,9 @@ void IRGenDebugInfo::emitVariableDeclaration(
 
   // Emit locationless intrinsic for variables that were optimized away.
   if (Storage.size() == 0) {
-    auto *undef = llvm::UndefValue::get(DbgTy.StorageType);
-    emitDbgIntrinsic(BB, undef, Var, DBuilder.createExpression(), Line,
+    auto Zero =
+        llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
+    emitDbgIntrinsic(BB, Zero, Var, DBuilder.createExpression(), Line,
                      Loc.Column, Scope, DS);
   }
 }
