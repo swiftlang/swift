@@ -64,10 +64,10 @@ def obtain_additional_swift_sources(
                          echo=False):
             if not os.path.isdir(os.path.join(dir_name, ".git")):
                 print("--- Cloning '" + dir_name + "' ---")
-                if with_ssh is True:
-                    remote = "git@github.com:" + repo + '.git'
+                if with_ssh is True or "https_clone_pattern" not in config:
+                    remote = config["ssh_clone_pattern"] % repo
                 else:
-                    remote = "https://github.com/" + repo + '.git'
+                    remote = config["https_clone_pattern"] % repo
                 if skip_history:
                     shell.call(['git', 'clone', '--recursive', '--depth', '1',
                                 remote, dir_name], echo=False)
