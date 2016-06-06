@@ -85,8 +85,7 @@ def obtain_additional_swift_sources(
                             config["swift-3.0-preview-1-branches"][dir_name]
                     else:
                         repo_branch = branch
-                    src_path = SWIFT_SOURCE_ROOT + "/" + dir_name + "/" + \
-                        ".git"
+                    src_path = os.path.join(SWIFT_SOURCE_ROOT, dir_name, ".git")
                     shell.call(['git', '--git-dir', src_path, '--work-tree',
                                 os.path.join(SWIFT_SOURCE_ROOT, dir_name),
                                 'checkout', repo_branch], echo=False)
