@@ -1,5 +1,6 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRAINT1 | FileCheck %s -check-prefix=CONSTRAINT1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRAINT2 | FileCheck %s -check-prefix=CONSTRAINT2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRAINT3 | FileCheck %s -check-prefix=CONSTRAINT3
 
 public protocol P1 {}
 public protocol P2 {}
@@ -33,3 +34,20 @@ func foo2() {
 // CONSTRAINT2:      Begin completions, 1 items
 // CONSTRAINT2-NEXT: Decl[InstanceMethod]/CurrNominal:   P2Method()[#Void#]; name=P2Method()
 // CONSTRAINT2-NEXT: End completions
+
+protocol MyIndexable {}
+protocol MyCollection : MyIndexable {
+  associatedtype Indices = MyDefaultIndices<Self>
+  var indices: Indices { get }
+}
+struct MyDefaultIndices<Elements : MyIndexable> : MyCollection {}
+extension MyCollection where Indices == MyDefaultIndices<Self> {
+    var indices: MyDefaultIndices<Self> { return MyDefaultIndices() }
+}
+struct ConcreteCollection<Element> : MyCollection {}
+func foo3() {
+  ConcreteCollection<Int>().#^CONSTRAINT3^#
+}
+// CONSTRAINT3:      Begin completions, 1 items
+// CONSTRAINT3-NEXT: Decl[InstanceVar]/Super:            indices[#MyDefaultIndices<ConcreteCollection<Int>>#]; name=indices
+// CONSTRAINT3-NEXT: End completions
