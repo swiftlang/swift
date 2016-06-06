@@ -3178,7 +3178,7 @@ static void tryRawRepresentableFixIts(InFlightDiagnostic &diag,
         diag.fixItInsert(exprRange.Start, "(");
         mapCodeFix += ")";
       }
-      mapCodeFix += ".map{ ";
+      mapCodeFix += ".map { ";
       mapCodeFix += convWrapBefore;
       mapCodeFix += "$0";
       mapCodeFix += convWrapAfter;
