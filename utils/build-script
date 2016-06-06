@@ -47,8 +47,7 @@ import swift_build_support.tar        # noqa (E402)
 import swift_build_support.targets    # noqa (E402)
 from swift_build_support.targets import StdlibDeploymentTarget  # noqa (E402)
 from swift_build_support.cmake import CMake  # noqa (E402)
-from swift_build_support.workspace import Workspace  # noqa(E402)
-from swift_build_support.workspace import compute_build_subdir  # noqa(E402)
+import swift_build_support.workspace    # noqa (E402)
 
 
 def call_without_sleeping(command, dry_run=False):
@@ -64,6 +63,48 @@ def call_without_sleeping(command, dry_run=False):
         command = ["caffeinate"] + list(command)
 
     shell.call(command, dry_run=dry_run, echo=False)
+
+
+class BuildScriptInvocation(object):
+    """Represent a single build script invocation."""
+
+    def __init__(self, toolchain, args):
+        self.toolchain = toolchain
+        self.args = args
+
+        self.workspace = swift_build_support.workspace.Workspace(
+            source_root=SWIFT_SOURCE_ROOT,
+            build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
+
+    def initialize_runtime_environment(self):
+        """Change the program environment for building."""
+
+        # Set an appropriate default umask.
+        os.umask(0o022)
+
+        # Unset environment variables that might affect how tools behave.
+        for v in [
+                'MAKEFLAGS',
+                'SDKROOT',
+                'MACOSX_DEPLOYMENT_TARGET',
+                'IPHONEOS_DEPLOYMENT_TARGET',
+                'TVOS_DEPLOYMENT_TARGET',
+                'WATCHOS_DEPLOYMENT_TARGET']:
+            os.environ.pop(v, None)
+
+    def build_ninja(self):
+        if not os.path.exists(self.workspace.source_dir("ninja")):
+            diagnostics.fatal(
+                "can't find source directory for ninja "
+                "(tried %s)" % (self.workspace.source_dir("ninja")))
+
+        ninja_build = products.Ninja(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir=self.workspace.source_dir("ninja"),
+            build_dir=self.workspace.build_dir("build", "ninja"))
+        ninja_build.do_build()
+        self.toolchain.ninja = ninja_build.ninja_bin_path
 
 
 # Main entry point for the preset mode.
@@ -1239,60 +1280,41 @@ details of the setups of other systems or automated environments.""")
         args.skip_test_watchos_host = True
 
     if args.build_subdir is None:
-        args.build_subdir = compute_build_subdir(args)
+        args.build_subdir = swift_build_support.workspace.compute_build_subdir(
+            args)
 
     # Add optional stdlib-deployment-targets
     if args.android:
         args.stdlib_deployment_targets.append(
             StdlibDeploymentTarget.Android.armv7)
 
-    workspace = Workspace(
-        source_root=SWIFT_SOURCE_ROOT,
-        build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
+    # Create the build script invocation.
+    invocation = BuildScriptInvocation(toolchain, args)
 
-    if args.build_ninja:
-        if not os.path.exists(workspace.source_dir("ninja")):
-            diagnostics.fatal("can't find source directory for ninja "
-                              "(tried %s)" % (workspace.source_dir("ninja")))
+    # Sanitize the runtime environment.
+    invocation.initialize_runtime_environment()
 
-    os.umask(0o022)
-
-    # Unset environment variables that might affect how tools behave.
-    for v in [
-            'MAKEFLAGS',
-            'SDKROOT',
-            'MACOSX_DEPLOYMENT_TARGET',
-            'IPHONEOS_DEPLOYMENT_TARGET',
-            'TVOS_DEPLOYMENT_TARGET',
-            'WATCHOS_DEPLOYMENT_TARGET']:
-        os.environ.pop(v, None)
-
+    # Show SDKs, if requested.
     if args.show_sdks:
         swift_build_support.debug.print_xcodebuild_versions()
 
     # Clean build directory if requested.
     if args.clean:
-        shell.rmtree(workspace.build_root)
+        shell.rmtree(invocation.workspace.build_root)
 
     # Create build directory.
-    shell.makedirs(workspace.build_root)
+    shell.makedirs(invocation.workspace.build_root)
 
-    # Build ninja if required.
+    # Build ninja if required, which will update the toolchain.
     if args.build_ninja:
-        ninja_build = products.Ninja(
-            args=args,
-            toolchain=toolchain,
-            source_dir=workspace.source_dir("ninja"),
-            build_dir=workspace.build_dir("build", "ninja"))
-        ninja_build.do_build()
-        toolchain.ninja = ninja_build.ninja_bin_path
+        invocation.build_ninja()
 
     cmake = CMake(args=args,
                   toolchain=toolchain)
 
     build_script_impl_args = [
-        "--workspace", workspace.source_root,
-        "--build-dir", workspace.build_root,
+        "--workspace", invocation.workspace.source_root,
+        "--build-dir", invocation.workspace.build_root,
         "--install-prefix", args.install_prefix,
         "--host-target", args.host_target,
         "--stdlib-deployment-targets",
