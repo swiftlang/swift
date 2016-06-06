@@ -44,6 +44,9 @@ The testsuite is split into three subsets:
 
 * Long tests, which are marked with ``REQUIRES: long_test``.
 
+  Unlike other tests, every long test should also include either
+  ``REQUIRES: nonexecutable_test`` or ``REQUIRES: executable_test``.
+
 Running the LLVM lit-based testsuite
 ------------------------------------
 

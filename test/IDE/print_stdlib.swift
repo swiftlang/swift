@@ -1,6 +1,7 @@
 // Check interface produced for the standard library.
 //
 // REQUIRES: long_test
+// REQUIRES: nonexecutable_test
 //
 // RUN: %target-swift-frontend -parse %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=Swift -source-filename %s -print-interface > %t.txt
