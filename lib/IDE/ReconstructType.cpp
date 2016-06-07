@@ -483,9 +483,6 @@ struct VisitNodeResult {
     _tuple_type_element = TupleTypeElt();
     _error.clear();
   }
-
-
-  bool HasAnyTypes() { return !_types.empty(); }
 };
 
 static Identifier
