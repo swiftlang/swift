@@ -469,7 +469,7 @@ func _Unicode() {
   func fn<T : UnicodeCodecType>(_: T) {} // expected-error {{'UnicodeCodecType' has been renamed to 'UnicodeCodec'}} {{15-31=UnicodeCodec}} {{none}}
 }
 func _Unicode<I : IteratorProtocol, E : UnicodeCodec>(i: I, e: E.Type) where I.Element == E.CodeUnit {
-  _ = transcode(e, e, i, { _ in }, stopOnError: true) // expected-error {{'transcode(_:_:_:_:stopOnError:)' is unavailable: use 'transcode(_:from:to:stoppingOnError:sendingOutputTo:)'}} {{none}}
+  _ = transcode(e, e, i, { _ in }, stopOnError: true) // expected-error {{'transcode(_:_:_:_:stopOnError:)' is unavailable: use 'transcode(_:from:to:stoppingOnError:into:)'}} {{none}}
   _ = UTF16.measure(e, input: i, repairIllFormedSequences: true) // expected-error {{'measure(_:input:repairIllFormedSequences:)' is unavailable: use 'transcodedLength(of:decodedAs:repairingIllFormedSequences:)'}} {{none}}
 }
 
