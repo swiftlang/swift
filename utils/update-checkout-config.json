@@ -1,6 +1,6 @@
 {
-    "ssh_clone_pattern": "git@github.com:%s.git",
-    "https_clone_pattern": "https://github.com/%s.git",
+    "ssh-clone-pattern": "git@github.com:%s.git",
+    "https-clone-pattern": "https://github.com/%s.git",
     "repositories" : {
         "llvm": "apple/swift-llvm",
         "clang": "apple/swift-clang",
@@ -15,7 +15,7 @@
         "swift-corelibs-libdispatch": "apple/swift-corelibs-libdispatch",
         "swift-integration-tests": "apple/swift-integration-tests"
     },
-    "branch_names": ["master-branches", "next-branches", "swift-3.0-preview-1-branches"],
+    "branch-names": ["master-branches", "next-branches", "swift-3.0-preview-1-branches"],
     "default-branch-alias": "master",
     "master-branches": {
         "aliases": ["master", "stable"],

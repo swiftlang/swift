@@ -64,10 +64,10 @@ def obtain_additional_swift_sources(
                          echo=False):
             if not os.path.isdir(os.path.join(dir_name, ".git")):
                 print("--- Cloning '" + dir_name + "' ---")
-                if with_ssh is True or "https_clone_pattern" not in config:
-                    remote = config["ssh_clone_pattern"] % repo
+                if with_ssh is True or 'https-clone-pattern' not in config:
+                    remote = config['ssh-clone-pattern'] % repo
                 else:
-                    remote = config["https_clone_pattern"] % repo
+                    remote = config['https-clone-pattern'] % repo
                 if skip_history:
                     shell.call(['git', 'clone', '--recursive', '--depth', '1',
                                 remote, dir_name], echo=False)
@@ -75,7 +75,7 @@ def obtain_additional_swift_sources(
                     shell.call(['git', 'clone', '--recursive', remote,
                                 dir_name], echo=False)
                 if branch:
-                    for config_branch_name in config['branch_names']:
+                    for config_branch_name in config['branch-names']:
                         if branch not in config[config_branch_name]['aliases']:
                             continue
                         repo_branch = \
@@ -91,9 +91,9 @@ def obtain_additional_swift_sources(
 
 
 def validate_config(config):
-    # Make sure that our branch_names are unique.
-    if len(config['branch_names']) != len(set(config['branch_names'])):
-        raise RuntimeError('Configuration file has duplicate \'branch_names\'')
+    # Make sure that our branch-names are unique.
+    if len(config['branch-names']) != len(set(config['branch-names'])):
+        raise RuntimeError('Configuration file has duplicate \'branch-names\'')
 
     # Then make sure the alias names used by our branches are unique.
     #
@@ -102,7 +102,7 @@ def validate_config(config):
     # the union of the sets. We have uniqueness if the length of the union
     # equals the length of the sum of the counts.
     data = [(len(config[branch]['aliases']), set(config[branch]['aliases']))
-            for branch in config['branch_names']]
+            for branch in config['branch-names']]
     result = reduce(lambda acc, x: (acc[0] + x[0], acc[1] | x[1]), data,
                     (0, set([])))
     if result[0] == len(result[1]):
@@ -168,7 +168,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
             print("--- Skipping '" + dir_name + "' ---")
             continue
         if branch:
-            for config_branch_name in config['branch_names']:
+            for config_branch_name in config['branch-names']:
                 if branch not in config[config_branch_name]['aliases']:
                     continue
                 repo_branch = config[config_branch_name]['repos'][dir_name]
