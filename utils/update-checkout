@@ -56,7 +56,8 @@ def update_working_copy(repo_path, branch):
 
 def obtain_additional_swift_sources(
         config, with_ssh, branch, skip_history, skip_repositories):
-    for dir_name, repo in config['repositories'].items():
+    for dir_name, repo_info in config['repositories'].items():
+        repo = repo_info['name']
         if dir_name in skip_repositories:
             print("--- Skipping '" + dir_name + "' ---")
             continue
@@ -64,7 +65,12 @@ def obtain_additional_swift_sources(
                          echo=False):
             if not os.path.isdir(os.path.join(dir_name, ".git")):
                 print("--- Cloning '" + dir_name + "' ---")
-                if with_ssh is True or 'https-clone-pattern' not in config:
+
+                # If we have a url override, use that url instead of
+                # interpolating.
+                if 'url' in repo_info:
+                    remote = repo_info['url']
+                elif with_ssh is True or 'https-clone-pattern' not in config:
                     remote = config['ssh-clone-pattern'] % repo
                 else:
                     remote = config['https-clone-pattern'] % repo
