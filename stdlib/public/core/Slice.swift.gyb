@@ -435,6 +435,11 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     else:
   internal let _base: Base
 %     end
+
+  /// The underlying collection of the slice.
+  public var base: Base {
+    return _base
+  }
 }
 
 %     end
