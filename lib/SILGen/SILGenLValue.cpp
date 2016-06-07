@@ -1514,6 +1514,11 @@ void LValue::print(raw_ostream &OS) const {
 }
 
 LValue SILGenFunction::emitLValue(Expr *e, AccessKind accessKind) {
+  // Some lvalue nodes (namely BindOptionalExprs) require immediate evaluation
+  // of their subexpression, so we must have a writeback scope open while
+  // building an lvalue.
+  assert(InWritebackScope && "must be in a writeback scope");
+
   LValue r = SILGenLValue(*this).visit(e, accessKind);
   // If the final component has an abstraction change, introduce a
   // reabstraction component.
