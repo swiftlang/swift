@@ -139,7 +139,7 @@ func lookUpManyTopLevelNames() {
 
   // CHECK-DAG: !private "UInt"
   // CHECK-DAG: !private "+"
-  let _: UInt = [1, 2].reduce(0, combine: +)
+  let _: UInt = [1, 2].reduce(0, +)
   
   // CHECK-DAG: !private "-"
   let _: UInt = 3 - 2 - 1
