@@ -21,7 +21,7 @@ func benchCaptureProp<S : Sequence
 
   var it = s.makeIterator()
   let initial = it.next()!
-  return IteratorSequence(it).reduce(initial, combine: f)
+  return IteratorSequence(it).reduce(initial, f)
 }
 
 public func run_CaptureProp(_ N: Int) {

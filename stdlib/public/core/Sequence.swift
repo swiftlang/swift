@@ -61,9 +61,10 @@
 /// algorithms, however, may call for direct iterator use.
 ///
 /// One example is the `reduce1(_:)` method. Similar to the
-/// `reduce(_:combine:)` method defined in the standard library, which takes
-/// an initial value and a combining closure, `reduce1(_:)` uses the first
-/// element of the sequence as the initial value.
+/// `reduce(_:)` method defined in the standard
+/// library, which takes an initial value and a combining closure,
+/// `reduce1(_:)` uses the first element of the sequence as the
+/// initial value.
 ///
 /// Here's an implementation of the `reduce1(_:)` method. The sequence's
 /// iterator is used directly to retrieve the initial value before looping
@@ -71,7 +72,7 @@
 ///
 ///     extension Sequence {
 ///         func reduce1(
-///           combine: (Iterator.Element, Iterator.Element) -> Iterator.Element
+///           _ nextPartialResult: (Iterator.Element, Iterator.Element) -> Iterator.Element
 ///         ) -> Iterator.Element?
 ///         {
 ///             var i = makeIterator()
@@ -80,7 +81,7 @@
 ///             }
 ///
 ///             while let element = i.next() {
-///                 accumulated = combine(accumulated, element)
+///                 accumulated = nextPartialResult(accumulated, element)
 ///             }
 ///             return accumulated
 ///         }

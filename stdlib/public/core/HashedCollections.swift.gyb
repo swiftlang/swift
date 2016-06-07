@@ -376,7 +376,7 @@ internal struct _UnmanagedAnyObjectArray {
 ///     }
 ///     // Prints "We have 4 primes."
 ///
-///     let primesSum = primes.reduce(0, combine: +)
+///     let primesSum = primes.reduce(0, +)
 ///     // 'primesSum' == 17
 ///
 ///     let primeStrings = primes.sorted().map(String.init)
