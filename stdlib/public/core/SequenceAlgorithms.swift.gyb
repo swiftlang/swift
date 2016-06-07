@@ -21,10 +21,10 @@ orderingExplanation = """\
   /// is, for any elements `a`, `b`, and `c`, the following conditions must
   /// hold:
   ///
-  /// - `isOrderedBefore(a, a)` is always `false`. (Irreflexivity)
-  /// - If `isOrderedBefore(a, b)` and `isOrderedBefore(b, c)` are both `true`,
-  ///   then `isOrderedBefore(a, c)` is also `true`. (Transitive
-  ///   comparability)
+  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///   both `true`, then `areInIncreasingOrder(a, c)` is also
+  ///   `true`. (Transitive comparability)
   /// - Two elements are *incomparable* if neither is ordered before the other
   ///   according to the predicate. If `a` and `b` are incomparable, and `b`
   ///   and `c` are incomparable, then `a` and `c` are also incomparable.
@@ -87,7 +87,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
   /// the comparison between elements.
   ///
 ${orderingExplanation}
-  /// This example shows how to use the `min(isOrderedBefore:)` method on a
+  /// This example shows how to use the `min(by:)` method on a
   /// dictionary to find the key-value pair with the lowest value.
   ///
   ///     let hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
@@ -95,11 +95,12 @@ ${orderingExplanation}
   ///     print(leastHue)
   ///     // Prints "Optional(("Coral", 16))"
   ///
-  /// - Parameter isOrderedBefore: A predicate that returns `true` if its first
-  ///   argument should be ordered before its second argument; otherwise,
-  ///   `false`.
+  /// - Parameter areInIncreasingOrder: A predicate that returns `true`
+  ///   if its first argument should be ordered before its second
+  ///   argument; otherwise, `false`.
   /// - Returns: The sequence's minimum element, according to
-  ///   `isOrderedBefore`. If the sequence has no elements, returns `nil`.
+  ///   `areInIncreasingOrder`. If the sequence has no elements, returns
+  ///   `nil`.
   ///
   /// - SeeAlso: `min()`
 %   else:
@@ -115,19 +116,19 @@ ${orderingExplanation}
   /// - Returns: The sequence's minimum element. If the sequence has no
   ///   elements, returns `nil`.
   ///
-  /// - SeeAlso: `min(isOrderedBefore:)`
+  /// - SeeAlso: `min(by:)`
 %   end
   @warn_unqualified_access
   public func min(
 %   if preds:
-    isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
+    by areInIncreasingOrder: @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
     var it = makeIterator()
     guard var result = it.next() else { return nil }
     for e in IteratorSequence(it) {
 %   if preds:
-      if try isOrderedBefore(e, result) { result = e }
+      if try areInIncreasingOrder(e, result) { result = e }
 %   else:
       if e < result { result = e }
 %   end
@@ -140,7 +141,7 @@ ${orderingExplanation}
   /// as the comparison between elements.
   ///
 ${orderingExplanation}
-  /// This example shows how to use the `max(isOrderedBefore:)` method on a
+  /// This example shows how to use the `max(by:)` method on a
   /// dictionary to find the key-value pair with the highest value.
   ///
   ///     let hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
@@ -148,7 +149,7 @@ ${orderingExplanation}
   ///     print(greatestHue)
   ///     // Prints "Optional(("Heliotrope", 296))"
   ///
-  /// - Parameter isOrderedBefore:  A predicate that returns `true` if its
+  /// - Parameter areInIncreasingOrder:  A predicate that returns `true` if its
   ///   first argument should be ordered before its second argument;
   ///   otherwise, `false`.
   /// - Returns: The sequence's maximum element if the sequence is not empty;
@@ -168,19 +169,19 @@ ${orderingExplanation}
   /// - Returns: The sequence's maximum element. If the sequence has no
   ///   elements, returns `nil`.
   ///
-  /// - SeeAlso: `max(isOrderedBefore:)`
+  /// - SeeAlso: `max(by:)`
 %   end
   @warn_unqualified_access
   public func max(
 %   if preds:
-    isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
+    by areInIncreasingOrder: @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
     var it = makeIterator()
     guard var result = it.next() else { return nil }
     for e in IteratorSequence(it) {
 %   if preds:
-      if try isOrderedBefore(result, e) { result = e }
+      if try areInIncreasingOrder(result, e) { result = e }
 %   else:
       if e > result { result = e }
 %   end
@@ -363,11 +364,11 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 ${orderingExplanation}
   /// - Parameters:
   ///   - other: A sequence to compare to this sequence.
-  ///   - isOrderedBefore:  A predicate that returns `true` if its first
+  ///   - areInIncreasingOrder:  A predicate that returns `true` if its first
   ///     argument should be ordered before its second argument; otherwise,
   ///     `false`.
   /// - Returns: `true` if this sequence precedes `other` in a dictionary
-  ///   ordering as ordered by `isOrderedBefore`; otherwise, `false`.
+  ///   ordering as ordered by `areInIncreasingOrder`; otherwise, `false`.
   ///
   /// - Note: This method implements the mathematical notion of lexicographical
   ///   ordering, which has no connection to Unicode.  If you are sorting
@@ -397,12 +398,13 @@ ${orderingExplanation}
   ///   ordering, which has no connection to Unicode.  If you are sorting
   ///   strings to present to the end user, you should use `String` APIs that
   ///   perform localized comparison.
-  /// - SeeAlso: `lexicographicallyPrecedes(_:isOrderedBefore:)`
+  /// - SeeAlso: `lexicographicallyPrecedes(_:by:)`
 %   end
   public func lexicographicallyPrecedes<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
-    isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
+    by areInIncreasingOrder: 
+      @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool
     where
@@ -414,10 +416,10 @@ ${orderingExplanation}
     while true {
       if let e1 = iter1.next() {
         if let e2 = iter2.next() {
-          if ${"try isOrderedBefore(e1, e2)" if preds else "e1 < e2"} {
+          if ${"try areInIncreasingOrder(e1, e2)" if preds else "e1 < e2"} {
             return true
           }
-          if ${"try isOrderedBefore(e2, e1)" if preds else "e2 < e1"} {
+          if ${"try areInIncreasingOrder(e2, e1)" if preds else "e2 < e1"} {
             return false
           }
           continue // Equivalent
@@ -673,14 +675,14 @@ extension Sequence {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "min(isOrderedBefore:)")
+  @available(*, unavailable, renamed: "min(by:)")
   public func minElement(
     _ isOrderedBefore: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "max(isOrderedBefore:)")
+  @available(*, unavailable, renamed: "max(by:)")
   public func maxElement(
     _ isOrderedBefore: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
@@ -703,7 +705,7 @@ extension Sequence {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "lexicographicallyPrecedes(_:isOrderedBefore:)")
+  @available(*, unavailable, renamed: "lexicographicallyPrecedes(_:by:)")
   public func lexicographicalCompare<
     OtherSequence
   >(
