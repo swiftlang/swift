@@ -200,7 +200,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
   internal func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    isSeparator: @noescape (Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
     _abstract()
   }
@@ -376,12 +376,12 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
 %   for ResultKind in EqualAndWeakerKinds:
   internal override func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    isSeparator: @noescape (Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${ResultKind}<Element>] {
     return try _base.split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      isSeparator: isSeparator)
+      whereSeparator: isSeparator)
       .map {
         Any${ResultKind}(_box: _${Kind}Box<S.SubSequence>(_base: $0))
       }
@@ -609,12 +609,12 @@ extension Any${Kind} {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    isSeparator: @noescape (Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
     return try _box._split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      isSeparator: isSeparator)
+      whereSeparator: isSeparator)
   }
 
   public func _preprocessingPass<R>(
