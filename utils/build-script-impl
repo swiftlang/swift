@@ -76,6 +76,8 @@ KNOWN_SETTINGS=(
     swift-analyze-code-coverage "not-merged"     "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
     swift-tools-enable-lto      "0"              "enable LTO compilation of Swift tools. *NOTE* This does not include the swift standard library and runtime."
     llvm-enable-lto             "0"              "enable LTO compilation of LLVM/Clang."
+    swift-tools-num-parallel-lto-link-jobs ""    "The number of parallel link jobs to use when compiling swift tools"
+    llvm-num-parallel-lto-link-jobs ""           "The number of parallel link jobs to use when compiling llvm"
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
     swift-stdlib-enable-resilience "0"           "build the Swift stdlib and overlays with resilience enabled"
@@ -287,28 +289,6 @@ function set_lldb_build_mode() {
     LLDB_BUILD_MODE="CustomSwift-${LLDB_BUILD_TYPE}"
 }
 
-function system_memory_in_bytes() {
-    case "$(uname -s -m)" in
-        Darwin\ x86_64)
-            sysctl hw.memsize | cut -f 2 -d " "
-            ;;
-        *)
-            echo "Unknown operating system"
-            exit 1
-            ;;
-    esac
-}
-
-function float_min() {
-    local LHS=$1
-    local RHS=$2
-    if (( $(echo "${LHS} < ${RHS}" | bc -l) )); then
-        echo ${LHS}
-    else
-        echo ${RHS}
-    fi
-}
-
 # Support for performing isolated actions.
 #
 # This is part of refactoring more work to be done or controllable via
@@ -352,48 +332,6 @@ function should_execute_host_actions_for_phase() {
            [[ "${ONLY_EXECUTE}" == ${host}-*-${phase_name} ]]; then
         echo 1
     fi
-}
-
-function num_llvm_parallel_lto_link_jobs() {
-    case "$(uname -s -m)" in
-        Darwin\ x86_64)
-            # *WARNING! HEURISTIC!*
-            #
-            # Use the formula (GB Memory - 3)/6.0GB to get the number of
-            # parallel link threads we can support. This gives the OS 3 GB of
-            # room to work with.
-            #
-            # This is a bit conservative, but I have found that this number
-            # prevents me from swapping on my test machine.
-            local NUM_MEMORY_THREADS=$(echo \( $(system_memory_in_bytes)/1000000000.0 - 3.0 \) / 6.0 | bc)
-            echo $(float_min "${NUM_MEMORY_THREADS}" "${BUILD_JOBS}")
-            ;;
-        *)
-            echo "Unknown operating system"
-            exit 1
-            ;;
-    esac
-}
-
-function num_swift_parallel_lto_link_jobs() {
-    case "$(uname -s -m)" in
-        Darwin\ x86_64)
-            # *WARNING! HEURISTIC!*
-            #
-            # Use the formula (GB Memory - 3)/8.0GB to get the number of
-            # parallel link threads we can support. This gives the OS 3 GB of
-            # room to work with.
-            #
-            # This is a bit conservative, but I have found that this number
-            # prevents me from swapping on my test machine.
-            local NUM_MEMORY_THREADS=$(echo \( $(system_memory_in_bytes)/1000000000 - 3.0 \) / 8.0 | bc)
-            echo $(float_min "${NUM_MEMORY_THREADS}" "${BUILD_JOBS}")
-            ;;
-        *)
-            echo "Unknown operating system"
-            exit 1
-            ;;
-    esac
 }
 
 function set_build_options_for_host() {
@@ -638,7 +576,7 @@ function set_build_options_for_host() {
                 fi
 
                 llvm_cmake_options+=(
-                    "-DLLVM_PARALLEL_LINK_JOBS=$(num_llvm_parallel_lto_link_jobs)"
+                    "-DLLVM_PARALLEL_LINK_JOBS=${LLVM_NUM_PARALLEL_LTO_LINK_JOBS}"
                 )
             fi
 
@@ -659,7 +597,7 @@ function set_build_options_for_host() {
                     )
                 fi
                 swift_cmake_options+=(
-                    "-DSWIFT_PARALLEL_LINK_JOBS=$(num_swift_parallel_lto_link_jobs)"
+                    "-DSWIFT_PARALLEL_LINK_JOBS=${SWIFT_TOOLS_NUM_PARALLEL_LTO_LINK_JOBS}"
                 )
             fi
 
