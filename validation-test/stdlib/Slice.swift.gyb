@@ -18,6 +18,32 @@ import StdlibCollectionUnittest
 import SwiftPrivate
 
 
+/// Reference-type collection for testing the `base` property.
+class ReferenceCollection : RandomAccessCollection {
+    typealias Index = Int
+    
+    var startIndex: Int {
+        return 0
+    }
+    
+    var endIndex: Int {
+        return 1
+    }
+
+    subscript(index: Int) -> String {
+        return ""
+    }
+    
+    func index(after i: Int) -> Int {
+        return 1
+    }
+    
+    func index(before i: Int) -> Int {
+        return 0
+    }
+}
+
+
 var SliceTests = TestSuite("Collection")
 
 //===----------------------------------------------------------------------===//
@@ -68,6 +94,14 @@ SliceTests.test("${Slice}/init(base:bounds:)") {
       { $0.value == $1.value }
   }
 }
+
+% if RangeReplaceable == False and Mutable == False:
+SliceTests.test("${Slice}/baseProperty") {
+  let referenceCollection = ReferenceCollection()
+  let testSlice = ${Slice}(base: referenceCollection, bounds: 0..<1)
+  expectTrue(testSlice.base === referenceCollection)
+}
+% end
 
 SliceTests.test("${Slice}.{startIndex,endIndex}") {
   for test in subscriptRangeTests {
