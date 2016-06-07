@@ -387,12 +387,12 @@ public protocol Sequence {
   ///     print(shortNames)
   ///     // Prints "["Kim", "Karl"]"
   ///
-  /// - Parameter includeElement: A closure that takes an element of the
+  /// - Parameter isIncluded: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
   /// - Returns: An array of the elements that `includeElement` allowed.
   func filter(
-    _ includeElement: @noescape (Iterator.Element) throws -> Bool
+    _ isIncluded: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [Iterator.Element]
 
   /// Calls the given closure on each element in the sequence in the same order
@@ -747,12 +747,12 @@ extension Sequence {
   ///     print(shortNames)
   ///     // Prints "["Kim", "Karl"]"
   ///
-  /// - Parameter includeElement: A closure that takes an element of the
+  /// - Parameter shouldInclude: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
   /// - Returns: An array of the elements that `includeElement` allowed.
   public func filter(
-    _ includeElement: @noescape (Iterator.Element) throws -> Bool
+    _ isIncluded: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [Iterator.Element] {
 
     var result = ContiguousArray<Iterator.Element>()
@@ -760,7 +760,7 @@ extension Sequence {
     var iterator = self.makeIterator()
 
     while let element = iterator.next() {
-      if try includeElement(element) {
+      if try isIncluded(element) {
         result.append(element)
       }
     }
