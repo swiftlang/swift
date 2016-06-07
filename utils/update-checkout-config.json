@@ -16,6 +16,7 @@
         "swift-integration-tests": "apple/swift-integration-tests"
     },
     "branch_names": ["master-branches", "next-branches", "swift-3.0-preview-1-branches"],
+    "default-branch-alias": "master",
     "master-branches": {
         "aliases": ["master", "stable"],
         "repos": {
