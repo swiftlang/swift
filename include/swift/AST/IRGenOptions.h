@@ -166,8 +166,8 @@ public:
   llvm::SanitizerCoverageOptions SanitizeCoverage;
 
   IRGenOptions()
-      : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
-        Optimize(false), Sanitize(SanitizerKind::None),
+      : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
+        Verify(true), Optimize(false), Sanitize(SanitizerKind::None),
         DebugInfoKind(IRGenDebugInfoKind::None), UseJIT(false),
         DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
         DisableLLVMSLPVectorizer(false), DisableFPElim(true), Playground(false),
