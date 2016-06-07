@@ -51,6 +51,7 @@ namespace swift {
   class TypeDecl;
   class PatternBindingDecl;
   class ParameterList;
+  class EnumElementDecl;
   
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -3652,6 +3653,33 @@ public:
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::If;
+  }
+};
+
+/// EnumIsCaseExpr - A boolean expression that is true if an enum value is of
+/// a particular case.
+class EnumIsCaseExpr : public Expr {
+  Expr *SubExpr;
+  EnumElementDecl *Element;
+  
+public:
+  EnumIsCaseExpr(Expr *SubExpr, EnumElementDecl *Element)
+    : Expr(ExprKind::EnumIsCase, /*implicit*/ true),
+      SubExpr(SubExpr), Element(Element)
+  {}
+  
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *e) { SubExpr = e; }
+  
+  EnumElementDecl *getEnumElement() const { return Element; }
+  void setEnumElement(EnumElementDecl *elt) { Element = elt; }
+  
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
+  SourceLoc getEndLoc() const { return SubExpr->getEndLoc(); }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::EnumIsCase;
   }
 };
 

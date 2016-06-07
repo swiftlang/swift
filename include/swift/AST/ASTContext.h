@@ -454,10 +454,6 @@ public:
   FuncDecl *get##Name(LazyResolver *resolver) const;
 #include "swift/AST/KnownDecls.def"
 
-  /// Swift._stdlib_{,ImplicitlyUnwrapped}Optional_isSome.
-  FuncDecl *getOptionalIsSomeDecl(LazyResolver *resolver,
-                                  OptionalTypeKind kind) const;
-
   /// Retrieve the declaration of
   /// Swift._stdlib_{,ImplicitlyUnwrapped}Optional_unwrapped.
   FuncDecl *getOptionalUnwrappedDecl(LazyResolver *resolver,

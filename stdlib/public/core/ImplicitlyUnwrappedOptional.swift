@@ -65,14 +65,6 @@ extension ImplicitlyUnwrappedOptional : CustomDebugStringConvertible {
 
 @_transparent
 public // COMPILER_INTRINSIC
-func _stdlib_ImplicitlyUnwrappedOptional_isSome<Wrapped>
-  (_ `self`: Wrapped!) -> Bool {
-
-  return `self` != nil
-}
-
-@_transparent
-public // COMPILER_INTRINSIC
 func _stdlib_ImplicitlyUnwrappedOptional_unwrapped<Wrapped>
   (_ `self`: Wrapped!) -> Wrapped {
 

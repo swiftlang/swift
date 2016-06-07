@@ -168,9 +168,6 @@ struct ASTContext::Implementation {
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
   
-  /// func _stdlib_Optional_isSome<T>(v: Optional<T>) -> Bool
-  FuncDecl *OptionalIsSomeSomeDecls[NumOptionalTypeKinds] = {};
-
   /// func _stdlib_Optional_unwrapped<T>(v: Optional<T>) -> T
   FuncDecl *OptionalUnwrappedDecls[NumOptionalTypeKinds] = {};
 
@@ -1121,35 +1118,6 @@ static unsigned asIndex(OptionalTypeKind optionalKind) {
     ? (PREFIX "Optional" SUFFIX)                       \
     : (PREFIX "ImplicitlyUnwrappedOptional" SUFFIX))
 
-FuncDecl *ASTContext::getOptionalIsSomeDecl(
-    LazyResolver *resolver, OptionalTypeKind optionalKind) const {
-  auto &cache = Impl.OptionalIsSomeSomeDecls[asIndex(optionalKind)];
-  if (cache)
-    return cache;
-
-  auto name =
-      getOptionalIntrinsicName("_stdlib_", optionalKind, "_isSome");
-
-  // Look for a generic function.
-  CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, name, resolver);
-  if (!decl || !isGenericIntrinsic(decl, input, output, param))
-    return nullptr;
-
-  // Input must be Optional<T>.
-  if (!isOptionalType(*this, optionalKind, input, param))
-    return nullptr;
-
-  // Output must be a global type named Bool.
-  auto nominalType = dyn_cast<NominalType>(output);
-  if (!nominalType || nominalType.getParent() ||
-      nominalType->getDecl()->getName().str() != "Bool")
-    return nullptr;
-
-  cache = decl;
-  return decl;
-}
-
 FuncDecl *ASTContext::getOptionalUnwrappedDecl(LazyResolver *resolver,
                                          OptionalTypeKind optionalKind) const {
   auto &cache = Impl.OptionalUnwrappedDecls[asIndex(optionalKind)];
@@ -1178,8 +1146,7 @@ FuncDecl *ASTContext::getOptionalUnwrappedDecl(LazyResolver *resolver,
 
 static bool hasOptionalIntrinsics(const ASTContext &ctx, LazyResolver *resolver,
                                   OptionalTypeKind optionalKind) {
-  return ctx.getOptionalIsSomeDecl(resolver, optionalKind) &&
-    ctx.getOptionalUnwrappedDecl(resolver, optionalKind);
+  return ctx.getOptionalUnwrappedDecl(resolver, optionalKind);
 }
 
 bool ASTContext::hasOptionalIntrinsics(LazyResolver *resolver) const {

@@ -316,6 +316,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(CodeCompletion)
     NON_LVALUE_EXPR(ObjCSelector)
     NON_LVALUE_EXPR(ObjCKeyPath)
+    NON_LVALUE_EXPR(EnumIsCase)
 
 #define UNCHECKED_EXPR(KIND, BASE) \
     NON_LVALUE_EXPR(KIND)
@@ -600,6 +601,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::LValueToPointer:
   case ExprKind::ForeignObjectConversion:
   case ExprKind::UnevaluatedInstance:
+  case ExprKind::EnumIsCase:
     // Implicit conversion nodes have no syntax of their own; defer to the
     // subexpression.
     return cast<ImplicitConversionExpr>(this)->getSubExpr()
