@@ -124,7 +124,7 @@ public struct StaticString
   ///   `withUTF8Buffer(invoke:)` method.
   /// - Returns: The return value of the `body` closure, if any.
   public func withUTF8Buffer<R>(
-    invoke body: @noescape (UnsafeBufferPointer<UInt8>) -> R) -> R {
+    _ body: @noescape (UnsafeBufferPointer<UInt8>) -> R) -> R {
     if hasPointerRepresentation {
       return body(UnsafeBufferPointer(
         start: utf8Start, count: Int(utf8CodeUnitCount)))

@@ -76,7 +76,8 @@ extension Optional {
   /// `body` is complicated than that results in unnecessarily repeated code.
   internal func _withNilOrAddress<NSType : AnyObject, ResultType>(
     of object: inout NSType?,
-    body: @noescape (AutoreleasingUnsafeMutablePointer<NSType?>?) -> ResultType
+    _ body:
+      @noescape (AutoreleasingUnsafeMutablePointer<NSType?>?) -> ResultType
   ) -> ResultType {
     return self == nil ? body(nil) : body(&object)
   }
@@ -495,7 +496,9 @@ extension String {
   //     enumerateLinesUsing:(void (^)(NSString *line, BOOL *stop))block
 
   /// Enumerates all the lines in a string.
-  public func enumerateLines(_ body: (line: String, stop: inout Bool) -> ()) {
+  public func enumerateLines(
+    invoking body: (line: String, stop: inout Bool) -> ()
+  ) {
     _ns.enumerateLines {
       (line: String, stop: UnsafeMutablePointer<ObjCBool>)
     in
@@ -526,7 +529,7 @@ extension String {
     scheme tagScheme: String,
     options opts: NSLinguisticTagger.Options = [],
     orthography: NSOrthography? = nil,
-    _ body:
+    invoking body:
       (String, Range<Index>, Range<Index>, inout Bool) -> ()
   ) {
     _ns.enumerateLinguisticTags(
