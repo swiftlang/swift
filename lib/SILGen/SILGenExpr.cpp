@@ -803,6 +803,8 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 }
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
+  // Any writebacks here are tightly scoped.
+  WritebackScope writeback(SGF);
   LValue lv = SGF.emitLValue(E->getSubExpr(), AccessKind::Read);
   return SGF.emitLoadOfLValue(E, std::move(lv), C);
 }
@@ -3436,6 +3438,7 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   FullExpr scope(Cleanups, CleanupLocation(E));
   if (!E->getType()->isMaterializable()) {
     // Emit the l-value, but don't perform an access.
+    WritebackScope scope(*this);
     emitLValue(E, AccessKind::Read);
     return;
   }
@@ -3443,6 +3446,7 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   // If this is a load expression, we try hard not to actually do the load
   // (which could materialize a potentially expensive value with cleanups).
   if (auto *LE = dyn_cast<LoadExpr>(E)) {
+    WritebackScope scope(*this);
     LValue lv = emitLValue(LE->getSubExpr(), AccessKind::Read);
     // If the lvalue is purely physical, then it won't have any side effects,
     // and we don't need to drill into it.
