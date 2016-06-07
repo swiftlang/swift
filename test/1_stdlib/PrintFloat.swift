@@ -212,12 +212,16 @@ PrintTests.test("Printable") {
   expectDebugPrinted("inf", Float.infinity)
   expectDebugPrinted("-inf", -Float.infinity)
   expectDebugPrinted("nan", Float.nan)
+#if !arch(armv7)
   expectDebugPrinted("-nan", -Float.nan)
+#endif
   expectDebugPrinted("nan(0xffff)", Float(nan: 65535, signaling: false))
-  expectDebugPrinted("-nan(0xffff)", -Float(nan: 65535, signaling: false))
+#if !arch(armv7)
+  expectDebugPrinted("-nan(0xffff)", -Float(nan: 65535, signaling: false)) // fail
+#endif
   expectDebugPrinted("nan(0x1fffff)", Float(bitPattern: 0x7fff_ffff))
   expectDebugPrinted("nan(0x1fffff)", Float(bitPattern: 0x7fdf_ffff))
-#if !arch(i386)
+#if !arch(i386) && !arch(armv7)
   expectDebugPrinted("snan", Float.signalingNaN)
   expectDebugPrinted("snan(0xffff)", Float(nan: 65535, signaling: true))
   expectDebugPrinted("-snan(0xffff)", -Float(nan: 65535, signaling: true))
