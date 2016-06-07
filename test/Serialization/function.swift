@@ -63,13 +63,13 @@ var pair : (Int, Double) = makePair(a: 1, b: 2.5)
 // SIL:   [[DIFFERENT_A:%.+]] = function_ref @_TF8def_func9different{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
 // SIL:   [[DIFFERENT_B:%.+]] = function_ref @_TF8def_func9different{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
 
-different(a: 1, b: 2)
-different(a: false, b: false)
+_ = different(a: 1, b: 2)
+_ = different(a: false, b: false)
 
 // SIL:   [[DIFFERENT2_A:%.+]] = function_ref @_TF8def_func10different2{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
 // SIL:   [[DIFFERENT2_B:%.+]] = function_ref @_TF8def_func10different2{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
-different2(a: 1, b: 2)
-different2(a: false, b: false)
+_ = different2(a: 1, b: 2)
+_ = different2(a: false, b: false)
 
 
 struct IntWrapper1 : Wrapped {
@@ -83,7 +83,7 @@ struct IntWrapper2 : Wrapped {
 
 // SIL:   [[DIFFERENT_WRAPPED:%.+]] = function_ref @_TF8def_func16differentWrapped{{.*}} : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Wrapped, τ_0_1 : Wrapped, τ_0_0.Value : Equatable, τ_0_0.Value == τ_0_1.Value> (@in τ_0_0, @in τ_0_1) -> Bool
 
-differentWrapped(a: IntWrapper1(), b: IntWrapper2())
+_ = differentWrapped(a: IntWrapper1(), b: IntWrapper2())
 
 
 // SIL:   {{%.+}} = function_ref @_TF8def_func10overloadedFT1xSi_T_ : $@convention(thin) (Int) -> ()
@@ -110,13 +110,10 @@ if raw == 5 {
 
 do {
   try throws1()
-  try throws2(1)
+  _ = try throws2(1)
 } catch _ {}
 // SIL: sil @_TF8def_func7throws1FzT_T_ : $@convention(thin) () -> @error ErrorProtocol
 // SIL: sil @_TF8def_func7throws2{{.*}} : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error ErrorProtocol)
 
 // LLVM: }
 
-mineGold() // expected-warning{{you might want to keep it}}
-var foo = Foo()
-foo.reverse() // expected-warning{{reverseInPlace}}{{5-12=reverseInPlace}}

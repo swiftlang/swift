@@ -555,7 +555,6 @@ final class EvilSequence : Sequence {
     return _count
   }
 
-  @warn_unused_result
   func makeIterator() -> AnyIterator<LifetimeTracked> {
     var i = 0
     return AnyIterator {
