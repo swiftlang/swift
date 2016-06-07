@@ -74,7 +74,7 @@ KNOWN_SETTINGS=(
     swift-build-type            "Debug"          "the CMake build variant for Swift"
     swift-enable-assertions     "1"              "enable assertions in Swift"
     swift-analyze-code-coverage "not-merged"     "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
-    swift-enable-lto            "0"              "enable LTO compilation of just Swift."
+    swift-tools-enable-lto      "0"              "enable LTO compilation of Swift tools. *NOTE* This does not include the swift standard library and runtime."
     llvm-enable-lto             "0"              "enable LTO compilation of LLVM/Clang."
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
@@ -642,7 +642,7 @@ function set_build_options_for_host() {
                 )
             fi
 
-            if [[ $(true_false "${SWIFT_ENABLE_LTO}") = "TRUE" ]]; then
+            if [[ $(true_false "${SWIFT_TOOLS_ENABLE_LTO}") = "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
                     swift_cmake_options+=(
                         "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
@@ -1900,7 +1900,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_INCLUDE_TESTS:BOOL=$(true_false "${build_tests_this_time}")
                     -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
                     -DSWIFT_EMBED_BITCODE_SECTION:BOOL=$(true_false "${EMBED_BITCODE_SECTION}")
-                    -DSWIFT_ENABLE_LTO:BOOL=$(true_false "${SWIFT_ENABLE_LTO}")
+                    -DSWIFT_TOOLS_ENABLE_LTO:BOOL=$(true_false "${SWIFT_TOOLS_ENABLE_LTO}")
                     -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL=$(true_false "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
                     "${swift_cmake_options[@]}"
                 )

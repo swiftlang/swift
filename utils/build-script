@@ -1455,7 +1455,7 @@ details of the setups of other systems or automated environments.""")
     if args.lto:
         build_script_impl_args += [
             "--llvm-enable-lto",
-            "--swift-enable-lto"
+            "--swift-tools-enable-lto"
         ]
 
     build_script_impl_args += args.build_script_impl_args
