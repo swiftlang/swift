@@ -2244,7 +2244,7 @@ public func expectEqualSequence<
 ) where
   Expected.Iterator.Element == Actual.Iterator.Element {
 
-  if !expected.elementsEqual(actual, isEquivalent: sameValue) {
+  if !expected.elementsEqual(actual, by: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
       + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace})
