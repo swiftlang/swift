@@ -977,6 +977,16 @@ details of the setups of other systems or automated environments.""")
         const=True)
 
     parser.add_argument(
+        "--lto",
+        help="use lto optimization on llvm/swift tools. This does not "
+             "imply using lto on the swift standard library or runtime",
+        metavar="BOOL",
+        nargs='?',
+        type=arguments.type.bool,
+        default=False,
+        const=True)
+
+    parser.add_argument(
         # Explicitly unavailable options here.
         "--build-jobs",
         "--common-cmake-options",
@@ -1440,6 +1450,12 @@ details of the setups of other systems or automated environments.""")
         build_script_impl_args += [
             "--extra-cmake-options=%s" % ' '.join(
                 pipes.quote(opt) for opt in args.extra_cmake_options)
+        ]
+
+    if args.lto:
+        build_script_impl_args += [
+            "--llvm-enable-lto",
+            "--swift-enable-lto"
         ]
 
     build_script_impl_args += args.build_script_impl_args
