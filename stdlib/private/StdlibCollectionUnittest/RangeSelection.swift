@@ -21,6 +21,13 @@ public enum RangeSelection {
   case rightHalf
   case offsets(Int, Int)
 
+  public var isEmpty: Bool {
+    switch self {
+    case .emptyRange: return true
+    default: return false
+    }
+  }
+
   public func range<C : Collection>(in c: C) -> Range<C.Index> {
     switch self {
       case .emptyRange: return c.endIndex..<c.endIndex
