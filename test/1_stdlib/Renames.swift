@@ -61,7 +61,7 @@ func _Collection<C : Collection>(c: C) {
   func fn<T : Collection, U>(_: T, _: U) where T.Generator == U {} // expected-error {{'T' does not have a member type named 'Generator'; did you mean 'Iterator'?}} {{50-59=Iterator}} {{none}} 
   _ = c.generate() // expected-error {{'generate()' has been renamed to 'makeIterator()'}} {{9-17=makeIterator}} {{none}}
   _ = c.underestimateCount() // expected-error {{'underestimateCount()' is unavailable: Removed in Swift 3. Please use underestimatedCount property.}} {{none}}
-  _ = c.split(1) { _ in return true} // expected-error {{'split(_:allowEmptySlices:isSeparator:)' is unavailable: Please use split(maxSplits:omittingEmptySubsequences:isSeparator:) instead}} {{none}}
+  _ = c.split(1) { _ in return true} // expected-error {{split(maxSplits:omittingEmptySubsequences:whereSeparator:) instead}} {{none}}
 }
 
 func _Collection<C : Collection, E>(c: C, e: E) where C.Iterator.Element: Equatable, C.Iterator.Element == E {

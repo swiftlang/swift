@@ -558,7 +558,7 @@ public protocol Sequence {
   /// - Returns: An array of subsequences, split from this sequence's elements.
   func split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    isSeparator: @noescape (Iterator.Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence]
 
   /// Returns the first element of the sequence that satisfies the given
@@ -859,7 +859,7 @@ extension Sequence {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    isSeparator: @noescape (Iterator.Element) throws -> Bool
+    whereSeparator isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [AnySequence<Iterator.Element>] {
     _precondition(maxSplits >= 0, "Must take zero or more splits")
     var result: [AnySequence<Iterator.Element>] = []
@@ -1043,7 +1043,7 @@ extension Sequence where Iterator.Element : Equatable {
     return split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      isSeparator: { $0 == separator })
+      whereSeparator: { $0 == separator })
   }
 }
 
