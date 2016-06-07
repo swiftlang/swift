@@ -315,12 +315,6 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     }
   }
 
-  void addObjCClassRecord() {
-    addConstantInt16(uint16_t(FieldDescriptorKind::ObjCClass));
-    addConstantInt16(0);
-    addConstantInt32(0);
-  }
-
   void layout() {
     using swift::reflection::FieldDescriptorKind;
 
