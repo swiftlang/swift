@@ -949,8 +949,9 @@ void IRGenDebugInfo::emitVariableDeclaration(
 
   // Emit locationless intrinsic for variables that were optimized away.
   if (Storage.size() == 0) {
-    auto *undef = llvm::UndefValue::get(DbgTy.StorageType);
-    emitDbgIntrinsic(BB, undef, Var, DBuilder.createExpression(), Line,
+    auto Zero =
+        llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
+    emitDbgIntrinsic(BB, Zero, Var, DBuilder.createExpression(), Line,
                      Loc.Column, Scope, DS);
   }
 }
@@ -982,10 +983,11 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
 }
 
 
-void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
+void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::Constant *Var,
                                                    StringRef Name,
                                                    StringRef LinkageName,
                                                    DebugTypeInfo DbgTy,
+                                                   bool IsLocalToUnit,
                                                    Optional<SILLocation> Loc) {
   if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
     return;
@@ -1003,7 +1005,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
 
   // Emit it as global variable of the current module.
   DBuilder.createGlobalVariable(MainModule, Name, LinkageName, File, L.Line, Ty,
-                                Var->hasInternalLinkage(), Var, nullptr);
+                                IsLocalToUnit, Var, nullptr);
 }
 
 StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
@@ -1259,12 +1261,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   // to emit the (target!) size of the underlying basic type.
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
   uint64_t SizeInBits = DbgTy.size.getValue() * SizeOfByte;
-  // Prefer the actual storage size over the DbgTy.
-  if (DbgTy.StorageType && DbgTy.StorageType->isSized()) {
-    uint64_t Storage = IGM.DataLayout.getTypeSizeInBits(DbgTy.StorageType);
-    if (Storage)
-      SizeInBits = Storage;
-  }
   uint64_t AlignInBits = DbgTy.align.getValue() * SizeOfByte;
   unsigned Encoding = 0;
   unsigned Flags = 0;

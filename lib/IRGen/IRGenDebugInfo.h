@@ -181,9 +181,10 @@ public:
                         const SILDebugScope *DS);
 
   /// Create debug metadata for a global variable.
-  void emitGlobalVariableDeclaration(llvm::GlobalValue *Storage, StringRef Name,
+  void emitGlobalVariableDeclaration(llvm::Constant *Storage, StringRef Name,
                                      StringRef LinkageName,
                                      DebugTypeInfo DebugType,
+                                     bool IsLocalToUnit,
                                      Optional<SILLocation> Loc);
 
   /// Emit debug metadata for type metadata (for generic types). So meta.
