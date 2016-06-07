@@ -36,10 +36,10 @@ equivalenceExplanation = """\
   /// is, for any elements `a`, `b`, and `c`, the following conditions must
   /// hold:
   ///
-  /// - `isEquivalent(a, a)` is always `true`. (Reflexivity)
-  /// - `isEquivalent(a, b)` implies `isEquivalent(b, a)`. (Symmetry)
-  /// - If `isEquivalent(a, b)` and `isEquivalent(b, c)` are both `true`, then
-  ///   `isEquivalent(a, c)` is also `true`. (Transitivity)
+  /// - `areEquivalent(a, a)` is always `true`. (Reflexivity)
+  /// - `areEquivalent(a, b)` implies `areEquivalent(b, a)`. (Symmetry)
+  /// - If `areEquivalent(a, b)` and `areEquivalent(b, c)` are both `true`, then
+  ///   `areEquivalent(a, c)` is also `true`. (Transitivity)
   ///"""
 
 }%
@@ -211,7 +211,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 ${equivalenceExplanation}
   /// - Parameters:
   ///   - possiblePrefix: A sequence to compare to this sequence.
-  ///   - isEquivalent: A predicate that returns `true` if its two arguments
+  ///   - areEquivalent: A predicate that returns `true` if its two arguments
   ///     are equivalent; otherwise, `false`.
   /// - Returns: `true` if the initial elements of the sequence are equivalent
   ///   to the elements of `possiblePrefix`; otherwise, `false`. Returns
@@ -237,12 +237,12 @@ ${equivalenceExplanation}
   ///   the elements of `possiblePrefix`; otherwise, `false`. Returns `true`
   ///   if `possiblePrefix` has no elements.
   ///
-  /// - SeeAlso: `starts(with:isEquivalent:)`
+  /// - SeeAlso: `starts(with:by:)`
 %   end
   public func starts<PossiblePrefix>(
     with possiblePrefix: PossiblePrefix${"," if preds else ""}
 %   if preds:
-    isEquivalent: @noescape (${GElement}, ${GElement}) throws -> Bool
+    by areEquivalent: @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool
     where
@@ -252,7 +252,7 @@ ${equivalenceExplanation}
     var possiblePrefixIterator = possiblePrefix.makeIterator()
     for e0 in self {
       if let e1 = possiblePrefixIterator.next() {
-        if ${"try !isEquivalent(e0, e1)" if preds else "e0 != e1"} {
+        if ${"try !areEquivalent(e0, e1)" if preds else "e0 != e1"} {
           return false
         }
       }
@@ -287,10 +287,10 @@ extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 ${equivalenceExplanation}
   /// - Parameters:
   ///   - other: A sequence to compare to this sequence.
-  ///   - isEquivalent: A predicate that returns `true` if its two arguments
+  ///   - areEquivalent: A predicate that returns `true` if its two arguments
   ///     are equivalent; otherwise, `false`.
   /// - Returns: `true` if this sequence and `other` contain equivalent items,
-  ///   using `isEquivalent` as the equivalence test; otherwise, `false.`
+  ///   using `areEquivalent` as the equivalence test; otherwise, `false.`
   ///
   /// - SeeAlso: `elementsEqual(_:)`
 %   else:
@@ -313,12 +313,12 @@ ${equivalenceExplanation}
   /// - Returns: `true` if this sequence and `other` contain the same elements
   ///   in the same order.
   ///
-  /// - SeeAlso: `elementsEqual(_:isEquivalent:)`
+  /// - SeeAlso: `elementsEqual(_:by:)`
 %   end
   public func elementsEqual<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
-    isEquivalent: @noescape (${GElement}, ${GElement}) throws -> Bool
+    by areEquivalent: @noescape (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool
     where
@@ -330,7 +330,7 @@ ${equivalenceExplanation}
     while true {
       switch (iter1.next(), iter2.next()) {
       case let (e1?, e2?):
-        if ${'try !isEquivalent(e1, e2)' if preds else 'e1 != e2'} {
+        if ${'try !areEquivalent(e1, e2)' if preds else 'e1 != e2'} {
           return false
         }
       case (_?, nil),
@@ -694,7 +694,7 @@ extension Sequence {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "starts(with:isEquivalent:)")
+  @available(*, unavailable, renamed: "starts(with:by:)")
   public func startsWith<PossiblePrefix>(
     _ possiblePrefix: PossiblePrefix,
     isEquivalent: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
