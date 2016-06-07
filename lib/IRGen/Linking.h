@@ -506,6 +506,11 @@ public:
   ///
   bool isAvailableExternally(IRGenModule &IGM) const;
 
+  /// Returns true if this function or global variable may be inlined into
+  /// another module.
+  ///
+  bool isFragile(IRGenModule &IGM) const;
+
   ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
     return reinterpret_cast<ValueDecl*>(Pointer);

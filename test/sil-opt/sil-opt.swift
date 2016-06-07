@@ -18,7 +18,7 @@
 // CHECK: func unknown()
 // SIB-CHECK: func unknown()
 
-// CHECK-LABEL: sil [fragile] @_TFVs1X4testfT_T_ : $@convention(method) (X) -> ()
+// CHECK-LABEL: sil hidden [fragile] @_TFVs1X4testfT_T_ : $@convention(method) (X) -> ()
 // CHECK: bb0
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()
@@ -36,7 +36,7 @@
 // CHECK: sil @unknown : $@convention(thin) () -> ()
 // SIB-CHECK: sil @unknown : $@convention(thin) () -> ()
 
-// CHECK: sil [fragile] @_TFVs1XCfT_S_ : $@convention(method) (@thin X.Type) -> X
+// CHECK: sil hidden [fragile] @_TFVs1XCfT_S_ : $@convention(method) (@thin X.Type) -> X
 // CHECK: bb0
 // CHECK-NEXT: struct $X ()
 // CHECK-NEXT: return

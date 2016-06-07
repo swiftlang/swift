@@ -7547,7 +7547,10 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
     auto superclassTy = classDecl->getSuperclass();
-    for (auto memberResult : lookupConstructors(classDecl, superclassTy)) {
+    auto ctors = lookupConstructors(classDecl, superclassTy,
+                                    NameLookupFlags::IgnoreAccessibility);
+
+    for (auto memberResult : ctors) {
       auto member = memberResult.Decl;
 
       // Skip unavailable superclass initializers.
@@ -7595,12 +7598,23 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
              getInitializerParamType(superclassCtor)).second)
         continue;
 
+      // If we're inheriting initializers, create an override delegating
+      // to 'super.init'. Otherwise, create a stub which traps at runtime.
+      auto kind = canInheritInitializers
+                    ? DesignatedInitKind::Chaining
+                    : DesignatedInitKind::Stub;
+
+      // If the superclass initializer is not accessible from the derived
+      // class, we cannot chain to 'super.init' either -- create a stub.
+      if (!superclassCtor->isAccessibleFrom(classDecl)) {
+        assert(!superclassCtor->isRequired() &&
+               "required initializer less visible than the class?");
+        kind = DesignatedInitKind::Stub;
+      }
+
       // We have a designated initializer. Create an override of it.
       if (auto ctor = createDesignatedInitOverride(
-                        *this, classDecl, superclassCtor,
-                        canInheritInitializers
-                          ? DesignatedInitKind::Chaining
-                          : DesignatedInitKind::Stub)) {
+                        *this, classDecl, superclassCtor, kind)) {
         classDecl->addMember(ctor);
       }
     }
