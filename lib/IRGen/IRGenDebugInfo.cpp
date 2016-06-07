@@ -525,16 +525,11 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     // A module may contain multiple files.
     return getOrCreateContext(DC->getParent());
   case DeclContextKind::GenericTypeDecl: {
-    auto CachedType = DITypeCache.find(
-        cast<GenericTypeDecl>(DC)->getDeclaredType().getPointer());
-    if (CachedType != DITypeCache.end()) {
-      // Verify that the information still exists.
-      if (llvm::Metadata *Val = CachedType->second)
-        return cast<llvm::DIType>(Val);
-    }
+    auto *TyDecl = cast<GenericTypeDecl>(DC);
+    if (auto *DITy = getTypeOrNull(TyDecl->getDeclaredType().getPointer()))
+      return DITy;
 
     // Create a Forward-declared type.
-    auto *TyDecl = cast<NominalTypeDecl>(DC);
     auto Loc = getDebugLoc(SM, TyDecl);
     auto File = getOrCreateFile(Loc.Filename);
     auto Line = Loc.Line;
@@ -1707,14 +1702,8 @@ static bool canMangle(TypeBase *Ty) {
   }
 }
 
-llvm::DIType *IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
-  // Is this an empty type?
-  if (DbgTy.isNull())
-    // We can't use the empty type as an index into DenseMap.
-    return createType(DbgTy, "", TheCU, MainFile);
-
-  // Look in the cache first.
-  auto CachedType = DITypeCache.find(DbgTy.getType());
+llvm::DIType *IRGenDebugInfo::getTypeOrNull(TypeBase *Ty) {
+  auto CachedType = DITypeCache.find(Ty);
   if (CachedType != DITypeCache.end()) {
     // Verify that the information still exists.
     if (llvm::Metadata *Val = CachedType->second) {
@@ -1722,6 +1711,18 @@ llvm::DIType *IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
       return DITy;
     }
   }
+  return nullptr;
+}
+
+llvm::DIType *IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
+  // Is this an empty type?
+  if (DbgTy.isNull())
+    // We can't use the empty type as an index into DenseMap.
+    return createType(DbgTy, "", TheCU, MainFile);
+
+  // Look in the cache first.
+  if (auto *DITy = getTypeOrNull(DbgTy.getType()))
+    return DITy;
 
   // Second line of defense: Look up the mangled name. TypeBase*'s are
   // not necessarily unique, but name mangling is too expensive to do
