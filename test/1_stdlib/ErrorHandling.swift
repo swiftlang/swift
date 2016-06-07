@@ -233,7 +233,7 @@ ErrorHandlingTests.test("ErrorHandling/contains") {
 ErrorHandlingTests.test("ErrorHandling/reduce") {
   var loopCount = 0
   do {
-    let x: Int = try [1, 2, 3, 4, 5].reduce(0, combine: {
+    let x: Int = try [1, 2, 3, 4, 5].reduce(0) {
       (x: Int, y: Int) -> Int
     in
       loopCount += 1
@@ -242,7 +242,7 @@ ErrorHandlingTests.test("ErrorHandling/reduce") {
         throw SillyError.JazzHands
       }
       return total
-    })
+    }
     expectUnreachable()
   } catch {}
   expectEqual(loopCount, 3)

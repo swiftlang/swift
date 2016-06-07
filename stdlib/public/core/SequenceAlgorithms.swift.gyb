@@ -524,40 +524,44 @@ extension Sequence {
   /// Returns the result of calling the given combining closure with each
   /// element of this sequence and an accumulating value.
   ///
-  /// The `combine` closure is called sequentially with an accumulating
-  /// value initialized to `initial` and each element of the sequence. This
-  /// example shows how to find the sum of an array of numbers.
+  /// The `nextPartialResult` closure is called sequentially with an
+  /// accumulating value initialized to `initialResult` and each
+  /// element of the sequence. This example shows how to find the sum
+  /// of an array of numbers.
   ///
   ///     let numbers = [1, 2, 3, 4]
   ///     let addTwo: (Int, Int) -> Int = { x, y in x + y }
-  ///     let numberSum = numbers.reduce(0, combine: addTwo)
+  ///     let numberSum = numbers.reduce(0, addTwo)
   ///     // 'numberSum' == 10
   ///
-  /// When `numbers.reduce(_:combine:)` is called, the following steps
-  /// occur:
+  /// When `numbers.reduce(_:_:)` is called, the
+  /// following steps occur:
   ///
-  /// 1. The `combine` closure is called with the initial value and the
-  ///    first element of `numbers`, returning the sum: `1`.
+  /// 1. The `nextPartialResult` closure is called with the initial
+  ///    result and the first element of `numbers`, returning the sum:
+  ///    `1`.
   /// 2. The closure is called again repeatedly with the previous call's
   ///    return value and each element of the sequence.
   /// 3. When the sequence is exhausted, the last value returned from the
   ///    closure is returned to the caller.
   ///
   /// - Parameters:
-  ///   - initial: A value to use as the initial value for accumulation.
-  ///   - combine: A closure that combines an accumulating value and an
-  ///     element of the sequence into a new accumulating value, to be used
-  ///     in the next call of the `combine` closure or returned to the
-  ///     caller.
-  /// - Returns: The final accumulated value.
-  public func reduce<T>(
-    _ initial: T, combine: @noescape (T, ${GElement}) throws -> T
-  ) rethrows -> T {
-    var result = initial
+  ///   - initialResult: the initial accumulating value.
+  ///   - nextPartialResult: A closure that combines an accumulating
+  ///     value and an element of the sequence into a new accumulating
+  ///     value, to be used in the next call of the
+  ///     `nextPartialResult` closure or returned to the caller.
+    /// - Returns: The final accumulated value.
+  public func reduce<Result>(
+    _ initialResult: Result,
+    _ nextPartialResult:
+      @noescape (partialResult: Result, ${GElement}) throws -> Result
+  ) rethrows -> Result {
+    var accumulator = initialResult
     for element in self {
-      result = try combine(result, element)
+      accumulator = try nextPartialResult(partialResult: accumulator, element)
     }
-    return result
+    return accumulator
   }
 }
 

@@ -1274,7 +1274,9 @@ public struct CollectionTransformerPipeline<
     )
   }
 
-  public func reduce<U>(_ initial: U, _ combine: (U, T) -> U) -> U {
+  public func reduce<U>(
+    _ initial: U, _ combine: (U, T) -> U
+  ) -> U {
     return _runCollectionTransformer(_input, _step.reduce(initial, combine))
   }
 
