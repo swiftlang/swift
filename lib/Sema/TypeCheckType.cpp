@@ -1154,12 +1154,21 @@ static Type resolveNestedIdentTypeComponent(
     member = memberTypes.back().first;
   }
 
-  if (parentTy->isExistentialType()) {
+  if (parentTy->isExistentialType() && isa<AssociatedTypeDecl>(member)) {
     if (diagnoseErrors)
       TC.diagnose(comp->getIdLoc(), diag::assoc_type_outside_of_protocol,
                   comp->getIdentifier());
 
     return ErrorType::get(TC.Context);
+  }
+  if (auto alias = dyn_cast<TypeAliasDecl>(member)) {
+    if (parentTy->isExistentialType() && memberType->hasTypeParameter()) {
+      if (diagnoseErrors)
+        TC.diagnose(comp->getIdLoc(), diag::typealias_to_assoc_type_outside_of_protocol,
+                    comp->getIdentifier(), alias->getUnderlyingTypeLoc());
+
+      return ErrorType::get(TC.Context);
+    }
   }
 
   // If there are generic arguments, apply them now.
@@ -3243,10 +3252,18 @@ public:
   }
 
   bool walkToTypeReprPre(TypeRepr *T) {
+    if (T->isInvalid())
+      return false;
+    if (auto compound = dyn_cast<CompoundIdentTypeRepr>(T)) {
+      // Only visit the last component to check, because nested typealiases in
+      // existentials are okay.
+      visit(compound->getComponentRange().back());
+      return false;
+    }
     visit(T);
     return true;
   }
-    
+
   std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) {
     if (recurseIntoSubstatements) {
       return { true, S };

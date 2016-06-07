@@ -248,4 +248,17 @@ protocol P4 {
   func getSelf() -> X
 }
 
+// Availability of typealiases in protocols for nested type lookup
+protocol P5 {
+  associatedtype A
+  typealias T1 = Int
+  typealias T2 = A
+  var a: T2 { get }
+}
+
+struct T5 : P5 {
+  var a: P5.T1 // OK
+  var v2: P5.T2 // expected-error {{cannot use typealias 'T2' of associated type 'A' outside of its protocol}}
+}
+
 
