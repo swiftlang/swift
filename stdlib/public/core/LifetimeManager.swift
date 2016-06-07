@@ -13,19 +13,19 @@
 /// Evaluate `f()` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 public func withExtendedLifetime<T, Result>(
-  _ x: T, _ f: @noescape () throws -> Result
+  _ x: T, _ body: @noescape () throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
-  return try f()
+  return try body()
 }
 
 /// Evaluate `f(x)` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 public func withExtendedLifetime<T, Result>(
-  _ x: T, _ f: @noescape (T) throws -> Result
+  _ x: T, _ body: @noescape (T) throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
-  return try f(x)
+  return try body(x)
 }
 
 extension String {
@@ -41,10 +41,10 @@ extension String {
   ///   it is used as the return value of the `withCString(_:)` method.
   /// - Returns: The return value of the `f` closure, if any.
   public func withCString<Result>(
-    _ f: @noescape (UnsafePointer<Int8>) throws -> Result
+    _ body: @noescape (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
     return try self.nulTerminatedUTF8.withUnsafeBufferPointer {
-      try f(UnsafePointer($0.baseAddress!))
+      try body(UnsafePointer($0.baseAddress!))
     }
   }
 }

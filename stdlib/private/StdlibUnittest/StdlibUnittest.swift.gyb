@@ -107,7 +107,7 @@ var _seenExpectCrash = false
 /// Run `body` and expect a failure to happen.
 ///
 /// The check passes iff `body` triggers one or more failures.
-public func expectFailure(${TRACE}, body: () -> Void) {
+public func expectFailure(${TRACE}, invoking body: () -> Void) {
   let startAnyExpectFailed = _anyExpectFailed
   _anyExpectFailed = false
   body()

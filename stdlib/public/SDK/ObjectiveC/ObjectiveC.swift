@@ -188,7 +188,7 @@ func __pushAutoreleasePool() -> OpaquePointer
 func __popAutoreleasePool(_ pool: OpaquePointer)
 
 public func autoreleasepool<Result>(
-  _ body: @noescape () throws -> Result
+  invoking body: @noescape () throws -> Result
 ) rethrows -> Result {
   let pool = __pushAutoreleasePool()
   defer {
