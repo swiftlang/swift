@@ -23,6 +23,7 @@ add_swift_library(swiftStdlibCollectionUnittest SHARED IS_STDLIB
   CheckSequenceType.swift
   LoggingWrappers.swift.gyb
   MinimalCollections.swift.gyb
+  RangeSelection.swift
   ../../public/core/WriteBackMutableSlice.swift
 
   SWIFT_MODULE_DEPENDS StdlibUnittest

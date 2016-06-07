@@ -516,7 +516,7 @@ Int64 distances.
 %         # Only generating MinimalRandomAccessCollectionWithStrideableIndex
 %         if not StrideableIndex or (
 %           StrideableIndex and Traversal == 'RandomAccess' and
-%           not Mutable and not RangeReplaceable):
+%           not Mutable):
 
 /// A minimal implementation of `Collection` with extra checks.
 public struct ${Self}<T> : ${SelfProtocols} {
