@@ -564,12 +564,12 @@ public protocol Sequence {
   /// Returns the first element of the sequence that satisfies the given
   /// predicate or nil if no such element is found.
   ///
-  /// - Parameter where: A closure that takes an element of the
+  /// - Parameter predicate: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element is a match.
   /// - Returns: The first match or `nil` if there was no match.
   func first(
-    where: @noescape (Iterator.Element) throws -> Bool
+    where predicate: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element?
 
   func _customContainsEquatableElement(
@@ -969,7 +969,7 @@ extension Sequence {
   /// Returns the first element of the sequence that satisfies the given
   /// predicate or nil if no such element is found.
   ///
-  /// - Parameter where: A closure that takes an element of the
+  /// - Parameter predicate: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element is a match.
   /// - Returns: The first match or `nil` if there was no match.

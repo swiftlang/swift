@@ -505,7 +505,7 @@ extension Sequence {
   /// - Returns: `true` if the sequence contains an element that satisfies
   ///   `predicate`; otherwise, `false`.
   public func contains(
-    _ predicate: @noescape (${GElement}) throws -> Bool
+    where predicate: @noescape (${GElement}) throws -> Bool
   ) rethrows -> Bool {
     for e in self {
       if try predicate(e) {
