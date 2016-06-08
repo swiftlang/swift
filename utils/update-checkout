@@ -37,7 +37,7 @@ def update_working_copy(repo_path, branch):
     print("--- Updating '" + repo_path + "' ---")
     with shell.pushd(repo_path, dry_run=False, echo=False):
         if branch:
-            status = shell.capture(['git', 'status', '--porcelain'],
+            status = shell.capture(['git', 'status', '--porcelain', '-uno'],
                                    echo=False)
             if status:
                 print("Please, commit your changes.")
