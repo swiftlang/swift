@@ -291,7 +291,6 @@ extension String {
   ///   lower bounds of `bounds` must be valid indices of the string.
 % end
   public mutating func removeSubrange(_ bounds: ${Range}<Index>) {
-    // FIXME: swift-3-indexing-model: tests.
     withMutableCharacters {
       (v: inout CharacterView) in v.removeSubrange(bounds)
     }
