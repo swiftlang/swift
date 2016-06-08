@@ -1849,12 +1849,6 @@ ERROR(lazy_not_observable,none,
 ERROR(attr_for_debugger_support_only,none,
       "@LLDBDebuggerSupport may only be used when debugger support is on", ())
 
-// warn_unused_result
-ERROR(attr_warn_unused_result_mutable_variable,none,
-      "'mutable_variant' parameter of 'warn_unused_result' attribute does not "
-      "make sense on a %select{non-function|non-method|non-instance method|"
-      "method of a class|mutating method}0", (unsigned))
-
 //------------------------------------------------------------------------------
 // Type Check Expressions
 //------------------------------------------------------------------------------
