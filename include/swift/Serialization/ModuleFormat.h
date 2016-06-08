@@ -1376,14 +1376,6 @@ namespace decls_block {
     BCBlob      // rename, followed by message
   >;
 
-  using WarnUnusedResultDeclAttrLayout = BCRecordLayout<
-    WarnUnusedResult_DECL_ATTR,
-    BCFixed<1>, // implicit flag
-    BCVBR<6>,  // index at the end of the message,
-    BCBlob     // blob contains the message and mutating-version
-               // strings, separated by the prior index
-  >;
-
   using SpecializeDeclAttrLayout = BCRecordLayout<
     Specialize_DECL_ATTR,
     BCArray<TypeIDField> // concrete types

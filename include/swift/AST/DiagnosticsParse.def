@@ -1258,16 +1258,8 @@ ERROR(attr_unowned_expected_rparen,none,
       "expected ')' after specifier for 'unowned'", ())
 
 // warn_unused_result
-WARNING(attr_warn_unused_result_expected_name,none,
-        "expected parameter 'message' or 'mutable_variant'", ())
-WARNING(attr_warn_unused_result_duplicate_parameter,none,
-      "duplicate '%0' parameter; previous value will be ignored", (StringRef))
-ERROR(attr_warn_unused_result_expected_colon,none,
-      "expected ':' following '%0' parameter", (StringRef))
-ERROR(attr_warn_unused_result_expected_string,none,
-      "expected a string following ':' for '%0' parameter", (StringRef))
-WARNING(attr_warn_unused_result_unknown_parameter,none,
-        "unknown parameter '%0' in 'warn_unused_result' attribute", (StringRef))
+WARNING(attr_warn_unused_result_removed,none,
+        "'warn_unused_result' attribute behavior is now the default", ())
 ERROR(attr_warn_unused_result_expected_rparen,none,
       "expected ')' after 'warn_unused_result' attribute", ())
 

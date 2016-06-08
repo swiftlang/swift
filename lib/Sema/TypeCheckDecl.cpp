@@ -5376,7 +5376,6 @@ public:
     UNINTERESTING_ATTR(SILStored)
     UNINTERESTING_ATTR(Testable)
 
-    UNINTERESTING_ATTR(WarnUnusedResult)
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
     UNINTERESTING_ATTR(DiscardableResult)
 
