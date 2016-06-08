@@ -139,7 +139,7 @@ if(PYTHONINTERP_FOUND)
       only_long
   )
 
-  foreach(SDK ${SWIFT_SDKS})
+  foreach(SDK ${SWIFT_CONFIGURED_SDKS})
     foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
       # Configure variables for this subdirectory.
       set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
