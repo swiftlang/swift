@@ -149,20 +149,6 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   return emitManagedRValueWithCleanup(result, optTL);
 }
 
-static Substitution getSimpleSubstitution(GenericSignature *genericSig,
-                                          CanType typeArg) {
-  assert(genericSig->getGenericParams().size() == 1);
-  return Substitution{typeArg, {}};
-}
-
-/// Create the correct substitution for calling the given function at
-/// the given type.
-static Substitution getSimpleSubstitution(FuncDecl *fn, CanType typeArg) {
-  auto genericFnType =
-    cast<GenericFunctionType>(fn->getInterfaceType()->getCanonicalType());
-  return getSimpleSubstitution(genericFnType->getGenericSignature(), typeArg);
-}
-
 static CanType getOptionalValueType(SILType optType,
                                     OptionalTypeKind &optionalKind) {
   auto generic = cast<BoundGenericType>(optType.getSwiftRValueType());
@@ -172,19 +158,24 @@ static CanType getOptionalValueType(SILType optType,
 }
 
 void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
-                                                      SILValue addr) {
+                                                      SILValue optional) {
   OptionalTypeKind OTK;
-  getOptionalValueType(addr->getType().getObjectType(), OTK);
+  getOptionalValueType(optional->getType().getObjectType(), OTK);
 
-  // Generate code to the optional is present, and if not abort with a message
+  // Generate code to the optional is present, and if not, abort with a message
   // (provided by the stdlib).
   SILBasicBlock *contBB = createBasicBlock();
   SILBasicBlock *failBB = createBasicBlock();
 
   auto NoneEnumElementDecl = getASTContext().getOptionalNoneDecl(OTK);
-  B.createSwitchEnumAddr(loc, addr, /*defaultDest*/contBB,
-                         { { NoneEnumElementDecl, failBB }});
-
+  if (optional->getType().isAddress()) {
+    B.createSwitchEnumAddr(loc, optional, /*defaultDest*/contBB,
+                           { { NoneEnumElementDecl, failBB }});
+  } else {
+    B.createSwitchEnum(loc, optional, /*defaultDest*/contBB,
+                       { { NoneEnumElementDecl, failBB }});
+    
+  }
   B.emitBlock(failBB);
 
   // Call the standard library implementation of _diagnoseUnexpectedNilOptional.
@@ -221,27 +212,8 @@ ManagedValue SILGenFunction::emitCheckedGetOptionalValueFrom(SILLocation loc,
                                                       ManagedValue src,
                                                       const TypeLowering &optTL,
                                                       SGFContext C) {
-  SILType optType = src.getType().getObjectType();
-  OptionalTypeKind optionalKind;
-  CanType valueType = getOptionalValueType(optType, optionalKind);
-
-  FuncDecl *fn = getASTContext().getOptionalUnwrappedDecl(
-      nullptr, optionalKind);
-  Substitution sub = getSimpleSubstitution(fn, valueType);
-
-  // The intrinsic takes its parameter indirectly.
-  if (src.getType().isObject()) {
-    auto buf = emitTemporaryAllocation(loc, src.getType());
-    B.createStore(loc, src.forward(*this), buf);
-    src = emitManagedBufferWithCleanup(buf);
-  }
-
-  RValue result = emitApplyOfLibraryIntrinsic(loc, fn, sub, src, C);
-  if (result) {
-    return std::move(result).getAsSingleValue(*this, loc);
-  } else {
-    return ManagedValue::forInContext();
-  }
+  emitPreconditionOptionalHasValue(loc, src.getValue());
+  return emitUncheckedGetOptionalValueFrom(loc, src, optTL, C);
 }
 
 ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,

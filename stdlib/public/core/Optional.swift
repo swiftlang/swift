@@ -286,24 +286,6 @@ extension Optional : CustomReflectable {
 
 @_transparent
 public // COMPILER_INTRINSIC
-func _stdlib_Optional_isSome<Wrapped>(_ `self`: Wrapped?) -> Bool {
-  return `self` != nil
-}
-
-@_transparent
-public // COMPILER_INTRINSIC
-func _stdlib_Optional_unwrapped<Wrapped>(_ `self`: Wrapped?) -> Wrapped {
-  switch `self` {
-  case let wrapped?:
-    return wrapped
-  case .none:
-    _preconditionFailure(
-      "unexpectedly found nil while unwrapping an Optional value")
-  }
-}
-
-@_transparent
-public // COMPILER_INTRINSIC
 func _diagnoseUnexpectedNilOptional() {
   _preconditionFailure(
     "unexpectedly found nil while unwrapping an Optional value")

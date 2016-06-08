@@ -3307,6 +3307,13 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
     
+    Expr *visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
+      // Should already be type-checked.
+      Type valueType = simplifyType(expr->getType());
+      expr->setType(valueType);
+      return expr;
+    }
+    
     Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
       Type valueType = simplifyType(E->getType());
       E->setType(valueType);
@@ -6827,32 +6834,10 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   auto &tc = cs.getTypeChecker();
   tc.requireOptionalIntrinsics(expr->getLoc());
 
-  // Find the library intrinsic.
+  // Match the optional value against its `Some` case.
   auto &ctx = tc.Context;
-  auto *fn = ctx.getOptionalIsSomeDecl(&tc, OTK_Optional);
-  tc.validateDecl(fn);
-
-  // Form a reference to the function. This library intrinsic is generic, so we
-  // need to form substitutions and compute the resulting type.
-  auto unwrappedOptionalType = expr->getType()->getOptionalObjectType();
-
-  Substitution sub(unwrappedOptionalType, {});
-  ConcreteDeclRef fnSpecRef(ctx, fn, sub);
-  auto *fnRef =
-      new (ctx) DeclRefExpr(fnSpecRef, DeclNameLoc(), /*Implicit=*/true);
-
-  TypeSubstitutionMap subMap;
-  auto genericParam = fn->getGenericSignatureOfContext()->getGenericParams()[0];
-  subMap[genericParam->getCanonicalType()->castTo<SubstitutableType>()] =
-      unwrappedOptionalType;
-  fnRef->setType(fn->getInterfaceType().subst(
-      constraintSystem->DC->getParentModule(), subMap, None));
-
-  Expr *call = new (ctx) CallExpr(fnRef, expr, /*Implicit=*/true);
-
-  bool failed = tc.typeCheckExpressionShallow(call, cs.DC);
-  assert(!failed && "Could not call library intrinsic?");
-  (void)failed;
-  return call;
+  auto isSomeExpr = new (ctx) EnumIsCaseExpr(expr, ctx.getOptionalSomeDecl());
+  isSomeExpr->setType(tc.lookupBoolType(cs.DC));
+  return isSomeExpr;
 }
 

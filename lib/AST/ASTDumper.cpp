@@ -2160,6 +2160,12 @@ public:
     printRec(E->getSrc());
     OS << ')';
   }
+  void visitEnumIsCaseExpr(EnumIsCaseExpr *E) {
+    printCommon(E, "enum_is_case_expr") << ' ' <<
+      E->getEnumElement()->getName() << "\n";
+    printRec(E->getSubExpr());
+    
+  }
   void visitUnresolvedPatternExpr(UnresolvedPatternExpr *E) {
     printCommon(E, "unresolved_pattern_expr") << '\n';
     printRec(E->getSubPattern());

@@ -71,8 +71,11 @@ func wrap<T>(_ x: T) -> T? { return x }
 
 // CHECK-LABEL: sil hidden @_TF8optional16wrap_then_unwrap
 func wrap_then_unwrap<T>(_ x: T) -> T {
-  // CHECK: [[FORCE:%.*]] = function_ref @_TFs26_stdlib_Optional_unwrappedurFGSqx_x
-  // CHECK: apply [[FORCE]]<{{.*}}>(%0, {{%.*}})
+  // CHECK:   switch_enum_addr {{.*}}, case #Optional.none!enumelt: [[FAIL:bb[0-9]+]], default [[OK:bb[0-9]+]]
+  // CHECK: [[FAIL]]:
+  // CHECK:   unreachable
+  // CHECK: [[OK]]:
+  // CHECK:   unchecked_take_enum_data_addr
   return wrap(x)!
 }
 

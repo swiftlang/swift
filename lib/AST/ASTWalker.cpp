@@ -747,6 +747,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return AE;
   }
   
+  Expr *visitEnumIsCaseExpr(EnumIsCaseExpr *E) {
+    if (Expr *Sub = E->getSubExpr()) {
+      if (!(Sub = doIt(Sub)))
+        return nullptr;
+      E->setSubExpr(Sub);
+    }
+    
+    return E;
+  }
+  
   
   Expr *visitIfExpr(IfExpr *E) {
     if (Expr *Cond = E->getCondExpr()) {
