@@ -649,6 +649,15 @@ function set_build_options_for_host() {
                         "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
                     )
                 fi
+
+                # We need to also pass in this flag so that parts of LLVM's
+                # build system that we use (for instance when compiling
+                # unittests) do not use too many threads when we are using lto.
+                if [[ $(true_false "${LLVM_ENABLE_LTO}") == "TRUE" ]]; then
+                    swift_cmake_options+=(
+                        "-DLLVM_PARALLEL_LINK_JOBS=${LLVM_NUM_PARALLEL_LTO_LINK_JOBS}"
+                    )
+                fi
                 swift_cmake_options+=(
                     "-DSWIFT_PARALLEL_LINK_JOBS=$(num_swift_parallel_lto_link_jobs)"
                 )
