@@ -148,4 +148,8 @@ func tuple_splat2(_ q : (a : Int, b : Int)) {
   tuple_splat2(1, b: 2)    // expected-error {{extra argument 'b' in call}}
 }
 
+// SR-1612: Type comparison of foreign types is always true.
+func is_foreign(a: AnyObject) -> Bool {
+  return a is CGColor // expected-warning {{'is' test is always true because 'CGColor' is a Core Foundation type}}
+}
 

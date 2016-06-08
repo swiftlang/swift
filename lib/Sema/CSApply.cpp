@@ -2857,12 +2857,20 @@ namespace {
         tc.diagnose(expr->getLoc(), diag::isa_is_always_true, "is");
         expr->setCastKind(castKind);
         break;
+      case CheckedCastKind::ValueCast:
+        // Check the cast target is a non-foreign type
+        if (auto cls = toType->getAs<ClassType>()) {
+          if (cls->getDecl()->isForeign()) {
+            tc.diagnose(expr->getLoc(), diag::isa_is_foreign_check, toType);
+          }
+        }
+        expr->setCastKind(castKind);
+        break;
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::DictionaryDowncastBridged:
       case CheckedCastKind::SetDowncast:
       case CheckedCastKind::SetDowncastBridged:
-      case CheckedCastKind::ValueCast:
       case CheckedCastKind::BridgeFromObjectiveC:
         // Valid checks.
         expr->setCastKind(castKind);
