@@ -276,7 +276,7 @@ class EEE : CCC {
 
 // Check that c.foo() is devirtualized, because the optimizer can handle the casting the return type
 // correctly, i.e. it can cast (BBB, BBB) into (AAA, AAA)
-// CHECK-LABEL: sil hidden @_TTSf4g_n___TF23devirt_covariant_return37testDevirtOfMethodReturningTupleTypesFTCS_3CCC1bCS_2BB_TCS_2AAS2__
+// CHECK-LABEL: sil hidden @_TTSf4g_g___TF23devirt_covariant_return37testDevirtOfMethodReturningTupleTypesFTCS_3CCC1bCS_2BB_TCS_2AAS2__
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $CCC
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $DDD
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $EEE
