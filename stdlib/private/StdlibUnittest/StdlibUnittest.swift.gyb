@@ -510,6 +510,7 @@ public func expectEmpty<T>(_ value: T?, ${TRACE}) {
   }
 }
 
+@discardableResult
 public func expectNotEmpty<T>(_ value: T?, ${TRACE}) -> T? {
   if value == nil {
     expectationFailure("expected optional to be non-empty", trace: ${trace})
