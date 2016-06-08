@@ -12,6 +12,7 @@
 import os
 import unittest
 
+from swift_build_support import toolchain
 from swift_build_support.toolchain import host_toolchain
 
 
@@ -109,6 +110,14 @@ class ToolchainTestCase(unittest.TestCase):
                 self.assertEqual(cc_suffix, cov_suffix)
             if profdata_suffix is not None:
                 self.assertEqual(cc_suffix, profdata_suffix)
+
+    def test_toolchain_instances(self):
+        # Check that we can instantiate every toolchain, even if it isn't the
+        # current patform.
+        toolchain.MacOSX()
+        toolchain.Linux()
+        toolchain.FreeBSD()
+        toolchain.Cygwin()
 
 
 if __name__ == '__main__':

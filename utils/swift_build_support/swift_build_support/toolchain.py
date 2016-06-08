@@ -147,7 +147,7 @@ class FreeBSD(GenericUnix):
         super(FreeBSD, self).__init__(suffixes)
 
     @cache_util.reify
-    def _release_date():
+    def _release_date(self):
         """Return the release date for FreeBSD operating system on this host.
         If the release date cannot be ascertained, return None.
         """
