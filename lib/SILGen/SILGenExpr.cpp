@@ -2033,7 +2033,7 @@ getMagicFunctionString(SILGenFunction &gen) {
 
 RValue RValueEmitter::
 visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
-  ASTContext &Ctx = SGF.SGM.M.getASTContext();
+  ASTContext &Ctx = SGF.getASTContext();
   SILType Ty = SGF.getLoweredLoadableType(E->getType());
   SourceLoc Loc;
   

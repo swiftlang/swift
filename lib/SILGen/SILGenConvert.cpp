@@ -157,6 +157,46 @@ static CanType getOptionalValueType(SILType optType,
   return generic.getGenericArgs()[0];
 }
 
+static void emitSourceLocationArgs(SILGenFunction &gen,
+                                   SILLocation loc,
+                                   ManagedValue (&args)[4]) {
+  auto &ctx = gen.getASTContext();
+  auto sourceLoc = loc.getSourceLoc();
+  
+  StringRef filename = "";
+  unsigned line = 0;
+  if (sourceLoc.isValid()) {
+    unsigned bufferID = ctx.SourceMgr.findBufferContainingLoc(sourceLoc);
+    filename = ctx.SourceMgr.getIdentifierForBuffer(bufferID);
+    line = ctx.SourceMgr.getLineAndColumn(sourceLoc).first;
+  }
+  
+  bool isASCII = true;
+  for (unsigned char c : filename) {
+    if (c > 127) {
+      isASCII = false;
+      break;
+    }
+  }
+  
+  auto wordTy = SILType::getBuiltinWordType(ctx);
+  auto i1Ty = SILType::getBuiltinIntegerType(1, ctx);
+  
+  // File
+  SILValue literal = gen.B.createStringLiteral(loc, filename,
+                                             StringLiteralInst::Encoding::UTF8);
+  args[0] = ManagedValue::forUnmanaged(literal);
+  // File length
+  literal = gen.B.createIntegerLiteral(loc, wordTy, filename.size());
+  args[1] = ManagedValue::forUnmanaged(literal);
+  // File is ascii
+  literal = gen.B.createIntegerLiteral(loc, i1Ty, isASCII);
+  args[2] = ManagedValue::forUnmanaged(literal);
+  // Line
+  literal = gen.B.createIntegerLiteral(loc, wordTy, line);
+  args[3] = ManagedValue::forUnmanaged(literal);
+}
+
 void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
                                                       SILValue optional) {
   OptionalTypeKind OTK;
@@ -181,7 +221,10 @@ void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   // Call the standard library implementation of _diagnoseUnexpectedNilOptional.
   if (auto diagnoseFailure =
         getASTContext().getDiagnoseUnexpectedNilOptional(nullptr)) {
-    emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, {}, {},
+    ManagedValue args[4];
+    emitSourceLocationArgs(*this, loc, args);
+    
+    emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, {}, args,
                                 SGFContext());
   }
 

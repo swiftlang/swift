@@ -3,8 +3,8 @@
 // CHECK-LABEL: sil hidden @_TF15optional_lvalue22assign_optional_lvalueFTRGSqSi_Si_T_
 // CHECK:         [[SHADOW:%.*]] = alloc_box $Optional<Int>
 // CHECK:         [[PB:%.*]] = project_box [[SHADOW]]
-// CHECK:         [[PRECOND:%.*]] = function_ref @_TFs30_diagnoseUnexpectedNilOptionalFT_T_
-// CHECK:         apply [[PRECOND]]()
+// CHECK:         [[PRECOND:%.*]] = function_ref @_TFs30_diagnoseUnexpectedNilOptional
+// CHECK:         apply [[PRECOND]](
 // CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[PB]] : $*Optional<Int>, #Optional.some!enumelt.1
 // CHECK:         assign {{%.*}} to [[PAYLOAD]]
 func assign_optional_lvalue(_ x: inout Int?, _ y: Int) {
@@ -14,8 +14,8 @@ func assign_optional_lvalue(_ x: inout Int?, _ y: Int) {
 // CHECK-LABEL: sil hidden @_TF15optional_lvalue17assign_iuo_lvalueFTRGSQSi_Si_T_
 // CHECK:         [[SHADOW:%.*]] = alloc_box $ImplicitlyUnwrappedOptional<Int>
 // CHECK:         [[PB:%.*]] = project_box [[SHADOW]]
-// CHECK:         [[PRECOND:%.*]] = function_ref @_TFs30_diagnoseUnexpectedNilOptionalFT_T_
-// CHECK:         apply [[PRECOND]]()
+// CHECK:         [[PRECOND:%.*]] = function_ref @_TFs30_diagnoseUnexpectedNilOptional
+// CHECK:         apply [[PRECOND]](
 // CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[PB]] : $*ImplicitlyUnwrappedOptional<Int>, #ImplicitlyUnwrappedOptional.some!enumelt.1
 // CHECK:         assign {{%.*}} to [[PAYLOAD]]
 func assign_iuo_lvalue(_ x: inout Int!, _ y: Int) {
