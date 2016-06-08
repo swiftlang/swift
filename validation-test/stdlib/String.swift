@@ -1285,10 +1285,9 @@ StringTests.test("String.decodeCString/UTF32") {
 internal struct ReplaceSubrangeTest {
   let original: String
   let newElements: String
-  // RangeSelection is defined in CheckRangeReplaceableCollectionType
   let rangeSelection: RangeSelection
   let expected: String
-  let closedExpected: String?  // Expected array for closed ranges
+  let closedExpected: String?
   let loc: SourceLoc
 
   internal init(
@@ -1322,49 +1321,57 @@ let replaceSubrangeTests = [
     original: "eela",
     newElements: "m",
     rangeSelection: .leftEdge,
-    expected: "meela"
+    expected: "meela",
+    closedExpected: "mela"
   ),
   ReplaceSubrangeTest(
     original: "meel",
     newElements: "a",
     rangeSelection: .rightEdge,
-    expected: "meela"
+    expected: "meela",
+    closedExpected: "meea"
   ),
   ReplaceSubrangeTest(
     original: "a",
     newElements: "meel",
     rangeSelection: .leftEdge,
-    expected: "meela"
+    expected: "meela",
+    closedExpected: "meel"
   ),
   ReplaceSubrangeTest(
     original: "m",
     newElements: "eela",
     rangeSelection: .rightEdge,
-    expected: "meela"
+    expected: "meela",
+    closedExpected: "eela"
   ),
   ReplaceSubrangeTest(
     original: "alice",
     newElements: "bob",
     rangeSelection: .offsets(1, 1),
-    expected: "aboblice"
+    expected: "aboblice",
+    closedExpected: "abobice"
   ),
   ReplaceSubrangeTest(
     original: "alice",
     newElements: "bob",
     rangeSelection: .offsets(1, 2),
-    expected: "abobice"
+    expected: "abobice",
+    closedExpected: "abobce"
   ),
   ReplaceSubrangeTest(
     original: "alice",
     newElements: "bob",
     rangeSelection: .offsets(1, 3),
-    expected: "abobce"
+    expected: "abobce",
+    closedExpected: "abobe"
   ),
   ReplaceSubrangeTest(
     original: "alice",
     newElements: "bob",
     rangeSelection: .offsets(1, 4),
-    expected: "abobe"
+    expected: "abobe",
+    closedExpected: "abob"
   ),
   ReplaceSubrangeTest(
     original: "alice",
@@ -1376,7 +1383,8 @@ let replaceSubrangeTests = [
     original: "bob",
     newElements: "meela",
     rangeSelection: .offsets(1, 2),
-    expected: "bmeelab"
+    expected: "bmeelab",
+    closedExpected: "bmeela"
   ),
 ]
 
@@ -1403,6 +1411,39 @@ StringTests.test("String.replaceSubrange()/string/range") {
     expectEqual(
       theString,
       test.expected,
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+StringTests.test("String.replaceSubrange()/characters/closedRange") {
+  for test in replaceSubrangeTests {
+    guard let closedExpected = test.closedExpected else {
+      continue
+    }
+    var theString = test.original
+    let c = test.original.characters
+    let rangeToReplace = test.rangeSelection.closedRange(in: c)
+    let newCharacters = Array(test.newElements.characters)
+    theString.replaceSubrange(rangeToReplace, with: newCharacters)
+    expectEqual(
+      theString,
+      closedExpected,
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+StringTests.test("String.replaceSubrange()/string/closedRange") {
+  for test in replaceSubrangeTests {
+    guard let closedExpected = test.closedExpected else {
+      continue
+    }
+    var theString = test.original
+    let c = test.original.characters
+    let rangeToReplace = test.rangeSelection.closedRange(in: c)
+    theString.replaceSubrange(rangeToReplace, with: test.newElements)
+    expectEqual(
+      theString,
+      closedExpected,
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
