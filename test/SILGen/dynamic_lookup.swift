@@ -132,7 +132,6 @@ func opt_to_property(_ obj: AnyObject) {
   // CHECK: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: [[INT_BOX:%[0-9]+]] = alloc_box $Int
   // CHECK-NEXT: project_box [[INT_BOX]]
-  // CHECK-NEXT: [[UNKNOWN_USE:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<Int>
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
   // CHECK-NEXT: [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
@@ -162,7 +161,6 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK-NEXT: store [[I]] to [[PBI]] : $*Int
   // CHECK-NEXT: alloc_box $Int
   // CHECK-NEXT: project_box
-  // CHECK-NEXT: [[UNKNOWN_USE:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<Int>
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
   // CHECK-NEXT: [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject

@@ -46,16 +46,9 @@ extension Gizmo : Bells {
 
 // CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFCSo5GizmoC{{.*}} : $@convention(method) (Int, @thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
 // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[I]], [[META]]) : $@convention(method) (Int, @thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
-// CHECK:   [[IUO_RESULT_TEMP:%[0-9]+]] = alloc_stack $ImplicitlyUnwrappedOptional<Gizmo>
-// CHECK:   store [[IUO_RESULT]] to [[IUO_RESULT_TEMP]] : $*ImplicitlyUnwrappedOptional<Gizmo>
-
-// CHECK:   [[UNWRAP_FUNC:%[0-9]+]] = function_ref @_TFs45_stdlib_ImplicitlyUnwrappedOptional_unwrappedurFGSQx_x
-// CHECK:   [[UNWRAPPED_RESULT_TEMP:%[0-9]+]] = alloc_stack $Gizmo
-// CHECK:   apply [[UNWRAP_FUNC]]<Gizmo>([[UNWRAPPED_RESULT_TEMP]], [[IUO_RESULT_TEMP]]) : $@convention(thin) <τ_0_0> (@in ImplicitlyUnwrappedOptional<τ_0_0>) -> @out τ_0_0
-// CHECK:   [[UNWRAPPED_RESULT:%[0-9]+]] = load [[UNWRAPPED_RESULT_TEMP]] : $*Gizmo
+// CHECK:   switch_enum [[IUO_RESULT]]
+// CHECK:   [[UNWRAPPED_RESULT:%[0-9]+]] = unchecked_enum_data [[IUO_RESULT]]
 // CHECK:   store [[UNWRAPPED_RESULT]] to [[SELF]] : $*Gizmo
-// CHECK:   dealloc_stack [[UNWRAPPED_RESULT_TEMP]] : $*Gizmo
-// CHECK:   dealloc_stack [[IUO_RESULT_TEMP]] : $*ImplicitlyUnwrappedOptional<Gizmo>
 
 // Test extension of a native @objc class to conform to a protocol with a
 // subscript requirement. rdar://problem/20371661

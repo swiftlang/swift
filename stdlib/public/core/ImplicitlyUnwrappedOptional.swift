@@ -63,20 +63,6 @@ extension ImplicitlyUnwrappedOptional : CustomDebugStringConvertible {
   }
 }
 
-@_transparent
-public // COMPILER_INTRINSIC
-func _stdlib_ImplicitlyUnwrappedOptional_unwrapped<Wrapped>
-  (_ `self`: Wrapped!) -> Wrapped {
-
-  switch `self` {
-  case .some(let wrapped):
-    return wrapped
-  case .none:
-    _preconditionFailure(
-      "unexpectedly found nil while unwrapping an Optional value")
-  }
-}
-
 #if _runtime(_ObjC)
 extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> AnyObject {
