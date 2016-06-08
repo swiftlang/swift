@@ -157,3 +157,5 @@ FloatingPointConversionFailure.test("${Other}To${Self}Conversion/dest=${testValu
 
 %   end # for in floatNameToSignificandBits (Other)
 % end # for in all_integer_types (Self)
+
+runAllTests()
