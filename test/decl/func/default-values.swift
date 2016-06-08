@@ -111,3 +111,14 @@ foo2([].bar { $0 == "c" }!)
 // rdar://problem/21643052
 let a = ["1", "2"].map { Int($0) }
 
+// Default arguments for static members used via ".foo"
+struct X<T> {
+  static func foo(i: Int, j: Int = 0) -> X {
+    return X()
+  }
+
+  static var bar: X { return X() }
+}
+
+let testXa: X<Int> = .foo(i: 0)
+let testXb: X<Int> = .bar

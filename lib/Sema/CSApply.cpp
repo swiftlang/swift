@@ -3690,7 +3690,9 @@ static ConcreteDeclRef
 resolveLocatorToDecl(ConstraintSystem &cs, ConstraintLocator *locator,
    std::function<Optional<SelectedOverload>(ConstraintLocator *)> findOvlChoice,
    std::function<ConcreteDeclRef (ValueDecl *decl,
-                                  Type openedType)> getConcreteDeclRef)
+                                  Type openedType,
+                                  ConstraintLocator *declLocator)>
+     getConcreteDeclRef)
 {
   assert(locator && "Null locator");
   if (!locator->getAnchor())
@@ -3755,7 +3757,8 @@ resolveLocatorToDecl(ConstraintSystem &cs, ConstraintLocator *locator,
     if (auto selected = findOvlChoice(anchorLocator)) {
       if (selected->choice.isDecl())
         return getConcreteDeclRef(selected->choice.getDecl(),
-                                  selected->openedType);
+                                  selected->openedType,
+                                  anchorLocator);
     }
   }
   
@@ -3766,7 +3769,8 @@ resolveLocatorToDecl(ConstraintSystem &cs, ConstraintLocator *locator,
     if (auto selected = findOvlChoice(anchorLocator)) {
       if (selected->choice.isDecl())
         return getConcreteDeclRef(selected->choice.getDecl(),
-                                  selected->openedType);
+                                  selected->openedType,
+                                  anchorLocator);
     }
   }
 
@@ -3832,8 +3836,8 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
 
               return known->second;
             },
-            [&](ValueDecl *decl,
-                Type openedType) -> ConcreteDeclRef {
+            [&](ValueDecl *decl, Type openedType, ConstraintLocator *locator)
+                  -> ConcreteDeclRef {
               if (decl->getInnermostDeclContext()->isGenericContext()) {
                 SmallVector<Substitution, 4> subs;
                 solution.computeSubstitutions(
@@ -4039,7 +4043,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
                                  fromTuple->getElements().size());
   SmallVector<Expr *, 2> callerDefaultArgs;
-  ConcreteDeclRef defaultArgsOwner;
+  ConcreteDeclRef defaultArgsOwner =
+    findDefaultArgsOwner(cs, solution, cs.getConstraintLocator(locator));
 
   for (unsigned i = 0, n = toTuple->getNumElements(); i != n; ++i) {
     const auto &toElt = toTuple->getElement(i);
@@ -4047,32 +4052,15 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
     // If we're default-initializing this member, there's nothing to do.
     if (sources[i] == TupleShuffleExpr::DefaultInitialize) {
-      // Dig out the owner of the default arguments.
-      ConcreteDeclRef argOwner;
-      if (!defaultArgsOwner) {
-        argOwner
-          = findDefaultArgsOwner(cs, solution,
-                                 cs.getConstraintLocator(locator));
-        assert(argOwner && "Missing default arguments owner?");
-      } else {
-        argOwner = defaultArgsOwner;
-      }
-
       anythingShuffled = true;
       hasInits = true;
       toSugarFields.push_back(toElt);
 
       // Create a caller-side default argument, if we need one.
       if (auto defArg = getCallerDefaultArg(tc, dc, expr->getLoc(),
-                                            argOwner, i).first) {
+                                            defaultArgsOwner, i).first) {
         callerDefaultArgs.push_back(defArg);
         sources[i] = TupleShuffleExpr::CallerDefaultInitialize;
-      }
-      if (!defaultArgsOwner) {
-        defaultArgsOwner = argOwner;
-      } else {
-        assert(defaultArgsOwner == argOwner &&
-               "default args on same func have different owners");
       }
       continue;
     }
@@ -4311,7 +4299,9 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   SmallVector<int, 4> elements;
   SmallVector<unsigned, 1> variadicArgs;
   SmallVector<Expr*, 4> callerDefaultArgs;
-  ConcreteDeclRef defaultArgsOwner = nullptr;
+  ConcreteDeclRef defaultArgsOwner =
+    findDefaultArgsOwner(cs, solution, cs.getConstraintLocator(locator));
+
   i = 0;
   for (auto &field : toTuple->getElements()) {
     if (field.isVararg()) {
@@ -4332,20 +4322,9 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 
     assert(field.hasDefaultArg() && "Expected a default argument");
 
-    ConcreteDeclRef argOwner;
-    // Dig out the owner of the default arguments.
-    if (!defaultArgsOwner) {
-      argOwner
-      = findDefaultArgsOwner(cs, solution,
-                             cs.getConstraintLocator(locator));
-      assert(argOwner && "Missing default arguments owner?");
-    } else {
-      argOwner = defaultArgsOwner;
-    }
-
     // Create a caller-side default argument, if we need one.
     if (auto defArg = getCallerDefaultArg(tc, dc, expr->getLoc(),
-                                          argOwner, i).first) {
+                                          defaultArgsOwner, i).first) {
       // Record the caller-side default argument expression.
       // FIXME: Do we need to record what this was synthesized from?
       elements.push_back(TupleShuffleExpr::CallerDefaultInitialize);
@@ -4354,13 +4333,6 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
       // Record the owner of the default argument.
       elements.push_back(TupleShuffleExpr::DefaultInitialize);
     }
-    if (!defaultArgsOwner) {
-      defaultArgsOwner = argOwner;
-    } else {
-      assert(defaultArgsOwner == argOwner &&
-             "default args on same func have different owners");
-    }
-
     ++i;
   }
 
@@ -4642,7 +4614,8 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
   SmallVector<Expr*, 4> fromTupleExpr(argTuple? argTuple->getNumElements() : 1);
   SmallVector<unsigned, 4> variadicArgs;
   SmallVector<Expr *, 2> callerDefaultArgs;
-  ConcreteDeclRef defaultArgsOwner = nullptr;
+  ConcreteDeclRef defaultArgsOwner =
+    findDefaultArgsOwner(cs, solution, cs.getConstraintLocator(locator));
   Type sliceType = nullptr;
   SmallVector<int, 4> sources;
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
@@ -4696,22 +4669,12 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
 
     // If we are using a default argument, handle it now.
     if (parameterBindings[paramIdx].empty()) {
-      // Dig out the owner of the default arguments.
-      ConcreteDeclRef argOwner;
-      if (!defaultArgsOwner) {
-        argOwner
-        = findDefaultArgsOwner(cs, solution,
-                               cs.getConstraintLocator(locator));
-        assert(argOwner && "Missing default arguments owner?");
-      } else {
-        argOwner = defaultArgsOwner;
-      }
-
       // Create a caller-side default argument, if we need one.
       Expr *defArg;
       DefaultArgumentKind defArgKind;
       std::tie(defArg, defArgKind) = getCallerDefaultArg(tc, dc, arg->getLoc(),
-                                                         argOwner, paramIdx);
+                                                         defaultArgsOwner,
+                                                         paramIdx);
 
       // Note that we'll be doing a shuffle involving default arguments.
       anythingShuffled = true;
@@ -4729,12 +4692,6 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
         sources.push_back(TupleShuffleExpr::CallerDefaultInitialize);
       } else {
         sources.push_back(TupleShuffleExpr::DefaultInitialize);
-      }
-      if (!defaultArgsOwner) {
-        defaultArgsOwner = argOwner;
-      } else {
-        assert(defaultArgsOwner == argOwner &&
-               "default args on same func have different owners");
       }
       continue;
     }
