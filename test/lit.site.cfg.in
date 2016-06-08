@@ -26,7 +26,7 @@ if "@SWIFT_ASAN_BUILD@" == "TRUE":
 else:
     config.available_features.add('no_asan')
 
-if '@SWIFT_ENABLE_LTO@' == 'TRUE':
+if '@SWIFT_TOOLS_ENABLE_LTO@' == 'TRUE':
     config.available_features.add('lto')
 else:
     config.available_features.add('no_lto')

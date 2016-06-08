@@ -37,6 +37,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 # E402 means module level import not at top of file
 from swift_build_support import arguments  # noqa (E402)
 from swift_build_support import diagnostics  # noqa (E402)
+from swift_build_support import host  # noqa (E402)
 from swift_build_support.toolchain import host_toolchain  # noqa (E402)
 import swift_build_support.debug      # noqa (E402)
 from swift_build_support import migration  # noqa (E402)
@@ -977,6 +978,31 @@ details of the setups of other systems or automated environments.""")
         const=True)
 
     parser.add_argument(
+        "--lto",
+        help="use lto optimization on llvm/swift tools. This does not "
+             "imply using lto on the swift standard library or runtime",
+        metavar="BOOL",
+        nargs='?',
+        type=arguments.type.bool,
+        default=False,
+        const=True)
+
+    default_max_lto_link_job_counts = host.max_lto_link_job_counts()
+    parser.add_argument(
+        "--llvm-max-parallel-lto-link-jobs",
+        help="the maximum number of parallel link jobs to use when compiling "
+             "llvm",
+        metavar="COUNT",
+        default=default_max_lto_link_job_counts['llvm'])
+
+    parser.add_argument(
+        "--swift-tools-max-parallel-lto-link-jobs",
+        help="the maximum number of parallel link jobs to use when compiling "
+             "swift tools.",
+        metavar="COUNT",
+        default=default_max_lto_link_job_counts['swift'])
+
+    parser.add_argument(
         # Explicitly unavailable options here.
         "--build-jobs",
         "--common-cmake-options",
@@ -1442,6 +1468,22 @@ details of the setups of other systems or automated environments.""")
                 pipes.quote(opt) for opt in args.extra_cmake_options)
         ]
 
+    if args.lto:
+        build_script_impl_args += [
+            "--llvm-enable-lto",
+            "--swift-tools-enable-lto"
+        ]
+        if args.llvm_max_parallel_lto_link_jobs is not None:
+            build_script_impl_args += [
+                "--llvm-num-parallel-lto-link-jobs=%s" %
+                min(args.llvm_max_parallel_lto_link_jobs, args.build_jobs)
+            ]
+        if args.swift_tools_max_parallel_lto_link_jobs is not None:
+            build_script_impl_args += [
+                "--swift-tools-num-parallel-lto-link-jobs=%s" %
+                min(args.swift_tools_max_parallel_lto_link_jobs,
+                    args.build_jobs)
+            ]
     build_script_impl_args += args.build_script_impl_args
 
     if args.dry_run:

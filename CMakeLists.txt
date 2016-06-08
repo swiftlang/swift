@@ -140,7 +140,7 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "" CACHE STRING
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
     "Path to the directory that contains Swift tools that are executable on the build machine")
 
-option(SWIFT_ENABLE_LTO
+option(SWIFT_TOOLS_ENABLE_LTO
   "If set to true, build the swift compiler with link time optimization enabled" FALSE)
 
 # The following only works with the Ninja generator in CMake >= 3.0.
@@ -743,7 +743,7 @@ endif()
 message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
-message(STATUS "  LTO:        ${SWIFT_ENABLE_LTO}")
+message(STATUS "  LTO:        ${SWIFT_TOOLS_ENABLE_LTO}")
 message(STATUS "")
 
 message(STATUS "Building Swift standard library and SDK overlays for SDKs: ${SWIFT_SDKS}")

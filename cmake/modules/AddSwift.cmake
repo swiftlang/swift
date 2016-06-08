@@ -131,7 +131,7 @@ function(_add_variant_c_compile_flags)
     ARCH "${CFLAGS_ARCH}"
     BUILD_TYPE "${CFLAGS_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${CFLAGS_ENABLE_ASSERTIONS}"
-    ENABLE_LTO "${SWIFT_ENABLE_LTO}"
+    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE FALSE
     DEPLOYMENT_VERSION_IOS "${CFLAGS_DEPLOYMENT_VERSION_IOS}"
     RESULT_VAR_NAME result)
@@ -150,7 +150,7 @@ function(_add_variant_c_compile_flags)
 
   is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
   if(debuginfo)
-    if(SWIFT_ENABLE_LTO)
+    if(SWIFT_TOOLS_ENABLE_LTO)
       list(APPEND result "-gline-tables-only")
     else()
       list(APPEND result "-g")
@@ -236,7 +236,7 @@ function(_add_variant_link_flags)
     ARCH "${LFLAGS_ARCH}"
     BUILD_TYPE "${LFLAGS_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${LFLAGS_ENABLE_ASSERTIONS}"
-    ENABLE_LTO "${SWIFT_ENABLE_LTO}"
+    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${LFLAGS_ANALYZE_CODE_COVERAGE}"
     DEPLOYMENT_VERSION_IOS "${LFLAGS_DEPLOYMENT_VERSION_IOS}"
     RESULT_VAR_NAME result)
