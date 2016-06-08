@@ -85,7 +85,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/Utils/LSBase.h"
+#include "swift/SILOptimizer/Utils/LoadStoreOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/MapVector.h"
