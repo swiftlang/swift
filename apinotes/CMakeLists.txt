@@ -15,7 +15,8 @@ set(SWIFT_API_NOTES_INPUTS
   TVServices
   UIKit
   WatchKit
-  WebKit)
+  WebKit
+  XCTest)
 
 if(NOT DEFINED SWIFT_API_NOTES_PATH)
   message(FATAL_ERROR "Define SWIFT_API_NOTES_PATH before including this file")
