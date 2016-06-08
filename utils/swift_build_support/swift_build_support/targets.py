@@ -47,7 +47,7 @@ class DarwinPlatform(Platform):
     def __init__(self, name, archs, sdk_name=None, is_simulator=False):
         super(DarwinPlatform, self).__init__(name, archs, sdk_name)
         self.is_simulator = is_simulator
-        
+
     @property
     def is_embedded(self):
         """Check if this is a Darwin platform for embedded devices."""

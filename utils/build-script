@@ -114,10 +114,10 @@ class HostSpecificConfiguration(object):
                 continue
 
             # Compute which actions are desired.
-            build = deployment_platform not in \
-                    invocation.platforms_to_skip_build
-            test = deployment_platform not in \
-                   invocation.platforms_to_skip_test
+            build = (
+                deployment_platform not in invocation.platforms_to_skip_build)
+            test = (
+                deployment_platform not in invocation.platforms_to_skip_test)
             test_host_only = None
             build_benchmark = build and deployment_target.supports_benchmark
             # FIXME: Note, `build-script-impl` computed a property here
@@ -448,7 +448,8 @@ class BuildScriptInvocation(object):
         if args.skip_test_ios_host:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
         if args.skip_test_ios_simulator:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.iOSSimulator)
+            self.platforms_to_skip_test.add(
+                StdlibDeploymentTarget.iOSSimulator)
         if args.skip_test_tvos_host:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
         if args.skip_test_tvos_simulator:
@@ -469,7 +470,8 @@ class BuildScriptInvocation(object):
         if args.skip_test_ios_host:
             self.platforms_to_skip_test_host.add(StdlibDeploymentTarget.iOS)
         if args.skip_test_tvos_host:
-            self.platforms_to_skip_test_host.add(StdlibDeploymentTarget.AppleTV)
+            self.platforms_to_skip_test_host.add(
+                StdlibDeploymentTarget.AppleTV)
         if args.skip_test_watchos_host:
             self.platforms_to_skip_test_host.add(
                 StdlibDeploymentTarget.AppleWatch)
@@ -752,12 +754,12 @@ class BuildScriptInvocation(object):
         args = self.args
 
         options = {}
-        for host in [args.host_target] + args.cross_compile_hosts:
+        for host_target in [args.host_target] + args.cross_compile_hosts:
             # Compute the host specific configuration.
-            config = HostSpecificConfiguration(host, self)
+            config = HostSpecificConfiguration(host_target, self)
 
             # Convert into `build-script-impl` style variables.
-            options[host] = {
+            options[host_target] = {
                 "SWIFT_SDKS": " ".join(sorted(
                     config.sdks_to_configure)),
                 "SWIFT_STDLIB_TARGETS": " ".join(
@@ -1794,7 +1796,7 @@ details of the setups of other systems or automated environments.""")
         invocation.build_ninja()
 
     # Convert to a build-script-impl invocation.
-    (build_script_impl_env,build_script_impl_args) = \
+    (build_script_impl_env, build_script_impl_args) = \
         invocation.convert_to_impl_arguments()
 
     # Execute the underlying build script implementation.
