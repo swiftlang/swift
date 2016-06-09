@@ -43,10 +43,10 @@ internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
 
 //===--- Parsing ----------------------------------------------------------===//
 extension ${Self} {
-  /// Construct from an ASCII representation.
+  /// Creates a new instance from the given string.
   ///
   /// The string passed as `text` can represent a real number in decimal or
-  /// hexadecimal format or special floating-point values for infinty and NaN
+  /// hexidecimal format or special floating-point values for infinty and NaN
   /// ("not a number").
   ///
   /// The given string may begin with a plus or minus sign character (`+` or
