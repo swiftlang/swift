@@ -114,6 +114,14 @@ ERROR(lex_invalid_u_escape,none,
       "\\u{...} escape sequence expects between 1 and 8 hex digits", ())
 ERROR(lex_invalid_u_escape_rbrace,none,
       "expected '}' in \\u{...} escape sequence", ())
+ERROR(lex_invalid_string_modifier,none,
+      "invalid string modifier", ())
+WARNING(lex_ambiguous_string_indent,none,
+      "invalid mix of multi-line string literal indentation", ())
+ERROR(lex_invalid_heredoc,none,
+      "invalid heredoc syntax", ())
+ERROR(lex_missing_heredoc,none,
+      "cannot find heredoc terminator", ())
 
 ERROR(lex_invalid_unicode_scalar,none,
        "invalid unicode scalar", ())

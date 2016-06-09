@@ -68,6 +68,9 @@ class Token {
   
   /// \brief Whether this token is an escaped `identifier` token.
   unsigned EscapedIdentifier : 1;
+
+  /// modifiers for string literals
+  unsigned StringModifiers: 10;
   
   /// Text - The actual string covered by the token in the source buffer.
   StringRef Text;
@@ -80,7 +83,7 @@ class Token {
 
 public:
   Token() : Kind(tok::NUM_TOKENS), AtStartOfLine(false), CommentLength(0),
-            EscapedIdentifier(false) {}
+            EscapedIdentifier(false), StringModifiers(0) {}
   
   tok getKind() const { return Kind; }
   void setKind(tok K) { Kind = K; }
@@ -272,11 +275,17 @@ public:
   void setText(StringRef T) { Text = T; }
 
   /// \brief Set the token to the specified kind and source range.
-  void setToken(tok K, StringRef T, unsigned CommentLength = 0) {
+  void setToken(tok K, StringRef T, unsigned CommentLength = 0, unsigned Modifiers = 0) {
     Kind = K;
     Text = T;
     this->CommentLength = CommentLength;
     EscapedIdentifier = false;
+    StringModifiers = Modifiers;
+    assert(StringModifiers == Modifiers && "Modifier overflow");
+  }
+
+  unsigned getStringModifiers() const {
+    return StringModifiers;
   }
 };
   

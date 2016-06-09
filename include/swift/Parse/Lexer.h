@@ -90,6 +90,10 @@ class Lexer {
   /// in a SIL file.  This enables some context-sensitive lexing.
   bool InSILBody = false;
   
+  /// Heredoc syntax: <<"HERE" or <<'HERE' or perhaps <<e"HERE"
+  const char *HeredocStart;
+  const char *HeredocEnd;
+
 public:
   /// \brief Lexer state can be saved/restored to/from objects of this class.
   class State {
@@ -323,12 +327,17 @@ public:
     // Loc+Length for the segment inside the string literal, without quotes.
     SourceLoc Loc;
     unsigned Length;
-    
-    static StringSegment getLiteral(SourceLoc Loc, unsigned Length) {
+    unsigned Modifiers;
+    std::string ToStrip;
+
+    static StringSegment getLiteral(SourceLoc Loc, unsigned Length,
+                                    unsigned Modifiers = 0, std::string ToStrip = "") {
       StringSegment Result;
       Result.Kind = Literal;
       Result.Loc = Loc;
       Result.Length = Length;
+      Result.Modifiers = Modifiers;
+      Result.ToStrip = ToStrip;
       return Result;
     }
     
@@ -345,12 +354,13 @@ public:
   /// If a copy needs to be made, it will be allocated out of the provided
   /// Buffer.
   static StringRef getEncodedStringSegment(StringRef Str,
-                                           SmallVectorImpl<char> &Buffer);
+                                           SmallVectorImpl<char> &Buffer,
+                                           unsigned Modifiers = 0, std::string ToStrip = "");
   StringRef getEncodedStringSegment(StringSegment Segment,
                                     SmallVectorImpl<char> &Buffer) const {
     return getEncodedStringSegment(
         StringRef(getBufferPtrForSourceLoc(Segment.Loc), Segment.Length),
-        Buffer);
+        Buffer, Segment.Modifiers, Segment.ToStrip);
   }
 
   /// \brief Given a string literal token, separate it into string/expr segments
@@ -412,7 +422,7 @@ private:
     return diagnose(Loc, Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
   }
 
-  void formToken(tok Kind, const char *TokStart);
+  void formToken(tok Kind, const char *TokStart, unsigned Modifiers = 0);
 
   void skipToEndOfLine();
 
@@ -432,10 +442,13 @@ private:
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr,
-                        char StopQuote, bool EmitDiagnostics);
-  void lexStringLiteral();
+                        char StopQuote, bool EmitDiagnostics, unsigned modifiers = 0);
+  const char *buildModifiers(const char *ModPtr, unsigned &Modifiers, bool warn);
+  void lexStringLiteral(unsigned Modifiers = 0);
+  void lexHeredoc(unsigned Modifiers);
   void lexEscapedIdentifier();
 
+  void validateIndents();
   void tryLexEditorPlaceholder();
   const char *findEndOfCurlyQuoteStringLiteral(const char*);
 };
