@@ -82,7 +82,36 @@ POSIXTests.test("sem_open existing O_EXCL fail") {
   let res2 = sem_unlink(semaphoreName)
   expectEqual(0, res2)
 }
+
+// Fail because the file descriptor is invalid.
+POSIXTests.test("ioctl(CInt, UInt, CInt): fail") {
+  let fd = open(fn, 0)
+  expectEqual(-1, fd)
+  expectEqual(ENOENT, errno)
 	
+  // A simple check to verify that ioctl is available
+  let _ = ioctl(fd, 0, 0)
+  expectEqual(EBADF, errno)
+}   
+
+#if os(Linux)
+// Successful creation of a socket and listing interfaces
+POSIXTests.test("ioctl(CInt, UInt, UnsafeMutablePointer<Void>): listing interfaces success") {
+  // Create a socket
+  let sock = socket(PF_INET, 1, 0)
+  expectGT(Int(sock), 0)
+
+  // List interfaces
+  var ic = ifconf()
+  let io = ioctl(sock, UInt(SIOCGIFCONF), &ic);
+  expectGE(io, 0)
+
+  //Cleanup
+  let res = close(sock)
+  expectEqual(0, res)
+}
+#endif
+
 // Fail because file doesn't exist.
 POSIXTests.test("fcntl(CInt, CInt): fail") {
   let fd = open(fn, 0)
