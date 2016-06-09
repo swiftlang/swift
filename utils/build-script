@@ -1768,11 +1768,11 @@ details of the setups of other systems or automated environments.""")
     if args.cmake is not None:
         toolchain.cmake = args.cmake
 
-    # Validate the arguments.
-    BuildScriptInvocation.validate_arguments(toolchain, args)
-
     # Preprocess the arguments to apply defaults.
     BuildScriptInvocation.apply_default_arguments(toolchain, args)
+
+    # Validate the arguments.
+    BuildScriptInvocation.validate_arguments(toolchain, args)
 
     # Create the build script invocation.
     invocation = BuildScriptInvocation(toolchain, args)
