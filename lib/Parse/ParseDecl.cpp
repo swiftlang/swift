@@ -361,14 +361,15 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
 
   // Check 'Tok', return false if ':' or '=' cannot be found.
-  // Complain if '=' is found and suggest replacing it with ':'.
+  // Complain if '=' is found and suggest replacing it with ": ".
   auto findAttrValueDelimiter = [&]() -> bool {
     if (!Tok.is(tok::colon)) {
       if (!Tok.is(tok::equal))
         return false;
-      else
-        diagnose(Tok.getLoc(), diag::replace_equal_with_colon_for_value)
-          .fixItReplace(Tok.getLoc(), ":");
+
+      bool wantSpace = (Tok.getRange().getEnd() == peekToken().getLoc());
+      diagnose(Tok.getLoc(), diag::replace_equal_with_colon_for_value)
+        .fixItReplace(Tok.getLoc(), wantSpace ? ": " : ":");
     }
     return true;
   };
