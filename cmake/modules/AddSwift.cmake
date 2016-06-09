@@ -789,7 +789,7 @@ function(_add_swift_library_single target name)
   set(link_flags ${SWIFTLIB_SINGLE_LINK_FLAGS})
 
   # Add variant-specific flags.
-  if(SWIFTLIB_SINGLE_IS_STDLIB)
+  if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
     set(build_type "${SWIFT_STDLIB_BUILD_TYPE}")
     set(enable_assertions "${SWIFT_STDLIB_ASSERTIONS}")
   else()
