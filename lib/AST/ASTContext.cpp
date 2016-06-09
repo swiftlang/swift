@@ -277,7 +277,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
 
-    llvm::DenseMap<std::pair<BoundGenericType *, DeclContext *>,
+    llvm::DenseMap<std::pair<TypeBase *, DeclContext *>,
                    ArrayRef<Substitution>>
       BoundGenericSubstitutions;
 
@@ -1130,35 +1130,36 @@ ASTContext::createTrivialSubstitutions(BoundGenericType *BGT,
 }
 
 Optional<ArrayRef<Substitution>>
-ASTContext::getSubstitutions(BoundGenericType* bound,
+ASTContext::getSubstitutions(TypeBase *type,
                              DeclContext *gpContext) const {
   assert(gpContext && "Missing generic parameter context");
-  auto arena = getArena(bound->getRecursiveProperties());
-  assert(bound->isCanonical() && "Requesting non-canonical substitutions");
+  auto arena = getArena(type->getRecursiveProperties());
+  assert(type->isCanonical() && "Requesting non-canonical substitutions");
   auto &boundGenericSubstitutions
     = Impl.getArena(arena).BoundGenericSubstitutions;
-  auto known = boundGenericSubstitutions.find({bound, gpContext});
+  auto known = boundGenericSubstitutions.find({type, gpContext});
   if (known != boundGenericSubstitutions.end())
     return known->second;
 
   // We can trivially create substitutions for Array and Optional.
-  if (bound->getDecl() == getArrayDecl() ||
-      bound->getDecl() == getOptionalDecl())
-    return createTrivialSubstitutions(bound, gpContext);
+  if (auto bound = dyn_cast<BoundGenericType>(type))
+    if (bound->getDecl() == getArrayDecl() ||
+        bound->getDecl() == getOptionalDecl())
+      return createTrivialSubstitutions(bound, gpContext);
 
   return None;
 }
 
-void ASTContext::setSubstitutions(BoundGenericType* Bound,
+void ASTContext::setSubstitutions(TypeBase* type,
                                   DeclContext *gpContext,
                                   ArrayRef<Substitution> Subs) const {
-  auto arena = getArena(Bound->getRecursiveProperties());
+  auto arena = getArena(type->getRecursiveProperties());
   auto &boundGenericSubstitutions
     = Impl.getArena(arena).BoundGenericSubstitutions;
-  assert(Bound->isCanonical() && "Requesting non-canonical substitutions");
-  assert(boundGenericSubstitutions.count({Bound, gpContext}) == 0 &&
+  assert(type->isCanonical() && "Requesting non-canonical substitutions");
+  assert(boundGenericSubstitutions.count({type, gpContext}) == 0 &&
          "Already have substitutions?");
-  boundGenericSubstitutions[{Bound, gpContext}] = Subs;
+  boundGenericSubstitutions[{type, gpContext}] = Subs;
 }
 
 Type ASTContext::getTypeVariableMemberType(TypeVariableType *baseTypeVar,

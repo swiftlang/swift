@@ -2007,10 +2007,8 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   SILGenLValue sgl(*this);
   LValue lv;
 
-  ArrayRef<Substitution> subs;
-  if (auto genericType = base.getType().getAs<BoundGenericType>()) {
-    subs = genericType->getSubstitutions(SGM.SwiftModule, nullptr);
-  }
+  ArrayRef<Substitution> subs =
+      base.getType().gatherAllSubstitutions(SGM.M);
 
   LValueTypeData baseTypeData = getValueTypeData(baseFormalType,
                                                  base.getValue());

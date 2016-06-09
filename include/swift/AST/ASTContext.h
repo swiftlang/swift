@@ -755,7 +755,7 @@ public:
   
   /// \brief Retrieve the substitutions for a bound generic type, if known.
   Optional<ArrayRef<Substitution>>
-  getSubstitutions(BoundGenericType *Bound, DeclContext *gpContext) const;
+  getSubstitutions(TypeBase *type, DeclContext *gpContext) const;
 
   /// Record a conformance loader and its context data for the given
   /// declaration.
@@ -856,10 +856,10 @@ private:
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);
 
-  friend class BoundGenericType;
+  friend class TypeBase;
 
   /// \brief Set the substitutions for the given bound generic type.
-  void setSubstitutions(BoundGenericType *Bound,
+  void setSubstitutions(TypeBase *type,
                         DeclContext *gpContext,
                         ArrayRef<Substitution> Subs) const;
 

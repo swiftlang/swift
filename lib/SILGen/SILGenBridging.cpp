@@ -57,14 +57,14 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
   auto witnessRef = gen.emitGlobalFunctionRef(loc, witnessConstant);
 
   // Determine the substitutions.
-  ArrayRef<Substitution> substitutions;
   auto witnessFnTy = witnessRef->getType();
 
-  if (auto valueTypeBGT = swiftValueType->getAs<BoundGenericType>()) {
-    // Compute the substitutions.
-    substitutions = valueTypeBGT->getSubstitutions(gen.SGM.SwiftModule,
-                                                   nullptr);
+  // Compute the substitutions.
+  ArrayRef<Substitution> substitutions =
+      swiftValueType->gatherAllSubstitutions(
+          gen.SGM.SwiftModule, nullptr);
 
+  if (!substitutions.empty()) {
     // Substitute into the witness function tye.
     witnessFnTy = witnessFnTy.substGenericArgs(gen.SGM.M, substitutions);
   }
@@ -100,15 +100,12 @@ emitBridgeObjectiveCToNative(SILGenFunction &gen,
   auto witnessRef = gen.emitGlobalFunctionRef(loc, witnessConstant);
 
   // Determine the substitutions.
-  ArrayRef<Substitution> substitutions;
   auto witnessFnTy = witnessRef->getType().castTo<SILFunctionType>();
 
   Type swiftValueType = conformance->getType();
-  if (auto valueTypeBGT = swiftValueType->getAs<BoundGenericType>()) {
-    // Compute the substitutions.
-    substitutions = valueTypeBGT->getSubstitutions(gen.SGM.SwiftModule,
-                                                   nullptr);
-  }
+  ArrayRef<Substitution> substitutions =
+      swiftValueType->gatherAllSubstitutions(
+          gen.SGM.SwiftModule, nullptr);
 
   // Substitute into the witness function type.
   if (!substitutions.empty())
