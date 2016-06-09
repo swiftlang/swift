@@ -445,18 +445,18 @@ class BuildScriptInvocation(object):
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.Cygwin)
         if args.skip_test_osx:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.OSX)
-        if args.skip_test_ios_host:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
+        # iOS device tests are not supported.
+        self.platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
         if args.skip_test_ios_simulator:
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator)
-        if args.skip_test_tvos_host:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
+        # tvOS device tests are not supported.
+        self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
         if args.skip_test_tvos_simulator:
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.AppleTVSimulator)
-        if args.skip_test_watchos_host:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
+        # watchOS device tests are not supported.
+        self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
         if args.skip_test_watchos_simulator:
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator)
