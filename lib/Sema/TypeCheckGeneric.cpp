@@ -461,6 +461,28 @@ static Type getResultType(TypeChecker &TC, FuncDecl *fn, Type resultType) {
   return resultType;
 }
 
+static void 
+markInvalidGenericParams(DeclContext *parentDC,
+                         ArchetypeBuilder &builder,
+                         SmallVectorImpl<GenericTypeParamType *> &allParams) {
+  if (parentDC->isModuleScopeContext())
+    return;
+
+  markInvalidGenericParams(parentDC->getParent(), builder, allParams);
+
+  if (parentDC->isInnermostContextGeneric())
+    if (auto *genericParams = parentDC->getGenericParamsOfContext()) {
+      unsigned depth = genericParams->getDepth();
+
+      for (auto param : *genericParams) {
+        allParams.push_back(param->getDeclaredType()
+            ->castTo<GenericTypeParamType>());
+        param->setDepth(depth);
+        builder.addGenericParameter(param);
+      }
+    }
+}
+
 void TypeChecker::markInvalidGenericSignature(ValueDecl *VD) {
   GenericParamList *genericParams;
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
@@ -468,30 +490,54 @@ void TypeChecker::markInvalidGenericSignature(ValueDecl *VD) {
   else
     genericParams = cast<GenericTypeDecl>(VD)->getGenericParams();
 
-  // If there aren't any generic parameters at this level, we're done.
-  if (genericParams == nullptr)
-    return;
-
-  DeclContext *DC = VD->getDeclContext();
+  DeclContext *DC = VD->getInnermostDeclContext();
   ArchetypeBuilder builder = createArchetypeBuilder(DC->getParentModule());
+  SmallVector<GenericTypeParamType *, 4> allGenericParams;
 
-  if (auto sig = DC->getGenericSignatureOfContext())
-    builder.addGenericSignature(sig, true);
+  // Visit all generic parameters from all outer contexts.
+  markInvalidGenericParams(DC, builder, allGenericParams);
 
-  // Visit each of the generic parameters.
-  for (auto param : *genericParams)
-    builder.addGenericParameter(param);
+  // If there aren't any generic parameters at this level, we're done.
+  if (genericParams != nullptr) {
 
-  // Wire up the archetypes.
-  for (auto GP : *genericParams)
-    GP->setArchetype(builder.getArchetype(GP));
+    // Wire up the archetypes for the generic parameters of this context.
+    for (auto param : *genericParams)
+      param->setArchetype(builder.getArchetype(param));
 
-  genericParams->setAllArchetypes(
-      Context.AllocateCopy(builder.getAllArchetypes()));
+    genericParams->setAllArchetypes(
+        Context.AllocateCopy(builder.getAllArchetypes()));
+  }
+
+  auto sig = builder.getGenericSignature(allGenericParams);
+
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+    if (!AFD->getGenericSignature())
+      AFD->setGenericSignature(sig);
+  } else {
+    if (!cast<GenericTypeDecl>(VD)->getGenericSignature())
+      cast<GenericTypeDecl>(VD)->setGenericSignature(sig);
+  }
 }
 
 bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   bool invalid = false;
+
+  // If we haven't validated our parent type yet, we're here because of
+  // weird circularity with an inheritance clause or something like that.
+  //
+  // FIXME: Iterative decl checker!
+  if (auto *nominalType = func->getDeclContext()
+          ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    llvm::errs() << "func is inside a nominal type\n";
+    // XXX
+    if (!nominalType->hasType() ||
+        (nominalType->getGenericParams() && !nominalType->getGenericSignature()) ||
+        nominalType->isValidatingGenericSignature()) {
+      llvm::errs() << "nominal type not checked yet\n";
+      diagnose(func->getStartLoc(), diag::recursive_requirement_reference);
+      return true;
+    }
+  }
 
   // Create the archetype builder.
   ArchetypeBuilder builder = createArchetypeBuilder(func->getParentModule());
@@ -503,7 +549,8 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     invalid = true;
 
   // If this triggered a recursive validation, back out: we're done.
-  // FIXME: This is an awful hack.
+  //
+  // FIXME: Iterative decl checker!
   if (func->hasType())
     return !func->isInvalid();
 
