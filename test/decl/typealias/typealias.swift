@@ -158,8 +158,12 @@ protocol Col {
 protocol CB {
   associatedtype C : Col
   typealias E = C.Elem
+  typealias OE = C.Elem?
+  typealias FE = (C) -> (C.Elem) -> Self
   
   func setIt(_ element: E)
+  func setItMaybe(_ element: OE)
+  func teleport(_ fn: FE)
 }
 
 func go1<T : CB, U : Col where U.Elem == T.E>(_ col: U, builder: T) { // OK
