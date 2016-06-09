@@ -130,7 +130,7 @@ class HostSpecificConfiguration(object):
                deployment_platform.is_embedded and \
                not deployment_platform.is_simulator:
                 if deployment_platform not in \
-                       invocation.platforms_to_skip_test_host:
+                        invocation.platforms_to_skip_test_host:
                     test_host_only = True
                     test = True
                 else:
@@ -142,7 +142,7 @@ class HostSpecificConfiguration(object):
                 # library, whereas the other targets can build a slightly
                 # smaller subset which is faster to build.
                 if args.build_swift_stdlib_unittest_extra or \
-                       args.validation_test or args.long_test:
+                        args.validation_test or args.long_test:
                     self.swift_stdlib_build_targets.append(
                         "swift-stdlib-" + name)
                 else:
@@ -394,6 +394,18 @@ class BuildScriptInvocation(object):
         if args.android:
             args.stdlib_deployment_targets.append(
                 StdlibDeploymentTarget.Android.armv7.name)
+
+        # Infer platform flags from manually-specified configure targets.
+        # This doesn't apply to Darwin platforms, as they are
+        # already configured. No building without the platform flag, though.
+
+        android_tgts = [tgt for tgt in args.stdlib_deployment_targets
+                        if StdlibDeploymentTarget.Android.contains(tgt)]
+        if not args.android and len(android_tgts) > 0:
+            args.android = True
+            args.skip_build_android = True
+
+# ---
 
     def __init__(self, toolchain, args):
         self.toolchain = toolchain
