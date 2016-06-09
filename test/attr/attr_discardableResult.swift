@@ -104,3 +104,9 @@ func f(a : () -> Int) {
 }
 
 @warn_unused_result func g() -> Int { } // expected-warning {{'warn_unused_result' attribute behavior is now the default}} {{1-21=}}
+
+class X {
+  @warn_unused_result // expected-warning {{'warn_unused_result' attribute behavior is now the default}} {{3-23=}}
+  @objc
+  func h() -> Int { }
+}
