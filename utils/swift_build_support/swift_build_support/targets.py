@@ -45,8 +45,8 @@ class Platform(object):
 
 class DarwinPlatform(Platform):
     def __init__(self, name, archs, sdk_name=None, is_simulator=False):
-        super(DarwinPlatform, self).__init__(name, archs, sdk_name)
         self.is_simulator = is_simulator
+        super(DarwinPlatform, self).__init__(name, archs, sdk_name)
 
     @property
     def is_embedded(self):
@@ -55,8 +55,9 @@ class DarwinPlatform(Platform):
 
     @property
     def supports_benchmark(self):
-        # By default, on Darwin we support benchmarks.
-        return True
+        # By default, on Darwin we support benchmarks on all non-simulator
+        # platforms.
+        return not self.is_simulator
 
 
 class Target(object):
