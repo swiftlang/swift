@@ -1358,7 +1358,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
       diagnose(AtLoc, diag::attr_warn_unused_result_removed)
         .fixItRemove(SourceRange(AtLoc, attrLoc));
 
-      return true;
+      return false;
     }
 
     // @warn_unused_result with arguments.
@@ -1379,7 +1379,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     diagnose(AtLoc, diag::attr_warn_unused_result_removed)
       .fixItRemove(SourceRange(AtLoc, rParenLoc));
 
-    return true;
+    return false;
   }
 
   if (DK != DAK_Count && !DeclAttribute::shouldBeRejectedByParser(DK))
