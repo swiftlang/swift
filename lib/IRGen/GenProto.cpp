@@ -1891,7 +1891,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
 
     auto argIndex =
       getDependentTypeIndex(generics, *module, requirement.TypeParameter);
-    Substitution sub = generic->getSubstitutions(module, nullptr)[argIndex];
+    Substitution sub = generic->gatherAllSubstitutions(module, nullptr)[argIndex];
 
     // In either case, we need to change the type.
     sourceKey.Type = sub.getReplacement()->getCanonicalType();
