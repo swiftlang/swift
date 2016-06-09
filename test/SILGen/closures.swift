@@ -343,11 +343,8 @@ struct StructWithMutatingMethod {
 
 // CHECK-LABEL: sil hidden @_TFV8closures24StructWithMutatingMethod14mutatingMethod
 // CHECK: bb0(%0 : $*StructWithMutatingMethod):
-// CHECK-NEXT: %1 = alloc_box $StructWithMutatingMethod, var, name "self", argno 1
-// CHECK-NEXT: %2 = project_box %1
-// CHECK-NEXT: copy_addr %0 to [initialization] %2 : $*StructWithMutatingMethod
 // CHECK: [[CLOSURE:%[0-9]+]] = function_ref @_TFFV8closures24StructWithMutatingMethod14mutatingMethod{{.*}} : $@convention(thin) (@inout_aliasable StructWithMutatingMethod) -> Int
-// CHECK: partial_apply [[CLOSURE]](%2) : $@convention(thin) (@inout_aliasable StructWithMutatingMethod) -> Int
+// CHECK: partial_apply [[CLOSURE]](%0) : $@convention(thin) (@inout_aliasable StructWithMutatingMethod) -> Int
 
 // Check that the closure body only takes the pointer.
 // CHECK-LABEL: sil shared @_TFFV8closures24StructWithMutatingMethod14mutatingMethod{{.*}} : $@convention(thin) (@inout_aliasable StructWithMutatingMethod) -> Int {
