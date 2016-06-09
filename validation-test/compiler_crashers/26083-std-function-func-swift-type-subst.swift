@@ -5,13 +5,6 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
-protocol a {
-protocol A {
-}
-}
-protocol b : a {
-protocol c : A {
-}
-}
-for b
+// DUPLICATE-OF: 01766-swift-typechecker-validatedecl.swift
+// RUN: not --crash %target-swift-frontend %s -parse
+protocol e:A{protocol e:A class A}protocol A{enum A}protocol B:e
