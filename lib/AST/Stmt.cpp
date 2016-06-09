@@ -153,7 +153,9 @@ SourceLoc ReturnStmt::getStartLoc() const {
   return ReturnLoc;
 }
 SourceLoc ReturnStmt::getEndLoc() const {
-  return (Result ? Result->getEndLoc() : ReturnLoc);
+  if (Result && Result->getEndLoc().isValid())
+    return Result->getEndLoc();
+  return ReturnLoc;
 }
 
 SourceLoc ThrowStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
