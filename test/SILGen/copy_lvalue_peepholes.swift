@@ -19,11 +19,9 @@ func init_var_from_lvalue(x: Int) {
 }
 
 // CHECK-LABEL: sil hidden @_TF21copy_lvalue_peepholes22assign_var_from_lvalue
-// CHECK:   [[X:%.*]] = alloc_box $Builtin.Int64
-// CHECK:   [[PBX:%.*]] = project_box [[X]]
 // CHECK:   [[Y:%.*]] = alloc_box $Builtin.Int64
 // CHECK:   [[PBY:%.*]] = project_box [[Y]]
-// CHECK:   copy_addr [[PBY]] to [[PBX]]
+// CHECK:   copy_addr [[PBY]] to %0
 func assign_var_from_lvalue(x: inout Int, y: Int) {
   var y = y
   x = y
@@ -58,9 +56,7 @@ func assign_computed_from_lvalue(y: Int) {
 }
 
 // CHECK-LABEL: sil hidden @_TF21copy_lvalue_peepholes24assign_var_from_computed
-// CHECK:   [[X:%.*]] = alloc_box
-// CHECK:   [[PBX:%.*]] = project_box [[X]]
-// CHECK:   assign {{%.*}} to [[PBX]]
+// CHECK:   assign {{%.*}} to %0
 func assign_var_from_computed(x: inout Int) {
   x = computed
 }
