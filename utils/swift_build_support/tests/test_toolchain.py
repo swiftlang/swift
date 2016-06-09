@@ -113,7 +113,7 @@ class ToolchainTestCase(unittest.TestCase):
 
     def test_toolchain_instances(self):
         # Check that we can instantiate every toolchain, even if it isn't the
-        # current patform.
+        # current platform.
         toolchain.MacOSX()
         toolchain.Linux()
         toolchain.FreeBSD()
