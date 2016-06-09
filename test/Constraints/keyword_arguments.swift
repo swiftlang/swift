@@ -173,7 +173,7 @@ variadics3(1)
 variadics3()
 
 // Using variadics (out-of-order)
-variadics3(y: 0, 1, 2, 3) // expected-error{{missing argument label 'z:' in call}} {{18-18=z: }}
+variadics3(y: 0, 1, 2, 3) // FIXME: error here
 variadics3(z: 1, 1) // FIXME: error here?
 
 func variadics4(x: Int..., y: Int = 2, z: Int = 3) { }

@@ -23,6 +23,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/Fixnum.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -1111,10 +1112,15 @@ namespace {
     ///
     /// \param arg The argument expression.
     /// \param paramType The parameter type.
+    /// \param applyOrLevel For function applications, the ApplyExpr that forms
+    /// the call. Otherwise, a specific level describing which parameter level
+    /// we're applying.
     /// \param locator Locator used to describe where in this expression we are.
     ///
     /// \returns the coerced expression, which will have type \c ToType.
     Expr *coerceCallArguments(Expr *arg, Type paramType,
+                              llvm::PointerUnion<ApplyExpr *, llvm::Fixnum<2>>
+                                applyOrLevel,
                               ConstraintLocatorBuilder locator);
 
     /// \brief Coerce the given object argument (e.g., for the base of a
@@ -1184,7 +1190,7 @@ namespace {
       }
 
       // Coerce the index argument.
-      index = coerceCallArguments(index, indexTy,
+      index = coerceCallArguments(index, indexTy, /*level=*/llvm::Fixnum<2>(1),
                                   locator.withPathElement(
                                     ConstraintLocator::SubscriptIndex));
       if (!index)
@@ -3778,11 +3784,11 @@ resolveLocatorToDecl(ConstraintSystem &cs, ConstraintLocator *locator,
 }
 
 
-/// \brief Given a constraint locator, find the owner of default arguments for
-/// that tuple, i.e., a FuncDecl.
+/// \brief Given a constraint locator, find the declaration reference
+/// to the callee, it is a call to a declaration.
 static ConcreteDeclRef
-findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
-                     ConstraintLocator *locator) {
+findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
+                  ConstraintLocator *locator) {
   if (locator->getPath().empty() || !locator->getAnchor())
     return nullptr;
 
@@ -4043,8 +4049,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
                                  fromTuple->getElements().size());
   SmallVector<Expr *, 2> callerDefaultArgs;
-  ConcreteDeclRef defaultArgsOwner =
-    findDefaultArgsOwner(cs, solution, cs.getConstraintLocator(locator));
+  ConcreteDeclRef callee =
+    findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
   for (unsigned i = 0, n = toTuple->getNumElements(); i != n; ++i) {
     const auto &toElt = toTuple->getElement(i);
@@ -4058,7 +4064,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
       // Create a caller-side default argument, if we need one.
       if (auto defArg = getCallerDefaultArg(tc, dc, expr->getLoc(),
-                                            defaultArgsOwner, i).first) {
+                                            callee, i).first) {
         callerDefaultArgs.push_back(defArg);
         sources[i] = TupleShuffleExpr::CallerDefaultInitialize;
       }
@@ -4218,7 +4224,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   auto shuffle = new (tc.Context) TupleShuffleExpr(
                                     expr, mapping,
                                     TupleShuffleExpr::SourceIsTuple,
-                                    defaultArgsOwner,
+                                    callee,
                                     tc.Context.AllocateCopy(variadicArgs),
                                     callerDefaultArgsCopy,
                                     toSugarType);
@@ -4299,8 +4305,8 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   SmallVector<int, 4> elements;
   SmallVector<unsigned, 1> variadicArgs;
   SmallVector<Expr*, 4> callerDefaultArgs;
-  ConcreteDeclRef defaultArgsOwner =
-    findDefaultArgsOwner(cs, solution, cs.getConstraintLocator(locator));
+  ConcreteDeclRef callee =
+    findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
   i = 0;
   for (auto &field : toTuple->getElements()) {
@@ -4324,7 +4330,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 
     // Create a caller-side default argument, if we need one.
     if (auto defArg = getCallerDefaultArg(tc, dc, expr->getLoc(),
-                                          defaultArgsOwner, i).first) {
+                                          callee, i).first) {
       // Record the caller-side default argument expression.
       // FIXME: Do we need to record what this was synthesized from?
       elements.push_back(TupleShuffleExpr::CallerDefaultInitialize);
@@ -4342,7 +4348,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   return new (tc.Context) TupleShuffleExpr(expr,
                             tc.Context.AllocateCopy(elements),
                             TupleShuffleExpr::SourceIsScalar,
-                            defaultArgsOwner,
+                            callee,
                             tc.Context.AllocateCopy(variadicArgs),
                             tc.Context.AllocateCopy(callerDefaultArgs),
                             destSugarTy);
@@ -4525,14 +4531,56 @@ Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type ob
   return expr;
 }
 
-Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
-                                        ConstraintLocatorBuilder locator) {
+/// Determine whether the given expression is a reference to an
+/// unbound instance member of a type.
+static bool isReferenceToMetatypeMember(Expr *expr) {
+  expr = expr->getSemanticsProvidingExpr();
+  if (auto dotIgnored = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr))
+    return dotIgnored->getLHS()->getType()->is<AnyMetatypeType>();
+  if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(expr))
+    return dotSyntax->getBase()->getType()->is<AnyMetatypeType>();
+  return false;
+}
+
+Expr *ExprRewriter::coerceCallArguments(
+    Expr *arg, Type paramType,
+    llvm::PointerUnion<ApplyExpr *, llvm::Fixnum<2>> applyOrLevel,
+    ConstraintLocatorBuilder locator) {
 
   bool allParamsMatch = arg->getType()->isEqual(paramType);
-  
+
+  // Find the callee declaration.
+  ConcreteDeclRef callee =
+    findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
+
+  // Determine the level,
+  unsigned level = 0;
+  if (applyOrLevel.is<llvm::Fixnum<2>>()) {
+    // Level specified by caller.
+    level = applyOrLevel.get<llvm::Fixnum<2>>();
+  } else if (callee) {
+    // Determine the level based on the application itself.
+    auto apply = applyOrLevel.get<ApplyExpr *>();
+
+    // Only calls to members of types can have level > 0.
+    auto calleeDecl = callee.getDecl();
+    if (calleeDecl->getDeclContext()->isTypeContext()) {
+      // Level 1 if we're not applying "self".
+      if (auto call = dyn_cast<CallExpr>(apply)) {
+        if (!calleeDecl->isInstanceMember() ||
+            !isReferenceToMetatypeMember(call->getDirectCallee()))
+          level = 1;
+      } else if (isa<PrefixUnaryExpr>(apply) ||
+                 isa<PostfixUnaryExpr>(apply) ||
+                 isa<BinaryExpr>(apply)) {
+        level = 1;
+      }
+    }
+  }
+
   // Determine the parameter bindings.
-  auto params = decomposeArgParamType(paramType);
-  auto args = decomposeArgParamType(arg->getType());
+  auto params = decomposeParamType(paramType, callee.getDecl(), level);
+  auto args = decomposeArgType(arg->getType());
 
   // Quickly test if any further fix-ups for the argument types are necessary.
   // FIXME: This hack is only necessary to work around some problems we have
@@ -4614,8 +4662,6 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
   SmallVector<Expr*, 4> fromTupleExpr(argTuple? argTuple->getNumElements() : 1);
   SmallVector<unsigned, 4> variadicArgs;
   SmallVector<Expr *, 2> callerDefaultArgs;
-  ConcreteDeclRef defaultArgsOwner =
-    findDefaultArgsOwner(cs, solution, cs.getConstraintLocator(locator));
   Type sliceType = nullptr;
   SmallVector<int, 4> sources;
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
@@ -4673,8 +4719,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
       Expr *defArg;
       DefaultArgumentKind defArgKind;
       std::tie(defArg, defArgKind) = getCallerDefaultArg(tc, dc, arg->getLoc(),
-                                                         defaultArgsOwner,
-                                                         paramIdx);
+                                                         callee, paramIdx);
 
       // Note that we'll be doing a shuffle involving default arguments.
       anythingShuffled = true;
@@ -4793,7 +4838,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
   auto shuffle = new (tc.Context) TupleShuffleExpr(
                                     arg, mapping,
                                     isSourceScalar,
-                                    defaultArgsOwner,
+                                    callee,
                                     tc.Context.AllocateCopy(variadicArgs),
                                     callerDefaultArgsCopy,
                                     paramType);
@@ -5768,8 +5813,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // the function.
   if (auto fnType = fn->getType()->getAs<FunctionType>()) {
     auto origArg = apply->getArg();
-
     Expr *arg = coerceCallArguments(origArg, fnType->getInput(),
+                                    apply,
                                     locator.withPathElement(
                                       ConstraintLocator::ApplyArgument));
     if (!arg) {
@@ -6547,14 +6592,23 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   if (!witness)
     return nullptr;
 
+  // Form a syntactic expression that describes the reference to the
+  // witness.
+  // FIXME: Egregious hack.
+  Expr *unresolvedDot = new (Context) UnresolvedDotExpr(
+                                        base, SourceLoc(),
+                                        witness->getFullName(),
+                                        DeclNameLoc(base->getEndLoc()),
+                                        /*Implicit=*/true);
+  auto dotLocator = cs.getConstraintLocator(unresolvedDot);
+
   // Form a reference to the witness itself.
-  auto locator = cs.getConstraintLocator(base);
   Type openedFullType, openedType;
   std::tie(openedFullType, openedType)
     = cs.getTypeOfMemberReference(base->getType(), witness,
                                   /*isTypeReference=*/false,
                                   /*isDynamicResult=*/false,
-                                  locator);
+                                  dotLocator);
 
   // Form the call argument.
   // FIXME: Standardize all callers to always provide all argument names,
@@ -6626,7 +6680,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                            base->getStartLoc(),
                                            witness,
                                            DeclNameLoc(base->getEndLoc()),
-                                           openedType, locator, locator,
+                                           openedType, dotLocator, dotLocator,
                                            /*Implicit=*/true,
                                            AccessSemantics::Ordinary,
                                            /*isDynamic=*/false);

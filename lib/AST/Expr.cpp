@@ -1035,6 +1035,25 @@ ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
 }
 
+Expr *CallExpr::getDirectCallee() const {
+  auto fn = getFn();
+  while (true) {
+    fn = fn->getSemanticsProvidingExpr();
+
+    if (auto force = dyn_cast<ForceValueExpr>(fn)) {
+      fn = force->getSubExpr();
+      continue;
+    }
+
+    if (auto bind = dyn_cast<BindOptionalExpr>(fn)) {
+      fn = bind->getSubExpr();
+      continue;
+    }
+
+    return fn;
+  }
+}
+
 RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
                                                          VarDecl *Self)
   : Expr(ExprKind::RebindSelfInConstructor, /*Implicit=*/true,

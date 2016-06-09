@@ -648,9 +648,11 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         auto funcTy1 = openedType1->castTo<FunctionType>();
         auto funcTy2 = openedType2->castTo<FunctionType>();
         SmallVector<CallArgParam, 4> params1 =
-          decomposeArgParamType(funcTy1->getInput());
+          decomposeParamType(funcTy1->getInput(), decl1,
+                             decl1->getDeclContext()->isTypeContext());
         SmallVector<CallArgParam, 4> params2 =
-          decomposeArgParamType(funcTy2->getInput());
+          decomposeParamType(funcTy2->getInput(), decl2,
+                             decl2->getDeclContext()->isTypeContext());
 
         unsigned numParams1 = params1.size();
         unsigned numParams2 = params2.size();

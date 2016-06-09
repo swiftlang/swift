@@ -2155,10 +2155,19 @@ struct LLVM_LIBRARY_VISIBILITY CallArgParam {
   bool hasLabel() const { return !Label.empty(); }
 };
 
-/// Compute an argument or parameter type into an array of \c CallArgParams.
+/// Break an argument type into an array of \c CallArgParams.
 ///
 /// \param type The type to decompose.
-SmallVector<CallArgParam, 4> decomposeArgParamType(Type type);
+SmallVector<CallArgParam, 4> decomposeArgType(Type type);
+
+/// Break a parameter type into an array of \c CallArgParams.
+///
+/// \param paramOwner The declaration that owns this parameter.
+/// \param level The level of parameters that are being decomposed.
+SmallVector<CallArgParam, 4> decomposeParamType(
+                               Type type,
+                               ValueDecl *paramOwner,
+                               unsigned level);
 
 /// Turn a param list into a symbolic and printable representation that does not
 /// include the types, something like (: , b:, c:)

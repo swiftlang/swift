@@ -129,8 +129,8 @@ void constraints::simplifyLocator(Expr *&anchor,
 
           anchor = unresolvedMember;
           path = path.slice(1);
+          continue;
         }
-        continue;
       }
 
       break;
@@ -188,6 +188,7 @@ void constraints::simplifyLocator(Expr *&anchor,
 
         anchor = parenExpr->getSubExpr();
         path = path.slice(1);
+        continue;
       }
       break;
 
@@ -762,16 +763,6 @@ namespace {
     Type getUncurriedType() const {
       // Start with the known type of the decl.
       auto type = entityType;
-
-      // If this is an operator func decl in a type context, the 'self' isn't
-      // actually going to be applied.
-      if (auto *fd = dyn_cast_or_null<FuncDecl>(getDecl()))
-        if (fd->isOperator() && fd->getDeclContext()->isTypeContext()) {
-          if (type->is<ErrorType>())
-            return Type();
-          type = type->castTo<AnyFunctionType>()->getResult();
-        }
-
       for (unsigned i = 0, e = level; i != e; ++i) {
         auto funcTy = type->getAs<AnyFunctionType>();
         if (!funcTy) return Type();
@@ -884,11 +875,13 @@ namespace {
     /// resultant set.
     ClosenessResultTy
     evaluateCloseness(DeclContext *dc, Type candArgListType,
+                      ValueDecl *candidateDecl,
+                      unsigned level,
                       ArrayRef<CallArgParam> actualArgs);
       
     void filterList(ArrayRef<CallArgParam> actualArgs);
     void filterList(Type actualArgsType) {
-      return filterList(decomposeArgParamType(actualArgsType));
+      return filterList(decomposeArgType(actualArgsType));
     }
     void filterList(ClosenessPredicate predicate);
     void filterContextualMemberList(Expr *argExpr);
@@ -1096,8 +1089,10 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
 /// information about that failure.
 CalleeCandidateInfo::ClosenessResultTy
 CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
+                                       ValueDecl *candidateDecl,
+                                       unsigned level,
                                        ArrayRef<CallArgParam> actualArgs) {
-  auto candArgs = decomposeArgParamType(candArgListType);
+  auto candArgs = decomposeParamType(candArgListType, candidateDecl, level);
 
   struct OurListener : public MatchCallArgumentListener {
     CandidateCloseness result = CC_ExactMatch;
@@ -1315,15 +1310,27 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
       return collectCalleeCandidates(load->getSubExpr());
   }
 
+  // Determine the callee level for a "bare" reference to the given
+  // declaration.
+  auto getCalleeLevel = [](ValueDecl *decl) -> unsigned {
+    if (auto func = dyn_cast<FuncDecl>(decl)) {
+      if (func->isOperator() && func->getDeclContext()->isTypeContext())
+        return 1;
+    }
+
+    return 0;
+  };
+
   if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
-    candidates.push_back({ declRefExpr->getDecl(), 0 });
-    declName = declRefExpr->getDecl()->getNameStr().str();
+    auto decl = declRefExpr->getDecl();
+    candidates.push_back({ decl, getCalleeLevel(decl) });
+    declName = decl->getNameStr().str();
     return;
   }
 
   if (auto declRefExpr = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
     auto decl = declRefExpr->getDecl();
-    candidates.push_back({ decl, 0 });
+    candidates.push_back({ decl, getCalleeLevel(decl) });
     
     if (auto fTy = decl->getType()->getAs<AnyFunctionType>())
       declName = fTy->getInput()->getRValueInstanceType()->getString()+".init";
@@ -1334,7 +1341,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
 
   if (auto overloadedDRE = dyn_cast<OverloadedDeclRefExpr>(fn)) {
     for (auto cand : overloadedDRE->getDecls()) {
-      candidates.push_back({ cand, 0 });
+      candidates.push_back({ cand, getCalleeLevel(cand) });
     }
 
     if (!candidates.empty())
@@ -1482,9 +1489,9 @@ void CalleeCandidateInfo::filterList(ArrayRef<CallArgParam> actualArgs) {
     // If this isn't a function or isn't valid at this uncurry level, treat it
     // as a general mismatch.
     if (!inputType) return { CC_GeneralMismatch, {}};
-    Decl *decl = candidate.getDecl();
+    ValueDecl *decl = candidate.getDecl();
     return evaluateCloseness(decl ? decl->getInnermostDeclContext() : nullptr,
-                             inputType, actualArgs);
+                             inputType, decl, candidate.level, actualArgs);
   });
 }
 
@@ -3790,8 +3797,8 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
   auto argTy = candidate.getArgumentType();
   if (!argTy) return false;
 
-  auto params = decomposeArgParamType(argTy);
-  auto args = decomposeArgParamType(argExpr->getType());
+  auto params = decomposeParamType(argTy, candidate.getDecl(), candidate.level);
+  auto args = decomposeArgType(argExpr->getType());
 
   // It is a somewhat common error to try to access an instance method as a
   // curried member on the type, instead of using an instance, e.g. the user
@@ -4127,8 +4134,8 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 
   auto indexType = indexExpr->getType();
 
-  auto decomposedBaseType = decomposeArgParamType(baseType);
-  auto decomposedIndexType = decomposeArgParamType(indexType);
+  auto decomposedBaseType = decomposeArgType(baseType);
+  auto decomposedIndexType = decomposeArgType(indexType);
   calleeInfo.filterList([&](UncurriedCandidate cand) ->
                                  CalleeCandidateInfo::ClosenessResultTy
   {
@@ -4139,7 +4146,8 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     // Check whether the self type matches.
     auto selfConstraint = CC_ExactMatch;
     if (calleeInfo.evaluateCloseness(SD->getInnermostDeclContext(),
-                                   cand.getArgumentType(), decomposedBaseType)
+                                     cand.getArgumentType(), SD, cand.level,
+                                     decomposedBaseType)
           .first != CC_ExactMatch)
       selfConstraint = CC_SelfMismatch;
     
@@ -4149,7 +4157,8 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     // Explode out multi-index subscripts to find the best match.
     auto indexResult =
       calleeInfo.evaluateCloseness(SD->getInnermostDeclContext(),
-                                   cand.getArgumentType(), decomposedIndexType);
+                                   cand.getArgumentType(), SD, cand.level,
+                                   decomposedIndexType);
     if (selfConstraint > indexResult.first)
       return {selfConstraint, {}};
     return indexResult;
@@ -4406,7 +4415,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   
   // Handle argument label mismatches when we have multiple candidates.
   if (calleeInfo.closeness == CC_ArgumentLabelMismatch) {
-    auto args = decomposeArgParamType(argExpr->getType());
+    auto args = decomposeArgType(argExpr->getType());
 
     // If we have multiple candidates that we fail to match, just say we have
     // the wrong labels and list the candidates out.
@@ -5337,7 +5346,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     // expected.
     assert(argumentTy &&
            "Candidate must expect an argument to have a label mismatch");
-    auto arguments = decomposeArgParamType(argumentTy);
+    auto arguments = decomposeArgType(argumentTy);
     
     // TODO: This is probably wrong for varargs, e.g. calling "print" with the
     // wrong label.
