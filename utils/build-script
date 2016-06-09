@@ -393,7 +393,7 @@ class BuildScriptInvocation(object):
         # Add optional stdlib-deployment-targets
         if args.android:
             args.stdlib_deployment_targets.append(
-                StdlibDeploymentTarget.Android.armv7)
+                StdlibDeploymentTarget.Android.armv7.name)
 
     def __init__(self, toolchain, args):
         self.toolchain = toolchain
