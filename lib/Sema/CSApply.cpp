@@ -754,7 +754,8 @@ namespace {
       ConcreteDeclRef memberRef;
       Type refTy;
       Type dynamicSelfFnType;
-      if (openedFullType->hasTypeVariable()) {
+      if (member->getInterfaceType()->is<GenericFunctionType>() ||
+          openedFullType->hasTypeVariable()) {
         // We require substitutions. Figure out what they are.
 
         // Figure out the declaration context where we'll get the generic

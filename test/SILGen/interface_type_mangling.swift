@@ -197,14 +197,14 @@ struct GenericTypeContext<T>: GenericWitnessTest {
   typealias Tee = T
 
   var a: T
-  // CHECK-LABEL: sil shared @_TFFV23interface_type_mangling18GenericTypeContext23closureInGenericContexturFqd__T_L_3fooFTQ_Qd___T_
+  // CHECK-LABEL: sil shared @_TFFV23interface_type_mangling18GenericTypeContext23closureInGenericContexturFqd__T_L_3foou__rFTxqd___T_
   func closureInGenericContext<U>(_ b: U) {
     func foo(_ x: T, _ y: U) { }
 
     foo(a, b)
   }
 
-  // CHECK-LABEL: sil shared @_TFFV23interface_type_mangling18GenericTypeContextg31closureInGenericPropertyContextxL_3fooFT_Q_
+  // CHECK-LABEL: sil shared @_TFFV23interface_type_mangling18GenericTypeContextg31closureInGenericPropertyContextxL_3foourFT_x
   var closureInGenericPropertyContext: T {
     func foo() -> T { }
 

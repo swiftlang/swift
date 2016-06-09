@@ -3462,7 +3462,7 @@ void swift::collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                                                     VD->getFullName());
     if (Result.OtherViables.empty())
       continue;
-    if (!Result.Favored->getDeclContext()->isGenericTypeContext())
+    if (!Result.Favored->getDeclContext()->isGenericContext())
       continue;
     for (ValueDecl *Default : Result.OtherViables) {
       if (Default->getDeclContext()->isExtensionContext()) {

@@ -5,6 +5,6 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// DUPLICATE-OF: 26832-swift-typechecker-conformstoprotocol.swift
-// RUN: not --crash %target-swift-frontend %s -parse
-if{enum S<T,g{protocol a{func f:B<T>class B<a
+// RUN: not %target-swift-frontend %s -parse
+// REQUIRES: asserts
+protocol A.struct B<f func a<T:A{class A{var t:B=

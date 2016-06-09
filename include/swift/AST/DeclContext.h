@@ -367,10 +367,6 @@ public:
 
   /// Determine whether the innermost context is generic.
   bool isInnermostContextGeneric() const;
-  
-  /// Determine whether the innermost context is either a generic type context,
-  /// or a concrete type nested inside a generic type context.
-  bool isGenericTypeContext() const;
 
   /// Determine the maximum depth of the current generic type context's generic
   /// parameters. If the current context is not a generic type context, returns

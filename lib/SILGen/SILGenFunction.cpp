@@ -337,6 +337,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                  ArrayRef<Substitution> subs) {
   auto closure = *constant.getAnyFunctionRef();
   auto captureInfo = closure.getCaptureInfo();
+  auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(closure);
 
   assert(((constant.uncurryLevel == 1 &&
            captureInfo.hasLocalCaptures()) ||
@@ -351,17 +352,21 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   // Apply substitutions.
   auto pft = constantInfo.SILFnType;
 
+  auto *dc = closure.getAsDeclContext()->getParent();
+  if (dc->isLocalContext() && !loweredCaptureInfo.hasGenericParamCaptures()) {
+    // If the lowered function type is not polymorphic but we were given
+    // substitutions, we have a closure in a generic context which does not
+    // capture generic parameters. Just drop the substitutions.
+    subs = { };
+  } else if (closure.getAbstractClosureExpr()) {
+    // If we have a closure expression in generic context, Sema won't give
+    // us substitutions, so we just use the forwarding substitutions from
+    // context.
+    subs = getForwardingSubstitutions();
+  }
+
   bool wasSpecialized = false;
-  if (pft->isPolymorphic()) {
-    // If the lowered function type is generic but Sema did not hand us any
-    // substitutions, the function is a local function that appears in a
-    // generic context but does not have a generic parameter list of its own;
-    // just use our forwarding substitutions.
-    if (subs.empty()) {
-      assert(closure.getAsDeclContext()->isLocalContext() &&
-             "cannot reference generic global function without substitutions");
-      subs = getForwardingSubstitutions();
-    }
+  if (!subs.empty()) {
     auto specialized = pft->substGenericArgs(F.getModule(),
                                              F.getModule().getSwiftModule(),
                                              subs);

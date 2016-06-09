@@ -6,6 +6,5 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // DUPLICATE-OF: 26832-swift-typechecker-conformstoprotocol.swift
-// RUN: not --crash %target-swift-frontend %s -parse
-// REQUIRES: asserts
-{struct X<a{protocol A{class B<T>:B<T>let h:A
+// RUN: not %target-swift-frontend %s -parse
+if{enum S<T,g{protocol a{func f:B<T>class B<a

@@ -861,22 +861,24 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
 
   auto genericParams = genericSig->getGenericParams();
 
-  unsigned genericTypeDepth =
-      owner->getAnyNominal()->getGenericTypeContextDepth();
   unsigned count = 0;
 
+  // If the type is nested inside a generic function, skip
+  // substitutions from the outer context.
+  unsigned start = (genericParams.size() - genericArgs.size());
+
   for (auto gp : genericParams) {
-    // Skip parameters that were introduced by outer generic
-    // function signatures.
-    if (gp->getDecl()->getDepth() < genericTypeDepth)
-      continue;
-    auto gpTy = gp->getCanonicalType()->castTo<GenericTypeParamType>();
-    substitutions[gpTy] = genericArgs[count++];
+    if (count >= start) {
+      auto gpTy = gp->getCanonicalType()->castTo<GenericTypeParamType>();
+      substitutions[gpTy] = genericArgs[count - start];
+    }
+
+    count++;
   }
 
   // The number of generic type arguments being bound must be equal to the
   // total number of generic parameters in the current generic type context.
-  assert(count == genericArgs.size());
+  assert(count - start == genericArgs.size());
 
   // Check each of the requirements.
   Module *module = dc->getParentModule();
