@@ -1192,6 +1192,12 @@ public final class TestSuite {
     PersistentState.complainIfNothingRuns()
   }
 
+  // This method is prohibited from inlining because inlining the test harness
+  // into the test is not interesting from the runtime performance perspective.
+  // And it does not really make the test cases more effectively at testing the
+  // optimizer from a correctness prospective. On the contrary, it sometimes
+  // severely affects the compile time of the test code.
+  @inline(never)
   public func test(
     _ name: String,
     file: String = #file, line: UInt = #line,
@@ -1201,6 +1207,12 @@ public final class TestSuite {
     .code(testFunction)
   }
 
+  // This method is prohibited from inlining because inlining the test harness
+  // into the test is not interesting from the runtime performance perspective.
+  // And it does not really make the test cases more effectively at testing the
+  // optimizer from a correctness prospective. On the contrary, it sometimes
+  // severely affects the compile time of the test code.
+  @inline(never)
   public func test(
     _ name: String, file: String = #file, line: UInt = #line
   ) -> _TestBuilder {
