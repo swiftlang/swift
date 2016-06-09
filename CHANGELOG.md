@@ -276,6 +276,8 @@ Swift 3.0
     ```swift
     person.valueForKeyPath(#keyPath(Person.bestFriend.lastName))
     ```
+    
+* [SE-0093](https://github.com/apple/swift-evolution/blob/master/proposals/0093-slice-base.md): Slice types now have a `base` property that allows public readonly access to their base collections.
 
 Swift 2.2
 ---------
