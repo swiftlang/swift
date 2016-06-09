@@ -233,6 +233,7 @@ extension OptionSet where Element == Self {
   /// - Returns: `(true, newMember)` if `newMember` was not contained in
   ///   `self`. Otherwise, returns `(false, oldMember)`, where `oldMember` is
   ///   the member of the set equal to `newMember`.
+  @discardableResult
   public mutating func insert(
     _ newMember: Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
