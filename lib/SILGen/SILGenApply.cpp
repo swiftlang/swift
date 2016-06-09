@@ -1169,9 +1169,8 @@ public:
     }
 
     ArrayRef<Substitution> subs;
-    if (e->getDeclRef().isSpecialized()) {
+    if (e->getDeclRef().isSpecialized())
       subs = e->getDeclRef().getSubstitutions();
-    }
 
     // Enum case constructor references are open-coded.
     if (isa<EnumElementDecl>(e->getDecl()))
@@ -1191,14 +1190,13 @@ public:
                          captures);
         ApplyCallee->setCaptures(std::move(captures));
       }
-
-      if (subs.empty() && afd->getCaptureInfo().hasGenericParamCaptures()) {
-        subs = SGF.getForwardingSubstitutions();
-      }
     }
 
     // If there are substitutions, add them, always at depth 0.
-    if (!subs.empty())
+    if (!subs.empty() &&
+        (!afd ||
+         !afd->getDeclContext()->isLocalContext() ||
+         afd->getCaptureInfo().hasGenericParamCaptures()))
       ApplyCallee->setSubstitutions(SGF, e, subs, 0);
   }
   

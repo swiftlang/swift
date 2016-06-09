@@ -431,17 +431,6 @@ bool DeclContext::isGenericContext() const {
   llvm_unreachable("illegal declcontext hierarchy");
 }
 
-/// Determine whether the given context nested inside a generic type context
-/// with no local contexts in between.
-bool DeclContext::isGenericTypeContext() const {
-  for (const auto *dc = this; dc->isTypeContext(); dc = dc->getParent()) {
-    if (dc->isInnermostContextGeneric())
-      return true;
-  }
-  
-  return false;
-}
-
 /// Determine the maximum depth of the current generic type context's generic
 /// parameters. If the current context is not a generic type context, returns
 /// the maximum depth of any generic parameter in this context.

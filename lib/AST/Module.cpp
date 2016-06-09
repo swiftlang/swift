@@ -726,6 +726,13 @@ TypeBase::gatherAllSubstitutions(Module *module,
     llvm_unreachable("Not a nominal or bound generic type");
   }
 
+  // Add forwarding substitutions from the outer context if we have
+  // a type nested inside a generic function.
+  if (auto *outerGenericParams = parentDC->getGenericParamsOfContext()) {
+    for (auto archetype : outerGenericParams->getAllNestedArchetypes())
+      substitutions[archetype] = archetype;
+  }
+
   // Collect all of the archetypes.
   SmallVector<ArchetypeType *, 2> allArchetypesList;
   ArrayRef<ArchetypeType *> allArchetypes = genericParams->getAllArchetypes();

@@ -5,6 +5,7 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
+// DUPLICATE-OF: 26832-swift-typechecker-conformstoprotocol.swift
+// RUN: not %target-swift-frontend %s -parse
 // REQUIRES: asserts
-class B<T{func a{{func g:A}protocol A{associatedtype e=c<T>struct c<a]associatedtype d:e
+{struct X<a{protocol A{class B<T>:B<T>let h:A
