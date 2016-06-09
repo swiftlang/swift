@@ -200,8 +200,8 @@ class StdlibDeploymentTarget(object):
             return [host_target]
 
     @classmethod
-    def get_target_for_name(klass, name):
-        return klass._targets_by_name.get(name)
+    def get_target_for_name(cls, name):
+        return cls._targets_by_name.get(name)
 
 
 def install_prefix():
