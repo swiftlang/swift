@@ -10,6 +10,16 @@ function(add_swift_unittest test_dirname)
   # function defined by AddLLVM.cmake.
   add_unittest(SwiftUnitTests ${test_dirname} ${ARGN})
 
+  # TODO: _add_variant_c_compile_link_flags and these tests should share some
+  # sort of logic.
+  #
+  # *NOTE* The unittests are never built for the target, so we always enable LTO
+  # *if we are asked to.
+  if (SWIFT_TOOLS_ENABLE_LTO)
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY COMPILE_FLAGS " -flto ")
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY LINK_FLAGS " -flto ")
+  endif()
+
   if(SWIFT_BUILT_STANDALONE AND NOT "${CMAKE_CFG_INTDIR}" STREQUAL ".")
     # Replace target references with full paths, so that we use LLVM's
     # build configuration rather than Swift's.
