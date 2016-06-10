@@ -414,6 +414,14 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, getter=isAnimated) BOOL animated;
 // CHECK-NEXT: @property (nonatomic, getter=register, setter=setRegister:) BOOL register_;
 // CHECK-NEXT: @property (nonatomic, readonly, strong, getter=this) Properties * _Nonnull this_;
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger privateSetter;
+// CHECK-NEXT: @property (nonatomic, readonly, getter=customGetterNameForPrivateSetter) BOOL privateSetterCustomNames;
+// CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) NSInteger privateSetter;)
+// CHECK-NEXT: + (NSInteger)privateSetter;
+// CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly, getter=customGetterNameForPrivateSetter) BOOL privateSetterCustomNames;)
+// CHECK-NEXT: + (BOOL)customGetterNameForPrivateSetter;
+// CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) NSInteger sharedConstant;)
+// CHECK-NEXT: + (NSInteger)sharedConstant;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {
@@ -494,6 +502,19 @@ public class NonObjCClass { }
 
   var register: Bool = false
   var this: Properties { return self }
+
+  private(set) var privateSetter = 2
+  private(set) var privateSetterCustomNames: Bool {
+    @objc(customGetterNameForPrivateSetter) get { return true }
+    @objc(customSetterNameForPrivateSetter:) set {}
+  }
+
+  static private(set) var privateSetter = 2
+  class private(set) var privateSetterCustomNames: Bool {
+    @objc(customGetterNameForPrivateSetter) get { return true }
+    @objc(customSetterNameForPrivateSetter:) set {}
+  }
+  static let sharedConstant = 2
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden
