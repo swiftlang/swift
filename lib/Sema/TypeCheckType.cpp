@@ -962,7 +962,7 @@ static Type resolveNestedIdentTypeComponent(
   // Short-circuiting.
   if (comp->isInvalid()) return ErrorType::get(TC.Context);
 
-  // If a declaration has already been bound, use it.
+  // Phase 2: If a declaration has already been bound, use it.
   if (ValueDecl *decl = comp->getBoundDecl()) {
     // Make sure we have a type declaration.
     auto typeDecl = dyn_cast<TypeDecl>(decl);
@@ -993,9 +993,13 @@ static Type resolveNestedIdentTypeComponent(
       memberType = resolver->resolveDependentMemberType(parentTy, DC,
                                                         parentRange, comp);
       assert(memberType && "Received null dependent member type");
-    } else if (isa<AssociatedTypeDecl>(typeDecl) &&
-               !parentTy->is<ArchetypeType>() &&
-               !parentTy->isExistentialType()) {
+      return memberType;
+    }
+
+    if (isa<AssociatedTypeDecl>(typeDecl) &&
+        !parentTy->is<ArchetypeType>()) {
+      assert(!parentTy->isExistentialType());
+
       auto assocType = cast<AssociatedTypeDecl>(typeDecl);
 
       // Find the conformance and dig out the type witness.
@@ -1013,12 +1017,12 @@ static Type resolveNestedIdentTypeComponent(
 
       // FIXME: Establish that we need a type witness.
       return conformance->getTypeWitness(assocType, &TC).getReplacement();
-    } else {
-      // Otherwise, simply substitute the parent type into the member.
-      memberType = TC.substMemberTypeWithBase(DC->getParentModule(), typeDecl,
-                                              parentTy,
-                                              /*isTypeReference=*/true);
     }
+
+    // Otherwise, simply substitute the parent type into the member.
+    memberType = TC.substMemberTypeWithBase(DC->getParentModule(), typeDecl,
+                                            parentTy,
+                                            /*isTypeReference=*/true);
 
     // Propagate failure.
     if (!memberType || memberType->is<ErrorType>()) return memberType;
@@ -1036,6 +1040,8 @@ static Type resolveNestedIdentTypeComponent(
     // We're done.
     return memberType;
   }
+
+  // Phase 1: Find and bind the component decl.
 
   // If the parent is a dependent type, the member is a dependent member.
   if (parentTy->isTypeParameter()) {

@@ -2917,22 +2917,11 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
   // If the member is part of a protocol or extension thereof, we need
   // to substitute in the type of Self.
   if (dc->getAsProtocolOrProtocolExtensionContext()) {
-#if false
-    // We only substitute into archetypes for now for protocols.
-    // FIXME: This seems like an odd restriction. Whatever is depending on
-    // this, shouldn't.
-    if (!baseTy->is<ArchetypeType>() && isa<ProtocolDecl>(dc))
-      return substitutions;
-#endif
-
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
     substitutions[dc->getProtocolSelf()->getDeclaredType()
                     ->getCanonicalType()->castTo<GenericTypeParamType>()]
       = baseTy;
-#if false
-    substitutions[dc->getProtocolSelf()->getArchetype()] = baseTy;
-#endif
 
     return substitutions;
   }
