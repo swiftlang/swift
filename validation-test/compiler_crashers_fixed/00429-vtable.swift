@@ -6,11 +6,6 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -parse
-
-// REQUIRES: asserts
-// SR-1584
-// XFAIL: objc_interop
-
 }
 struct S {
 static let i: B<Q<T where A"""
