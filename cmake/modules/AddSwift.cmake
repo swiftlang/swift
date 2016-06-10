@@ -117,7 +117,7 @@ function(_add_variant_c_compile_link_flags)
 endfunction()
 
 function(_add_variant_c_compile_flags)
-  set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE DEPLOYMENT_VERSION_IOS RESULT_VAR_NAME)
+  set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE DEPLOYMENT_VERSION_IOS RESULT_VAR_NAME ENABLE_LTO)
   cmake_parse_arguments(CFLAGS
     ""
     "${oneValueArgs}"
@@ -131,7 +131,7 @@ function(_add_variant_c_compile_flags)
     ARCH "${CFLAGS_ARCH}"
     BUILD_TYPE "${CFLAGS_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${CFLAGS_ENABLE_ASSERTIONS}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
+    ENABLE_LTO "${CFLAGS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE FALSE
     DEPLOYMENT_VERSION_IOS "${CFLAGS_DEPLOYMENT_VERSION_IOS}"
     RESULT_VAR_NAME result)
@@ -214,7 +214,7 @@ function(_add_variant_swift_compile_flags
 endfunction()
 
 function(_add_variant_link_flags)
-  set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE DEPLOYMENT_VERSION_IOS RESULT_VAR_NAME)
+  set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE DEPLOYMENT_VERSION_IOS RESULT_VAR_NAME ENABLE_LTO)
   cmake_parse_arguments(LFLAGS
     ""
     "${oneValueArgs}"
@@ -236,7 +236,7 @@ function(_add_variant_link_flags)
     ARCH "${LFLAGS_ARCH}"
     BUILD_TYPE "${LFLAGS_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${LFLAGS_ENABLE_ASSERTIONS}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
+    ENABLE_LTO "${LFLAGS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${LFLAGS_ANALYZE_CODE_COVERAGE}"
     DEPLOYMENT_VERSION_IOS "${LFLAGS_DEPLOYMENT_VERSION_IOS}"
     RESULT_VAR_NAME result)
@@ -803,6 +803,7 @@ function(_add_swift_library_single target name)
     BUILD_TYPE "${build_type}"
     ENABLE_ASSERTIONS "${enable_assertions}"
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
+    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     RESULT_VAR_NAME c_compile_flags
     )
@@ -812,6 +813,7 @@ function(_add_swift_library_single target name)
     BUILD_TYPE "${build_type}"
     ENABLE_ASSERTIONS "${enable_assertions}"
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
+    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     RESULT_VAR_NAME link_flags
       )
@@ -1415,6 +1417,7 @@ function(_add_swift_executable_single name)
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${CMAKE_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS}"
+    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
     RESULT_VAR_NAME c_compile_flags)
   _add_variant_link_flags(
@@ -1422,6 +1425,7 @@ function(_add_swift_executable_single name)
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${CMAKE_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS}"
+    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
     RESULT_VAR_NAME link_flags)
 
