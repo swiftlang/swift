@@ -137,6 +137,7 @@ namespace {
           !isa<ProtocolDecl>(found->getDeclContext()) ||
           SearchingFromProtoExt ||
           isa<GenericTypeParamDecl>(found) ||
+          isa<TypeAliasDecl>(found) ||
           (isa<FuncDecl>(found) && cast<FuncDecl>(found)->isOperator())) {
         if (Known.insert({{found, base}, false}).second) {
           Result.add({found, base});
@@ -158,23 +159,26 @@ namespace {
 
         // Dig out the witness.
         ValueDecl *witness;
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-          witness = conformance->getTypeWitnessSubstAndDecl(assocType, &TC)
-            .second;
-        } else if (isa<TypeAliasDecl>(found)) {
-          // No witness for typealiases.
-          return;
+        if (isa<TypeAliasDecl>(found)) {
+          // A typealias in a protocol is its own witness.
+          witness = found;
         } else {
-          witness = conformance->getWitness(found, &TC).getDecl();
+          if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
+            witness = conformance->getTypeWitnessSubstAndDecl(assocType, &TC)
+              .second;
+          } else {
+            witness = conformance->getWitness(found, &TC).getDecl();
+          }
+
+          // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
+          // default implementations in protocols.
+          if (!witness || isa<ProtocolDecl>(witness->getDeclContext()))
+            return;
         }
 
-        // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
-        // default implementations in protocols.
-        if (witness && !isa<ProtocolDecl>(witness->getDeclContext())) {
-          if (Known.insert({{witness, base}, false}).second) {
-            Result.add({witness, base});
-            FoundDecls.push_back(witness);
-          }
+        if (Known.insert({{witness, base}, false}).second) {
+          Result.add({witness, base});
+          FoundDecls.push_back(witness);
         }
         return;
       }

@@ -302,12 +302,16 @@ Type TypeChecker::resolveTypeInContext(
       if (!visited.insert(fromType->getAnyNominal()).second)
         continue;
 
-      // Handle this case:
+      // Handle these cases:
       // - Current context: concrete type
-      // - Nested type: associated type
       // - Nested type's context: protocol or protocol extension
+      // - Nested type: associated type
       //
-      if (assocType && fromProto == nullptr) {
+      // - Current context: concrete type
+      // - Nested type's context: protocol or protocol extension
+      // - Nested type: type alias
+      //
+      if (isa<ProtocolDecl>(ownerNominal) && fromProto == nullptr) {
         ProtocolConformance *conformance = nullptr;
 
         // If the conformance check failed, the associated type is for a
@@ -318,23 +322,27 @@ Type TypeChecker::resolveTypeInContext(
                                parentDC, ConformanceCheckFlags::Used,
                                &conformance) &&
             conformance) {
-          return conformance->getTypeWitness(assocType, this).getReplacement();
+
+          // We either have an associated type...
+          if (assocType)
+            return conformance->getTypeWitness(assocType, this).getReplacement();
+
+          // Otherwise, we have a typealias
+
+          // FIXME: We end up calling lookupConformance() again here
+          return substMemberTypeWithBase(parentDC->getParentModule(), typeDecl,
+                                         fromType, /*isTypeReference=*/true);
         }
       }
 
       // Handle these cases:
       // - Current context: concrete type
-      // - Nested type: concrete type or type alias
       // - Nested type's context: concrete type
+      // - Nested type: concrete type or type alias
       //
       // - Current context: protocol or protocol extension
-      // - Nested type: type alias
       // - Nested type's context: protocol or protocol extension
-      //
-      // Note: this is not supported yet, FIXME:
-      // - Current context: concrete type
       // - Nested type: type alias
-      // - Nested type's context: protocol or protocol extension
       //
       if (fromType->getAnyNominal() == ownerNominal) {
         if (fromProto &&
