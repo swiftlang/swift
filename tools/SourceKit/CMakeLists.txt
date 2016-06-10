@@ -75,12 +75,14 @@ function(add_sourcekit_default_compiler_flags target)
     BUILD_TYPE "${build_type}"
     ENABLE_ASSERTIONS "${enable_assertions}"
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
+    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     RESULT_VAR_NAME c_compile_flags)
   _add_variant_link_flags(
     SDK "${sdk}"
     ARCH "${arch}"
     BUILD_TYPE "${build_type}"
     ENABLE_ASSERTIONS "${enable_assertions}"
+    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
     RESULT_VAR_NAME link_flags)
 
