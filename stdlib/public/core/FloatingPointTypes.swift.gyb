@@ -33,6 +33,9 @@ builtinIntLiteralBits = 2048
 
 # Mapping from float bits to significand bits
 explicitSignificandBits = { 32:24, 64:53, 80:64 }
+SignificandSizes = { 32:32, 64:64, 80:64 }
+SignificandBitCounts = { 32:23, 64:52, 80:63 }
+ExponentBitCounts = { 32:8, 64:11, 80:15 }
 
 def allInts():
     for bits in allIntBits:
@@ -79,7 +82,9 @@ extension UInt${bits} {
 % for bits in allFloatBits:
 %{
 Self = floatName[bits]
-SignificandSize = {32:32, 64:64, 80:64}[bits]
+SignificandSize = SignificandSizes[bits]
+SignificandBitCount = SignificandBitCounts[bits]
+ExponentBitCount = ExponentBitCounts[bits]
 RawSignificand = 'UInt' + str(SignificandSize)
 
 if Self == 'Float':
@@ -120,10 +125,6 @@ public struct ${Self} {
   init(_bits v: Builtin.FPIEEE${bits}) {
     self._value = v
   }
-
-  /// Create an instance initialized to `value`.
-  @_transparent public
-  init(_ value: ${Self}) { self = value }
 }
 
 extension ${Self} : CustomStringConvertible {
@@ -146,11 +147,11 @@ extension ${Self}: BinaryFloatingPoint {
   public typealias RawSignificand = ${RawSignificand}
 
   public static var exponentBitCount: Int {
-    return ${{32:8, 64:11, 80:15}[bits]}
+    return ${ExponentBitCount}
   }
 
   public static var significandBitCount: Int {
-    return ${{32:23, 64:52, 80:63}[bits]}
+    return ${SignificandBitCount}
   }
 
   //  Implementation details.
@@ -760,25 +761,42 @@ extension ${Self} {
 extension ${Self} {
 % for srcBits in allFloatBits:
 %   That = floatName[srcBits]
-%   if Self != That:
 
-%     if srcBits == 80:
+%   if srcBits == 80:
 #if !os(Windows) && (arch(i386) || arch(x86_64))
-%     end
+%   end
 
+%   if srcBits == bits:
+  /// Create an instance initialized to `value`.
+%   else:
   /// Construct an instance that approximates `other`.
+%   end
+  @_transparent
   public init(_ other: ${That}) {
-%     if srcBits > bits:
+%   if srcBits > bits:
     _value = Builtin.fptrunc_FPIEEE${srcBits}_FPIEEE${bits}(other._value)
-%     else:
+%   elif srcBits < bits:
     _value = Builtin.fpext_FPIEEE${srcBits}_FPIEEE${bits}(other._value)
-%     end
+%   else:
+    _value = other._value
+%   end
+  }
+  
+  /// Create a ${That} initialized to `value`, if `value` can be represented without rounding.
+  /// - note: This is effectively checking that `inputValue == outputValue`, meaning `NaN` inputs will always return `nil`. 
+  @inline(__always)
+  public init?(exactly other: ${That}) {
+    self.init(other)
+    // Converting the infinity value is considered value preserving. 
+    // In other cases, check that we can round-trip and get the same value.
+    // NaN always fails.
+    if ${That}(self) != other {
+      return nil
+    }
   }
 
-%     if srcBits == 80:
+%   if srcBits == 80:
 #endif
-%     end
-
 %   end
 % end
 }
