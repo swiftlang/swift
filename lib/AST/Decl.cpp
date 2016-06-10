@@ -286,8 +286,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
 DeclContext *Decl::getInnermostDeclContext() const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
     return const_cast<AbstractFunctionDecl*>(func);
-  if (auto nominal = dyn_cast<NominalTypeDecl>(this))
-    return const_cast<NominalTypeDecl*>(nominal);
+  if (auto nominal = dyn_cast<GenericTypeDecl>(this))
+    return const_cast<GenericTypeDecl*>(nominal);
   if (auto ext = dyn_cast<ExtensionDecl>(this))
     return const_cast<ExtensionDecl*>(ext);
   if (auto topLevel = dyn_cast<TopLevelCodeDecl>(this))
