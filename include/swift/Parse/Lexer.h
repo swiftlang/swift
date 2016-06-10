@@ -36,6 +36,16 @@ enum class CommentRetentionMode {
   ReturnAsTokens,
 };
 
+/// Kinds of conflict marker which the lexer might encounter.
+enum class ConflictMarkerKind {
+  /// A normal or diff3 conflict marker, initiated by at least 7 "<"s,
+  /// separated by at least 7 "="s or "|"s, and terminated by at least 7 ">"s.
+  Normal,
+  /// A Perforce-style conflict marker, initiated by 4 ">"s,
+  /// separated by 4 "="s, and terminated by 4 "<"s.
+  Perforce
+};
+  
 class Lexer {
   const LangOptions &LangOpts;
   const SourceManager &SourceMgr;
@@ -438,6 +448,10 @@ private:
 
   void tryLexEditorPlaceholder();
   const char *findEndOfCurlyQuoteStringLiteral(const char*);
+
+  /// Try to lex conflict markers by checking for the presence of the start and
+  /// end of the marker in diff3 or Perforce style respectively.
+  bool tryLexConflictMarker();
 };
   
 } // end namespace swift

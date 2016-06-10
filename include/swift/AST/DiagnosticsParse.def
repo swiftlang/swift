@@ -141,7 +141,8 @@ ERROR(lex_editor_placeholder,none,
       "editor placeholder in source file", ())
 WARNING(lex_editor_placeholder_in_playground,none,
         "editor placeholder in source file", ())
-
+ERROR(lex_conflict_marker_in_file,none,
+      "source control conflict marker in source file", ())
 //------------------------------------------------------------------------------
 // Declaration parsing diagnostics
 //------------------------------------------------------------------------------
