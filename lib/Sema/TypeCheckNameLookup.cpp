@@ -137,13 +137,22 @@ namespace {
           !isa<ProtocolDecl>(found->getDeclContext()) ||
           SearchingFromProtoExt ||
           isa<GenericTypeParamDecl>(found) ||
-          isa<TypeAliasDecl>(found) ||
           (isa<FuncDecl>(found) && cast<FuncDecl>(found)->isOperator())) {
         if (Known.insert({{found, base}, false}).second) {
           Result.add({found, base});
           FoundDecls.push_back(found);
         }
         return;
+      }
+
+      if (isa<ProtocolDecl>(foundDC) && isa<ProtocolDecl>(baseNominal)) {
+        if (isa<TypeAliasDecl>(found) || isa<AssociatedTypeDecl>(found)) {
+          if (Known.insert({{found, base}, false}).second) {
+            Result.add({found, base});
+            FoundDecls.push_back(found);
+          }
+          return;
+        }
       }
 
       // If we found something within the protocol itself, and our
@@ -161,8 +170,7 @@ namespace {
         ValueDecl *witness;
         if (isa<TypeAliasDecl>(found)) {
           // A typealias in a protocol is its own witness.
-          //witness = found;
-          return;
+          witness = found;
         } else {
           if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
             witness = conformance->getTypeWitnessSubstAndDecl(assocType, &TC)
