@@ -1103,29 +1103,15 @@ CanType TypeBase::getCanonicalType() {
     GenericSignature *sig = function->getGenericSignature()
       ->getCanonicalSignature();
     
-    // Canonicalize generic parameters.
-    SmallVector<GenericTypeParamType *, 4> genericParams;
-    for (auto param : function->getGenericParams()) {
-      auto newParam = param->getCanonicalType()->castTo<GenericTypeParamType>();
-      genericParams.push_back(newParam);
-    }
-
-    // Transform requirements.
-    SmallVector<Requirement, 4> requirements;
-    for (const auto &req : function->getRequirements()) {
-      auto firstType = req.getFirstType()->getCanonicalType();
-      auto secondType = req.getSecondType();
-      if (secondType)
-        secondType = secondType->getCanonicalType();
-      requirements.push_back(Requirement(req.getKind(), firstType, secondType));
-    }
-
-    // Transform input type.
-    auto inputTy = function->getInput()->getCanonicalType();
-    auto resultTy = function->getResult()->getCanonicalType();
+    // Transform the input and result types.
+    auto &ctx = function->getInput()->getASTContext();
+    auto &mod = *ctx.TheBuiltinModule;
+    auto inputTy = sig->getCanonicalTypeInContext(function->getInput(), mod);
+    auto resultTy = sig->getCanonicalTypeInContext(function->getResult(), mod);
 
     Result = GenericFunctionType::get(sig, inputTy, resultTy,
                                       function->getExtInfo());
+    assert(Result->isCanonical());
     break;
   }
       
