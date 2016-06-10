@@ -161,7 +161,8 @@ namespace {
         ValueDecl *witness;
         if (isa<TypeAliasDecl>(found)) {
           // A typealias in a protocol is its own witness.
-          witness = found;
+          //witness = found;
+          return;
         } else {
           if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
             witness = conformance->getTypeWitnessSubstAndDecl(assocType, &TC)
