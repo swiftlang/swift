@@ -377,6 +377,7 @@ endfunction()
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
 #     [IS_SDK_OVERLAY]
+#     [FORCE_BUILD_FOR_HOST_SDK]
 #     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
 #
@@ -440,12 +441,15 @@ endfunction()
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
+# FORCE_BUILD_FOR_HOST_SDK
+#   Regardless of the defaults, also build this library for the host SDK.
+#
 # source1 ...
 #   Sources to add into this library
 function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_options
       SHARED OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
-      TARGET_LIBRARY HOST_LIBRARY
+      TARGET_LIBRARY FORCE_BUILD_FOR_HOST_SDK
       API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
   cmake_parse_arguments(SWIFTLIB_SINGLE
     "${SWIFTLIB_SINGLE_options}"
@@ -934,6 +938,7 @@ endfunction()
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
 #     [TARGET_LIBRARY]
+#     [FORCE_BUILD_FOR_HOST_SDK]
 #     INSTALL_IN_COMPONENT comp
 #     DEPLOYMENT_VERSION_IOS version
 #     source1 [source2 source3 ...])
@@ -1016,12 +1021,15 @@ endfunction()
 # DEPLOYMENT_VERSION_IOS
 #   The minimum deployment version to build for if this is an iOS library.
 #
+# FORCE_BUILD_FOR_HOST_SDK
+#   Regardless of the defaults, also build this library for the host SDK.
+#
 # source1 ...
 #   Sources to add into this library.
 function(add_swift_library name)
   set(SWIFTLIB_options
       SHARED OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
-      TARGET_LIBRARY HOST_LIBRARY
+      TARGET_LIBRARY FORCE_BUILD_FOR_HOST_SDK
       API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE HAS_SWIFT_CONTENT)
   cmake_parse_arguments(SWIFTLIB
     "${SWIFTLIB_options}"
@@ -1102,7 +1110,7 @@ function(add_swift_library name)
     # SDKs building the variants of this library.
     list_intersect(
         "${SWIFTLIB_TARGET_SDKS}" "${SWIFT_SDKS}" SWIFTLIB_TARGET_SDKS)
-    if(SWIFTLIB_HOST_LIBRARY)
+    if(SWIFTLIB_FORCE_BUILD_FOR_HOST_SDK)
       list_union(
           "${SWIFTLIB_TARGET_SDKS}" "${SWIFT_HOST_VARIANT_SDK}"
           SWIFTLIB_TARGET_SDKS)
@@ -1209,7 +1217,7 @@ function(add_swift_library name)
           ${SWIFTLIB_IS_STDLIB_CORE_keyword}
           ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
           ${SWIFTLIB_TARGET_LIBRARY_keyword}
-          ${SWIFTLIB_HOST_LIBRARY_keyword}
+          ${SWIFTLIB_FORCE_BUILD_FOR_HOST_SDK_keyword}
           INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
           DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
         )
