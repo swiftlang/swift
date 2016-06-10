@@ -1102,9 +1102,11 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   SmallVector<ValueDecl *, 4> witnesses;
   if (req->getName().isOperator()) {
     // Operator lookup is always global.
-    auto lookupOptions = defaultUnqualifiedLookupOptions;
+    NameLookupOptions lookupOptions;
+
     if (!DC->isCascadingContextForLookup(false))
       lookupOptions |= NameLookupFlags::KnownPrivate;
+
     auto lookup = TC.lookupUnqualified(DC->getModuleScopeContext(),
                                        req->getName(),
                                        SourceLoc(),
@@ -1114,13 +1116,16 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
     }
   } else {
     // Variable/function/subscript requirements.
+    NameLookupOptions lookupOptions;
+
     auto metaType = MetatypeType::get(Adoptee);
-    auto candidates = TC.lookupMember(DC, metaType, req->getFullName());
+    auto candidates = TC.lookupMember(DC, metaType, req->getFullName(),
+                                      lookupOptions);
 
     // If we didn't find anything with the appropriate name, look
     // again using only the base name.
     if (candidates.empty() && ignoringNames) {
-      candidates = TC.lookupMember(DC, metaType, req->getName());
+      candidates = TC.lookupMember(DC, metaType, req->getName(), lookupOptions);
       *ignoringNames = true;
     }
 
