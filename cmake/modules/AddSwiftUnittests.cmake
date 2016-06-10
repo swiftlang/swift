@@ -15,9 +15,10 @@ function(add_swift_unittest test_dirname)
   #
   # *NOTE* The unittests are never built for the target, so we always enable LTO
   # *if we are asked to.
-  if (SWIFT_TOOLS_ENABLE_LTO)
-    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY COMPILE_FLAGS " -flto ")
-    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY LINK_FLAGS " -flto ")
+  _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
+  if (_lto_flag_out)
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY COMPILE_FLAGS " ${_lto_flag_out} ")
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY LINK_FLAGS " ${_lto_flag_out} ")
   endif()
 
   if(SWIFT_BUILT_STANDALONE AND NOT "${CMAKE_CFG_INTDIR}" STREQUAL ".")

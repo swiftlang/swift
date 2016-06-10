@@ -118,8 +118,8 @@ function(_add_variant_c_compile_link_flags)
     endif()
   endif()
 
-  if(CFLAGS_ENABLE_LTO)
-    _compute_lto_flag(${CFLAGS_ENABLE_LTO} _lto_flag_out)
+  _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
+  if (_lto_flag_out)
     list(APPEND result "${_lto_flag_out}")
   endif()
 
