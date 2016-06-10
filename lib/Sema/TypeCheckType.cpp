@@ -879,9 +879,6 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   lookupOptions |= NameLookupFlags::OnlyTypes;
   if (options.contains(TR_KnownNonCascadingDependency))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  // FIXME: Eliminate this once we can handle finding protocol members
-  // in resolveTypeInContext.
-  lookupOptions -= NameLookupFlags::ProtocolMembers;
   LookupResult globals = TC.lookupUnqualified(lookupDC, comp->getIdentifier(),
                                               comp->getIdLoc(), lookupOptions);
 
