@@ -153,11 +153,8 @@ namespace {
         ProtocolConformance *conformance = nullptr;
         if (!TC.conformsToProtocol(foundInType, foundProto, DC,
                                    conformanceOptions, &conformance) ||
-            !conformance) {
-          llvm::errs() << "no conformance: "; foundInType->dump();
-          foundProto->dump();
+            !conformance)
           return;
-        }
 
         // Dig out the witness.
         ValueDecl *witness;
@@ -165,18 +162,15 @@ namespace {
           witness = conformance->getTypeWitnessSubstAndDecl(assocType, &TC)
             .second;
         } else if (isa<TypeAliasDecl>(found)) {
-          // A typealias in a protocol is its own witness.
-          assert(false);
-          witness = found;
+          // No witness for typealiases.
+          return;
         } else {
           witness = conformance->getWitness(found, &TC).getDecl();
         }
 
         // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
         // default implementations in protocols.
-        if (witness &&
-            (isa<TypeAliasDecl>(witness) ||
-             !isa<ProtocolDecl>(witness->getDeclContext()))) {
+        if (witness && !isa<ProtocolDecl>(witness->getDeclContext())) {
           if (Known.insert({{witness, base}, false}).second) {
             Result.add({witness, base});
             FoundDecls.push_back(witness);
@@ -288,7 +282,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
     dc->lookupQualified(type, name, subOptions, this, lookupResults);
 
     for (auto found : lookupResults) {
-      builder.add(found, nominalLookupType, lookupType);
+      builder.add(found, nominalLookupType, type);
     }
   };
 
