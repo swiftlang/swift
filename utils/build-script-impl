@@ -637,8 +637,14 @@ if [[ "${CMAKE_GENERATOR}" == "Ninja" && \
     BUILD_NINJA=1
 fi
 
+# FIXME: We currently do not support building compiler-rt with the
+# Xcode generator.
+if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
+    SKIP_COMPILER_RT=1
+fi
+
 # FIXME: We currently do not support cross-compiling swift with compiler-rt.
-if [[ "${CROSS_COMPILE_TOOLS_DEPLOYMENT_TARGETS}" ]]; then
+if [[ "${CROSS_COMPILE_HOSTS}" ]]; then
     SKIP_COMPILER_RT=1
 fi
 
