@@ -24,6 +24,11 @@ if "@SWIFT_ASAN_BUILD@" == "TRUE":
 else:
     config.available_features.add('no_asan')
 
+if "@SWIFT_TOOLS_ENABLE_LTO@".lower() in ["full", "thin"]:
+   config.available_features.add("lto")
+else:
+   config.available_features.add("no_lto")
+
 if "@LLVM_ENABLE_ASSERTIONS@" == "TRUE":
     config.available_features.add('asserts')
 else:

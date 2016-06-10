@@ -53,6 +53,15 @@ function(compute_library_subdir result_var_name sdk arch)
   set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
 endfunction()
 
+function(_compute_lto_flag option out_var)
+  string(TOLOWER "${option}" lowercase_option)
+  if (lowercase_option STREQUAL "full")
+    set(${out_var} "-flto=full" PARENT_SCOPE)
+  elseif (lowercase_option STREQUAL "thin")
+    set(${out_var} "-flto=thin" PARENT_SCOPE)
+  endif()
+endfunction()
+
 # Usage:
 # _add_variant_c_compile_link_flags(
 #   SDK sdk
@@ -110,7 +119,8 @@ function(_add_variant_c_compile_link_flags)
   endif()
 
   if(CFLAGS_ENABLE_LTO)
-    list(APPEND result "-flto")
+    _compute_lto_flag(${CFLAGS_ENABLE_LTO} _lto_flag_out)
+    list(APPEND result "${_lto_flag_out}")
   endif()
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
@@ -150,7 +160,8 @@ function(_add_variant_c_compile_flags)
 
   is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
   if(debuginfo)
-    if(SWIFT_TOOLS_ENABLE_LTO)
+    _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
+    if(_lto_flag_out)
       list(APPEND result "-gline-tables-only")
     else()
       list(APPEND result "-g")
@@ -797,13 +808,18 @@ function(_add_swift_library_single target name)
     set(enable_assertions "${LLVM_ENABLE_ASSERTIONS}")
     set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
   endif()
+
+  if (NOT SWIFTLIB_SINGLE_TARGET_LIBRARY)
+    set(lto_type "${SWIFT_TOOLS_ENABLE_LTO}")
+  endif()
+
   _add_variant_c_compile_flags(
     SDK "${SWIFTLIB_SINGLE_SDK}"
     ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${build_type}"
     ENABLE_ASSERTIONS "${enable_assertions}"
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
+    ENABLE_LTO "${lto_type}"
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     RESULT_VAR_NAME c_compile_flags
     )
@@ -813,7 +829,7 @@ function(_add_swift_library_single target name)
     BUILD_TYPE "${build_type}"
     ENABLE_ASSERTIONS "${enable_assertions}"
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
+    ENABLE_LTO "${lto_type}"
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     RESULT_VAR_NAME link_flags
       )

@@ -709,10 +709,10 @@ class BuildScriptInvocation(object):
                     pipes.quote(opt) for opt in args.extra_cmake_options)
             ]
 
-        if args.lto:
+        if args.lto_type is not None:
             impl_args += [
-                "--llvm-enable-lto",
-                "--swift-tools-enable-lto"
+                "--llvm-enable-lto=%s" % args.lto_type,
+                "--swift-tools-enable-lto=%s" % args.lto_type
             ]
             if args.llvm_max_parallel_lto_link_jobs is not None:
                 impl_args += [
@@ -1707,12 +1707,15 @@ details of the setups of other systems or automated environments.""")
     parser.add_argument(
         "--lto",
         help="use lto optimization on llvm/swift tools. This does not "
-             "imply using lto on the swift standard library or runtime",
-        metavar="BOOL",
+             "imply using lto on the swift standard library or runtime. "
+             "Options: thin, full. If no optional arg is provided, full is "
+             "chosen by default",
+        metavar="LTO_TYPE",
         nargs='?',
-        type=arguments.type.bool,
-        default=False,
-        const=True)
+        choices=['thin', 'full'],
+        default=None,
+        const='full',
+        dest='lto_type')
 
     default_max_lto_link_job_counts = host.max_lto_link_job_counts()
     parser.add_argument(
