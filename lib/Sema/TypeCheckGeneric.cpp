@@ -462,25 +462,27 @@ static Type getResultType(TypeChecker &TC, FuncDecl *fn, Type resultType) {
 }
 
 static void 
-markInvalidGenericParams(DeclContext *parentDC,
+markInvalidGenericParams(GenericParamList *genericParams,
                          ArchetypeBuilder &builder,
                          SmallVectorImpl<GenericTypeParamType *> &allParams) {
-  if (parentDC->isModuleScopeContext())
+  if (genericParams == nullptr) {
+    llvm::errs() << "no params\n";
     return;
+  } else
+    llvm::errs() << "we have params\n";
 
-  markInvalidGenericParams(parentDC->getParent(), builder, allParams);
+  markInvalidGenericParams(genericParams->getOuterParameters(),
+                           builder, allParams);
 
-  if (parentDC->isInnermostContextGeneric())
-    if (auto *genericParams = parentDC->getGenericParamsOfContext()) {
-      unsigned depth = genericParams->getDepth();
+  unsigned depth = genericParams->getDepth();
 
-      for (auto param : *genericParams) {
-        allParams.push_back(param->getDeclaredType()
-            ->castTo<GenericTypeParamType>());
-        param->setDepth(depth);
-        builder.addGenericParameter(param);
-      }
-    }
+  for (auto param : *genericParams) {
+    llvm::errs() << "add\n";
+    allParams.push_back(param->getDeclaredType()
+        ->castTo<GenericTypeParamType>());
+    param->setDepth(depth);
+    builder.addGenericParameter(param);
+  }
 }
 
 void TypeChecker::markInvalidGenericSignature(ValueDecl *VD) {
@@ -494,11 +496,20 @@ void TypeChecker::markInvalidGenericSignature(ValueDecl *VD) {
   ArchetypeBuilder builder = createArchetypeBuilder(DC->getParentModule());
   SmallVector<GenericTypeParamType *, 4> allGenericParams;
 
+  llvm::errs() << "a\n";
+
   // Visit all generic parameters from all outer contexts.
-  markInvalidGenericParams(DC, builder, allGenericParams);
+  markInvalidGenericParams(DC->getGenericParamsOfContext(),
+                           builder, allGenericParams);
+
+  llvm::errs() << "b\n";
 
   // If there aren't any generic parameters at this level, we're done.
   if (genericParams != nullptr) {
+
+    llvm::errs() << "there are params\n";
+
+    VD->dump();
 
     // Wire up the archetypes for the generic parameters of this context.
     for (auto param : *genericParams)
@@ -506,7 +517,8 @@ void TypeChecker::markInvalidGenericSignature(ValueDecl *VD) {
 
     genericParams->setAllArchetypes(
         Context.AllocateCopy(builder.getAllArchetypes()));
-  }
+  } else if (allGenericParams.empty())
+    return;
 
   auto sig = builder.getGenericSignature(allGenericParams);
 
