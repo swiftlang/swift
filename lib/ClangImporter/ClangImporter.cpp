@@ -2837,7 +2837,7 @@ auto ClangImporter::Implementation::importFullName(
           owningD = *def;
       }
 
-      std::string moduleName;
+      SmallString<32> moduleName;
       if (auto module = owningD->getImportedOwningModule())
         moduleName = module->getTopLevelModuleName();
       else
