@@ -10,7 +10,7 @@ set -e
 set -u
 
 # REQUIRES: lto
-# REQUIRES: macosx
+# REQUIRES: OS=macosx
 # RUN: %s %swift_obj_root %t
 
 function check_thin_archive_for_bitcode() {

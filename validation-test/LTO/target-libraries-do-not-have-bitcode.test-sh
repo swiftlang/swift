@@ -7,6 +7,7 @@
 # are still mach-o files and come up as such.
 
 # REQUIRES: lto
+# REQUIRES: OS=macosx
 # RUN: %s %swift_obj_root %t
 
 set -u
