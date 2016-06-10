@@ -17,13 +17,12 @@ import SwiftShims
 # Utility code for later in this template
 #
 
+from SwiftIntTypes import all_integer_types
+
 # // Bit counts for all floating point types. 
 # // 80-bit floating point types are only permitted on x86 architectures. This
 # // restriction is handled via #if's in the generated code.
 allFloatBits = [32, 64, 80]
-
-# Bit counts for all int types
-allIntBits = [8, 16, 32, 64, 'Int']
 
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
@@ -31,22 +30,7 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
 
-# Mapping from float bits to significand bits
-explicitSignificandBits = { 32:24, 64:53, 80:64 }
-
-def allInts():
-    for bits in allIntBits:
-        for signed in False, True:
-            yield bits, signed
-
-def baseIntName(name):
-    return 'Int' if name == 'Int' else 'Int' + str(name)
-
-def builtinIntName(name):
-    return 'Int' + str(word_bits) if name == 'Int' else 'Int' + str(name)
-
-def intName(name, signed):
-    return ('' if signed else 'U') + baseIntName(name)
+cFunctionSuffix = { 32:'f', 64:'', 80:'l' } 
 
 floatName = { 32:'Float', 64:'Double', 80:'Float80' }
 
@@ -80,6 +64,8 @@ extension UInt${bits} {
 %{
 Self = floatName[bits]
 SignificandSize = {32:32, 64:64, 80:64}[bits]
+SignificandBitCount = {32:23, 64:52, 80:63}[bits]
+ExponentBitCount = {32:8, 64:11, 80:15}[bits]
 RawSignificand = 'UInt' + str(SignificandSize)
 
 if Self == 'Float':
@@ -124,6 +110,11 @@ public struct ${Self} {
   /// Create an instance initialized to `value`.
   @_transparent public
   init(_ value: ${Self}) { self = value }
+  
+  /// Create an instance initialized to `value`.
+  @available(*, message: "Converting ${Self} to ${Self} will always succeed.")
+  @_transparent public
+  init?(exactly value: ${Self}) { self = value }
 }
 
 extension ${Self} : CustomStringConvertible {
@@ -146,11 +137,11 @@ extension ${Self}: BinaryFloatingPoint {
   public typealias RawSignificand = ${RawSignificand}
 
   public static var exponentBitCount: Int {
-    return ${{32:8, 64:11, 80:15}[bits]}
+    return ${ExponentBitCount}
   }
 
   public static var significandBitCount: Int {
-    return ${{32:23, 64:52, 80:63}[bits]}
+    return ${SignificandBitCount}
   }
 
   //  Implementation details.
@@ -745,13 +736,38 @@ public prefix func -(x: ${Self}) -> ${Self} {
 // Construction from integers.
 @_transparent
 extension ${Self} {
-% for (srcBits, srcSigned) in allInts():
-%    That = intName(srcBits, srcSigned)
-%    ThatBuiltinName = builtinIntName(srcBits)
-%    sign = 's' if srcSigned else 'u'
+% for that_ty in all_integer_types(word_bits):
+%   srcBits = that_ty.bits
+%   srcSigned = that_ty.is_signed
+%   srcSign = 's' if srcSigned else 'u'
+%   That = that_ty.stdlib_name
+%   ThatBuiltinName = that_ty.builtin_name
+
+  @_transparent
   public init(_ v: ${That}) {
-    _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
+    _value = Builtin.${srcSign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
   }
+  
+% if srcBits <= SignificandBitCount:
+  @available(*, message: "Converting ${That} to ${Self} will always succeed.")
+% end
+  @_transparent
+  public init?(exactly value: ${That}) {
+% if srcBits > SignificandBitCount:
+    if ${ "abs" if srcSigned else "" }(value) > ${2**SignificandBitCount - 1} {
+      return nil
+    }
+% end  
+
+    _value = Builtin.${srcSign}itofp_${ThatBuiltinName}_FPIEEE${bits}(value._value)
+
+% if srcBits > SignificandBitCount:
+    if ${That}(self) != value {
+      return nil
+    }
+% end
+  }
+  
 % end
 }
 
@@ -760,25 +776,46 @@ extension ${Self} {
 extension ${Self} {
 % for srcBits in allFloatBits:
 %   That = floatName[srcBits]
+%   thatSignificandBitCount = {32:23, 64:52, 80:63}[bits]
 %   if Self != That:
 
-%     if srcBits == 80:
+%   if srcBits == 80:
 #if !os(Windows) && (arch(i386) || arch(x86_64))
-%     end
+%   end
 
-  /// Construct an instance that approximates `other`.
+%   if thatSignificandBitCount <= SignificandBitCount:
+  /// Construct an ${That} that approximates `other`.
+%   else:
+  /// Create an ${That} initialized to `value`.
+%   end
+  @_transparent
   public init(_ other: ${That}) {
-%     if srcBits > bits:
+%       if srcBits == bits:
+      _value = other._value
+%       elif srcBits > bits:
     _value = Builtin.fptrunc_FPIEEE${srcBits}_FPIEEE${bits}(other._value)
-%     else:
+%       else:
     _value = Builtin.fpext_FPIEEE${srcBits}_FPIEEE${bits}(other._value)
-%     end
+%       end
+  }
+  
+% if thatSignificandBitCount <= SignificandBitCount:
+  @available(*, message: "Converting ${That} to ${Self} will always succeed.")
+% end
+  /// Create an ${That} initialized to `value`, if `value` can be represented without rounding.
+  @_transparent
+  public init?(exactly other: ${That}) {
+    self.init(other)
+%    if thatSignificandBitCount <= SignificandBitCount:
+    if ${That}(self) != other {
+      return nil
+    }
+%    end
   }
 
 %     if srcBits == 80:
 #endif
 %     end
-
 %   end
 % end
 }
@@ -903,45 +940,3 @@ public postfix func --(lhs: inout ${Self}) -> ${Self} {
 #endif
 % end
 % end # for bits in allFloatBits
-
-// Construction of integers from floating point numbers.
-%{
-def getFtoIBounds(floatBits, intBits, signed):
-  if not signed:
-    return (-1, 1 << intBits)
-  upper = 1 << intBits - 1
-  if intBits <= explicitSignificandBits[floatBits]:
-    return (-upper - 1, upper)
-  ulp = 1 << intBits - explicitSignificandBits[floatBits]
-  return (-upper - ulp, upper)
-}%
-% for (bits, signed) in allInts():
-%   sign = 's' if signed else 'u'
-%   Self = intName(bits, signed)
-%   BuiltinName = builtinIntName(bits)
-%   intBits = intFormatFix(bits)
-@_transparent
-extension ${Self} {
-%   for srcBits in allFloatBits:
-%     That = floatName[srcBits]
-
-%     if srcBits == 80:
-#if !os(Windows) && (arch(i386) || arch(x86_64))
-%     end
-  /// Creates a ${Self} whose value is `other` rounded towards zero.
-  public init(_ other: ${That}) {
-    _precondition(other.isFinite,
-      "${That} value cannot be converted to ${Self} because it is either infinite or NaN")
-%     (lower, upper) = getFtoIBounds(srcBits, int(intBits), signed)
-    _precondition(other > ${str(lower)}.0,
-      "${That} value cannot be converted to ${Self} because the result would be less than ${Self}.min")
-    _precondition(other < ${str(upper)}.0,
-      "${That} value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
-    self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(other._value)
-  }
-%     if srcBits == 80:
-#endif
-%     end
-%   end
-}
-% end # for (bits, signed) in allInts()

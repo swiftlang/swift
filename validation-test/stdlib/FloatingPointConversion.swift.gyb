@@ -1,0 +1,266 @@
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %S/../../utils/gyb %s -o %t/FloatingPointConversion.swift
+// RUN: %S/../../utils/line-directive %t/FloatingPointConversion.swift -- %target-build-swift %t/FloatingPointConversion.swift -Xfrontend -disable-access-control -o %t/a.out_Debug
+// RUN: %S/../../utils/line-directive %t/FloatingPointConversion.swift -- %target-build-swift %t/FloatingPointConversion.swift -Xfrontend -disable-access-control -o %t/a.out_Release -O
+//
+// RUN: %S/../../utils/line-directive %t/FloatingPointConversion.swift -- %target-run %t/a.out_Debug
+// RUN: %S/../../utils/line-directive %t/FloatingPointConversion.swift -- %target-run %t/a.out_Release
+// REQUIRES: executable_test
+
+import StdlibUnittest
+
+
+%{
+
+from SwiftIntTypes import all_integer_types
+
+# Test cases are written in a way that they don't depend on the word size.
+word_bits = 4
+
+floatNameToSignificandBits = { 'Float32':24, 'Float64':53, 'Float80':64 }
+
+}%
+
+func getInfiniteOrNaNMessage(_ floatType: String) -> String {
+  if _isDebugAssertConfiguration() {
+    return "either infinite or NaN"
+  }
+  return ""
+}
+
+func getTooSmallMessage() -> String {
+  if _isDebugAssertConfiguration() {
+    return "would be less than"
+  }
+  return ""
+}
+
+func getTooLargeMessage() -> String {
+  if _isDebugAssertConfiguration() {
+    return "would be greater than"
+  }
+  return ""
+}
+
+var FixedPointConversionTraps = TestSuite("FloatingPointToFixedPointConversionTraps")
+var FixedPointConversionFailures = TestSuite("FloatingPointToFixedPointConversionFailures")
+
+var FloatingPointConversionTruncations = TestSuite("FloatingPointToFloatingPointConversionTruncations")
+var FloatingPointConversionFailures = TestSuite("FloatingPointToFloatingPointConversionFailures")
+
+% for Self, selfSignificandBits in floatNameToSignificandBits.iteritems():
+
+%     if Self == 'Float80':
+#if arch(i386) || arch(x86_64)
+%     end
+
+%   for int_ty in all_integer_types(word_bits):
+%     OtherInt = int_ty.stdlib_name
+
+FixedPointConversionTraps.test("${Self}/${OtherInt}/+inf")
+  .crashOutputMatches(getInfiniteOrNaNMessage("${Self}")).code {
+  do {
+    var a = get${OtherInt}(${OtherInt}(get${Self}(0.0)))
+    expectEqual(0, a)
+  }
+  do {
+    var a = get${OtherInt}(${OtherInt}(get${Self}(123.0)))
+    expectEqual(123, a)
+  }
+
+  expectCrashLater()
+  _blackHole(get${OtherInt}(${OtherInt}(get${Self}(+${Self}.infinity))))
+}
+
+FixedPointConversionFailures.test("${Self}/${OtherInt}/+inf") {
+  do {
+    var a = (${OtherInt}(exactly: get${Self}(0.0)))
+    expectEqual(0, a)
+  }
+  do {
+    var a = (${OtherInt}(exactly: get${Self}(123.0)))
+    expectEqual(123, a)
+  }
+  do {
+    let a = (${OtherInt}(exactly: get${Self}(+${Self}.infinity)))
+    expectEqual(nil, a)
+  }
+}
+
+%     if int_ty.is_signed:
+
+FixedPointConversionTraps.test("${Self}/${OtherInt}/-inf")
+  .crashOutputMatches(getInfiniteOrNaNMessage("${Self}")).code {
+  do {
+    var a = get${OtherInt}(${OtherInt}(get${Self}(-0.0)))
+    expectEqual(0, a)
+  }
+  do {
+    var a = get${OtherInt}(${OtherInt}(get${Self}(-123.0)))
+    expectEqual(-123, a)
+  }
+
+  expectCrashLater()
+  _blackHole(get${OtherInt}(${OtherInt}(get${Self}(-${Self}.infinity))))
+}
+
+FixedPointConversionFailures.test("${Self}/${OtherInt}/-inf") {
+  do {
+    var a = (${OtherInt}(exactly: get${Self}(-0.0)))
+    expectEqual(0, a)
+  }
+  do {
+    var a = (${OtherInt}(exactly: get${Self}(-123.0)))
+    expectEqual(-123, a)
+  }
+  do {
+    var a = (${OtherInt}(exactly: get${Self}(-123.0)))
+    expectEqual(nil, a)
+  }
+}
+
+%     else:
+
+FixedPointConversionTraps.test("${Self}/${OtherInt}/negative")
+  .crashOutputMatches(getTooSmallMessage()).code {
+  expectCrashLater()
+  _blackHole(get${OtherInt}(${OtherInt}(get${Self}(-123.0))))
+}
+
+FixedPointConversionFailures.test("${Self}/${OtherInt}/negative") {
+  let a = (${OtherInt}(exactly: get${Self}(-123.0)))
+  expectEqual(nil, a)
+}
+
+FixedPointConversionTraps.test("${Self}/${OtherInt}/-inf")
+  .crashOutputMatches(getInfiniteOrNaNMessage("${Self}")).code {
+  expectCrashLater()
+  _blackHole(get${OtherInt}(${OtherInt}(get${Self}(-${Self}.infinity))))
+}
+
+FixedPointConversionFailures.test("${Self}/${OtherInt}/-inf") {
+  let a = (${OtherInt}(exactly: get${Self}(-${Self}.infinity)))
+  expectEqual(nil, a)
+}
+
+%     end
+
+FixedPointConversionTraps.test("${Self}/${OtherInt}/NaN")
+  .crashOutputMatches(getInfiniteOrNaNMessage("${Self}")).code {
+  expectCrashLater()
+  _blackHole(get${OtherInt}(${OtherInt}(get${Self}(${Self}.nan))))
+}
+
+FixedPointConversionFailures.test("${Self}/${OtherInt}/NaN") {
+  let a = (${OtherInt}(exactly: get${Self}(${Self}.nan)))
+  expectEqual(nil, a)
+}
+
+%   end # for in all_integer_types (Other)
+
+%   for OtherFloat, otherSignificandBits in floatNameToSignificandBits.iteritems():
+
+%     if OtherFloat == 'Float80':
+#if arch(i386) || arch(x86_64)
+%     end
+
+%     if otherSignificandBits <= selfSignificandBits:
+
+/// Always-safe conversion from ${OtherFloat}.greatestFiniteMagnitude to ${Self}.
+FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/dest=${OtherFloat}.greatestFiniteMagnitude") {
+  // Test that nothing interesting happens and we end up with the same result after converting.
+  let input = ${OtherFloat}.greatestFiniteMagnitude 
+  let result = ${Self}(input)
+  var resultConvertedBack = ${OtherFloat}(result)
+  expectEqual(input, resultConvertedBack)
+}
+
+/// Never-nil failable conversion from ${OtherFloat}.greatestFiniteMagnitude to ${Self}.
+FloatingPointConversionFailures.test("${OtherFloat}To${Self}FailableConversion/dest=${OtherFloat}.greatestFiniteMagnitude") {
+  // Test that nothing interesting happens and we end up with a non-nil, identical result.
+  let input = ${OtherFloat}.greatestFiniteMagnitude 
+  var result = ${Self}(exactly: input)
+  expectNotEqual(result, nil)
+}
+
+%    else:
+
+/// Always-truncating conversion from ${OtherFloat}.greatestFiniteMagnitude to ${Self}.
+FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/dest=${OtherFloat}.greatestFiniteMagnitude") {
+  // Test that we check if we fail and crash when an float would be truncated in conversion.
+  let input = ${OtherFloat}.greatestFiniteMagnitude 
+  var result = ${Self}(input)
+  var resultConvertedBack = ${OtherFloat}(result)
+  expectNotEqual(input, resultConvertedBack)
+}
+
+/// Always-nil failable conversion from ${OtherFloat}.greatestFiniteMagnitude to ${Self}.
+FloatingPointConversionFailures.test("${OtherFloat}To${Self}FailableConversion/dest=${OtherFloat}.greatestFiniteMagnitude") {
+  // Test that we check if we return nil when a float would be truncated in conversion.
+  let input = ${OtherFloat}.greatestFiniteMagnitude 
+  var result = ${Self}(exactly: input)
+  expectEqual(nil, result)
+}
+
+%    end
+
+FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/dest=NaN") {
+  // Check that initializing with NaN from another type works.
+  let input = ${OtherFloat}.nan
+  var result = ${Self}(input)
+  var resultConvertedBack = ${OtherFloat}(result)
+  expectEqual(input, resultConvertedBack)
+}
+
+FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/dest=NaN") {
+  // Check that initializing with NaN doesn't fail the initializer.
+  let input = ${OtherFloat}.nan
+  var result = ${Self}(exactly: input)
+  expectNotEqual(nil, result)
+}
+
+FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/dest=inf") {
+  // Check that initializing with NaN from another type works.
+  let input = ${OtherFloat}.infinity
+  var result = ${Self}(input)
+  var resultConvertedBack = ${OtherFloat}(result)
+  expectEqual(input, resultConvertedBack)
+}
+
+FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/dest=inf") {
+  // Check that initializing with Inf from another type works.
+  let input = ${OtherFloat}.infinity
+  var result = ${Self}(exactly: input)
+  expectNotEqual(nil, result)
+}
+
+FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/dest=-inf") {
+  // Check that initializing with NaN from another type works.
+  let input = ${OtherFloat}.infinity * -1
+  var result = ${Self}(input)
+  var resultConvertedBack = ${OtherFloat}(result)
+  expectEqual(input, resultConvertedBack)
+}
+
+FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/dest=-inf") {
+  // Check that initializing with -Inf from another type works.
+  let input = ${OtherFloat}.infinity * -1
+  var result = ${Self}(exactly: input)
+  expectNotEqual(nil, result)
+}
+
+%     if OtherFloat == 'Float80':
+#endif
+%     end
+
+%   end # for in floatNameToSignificandBits (Other)
+
+%     if Self == 'Float80':
+#endif
+%     end
+
+% end # for in floatNameToSignificandBits (Self)
+
+runAllTests()
+

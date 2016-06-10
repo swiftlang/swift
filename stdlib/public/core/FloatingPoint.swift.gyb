@@ -75,6 +75,8 @@ public protocol FloatingPoint: Comparable, IntegerLiteralConvertible,
   /// `value` rounded to the closest representable `Self`.
   init(_ value: ${src_ty.stdlib_name})
 
+  /// `value` as `Self`, if `value` can be represented without rounding.
+  init?(exactly value: ${src_ty.stdlib_name})
 % end
   /*  TODO: Implement the following APIs once a revised integer protocol is
       introduced that allows for them to be implemented.  In particular, we

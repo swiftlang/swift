@@ -33,6 +33,21 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
 
+# Mapping from float bits to significand bits
+allFloatBits = [32, 64, 80]
+floatName = { 32:'Float', 64:'Double', 80:'Float80' }
+explicitFloatSignificandBits = { 32:24, 64:53, 80:64 }
+
+
+def getFtoIBounds(floatBits, intBits, signed):
+  if not signed:
+    return (-1, 1 << intBits)
+  upper = 1 << intBits - 1
+  if intBits <= explicitFloatSignificandBits[floatBits]:
+    return (-upper - 1, upper)
+  ulp = 1 << intBits - explicitFloatSignificandBits[floatBits]
+  return (-upper - ulp, upper)
+
 def maskBits(n):
     """Return an n-bit mask in hex"""
     return hexify((1 << n) - 1)
@@ -438,33 +453,40 @@ extension ${Self} {
 %    Src = src_ty.stdlib_name
 %    (srcSign, srcExt) = ('s', 'sext') if srcSigned else ('u', 'zext')
 %    if Self != Src:
-  public init(_ v: ${Src}) {
+  @_transparent
+  public init(_ value: ${Src}) {
+    self.init(exactly: value)!
+  }
+    
+% if srcBits <= bits and (srcSign == sign or not signed): 
+  @available(*, message: "Converting ${Src} to ${Self} will always succeed.")
+% end
+  @_transparent 
+  public init?(exactly value: ${Src}) {
 %
-    let srcNotWord = v._value
+    let srcNotWord = value._value
 %
 %       if srcBits == bits and srcSign == sign:
-    let dstNotWord = srcNotWord
+    let result = (srcNotWord, false)
 %
 %       elif srcBits == bits:
-    let tmp = Builtin.${srcSign}_to_${sign}_checked_conversion_Int${srcBits}(srcNotWord)
-    Builtin.condfail(tmp.1)
-    let dstNotWord = tmp.0
+    let result = Builtin.${srcSign}_to_${sign}_checked_conversion_Int${srcBits}(srcNotWord)
 %
 %       elif srcBits > bits:
-    let tmp = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(srcNotWord)
-    Builtin.condfail(tmp.1)
-    let dstNotWord = tmp.0
+    let result = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(srcNotWord)
 %
 %       elif srcSigned and not signed:
     let tmp = Builtin.s_to_u_checked_conversion_Int${srcBits}(srcNotWord)
-    Builtin.condfail(tmp.1)
-    let dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(tmp.0)
+    let result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(tmp.0), false)
 %
 %       else:
-    let dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(srcNotWord)
+    let result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(srcNotWord), false)
 %       end
 %
-    self._value = dstNotWord
+    if Bool(result.1) == false {
+      return nil
+    }
+    self._value = result.0
   }
 %    end
 
@@ -489,6 +511,40 @@ extension ${Self} {
 
 %    end
 % end
+
+// Construction of integers from floating point numbers.
+%   for srcBits in allFloatBits:
+%     Src = floatName[srcBits]
+%     (lower, upper) = getFtoIBounds(srcBits, int(bits), signed)
+
+%     if srcBits == 80:
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+%     end
+
+  /// Creates a ${Self} whose value is `value` rounded towards zero.
+  @_transparent
+  public init(_ value: ${Src}) {
+    _precondition(value.isFinite,
+      "${Src} value cannot be converted to ${Self} because it is either infinite or NaN")
+    _precondition(value > ${str(lower)}.0,
+      "${Src} value cannot be converted to ${Self} because the result would be less than ${Self}.min")
+    _precondition(value < ${str(upper)}.0,
+      "${Src} value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
+    self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(value._value)
+  }
+
+  /// Creates a ${Self} whose value is `value` if no rounding is necessary, nil otherwise.
+  @_transparent
+  public init?(exactly value: ${Src}) {
+    if value.isFinite == false || value < ${str(lower)}.0 || value > ${str(upper)}.0 {
+      return nil
+    }
+    self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(value._value)
+  }
+%     if srcBits == 80:
+#endif
+%     end
+%   end
 
   /// Construct a `${Self}` having the same memory representation as
   /// the `${OtherSelf}` `bitPattern`.  No range or overflow checking
