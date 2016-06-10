@@ -1115,7 +1115,8 @@ def main():
 
     if args.test or args.verbose_test:
         import doctest
-        if doctest.testmod(verbose=args.verbose_test).failed:
+        selfmod = sys.modules[__name__]
+        if doctest.testmod(selfmod, verbose=args.verbose_test).failed:
             sys.exit(1)
 
     bindings = dict(x.split('=', 1) for x in args.defines)
