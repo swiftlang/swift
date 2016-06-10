@@ -10,8 +10,27 @@
 #
 # ----------------------------------------------------------------------------
 
+from .cmark import CMark
+from .foundation import Foundation
+from .libdispatch import LibDispatch
+from .llbuild import LLBuild
+from .lldb import LLDB
+from .llvm import LLVM
 from .ninja import Ninja
+from .swift import Swift
+from .swiftpm import SwiftPM
+from .xctest import XCTest
 
 __all__ = [
+    'CMark',
     'Ninja',
+    'Foundation',
+    'LibDispatch',
+    'LLBuild',
+    'LLDB',
+    'LLVM',
+    'Ninja',
+    'Swift',
+    'SwiftPM',
+    'XCTest',
 ]

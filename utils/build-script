@@ -50,7 +50,11 @@ from swift_build_support.cmake import CMake  # noqa (E402)
 import swift_build_support.workspace    # noqa (E402)
 
 
-def call_without_sleeping(command, env=None, dry_run=False):
+build_script_impl = os.path.join(
+    SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl")
+
+
+def call_without_sleeping(command, env=None, dry_run=False, echo=False):
     """
     Execute a command during which system sleep is disabled.
 
@@ -62,7 +66,7 @@ def call_without_sleeping(command, env=None, dry_run=False):
         # Don't mutate the caller's copy of the arguments.
         command = ["caffeinate"] + list(command)
 
-    shell.call(command, env=env, dry_run=dry_run)
+    shell.call(command, env=env, dry_run=dry_run, echo=echo)
 
 
 class HostSpecificConfiguration(object):
@@ -774,6 +778,115 @@ class BuildScriptInvocation(object):
 
         return options
 
+    def compute_product_classes(self):
+        """compute_product_classes() -> list
+
+        Compute the list of all Product classes used in this build. This list
+        is constructed in dependency order.
+        """
+
+        # FIXME: This is a weird division (returning a list of class objects),
+        # but it matches the existing structure of the `build-script-impl`.
+
+        product_classes = []
+        product_classes.append(products.CMark)
+        product_classes.append(products.LLVM)
+        product_classes.append(products.Swift)
+        if self.args.build_lldb:
+            product_classes.append(products.LLDB)
+        if self.args.build_llbuild:
+            product_classes.append(products.LLBuild)
+        if self.args.build_libdispatch:
+            product_classes.append(products.LibDispatch)
+        if self.args.build_foundation:
+            product_classes.append(products.Foundation)
+        if self.args.build_xctest:
+            product_classes.append(products.XCTest)
+        if self.args.build_swiftpm:
+            product_classes.append(products.SwiftPM)
+        return product_classes
+
+    def execute(self):
+        """Execute the invocation with the configured arguments."""
+
+        # Convert to a build-script-impl invocation.
+        (impl_env, impl_args) = self.convert_to_impl_arguments()
+
+        # If using the legacy implementation, delegate all behavior to
+        # `build-script-impl`.
+        if self.args.legacy_impl:
+            # Execute the underlying build script implementation.
+            call_without_sleeping([build_script_impl] + impl_args,
+                                  env=impl_env, echo=True)
+            return
+
+        # Otherwise, we compute and execute the individual actions ourselves.
+
+        def execute_one_impl_action(host=None, product_class=None, name=None):
+            if host is None:
+                assert (product_class is None and
+                        name == "merged-hosts-lipo"), "invalid action"
+                action_name = name
+            elif product_class is None:
+                assert name == "package", "invalid action"
+                action_name = "{}-{}".format(host.name, name)
+            else:
+                assert name is not None, "invalid action"
+                action_name = "{}-{}-{}".format(
+                    host.name, product_class.product_name(), name)
+            call_without_sleeping(
+                [build_script_impl] + impl_args + [
+                    "--only-execute", action_name],
+                env=impl_env, echo=self.args.verbose_build)
+
+        # Compute the list of hosts to operate on.
+        all_host_names = [
+            self.args.host_target] + self.args.cross_compile_hosts
+        all_hosts = [StdlibDeploymentTarget.get_target_for_name(name)
+                     for name in all_host_names]
+
+        # Compute the list of product classes to operate on.
+        #
+        # FIXME: This should really be per-host, but the current structure
+        # matches that of `build-script-impl`.
+        product_classes = self.compute_product_classes()
+
+        # Execute each "pass".
+
+        # Build...
+        for host_target in all_hosts:
+            # FIXME: We should only compute these once.
+            config = HostSpecificConfiguration(host_target.name, self)
+            print("Building the standard library for: {}".format(
+                " ".join(config.swift_stdlib_build_targets)))
+            if config.swift_test_run_targets and (
+                    self.args.test or self.args.long_test):
+                print("Running Swift tests for: {}".format(
+                    " ".join(config.swift_test_run_targets)))
+            if config.swift_benchmark_run_targets and self.args.benchmark:
+                print("Running Swift benchmarks for: {}".format(
+                    " ".join(config.swift_benchmark_run_targets)))
+
+            for product_class in product_classes:
+                execute_one_impl_action(host_target, product_class, "build")
+
+        # Test...
+        for host_target in all_hosts:
+            for product_class in product_classes:
+                execute_one_impl_action(host_target, product_class, "test")
+
+        # Install...
+        for host_target in all_hosts:
+            for product_class in product_classes:
+                execute_one_impl_action(host_target, product_class, "install")
+
+        # Package...
+        for host_target in all_hosts:
+            execute_one_impl_action(host_target, name="package")
+
+        # Lipo...
+        execute_one_impl_action(name="merged-hosts-lipo")
+
 
 # Main entry point for the preset mode.
 def main_preset():
@@ -1042,6 +1155,11 @@ details of the setups of other systems or automated environments.""")
              "them",
         action="store_true",
         default=False)
+    parser.add_argument(
+        "--no-legacy-impl", dest="legacy_impl",
+        help="avoid legacy implementation",
+        action="store_false",
+        default=True)
 
     targets_group = parser.add_argument_group(
         title="Host and cross-compilation targets")
@@ -1739,9 +1857,6 @@ details of the setups of other systems or automated environments.""")
 
     args = migration.parse_args(parser, sys.argv[1:])
 
-    build_script_impl = os.path.join(
-        SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl")
-
     if args.build_script_impl_args:
         # If we received any impl args, check if `build-script-impl` would
         # accept them or not before any further processing.
@@ -1795,13 +1910,8 @@ details of the setups of other systems or automated environments.""")
     if args.build_ninja:
         invocation.build_ninja()
 
-    # Convert to a build-script-impl invocation.
-    (build_script_impl_env, build_script_impl_args) = \
-        invocation.convert_to_impl_arguments()
-
     # Execute the underlying build script implementation.
-    call_without_sleeping([build_script_impl] + build_script_impl_args,
-                          env=build_script_impl_env)
+    invocation.execute()
 
     if args.symbols_package:
         print('--- Creating symbols package ---')
