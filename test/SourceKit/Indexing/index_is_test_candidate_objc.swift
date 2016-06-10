@@ -12,7 +12,7 @@ struct MyStruct {
   func test_startsWithTest_takesNoParams_returnsVoid_butIsDefinedOnAStruct() {}
 }
 
-private class MyPrivateClass() {
+private class MyPrivateClass {
   func test_startsWithTest_takesNoParams_returnsVoid_andIsPrivate() {}
 }
 
