@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/Lazy.swift
-// RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-build-swift %t/Lazy.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-run %t/a.out
+// RUN: %gyb %s -o %t/Lazy.swift
+// RUN: %line-directive %t/Lazy.swift -- %target-build-swift %t/Lazy.swift -o %t/a.out
+// RUN: %line-directive %t/Lazy.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
 import StdlibUnittest

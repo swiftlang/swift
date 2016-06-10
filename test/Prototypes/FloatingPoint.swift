@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %S/../../utils/line-directive %s -- %target-build-swift -parse-stdlib %s -o %t/a.out
-// RUN: %S/../../utils/line-directive %s -- %target-run %t/a.out
+// RUN: %line-directive %s -- %target-build-swift -parse-stdlib %s -o %t/a.out
+// RUN: %line-directive %s -- %target-run %t/a.out
 // REQUIRES: executable_test
 import Swift
 

@@ -7,9 +7,9 @@
 
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %S/../../../utils/gyb %s -o %t/main.swift
-// RUN: %S/../../../utils/line-directive %t/main.swift -- %target-build-swift %t/main.swift -o %t/MutableRangeReplaceableRandomAccessSlice_Of_MinimalMutableRangeReplaceableRandomAccessCollection_WithPrefixAndSuffix.swift.gyb.a.out
-// RUN: %S/../../../utils/line-directive %t/main.swift -- %target-run %t/MutableRangeReplaceableRandomAccessSlice_Of_MinimalMutableRangeReplaceableRandomAccessCollection_WithPrefixAndSuffix.swift.gyb.a.out
+// RUN: %gyb %s -o %t/main.swift
+// RUN: %line-directive %t/main.swift -- %target-build-swift %t/main.swift -o %t/MutableRangeReplaceableRandomAccessSlice_Of_MinimalMutableRangeReplaceableRandomAccessCollection_WithPrefixAndSuffix.swift.gyb.a.out
+// RUN: %line-directive %t/main.swift -- %target-run %t/MutableRangeReplaceableRandomAccessSlice_Of_MinimalMutableRangeReplaceableRandomAccessCollection_WithPrefixAndSuffix.swift.gyb.a.out
 // REQUIRES: executable_test
 
 // FIXME: the test is too slow when the standard library is not optimized.

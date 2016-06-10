@@ -15,9 +15,9 @@
 //  distinguish these cases efficiently.
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/out.swift
-// RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
+// RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/out.swift
+// RUN: %line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out
+// RUN: %line-directive %t/out.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
