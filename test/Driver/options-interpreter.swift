@@ -17,8 +17,9 @@
 // RUN: %swift_driver -### -target x86_64-apple-macosx10.9 -resource-dir /RSRC/ %s | FileCheck -check-prefix=CHECK-RESOURCE-DIR-ONLY %s
 // CHECK-RESOURCE-DIR-ONLY: # DYLD_LIBRARY_PATH=/RSRC/macosx{{$}}
 
-// RUN: %swift_driver -### -target x86_64-unknown-linux-gnu -resource-dir /RSRC/ %s | FileCheck -check-prefix=CHECK-RESOURCE-DIR-ONLY-LINUX %s
+// RUN: %swift_driver -### -target x86_64-unknown-linux-gnu -resource-dir /RSRC/ %s | FileCheck -check-prefix=CHECK-RESOURCE-DIR-ONLY-LINUX${LD_LIBRARY_PATH+_LAX} %s
 // CHECK-RESOURCE-DIR-ONLY-LINUX: # LD_LIBRARY_PATH=/RSRC/linux{{$}}
+// CHECK-RESOURCE-DIR-ONLY-LINUX_LAX: # LD_LIBRARY_PATH=/RSRC/linux{{$|:}}
 
 // RUN: %swift_driver -### -target x86_64-apple-macosx10.9 -L/foo/ %s | FileCheck -check-prefix=CHECK-L %s
 // CHECK-L: # DYLD_LIBRARY_PATH={{/foo/:[^:]+/lib/swift/macosx$}}
@@ -57,8 +58,10 @@
 // CHECK-COMPLEX-DAG: DYLD_FRAMEWORK_PATH=/foo/:/bar/:/abc/{{$| }}
 // CHECK-COMPLEX-DAG: DYLD_LIBRARY_PATH={{/foo2/:/bar2/:[^:]+/lib/swift/macosx($| )}}
 
-// RUN: %swift_driver -### -target x86_64-unknown-linux-gnu -L/foo/ %s | FileCheck -check-prefix=CHECK-L-LINUX %s
+// RUN: %swift_driver -### -target x86_64-unknown-linux-gnu -L/foo/ %s | FileCheck -check-prefix=CHECK-L-LINUX${LD_LIBRARY_PATH+_LAX} %s
 // CHECK-L-LINUX: # LD_LIBRARY_PATH={{/foo/:[^:]+/lib/swift/linux$}}
+// CHECK-L-LINUX_LAX: # LD_LIBRARY_PATH={{/foo/:[^:]+/lib/swift/linux($|:)}}
 
-// RUN: env LD_LIBRARY_PATH=/abc/ %swift_driver_plain -### -target x86_64-unknown-linux-gnu -L/foo/ -L/bar/ %s | FileCheck -check-prefix=CHECK-LINUX-COMPLEX %s
+// RUN: env LD_LIBRARY_PATH=/abc/ %swift_driver_plain -### -target x86_64-unknown-linux-gnu -L/foo/ -L/bar/ %s | FileCheck -check-prefix=CHECK-LINUX-COMPLEX${LD_LIBRARY_PATH+_LAX} %s
 // CHECK-LINUX-COMPLEX: # LD_LIBRARY_PATH={{/foo/:/bar/:[^:]+/lib/swift/linux:/abc/$}}
+// CHECK-LINUX-COMPLEX_LAX: # LD_LIBRARY_PATH={{/foo/:/bar/:[^:]+/lib/swift/linux:/abc/($|:)}}
