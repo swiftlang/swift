@@ -362,21 +362,23 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       }
     }
 
-    // Substitute the base into the member's type.
-    if (Type memberType = substMemberTypeWithBase(dc->getParentModule(),
-                                                  typeDecl, type,
-                                                  /*isTypeReference=*/true)) {
-
-      // Similar to the associated type case, ignore typealiases containing
-      // associated types when looking into a non-protocol.
+    // Similar to the associated type case, ignore typealiases containing
+    // associated types when looking into a non-protocol.
+    if (type->isExistentialType()) {
       if (auto alias = dyn_cast<TypeAliasDecl>(typeDecl)) {
         auto parentProtocol = alias->getDeclContext()->
           getAsProtocolOrProtocolExtensionContext();
-        if (parentProtocol && memberType->hasTypeParameter() &&
+        if (parentProtocol && alias->getInterfaceType()->hasTypeParameter() &&
             !type->is<ArchetypeType>() && !type->isExistentialType()) {
           continue;
         }
       }
+    }
+
+    // Substitute the base into the member's type.
+    if (Type memberType = substMemberTypeWithBase(dc->getParentModule(),
+                                                  typeDecl, type,
+                                                  /*isTypeReference=*/true)) {
 
       // If we haven't seen this type result yet, add it to the result set.
       if (types.insert(memberType->getCanonicalType()).second)
