@@ -27,5 +27,5 @@ func foo() {
   f1 { left, right in left == 0 || right == 1 }
 }
 
-bar(arr: [{ x in x }])
+bar([{ x in x }])
 foo()

@@ -733,7 +733,9 @@ function true_false() {
 # Set default values for command-line parameters.
 #
 function false_true() {
-    if [[ $(true_false "$1") = "TRUE" ]]; then
+    if [ -z "$1" ]; then
+        echo "TRUE"
+    elif [[ $(true_false "$1") = "TRUE" ]]; then
         echo "FALSE"
     else
         echo "TRUE"

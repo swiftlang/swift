@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir %t
-// RUN: %target-build-swift %s -profile-generate -profile-coverage-mapping -Xfrontend -disable-incremental-llvm-codegen -o %t/main
+// RUN: %target-build-swift %s -profile-generate -profile-coverage-mapping -o %t/main
 // RUN: env LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
 // RUN: %llvm-profdata show %t/default.profdata -function=f_internal | FileCheck %s --check-prefix=CHECK-INTERNAL
@@ -12,7 +12,6 @@
 // REQUIRES: profile_runtime
 // REQUIRES: OS=macosx
 
-// XFAIL: asan
 // CHECK-INTERNAL: Functions shown: 1
 // CHECK-COV: 1|{{.*}}[[@LINE+1]]|{{.*}}func f_internal
 internal func f_internal() {}
