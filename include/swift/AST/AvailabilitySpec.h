@@ -89,6 +89,12 @@ public:
   static bool classof(const AvailabilitySpec *Spec) {
     return Spec->getKind() == AvailabilitySpecKind::VersionConstraint;
   }
+
+  void *
+  operator new(size_t Bytes, ASTContext &C,
+               unsigned Alignment = alignof(VersionConstraintAvailabilitySpec)){
+    return AvailabilitySpec::operator new(Bytes, C, Alignment);
+  }
 };
 
 /// A wildcard availability specification that guards execution
@@ -114,6 +120,12 @@ public:
 
   static bool classof(const AvailabilitySpec *Spec) {
     return Spec->getKind() == AvailabilitySpecKind::OtherPlatform;
+  }
+
+  void *
+  operator new(size_t Bytes, ASTContext &C,
+               unsigned Alignment = alignof(OtherPlatformAvailabilitySpec)) {
+    return AvailabilitySpec::operator new(Bytes, C, Alignment);
   }
 };
 

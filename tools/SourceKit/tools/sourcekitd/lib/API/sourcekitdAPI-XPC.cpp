@@ -182,7 +182,9 @@ public:
 
   void visitString(StringRef Str) {
     OS << '\"';
-    OS.write_escaped(Str);
+    // Avoid raw_ostream's write_escaped, we don't want to escape unicode
+    // characters because it will be invalid JSON.
+    writeEscaped(Str, OS);
     OS << '\"';
   }
 

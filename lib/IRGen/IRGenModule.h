@@ -19,6 +19,8 @@
 #define SWIFT_IRGEN_IRGENMODULE_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
+#include "swift/SIL/SILFunction.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/SuccessorMap.h"
@@ -62,10 +64,9 @@ namespace clang {
   class Decl;
   class Type;
   namespace CodeGen {
-    class CodeGenABITypes;
+    class CGFunctionInfo;
   }
 }
-using clang::CodeGen::CodeGenABITypes;
 
 namespace swift {
   class ArchetypeBuilder;
@@ -315,9 +316,6 @@ public:
   const SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
   IRGenDebugInfo *DebugInfo;
-  /// A Clang-to-IR-type converter for types appearing in function
-  /// signatures of Objective-C methods and C functions.
-  CodeGenABITypes *ABITypes;
 
   /// Does the current target require Objective-C interoperation?
   bool ObjCInterop = true;

@@ -42,6 +42,7 @@ UIdent sourcekitd::KeyModuleName("key.modulename");
 UIdent sourcekitd::KeyNotification("key.notification");
 UIdent sourcekitd::KeyKeyword("key.keyword");
 UIdent sourcekitd::KeyName("key.name");
+UIdent sourcekitd::KeyNames("key.names");
 UIdent sourcekitd::KeyEnableSyntaxMap("key.enablesyntaxmap");
 UIdent sourcekitd::KeyEnableDiagnostics("key.enablediagnostics");
 UIdent sourcekitd::KeySyntacticOnly("key.syntactic_only");
@@ -106,6 +107,7 @@ UIdent sourcekitd::KeyCodeCompleteOptions("key.codecomplete.options");
 UIdent sourcekitd::KeyNextRequestStart("key.nextrequeststart");
 UIdent sourcekitd::KeyPopular("key.popular");
 UIdent sourcekitd::KeyUnpopular("key.unpopular");
+UIdent sourcekitd::KeySimplified("key.simplified");
 
 UIdent sourcekitd::KeyIsDeprecated("key.is_deprecated");
 UIdent sourcekitd::KeyIsUnavailable("key.is_unavailable");
@@ -128,6 +130,7 @@ static UIdent *OrderedKeys[] = {
   &KeySetterAccessibility,
   &KeyKeyword,
   &KeyName,
+  &KeyNames,
   &KeyUSR,
   &KeyGenericParams,
   &KeyGenericRequirements,
@@ -330,7 +333,9 @@ public:
 
   void visitString(StringRef Str) {
     OS << '\"';
-    OS.write_escaped(Str);
+    // Avoid raw_ostream's write_escaped, we don't want to escape unicode
+    // characters because it will be invalid JSON.
+    writeEscaped(Str, OS);
     OS << '\"';
   }
 
@@ -342,6 +347,30 @@ public:
     }
   }
 };
+}
+
+void sourcekitd::writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS) {
+  for (unsigned i = 0, e = Str.size(); i != e; ++i) {
+    unsigned char c = Str[i];
+
+    switch (c) {
+    case '\\':
+      OS << '\\' << '\\';
+      break;
+    case '\t':
+      OS << '\\' << 't';
+      break;
+    case '\n':
+      OS << '\\' << 'n';
+      break;
+    case '"':
+      OS << '\\' << '"';
+      break;
+    default:
+      OS << c;
+      break;
+    }
+  }
 }
 
 static void printError(sourcekitd_response_t Err, raw_ostream &OS) {

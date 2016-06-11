@@ -8,7 +8,7 @@
 // CHECK-SIL: debug_value_addr %0 : $*T, let, name "t"
 
 // CHECK: define {{.*}}_TF16debug_value_addr4testurFxT_
-// CHECK: entry:
+// CHECK-NEXT: entry
 // CHECK-NEXT: %[[TADDR:.*]] = alloca
 // CHECK: store %swift.opaque* %0, %swift.opaque** %[[TADDR:.*]], align
 // CHECK-NEXT: call void @llvm.dbg.declare({{.*}}%[[TADDR]]

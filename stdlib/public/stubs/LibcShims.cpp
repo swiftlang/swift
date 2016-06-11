@@ -10,16 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <random>
 #include <type_traits>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include "../SwiftShims/LibcShims.h"
-
-#if defined(__linux__)
-#include <bsd/stdlib.h>
-#endif
 
 static_assert(std::is_same<ssize_t, swift::__swift_ssize_t>::value,
               "__swift_ssize_t is wrong");
@@ -64,11 +61,18 @@ size_t _swift_stdlib_malloc_size(const void *ptr) {
 #error No malloc_size analog known for this platform/libc.
 #endif
 
-__swift_uint32_t _swift_stdlib_arc4random(void) { return arc4random(); }
+static std::mt19937 MersenneRandom;
+
+__swift_uint32_t _swift_stdlib_cxx11_mt19937(void) {
+  return MersenneRandom();
+}
 
 __swift_uint32_t
-_swift_stdlib_arc4random_uniform(__swift_uint32_t upper_bound) {
-  return arc4random_uniform(upper_bound);
+_swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
+  if (upper_bound > 0)
+    upper_bound--;
+  std::uniform_int_distribution<__swift_uint32_t> RandomUniform(0, upper_bound);
+  return RandomUniform(MersenneRandom);
 }
 
 } // namespace swift

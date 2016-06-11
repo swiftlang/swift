@@ -34,20 +34,22 @@ protocol ABO : A, B, O { func abo() }
 // CHECK: }
 
 // -- @objc protocol O uses ObjC symbol mangling and layout
-// CHECK: @_PROTOCOL__TtP17protocol_metadata1O_ = private constant { {{.*}} i32, { [1 x i8*] }* } {
+// CHECK: @_PROTOCOL__TtP17protocol_metadata1O_ = private constant { {{.*}} i32, { [1 x i8*] }*, i8*, i8* } {
 // CHECK:   @_PROTOCOL_INSTANCE_METHODS__TtP17protocol_metadata1O_,
-// -- flags: 1 = Swift
-// CHECK:   i32 80, i32 1
+// -- size, flags: 1 = Swift
+// CHECK:   i32 96, i32 1
+// CHECK: }
 // CHECK: @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata1O_
 // CHECK: }
 
 // -- @objc protocol OPT uses ObjC symbol mangling and layout
-// CHECK: @_PROTOCOL__TtP17protocol_metadata3OPT_ = private constant { {{.*}} i32, { [4 x i8*] }* } {
+// CHECK: @_PROTOCOL__TtP17protocol_metadata3OPT_ = private constant { {{.*}} i32, { [4 x i8*] }*, i8*, i8* } {
 // CHECK:   @_PROTOCOL_INSTANCE_METHODS_OPT__TtP17protocol_metadata3OPT_,
 // CHECK:   @_PROTOCOL_CLASS_METHODS_OPT__TtP17protocol_metadata3OPT_,
-// CHECK:   i32 80, i32 1
-// CHECK:   @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata3OPT_
-// -- flags: 1 = Swift
+// -- size, flags: 1 = Swift
+// CHECK:   i32 96, i32 1
+// CHECK: }
+// CHECK: @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata3OPT_
 // CHECK: }
 
 // -- inheritance lists for refined protocols

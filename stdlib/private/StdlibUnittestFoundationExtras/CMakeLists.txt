@@ -2,6 +2,7 @@ add_swift_library(swiftStdlibUnittestFoundationExtras SHARED IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
   StdlibUnittestFoundationExtras.swift
+  UnavailableFoundationMethodThunks.mm
 
   # Cannot serialize StdlibUnittestFoundationExtras because of:
   # <rdar://problem/18917405> Compiling StdlibUnittest with -sil-serialize-all

@@ -73,12 +73,12 @@ StringRef IRGenDebugInfo::BumpAllocatedString(StringRef S) {
 }
 
 /// Return the size reported by a type.
-static unsigned getSizeInBits(llvm::DIType *Ty, const TrackingDIRefMap &Map) {
+static unsigned getSizeInBits(llvm::DIType *Ty) {
   // Follow derived types until we reach a type that
   // reports back a size.
   while (isa<llvm::DIDerivedType>(Ty) && !Ty->getSizeInBits()) {
     auto *DT = cast<llvm::DIDerivedType>(Ty);
-    Ty = DT->getBaseType().resolve(Map);
+    Ty = DT->getBaseType().resolve();
     if (!Ty)
       return 0;
   }
@@ -86,10 +86,9 @@ static unsigned getSizeInBits(llvm::DIType *Ty, const TrackingDIRefMap &Map) {
 }
 
 /// Return the size reported by the variable's type.
-static unsigned getSizeInBits(const llvm::DILocalVariable *Var,
-                              const TrackingDIRefMap &Map) {
-  llvm::DIType *Ty = Var->getType().resolve(Map);
-  return getSizeInBits(Ty, Map);
+static unsigned getSizeInBits(const llvm::DILocalVariable *Var) {
+  llvm::DIType *Ty = Var->getType().resolve();
+  return getSizeInBits(Ty);
 }
 
 IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
@@ -138,8 +137,8 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
       Lang, AbsMainFile, Opts.DebugCompilationDir, Producer, IsOptimized,
       Flags, RuntimeVersion, SplitName,
       Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables
-          ? llvm::DIBuilder::LineTablesOnly
-          : llvm::DIBuilder::FullDebug);
+          ? llvm::DICompileUnit::LineTablesOnly
+          : llvm::DICompileUnit::FullDebug);
   MainFile = getOrCreateFile(BumpAllocatedString(AbsMainFile).data());
 
   if (auto *MainFunc = IGM.SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)) {
@@ -904,13 +903,12 @@ static uint64_t getSizeFromExplosionValue(const clang::TargetInfo &TI,
 /// A generator that recursively returns the size of each element of a
 /// composite type.
 class ElementSizes {
-  const TrackingDIRefMap &DIRefMap;
   llvm::SmallPtrSetImpl<const llvm::DIType *> &IndirectEnums;
   llvm::SmallVector<const llvm::DIType *, 12> Stack;
 public:
   ElementSizes(const llvm::DIType *DITy, const TrackingDIRefMap &DIRefMap,
                llvm::SmallPtrSetImpl<const llvm::DIType *> &IndirectEnums)
-    : DIRefMap(DIRefMap), IndirectEnums(IndirectEnums), Stack(1, DITy) {}
+    : IndirectEnums(IndirectEnums), Stack(1, DITy) {}
 
   struct SizeAlign {
     uint64_t SizeInBits, AlignInBits;
@@ -948,7 +946,7 @@ public:
     case llvm::dwarf::DW_TAG_typedef: {
       // Replace top of stack.
       auto *DTy = cast<llvm::DIDerivedType>(Cur);
-      Stack.push_back(DTy->getBaseType().resolve(DIRefMap));
+      Stack.push_back(DTy->getBaseType().resolve());
       return getNext();
     }
     default:
@@ -1020,7 +1018,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
   auto *BB = Builder.GetInsertBlock();
   bool IsPiece = Storage.size() > 1;
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
-  unsigned VarSizeInBits = getSizeInBits(Var, DIRefMap);
+  unsigned VarSizeInBits = getSizeInBits(Var);
   ElementSizes EltSizes(DITy, DIRefMap, IndirectEnumCases);
   auto Dim = EltSizes.getNext();
   for (llvm::Value *Piece : Storage) {
@@ -1061,8 +1059,8 @@ void IRGenDebugInfo::emitVariableDeclaration(
       auto Size = Dim.SizeInBits;
       Dim = EltSizes.getNext();
       OffsetInBits +=
-        llvm::RoundUpToAlignment(Size, Dim.AlignInBits ? Dim.AlignInBits
-                                                       : SizeOfByte);
+        llvm::alignTo(Size, Dim.AlignInBits ? Dim.AlignInBits
+                      : SizeOfByte);
     }
     emitDbgIntrinsic(BB, Piece, Var, DBuilder.createExpression(Operands), Line,
                      Loc.Col, Scope, DS);
@@ -1152,8 +1150,8 @@ IRGenDebugInfo::createMemberType(DebugTypeInfo DbgTy, StringRef Name,
   auto *DITy = DBuilder.createMemberType(
       Scope, Name, File, 0, SizeOfByte * DbgTy.size.getValue(),
       SizeOfByte * DbgTy.align.getValue(), OffsetInBits, Flags, Ty);
-  OffsetInBits += getSizeInBits(Ty, DIRefMap);
-  OffsetInBits = llvm::RoundUpToAlignment(OffsetInBits,
+  OffsetInBits += getSizeInBits(Ty);
+  OffsetInBits = llvm::alignTo(OffsetInBits,
                                           SizeOfByte * DbgTy.align.getValue());
   return DITy;
 }

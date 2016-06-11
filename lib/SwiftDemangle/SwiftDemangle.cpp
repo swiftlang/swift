@@ -23,7 +23,7 @@ static bool isSwiftPrefixed(const char *MangledName) {
   return (MangledName[0] == '_' && MangledName[1] == 'T');
 }
 
-size_t swift_demangle_getDemangledName_Options(const char *MangledName,
+static size_t swift_demangle_getDemangledName_Options(const char *MangledName,
     char *OutputBuffer, size_t Length,
     swift::Demangle::DemangleOptions DemangleOptions) {
   assert(MangledName != nullptr && "null input");

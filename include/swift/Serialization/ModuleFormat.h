@@ -52,7 +52,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 235; // swift3_migration property rename
+const uint16_t VERSION_MINOR = 236; // break compatibility with Xcode 7.3
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -414,6 +414,7 @@ namespace control_block {
     METADATA, // ID
     BCFixed<16>, // Module format major version
     BCFixed<16>, // Module format minor version
+    BCVBR<8>, // length of "short version string" in the blob
     BCBlob // misc. version information
   >;
 

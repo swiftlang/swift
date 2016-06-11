@@ -185,6 +185,11 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
         }
       }
 
+      // This field was added later; be resilient against its absence.
+      if (scratch.size() > 2) {
+        result.shortVersion = blobData.slice(0, scratch[2]);
+      }
+
       versionSeen = true;
       break;
     }
@@ -718,7 +723,7 @@ static bool isTargetTooNew(const llvm::Triple &moduleTarget,
 ModuleFile::ModuleFile(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-    bool isFramework,
+    bool isFramework, serialization::ValidationInfo &info,
     serialization::ExtendedValidationInfo *extInfo)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
@@ -750,7 +755,7 @@ ModuleFile::ModuleFile(
     case CONTROL_BLOCK_ID: {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
 
-      auto info = validateControlBlock(cursor, scratch, extInfo);
+      info = validateControlBlock(cursor, scratch, extInfo);
       if (info.status != Status::Valid) {
         error(info.status);
         return;

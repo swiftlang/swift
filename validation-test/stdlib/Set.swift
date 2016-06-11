@@ -11,6 +11,8 @@
 // XFAIL: linux
 
 import StdlibUnittest
+// For rand32
+import SwiftPrivate
 import Foundation
 
 // For experimental Set operators
@@ -38,8 +40,8 @@ extension SetGenerator where Element : TestProtocol1 {
 }
 
 let hugeNumberArray = (0..<500).map {
-  (i: Int) -> Int in
-  return random()
+  (_: Int) -> Int in
+  return Int(bitPattern: UInt(arc4random()))
 }
 
 var SetTestSuite = TestSuite("Set")
@@ -93,7 +95,7 @@ func helperDeleteThree(k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
 }
 
 func uniformRandom(max: Int) -> Int {
-  return Int(arc4random_uniform(UInt32(max)))
+  return Int(rand32(exclusiveUpperBound: UInt32(max)))
 }
 
 func pickRandom<T>(a: [T]) -> T {
@@ -2125,12 +2127,37 @@ SetTestSuite.test("BridgedToObjC.Verbatim.Count") {
 }
 
 SetTestSuite.test("BridgedToObjC.Verbatim.Contains") {
-  let nss = getBridgedNSSetOfRefTypesBridgedVerbatim()
+  let s = getBridgedNSSetOfRefTypesBridgedVerbatim()
 
-  expectNotEmpty(nss.member(TestObjCKeyTy(1010)))
-  expectNotEmpty(nss.member(TestObjCKeyTy(2020)))
-  expectNotEmpty(nss.member(TestObjCKeyTy(3030)))
-  expectEmpty(nss.member(TestObjCKeyTy(4040)))
+  var v: AnyObject? = s.member(TestObjCKeyTy(1010))
+  expectEqual(1010, (v as! TestObjCKeyTy).value)
+  let idValue10 = unsafeBitCast(v, UInt.self)
+
+  v = s.member(TestObjCKeyTy(2020))
+  expectEqual(2020, (v as! TestObjCKeyTy).value)
+  let idValue20 = unsafeBitCast(v, UInt.self)
+
+  v = s.member(TestObjCKeyTy(3030))
+  expectEqual(3030, (v as! TestObjCKeyTy).value)
+  let idValue30 = unsafeBitCast(v, UInt.self)
+
+  expectEmpty(s.member(TestObjCKeyTy(4040)))
+
+  // NSSet can store mixed key types.  Swift's Set is typed, but when bridged
+  // to NSSet, it should behave like one, and allow queries for mismatched key
+  // types.
+  expectEmpty(s.member(TestObjCInvalidKeyTy()))
+
+  for i in 0..<3 {
+    expectEqual(idValue10,
+      unsafeBitCast(s.member(TestObjCKeyTy(1010)), UInt.self))
+
+    expectEqual(idValue20,
+      unsafeBitCast(s.member(TestObjCKeyTy(2020)), UInt.self))
+
+    expectEqual(idValue30,
+      unsafeBitCast(s.member(TestObjCKeyTy(3030)), UInt.self))
+  }
 
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }

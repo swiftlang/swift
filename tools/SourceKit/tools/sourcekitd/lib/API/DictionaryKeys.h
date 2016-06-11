@@ -29,6 +29,7 @@ extern SourceKit::UIdent KeyModuleName;
 extern SourceKit::UIdent KeyNotification;
 extern SourceKit::UIdent KeyKeyword;
 extern SourceKit::UIdent KeyName;
+extern SourceKit::UIdent KeyNames;
 extern SourceKit::UIdent KeyEnableSyntaxMap;
 extern SourceKit::UIdent KeyEnableDiagnostics;
 extern SourceKit::UIdent KeySyntacticOnly;
@@ -93,6 +94,7 @@ extern SourceKit::UIdent KeyCodeCompleteOptions;
 extern SourceKit::UIdent KeyNextRequestStart;
 extern SourceKit::UIdent KeyPopular;
 extern SourceKit::UIdent KeyUnpopular;
+extern SourceKit::UIdent KeySimplified;
 
 extern SourceKit::UIdent KeyIsUnavailable;
 extern SourceKit::UIdent KeyIsDeprecated;

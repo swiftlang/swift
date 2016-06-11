@@ -51,7 +51,7 @@ public func _bridgeErrorTypeToNSError(e: ErrorType) -> AnyObject
 /// throws an error.
 @_silgen_name("swift_unexpectedError")
 public func _unexpectedError(error: ErrorType) {
-  preconditionFailure("'try!' expression unexpectedly raised an error: \(String(reflecting: error))")
+  fatalError("'try!' expression unexpectedly raised an error: \(String(reflecting: error))")
 }
 
 /// Invoked by the compiler when code at top level throws an uncaught error.

@@ -447,8 +447,30 @@ let _stdlibUnittestStreamPrefix = "__STDLIB_UNITTEST__"
 @_silgen_name("swift_stdlib_installTrapInterceptor")
 func _stdlib_installTrapInterceptor()
 
+#if _runtime(_ObjC)
+@objc protocol _StdlibUnittestNSException {
+  optional var name: AnyObject { get }
+}
+#endif
+
 func _childProcess() {
   _stdlib_installTrapInterceptor()
+
+#if _runtime(_ObjC)
+  objc_setUncaughtExceptionHandler {
+    var stderr = _Stderr()
+    let maybeNSException = unsafeBitCast($0, _StdlibUnittestNSException.self)
+    if let name = maybeNSException.name {
+      print("*** [StdlibUnittest] Terminating due to uncaught exception " +
+        "\(name): \($0)",
+        toStream: &stderr)
+    } else {
+      print("*** [StdlibUnittest] Terminating due to uncaught exception: \($0)",
+        toStream: &stderr)      
+    }
+  }
+#endif
+
   while let line = _stdlib_getline() {
     let parts = line._split(";")
     let testSuiteName = parts[0]

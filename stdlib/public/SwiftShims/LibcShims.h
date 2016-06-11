@@ -55,8 +55,11 @@ int _swift_stdlib_close(int fd);
 
 // Non-standard extensions
 __swift_size_t _swift_stdlib_malloc_size(const void *ptr);
-__swift_uint32_t _swift_stdlib_arc4random(void);
-__swift_uint32_t _swift_stdlib_arc4random_uniform(__swift_uint32_t upper_bound);
+
+// Random number <random>
+__swift_uint32_t _swift_stdlib_cxx11_mt19937(void);
+__swift_uint32_t
+_swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift

@@ -54,7 +54,7 @@ option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
 
-set(SWIFT_VERSION "2.2.1" CACHE STRING
+set(SWIFT_VERSION "2.3" CACHE STRING
     "The user-visible version of the Swift compiler")
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")

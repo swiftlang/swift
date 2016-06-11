@@ -1,3 +1,4 @@
+// REQUIRES: disabled
 // RUN: rm -rf %t
 // RUN: %target-swift-frontend -parse %s
 

@@ -12,6 +12,8 @@
 
 import Darwin
 import StdlibUnittest
+// For rand32
+import SwiftPrivate
 import Foundation
 import StdlibUnittestFoundationExtras
 
@@ -1022,7 +1024,7 @@ DictionaryTestSuite.test("deleteChainCollision2") {
 
 func uniformRandom(max: Int) -> Int {
   // FIXME: this is not uniform.
-  return random() % max
+  return Int(rand32(exclusiveUpperBound: UInt32(max)))
 }
 
 func pickRandom<T>(a: [T]) -> T {
@@ -1342,7 +1344,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.DictionaryIsCopied") {
   do {
     var kv = d[d.indexForKey(TestObjCKeyTy(10))!]
     assert(kv.0 == TestObjCKeyTy(10))
-    assert(kv.1.value == 1010)
+    assert((kv.1 as! TestObjCValueTy).value == 1010)
   }
 
   // Delete the key from the NSMutableDictionary.
@@ -1354,7 +1356,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.DictionaryIsCopied") {
   do {
     var kv = d[d.indexForKey(TestObjCKeyTy(10))!]
     assert(kv.0 == TestObjCKeyTy(10))
-    assert(kv.1.value == 1010)
+    assert((kv.1 as! TestObjCValueTy).value == 1010)
   }
 }
 
@@ -1479,15 +1481,15 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.IndexForKey") {
   do {
     var kv = d[d.indexForKey(TestObjCKeyTy(10))!]
     assert(kv.0 == TestObjCKeyTy(10))
-    assert(kv.1.value == 1010)
+    assert((kv.1 as! TestObjCValueTy).value == 1010)
 
     kv = d[d.indexForKey(TestObjCKeyTy(20))!]
     assert(kv.0 == TestObjCKeyTy(20))
-    assert(kv.1.value == 1020)
+    assert((kv.1 as! TestObjCValueTy).value == 1020)
 
     kv = d[d.indexForKey(TestObjCKeyTy(30))!]
     assert(kv.0 == TestObjCKeyTy(30))
-    assert(kv.1.value == 1030)
+    assert((kv.1 as! TestObjCValueTy).value == 1030)
   }
 
   // Try to find a key that does not exist.
@@ -1739,10 +1741,10 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.UpdateValueForKey") {
     assert(isNativeDictionary(d))
     assert(d.count == 4)
 
-    assert(d[TestObjCKeyTy(10)]!.value == 1010)
-    assert(d[TestObjCKeyTy(20)]!.value == 1020)
-    assert(d[TestObjCKeyTy(30)]!.value == 1030)
-    assert(d[TestObjCKeyTy(40)]!.value == 2040)
+    assert((d[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
+    assert((d[TestObjCKeyTy(20)] as! TestObjCValueTy).value == 1020)
+    assert((d[TestObjCKeyTy(30)] as! TestObjCValueTy).value == 1030)
+    assert((d[TestObjCKeyTy(40)] as! TestObjCValueTy).value == 2040)
   }
 
   // Overwrite a value in existing binding.
@@ -1760,9 +1762,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.UpdateValueForKey") {
     assert(isNativeDictionary(d))
     assert(d.count == 3)
 
-    assert(d[TestObjCKeyTy(10)]!.value == 2010)
-    assert(d[TestObjCKeyTy(20)]!.value == 1020)
-    assert(d[TestObjCKeyTy(30)]!.value == 1030)
+    assert((d[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 2010)
+    assert((d[TestObjCKeyTy(20)] as! TestObjCValueTy).value == 1020)
+    assert((d[TestObjCKeyTy(30)] as! TestObjCValueTy).value == 1030)
   }
 }
 
@@ -1816,14 +1818,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAtIndex") {
 
   let foundIndex1 = d.indexForKey(TestObjCKeyTy(10))!
   assert(d[foundIndex1].0 == TestObjCKeyTy(10))
-  assert(d[foundIndex1].1.value == 1010)
+  assert((d[foundIndex1].1 as! TestObjCValueTy).value == 1010)
   assert(identity1 == unsafeBitCast(d, Int.self))
 
   let removedElement = d.removeAtIndex(foundIndex1)
   assert(identity1 != unsafeBitCast(d, Int.self))
   assert(isNativeDictionary(d))
   assert(removedElement.0 == TestObjCKeyTy(10))
-  assert(removedElement.1.value == 1010)
+  assert((removedElement.1 as! TestObjCValueTy).value == 1010)
   assert(d.count == 2)
   assert(d.indexForKey(TestObjCKeyTy(10)) == nil)
 }
@@ -1860,15 +1862,15 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
     assert(isCocoaDictionary(d))
 
     deleted = d.removeValueForKey(TestObjCKeyTy(10))
-    assert(deleted!.value == 1010)
+    assert((deleted as! TestObjCValueTy).value == 1010)
     var identity2 = unsafeBitCast(d, Int.self)
     assert(identity1 != identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 2)
 
     assert(d[TestObjCKeyTy(10)] == nil)
-    assert(d[TestObjCKeyTy(20)]!.value == 1020)
-    assert(d[TestObjCKeyTy(30)]!.value == 1030)
+    assert((d[TestObjCKeyTy(20)] as! TestObjCValueTy).value == 1020)
+    assert((d[TestObjCKeyTy(30)] as! TestObjCValueTy).value == 1030)
     assert(identity2 == unsafeBitCast(d, Int.self))
   }
 
@@ -1888,21 +1890,21 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
     assert(isCocoaDictionary(d2))
 
     deleted = d2.removeValueForKey(TestObjCKeyTy(10))
-    assert(deleted!.value == 1010)
+    assert((deleted as! TestObjCValueTy).value == 1010)
     var identity2 = unsafeBitCast(d2, Int.self)
     assert(identity1 != identity2)
     assert(isCocoaDictionary(d1))
     assert(isNativeDictionary(d2))
     assert(d2.count == 2)
 
-    assert(d1[TestObjCKeyTy(10)]!.value == 1010)
-    assert(d1[TestObjCKeyTy(20)]!.value == 1020)
-    assert(d1[TestObjCKeyTy(30)]!.value == 1030)
+    assert((d1[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
+    assert((d1[TestObjCKeyTy(20)] as! TestObjCValueTy).value == 1020)
+    assert((d1[TestObjCKeyTy(30)] as! TestObjCValueTy).value == 1030)
     assert(identity1 == unsafeBitCast(d1, Int.self))
 
     assert(d2[TestObjCKeyTy(10)] == nil)
-    assert(d2[TestObjCKeyTy(20)]!.value == 1020)
-    assert(d2[TestObjCKeyTy(30)]!.value == 1030)
+    assert((d2[TestObjCKeyTy(20)] as! TestObjCValueTy).value == 1020)
+    assert((d2[TestObjCKeyTy(30)] as! TestObjCValueTy).value == 1030)
     assert(identity2 == unsafeBitCast(d2, Int.self))
   }
 }
@@ -1985,7 +1987,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(isCocoaDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
-    assert(d[TestObjCKeyTy(10)]!.value == 1010)
+    assert((d[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
 
     d.removeAll()
     assert(identity1 != unsafeBitCast(d, Int.self))
@@ -2000,7 +2002,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(isCocoaDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
-    assert(d[TestObjCKeyTy(10)]!.value == 1010)
+    assert((d[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
 
     d.removeAll(keepCapacity: true)
     assert(identity1 != unsafeBitCast(d, Int.self))
@@ -2015,7 +2017,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(isCocoaDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
-    assert(d1[TestObjCKeyTy(10)]!.value == 1010)
+    assert((d1[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
 
     var d2 = d1
     d2.removeAll()
@@ -2023,7 +2025,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(identity1 == unsafeBitCast(d1, Int.self))
     assert(identity2 != identity1)
     assert(d1.count == 3)
-    assert(d1[TestObjCKeyTy(10)]!.value == 1010)
+    assert((d1[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
     assert(d2._variantStorage.native.capacity < originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestObjCKeyTy(10)] == nil)
@@ -2035,7 +2037,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(isCocoaDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
-    assert(d1[TestObjCKeyTy(10)]!.value == 1010)
+    assert((d1[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
 
     var d2 = d1
     d2.removeAll(keepCapacity: true)
@@ -2043,7 +2045,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(identity1 == unsafeBitCast(d1, Int.self))
     assert(identity2 != identity1)
     assert(d1.count == 3)
-    assert(d1[TestObjCKeyTy(10)]!.value == 1010)
+    assert((d1[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
     assert(d2._variantStorage.native.capacity >= originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestObjCKeyTy(10)] == nil)
@@ -2542,6 +2544,11 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.ObjectForKey") {
   let idValue30 = unsafeBitCast(v, UInt.self)
 
   expectEmpty(d.objectForKey(TestObjCKeyTy(40)))
+
+  // NSDictionary can store mixed key types.  Swift's Dictionary is typed, but
+  // when bridged to NSDictionary, it should behave like one, and allow queries
+  // for mismatched key types.
+  expectEmpty(d.objectForKey(TestObjCInvalidKeyTy()))
 
   for i in 0..<3 {
     expectEqual(idValue10, unsafeBitCast(
@@ -3828,15 +3835,15 @@ DictionaryTestSuite.test("getObjects:andKeys:") {
   var vp = AutoreleasingUnsafeMutablePointer<AnyObject?>(values.baseAddress)
   var null: AutoreleasingUnsafeMutablePointer<AnyObject?> = nil
 
-  d.getObjects(null, andKeys: null) // don't segfault
+  d.available_getObjects(null, andKeys: null) // don't segfault
 
-  d.getObjects(null, andKeys: kp)
+  d.available_getObjects(null, andKeys: kp)
   expectEqual([2, 1] as [NSNumber], Array(keys))
 
-  d.getObjects(vp, andKeys: null)
+  d.available_getObjects(vp, andKeys: null)
   expectEqual(["two", "one"] as [NSString], Array(values))
 
-  d.getObjects(vp, andKeys: kp)
+  d.available_getObjects(vp, andKeys: kp)
   expectEqual([2, 1] as [NSNumber], Array(keys))
   expectEqual(["two", "one"] as [NSString], Array(values))
 }

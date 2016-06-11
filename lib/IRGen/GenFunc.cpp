@@ -945,6 +945,9 @@ namespace {
       case clang::Type::Auto:
         llvm_unreachable("C++ type in ABI lowering?");
 
+      case clang::Type::Pipe:
+        llvm_unreachable("OpenCL type in ABI lowering?");
+
       case clang::Type::ConstantArray: {
         auto array = Ctx.getAsConstantArrayType(type);
         auto elt = Ctx.getCanonicalType(array->getElementType());
@@ -1263,7 +1266,7 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
 
   // Generate function info for this signature.
   auto extInfo = clang::FunctionType::ExtInfo();
-  auto &FI = IGM.ABITypes->arrangeFreeFunctionCall(clangResultTy, paramTys,
+  auto &FI = clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(), clangResultTy, paramTys,
                                                    extInfo,
                                              clang::CodeGen::RequiredArgs::All);
 
@@ -2637,7 +2640,7 @@ irgen::requiresExternalIndirectResult(IRGenModule &IGM,
 
   SmallVector<clang::CanQualType,1> args;
   auto extInfo = clang::FunctionType::ExtInfo();
-  auto &FI = IGM.ABITypes->arrangeFreeFunctionCall(clangTy, args, extInfo,
+  auto &FI = clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(), clangTy, args, extInfo,
                                              clang::CodeGen::RequiredArgs::All);
 
   auto &returnInfo = FI.getReturnInfo();
@@ -2841,7 +2844,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
 
   // Generate function info for this set of arguments.
   auto extInfo = clang::FunctionType::ExtInfo();
-  auto &FI = IGF.IGM.ABITypes->arrangeFreeFunctionCall(clangResultTy,
+  auto &FI = clang::CodeGen::arrangeFreeFunctionCall(IGF.IGM.ClangCodeGen->CGM(), clangResultTy,
                                                        paramTys, extInfo,
                                              clang::CodeGen::RequiredArgs::All);
 

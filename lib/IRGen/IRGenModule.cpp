@@ -49,7 +49,6 @@
 
 using namespace swift;
 using namespace irgen;
-using clang::CodeGen::CodeGenABITypes;
 using llvm::Attribute;
 
 const unsigned DefaultAS = 0;
@@ -85,13 +84,13 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   CGO.DisableFPElim = Opts.DisableFPElim;
   switch (Opts.DebugInfoKind) {
   case IRGenDebugInfoKind::None:
-    CGO.setDebugInfo(clang::CodeGenOptions::DebugInfoKind::NoDebugInfo);
+    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::NoDebugInfo);
     break;
   case IRGenDebugInfoKind::LineTables:
-    CGO.setDebugInfo(clang::CodeGenOptions::DebugInfoKind::DebugLineTablesOnly);
+    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
     break;
  case IRGenDebugInfoKind::Normal:
-    CGO.setDebugInfo(clang::CodeGenOptions::DebugInfoKind::FullDebugInfo);
+    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }
   if (Opts.DebugInfoKind != IRGenDebugInfoKind::None) {
@@ -104,6 +103,11 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                   .getHeaderSearchInfo()
                   .getHeaderSearchOpts();
   auto &PPO = Importer->getClangPreprocessor().getPreprocessorOpts();
+
+  // FIXME: see <rdar://problem/25421818>
+  // We need to make sure LLVM preserve the value names because some swift 
+  // tests are relying on these right now.
+  CGO.DiscardValueNames =false;
   auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
                                                 ModuleName, HSI, PPO, CGO,
                                                 LLVMContext);
@@ -331,8 +335,6 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   // TODO: use "tinycc" on platforms that support it
   RuntimeCC = llvm::CallingConv::C;
 
-  ABITypes = new CodeGenABITypes(clangASTContext, Module);
-
   if (Opts.DebugInfoKind != IRGenDebugInfoKind::None) {
     DebugInfo = new IRGenDebugInfo(Opts, *CI, *this, Module, SF);
   }
@@ -343,9 +345,7 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
 IRGenModule::~IRGenModule() {
   destroyClangTypeConverter();
   delete &Types;
-  if (DebugInfo)
-    delete DebugInfo;
-  delete ABITypes;
+  delete DebugInfo;
 }
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
 

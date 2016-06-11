@@ -45,10 +45,10 @@ class MetadataAllocator {
   ///
   /// Initializing to -1 instead of nullptr ensures that the first allocation
   /// triggers a page allocation since it will always span a "page" boundary.
-  char *next = (char*)(~(uintptr_t)0U);
+  std::atomic<uintptr_t> NextValue;
   
 public:
-  MetadataAllocator() = default;
+  constexpr MetadataAllocator() : NextValue(~(uintptr_t)0) {}
 
   // Don't copy or move, please.
   MetadataAllocator(const MetadataAllocator &) = delete;

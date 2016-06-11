@@ -449,7 +449,7 @@ extension Mirror.DisplayStyle {
     case .IndexContainer: self = .Collection
     case .KeyContainer: self = .Dictionary
     case .MembershipContainer: self = .Set
-    case .Container: preconditionFailure("unused!")
+    case .Container: _preconditionFailure("unused!")
     case .Optional: self = .Optional
     case .ObjCObject: self = .Class
     }

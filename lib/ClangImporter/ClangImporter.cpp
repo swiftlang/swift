@@ -298,6 +298,9 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     // Enable modules.
     "-fmodules",
 
+    // Enable implicit module maps
+    "-fimplicit-module-maps",
+
     // Don't emit LLVM IR.
     "-fsyntax-only",
 
@@ -330,16 +333,22 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       "-D_ISO646_H_", "-D__ISO646_H",
 
       // Request new APIs from Foundation.
-      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=5",
+      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=6",
 
       // Request new APIs from SceneKit.
-      "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=1",
-
-      // Request new APIs from SpriteKit.
-      "-DSWIFT_SDK_OVERLAY2_SPRITEKIT_EPOCH=1",
+      "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=2",
 
       // Request new APIs from CoreImage.
-      "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=1",
+      "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=2",
+
+      // Request new APIs from libdispatch.
+      "-DSWIFT_SDK_OVERLAY_DISPATCH_EPOCH=0",
+
+      // Request new APIs from libpthread
+      "-DSWIFT_SDK_OVERLAY_PTHREAD_EPOCH=1",
+
+      // Request new APIs from CoreGraphics.
+      "-DSWIFT_SDK_OVERLAY_COREGRAPHICS_EPOCH=0",
     });
 
     // Get the version of this compiler and pass it to
@@ -509,6 +518,10 @@ ClangImporter::create(ASTContext &ctx,
   };
 
   std::vector<std::string> invocationArgStrs;
+
+  // Clang expects this to be like an actual command line. So we need to pass in
+  // "clang" for argv[0]
+  invocationArgStrs.push_back("clang");
 
   switch (importerOpts.Mode) {
   case ClangImporterOptions::Modes::Normal:
@@ -3786,7 +3799,8 @@ void ClangImporter::loadObjCMethods(
   SmallVector<clang::ObjCMethodDecl *, 4> objcMethods;
   auto &sema = Impl.Instance->getSema();
   sema.CollectMultipleMethodsInGlobalPool(clangSelector, objcMethods,
-                                          isInstanceMethod);
+                                          isInstanceMethod,
+                                          /*CheckTheOther=*/false);
 
   // Check whether this method is in the class we care about.
   SmallVector<AbstractFunctionDecl *, 4> foundMethods;
@@ -3864,10 +3878,12 @@ void ClangModuleUnit::lookupObjCMethods(
   auto &clangSema = owner.Impl.getClangSema();
   clangSema.CollectMultipleMethodsInGlobalPool(clangSelector,
                                                objcMethods,
-                                               /*instance=*/true);
+                                               /*instance=*/true,
+                                               /*CheckTheOther=*/false);
   clangSema.CollectMultipleMethodsInGlobalPool(clangSelector,
                                                objcMethods,
-                                               /*instance=*/false);
+                                               /*instance=*/false,
+                                               /*CheckTheOther=*/false);
 
   // Import the methods.
   auto &clangCtx = clangSema.getASTContext();

@@ -1004,10 +1004,10 @@ for indexRange in [
     let a = getBridgedNSArrayOfRefTypeVerbatimBridged(
       numElements: 0, capacity: 16)
     let buffer = UnsafeMutablePointer<AnyObject>.alloc(16)
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<0))
     expectCrashLater()
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(indexRange))
   }
 }
@@ -1019,10 +1019,10 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
     let a = getBridgedNSArrayOfRefTypeVerbatimBridged(
       numElements: 3, capacity: 16)
     let buffer = UnsafeMutablePointer<AnyObject>.alloc(16)
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
     expectCrashLater()
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(indexRange))
   }
 }
@@ -1030,7 +1030,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
 ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
   let buffer = UnsafeMutablePointer<AnyObject>.alloc(16)
-  a.getObjects(
+  a.available_getObjects(
     AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
 
   var v: AnyObject = buffer[0]
@@ -1276,10 +1276,10 @@ for indexRange in [
     let a = getBridgedNSArrayOfValueTypeCustomBridged(
       numElements: 0, capacity: 16)
     let buffer = UnsafeMutablePointer<AnyObject>.alloc(16)
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<0))
     expectCrashLater()
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(indexRange))
   }
 }
@@ -1291,10 +1291,10 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
     let a = getBridgedNSArrayOfValueTypeCustomBridged(
       numElements: 3, capacity: 16)
     let buffer = UnsafeMutablePointer<AnyObject>.alloc(16)
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
     expectCrashLater()
-    a.getObjects(
+    a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(indexRange))
   }
 }
@@ -1302,7 +1302,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
 ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
   let buffer = UnsafeMutablePointer<AnyObject>.alloc(16)
-  a.getObjects(
+  a.available_getObjects(
     AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
 
   var v: AnyObject = buffer[0]

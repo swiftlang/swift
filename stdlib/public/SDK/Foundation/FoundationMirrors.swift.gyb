@@ -41,7 +41,7 @@ ${getMirrorDecl("NSURL")} {
     _preconditionFailure("_MirrorType access out of bounds")
   }
   
-  var summary: String { get { return _value.absoluteString } }
+  var summary: String { get { return _value.absoluteString ?? "Unknown URL" } }
   
   var quickLookObject: PlaygroundQuickLook? { return .Some(.URL(summary)) }
 }

@@ -7,8 +7,9 @@
 // CHECK-SAME:             identifier: "_TtO4enum5Color"
 enum Color : UInt64 {
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "Red"
-// CHECK-SAME:           baseType: !"_TtVs6UInt64"
+// CHECK-SAME:           baseType: ![[UINT64:[0-9]+]]
 // CHECK-SAME:           size: 8, align: 8{{[,)]}}
+// CHECK: ![[UINT64]] = !DICompositeType({{.*}}identifier: "_TtVs6UInt64"
   case Red, Green, Blue
 }
 
@@ -17,14 +18,12 @@ enum Color : UInt64 {
 // CHECK-SAME:             size: 136, align: 64{{[,)]}}
 // CHECK-SAME:             identifier: "_TtO4enum12MaybeIntPair"
 enum MaybeIntPair {
-// CHECK: !DIDerivedType(tag: DW_TAG_member, name: "None"
-// CHECK-SAME:           baseType: !"_TtSi"
-// CHECK-SAME:           size: 136, align: 64{{[,)]}}
-case None
-// CHECK: !DIDerivedType(tag: DW_TAG_member, name: "Just"
-// CHECK-SAME:           baseType: !"_TtTVs5Int64S__"
-// CHECK-SAME:           size: 136, align: 64{{[,)]}}
-  case Just(Int64, Int64)
+// CHECK: !DIDerivedType(tag: DW_TAG_member, name: "none"
+  case none
+// CHECK: !DIDerivedType(tag: DW_TAG_member, name: "just"
+// CHECK-SAME:           baseType: ![[INTTUP:[0-9]+]]
+// CHECK: ![[INTTUP]] = !DICompositeType({{.*}}identifier: "_TtTVs5Int64S__"
+  case just(Int64, Int64)
 }
 
 enum Maybe<T> {
@@ -33,7 +32,7 @@ enum Maybe<T> {
 }
 
 let r = Color.Red
-let c = MaybeIntPair.Just(74, 75)
+let c = MaybeIntPair.just(74, 75)
 // CHECK: !DICompositeType(tag: DW_TAG_union_type, name: "Maybe",
 // CHECK-SAME:             line: [[@LINE-8]],
 // CHECK-SAME:             size: 8, align: 8{{[,)]}}
@@ -44,12 +43,10 @@ public enum Nothing { }
 public func foo(empty : Nothing) { }
 // CHECK: !DICompositeType({{.*}}name: "Nothing", {{.*}}elements: ![[EMPTY]]
 
-// CHECK: !DICompositeType({{.*}}name: "Rose", {{.*}}elements: ![[ELTS:[0-9]+]],
-// CHECK-SAME:             {{.*}}identifier: "_TtGO4enum4Rosex_")
+// CHECK: !DICompositeType({{.*}}name: "Rose", {{.*}}elements: ![[ELTS:[0-9]+]], {{.*}}identifier: "_TtGO4enum4Rosex_")
 enum Rose<A> {
 	case MkRose(() -> A, () -> [Rose<A>])
-  // CHECK: !DICompositeType({{.*}}name: "Rose", {{.*}}elements: ![[ELTS]],
-  // CHECK-SAME:             {{.*}}identifier: "_TtGO4enum4RoseQq_S0__")
+  // CHECK: !DICompositeType({{.*}}name: "Rose", {{.*}}elements: ![[ELTS]],{{.*}}identifier: "_TtGO4enum4RoseQq_S0__")
 	case IORose(() -> Rose<A>)
 }
 
@@ -65,10 +62,11 @@ public enum Tuple<P> {
 
 func bar<T>(x : Tuple<T>) -> Tuple<T> { return x }
 
+// CHECK: ![[LIST:.*]] = !DICompositeType({{.*}}identifier: "_TtGO4enum4ListQq_S0__"
 public enum List<T> {
        indirect case Tail(List, T)
        case End
 
-// CHECK: !DILocalVariable(name: "self", arg: 1, {{.*}} line: [[@LINE+1]], type: !"_TtGO4enum4ListQq_S0__", flags: DIFlagArtificial)
+// CHECK: !DILocalVariable(name: "self", arg: 1, {{.*}} line: [[@LINE+1]], type: ![[LIST]], flags: DIFlagArtificial)
        func fooMyList() {}
 }

@@ -13,8 +13,14 @@ endforeach()
 add_custom_target(swift-stdlib ALL
     DEPENDS "swift-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}")
 
-if(SWIFT_HOST_VARIANT STREQUAL "linux")
-  find_package(BSD REQUIRED)
+if(SWIFT_STDLIB_ENABLE_RESILIENCE)
+  set(STDLIB_SIL_SERIALIZE_ALL)
+else()
+  if(SWIFT_STDLIB_SIL_SERIALIZE_ALL)
+    set(STDLIB_SIL_SERIALIZE_ALL "-Xfrontend" "-sil-serialize-all")
+  else()
+    set(STDLIB_SIL_SERIALIZE_ALL)
+  endif()
 endif()
 
 add_subdirectory(public)

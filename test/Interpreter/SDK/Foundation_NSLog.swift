@@ -3,6 +3,9 @@
 
 // REQUIRES: objc_interop
 
+// FIXME: <rdar://problem/26009042>
+// REQUIRES: disabled
+
 import Foundation
 
 // CHECK: 1 is the loneliest number that you'll ever do

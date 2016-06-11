@@ -87,16 +87,54 @@ add_custom_command_target(unused_var
       "${SWIFTLIB_DIR}/install-tmp/install-tmp/clang"
     COMMAND
       "${CMAKE_COMMAND}" "-E" "create_symlink"
-      "../clang/${CLANG_VERSION}"
+      "../../../../XcodeDefault.xctoolchain/usr/lib/clang/${CLANG_VERSION}"
       "${SWIFTLIB_DIR}/install-tmp/install-tmp/clang"
     CUSTOM_TARGET_NAME "symlink_clang_headers"
     OUTPUT "${SWIFTLIB_DIR}/clang" "${SWIFTLIB_DIR}/install-tmp/install-tmp/clang"
     COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
 add_dependencies(copy_shim_headers symlink_clang_headers)
 
+set(CLANG_HEADERS_LIB_DIR
+    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/clang")
+add_custom_command_target(unused_var
+    COMMAND
+      "${CMAKE_COMMAND}" "-E" "remove"
+      "${CLANG_HEADERS_LIB_DIR}"
+    COMMAND
+      "${CMAKE_COMMAND}" "-E" "create_symlink"
+      "../../../XcodeDefault.xctoolchain/usr/lib/clang"
+      "${CLANG_HEADERS_LIB_DIR}"
+    CUSTOM_TARGET_NAME "symlink_clang_headers_for_libclang"
+    OUTPUT "${CLANG_HEADERS_LIB_DIR}"
+    COMMENT "Symlinking clang headers into ${CLANG_HEADERS_LIB_DIR} for libclang")
+add_dependencies(copy_shim_headers symlink_clang_headers_for_libclang)
+
+set(ARCLIB_DIR
+    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/arc")
+add_custom_command_target(unused_var
+    COMMAND
+      "${CMAKE_COMMAND}" "-E" "remove"
+      "${ARCLIB_DIR}"
+    COMMAND
+      "${CMAKE_COMMAND}" "-E" "create_symlink"
+      "../../../XcodeDefault.xctoolchain/usr/lib/arc"
+      "${ARCLIB_DIR}"
+    CUSTOM_TARGET_NAME "symlink_arc"
+    OUTPUT "${ARCLIB_DIR}"
+    COMMENT "Symlinking arc into ${ARCLIB_DIR}")
+add_dependencies(copy_shim_headers symlink_arc)
+
 swift_install_in_component(compiler
     FILES ${sources}
     DESTINATION "lib/swift/shims")
+
+swift_install_in_component(compiler
+    FILES "${CLANG_HEADERS_LIB_DIR}"
+    DESTINATION "lib")
+
+swift_install_in_component(compiler
+    FILES "${ARCLIB_DIR}"
+    DESTINATION "lib")
 
 # Install Clang headers under the Swift library so that an installed Swift's
 # module importer can find the compiler headers corresponding to its Clang.

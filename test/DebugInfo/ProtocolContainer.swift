@@ -12,7 +12,6 @@ class AClass : AProtocol {
    func print() { markUsed("x = \(x)")}
 }
 // CHECK: define hidden void @_TF17ProtocolContainer3foo
-// CHECK-NEXT: entry:
 // CHECK: [[XADDR:[%].*]] = alloca %P17ProtocolContainer9AProtocol_*, align {{(4|8)}}
 // CHECK: [[MD:%.metadata[0-9]+]] = alloca %swift.type*, align {{(4|8)}}
 // CHECK: store %P17ProtocolContainer9AProtocol_* %0, %P17ProtocolContainer9AProtocol_** [[XADDR]], align {{(4|8)}}

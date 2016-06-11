@@ -9,6 +9,9 @@
 
 // REQUIRES: objc_interop
 
+// FIXME: <rdar://problem/26009042>
+// REQUIRES: disabled
+
 import Foundation
 import ObjCWeak
 

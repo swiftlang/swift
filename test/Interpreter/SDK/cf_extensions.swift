@@ -15,7 +15,7 @@ import UIKit
 
 extension CGColorSpace {
   class func deviceRGB() -> CGColorSpace {
-    return CGColorSpaceCreateDeviceRGB()!
+    return CGColorSpaceCreateDeviceRGB()
   }
 }
 

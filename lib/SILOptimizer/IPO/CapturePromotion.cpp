@@ -801,10 +801,12 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
   // Helper lambda function to determine if instruction b is strictly after
   // instruction a, assuming both are in the same basic block.
   auto isAfter = [](SILInstruction *a, SILInstruction *b) {
-    SILInstruction *f = &*b->getParent()->begin();
-    while (b != f) {
-      b = b->getPrevNode();
-      if (a == b)
+    auto fIter = b->getParent()->begin();
+    auto bIter = b->getIterator();
+    auto aIter = a->getIterator();
+    while (bIter != fIter) {
+      --bIter;
+      if (aIter == bIter)
         return true;
     }
     return false;

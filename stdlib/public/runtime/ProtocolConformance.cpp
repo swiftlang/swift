@@ -496,10 +496,9 @@ recur:
       return FoundConformance.first;
   }
 
-  unsigned failedGeneration = ConformanceCacheGeneration;
-
   // If we didn't have an up-to-date cache entry, scan the conformance records.
   pthread_mutex_lock(&C.SectionsToScanLock);
+  unsigned failedGeneration = ConformanceCacheGeneration;
 
   // If we have no new information to pull in (and nobody else pulled in
   // new information while we waited on the lock), we're done.

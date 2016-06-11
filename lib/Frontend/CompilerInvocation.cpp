@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Option/Options.h"
+#include "swift/Option/SanitizerOptions.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Option/Arg.h"
@@ -1204,6 +1205,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       }
     }
   }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ))
+    parseSanitizerArgValues(A, Diags);
 
   return false;
 }

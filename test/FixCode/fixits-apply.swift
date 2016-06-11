@@ -11,7 +11,7 @@ b as Derived
 b as! Base
 
 var opti : Int?
-// Don't add bang.
+// Add bang.
 var i : Int = opti
 // But remove unnecessary bang.
 var i2 : Int = i!
@@ -29,6 +29,18 @@ struct MyMask : OptionSetType {
 
 func supported() -> MyMask {
   return Int(MyMask.Bingo.rawValue)
+}
+
+struct MyEventMask2 : OptionSetType {
+  init(rawValue: UInt64) {}
+  var rawValue: UInt64 { return 0 }
+}
+func sendIt(_: MyEventMask2) {}
+func testMask1(a: Int) {
+  sendIt(a)
+}
+func testMask2(a: UInt64) {
+  sendIt(a)
 }
 
 func foo() -> Int {

@@ -60,7 +60,7 @@ done:
 namespace {
 /// \brief Associates sourcekitd_uid_t to a UIdent.
 class SKUIDToUIDMap {
-  typedef llvm::DenseMap<sourcekitd_uid_t, UIdent> MapTy;
+  typedef llvm::DenseMap<void *, UIdent> MapTy;
   MapTy Map;
   WorkQueue Queue{ WorkQueue::Dequeuing::Concurrent, "UIDMap" };
 
@@ -216,9 +216,11 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
       // The client process on the other end of the connection has either
       // crashed or cancelled the connection. After receiving this error,
       // the connection is in an invalid state, and we do not need to
-      // call xpc_connection_cancel(). Tear down any associated state
-      // here.
-      sourcekitd::shutdown();
+      // call xpc_connection_cancel().
+      // No need to call sourcekitd::shutdown() since the process is going down
+      // anyway, plus if we get a new connection before the process closes then
+      // we will fail to re-initialize properly since the initialize call is at
+      // main.
       xpc_transaction_end();
     } else if (event == XPC_ERROR_TERMINATION_IMMINENT) {
       // Handle per-connection termination cleanup.

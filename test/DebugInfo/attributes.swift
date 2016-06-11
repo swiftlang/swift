@@ -2,7 +2,7 @@
 
 // REQUIRES: objc_interop
 
-// CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "ObjCClass",{{.*}} line: [[@LINE+1]],{{.*}} runtimeLang: DW_LANG_Swift,{{.*}} identifier: [[TY0:"[^"]*"]])
+// CHECK-DAG: ![[TY0:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "ObjCClass",{{.*}} line: [[@LINE+1]],{{.*}} runtimeLang: DW_LANG_Swift,
 @objc class ObjCClass {
       @IBAction func click(_: AnyObject?) -> () {}
 }

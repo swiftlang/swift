@@ -1624,7 +1624,7 @@ internal struct _BitMap {
 
   @warn_unused_result
   internal static func wordsFor(bitCount: Int) -> Int {
-    return bitCount + Int._sizeInBytes - 1 / Int._sizeInBytes
+    return (bitCount + Int._sizeInBits - 1) / Int._sizeInBits
   }
 
   internal init(storage: UnsafeMutablePointer<UInt>, bitCount: Int) {
@@ -2737,7 +2737,9 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   @warn_unused_result
   internal func bridgingObjectForKey(aKey: AnyObject)
     -> AnyObject? {
-    let nativeKey = _forceBridgeFromObjectiveC(aKey, Key.self)
+    guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
+    else { return nil }
+
     let (i, found) = nativeStorage._find(
       nativeKey, nativeStorage._bucket(nativeKey))
     if found {

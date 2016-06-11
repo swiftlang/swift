@@ -548,11 +548,6 @@ private:
     if (FixitAll)
       return true;
 
-    // Err on the side of caution and don't automatically add bang, which may
-    // lead to crashes.
-    if (Info.ID == diag::missing_unwrap_optional.ID)
-      return false;
-
     // Do not add a semi as it is wrong in most cases during migration
     if (Info.ID == diag::statement_same_line_without_semi.ID)
       return false;

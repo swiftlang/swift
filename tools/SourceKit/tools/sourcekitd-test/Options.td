@@ -70,3 +70,5 @@ def print_response_as_json : Flag<["-"], "print-response-as-json">,
 def print_raw_response : Flag<["-"], "print-raw-response">,
   HelpText<"Dump the response to stdout">;
 
+def simplified_demangling : Flag<["-"], "simplified-demangling">,
+  HelpText<"Use simplified demangling for the 'demangle' request">;
