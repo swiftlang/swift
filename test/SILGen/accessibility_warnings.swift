@@ -20,8 +20,8 @@ internal struct InternalStruct {
   public var publicVarGetSet: Int { get { return 0 } set {} } // expected-warning {{declaring a public var for an internal struct}} {{3-9=internal}}
 }
 
-private struct PrivateStruct {
-  public var publicVar = 0 // expected-warning {{declaring a public var for a private struct}} {{3-9=private}}
+fileprivate struct PrivateStruct {
+  public var publicVar = 0 // expected-warning {{declaring a public var for a fileprivate struct}} {{3-9=fileprivate}}
 }
 
 
@@ -38,9 +38,9 @@ extension InternalStruct {
 }
 
 extension PrivateStruct {
-  public init(x: Int) { self.init() } // expected-warning {{declaring a public initializer for a private struct}} {{3-9=private}}
+  public init(x: Int) { self.init() } // expected-warning {{declaring a public initializer for a fileprivate struct}} {{3-9=fileprivate}}
 
-  public var publicVarExtension: Int { get { return 0 } set {} } // expected-warning {{declaring a public var for a private struct}} {{3-9=private}}
+  public var publicVarExtension: Int { get { return 0 } set {} } // expected-warning {{declaring a public var for a fileprivate struct}} {{3-9=fileprivate}}
 }
 
 public extension PublicStruct {

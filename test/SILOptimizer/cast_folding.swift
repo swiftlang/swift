@@ -16,11 +16,11 @@ class X {}
 
 class B:P {}
 
-private struct S:P {}
+fileprivate struct S:P {}
 
 struct T:Q {}
 
-private struct U {}
+fileprivate struct U {}
 
 public protocol CP1: class {}
 

@@ -8,11 +8,11 @@ import Builtin
 import Swift
 import SwiftShims
 
-private class Base {
-	private init()
+fileprivate class Base {
+	fileprivate init()
 }
 
-private class Derived : Base {
+fileprivate class Derived : Base {
 }
 
 sil private @BaseInit : $@convention(method) (@owned Base) -> @owned Base {

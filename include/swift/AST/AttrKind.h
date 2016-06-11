@@ -48,8 +48,10 @@ enum class UnaryOperatorKind : uint8_t {
 /// Access control levels.
 // These are used in diagnostics, so please do not reorder existing values.
 enum class Accessibility : uint8_t {
-  /// Private access is limited to the current file.
+  /// Private access is limited to the current declaration.
   Private = 0,
+  /// FilePrivate access is limited to the current file.
+  FilePrivate,
   /// Internal access is limited to the current module.
   Internal,
   /// Public access is not limited.

@@ -39,7 +39,7 @@ let closureCapture: () -> Void = { [x] in
 }
 
 // CHECK-LABEL: (defer_stmt
-// CHECK-NEXT: (func_decl implicit "$defer()" type='() -> ()' access=private captures=(x<direct><noescape>)
+// CHECK-NEXT: (func_decl implicit "$defer()" type='() -> ()' access=fileprivate captures=(x<direct><noescape>)
 defer {
   _ = x
 }

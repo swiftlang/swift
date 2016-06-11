@@ -112,19 +112,19 @@ bb0:
   return %0 : $()
 }
 
-private class private_base {
+fileprivate class private_base {
   func foo()
 }
 
-private class private_derived : private_base {
+fileprivate class private_derived : private_base {
   override func foo()
 }
 
-@inline(never) private func call_private(b: private_base)
+@inline(never) fileprivate func call_private(b: private_base)
 
 class internal_base {
   func foo()
-  private func bar()
+  fileprivate func bar()
 }
 
 class internal_derived : internal_base {
@@ -137,7 +137,7 @@ class internal_derived : internal_base {
 public class public_base {
   func foo()
   public func bar()
-  private func baz()
+  fileprivate func baz()
 }
 
 public class public_derived : public_base {
@@ -305,17 +305,17 @@ sil_vtable public_derived {
   #public_base.baz!1: public_derived_baz
 }
 
-private protocol private_proto_1 {
+fileprivate protocol private_proto_1 {
   func theMethod()
 }
 
-private class private_proto_private_class : private_proto_1 {
+fileprivate class private_proto_private_class : private_proto_1 {
   func theMethod()
 }
 
-private func call_through_private_proto_1<T : private_proto_1>(x: T)
+fileprivate func call_through_private_proto_1<T : private_proto_1>(x: T)
 
-private protocol private_proto_2 {
+fileprivate protocol private_proto_2 {
   func theMethod()
 }
 
@@ -323,9 +323,9 @@ class private_proto_internal_class : private_proto_2 {
   func theMethod()
 }
 
-private func call_through_private_proto_2<T : private_proto_2>(x: T)
+fileprivate func call_through_private_proto_2<T : private_proto_2>(x: T)
 
-private protocol private_proto_3 {
+fileprivate protocol private_proto_3 {
   func theMethod()
 }
 
@@ -333,17 +333,17 @@ public class private_proto_public_class : private_proto_3 {
   public func theMethod()
 }
 
-private func call_through_private_proto_3<T : private_proto_3>(x: T)
+fileprivate func call_through_private_proto_3<T : private_proto_3>(x: T)
 
-private protocol private_proto_4 {
+fileprivate protocol private_proto_4 {
   func theMethod()
 }
 
 public class private_proto_public_class_private_method : private_proto_4 {
-  private func theMethod()
+  fileprivate func theMethod()
 }
 
-private func call_through_private_proto_4<T : private_proto_4>(x: T)
+fileprivate func call_through_private_proto_4<T : private_proto_4>(x: T)
 
 sil private @private_proto_private_class_theMethod : $@convention(method) (@guaranteed private_proto_private_class) -> () {
 bb0(%0 : $private_proto_private_class):

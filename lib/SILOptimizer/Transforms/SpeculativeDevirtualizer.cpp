@@ -252,6 +252,7 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
       return false;
     break;
   case Accessibility::Private:
+  case Accessibility::FilePrivate:
     break;
   }
 

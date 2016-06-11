@@ -5,18 +5,18 @@ public class Base1 { @inline(never) func f() -> Int { return 0 } }
 public class Base2: Base1 {
 }
 
-private class A: Base2 { }
+fileprivate class A: Base2 { }
 
-private class B : A { 
+fileprivate class B : A { 
     @inline(never) override func f() -> Int { return 1 }
 }
 
-private class C : A { 
+fileprivate class C : A { 
     @inline(never) override func f() -> Int { return 2 }
 }
 
 @inline(never)
-private func foo(_ a: A) -> Int {
+fileprivate func foo(_ a: A) -> Int {
 
 
 // Check that a.f() call can be devirtualized, even
@@ -41,7 +41,7 @@ private func foo(_ a: A) -> Int {
 
 print("foo(C()) = \(foo(C()))")
 
-private class F1 {
+fileprivate class F1 {
   init() {
   }
 
@@ -53,7 +53,7 @@ private class F1 {
   }
 }
 
-private class F2 : F1 {
+fileprivate class F2 : F1 {
   init (v : Int) {
     super.init()
     addConstraint()

@@ -9,7 +9,7 @@ internal func f1() {}
 // SIL-DAG: sil private @_TF8coverageP33_[[F2HASH:[_a-zA-Z0-9]+]]
 // SIL-DAG: string_literal utf8 "{{.*}}coverage.swift:_TF8coverageP33_[[F2HASH]]"
 // IR-DAG: @"__profn_{{.*}}coverage.swift:_TF8coverageP33_[[F2HASH:[_a-zA-Z0-9]+]]" {{.*}} c"{{.*}}coverage.swift:_TF8coverageP33_[[F2HASH]]"
-private func f2() {}
+fileprivate func f2() {}
 
 // SIL-DAG: sil @_TF8coverage2f3FT_T_
 // SIL-DAG: string_literal utf8 "_TF8coverage2f3FT_T_"

@@ -33,7 +33,7 @@ public func broccoli(_ x: Int) -> Int {
 // CHECK:         function_ref @_TF5cdeclP[[PRIVATE:.*]]4kale
 // CHECK:       sil private @_TF5cdeclP[[PRIVATE:.*]]4kale
 @_cdecl("collard_greens")
-private func kale(_ x: Int) -> Int {
+fileprivate func kale(_ x: Int) -> Int {
   return x
 }
 

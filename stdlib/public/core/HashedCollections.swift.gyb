@@ -1209,7 +1209,7 @@ public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Boo
 }
 
 extension Set : CustomStringConvertible, CustomDebugStringConvertible {
-  private func makeDescription(isDebug: Bool) -> String {
+  fileprivate func makeDescription(isDebug: Bool) -> String {
     var result = isDebug ? "Set([" : "["
     var first = true
     for member in self {

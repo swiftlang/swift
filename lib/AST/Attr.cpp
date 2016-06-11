@@ -543,6 +543,8 @@ StringRef DeclAttribute::getAttrName() const {
     switch (cast<AbstractAccessibilityAttr>(this)->getAccess()) {
     case Accessibility::Private:
       return "private";
+    case Accessibility::FilePrivate:
+      return "fileprivate";
     case Accessibility::Internal:
       return "internal";
     case Accessibility::Public:

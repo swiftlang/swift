@@ -9,7 +9,7 @@
 // RUN: FileCheck %s < %t.testing.sil
 // RUN: FileCheck %s -check-prefix=NEGATIVE-TESTABLE < %t.testing.sil
 
-private func privateFn() -> Int32 {
+fileprivate func privateFn() -> Int32 {
   return 2
 }
 

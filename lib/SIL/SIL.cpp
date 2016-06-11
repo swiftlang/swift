@@ -70,6 +70,7 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
       return FormalLinkage::PublicUnique;
     return FormalLinkage::HiddenUnique;
   case Accessibility::Private:
+  case Accessibility::FilePrivate:
     // Why "hidden" instead of "private"? Because the debugger may need to
     // access these symbols.
     return FormalLinkage::HiddenUnique;
@@ -144,7 +145,7 @@ swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
 
   // FIXME: This should be using std::min(protocol's access, type's access).
   switch (C->getProtocol()->getEffectiveAccess()) {
-    case Accessibility::Private:
+    case Accessibility::FilePrivate:
       return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
 
     case Accessibility::Internal:

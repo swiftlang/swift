@@ -279,7 +279,7 @@ extension Int {
     var description: String { return "abc" }
   }
 
-  private class PrivateExtensionClassConformsToP2 : P2 {
+  fileprivate class PrivateExtensionClassConformsToP2 : P2 {
     var description: String { return "def" }
   }
 }

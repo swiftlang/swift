@@ -61,7 +61,7 @@ struct IntWrapper: Comparable {
 
   // CHECK-DAG: - "TypeReferencedOnlyByPrivateSubscript"
   // FIXME: This should be marked "!private".
-  private subscript(_: TypeReferencedOnlyByPrivateSubscript) -> Void { return () }
+  fileprivate subscript(_: TypeReferencedOnlyByPrivateSubscript) -> Void { return () }
 }
 
 // CHECK-DAG: "IntWrapper"
@@ -112,7 +112,7 @@ protocol ExtraFloatLiteralConvertible
     : OtherFileAliasForFloatLiteralConvertible {
 }
 // CHECK-DAG: !private "UnicodeScalarLiteralConvertible"
-private protocol ExtraCharLiteralConvertible : UnicodeScalarLiteralConvertible {
+fileprivate protocol ExtraCharLiteralConvertible : UnicodeScalarLiteralConvertible {
 }
 
 prefix operator ~~~ {}
@@ -120,14 +120,14 @@ protocol ThreeTilde {
   prefix func ~~~(lhs: Self)
 }
 
-private struct ThreeTildeTypeImpl : ThreeTilde {
+fileprivate struct ThreeTildeTypeImpl : ThreeTilde {
 }
 
 func overloadedOnProto<T>(_: T) {}
 func overloadedOnProto<T: ThreeTilde>(_: T) {}
 
 // CHECK-DAG: - "~~~"
-private prefix func ~~~(_: ThreeTildeTypeImpl) {}
+fileprivate prefix func ~~~(_: ThreeTildeTypeImpl) {}
 
 var topLevelComputedProperty: Bool {
   return true
@@ -235,7 +235,7 @@ struct Outer {
 }
 
 // CHECK-DAG: !private "privateFunc"
-private func privateFunc() {}
+fileprivate func privateFunc() {}
 
 // CHECK-DAG: - "topLevel1"
 var use1 = topLevel1()
@@ -256,7 +256,7 @@ _ = 42 * 30
 // CHECK-DAG: - "topLevel6"
 _ = topLevel6()
 // CHECK-DAG: - "topLevel7"
-private var use7 = topLevel7()
+fileprivate var use7 = topLevel7()
 // CHECK-DAG: - "topLevel8"
 var use8: Int = topLevel8()
 // CHECK-DAG: - "topLevel9"
@@ -292,7 +292,7 @@ struct StructForDeclaringProperties {
 func private1(_ a: Int = privateTopLevel1()) {}
 // CHECK-DAG: !private "privateTopLevel2"
 // CHECK-DAG: !private "PrivateProto1"
-private struct Private2 : PrivateProto1 {
+fileprivate struct Private2 : PrivateProto1 {
   var private2 = privateTopLevel2()
 }
 // CHECK-DAG: !private "privateTopLevel3"
@@ -301,7 +301,7 @@ func outerPrivate3() {
 }
 
 // CHECK-DAG: !private "PrivateTopLevelTy1"
-private extension Use4 {
+fileprivate extension Use4 {
   var privateTy1: PrivateTopLevelTy1? { return nil }
 } 
 // CHECK-DAG: !private "PrivateTopLevelTy2"
@@ -315,38 +315,38 @@ func outerPrivateTy3() {
   inner(nil)
 }
 // CHECK-DAG: !private "PrivateTopLevelStruct3"
-private typealias PrivateTy4 = PrivateTopLevelStruct3.ValueType
+fileprivate typealias PrivateTy4 = PrivateTopLevelStruct3.ValueType
 // CHECK-DAG: !private "PrivateTopLevelStruct4"
-private func privateTy5(_ x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelStruct4.ValueType {
+fileprivate func privateTy5(_ x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelStruct4.ValueType {
   return x
 }
 
 // Deliberately empty.
-private struct PrivateTy6 {}
+fileprivate struct PrivateTy6 {}
 // CHECK-DAG: !private "PrivateProto3"
 extension PrivateTy6 : PrivateProto3 {}
 
 // CHECK-DAG: - "ProtoReferencedOnlyInGeneric"
 func genericTest<T: ProtoReferencedOnlyInGeneric>(_: T) {}
 // CHECK-DAG: !private "ProtoReferencedOnlyInPrivateGeneric"
-private func privateGenericTest<T: ProtoReferencedOnlyInPrivateGeneric>(_: T) {}
+fileprivate func privateGenericTest<T: ProtoReferencedOnlyInPrivateGeneric>(_: T) {}
 
 struct PrivateStoredProperty {
   // CHECK-DAG: - "TypeReferencedOnlyByPrivateVar"
-  private var value: TypeReferencedOnlyByPrivateVar
+  fileprivate var value: TypeReferencedOnlyByPrivateVar
 }
 class PrivateStoredPropertyRef {
   // CHECK-DAG: - "TypeReferencedOnlyByPrivateClassVar"
-  private var value: TypeReferencedOnlyByPrivateClassVar?
+  fileprivate var value: TypeReferencedOnlyByPrivateClassVar?
 }
 
 struct Sentinel1 {}
 
-private protocol ExtensionProto {}
+fileprivate protocol ExtensionProto {}
 extension OtherFileTypeToBeExtended : ExtensionProto {
-  private func foo() {}
+  fileprivate func foo() {}
 }
-private extension OtherFileTypeToBeExtended {
+fileprivate extension OtherFileTypeToBeExtended {
   var bar: Bool { return false }
 }
 

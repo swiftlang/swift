@@ -173,7 +173,7 @@ print((b as Bank).deposit(Account(owner: "A")))
 
 // rdar://25412647
 
-private class Parent<T> {
+fileprivate class Parent<T> {
   required init() {}
 
   func doSomething() {
@@ -185,7 +185,7 @@ private class Parent<T> {
   }
 }
 
-private class Child: Parent<String> {
+fileprivate class Child: Parent<String> {
   override func overriddenMethod() {
     print("Heaven!")
   }

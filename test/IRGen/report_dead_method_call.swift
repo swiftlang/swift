@@ -11,7 +11,7 @@
 // RUN: %target-run %t/report_dead_method_call
 // REQUIRES: executable_test
 
-private protocol PrivateProto {
+fileprivate protocol PrivateProto {
 	func abc()
 }
 
@@ -22,7 +22,7 @@ struct PrivateStructC : PrivateProto {
 
 struct Container {
 
-	private var p: PrivateProto = PrivateStructC()
+	fileprivate var p: PrivateProto = PrivateStructC()
 }
 
 @inline(never)
@@ -30,19 +30,19 @@ func callProto() {
 	testProto(Container())
 }
 
-private class Base {
+fileprivate class Base {
 	func def() {
 	}
 }
 
-private class Derived : Base {
+fileprivate class Derived : Base {
 	override func def() {
 	}
 }
 
 struct ClassContainer {
 
-	private var p: Base = Derived()
+	fileprivate var p: Base = Derived()
 }
 
 @inline(never)
@@ -51,7 +51,7 @@ func callClass() {
 }
 
 public class PublicBase {
-	private func ghi() {
+	fileprivate func ghi() {
 	}
 }
 

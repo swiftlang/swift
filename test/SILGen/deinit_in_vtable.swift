@@ -3,14 +3,14 @@
 // The second run tests is it can be compiled without crashes.
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -O -S %s
 
-private class A {
+fileprivate class A {
 	func foo() -> Int { return 0 }
 }
 
 // CHECK-LABEL: deinit_in_vtable.(A in {{.*}}).__deallocating_deinit
 // CHECK: sil private @[[A:.*]] :
 
-private class B : A {
+fileprivate class B : A {
 	override func foo() -> Int { return 1 }
 }
 
@@ -18,7 +18,7 @@ private class B : A {
 // CHECK: sil private @[[B:.*]] :
 
 @inline(never)
-private func testfunc(_ a: A) -> Int {
+fileprivate func testfunc(_ a: A) -> Int {
   return a.foo()
 }
 

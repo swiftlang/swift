@@ -249,7 +249,7 @@ struct PrintOptions {
   bool PrintInternalAccessibilityKeyword = true;
 
   /// Print all decls that have at least this level of access.
-  Accessibility AccessibilityFilter = Accessibility::Private;
+  Accessibility AccessibilityFilter = Accessibility::FilePrivate;
 
   /// Print IfConfigDecls and IfConfigStmts.
   bool PrintIfConfig = true;

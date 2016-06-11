@@ -185,6 +185,7 @@ static bool isKnownFinalClass(ClassDecl *CD, SILModule &M,
       return false;
     break;
   case Accessibility::Private:
+  case Accessibility::FilePrivate:
     break;
   }
 
@@ -204,6 +205,7 @@ static bool isKnownFinalClass(ClassDecl *CD, SILModule &M,
           return false;
         break;
       case Accessibility::Private:
+      case Accessibility::FilePrivate:
         break;
       }
 

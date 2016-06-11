@@ -1851,10 +1851,10 @@ typealias BadBlock = @convention(block) (NotObjCEnum) -> () // expected-error{{'
 @objc class AccessControl {
   // CHECK: @objc func foo
   func foo() {}
-  // CHECK: {{^}} private func bar
-  private func bar() {}
-  // CHECK: @objc private func baz
-  @objc private func baz() {}
+  // CHECK: {{^}} fileprivate func bar
+  fileprivate func bar() {}
+  // CHECK: @objc fileprivate func baz
+  @objc fileprivate func baz() {}
 }
 
 //===--- Ban @objc +load methods
@@ -2033,11 +2033,11 @@ class ConformsToProtocolThrowsObjCName1 : ProtocolThrowsObjCName {
 }
 
 class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName {
-  @objc func doThing(_ x: Int) throws -> String { return "" }
-  // expected-warning@-1{{instance method 'doThing' nearly matches optional requirement 'doThing' of protocol 'ProtocolThrowsObjCName'}}
-  // expected-note@-2{{move 'doThing' to an extension to silence this warning}}
-  // expected-note@-3{{make 'doThing' private to silence this warning}}{{9-9=private }}
-  // expected-note@-4{{candidate has non-matching type '(Int) throws -> String'}}
+  @objc func doThing(_ x: Int) throws -> String { return "" } 
+// expected-warning@-1{{instance method 'doThing' nearly matches optional requirement 'doThing' of protocol 'ProtocolThrowsObjCName'}} 
+// expected-note@-2 {{candidate has non-matching type '(Int) throws -> String'}}
+// expected-note@-3 {{move 'doThing' to an extension to silence this warning}}
+// expected-note@-4 {{make 'doThing' fileprivate to silence this warning}} 
 }
 
 @objc class DictionaryTest {

@@ -1005,7 +1005,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   ReferencedNameTracker *tracker = currentFile->getReferencedNameTracker();
   bool isCascading = true;
   if (current->hasAccessibility())
-    isCascading = (current->getFormalAccess() > Accessibility::Private);
+    isCascading = (current->getFormalAccess() > Accessibility::FilePrivate);
 
   // Find other potential definitions.
   SmallVector<ValueDecl *, 4> otherDefinitionsVec;
@@ -1318,7 +1318,7 @@ class TypeAccessibilityChecker : private TypeWalker {
   explicit TypeAccessibilityChecker(TypeAccessibilityCacheMap &cache)
       : Cache(cache) {
     // Always have something on the stack.
-    AccessStack.push_back(Accessibility::Private);
+    AccessStack.push_back(Accessibility::FilePrivate);
   }
 
   bool shouldVisitOriginalSubstitutedType() override { return true; }
@@ -1455,7 +1455,7 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::AbstractFunctionDecl:
     case DeclContextKind::SubscriptDecl:
-      D->setAccessibility(Accessibility::Private);
+      D->setAccessibility(Accessibility::FilePrivate);
       break;
     case DeclContextKind::Module:
     case DeclContextKind::FileUnit:
@@ -1535,7 +1535,7 @@ static void checkTypeAccessibility(
     llvm::function_ref<void(Accessibility, const TypeRepr *)> diagnose) {
   // Don't spend time checking private access; this is always valid.
   // This includes local declarations.
-  if (contextAccess == Accessibility::Private || !TL.getType())
+  if (contextAccess <= Accessibility::FilePrivate || !TL.getType())
     return;
 
   Accessibility typeAccess =
@@ -2064,7 +2064,7 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // Implicitly generated declarations are not @objc, except for constructors.
   else if (!allowImplicit && VD->isImplicit())
     return None;
-  else if (VD->getFormalAccess() == Accessibility::Private)
+  else if (VD->getFormalAccess() <= Accessibility::FilePrivate)
     return None;
 
   // If this declaration is part of a class with implicitly @objc members,
@@ -3484,7 +3484,7 @@ public:
       TypeResolutionOptions options;
       if (!TAD->getDeclContext()->isTypeContext())
         options |= TR_GlobalTypeAlias;
-      if (TAD->getFormalAccess() == Accessibility::Private)
+      if (TAD->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
       
       if (TAD->getDeclContext()->isModuleScopeContext()) {
@@ -3848,7 +3848,7 @@ public:
 
         if (auto *SF = CD->getParentSourceFile()) {
           if (auto *tracker = SF->getReferencedNameTracker()) {
-            bool isPrivate = CD->getFormalAccess() == Accessibility::Private;
+            bool isPrivate = CD->getFormalAccess() <= Accessibility::FilePrivate;
             tracker->addUsedMember({Super, Identifier()}, !isPrivate);
           }
         }
@@ -3915,7 +3915,7 @@ public:
 
       if (auto *SF = PD->getParentSourceFile()) {
         if (auto *tracker = SF->getReferencedNameTracker()) {
-          bool isNonPrivate = (PD->getFormalAccess() != Accessibility::Private);
+          bool isNonPrivate = (PD->getFormalAccess() > Accessibility::FilePrivate);
           for (auto *parentProto : PD->getInheritedProtocols(nullptr))
             tracker->addUsedMember({parentProto, Identifier()}, isNonPrivate);
         }
@@ -5161,7 +5161,7 @@ public:
         std::min(classDecl->getFormalAccess(), matchDecl->getFormalAccess());
       bool shouldDiagnose = false;
       bool shouldDiagnoseSetter = false;
-      if (requiredAccess > Accessibility::Private &&
+      if (requiredAccess > Accessibility::FilePrivate &&
           !isa<ConstructorDecl>(decl)) {
         shouldDiagnose = (decl->getFormalAccess() < requiredAccess);
 
@@ -6927,7 +6927,7 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
   case DeclKind::Destructor:
   case DeclKind::EnumElement: {
     if (D->isInvalid()) {
-      D->setAccessibility(Accessibility::Private);
+      D->setAccessibility(Accessibility::FilePrivate);
     } else {
       auto container = cast<NominalTypeDecl>(D->getDeclContext());
       validateAccessibility(container);

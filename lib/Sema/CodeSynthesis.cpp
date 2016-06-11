@@ -1177,8 +1177,8 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
     makeFinal(Context, Storage);
   Storage->setImplicit();
-  Storage->setAccessibility(Accessibility::Private);
-  Storage->setSetterAccessibility(Accessibility::Private);
+  Storage->setAccessibility(Accessibility::FilePrivate);
+  Storage->setSetterAccessibility(Accessibility::FilePrivate);
   
   addMemberToContextIfNeeded(Storage, DC);
   
@@ -1407,7 +1407,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   if (DC->getAsClassOrClassExtensionContext())
     makeFinal(Context, Parameter);
   Parameter->setImplicit();
-  Parameter->setAccessibility(Accessibility::Private);
+  Parameter->setAccessibility(Accessibility::FilePrivate);
   Parameter->setIsBeingTypeChecked();
   Parameter->setBodyResultType(SubstBodyResultTy);
 
@@ -1641,8 +1641,8 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
     makeFinal(Context, Storage);
   Storage->setImplicit();
-  Storage->setAccessibility(Accessibility::Private);
-  Storage->setSetterAccessibility(Accessibility::Private);
+  Storage->setAccessibility(Accessibility::FilePrivate);
+  Storage->setSetterAccessibility(Accessibility::FilePrivate);
 
   typeCheckDecl(Get, true);
   typeCheckDecl(Get, false);

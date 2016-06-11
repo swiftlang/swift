@@ -44,18 +44,18 @@ markUsed(c) // expected-error {{use of unresolved identifier 'c'}}
 
 Foo.x()
 Foo.y() // expected-error {{'y' is inaccessible due to 'internal' protection level}}
-Foo.z() // expected-error {{'z' is inaccessible due to 'private' protection level}}
+Foo.z() // expected-error {{'z' is inaccessible due to 'fileprivate' protection level}}
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
-// TESTABLE: :[[@LINE-3]]:{{[^:]+}}: error: 'z' is inaccessible due to 'private' protection level
+// TESTABLE: :[[@LINE-3]]:{{[^:]+}}: error: 'z' is inaccessible due to 'fileprivate' protection level
 Foo.a()
 Foo.b()
-Foo.c() // expected-error {{'c' is inaccessible due to 'private' protection level}}
+Foo.c() // expected-error {{'c' is inaccessible due to 'fileprivate' protection level}}
 
 _ = Foo() // expected-error {{'Foo' initializer is inaccessible due to 'internal' protection level}}
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
-_ = PrivateInit() // expected-error {{'PrivateInit' initializer is inaccessible due to 'private' protection level}}
-// TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' initializer is inaccessible due to 'private' protection level
+_ = PrivateInit() // expected-error {{'PrivateInit' initializer is inaccessible due to 'fileprivate' protection level}}
+// TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' initializer is inaccessible due to 'fileprivate' protection level
 
 var s = StructWithPrivateSetter()
 s.x = 42 // expected-error {{cannot assign to property: 'x' setter is inaccessible}}
@@ -124,13 +124,13 @@ func privateInOtherFile() {} // expected-note {{previously declared here}}
 
 #if !ACCESS_DISABLED
 // rdar://problem/21408035
-private class PrivateBox<T> { // expected-note 2 {{type declared here}}
+fileprivate class PrivateBox<T> { // expected-note 2 {{type declared here}}
   typealias ValueType = T
   typealias AlwaysFloat = Float
 }
 
-let boxUnboxInt: PrivateBox<Int>.ValueType = 0 // expected-error {{constant must be declared private because its type uses a private type}}
-let boxFloat: PrivateBox<Int>.AlwaysFloat = 0 // expected-error {{constant must be declared private because its type uses a private type}}
+let boxUnboxInt: PrivateBox<Int>.ValueType = 0 // expected-error {{constant must be declared fileprivate because its type uses a fileprivate type}}
+let boxFloat: PrivateBox<Int>.AlwaysFloat = 0 // expected-error {{constant must be declared fileprivate because its type uses a fileprivate type}}
 #endif
 
 

@@ -246,7 +246,7 @@ public protocol HA_PublicProtocol {
 internal protocol HB_InternalProtocol {
   associatedtype Assoc
 }
-private protocol HC_PrivateProtocol {
+fileprivate protocol HC_PrivateProtocol {
   associatedtype Assoc
 }
 public struct HA_PublicStruct {}

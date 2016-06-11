@@ -91,6 +91,7 @@ DECL_KEYWORD(associatedtype)
 DECL_KEYWORD(var)
 
 DECL_KEYWORD(internal)
+DECL_KEYWORD(fileprivate)
 DECL_KEYWORD(private)
 DECL_KEYWORD(public)
 DECL_KEYWORD(static)

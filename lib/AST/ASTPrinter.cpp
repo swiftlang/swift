@@ -1125,6 +1125,9 @@ class PrintAST : public ASTVisitor<PrintAST> {
     case Accessibility::Private:
       Printer << tok::kw_private;
       break;
+    case Accessibility::FilePrivate:
+      Printer << tok::kw_fileprivate;
+      break;
     case Accessibility::Internal:
       if (!Options.PrintInternalAccessibilityKeyword)
         return;
@@ -1606,7 +1609,7 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
 
   // Skip declarations that are not accessible.
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    if (Options.AccessibilityFilter > Accessibility::Private &&
+    if (Options.AccessibilityFilter > Accessibility::FilePrivate &&
         VD->hasAccessibility() &&
         VD->getFormalAccess() < Options.AccessibilityFilter)
       return false;

@@ -10,7 +10,7 @@
 // But: we want debug info for it.
 // CHECK-IR: !DISubprogram(name: "to_be_inlined"
 
-private func to_be_inlined(_ x: Int) -> Int {
+fileprivate func to_be_inlined(_ x: Int) -> Int {
 	return x + 1
 }
 

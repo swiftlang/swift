@@ -161,9 +161,9 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
 
   // Check if a given let property can be removed, because it
   // is not accessible elsewhere. This can happen if this property
-  // is private or if it is internal and WMO mode is used.
-  if (TypeAccess == Accessibility::Private ||
-      PropertyAccess == Accessibility::Private
+  // is private or fileprivate or if it is internal and WMO mode is used.
+  if (TypeAccess <= Accessibility::FilePrivate ||
+      PropertyAccess <= Accessibility::FilePrivate
       || ((TypeAccess == Accessibility::Internal ||
           PropertyAccess == Accessibility::Internal) &&
           Module->isWholeModule())) {
@@ -280,6 +280,7 @@ static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
   SILLinkage linkage;
   switch (accessibility) {
   case Accessibility::Private:
+  case Accessibility::FilePrivate:
     linkage = SILLinkage::Private;
     DEBUG(llvm::dbgs() << "Property " << *Property << " has private access\n");
     break;
@@ -312,12 +313,12 @@ static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
     if (isa<ClassDecl>(Ty))
       return false;
 
-    // Check if there are any private properties or any internal properties and
-    // it is a whole module compilation. In this case, no external initializer
-    // may exist.
+    // Check if there are any private or fileprivate properties or any internal
+    // properties and it is a whole module compilation. In this case, no
+    // external initializer may exist.
     for (auto SP : Ty->getStoredProperties()) {
       auto storedPropertyAccessibility = SP->getEffectiveAccess();
-      if (storedPropertyAccessibility == Accessibility::Private ||
+      if (storedPropertyAccessibility <= Accessibility::FilePrivate ||
           (storedPropertyAccessibility == Accessibility::Internal &&
            Module->isWholeModule())) {
        DEBUG(llvm::dbgs() << "Property " << *Property

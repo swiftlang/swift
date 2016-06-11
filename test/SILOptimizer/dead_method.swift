@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -O -primary-file %s %S/Inputs/public_class.swift -parse-as-library -emit-sil | FileCheck %s
 
-private class Derived : Base {
+fileprivate class Derived : Base {
   override func visible() {
   }
   func is_dead() {
