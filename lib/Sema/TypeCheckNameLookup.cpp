@@ -145,6 +145,16 @@ namespace {
         return;
       }
 
+      if (isa<ProtocolDecl>(foundDC) && isa<ProtocolDecl>(baseNominal)) {
+        if (isa<TypeAliasDecl>(found) || isa<AssociatedTypeDecl>(found)) {
+          if (Known.insert({{found, base}, false}).second) {
+            Result.add({found, base});
+            FoundDecls.push_back(found);
+          }
+          return;
+        }
+      }
+
       // If we found something within the protocol itself, and our
       // search began somewhere that is not in a protocol or extension
       // thereof, remap this declaration to the witness.
@@ -158,23 +168,26 @@ namespace {
 
         // Dig out the witness.
         ValueDecl *witness;
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-          witness = conformance->getTypeWitnessSubstAndDecl(assocType, &TC)
-            .second;
-        } else if (isa<TypeAliasDecl>(found)) {
-          // No witness for typealiases.
-          return;
+        if (isa<TypeAliasDecl>(found)) {
+          // A typealias in a protocol is its own witness.
+          witness = found;
         } else {
-          witness = conformance->getWitness(found, &TC).getDecl();
+          if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
+            witness = conformance->getTypeWitnessSubstAndDecl(assocType, &TC)
+              .second;
+          } else {
+            witness = conformance->getWitness(found, &TC).getDecl();
+          }
+
+          // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
+          // default implementations in protocols.
+          if (!witness || isa<ProtocolDecl>(witness->getDeclContext()))
+            return;
         }
 
-        // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
-        // default implementations in protocols.
-        if (witness && !isa<ProtocolDecl>(witness->getDeclContext())) {
-          if (Known.insert({{witness, base}, false}).second) {
-            Result.add({witness, base});
-            FoundDecls.push_back(witness);
-          }
+        if (Known.insert({{witness, base}, false}).second) {
+          Result.add({witness, base});
+          FoundDecls.push_back(witness);
         }
         return;
       }
@@ -351,37 +364,49 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     validateDecl(typeDecl);
     if (!typeDecl->hasType()) // FIXME: recursion-breaking hack
       continue;
-    
-    // If we found a member of a protocol type when looking into a non-protocol,
-    // non-archetype type, only include this member in the result set if
-    // this member was used as the default definition or otherwise inferred.
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
-      if (!type->is<ArchetypeType>() && !type->isExistentialType()) {
-        inferredAssociatedTypes.push_back(assocType);
-        continue;
-      }
-    }
 
-    // Substitute the base into the member's type.
-    if (Type memberType = substMemberTypeWithBase(dc->getParentModule(),
-                                                  typeDecl, type,
-                                                  /*isTypeReference=*/true)) {
+    // If we're looking up a member of a protocol, we must take special care.
+    if (typeDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+      // We don't allow lookups of an associated type or typealias of an
+      // existential type, because we have no way to represent such types.
+      //
+      // This is diagnosed further on down in resolveNestedIdentTypeComponent().
+      if (type->isExistentialType()) {
+        auto memberType = typeDecl->getInterfaceType()->getRValueInstanceType();
 
-      // Similar to the associated type case, ignore typealiases containing
-      // associated types when looking into a non-protocol.
-      if (auto alias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-        auto parentProtocol = alias->getDeclContext()->
-          getAsProtocolOrProtocolExtensionContext();
-        if (parentProtocol && memberType->hasTypeParameter() &&
-            !type->is<ArchetypeType>() && !type->isExistentialType()) {
+        if (memberType->hasTypeParameter()) {
+          // If we haven't seen this type result yet, add it to the result set.
+          if (types.insert(memberType->getCanonicalType()).second)
+            result.Results.push_back({typeDecl, memberType});
+
           continue;
         }
       }
 
-      // If we haven't seen this type result yet, add it to the result set.
-      if (types.insert(memberType->getCanonicalType()).second)
-        result.Results.push_back({typeDecl, memberType});
+      // If we're looking up an associated type of a concrete type,
+      // record it later for conformance checking; we might find a more
+      // direct typealias with the same name later.
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
+        if (!type->is<ArchetypeType>()) {
+          inferredAssociatedTypes.push_back(assocType);
+          continue;
+        }
+      }
+
+      // We are looking up an associated type of an archetype, or a
+      // protocol typealias or an archetype or concrete type.
+      //
+      // Proceed with the usual path below.
     }
+
+    // Substitute the base into the member's type.
+    auto memberType = substMemberTypeWithBase(dc->getParentModule(),
+                                              typeDecl, type,
+                                              /*isTypeReference=*/true);
+
+    // If we haven't seen this type result yet, add it to the result set.
+    if (types.insert(memberType->getCanonicalType()).second)
+      result.Results.push_back({typeDecl, memberType});
   }
 
   if (result.Results.empty()) {

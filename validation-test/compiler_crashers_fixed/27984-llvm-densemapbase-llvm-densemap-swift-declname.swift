@@ -6,7 +6,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // DUPLICATE-OF: 26832-swift-typechecker-conformstoprotocol.swift
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 class B<T{enum S<h{protocol A{{
 }
 func g:A

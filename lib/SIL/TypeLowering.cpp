@@ -1732,13 +1732,12 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
 GenericParamList *
 TypeConverter::getEffectiveGenericParams(AnyFunctionRef fn,
                                          CaptureInfo captureInfo) {
-  auto dc = fn.getAsDeclContext()->getParent();
+  auto dc = fn.getAsDeclContext();
 
-  if (dc->isLocalContext() &&
-      !captureInfo.hasGenericParamCaptures()) {
+  if (dc->getParent()->isLocalContext() &&
+      !captureInfo.hasGenericParamCaptures())
     return nullptr;
-  }
-  
+
   return dc->getGenericParamsOfContext();
 }
 
@@ -1747,14 +1746,9 @@ TypeConverter::getEffectiveGenericSignature(AnyFunctionRef fn,
                                             CaptureInfo captureInfo) {
   auto dc = fn.getAsDeclContext();
 
-  // If this is a non-generic local function that does not capture any
-  // generic type parameters from the outer context, don't need a
-  // signature at all.
-  if (!dc->isInnermostContextGeneric() &&
-      dc->getParent()->isLocalContext() &&
-      !captureInfo.hasGenericParamCaptures()) {
+  if (dc->getParent()->isLocalContext() &&
+      !captureInfo.hasGenericParamCaptures())
     return nullptr;
-  }
 
   if (auto sig = dc->getGenericSignatureOfContext())
     return sig->getCanonicalSignature();
@@ -1832,8 +1826,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
-      // TODO: Substitute out archetypes from the enclosing context with generic
-      // parameters.
+      // FIXME: Closures could have an interface type computed by Sema.
       auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
       funcTy = cast<AnyFunctionType>(
           ArchetypeBuilder::mapTypeOutOfContext(ACE->getParent(), funcTy)
@@ -1844,10 +1837,6 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     FuncDecl *func = cast<FuncDecl>(vd);
     auto funcTy = cast<AnyFunctionType>(
                                   func->getInterfaceType()->getCanonicalType());
-    if (func->getParent() && func->getParent()->isLocalContext())
-      funcTy = cast<AnyFunctionType>(
-          ArchetypeBuilder::mapTypeOutOfContext(func->getParent(), funcTy)
-              ->getCanonicalType());
     funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
     return getFunctionInterfaceTypeWithCaptures(funcTy, func);
   }
@@ -1909,22 +1898,6 @@ TypeConverter::getConstantContextGenericParams(SILDeclRef c) {
     FuncDecl *func = cast<FuncDecl>(vd);
     auto captureInfo = getLoweredLocalCaptures(func);
 
-    // FIXME: This is really weird:
-    // 1) For generic functions, generic methods and generic
-    // local functions, we return the function's generic
-    // parameter list twice.
-    // 2) For non-generic methods inside generic types, we
-    // return the generic type's parameters and nullptr.
-    // 3) For non-generic local functions, we return the
-    // outer function's parameters and nullptr.
-    //
-    // Local generic functions could probably be modeled better
-    // at the SIL level.
-    if (func->isInnermostContextGeneric() ||
-        func->getDeclContext()->isGenericTypeContext()) {
-      if (auto GP = func->getGenericParamsOfContext())
-        return {GP, func->getGenericParams()};
-    }
     return {getEffectiveGenericParams(func, captureInfo),
             func->getGenericParams()};
   }

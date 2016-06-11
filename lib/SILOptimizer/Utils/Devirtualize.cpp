@@ -371,9 +371,7 @@ getSubstitutionsForCallee(SILModule &M, CanSILFunctionType GenCalleeType,
       if (isa<BoundGenericType>(ClassInstanceType.getSwiftRValueType())) {
         auto BoundBaseType = bindSuperclass(FSelfGenericType,
                                             ClassInstanceType);
-        if (auto BoundTy = BoundBaseType->getAs<BoundGenericType>()) {
-          ClassSubs = BoundTy->getSubstitutions(Module, nullptr);
-        }
+        ClassSubs = BoundBaseType->gatherAllSubstitutions(Module, nullptr);
       }
     }
   } else {

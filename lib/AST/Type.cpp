@@ -329,32 +329,6 @@ ArrayRef<Type> TypeBase::getAllGenericArgs(SmallVectorImpl<Type> &scratch) {
   return scratch;
 }
 
-ArrayRef<Substitution>
-TypeBase::gatherAllSubstitutions(Module *module,
-                                 LazyResolver *resolver,
-                                 DeclContext *gpContext) {
-  Type type(this);
-  while (type) {
-    // Skip to the parent of a nominal type.
-    if (auto nominal = type->getAs<NominalType>()) {
-      type = nominal->getParent();
-      if (gpContext)
-        gpContext = gpContext->getParent();
-      continue;
-    }
-
-    // Return the substitutions in a bound generic type.
-    // This walks any further parent types.
-    if (auto boundGeneric = type->getAs<BoundGenericType>())
-      return boundGeneric->getSubstitutions(module, resolver, gpContext);
-
-    llvm_unreachable("Not a nominal or bound generic type");
-  }
-
-  // Not a generic type.
-  return { };
-}
-
 bool TypeBase::isUnspecializedGeneric() {
   CanType CT = getCanonicalType();
   if (CT.getPointer() != this)
@@ -1814,11 +1788,10 @@ bool TypeBase::isBindableTo(Type b, LazyResolver *resolver) {
         if (bgt->getDecl()->isInvalid())
           return false;
         
-        auto origSubs = bgt->getSubstitutions(bgt->getDecl()->getParentModule(),
-                                              Resolver);
-        auto substSubs = substBGT->getSubstitutions(
-                                              bgt->getDecl()->getParentModule(),
-                                              Resolver);
+        auto origSubs = bgt->gatherAllSubstitutions(
+            bgt->getDecl()->getParentModule(), Resolver);
+        auto substSubs = substBGT->gatherAllSubstitutions(
+            bgt->getDecl()->getParentModule(), Resolver);
         assert(origSubs.size() == substSubs.size());
         for (unsigned subi : indices(origSubs)) {
           if (!visit(origSubs[subi].getReplacement()->getCanonicalType(),
@@ -2917,18 +2890,12 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
   // If the member is part of a protocol or extension thereof, we need
   // to substitute in the type of Self.
   if (dc->getAsProtocolOrProtocolExtensionContext()) {
-    // We only substitute into archetypes for now for protocols.
-    // FIXME: This seems like an odd restriction. Whatever is depending on
-    // this, shouldn't.
-    if (!baseTy->is<ArchetypeType>() && isa<ProtocolDecl>(dc))
-      return substitutions;
-
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
-    substitutions[dc->getProtocolSelf()->getArchetype()] = baseTy;
     substitutions[dc->getProtocolSelf()->getDeclaredType()
                     ->getCanonicalType()->castTo<GenericTypeParamType>()]
       = baseTy;
+
     return substitutions;
   }
 

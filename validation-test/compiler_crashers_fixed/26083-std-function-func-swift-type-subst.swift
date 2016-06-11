@@ -5,6 +5,6 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// DUPLICATE-OF: 26832-swift-typechecker-conformstoprotocol.swift
-// RUN: not --crash %target-swift-frontend %s -parse
-class C struct B<B{struct B<T:C{protocol d{let:B<T>{}struct B<b
+// DUPLICATE-OF: 01766-swift-typechecker-validatedecl.swift
+// RUN: not %target-swift-frontend %s -parse
+protocol e:A{protocol e:A class A}protocol A{enum A}protocol B:e
