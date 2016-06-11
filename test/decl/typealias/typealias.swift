@@ -3,6 +3,9 @@
 typealias rgb = Int32 // expected-note {{declared here}}
 var rgb : rgb? // expected-error {{invalid redeclaration of 'rgb'}}
 
+// This used to produce a diagnostic about 'rgba' being used in its own
+// type, but arguably that is incorrect, since we are referencing a
+// different 'rgba'.
 struct Color {
     var rgba : rgba? { // expected-error {{'rgba' used within its own type}}
         return nil
@@ -12,7 +15,7 @@ struct Color {
 }
 
 struct Color2 {
-    let rgba : rgba? // expected-error {{'rgba' used within its own type}}
+    let rgba : rgba?
 
     struct rgba {}
 }

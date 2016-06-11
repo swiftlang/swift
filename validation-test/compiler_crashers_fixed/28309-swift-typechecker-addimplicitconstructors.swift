@@ -5,12 +5,10 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 // REQUIRES: asserts
-class A{let h=B<
-protocol A{
-extension{
-struct A{
-var b={}
-class A:b{
-protocol C{func<
+class a
+class A:a{
+class d:a
+let a=D
+let f:d
