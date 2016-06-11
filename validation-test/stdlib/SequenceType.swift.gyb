@@ -1,8 +1,8 @@
 // -*- swift -*-
 // RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/Sequence.swift -D test_path="%S"
-// RUN: %S/../../utils/line-directive %t/Sequence.swift -- %target-build-swift %t/Sequence.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/Sequence.swift -- %target-run %t/a.out
+// RUN: %gyb %s -o %t/Sequence.swift -D test_path="%S"
+// RUN: %line-directive %t/Sequence.swift -- %target-build-swift %t/Sequence.swift -o %t/a.out
+// RUN: %line-directive %t/Sequence.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
 % import gyb

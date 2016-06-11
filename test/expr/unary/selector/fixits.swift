@@ -20,7 +20,7 @@
 // RUN: mkdir -p %t.remapping
 // RUN: cp %s %t.sources/fixits.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -parse %t.sources/fixits.swift -fixit-all -emit-fixits-path %t.remapping/fixits.remap
-// RUN: %S/../../../../utils/apply-fixit-edits.py %t.remapping
+// RUN: %utils/apply-fixit-edits.py %t.remapping
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -parse %t.sources/fixits.swift 2> %t.result
 
 // RUN: FileCheck %s < %t.result

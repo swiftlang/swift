@@ -1,6 +1,6 @@
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/Unicode.swift
-// RUN: %S/../../utils/line-directive %t/Unicode.swift -- %target-build-swift %t/Unicode.swift -o %t/a.out -Xfrontend -disable-objc-attr-requires-foundation-module
-// RUN: %S/../../utils/line-directive %t/Unicode.swift -- %target-run %t/a.out
+// RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/Unicode.swift
+// RUN: %line-directive %t/Unicode.swift -- %target-build-swift %t/Unicode.swift -o %t/a.out -Xfrontend -disable-objc-attr-requires-foundation-module
+// RUN: %line-directive %t/Unicode.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
 import SwiftPrivate

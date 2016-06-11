@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-build-swift %s -o %t/a.out
-// RUN: not --crash %t/a.out 2>&1 | %S/../../utils/backtrace-check
+// RUN: not --crash %t/a.out 2>&1 | %utils/backtrace-check
 
 // This is not supported on watchos, ios, or tvos
 // UNSUPPORTED: OS=watchos
