@@ -42,6 +42,16 @@ class Platform(object):
         # By default, we don't support benchmarks on most platforms.
         return False
 
+    def contains(self, target_name):
+        """
+        Returns True if the given target name belongs to a one of this
+        platform's targets.
+        """
+        for target in self.targets:
+            if target.name == target_name:
+                return True
+        return False
+
 
 class DarwinPlatform(Platform):
     def __init__(self, name, archs, sdk_name=None, is_simulator=False):
