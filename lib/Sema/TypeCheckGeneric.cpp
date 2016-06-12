@@ -59,6 +59,10 @@ Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
   return ext->getExtendedType()->getAnyNominal()->getDeclaredInterfaceType();
 }
 
+Type DependentGenericTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
+  return decl->getDeclaredInterfaceType();
+}
+
 Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
                                        GenericTypeParamType *gp) {
   auto gpDecl = gp->getDecl();
@@ -88,6 +92,10 @@ Type GenericTypeToArchetypeResolver::resolveSelfAssociatedType(
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
   return dc->getDeclaredTypeInContext();
+}
+
+Type GenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
+  return decl->getDeclaredType();
 }
 
 Type PartialGenericTypeToArchetypeResolver::resolveGenericTypeParamType(
@@ -127,6 +135,11 @@ Type PartialGenericTypeToArchetypeResolver::resolveSelfAssociatedType(
 Type
 PartialGenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
   return dc->getDeclaredTypeInContext();
+}
+
+Type
+PartialGenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
+  return decl->getDeclaredType();
 }
 
 Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
@@ -221,6 +234,10 @@ Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
   // FIXME: Should be the interface type of the extension.
   auto ext = dyn_cast<ExtensionDecl>(dc);
   return ext->getExtendedType()->getAnyNominal()->getDeclaredInterfaceType();
+}
+
+Type CompleteGenericTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
+  return decl->getDeclaredInterfaceType();
 }
 
 /// Check the generic parameters in the given generic parameter list (and its
