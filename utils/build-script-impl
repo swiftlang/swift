@@ -879,7 +879,7 @@ function false_true() {
 }
 
 function cmake_version() {
-    echo $("${CMAKE}" --version | grep "cmake version" | cut -f 3 -d " ")
+    "${CMAKE}" --version | grep "cmake version" | cut -f 3 -d " "
 }
 
 function cmake_needs_to_specify_standard_computed_defaults() {
@@ -914,7 +914,7 @@ function make_relative_symlink() {
 # - "BUILD_STDLIB_DEPLOYMENT_TARGETS" are the Targets to build in this invocation
 
 CROSS_COMPILE_HOSTS=($CROSS_COMPILE_HOSTS)
-for t in ${CROSS_COMPILE_HOSTS} ; do
+for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     case ${t} in
         iphone* | appletv* | watch* | linux-armv6 | linux-armv7 )
             ;;
@@ -1171,7 +1171,7 @@ function calculate_targets_for_host() {
     SWIFT_TEST_TARGETS=()
 
     # Get the list of Target platforms for the Host
-    local stdlib_targets=(`echo $(get_stdlib_targets_for_host ${host})`)
+    local stdlib_targets=($(get_stdlib_targets_for_host ${host}))
 
     for stdlib_deployment_target in "${stdlib_targets[@]}"; do
         local swift_sdk=
@@ -1315,7 +1315,7 @@ function calculate_targets_for_host() {
 
     # Filter duplicate SWIFT_SDKs
     # We will get them if building for multiple architecture variants
-    SWIFT_SDKS=(`echo "${SWIFT_SDKS[@]}" | tr " " "\n" | sort -u | tr "\n" " "`)
+    SWIFT_SDKS=($(echo "${SWIFT_SDKS[@]}" | tr " " "\n" | sort -u | tr "\n" " "))
 
     # Get the values passed by `build-script`.
     LEGACY_SWIFT_STDLIB_TARGETS=(${SWIFT_STDLIB_TARGETS[@]})
