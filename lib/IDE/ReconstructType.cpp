@@ -484,7 +484,6 @@ struct VisitNodeResult {
     _error.clear();
   }
 
-  bool HasAnyDecls() { return !_decls.empty(); }
 
   bool HasAnyTypes() { return !_types.empty(); }
 };
