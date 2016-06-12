@@ -5,5 +5,10 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-struct A{class d:a{protocol a{func<}}let a=S<
+// RUN: not %target-swift-frontend %s -parse
+// REQUIRES: asserts
+class a
+class A:a{
+class d:a
+let a=D
+let f:d
