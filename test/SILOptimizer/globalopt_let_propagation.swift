@@ -44,6 +44,14 @@ struct IntWrapper5 {
   static let Five = IntWrapper5(val: 5)
 }
 
+// Also test that the analysis of an initializer can handle EnumInsts.
+enum IntEnum: Int { case One = 1, Two }
+struct EnumWrapper {
+  let val: IntEnum
+  init(val: IntEnum) { self.val = val }
+  static let Two = EnumWrapper(val: .Two)
+}
+
 var PROP1: Double {
    return PI
 }
@@ -319,7 +327,8 @@ public func test_static_struct_let_wrapped_int() -> Int {
 // CHECK: return
 @inline(never)
 public func test_static_struct_let_struct_wrapped_multiple_ints() -> Int {
-  return B.IW4.val.val.val + B.IW4.val2.val + IntWrapper5.Five.val + 1
+  return B.IW4.val.val.val + B.IW4.val2.val + IntWrapper5.Five.val +
+         EnumWrapper.Two.val.rawValue + 1
 }
 
 // Test accessing multiple Int fields wrapped into multiple structs, where each struct may have
@@ -333,7 +342,8 @@ public func test_static_struct_let_struct_wrapped_multiple_ints() -> Int {
 // CHECK: return
 @inline(never)
 public func test_static_class_let_struct_wrapped_multiple_ints() -> Int {
-  return C.IW4.val.val.val + C.IW4.val2.val + IntWrapper5.Five.val + 1
+  return C.IW4.val.val.val + C.IW4.val2.val + IntWrapper5.Five.val +
+         EnumWrapper.Two.val.rawValue + 1
 }
 
 // Test accessing multiple Int fields wrapped into multiple tuples, where each tuple may have
