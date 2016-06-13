@@ -3546,19 +3546,21 @@ public:
     // We don't support nested types in generics yet.
     if (NTD->isGenericContext()) {
       auto DC = NTD->getDeclContext();
-      if (DC->isTypeContext()) {
-        if (NTD->getGenericParams())
-          TC.diagnose(NTD->getLoc(), diag::unsupported_generic_nested_in_type,
-                NTD->getName(),
-                DC->getDeclaredTypeOfContext());
-        else
-          TC.diagnose(NTD->getLoc(),
-                      diag::unsupported_type_nested_in_generic_type,
-                      NTD->getName(),
-                      DC->getDeclaredTypeOfContext());
-        return true;
+      if (!TC.Context.LangOpts.EnableExperimentalNestedGenericTypes) {
+        if (DC->isTypeContext()) {
+          if (NTD->getGenericParams())
+            TC.diagnose(NTD->getLoc(), diag::unsupported_generic_nested_in_type,
+                  NTD->getName(),
+                  DC->getDeclaredTypeOfContext());
+          else
+            TC.diagnose(NTD->getLoc(),
+                        diag::unsupported_type_nested_in_generic_type,
+                        NTD->getName(),
+                        DC->getDeclaredTypeOfContext());
+          return true;
+        }
       }
-      
+
       if (DC->isLocalContext() && DC->isGenericContext()) {
         // A local generic context is a generic function.
         if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {

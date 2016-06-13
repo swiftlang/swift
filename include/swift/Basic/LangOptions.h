@@ -140,6 +140,9 @@ namespace swift {
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
 
+    /// \brief Enable experimental nested generic types feature.
+    bool EnableExperimentalNestedGenericTypes = false;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
