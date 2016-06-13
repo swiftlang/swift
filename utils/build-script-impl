@@ -2159,7 +2159,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
-                    echo "Skipping Foundation on OS X -- use the XCode project instead"
+                    echo "Skipping Foundation on OS X -- use the Xcode project instead"
                     continue
                 fi
     
@@ -2414,7 +2414,7 @@ for host in "${ALL_HOSTS[@]}"; do
             foundation)
                 # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
-                    echo "Skipping Foundation on OS X -- use the XCode project instead"
+                    echo "Skipping Foundation on OS X -- use the Xcode project instead"
                     continue
                 fi
                 if [[ "${SKIP_TEST_FOUNDATION}" ]]; then
@@ -2623,7 +2623,7 @@ for host in "${ALL_HOSTS[@]}"; do
             foundation)
                 # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
-                    echo "Skipping Foundation on OS X -- use the XCode project instead"
+                    echo "Skipping Foundation on OS X -- use the Xcode project instead"
                     continue
                 fi
                 if [[ -z "${INSTALL_FOUNDATION}" ]] ; then
