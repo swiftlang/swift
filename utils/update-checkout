@@ -56,8 +56,31 @@ def update_working_copy(repo_path, branch):
                    echo=False)
 
 
-def obtain_additional_swift_sources(
-        config, with_ssh, branch, skip_history, skip_repositories):
+def update_all_working_copies(args, config):
+    repo_branch = args.branch
+    for dir_name, _ in config["repositories"].items():
+        if dir_name in args.skip_repository:
+            print("--- Skipping '" + dir_name + "' ---")
+            continue
+        if args.branch is not None:
+            for config_branch_name in config['branch-names']:
+                if args.branch not in config[config_branch_name]['aliases']:
+                    continue
+                repo_branch = config[config_branch_name]['repos'][dir_name]
+                break
+
+        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, dir_name),
+                            repo_branch)
+
+
+def obtain_additional_swift_sources(args, config):
+    with_ssh = args.clone_with_ssh
+    branch = args.branch
+    if branch is None:
+        branch = config['default-branch-alias']
+    skip_history = args.skip_history
+    skip_repositories = args.skip_repositories
+
     for dir_name, repo_info in config['repositories'].items():
         repo = repo_info['name']
         if dir_name in skip_repositories:
@@ -126,67 +149,64 @@ repositories.
 
 By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     parser.add_argument(
-        "--clone",
-        help="Obtain Sources for Swift and Related Projects",
-        action="store_true")
-    parser.add_argument(
-        "--clone-with-ssh",
-        help="Obtain Sources for Swift and Related Projects via SSH",
-        action="store_true")
-    parser.add_argument(
-        "--skip-history",
-        help="Skip histories when obtaining sources",
-        action="store_true")
-    parser.add_argument(
-        "--skip-repository",
-        metavar="DIRECTORY",
-        default=[],
-        help="Skip the specified repository",
-        action="append")
-    parser.add_argument(
-        "--branch",
-        help="Obtain Sources for specific branch")
-    parser.add_argument(
         "--config",
         default=os.path.join(SCRIPT_DIR, "update-checkout-config.json"),
         help="Configuration file to use")
+
+    subparsers = parser.add_subparsers()
+
+    update_parser = subparsers.add_parser(
+        'update',
+        help='Update sources using \"git pull\"')
+    update_parser.add_argument(
+        "--skip-repository",
+        metavar="DIRECTORY",
+        default=[],
+        dest='skip_repositories',
+        help="Skip the specified repository",
+        action="append")
+    update_parser.add_argument(
+        '--branch',
+        metavar="BRANCH",
+        help='When updating, first checkout the given branch')
+    update_parser.set_defaults(func=update_all_working_copies)
+
+    clone_parser = subparsers.add_parser(
+        'clone', help='Obtain Sources for Swift and Related Projects')
+    clone_parser.add_argument(
+        '--ssh', help='Clone Sources for Swift and Related Projects using SSH',
+        dest='clone_with_ssh',
+        action='store_true')
+    clone_parser.add_argument(
+        "--skip-history",
+        help="Skip histories when obtaining sources",
+        action="store_true")
+    clone_parser.add_argument(
+        "--skip-repository",
+        metavar="DIRECTORY",
+        default=[],
+        dest='skip_repositories',
+        help="Skip the specified repository",
+        action="append")
+    clone_parser.add_argument(
+        "--branch",
+        help="When cloning, obtain sources for specific branch")
+    clone_parser.set_defaults(func=obtain_additional_swift_sources)
+
+    # Parse our arguments.
     args = parser.parse_args()
 
-    clone = args.clone
-    clone_with_ssh = args.clone_with_ssh
-    skip_history = args.skip_history
-    branch = args.branch
-
+    # Then load the configuration file and do some basic validation.
     with open(args.config) as f:
         config = json.load(f)
     validate_config(config)
 
-    # If branch is None, default to using the default branch alias specified by
-    # our configuration file.
-    if branch is None:
-        branch = config['default-branch-alias']
+    # Finally invoke our custom function passing in our arguments and
+    # configuration.
+    args.func(args, config)
 
-    if clone or clone_with_ssh:
-        obtain_additional_swift_sources(
-            config, clone_with_ssh, branch, skip_history, args.skip_repository)
-
-    repo_branch = branch
-    for dir_name, _ in config["repositories"].items():
-        if dir_name in args.skip_repository:
-            print("--- Skipping '" + dir_name + "' ---")
-            continue
-        if branch:
-            for config_branch_name in config['branch-names']:
-                if branch not in config[config_branch_name]['aliases']:
-                    continue
-                repo_branch = config[config_branch_name]['repos'][dir_name]
-                break
-
-        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, dir_name),
-                            repo_branch)
-
+    # TODO: Maybe we allow for func to return an error code?
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
