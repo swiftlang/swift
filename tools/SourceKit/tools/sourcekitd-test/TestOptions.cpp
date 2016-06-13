@@ -133,10 +133,11 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Default(SourceKitRequest::None);
       if (Request == SourceKitRequest::None) {
         llvm::errs() << "error: invalid request, expected one of "
-            << "version/demangle/mangle/index/complete/cursor/related-idents/syntax-map/structure/"
-               "format/expand-placeholder/doc-info/sema/interface-gen/interface-gen-open/"
-               "find-usr/find-interface/open/edit/print-annotations/extract-comment/"
-               "module-groups\n";
+            << "version/demangle/mangle/index/complete/complete.open/complete.cursor/"
+               "complete.update/complete.cache.ondisk/complete.cache.setpopularapi/"
+               "cursor/related-idents/syntax-map/structure/format/expand-placeholder/"
+               "doc-info/sema/interface-gen/interface-gen-openfind-usr/find-interface/"
+               "open/edit/print-annotations/print-diags/extract-comment/module-groups\n";
         return true;
       }
       break;
