@@ -29,7 +29,8 @@ Swift 3.0
 
     class Derived<T> : Base<T> {
       // init(t: T) is now synthesized to call super.init(t: t)
-    }```
+    }
+    ```
 
 * [SE-0081](https://github.com/apple/swift-evolution/blob/master/proposals/0081-move-where-expression.md)
   "Move 'where' clause to end of declaration" is implemented, allowing you to 
