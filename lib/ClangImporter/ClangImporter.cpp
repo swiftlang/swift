@@ -316,22 +316,25 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
-  invocationArgStrs.insert(invocationArgStrs.end(), {
-    // Enable modules.
-    "-fmodules",
+  invocationArgStrs.insert(
+      invocationArgStrs.end(),
+      {
 
-    // Enable implicit module maps (this option is implied by "-fmodules").
-    "-fimplicit-module-maps",
+          // Enable modules
+          "-fmodules",
+          "-fmodules-validate-system-headers",
+          "-Werror=non-modular-include-in-framework-module",
+          // Enable implicit module maps (implied by "-fmodules")
+          "-fimplicit-module-maps",
+          "-Xclang", "-fmodule-feature", "-Xclang", "swift",
 
-    // Don't emit LLVM IR.
-    "-fsyntax-only",
+          // Don't emit LLVM IR.
+          "-fsyntax-only",
 
-    SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
-    "-fretain-comments-from-system-headers",
-    "-fmodules-validate-system-headers",
-    "-Werror=non-modular-include-in-framework-module",
-    "-Xclang", "-fmodule-feature", "-Xclang", "swift",
-  });
+          "-fretain-comments-from-system-headers",
+
+          SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
+      });
 
   // Set C language options.
   if (triple.isOSDarwin()) {
