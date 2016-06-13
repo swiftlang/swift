@@ -34,6 +34,7 @@
 -(void)doSomethingSeparatedBy:(NSInteger)value;
 +(nonnull OmitNeedlessWords *)currentOmitNeedlessWords;
 +(void)setCurrentOmitNeedlessWords:(nonnull OmitNeedlessWords *)value;
+-(void)compilerPlugInValue:(NSInteger)value;
 @end
 
 @interface ABCDoodle : NSObject

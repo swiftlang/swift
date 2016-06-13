@@ -308,6 +308,9 @@
 // CHECK-OMIT-NEEDLESS-WORDS: class func current() -> OmitNeedlessWords
 // CHECK-OMIT-NEEDLESS-WORDS: class func setCurrent(_: OmitNeedlessWords)
 
+// Don't split "PlugIn".
+// CHECK-OMIT-NEEDLESS-WORDS: func compilerPlugInValue(_: Int)
+
 // Property-name sensitivity in the base name "Self" stripping.
 // CHECK-OMIT-NEEDLESS-WORDS: func addDoodle(_: ABCDoodle)
 

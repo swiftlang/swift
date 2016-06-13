@@ -886,6 +886,10 @@ camel_case::toLowercaseInitialisms(StringRef string,
 /// splitting.
 static bool wordConflictsBeforePreposition(StringRef word,
                                            StringRef preposition) {
+  if (camel_case::sameWordIgnoreFirstCase(preposition, "in") &&
+      camel_case::sameWordIgnoreFirstCase(word, "plug"))
+    return true;
+
   return false;
 }
 
