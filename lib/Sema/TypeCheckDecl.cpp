@@ -1294,7 +1294,7 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
     fnType = FunctionType::get(argType, resultType, extInfo);
   }
   Type selfMetaType = MetatypeType::get(selfType->getInOutObjectType());
-  if (ctor->getDeclContext()->isGenericTypeContext()) {
+  if (ctor->getDeclContext()->isGenericContext()) {
     allocFnType = PolymorphicFunctionType::get(selfMetaType, fnType,
                                                outerGenericParams);
     initFnType = PolymorphicFunctionType::get(selfType, fnType,
@@ -3996,7 +3996,7 @@ public:
     GenericParamList *outerGenericParams = nullptr;
     auto paramLists = FD->getParameterLists();
     bool hasSelf = FD->getDeclContext()->isTypeContext();
-    if (FD->getDeclContext()->isGenericTypeContext())
+    if (FD->getDeclContext()->isGenericContext())
       outerGenericParams = FD->getDeclContext()->getGenericParamsOfContext();
 
     for (unsigned i = 0, e = paramLists.size(); i != e; ++i) {
@@ -4359,7 +4359,7 @@ public:
         // Assign archetypes.
         finalizeGenericParamList(builder, gp, FD, TC);
       }
-    } else if (FD->getDeclContext()->isGenericTypeContext()) {
+    } else if (FD->getDeclContext()->isGenericContext()) {
       if (TC.validateGenericFuncSignature(FD)) {
         TC.markInvalidGenericSignature(FD);
       } else if (!FD->hasType()) {
@@ -5815,7 +5815,7 @@ public:
     // case the enclosing enum type was illegally declared inside of a generic
     // context. (In that case, we'll post a diagnostic while visiting the
     // parent enum.)
-    if (EED->getDeclContext()->isGenericTypeContext())
+    if (EED->getDeclContext()->isGenericContext())
       computeEnumElementInterfaceType(EED);
 
     // Require the carried type to be materializable.
@@ -5988,7 +5988,7 @@ public:
         // Assign archetypes.
         finalizeGenericParamList(builder, gp, CD, TC);
       }
-    } else if (CD->getDeclContext()->isGenericTypeContext()) {
+    } else if (CD->getDeclContext()->isGenericContext()) {
       if (TC.validateGenericFuncSignature(CD)) {
         TC.markInvalidGenericSignature(CD);
       } else {
@@ -6132,7 +6132,7 @@ public:
 
     Type SelfTy = configureImplicitSelf(TC, DD);
 
-    if (DD->getDeclContext()->isGenericTypeContext())
+    if (DD->getDeclContext()->isGenericContext())
       TC.validateGenericFuncSignature(DD);
 
     if (semaFuncParamPatterns(DD)) {
@@ -6142,7 +6142,7 @@ public:
 
     if (!DD->hasType()) {
       Type FnTy;
-      if (DD->getDeclContext()->isGenericTypeContext()) {
+      if (DD->getDeclContext()->isGenericContext()) {
         FnTy = PolymorphicFunctionType::get(SelfTy,
                                             TupleType::getEmpty(TC.Context),
                             DD->getDeclContext()->getGenericParamsOfContext());

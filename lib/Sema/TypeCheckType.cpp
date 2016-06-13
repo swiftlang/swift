@@ -249,8 +249,18 @@ Type TypeChecker::resolveTypeInContext(
       nominalType = nullptr;
     }
 
-    if (nonTypeOwner)
+    if (nonTypeOwner) {
+      // If this is a typealias not in type context, we still need the
+      // interface type; the typealias might be in a function context, and
+      // its underlying type might reference outer generic parameters.
+      if (isa<TypeAliasDecl>(typeDecl))
+        return resolver->resolveTypeOfDecl(typeDecl);
+
+      // When a nominal type used outside its context, return the unbound
+      // generic form of the type.
+      assert(isa<NominalTypeDecl>(typeDecl) || isa<ModuleDecl>(typeDecl));
       return typeDecl->getDeclaredType();
+    }
 
     // For the next steps we need our parentDC to be a type context
     if (!parentDC->isTypeContext())
