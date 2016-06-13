@@ -2353,7 +2353,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLDB_FORMATTER_OPTS="\
                                        --results-formatter lldbsuite.test_event.formatter.xunit.XunitFormatter \
                                        --results-file ${results_dir}/results.xml \
-                                       -O--xpass=ignore"
+                                       -O--xpass=success \
+                                       -O--xfail=success"
                     # Setup the xUnit results formatter.
                     if [[ "$(uname -s)" != "Darwin" ]] ; then
                         # On non-Darwin, we ignore skipped tests entirely
