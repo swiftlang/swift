@@ -1415,12 +1415,19 @@ extension String {
   //     stringByFoldingWithOptions:(NSStringCompareOptions)options
   //     locale:(NSLocale *)locale
 
-  /// Returns a string with the given character folding options
-  /// applied.
+  @available(*, unavailable, renamed: "folding(options:locale:)")
   public func folding(
     _ options: NSStringCompareOptions = [], locale: NSLocale?
   ) -> String {
-    return _ns.folding(options, locale: locale)
+    return folding(options: options, locale: locale)
+  }
+
+  /// Returns a string with the given character folding options
+  /// applied.
+  public func folding(
+    options: NSStringCompareOptions = [], locale: NSLocale?
+  ) -> String {
+    return _ns.folding(options: options, locale: locale)
   }
 
   // - (NSString *)stringByPaddingToLength:(NSUInteger)newLength
@@ -1880,13 +1887,6 @@ extension String {
   @available(*, unavailable, renamed: "appendingFormat")
   public func stringByAppendingFormat(
     _ format: String, _ arguments: CVarArg...
-  ) -> String {
-    fatalError("unavailable function can't be called")
-  }
-
-  @available(*, unavailable, renamed: "folding(_:locale:)")
-  public func folding(
-    options: NSStringCompareOptions = [], locale: NSLocale?
   ) -> String {
     fatalError("unavailable function can't be called")
   }

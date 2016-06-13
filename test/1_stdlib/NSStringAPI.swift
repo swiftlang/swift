@@ -1391,12 +1391,12 @@ NSStringAPIs.test("deletingLastPathComponent") {
   expectEqual("/tmp", "/tmp/a.txt".deletingLastPathComponent)
 }
 
-NSStringAPIs.test("folding(_:locale:)") {
+NSStringAPIs.test("folding(options:locale:)") {
 
   func fwo(
     _ s: String, _ options: NSStringCompareOptions
   ) -> (NSLocale?) -> String {
-    return { loc in s.folding(options, locale: loc) }
+    return { loc in s.folding(options: options, locale: loc) }
   }
   
   expectLocalizedEquality("abcd", fwo("abCD", .caseInsensitiveSearch), "en")

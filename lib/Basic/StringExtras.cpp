@@ -1254,6 +1254,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     NameRole role = i > 0 ? NameRole::SubsequentParameter
       : argNames[0].empty() ? NameRole::BaseName
       : baseName == "init" ? NameRole::SubsequentParameter
+      : paramTypes[0].hasDefaultArgument() ? NameRole::SubsequentParameter
       : NameRole::FirstParameter;
 
     // Omit needless words from the name.
