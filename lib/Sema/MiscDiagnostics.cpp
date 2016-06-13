@@ -494,13 +494,15 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           return;
         }
 
-        // FIXME: As a specific hack, we white-list parenthesized
-        // expressions that are call arguments.  This allows some
-        // ill-formed code to omit ".self" due to a historical bug. We
-        // keep that code working until we have a decision on SE-0090,
-        // rather than potentially breaking code twice.
-        if (isa<ParenExpr>(ParentExpr) && CallArgs.count(ParentExpr) > 0)
+        // Note: as a specific hack, produce a warning + Fix-It for
+        // the missing ".self" as the subexpression of a parenthesized
+        // expression, which is a historical bug.
+        if (isa<ParenExpr>(ParentExpr) && CallArgs.count(ParentExpr) > 0) {
+          TC.diagnose(E->getEndLoc(), diag::warn_value_of_metatype_missing_self,
+                      E->getType()->getRValueInstanceType())
+            .fixItInsertAfter(E->getEndLoc(), ".self");
           return;
+        }
       }
 
       // Is this a protocol metatype?

@@ -2475,14 +2475,14 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   /// padding to align the start to word alignment.
   internal static func bytesForBitMap(capacity: Int) -> Int {
     let numWords = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
-    return numWords * strideof(UInt) + alignof(UInt)
+    return numWords * strideof(UInt.self) + alignof(UInt.self)
   }
 
   /// Returns the bytes necessary to store 'capacity' keys and padding to align
   /// the start to the alignment of the 'Key' type assuming a word aligned base
   /// address.
   internal static func bytesForKeys(capacity: Int) -> Int {
-    let padding = max(0, alignof(Key.self) - alignof(UInt))
+    let padding = max(0, alignof(Key.self) - alignof(UInt.self))
     return strideof(Key.self) * capacity + padding
   }
 
@@ -2492,7 +2492,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   /// address aligned to the maximum of the alignment of the 'Key' type and the
   /// alignment of a word.
   internal static func bytesForValues(capacity: Int) -> Int {
-    let maxPrevAlignment = max(alignof(Key.self), alignof(UInt))
+    let maxPrevAlignment = max(alignof(Key.self), alignof(UInt.self))
     let padding = max(0, alignof(Value.self) - maxPrevAlignment)
     return strideof(Value.self) * capacity + padding
   }
@@ -2540,7 +2540,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     let bitMapSizeInBytes =
       _unsafeMultiply(
         _UnsafeBitMap.sizeInWords(forSizeInBits: _capacity),
-        strideof(UInt))
+        strideof(UInt.self))
     let start =
       UnsafeMutablePointer<UInt8>(_initializedHashtableEntriesBitMapStorage)
       + bitMapSizeInBytes

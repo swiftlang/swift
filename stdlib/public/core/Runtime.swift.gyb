@@ -474,7 +474,7 @@ func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
       radix: 16,
       uppercase: false
     )
-  for _ in 0..<(2 * sizeof(UnsafePointer<Void>) - result.utf16.count) {
+  for _ in 0..<(2 * sizeof(UnsafePointer<Void>.self) - result.utf16.count) {
     result = "0" + result
   }
   return "0x" + result

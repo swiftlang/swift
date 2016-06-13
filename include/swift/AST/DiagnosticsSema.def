@@ -2168,6 +2168,8 @@ ERROR(value_of_module_type,none,
 
 ERROR(value_of_metatype_type,none,
       "expected member name or constructor call after type name", ())
+WARNING(warn_value_of_metatype_missing_self,none,
+      "missing '.self' for reference to metatype of type %0", (Type))
 
 NOTE(add_parens_to_type,none,
      "add arguments after the type to construct a value of the type", ())

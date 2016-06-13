@@ -162,10 +162,10 @@ extension SCNGeometryElement {
       primitiveCount = indexCount
     }
     self.init(
-      data: NSData(bytes: indices, length: indexCount * sizeof(IndexType)),
+      data: NSData(bytes: indices, length: indexCount * sizeof(IndexType.self)),
       primitiveType: primitiveType,
       primitiveCount: primitiveCount,
-      bytesPerIndex: sizeof(IndexType))
+      bytesPerIndex: sizeof(IndexType.self))
   }
 }
 

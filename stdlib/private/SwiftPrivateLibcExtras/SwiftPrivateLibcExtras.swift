@@ -40,7 +40,7 @@ public var _stdlib_FD_SETSIZE: CInt {
 public struct _stdlib_fd_set {
   var _data: [UInt]
   static var _wordBits: Int {
-    return sizeof(UInt) * 8
+    return sizeof(UInt.self) * 8
   }
 
   public init() {
