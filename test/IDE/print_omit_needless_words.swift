@@ -260,6 +260,11 @@
 // CHECK-APPKIT: func add(_: Rect)
 // CHECK-APPKIT: class func conjureRect(_: Rect)
 
+// CHECK-OMIT-NEEDLESS-WORDS: struct OMWWobbleOptions
+// CHECK-OMIT-NEEDLESS-WORDS:   static var sideToSide: OMWWobbleOptions
+// CHECK-OMIT-NEEDLESS-WORDS:   static var backAndForth: OMWWobbleOptions
+// CHECK-OMIT-NEEDLESS-WORDS:   static var toXMLHex: OMWWobbleOptions
+
 // CHECK-OMIT-NEEDLESS-WORDS: func jump(to: URL)
 // CHECK-OMIT-NEEDLESS-WORDS: func objectIs(compatibleWith: AnyObject) -> Bool
 // CHECK-OMIT-NEEDLESS-WORDS: func insetBy(x: Int, y: Int)

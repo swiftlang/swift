@@ -9,7 +9,8 @@
 
 typedef NS_OPTIONS(NSUInteger, OMWWobbleOptions) {
   OMWWobbleSideToSide = 0x01,
-  OMWWobbleBackAndForth = 0x02
+  OMWWobbleBackAndForth = 0x02,
+  OMWWobbleToXMLHex = 0x04
 };
 
 @interface OmitNeedlessWords : NSObject

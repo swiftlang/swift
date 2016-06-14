@@ -857,14 +857,13 @@ camel_case::toLowercaseInitialisms(StringRef string,
   // Lowercase until we hit the an uppercase letter followed by a
   // non-uppercase letter.
   llvm::SmallString<32> scratchStr;
-  scratchStr.push_back(clang::toLowercase(string[0]));
-  for (unsigned i = 1, n = string.size(); i != n; ++i) {
+  for (unsigned i = 0, n = string.size(); i != n; ++i) {
     // If the next character is not uppercase, stop.
     if (i < n - 1 && !clang::isUppercase(string[i+1])) {
       // If the next non-uppercase character was not a letter, we seem
-      // to have a plural, we should still lowercase the character
-      // we're on.
-      if (!clang::isLetter(string[i+1]) ||
+      // to have a plural, or we're at the beginning, we should still
+      // lowercase the character we're on.
+      if (i == 0 || !clang::isLetter(string[i+1]) ||
           isPluralSuffix(camel_case::getFirstWord(string.substr(i+1)))) {
         scratchStr.push_back(clang::toLowercase(string[i]));
         ++i;
