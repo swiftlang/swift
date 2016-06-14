@@ -3173,21 +3173,17 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig,
 
     for (auto param : getParameters()) {
       (void)param;
-      assert(!param.getType().findIf([](Type t) {
-        return t->is<ArchetypeType>()
-          && !t->castTo<ArchetypeType>()->getSelfProtocol();
-      }) && "interface type of generic type should not contain context archetypes");
+      assert(!param.getType()->hasArchetype()
+             && "interface type of generic type should not contain context archetypes");
     }
     for (auto result : getAllResults()) {
       (void)result;
-      assert(!result.getType().findIf([](Type t) {
-        return t->is<ArchetypeType>();
-      }) && "interface type of generic type should not contain context archetypes");
+      assert(!result.getType()->hasArchetype()
+             && "interface type of generic type should not contain context archetypes");
     }
     if (hasErrorResult()) {
-      assert(!getErrorResult().getType().findIf([](Type t) {
-        return t->is<ArchetypeType>();
-      }) && "interface type of generic type should not contain context archetypes");
+      assert(!getErrorResult().getType()->hasArchetype()
+             && "interface type of generic type should not contain context archetypes");
     }
   }
 
