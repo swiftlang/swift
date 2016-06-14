@@ -558,7 +558,7 @@ ${TestSuite}.test("index(after:)/semantics") {
     var previousValue : Int? = nil
 
     for _ in 0${op}(endValue - 1) {
-      // Advance the index
+      // Advance the index to the last in-range position
       idx = range.index(after: idx)
       if let previousValue = previousValue {
         expectEqual(range[idx].value, previousValue + 1)
@@ -567,6 +567,7 @@ ${TestSuite}.test("index(after:)/semantics") {
     }
     // Iterate once more to get to the 'after end' position
     idx = range.index(after: idx)
+    expectEqual(idx, range.endIndex)
     // Now, iterate once more and expect a crash
     expectCrashLater()
     _ = range.index(after: idx)
@@ -596,16 +597,18 @@ ${TestSuite}.test("index(before:)/semantics") {
     var idx = range.endIndex
     var previousValue : Int? = nil
 
-    for _ in 0${op}(endValue - 1) {
-      // Advance the index
+    for _ in 0${op}(endValue) {
+      // Advance the index backwards until we reach `startIndex`
+      // Precondition: for a..<b, advance endIndex (b - a) times to reach startIndex
+      // Precondition: for a...b, advance endIndex (b - a) + 1 times to reach startIndex
       idx = range.index(before: idx)
       if let previousValue = previousValue {
         expectEqual(range[idx].value, previousValue - 1)
       }
       previousValue = range[idx].value
     }
-    // Iterate once more to get to the 'before start' position
-    idx = range.index(before: idx)
+    // At this point, we should be at `startIndex`
+    expectEqual(idx, range.startIndex)
     // Now, iterate once more and expect a crash
     expectCrashLater()
     _ = range.index(before: idx)
