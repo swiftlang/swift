@@ -2621,6 +2621,8 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   ASTContext &C = TheDecl->getDeclContext()->getASTContext();
   llvm::FoldingSetNodeID ID;
   RecursiveTypeProperties properties;
+  if (Parent)
+    properties |= Parent->getRecursiveProperties();
   BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs, properties);
 
   auto arena = getArena(properties);
