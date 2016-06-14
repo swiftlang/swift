@@ -1,8 +1,5 @@
 // -*- swift -*-
-// RUN: rm -rf %t ; mkdir -p %t
-// RUN: %gyb %s -o %t/CastTraps.swift
-// RUN: %line-directive %t/CastTraps.swift -- %target-build-swift %t/CastTraps.swift -o %t/a.out
-// RUN: %line-directive %t/CastTraps.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 // FIXME: Casting.cpp has dozens of places to fail a cast. This test does not 
@@ -20,17 +17,17 @@ import Foundation
 % objectTypes = []
 % protocolTypes = []
 
-% types.append(['a.Class1', 'a.Class2'])
-% objectTypes.append(['a.Class1', 'a.Class2'])
+% types.append(['main.Class1', 'main.Class2'])
+% objectTypes.append(['main.Class1', 'main.Class2'])
 class Class1 { }
 class Class2 { }
 
-% types.append(['a.Struct1', 'a.Struct2'])
+% types.append(['main.Struct1', 'main.Struct2'])
 struct Struct1 { }
 struct Struct2 { }
 
-% types.append(['a.ObjCClass1', 'a.ObjCClass2'])
-% objectTypes.append(['a.ObjCClass1', 'a.ObjCClass2'])
+% types.append(['main.ObjCClass1', 'main.ObjCClass2'])
+% objectTypes.append(['main.ObjCClass1', 'main.ObjCClass2'])
 class ObjCClass1 : NSObject { }
 class ObjCClass2 : NSObject { }
 
@@ -38,8 +35,8 @@ class ObjCClass2 : NSObject { }
 % objectTypes.append(['DateFormatter', 'NumberFormatter'])
 // non-Swift Objective-C class
 
-% protocolTypes.append('a.Proto1')
-% protocolTypes.append('a.Proto2')
+% protocolTypes.append('main.Proto1')
+% protocolTypes.append('main.Proto2')
 protocol Proto1 { }
 protocol Proto2 { }
 % protocolTypes.append('URLSessionDelegate')
