@@ -42,7 +42,7 @@ def all_tests():
       ('WithPrefixAndSuffix', '[-9999, -9998, -9997, -9996, -9995]',
        '[-9994, -9993, -9992]')
     ]:
-      test.name = test.base_slice + '_Of_' + test.base + '_' + name + '.swift.gyb'
+      test.name = test.base_slice + '_Of_' + test.base + '_' + name + '.swift'
       test.prefix = prefix
       test.suffix
       yield test
@@ -67,7 +67,7 @@ def test_methods(test):
 }%
 
 % for test in all_tests():
-// Start of file: ${test.name}
+// BEGIN ${test.name}
 // -*- swift -*-
 
 //===----------------------------------------------------------------------===//
@@ -75,11 +75,7 @@ def test_methods(test):
 // Do Not Edit Directly!
 //===----------------------------------------------------------------------===//
 
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %gyb %s -o %t/main.swift
-// RUN: %line-directive %t/main.swift -- %target-build-swift %t/main.swift -o %t/${test.name}.a.out
-// RUN: %line-directive %t/main.swift -- %target-run %t/${test.name}.a.out
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 // FIXME: the test is too slow when the standard library is not optimized.
@@ -181,6 +177,4 @@ SliceTests.add${method}Tests(
 % end
 
 runAllTests()
-// End of file: ${test.name}
 % end
-
