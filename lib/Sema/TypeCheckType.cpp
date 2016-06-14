@@ -128,7 +128,9 @@ static Type getObjectiveCNominalType(TypeChecker &TC,
     return nullptr;
 
   NameLookupOptions lookupOptions
-    = defaultMemberLookupOptions | NameLookupFlags::KnownPrivate;
+    = defaultMemberLookupOptions |
+      NameLookupFlags::KnownPrivate |
+      NameLookupFlags::OnlyTypes;
   if (auto result = TC.lookupMember(dc, ModuleType::get(module), TypeName,
                                     lookupOptions)) {
     for (auto decl : result) {

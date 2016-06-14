@@ -329,7 +329,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
          
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
-  NLOptions subOptions = NL_QualifiedDefault;
+  NLOptions subOptions = NL_QualifiedDefault | NL_OnlyTypes;
+
   if (options.contains(NameLookupFlags::KnownPrivate))
     subOptions |= NL_KnownNonCascadingDependency;
   if (options.contains(NameLookupFlags::ProtocolMembers))
