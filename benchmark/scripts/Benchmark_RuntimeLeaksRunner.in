@@ -26,7 +26,7 @@ import perf_test_driver  # noqa (E402 module level import not at top of file)
 XFAIL_LIST = [
 ]
 
-# Global objective-c classes created by various frameworks. We do not care
+# Global Objective-C classes created by various frameworks. We do not care
 # about these.
 IGNORABLE_GLOBAL_OBJC_CLASSES = set([
     '__NSPlaceholderDate',
