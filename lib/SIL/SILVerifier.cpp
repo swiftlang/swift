@@ -2700,9 +2700,7 @@ public:
     // NOTE: IRGen currently does not support the following method_inst
     // variants as branch arguments.
     // Once this is supported, the check can be removed.
-    require(
-        !isa<WitnessMethodInst>(branchArg) &&
-            !(isa<MethodInst>(branchArg) &&
+    require(!(isa<MethodInst>(branchArg) &&
               cast<MethodInst>(branchArg)->getMember().isForeign),
         "branch argument cannot be a witness_method or an objc method_inst");
     return branchArg->getType() == bbArg->getType();

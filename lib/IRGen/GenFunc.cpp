@@ -176,8 +176,9 @@ namespace {
   class FuncTypeInfo : public ScalarTypeInfo<FuncTypeInfo, ReferenceTypeInfo>,
                        public FuncSignatureInfo {
     FuncTypeInfo(CanSILFunctionType formalType, llvm::StructType *storageType,
-                 Size size, Alignment align, SpareBitVector &&spareBits)
-      : ScalarTypeInfo(storageType, size, std::move(spareBits), align),
+                 Size size, Alignment align, SpareBitVector &&spareBits,
+                 IsPOD_t pod)
+      : ScalarTypeInfo(storageType, size, std::move(spareBits), align, pod),
         FuncSignatureInfo(formalType)
     {
     }
@@ -186,9 +187,10 @@ namespace {
     static const FuncTypeInfo *create(CanSILFunctionType formalType,
                                       llvm::StructType *storageType,
                                       Size size, Alignment align,
-                                      SpareBitVector &&spareBits) {
+                                      SpareBitVector &&spareBits,
+                                      IsPOD_t pod) {
       return new FuncTypeInfo(formalType, storageType, size, align,
-                              std::move(spareBits));
+                              std::move(spareBits), pod);
     }
     
     // Function types do not satisfy allowsOwnership.
@@ -247,7 +249,8 @@ namespace {
 
       Address dataAddr = projectData(IGF, address);
       auto data = IGF.Builder.CreateLoad(dataAddr);
-      IGF.emitNativeStrongRetain(data);
+      if (!isPOD(ResilienceExpansion::Maximal))
+        IGF.emitNativeStrongRetain(data);
       e.add(data);
     }
 
@@ -268,7 +271,11 @@ namespace {
       IGF.Builder.CreateStore(e.claimNext(), fnAddr);
 
       Address dataAddr = projectData(IGF, address);
-      IGF.emitNativeStrongAssign(e.claimNext(), dataAddr);
+      auto context = e.claimNext();
+      if (isPOD(ResilienceExpansion::Maximal))
+        IGF.Builder.CreateStore(context, dataAddr);
+      else
+        IGF.emitNativeStrongAssign(context, dataAddr);
     }
 
     void initialize(IRGenFunction &IGF, Explosion &e,
@@ -279,21 +286,28 @@ namespace {
 
       // Store the data pointer, if any, transferring the +1.
       Address dataAddr = projectData(IGF, address);
-      IGF.emitNativeStrongInit(e.claimNext(), dataAddr);
+      auto context = e.claimNext();
+      if (isPOD(ResilienceExpansion::Maximal))
+        IGF.Builder.CreateStore(context, dataAddr);
+      else
+        IGF.emitNativeStrongInit(context, dataAddr);
     }
 
     void copy(IRGenFunction &IGF, Explosion &src,
               Explosion &dest, Atomicity atomicity) const override {
       src.transferInto(dest, 1);
       auto data = src.claimNext();
-      IGF.emitNativeStrongRetain(data, atomicity);
+      if (!isPOD(ResilienceExpansion::Maximal))
+        IGF.emitNativeStrongRetain(data, atomicity);
       dest.add(data);
     }
 
     void consume(IRGenFunction &IGF, Explosion &src,
                  Atomicity atomicity) const override {
       src.claimNext();
-      IGF.emitNativeStrongRelease(src.claimNext(), atomicity);
+      auto context = src.claimNext();
+      if (!isPOD(ResilienceExpansion::Maximal))
+        IGF.emitNativeStrongRelease(context, atomicity);
     }
 
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
@@ -304,13 +318,17 @@ namespace {
     void strongRetain(IRGenFunction &IGF, Explosion &e,
                       Atomicity atomicity) const override {
       e.claimNext();
-      IGF.emitNativeStrongRetain(e.claimNext(), atomicity);
+      auto context = e.claimNext();
+      if (!isPOD(ResilienceExpansion::Maximal))
+        IGF.emitNativeStrongRetain(context, atomicity);
     }
 
     void strongRelease(IRGenFunction &IGF, Explosion &e,
                        Atomicity atomicity) const override {
       e.claimNext();
-      IGF.emitNativeStrongRelease(e.claimNext(), atomicity);
+      auto context = e.claimNext();
+      if (!isPOD(ResilienceExpansion::Maximal))
+        IGF.emitNativeStrongRelease(context, atomicity);
     }
 
     void strongRetainUnowned(IRGenFunction &IGF, Explosion &e) const override {
@@ -352,7 +370,8 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       auto data = IGF.Builder.CreateLoad(projectData(IGF, addr));
-      IGF.emitNativeStrongRelease(data);
+      if (!isPOD(ResilienceExpansion::Maximal))
+        IGF.emitNativeStrongRelease(data);
     }
 
     void packIntoEnumPayload(IRGenFunction &IGF,
@@ -534,7 +553,6 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
       
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::Method:
-  case SILFunctionType::Representation::WitnessMethod:
   case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::CFunctionPointer:
     return ThinFuncTypeInfo::create(CanSILFunctionType(T),
@@ -552,7 +570,21 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
                                 IGM.FunctionPairTy,
                                 IGM.getPointerSize() * 2,
                                 IGM.getPointerAlignment(),
-                                std::move(spareBits));
+                                std::move(spareBits),
+                                IsNotPOD);
+  }
+  // Witness method values carry a reference to their originating witness table
+  // as context.
+  case SILFunctionType::Representation::WitnessMethod: {
+    SpareBitVector spareBits;
+    spareBits.append(IGM.getFunctionPointerSpareBits());
+    spareBits.append(IGM.getWitnessTablePtrSpareBits());
+    return FuncTypeInfo::create(CanSILFunctionType(T),
+                                IGM.WitnessFunctionPairTy,
+                                IGM.getPointerSize() * 2,
+                                IGM.getPointerAlignment(),
+                                std::move(spareBits),
+                                IsPOD);
   }
   }
   llvm_unreachable("bad function type representation");

@@ -274,6 +274,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     FunctionPtrTy,
     RefCountedPtrTy,
   });
+  WitnessFunctionPairTy = createStructType(*this, "swift.function", {
+    FunctionPtrTy,
+    WitnessTablePtrTy,
+  });
   
   OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
                   ->getPointerTo(DefaultAS);
