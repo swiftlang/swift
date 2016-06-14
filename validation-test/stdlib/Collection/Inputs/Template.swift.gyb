@@ -1,4 +1,8 @@
 %{
+# This is a template of validation-test/stdlib/Collection/*.swift
+#
+# cd validation-test/stdlib/Collection
+# ../../../utils/gyb --line-directive="" Inputs/Template.swift.gyb | ../../../utils/split_file.py
 
 from gyb_stdlib_support import (
     TRAVERSALS,
