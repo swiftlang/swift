@@ -617,7 +617,7 @@ namespace {
                        unboundDecl->getInnermostGenericParamTypes(),
                        unboundDecl->getGenericRequirements(),
                        /*skipProtocolSelfConstraint=*/false,
-                       minOpeningDepth,
+                       unboundDecl->getGenericTypeContextDepth(),
                        locator,
                        replacements);
         

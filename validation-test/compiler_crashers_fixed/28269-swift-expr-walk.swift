@@ -6,6 +6,4 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -parse
-// REQUIRES: asserts
-// XFAIL: *
 protocol A.struct B<f func a<T:A{class A{var t:B=
