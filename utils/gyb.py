@@ -699,6 +699,7 @@ class Code(ASTNode):
         save_children = context.local_bindings.get('__children__')
         # Execute the code with our __children__ in scope
         context.local_bindings['__children__'] = self.children
+        context.local_bindings['__file__'] = self.filename
         result = eval(self.code, context.local_bindings)
 
         if context.local_bindings['__children__'] is not self.children:
