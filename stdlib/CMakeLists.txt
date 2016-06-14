@@ -10,6 +10,12 @@ else()
   set(CMAKE_C_COMPILER_ARG1 "")
 endif()
 
+# FIXME: Make it possible to build *only* static libraries for the stdlib.
+set(SWIFT_STDLIB_LIBRARY_BUILD_TYPES SHARED)
+if(SWIFT_BUILD_STATIC_STDLIB)
+  list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES STATIC)
+endif()
+
 add_custom_target(swift-stdlib-all)
 foreach(SDK ${SWIFT_SDKS})
   add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")

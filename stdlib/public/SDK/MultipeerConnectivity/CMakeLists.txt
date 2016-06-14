@@ -1,4 +1,4 @@
-add_swift_library(swiftMultipeerConnectivity IS_SDK_OVERLAY
+add_swift_library(swiftMultipeerConnectivity ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   MultipeerConnectivity.swift
 
   TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR

@@ -1,4 +1,4 @@
-add_swift_library(swiftContacts IS_SDK_OVERLAY
+add_swift_library(swiftContacts ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   Contacts.swift
   TARGET_SDKS OSX IOS IOS_SIMULATOR WATCHOS WATCHOS_SIMULATOR
   SWIFT_MODULE_DEPENDS Foundation

@@ -1,4 +1,4 @@
-add_swift_library(swiftSema
+add_swift_library(swiftSema STATIC
   CodeSynthesis.cpp
   Constraint.cpp
   ConstraintGraph.cpp

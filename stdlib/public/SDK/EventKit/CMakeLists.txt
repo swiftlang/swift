@@ -1,4 +1,4 @@
-add_swift_library(swiftEventKit IS_SDK_OVERLAY
+add_swift_library(swiftEventKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   EventKit.swift
 
   TARGET_SDKS OSX IOS IOS_SIMULATOR WATCHOS WATCHOS_SIMULATOR

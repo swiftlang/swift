@@ -1,4 +1,4 @@
-add_swift_library(swiftGameKit IS_SDK_OVERLAY
+add_swift_library(swiftGameKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   GameKit.swift
   TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR WATCHOS
   SWIFT_MODULE_DEPENDS Foundation SpriteKit SceneKit simd

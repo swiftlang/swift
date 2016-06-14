@@ -1,4 +1,4 @@
-add_swift_library(swiftGameplayKit IS_SDK_OVERLAY
+add_swift_library(swiftGameplayKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   GameplayKit.swift
   GameplayKit.mm
 

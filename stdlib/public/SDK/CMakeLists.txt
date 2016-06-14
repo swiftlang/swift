@@ -1,5 +1,11 @@
 # All libraries in this directory tree are overlays that depend on Darwin SDK.
 
+# FIXME: Make it possible to build *only* static libraries for the SDK overlays.
+set(SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES SHARED)
+if(SWIFT_BUILD_STATIC_STDLIB)
+  list(APPEND SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES STATIC)
+endif()
+
 # Please keep this list sorted.
 add_subdirectory(AppKit)
 add_subdirectory(AVFoundation)

@@ -1,4 +1,4 @@
-add_swift_library(swiftIDE
+add_swift_library(swiftIDE STATIC
   CodeCompletion.cpp
   CodeCompletionCache.cpp
   CommentConversion.cpp

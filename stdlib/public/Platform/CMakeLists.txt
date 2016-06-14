@@ -24,7 +24,7 @@ else()
       DEPENDS glibc_modulemap)
 endif()
 
-add_swift_library(${swift_platform_name} IS_SDK_OVERLAY
+add_swift_library(${swift_platform_name} ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     ${swift_platform_sources}
     ${swift_platform_flags})
 

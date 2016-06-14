@@ -1,4 +1,4 @@
-add_swift_library(swiftCoreBluetooth IS_SDK_OVERLAY
+add_swift_library(swiftCoreBluetooth ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   CoreBluetooth.swift
   TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR
   SWIFT_MODULE_DEPENDS Foundation

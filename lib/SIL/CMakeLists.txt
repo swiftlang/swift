@@ -1,4 +1,4 @@
-add_swift_library(swiftSIL
+add_swift_library(swiftSIL STATIC
   AbstractionPattern.cpp
   Bridging.cpp
   Dominance.cpp

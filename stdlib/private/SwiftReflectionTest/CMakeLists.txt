@@ -1,4 +1,4 @@
-add_swift_library(swiftSwiftReflectionTest SHARED IS_STDLIB
+add_swift_library(swiftSwiftReflectionTest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   SwiftReflectionTest.swift
   SWIFT_MODULE_DEPENDS Darwin
   INSTALL_IN_COMPONENT stdlib-experimental)
