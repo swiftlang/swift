@@ -1574,8 +1574,8 @@ extension TestSuite {
       return makeCollection(r.map { wrapValue(OpaqueValue($0)) })
     }
 
-%   for i in ['index', 'formIndex']:
-    self.test("\(testNamePrefix).${i}(after:)/semantics") {
+%   for function_name in ['index', 'formIndex']:
+    self.test("\(testNamePrefix).${function_name}(after:)/semantics") {
       for test in indexAfterTests {
         let c = toCollection(test.start..<test.end)
         var currentIndex = c.startIndex
@@ -1583,7 +1583,7 @@ extension TestSuite {
         repeat {
           expectEqual(counter, extractValue(c[currentIndex]).value,
             stackTrace: SourceLocStack().with(test.loc))
-%     if i is 'index':
+%     if function_name is 'index':
           currentIndex = c.index(after: currentIndex)
 %     else:
           c.formIndex(after: &currentIndex)
@@ -1651,13 +1651,13 @@ extension TestSuite {
       }
     }
 
-%   for i in ['index', 'formIndex']:
-    self.test("\(testNamePrefix)/${i}(_:offsetBy: -n)/semantics") {
+%   for function_name in ['index', 'formIndex']:
+    self.test("\(testNamePrefix)/${function_name}(_:offsetBy: -n)/semantics") {
       for test in indexOffsetByTests.filter(
         {$0.limit == nil && $0.distance < 0}
       ) {
         let c = toCollection(0..<20)
-%     if i is 'index':
+%     if function_name is 'index':
         let start = c.nthIndex(test.startOffset)
 %     else:
         var new = c.nthIndex(test.startOffset)
@@ -1666,7 +1666,7 @@ extension TestSuite {
         if test.expectedOffset! < 0 || !collectionIsBidirectional {
           expectCrashLater()
         }
-%     if i is 'index':
+%     if function_name is 'index':
         let new = c.index(start, offsetBy: numericCast(test.distance))
 %     else:
         c.formIndex(&new, offsetBy: numericCast(test.distance))

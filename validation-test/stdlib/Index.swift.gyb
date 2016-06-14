@@ -60,7 +60,7 @@ Index.test(
 ) {
   let max = 10
   for test in indexOffsetByTests.filter(
-    { $0.limit == nil && $0.distance >= 0 && $0.expectedOffset! < max }
+    { $0.limit == nil && $0.distance >= 0 && ($0.expectedOffset ?? max) < max }
   ) {
     let c = ${Collection}(Array(0..<max))
 
