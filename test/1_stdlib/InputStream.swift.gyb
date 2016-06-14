@@ -16,6 +16,10 @@
 // RUN: %line-directive %t/InputStream.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
+// FIXME: The Android test runner is incapable of running this test, which
+//        relies on stdin input.
+// UNSUPPORTED: OS=linux-androideabi
+
 import StdlibUnittest
 
 

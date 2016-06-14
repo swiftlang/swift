@@ -144,6 +144,7 @@ KNOWN_SETTINGS=(
     skip-test-tvos-host         ""               "set to skip testing the host parts of the tvOS toolchain"
     skip-test-watchos-simulator  ""              "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
     skip-test-watchos-host      ""               "set to skip testing the host parts of the watchOS toolchain"
+    skip-test-android-host      ""               "set to skip testing the host parts of the Android toolchain"
     validation-test             "0"              "set to run the validation test suite"
     long-test                   "0"              "set to run the long test suite"
     skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
@@ -216,6 +217,7 @@ KNOWN_SETTINGS=(
     android-icu-uc-include             ""        "Path to a directory containing headers for libicuuc"
     android-icu-i18n                   ""        "Path to a directory containing libicui18n.so"
     android-icu-i18n-include           ""        "Path to a directory containing headers libicui18n"
+    android-deploy-device-path         ""        "Path on an Android device to which built Swift stdlib products will be deployed"
     check-args-only                    ""        "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
     common-cmake-options               ""        "CMake options used for all targets, including LLVM/Clang"
     # TODO: Remove this some time later.
@@ -1258,9 +1260,7 @@ function calculate_targets_for_host() {
             android-*)
                 swift_sdk="ANDROID"
                 build_for_this_target=$(not ${SKIP_BUILD_ANDROID})
-                # FIXME: Allow Android host tests to be enabled/disabled by the
-                #        build script.
-                test_this_target=
+                test_this_target=$(not ${SKIP_TEST_ANDROID_HOST})
                 ;;
             *)
                 echo "Unknown compiler deployment target: ${stdlib_deployment_target}"
@@ -1816,6 +1816,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_ANDROID_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
                         -DSWIFT_ANDROID_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
                         -DSWIFT_ANDROID_ICU_I18N_INCLUDE:STRING="${ANDROID_ICU_I18N_INCLUDE}"
+                        -DSWIFT_ANDROID_DEPLOY_DEVICE_PATH:STRING="${ANDROID_DEPLOY_DEVICE_PATH}"
                     )
                 fi
 
@@ -2265,7 +2266,6 @@ for host in "${ALL_HOSTS[@]}"; do
     done
 done
 # END OF BUILD PHASE
-
 
 # Trap function to print the current test configuration when tests fail.
 # This is a function so the text is not unnecessarily displayed when running -x.

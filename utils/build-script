@@ -49,6 +49,9 @@ from swift_build_support.targets import StdlibDeploymentTarget  # noqa (E402)
 from swift_build_support.cmake import CMake  # noqa (E402)
 import swift_build_support.workspace    # noqa (E402)
 
+sys.path.append(os.path.join(os.path.dirname(__file__), 'android'))
+import adb.commands  # noqa (E402)
+
 
 def call_without_sleeping(command, env=None, dry_run=False):
     """
@@ -381,10 +384,14 @@ class BuildScriptInvocation(object):
         if args.skip_build_watchos_simulator:
             args.skip_test_watchos_simulator = True
 
+        if args.skip_build_android:
+            args.skip_test_android_host = True
+
         if not args.host_test:
             args.skip_test_ios_host = True
             args.skip_test_tvos_host = True
             args.skip_test_watchos_host = True
+            args.skip_test_android_host = True
 
         if args.build_subdir is None:
             args.build_subdir = \
@@ -472,11 +479,9 @@ class BuildScriptInvocation(object):
         if args.skip_test_watchos_simulator:
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator)
-        # We never allow testing Android, currently.
-        #
-        # FIXME: Allow Android host tests to be enabled/disabled by the build
-        # script.
-        self.platforms_to_skip_test.add(StdlibDeploymentTarget.Android)
+
+        if args.skip_test_android_host:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.Android)
 
         self.platforms_to_skip_test_host = set()
         if args.skip_test_ios_host:
@@ -676,6 +681,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-watchos-host"]
         if args.skip_test_watchos_simulator:
             impl_args += ["--skip-test-watchos-simulator"]
+        if args.skip_test_android_host:
+            impl_args += ["--skip-test-android-host"]
         if args.build_runtime_with_host_compiler:
             impl_args += ["--build-runtime-with-host-compiler"]
         if args.validation_test:
@@ -697,6 +704,11 @@ class BuildScriptInvocation(object):
                 "--android-icu-uc-include", args.android_icu_uc_include,
                 "--android-icu-i18n", args.android_icu_i18n,
                 "--android-icu-i18n-include", args.android_icu_i18n_include,
+            ]
+        if args.android_deploy_device_path:
+            impl_args += [
+                "--android-deploy-device-path",
+                args.android_deploy_device_path,
             ]
 
         if platform.system() == 'Darwin':
@@ -1509,6 +1521,11 @@ details of the setups of other systems or automated environments.""")
         help="skip testing watchOS device targets on the host machine (the "
              "watch itself)",
         action="store_true")
+    skip_test_group.add_argument(
+        "--skip-test-android-host",
+        help="skip testing Android device targets on the host machine (the "
+             "phone itself)",
+        action="store_true")
 
     parser.add_argument(
         "-i", "--ios",
@@ -1637,6 +1654,12 @@ details of the setups of other systems or automated environments.""")
     android_group.add_argument(
         "--android-icu-i18n-include",
         help="Path to a directory containing headers libicui18n",
+        metavar="PATH")
+    android_group.add_argument(
+        "--android-deploy-device-path",
+        help="Path on an Android device to which built Swift stdlib products "
+             "will be deployed. If running host tests, specify the '{}' "
+             "directory.".format(adb.commands.DEVICE_TEMP_DIR),
         metavar="PATH")
 
     parser.add_argument(
