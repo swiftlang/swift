@@ -260,7 +260,6 @@
 // CHECK-APPKIT: func add(_: NSRect)
 // CHECK-APPKIT: class func conjureRect(_: NSRect)
 
-<<<<<<< 8016a931e7dddf4320006b4c478626db98d2bafd
 // CHECK-OMIT-NEEDLESS-WORDS: struct OMWWobbleOptions
 // CHECK-OMIT-NEEDLESS-WORDS:   static var sideToSide: OMWWobbleOptions
 // CHECK-OMIT-NEEDLESS-WORDS:   static var backAndForth: OMWWobbleOptions
