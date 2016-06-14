@@ -27,7 +27,7 @@ public func conditionalCast<NS, T>(_ ns: NS) -> T? {
 // === String === //
 
 func createNSString() -> NSString {
-  return NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
+  return NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
 }
 
 @inline(never)
@@ -94,7 +94,7 @@ public func run_ObjectiveCBridgeToNSString(_ N: Int) {
 
 func createNSArray() -> NSArray {
   let nsMutableArray = NSMutableArray()
-  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
+  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
   nsMutableArray.add(nsString)
   nsMutableArray.add(nsString)
   nsMutableArray.add(nsString)
@@ -211,16 +211,16 @@ public func run_ObjectiveCBridgeFromNSArrayAnyObjectToStringForced(_ N: Int) {
 
 func createNSDictionary() -> NSDictionary {
   let nsMutableDictionary = NSMutableDictionary()
-  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
-  let nsString2 = NSString(cString: "NSString that does not fit in tagged pointer 2", encoding: NSUTF8StringEncoding)!
-  let nsString3 = NSString(cString: "NSString that does not fit in tagged pointer 3", encoding: NSUTF8StringEncoding)!
-  let nsString4 = NSString(cString: "NSString that does not fit in tagged pointer 4", encoding: NSUTF8StringEncoding)!
-  let nsString5 = NSString(cString: "NSString that does not fit in tagged pointer 5", encoding: NSUTF8StringEncoding)!
-  let nsString6 = NSString(cString: "NSString that does not fit in tagged pointer 6", encoding: NSUTF8StringEncoding)!
-  let nsString7 = NSString(cString: "NSString that does not fit in tagged pointer 7", encoding: NSUTF8StringEncoding)!
-  let nsString8 = NSString(cString: "NSString that does not fit in tagged pointer 8", encoding: NSUTF8StringEncoding)!
-  let nsString9 = NSString(cString: "NSString that does not fit in tagged pointer 9", encoding: NSUTF8StringEncoding)!
-  let nsString10 = NSString(cString: "NSString that does not fit in tagged pointer 10", encoding: NSUTF8StringEncoding)!
+  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
+  let nsString2 = NSString(cString: "NSString that does not fit in tagged pointer 2", encoding: String.Encoding.utf8.rawValue)!
+  let nsString3 = NSString(cString: "NSString that does not fit in tagged pointer 3", encoding: String.Encoding.utf8.rawValue)!
+  let nsString4 = NSString(cString: "NSString that does not fit in tagged pointer 4", encoding: String.Encoding.utf8.rawValue)!
+  let nsString5 = NSString(cString: "NSString that does not fit in tagged pointer 5", encoding: String.Encoding.utf8.rawValue)!
+  let nsString6 = NSString(cString: "NSString that does not fit in tagged pointer 6", encoding: String.Encoding.utf8.rawValue)!
+  let nsString7 = NSString(cString: "NSString that does not fit in tagged pointer 7", encoding: String.Encoding.utf8.rawValue)!
+  let nsString8 = NSString(cString: "NSString that does not fit in tagged pointer 8", encoding: String.Encoding.utf8.rawValue)!
+  let nsString9 = NSString(cString: "NSString that does not fit in tagged pointer 9", encoding: String.Encoding.utf8.rawValue)!
+  let nsString10 = NSString(cString: "NSString that does not fit in tagged pointer 10", encoding: String.Encoding.utf8.rawValue)!
   nsMutableDictionary.setObject(1, forKey: nsString)
   nsMutableDictionary.setObject(2, forKey: nsString2)
   nsMutableDictionary.setObject(3, forKey: nsString3)
@@ -238,7 +238,7 @@ func createNSDictionary() -> NSDictionary {
 @inline(never)
 func testObjectiveCBridgeFromNSDictionaryAnyObject() {
   let nsDictionary = createNSDictionary()
-  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
+  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
 
   var nativeInt : Int?
   for _ in 0 ..< 10_000 {
@@ -259,7 +259,7 @@ public func run_ObjectiveCBridgeFromNSDictionaryAnyObject(_ N: Int) {
 @inline(never)
 func testObjectiveCBridgeFromNSDictionaryAnyObjectForced() {
   let nsDictionary = createNSDictionary()
-  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
+  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
 
   var nativeInt : Int?
   for _ in 0 ..< 10_000 {
@@ -302,7 +302,7 @@ public func run_ObjectiveCBridgeToNSDictionary(_ N: Int) {
 @inline(never)
 func testObjectiveCBridgeFromNSDictionaryAnyObjectToString() {
   let nsDictionary = createNSDictionary()
-  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
+  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
   let nativeString = nsString as String
 
   var nativeInt : Int?
@@ -324,7 +324,7 @@ public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString(_ N: Int) {
 @inline(never)
 func testObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced() {
   let nsDictionary = createNSDictionary()
-  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
+  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
   let nativeString = nsString as String
 
   var nativeInt : Int?
@@ -347,16 +347,16 @@ public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced(_ N: Int
 
 func createNSSet() -> NSSet {
   let nsMutableSet = NSMutableSet()
-  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
-  let nsString2 = NSString(cString: "NSString that does not fit in tagged pointer 2", encoding: NSUTF8StringEncoding)!
-  let nsString3 = NSString(cString: "NSString that does not fit in tagged pointer 3", encoding: NSUTF8StringEncoding)!
-  let nsString4 = NSString(cString: "NSString that does not fit in tagged pointer 4", encoding: NSUTF8StringEncoding)!
-  let nsString5 = NSString(cString: "NSString that does not fit in tagged pointer 5", encoding: NSUTF8StringEncoding)!
-  let nsString6 = NSString(cString: "NSString that does not fit in tagged pointer 6", encoding: NSUTF8StringEncoding)!
-  let nsString7 = NSString(cString: "NSString that does not fit in tagged pointer 7", encoding: NSUTF8StringEncoding)!
-  let nsString8 = NSString(cString: "NSString that does not fit in tagged pointer 8", encoding: NSUTF8StringEncoding)!
-  let nsString9 = NSString(cString: "NSString that does not fit in tagged pointer 9", encoding: NSUTF8StringEncoding)!
-  let nsString10 = NSString(cString: "NSString that does not fit in tagged pointer 10", encoding: NSUTF8StringEncoding)!
+  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
+  let nsString2 = NSString(cString: "NSString that does not fit in tagged pointer 2", encoding: String.Encoding.utf8.rawValue)!
+  let nsString3 = NSString(cString: "NSString that does not fit in tagged pointer 3", encoding: String.Encoding.utf8.rawValue)!
+  let nsString4 = NSString(cString: "NSString that does not fit in tagged pointer 4", encoding: String.Encoding.utf8.rawValue)!
+  let nsString5 = NSString(cString: "NSString that does not fit in tagged pointer 5", encoding: String.Encoding.utf8.rawValue)!
+  let nsString6 = NSString(cString: "NSString that does not fit in tagged pointer 6", encoding: String.Encoding.utf8.rawValue)!
+  let nsString7 = NSString(cString: "NSString that does not fit in tagged pointer 7", encoding: String.Encoding.utf8.rawValue)!
+  let nsString8 = NSString(cString: "NSString that does not fit in tagged pointer 8", encoding: String.Encoding.utf8.rawValue)!
+  let nsString9 = NSString(cString: "NSString that does not fit in tagged pointer 9", encoding: String.Encoding.utf8.rawValue)!
+  let nsString10 = NSString(cString: "NSString that does not fit in tagged pointer 10", encoding: String.Encoding.utf8.rawValue)!
   nsMutableSet.add(nsString)
   nsMutableSet.add(nsString2)
   nsMutableSet.add(nsString3)
@@ -375,7 +375,7 @@ func createNSSet() -> NSSet {
 @inline(never)
 func testObjectiveCBridgeFromNSSetAnyObject() {
   let nsSet = createNSSet()
-  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
+  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
 
   var result : Bool?
   for _ in 0 ..< 10_000 {
@@ -396,7 +396,7 @@ public func run_ObjectiveCBridgeFromNSSetAnyObject(_ N: Int) {
 @inline(never)
 func testObjectiveCBridgeFromNSSetAnyObjectForced() {
   let nsSet = createNSSet()
-  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
+  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
 
   var result : Bool?
   for _ in 0 ..< 10_000 {
@@ -437,7 +437,7 @@ public func run_ObjectiveCBridgeToNSSet(_ N: Int) {
 
 @inline(never)
 func testObjectiveCBridgeFromNSSetAnyObjectToString() {
-  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
+  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
   let nativeString = nsString as String
   let nsSet = createNSSet()
 
@@ -460,7 +460,7 @@ public func run_ObjectiveCBridgeFromNSSetAnyObjectToString(_ N: Int) {
 @inline(never)
 func testObjectiveCBridgeFromNSSetAnyObjectToStringForced() {
   let nsSet = createNSSet()
-  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: NSUTF8StringEncoding)!
+  let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
   let nativeString = nsString as String
 
   var result : Bool?

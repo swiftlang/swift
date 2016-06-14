@@ -1,0 +1,5 @@
+---
+Name: QuartzCore
+Classes:
+- Name: NSEnumerator
+  SwiftName: NSEnumerator

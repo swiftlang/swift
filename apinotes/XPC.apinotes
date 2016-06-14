@@ -1,0 +1,7 @@
+Name: XPC
+Functions:
+# xpc_object
+- Name: xpc_retain
+  Availability: nonswift
+- Name: xpc_release
+  Availability: nonswift

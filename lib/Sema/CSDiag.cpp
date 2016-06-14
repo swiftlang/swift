@@ -5184,7 +5184,7 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
   } else if (protocol == Ctx.getProtocol( 
                KnownProtocolKind::FileReferenceLiteralConvertible)) {
     importModule = "Foundation";
-    importDefaultTypeName = Ctx.getSwiftName(KnownFoundationEntity::NSURL);
+    importDefaultTypeName = "URL";
   }
 
   // Emit the diagnostic.

@@ -3,7 +3,7 @@
 
 // RUN: %target-swift-frontend %clang-importer-sdk-nosource -I %t %s -emit-ir
 // REQUIRES: executable_test
-
+// REQUIRES: OS=macosx
 // REQUIRES: objc_interop
 
 // Test that we don't crash when producing IR.
@@ -14,7 +14,7 @@ class MyView: NSView {
         var x = self.superview
         var l = self.layer
         self.layer = CALayer()
-        self.nextKey = nil
+        self.nextKeyView = nil
         subviews = []
     }    
 }

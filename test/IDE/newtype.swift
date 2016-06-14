@@ -70,10 +70,10 @@
 // PRINT-NEXT:    static let isDirectoryKey: NSURLResourceKey
 // PRINT-NEXT:    static let localizedNameKey: NSURLResourceKey
 // PRINT-NEXT:  }
-// PRINT-NEXT:  extension NSNotificationName {
-// PRINT-NEXT:    static let Foo: NSNotificationName
-// PRINT-NEXT:    static let bar: NSNotificationName
-// PRINT-NEXT:    static let NSWibble: NSNotificationName
+// PRINT-NEXT:  extension NSNotification.Name {
+// PRINT-NEXT:    static let Foo: NSNotification.Name
+// PRINT-NEXT:    static let bar: NSNotification.Name
+// PRINT-NEXT:    static let NSWibble: NSNotification.Name
 // PRINT-NEXT:  }
 // PRINT-NEXT:  let kNotification: String
 // PRINT-NEXT:  let Notification: String
@@ -154,8 +154,8 @@ func tests() {
 	let _ = ErrorDomain(rawValue: thirdEnum.rawValue)
 	let _ = ClosedEnum(rawValue: errOne.rawValue)
 
-	let _ = NSNotificationName.Foo
-	let _ = NSNotificationName.bar
+	let _ = NSNotification.Name.Foo
+	let _ = NSNotification.Name.bar
 	let _ : CFNewType = CFNewType.MyCFNewTypeValue
 	let _ : CFNewType = CFNewType.MyCFNewTypeValueUnauditedButConst
 	let _ : CFNewType = CFNewType.MyCFNewTypeValueUnaudited

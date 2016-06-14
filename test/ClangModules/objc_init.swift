@@ -59,7 +59,7 @@ class MyDocument3 : NSAwesomeDocument {
 
 func createMyDocument3(_ url: NSURL) {
   var md = MyDocument3()
-  md = try! MyDocument3(contentsOf: url, ofType:"")
+  md = try! MyDocument3(contentsOf: url as URL, ofType:"")
   _ = md
 }
 

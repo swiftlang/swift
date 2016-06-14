@@ -7,10 +7,10 @@
 
 // REQUIRES: OS=macosx
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=AppKit -function-definitions=false -prefer-type-repr=true > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=APPKIT -strict-whitespace < %t.printed.txt
@@ -28,7 +28,7 @@
 // APPKIT-NEXT: var trackingAreas: [AnyObject] { get }
 // APPKIT-NEXT: var subviews: [AnyObject]
 // APPKIT-LABEL:      extension NSView {
-// APPKIT-NEXT:   unowned(unsafe) var nextKey: @sil_unmanaged NSView?
+// APPKIT-NEXT:   unowned(unsafe) var nextKeyView: @sil_unmanaged NSView?
 
 // APPKIT-LABEL: {{^}}class NSMenuItem : NSObject, NSCopying, NSCoding {
 // APPKIT-NEXT: unowned(unsafe) var menu: @sil_unmanaged NSMenu?
@@ -37,7 +37,8 @@
 // APPKIT-NEXT: weak var target: @sil_weak AnyObject
 // APPKIT-NEXT: var action: Selector
 // APPKIT: {{^}}}{{$}}
-// APPKIT: let NSViewFrameDidChangeNotification: String
-// APPKIT: let NSViewFocusDidChangeNotification: String
-
+// APPKIT: extension NSNotification.Name {
+// APPKIT:   static let NSViewFrameDidChange: NSNotification.Name
+// APPKIT:   static let NSViewFocusDidChange: NSNotification.Name
+// APPKIT: }
 

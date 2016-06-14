@@ -1,0 +1,8 @@
+---
+Name: QuickLook
+Classes:
+- Name: QLPreviewController
+  Methods:
+  - Selector: 'canPreviewItem:'
+    SwiftName: canPreview(_:)
+    MethodKind: Class

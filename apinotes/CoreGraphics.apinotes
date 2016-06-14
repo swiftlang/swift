@@ -560,6 +560,16 @@ Enumerators:
   SwiftName: CGWindowLevelKey.cursorWindow
 - Name: kCGAssistiveTechHighWindowLevelKey
   SwiftName: CGWindowLevelKey.assistiveTechHighWindow
+# CGConfigureOption
+- Name: kCGConfigureForAppOnly
+  SwiftName: forAppOnly
+# CGScreenUpdateOperation
+- Name: kCGScreenUpdateOperationRefresh
+  SwiftName: refresh
+# CGWindowListOption
+- Name: kCGWindowListOptionAll
+  SwiftName: optionAll
+
 
 #
 # Tags

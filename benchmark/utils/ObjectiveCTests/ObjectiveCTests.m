@@ -24,6 +24,25 @@
     [mutableArray addObject: myString];
   }
   myArrayOfStrings = [mutableArray copy];
+
+  id cal = [NSCalendar currentCalendar];
+  myBeginDate = [cal dateWithEra:1
+                            year:2016
+                           month:1
+                             day:29
+                            hour:1
+                          minute:1
+                          second:0
+                      nanosecond:0];
+  myEndDate = [cal dateWithEra:1
+                          year:2016
+                         month:1
+                           day:29
+                          hour:1
+                        minute:1
+                        second:0
+                    nanosecond:10];
+
   return self;
 }
 
@@ -43,5 +62,18 @@
   return myArrayOfStrings;
 }
 
+- (NSDate *)beginDate {
+  return myBeginDate;
+}
+
+- (NSDate *)endDate {
+  return myEndDate;
+}
+
+- (void)useDate:(NSDate *)date {
+  if ([date isEqualToDate:myBeginDate]) {
+    assert(false && "Dates should be different");
+  }
+}
 
 @end

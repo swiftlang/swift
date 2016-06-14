@@ -34,15 +34,15 @@ struct Struct2 { }
 class ObjCClass1 : NSObject { }
 class ObjCClass2 : NSObject { }
 
-% types.append(['NSDateFormatter', 'NSNumberFormatter'])
-% objectTypes.append(['NSDateFormatter', 'NSNumberFormatter'])
+% types.append(['DateFormatter', 'NumberFormatter'])
+% objectTypes.append(['DateFormatter', 'NumberFormatter'])
 // non-Swift Objective-C class
 
 % protocolTypes.append('a.Proto1')
 % protocolTypes.append('a.Proto2')
 protocol Proto1 { }
 protocol Proto2 { }
-% protocolTypes.append('NSURLSessionDelegate')
+% protocolTypes.append('URLSessionDelegate')
 // non-Swift Objective-C protocol
 
 
@@ -58,8 +58,10 @@ CastTrapsTestSuite.test("${t1}__${t2}")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches("Could not cast value of type '${t1}' ")
-  .crashOutputMatches(" to '${t2}'")
+  .crashOutputMatches("Could not cast value of type '")
+  .crashOutputMatches("${t1}' ")
+  .crashOutputMatches(" to '")
+  .crashOutputMatches("${t2}'")
   .code
 {
   let o = ${t1}() as Any
@@ -80,8 +82,10 @@ CastTrapsTestSuite.test("${t1}__${t2}")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches("Could not cast value of type '${t1}' ")
-  .crashOutputMatches(" to '${t2}'")
+  .crashOutputMatches("Could not cast value of type '")
+  .crashOutputMatches("${t1}' ")
+  .crashOutputMatches(" to '")
+  .crashOutputMatches("${t2}'")
   .code
 {
   let o = ${t1}() as AnyObject

@@ -2749,7 +2749,7 @@ function build_and_test_installable_package() {
           DARWIN_TOOLCHAIN_INSTALL_LOCATION="/Library/Developer/Toolchains/${DARWIN_TOOLCHAIN_NAME}.xctoolchain"
           DARWIN_TOOLCHAIN_INFO_PLIST="${host_install_destdir}${TOOLCHAIN_PREFIX}/Info.plist"
           DARWIN_TOOLCHAIN_REPORT_URL="https://bugs.swift.org/"
-          COMPATIBILITY_VERSION=1
+          COMPATIBILITY_VERSION=2
           DARWIN_TOOLCHAIN_CREATED_DATE="$(date -u +'%a %b %d %T GMT %Y')"
 
           echo "-- Removing: ${DARWIN_TOOLCHAIN_INFO_PLIST}"

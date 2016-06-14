@@ -44,22 +44,22 @@ NSSetAPI.test("CustomStringConvertible") {
 var NSOrderedSetAPI = TestSuite("NSOrderedSetAPI")
 
 NSOrderedSetAPI.test("Sequence") {
-  let result = NSOrderedSet()
+  let result = OrderedSet()
   expectSequenceType(result)
 }
 
 NSOrderedSetAPI.test("initWithObjects") {
-  let result = NSOrderedSet(objects: 1, "two")
+  let result = OrderedSet(objects: 1, "two")
   expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
 }
 
 NSOrderedSetAPI.test("ArrayLiteralConvertible") {
-  let result: NSOrderedSet = [1, "two"]
+  let result: OrderedSet = [1, "two"]
   expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
 }
 
 NSOrderedSetAPI.test("CustomStringConvertible") {
-  let result = String(NSOrderedSet(objects:"a", "b", "c", "42"))
+  let result = String(OrderedSet(objects:"a", "b", "c", "42"))
   let expect = "{(\n    a,\n    b,\n    c,\n    42\n)}"
   expectEqual(expect, result)
 }

@@ -148,6 +148,16 @@ public var stderr : UnsafeMutablePointer<FILE> {
     __stderrp = newValue
   }
 }
+
+public func dprintf(_ fd: Int, _ format: UnsafeMutablePointer<Int8>, _ args: CVarArg...) -> Int32 {
+  let va_args = getVaList(args)
+  return vdprintf(Int32(fd), format, va_args)
+}
+
+public func snprintf(ptr: UnsafeMutablePointer<Int8>, _ len: Int, _ format: UnsafePointer<Int8>, _ args: CVarArg...) -> Int32 {
+  let va_args = getVaList(args)
+  return vsnprintf(ptr, len, format, va_args)
+}
 #endif
 
 

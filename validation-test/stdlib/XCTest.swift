@@ -44,7 +44,7 @@ class FailureDescriptionObserver: NSObject, XCTestObservation {
 XCTestTestSuite.test("exceptions") {
   class ExceptionTestCase: XCTestCase {
     dynamic func test_raises() {
-      NSException(name: "XCTestTestSuiteException", reason: nil, userInfo: nil).raise()
+      NSException(name: NSExceptionName(rawValue: "XCTestTestSuiteException"), reason: nil, userInfo: nil).raise()
     }
   }
 

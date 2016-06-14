@@ -1159,7 +1159,7 @@ class infer_instanceVar1 {
   var var_Optional_fail14: CBool?
   var var_Optional_fail20: AnyObject??
   var var_Optional_fail21: AnyObject.Type??
-  var var_Optional_fail22: NSComparisonResult? // a non-bridged imported value type
+  var var_Optional_fail22: ComparisonResult? // a non-bridged imported value type
   var var_Optional_fail23: NSRange? // a bridged struct imported from C
 // CHECK-NOT: @objc{{.*}}Optional_fail
 

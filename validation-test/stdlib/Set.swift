@@ -49,10 +49,7 @@ extension SetIterator where Element : TestProtocol1 {
   }
 }
 
-let hugeNumberArray = (0..<500).map {
-  (i: Int) -> Int in
-  return random()
-}
+let hugeNumberArray = Array(0..<500)
 
 var SetTestSuite = TestSuite("Set")
 

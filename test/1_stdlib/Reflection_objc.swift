@@ -63,8 +63,8 @@ print("ObjC quick look objects:")
 // CHECK-LABEL: ObjC enums:
 print("ObjC enums:")
 
-// CHECK-NEXT: We cannot reflect NSComparisonResult yet
-print("We cannot reflect \(NSComparisonResult.orderedAscending) yet")
+// CHECK-NEXT: We cannot reflect ComparisonResult yet
+print("We cannot reflect \(ComparisonResult.orderedAscending) yet")
 
 // Don't crash when introspecting framework types such as NSURL.
 // <rdar://problem/16592777>
@@ -93,9 +93,9 @@ switch PlaygroundQuickLook(reflecting: somesubclassofnsstring) {
 }
 
 // CHECK-NEXT: got the expected quick look attributed string
-let astr = NSAttributedString(string: "yizzle pizzle")
-switch PlaygroundQuickLook(reflecting: astr as NSAttributedString) {
-case .attributedString(let astr2 as NSAttributedString)
+let astr = AttributedString(string: "yizzle pizzle")
+switch PlaygroundQuickLook(reflecting: astr as AttributedString) {
+case .attributedString(let astr2 as AttributedString)
 where astr === astr2:
   print("got the expected quick look attributed string")
 case _:
@@ -242,7 +242,7 @@ class HasNumberQLO : CanaryBase {
 
 class HasAttributedQLO : CanaryBase {
   @objc var debugQuickLookObject: AnyObject {
-    let str = NSAttributedString(string: "attributed string")
+    let str = AttributedString(string: "attributed string")
     objc_setAssociatedObject(str, &CanaryHandle, CanaryBase(),
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     return str

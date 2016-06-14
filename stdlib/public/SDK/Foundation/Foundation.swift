@@ -15,41 +15,6 @@ import CoreFoundation
 import CoreGraphics
 
 //===----------------------------------------------------------------------===//
-// Enums
-//===----------------------------------------------------------------------===//
-
-// FIXME: one day this will be bridged from CoreFoundation and we
-// should drop it here. <rdar://problem/14497260> (need support
-// for CF bridging)
-public var kCFStringEncodingASCII: CFStringEncoding { return 0x0600 }
-
-// FIXME: <rdar://problem/16074941> NSStringEncoding doesn't work on 32-bit
-public typealias NSStringEncoding = UInt
-public var NSASCIIStringEncoding: UInt { return 1 }
-public var NSNEXTSTEPStringEncoding: UInt { return 2 }
-public var NSJapaneseEUCStringEncoding: UInt { return 3 }
-public var NSUTF8StringEncoding: UInt { return 4 }
-public var NSISOLatin1StringEncoding: UInt { return 5 }
-public var NSSymbolStringEncoding: UInt { return 6 }
-public var NSNonLossyASCIIStringEncoding: UInt { return 7 }
-public var NSShiftJISStringEncoding: UInt { return 8 }
-public var NSISOLatin2StringEncoding: UInt { return 9 }
-public var NSUnicodeStringEncoding: UInt { return 10 }
-public var NSWindowsCP1251StringEncoding: UInt { return 11 }
-public var NSWindowsCP1252StringEncoding: UInt { return 12 }
-public var NSWindowsCP1253StringEncoding: UInt { return 13 }
-public var NSWindowsCP1254StringEncoding: UInt { return 14 }
-public var NSWindowsCP1250StringEncoding: UInt { return 15 }
-public var NSISO2022JPStringEncoding: UInt { return 21 }
-public var NSMacOSRomanStringEncoding: UInt { return 30 }
-public var NSUTF16StringEncoding: UInt { return NSUnicodeStringEncoding }
-public var NSUTF16BigEndianStringEncoding: UInt { return 0x90000100 }
-public var NSUTF16LittleEndianStringEncoding: UInt { return 0x94000100 }
-public var NSUTF32StringEncoding: UInt { return 0x8c000100 }
-public var NSUTF32BigEndianStringEncoding: UInt { return 0x98000100 }
-public var NSUTF32LittleEndianStringEncoding: UInt { return 0x9c000100 }
-
-//===----------------------------------------------------------------------===//
 // NSObject
 //===----------------------------------------------------------------------===//
 
@@ -93,14 +58,14 @@ extension NSString : StringLiteralConvertible {
       immutableResult = NSString(
         bytesNoCopy: UnsafeMutablePointer<Void>(value.utf8Start),
         length: Int(value.utf8CodeUnitCount),
-        encoding: value.isASCII ? NSASCIIStringEncoding : NSUTF8StringEncoding,
+        encoding: value.isASCII ? String.Encoding.ascii.rawValue : String.Encoding.utf8.rawValue,
         freeWhenDone: false)!
     } else {
       var uintValue = value.unicodeScalar
       immutableResult = NSString(
         bytes: &uintValue,
         length: 4,
-        encoding: NSUTF32StringEncoding)!
+        encoding: String.Encoding.utf32.rawValue)!
     }
     self.init(string: immutableResult as String)
   }
@@ -750,7 +715,7 @@ extension NSSet : Sequence {
   }
 }
 
-extension NSOrderedSet : Sequence {
+extension OrderedSet : Sequence {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
@@ -940,7 +905,7 @@ extension NSRange {
 public
 func NSLocalizedString(_ key: String,
                        tableName: String? = nil,
-                       bundle: NSBundle = NSBundle.main(),
+                       bundle: Bundle = Bundle.main(),
                        value: String = "",
                        comment: String) -> String {
   return bundle.localizedString(forKey: key, value:value, table:tableName)
@@ -1027,7 +992,7 @@ func _convertErrorProtocolToNSError(_ error: ErrorProtocol) -> NSError {
 // Variadic initializers and methods
 //===----------------------------------------------------------------------===//
 
-extension NSPredicate {
+extension Predicate {
   // + (NSPredicate *)predicateWithFormat:(NSString *)predicateFormat, ...;
   public
   convenience init(format predicateFormat: String, _ args: CVarArg...) {
@@ -1054,7 +1019,7 @@ extension NSString {
   }
 
   public convenience init(
-    format: NSString, locale: NSLocale?, _ args: CVarArg...
+    format: NSString, locale: Locale?, _ args: CVarArg...
   ) {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
@@ -1066,7 +1031,7 @@ extension NSString {
     _ format: NSString, _ args: CVarArg...
   ) -> Self {
     return withVaList(args) {
-      self.init(format: format as String, locale: NSLocale.current(), arguments: $0)
+      self.init(format: format as String, locale: Locale.current(), arguments: $0)
     }
   }
 
@@ -1093,7 +1058,7 @@ extension NSArray {
   }
 }
 
-extension NSOrderedSet {
+extension OrderedSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
   public convenience init(objects elements: AnyObject...) {
     self.init(array: elements)
@@ -1113,7 +1078,7 @@ extension NSSet : ArrayLiteralConvertible {
   }
 }
 
-extension NSOrderedSet : ArrayLiteralConvertible {
+extension OrderedSet : ArrayLiteralConvertible {
   public required convenience init(arrayLiteral elements: AnyObject...) {
     self.init(array: elements)
   }
@@ -1189,7 +1154,7 @@ internal func NS_Swift_NSUndoManager_registerUndoWithTargetHandler(
   _ target: AnyObject,
   _ handler: @convention(block) (AnyObject) -> Void)
 
-extension NSUndoManager {
+extension UndoManager {
   @available(OSX 10.11, iOS 9.0, *)
   public func registerUndoWithTarget<TargetType : AnyObject>(
     _ target: TargetType, handler: (TargetType) -> Void
@@ -1319,30 +1284,13 @@ extension NSKeyedUnarchiver {
 }
 
 //===----------------------------------------------------------------------===//
-// NSURL
-//===----------------------------------------------------------------------===//
-
-extension NSURL : _FileReferenceLiteralConvertible {
-  private convenience init(failableFileReferenceLiteral path: String) {
-    let fullPath = NSBundle.main().pathForResource(path, ofType: nil)!
-    self.init(fileURLWithPath: fullPath)
-  }
-
-  public required convenience
-  init(fileReferenceLiteralResourceName path: String) {
-    self.init(failableFileReferenceLiteral: path)
-  }
-}
-
-public typealias _FileReferenceLiteralType = NSURL
-
-//===----------------------------------------------------------------------===//
 // Mirror/Quick Look Conformance
 //===----------------------------------------------------------------------===//
 
 extension NSURL : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .url(absoluteString)
+    guard let str = absoluteString else { return .text("Unknown URL") }
+    return .url(str)
   }
 }
 
@@ -1360,10 +1308,10 @@ extension NSRange : CustomPlaygroundQuickLookable {
 
 extension NSDate : CustomPlaygroundQuickLookable {
   var summary: String {
-    let df = NSDateFormatter()
-    df.dateStyle = .mediumStyle
-    df.timeStyle = .shortStyle
-    return df.string(from: self)
+    let df = DateFormatter()
+    df.dateStyle = .medium
+    df.timeStyle = .short
+    return df.string(from: self as Date)
   }
 
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
@@ -1394,3 +1342,16 @@ extension NSDictionary : CustomReflectable {
     return Mirror(reflecting: self as [NSObject : AnyObject])
   }
 }
+
+@available(*, deprecated, renamed:"NSCoding", message: "Please use NSCoding")
+typealias Coding = NSCoding
+
+@available(*, deprecated, renamed:"NSCoder", message: "Please use NSCoder")
+typealias Coder = NSCoder
+
+@available(*, deprecated, renamed:"NSKeyedUnarchiver", message: "Please use NSKeyedUnarchiver")
+typealias KeyedUnarchiver = NSKeyedUnarchiver
+
+@available(*, deprecated, renamed:"NSKeyedArchiver", message: "Please use NSKeyedArchiver")
+typealias KeyedArchiver = NSKeyedArchiver
+
