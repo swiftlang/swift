@@ -808,8 +808,7 @@ def main_preset():
         "-n", "--dry-run",
         help="print the commands that would be executed, but do not execute "
              "them",
-        action="store_true",
-        default=False)
+        action=arguments.action.optional_bool)
     parser.add_argument(
         "--preset-file",
         help="load presets from the specified file",
@@ -824,11 +823,11 @@ def main_preset():
     parser.add_argument(
         "--show-presets",
         help="list all presets and exit",
-        action="store_true")
+        action=arguments.action.optional_bool)
     parser.add_argument(
         "--distcc",
         help="use distcc",
-        action="store_true")
+        action=arguments.action.optional_bool)
     parser.add_argument(
         "preset_substitutions_raw",
         help="'name=value' pairs that are substituted in the preset",
@@ -1064,8 +1063,7 @@ details of the setups of other systems or automated environments.""")
         "-n", "--dry-run",
         help="print the commands that would be executed, but do not execute "
              "them",
-        action="store_true",
-        default=False)
+        action=arguments.action.optional_bool)
 
     targets_group = parser.add_argument_group(
         title="Host and cross-compilation targets")
@@ -1101,48 +1099,48 @@ details of the setups of other systems or automated environments.""")
     projects_group.add_argument(
         "-l", "--lldb",
         help="build LLDB",
-        action="store_true",
+        action=arguments.action.optional_bool,
         dest="build_lldb")
     projects_group.add_argument(
         "-b", "--llbuild",
         help="build llbuild",
-        action="store_true",
+        action=arguments.action.optional_bool,
         dest="build_llbuild")
     projects_group.add_argument(
         "-p", "--swiftpm",
         help="build swiftpm",
-        action="store_true",
+        action=arguments.action.optional_bool,
         dest="build_swiftpm")
     projects_group.add_argument(
         "--xctest",
         help="build xctest",
-        action="store_true",
+        action=arguments.action.optional_bool,
         dest="build_xctest")
     projects_group.add_argument(
         "--foundation",
         help="build foundation",
-        action="store_true",
+        action=arguments.action.optional_bool,
         dest="build_foundation")
     projects_group.add_argument(
         "--libdispatch",
         help="build libdispatch",
-        action="store_true",
+        action=arguments.action.optional_bool,
         dest="build_libdispatch")
     projects_group.add_argument(
         "--build-ninja",
         help="build the Ninja tool",
-        action="store_true")
+        action=arguments.action.optional_bool)
 
     extra_actions_group = parser.add_argument_group(
         title="Extra actions to perform before or in addition to building")
     extra_actions_group.add_argument(
         "-c", "--clean",
         help="do a clean build",
-        action="store_true")
+        action=arguments.action.optional_bool)
     extra_actions_group.add_argument(
         "--export-compile-commands",
         help="generate compilation databases in addition to building",
-        action="store_true")
+        action=arguments.action.optional_bool)
     extra_actions_group.add_argument(
         "--symbols-package",
         metavar="PATH",
@@ -1324,11 +1322,7 @@ details of the setups of other systems or automated environments.""")
     run_tests_group.add_argument(
         "--test",
         help="test Swift after building",
-        metavar="BOOL",
-        nargs='?',
-        type=arguments.type.bool,
-        default=False,
-        const=True)
+        action=arguments.action.optional_bool)
     run_tests_group.add_argument(
         "-T",
         help="run the validation test suite (implies --test)",
@@ -1338,11 +1332,7 @@ details of the setups of other systems or automated environments.""")
     run_tests_group.add_argument(
         "--validation-test",
         help="run the validation test suite (implies --test)",
-        metavar="BOOL",
-        nargs='?',
-        type=arguments.type.bool,
-        default=False,
-        const=True)
+        action=arguments.action.optional_bool)
     run_tests_group.add_argument(
         "-o",
         help="run the test suite in optimized mode too (implies --test)",
@@ -1352,130 +1342,122 @@ details of the setups of other systems or automated environments.""")
     run_tests_group.add_argument(
         "--test-optimized",
         help="run the test suite in optimized mode too (implies --test)",
-        metavar="BOOL",
-        nargs='?',
-        type=arguments.type.bool,
-        default=False,
-        const=True)
+        action=arguments.action.optional_bool)
     run_tests_group.add_argument(
         "--long-test",
         help="run the long test suite",
-        metavar="BOOL",
-        nargs='?',
-        type=arguments.type.bool,
-        default=False,
-        const=True)
+        action=arguments.action.optional_bool)
     run_tests_group.add_argument(
         "--host-test",
         help="run executable tests on host devices (such as iOS or tvOS)",
-        action="store_true")
+        action=arguments.action.optional_bool)
     run_tests_group.add_argument(
         "-B", "--benchmark",
         help="run the Swift Benchmark Suite after building",
-        action="store_true")
+        action=arguments.action.optional_bool)
     run_tests_group.add_argument(
         "--skip-test-osx",
         help="skip testing Swift stdlibs for Mac OS X",
-        action="store_true")
+        action=arguments.action.optional_bool)
     run_tests_group.add_argument(
         "--skip-test-linux",
         help="skip testing Swift stdlibs for Linux",
-        action="store_true")
+        action=arguments.action.optional_bool)
     run_tests_group.add_argument(
         "--skip-test-freebsd",
         help="skip testing Swift stdlibs for FreeBSD",
-        action="store_true")
+        action=arguments.action.optional_bool)
     run_tests_group.add_argument(
         "--skip-test-cygwin",
         help="skip testing Swift stdlibs for Cygwin",
-        action="store_true")
+        action=arguments.action.optional_bool)
     parser.add_argument(
         "--build-runtime-with-host-compiler",
         help="Use the host compiler, not the self-built one to compile the "
              "Swift runtime",
-        action="store_true")
+        action=arguments.action.optional_bool)
     parser.add_argument(
         "--build-swift-stdlib-unittest-extra",
         help="Build optional StdlibUnittest components",
-        action="store_true")
+        action=arguments.action.optional_bool)
 
     run_build_group = parser.add_argument_group(
         title="Run build")
     run_build_group.add_argument(
         "-S", "--skip-build",
         help="generate build directory only without building",
-        action="store_true")
+        action=arguments.action.optional_bool)
     run_build_group.add_argument(
         "--skip-build-linux",
         help="skip building Swift stdlibs for Linux",
-        action="store_true")
+        action=arguments.action.optional_bool)
     run_build_group.add_argument(
         "--skip-build-freebsd",
         help="skip building Swift stdlibs for FreeBSD",
-        action="store_true")
+        action=arguments.action.optional_bool)
     run_build_group.add_argument(
         "--skip-build-cygwin",
         help="skip building Swift stdlibs for Cygwin",
-        action="store_true")
+        action=arguments.action.optional_bool)
     run_build_group.add_argument(
         "--skip-build-osx",
         help="skip building Swift stdlibs for MacOSX",
-        action="store_true")
+        action=arguments.action.optional_bool)
 
     run_build_group.add_argument(
         "--skip-build-ios",
         help="skip building Swift stdlibs for iOS",
-        action="store_true")
+        action=arguments.action.optional_bool)
     run_build_group.add_argument(
         "--skip-build-ios-device",
         help="skip building Swift stdlibs for iOS devices "
              "(i.e. build simulators only)",
-        action="store_true")
+        action=arguments.action.optional_bool)
     run_build_group.add_argument(
         "--skip-build-ios-simulator",
         help="skip building Swift stdlibs for iOS simulator "
              "(i.e. build devices only)",
-        action="store_true")
+        action=arguments.action.optional_bool)
 
     run_build_group.add_argument(
         "--skip-build-tvos",
         help="skip building Swift stdlibs for tvOS",
-        action="store_true")
+        action=arguments.action.optional_bool)
     run_build_group.add_argument(
         "--skip-build-tvos-device",
         help="skip building Swift stdlibs for tvOS devices "
              "(i.e. build simulators only)",
-        action="store_true")
+        action=arguments.action.optional_bool)
     run_build_group.add_argument(
         "--skip-build-tvos-simulator",
         help="skip building Swift stdlibs for tvOS simulator "
              "(i.e. build devices only)",
-        action="store_true")
+        action=arguments.action.optional_bool)
 
     run_build_group.add_argument(
         "--skip-build-watchos",
         help="skip building Swift stdlibs for watchOS",
-        action="store_true")
+        action=arguments.action.optional_bool)
     run_build_group.add_argument(
         "--skip-build-watchos-device",
         help="skip building Swift stdlibs for watchOS devices "
              "(i.e. build simulators only)",
-        action="store_true")
+        action=arguments.action.optional_bool)
     run_build_group.add_argument(
         "--skip-build-watchos-simulator",
         help="skip building Swift stdlibs for watchOS simulator "
              "(i.e. build devices only)",
-        action="store_true")
+        action=arguments.action.optional_bool)
 
     run_build_group.add_argument(
         "--skip-build-android",
         help="skip building Swift stdlibs for Android",
-        action="store_true")
+        action=arguments.action.optional_bool)
 
     run_build_group.add_argument(
         "--skip-build-benchmarks",
         help="skip building Swift Benchmark Suite",
-        action="store_true")
+        action=arguments.action.optional_bool)
 
     skip_test_group = parser.add_argument_group(
         title="Skip testing specified targets")
@@ -1483,55 +1465,55 @@ details of the setups of other systems or automated environments.""")
         "--skip-test-ios",
         help="skip testing all iOS targets. Equivalent to specifying both "
              "--skip-test-ios-simulator and --skip-test-ios-host",
-        action="store_true")
+        action=arguments.action.optional_bool)
     skip_test_group.add_argument(
         "--skip-test-ios-simulator",
         help="skip testing iOS simulator targets",
-        action="store_true")
+        action=arguments.action.optional_bool)
     skip_test_group.add_argument(
         "--skip-test-ios-host",
         help="skip testing iOS device targets on the host machine (the phone "
              "itself)",
-        action="store_true")
+        action=arguments.action.optional_bool)
     skip_test_group.add_argument(
         "--skip-test-tvos",
         help="skip testing all tvOS targets. Equivalent to specifying both "
              "--skip-test-tvos-simulator and --skip-test-tvos-host",
-        action="store_true")
+        action=arguments.action.optional_bool)
     skip_test_group.add_argument(
         "--skip-test-tvos-simulator",
         help="skip testing tvOS simulator targets",
-        action="store_true")
+        action=arguments.action.optional_bool)
     skip_test_group.add_argument(
         "--skip-test-tvos-host",
         help="skip testing tvOS device targets on the host machine (the TV "
              "itself)",
-        action="store_true")
+        action=arguments.action.optional_bool)
     skip_test_group.add_argument(
         "--skip-test-watchos",
         help="skip testing all tvOS targets. Equivalent to specifying both "
              "--skip-test-watchos-simulator and --skip-test-watchos-host",
-        action="store_true")
+        action=arguments.action.optional_bool)
     skip_test_group.add_argument(
         "--skip-test-watchos-simulator",
         help="skip testing watchOS simulator targets",
-        action="store_true")
+        action=arguments.action.optional_bool)
     skip_test_group.add_argument(
         "--skip-test-watchos-host",
         help="skip testing watchOS device targets on the host machine (the "
              "watch itself)",
-        action="store_true")
+        action=arguments.action.optional_bool)
     skip_test_group.add_argument(
         "--skip-test-android-host",
         help="skip testing Android device targets on the host machine (the "
              "phone itself)",
-        action="store_true")
+        action=arguments.action.optional_bool)
 
     parser.add_argument(
         "-i", "--ios",
         help="also build for iOS, but disallow tests that require an iOS "
              "device",
-        action="store_true")
+        action=arguments.action.optional_bool)
     parser.add_argument(
         "--skip-ios",
         help="set to skip everything iOS-related",
@@ -1542,7 +1524,7 @@ details of the setups of other systems or automated environments.""")
         "--tvos",
         help="also build for tvOS, but disallow tests that require a tvos "
              "device",
-        action="store_true")
+        action=arguments.action.optional_bool)
     parser.add_argument(
         "--skip-tvos",
         help="set to skip everything tvOS-related",
@@ -1553,7 +1535,7 @@ details of the setups of other systems or automated environments.""")
         "--watchos",
         help="also build for watchOS, but disallow tests that require an "
              "watchOS device",
-        action="store_true")
+        action=arguments.action.optional_bool)
     parser.add_argument(
         "--skip-watchos",
         help="set to skip everything watchOS-related",
@@ -1563,7 +1545,7 @@ details of the setups of other systems or automated environments.""")
     parser.add_argument(
         "--android",
         help="also build for Android",
-        action="store_true")
+        action=arguments.action.optional_bool)
 
     parser.add_argument(
         "--swift-analyze-code-coverage",
@@ -1609,7 +1591,7 @@ details of the setups of other systems or automated environments.""")
     parser.add_argument(
         "--show-sdks",
         help="print installed Xcode and SDK versions",
-        action="store_true")
+        action=arguments.action.optional_bool)
 
     parser.add_argument(
         "--extra-swift-args",
@@ -1677,15 +1659,15 @@ details of the setups of other systems or automated environments.""")
     parser.add_argument(
         "--distcc",
         help="use distcc in pump mode",
-        action="store_true")
+        action=arguments.action.optional_bool)
     parser.add_argument(
         "--enable-asan",
         help="enable Address Sanitizer",
-        action="store_true")
+        action=arguments.action.optional_bool)
     parser.add_argument(
         "--enable-ubsan",
         help="enable Undefined Behavior Sanitizer",
-        action="store_true")
+        action=arguments.action.optional_bool)
     parser.add_argument(
         "--clang-compiler-version",
         help="string that indicates a compiler version for Clang",
@@ -1733,11 +1715,7 @@ details of the setups of other systems or automated environments.""")
     parser.add_argument(
         "--verbose-build",
         help="print the commands executed during the build",
-        metavar="BOOL",
-        nargs='?',
-        type=arguments.type.bool,
-        default=False,
-        const=True)
+        action=arguments.action.optional_bool)
 
     parser.add_argument(
         "--lto",
