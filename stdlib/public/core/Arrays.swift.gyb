@@ -2154,7 +2154,7 @@ extension ${Self} {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "remove")
+  @available(*, unavailable, renamed: "remove(at:)")
   public mutating func removeAtIndex(_ index: Int) -> Element {
     Builtin.unreachable()
   }

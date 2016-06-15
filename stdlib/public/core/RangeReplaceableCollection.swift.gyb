@@ -1160,7 +1160,7 @@ extension RangeReplaceableCollection {
     Builtin.unreachable()
   }
   
-  @available(*, unavailable, renamed: "removeAt")
+  @available(*, unavailable, renamed: "remove(at:)")
   public mutating func removeAtIndex(_ i: Index) -> Iterator.Element {
     Builtin.unreachable()
   }
