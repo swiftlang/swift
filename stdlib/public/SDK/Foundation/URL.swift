@@ -711,10 +711,10 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
         // TODO: Use URLComponents to handle an empty-path case
         /*
          URLByAppendingPathComponent can return nil if:
-         • the URL does not have a path component. (see note 1)
-         • a mutable copy of the URLs string could not be created.
-         • a percent-encoded string of the new path component could not created using the same encoding as the URL's string. (see note 2)
-         • a new URL object could not be created with the modified URL string.
+         * the URL does not have a path component. (see note 1)
+         * a mutable copy of the URLs string could not be created.
+         * a percent-encoded string of the new path component could not created using the same encoding as the URL's string. (see note 2)
+         * a new URL object could not be created with the modified URL string.
          
          Note 1: If NS/CFURL parsed URLs correctly, this would not occur because URL strings always have a path component. For example, the URL <mailto:user@example.com> should be parsed as Scheme=“mailto”, and Path= “user@example.com". Instead, CFURL returns false for CFURLCanBeDecomposed(), says Scheme=“mailto”, Path=nil, and ResourceSpecifier=“user@example.com”. rdar://problem/15060399
          
@@ -742,10 +742,10 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     public func deletingLastPathComponent() throws -> URL {
         /*
          URLByDeletingLastPathComponent can return nil if:
-         • the URL is a file reference URL which cannot be resolved back to a path.
-         • the URL does not have a path component. (see note 1)
-         • a mutable copy of the URLs string could not be created.
-         • a new URL object could not be created with the modified URL string.
+         * the URL is a file reference URL which cannot be resolved back to a path.
+         * the URL does not have a path component. (see note 1)
+         * a mutable copy of the URLs string could not be created.
+         * a new URL object could not be created with the modified URL string.
          */
         if let result = _url.deletingLastPathComponent.map({ URL(reference: $0 as NSURL) }) {
             return result
@@ -762,12 +762,12 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     public func appendingPathExtension(_ pathExtension: String) throws -> URL {
         /*
          URLByAppendingPathExtension can return nil if:
-         • the new path extension is not a valid extension (see _CFExtensionIsValidToAppend)
-         • the URL is a file reference URL which cannot be resolved back to a path.
-         • the URL does not have a path component. (see note 1)
-         • a mutable copy of the URLs string could not be created.
-         • a percent-encoded string of the new path extension could not created using the same encoding as the URL's string. (see note 1))
-         • a new URL object could not be created with the modified URL string.
+         * the new path extension is not a valid extension (see _CFExtensionIsValidToAppend)
+         * the URL is a file reference URL which cannot be resolved back to a path.
+         * the URL does not have a path component. (see note 1)
+         * a mutable copy of the URLs string could not be created.
+         * a percent-encoded string of the new path extension could not created using the same encoding as the URL's string. (see note 1))
+         * a new URL object could not be created with the modified URL string.
          */
         guard let result = _url.appendingPathExtension(pathExtension) else {
             throw NSError(domain: NSCocoaErrorDomain, code: NSFileReadUnknownError, userInfo: [:])
@@ -781,10 +781,10 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     public func deletingPathExtension() throws -> URL {
         /*
          URLByDeletingPathExtension can return nil if:
-         • the URL is a file reference URL which cannot be resolved back to a path.
-         • the URL does not have a path component. (see note 1)
-         • a mutable copy of the URLs string could not be created.
-         • a new URL object could not be created with the modified URL string.
+         * the URL is a file reference URL which cannot be resolved back to a path.
+         * the URL does not have a path component. (see note 1)
+         * a mutable copy of the URLs string could not be created.
+         * a new URL object could not be created with the modified URL string.
          */
         if let result = _url.deletingPathExtension.map({ URL(reference: $0 as NSURL) }) {
             return result
@@ -801,8 +801,8 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     public func standardizingPath() throws -> URL {
         /*
          URLByStandardizingPath can return nil if:
-         • the URL is a file reference URL which cannot be resolved back to a path.
-         • a new URL object could not be created with the standardized path).
+         * the URL is a file reference URL which cannot be resolved back to a path.
+         * a new URL object could not be created with the standardized path).
          */
         if let result = _url.standardizingPath.map({ URL(reference: $0 as NSURL) }) {
             return result
@@ -819,9 +819,9 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     public func resolvingSymlinksInPath() throws -> URL {
         /*
          URLByResolvingSymlinksInPath can return nil if:
-         • the URL is a file reference URL which cannot be resolved back to a path.
-         • NSPathUtilities' stringByResolvingSymlinksInPath property returns nil.
-         • a new URL object could not be created with the resolved path).
+         * the URL is a file reference URL which cannot be resolved back to a path.
+         * NSPathUtilities' stringByResolvingSymlinksInPath property returns nil.
+         * a new URL object could not be created with the resolved path).
          */
         if let result = _url.resolvingSymlinksInPath.map({ URL(reference: $0 as NSURL) }) {
             return result
