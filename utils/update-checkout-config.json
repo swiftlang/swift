@@ -53,7 +53,7 @@
         }
     },
     "swift-3.0-preview-1-branches" : {
-        "aliases": ["swift-3.0-branch", "swift-3.0-preview-1-branch"],
+        "aliases": ["swift-3.0-preview-1-branch"],
         "repos": {
             "llvm": "swift-3.0-branch",
             "clang": "swift-3.0-branch",
@@ -67,6 +67,23 @@
             "swift-corelibs-foundation": "swift-3.0-preview-1-branch",
             "swift-corelibs-libdispatch": "swift-3.0-preview-1-branch",
             "swift-integration-tests": "swift-3.0-preview-1-branch"
+        }
+    },
+    "swift-3.0-preview-2-branches" : {
+        "aliases": ["swift-3.0-branch", "swift-3.0-preview-2-branch"],
+        "repos": {
+            "llvm": "swift-3.0-branch",
+            "clang": "swift-3.0-branch",
+            "swift": "swift-3.0-preview-2-branch",
+            "lldb": "swift-3.0-preview-2-branch",
+            "cmark": "swift-3.0-preview-2-branch",
+            "llbuild": "swift-3.0-preview-2-branch",
+            "swiftpm": "swift-3.0-preview-2-branch",
+            "compiler-rt": "swift-3.0-branch",
+            "swift-corelibs-xctest": "swift-3.0-preview-2-branch",
+            "swift-corelibs-foundation": "swift-3.0-preview-2-branch",
+            "swift-corelibs-libdispatch": "swift-3.0-preview-2-branch",
+            "swift-integration-tests": "swift-3.0-preview-2-branch"
         }
     }
 }
