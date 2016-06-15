@@ -275,7 +275,7 @@ public struct URLResourceValues {
     
     /// The document identifier -- a value assigned by the kernel to a document (which can be either a file or directory) and is used to identify the document regardless of where it gets moved on a volume.
     ///
-    /// The document identifier survives "safe save” operations; i.e it is sticky to the path it was assigned to (`replaceItem(at:,withItemAt:,backupItemName:,options:,resultingItem:) throws` is the preferred safe-save API). The document identifier is persistent across system restarts. The document identifier is not transferred when the file is copied. Document identifiers are only unique within a single volume. This property is not supported by all volumes.
+    /// The document identifier survives "safe save" operations; i.e it is sticky to the path it was assigned to (`replaceItem(at:,withItemAt:,backupItemName:,options:,resultingItem:) throws` is the preferred safe-save API). The document identifier is persistent across system restarts. The document identifier is not transferred when the file is copied. Document identifiers are only unique within a single volume. This property is not supported by all volumes.
     @available(OSX 10.10, iOS 8.0, *)
     public var documentIdentifier: Int? { return _get(.documentIdentifierKey) }
     
@@ -716,7 +716,7 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
          * a percent-encoded string of the new path component could not created using the same encoding as the URL's string. (see note 2)
          * a new URL object could not be created with the modified URL string.
          
-         Note 1: If NS/CFURL parsed URLs correctly, this would not occur because URL strings always have a path component. For example, the URL <mailto:user@example.com> should be parsed as Scheme=“mailto”, and Path= “user@example.com". Instead, CFURL returns false for CFURLCanBeDecomposed(), says Scheme=“mailto”, Path=nil, and ResourceSpecifier=“user@example.com”. rdar://problem/15060399
+         Note 1: If NS/CFURL parsed URLs correctly, this would not occur because URL strings always have a path component. For example, the URL <mailto:user@example.com> should be parsed as Scheme="mailto", and Path= "user@example.com". Instead, CFURL returns false for CFURLCanBeDecomposed(), says Scheme="mailto", Path=nil, and ResourceSpecifier="user@example.com". rdar://problem/15060399
          
          Note 2: CFURLCreateWithBytes() and CFURLCreateAbsoluteURLWithBytes() allow URLs to be created with an array of bytes and a CFStringEncoding. All other CFURL functions and URL methods which create URLs use kCFStringEncodingUTF8/NSUTF8StringEncoding. So, the encoding passed to CFURLCreateWithBytes/CFURLCreateAbsoluteURLWithBytes might prevent the percent-encoding of the new path component or path extension.
          */
