@@ -321,6 +321,24 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
     // trivial accessors.
     return AccessSemantics::DirectToStorage;
   }
+  
+  // Check for property behavior initializations.
+  if (auto *AFD_DC = dyn_cast<AbstractFunctionDecl>(DC)) {
+    if (member->hasBehaviorNeedingInitialization() &&
+        // In a ctor.
+        isa<ConstructorDecl>(AFD_DC) &&
+        
+        // Ctor is for immediate class, not a derived class.
+        AFD_DC->getParent()->getDeclaredTypeOfContext()->getCanonicalType() ==
+          member->getDeclContext()->getDeclaredTypeOfContext()->getCanonicalType() &&
+        
+        // Is a "self.property" reference.
+        isa<DeclRefExpr>(base) &&
+        AFD_DC->getImplicitSelfDecl() == cast<DeclRefExpr>(base)->getDecl()) {
+      // Do definite initialization analysis to handle this property.
+      return AccessSemantics::BehaviorInitialization;
+    }
+  }
 
   // If the value is always directly accessed from this context, do it.
   return member->getAccessSemanticsFromContext(DC);

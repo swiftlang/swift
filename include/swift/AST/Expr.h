@@ -102,6 +102,12 @@ enum class AccessSemantics : unsigned char {
   /// On a property or subscript reference, this is a direct,
   /// non-polymorphic access to the getter/setter accessors.
   DirectToAccessor,
+  
+  /// On a property or subscript reference, this is a access to a property
+  /// behavior that may be an initialization. Reads always go through the
+  /// 'get' accessor on the property. Writes may go through the 'init' or
+  /// 'set' logic of the behavior based on its initialization state.
+  BehaviorInitialization,
 
   /// This is an ordinary access to a declaration, using whatever
   /// polymorphism is expected.
