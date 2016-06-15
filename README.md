@@ -3,9 +3,9 @@
 
 || **Status** |
 |---|---|
-|**OS X**         |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-osx/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-osx)|
-|**Ubuntu 14.04** |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04)|
-|**Ubuntu 15.10** |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-15_10/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-15_10)|
+|**OS X**         |[![Build Status](https://ci.swift.org/job/oss-swift-3.0-preview-2-incremental-RA-osx/badge/icon)](https://ci.swift.org/job/oss-swift-3.0-preview-2-incremental-RA-osx)|
+|**Ubuntu 14.04** |[![Build Status](https://ci.swift.org/job/oss-swift-3.0-preview-2-incremental-RA-linux-ubuntu-14_04/badge/icon)](https://ci.swift.org/job/oss-swift-3.0-preview-2-incremental-RA-linux-ubuntu-14_04)|
+|**Ubuntu 15.10** |[![Build Status](https://ci.swift.org/job/oss-swift-3.0-preview-2-incremental-RA-linux-ubuntu-15_10/badge/icon)](https://ci.swift.org/job/oss-swift-3.0-preview-2-incremental-RA-linux-ubuntu-15_10)|
 
 **Welcome to Swift!**
 
