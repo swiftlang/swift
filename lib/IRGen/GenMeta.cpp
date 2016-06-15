@@ -3245,7 +3245,7 @@ namespace {
         addWord(flags);
       } else {
         // On non-objc platforms just fill it with a null, there
-        // is no objective-c metaclass.
+        // is no Objective-C metaclass.
         // FIXME: Remove this to save metadata space.
         // rdar://problem/18801263
         addWord(llvm::ConstantExpr::getNullValue(IGM.IntPtrTy));
@@ -3375,7 +3375,7 @@ namespace {
 
     void addClassDataPointer() {
       if (!IGM.ObjCInterop) {
-        // with no objective-c runtime, just give an empty pointer with the
+        // with no Objective-C runtime, just give an empty pointer with the
         // swift bit set.
         addWord(llvm::ConstantInt::get(IGM.IntPtrTy, 1));
         return;
