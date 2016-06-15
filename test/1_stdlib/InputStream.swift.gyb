@@ -10,10 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // -*- swift -*-
-// RUN: rm -rf %t ; mkdir -p %t
-// RUN: %gyb %s -o %t/InputStream.swift
-// RUN: %line-directive %t/InputStream.swift -- %target-build-swift %t/InputStream.swift -o %t/a.out
-// RUN: %line-directive %t/InputStream.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 // FIXME: The Android test runner is incapable of running this test, which

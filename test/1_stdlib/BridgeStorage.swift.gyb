@@ -15,9 +15,7 @@
 //  distinguish these cases efficiently.
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/out.swift
-// RUN: %line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out
-// RUN: %line-directive %t/out.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop

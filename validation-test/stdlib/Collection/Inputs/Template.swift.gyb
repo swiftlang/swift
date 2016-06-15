@@ -58,7 +58,7 @@ def test_methods(test):
 }%
 
 % for test in all_tests():
-// Start of file: ${test.name}
+// BEGIN ${test.name}
 // -*- swift -*-
 
 //===----------------------------------------------------------------------===//
@@ -66,11 +66,7 @@ def test_methods(test):
 // Do Not Edit Directly!
 //===----------------------------------------------------------------------===//
 
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %gyb %s -o %t/main.swift
-// RUN: %line-directive %t/main.swift -- %target-build-swift %t/main.swift -o %t/${test.name}.a.out
-// RUN: %line-directive %t/main.swift -- %target-run %t/${test.name}.a.out
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -159,6 +155,4 @@ do {
 }
 
 runAllTests()
-// End of file: ${test.name}
 % end
-

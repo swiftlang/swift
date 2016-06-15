@@ -1,6 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/UnsafePointer.swift
-// RUN: %line-directive %t/UnsafePointer.swift -- %target-build-swift %t/UnsafePointer.swift -o %t/a.out
-// RUN: %line-directive %t/UnsafePointer.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest

@@ -5,11 +5,7 @@
 // Do Not Edit Directly!
 //===----------------------------------------------------------------------===//
 
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %gyb %s -o %t/main.swift
-// RUN: %line-directive %t/main.swift -- %target-build-swift %t/main.swift -o %t/MinimalCollection.swift.a.out
-// RUN: %line-directive %t/main.swift -- %target-run %t/MinimalCollection.swift.a.out
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 import StdlibUnittest
