@@ -275,7 +275,7 @@ public struct URLResourceValues {
     
     /// The document identifier -- a value assigned by the kernel to a document (which can be either a file or directory) and is used to identify the document regardless of where it gets moved on a volume.
     ///
-    /// The document identifier survives "safe save” operations; i.e it is sticky to the path it was assigned to (`replaceItem(at:,withItemAt:,backupItemName:,options:,resultingItem:) throws` is the preferred safe-save API). The document identifier is persistent across system restarts. The document identifier is not transferred when the file is copied. Document identifiers are only unique within a single volume. This property is not supported by all volumes.
+    /// The document identifier survives "safe save" operations; i.e it is sticky to the path it was assigned to (`replaceItem(at:,withItemAt:,backupItemName:,options:,resultingItem:) throws` is the preferred safe-save API). The document identifier is persistent across system restarts. The document identifier is not transferred when the file is copied. Document identifiers are only unique within a single volume. This property is not supported by all volumes.
     @available(OSX 10.10, iOS 8.0, *)
     public var documentIdentifier: Int? { return _get(.documentIdentifierKey) }
     
@@ -471,7 +471,7 @@ public struct URLResourceValues {
 /**
  A URL is a type that can potentially contain the location of a resource on a remote server, the path of a local file on disk, or even an arbitrary piece of encoded data.
  
- You can construct URLs and access their parts. For URLs that represent local files, you can also manipulate properties of those files directly, such as changing the file’s last modification date. Finally, you can pass URLs to other APIs to retrieve the contents of those URLs. For example, you can use the URLSession classes to access the contents of remote resources, as described in URL Session Programming Guide.
+ You can construct URLs and access their parts. For URLs that represent local files, you can also manipulate properties of those files directly, such as changing the file's last modification date. Finally, you can pass URLs to other APIs to retrieve the contents of those URLs. For example, you can use the URLSession classes to access the contents of remote resources, as described in URL Session Programming Guide.
  
  URLs are the preferred way to refer to local files. Most objects that read data from or write data to a file have methods that accept a URL instead of a pathname as the file reference. For example, you can get the contents of a local file URL as `String` by calling `func init(contentsOf:encoding) throws`, or as a `Data` by calling `func init(contentsOf:options) throws`.
 */
@@ -673,7 +673,7 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     
     /// Returns a file reference URL that refers to the same resource as a specified file URL.
     ///
-    /// File reference URLs use a URL path syntax that identifies a file system object by reference, not by path. This form of file URL remains valid when the file system path of the URL’s underlying resource changes. An error will occur if the url parameter is not a file URL. File reference URLs cannot be created to file system objects which do not exist or are not reachable. In some areas of the file system hierarchy, file reference URLs cannot be generated to the leaf node of the URL path. A file reference URL's path should never be persistently stored because is not valid across system restarts, and across remounts of volumes -- if you want to create a persistent reference to a file system object, use a bookmark.
+    /// File reference URLs use a URL path syntax that identifies a file system object by reference, not by path. This form of file URL remains valid when the file system path of the URL's underlying resource changes. An error will occur if the url parameter is not a file URL. File reference URLs cannot be created to file system objects which do not exist or are not reachable. In some areas of the file system hierarchy, file reference URLs cannot be generated to the leaf node of the URL path. A file reference URL's path should never be persistently stored because is not valid across system restarts, and across remounts of volumes -- if you want to create a persistent reference to a file system object, use a bookmark.
     /// - seealso: func bookmarkData(options: BookmarkCreationOptions = [], includingResourceValuesForKeys keys: Set<URLResourceKey>? = nil, relativeTo url: URL? = nil) throws -> Data
     public func fileReferenceURL() throws -> URL {
         if let result = _url.fileReferenceURL().map({ URL(reference: $0 as NSURL) }) {
@@ -711,12 +711,12 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
         // TODO: Use URLComponents to handle an empty-path case
         /*
          URLByAppendingPathComponent can return nil if:
-         • the URL does not have a path component. (see note 1)
-         • a mutable copy of the URLs string could not be created.
-         • a percent-encoded string of the new path component could not created using the same encoding as the URL’s string. (see note 2)
-         • a new URL object could not be created with the modified URL string.
+         * the URL does not have a path component. (see note 1)
+         * a mutable copy of the URLs string could not be created.
+         * a percent-encoded string of the new path component could not created using the same encoding as the URL's string. (see note 2)
+         * a new URL object could not be created with the modified URL string.
          
-         Note 1: If NS/CFURL parsed URLs correctly, this would not occur because URL strings always have a path component. For example, the URL <mailto:user@example.com> should be parsed as Scheme=“mailto”, and Path= “user@example.com". Instead, CFURL returns false for CFURLCanBeDecomposed(), says Scheme=“mailto”, Path=nil, and ResourceSpecifier=“user@example.com”. rdar://problem/15060399
+         Note 1: If NS/CFURL parsed URLs correctly, this would not occur because URL strings always have a path component. For example, the URL <mailto:user@example.com> should be parsed as Scheme="mailto", and Path= "user@example.com". Instead, CFURL returns false for CFURLCanBeDecomposed(), says Scheme="mailto", Path=nil, and ResourceSpecifier="user@example.com". rdar://problem/15060399
          
          Note 2: CFURLCreateWithBytes() and CFURLCreateAbsoluteURLWithBytes() allow URLs to be created with an array of bytes and a CFStringEncoding. All other CFURL functions and URL methods which create URLs use kCFStringEncodingUTF8/NSUTF8StringEncoding. So, the encoding passed to CFURLCreateWithBytes/CFURLCreateAbsoluteURLWithBytes might prevent the percent-encoding of the new path component or path extension.
          */
@@ -742,10 +742,10 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     public func deletingLastPathComponent() throws -> URL {
         /*
          URLByDeletingLastPathComponent can return nil if:
-         • the URL is a file reference URL which cannot be resolved back to a path.
-         • the URL does not have a path component. (see note 1)
-         • a mutable copy of the URLs string could not be created.
-         • a new URL object could not be created with the modified URL string.
+         * the URL is a file reference URL which cannot be resolved back to a path.
+         * the URL does not have a path component. (see note 1)
+         * a mutable copy of the URLs string could not be created.
+         * a new URL object could not be created with the modified URL string.
          */
         if let result = _url.deletingLastPathComponent.map({ URL(reference: $0 as NSURL) }) {
             return result
@@ -762,12 +762,12 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     public func appendingPathExtension(_ pathExtension: String) throws -> URL {
         /*
          URLByAppendingPathExtension can return nil if:
-         • the new path extension is not a valid extension (see _CFExtensionIsValidToAppend)
-         • the URL is a file reference URL which cannot be resolved back to a path.
-         • the URL does not have a path component. (see note 1)
-         • a mutable copy of the URLs string could not be created.
-         • a percent-encoded string of the new path extension could not created using the same encoding as the URL’s string. (see note 1))
-         • a new URL object could not be created with the modified URL string.
+         * the new path extension is not a valid extension (see _CFExtensionIsValidToAppend)
+         * the URL is a file reference URL which cannot be resolved back to a path.
+         * the URL does not have a path component. (see note 1)
+         * a mutable copy of the URLs string could not be created.
+         * a percent-encoded string of the new path extension could not created using the same encoding as the URL's string. (see note 1))
+         * a new URL object could not be created with the modified URL string.
          */
         guard let result = _url.appendingPathExtension(pathExtension) else {
             throw NSError(domain: NSCocoaErrorDomain, code: NSFileReadUnknownError, userInfo: [:])
@@ -781,10 +781,10 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     public func deletingPathExtension() throws -> URL {
         /*
          URLByDeletingPathExtension can return nil if:
-         • the URL is a file reference URL which cannot be resolved back to a path.
-         • the URL does not have a path component. (see note 1)
-         • a mutable copy of the URLs string could not be created.
-         • a new URL object could not be created with the modified URL string.
+         * the URL is a file reference URL which cannot be resolved back to a path.
+         * the URL does not have a path component. (see note 1)
+         * a mutable copy of the URLs string could not be created.
+         * a new URL object could not be created with the modified URL string.
          */
         if let result = _url.deletingPathExtension.map({ URL(reference: $0 as NSURL) }) {
             return result
@@ -801,8 +801,8 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     public func standardizingPath() throws -> URL {
         /*
          URLByStandardizingPath can return nil if:
-         • the URL is a file reference URL which cannot be resolved back to a path.
-         • a new URL object could not be created with the standardized path).
+         * the URL is a file reference URL which cannot be resolved back to a path.
+         * a new URL object could not be created with the standardized path).
          */
         if let result = _url.standardizingPath.map({ URL(reference: $0 as NSURL) }) {
             return result
@@ -819,9 +819,9 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     public func resolvingSymlinksInPath() throws -> URL {
         /*
          URLByResolvingSymlinksInPath can return nil if:
-         • the URL is a file reference URL which cannot be resolved back to a path.
-         • NSPathUtilities’ stringByResolvingSymlinksInPath property returns nil.
-         • a new URL object could not be created with the resolved path).
+         * the URL is a file reference URL which cannot be resolved back to a path.
+         * NSPathUtilities' stringByResolvingSymlinksInPath property returns nil.
+         * a new URL object could not be created with the resolved path).
          */
         if let result = _url.resolvingSymlinksInPath.map({ URL(reference: $0 as NSURL) }) {
             return result

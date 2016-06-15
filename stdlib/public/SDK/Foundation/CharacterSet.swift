@@ -182,7 +182,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
         return CharacterSet(reference: NSCharacterSet.alphanumerics() as NSCharacterSet)
     }
     
-    /// Returns a character set containing individual Unicode characters that can also be represented as composed character sequences (such as for letters with accents), by the definition of “standard decomposition” in version 3.2 of the Unicode character encoding standard.
+    /// Returns a character set containing individual Unicode characters that can also be represented as composed character sequences (such as for letters with accents), by the definition of "standard decomposition" in version 3.2 of the Unicode character encoding standard.
     public static var decomposables : CharacterSet {
         return CharacterSet(reference: NSCharacterSet.decomposables() as NSCharacterSet)
     }
