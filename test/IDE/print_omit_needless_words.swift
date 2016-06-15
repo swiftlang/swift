@@ -265,7 +265,7 @@
 // CHECK-OMIT-NEEDLESS-WORDS:   static var backAndForth: OMWWobbleOptions
 // CHECK-OMIT-NEEDLESS-WORDS:   static var toXMLHex: OMWWobbleOptions
 
-// CHECK-OMIT-NEEDLESS-WORDS: func jump(to: URL)
+// CHECK-OMIT-NEEDLESS-WORDS: func jump(to: NSURL)
 // CHECK-OMIT-NEEDLESS-WORDS: func objectIs(compatibleWith: AnyObject) -> Bool
 // CHECK-OMIT-NEEDLESS-WORDS: func insetBy(x: Int, y: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func setIndirectlyToValue(_: AnyObject)
