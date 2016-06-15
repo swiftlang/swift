@@ -23,7 +23,6 @@
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/Fixnum.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -1137,10 +1136,12 @@ namespace {
     /// \param locator Locator used to describe where in this expression we are.
     ///
     /// \returns the coerced expression, which will have type \c ToType.
-    Expr *coerceCallArguments(Expr *arg, Type paramType,
-                              llvm::PointerUnion<ApplyExpr *, llvm::Fixnum<2>>
-                                applyOrLevel,
-                              ConstraintLocatorBuilder locator);
+    using LevelTy = llvm::PointerEmbeddedInt<unsigned, 2>;
+
+    Expr *
+    coerceCallArguments(Expr *arg, Type paramType,
+                        llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
+                        ConstraintLocatorBuilder locator);
 
     /// \brief Coerce the given object argument (e.g., for the base of a
     /// member expression) to the given type.
@@ -1209,9 +1210,9 @@ namespace {
       }
 
       // Coerce the index argument.
-      index = coerceCallArguments(index, indexTy, /*level=*/llvm::Fixnum<2>(1),
-                                  locator.withPathElement(
-                                    ConstraintLocator::SubscriptIndex));
+      index = coerceCallArguments(
+          index, indexTy, LevelTy(1),
+          locator.withPathElement(ConstraintLocator::SubscriptIndex));
       if (!index)
         return nullptr;
 
@@ -4563,7 +4564,7 @@ static bool isReferenceToMetatypeMember(Expr *expr) {
 
 Expr *ExprRewriter::coerceCallArguments(
     Expr *arg, Type paramType,
-    llvm::PointerUnion<ApplyExpr *, llvm::Fixnum<2>> applyOrLevel,
+    llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
     ConstraintLocatorBuilder locator) {
 
   bool allParamsMatch = arg->getType()->isEqual(paramType);
@@ -4574,9 +4575,9 @@ Expr *ExprRewriter::coerceCallArguments(
 
   // Determine the level,
   unsigned level = 0;
-  if (applyOrLevel.is<llvm::Fixnum<2>>()) {
+  if (applyOrLevel.is<LevelTy>()) {
     // Level specified by caller.
-    level = applyOrLevel.get<llvm::Fixnum<2>>();
+    level = applyOrLevel.get<LevelTy>();
   } else if (callee) {
     // Determine the level based on the application itself.
     auto apply = applyOrLevel.get<ApplyExpr *>();
