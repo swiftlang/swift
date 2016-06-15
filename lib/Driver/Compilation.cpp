@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -40,18 +40,18 @@ using namespace swift::sys;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
-                         DiagnosticEngine &Diags, OutputLevel Level,
+Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
+                         InputFileList InputsWithTypes,
                          StringRef ArgsHash, llvm::sys::TimeValue StartTime,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
                          bool SkipTaskExecution,
                          bool SaveTemps)
-  : TheDriver(D), DefaultToolChain(DefaultToolChain), Diags(Diags),
-    Level(Level), InputArgs(std::move(InputArgs)),
-    TranslatedArgs(std::move(TranslatedArgs)), ArgsHash(ArgsHash),
+  : Diags(Diags), Level(Level), RawInputArgs(std::move(InputArgs)),
+    TranslatedArgs(std::move(TranslatedArgs)), 
+    InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
     BuildStartTime(StartTime),
     NumberOfParallelCommands(NumberOfParallelCommands),
     SkipTaskExecution(SkipTaskExecution),
@@ -215,6 +215,43 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
   }
 }
 
+static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
+  FilelistInfo filelistInfo = job->getFilelistInfo();
+  if (filelistInfo.path.empty())
+    return true;
+
+  std::error_code error;
+  llvm::raw_fd_ostream out(filelistInfo.path, error, llvm::sys::fs::F_None);
+  if (out.has_error()) {
+    out.clear_error();
+    diags.diagnose(SourceLoc(), diag::error_unable_to_make_temporary_file,
+                   error.message());
+    return false;
+  }
+
+  if (filelistInfo.whichFiles == FilelistInfo::Input) {
+    // FIXME: Duplicated from ToolChains.cpp.
+    for (const Job *input : job->getInputs()) {
+      const CommandOutput &outputInfo = input->getOutput();
+      if (outputInfo.getPrimaryOutputType() == filelistInfo.type) {
+        for (auto &output : outputInfo.getPrimaryOutputFilenames())
+          out << output << "\n";
+      } else {
+        auto &output = outputInfo.getAnyOutputForType(filelistInfo.type);
+        if (!output.empty())
+          out << output << "\n";
+      }
+    }
+  } else {
+    const CommandOutput &outputInfo = job->getOutput();
+    assert(outputInfo.getPrimaryOutputType() == filelistInfo.type);
+    for (auto &output : outputInfo.getPrimaryOutputFilenames())
+      out << output << "\n";
+  }
+
+  return true;
+}
+
 int Compilation::performJobsImpl() {
   // Create a TaskQueue for execution.
   std::unique_ptr<TaskQueue> TQ;
@@ -262,6 +299,13 @@ int Compilation::performJobsImpl() {
       return;
     }
 
+    // FIXME: Failing here should not take down the whole process.
+    bool success = writeFilelistIfNecessary(Cmd, Diags);
+    assert(success && "failed to write filelist");
+    (void)success;
+
+    assert(Cmd->getExtraEnvironment().empty() &&
+           "not implemented for compilations with multiple jobs");
     State.ScheduledCommands.insert(Cmd);
     TQ->addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
                 (void *)Cmd);
@@ -497,7 +541,7 @@ int Compilation::performJobsImpl() {
     Diags.diagnose(SourceLoc(), diag::error_command_signalled,
                    SignalledCmd->getSource().getClassName());
 
-    // Since the task signalled, so unconditionally set result to -2.
+    // Since the task signalled, unconditionally set result to -2.
     Result = -2;
 
     return TaskFinishedResponse::StopExecution;
@@ -573,6 +617,9 @@ int Compilation::performSingleCommand(const Job *Cmd) {
     break;
   }
 
+  if (!writeFilelistIfNecessary(Cmd, Diags))
+    return 1;
+
   if (Level == OutputLevel::Verbose)
     Cmd->printCommandLine(llvm::errs());
 
@@ -584,10 +631,37 @@ int Compilation::performSingleCommand(const Job *Cmd) {
   const char *ExecPath = Cmd->getExecutable();
   const char **argv = Argv.data();
 
+  for (auto &envPair : Cmd->getExtraEnvironment())
+    setenv(envPair.first, envPair.second, /*replacing=*/true);
+
   return ExecuteInPlace(ExecPath, argv);
 }
 
+static bool writeAllSourcesFile(DiagnosticEngine &diags, StringRef path,
+                                ArrayRef<InputPair> inputFiles) {
+  std::error_code error;
+  llvm::raw_fd_ostream out(path, error, llvm::sys::fs::F_None);
+  if (out.has_error()) {
+    out.clear_error();
+    diags.diagnose(SourceLoc(), diag::error_unable_to_make_temporary_file,
+                   error.message());
+    return false;
+  }
+
+  for (auto inputPair : inputFiles) {
+    if (!types::isPartOfSwiftCompilation(inputPair.first))
+      continue;
+    out << inputPair.second->getValue() << "\n";
+  }
+
+  return true;
+}
+
 int Compilation::performJobs() {
+  if (AllSourceFilesPath)
+    if (!writeAllSourcesFile(Diags, AllSourceFilesPath, getInputFiles()))
+      return EXIT_FAILURE;
+
   // If we don't have to do any cleanup work, just exec the subprocess.
   if (Level < OutputLevel::Parseable &&
       (SaveTemps || TempFilePaths.empty()) &&
@@ -599,7 +673,7 @@ int Compilation::performJobs() {
   if (!TaskQueue::supportsParallelExecution() && NumberOfParallelCommands > 1) {
     Diags.diagnose(SourceLoc(), diag::warning_parallel_execution_not_supported);
   }
-
+  
   int result = performJobsImpl();
 
   if (!SaveTemps) {
@@ -612,4 +686,23 @@ int Compilation::performJobs() {
   }
 
   return result;
+}
+
+const char *Compilation::getAllSourcesPath() const {
+  if (!AllSourceFilesPath) {
+    SmallString<128> Buffer;
+    std::error_code EC =
+        llvm::sys::fs::createTemporaryFile("sources", "", Buffer);
+    if (EC) {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_unable_to_make_temporary_file,
+                     EC.message());
+      // FIXME: This should not take down the entire process.
+      llvm::report_fatal_error("unable to create list of input sources");
+    }
+    auto *mutableThis = const_cast<Compilation *>(this);
+    mutableThis->addTemporaryFile(Buffer.str());
+    mutableThis->AllSourceFilesPath = getArgs().MakeArgString(Buffer);
+  }
+  return AllSourceFilesPath;
 }

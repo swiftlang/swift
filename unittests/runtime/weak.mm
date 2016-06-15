@@ -1,8 +1,8 @@
-//===- swift/unittests/runtime/weak.mm - Weak-pointer tests ---------------===//
+//===--- weak.mm - Weak-pointer tests -------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -38,6 +38,10 @@ static HeapObject *make_objc_object() {
 // Make a Native Swift object by calling a Swift function.
 // make_swift_object is defined in TestHelpers.swift as part of StdlibUnittest.
 extern "C" HeapObject *make_swift_object();
+
+static unsigned getUnownedRetainCount(HeapObject *object) {
+  return swift_unownedRetainCount(object) - 1;
+}
 
 static void unknown_release(void *value) {
   objc_release((id) value);
@@ -285,19 +289,553 @@ TEST(WeakTest, simple_objc_and_swift) {
   swift_unknownWeakDestroy(&ref1);
 }
 
-TEST(WeakTest, objc_weak_release_after_strong_release) {
-  DestroyedObjCCount = 0;
+TEST(WeakTest, objc_unowned_basic) {
+  UnownedReference ref;
+  void *objc1 = make_objc_object();
+  void *objc2 = make_objc_object();
+  HeapObject *swift1 = make_swift_object();
+  HeapObject *swift2 = make_swift_object();
 
-  void *o = make_objc_object();
-  // strong 1, unowned 0
+  ASSERT_NE(objc1, objc2);
+  ASSERT_NE(swift1, swift2);
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+  ASSERT_EQ(0U, getUnownedRetainCount(swift2));
 
-  swift_unknownWeakRetain(o);
-  // strong 1, unowned 1
+  void *result;
 
-  swift_unknownRelease(o);
-  // strong 0, unowned 1 -- object gets greedily deallocated by ObjC runtime
-  ASSERT_EQ(1U, DestroyedObjCCount);
-  
-  swift_unknownWeakRelease(o);
-  // strong 0, unowned 0
+  // ref = swift1
+  swift_unknownUnownedInit(&ref, swift1);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref);
+  ASSERT_EQ(swift1, result);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  swift_unknownRelease(result);
+  swift_unknownUnownedDestroy(&ref);
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+
+  // ref = objc1
+  swift_unknownUnownedInit(&ref, objc1);
+  result = swift_unknownUnownedLoadStrong(&ref);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+
+  // ref = objc1 (objc self transition)
+  swift_unknownUnownedAssign(&ref, objc1);
+  result = swift_unknownUnownedLoadStrong(&ref);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+
+  // ref = objc2 (objc -> objc transition)
+  swift_unknownUnownedAssign(&ref, objc2);
+  result = swift_unknownUnownedLoadStrong(&ref);
+  ASSERT_EQ(objc2, result);
+  swift_unknownRelease(result);
+
+  // ref = swift1 (objc -> swift transition)
+  swift_unknownUnownedAssign(&ref, swift1);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref);
+  ASSERT_EQ(swift1, result);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  swift_unknownRelease(result);
+
+  // ref = swift1 (swift self transition)
+  swift_unknownUnownedAssign(&ref, swift1);
+  result = swift_unknownUnownedLoadStrong(&ref);
+  ASSERT_EQ(swift1, result);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  swift_unknownRelease(result);
+
+  // ref = swift2 (swift -> swift transition)
+  swift_unknownUnownedAssign(&ref, swift2);
+  result = swift_unknownUnownedLoadStrong(&ref);
+  ASSERT_EQ(swift2, result);
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+  ASSERT_EQ(1U, getUnownedRetainCount(swift2));
+  swift_unknownRelease(result);
+
+  // ref = objc1 (swift -> objc transition)
+  swift_unknownUnownedAssign(&ref, objc1);
+  result = swift_unknownUnownedLoadStrong(&ref);
+  ASSERT_EQ(objc1, result);
+  ASSERT_EQ(0U, getUnownedRetainCount(swift2));
+  swift_unknownRelease(result);
+
+  swift_unknownUnownedDestroy(&ref);
+
+  swift_unknownRelease(objc1);
+  swift_unknownRelease(objc2);
+  swift_unknownRelease(swift1);
+  swift_unknownRelease(swift2);
+}
+
+TEST(WeakTest, objc_unowned_takeStrong) {
+  UnownedReference ref;
+  void *objc1 = make_objc_object();
+  HeapObject *swift1 = make_swift_object();
+
+  void *result;
+
+  // ref = objc1
+  swift_unknownUnownedInit(&ref, objc1);
+  result = swift_unknownUnownedTakeStrong(&ref);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+
+  // ref = swift1
+  swift_unknownUnownedInit(&ref, swift1);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedTakeStrong(&ref);
+  ASSERT_EQ(swift1, result);
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+  swift_unknownRelease(result);
+
+  swift_unknownRelease(objc1);
+  swift_unknownRelease(swift1);
+}
+
+TEST(WeakTest, objc_unowned_copyInit_nil) {
+  UnownedReference ref1;
+  UnownedReference ref2;
+
+  void *result;
+
+  // ref1 = nil
+  swift_unknownUnownedInit(&ref1, nullptr);
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(nullptr, result);
+
+  // ref2 = ref1 (nil -> nil)
+  swift_unknownUnownedCopyInit(&ref2, &ref1);
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(nullptr, result);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(nullptr, result);
+  swift_unknownUnownedDestroy(&ref2);
+}
+
+TEST(WeakTest, objc_unowned_copyInit_objc) {
+  UnownedReference ref1;
+  UnownedReference ref2;
+
+  void *result;
+  void *objc1 = make_objc_object();
+
+  // ref1 = objc1
+  swift_unknownUnownedInit(&ref1, objc1);
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+
+  // ref2 = ref1 (objc -> objc)
+  swift_unknownUnownedCopyInit(&ref2, &ref1);
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+  swift_unknownUnownedDestroy(&ref2);
+
+  swift_unknownUnownedDestroy(&ref1);
+
+  swift_unknownRelease(objc1);
+}
+
+TEST(WeakTest, objc_unowned_copyInit_swift) {
+  UnownedReference ref1;
+  UnownedReference ref2;
+
+  void *result;
+
+  HeapObject *swift1 = make_swift_object();
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+
+  // ref1 = swift1
+  swift_unknownUnownedInit(&ref1, swift1);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(swift1, result);
+  swift_unknownRelease(result);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+
+  // ref2 = ref1 (swift -> swift)
+  swift_unknownUnownedCopyInit(&ref2, &ref1);
+  ASSERT_EQ(2U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(swift1, result);
+  swift_unknownRelease(result);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(swift1, result);
+  swift_unknownRelease(result);
+  ASSERT_EQ(2U, getUnownedRetainCount(swift1));
+  swift_unknownUnownedDestroy(&ref2);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+
+  // ref2 = ref1
+  // ref2 = nil
+  swift_unknownUnownedCopyInit(&ref2, &ref1);
+  ASSERT_EQ(2U, getUnownedRetainCount(swift1));
+  swift_unknownUnownedAssign(&ref2, nullptr);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(swift1, result);
+  swift_unknownRelease(result);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(nullptr, result);
+  swift_unknownRelease(result);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  swift_unknownUnownedDestroy(&ref2);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+
+  swift_unknownUnownedDestroy(&ref1);
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+
+  swift_unknownRelease(swift1);
+}
+
+TEST(WeakTest, objc_unowned_takeInit_nil) {
+  UnownedReference ref1;
+  UnownedReference ref2;
+
+  void *result;
+
+  // ref1 = nil
+  swift_unknownUnownedInit(&ref1, nullptr);
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(nullptr, result);
+
+  // ref2 = ref1 (nil -> nil)
+  swift_unknownUnownedTakeInit(&ref2, &ref1);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(nullptr, result);
+  swift_unknownUnownedDestroy(&ref2);
+}
+
+TEST(WeakTest, objc_unowned_takeInit_objc) {
+  UnownedReference ref1;
+  UnownedReference ref2;
+
+  void *result;
+  void *objc1 = make_objc_object();
+
+  // ref1 = objc1
+  swift_unknownUnownedInit(&ref1, objc1);
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+
+  // ref2 = ref1 (objc -> objc)
+  swift_unknownUnownedTakeInit(&ref2, &ref1);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+  swift_unknownUnownedDestroy(&ref2);
+
+  swift_unknownRelease(objc1);
+}
+
+TEST(WeakTest, objc_unowned_takeInit_swift) {
+  UnownedReference ref1;
+  UnownedReference ref2;
+
+  void *result;
+
+  HeapObject *swift1 = make_swift_object();
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+
+  // ref1 = swift1
+  swift_unknownUnownedInit(&ref1, swift1);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(swift1, result);
+  swift_unknownRelease(result);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+
+  // ref2 = ref1 (swift -> swift)
+  swift_unknownUnownedTakeInit(&ref2, &ref1);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(swift1, result);
+  swift_unknownRelease(result);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  swift_unknownUnownedDestroy(&ref2);
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+
+  // ref1 = swift1
+  swift_unknownUnownedInit(&ref1, swift1);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+
+  // ref2 = ref1
+  // ref2 = nil
+  swift_unknownUnownedTakeInit(&ref2, &ref1);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  swift_unknownUnownedAssign(&ref2, nullptr);
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(nullptr, result);
+
+  swift_unknownUnownedDestroy(&ref2);
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+
+  swift_unknownRelease(swift1);
+}
+
+TEST(WeakTest, objc_unowned_copyAssign) {
+  UnownedReference ref1;
+  UnownedReference ref2;
+  void *objc1 = make_objc_object();
+  void *objc2 = make_objc_object();
+  HeapObject *swift1 = make_swift_object();
+  HeapObject *swift2 = make_swift_object();
+
+  ASSERT_NE(objc1, objc2);
+  ASSERT_NE(swift1, swift2);
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+  ASSERT_EQ(0U, getUnownedRetainCount(swift2));
+
+  void *result;
+
+  // ref1 = objc1
+  swift_unknownUnownedInit(&ref1, objc1);
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+
+  // ref2 = objc1
+  swift_unknownUnownedInit(&ref2, objc1);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+
+  // ref1 = ref2 (objc self transition)
+  swift_unknownUnownedCopyAssign(&ref1, &ref2);
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+
+  // ref2 = objc2
+  swift_unknownUnownedAssign(&ref2, objc2);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(objc2, result);
+  swift_unknownRelease(result);
+
+  // ref1 = ref2 (objc -> objc transition)
+  swift_unknownUnownedCopyAssign(&ref1, &ref2);
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(objc2, result);
+  swift_unknownRelease(result);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(objc2, result);
+  swift_unknownRelease(result);
+
+  // ref2 = swift1
+  swift_unknownUnownedAssign(&ref2, swift1);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(swift1, result);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  swift_unknownRelease(result);
+
+  // ref1 = ref2 (objc -> swift transition)
+  swift_unknownUnownedCopyAssign(&ref1, &ref2);
+  ASSERT_EQ(2U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(swift1, result);
+  swift_unknownRelease(result);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(swift1, result);
+  swift_unknownRelease(result);
+
+  // ref2 = swift1
+  swift_unknownUnownedAssign(&ref2, swift1);
+  ASSERT_EQ(2U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(swift1, result);
+  swift_unknownRelease(result);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(swift1, result);
+  swift_unknownRelease(result);
+  ASSERT_EQ(2U, getUnownedRetainCount(swift1));
+
+  // ref1 = ref2 (swift self transition)
+  swift_unknownUnownedCopyAssign(&ref1, &ref2);
+  ASSERT_EQ(2U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(swift1, result);
+  ASSERT_EQ(2U, getUnownedRetainCount(swift1));
+  swift_unknownRelease(result);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(swift1, result);
+  ASSERT_EQ(2U, getUnownedRetainCount(swift1));
+  swift_unknownRelease(result);
+
+  // ref2 = swift2
+  swift_unknownUnownedAssign(&ref2, swift2);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  ASSERT_EQ(1U, getUnownedRetainCount(swift2));
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(swift2, result);
+  swift_unknownRelease(result);
+
+  // ref1 = ref2 (swift -> swift transition)
+  swift_unknownUnownedCopyAssign(&ref1, &ref2);
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+  ASSERT_EQ(2U, getUnownedRetainCount(swift2));
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(swift2, result);
+  ASSERT_EQ(2U, getUnownedRetainCount(swift2));
+  swift_unknownRelease(result);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(swift2, result);
+  ASSERT_EQ(2U, getUnownedRetainCount(swift2));
+  swift_unknownRelease(result);
+
+  // ref2 = objc1
+  swift_unknownUnownedAssign(&ref2, objc1);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(objc1, result);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift2));
+  swift_unknownRelease(result);
+
+  // ref1 = ref2 (swift -> objc transition)
+  swift_unknownUnownedCopyAssign(&ref1, &ref2);
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+  ASSERT_EQ(0U, getUnownedRetainCount(swift2));
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+
+  swift_unknownUnownedDestroy(&ref1);
+  swift_unknownUnownedDestroy(&ref2);
+
+  swift_unknownRelease(objc1);
+  swift_unknownRelease(objc2);
+  swift_unknownRelease(swift1);
+  swift_unknownRelease(swift2);
+}
+
+TEST(WeakTest, objc_unowned_takeAssign) {
+  UnownedReference ref1;
+  UnownedReference ref2;
+  void *objc1 = make_objc_object();
+  void *objc2 = make_objc_object();
+  HeapObject *swift1 = make_swift_object();
+  HeapObject *swift2 = make_swift_object();
+
+  ASSERT_NE(objc1, objc2);
+  ASSERT_NE(swift1, swift2);
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+  ASSERT_EQ(0U, getUnownedRetainCount(swift2));
+
+  void *result;
+
+  // ref1 = objc1
+  swift_unknownUnownedInit(&ref1, objc1);
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+
+  // ref2 = objc1
+  swift_unknownUnownedInit(&ref2, objc1);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+
+  // ref1 = ref2 (objc self transition)
+  swift_unknownUnownedTakeAssign(&ref1, &ref2);
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+
+  // ref2 = objc2
+  swift_unknownUnownedInit(&ref2, objc2);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(objc2, result);
+  swift_unknownRelease(result);
+
+  // ref1 = ref2 (objc -> objc transition)
+  swift_unknownUnownedTakeAssign(&ref1, &ref2);
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(objc2, result);
+  swift_unknownRelease(result);
+
+  // ref2 = swift1
+  swift_unknownUnownedInit(&ref2, swift1);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(swift1, result);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  swift_unknownRelease(result);
+
+  // ref1 = ref2 (objc -> swift transition)
+  swift_unknownUnownedTakeAssign(&ref1, &ref2);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(swift1, result);
+  swift_unknownRelease(result);
+
+  // ref2 = swift1
+  swift_unknownUnownedInit(&ref2, swift1);
+  ASSERT_EQ(2U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(swift1, result);
+  swift_unknownRelease(result);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(swift1, result);
+  swift_unknownRelease(result);
+  ASSERT_EQ(2U, getUnownedRetainCount(swift1));
+
+  // ref1 = ref2 (swift self transition)
+  swift_unknownUnownedTakeAssign(&ref1, &ref2);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(swift1, result);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  swift_unknownRelease(result);
+
+  // ref2 = swift2
+  swift_unknownUnownedInit(&ref2, swift2);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift1));
+  ASSERT_EQ(1U, getUnownedRetainCount(swift2));
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(swift2, result);
+  swift_unknownRelease(result);
+
+  // ref1 = ref2 (swift -> swift transition)
+  swift_unknownUnownedTakeAssign(&ref1, &ref2);
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+  ASSERT_EQ(1U, getUnownedRetainCount(swift2));
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(swift2, result);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift2));
+  swift_unknownRelease(result);
+
+  // ref2 = objc1
+  swift_unknownUnownedInit(&ref2, objc1);
+  result = swift_unknownUnownedLoadStrong(&ref2);
+  ASSERT_EQ(objc1, result);
+  ASSERT_EQ(1U, getUnownedRetainCount(swift2));
+  swift_unknownRelease(result);
+
+  // ref1 = ref2 (swift -> objc transition)
+  swift_unknownUnownedTakeAssign(&ref1, &ref2);
+  ASSERT_EQ(0U, getUnownedRetainCount(swift1));
+  ASSERT_EQ(0U, getUnownedRetainCount(swift2));
+  result = swift_unknownUnownedLoadStrong(&ref1);
+  ASSERT_EQ(objc1, result);
+  swift_unknownRelease(result);
+
+  swift_unknownUnownedDestroy(&ref1);
+
+  swift_unknownRelease(objc1);
+  swift_unknownRelease(objc2);
+  swift_unknownRelease(swift1);
+  swift_unknownRelease(swift2);
 }

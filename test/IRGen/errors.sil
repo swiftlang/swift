@@ -9,26 +9,26 @@ import Swift
 class A {}
 sil_vtable A {}
 
-sil @create_error : $@convention(thin) () -> @owned ErrorType {
+sil @create_error : $@convention(thin) () -> @owned ErrorProtocol {
 entry:
   unreachable
 }
 
-// CHECK: define void @throws(%swift.refcounted*, %swift.error**) {{.*}} {
-sil @throws : $@convention(thin) () -> @error ErrorType {
+// CHECK-LABEL: define{{( protected)?}} void @throws(%swift.refcounted*, %swift.error**) {{.*}} {
+sil @throws : $@convention(thin) () -> @error ErrorProtocol {
   // CHECK: [[T0:%.*]] = call %swift.error* @create_error()
-  %0 = function_ref @create_error : $@convention(thin) () -> @owned ErrorType
-  %1 = apply %0() : $@convention(thin) () -> @owned ErrorType
+  %0 = function_ref @create_error : $@convention(thin) () -> @owned ErrorProtocol
+  %1 = apply %0() : $@convention(thin) () -> @owned ErrorProtocol
 
   // CHECK-NEXT: call void @swift_willThrow
   // CHECK-NEXT: store %swift.error* [[T0]], %swift.error** %1,
   // CHECK-NEXT: ret void
-  builtin "willThrow"(%1 : $ErrorType) : $()
-  throw %1 : $ErrorType
+  builtin "willThrow"(%1 : $ErrorProtocol) : $()
+  throw %1 : $ErrorProtocol
 }
 
-// CHECK: define void @doesnt_throw(%swift.refcounted*, %swift.error**) {{.*}} {
-sil @doesnt_throw : $@convention(thin) () -> @error ErrorType {
+// CHECK-LABEL: define{{( protected)?}} void @doesnt_throw(%swift.refcounted*, %swift.error**) {{.*}} {
+sil @doesnt_throw : $@convention(thin) () -> @error ErrorProtocol {
   //   We don't have to do anything here because the caller always
   //   zeroes the error slot before a call.
   // CHECK-NEXT: entry:
@@ -37,10 +37,10 @@ sil @doesnt_throw : $@convention(thin) () -> @error ErrorType {
   return %0 : $()
 }
 
-sil @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error ErrorType)
+sil @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error ErrorProtocol)
 
-// CHECK-objc: define void @try_apply(%objc_object*)
-// CHECK-native: define void @try_apply(%swift.refcounted*)
+// CHECK-objc-LABEL: define{{( protected)?}} void @try_apply(%objc_object*)
+// CHECK-native-LABEL: define{{( protected)?}} void @try_apply(%swift.refcounted*)
 sil @try_apply : $@convention(thin) (@owned AnyObject) -> () {
 entry(%0 : $AnyObject):
   // CHECK:      [[ERRORSLOT:%.*]] = alloca %swift.error*, align
@@ -51,14 +51,14 @@ entry(%0 : $AnyObject):
   // CHECK-NEXT: [[ERR:%.*]] = load %swift.error*, %swift.error** [[ERRORSLOT]], align
   // CHECK-NEXT: [[T0:%.*]] = icmp ne %swift.error* [[ERR]], null
   // CHECK-NEXT: br i1 [[T0]],
-  %1 = function_ref @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error ErrorType)
-  try_apply %1(%0) : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error ErrorType),
+  %1 = function_ref @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error ErrorProtocol)
+  try_apply %1(%0) : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error ErrorProtocol),
     normal bb1, error bb2
 
 // CHECK-objc:        [[T0:%.*]] = phi %objc_object* [ [[RESULT]],
-// CHECK-objc-NEXT:   call void bitcast (void (%swift.refcounted*)* @swift_unknownRelease to void (%objc_object*)*)(%objc_object* [[T0]])
+// CHECK-objc-NEXT:   call void @swift_unknownRelease(%objc_object* [[T0]])
 // CHECK-native:      [[T0:%.*]] = phi %swift.refcounted* [ [[RESULT]],
-// CHECK-native-NEXT: call void @swift_release(%swift.refcounted* [[T0]])
+// CHECK-native-NEXT: call void @rt_swift_release(%swift.refcounted* [[T0]])
 // CHECK-NEXT:        br label [[CONT:%[0-9]+]]
 bb1(%2 : $AnyObject):
   strong_release %2 : $AnyObject
@@ -67,17 +67,17 @@ bb1(%2 : $AnyObject):
 // CHECK:             [[T0:%.*]] = phi %swift.error* [ [[ERR]],
 // CHECK-NEXT:        store %swift.error* null, %swift.error** [[ERRORSLOT]], align
 // CHECK-objc-NEXT:   call void @swift_errorRelease(%swift.error* [[T0]])
-// CHECK-native-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%swift.error*)*)(%swift.error* [[T0]])
+// CHECK-native-NEXT: call void bitcast (void (%swift.refcounted*)* @rt_swift_release to void (%swift.error*)*)(%swift.error* [[T0]])
 // CHECK-NEXT:        br label [[CONT]]
-bb2(%3 : $ErrorType):
-  release_value %3 : $ErrorType
+bb2(%3 : $ErrorProtocol):
+  release_value %3 : $ErrorProtocol
   br bb3
 bb3:
   %4 = tuple ()
   return %4 : $()
 }
 
-enum ColorError : ErrorType {
+enum ColorError : ErrorProtocol {
   case Red, Green, Blue
 }
 
@@ -85,24 +85,24 @@ enum ColorError : ErrorType {
 // CHECK: call void @swift_willThrow(%swift.error* %0)
 // CHECK: store %swift.error* %0
 // CHECK: ret i64 undef
-sil hidden @TestCallToWillThrowCallBack : $@convention(thin) (@owned ErrorType) -> (Int64, @error ErrorType) {
-bb0(%0 : $ErrorType):
-  builtin "willThrow"(%0 : $ErrorType) : $()
-  throw %0 : $ErrorType                        // id: %3
+sil hidden @TestCallToWillThrowCallBack : $@convention(thin) (@owned ErrorProtocol) -> (Int64, @error ErrorProtocol) {
+bb0(%0 : $ErrorProtocol):
+  builtin "willThrow"(%0 : $ErrorProtocol) : $()
+  throw %0 : $ErrorProtocol                        // id: %3
 }
 
 // rdar://21084084 - Partial application of throwing functions.
 
-// CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_single(%C6errors1A*)
+// CHECK-LABEL: define{{( protected)?}} { i8*, %swift.refcounted* } @partial_apply_single(%C6errors1A*)
 // CHECK:       insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*, %swift.error**)* @_TPA_partial_apply_single_helper to i8*), %swift.refcounted* undef },
 // CHECK-LABEL: define internal void @_TPA_partial_apply_single_helper(%swift.refcounted*, %swift.error**)
 // CHECK:       [[T0:%.*]] = bitcast %swift.refcounted* {{%.*}} to %C6errors1A*
 // CHECK-NEXT:  tail call void @partial_apply_single_helper(%C6errors1A* [[T0]], %swift.refcounted* undef, %swift.error** {{%.*}})
 // CHECK-NEXT:  ret void
-sil @partial_apply_single : $@convention(thin) (@owned A) -> @callee_owned () -> @error ErrorType {
+sil @partial_apply_single : $@convention(thin) (@owned A) -> @callee_owned () -> @error ErrorProtocol {
 entry(%0 : $A):
-  %1 = function_ref @partial_apply_single_helper : $@convention(thin) (@owned A) -> @error ErrorType
-  %2 = partial_apply %1(%0) : $@convention(thin) (@owned A) -> @error ErrorType
-  return %2 : $@callee_owned () -> @error ErrorType
+  %1 = function_ref @partial_apply_single_helper : $@convention(thin) (@owned A) -> @error ErrorProtocol
+  %2 = partial_apply %1(%0) : $@convention(thin) (@owned A) -> @error ErrorProtocol
+  return %2 : $@callee_owned () -> @error ErrorProtocol
 }
-sil @partial_apply_single_helper : $@convention(thin) (@owned A) -> (@error ErrorType)
+sil @partial_apply_single_helper : $@convention(thin) (@owned A) -> (@error ErrorProtocol)

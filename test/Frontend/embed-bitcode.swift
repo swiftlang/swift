@@ -4,7 +4,11 @@
 // RUN: llvm-objdump -macho -section="__LLVM,__bitcode" %t.o | FileCheck -check-prefix=MARKER %s
 // RUN: llvm-objdump -macho -section="__LLVM,__swift_cmdline" %t.o | FileCheck -check-prefix=MARKER-CMD %s
 
+// This file tests Mach-O file output, but Linux variants do not produce Mach-O
+// files.
 // UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=linux-gnueabihf
+// UNSUPPORTED: OS=freebsd
 
 // MARKER: Contents of (__LLVM,__bitcode) section
 // MARKER-NEXT: 00

@@ -1,8 +1,8 @@
-//===--- ArgumentSource.cpp - Latent value representation -------*- C++ -*-===//
+//===--- ArgumentSource.cpp - Latent value representation -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -78,11 +78,23 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &gen,
   }
 }
 
+
+ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &gen,
+                                              AbstractionPattern origFormalType,
+                                              SGFContext C) && {
+  auto loc = getLocation();
+  auto substFormalType = getSubstType();
+  ManagedValue outputValue = std::move(*this).getAsSingleValue(gen);
+  return gen.emitSubstToOrigValue(loc,
+                                  outputValue, origFormalType,
+                                  substFormalType, C);
+}
+
 void ArgumentSource::forwardInto(SILGenFunction &gen, Initialization *dest) && {
   assert(!isLValue());
   if (isRValue()) {
     auto loc = getKnownRValueLocation();
-    return std::move(*this).asKnownRValue().forwardInto(gen, dest, loc);
+    return std::move(*this).asKnownRValue().forwardInto(gen, loc, dest);
   }
 
   auto e = std::move(*this).asKnownExpr();
@@ -152,12 +164,10 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF,
 
   // Otherwise, emit as a single independent value.
   SILLocation loc = getLocation();
-  ManagedValue inputValue = std::move(*this).getAsSingleValue(SGF);
-
-  // Reabstract.
   ManagedValue outputValue =
-    SGF.emitSubstToOrigValue(loc, inputValue, origFormalType,
-                             substFormalType, SGFContext(dest));
+      std::move(*this).getAsSingleValue(SGF, origFormalType,
+                                        SGFContext(dest));
+
   if (outputValue.isInContext()) return;
 
   // Use RValue's forward-into-initialization code.  We have to lie to
@@ -165,5 +175,5 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF,
   // we're emitting into an abstracted value, which RValue doesn't
   // really handle.
   auto substLoweredType = destTL.getLoweredType().getSwiftRValueType();
-  RValue(SGF, loc, substLoweredType, outputValue).forwardInto(SGF, dest, loc);
+  RValue(SGF, loc, substLoweredType, outputValue).forwardInto(SGF, loc, dest);
 }

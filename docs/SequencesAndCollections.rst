@@ -35,15 +35,15 @@ Because this construct is generic, `s` could be
 In Swift, all of the above are called **sequences**, an abstraction
 represented by the `SequenceType` protocol::
 
-  protocol SequenceType { 
-    typealias Generator : GeneratorType
-    func generate() -> Generator
+  protocol SequenceType {
+    typealias Iterator : IteratorProtocol
+    func makeIterator() -> Iterator
   }
 
-.. sidebar:: Hiding Generator Type Details
+.. sidebar:: Hiding Iterator Type Details
 
-  A sequence's generator is an associated type—rather than something
-  like |AnyGenerator|__ that depends only on the element type—for
+  A sequence's iterator is an associated type—rather than something
+  like |AnyIterator|__ that depends only on the element type—for
   performance reasons.  Although the alternative design has
   significant usability benefits, it requires one dynamic
   allocation/deallocation pair and *N* dynamic dispatches to traverse
@@ -52,29 +52,29 @@ represented by the `SequenceType` protocol::
   and we are `considering <rdar://19755076>`_ changing the design
   accordingly.
 
-  .. |AnyGenerator| replace:: `AnyGenerator<T>`
+  .. |AnyIterator| replace:: `AnyIterator<T>`
 
-  __ http://swiftdoc.org/type/AnyGenerator/
+  __ http://swiftdoc.org/v3.0/type/AnyIterator/
 
-As you can see, sequence does nothing more than deliver a generator.
-To understand the need for generators, it's important to distinguish
+As you can see, sequence does nothing more than deliver an iterator.
+To understand the need for iterators, it's important to distinguish
 the two kinds of sequences.
 
-* **Volatile** sequences like “stream of network packets,” carry
-  their own traversal state, and are expected to be “consumed” as they
+* **Volatile** sequences like "stream of network packets," carry
+  their own traversal state, and are expected to be "consumed" as they
   are traversed.
 
 * **Stable** sequences, like arrays, should *not* be mutated by `for`\
   …\ `in`, and thus require *separate traversal state*.
 
 To get an initial traversal state for an arbitrary sequence `x`, Swift
-calls `x.generate()`.  The sequence delivers that state, along with
-traversal logic, in the form of a **generator**.
+calls `x.makeIterator()`.  The sequence delivers that state, along with
+traversal logic, in the form of an **iterator**.
 
-Generators
+Iterators
 ==========
 
-`for`\ …\ `in` needs three operations from the generator:
+`for`\ …\ `in` needs three operations from the iterator:
 
 * get the current element
 * advance to the next element
@@ -83,7 +83,7 @@ Generators
 If we literally translate the above into protocol requirements, we get
 something like this::
 
-  protocol NaiveGeneratorType {
+  protocol NaiveIteratorProtocol {
     typealias Element
     var current() -> Element      // get the current element
     mutating func advance()       // advance to the next element       
@@ -91,7 +91,7 @@ something like this::
   }
 
 Such a protocol, though, places a burden on implementors of volatile
-sequences: either the generator must buffer the current element
+sequences: either the iterator must buffer the current element
 internally so that `current` can repeatedly return the same value, or
 it must trap when `current` is called twice without an intervening
 call to `moveToNext`.  Both semantics have a performance cost, and
@@ -99,17 +99,16 @@ the latter unnecessarily adds the possibility of incorrect usage.
 
 .. sidebar:: `NSEnumerator`
 
-  You might recognize the influence on generators of the
-  `NSEnumerator` API::
+  You might recognize the influence on iterators of the `NSEnumerator` API::
 
     class NSEnumerator : NSObject {
       func nextObject() -> AnyObject?
     }
 
-Therefore, Swift's `GeneratorType` merges the three operations into one,
-returning `nil` when the generator is exhausted::
+Therefore, Swift's `IteratorProtocol` merges the three operations into one,
+returning `nil` when the iterator is exhausted::
 
-  protocol GeneratorType {
+  protocol IteratorProtocol {
     typealias Element
     mutating func next() -> Element?
   }
@@ -119,33 +118,32 @@ implement a generic `for`\ …\ `in` loop.
 
 .. sidebar:: Adding a Buffer
 
-  The use-cases for singly-buffered generators are rare enough that it
-  is not worth complicating `GeneratorType`, [#input_iterator]_ but
+  The use-cases for singly-buffered iterators are rare enough that it
+  is not worth complicating `IteratorProtocol`, [#input_iterator]_ but
   support for buffering would fit nicely into the scheme, should it
   prove important::
 
-    public protocol BufferedGeneratorType 
-      : GeneratorType {
+    public protocol BufferedIteratorProtocol 
+      : IteratorProtocol {
       var latest: Element? {get}
     }
 
   The library could easily offer a generic wrapper that adapts any
-  `GeneratorType` to create a `BufferedGeneratorType`::
+  `IteratorProtocol` to create a `BufferedIteratorProtocol`::
 
-    /// Add buffering to any GeneratorType G
-    struct BufferedGenerator<G: GeneratorType> 
-      : BufferedGeneratorType {
+    /// Add buffering to any IteratorProtocol I
+    struct BufferedIterator<I : IteratorProtocol>
+      : BufferedIteratorProtocol {
 
-      public init(_ baseGenerator: G) { 
-        self._baseGenerator = baseGenerator
+      public init(_ baseIterator: I) {
+        self._baseIterator = baseIterator
       }
-      public func next() -> Element? { 
-        latest = _baseGenerator.next() ?? latest
+      public func next() -> Element? {
+        latest = _baseIterator.next() ?? latest
         return latest 
       }
-      public private(set) var 
-        latest: G.Element? = nil
-      private var _baseGenerator: G
+      public private(set) var latest: I.Element? = nil
+      private var _baseIterator: I
     }
 
 Operating on Sequences Generically
@@ -158,14 +156,14 @@ end.  For example::
   // Return an array containing the elements of `source`, with
   // `separator` interposed between each consecutive pair.
   func array<S: SequenceType>(
-    source: S, 
-    withSeparator separator: S.Generator.Element
-  ) -> [S.Generator.Element] {
-    var result: [S.Generator.Element] = []
-    var g = source.generate()
-    if let start = g.next() {
+    _ source: S, 
+    withSeparator separator: S.Iterator.Element
+  ) -> [S.Iterator.Element] {
+    var result: [S.Iterator.Element] = []
+    var iterator = source.makeIterator()
+    if let start = iterator.next() {
       result.append(start)
-      while let next = g.next() {
+      while let next = iterator.next() {
         result.append(separator)
         result.append(next)
       }
@@ -188,25 +186,25 @@ depend on stability that an arbitrary sequence can't provide:
 * Meaningful in-place element mutation (including sorting,
   partitioning, rotations, etc.)
 
-.. sidebar:: Generators Should Be Sequences
+.. sidebar:: Iterators Should Be Sequences
 
-  In principle, every generator is a volatile sequence containing
+  In principle, every iterator is a volatile sequence containing
   the elements it has yet to return from `next()`.  Therefore, every
-  generator *could* satisfy the requirements of `SequenceType` by
+  iterator *could* satisfy the requirements of `SequenceType` by
   simply declaring conformance, and returning `self` from its
-  `generate()` method.  In fact, if it weren't for `current language
-  limitations <rdar://17986597>`_, `GeneratorType` would refine
+  `makeIterator()` method.  In fact, if it weren't for `current language
+  limitations <rdar://17986597>`_, `IteratorProtocol` would refine
   `SequenceType`, as follows:
 
   .. parsed-literal::
 
-       protocol GeneratorType **: SequenceType** {
+       protocol IteratorProtocol **: SequenceType** {
          typealias Element
          mutating func next() -> Element?
        }
 
   Though we may not currently be able to *require* that every
-  `GeneratorType` refines `SequenceType`, most generators in the
+  `IteratorProtocol` refines `SequenceType`, most iterators in the
   standard library do conform to `SequenceType`.
 
 Fortunately, many real sequences *are* stable. To take advantage of
@@ -215,12 +213,12 @@ that stability in generic code, we'll need another protocol.
 Collections
 ===========
 
-A **collection** is a stable sequence with addressable “positions,”
+A **collection** is a stable sequence with addressable "positions,"
 represented by an associated `Index` type::
  
   protocol CollectionType : SequenceType {
     typealias Index : ForwardIndexType             // a position
-    subscript(i: Index) -> Generator.Element {get}
+    subscript(i: Index) -> Iterator.Element {get}
 
     var startIndex: Index {get}
     var endIndex: Index {get}
@@ -277,7 +275,7 @@ subscript setter:
 .. parsed-literal::
 
   protocol MutableCollectionType : CollectionType {
-    subscript(i: Index) -> Generator.Element { get **set** }
+    subscript(i: Index) -> Iterator.Element { get **set** }
   }
 
 The `CollectionType` protocol does not require collection to support mutation,
@@ -308,10 +306,10 @@ range of elements, denoted by two indices, by elements from a collection with a
 ::
 
   public protocol RangeReplaceableCollectionType : MutableCollectionType {
-    mutating func replaceRange<
-      C: CollectionType where C.Generator.Element == Self.Generator.Element
+    mutating func replaceSubrange<
+      C: CollectionType where C.Iterator.Element == Self.Iterator.Element
     >(
-      subRange: Range<Index>, with newElements: C
+      _ subRange: Range<Index>, with newElements: C
     )
   }
 
@@ -349,8 +347,8 @@ addressing the same collection, and the ability to advance an index by
 a (possibly negative) number of steps::
 
   public protocol RandomAccessIndexType : BidirectionalIndexType {
-    func distanceTo(other: Self) -> Distance
-    func advancedBy(n: Distance) -> Self
+    func distance(to other: Self) -> Distance
+    func advanced(by n: Distance) -> Self
   }
 
 From these methods, the standard library derives several other
@@ -358,7 +356,7 @@ features such as `Comparable` conformance, index subtraction, and
 addition/subtraction of integers to/from indices.
 
 The indices of a `deque
-<http://en.wikipedia.org/wiki/Double-ended_queue>`_ can provide random
+<https://en.wikipedia.org/wiki/Double-ended_queue>`_ can provide random
 access, as do the indices into `String.UTF16View` (when Foundation is
 loaded) and, of course, array indices.  Many common sorting and
 selection algorithms, among others, depend on these capabilities.
@@ -381,6 +379,6 @@ performant.  Thanks for taking the tour!
 ------
 
 .. [#input_iterator] This trade-off is not as obvious as it might
-   seem.  For example, the C# and C++ analogues for `GeneratorType`
+   seem.  For example, the C# and C++ analogues for `IteratorProtocol`
    (`IEnumerable` and `input iterator`) are saddled with the
    obligation to provide buffering.

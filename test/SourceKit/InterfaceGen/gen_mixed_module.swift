@@ -1,5 +1,6 @@
 var x = 10
 
+// REQUIRES: objc_interop
 // RUN: rm -rf %t.overlays
 // RUN: mkdir %t.overlays
 

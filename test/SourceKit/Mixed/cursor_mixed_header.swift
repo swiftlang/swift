@@ -1,8 +1,9 @@
 
-func test(b : BaseInHead) {
+func test(_ b : BaseInHead) {
   b.doIt(0);
 }
 
+// REQUIRES: objc_interop
 // RUN: %swift -parse %s %mcp_opt -module-name Mixed -import-objc-header %S/Inputs/header.h 2> %t.diags
 // RUN: FileCheck -input-file %t.diags %s -check-prefix=DIAG
 // DIAG: warning: using the result of an assignment
@@ -13,4 +14,4 @@ func test(b : BaseInHead) {
 // CHECK: doIt(_:)
 // CHECK: c:objc(cs)BaseInHead(im)doIt:
 // CHECK: BaseInHead -> (Int32) -> Void
-// CHECK: <Declaration>func doIt(arg: <Type usr="s:Vs5Int32">Int32</Type>)</Declaration>
+// CHECK: <Declaration>func doIt(_ arg: <Type usr="s:Vs5Int32">Int32</Type>)</Declaration>

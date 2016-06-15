@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -12,14 +12,18 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
-// RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
-// RUN: %target-build-swift %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror
+// RUN: if [ %target-runtime == "objc" ]; \
+// RUN: then \
+// RUN:   %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g && \
+// RUN:   %target-build-swift %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror; \
+// RUN: else \
+// RUN:   %target-build-swift %s -o %t/Mirror; \
+// RUN: fi
 // RUN: %target-run %t/Mirror
 // REQUIRES: executable_test
 
-// XFAIL: linux
-
 import StdlibUnittest
+
 
 var mirrors = TestSuite("Mirrors")
 
@@ -29,55 +33,57 @@ extension Mirror {
     return "[" +
       children.lazy
         .map { "\($0.0 ?? nil_): \(String(reflecting: $0.1))" }
-        .joinWithSeparator(", ")
+        .joined(separator: ", ")
       + "]"
   }
 }
 
 mirrors.test("RandomAccessStructure") {
   struct Eggs : CustomReflectable {
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(self, unlabeledChildren: ["aay", "bee", "cee"])
     }
   }
 
-  let x = Eggs().customMirror()
+  let x = Eggs().customMirror
   
   expectEqual("[nil: \"aay\", nil: \"bee\", nil: \"cee\"]", x.testDescription)
 }
 
 let letters = "abcdefghijklmnopqrstuvwxyz "
 
-func find(substring: String, within domain: String) -> String.Index? {
+func find(_ substring: String, within domain: String) -> String.Index? {
   let domainCount = domain.characters.count
   let substringCount = substring.characters.count
 
   if (domainCount < substringCount) { return nil }
   var sliceStart = domain.startIndex
-  var sliceEnd = domain.startIndex.advancedBy(substringCount)
-  for var i = 0;; ++i  {
+  var sliceEnd = domain.index(sliceStart, offsetBy: substringCount)
+  var i = 0
+  while true {
     if domain[sliceStart..<sliceEnd] == substring {
       return sliceStart
     }
     if i == domainCount - substringCount { break }
-    ++sliceStart
-    ++sliceEnd
+    sliceStart = domain.index(after: sliceStart)
+    sliceEnd = domain.index(after: sliceEnd)
+    i += 1
   }
   return nil
 }
 
 mirrors.test("ForwardStructure") {
   struct DoubleYou : CustomReflectable {
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
         self,
         unlabeledChildren: Set(letters.characters),
-        displayStyle: .Set)
+        displayStyle: .`set`)
     }
   }
 
-  let w = DoubleYou().customMirror()
-  expectEqual(.Set, w.displayStyle)
+  let w = DoubleYou().customMirror
+  expectEqual(.`set`, w.displayStyle)
   expectEqual(letters.characters.count, numericCast(w.children.count))
   
   // Because we don't control the order of a Set, we need to do a
@@ -91,53 +97,53 @@ mirrors.test("ForwardStructure") {
 
 mirrors.test("BidirectionalStructure") {
   struct Why : CustomReflectable {
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
         self,
         unlabeledChildren: letters.characters,
-        displayStyle: .Collection)
+        displayStyle: .collection)
     }
   }
 
   // Test that the basics seem to work
-  let y = Why().customMirror()
-  expectEqual(.Collection, y.displayStyle)
+  let y = Why().customMirror
+  expectEqual(.`collection`, y.displayStyle)
 
   let description = y.testDescription
   expectEqual(
     "[nil: \"a\", nil: \"b\", nil: \"c\", nil: \"",
-    description[description.startIndex..<description.characters.indexOf("d")!])
+    description[description.startIndex..<description.characters.index(of: "d")!])
 }
 
 mirrors.test("LabeledStructure") {
   struct Zee : CustomReflectable, CustomStringConvertible {
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(self, children: ["bark": 1, "bite": 0])
     }
     var description: String { return "Zee" }
   }
 
-  let z = Zee().customMirror()
+  let z = Zee().customMirror
   expectEqual("[bark: 1, bite: 0]", z.testDescription)
   expectEmpty(z.displayStyle)
 
   struct Zee2 : CustomReflectable {
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
-        self, children: ["bark": 1, "bite": 0], displayStyle: .Dictionary)
+        self, children: ["bark": 1, "bite": 0], displayStyle: .dictionary)
     }
   }
-  let z2 = Zee2().customMirror()
-  expectEqual(.Dictionary, z2.displayStyle)
+  let z2 = Zee2().customMirror
+  expectEqual(.dictionary, z2.displayStyle)
   expectEqual("[bark: 1, bite: 0]", z2.testDescription)
 
   struct Heterogeny : CustomReflectable {
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
         self, children: ["bark": 1, "bite": Zee()])
     }
   }
-  let h = Heterogeny().customMirror()
+  let h = Heterogeny().customMirror
   expectEqual("[bark: 1, bite: Zee]", h.testDescription)
 }
 
@@ -146,13 +152,13 @@ mirrors.test("Legacy") {
   expectTrue(m.subjectType == [Int].self)
   
   let x0: [Mirror.Child] = [
-    (label: "[0]", value: 1),
-    (label: "[1]", value: 2),
-    (label: "[2]", value: 3)
+    (label: nil, value: 1),
+    (label: nil, value: 2),
+    (label: nil, value: 3)
   ]
   expectFalse(
     zip(x0, m.children).contains {
-      $0.0.label != $0.1.label || $0.0.value as! Int != $0.1.value as! Int
+      $0.0.value as! Int != $0.1.value as! Int
     })
 
   class B { let bx: Int = 0 }
@@ -161,14 +167,14 @@ mirrors.test("Legacy") {
   let mb = Mirror(reflecting: B())
   
   func expectBMirror(
-    mb: Mirror,   stackTrace: SourceLocStack = SourceLocStack(),
-    file: String = __FILE__, line: UInt = __LINE__
+    _ mb: Mirror, stackTrace: SourceLocStack = SourceLocStack(),
+    file: String = #file, line: UInt = #line
   ) {
     expectTrue(mb.subjectType == B.self,
       stackTrace: stackTrace, file: file, line: line)
     
     expectEmpty(
-      mb.superclassMirror(),
+      mb.superclassMirror,
       stackTrace: stackTrace, file: file, line: line)
     
     expectEqual(
@@ -196,8 +202,8 @@ mirrors.test("Legacy") {
     expectEqual("dx", md.children.first?.label)
     expectEqual(1, md.children.first?.value as? Int)
     
-    expectNotEmpty(md.superclassMirror())
-    if let mb2 = md.superclassMirror() { expectBMirror(mb2) }
+    expectNotEmpty(md.superclassMirror)
+    if let mb2 = md.superclassMirror { expectBMirror(mb2) }
   }
 
   do {
@@ -209,8 +215,8 @@ mirrors.test("Legacy") {
     expectEqual("dx", md.children.first?.label)
     expectEqual(1, md.children.first?.value as? Int)
     
-    expectNotEmpty(md.superclassMirror())
-    if let mb2 = md.superclassMirror() { expectBMirror(mb2) }
+    expectNotEmpty(md.superclassMirror)
+    if let mb2 = md.superclassMirror { expectBMirror(mb2) }
   }
 }
 
@@ -222,24 +228,24 @@ mirrors.test("Class/Root/Uncustomized") {
 
   let a = Mirror(reflecting: A())
   expectTrue(a.subjectType == A.self)
-  expectEmpty(a.superclassMirror())
+  expectEmpty(a.superclassMirror)
   expectEqual(1, a.children.count)
   expectEqual("a", a.children.first!.label)
 }
 
 //===--- Generated Superclass Mirrors -------------------------------------===//
-mirrors.test("Class/Root/superclass:.Generated") {
+mirrors.test("Class/Root/superclass:.generated") {
   class B : CustomReflectable {
     var b: String = "two"
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ], ancestorRepresentation: .Generated)
+        self, children: ["bee": b], ancestorRepresentation: .generated)
     }
   }
   
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  expectEmpty(b.superclassMirror())
+  expectEmpty(b.superclassMirror)
   expectEqual(1, b.children.count)
   expectEqual("bee", b.children.first!.label)
   expectEqual("two", b.children.first!.value as? String)
@@ -249,14 +255,14 @@ mirrors.test("Class/Root/superclass:.Generated") {
 mirrors.test("class/Root/superclass:<default>") {
   class C : CustomReflectable {
     var c: UInt = 3
-    func customMirror() -> Mirror {
-      return Mirror(self, children: [ "sea": c + 1 ])
+    var customMirror: Mirror {
+      return Mirror(self, children: ["sea": c + 1])
     }
   }
   
   let c = Mirror(reflecting: C())
   expectTrue(c.subjectType == C.self)
-  expectEmpty(c.superclassMirror())
+  expectEmpty(c.superclassMirror)
   expectEqual(1, c.children.count)
   expectEqual("sea", c.children.first!.label)
   expectEqual(4, c.children.first!.value as? UInt)
@@ -273,12 +279,12 @@ mirrors.test("class/Plain/Plain") {
     expectEqual("b", bChild.label)
     expectEqual(42, bChild.value as? UInt)
   }
-  if let a = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror) {
     expectTrue(a.subjectType == A.self)
     if let aChild = expectNotEmpty(a.children.first) {
       expectEqual("a", aChild.label)
       expectEqual(1, aChild.value as? Int)
-      expectEmpty(a.superclassMirror())
+      expectEmpty(a.superclassMirror)
     }
   }
 }
@@ -288,17 +294,17 @@ mirrors.test("class/UncustomizedSuper/Synthesized/Implicit") {
 
   class B : A, CustomReflectable {
     var b: UInt = 42
-    func customMirror() -> Mirror {
-      return Mirror(self, children: [ "bee": b ])
+    var customMirror: Mirror {
+      return Mirror(self, children: ["bee": b])
     }
   }
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  if let a = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror) {
     expectTrue(a.subjectType == A.self)
     expectEqual("a", a.children.first?.label)
-    expectEmpty(a.superclassMirror())
+    expectEmpty(a.superclassMirror)
   }
 }
 
@@ -307,26 +313,26 @@ mirrors.test("class/UncustomizedSuper/Synthesized/Explicit") {
 
   class B : A, CustomReflectable {
     var b: UInt = 42
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ], ancestorRepresentation: .Generated)
+        self, children: ["bee": b], ancestorRepresentation: .generated)
     }
   }
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  if let a = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror) {
     expectTrue(a.subjectType == A.self)
     expectEqual("a", a.children.first!.label)
-    expectEmpty(a.superclassMirror())
+    expectEmpty(a.superclassMirror)
   }
 }
 
 mirrors.test("class/CustomizedSuper/Synthesized") {
   class A : CustomReflectable {
     var a: Int = 1
-    func customMirror() -> Mirror {
-      return Mirror(self, children: [ "aye": a ])
+    var customMirror: Mirror {
+      return Mirror(self, children: ["aye": a])
     }
   }
 
@@ -334,23 +340,24 @@ mirrors.test("class/CustomizedSuper/Synthesized") {
     var b: UInt = 42
     // This is an unusual case: when writing override on a
     // customMirror implementation you would typically want to pass
-    // ancestorRepresentation: .Customized(super.customMirror) or, in
+    // ancestorRepresentation: .customized(super.customMirror) or, in
     // rare cases, ancestorRepresentation: .Suppressed.  However, it
     // has an expected behavior, which we test here.
-    override func customMirror() -> Mirror {
-      return Mirror(self, children: [ "bee": b ])
+    override var customMirror: Mirror {
+      return Mirror(self, children: ["bee": b])
     }
   }
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  if let a = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror) {
     expectTrue(a.subjectType == A.self)
     expectEqual("a", a.children.first!.label)
-    expectEmpty(a.superclassMirror())
+    expectEmpty(a.superclassMirror)
   }
 }
 
+#if _runtime(_ObjC)
 import Foundation
 
 //===--- ObjC Base Classes ------------------------------------------------===//
@@ -366,12 +373,12 @@ mirrors.test("class/ObjCPlain/Plain") {
     expectEqual("b", bChild.label)
     expectEqual(42, bChild.value as? UInt)
   }
-  if let a = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror) {
     expectTrue(a.subjectType == A.self)
     if let aChild = expectNotEmpty(a.children.first) {
       expectEqual("a", aChild.label)
       expectEqual(1, aChild.value as? Int)
-      if let o = expectNotEmpty(a.superclassMirror()) {
+      if let o = expectNotEmpty(a.superclassMirror) {
         expectEqual("NSObject", String(reflecting: o.subjectType))
       }
     }
@@ -383,17 +390,17 @@ mirrors.test("class/ObjCUncustomizedSuper/Synthesized/Implicit") {
 
   class B : A, CustomReflectable {
     var b: UInt = 42
-    func customMirror() -> Mirror {
-      return Mirror(self, children: [ "bee": b ])
+    var customMirror: Mirror {
+      return Mirror(self, children: ["bee": b])
     }
   }
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  if let a = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror) {
     expectTrue(a.subjectType == A.self)
     expectEqual("a", a.children.first?.label)
-    if let o = expectNotEmpty(a.superclassMirror()) {
+    if let o = expectNotEmpty(a.superclassMirror) {
       expectTrue(o.subjectType == NSObject.self)
     }
   }
@@ -404,28 +411,28 @@ mirrors.test("class/ObjCUncustomizedSuper/Synthesized/Explicit") {
 
   class B : A, CustomReflectable {
     var b: UInt = 42
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ], ancestorRepresentation: .Generated)
+        self, children: ["bee": b], ancestorRepresentation: .generated)
     }
   }
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  if let a = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror) {
     expectTrue(a.subjectType == A.self)
     expectEqual("a", a.children.first!.label)
-    if let o = expectNotEmpty(a.superclassMirror()) {
+    if let o = expectNotEmpty(a.superclassMirror) {
       expectTrue(o.subjectType == NSObject.self)
     }
   }
 }
 
 mirrors.test("class/ObjCCustomizedSuper/Synthesized") {
-  class A : NSDateFormatter, CustomReflectable {
+  class A : DateFormatter, CustomReflectable {
     var a: Int = 1
-    func customMirror() -> Mirror {
-      return Mirror(self, children: [ "aye": a ])
+    var customMirror: Mirror {
+      return Mirror(self, children: ["aye": a])
     }
   }
 
@@ -433,45 +440,46 @@ mirrors.test("class/ObjCCustomizedSuper/Synthesized") {
     var b: UInt = 42
     // This is an unusual case: when writing override on a
     // customMirror implementation you would typically want to pass
-    // ancestorRepresentation: .Customized(super.customMirror) or, in
+    // ancestorRepresentation: .customized(super.customMirror) or, in
     // rare cases, ancestorRepresentation: .Suppressed.  However, it
     // has an expected behavior, which we test here.
-    override func customMirror() -> Mirror {
-      return Mirror(self, children: [ "bee": b ])
+    override var customMirror: Mirror {
+      return Mirror(self, children: ["bee": b])
     }
   }
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  if let a = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror) {
     expectTrue(a.subjectType == A.self)
     expectEqual("a", a.children.first!.label)
-    if let d = expectNotEmpty(a.superclassMirror()) {
-      expectTrue(d.subjectType == NSDateFormatter.self)
-      if let f = expectNotEmpty(d.superclassMirror()) {
-        expectTrue(f.subjectType == NSFormatter.self)
-        if let o = expectNotEmpty(f.superclassMirror()) {
+    if let d = expectNotEmpty(a.superclassMirror) {
+      expectTrue(d.subjectType == DateFormatter.self)
+      if let f = expectNotEmpty(d.superclassMirror) {
+        expectTrue(f.subjectType == Formatter.self)
+        if let o = expectNotEmpty(f.superclassMirror) {
           expectTrue(o.subjectType == NSObject.self)
-          expectEmpty(o.superclassMirror())
+          expectEmpty(o.superclassMirror)
         }
       }
     }
   }
 }
+#endif // _runtime(_ObjC)
 
 //===--- Suppressed Superclass Mirrors ------------------------------------===//
 mirrors.test("Class/Root/NoSuperclassMirror") {
   class B : CustomReflectable {
     var b: String = "two"
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ], ancestorRepresentation: .Suppressed)
+        self, children: ["bee": b], ancestorRepresentation: .suppressed)
     }
   }
   
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  expectEmpty(b.superclassMirror())
+  expectEmpty(b.superclassMirror)
   expectEqual(1, b.children.count)
   expectEqual("bee", b.children.first!.label)
 }
@@ -481,72 +489,72 @@ mirrors.test("class/UncustomizedSuper/NoSuperclassMirror") {
 
   class B : A, CustomReflectable {
     var b: UInt = 42
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ], ancestorRepresentation: .Suppressed)
+        self, children: ["bee": b], ancestorRepresentation: .suppressed)
     }
   }
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  expectEmpty(b.superclassMirror())
+  expectEmpty(b.superclassMirror)
 }
 
 mirrors.test("class/CustomizedSuper/NoSuperclassMirror") {
   class A : CustomReflectable {
     var a: Int = 1
-    func customMirror() -> Mirror {
-      return Mirror(self, children: [ "aye": a ])
+    var customMirror: Mirror {
+      return Mirror(self, children: ["aye": a])
     }
   }
 
   class B : A {
     var b: UInt = 42
-    override func customMirror() -> Mirror {
+    override var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ], ancestorRepresentation: .Suppressed)
+        self, children: ["bee": b], ancestorRepresentation: .suppressed)
     }
   }
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  expectEmpty(b.superclassMirror())
+  expectEmpty(b.superclassMirror)
 }
 
 //===--- Override Superclass Mirrors --------------------------------------===//
 mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Direct") {
   class A : CustomReflectable {
     var a: Int = 1
-    func customMirror() -> Mirror {
-      return Mirror(self, children: [ "aye": a ])
+    var customMirror: Mirror {
+      return Mirror(self, children: ["aye": a])
     }
   }
 
   // B inherits A directly
   class B : A {
     var b: UInt = 42
-    override func customMirror() -> Mirror {
+    override var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ],
-        ancestorRepresentation: .Customized(super.customMirror)
-        )
+        self,
+        children: ["bee": b],
+        ancestorRepresentation: .customized({ super.customMirror }))
     }
   }
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  if let a = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror) {
     expectTrue(a.subjectType == A.self)
     expectEqual("aye", a.children.first!.label)
-    expectEmpty(a.superclassMirror())
+    expectEmpty(a.superclassMirror)
   }
 }
 
 mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect") {
   class A : CustomReflectable {
     var a: Int = 1
-    func customMirror() -> Mirror {
-      return Mirror(self, children: [ "aye": a ])
+    var customMirror: Mirror {
+      return Mirror(self, children: ["aye": a])
     }
   }
 
@@ -557,21 +565,22 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect") {
   // B inherits A indirectly through X and Y
   class B : Y {
     var b: UInt = 42
-    override func customMirror() -> Mirror {
+    override var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ],
-        ancestorRepresentation: .Customized(super.customMirror))
+        self,
+        children: ["bee": b],
+        ancestorRepresentation: .customized({ super.customMirror }))
     }
   }
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  if let y = expectNotEmpty(b.superclassMirror()) {
+  if let y = expectNotEmpty(b.superclassMirror) {
     expectTrue(y.subjectType == Y.self)
-    if let x = expectNotEmpty(y.superclassMirror()) {
+    if let x = expectNotEmpty(y.superclassMirror) {
       expectTrue(x.subjectType == X.self)
       expectEqual(0, x.children.count)
-      if let a = expectNotEmpty(x.superclassMirror()) {
+      if let a = expectNotEmpty(x.superclassMirror) {
         expectTrue(a.subjectType == A.self)
         if let aye = expectNotEmpty(a.children.first) {
           expectEqual("aye", aye.label)
@@ -584,9 +593,9 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect") {
 mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect2") {
   class A : CustomLeafReflectable {
     var a: Int = 1
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
-        self, children: [ "aye": a ])
+        self, children: ["aye": a])
     }
   }
 
@@ -597,16 +606,17 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect2") {
   // B inherits A indirectly through X and Y
   class B : Y {
     var b: UInt = 42
-    override func customMirror() -> Mirror {
+    override var customMirror: Mirror {
       return Mirror(
-        self, children: [ "bee": b ],
-        ancestorRepresentation: .Customized(super.customMirror))
+        self,
+        children: ["bee": b],
+        ancestorRepresentation: .customized({ super.customMirror }))
     }
   }
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  if let a = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror) {
     expectTrue(a.subjectType == A.self)
     if let aye = expectNotEmpty(a.children.first) {
       expectEqual("aye", aye.label)
@@ -617,9 +627,9 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect2") {
 mirrors.test("class/Cluster") {
   class A : CustomLeafReflectable {
     var a: Int = 1
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(
-        self, children: [ "aye": a ])
+        self, children: ["aye": a])
     }
   }
 
@@ -640,11 +650,8 @@ mirrors.test("class/Cluster") {
 mirrors.test("Addressing") {
   let m0 = Mirror(reflecting: [1, 2, 3])
   expectEqual(1, m0.descendant(0) as? Int)
-  expectEqual(1, m0.descendant("[0]") as? Int)
   expectEqual(2, m0.descendant(1) as? Int)
-  expectEqual(2, m0.descendant("[1]") as? Int)
   expectEqual(3, m0.descendant(2) as? Int)
-  expectEqual(3, m0.descendant("[2]") as? Int)
   
   let m1 = Mirror(reflecting: (a: ["one", "two", "three"], b: 4))
   let ott0 = m1.descendant(0) as? [String]
@@ -660,11 +667,9 @@ mirrors.test("Addressing") {
   expectEqual("two", m1.descendant(0, 1) as? String)
   expectEqual("three", m1.descendant(0, 2) as? String)
   expectEqual("one", m1.descendant(".0", 0) as? String)
-  expectEqual("two", m1.descendant(0, "[1]") as? String)
-  expectEqual("three", m1.descendant(".0", "[2]") as? String)
 
   struct Zee : CustomReflectable {
-    func customMirror() -> Mirror {
+    var customMirror: Mirror {
       return Mirror(self, children: ["bark": 1, "bite": 0])
     }
   }
@@ -683,39 +688,44 @@ mirrors.test("Addressing") {
 }
 
 mirrors.test("Invalid Path Type")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
-  struct X : MirrorPathType {}
+  struct X : MirrorPath {}
   let m = Mirror(reflecting: [1, 2, 3])
   expectEqual(1, m.descendant(0) as? Int)
   expectCrashLater()
-  m.descendant(X())
+  _ = m.descendant(X())
 }
 
 mirrors.test("PlaygroundQuickLook") {
   // Customization works.
   struct CustomQuickie : CustomPlaygroundQuickLookable {
-    func customPlaygroundQuickLook() -> PlaygroundQuickLook {
-      return .Point(1.25, 42)
+    var customPlaygroundQuickLook: PlaygroundQuickLook {
+      return .point(1.25, 42)
     }
   }
   switch PlaygroundQuickLook(reflecting: CustomQuickie()) {
-  case .Point(1.25, 42): break; default: expectTrue(false)
+  case .point(1.25, 42): break
+  default: expectTrue(false)
   }
   
   // PlaygroundQuickLook support from Legacy Mirrors works.
   switch PlaygroundQuickLook(reflecting: true) {
-  case .Logical(true): break; default: expectTrue(false)
+  case .bool(true): break
+  default: expectTrue(false)
   }
 
   // With no Legacy Mirror QuickLook support, we fall back to
   // String(reflecting: ).
   struct X {}
   switch PlaygroundQuickLook(reflecting: X()) {
-  case .Text(let text):
+  case .text(let text):
+#if _runtime(_ObjC)
+// FIXME: Enable if non-objc hasSuffix is implemented.
     expectTrue(text.hasSuffix(".(X #1)()"), text)
+#endif
   default:
     expectTrue(false)
   }
@@ -723,10 +733,41 @@ mirrors.test("PlaygroundQuickLook") {
     var debugDescription: String { return "Why?" }
   }
   switch PlaygroundQuickLook(reflecting: Y()) {
-  case .Text("Why?"): break; default: expectTrue(false)
+  case .text("Why?"): break
+  default: expectTrue(false)
   }
 }
 
+class Parent {}
+
+extension Parent : _DefaultCustomPlaygroundQuickLookable {
+  var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text("base")
+  }
+}
+
+class Child : Parent { }
+
+class FancyChild : Parent, CustomPlaygroundQuickLookable {
+  var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text("child")
+  }
+}
+
+mirrors.test("_DefaultCustomPlaygroundQuickLookable") {
+  // testing the workaround for custom quicklookables in subclasses
+  switch PlaygroundQuickLook(reflecting: Child()) {
+  case .text("base"): break
+  default: expectUnreachable("Base custom quicklookable was expected")
+  }
+
+  switch PlaygroundQuickLook(reflecting: FancyChild()) {
+  case .text("child"): break
+  default: expectUnreachable("FancyChild custom quicklookable was expected")
+  }
+}
+
+#if _runtime(_ObjC)
 import MirrorObjC
 mirrors.test("ObjC") {
   // Some Foundation classes lie about their ivars, which would crash
@@ -734,6 +775,7 @@ mirrors.test("ObjC") {
   // Objective-C classes from the default mirror implementation.
   expectEqual(0, Mirror(reflecting: HasIVars()).children.count)
 }
+#endif
 
 mirrors.test("String.init") {
   expectEqual("42", String(42))

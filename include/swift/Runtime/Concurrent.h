@@ -1,8 +1,8 @@
-//===--- Concurrent.h - Concurrent Data Structures  ------------*- C++ -*--===//
+//===--- Concurrent.h - Concurrent Data Structures  -------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -14,6 +14,10 @@
 #include <iterator>
 #include <atomic>
 #include <stdint.h>
+
+#if defined(__FreeBSD__)
+#include <stdio.h>
+#endif
 
 /// This is a node in a concurrent linked list.
 template <class ElemTy> struct ConcurrentListNode {
@@ -119,106 +123,193 @@ template <class ElemTy> struct ConcurrentList {
   std::atomic<ConcurrentListNode<ElemTy> *> First;
 };
 
-template <class KeyTy, class ValueTy> struct ConcurrentMapNode {
-  ConcurrentMapNode(KeyTy H)
-      : Left(nullptr), Right(nullptr), Key(H), Payload() {}
-
-  ~ConcurrentMapNode() {
-    delete Left.load(std::memory_order_acquire);
-    delete Right.load(std::memory_order_acquire);
-  }
-
-  ConcurrentMapNode(const ConcurrentMapNode &) = delete;
-  ConcurrentMapNode &operator=(const ConcurrentMapNode &) = delete;
-
-  typedef std::atomic<ConcurrentMapNode *> EdgeTy;
-  EdgeTy Left;
-  EdgeTy Right;
-  KeyTy Key;
-  ValueTy Payload;
-};
-
 /// A concurrent map that is implemented using a binary tree. It supports
 /// concurrent insertions but does not support removals or rebalancing of
-/// the tree. Much like the concurrent linked list this data structure
-/// does not support the removal of nodes, which is more difficult.
-/// The method findOrAllocateNode searches the binary tree in search of the
-/// exact Key value. If it finds an edge that points to NULL that should
-/// contain the value then it tries to compare and swap the new node into
-/// place. If it looses the race to a different thread it de-allocates
-/// the node and starts the search again since the new node should
-/// be placed (or found) on the new link. See findOrAllocateNode for more
-/// details.
-template <class KeyTy, class ValueTy> class ConcurrentMap {
+/// the tree.
+///
+/// The entry type must provide the following operations:
+///
+///   /// For debugging purposes only. Summarize this key as an integer value.
+///   long getKeyIntValueForDump() const;
+///
+///   /// A ternary comparison.  KeyTy is the type of the key provided
+///   /// to find or getOrInsert.
+///   int compareWithKey(KeyTy key) const;
+///
+///   /// Return the amount of extra trailing space required by an entry,
+///   /// where KeyTy is the type of the first argument to getOrInsert and
+///   /// ArgTys is the type of the remaining arguments.
+///   static size_t getExtraAllocationSize(KeyTy key, ArgTys...)
+template <class EntryTy> class ConcurrentMap {
+  struct Node {
+    std::atomic<Node*> Left;
+    std::atomic<Node*> Right;
+    EntryTy Payload;
+
+    template <class... Args>
+    Node(Args &&... args)
+      : Left(nullptr), Right(nullptr), Payload(std::forward<Args>(args)...) {}
+
+    Node(const Node &) = delete;
+    Node &operator=(const Node &) = delete;
+
+    ~Node() {
+      // These can be relaxed accesses because there is no safe way for
+      // another thread to race an access to this node with our destruction
+      // of it.
+      ::delete Left.load(std::memory_order_relaxed);
+      ::delete Right.load(std::memory_order_relaxed);
+    }
+
+#ifndef NDEBUG
+    void dump() const {
+      auto L = Left.load(std::memory_order_acquire);
+      auto R = Right.load(std::memory_order_acquire);
+      printf("\"%p\" [ label = \" {<f0> %08lx | {<f1> | <f2>}}\" "
+             "style=\"rounded\" shape=\"record\"];\n",
+             this, (long) Payload.getKeyValueForDump());
+
+      if (L) {
+        L->dump();
+        printf("\"%p\":f1 -> \"%p\":f0;\n", this, L);
+      }
+      if (R) {
+        R->dump();
+        printf("\"%p\":f2 -> \"%p\":f0;\n", this, R);
+      }
+    }
+#endif
+  };
+
+  /// The root of the tree.
+  std::atomic<Node*> Root;
+
+  /// This member stores the address of the last node that was found by the
+  /// search procedure. We cache the last search to accelerate code that
+  /// searches the same value in a loop.
+  std::atomic<Node*> LastSearch;
+
 public:
-  ConcurrentMap() : Sentinel(0), LastSearch(&Sentinel) {}
+  constexpr ConcurrentMap() : Root(nullptr), LastSearch(nullptr) {}
 
   ConcurrentMap(const ConcurrentMap &) = delete;
   ConcurrentMap &operator=(const ConcurrentMap &) = delete;
 
-  /// A Sentinel root node that contains no elements.
-  typedef ConcurrentMapNode<KeyTy, ConcurrentList<ValueTy>> NodeTy;
-  NodeTy Sentinel;
-
-  /// This value stores the last node that we searched. This is useful for
-  /// accelerating the search of the same value again and again.
-  std::atomic<NodeTy *> LastSearch;
-
-  /// Search a for a node with key value \p. If the node does not exist then
-  /// allocate a new bucket and add it to the tree.
-  ConcurrentList<ValueTy> &findOrAllocateNode(KeyTy Key) {
-    // Try looking at the last node we searched.
-    NodeTy *Last = LastSearch.load(std::memory_order_acquire);
-    if (Last->Key == Key)
-      return Last->Payload;
-
-    // Search the binary tree.
-    NodeTy *Found = findOrAllocateNode_rec(&Sentinel, Key);
-
-    // Save the node that we found, in case we look for the same value again.
-    LastSearch.store(Found,std:: memory_order_release);
-    return Found->Payload;
+  ~ConcurrentMap() {
+    ::delete Root.load(std::memory_order_relaxed);
   }
 
-private:
-  static NodeTy *findOrAllocateNode_rec(NodeTy *P, KeyTy Key) {
-    // Found the node we were looking for.
-    if (P->Key == Key)
-      return P;
+#ifndef NDEBUG
+  void dump() const {
+    auto R = Root.load(std::memory_order_acquire);
+    printf("digraph g {\n"
+           "graph [ rankdir = \"TB\"];\n"
+           "node  [ fontsize = \"16\" ];\n"
+           "edge  [ ];\n");
+    if (R) {
+      R->dump();
+    }
+    printf("\n}\n");
+  }
+#endif
 
-    // Point to the edge we want to replace.
-    typename NodeTy::EdgeTy *Edge = nullptr;
-
-    // The current edge value.
-    NodeTy *CurrentVal;
-
-    // Select the edge to follow.
-    if (P->Key > Key) {
-      CurrentVal = P->Left.load(std::memory_order_acquire);
-      if (CurrentVal) return findOrAllocateNode_rec(CurrentVal, Key);
-      Edge = &P->Left;
-    } else {
-      CurrentVal = P->Right.load(std::memory_order_acquire);
-      if (CurrentVal) return findOrAllocateNode_rec(CurrentVal, Key);
-      Edge = &P->Right;
+  /// Search for a value by key \p Key.
+  /// \returns a pointer to the value or null if the value is not in the map.
+  template <class KeyTy>
+  EntryTy *find(const KeyTy &key) {
+    // Check if we are looking for the same key that we looked for in the last
+    // time we called this function.
+    if (Node *last = LastSearch.load(std::memory_order_acquire)) {
+      if (last->Payload.compareWithKey(key) == 0)
+        return &last->Payload;
     }
 
-    // Allocate a new node.
-    NodeTy *New = new NodeTy(Key);
-
-    // Try to set a new node:
-    if (std::atomic_compare_exchange_weak_explicit(Edge, &CurrentVal, New,
-                                                   std::memory_order_release,
-                                                   std::memory_order_relaxed)){
-      // On success return the new node.
-      return New;
+    // Search the tree, starting from the root.
+    Node *node = Root.load(std::memory_order_acquire);
+    while (node) {
+      int comparisonResult = node->Payload.compareWithKey(key);
+      if (comparisonResult == 0) {
+        LastSearch.store(node, std::memory_order_release);
+        return &node->Payload;
+      } else if (comparisonResult < 0) {
+        node = node->Left.load(std::memory_order_acquire);
+      } else {
+        node = node->Right.load(std::memory_order_acquire);
+      }
     }
 
-    // If failed, deallocate the node and look for a new place in the
-    // tree. Some other thread may have created a new entry and we may
-    // discover it, so start searching with the current node.
-    delete New;
-    return findOrAllocateNode_rec(P, Key);
+    return nullptr;
+  }
+
+  /// Get or create an entry in the map.
+  ///
+  /// \returns the entry in the map and whether a new node was added (true)
+  ///   or already existed (false)
+  template <class KeyTy, class... ArgTys>
+  std::pair<EntryTy*, bool> getOrInsert(KeyTy key, ArgTys &&... args) {
+    // Check if we are looking for the same key that we looked for the
+    // last time we called this function.
+    if (Node *last = LastSearch.load(std::memory_order_acquire)) {
+      if (last && last->Payload.compareWithKey(key) == 0)
+        return { &last->Payload, false };
+    }
+
+    // The node we allocated.
+    Node *newNode = nullptr;
+
+    // Start from the root.
+    auto edge = &Root;
+
+    while (true) {
+      // Load the edge.
+      Node *node = edge->load(std::memory_order_acquire);
+
+      // If there's a node there, it's either a match or we're going to
+      // one of its children.
+      if (node) {
+      searchFromNode:
+
+        // Compare our key against the node's key.
+        int comparisonResult = node->Payload.compareWithKey(key);
+
+        // If it's equal, we can use this node.
+        if (comparisonResult == 0) {
+          // Destroy the node we allocated before if we're carrying one around.
+          ::delete newNode;
+
+          // Cache and report that we found an existing node.
+          LastSearch.store(node, std::memory_order_release);
+          return { &node->Payload, false };
+        }
+
+        // Otherwise, select the appropriate child edge and descend.
+        edge = (comparisonResult < 0 ? &node->Left : &node->Right);
+        continue;
+      }
+
+      // Create a new node.
+      if (!newNode) {
+        size_t allocSize =
+          sizeof(Node) + EntryTy::getExtraAllocationSize(key, args...);
+        void *memory = ::operator new(allocSize);
+        newNode = ::new (memory) Node(key, std::forward<ArgTys>(args)...);
+      }
+
+      // Try to set the edge to the new node.
+      if (std::atomic_compare_exchange_strong_explicit(edge, &node, newNode,
+                                                  std::memory_order_acq_rel,
+                                                  std::memory_order_acquire)) {
+        // If that succeeded, cache and report that we created a new node.
+        LastSearch.store(newNode, std::memory_order_release);
+        return { &newNode->Payload, true };
+      }
+
+      // Otherwise, we lost the race because some other thread initialized
+      // the edge before us.  node will be set to the current value;
+      // repeat the search from there.
+      assert(node && "spurious failure from compare_exchange_strong?");
+      goto searchFromNode;
+    }
   }
 };
 

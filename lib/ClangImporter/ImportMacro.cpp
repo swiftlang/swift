@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,7 +23,6 @@
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Sema.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
@@ -225,40 +224,12 @@ static bool isSignToken(const clang::Token &tok) {
          tok.is(clang::tok::tilde);
 }
 
-/// Returns true if it is expected that the macro is ignored.
-bool ClangImporter::Implementation::shouldIgnoreMacro(StringRef name,
-                                                const clang::MacroInfo *macro) {
-  // Ignore include guards.
-  if (macro->isUsedForHeaderGuard())
-    return true;
-
-  if (macro->tokens_empty())
-    return true;
-
-  // Consult the blacklist of macros to suppress.
-  auto suppressMacro =
-    llvm::StringSwitch<bool>(name)
-#define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
-#include "MacroTable.def"
-    .Default(false);
-
-  if (suppressMacro)
-    return true;
-
-  return false;
-}
-
 static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                               DeclContext *DC,
                               Identifier name,
                               const clang::MacroInfo *macro,
                               const clang::MacroInfo *ClangN) {
-  if (impl.shouldIgnoreMacro(name.str(), macro))
-    return nullptr;
-
-  // Currently we only convert non-function-like macros.
-  if (macro->isFunctionLike())
-    return nullptr;
+  if (name.empty()) return nullptr;
 
   auto numTokens = macro->getNumTokens();
   auto tokenI = macro->tokens_begin(), tokenE = macro->tokens_end();
@@ -393,10 +364,25 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
   if (!macro)
     return nullptr;
 
-  // Look for the value for an already-imported macro.
-  auto known = ImportedMacros.find(macro);
+  // Look for macros imported with the same name.
+  auto known = ImportedMacros.find(name);
   if (known != ImportedMacros.end()) {
-    return known->second;
+    // Check whether this macro has already been imported.
+    for (const auto &entry : known->second) {
+      if (entry.first == macro) return entry.second;
+    }
+
+    // Otherwise, check whether this macro is identical to a macro that has
+    // already been imported.
+    auto &clangPP = getClangPreprocessor();
+    for (const auto &entry : known->second) {
+      // If the macro is equal to an existing macro, map down to the same
+      // declaration.
+      if (macro->isIdenticalTo(*entry.first, clangPP, true)) {
+        known->second.push_back({macro, entry.second});
+        return entry.second;
+      }
+    }
   }
 
   ImportingEntityRAII ImportingEntity(*this);
@@ -408,6 +394,6 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
     return nullptr;
 
   auto valueDecl = ::importMacro(*this, DC, name, macro, macro);
-  ImportedMacros[macro] = valueDecl;
+  ImportedMacros[name].push_back({macro, valueDecl});
   return valueDecl;
 }

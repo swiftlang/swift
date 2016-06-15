@@ -56,6 +56,102 @@ TEST(CamelCaseWordsTest, Iteration) {
   EXPECT_EQ(iter, words.end());
 }
 
+TEST(CamelCaseWordsTest, PluralAcronyms) {
+  auto words = camel_case::getWords("CreateURLsFromPIXies");
+
+  // Forward iteration count.
+  EXPECT_EQ(4, std::distance(words.begin(), words.end()));
+
+  // Reverse iteration count.
+  EXPECT_EQ(4, std::distance(words.rbegin(), words.rend()));
+
+  // Iteration contents.
+  auto iter = words.begin();
+  EXPECT_EQ(*iter, "Create");
+
+  // Stepping forward.
+  ++iter;
+  EXPECT_EQ(*iter, "URLs");
+
+  // Immediately stepping back.
+  --iter;
+  EXPECT_EQ(*iter, "Create");
+
+  // Immediately stepping forward.
+  ++iter;
+  EXPECT_EQ(*iter, "URLs");
+
+  // Stepping forward.
+  ++iter;
+  EXPECT_EQ(*iter, "From");
+
+  // Stepping back twice (slow path).
+  --iter;
+  --iter;
+  EXPECT_EQ(*iter, "Create");
+
+  // Stepping forward to visit the remaining elements.
+  ++iter;
+  EXPECT_EQ(*iter, "URLs");
+  ++iter;
+  EXPECT_EQ(*iter, "From");
+  ++iter;
+  EXPECT_EQ(*iter, "PIXies");
+
+  // We're done.
+  ++iter;
+  EXPECT_EQ(iter, words.end());
+}
+
+TEST(CamelCaseWordsTest, MorePluralAcronyms) {
+  auto words = camel_case::getWords("inSameDayAsDate");
+
+  // Forward iteration count.
+  EXPECT_EQ(5, std::distance(words.begin(), words.end()));
+
+  // Reverse iteration count.
+  EXPECT_EQ(5, std::distance(words.rbegin(), words.rend()));
+
+  // Iteration contents.
+  auto iter = words.begin();
+  EXPECT_EQ(*iter, "in");
+
+  // Stepping forward.
+  ++iter;
+  EXPECT_EQ(*iter, "Same");
+
+  // Immediately stepping back (fast path).
+  --iter;
+  EXPECT_EQ(*iter, "in");
+
+  // Immediately stepping forward (fast path).
+  ++iter;
+  EXPECT_EQ(*iter, "Same");
+
+  // Stepping forward.
+  ++iter;
+  EXPECT_EQ(*iter, "Day");
+
+  // Stepping back twice (slow path).
+  --iter;
+  --iter;
+  EXPECT_EQ(*iter, "in");
+
+  // Stepping forward to visit the remaining elements.
+  ++iter;
+  EXPECT_EQ(*iter, "Same");
+  ++iter;
+  EXPECT_EQ(*iter, "Day");
+  ++iter;
+  EXPECT_EQ(*iter, "As");
+  ++iter;
+  EXPECT_EQ(*iter, "Date");
+
+  // We're done.
+  ++iter;
+  EXPECT_EQ(iter, words.end());
+}
+
 TEST(CamelCaseWordsTest, WordsWithUnderscores) {
   auto words = camel_case::getWords("CF_Flags_789");
   EXPECT_EQ(5, std::distance(words.begin(), words.end()));
@@ -94,6 +190,14 @@ TEST(ToLowercaseTest, Words) {
   EXPECT_EQ(camel_case::toLowercaseWord("A", scratch), "a");
   EXPECT_EQ(camel_case::toLowercaseWord("URL", scratch), "URL");
   EXPECT_EQ(camel_case::toLowercaseWord("", scratch), "");
+}
+
+TEST(ToLowercaseInitialismsTest, Words) {
+  llvm::SmallString<64> scratch;
+
+  EXPECT_EQ(camel_case::toLowercaseInitialisms("ToXML", scratch), "toXML");
+  EXPECT_EQ(camel_case::toLowercaseInitialisms("URLsInHand", scratch),
+            "urlsInHand");
 }
 
 TEST(ToSentencecaseTest, Words) {

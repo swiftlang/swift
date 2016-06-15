@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 
-#ifndef LLVM_REST_SOURCELOC_H
-#define LLVM_REST_SOURCELOC_H
+#ifndef SWIFT_MARKUP_SOURCELOC_H
+#define SWIFT_MARKUP_SOURCELOC_H
 
 #include "llvm/ADT/StringRef.h"
 #include <algorithm>
@@ -20,7 +20,7 @@
 #include <utility>
 #include <vector>
 
-namespace llvm {
+namespace swift {
 namespace markup {
 
 class SourceLoc {
@@ -147,7 +147,7 @@ SourceManager<ExternalSourceLocTy>::toExternalSourceLoc(SourceLoc Loc) const {
 }
 
 } // namespace markup
-} // namespace llvm
+} // namespace swift
 
-#endif // LLVM_REST_SOURCELOC_H
+#endif // SWIFT_MARKUP_SOURCELOC_H
 

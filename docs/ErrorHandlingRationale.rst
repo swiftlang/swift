@@ -1,6 +1,8 @@
 Error Handling Rationale and Proposal
 *************************************
 
+.. contents::
+
 This paper surveys the error-handling world, analyzes various ideas
 which have been proposed or are in practice in other languages, and
 ultimately proposes an error-handling scheme for Swift together
@@ -26,7 +28,7 @@ The most important dimensions of variation are:
   errors or not; such a language has **typed propagation**.
 
 * Whether, in a language with typed propagation, the default rule is
-  that that a function can produce an error or that it can't; this
+  that a function can produce an error or that it can't; this
   is the language's **default propagation rule**.
 
 * Whether, in a language with typed propagation, the language enforces
@@ -173,7 +175,7 @@ be quite amazing for us to assert that code shouldn't be written that
 way, understanding nothing else about it.  As long as programmers do
 face these issues, the language has some responsibility to help them.
 
-Therefore, in my judgement, promoting the use of universal errors is
+Therefore, in my judgment, promoting the use of universal errors is
 highly problematic.  They undermine the easy comprehension of code,
 and they undermine the language's ability to help the programmer
 reason about errors.  This design will instead focus on explicitly
@@ -213,7 +215,7 @@ implementing it in the future:
   a major compatibility break.
 
 - With some admitted awkwardness, external exceptions can be reflected
-  into an ``ErrorType`` - like model automatically by the catch
+  into an ``ErrorProtocol`` - like model automatically by the catch
   mechanism.
 
 - In the meanwhile, developers who must handle an Objective-C
@@ -389,7 +391,7 @@ options as a programmer:
   function called by your function.
 
 - You can carefully arrange your function so that there are no
-  critical sections where an universal error can leave things in an
+  critical sections where a universal error can leave things in an
   unwanted state.
 
 There are techniques for making the second more palatable.  Chiefly,
@@ -430,7 +432,7 @@ Here's another example of an out-parameter:
 
 .. code-block:: objc
 
-  - (instancetype)initWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc error:(NSError **)error;  
+  - (instancetype)initWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc error:(NSError **)error;
 
 Out-parameters have some nice advantages.  First, they're a reliable
 source of marking; even if the actual propagation gets separated from
@@ -577,7 +579,7 @@ they produce, and so many errors just end up falling into broad
 buckets.  Different libraries end up with their own library-specific
 general error classes, and exceptions list end up just restating the
 library's own dependencies or wrapping the underlying errors in ways
-that loses criticial information.
+that loses critical information.
 
 
 Tradeoffs of typed propagation
@@ -636,7 +638,7 @@ of the disadvantages and investigate ways to ameliorate them:
 
   - There are many situations where errors are not actually possible
     because the programmer has carefully restricted the input.  For
-    example, matching :code:``/[0-9]{4}/`` and then parsing the result
+    example, matching ``/[0-9]{4}/`` and then parsing the result
     as an integer.  It needs to be convenient to do this in a context
     that cannot actually propagate errors, but the facility to do this
     needs to be carefully designed to discourage use for swallowing
@@ -741,8 +743,8 @@ This approach is therefore relatively even-handed about the error
 vs. the non-error path, although it requires some care in order to
 minimize code-size penalties for parallel error paths.
 
-``setjmp`` / ``longmp``
-~~~~~~~~~~~~~~~~~~~~~~~
+``setjmp`` / ``longjmp``
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Another strategy to is to dynamically maintain a thread-local stack of
 interesting frames.  A function with an interesting frame must save
@@ -768,7 +770,7 @@ not free:
   which on our platforms means a function call because we're not
   willing to commit to anything more specific in the ABI.
 
-* Jumping across arbitary frames invalidates the callee-save
+* Jumping across arbitrary frames invalidates the callee-save
   registers, so the registering frame must save them all eagerly.  In
   calling conventions with many callee-save registers, this can be
   very expensive.  However, this is only necessary when it's possible
@@ -812,7 +814,7 @@ in a very unsafe way that does not behave well in the presence of
 inlining.
 
 Overall, this approach requires a lot of work in the non-error path
-of functions with interesting frames.  Given that we expects functions
+of functions with interesting frames.  Given that we expect functions
 with interesting frames to be very common in Swift, this is not
 an implementation approach we would consider in the abstract.  However,
 it is the implementation approach for C++/ObjC exceptions on iOS/ARM32,
@@ -955,7 +957,7 @@ This allows the defer action to be written near the code it
 "balances", allowing the reader to immediately see that the required
 clean-up will be done (but this has drawbacks, as discussed above).
 It's very compact, which is nice as most defer actions are short.  It
-also allow multiple actions to pile up without adding awkward nesting.
+also allows multiple actions to pile up without adding awkward nesting.
 However, the function-exit semantics exacerbate the problem of
 searching for intervening clean-up actions, and they introduce
 semantic and performance problems with capturing the values of local
@@ -1043,9 +1045,9 @@ C++ has exceptions.  Exceptions can have almost any type in the
 language.  Propagation typing is tied only to declarations; an
 indirect function pointer is generally assumed to be able to throw.
 Propagation typing used to allow functions to be specific about the
-kinds of exceptions they could throw (:code:``throws
+kinds of exceptions they could throw (``throws
 (std::exception)``), but this is deprecated in favor of just indicating
-whether a function can throw (:code:``noexcept(false)``).
+whether a function can throw (``noexcept(false)``).
 
 C++ aspires to making out-of-memory a recoverable condition, and so
 allocation can throw.  Therefore, it is essentially compulsory for the
@@ -1070,10 +1072,10 @@ from out-of-memory conditions.  For this reason, many C++ projects
 explicitly disable exceptions and rely on other error propagation
 mechanisms, on which there is no widespread consensus.
 
-Objective C
+Objective-C
 -----------
 
-Objective C has a first-class exceptions mechanism which is similar in
+Objective-C has a first-class exceptions mechanism which is similar in
 feature set to Java's: ``@throw`` / ``@try`` / ``@catch`` / ``@finally``.
 Exception values must be instances of an Objective-C class.  The
 language does a small amount of implicit frame cleanup during
@@ -1082,18 +1084,18 @@ stack copies of ``__block`` variables are torn down, and ARC ``__weak``
 variables are destroyed.  However, the language does not release
 object pointers held in local variables, even (by default) under ARC.
 
-Objective C exceptions used to be implemented with ``setjmp``,
+Objective-C exceptions used to be implemented with ``setjmp``,
 ``longjmp``, and thread-local state managed by a runtime, but the only
 surviving platform we support which does that is i386, and all others
 now use a "zero-cost" implementation that interoperates with C++
 exceptions.
 
-Objective C exceptions are *mostly* only used for unrecoverable
+Objective-C exceptions are *mostly* only used for unrecoverable
 conditions, akin to what I called "failures" above.  There are a few
 major exceptions to this rule, where APIs that do use exceptions to
 report errors.
 
-Instead, Objective C mostly relies on manual propagation,
+Instead, Objective-C mostly relies on manual propagation,
 predominantly using out-parameters of type ``NSError**``.  Whether the
 call failed is usually *not* indicated by whether a non-``nil`` error
 was written into this parameter; calls are permitted both to succeed
@@ -1108,7 +1110,7 @@ null object result is valid.
 CF APIs, meanwhile, have their own magnificent set of somewhat
 inconsistent conventions.
 
-Therefore, we can expect that incrementally improving CF / Objective C
+Therefore, we can expect that incrementally improving CF / Objective-C
 interoperation is going to be a long and remarkably painful process.
 
 
@@ -1316,16 +1318,16 @@ generalized ``do`` statement::
   }
 
 Swift should also provide some tools for doing manual propagation.  We
-should have a standard Rust-like :code:``Result<T>`` enum in the
+should have a standard Rust-like ``Result<T>`` enum in the
 library, as well as a rich set of tools, e.g.:
 
 - A function to evaluate an error-producing closure and capture the
-  result as a :code:``Result<T>``.
+  result as a ``Result<T>``.
 
-- A function to unpack a :code:``Result<T>`` by either returning its
+- A function to unpack a ``Result<T>`` by either returning its
   value or propagating the error in the current context.
 
-- A futures library that traffics in :code:``Result<T>`` when
+- A futures library that traffics in ``Result<T>`` when
   applicable.
 
 - An overload of ``dispatch_sync`` which takes an error-producing
@@ -1359,7 +1361,7 @@ declaration or type::
     return try stream.readInt()
   }
 
-  // ‘throws’ is written before the arrow to give a sensible and
+  // 'throws' is written before the arrow to give a sensible and
   // consistent grammar for function types and implicit () result types.
   func baz() throws {
     if let byte = try stream.getOOB() where byte == PROTO_RESET {
@@ -1367,8 +1369,8 @@ declaration or type::
     }
   }
 
-  // ‘throws’ appears in a consistent position in function types.
-  func fred(callback: (UInt8) throws -> ()) throws {
+  // 'throws' appears in a consistent position in function types.
+  func fred(_ callback: (UInt8) throws -> ()) throws {
      while true {
        let code = try stream.readByte()
        if code == OPER_CLOSE { return }
@@ -1379,8 +1381,8 @@ declaration or type::
   // It only applies to the innermost function for curried functions;
   // this function has type:
   //   (Int) -> (Int) throws -> Int
-  func jerry(i: Int)(j: Int) throws -> Int {
-    // It’s not an error to use ‘throws’ on a function that can’t throw.
+  func jerry(_ i: Int)(j: Int) throws -> Int {
+    // It's not an error to use 'throws' on a function that can't throw.
     return i + j
   }
 
@@ -1396,7 +1398,7 @@ same glance.  The keyword appears before the arrow for the simple
 reason that the arrow is optional (along with the rest of the return
 type) in function and initializer declarations; having the keyword
 appear in slightly different places based on the presence of a return
-type would be silly and would making adding a non-void return type
+type would be silly and would make adding a non-void return type
 feel awkward.  The keyword itself should be descriptive, and it's
 particularly nice for it to be a form of the verb used by the throwing
 expression, conjugated as if performed by the function itself.  Thus,
@@ -1456,7 +1458,7 @@ done in a fairly simple way: a function can declare that it throws if
 any of a set of named arguments do.  As an example (using strawman
 syntax)::
 
-  func map<T,U>(array: [T], fn: T throws -> U) throwsIf(fn) -> [U] {
+  func map<T, U>(_ array: [T], fn: T throws -> U) throwsIf(fn) -> [U] {
     ...
   }
 
@@ -1521,12 +1523,12 @@ allowed in a blocking context.
 Error type
 ~~~~~~~~~~
 
-The Swift standard library will provide ``ErrorType``, a protocol with
+The Swift standard library will provide ``ErrorProtocol``, a protocol with
 a very small interface (which is not described in this proposal).  The
 standard pattern should be to define the conformance of an ``enum`` to
 the type::
 
-  enum HomeworkError : ErrorType {
+  enum HomeworkError : ErrorProtocol {
     case Overworked
     case Impossible
     case EatenByCat(Cat)
@@ -1543,13 +1545,13 @@ techniques for that will work fine in the future.
 Note that this corresponds very cleanly to the ``NSError`` model of an
 error domain, an error code, and optional user data.  We expect to
 import system error domains as enums that follow this approach and
-implement ``ErrorType``.  ``NSError`` and ``CFError`` themselves will also
-conform to ``ErrorType``.
+implement ``ErrorProtocol``.  ``NSError`` and ``CFError`` themselves will also
+conform to ``ErrorProtocol``.
 
 The physical representation (still being nailed down) will make it
-efficient to embed an ``NSError`` as an ``ErrorType`` and vice-versa.  It
+efficient to embed an ``NSError`` as an ``ErrorProtocol`` and vice-versa.  It
 should be possible to turn an arbitrary Swift ``enum`` that conforms to
-``ErrorType`` into an ``NSError`` by using the qualified type name as the
+``ErrorProtocol`` into an ``NSError`` by using the qualified type name as the
 domain key, the enumerator as the error code, and turning the payload
 into user data.
 
@@ -1687,7 +1689,7 @@ might want to investigate closer, and you can easily imagine codebases
 that expect uses of it to always be explained in comments.  But more
 importantly, just like ``!`` it's only *statically* unsafe, and it
 will reliably fail when the programmer is wrong.  Therefore, while you
-can easily imagine (and demonstrate) uncautious programmers flailing
+can easily imagine (and demonstrate) incautious programmers flailing
 around with it to appease the type-checker, that's not actually a
 tenable position for the overall program: eventually the programmer
 will have to learn how to use the feature, or else their program
@@ -1806,9 +1808,9 @@ Let's wade into the details.
 Error types
 ~~~~~~~~~~~
 
-``NSError`` and ``CFError`` should implement the ``ErrorType`` protocol.  It
+``NSError`` and ``CFError`` should implement the ``ErrorProtocol`` protocol.  It
 should be possible to turn an arbitrary Swift ``enum`` that conforms to
-``ErrorType`` into an ``NSError`` by using the qualified type name as the
+``ErrorProtocol`` into an ``NSError`` by using the qualified type name as the
 domain key, the enumerator as the error code, and turning the payload
 into user data.
 
@@ -1906,7 +1908,7 @@ this one from ``NSAttributedString``::
 
 would be imported as::
 
-  func dataFromRange(range: NSRange,
+  func dataFromRange(_ range: NSRange,
                      documentAttributes dict: NSDictionary) throws -> NSData
 
 However, applying this rule haphazardly causes problems for
@@ -2028,7 +2030,7 @@ other words, we should not use table-based unwinding.
 
 Error propagation for universal errors should be handled by
 table-based unwinding.  ``catch`` handlers can catch both, mapping
-unwind exceptions to ``ErrorType`` values as necessary.  With a
+unwind exceptions to ``ErrorProtocol`` values as necessary.  With a
 carefully-designed interpretation function aimed to solve the specific
 needs of Swift, we can avoid most of the code-size impact by shifting
 it to the unwind tables, which needn't ever be loaded in the common

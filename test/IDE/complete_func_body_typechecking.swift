@@ -34,7 +34,7 @@ struct FooStruct {
     return self
   }
 
-  func builderFunc2(a: Int) -> FooStruct {
+  func builderFunc2(_ a: Int) -> FooStruct {
     return self
   }
 }

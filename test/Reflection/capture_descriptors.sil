@@ -1,0 +1,223 @@
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %target-build-swift %s -emit-module -emit-library -module-name capture_descriptors -o %t/capture_descriptors.%target-dylib-extension
+// RUN: %target-swift-reflection-dump -binary-filename %t/capture_descriptors.%target-dylib-extension | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// CHECK:      CAPTURE DESCRIPTORS:
+// CHECK-NEXT: ====================
+
+// Concrete caller and callee -- nothing interesting going on
+
+protocol P {}
+
+sil @concrete_callee1 : $@convention(thin) (Int, @owned @box Int, @thin Int.Type, @thick P.Type) -> () {
+bb0(%i: $Int, %b: $@box Int, %m: $@thin Int.Type, %p: $@thick P.Type):
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil @concrete_caller1 : $@convention(thin) (Int, @thick P.Type) -> @owned @callee_owned () -> () {
+bb0(%i: $Int, %p: $@thick P.Type):
+  %f = function_ref @concrete_callee1 : $@convention(thin) (Int, @owned @box Int, @thin Int.Type, @thick P.Type) -> ()
+  %b = alloc_box $Int
+  %m = metatype $@thin Int.Type
+  %c = partial_apply %f(%i, %b, %m, %p) : $@convention(thin) (Int, @owned @box Int, @thin Int.Type, @thick P.Type) -> ()
+  return %c : $@callee_owned () -> ()
+}
+
+// This is the descriptor for '@box Int' above
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (struct Swift.Int)
+// CHECK-NEXT: - Metadata sources:
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (struct Swift.Int)
+// CHECK-NEXT: (sil_box
+// CHECK-NEXT:   (struct Swift.Int))
+// CHECK-NEXT: (metatype
+// CHECK-NEXT:   (struct Swift.Int))
+// CHECK-NEXT: (existential_metatype
+// CHECK-NEXT:   (protocol capture_descriptors.P))
+// CHECK-NEXT: - Metadata sources:
+
+
+// Concrete caller and generic callee -- capture types are fully substituted,
+// and there are no metadata bindings
+
+sil @generic_callee2 : $@convention(thin) <T, U> (@in T, @owned @box U) -> () {
+bb0(%i: $*T, %b: $@box U):
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil @concrete_caller2 : $@convention(thin) () -> @owned @callee_owned () -> () {
+bb0:
+  %f = function_ref @generic_callee2 : $@convention(thin) <T, U> (@in T, @owned @box U) -> ()
+  %i = alloc_stack $Int
+  %b = alloc_box $String
+  %c = partial_apply %f<Int, String>(%i, %b) : $@convention(thin) <T, U> (@in T, @owned @box U) -> ()
+  dealloc_stack %i : $*Int
+  return %c : $@callee_owned () -> ()
+}
+
+// This is the descriptor for '@box String' above
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (struct Swift.String)
+// CHECK-NEXT: - Metadata sources:
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (struct Swift.Int)
+// CHECK-NEXT: (sil_box
+// CHECK-NEXT:   (struct Swift.String))
+// CHECK-NEXT:   - Metadata sources:
+
+
+// Generic caller and generic callee -- capture types are written in terms of
+// the caller's generic parameters, and metadata bindings are present for
+// structural sub-terms of the callee's substituted generic parameters that
+// contain the caller's generic parameters.
+
+sil @generic_callee3 : $@convention(thin) <T, U> (@in T) -> () {
+bb0(%t: $*T):
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil @generic_caller3 : $@convention(thin) <A, B, C> () -> @owned @callee_owned () -> () {
+bb0:
+  %f = function_ref @generic_callee3 : $@convention(thin) <T, U> (@in T) -> ()
+  %t = alloc_stack $Optional<(A) -> B>
+  %c = partial_apply %f<Optional<(A) -> B>, (B, (C) -> Int)>(%t) : $@convention(thin) <T, U> (@in T) -> ()
+  dealloc_stack %t : $*Optional<(A) -> B>
+  return %c : $@callee_owned () -> ()
+}
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (bound_generic_enum Swift.Optional
+// CHECK-NEXT:   (function
+// CHECK-NEXT:     (generic_type_parameter depth=0 index=0)
+// CHECK-NEXT:     (generic_type_parameter depth=0 index=1)))
+// CHECK-NEXT: - Metadata sources:
+// CHECK-NEXT: (bound_generic_enum Swift.Optional
+// CHECK-NEXT:   (function
+// CHECK-NEXT:     (generic_type_parameter depth=0 index=0)
+// CHECK-NEXT:     (generic_type_parameter depth=0 index=1)))
+// CHECK-NEXT: (closure_binding index=0)
+// CHECK-NEXT: (generic_type_parameter depth=0 index=1)
+// CHECK-NEXT: (closure_binding index=1)
+// CHECK-NEXT: (generic_type_parameter depth=0 index=2)
+// CHECK-NEXT: (closure_binding index=2)
+
+
+// Generic caller and generic callee -- and one of the type parameters is
+// fulfilled by a thick metatype value.
+
+sil @generic_callee4 : $@convention(thin) <T, U> (@thick Optional<T>.Type) -> () {
+bb0(%t: $@thick Optional<T>.Type):
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil @generic_caller4 : $@convention(thin) <A, B, C> () -> @owned @callee_owned () -> () {
+bb0:
+  %f = function_ref @generic_callee4 : $@convention(thin) <T, U> (@thick Optional<T>.Type) -> ()
+  %t = metatype $@thick Optional<(B) -> C>.Type
+  %c = partial_apply %f<(B) -> C, Int>(%t) : $@convention(thin) <T, U> (@thick Optional<T>.Type) -> ()
+  return %c : $@callee_owned () -> ()
+}
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (metatype was_abstract
+// CHECK-NEXT:  (bound_generic_enum Swift.Optional
+// CHECK-NEXT:    (function
+// CHECK-NEXT:      (generic_type_parameter depth=0 index=1)
+// CHECK-NEXT:      (generic_type_parameter depth=0 index=2))))
+// CHECK-NEXT: - Metadata sources:
+// CHECK-NEXT: (function
+// CHECK-NEXT:   (generic_type_parameter depth=0 index=1)
+// CHECK-NEXT:   (generic_type_parameter depth=0 index=2))
+// CHECK-NEXT: (generic_argument index=0
+// CHECK-NEXT:   (metadata_capture index=0))
+
+
+// Generic caller and generic callee -- and one of the type parameters is
+// fulfilled by the isa pointer of a class instance.
+
+class GenericClass<T, U> {}
+
+sil @generic_callee5 : $@convention(thin) <T, U, V> (@owned GenericClass<T, U>) -> () {
+bb0(%t: $GenericClass<T, U>):
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil @generic_caller5 : $@convention(thin) <A, B, C> (@owned GenericClass<(A, B), (B, C)>) -> @owned @callee_owned () -> () {
+bb0(%g: $GenericClass<(A, B), (B, C)>):
+  %f = function_ref @generic_callee5 : $@convention(thin) <T, U, V> (@owned GenericClass<T, U>) -> ()
+  %c = partial_apply %f<(A, B), (B, C), (C, A)>(%g) : $@convention(thin) <T, U, V> (@owned GenericClass<T, U>) -> ()
+  return %c : $@callee_owned () -> ()
+}
+
+sil_vtable GenericClass {}
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (bound_generic_class capture_descriptors.GenericClass
+// CHECK-NEXT:   (tuple
+// CHECK-NEXT:     (generic_type_parameter depth=0 index=0)
+// CHECK-NEXT:     (generic_type_parameter depth=0 index=1))
+// CHECK-NEXT:   (tuple
+// CHECK-NEXT:     (generic_type_parameter depth=0 index=1)
+// CHECK-NEXT:     (generic_type_parameter depth=0 index=2)))
+// CHECK-NEXT: - Metadata sources:
+// CHECK-NEXT: (generic_type_parameter depth=0 index=2)
+// CHECK-NEXT: (closure_binding index=0)
+// CHECK-NEXT: (generic_type_parameter depth=0 index=0)
+// CHECK-NEXT: (closure_binding index=1)
+// CHECK-NEXT: (tuple
+// CHECK-NEXT:   (generic_type_parameter depth=0 index=0)
+// CHECK-NEXT:   (generic_type_parameter depth=0 index=1))
+// CHECK-NEXT: (generic_argument index=0
+// CHECK-NEXT:   (reference_capture index=0))
+// CHECK-NEXT: (tuple
+// CHECK-NEXT:   (generic_type_parameter depth=0 index=1)
+// CHECK-NEXT:   (generic_type_parameter depth=0 index=2))
+// CHECK-NEXT: (generic_argument index=1
+// CHECK-NEXT:   (reference_capture index=0))
+
+
+// Capturing lowered function types
+
+sil @function_callee : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method) () -> ()) -> () {
+bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: $@convention(block) () -> (), %thick: $@convention(thick) () -> (), %method: $@convention(method) () -> (), %witness_method: $@convention(witness_method) () -> ()):
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil @function_caller : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method) () -> ()) -> @owned @callee_owned () -> () {
+bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: $@convention(block) () -> (), %thick: $@convention(thick) () -> (), %method: $@convention(method) () -> (), %witness_method: $@convention(witness_method) () -> ()):
+  %f = function_ref @function_callee : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method) () -> ()) -> ()
+  %result = partial_apply %f(%thin, %c, %block, %thick, %method, %witness_method) : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method) () -> ()) -> ()
+  return %result : $@callee_owned () -> ()
+}
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (function convention=thin
+// CHECK-NEXT:   (tuple))
+// CHECK-NEXT: (function convention=c
+// CHECK-NEXT:   (tuple))
+// CHECK-NEXT: (function convention=block
+// CHECK-NEXT:   (tuple))
+// CHECK-NEXT: (function
+// CHECK-NEXT:   (tuple))
+// CHECK-NEXT: (function convention=thin
+// CHECK-NEXT:   (tuple))
+// CHECK-NEXT: (function convention=thin
+// CHECK-NEXT:   (tuple))
+// CHECK-NEXT: - Metadata sources:

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -16,21 +16,32 @@
 //===----------------------------------------------------------------------===//
 
 #include "IRGenModule.h"
+#include "SwiftTargetInfo.h"
 
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
+#include "llvm/ProfileData/InstrProf.h"
 #include "llvm/ProfileData/CoverageMappingWriter.h"
 #include "llvm/Support/FileSystem.h"
 
 using namespace swift;
 using namespace irgen;
 
+using llvm::coverage::CovMapVersion;
 using llvm::coverage::CounterMappingRegion;
 
+static bool isMachO(IRGenModule &IGM) {
+  return SwiftTargetInfo::get(IGM).OutputObjectFormat == llvm::Triple::MachO;
+}
+
+static StringRef getCoverageSection(IRGenModule &IGM) {
+  return llvm::getInstrProfCoverageSectionName(isMachO(IGM));
+}
+
 void IRGenModule::emitCoverageMapping() {
-  const auto &Mappings = SILMod->getCoverageMapList();
+  const auto &Mappings = getSILModule().getCoverageMapList();
   // If there aren't any coverage maps, there's nothing to emit.
   if (Mappings.empty())
     return;
@@ -53,19 +64,28 @@ void IRGenModule::emitCoverageMapping() {
   }
 
   // Encode the filenames first.
-  std::string EncodedDataBuf;
-  llvm::raw_string_ostream OS(EncodedDataBuf);
+  std::string FilenamesAndCoverageMappings;
+  llvm::raw_string_ostream OS(FilenamesAndCoverageMappings);
   llvm::coverage::CoverageFilenamesSectionWriter(FilenameRefs).write(OS);
   size_t FilenamesSize = OS.str().size();
   size_t CurrentSize, PrevSize = FilenamesSize;
 
   // Now we need to build up the list of function records.
-  auto *Int32Ty = llvm::Type::getInt32Ty(LLVMContext);
-  auto *Int64Ty = llvm::Type::getInt64Ty(LLVMContext);
-  auto *Int8PtrTy = llvm::Type::getInt8PtrTy(LLVMContext);
-  auto *FunctionRecordTy = llvm::StructType::get(
-      LLVMContext, {Int8PtrTy, Int32Ty, Int32Ty, Int64Ty}, /*isPacked=*/true);
+  llvm::LLVMContext &Ctx = LLVMContext;
+  auto *Int32Ty = llvm::Type::getInt32Ty(Ctx);
+  auto *Int8PtrTy = llvm::Type::getInt8PtrTy(Ctx);
 
+  llvm::Type *FunctionRecordTypes[] = {
+#define COVMAP_FUNC_RECORD(Type, LLVMType, Name, Init) LLVMType,
+#include "llvm/ProfileData/InstrProfData.inc"
+#undef COVMAP_FUNC_RECORD
+  };
+
+  auto FunctionRecordTy =
+      llvm::StructType::get(Ctx, llvm::makeArrayRef(FunctionRecordTypes),
+                            /*isPacked=*/true);
+
+  std::vector<llvm::Constant *> FunctionNames;
   std::vector<llvm::Constant *> FunctionRecords;
   std::vector<CounterMappingRegion> Regions;
   for (const auto &M : Mappings) {
@@ -81,22 +101,28 @@ void IRGenModule::emitCoverageMapping() {
                                             Regions);
     W.write(OS);
 
-    auto *NameVal =
-        llvm::ConstantDataArray::getString(LLVMContext, M.getName(), true);
-    auto *NameVar =
-        new llvm::GlobalVariable(*getModule(), NameVal->getType(), true,
-                                 llvm::GlobalValue::LinkOnceAnyLinkage, NameVal,
-                                 "__llvm_profile_name_" + M.getName());
+    std::string NameValue = llvm::getPGOFuncName(
+        M.getName(),
+        M.isPossiblyUsedExternally() ? llvm::GlobalValue::ExternalLinkage
+                                     : llvm::GlobalValue::PrivateLinkage,
+        M.getFile());
+    llvm::GlobalVariable *NamePtr = llvm::createPGOFuncNameVar(
+        *getModule(), llvm::GlobalValue::LinkOnceAnyLinkage, NameValue);
+    FunctionNames.push_back(llvm::ConstantExpr::getBitCast(NamePtr, Int8PtrTy));
 
     CurrentSize = OS.str().size();
+    unsigned MappingLen = CurrentSize - PrevSize;
+    StringRef CoverageMapping(OS.str().c_str() + PrevSize, MappingLen);
+
+    uint64_t FuncHash = M.getHash();
+
     // Create a record for this function.
     llvm::Constant *FunctionRecordVals[] = {
-        llvm::ConstantExpr::getBitCast(NameVar, Int8PtrTy),
-        // TODO: We're including the null to match the profile, but we should
-        // really skip the null in the profile instead.
-        llvm::ConstantInt::get(Int32Ty, M.getName().size() + 1),
-        llvm::ConstantInt::get(Int32Ty, CurrentSize - PrevSize),
-        llvm::ConstantInt::get(Int64Ty, M.getHash())};
+#define COVMAP_FUNC_RECORD(Type, LLVMType, Name, Init) Init,
+#include "llvm/ProfileData/InstrProfData.inc"
+#undef COVMAP_FUNC_RECORD
+    };
+
     FunctionRecords.push_back(llvm::ConstantStruct::get(
         FunctionRecordTy, makeArrayRef(FunctionRecordVals)));
     PrevSize = CurrentSize;
@@ -110,28 +136,50 @@ void IRGenModule::emitCoverageMapping() {
     for (size_t I = 0, S = 8 - Rem; I < S; ++I)
       OS << '\0';
   }
-  auto *EncodedData =
-      llvm::ConstantDataArray::getString(LLVMContext, OS.str(), false);
+  auto *FilenamesAndMappingsVal =
+      llvm::ConstantDataArray::getString(Ctx, OS.str(), false);
 
   auto *RecordsTy =
       llvm::ArrayType::get(FunctionRecordTy, FunctionRecords.size());
   auto *RecordsVal = llvm::ConstantArray::get(RecordsTy, FunctionRecords);
 
-  // Now we embed everything into a constant with a well-known name.
-  auto *CovDataTy =
-      llvm::StructType::get(LLVMContext, {Int32Ty, Int32Ty, Int32Ty, Int32Ty,
-                                          RecordsTy, EncodedData->getType()});
-  llvm::Constant *TUDataVals[] = {
-      llvm::ConstantInt::get(Int32Ty, FunctionRecords.size()),
-      llvm::ConstantInt::get(Int32Ty, FilenamesSize),
-      llvm::ConstantInt::get(Int32Ty, CoverageMappingSize),
-      llvm::ConstantInt::get(Int32Ty, llvm::coverage::CoverageMappingVersion1),
-      RecordsVal, EncodedData};
-  auto CovDataVal =
+  // Create the coverage data header.
+  llvm::Type *CovDataHeaderTypes[] = {
+#define COVMAP_HEADER(Type, LLVMType, Name, Init) LLVMType,
+#include "llvm/ProfileData/InstrProfData.inc"
+#undef COVMAP_HEADER
+  };
+  auto *CovDataHeaderTy =
+      llvm::StructType::get(Ctx, makeArrayRef(CovDataHeaderTypes));
+  llvm::Constant *CovDataHeaderVals[] = {
+#define COVMAP_HEADER(Type, LLVMType, Name, Init) Init,
+#include "llvm/ProfileData/InstrProfData.inc"
+#undef COVMAP_HEADER
+  };
+  auto *CovDataHeaderVal = llvm::ConstantStruct::get(
+      CovDataHeaderTy, makeArrayRef(CovDataHeaderVals));
+
+  // Combine the header, function records, and mappings together.
+  llvm::Type *CovDataTypes[] = {CovDataHeaderTy, RecordsTy,
+                                FilenamesAndMappingsVal->getType()};
+  auto *CovDataTy = llvm::StructType::get(Ctx, makeArrayRef(CovDataTypes));
+  llvm::Constant *TUDataVals[] = {CovDataHeaderVal, RecordsVal,
+                                  FilenamesAndMappingsVal};
+  auto *CovDataVal =
       llvm::ConstantStruct::get(CovDataTy, makeArrayRef(TUDataVals));
+
   auto CovData = new llvm::GlobalVariable(
       *getModule(), CovDataTy, true, llvm::GlobalValue::InternalLinkage,
-      CovDataVal, "__llvm_coverage_mapping");
-
+      CovDataVal, llvm::getCoverageMappingVarName());
+  CovData->setSection(getCoverageSection(*this));
+  CovData->setAlignment(8);
   addUsedGlobal(CovData);
+
+  if (!FunctionNames.empty()) {
+    auto *NamesArrTy = llvm::ArrayType::get(Int8PtrTy, FunctionNames.size());
+    auto *NamesArrVal = llvm::ConstantArray::get(NamesArrTy, FunctionNames);
+    new llvm::GlobalVariable(*getModule(), NamesArrTy, true,
+                             llvm::GlobalValue::InternalLinkage, NamesArrVal,
+                             llvm::getCoverageUnusedNamesVarName());
+  }
 }

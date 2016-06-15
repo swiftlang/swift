@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -84,7 +84,7 @@ void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
 
   // Add this request to the stack of active requests.
   ActiveRequests.push_back(request);
-  defer([&] { ActiveRequests.pop_back(); });
+  defer { ActiveRequests.pop_back(); };
 
   while (true) {
     // Process this requirement, enumerating dependencies if anything else needs
@@ -112,9 +112,9 @@ void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
   }
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Diagnostics
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 void IterativeTypeChecker::diagnoseCircularReference(
        ArrayRef<TypeCheckRequest> requests) {
   bool isFirst = true;

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -24,27 +24,30 @@ struct objc_class;
 
 namespace swift {
 
-struct Metadata;
+template <typename Runtime> struct TargetMetadata;
+using Metadata = TargetMetadata<InProcess>;
+
 struct HeapObject;
 
 } // end namespace swift
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/objc.h>
+#include <objc/runtime.h>
+#include <objc/objc-api.h>
 
 // Redeclare APIs from the Objective-C runtime.
 // These functions are not available through public headers, but are guaranteed
 // to exist on OS X >= 10.9 and iOS >= 7.0.
 
-extern "C" id objc_retain(id);
-extern "C" void objc_release(id);
-extern "C" id _objc_rootAutorelease(id);
-extern "C" void objc_moveWeak(id*, id*);
-extern "C" void objc_copyWeak(id*, id*);
-extern "C" id objc_initWeak(id*, id);
-extern "C" id objc_storeWeak(id*, id);
-extern "C" void objc_destroyWeak(id*);
-extern "C" id objc_loadWeakRetained(id*);
+OBJC_EXPORT id objc_retain(id);
+OBJC_EXPORT void objc_release(id);
+OBJC_EXPORT id _objc_rootAutorelease(id);
+OBJC_EXPORT void objc_moveWeak(id*, id*);
+OBJC_EXPORT void objc_copyWeak(id*, id*);
+OBJC_EXPORT id objc_initWeak(id*, id);
+OBJC_EXPORT void objc_destroyWeak(id*);
+OBJC_EXPORT id objc_loadWeakRetained(id*);
 
 // Description of an Objective-C image.
 // __DATA,__objc_imageinfo stores one of these.
@@ -54,7 +57,7 @@ typedef struct objc_image_info {
 } objc_image_info;
 
 // Class and metaclass construction from a compiler-generated memory image.
-// cls and cls->isa must each be OBJC_MAX_CLASS_SIZE bytes.·
+// cls and cls->isa must each be OBJC_MAX_CLASS_SIZE bytes.
 // Extra bytes not used the metadata must be zero.
 // info is the same objc_image_info that would be emitted by a static compiler.
 // Returns nil if a class with the same name already exists.
@@ -73,6 +76,7 @@ namespace swift {
 // Swift reference counting. [super dealloc] MUST NOT be called after this,
 // for the object will have already been deallocated by the time
 // this function returns.
+SWIFT_RUNTIME_EXPORT
 extern "C" void swift_rootObjCDealloc(HeapObject *self);
 
 }

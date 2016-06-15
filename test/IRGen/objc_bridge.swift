@@ -103,16 +103,16 @@ import Foundation
 // CHECK: [[OBJC_BLOCK_PROPERTY:@.*]] = private unnamed_addr constant [11 x i8] c"T@?,N,C,Vx\00"
 // CHECK: @_PROPERTIES__TtC11objc_bridge21OptionalBlockProperty = private constant {{.*}} [[OBJC_BLOCK_PROPERTY]]
 
-func getDescription(o: NSObject) -> String {
+func getDescription(_ o: NSObject) -> String {
   return o.description
 }
 
-func getUppercaseString(s: NSString) -> String {
-  return s.uppercaseString()
+func getUppercaseString(_ s: NSString) -> String {
+  return s.uppercase()
 }
 
 // @interface Foo -(void) setFoo: (NSString*)s; @end
-func setFoo(f: Foo, s: String) {
+func setFoo(_ f: Foo, s: String) {
   f.setFoo(s)
 }
 
@@ -122,7 +122,7 @@ func callBar() -> String {
 }
 
 // void setBar(NSString *s);
-func callSetBar(s: String) {
+func callSetBar(_ s: String) {
   setBar(s)
 }
 
@@ -193,11 +193,11 @@ class Bas : NSObject {
 
   override var hashValue: Int { return 0 }
 
-  func acceptSet(set: Set<Bas>) { }
+  func acceptSet(_ set: Set<Bas>) { }
 }
 
 func ==(lhs: Bas, rhs: Bas) -> Bool { return true }
 
 class OptionalBlockProperty: NSObject {
-  var x: ([AnyObject] -> [AnyObject])?
+  var x: (([AnyObject]) -> [AnyObject])?
 }

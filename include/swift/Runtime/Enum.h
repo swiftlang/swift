@@ -1,8 +1,8 @@
-//===--- Enum.h - Runtime declarations for enums ---------------*- C++ -*--===//
+//===--- Enum.h - Runtime declarations for enums ----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,12 +17,20 @@
 #ifndef SWIFT_RUNTIME_ENUM_H
 #define SWIFT_RUNTIME_ENUM_H
 
+#include "swift/Runtime/Config.h"
+
 namespace swift {
   
 struct OpaqueValue;
 struct ValueWitnessTable;
-struct Metadata;
-struct EnumMetadata;
+  
+struct InProcess;
+
+template <typename Runtime> struct TargetMetadata;
+using Metadata = TargetMetadata<InProcess>;
+
+template <typename Runtime> struct TargetEnumMetadata;
+using EnumMetadata = TargetEnumMetadata<InProcess>;
 struct TypeLayout;
 
 /// \brief Initialize the value witness table for a generic, single-payload
@@ -32,6 +40,7 @@ struct TypeLayout;
 ///                  witness table for the enum.
 /// \param payload - type metadata for the payload case of the enum.
 /// \param emptyCases - the number of empty cases in the enum.
+SWIFT_RUNTIME_EXPORT
 extern "C" void swift_initEnumValueWitnessTableSinglePayload(
                                                     ValueWitnessTable *vwtable,
                                                     const TypeLayout *payload,
@@ -47,9 +56,13 @@ extern "C" void swift_initEnumValueWitnessTableSinglePayload(
 /// \returns -1 if the payload case is inhabited. If an empty case is inhabited,
 ///          returns a value greater than or equal to zero and less than
 ///          emptyCases.
+SWIFT_RT_ENTRY_VISIBILITY
 extern "C" int swift_getEnumCaseSinglePayload(const OpaqueValue *value,
                                               const Metadata *payload,
-                                              unsigned emptyCases);
+                                              unsigned emptyCases)
+  SWIFT_CC(RegisterPreservingCC);
+
+
 
 /// \brief Store the tag value for the given case into a single-payload enum,
 ///        whose associated payload (if any) has already been initialized.
@@ -62,13 +75,16 @@ extern "C" int swift_getEnumCaseSinglePayload(const OpaqueValue *value,
 ///                    case, or a value greater than or equal to zero and less
 ///                    than emptyCases for an empty case.
 /// \param emptyCases - the number of empty cases in the enum.
+SWIFT_RT_ENTRY_VISIBILITY
 extern "C" void swift_storeEnumTagSinglePayload(OpaqueValue *value,
                                                  const Metadata *payload,
                                                  int whichCase,
-                                                 unsigned emptyCases);
+                                                 unsigned emptyCases)
+  SWIFT_CC(RegisterPreservingCC);
 
 /// \brief Initialize the value witness table for a generic, multi-payload
 ///        enum instance.
+SWIFT_RUNTIME_EXPORT
 extern "C" void swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
                                        EnumMetadata *enumType,
                                        unsigned numPayloads,
@@ -81,11 +97,13 @@ extern "C" void swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
 /// \param enumType - type metadata for the enum.
 ///
 /// \returns The index of the enum case.
+SWIFT_RUNTIME_EXPORT
 extern "C" unsigned swift_getEnumCaseMultiPayload(const OpaqueValue *value,
                                                   const EnumMetadata *enumType);
   
 /// \brief Store the tag value for the given case into a multi-payload enum,
 ///        whose associated payload (if any) has already been initialized.
+SWIFT_RUNTIME_EXPORT
 extern "C" void swift_storeEnumTagMultiPayload(OpaqueValue *value,
                                                const EnumMetadata *enumType,
                                                unsigned whichCase);

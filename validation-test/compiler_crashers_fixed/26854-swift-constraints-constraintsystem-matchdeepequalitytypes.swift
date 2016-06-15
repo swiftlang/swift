@@ -1,9 +1,11 @@
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
 // RUN: not %target-swift-frontend %s -parse
-
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
 }
 class n{class c
 struct c,
@@ -33,7 +35,7 @@ struct b<f: AnyObject.c {class a{{return"[enum B<T where h:B<T where h{let , i {
 class B<f=B? = A{
 class A{
 let f=e:a{init(i
-class B<H:BooleanType}
+class B<H:Boolean}
 }}
 }
 struct c
@@ -44,10 +46,10 @@ struct c<T where h:d
 enum b<I : e :d: {
 let
 let f: A {let a {struct A {
-}class B:BooleanType}}struct b<T {
+}class B:Boolean}}struct b<T {
 if true {
 }}(i
-e :BooleanType}
+e :Boolean}
 var _=B
 }
 var = A{let
@@ -56,7 +58,7 @@ var = A{let
 protocol A {enum A{var _=[enum a {return"
 if true{"
 func b{
-let :BooleanType}}
+let :Boolean}}
 struct S<f
 protocol A {class d{
 "
@@ -66,13 +68,13 @@ let a {
 e .c {
 struct c
 struct S<T {{
-var b{{struct B{func a:c<h:BooleanType}
+var b{{struct B{func a:c<h:Boolean}
 (e = b{
 [1
 {
 class d{
 [enum B<T where T: e :AnyObject.c {{typealias f=a{
-struct D{var f=e:BooleanType}enum b<T where B
+struct D{var f=e:Boolean}enum b<T where B
 enum b
 let d
 }((){
@@ -83,13 +85,13 @@ enum S<T where h:A{
 let :NSManagedObject{
 class n{
 struct A {return"
-e :BooleanType}
+e :Boolean}
 }}
 class c<T where h:B{
 {{{
 let f=[]deinit{
 var d{
-enum b<I :a<T where h:BooleanType}
+enum b<I :a<T where h:Boolean}
 class a
 struct B<T where T{enum b
 ((){
@@ -131,7 +133,7 @@ class B:
 ([[]deinit{
 }
 func b{
-class B:BooleanType}enum B<T where T
+class B:Boolean}enum B<T where T
 func b
 let
 }

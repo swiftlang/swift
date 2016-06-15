@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 protocol Associated {
-  typealias Assoc
+  associatedtype Assoc
 }
 
 struct Abstracted<T: Associated, U: Associated> {
-  let closure: T.Assoc -> U.Assoc
+  let closure: (T.Assoc) -> U.Assoc
 }
 
 struct S1 {}

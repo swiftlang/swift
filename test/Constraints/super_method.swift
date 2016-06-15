@@ -9,7 +9,7 @@ struct S {
 class D : B {
   func b_foo() -> Int { return super.foo }
 
-  override func bar(a: Float) -> Int { return super.bar(a) }
+  override func bar(_ a: Float) -> Int { return super.bar(a) }
 
   func bas() -> (Int, UnicodeScalar, String) {
     return (super.zim(), super.zang(), super.zung())
@@ -26,7 +26,7 @@ extension D {
 
 class B {
   var foo : Int = 0
-  func bar(a: Float) -> Int {}
+  func bar(_ a: Float) -> Int {}
 
   func zim() -> Int {}
   func zang() -> UnicodeScalar {}
@@ -39,19 +39,19 @@ class B {
 }
 
 class X<T> {
-  func method<U>(x: T, y: U) { }
+  func method<U>(_ x: T, y: U) { }
 }
 
 class Y<U> : X<Int> {
-  func otherMethod<U>(x: Int, y: U) {
+  func otherMethod<U>(_ x: Int, y: U) {
     super.method(x, y: y)
   }
 }
 
-func use_d(d: D) -> Int {
-  d.b_foo()
-  d.bar(1.0)
-  d.bas()
+func use_d(_ d: D) -> Int {
+  _ = d.b_foo()
+  _ = d.bar(1.0)
+  _ = d.bas()
 
   return d.zippity
 }

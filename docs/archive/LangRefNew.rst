@@ -40,7 +40,7 @@ Basic Goals
 In no particular order, and not explained well:
 
 * Support building great frameworks and applications, with a specific focus on
-  permiting rich and powerful APIs.
+  permitting rich and powerful APIs.
 * Get the defaults right: this reduces the barrier to entry and increases the
   odds that the right thing happens.
 * Through our support for building great APIs, we aim to provide an expressive
@@ -54,7 +54,7 @@ In no particular order, and not explained well:
   ideas already out there.
 * Memory safe by default: array overrun errors, uninitialized values, and other
   problems endemic to C should not occur in Swift, even if it means some amount
-  of runtime overhead.  Eventually these checks will be disablable for people
+  of runtime overhead.  Eventually these checks will be disableable for people
   who want ultimate performance in production builds.
 * Efficiently implementable with a static compiler: runtime compilation is
   great technology and Swift may eventually get a runtime optimizer, but it is
@@ -752,7 +752,7 @@ protocols.
     }
 
   We disambiguate towards ``get-set`` or ``willset-didset`` production if the
-  first token after ``{`` is the corresponding keyword, possibly preceeded by
+  first token after ``{`` is the corresponding keyword, possibly preceded by
   attributes.  Thus, the following code is rejected because we are expecting
   ``{`` after ``set``:
 
@@ -782,7 +782,7 @@ protocols.
     }
 
   We disambiguate towards ``willget-didset`` production if the first token
-  after ``{`` is the keyword ``willSet`` or ``didSet``, possibly preceeded by
+  after ``{`` is the keyword ``willSet`` or ``didSet``, possibly preceded by
   attributes.
 
 .. admonition:: Rationale
@@ -1123,7 +1123,7 @@ label if it is a named pattern or a type annotation of a named pattern.
 
 A tuple pattern whose body ends in ``'...'`` is a varargs tuple.  The last
 element of such a tuple must be a typed pattern, and the type of that pattern
-is changed from ``T`` to ``T[]``.  The corresponding tuple type for a varargs
+is changed from ``T`` to ``[T]``.  The corresponding tuple type for a varargs
 tuple is a varargs tuple type.
 
 As a special case, a tuple pattern with one element that has no label, has no
@@ -1150,7 +1150,7 @@ appear in declarations.
   class D1 : B {}
   class D2 : B {}
 
-  var bs : B[] = [B(), D1(), D2()]
+  var bs : [B] = [B(), D1(), D2()]
 
   for b in bs {
     switch b {
@@ -1348,7 +1348,7 @@ otherwise empty cases in switch statements.
 
 ::
 
-  func classifyPoint(point: (Int, Int)) {
+  func classifyPoint(_ point: (Int, Int)) {
     switch point {
     case (0, 0):
       print("origin")
@@ -1424,7 +1424,7 @@ into every file.  Its declarations can only be found by <a href="#expr-dot">dot
 syntax</a>.  It provides access to a small number of primitive representation
 types and operations defined over them that map directly to LLVM IR.
 
-The existance of and details of this module are a private implementation detail
+The existence of and details of this module are a private implementation detail
 used by our implementation of the standard library.  Swift code outside the
 standard library should not be aware of this library, and an independent
 implementation of the swift standard library should be allowed to be
@@ -1537,8 +1537,8 @@ Short Circuiting Logical Operators
 
 ::
 
-  func && (lhs: Bool, rhs: ()->Bool) -> Bool
-  func || (lhs: Bool, rhs: ()->Bool) -> Bool
+  func && (lhs: Bool, rhs: () -> Bool) -> Bool
+  func || (lhs: Bool, rhs: () -> Bool) -> Bool
 
 Swift has a simplified precedence levels when compared with C.  From highest to
 lowest:
@@ -1551,5 +1551,3 @@ lowest:
   "comparative:" ==, !=, <, <=, >=, >
   "conjunctive:" &&
   "disjunctive:" ||
-
-

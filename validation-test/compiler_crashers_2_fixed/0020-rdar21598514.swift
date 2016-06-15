@@ -27,13 +27,13 @@ public class TypeIndexed<Value> : Resettable {
   internal var defaultValue: Value
 }
 
-public protocol WrapperType {
+public protocol Wrapper {
   typealias Base
   init(_: Base)
   var base: Base {get set}
 }
 
-public protocol LoggingType : WrapperType {
+public protocol LoggingType : Wrapper {
   typealias Log : AnyObject
 }
 
@@ -47,19 +47,19 @@ extension LoggingType {
   }
 }
 
-public class GeneratorLog {
-  public static func dispatchTester<G: GeneratorType>(
+public class IteratorLog {
+  public static func dispatchTester<G : IteratorProtocol>(
     g: G
-  ) -> LoggingGenerator<LoggingGenerator<G>> {
-    return LoggingGenerator(LoggingGenerator(g))
+  ) -> LoggingIterator<LoggingIterator<G>> {
+    return LoggingIterator(LoggingIterator(g))
   }
   public static var next = TypeIndexed(0)
 }
 
-public struct LoggingGenerator<Base: GeneratorType>
-  : GeneratorType, LoggingType {
+public struct LoggingIterator<Base : IteratorProtocol>
+  : IteratorProtocol, LoggingType {
 
-  typealias Log = GeneratorLog
+  typealias Log = IteratorLog
   
   public init(_ base: Base) {
     self.base = base
@@ -74,23 +74,23 @@ public struct LoggingGenerator<Base: GeneratorType>
 }
 
 public class SequenceLog {
-  public class func dispatchTester<S: SequenceType>(
+  public class func dispatchTester<S: Sequence>(
     s: S
   ) -> LoggingSequence<LoggingSequence<S>> {
     return LoggingSequence(LoggingSequence(s))
   }
-  public static var generate = TypeIndexed(0)
-  public static var underestimateCount = TypeIndexed(0)
+  public static var iterator = TypeIndexed(0)
+  public static var underestimatedCount = TypeIndexed(0)
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
   public static var _preprocessingPass = TypeIndexed(0)
   public static var _copyToNativeArrayBuffer = TypeIndexed(0)
-  public static var _initializeTo = TypeIndexed(0)
+  public static var _copyContents = TypeIndexed(0)
 }
 
-public protocol LoggingSequenceType  : SequenceType, LoggingType {
-  typealias Base : SequenceType
+public protocol LoggingSequenceType  : Sequence, LoggingType {
+  typealias Base : Sequence
 }
 
 extension LoggingSequenceType {
@@ -98,42 +98,42 @@ extension LoggingSequenceType {
     self.base = base
   }
   
-  public func generate() -> LoggingGenerator<Base.Generator> {
-    ++SequenceLog.generate[selfType]
-    return LoggingGenerator(base.generate())
+  public func makeIterator() -> LoggingIterator<Base.Iterator> {
+    ++SequenceLog.iterator[selfType]
+    return LoggingIterator(base.makeIterator())
   }
 
-  public func underestimateCount() -> Int {
-    ++SequenceLog.underestimateCount[selfType]
-    return base.underestimateCount()
+  public func underestimatedCount() -> Int {
+    ++SequenceLog.underestimatedCount[selfType]
+    return base.underestimatedCount()
   }
 
   public func map<T>(
-    @noescape transform: (Base.Generator.Element) -> T
+    @noescape transform: (Base.Iterator.Element) -> T
   ) -> [T] {
     ++SequenceLog.map[selfType]
     return base.map(transform)
   }
 
   public func filter(
-    @noescape includeElement: (Base.Generator.Element) -> Bool
-  ) -> [Base.Generator.Element] {
+    @noescape includeElement: (Base.Iterator.Element) -> Bool
+  ) -> [Base.Iterator.Element] {
     ++SequenceLog.filter[selfType]
     return base.filter(includeElement)
   }
   
   public func _customContainsEquatableElement(
-    element: Base.Generator.Element
+    element: Base.Iterator.Element
   ) -> Bool? {
     ++SequenceLog._customContainsEquatableElement[selfType]
     return base._customContainsEquatableElement(element)
   }
   
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
+  /// If `self` is multi-pass (i.e., a `Collection`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
-    preprocess: (Self)->R
+    @noescape _ preprocess: (Self) -> R
   ) -> R? {
     ++SequenceLog._preprocessingPass[selfType]
     return base._preprocessingPass { _ in preprocess(self) }
@@ -142,19 +142,21 @@ extension LoggingSequenceType {
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
   public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Generator.Element> {
+    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
     ++SequenceLog._copyToNativeArrayBuffer[selfType]
     return base._copyToNativeArrayBuffer()
   }
 
   /// Copy a Sequence into an array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>) {
-    ++SequenceLog._initializeTo[selfType]
-    return base._initializeTo(ptr)
+  public func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
+  ) {
+    ++SequenceLog._copyContents[selfType]
+    return base._copyContents(initializing: ptr)
   }
 }
 
-public struct LoggingSequence<Base_: SequenceType> : LoggingSequenceType {
+public struct LoggingSequence<Base_: Sequence> : LoggingSequenceType {
   typealias Log = SequenceLog
   typealias Base = Base_
   
@@ -166,7 +168,7 @@ public struct LoggingSequence<Base_: SequenceType> : LoggingSequenceType {
 }
 
 public class CollectionLog : SequenceLog {
-  public class func dispatchTester<C: CollectionType>(
+  public class func dispatchTester<C: Collection>(
     c: C
   ) -> LoggingCollection<LoggingCollection<C>> {
     return LoggingCollection(LoggingCollection(c))
@@ -179,12 +181,12 @@ public class CollectionLog : SequenceLog {
   static var first = TypeIndexed(0)
 }
 
-public protocol LoggingCollectionType : CollectionType, LoggingSequenceType {
-  typealias Base : CollectionType
+public protocol LoggingCollectionType : Collection, LoggingSequenceType {
+  typealias Base : Collection
 }
 
 extension LoggingCollectionType {
-  subscript(position: Base.Index) -> Base.Generator.Element {
+  subscript(position: Base.Index) -> Base.Iterator.Element {
     ++CollectionLog.subscriptIndex[selfType]
     return base[position]
   }
@@ -204,15 +206,15 @@ extension LoggingCollectionType {
     return base.count
   }
   
-  func _customIndexOfEquatableElement(element: Generator.Element) -> Base.Index?? {
+  func _customIndexOfEquatableElement(element: Iterator.Element) -> Base.Index?? {
     ++CollectionLog._customIndexOfEquatableElement[selfType]
     return base._customIndexOfEquatableElement(element)
   }
 
-  var first: Generator.Element? {
+  var first: Iterator.Element? {
     ++CollectionLog.first[selfType]
     return base.first
   }
 }
 
-struct LoggingCollection<Base_: CollectionType> : LoggingCollectionType {}
+struct LoggingCollection<Base_: Collection> : LoggingCollectionType {}

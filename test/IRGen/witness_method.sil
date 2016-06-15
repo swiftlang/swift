@@ -9,15 +9,94 @@ protocol DefCon {
 }
 
 
-// CHECK-LABEL: define void @defcon(%swift.opaque* noalias nocapture sret, %swift.type*, %swift.type* %T, i8** %T.DefCon) {{.*}} {
-sil @defcon : $@convention(thin) <T: DefCon> (@out T, @thick T.Type) -> () {
+// CHECK-LABEL: define{{( protected)?}} void @defcon(%swift.opaque* noalias nocapture sret, %swift.type*, %swift.type* %T, i8** %T.DefCon) {{.*}} {
+sil @defcon : $@convention(thin) <T: DefCon> (@thick T.Type) -> @out T {
 entry(%0: $*T, %1: $@thick T.Type):
 
   // CHECK-i386:   [[WITNESS:%.*]] = load i8*, i8** %T.DefCon, align 4
   // CHECK-x86_64: [[WITNESS:%.*]] = load i8*, i8** %T.DefCon, align 8
-  // CHECK: [[METHOD:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.type*, %swift.type*)*
+  // CHECK: [[METHOD:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.type*, %swift.type*, i8**)*
   // CHECK: call void [[METHOD]]
-  %m = witness_method $T, #DefCon.init!allocator.1 : $@convention(witness_method) <U: DefCon> (@out U, @thick U.Type) -> ()
-  %z = apply %m<T>(%0, %1) : $@convention(witness_method) <V: DefCon> (@out V, @thick V.Type) -> ()
+  %m = witness_method $T, #DefCon.init!allocator.1 : $@convention(witness_method) <U: DefCon> (@thick U.Type) -> @out U
+  %z = apply %m<T>(%0, %1) : $@convention(witness_method) <V: DefCon> (@thick V.Type) -> @out V
+  return %z : $()
+}
+
+// rdar://24141848
+protocol Base {
+  func foo()
+}
+protocol Derived : Base {}
+struct ImplementsDerived : Derived {
+  func foo() {}
+}
+
+// CHECK-LABEL: define{{( protected)?}} void @testInheritedConformance
+sil @testInheritedConformance : $@convention(thin) (@in ImplementsDerived) -> () {
+entry(%0: $*ImplementsDerived):
+  // CHECK: [[WITNESS:%.*]] = load i8*, i8** @_TWPV14witness_method17ImplementsDerivedS_4BaseS_
+  // CHECK: [[METHOD:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.type*, i8**)*
+  // CHECK: call void [[METHOD]]
+  %m = witness_method $ImplementsDerived, #Base.foo!1 : $@convention(witness_method) <U: Base> (@in_guaranteed U) -> ()
+  %z = apply %m<ImplementsDerived>(%0) : $@convention(witness_method) <V: Base> (@in_guaranteed V) -> ()
+  return %z : $()
+}
+
+
+// Make sure a witness_method call with a generic Self type uses the correct
+// calling convention.
+
+protocol Synergy {
+  associatedtype LowHangingFruit
+
+  func actionItem() -> LowHangingFruit
+}
+
+struct SyncUp<Deliverable> : Synergy {
+  let d: Deliverable
+
+  func actionItem() -> Deliverable {
+    return d
+  }
+}
+
+// CHECK-LABEL: define{{( protected)?}} void @testGenericWitnessMethod(%swift.opaque* noalias nocapture sret, %V14witness_method6SyncUp* noalias nocapture, %swift.type* %T)
+// CHECK: entry:
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @_TMaV14witness_method6SyncUp(%swift.type* %T)
+// CHECK:   [[WTABLE:%.*]] = call i8** @_TWaurGV14witness_method6SyncUpx_S_7SynergyS_(%swift.type* [[METADATA]])
+// CHECK:   [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[WTABLE]], i32 1
+// CHECK:   [[WITNESS_FN:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
+// CHECK:   [[WITNESS:%.*]] = bitcast i8* [[WITNESS_FN]] to void (%swift.opaque*, %swift.opaque*, %swift.type*, i8**)*
+// CHECK:   [[ARG:%.*]] = bitcast %V14witness_method6SyncUp* %1 to %swift.opaque*
+// CHECK:   call void [[WITNESS]](%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture [[ARG]], %swift.type* [[METADATA]], i8** [[WTABLE]])
+// CHECK:   ret void
+
+sil @testGenericWitnessMethod : $@convention(thin) <T> (@in SyncUp<T>) -> @out T {
+entry(%ret : $*T, %self : $*SyncUp<T>):
+  %m = witness_method $SyncUp<T>, #Synergy.actionItem!1 : $@convention(witness_method) <U: Synergy> (@in_guaranteed U) -> @out U.LowHangingFruit
+  %z = apply %m<SyncUp<T>, T>(%ret, %self) : $@convention(witness_method) <U: Synergy> (@in_guaranteed U) -> @out U.LowHangingFruit
+  return %z : $()
+}
+
+protocol Pivot {}
+
+protocol Strategy {
+  associatedtype GrowthHack : Pivot
+
+  func disrupt() -> GrowthHack
+}
+
+// CHECK-LABEL: define{{( protected)?}} void @testArchetypeWitnessMethod(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.Strategy)
+// CHECK: entry:
+// CHECK:   [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.Strategy, i32 2
+// CHECK:   [[WITNESS_FN:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
+// CHECK:   [[WITNESS:%.*]] = bitcast i8* [[WITNESS_FN]] to void (%swift.opaque*, %swift.opaque*, %swift.type*, i8**)*
+// CHECK:   call void [[WITNESS]](%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture %1, %swift.type* %T, i8** %T.Strategy)
+// CHECK:   ret void
+
+sil @testArchetypeWitnessMethod : $@convention(thin) <T : Strategy> (@in T) -> @out T.GrowthHack {
+entry(%ret : $*T.GrowthHack, %self : $*T):
+  %m = witness_method $T, #Strategy.disrupt!1 : $@convention(witness_method) <U: Strategy> (@in_guaranteed U) -> @out U.GrowthHack
+  %z = apply %m<T, T.GrowthHack>(%ret, %self) : $@convention(witness_method) <U: Strategy> (@in_guaranteed U) -> @out U.GrowthHack
   return %z : $()
 }

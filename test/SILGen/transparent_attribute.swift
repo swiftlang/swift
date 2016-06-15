@@ -1,12 +1,12 @@
 // RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | FileCheck %s
 
-// Test if 'transparent' atribute gets propagated correctly to apply instructions.
+// Test if 'transparent' attribute gets propagated correctly to apply instructions.
 
 // Test that the attribute gets set on default argument generators.
 @_transparent func transparentFuncWithDefaultArgument (x: Int = 1) -> Int {
   return x
 }
-func useTransparentFuncWithDefaultArgument() ->Int {
+func useTransparentFuncWithDefaultArgument() -> Int {
   return transparentFuncWithDefaultArgument();
 
   // CHECK-LABEL: sil hidden @_TF21transparent_attribute37useTransparentFuncWithDefaultArgumentFT_Si
@@ -71,8 +71,8 @@ var x2 : MySt {
 func testProperty(z: MySt) {
   x1 = z
   x2 = z
-  var m1 : MySt = x1;
-  var m2 : MySt = x2;
+  var m1 : MySt = x1
+  var m2 : MySt = x2
   // CHECK-APPLY: sil hidden @_TF21transparent_attribute12testPropertyFT1zVS_4MySt_T_
   // CHECK: function_ref @_TF21transparent_attributes2x1VS_4MySt
   // CHECK-NEXT: apply
@@ -142,9 +142,8 @@ func testEnumExtension() {
   MyEnum.onetransp.tr3()
   // CHECK-APPLY: sil hidden @_TF21transparent_attribute17testEnumExtensionFT_T_
   // CHECK: [[TR3:%[0-9]+]] = function_ref @_TFO21transparent_attribute6MyEnum3tr3
-  // CHECK: [[INIT:%[0-9]+]] = function_ref @_TFO21transparent_attribute6MyEnum9onetransp
-  // CHECK: apply [[INIT]]
-  // CHECK: apply [[TR3]]
+  // CHECK: [[INIT:%[0-9]+]] = enum $MyEnum, #MyEnum.onetransp!enumelt
+  // CHECK: apply [[TR3]]([[INIT]])
 }
 
 struct testVarDecl {
@@ -182,22 +181,32 @@ struct testVarDeclShortenedSyntax {
 }
 // CHECK: sil hidden [transparent] @_TF21transparent_attributeg22transparentOnGlobalVarSi
 
-// Local functions in transparent context have public linkage.
-@_transparent func foo() {
-  // CHECK-LABEL: sil @_TFF21transparent_attribute3fooFT_T_L_3barFT_T_ : $@convention(thin) () -> ()
+// Local functions in transparent context are fragile.
+@_transparent public func foo() {
+  // CHECK-LABEL: sil shared [fragile] @_TFF21transparent_attribute3fooFT_T_L_3barFT_T_ : $@convention(thin) () -> ()
   func bar() {}
   bar()
 
-  // CHECK-LABEL: sil @_TFF21transparent_attribute3fooFT_T_U_FT_T_ : $@convention(thin) () -> () {
+  // CHECK-LABEL: sil shared [fragile] @_TFF21transparent_attribute3fooFT_T_U_FT_T_ : $@convention(thin) () -> () {
   let f: () -> () = {}
   f()
 
-  // CHECK-LABEL: sil @_TFF21transparent_attribute3fooFT_T_L_3zimFT_T_ : $@convention(thin) () -> () {
+  // CHECK-LABEL: sil shared [fragile] @_TFF21transparent_attribute3fooFT_T_L_3zimFT_T_ : $@convention(thin) () -> () {
   func zim() {
-    // CHECK-LABEL: sil @_TFFF21transparent_attribute3fooFT_T_L_3zimFT_T_L_4zangFT_T_ : $@convention(thin) () -> () {
+    // CHECK-LABEL: sil shared [fragile] @_TFFF21transparent_attribute3fooFT_T_L_3zimFT_T_L_4zangFT_T_ : $@convention(thin) () -> () {
     func zang() {
     }
     zang()
   }
   zim()
+}
+
+
+// Check that @_versioned entities have public linkage.
+// CHECK-LABEL: sil @_TF21transparent_attribute25referencedFromTransparentFT_T_ : $@convention(thin) () -> () {
+@_versioned func referencedFromTransparent() {}
+
+// CHECK-LABEL: sil [transparent] [fragile] @_TF21transparent_attribute23referencesVersionedFuncFT_FT_T_ : $@convention(thin) () -> @owned @callee_owned () -> () {
+@_transparent public func referencesVersionedFunc() -> () -> () {
+  return referencedFromTransparent
 }

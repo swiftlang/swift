@@ -70,8 +70,8 @@ add_swift_library(swiftBasic
   JSONSerialization.cpp
   LangOptions.cpp
   Platform.cpp
-  PrettyStackTrace.cpp
   PrefixMap.cpp
+  PrettyStackTrace.cpp
   PrimitiveParsing.cpp
   Program.cpp
   Punycode.cpp
@@ -82,6 +82,7 @@ add_swift_library(swiftBasic
   StringExtras.cpp
   TaskQueue.cpp
   ThreadSafeRefCounted.cpp
+  Timer.cpp
   Unicode.cpp
   UUID.cpp
   Version.cpp

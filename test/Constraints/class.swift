@@ -15,11 +15,11 @@ var d : D
 var ef : E<Float> 
 var fi : F<Int>
 
-func f0(b : B) {}
+func f0(_ b : B) {}
 
-func ternary<T>(cond: Bool,
-                @autoclosure _ ifTrue: () -> T,
-                @autoclosure _ ifFalse: () -> T) -> T {}
+func ternary<T>(_ cond: Bool,
+                _ ifTrue: @autoclosure () -> T,
+                _ ifFalse: @autoclosure () -> T) -> T {}
 
 f0(c)
 f0(a) // expected-error{{cannot convert value of type 'A' to expected argument type 'B'}}
@@ -28,7 +28,7 @@ f0(fi)
 
 // FIXME: Test subtyping of class metatypes.
 
-ternary(true, ef, c)
+_ = ternary(true, ef, c)
 
 
 class X {

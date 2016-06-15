@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -19,24 +19,38 @@
 #ifndef SWIFT_ABI_METADATAVALUES_H
 #define SWIFT_ABI_METADATAVALUES_H
 
+#include "swift/AST/Ownership.h"
+
 #include <stdlib.h>
 #include <stdint.h>
 
 namespace swift {
 
-struct Metadata;
+struct InProcess;
+template <typename Runtime> struct TargetMetadata;
+using Metadata = TargetMetadata<InProcess>;
 
 /// Kinds of Swift metadata records.  Some of these are types, some
 /// aren't.
-enum class MetadataKind : uintptr_t {
+enum class MetadataKind : uint32_t {
 #define METADATAKIND(name, value) name = value,
 #define ABSTRACTMETADATAKIND(name, start, end)                                 \
   name##_Start = start, name##_End = end,
 #include "MetadataKind.def"
 };
 
+const unsigned LastEnumeratedMetadataKind = 2047;
+
+/// Try to translate the 'isa' value of a type/heap metadata into a value
+/// of the MetadataKind enum.
+inline MetadataKind getEnumeratedMetadataKind(uint64_t kind) {
+  if (kind > LastEnumeratedMetadataKind)
+    return MetadataKind::Class;
+  return MetadataKind(kind);
+}
+
 /// Kinds of Swift nominal type descriptor records.
-enum class NominalTypeKind : uintptr_t {
+enum class NominalTypeKind : uint32_t {
 #define NOMINALTYPEMETADATAKIND(name, value) name = value,
 #include "MetadataKind.def"
 };
@@ -93,8 +107,8 @@ enum : unsigned {
   NumGenericMetadataPrivateDataWords = 16,
 };
   
-/// Kinds of protocol conformance record.
-enum class ProtocolConformanceTypeKind : unsigned {
+/// Kinds of type metadata/protocol conformance records.
+enum class TypeMetadataRecordKind : unsigned {
   /// The conformance is universal and might apply to any type.
   /// getDirectType() is nil.
   Universal,
@@ -117,10 +131,10 @@ enum class ProtocolConformanceTypeKind : unsigned {
   /// and classes could be emitted as UniqueDirectType.
   UniqueIndirectClass,
   
-  /// The conformance is for a generic type.
-  /// getGenericPattern() points to the generic metadata pattern used to
-  /// form instances of the type.
-  UniqueGenericPattern,
+  /// The conformance is for a generic or resilient type.
+  /// getNominalTypeDescriptor() points to the nominal type descriptor shared
+  /// by all metadata instantiations of this type.
+  UniqueNominalTypeDescriptor,
   
   /// The conformance is for a nongeneric class type.
   /// getDirectType() points to the unique class object.
@@ -130,7 +144,7 @@ enum class ProtocolConformanceTypeKind : unsigned {
   /// platforms, the class object always is the type metadata.
   UniqueDirectClass = 0xF,
 };
-  
+
 /// Kinds of reference to protocol conformance.
 enum class ProtocolConformanceReferenceKind : unsigned {
   /// A direct reference to a protocol witness table.
@@ -139,32 +153,51 @@ enum class ProtocolConformanceReferenceKind : unsigned {
   /// table.
   WitnessTableAccessor,
 };
-  
-struct ProtocolConformanceFlags {
-private:
+
+// Type metadata record discriminant
+struct TypeMetadataRecordFlags {
+protected:
   using int_type = unsigned;
   int_type Data;
   
   enum : int_type {
     TypeKindMask = 0x0000000FU,
     TypeKindShift = 0,
-    ConformanceKindMask = 0x00000010U,
-    ConformanceKindShift = 4,
   };
   
 public:
-  constexpr ProtocolConformanceFlags() : Data(0) {}
-  constexpr ProtocolConformanceFlags(int_type Data) : Data(Data) {}
+  constexpr TypeMetadataRecordFlags() : Data(0) {}
+  constexpr TypeMetadataRecordFlags(int_type Data) : Data(Data) {}
   
-  constexpr ProtocolConformanceTypeKind getTypeKind() const {
-    return ProtocolConformanceTypeKind((Data >> TypeKindShift) & TypeKindMask);
+  constexpr TypeMetadataRecordKind getTypeKind() const {
+    return TypeMetadataRecordKind((Data >> TypeKindShift) & TypeKindMask);
   }
-  constexpr ProtocolConformanceFlags withTypeKind(
-                                        ProtocolConformanceTypeKind ptk) const {
-    return ProtocolConformanceFlags(
+  constexpr TypeMetadataRecordFlags withTypeKind(
+                                        TypeMetadataRecordKind ptk) const {
+    return TypeMetadataRecordFlags(
                      (Data & ~TypeKindMask) | (int_type(ptk) << TypeKindShift));
   }
   
+  int_type getValue() const { return Data; }
+};
+
+// Protocol conformance discriminant
+struct ProtocolConformanceFlags : public TypeMetadataRecordFlags {
+private:
+  enum : int_type {
+    ConformanceKindMask = 0x00000010U,
+    ConformanceKindShift = 4,
+  };
+
+public:
+  constexpr ProtocolConformanceFlags() : TypeMetadataRecordFlags(0) {}
+  constexpr ProtocolConformanceFlags(int_type Data) : TypeMetadataRecordFlags(Data) {}
+
+  constexpr ProtocolConformanceFlags withTypeKind(
+                                        TypeMetadataRecordKind ptk) const {
+    return ProtocolConformanceFlags(
+                     (Data & ~TypeKindMask) | (int_type(ptk) << TypeKindShift));
+  }
   constexpr ProtocolConformanceReferenceKind getConformanceKind() const {
     return ProtocolConformanceReferenceKind((Data >> ConformanceKindShift)
                                      & ConformanceKindMask);
@@ -174,8 +207,6 @@ public:
     return ProtocolConformanceFlags(
        (Data & ~ConformanceKindMask) | (int_type(pck) << ConformanceKindShift));
   }
-  
-  int_type getValue() const { return Data; }
 };
 
 /// Flag that indicates whether an existential type is class-constrained or not.
@@ -196,8 +227,8 @@ enum class SpecialProtocol: uint8_t {
   None = 0,
   /// The AnyObject protocol.
   AnyObject = 1,
-  /// The ErrorType protocol.
-  ErrorType = 2,
+  /// The ErrorProtocol protocol.
+  ErrorProtocol = 2,
 };
 
 /// Identifiers for protocol method dispatch strategies.
@@ -218,6 +249,63 @@ enum class ProtocolDispatchStrategy: uint8_t {
   Empty = 2,
 };
 
+/// Flags in a generic nominal type descriptor.
+class GenericParameterDescriptorFlags {
+  typedef uint32_t int_type;
+  enum : int_type {
+    HasParent        = 0x01,
+    HasGenericParent = 0x02,
+  };
+  int_type Data;
+  
+  constexpr GenericParameterDescriptorFlags(int_type data) : Data(data) {}
+public:
+  constexpr GenericParameterDescriptorFlags() : Data(0) {}
+
+  constexpr GenericParameterDescriptorFlags withHasParent(bool b) const {
+    return GenericParameterDescriptorFlags(b ? (Data | HasParent)
+                                             : (Data & ~HasParent));
+  }
+
+  constexpr GenericParameterDescriptorFlags withHasGenericParent(bool b) const {
+    return GenericParameterDescriptorFlags(b ? (Data | HasGenericParent)
+                                             : (Data & ~HasGenericParent));
+  }
+
+  /// Does this type have a lexical parent type?
+  ///
+  /// For class metadata, if this is true, the storage for the parent type
+  /// appears immediately prior to the first generic argument.  Other
+  /// metadata always have a slot for their parent type.
+  bool hasParent() const {
+    return Data & HasParent;
+  }
+
+  /// Given that this type has a parent type, is that type generic?  If so,
+  /// it forms part of the key distinguishing this metadata from other
+  /// metadata, and the parent metadata will be the first argument to
+  /// the generic metadata access function.
+  bool hasGenericParent() const {
+    return Data & HasGenericParent;
+  }
+
+  int_type getIntValue() const {
+    return Data;
+  }
+  
+  static GenericParameterDescriptorFlags fromIntValue(int_type Data) {
+    return GenericParameterDescriptorFlags(Data);
+  }
+  
+  bool operator==(GenericParameterDescriptorFlags other) const {
+    return Data == other.Data;
+  }
+  bool operator!=(GenericParameterDescriptorFlags other) const {
+    return Data != other.Data;
+  }
+};
+
+
 /// Flags for protocol descriptors.
 class ProtocolDescriptorFlags {
   typedef uint32_t int_type;
@@ -230,7 +318,9 @@ class ProtocolDescriptorFlags {
 
     SpecialProtocolMask  = 0x000003C0U,
     SpecialProtocolShift = 6,
-    
+
+    IsResilient       =   1U <<  10U,
+
     /// Reserved by the ObjC runtime.
     _ObjCReserved        = 0xFFFF0000U,
   };
@@ -257,6 +347,9 @@ public:
   withSpecialProtocol(SpecialProtocol sp) const {
     return ProtocolDescriptorFlags((Data & ~SpecialProtocolMask)
                                      | (int_type(sp) << SpecialProtocolShift));
+  }
+  constexpr ProtocolDescriptorFlags withResilient(bool s) const {
+    return ProtocolDescriptorFlags((Data & ~IsResilient) | (s ? IsResilient : 0));
   }
   
   /// Was the protocol defined in Swift 1 or 2?
@@ -294,6 +387,9 @@ public:
                                  >> SpecialProtocolShift));
   }
   
+  /// Can new requirements with default witnesses be added resiliently?
+  bool isResilient() const { return Data & IsResilient; }
+
   int_type getIntValue() const {
     return Data;
   }
@@ -356,8 +452,8 @@ enum class FunctionMetadataConvention: uint8_t {
 };
 
 /// Flags in a function type metadata record.
-class FunctionTypeFlags {
-  typedef size_t int_type;
+template <typename int_type>
+class TargetFunctionTypeFlags {
   enum : int_type {
     NumArgumentsMask = 0x00FFFFFFU,
     ConventionMask   = 0x0F000000U,
@@ -366,22 +462,24 @@ class FunctionTypeFlags {
   };
   int_type Data;
   
-  constexpr FunctionTypeFlags(int_type Data) : Data(Data) {}
+  constexpr TargetFunctionTypeFlags(int_type Data) : Data(Data) {}
 public:
-  constexpr FunctionTypeFlags() : Data(0) {}
+  constexpr TargetFunctionTypeFlags() : Data(0) {}
 
-  constexpr FunctionTypeFlags withNumArguments(unsigned numArguments) const {
-    return FunctionTypeFlags((Data & ~NumArgumentsMask) | numArguments);
+  constexpr TargetFunctionTypeFlags withNumArguments(unsigned numArguments) const {
+    return TargetFunctionTypeFlags((Data & ~NumArgumentsMask) | numArguments);
   }
   
-  constexpr FunctionTypeFlags withConvention(FunctionMetadataConvention c) const {
-    return FunctionTypeFlags((Data & ~ConventionMask)
+  constexpr TargetFunctionTypeFlags<int_type>
+  withConvention(FunctionMetadataConvention c) const {
+    return TargetFunctionTypeFlags((Data & ~ConventionMask)
                              | (int_type(c) << ConventionShift));
   }
   
-  constexpr FunctionTypeFlags withThrows(bool throws) const {
-    return FunctionTypeFlags((Data & ~ThrowsMask)
-                             | (throws ? ThrowsMask : 0));
+  constexpr TargetFunctionTypeFlags<int_type>
+  withThrows(bool throws) const {
+    return TargetFunctionTypeFlags<int_type>((Data & ~ThrowsMask) |
+                                             (throws ? ThrowsMask : 0));
   }
   
   unsigned getNumArguments() const {
@@ -400,17 +498,18 @@ public:
     return Data;
   }
   
-  static FunctionTypeFlags fromIntValue(int_type Data) {
-    return FunctionTypeFlags(Data);
+  static TargetFunctionTypeFlags<int_type> fromIntValue(int_type Data) {
+    return TargetFunctionTypeFlags(Data);
   }
   
-  bool operator==(FunctionTypeFlags other) const {
+  bool operator==(TargetFunctionTypeFlags<int_type> other) const {
     return Data == other.Data;
   }
-  bool operator!=(FunctionTypeFlags other) const {
+  bool operator!=(TargetFunctionTypeFlags<int_type> other) const {
     return Data != other.Data;
   }
 };
+using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 
 /// Field types and flags as represented in a nominal type's field/case type
 /// vector.
@@ -453,4 +552,4 @@ public:
 
 }
 
-#endif
+#endif /* SWIFT_ABI_METADATAVALUES_H */

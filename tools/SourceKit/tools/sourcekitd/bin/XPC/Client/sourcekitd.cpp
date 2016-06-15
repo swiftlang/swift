@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -108,9 +108,9 @@ sourcekitd_set_notification_handler(sourcekitd_response_receiver_t receiver) {
   });
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // sourcekitd_request_sync
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 
 static xpc_connection_t getGlobalConnection();
 
@@ -251,7 +251,7 @@ void sourcekitd::initialize() {
   initializeTracing();
 
   assert(!GlobalConn);
-  GlobalConn = xpc_connection_create("com.apple.SourceKitService", NULL);
+  GlobalConn = xpc_connection_create(SOURCEKIT_XPCSERVICE_IDENTIFIER, NULL);
 
   xpc_connection_set_event_handler(GlobalConn, ^(xpc_object_t event) {
     xpc_type_t type = xpc_get_type(event);
@@ -455,7 +455,7 @@ static void handleInterruptedConnection(xpc_object_t event, xpc_connection_t con
   sendNotification(event);
 
   // Retain connection while we try to ping it.
-  // Since this happens implicitely, we can't blame the client if it shutsdown
+  // Since this happens implicitly, we can't blame the client if it shuts down
   // while we are trying to ping.
   pingService((xpc_connection_t)xpc_retain(conn));
 }

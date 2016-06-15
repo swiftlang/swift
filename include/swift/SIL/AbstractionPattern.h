@@ -1,8 +1,8 @@
-//===--- AbstractionPattern.h - SIL type abstraction pattersn ---*- C++ -*-===//
+//===--- AbstractionPattern.h - SIL type abstraction patterns ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -26,6 +26,7 @@ namespace llvm {
 }
 
 namespace clang {
+  class ValueDecl;
   class ObjCMethodDecl;
   class Type;
 }
@@ -157,6 +158,8 @@ class AbstractionPattern {
     /// An open-coded tuple pattern.  OrigTupleElements is valid.
     /// OtherData is the number of tuple elements.
     Tuple,
+    /// A discarded value. OrigType is valid.
+    Discard,
     /// A type reference with a Clang type.  OrigType and ClangType are valid.
     ClangType,
     /// A reference to the parameters of a Clang function type,
@@ -174,6 +177,17 @@ class AbstractionPattern {
     /// function type.  ObjCMethod is valid.  OtherData is an encoded
     /// foreign error index.
     PartialCurriedObjCMethodType,
+    /// The curried imported type of a C function imported as a method.
+    /// OrigType is valid and is a function type. ClangType is valid and is
+    /// a function type. OtherData is the offset of the parameter imported as
+    /// `self`, or -1 if the function was imported as a static method.
+    CurriedCFunctionAsMethodType,
+    /// The partially-applied curried imported type of a C function imported as
+    /// a method.
+    /// OrigType is valid and is a function type. ClangType is valid and is
+    /// a function type. OtherData is the offset of the parameter imported as
+    /// `self`, or ~0 if the function was imported as a static method.
+    PartialCurriedCFunctionAsMethodType,
     /// The uncurried imported type of an Objective-C method (that is,
     /// '(Input, Self) -> Result').  OrigType is valid and is a function
     /// type.  ObjCMethod is valid.  OtherData is an encoded foreign
@@ -191,6 +205,12 @@ class AbstractionPattern {
     /// tuple type.  ObjCMethod is valid.  OtherData is an encoded
     /// foreign error index.
     ObjCMethodFormalParamTupleType,
+    /// A reference to the formal method parameters of a C function that was
+    /// imported as a method.
+    /// OrigType is valid and is a tuple type. ClangType is valid and is
+    /// a function type. OtherData is the offset of the parameter imported as
+    /// `self`, or ~0 if the function was imported as a static method.
+    CFunctionAsMethodFormalParamTupleType,
   };
 
   class EncodedForeignErrorInfo {
@@ -238,8 +258,11 @@ class AbstractionPattern {
     }
   };
 
-  unsigned TheKind : 4;
-  unsigned OtherData : 28;
+  static constexpr const unsigned NumOtherDataBits = 28;
+  static constexpr const unsigned MaxOtherData = (1 << NumOtherDataBits) - 1;
+
+  unsigned TheKind : 32 - NumOtherDataBits;
+  unsigned OtherData : NumOtherDataBits;
   CanType OrigType;
   union {
     const clang::Type *ClangType;
@@ -248,31 +271,7 @@ class AbstractionPattern {
   };
   CanGenericSignature GenericSig;
 
-  static bool isOpaqueType(CanGenericSignature signature, CanType type) {
-    assert(signature || !type->hasTypeParameter());
-    if (auto arch = dyn_cast<ArchetypeType>(type))
-      return !arch->requiresClass();
-    // FIXME: Check class constraint of dependent types in their originating
-    // context.  Even for direct parameters this requires a more principled
-    // check than this.
-    if (auto paramType = dyn_cast<GenericTypeParamType>(type))
-      return isOpaqueType(signature, paramType);
-    if (isa<DependentMemberType>(type))
-      return true;
-    return false;
-  }
-
-  static bool isOpaqueType(CanGenericSignature signature,
-                           CanGenericTypeParamType type);
-
   Kind getKind() const { return Kind(TheKind); }
-
-  CanGenericSignature getGenericSignature() const {
-    assert(getKind() == Kind::Type ||
-           hasStoredClangType() ||
-           hasStoredObjCMethod());
-    return CanGenericSignature(GenericSig);
-  }
 
   CanGenericSignature getGenericSignatureForFunctionComponent() const {
     if (auto genericFn = dyn_cast<GenericFunctionType>(getType())) {
@@ -289,7 +288,10 @@ class AbstractionPattern {
 
   bool hasStoredClangType() const {
     return (getKind() == Kind::ClangType ||
-            getKind() == Kind::ClangFunctionParamTupleType);
+            getKind() == Kind::ClangFunctionParamTupleType ||
+            getKind() == Kind::CurriedCFunctionAsMethodType ||
+            getKind() == Kind::PartialCurriedCFunctionAsMethodType ||
+            getKind() == Kind::CFunctionAsMethodFormalParamTupleType);
   }
 
   bool hasStoredObjCMethod() const {
@@ -304,36 +306,43 @@ class AbstractionPattern {
     return hasStoredObjCMethod();
   }
 
-  void initSwiftType(CanGenericSignature signature, CanType origType) {
+  bool hasImportAsMemberStatus() const {
+    return getKind() == Kind::CurriedCFunctionAsMethodType ||
+           getKind() == Kind::PartialCurriedCFunctionAsMethodType ||
+           getKind() == Kind::CFunctionAsMethodFormalParamTupleType;
+  }
+  
+  void initSwiftType(CanGenericSignature signature, CanType origType,
+                     Kind kind = Kind::Type) {
     assert(signature || !origType->hasTypeParameter());
-    if (isOpaqueType(signature, origType)) {
-      TheKind = unsigned(Kind::Opaque);
-    } else {
-      TheKind = unsigned(Kind::Type);
-      OrigType = origType;
+    TheKind = unsigned(kind);
+    OrigType = origType;
+    GenericSig = CanGenericSignature();
+    if (origType->hasTypeParameter())
       GenericSig = signature;
-    }
   }
 
   void initClangType(CanGenericSignature signature,
                      CanType origType, const clang::Type *clangType,
                      Kind kind = Kind::ClangType) {
-    assert(!isOpaqueType(signature, origType));
-    TheKind = unsigned(kind);
-    OrigType = origType;
+    initSwiftType(signature, origType, kind);
     ClangType = clangType;
-    GenericSig = signature;
   }
 
   void initObjCMethod(CanGenericSignature signature,
                       CanType origType, const clang::ObjCMethodDecl *method,
                       Kind kind, EncodedForeignErrorInfo errorInfo) {
-    assert(!isOpaqueType(signature, origType));
-    TheKind = unsigned(kind);
-    OrigType = origType;
+    initSwiftType(signature, origType, kind);
     ObjCMethod = method;
     OtherData = errorInfo.getOpaqueValue();
-    GenericSig = signature;
+  }
+
+  void initCFunctionAsMethod(CanGenericSignature signature,
+                             CanType origType, const clang::Type *clangType,
+                             Kind kind,
+                             ImportAsMemberStatus memberStatus) {
+    initClangType(signature, origType, clangType, kind);
+    OtherData = memberStatus.rawValue;
   }
 
   AbstractionPattern() {}
@@ -362,6 +371,21 @@ public:
     return AbstractionPattern(Kind::Invalid);
   }
 
+  bool hasGenericSignature() const {
+    return (getKind() == Kind::Type ||
+            getKind() == Kind::Discard ||
+            hasStoredClangType() ||
+            hasStoredObjCMethod());
+  }
+
+  CanGenericSignature getGenericSignature() const {
+    assert(getKind() == Kind::Type ||
+           getKind() == Kind::Discard ||
+           hasStoredClangType() ||
+           hasStoredObjCMethod());
+    return CanGenericSignature(GenericSig);
+  }
+  
   /// Return an open-coded abstraction pattern for a tuple.  The
   /// caller is responsible for ensuring that the storage for the
   /// tuple elements is valid for as long as the abstraction pattern is.
@@ -392,6 +416,32 @@ public:
   getCurriedObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
                        const Optional<ForeignErrorConvention> &foreignError);
 
+  /// Return an abstraction pattern for the curried type of a
+  /// C function imported as a method.
+  static AbstractionPattern
+  getCurriedCFunctionAsMethod(CanType origType,
+                              const AbstractFunctionDecl *function);
+
+  /// For a C-function-as-method pattern,
+  /// get the index of the C function parameter that was imported as the
+  /// `self` parameter of the imported method, or None if this is a static
+  /// method with no `self` parameter.
+  ImportAsMemberStatus getImportAsMemberStatus() const {
+    assert(hasImportAsMemberStatus());
+    ImportAsMemberStatus status;
+    status.rawValue = OtherData;
+    return status;
+  }
+  
+  /// Return an abstraction pattern for a value that is discarded after being
+  /// evaluated.
+  static AbstractionPattern
+  getDiscard(CanGenericSignature signature, CanType origType) {
+    AbstractionPattern pattern;
+    pattern.initSwiftType(signature, origType, Kind::Discard);
+    return pattern;
+  }
+  
 private:
   /// Return an abstraction pattern for the curried type of an
   /// Objective-C method.
@@ -402,6 +452,18 @@ private:
     AbstractionPattern pattern;
     pattern.initObjCMethod(nullptr, origType, method,
                            Kind::CurriedObjCMethodType, errorInfo);
+    return pattern;
+  }
+  
+  static AbstractionPattern
+  getCurriedCFunctionAsMethod(CanType origType,
+                              const clang::Type *clangType,
+                              ImportAsMemberStatus memberStatus) {
+    assert(isa<AnyFunctionType>(origType));
+    AbstractionPattern pattern;
+    pattern.initCFunctionAsMethod(nullptr, origType, clangType,
+                                  Kind::CurriedCFunctionAsMethodType,
+                                  memberStatus);
     return pattern;
   }
 
@@ -416,6 +478,19 @@ private:
     AbstractionPattern pattern;
     pattern.initObjCMethod(signature, origType, method,
                            Kind::PartialCurriedObjCMethodType, errorInfo);
+    return pattern;
+  }
+
+  static AbstractionPattern
+  getPartialCurriedCFunctionAsMethod(CanGenericSignature signature,
+                                     CanType origType,
+                                     const clang::Type *clangType,
+                                     ImportAsMemberStatus memberStatus) {
+    assert(isa<AnyFunctionType>(origType));
+    AbstractionPattern pattern;
+    pattern.initCFunctionAsMethod(signature, origType, clangType,
+                                  Kind::PartialCurriedCFunctionAsMethodType,
+                                  memberStatus);
     return pattern;
   }
 
@@ -452,13 +527,22 @@ private:
     return pattern;
   }
 
-  /// Return a pattern correspond to the 'self' parameter of the
+  /// Return a pattern corresponding to the 'self' parameter of the
   /// current Objective-C method.
   AbstractionPattern getObjCMethodSelfPattern(CanType paramType) const;
 
-  /// Return a pattern correspond to the formal parameters of the
+  /// Return a pattern corresponding to the formal parameters of the
   /// current Objective-C method.
   AbstractionPattern getObjCMethodFormalParamPattern(CanType paramType) const;
+  
+  /// Return a pattern corresponding to the 'self' parameter of the
+  /// current C function imported as a method.
+  AbstractionPattern getCFunctionAsMethodSelfPattern(CanType paramType) const;
+  
+  /// Return a pattern corresponding to the formal parameters of the
+  /// current C function imported as a method.
+  AbstractionPattern getCFunctionAsMethodFormalParamPattern(CanType paramType)
+    const;
 
   /// Return an abstraction pattern for a tuple representing the
   /// formal parameters to an Objective-C method.
@@ -470,6 +554,21 @@ private:
     AbstractionPattern pattern;
     pattern.initObjCMethod(signature, origType, method,
                            Kind::ObjCMethodFormalParamTupleType, errorInfo);
+    return pattern;
+  }
+
+  /// Return an abstraction pattern for a tuple representing the
+  /// formal method parameters to a C function imported as a method.
+  static AbstractionPattern
+  getCFunctionAsMethodFormalParamTuple(CanGenericSignature signature,
+                                       CanType origType,
+                                       const clang::Type *type,
+                                       ImportAsMemberStatus memberStatus) {
+    assert(isa<TupleType>(origType));
+    AbstractionPattern pattern;
+    pattern.initCFunctionAsMethod(signature, origType, type,
+                                  Kind::CFunctionAsMethodFormalParamTupleType,
+                                  memberStatus);
     return pattern;
   }
 
@@ -486,7 +585,8 @@ public:
   bool hasCachingKey() const {
     // Only the simplest Kind::Type pattern has a caching key; we
     // don't want to try to unique by Clang node.
-    return getKind() == Kind::Type || getKind() == Kind::Opaque;
+    return getKind() == Kind::Type || getKind() == Kind::Opaque
+        || getKind() == Kind::Discard;
   }
   using CachingKey = CanType;
   CachingKey getCachingKey() const {
@@ -498,10 +598,54 @@ public:
     return getKind() != Kind::Invalid;
   }
 
-  /// Is this abstraction pattern fully opaque?
-  bool isOpaque() const {
-    assert(isValid());
-    return getKind() == Kind::Opaque;
+  bool isTypeParameter() const {
+    switch (getKind()) {
+    case Kind::Opaque:
+      return true;
+    case Kind::Type:
+    case Kind::Discard: {
+      auto type = getType();
+      if (isa<ArchetypeType>(type) ||
+          isa<DependentMemberType>(type) ||
+          isa<AbstractTypeParamType>(type)) {
+        return true;
+      }
+      return false;
+    }
+    default:
+      return false;
+    }
+  }
+
+  /// Is this an interface type that is subject to a concrete
+  /// same-type constraint?
+  bool isConcreteType(ModuleDecl &module) const {
+    assert(isTypeParameter());
+    return (getKind() != Kind::Opaque &&
+            GenericSig != nullptr &&
+            GenericSig->isConcreteType(getType(), module));
+  }
+
+  bool requiresClass(ModuleDecl &module) {
+    switch (getKind()) {
+    case Kind::Opaque:
+      return false;
+    case Kind::Type:
+    case Kind::Discard: {
+      auto type = getType();
+      if (auto archetype = dyn_cast<ArchetypeType>(type))
+        return archetype->requiresClass();
+      else if (isa<DependentMemberType>(type) ||
+               isa<AbstractTypeParamType>(type)) {
+        assert(GenericSig &&
+               "Dependent type in pattern without generic signature?");
+        return GenericSig->requiresClass(type, module);
+      }
+      return false;
+    }
+    default:
+      return false;
+    }
   }
 
   /// Return the Swift type which provides structure for this
@@ -525,7 +669,11 @@ public:
     case Kind::ObjCMethodType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
+    case Kind::CurriedCFunctionAsMethodType:
+    case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CFunctionAsMethodFormalParamTupleType:
     case Kind::Type:
+    case Kind::Discard:
       return OrigType;
     }
     llvm_unreachable("bad kind");
@@ -543,6 +691,7 @@ public:
     case Kind::Opaque:
     case Kind::Tuple:
     case Kind::Type:
+    case Kind::Discard:
       return false;
     case Kind::ClangType:
     case Kind::ClangFunctionParamTupleType:
@@ -551,9 +700,17 @@ public:
     case Kind::ObjCMethodType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
+    case Kind::CurriedCFunctionAsMethodType:
+    case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CFunctionAsMethodFormalParamTupleType:
       return true;
     }
     llvm_unreachable("bad kind");
+  }
+
+  /// True if the value is discarded.
+  bool isDiscarded() const {
+    return getKind() == Kind::Discard;
   }
 
   /// Return whether this abstraction pattern represents a Clang type.
@@ -583,7 +740,7 @@ public:
     assert(hasStoredForeignErrorInfo());
     return EncodedForeignErrorInfo::fromOpaqueValue(OtherData);
   }
-
+  
   bool hasForeignErrorStrippingResultOptionality() const {
     switch (getKind()) {
     case Kind::Invalid:
@@ -597,6 +754,10 @@ public:
     case Kind::Opaque:
     case Kind::ClangType:
     case Kind::Type:
+    case Kind::Discard:
+    case Kind::CurriedCFunctionAsMethodType:
+    case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CFunctionAsMethodFormalParamTupleType:
       return false;
     case Kind::PartialCurriedObjCMethodType:
     case Kind::CurriedObjCMethodType:
@@ -625,7 +786,11 @@ public:
     case Kind::ObjCMethodType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
+    case Kind::CurriedCFunctionAsMethodType:
+    case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CFunctionAsMethodFormalParamTupleType:
     case Kind::Type:
+    case Kind::Discard:
       return dyn_cast<TYPE>(getType());
     }
     llvm_unreachable("bad kind");
@@ -649,9 +814,13 @@ public:
     case Kind::ObjCMethodType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
+    case Kind::CurriedCFunctionAsMethodType:
+    case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CFunctionAsMethodFormalParamTupleType:
       // We assume that the Clang type might provide additional structure.
       return false;
     case Kind::Type:
+    case Kind::Discard:
       return getType() == type;
     }
     llvm_unreachable("bad kind");
@@ -670,14 +839,18 @@ public:
     case Kind::Opaque:
     case Kind::PartialCurriedObjCMethodType:
     case Kind::CurriedObjCMethodType:
+    case Kind::CurriedCFunctionAsMethodType:
+    case Kind::PartialCurriedCFunctionAsMethodType:
     case Kind::ObjCMethodType:
       return false;
     case Kind::Tuple:
     case Kind::ClangFunctionParamTupleType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
+    case Kind::CFunctionAsMethodFormalParamTupleType:
       return true;
     case Kind::Type:
+    case Kind::Discard:
     case Kind::ClangType:
       return isa<TupleType>(getType());
     }
@@ -691,15 +864,19 @@ public:
     case Kind::Opaque:
     case Kind::PartialCurriedObjCMethodType:
     case Kind::CurriedObjCMethodType:
+    case Kind::CurriedCFunctionAsMethodType:
+    case Kind::PartialCurriedCFunctionAsMethodType:
     case Kind::ObjCMethodType:
       llvm_unreachable("pattern is not a tuple");      
     case Kind::Tuple:
       return getNumTupleElements_Stored();
     case Kind::Type:
+    case Kind::Discard:
     case Kind::ClangType:
     case Kind::ClangFunctionParamTupleType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
+    case Kind::CFunctionAsMethodFormalParamTupleType:
       return cast<TupleType>(getType())->getNumElements();
     }
     llvm_unreachable("bad kind");
@@ -727,6 +904,10 @@ public:
   /// Given that the value being abstracted is a function, return the
   /// abstraction pattern for its input type.
   AbstractionPattern getFunctionInputType() const;
+
+  /// Given that the value being abstracted is optional, return the
+  /// abstraction pattern for its object type.
+  AbstractionPattern getAnyOptionalObjectType() const;
 
   /// If this pattern refers to a reference storage type, look through
   /// it.

@@ -4,11 +4,11 @@
 struct S {}
 struct Q {}
 
-func printMetatype<T>(x: Any, _: T.Type) {
+func printMetatype<T>(_ x: Any, _: T.Type) {
   debugPrint(x as! T.Type)
 }
 
-func printMetatypeConditional<T>(x: Any, _: T.Type) {
+func printMetatypeConditional<T>(_ x: Any, _: T.Type) {
   if let y = x as? T.Type {
     debugPrint(y)
   } else {
@@ -40,7 +40,7 @@ printMetatypeConditional(any, Q.self)
 // Unspecialized wrapper around sizeof(T) to force us to get the runtime's idea
 // of the size of a type.
 @inline(never)
-func unspecializedSizeOf<T>(t: T.Type) -> Int {
+func unspecializedSizeOf<T>(_ t: T.Type) -> Int {
   return sizeof(t)
 }
 
@@ -64,7 +64,7 @@ print(sizeof(ContainsTupleOfTrivialMetatype<Int64>.self))
 print(unspecializedSizeOf(ContainsTupleOfTrivialMetatype<Int64>.self))
 
 struct ContainsTupleOfFunctions<T> {
-  var x: (T, T -> T)
+  var x: (T, (T) -> T)
   
   func apply() -> T {
     return x.1(x.0)
@@ -88,13 +88,13 @@ print(x.apply())
 // CHECK-NEXT: foobar
 print(y.apply())
 
-func callAny<T>(f: Any, _ x: T) -> T {
-  return (f as! T -> T)(x)
+func callAny<T>(_ f: Any, _ x: T) -> T {
+  return (f as! (T) -> T)(x)
 }
 
 any = {(x: Int) -> Int in x + x}
 // CHECK-NEXT: 24
-print((any as! Int -> Int)(12))
+print((any as! (Int) -> Int)(12))
 // CHECK-NEXT: 24
 let ca = callAny(any, 12)
 print(ca)

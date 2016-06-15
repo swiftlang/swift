@@ -13,7 +13,7 @@ class ThisBase1 {
   }
 
   func baseFunc0() {}
-  func baseFunc1(a: Int) {}
+  func baseFunc1(_ a: Int) {}
 
   subscript(i: Int) -> Double {
     get {
@@ -24,7 +24,7 @@ class ThisBase1 {
     }
   }
 
-  class var baseStaticVar: Int = 42 // expected-error {{class stored properties not yet supported}}
+  class var baseStaticVar: Int = 42 // expected-error {{class stored properties not supported}}
 
   class var baseStaticProp: Int {
     get {
@@ -59,7 +59,7 @@ class ThisDerived1 : ThisBase1 {
   }
 
   func derivedFunc0() {}
-  func derivedFunc1(a: Int) {}
+  func derivedFunc1(_ a: Int) {}
 
   subscript(i: Double) -> Int {
     get {
@@ -70,7 +70,7 @@ class ThisDerived1 : ThisBase1 {
     }
   }
 
-  class var derivedStaticVar: Int = 42// expected-error {{class stored properties not yet supported}}
+  class var derivedStaticVar: Int = 42// expected-error {{class stored properties not supported}}
 
   class var derivedStaticProp: Int {
     get {
@@ -223,11 +223,11 @@ class ThisDerived1 : ThisBase1 {
     self.baseInstanceVar = 42 // expected-error {{member 'baseInstanceVar' cannot be used on type 'ThisDerived1'}}
     self.baseProp = 42 // expected-error {{member 'baseProp' cannot be used on type 'ThisDerived1'}}
     self.baseFunc0() // expected-error {{missing argument}}
-    self.baseFunc0(ThisBase1())() // expected-error {{'(ThisBase1) -> _' is not convertible to 'ThisDerived1 -> () -> ()'}}
+    self.baseFunc0(ThisBase1())() // expected-error {{'(ThisBase1) -> () -> ()' is not convertible to 'ThisDerived1 -> () -> ()'}}
     
     self.baseFunc0(ThisDerived1())()
     self.baseFunc1(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'ThisBase1'}}
-    self.baseFunc1(ThisBase1())(42) // expected-error {{'(ThisBase1) -> _' is not convertible to 'ThisDerived1 -> (Int) -> ()'}}
+    self.baseFunc1(ThisBase1())(42) // expected-error {{'(ThisBase1) -> (Int) -> ()' is not convertible to 'ThisDerived1 -> (Int) -> ()'}}
     self.baseFunc1(ThisDerived1())(42)
     self[0] = 42.0 // expected-error {{instance member 'subscript' cannot be used on type 'ThisDerived1'}}
     self.baseStaticVar = 42
@@ -433,7 +433,7 @@ class Outer {
   class MoreInner : Inner {}
 }
 
-func makeGenericStruct<S>(x: S) -> GenericStruct<S> {
+func makeGenericStruct<S>(_ x: S) -> GenericStruct<S> {
   return GenericStruct<S>()
 }
 struct GenericStruct<T> {}
@@ -445,19 +445,19 @@ extension Outer {
 }
 
 // <rdar://problem/14149537>
-func useProto<R : MyProto>(value: R) -> R.Element {
+func useProto<R : MyProto>(_ value: R) -> R.Element {
   return value.get()
 }
 
 protocol MyProto {
-  typealias Element
+  associatedtype Element
   func get() -> Element
 }
 
 
 // <rdar://problem/14488311>
 struct DefaultArgumentFromExtension {
-  func g(x: (DefaultArgumentFromExtension) -> () -> () = f) {
+  func g(_ x: (DefaultArgumentFromExtension) -> () -> () = f) {
     let f = 42
     var x2 = x
     x2 = f // expected-error{{cannot assign value of type 'Int' to type '(DefaultArgumentFromExtension) -> () -> ()'}}
@@ -475,5 +475,19 @@ struct MyStruct {
   mutating func mod() {state = false}
   // expected-note @+1 {{mark method 'mutating' to make 'self' mutable}} {{3-3=mutating }}
   func foo() { mod() } // expected-error {{cannot use mutating member on immutable value: 'self' is immutable}}
+}
+
+
+// <rdar://problem/19935319> QoI: poor diagnostic initializing a variable with a non-class func
+class Test19935319 {
+  let i = getFoo()  // expected-error {{cannot use instance member 'getFoo' within property initializer; property initializers run before 'self' is available}}
+  
+  func getFoo() -> Int {}
+}
+
+// <rdar://problem/23904262> QoI: ivar default initializer cannot reference other default initialized ivars?
+class r23904262 {
+  let x = 1
+  let y = x // expected-error {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -parse-as-library | FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -7,7 +7,7 @@
 
 // CHECK: [[TYPE:%.+]] = type <{ [8 x i8] }>
 
-@inline(never) func id<T>(t: T) -> T {
+@inline(never) func id<T>(_ t: T) -> T {
   return t
 }
 // CHECK-LABEL: define hidden void @_TF21dynamic_self_metadata2idurFxx
@@ -37,7 +37,6 @@ class C {
   // CHECK-LABEL: define hidden i64 @_TFC21dynamic_self_metadata1C19dynamicSelfArgumentfT_GSqDS0__(%C21dynamic_self_metadata1C*)
   // CHECK: [[CAST1:%.+]] = bitcast %C21dynamic_self_metadata1C* %0 to [[METATYPE:%.+]]
   // CHECK: [[TYPE1:%.+]] = call %swift.type* @swift_getObjectType([[METATYPE]] [[CAST1]])
-  // CHECK: [[CAST2:%.+]] = bitcast %swift.type* [[TYPE1]] to i8*
-  // CHECK: [[TYPE2:%.+]] = call %swift.type* @swift_getGenericMetadata1(%swift.type_pattern* @_TMPSq, i8* [[CAST2]])
+  // CHECK: [[TYPE2:%.+]] = call %swift.type* @_TMaSq(%swift.type* [[TYPE1]])
   // CHECK: call void @_TF21dynamic_self_metadata2idurFxx({{.*}}, %swift.type* [[TYPE2]])
 }

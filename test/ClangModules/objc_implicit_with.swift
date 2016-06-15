@@ -12,15 +12,15 @@ class X {
   func doSomething(withDouble d: Double) { }
 
   init(_ withString: String) { } // not corrected
-  func doSomething(withString: String) { } // not corrected
+  func doSomething(_ withString: String) { } // not corrected
 }
 
 
-func testInitWith(url: String) {
-  _ = NSInterestingDesignated(URL: url)
+func testInitWith(_ url: String) {
+  _ = NSInterestingDesignated(url: url)
 }
 
-func testInstanceTypeFactoryMethod(queen: Bee) {
+func testInstanceTypeFactoryMethod(_ queen: Bee) {
   _ = Hive(queen: queen)
   
   _ = NSObjectFactory() // okay, prefers init method
@@ -33,24 +33,24 @@ func testInstanceTypeFactoryMethodInherited() {
   _ = NSObjectFactorySub() // okay, prefers init method
   _ = NSObjectFactorySub(integer: 1)
   _ = NSObjectFactorySub(double: 314159)
-  // FIXME: Awful diagnostic
-  _ = NSObjectFactorySub(float: 314159) // expected-error{{incorrect argument label in call (have 'float:', expected 'integer:')}} {{26-31=integer}}
+  _ = NSObjectFactorySub(float: 314159) // expected-error{{argument labels '(float:)' do not match any available overloads}} 
+  // expected-note @-1 {{overloads for 'NSObjectFactorySub' exist with these partially matching parameter lists: (integer: Int), (double: Double)}}
   let a = NSObjectFactorySub(buildingWidgets: ()) // expected-error{{argument labels '(buildingWidgets:)' do not match any available overloads}}
   // expected-note @-1 {{overloads for 'NSObjectFactorySub' exist with these partially matching parameter lists: (integer: Int), (double: Double)}}
   _ = a
 }
 
-func testNSErrorFactoryMethod(path: String) throws {
+func testNSErrorFactoryMethod(_ path: String) throws {
   _ = try NSString(contentsOfFile: path)
 }
 
-func testNonInstanceTypeFactoryMethod(s: String) {
+func testNonInstanceTypeFactoryMethod(_ s: String) {
   _ = NSObjectFactory(string: s) // expected-error{{argument labels '(string:)' do not match any available overloads}}
   // expected-note @-1 {{overloads for 'NSObjectFactory' exist with these partially matching parameter lists: (integer: Int), (double: Double), (float: Float)}}
 }
 
-func testUseOfFactoryMethod(queen: Bee) {
-  _ = Hive.hiveWithQueen(queen) // expected-error{{'hiveWithQueen' is unavailable: use object construction 'Hive(queen:)'}}
+func testUseOfFactoryMethod(_ queen: Bee) {
+  _ = Hive.withQueen(queen) // expected-error{{'withQueen' is unavailable: use object construction 'Hive(queen:)'}}
 }
 
 func testNonsplittableFactoryMethod() {
@@ -60,5 +60,5 @@ func testNonsplittableFactoryMethod() {
 // rdar://problem/18797808
 func testFactoryMethodWithKeywordArgument() {
   let prot = NSCoding.self
-  _ = NSXPCInterface(withProtocol: prot) // not "protocol:"
+  _ = NSXPCInterface(with: prot) // not "protocol:"
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -26,7 +26,7 @@
 // some utility functions, which can be used instead of the relevant member
 // functions in ValueBase and SILValue:
 //
-// V->use_empty()        ->  hasNoUsesExceptDebug(V)
+// V->use_empty()        ->  onlyHaveDebugUses(V)
 // V.hasOneUse()         ->  hasOneNonDebugUse(V)
 // V.getUses()           ->  getNonDebugUses(V)
 // I->eraseFromParent()  ->  eraseFromParentWithDebugInsts(I)
@@ -59,13 +59,13 @@ inline void deleteAllDebugUses(ValueBase *Inst) {
 }
 
 /// This iterator filters out any debug (or non-debug) instructions from a range
-/// of uses, provided by the underlying use-iterator \p Base.
+/// of uses, provided by the underlying ValueBaseUseIterator.
 /// If \p nonDebugInsts is true, then the iterator provides a view to all non-
 /// debug instructions. Otherwise it provides a view ot all debug-instructions.
-template <typename Base, bool nonDebugInsts> class DebugUseIterator
+template <bool nonDebugInsts> class DebugUseIterator
 : public std::iterator<std::forward_iterator_tag, Operand *, ptrdiff_t> {
   
-  Base BaseIterator;
+  ValueBaseUseIterator BaseIterator;
   
   // Skip any debug or non-debug instructions (depending on the nonDebugInsts
   // template argument).
@@ -84,7 +84,8 @@ template <typename Base, bool nonDebugInsts> class DebugUseIterator
   
 public:
   
-  DebugUseIterator(Base BaseIterator) : BaseIterator(BaseIterator) {
+  DebugUseIterator(ValueBaseUseIterator BaseIterator) :
+      BaseIterator(BaseIterator) {
     skipInsts();
   }
   
@@ -116,46 +117,48 @@ public:
 };
 
 /// Iterator for iteration over debug instructions.
-template <typename V> using DUIterator =
-  DebugUseIterator<typename V::use_iterator, false>;
+using DUIterator = DebugUseIterator<false>;
 
 /// Iterator for iteration over non-debug instructions.
-template <typename V> using NonDUIterator =
-  DebugUseIterator<typename V::use_iterator, true>;
+using NonDUIterator = DebugUseIterator<true>;
 
 
 /// Returns a range of all debug instructions in the uses of a value (e.g.
 /// SILValue or SILInstruction).
-template <typename V>
-inline iterator_range<DUIterator<V>> getDebugUses(const V &value) {
-  return make_range(DUIterator<V>(value.use_begin()),
-                    DUIterator<V>(value.use_end()));
+inline iterator_range<DUIterator> getDebugUses(SILValue V) {
+  return make_range(DUIterator(V->use_begin()), DUIterator(V->use_end()));
 }
 
 /// Returns a range of all non-debug instructions in the uses of a value (e.g.
 /// SILValue or SILInstruction).
-template <typename V>
-inline iterator_range<NonDUIterator<V>> getNonDebugUses(const V &value) {
-  return make_range(NonDUIterator<V>(value.use_begin()),
-                    NonDUIterator<V>(value.use_end()));
+inline iterator_range<NonDUIterator> getNonDebugUses(SILValue V) {
+  return make_range(NonDUIterator(V->use_begin()), NonDUIterator(V->use_end()));
 }
 
 /// Returns true if a value (e.g. SILInstruction) has no uses except debug
 /// instructions.
-template <typename V>
-inline bool hasNoUsesExceptDebug(V *I) {
-  auto NonDebugUses = getNonDebugUses(*I);
+inline bool onlyHaveDebugUses(SILValue V) {
+  auto NonDebugUses = getNonDebugUses(V);
   return NonDebugUses.begin() == NonDebugUses.end();
 }
 
 /// Returns true if a value (e.g. SILInstruction) has exactly one use which is
 /// not a debug instruction.
-template <typename V>
-inline bool hasOneNonDebugUse(const V &value) {
-  auto Range = getNonDebugUses(value);
+inline bool hasOneNonDebugUse(SILValue V) {
+  auto Range = getNonDebugUses(V);
   auto I = Range.begin(), E = Range.end();
   if (I == E) return false;
   return ++I == E;
+}
+
+// Returns the use if the value has only one non debug user.
+inline SILInstruction *getSingleNonDebugUser(SILValue V) {
+  auto Range = getNonDebugUses(V);
+  auto I = Range.begin(), E = Range.end();
+  if (I == E) return nullptr;
+  if (std::next(I) != E)
+    return nullptr;
+  return I->getUser();
 }
 
 /// Erases the instruction \p I from it's parent block and deletes it, including

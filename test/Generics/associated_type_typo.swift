@@ -4,11 +4,11 @@
 // RUN: FileCheck -check-prefix CHECK-GENERIC %s < %t.dump
 
 protocol P1 {
-  typealias Assoc
+  associatedtype Assoc
 }
 
 protocol P2 {
-  typealias AssocP2 : P1
+  associatedtype AssocP2 : P1
 }
 
 protocol P3 { }
@@ -49,12 +49,12 @@ func typoAssoc4<T : P2 where T.Assocp2.assoc : P3>(_: T) { }
 // <rdar://problem/19620340>
 
 func typoFunc1<T : P1>(x: TypoType) { // expected-error{{use of undeclared type 'TypoType'}}
-  let _: T.Assoc -> () = { let _ = $0 }
+  let _: T.Assoc -> () = { let _ = $0 } // expected-error{{'Assoc' is not a member type of 'T'}}
 }
 
 func typoFunc2<T : P1>(x: TypoType, y: T) { // expected-error{{use of undeclared type 'TypoType'}}
-  let _: T.Assoc -> () = { let _ = $0 }
+  let _: T.Assoc -> () = { let _ = $0 } // expected-error{{'Assoc' is not a member type of 'T'}}
 }
 
-func typoFunc3<T : P1>(x: TypoType, y: T.Assoc -> ()) { // expected-error{{use of undeclared type 'TypoType'}}
+func typoFunc3<T : P1>(x: TypoType, y: (T.Assoc) -> ()) { // expected-error{{use of undeclared type 'TypoType'}}
 }

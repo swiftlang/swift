@@ -4,8 +4,8 @@ struct Foo<T> {
 }
 
 protocol Runcible {
-  typealias Spoon
-  typealias Hat
+  associatedtype Spoon
+  associatedtype Hat
 }
 
 extension Foo {

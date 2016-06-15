@@ -5,10 +5,19 @@ struct PureClangType {
 
 #ifndef SWIFT_CLASS_EXTRA
 #  define SWIFT_CLASS_EXTRA
+#  define SWIFT_PROTOCOL_EXTRA
 #endif
 
 #ifndef SWIFT_CLASS
 #  define SWIFT_CLASS(SWIFT_NAME) SWIFT_CLASS_EXTRA
+#endif
+
+#ifndef SWIFT_PROTOCOL
+#  define SWIFT_PROTOCOL(SWIFT_NAME) SWIFT_PROTOCOL_EXTRA
+#endif
+
+#ifndef SWIFT_EXTENSION(X)
+#  define SWIFT_EXTENSION(X) X##__LINE__
 #endif
 
 #ifndef SWIFT_CLASS_NAMED
@@ -24,13 +33,19 @@ struct PureClangType {
 SWIFT_CLASS("SwiftClass")
 __attribute__((objc_root_class))
 @interface SwiftClass
+- (void)method;
+@property (nonatomic) long integerProperty;
+@end
+
+@interface SwiftClass (SWIFT_EXTENSION(foo))
+- (void)extensionMethod;
 @end
 
 @interface SwiftClass (Category)
 - (void)categoryMethod:(struct PureClangType)arg;
 @end
 
-SWIFT_PROTOCOL_NAMED("CustomNameType")
+SWIFT_PROTOCOL_NAMED("CustomName")
 @protocol SwiftProtoWithCustomName
 @end
 
@@ -38,7 +53,14 @@ SWIFT_CLASS_NAMED("CustomNameClass")
 __attribute__((objc_root_class))
 @interface SwiftClassWithCustomName <SwiftProtoWithCustomName>
 @end
-  
+
+SWIFT_PROTOCOL("SwiftProto")
+@protocol SwiftProto
+- (void)protoMethod;
+@property (nonatomic) long protoProperty;
+@end
+
+
 id <SwiftProtoWithCustomName> __nonnull convertToProto(SwiftClassWithCustomName * __nonnull obj);
 
 

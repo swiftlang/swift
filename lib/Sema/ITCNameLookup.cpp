@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -21,9 +21,9 @@
 #include <tuple>
 using namespace swift;
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Qualified name lookup handling
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isQualifiedLookupInDeclContextSatisfied(
        TypeCheckRequest::DeclContextLookupPayloadType payload) {
   auto dc = payload.DC;
@@ -35,6 +35,7 @@ bool IterativeTypeChecker::isQualifiedLookupInDeclContextSatisfied(
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::SerializedLocal:
+  case DeclContextKind::SubscriptDecl:
     llvm_unreachable("not a DeclContext that supports name lookup");
 
   case DeclContextKind::Module:
@@ -42,15 +43,16 @@ bool IterativeTypeChecker::isQualifiedLookupInDeclContextSatisfied(
     // Modules and file units can always handle name lookup.
     return true;
 
-  case DeclContextKind::NominalTypeDecl:
+  case DeclContextKind::GenericTypeDecl:
     // Get the nominal type.
-    nominal = cast<NominalTypeDecl>(dc);
+    nominal = dyn_cast<NominalTypeDecl>(cast<GenericTypeDecl>(dc));
+    if (!nominal) return true;
     break;
 
   case DeclContextKind::ExtensionDecl: {
     auto ext = cast<ExtensionDecl>(dc);
     // FIXME: bind the extension. We currently assume this is done.
-    nominal = ext->isNominalTypeOrNominalTypeExtensionContext();
+    nominal = ext->getAsNominalTypeOrNominalTypeExtensionContext();
     if (!nominal) return true;
     break;
   }
@@ -87,7 +89,7 @@ bool IterativeTypeChecker::isQualifiedLookupInDeclContextSatisfied(
 void IterativeTypeChecker::processQualifiedLookupInDeclContext(
        TypeCheckRequest::DeclContextLookupPayloadType payload,
        UnsatisfiedDependency unsatisfiedDependency) {
-  auto nominal = payload.DC->isNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = payload.DC->getAsNominalTypeOrNominalTypeExtensionContext();
   assert(nominal && "Only nominal types are handled here");
 
   // For classes, we need the superclass (if any) to support qualified lookup.
@@ -122,15 +124,16 @@ bool IterativeTypeChecker::breakCycleForQualifiedLookupInDeclContext(
   return false;
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Qualified name lookup handling
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isUnqualifiedLookupInDeclContextSatisfied(
        TypeCheckRequest::DeclContextLookupPayloadType payload) {
   auto dc = payload.DC;
   switch (dc->getContextKind()) {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::SerializedLocal:
@@ -145,7 +148,7 @@ bool IterativeTypeChecker::isUnqualifiedLookupInDeclContextSatisfied(
     // Modules and file units can always handle name lookup.
     return true;
 
-  case DeclContextKind::NominalTypeDecl:
+  case DeclContextKind::GenericTypeDecl:
   case DeclContextKind::ExtensionDecl:
     // Check whether we can perform qualified lookup into this
     // declaration context.

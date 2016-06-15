@@ -6,7 +6,7 @@ The general guiding principle of Swift access control:
 
   **No entity can be defined in terms of another entity that has a lower
   access level.**
-	
+
 There are three levels of access: "private", "internal", and "public".
 Private entities can only be accessed from within the source file where they
 are defined. Internal entities can be accessed anywhere within the module they
@@ -90,7 +90,7 @@ Protocols
 
 A protocol may have any access level less than or equal to the access levels
 of the protocols it refines. That is, a ``private`` ExtendedWidget protocol can
-refine an ``public`` Widget protocol, but not the other way around.
+refine a ``public`` Widget protocol, but not the other way around.
 
 The access level of a requirement is the access level of the enclosing
 protocol, even when the protocol is ``public``. Currently, requirements may not
@@ -154,7 +154,7 @@ elements. A function type's access level is the minimum of the access levels of
 its input and return types.
 
 A typealias may have any access level up to the access level of the type it
-aliases. That is, a ``private`` typealias can refer to an ``public`` type, but
+aliases. That is, a ``private`` typealias can refer to a ``public`` type, but
 not the other way around. This includes associated types used to satisfy
 protocol conformances.
 

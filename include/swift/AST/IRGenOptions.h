@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -19,6 +19,10 @@
 #define SWIFT_AST_IRGENOPTIONS_H
 
 #include "swift/AST/LinkLibrary.h"
+#include "swift/Basic/Sanitizers.h"
+// FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
+// split the header upstream so we don't include so much.
+#include "llvm/Transforms/Instrumentation.h"
 #include <string>
 #include <vector>
 
@@ -64,6 +68,9 @@ public:
   /// The compilation directory for the debug info.
   std::string DebugCompilationDir;
 
+  /// The DWARF version of debug info.
+  unsigned DWARFVersion;
+
   /// The command line string that is to be stored in the DWARF debug info.
   std::string DWARFDebugFlags;
 
@@ -83,6 +90,9 @@ public:
 
   /// Whether or not to run optimization passes.
   unsigned Optimize : 1;
+
+  /// Which sanitizer is turned on.
+  SanitizerKind Sanitize : 2;
 
   /// Whether we should emit debug info.
   IRGenDebugInfoKind DebugInfoKind : 2;
@@ -123,26 +133,67 @@ public:
   /// Instrument code to generate profiling information.
   unsigned GenerateProfile : 1;
 
+  /// Print the LLVM inline tree at the end of the LLVM pass pipeline.
+  unsigned PrintInlineTree : 1;
+
   /// Whether we should embed the bitcode file.
   IRGenEmbedMode EmbedMode : 2;
+
+  /// Add names to LLVM values.
+  unsigned HasValueNamesSetting : 1;
+  unsigned ValueNames : 1;
+
+  /// Emit nominal type field metadata.
+  unsigned EnableReflectionMetadata : 1;
+
+  /// Emit names of struct stored properties and enum cases.
+  unsigned EnableReflectionNames : 1;
+
+  /// Should we try to build incrementally by not emitting an object file if it
+  /// has the same IR hash as the module that we are preparing to emit?
+  ///
+  /// This is a debugging option meant to make it easier to perform compile time
+  /// measurements on a non-clean build directory.
+  unsigned UseIncrementalLLVMCodeGen : 1;
+
+  /// Enable use of the swiftcall calling convention.
+  unsigned UseSwiftCall : 1;
 
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
 
-  IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
-                   Optimize(false), DebugInfoKind(IRGenDebugInfoKind::None),
-                   UseJIT(false), DisableLLVMOptzns(false),
-                   DisableLLVMARCOpts(false), DisableLLVMSLPVectorizer(false),
-                   DisableFPElim(true), Playground(false),
-                   EmitStackPromotionChecks(false), GenerateProfile(false),
-                   EmbedMode(IRGenEmbedMode::None) {}
-  
+  /// Which sanitizer coverage is turned on.
+  llvm::SanitizerCoverageOptions SanitizeCoverage;
+
+  IRGenOptions()
+      : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
+        Verify(true), Optimize(false), Sanitize(SanitizerKind::None),
+        DebugInfoKind(IRGenDebugInfoKind::None), UseJIT(false),
+        DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
+        DisableLLVMSLPVectorizer(false), DisableFPElim(true), Playground(false),
+        EmitStackPromotionChecks(false), GenerateProfile(false),
+        PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
+        HasValueNamesSetting(false), ValueNames(false),
+        EnableReflectionMetadata(true), EnableReflectionNames(true),
+        UseIncrementalLLVMCodeGen(true), UseSwiftCall(false), CmdArgs(),
+        SanitizeCoverage(llvm::SanitizerCoverageOptions()) {}
+
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
   StringRef getSingleOutputFilename() const {
     if (OutputFilenames.size() >= 1)
       return OutputFilenames.back();
     return StringRef();
+  }
+
+  // Get a hash of all options which influence the llvm compilation but are not
+  // reflected in the llvm module itself.
+  unsigned getLLVMCodeGenOptionsHash() {
+    unsigned Hash = 0;
+    Hash = (Hash << 1) | Optimize;
+    Hash = (Hash << 1) | DisableLLVMOptzns;
+    Hash = (Hash << 1) | DisableLLVMARCOpts;
+    return Hash;
   }
 };
 

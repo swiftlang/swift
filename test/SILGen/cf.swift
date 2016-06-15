@@ -5,7 +5,7 @@
 import CoreCooling
 
 // CHECK: sil hidden @_TF2cf8useEmAllFCSo16CCMagnetismModelT_ :
-func useEmAll(model: CCMagnetismModel) {
+func useEmAll(_ model: CCMagnetismModel) {
 // CHECK: function_ref @CCPowerSupplyGetDefault : $@convention(c) () -> @autoreleased ImplicitlyUnwrappedOptional<CCPowerSupply>
   let power = CCPowerSupplyGetDefault()
 
@@ -50,18 +50,18 @@ func useEmAll(model: CCMagnetismModel) {
 }
 
 // Ensure that accessors are emitted for fields used as protocol witnesses.
-protocol ImpedanceType {
-  typealias Component
+protocol Impedance {
+  associatedtype Component
   var real: Component { get }
   var imag: Component { get }
 }
 
-extension CCImpedance: ImpedanceType {}
+extension CCImpedance: Impedance {}
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf13ImpedanceTypeS0_FS1_g4realwx9Component
-// CHECK-LABEL: sil shared [transparent] @_TFVSC11CCImpedanceg4realSd
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf13ImpedanceTypeS0_FS1_g4imagwx9Component
-// CHECK-LABEL: sil shared [transparent] @_TFVSC11CCImpedanceg4imagSd
+// CHECK-LABEL: sil hidden [transparent] [fragile] [thunk] @_TTWVSC11CCImpedance2cf9ImpedanceS0_FS1_g4realwx9Component
+// CHECK-LABEL: sil shared [transparent] [fragile] @_TFVSC11CCImpedanceg4realSd
+// CHECK-LABEL: sil hidden [transparent] [fragile] [thunk] @_TTWVSC11CCImpedance2cf9ImpedanceS0_FS1_g4imagwx9Component
+// CHECK-LABEL: sil shared [transparent] [fragile] @_TFVSC11CCImpedanceg4imagSd
 
 class MyMagnetism : CCMagnetismModel {
   // CHECK-LABEL: sil hidden [thunk] @_TToFC2cf11MyMagnetism15getRefrigerator{{.*}} : $@convention(objc_method) (MyMagnetism) -> @autoreleased CCRefrigerator

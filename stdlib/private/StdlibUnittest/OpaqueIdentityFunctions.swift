@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -11,72 +11,72 @@
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("swift_stdlib_getPointer")
-func _stdlib_getPointer(x: COpaquePointer) -> COpaquePointer
+func _stdlib_getPointer(_ x: OpaquePointer) -> OpaquePointer
 
-public func _opaqueIdentity<T>(x: T) -> T {
-  let ptr = UnsafeMutablePointer<T>.alloc(1)
-  ptr.initialize(x)
+public func _opaqueIdentity<T>(_ x: T) -> T {
+  let ptr = UnsafeMutablePointer<T>(allocatingCapacity: 1)
+  ptr.initialize(with: x)
   let result =
-    UnsafeMutablePointer<T>(_stdlib_getPointer(COpaquePointer(ptr))).memory
-  ptr.destroy()
-  ptr.dealloc(1)
+    UnsafeMutablePointer<T>(_stdlib_getPointer(OpaquePointer(ptr))).pointee
+  ptr.deinitialize()
+  ptr.deallocateCapacity(1)
   return result
 }
 
-func _blackHolePtr<T>(x: UnsafePointer<T>) {
-  _stdlib_getPointer(COpaquePointer(x))
+func _blackHolePtr<T>(_ x: UnsafePointer<T>) {
+  _ = _stdlib_getPointer(OpaquePointer(x))
 }
 
-public func _blackHole<T>(x: T) {
+public func _blackHole<T>(_ x: T) {
   var x = x
   _blackHolePtr(&x)
 }
 
 @inline(never)
-public func getBool(x: Bool) -> Bool { return _opaqueIdentity(x) }
+public func getBool(_ x: Bool) -> Bool { return _opaqueIdentity(x) }
 
 @inline(never)
-public func getInt8(x: Int8) -> Int8 { return _opaqueIdentity(x) }
+public func getInt8(_ x: Int8) -> Int8 { return _opaqueIdentity(x) }
 
 @inline(never)
-public func getInt16(x: Int16) -> Int16 { return _opaqueIdentity(x) }
+public func getInt16(_ x: Int16) -> Int16 { return _opaqueIdentity(x) }
 
 @inline(never)
-public func getInt32(x: Int32) -> Int32 { return _opaqueIdentity(x) }
+public func getInt32(_ x: Int32) -> Int32 { return _opaqueIdentity(x) }
 
 @inline(never)
-public func getInt64(x: Int64) -> Int64 { return _opaqueIdentity(x) }
+public func getInt64(_ x: Int64) -> Int64 { return _opaqueIdentity(x) }
 
 @inline(never)
-public func getInt(x: Int) -> Int { return _opaqueIdentity(x) }
+public func getInt(_ x: Int) -> Int { return _opaqueIdentity(x) }
 
 @inline(never)
-public func getUInt8(x: UInt8) -> UInt8 { return _opaqueIdentity(x) }
+public func getUInt8(_ x: UInt8) -> UInt8 { return _opaqueIdentity(x) }
 
 @inline(never)
-public func getUInt16(x: UInt16) -> UInt16 { return _opaqueIdentity(x) }
+public func getUInt16(_ x: UInt16) -> UInt16 { return _opaqueIdentity(x) }
 
 @inline(never)
-public func getUInt32(x: UInt32) -> UInt32 { return _opaqueIdentity(x) }
+public func getUInt32(_ x: UInt32) -> UInt32 { return _opaqueIdentity(x) }
 
 @inline(never)
-public func getUInt64(x: UInt64) -> UInt64 { return _opaqueIdentity(x) }
+public func getUInt64(_ x: UInt64) -> UInt64 { return _opaqueIdentity(x) }
 
 @inline(never)
-public func getUInt(x: UInt) -> UInt { return _opaqueIdentity(x) }
+public func getUInt(_ x: UInt) -> UInt { return _opaqueIdentity(x) }
 
 @inline(never)
-public func getFloat32(x: Float32) -> Float32 { return _opaqueIdentity(x) }
+public func getFloat32(_ x: Float32) -> Float32 { return _opaqueIdentity(x) }
 
 @inline(never)
-public func getFloat64(x: Float64) -> Float64 { return _opaqueIdentity(x) }
+public func getFloat64(_ x: Float64) -> Float64 { return _opaqueIdentity(x) }
 
 #if arch(i386) || arch(x86_64)
 @inline(never)
-public func getFloat80(x: Float80) -> Float80 { return _opaqueIdentity(x) }
+public func getFloat80(_ x: Float80) -> Float80 { return _opaqueIdentity(x) }
 #endif
 
-public func getPointer(x: COpaquePointer) -> COpaquePointer {
+public func getPointer(_ x: OpaquePointer) -> OpaquePointer {
   return _opaqueIdentity(x)
 }
 

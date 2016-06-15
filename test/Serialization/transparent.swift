@@ -8,7 +8,7 @@
 
 import def_transparent
 
-// SIL-LABEL: sil @main : $@convention(c) (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> Int32 {
+// SIL-LABEL: sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 // SIL: [[RAW:%.+]] = global_addr @_Tv11transparent3rawSb : $*Bool
 // SIL: [[FUNC:%.+]] = function_ref @_TF15def_transparent15testTransparentFT1xSb_Sb : $@convention(thin) (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@convention(thin) (Bool) -> Bool
@@ -20,10 +20,6 @@ var raw = testTransparent(x: false)
 // SIL: [[RESULT2:%.+]] = apply [[FUNC2]]() : $@convention(thin) () -> Int32
 // SIL: store [[RESULT2]] to [[TMP]] : $*Int32
 var tmp = testBuiltin()
-
-func test_partial(i: Int32, j: Int32) {
-  calls(i: i, j: j)
-}
 
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TF15def_transparent15testTransparentFT1xSb_Sb : $@convention(thin) (Bool) -> Bool {
 // SIL: bb0(%0 : $Bool):
@@ -56,7 +52,7 @@ func test_switch(u: MaybePair) {
   do_switch(u: u)
 }
 
-// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7WrapperCfT3ValVs5Int32_S0_ : $@convention(thin) (Int32, @thin Wrapper.Type) -> Wrapper {
+// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7WrapperCfT3ValVs5Int32_S0_ : $@convention(method) (Int32, @thin Wrapper.Type) -> Wrapper {
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapper8getValue{{.*}} : $@convention(method) (Wrapper) -> Int32 {
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapperg10valueAgainVs5Int32 : $@convention(method) (Wrapper) -> Int32 {
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapper13getValueAgain{{.*}} : $@convention(method) (Wrapper) -> Int32 {

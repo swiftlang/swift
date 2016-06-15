@@ -10,7 +10,7 @@ import AppKit
 // Okay to use an Objective-C-defined initializer to satisfy an
 // initializer requirement in a protocol.
 protocol URLInitializable {
-  init?(URL: String!)
+  init?(url: String!)
 }
 
 extension URLDocument : URLInitializable { }

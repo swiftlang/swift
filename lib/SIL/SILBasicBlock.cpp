@@ -1,8 +1,8 @@
-//===--- SILBasicBlock.cpp - Basic blocks for high-level SIL code ----------==//
+//===--- SILBasicBlock.cpp - Basic blocks for high-level SIL code ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -37,7 +37,25 @@ SILBasicBlock::SILBasicBlock(SILFunction *parent, SILBasicBlock *afterBB)
   }
 }
 SILBasicBlock::~SILBasicBlock() {
+  // Invalidate all of the basic block arguments.
+  for (auto *Arg : BBArgList) {
+    getModule().notifyDeleteHandlers(Arg);
+  }
+
+  dropAllReferences();
+
+  // Notify the delete handlers that the instructions in this block are
+  // being deleted.
+  auto &M = getModule();
+  for (auto I = begin(), E = end(); I != E;) {
+    auto Inst = &*I;
+    ++I;
+    M.notifyDeleteHandlers(Inst);
+    erase(Inst);
+  }
+
   // iplist's destructor is going to destroy the InstList.
+  InstList.clearAndLeakNodesUnsafely();
 }
 
 int SILBasicBlock::getDebugID() {
@@ -73,7 +91,11 @@ void SILBasicBlock::remove(SILInstruction *I) {
 }
 
 void SILBasicBlock::erase(SILInstruction *I) {
+  // Notify the delete handlers that this instruction is going away.
+  getModule().notifyDeleteHandlers(&*I);
+  auto *F = getParent();
   InstList.erase(I);
+  F->getModule().deallocateInst(I);
 }
 
 /// This method unlinks 'self' from the containing SILFunction and deletes it.
@@ -81,21 +103,23 @@ void SILBasicBlock::eraseFromParent() {
   getParent()->getBlocks().erase(this);
 }
 
-/// This method unlinks 'self' from the containing SILFunction.
-void SILBasicBlock::removeFromParent() {
-  getParent()->getBlocks().remove(this);
-}
-
-
 /// Replace the ith BB argument with a new one with type Ty (and optional
 /// ValueDecl D).
 SILArgument *SILBasicBlock::replaceBBArg(unsigned i, SILType Ty,
                                          const ValueDecl *D) {
   SILModule &M = getParent()->getModule();
+
+
   assert(BBArgList[i]->use_empty() && "Expected no uses of the old BB arg!");
+
+  // Notify the delete handlers that this argument is being deleted.
+  M.notifyDeleteHandlers(BBArgList[i]);
 
   auto *NewArg = new (M) SILArgument(Ty, D);
   NewArg->setParent(this);
+
+  // TODO: When we switch to malloc/free allocation we'll be leaking memory
+  // here.
   BBArgList[i] = NewArg;
 
   return NewArg;
@@ -108,6 +132,14 @@ SILArgument *SILBasicBlock::createBBArg(SILType Ty, const ValueDecl *D) {
 SILArgument *SILBasicBlock::insertBBArg(bbarg_iterator Iter, SILType Ty,
                                         const ValueDecl *D) {
   return new (getModule()) SILArgument(this, Iter, Ty, D);
+}
+
+void SILBasicBlock::eraseBBArg(int Index) {
+  assert(getBBArg(Index)->use_empty() &&
+         "Erasing block argument that has uses!");
+  // Notify the delete handlers that this BB argument is going away.
+  getModule().notifyDeleteHandlers(getBBArg(Index));
+  BBArgList.erase(BBArgList.begin() + Index);
 }
 
 /// \brief Splits a basic block into two at the specified instruction.
@@ -161,6 +193,21 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
   }
 }
 
+/// ScopeCloner expects NewFn to be a clone of the original
+/// function, with all debug scopes and locations still pointing to
+/// the original function.
+ScopeCloner::ScopeCloner(SILFunction &NewFn) : NewFn(NewFn) {
+  // Some clients of SILCloner copy over the original function's
+  // debug scope. Create a new one here.
+  // FIXME: Audit all call sites and make them create the function
+  // debug scope.
+  auto *SILFn = NewFn.getDebugScope()->Parent.get<SILFunction *>();
+  if (SILFn != &NewFn) {
+    SILFn->setInlined();
+    NewFn.setDebugScope(getOrCreateClonedScope(NewFn.getDebugScope()));
+  }
+}
+
 const SILDebugScope *
 ScopeCloner::getOrCreateClonedScope(const SILDebugScope *OrigScope) {
   if (!OrigScope)
@@ -176,8 +223,10 @@ ScopeCloner::getOrCreateClonedScope(const SILDebugScope *OrigScope) {
     ClonedScope->InlinedCallSite =
         getOrCreateClonedScope(OrigScope->InlinedCallSite);
   } else {
-    ClonedScope->SILFn = &NewFn;
-    ClonedScope->Parent = getOrCreateClonedScope(OrigScope->Parent);
+    if (auto *ParentScope = OrigScope->Parent.dyn_cast<const SILDebugScope *>())
+      ClonedScope->Parent = getOrCreateClonedScope(ParentScope);
+    else
+      ClonedScope->Parent = &NewFn;
   }
   // Create an inline scope for the cloned instruction.
   assert(ClonedScopeCache.find(OrigScope) == ClonedScopeCache.end());

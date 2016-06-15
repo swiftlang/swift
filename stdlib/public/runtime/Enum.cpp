@@ -1,8 +1,8 @@
-//===--- Enum.cpp - Runtime declarations for enums -----------*- C++ -*--===//
+//===--- Enum.cpp - Runtime declarations for enums ------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -54,7 +54,7 @@ static unsigned getNumTagBytes(size_t size, unsigned emptyCases,
 /// can be inlined, the loop unrolled and the memory accesses merged.
 template <unsigned count> static void small_memcpy(void *dest, const void *src) {
   uint8_t *d8 = (uint8_t*)dest, *s8 = (uint8_t*)src;
-  for (unsigned int i = 0; i < count; i++) {
+  for (unsigned i = 0; i < count; i++) {
     *d8++ = *s8++;
   }
 }
@@ -102,7 +102,7 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
     .withExtraInhabitants(unusedExtraInhabitants > 0)
     .withEnumWitnesses(true)
     .withInlineStorage(ValueWitnessTable::isValueInline(size, align));
-  vwtable->stride = llvm::RoundUpToAlignment(size, align);
+  vwtable->stride = llvm::alignTo(size, align);
   
   // Substitute in better common value witnesses if we have them.
   // If the payload type is a single-refcounted pointer, and the enum has
@@ -139,10 +139,12 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
   }
 }
 
+SWIFT_RT_ENTRY_VISIBILITY
 int
 swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
                                       const Metadata *payload,
-                                      unsigned emptyCases) {
+                                      unsigned emptyCases)
+  SWIFT_CC(RegisterPreservingCC_IMPL) {
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto payloadSize = payloadWitnesses->getSize();
   auto payloadNumExtraInhabitants = payloadWitnesses->getNumExtraInhabitants();
@@ -152,12 +154,16 @@ swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
     auto *valueAddr = reinterpret_cast<const uint8_t*>(value);
     auto *extraTagBitAddr = valueAddr + payloadSize;
     unsigned extraTagBits = 0;
-    // FIXME: endianness
     unsigned numBytes = getNumTagBytes(payloadSize,
                                        emptyCases-payloadNumExtraInhabitants,
                                        1 /*payload case*/);
 
+#if defined(__BIG_ENDIAN__)
+    small_memcpy(reinterpret_cast<uint8_t*>(&extraTagBits) + 4 - numBytes,
+                 extraTagBitAddr, numBytes);
+#else
     small_memcpy(&extraTagBits, extraTagBitAddr, numBytes);
+#endif
 
     // If the extra tag bits are zero, we have a valid payload or
     // extra inhabitant (checked below). If nonzero, form the case index from
@@ -168,10 +174,15 @@ swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
 
       // In practice we should need no more than four bytes from the payload
       // area.
-      // FIXME: endianness.
       unsigned caseIndexFromValue = 0;
+#if defined(__BIG_ENDIAN__)
+      unsigned numPayloadTagBytes = std::min(size_t(4), payloadSize);
+      memcpy(reinterpret_cast<uint8_t*>(&caseIndexFromValue) + 4 -
+             numPayloadTagBytes, valueAddr, numPayloadTagBytes);
+#else
       memcpy(&caseIndexFromValue, valueAddr,
              std::min(size_t(4), payloadSize));
+#endif
       return (caseIndexFromExtraTagBits | caseIndexFromValue)
         + payloadNumExtraInhabitants;
     }
@@ -188,10 +199,13 @@ swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
   return -1;
 }
 
+SWIFT_RT_ENTRY_VISIBILITY
 void
 swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
-                                        const Metadata *payload,
-                                        int whichCase, unsigned emptyCases) {
+                                       const Metadata *payload,
+                                       int whichCase,
+                                       unsigned emptyCases)
+  SWIFT_CC(RegisterPreservingCC_IMPL) {
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto payloadSize = payloadWitnesses->getSize();
   unsigned payloadNumExtraInhabitants
@@ -242,11 +256,22 @@ swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
   }
   
   // Store into the value.
-  // FIXME: endianness.
+#if defined(__BIG_ENDIAN__)
+  unsigned numPayloadTagBytes = std::min(size_t(4), payloadSize);
+  memcpy(valueAddr,
+         reinterpret_cast<uint8_t*>(&payloadIndex) + 4 - numPayloadTagBytes,
+         numPayloadTagBytes);
+  if (payloadSize > 4)
+    memset(valueAddr + 4, 0, payloadSize - 4);
+  memcpy(extraTagBitAddr,
+         reinterpret_cast<uint8_t*>(&extraTagIndex) + 4 - numExtraTagBytes,
+         numExtraTagBytes);
+#else
   memcpy(valueAddr, &payloadIndex, std::min(size_t(4), payloadSize));
   if (payloadSize > 4)
     memset(valueAddr + 4, 0, payloadSize - 4);
   memcpy(extraTagBitAddr, &extraTagIndex, numExtraTagBytes);
+#endif
 }
 
 void
@@ -267,7 +292,7 @@ swift::swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
   }
   
   // Store the max payload size in the metadata.
-  enumType->getPayloadSize() = payloadSize;
+  assignUnlessEqual(enumType->getPayloadSize(), payloadSize);
   
   // The total size includes space for the tag.
   unsigned totalSize = payloadSize + getNumTagBytes(payloadSize,
@@ -307,17 +332,29 @@ static void storeMultiPayloadTag(OpaqueValue *value,
                                  MultiPayloadLayout layout,
                                  unsigned tag) {
   auto tagBytes = reinterpret_cast<char *>(value) + layout.payloadSize;
+#if defined(__BIG_ENDIAN__)
+  small_memcpy(tagBytes,
+               reinterpret_cast<char *>(&tag) + 4 - layout.numTagBytes,
+               layout.numTagBytes);
+#else
   small_memcpy(tagBytes, &tag, layout.numTagBytes);
+#endif
 }
 
 static void storeMultiPayloadValue(OpaqueValue *value,
                                    MultiPayloadLayout layout,
                                    unsigned payloadValue) {
   auto bytes = reinterpret_cast<char *>(value);
-  
+#if defined(__BIG_ENDIAN__)
+  unsigned numPayloadValueBytes =
+      std::min(layout.payloadSize, sizeof(payloadValue));
+  memcpy(bytes,
+         reinterpret_cast<char *>(&payloadValue) + 4 - numPayloadValueBytes,
+         numPayloadValueBytes);
+#else
   memcpy(bytes, &payloadValue,
          std::min(layout.payloadSize, sizeof(payloadValue)));
-  
+#endif
   // If the payload is larger than the value, zero out the rest.
   if (layout.payloadSize > sizeof(payloadValue))
     memset(bytes + sizeof(payloadValue), 0,
@@ -329,7 +366,12 @@ static unsigned loadMultiPayloadTag(const OpaqueValue *value,
   auto tagBytes = reinterpret_cast<const char *>(value) + layout.payloadSize;
 
   unsigned tag = 0;
+#if defined(__BIG_ENDIAN__)
+  small_memcpy(reinterpret_cast<char *>(&tag) + 4 - layout.numTagBytes,
+               tagBytes, layout.numTagBytes);
+#else
   small_memcpy(&tag, tagBytes, layout.numTagBytes);
+#endif
 
   return tag;
 }
@@ -338,8 +380,15 @@ static unsigned loadMultiPayloadValue(const OpaqueValue *value,
                                       MultiPayloadLayout layout) {
   auto bytes = reinterpret_cast<const char *>(value);
   unsigned payloadValue = 0;
+#if defined(__BIG_ENDIAN__)
+  unsigned numPayloadValueBytes =
+      std::min(layout.payloadSize, sizeof(payloadValue));
+  memcpy(reinterpret_cast<char *>(&payloadValue) + 4 - numPayloadValueBytes,
+         bytes, numPayloadValueBytes);
+#else
   memcpy(&payloadValue, bytes,
          std::min(layout.payloadSize, sizeof(payloadValue)));
+#endif
   return payloadValue;
 }
 

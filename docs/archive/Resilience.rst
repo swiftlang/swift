@@ -42,7 +42,7 @@ program may depend on some number of other components; this graph of
 dependencies can be assumed to be acyclic.
 
 Because a component is distributed as a unit, ABI resilience within the
-component is not required. It may still help to serve as a build- time
+component is not required. It may still help to serve as a build-time
 optimization, but Swift aims to offer substantially better build times than
 C/C++ programs due to other properties of the language (the module system, the
 lack of a preprocessor, the instantiation model, etc.).
@@ -254,7 +254,7 @@ versioned [fragile] attribute. There is also a [resilient] attribute, exclusive
 to any form of [fragile], to explicitly describe a declaration as resilient.
 
 Resilience is lexically inherited. It is not lexically constrained; a resilient
-language structure may have fragile sub-structures and vice- versa. The global
+language structure may have fragile sub-structures and vice-versa. The global
 context is resilient, although since it is also [public] (and not [api]),
 objects are not in practice constrained by resilience.
 
@@ -351,7 +351,7 @@ change a
 Resilience affects pretty much every language feature.
 
 Execution-time abstraction does not come without cost, and we do not wish to
-incur those costs where unnecessary. Many forms of execution- time abstraction
+incur those costs where unnecessary. Many forms of execution-time abstraction
 are unnecessary except as a build-time optimization, because in practice the
 software is deployed in large chunks that can be compiled at the same
 time. Within such a resilience unit , many execution-time abstractions can be
@@ -364,7 +364,7 @@ outside its resilience unit.
 
 A structure is said to be resilient if accesses to it rely only on its
 
-A structure is said to be universally non-resilient if it is non- resilient in
+A structure is said to be universally non-resilient if it is non-resilient in
 all contexts in which it is accessible.
 
 Many APIs are willing to selectively "lock down" some of their component
@@ -405,8 +405,8 @@ non-resilient.
 
 Named types declared within a function are universally non-resilient.
 
-Named types with the [unchanging] annotation are universally non-
-resilient. Problem, because of the need/desire to make things depend on whether
+Named types with the [unchanging] annotation are universally non-resilient.
+Problem, because of the need/desire to make things depend on whether
 a type is universally non-resilient. Makes it impossible to add [unchanging]
 without breaking ABI. See the call section.
 
@@ -433,9 +433,9 @@ Named types
 
 It is an error to place the [unchanging] annotation on any of these types:
 
-* a struct type with member types that are not universally non- resilient
+* a struct type with member types that are not universally non-resilient
 
-* an enum type with an enumerator whose type is not universally non- resilient
+* an enum type with an enumerator whose type is not universally non-resilient
 
 * a class extension
 
@@ -450,8 +450,8 @@ It is an error to place the [unchanging] annotation on a class extension.
 It is an error to place the [unchanging] annotation on a class whose primary
 definition contains a field whose type is potentially resilient in a context
 where the class is accessible. That is, if the class is exported, all of its
-fields must be universally non- resilient. If it is not exported, all of its
-fields must be non- resilient within its resilience unit.
+fields must be universally non-resilient. If it is not exported, all of its
+fields must be non-resilient within its resilience unit.
 
 It is allowed to add fields to an [unchanging] class in a class extension. Such
 fields are always side-stored, even if they are declared within the same

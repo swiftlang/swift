@@ -5,7 +5,7 @@
 
 import Foundation
 
-func vf(params: CVarArgType...) {
+func vf(_ params: CVarArg...) {
 	print("OK")
 }
 

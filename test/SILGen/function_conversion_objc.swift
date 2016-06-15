@@ -7,10 +7,10 @@ import Foundation
 // ==== Metatype to object conversions
 
 // CHECK-LABEL: sil hidden @_TF24function_conversion_objc20convMetatypeToObjectFFCSo8NSObjectMS0_T_
-func convMetatypeToObject(f: NSObject -> NSObject.Type) {
+func convMetatypeToObject(_ f: (NSObject) -> NSObject.Type) {
 // CHECK:         function_ref @_TTRXFo_oCSo8NSObject_dXMTS__XFo_oS__oPs9AnyObject__
 // CHECK:         partial_apply
-  let _: NSObject -> AnyObject = f
+  let _: (NSObject) -> AnyObject = f
 }
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oCSo8NSObject_dXMTS__XFo_oS__oPs9AnyObject__ : $@convention(thin) (@owned NSObject, @owned @callee_owned (@owned NSObject) -> @thick NSObject.Type) -> @owned AnyObject {
@@ -22,10 +22,10 @@ func convMetatypeToObject(f: NSObject -> NSObject.Type) {
 @objc protocol NSBurrito {}
 
 // CHECK-LABEL: sil hidden @_TF24function_conversion_objc31convExistentialMetatypeToObjectFFPS_9NSBurrito_PMPS0__T_
-func convExistentialMetatypeToObject(f: NSBurrito -> NSBurrito.Type) {
+func convExistentialMetatypeToObject(_ f: (NSBurrito) -> NSBurrito.Type) {
 // CHECK:         function_ref @_TTRXFo_oP24function_conversion_objc9NSBurrito__dXPMTPS0___XFo_oPS0___oPs9AnyObject__
 // CHECK:         partial_apply
-  let _: NSBurrito -> AnyObject = f
+  let _: (NSBurrito) -> AnyObject = f
 }
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oP24function_conversion_objc9NSBurrito__dXPMTPS0___XFo_oPS0___oPs9AnyObject__ : $@convention(thin) (@owned NSBurrito, @owned @callee_owned (@owned NSBurrito) -> @thick NSBurrito.Type) -> @owned AnyObject
@@ -35,7 +35,7 @@ func convExistentialMetatypeToObject(f: NSBurrito -> NSBurrito.Type) {
 // CHECK:         return
 
 // CHECK-LABEL: sil hidden @_TF24function_conversion_objc28convProtocolMetatypeToObjectFFT_MPS_9NSBurrito_T_
-func convProtocolMetatypeToObject(f: () -> NSBurrito.Protocol) {
+func convProtocolMetatypeToObject(_ f: () -> NSBurrito.Protocol) {
 // CHECK:         function_ref @_TTRXFo__dXMtP24function_conversion_objc9NSBurrito__XFo__oCSo8Protocol_
 // CHECK:         partial_apply
   let _: () -> Protocol = f
@@ -54,34 +54,34 @@ func convProtocolMetatypeToObject(f: () -> NSBurrito.Protocol) {
 // CHECK:         [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]]
 // CHECK:         [[COPY:%.*]] = copy_block [[BLOCK]] : $@convention(block) () -> ()
 // CHECK:         return [[COPY]]
-func funcToBlock(x: () -> ()) -> @convention(block) () -> () {
+func funcToBlock(_ x: () -> ()) -> @convention(block) () -> () {
   return x
 }
 
 // CHECK-LABEL: sil hidden @_TF24function_conversion_objc11blockToFuncFbT_T_FT_T_ : $@convention(thin) (@owned @convention(block) () -> ()) -> @owned @callee_owned () -> ()
 // CHECK:         [[COPIED:%.*]] = copy_block %0
-// CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb__dT__XFo__dT__
+// CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb___XFo___
 // CHECK:         [[FUNC:%.*]] = partial_apply [[THUNK]]([[COPIED]])
 // CHECK:         return [[FUNC]]
-func blockToFunc(x: @convention(block) () -> ()) -> () -> () {
+func blockToFunc(_ x: @convention(block) () -> ()) -> () -> () {
   return x
 }
 
 // ==== Representation change + function type conversion
 
-// CHECK-LABEL: sil hidden @_TF24function_conversion_objc22blockToFuncExistentialFbT_SiFT_P_ : $@convention(thin) (@owned @convention(block) () -> Int) -> @owned @callee_owned (@out protocol<>) -> ()
+// CHECK-LABEL: sil hidden @_TF24function_conversion_objc22blockToFuncExistentialFbT_SiFT_P_ : $@convention(thin) (@owned @convention(block) () -> Int) -> @owned @callee_owned () -> @out protocol<>
 // CHECK:         function_ref @_TTRXFdCb__dSi_XFo__dSi_
 // CHECK:         partial_apply
 // CHECK:         function_ref @_TTRXFo__dSi_XFo__iP__
 // CHECK:         partial_apply
 // CHECK:         return
-func blockToFuncExistential(x: @convention(block) () -> Int) -> () -> Any {
+func blockToFuncExistential(_ x: @convention(block) () -> Int) -> () -> Any {
   return x
 }
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFdCb__dSi_XFo__dSi_ : $@convention(thin) (@owned @convention(block) () -> Int) -> Int
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dSi_XFo__iP__ : $@convention(thin) (@out protocol<>, @owned @callee_owned () -> Int) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dSi_XFo__iP__ : $@convention(thin) (@owned @callee_owned () -> Int) -> @out protocol<>
 
 // C function pointer conversions
 
@@ -89,23 +89,23 @@ class A : NSObject {}
 class B : A {}
 
 // CHECK-LABEL: sil hidden @_TF24function_conversion_objc18cFuncPtrConversionFcCS_1AT_cCS_1BT_
-func cFuncPtrConversion(x: @convention(c) A -> ()) -> @convention(c) B -> () {
+func cFuncPtrConversion(_ x: @convention(c) (A) -> ()) -> @convention(c) (B) -> () {
 // CHECK:         convert_function %0 : $@convention(c) (A) -> () to $@convention(c) (B) -> ()
 // CHECK:         return
   return x
 }
 
-func cFuncPtr(a: A) {}
+func cFuncPtr(_ a: A) {}
 
 // CHECK-LABEL: sil hidden @_TF24function_conversion_objc19cFuncDeclConversionFT_cCS_1BT_
-func cFuncDeclConversion() -> @convention(c) B -> () {
+func cFuncDeclConversion() -> @convention(c) (B) -> () {
 // CHECK:         function_ref @_TToF24function_conversion_objc8cFuncPtrFCS_1AT_ : $@convention(c) (A) -> ()
 // CHECK:         convert_function %0 : $@convention(c) (A) -> () to $@convention(c) (B) -> ()
 // CHECK:         return
   return cFuncPtr
 }
 
-func cFuncPtrConversionUnsupported(x: @convention(c) (@convention(block) () -> ()) -> ())
+func cFuncPtrConversionUnsupported(_ x: @convention(c) (@convention(block) () -> ()) -> ())
     -> @convention(c) (@convention(c) () -> ()) -> () {
   return x  // expected-error{{C function pointer signature '@convention(c) (@convention(block) () -> ()) -> ()' is not compatible with expected type '@convention(c) (@convention(c) () -> ()) -> ()'}}
 }

@@ -1,8 +1,8 @@
-//===--- Dominance.h - SIL dominance analysis ------------------*- C++ -*-===//
+//===--- Dominance.h - SIL dominance analysis -------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -41,7 +41,7 @@ public:
 
   /// Return true if the other dominator tree does not match this dominator
   /// tree.
-  inline bool errorOccuredOnComparison(const DominanceInfo &Other) const {
+  inline bool errorOccurredOnComparison(const DominanceInfo &Other) const {
     const auto *R = getRootNode();
     const auto *OtherR = Other.getRootNode();
 
@@ -131,12 +131,22 @@ public:
 
   /// Return true if the other dominator tree does not match this dominator
   /// tree.
-  inline bool errorOccuredOnComparison(const PostDominanceInfo &Other) const {
+  inline bool errorOccurredOnComparison(const PostDominanceInfo &Other) const {
     const auto *R = getRootNode();
     const auto *OtherR = Other.getRootNode();
 
     if (!R || !OtherR || R->getBlock() != OtherR->getBlock())
       return true;
+
+    if (!R->getBlock()) {
+      // The post dom-tree has multiple roots. The compare() function can not
+      // cope with multiple roots if at least one of the roots is caused by
+      // an infinite loop in the CFG (it crashes because no nodes are allocated
+      // for the blocks in the infinite loop).
+      // So we return a conservative false in this case.
+      // TODO: eventually fix the DominatorTreeBase::compare() function.
+      return false;
+    }
 
     // Returns *false* if they match.
     if (compare(Other))

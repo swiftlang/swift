@@ -22,11 +22,11 @@ parametric polymorphism. Swift makes extensive use of type inference,
 allowing one to omit the types of many variables and expressions. For
 example::
 
-  func round(x: Double) -> Int { /* ... */ }
+  func round(_ x: Double) -> Int { /* ... */ }
   var pi: Double = 3.14159
   var three = round(pi) // 'three' has type 'Int'
 
-  func identity<T>(x: T) -> T { return x }
+  func identity<T>(_ x: T) -> T { return x }
   var eFloat: Float = -identity(2.71828)  // numeric literal gets type 'Float'
 
 Swift's type inference allows type information to flow in two
@@ -106,7 +106,7 @@ the Swift type system:
   flavors of equality constraints: 
 
     - Exact equality constraints, or  "binding", written ``T0 := X``
-      for some type variable ``T0`` and  type ``X``, which requires
+      for some type variable ``T0`` and type ``X``, which requires
       that ``T0`` be exactly identical to ``X``;
     - Equality constraints, written ``X == Y`` for types ``X`` and
       ``Y``, which require ``X`` and ``Y`` to have the same type,
@@ -126,12 +126,12 @@ the Swift type system:
   to the second, which includes subtyping and equality. Additionally,
   it allows a user-defined conversion function to be
   called. Conversion constraints are written ``X <c Y``, read as
-  ```X`` can be converted to ``Y```.
+  "``X`` can be converted to ``Y``."
 
 **Construction**
   A construction constraint, written ``X <C Y`` requires that the
   second type be a nominal type with a constructor that accepts a
-  value of the first type. For example, the constraint``Int <C
+  value of the first type. For example, the constraint ``Int <C
   String`` is satisfiable because ``String`` has a constructor that
   accepts an ``Int``.
 
@@ -146,11 +146,11 @@ the Swift type system:
 
 **Conformance**
   A conformance constraint ``X conforms to Y`` specifies that the
-  first type (''X'') must conform to the protocol ``Y``.
+  first type (``X``) must conform to the protocol ``Y``.
 
 **Checked cast**
   A constraint describing a checked cast from the first type to the
-  second, i.e., for ''x as T''.
+  second, i.e., for ``x as T``.
 
 **Applicable function**
   An applicable function requires that both types are function types 
@@ -266,7 +266,7 @@ and types generated from the primary expression kinds are:
   i.e., the result type of the function.
 
 **Construction**
-  A type construction``A(b)``, where ``A`` refers to a type, generates
+  A type construction ``A(b)``, where ``A`` refers to a type, generates
   a construction constraint ``T(b) <C A``, which requires that ``A``
   have a constructor that accepts ``b``. The type of the expression is
   ``A``.
@@ -319,7 +319,7 @@ and types generated from the primary expression kinds are:
   of some type.
 
 **Ternary operator**
-  A ternary operator``x ? y : z`` generates a number of
+  A ternary operator ``x ? y : z`` generates a number of
   constraints. The type ``T(x)`` must conform to the ``LogicValue``
   protocol to determine which branch is taken. Then, a new type
   variable ``T0`` is introduced to capture the result type, and the
@@ -336,8 +336,8 @@ Overloading is the process of giving multiple, different definitions
 to the same name. For example, we might overload a ``negate`` function
 to work on both ``Int`` and ``Double`` types, e.g.::
 
-  func negate(x: Int) -> Int { return -x }
-  func negate(x: Double) -> Double { return -x }
+  func negate(_ x: Int) -> Int { return -x }
+  func negate(_ x: Double) -> Double { return -x }
 
 Given that there are two definitions of ``negate``, what is the type
 of the declaration reference expression ``negate``? If one selects the
@@ -368,7 +368,7 @@ that will be bound to the enum type and ``T1`` is a fresh type
 variable that will be bound to the type of the selected member. The
 issue noted in the prior section is that this constraint does not give
 the solver enough information to determine ``T0`` without
-guesswork. However, we note that the type of a enum member actually
+guesswork. However, we note that the type of an enum member actually
 has a regular structure. For example, consider the ``Optional`` type::
 
   enum Optional<T> {
@@ -376,10 +376,10 @@ has a regular structure. For example, consider the ``Optional`` type::
     case Some(T)
   }
 
-The type of ``Optional<T>.Vone`` is ``Optional<T>``, while the type of
+The type of ``Optional<T>.None`` is ``Optional<T>``, while the type of
 ``Optional<T>.Some`` is ``(T) -> Optional<T>``. In fact, the
-type of a enum element can have one of two forms: it can be ``T0``,
-for a enum element that has no extra data, or it can be ``T2 -> T0``,
+type of an enum element can have one of two forms: it can be ``T0``,
+for an enum element that has no extra data, or it can be ``T2 -> T0``,
 where ``T2`` is the data associated with the enum element.  For the
 latter case, the actual arguments are parsed as part of the unresolved
 member reference, so that a function application constraint describes
@@ -403,8 +403,8 @@ concrete type, so long as that type conforms to the protocol
 ``Comparable``. The type of ``min`` is (internally) written as ``<T :
 Comparable> (x: T, y: T) -> T``, which can be read as "for all ``T``,
 where ``T`` conforms to ``Comparable``, the type of the function is
-``(x: T, y: T) -> T``. Different uses of the ``min`` function may
-have different bindings for the generic parameter``T``.
+``(x: T, y: T) -> T``." Different uses of the ``min`` function may
+have different bindings for the generic parameter ``T``.
 
 When the constraint generator encounters a reference to a generic
 function, it immediately replaces each of the generic parameters within
@@ -433,8 +433,8 @@ solver. For example, consider the following generic dictionary type::
     // ...
   }
 
-When the constraint solver encounters the expression ``
-Dictionary()``, it opens up the type ``Dictionary``---which has not
+When the constraint solver encounters the expression ``Dictionary()``,
+it opens up the type ``Dictionary``---which has not
 been provided with any specific generic arguments---to the type
 ``Dictionary<T0, T1>``, for fresh type variables ``T0`` and ``T1``,
 and introduces the constraint ``T0 conforms to Hashable``. This allows
@@ -530,7 +530,7 @@ constraint ``A.member == B`` can be simplified when the type of ``A``
 is determined to be a nominal or tuple type, in which case name lookup
 can resolve the member name to an actual declaration. That declaration
 has some type ``C``, so the member constraint is simplified to the
-exact equality constraint``B := C``.
+exact equality constraint ``B := C``.
 
 The member name may refer to a set of overloaded declarations. In this
 case, the type ``C`` is a fresh type variable (call it ``T0``). A
@@ -650,7 +650,7 @@ Comparing Solutions
 The solver explores a potentially large solution space, and it is
 possible that it will find multiple solutions to the constraint system
 as given. Such cases are not necessarily ambiguities, because the
-solver can then compare the solutions to to determine whether one of
+solver can then compare the solutions to determine whether one of
 the solutions is better than all of the others. To do so, it computes
 a "score" for each solution based on a number of factors:
 
@@ -730,18 +730,18 @@ checking problem::
     func [conversion] __conversion () -> Int { /* ... */ }
   }
 
-  func f(i : Int, s : String) { }
+  func f(_ i : Int, s : String) { }
 
   var x : X
   f(10.5, x)
 
 This constraint system generates the constraints "``T(f)`` ==Fn ``T0
--> T1``" (for fresh variables ``T0`` and ``T1``), "``(T2, X)`` <c
-``T0``" (for fresh variable ``T2``) and "``T2 conforms to
+-> T1``" (for fresh variables ``T0`` and ``T1``), "``(T2, X) <c
+T0``" (for fresh variable ``T2``) and "``T2`` conforms to
 ``FloatLiteralConvertible``". As part of the solution, after ``T0`` is
 replaced with ``(i : Int, s : String)``, the second of
-these constraints is broken down into "``T2 <c ``Int``" and "``X`` <c
-``String``". These two constraints are interesting for different
+these constraints is broken down into "``T2 <c Int``" and "``X <c
+String``". These two constraints are interesting for different
 reasons: the first will fail, because ``Int`` does not conform to
 ``FloatLiteralConvertible``. The second will succeed by selecting one
 of the (overloaded) conversion functions.
@@ -762,7 +762,7 @@ zero or more derivation steps from that anchor. For example, the
 "``T(f)`` ==Fn ``T0 -> T1``" constraint has a locator that is
 anchored at the function application and a path with the "apply
 function" derivation step, meaning that this is the function being
-applied. Similarly, the "``(T2, X)`` <c ``T0`` constraint has a
+applied. Similarly, the "``(T2, X) <c T0`` constraint has a
 locator anchored at the function application and a path with the
 "apply argument" derivation step, meaning that this is the argument
 to the function.
@@ -805,7 +805,7 @@ an overloaded function. Additionally, when comparing two solutions to
 the same constraint system, overload sets present in both solutions
 can be found by comparing the locators for each of the overload
 choices made in each solution. Naturally, all of these operations
-require locators to be uniqued, which occurs in the constraint system
+require locators to be unique, which occurs in the constraint system
 itself.
 
 Simplifying Locators
@@ -836,7 +836,7 @@ consider a slight modification to our example, so that the argument to
 ``f`` is provided by another call, we get a different result
 entirely::
 
-  func f(i : Int, s : String) { }
+  func f(_ i : Int, s : String) { }
   func g() -> (f : Float, x : X) { }
 
   f(g())

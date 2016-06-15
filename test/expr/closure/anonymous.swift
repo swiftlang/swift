@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
-func takeIntToInt(f: (Int) -> Int) { }
-func takeIntIntToInt(f: (Int, Int) -> Int) { }
+func takeIntToInt(_ f: (Int) -> Int) { }
+func takeIntIntToInt(_ f: (Int, Int) -> Int) { }
 
 // Simple closures with anonymous arguments
 func simple() {

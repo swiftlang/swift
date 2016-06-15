@@ -9,6 +9,9 @@ syn keyword swiftImport import skipwhite nextgroup=swiftImportModule
 syn match swiftImportModule /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 syn match swiftImportComponent /\.\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 
+syn region swiftComment start="/\*" end="\*/" contains=swiftComment,swiftLineComment,swiftTodo
+syn region swiftLineComment start="//" end="$" contains=swiftComment,swiftTodo
+
 syn match swiftLineComment   /^#!.*/
 syn match swiftTypeName  /\<[A-Z][a-zA-Z_0-9]*\>/
 syn match swiftDecimal /\<[-]\?[0-9]\+\>/
@@ -22,22 +25,25 @@ syn keyword swiftKeyword break case continue default do else for if in static sw
 syn keyword swiftKeyword sil internal thunk skipwhite
 syn keyword swiftKeyword public hidden private shared public_external hidden_external skipwhite
 syn keyword swiftKeyword getter setter allocator initializer enumelt destroyer globalaccessor objc skipwhite
-syn keyword swiftKeyword alloc_stack alloc_ref alloc_ref_dynamic alloc_box dealloc_stack dealloc_box dealloc_ref skipwhite
+syn keyword swiftKeyword alloc_global alloc_stack alloc_ref alloc_ref_dynamic alloc_box alloc_existential_box alloc_value_buffer dealloc_stack dealloc_box dealloc_existential_box dealloc_ref dealloc_partial_ref dealloc_value_buffer skipwhite
 syn keyword swiftKeyword debug_value debug_value_addr skipwhite
-syn keyword swiftKeyword load store assign  mark_uninitialized mark_function_escape copy_addr destroy_addr index_addr index_raw_pointer to skipwhite
-syn keyword swiftKeyword strong_retain strong_retain_autoreleased strong_release strong_retain_unowned ref_to_unowned unowned_to_ref unowned_retain unowned_release load_weak store_weak fix_lifetime skipwhite
+syn keyword swiftKeyword load load_unowned store assign mark_uninitialized mark_function_escape copy_addr destroy_addr index_addr index_raw_pointer to skipwhite
+syn keyword swiftKeyword strong_retain strong_release strong_retain_unowned ref_to_unowned unowned_to_ref unowned_retain unowned_release load_weak store_unowned store_weak fix_lifetime autorelease_value set_deallocating is_unique is_unique_or_pinned strong_pin strong_unpin skipwhite
 syn keyword swiftKeyword function_ref integer_literal float_literal string_literal global_addr skipwhite
 syn keyword swiftKeyword class_method super_method witness_method dynamic_method skipwhite
-syn keyword swiftKeyword apply partial_apply builtin skipwhite
+syn keyword swiftKeyword partial_apply builtin skipwhite
+syn keyword swiftApplyKeyword apply try_apply skipwhite
 syn keyword swiftKeyword metatype value_metatype existential_metatype skipwhite
 syn keyword swiftKeyword retain_value release_value tuple tuple_extract tuple_element_addr struct struct_extract struct_element_addr ref_element_addr skipwhite
 syn keyword swiftKeyword init_enum_data_addr unchecked_enum_data unchecked_take_enum_data_addr inject_enum_addr skipwhite
-syn keyword swiftKeyword init_existential_addr deinit_existential_addr open_existential_addr init_existential_ref open_existential_ref skipwhite
-syn keyword swiftKeyword upcast address_to_pointer pointer_to_address unchecked_addr_cast unchecked_ref_cast ref_to_raw_pointer raw_pointer_to_ref convert_function thick_to_objc_metatype objc_to_thick_metatype thin_to_thick_function is_nonnull unchecked_ref_bit_cast unchecked_trivial_bit_cast skipwhite
-syn keyword swiftKeyword unconditional_checked_cast skipwhite
+syn keyword swiftKeyword init_existential_addr init_existential_metatype deinit_existential_addr open_existential_addr open_existential_box open_existential_metatype init_existential_ref open_existential_ref skipwhite
+syn keyword swiftKeyword upcast address_to_pointer pointer_to_address pointer_to_thin_function unchecked_addr_cast unchecked_ref_cast unchecked_ref_cast_addr ref_to_raw_pointer ref_to_bridge_object ref_to_unmanaged unmanaged_to_ref raw_pointer_to_ref skipwhite
+syn keyword swiftKeyword convert_function thick_to_objc_metatype thin_function_to_pointer objc_to_thick_metatype thin_to_thick_function is_nonnull unchecked_ref_bit_cast unchecked_trivial_bit_cast bridge_object_to_ref bridge_object_to_word unchecked_bitwise_cast skipwhite
+syn keyword swiftKeyword objc_existential_metatype_to_object objc_metatype_to_object objc_protocol skipwhite
+syn keyword swiftKeyword unconditional_checked_cast unconditional_checked_cast_addr skipwhite
 syn keyword swiftKeyword cond_fail skipwhite
-syn keyword swiftKeyword unreachable return autorelease_return br cond_br switch_value select_value switch_enum switch_enum_addr dynamic_method_br checked_cast_br skipwhite
-syn keyword swiftKeyword project_block_storage init_block_storage_header copy_block skipwhite
+syn keyword swiftKeyword unreachable return throw br cond_br switch_value select_enum select_enum_addr select_value switch_enum switch_enum_addr dynamic_method_br checked_cast_br checked_cast_addr_br skipwhite
+syn keyword swiftKeyword project_box project_existential_box project_value_buffer project_block_storage init_block_storage_header copy_block mark_dependence skipwhite
 
 syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName
 syn region swiftTypeAttributes start="\[" end="\]" skipwhite contained nextgroup=swiftTypeName
@@ -61,6 +67,7 @@ syn match swiftImplicitVarName /\$\<[A-Za-z_0-9]\+\>/
 hi def link swiftImport Include
 hi def link swiftImportModule Title
 hi def link swiftImportComponent Identifier
+hi def link swiftApplyKeyword ModeMsg
 hi def link swiftKeyword Statement
 hi def link swiftTypeDefinition Define
 hi def link swiftTypeName Type

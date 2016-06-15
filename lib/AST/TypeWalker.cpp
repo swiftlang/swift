@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -97,6 +97,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
       switch (req.getKind()) {
       case RequirementKind::SameType:
       case RequirementKind::Conformance:
+      case RequirementKind::Superclass:
         if (doIt(req.getSecondType()))
           return true;
         break;
@@ -113,7 +114,13 @@ class Traversal : public TypeVisitor<Traversal, bool>
     for (auto param : ty->getParameters())
       if (doIt(param.getType()))
         return true;
-    return doIt(ty->getResult().getType());
+    for (auto result : ty->getAllResults())
+      if (doIt(result.getType()))
+        return true;
+    if (ty->hasErrorResult())
+      if (doIt(ty->getErrorResult().getType()))
+        return true;
+    return false;
   }
 
   bool visitSyntaxSugarType(SyntaxSugarType *ty) {

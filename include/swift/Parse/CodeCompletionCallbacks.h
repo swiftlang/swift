@@ -1,8 +1,8 @@
-//===- CodeCompletionCallbacks.h - Parser's interface to code completion --===//
+//===--- CodeCompletionCallbacks.h - Parser's interface to code completion ===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -18,6 +18,17 @@
 
 namespace swift {
 
+enum class ObjCSelectorContext {
+  /// Code completion is not performed inside #selector
+  None,
+  /// Code completion is performed in a method #selector
+  MethodSelector,
+  /// Code completion is performed inside #selector(getter:)
+  GetterSelector,
+  /// Code completion is performed inside #selector(setter:)
+  SetterSelector
+};
+
 /// \brief Parser's interface to code completion.
 class CodeCompletionCallbacks {
 protected:
@@ -26,7 +37,7 @@ protected:
   Parser::ParserPosition ExprBeginPosition;
 
   /// The declaration parsed during delayed parsing that was caused by code
-  /// completion.  This declaration contained the code completion token.
+  /// completion. This declaration contained the code completion token.
   Decl *DelayedParsedDecl = nullptr;
 
   /// If code completion is done inside a controlling expression of a C-style
@@ -37,6 +48,14 @@ protected:
   /// case.
   bool InEnumElementRawValue = false;
 
+  /// Whether or not the expression that is currently parsed is inside a
+  /// \c #selector and if so, which kind of selector
+  ObjCSelectorContext ParseExprSelectorContext = ObjCSelectorContext::None;
+
+  /// Whether or not the expression that shall be completed is inside a
+  /// \c #selector and if so, which kind of selector
+  ObjCSelectorContext CompleteExprSelectorContext = ObjCSelectorContext::None;
+
   std::vector<Expr *> leadingSequenceExprs;
 
 public:
@@ -45,6 +64,10 @@ public:
   }
 
   virtual ~CodeCompletionCallbacks() {}
+
+  bool isInsideObjCSelector() const {
+    return CompleteExprSelectorContext != ObjCSelectorContext::None;
+  }
 
   void setExprBeginning(Parser::ParserPosition PP) {
     ExprBeginPosition = PP;
@@ -95,6 +118,25 @@ public:
     }
   };
 
+  /// RAII type that temporarily sets the "in Objective-C #selector expression"
+  /// flag on the code completion callbacks object.
+  class InObjCSelectorExprRAII {
+    CodeCompletionCallbacks *Callbacks;
+
+  public:
+    InObjCSelectorExprRAII(CodeCompletionCallbacks *Callbacks,
+                           ObjCSelectorContext SelectorContext)
+        : Callbacks(Callbacks) {
+      if (Callbacks)
+        Callbacks->ParseExprSelectorContext = SelectorContext;
+    }
+
+    ~InObjCSelectorExprRAII() {
+      if (Callbacks)
+        Callbacks->ParseExprSelectorContext = ObjCSelectorContext::None;
+    }
+  };
+
   /// \brief Complete the whole expression.  This is a fallback that should
   /// produce results when more specific completion methods failed.
   virtual void completeExpr() = 0;
@@ -122,6 +164,14 @@ public:
   /// \brief Complete expr-super after we have consumed the 'super' keyword and
   /// a dot.
   virtual void completeExprSuperDot(SuperRefExpr *SRE) = 0;
+
+  /// \brief Complete the argument to an Objective-C #keyPath
+  /// expression.
+  ///
+  /// \param KPE A partial #keyPath expression that can be used to
+  /// provide context. This will be \c NULL if no components of the
+  /// #keyPath argument have been parsed yet.
+  virtual void completeExprKeyPath(ObjCKeyPathExpr *KPE, bool HasDot) = 0;
 
   /// \brief Complete the beginning of type-simple -- no tokens provided
   /// by user.
@@ -155,7 +205,7 @@ public:
   virtual void completePoundAvailablePlatform() = 0;
 
   /// Complete the import decl with importable modules.
-  virtual void completeImportDecl(ArrayRef<std::pair<Identifier, SourceLoc>> Path) = 0;
+  virtual void completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) = 0;
 
   /// Complete unresolved members after dot.
   virtual void completeUnresolvedMember(UnresolvedMemberExpr *E,
@@ -169,6 +219,8 @@ public:
   virtual void completeReturnStmt(CodeCompletionExpr *E) = 0;
 
   virtual void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) = 0;
+
+  virtual void completeGenericParams(TypeLoc TL) = 0;
 
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.

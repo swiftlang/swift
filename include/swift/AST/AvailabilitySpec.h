@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -56,7 +56,7 @@ public:
 };
 
 /// \brief An availability specification that guards execution based on the
-/// run-time platform and version, e.g., OSX >= 10.10.
+/// run-time platform and version, e.g., OS X >= 10.10.
 class VersionConstraintAvailabilitySpec : public AvailabilitySpec {
   PlatformKind Platform;
   SourceLoc PlatformLoc;
@@ -89,6 +89,12 @@ public:
   static bool classof(const AvailabilitySpec *Spec) {
     return Spec->getKind() == AvailabilitySpecKind::VersionConstraint;
   }
+
+  void *
+  operator new(size_t Bytes, ASTContext &C,
+               unsigned Alignment = alignof(VersionConstraintAvailabilitySpec)){
+    return AvailabilitySpec::operator new(Bytes, C, Alignment);
+  }
 };
 
 /// A wildcard availability specification that guards execution
@@ -97,7 +103,7 @@ public:
 /// to new platforms. Because new platforms typically branch from
 /// existing platforms, the wildcard allows an #available() check to do the
 /// "right" thing (executing the guarded branch) on the new platform without
-/// requiring a modification to every availablity guard in the program. Note
+/// requiring a modification to every availability guard in the program. Note
 /// that we still do compile-time availability checking with '*', so the
 /// compiler will still catch references to potentially unavailable symbols.
 class OtherPlatformAvailabilitySpec : public AvailabilitySpec {
@@ -114,6 +120,12 @@ public:
 
   static bool classof(const AvailabilitySpec *Spec) {
     return Spec->getKind() == AvailabilitySpecKind::OtherPlatform;
+  }
+
+  void *
+  operator new(size_t Bytes, ASTContext &C,
+               unsigned Alignment = alignof(OtherPlatformAvailabilitySpec)) {
+    return AvailabilitySpec::operator new(Bytes, C, Alignment);
   }
 };
 

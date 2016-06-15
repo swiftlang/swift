@@ -10,7 +10,7 @@ sil_vtable C {}
 class D : C {}
 sil_vtable D {}
 
-// CHECK-LABEL: define void @downcast_test(%C26unconditional_checked_cast1D** noalias nocapture sret, %C26unconditional_checked_cast1C** nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} void @downcast_test(%C26unconditional_checked_cast1D** noalias nocapture sret, %C26unconditional_checked_cast1C** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK: entry:
 // CHECK-NEXT: [[INPUTPTR:%[0-9]+]] = load %C26unconditional_checked_cast1C*, %C26unconditional_checked_cast1C** [[INPUTPTRPTR:%[0-9]+]], align 8
 // CHECK-NEXT: [[I8INPUTPTR:%[0-9]+]] = bitcast %C26unconditional_checked_cast1C* [[INPUTPTR]] to i8*
@@ -21,7 +21,7 @@ sil_vtable D {}
 // CHECK-NEXT: store %C26unconditional_checked_cast1D* [[DOWNCASTINPUTPTR]], %C26unconditional_checked_cast1D** {{%[0-9]+}}, align 8
 // CHECK-NEXT: ret void
 
-sil @downcast_test : $@convention(thin) (@out D, @inout C) -> () {
+sil @downcast_test : $@convention(thin) (@inout C) -> @out D {
 bb0(%0 : $*D, %1 : $*C):
   %a = load %1 : $*C
   %2 = unconditional_checked_cast %a : $C to $D

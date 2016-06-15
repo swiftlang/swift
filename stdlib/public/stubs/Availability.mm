@@ -1,8 +1,8 @@
-//===--- Availability.mm - Swift Language API Availability Support---------===//
+//===--- Availability.mm - Swift Language API Availability Support --------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@
 #include "swift/Runtime/Debug.h"
 #import <Foundation/Foundation.h>
 #include <TargetConditionals.h>
+#include "../SwiftShims/FoundationShims.h"
 
 using namespace swift;
 
@@ -30,7 +31,8 @@ static NSDictionary *systemVersionDictionaryFromPlist() {
   // not pick up the host OS version.
   const char *simulatorRoot = getenv("IPHONE_SIMULATOR_ROOT");
   if (!simulatorRoot) {
-    fatalError("Unable to check API availability: "
+    fatalError(/* flags = */ 0,
+               "Unable to check API availability: "
                "IPHONE_SIMULATOR_ROOT not set when running under simulator");
   }
 
@@ -45,13 +47,15 @@ static NSDictionary *systemVersionDictionaryFromPlist() {
 static NSOperatingSystemVersion operatingSystemVersionFromPlist() {
   NSDictionary *plistDictionary = systemVersionDictionaryFromPlist();
   if (!plistDictionary) {
-    fatalError("Unable to check API availability: "
+    fatalError(/* flags = */ 0,
+               "Unable to check API availability: "
                "system version dictionary not found");
   }
 
   NSString *versionString = [plistDictionary objectForKey:@"ProductVersion"];
   if (!versionString) {
-    fatalError("Unable to check API availability: "
+    fatalError(/* flags = */ 0,
+               "Unable to check API availability: "
                "ProductVersion not present in system version dictionary");
   }
 
@@ -71,7 +75,7 @@ static NSOperatingSystemVersion operatingSystemVersionFromPlist() {
 
 /// Return the version of the operating system currently running for use in
 /// API availability queries.
-extern "C" NSOperatingSystemVersion _swift_stdlib_operatingSystemVersion() {
+_SwiftNSOperatingSystemVersion swift::_swift_stdlib_operatingSystemVersion() {
   static NSOperatingSystemVersion version = ([]{
     // Use -[NSProcessInfo.operatingSystemVersion] when present
     // (on iOS 8 and OS X 10.10 and above).
@@ -84,5 +88,5 @@ extern "C" NSOperatingSystemVersion _swift_stdlib_operatingSystemVersion() {
     }
   })();
 
-  return version;
+  return { version.majorVersion, version.minorVersion, version.patchVersion };
 }

@@ -11,13 +11,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 func returnNil() -> AnyObject? {
   return _opaqueIdentity(nil as AnyObject?)
@@ -26,7 +19,7 @@ func returnNil() -> AnyObject? {
 var OptionalTraps = TestSuite("OptionalTraps")
 
 OptionalTraps.test("UnwrapNone")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -37,12 +30,12 @@ OptionalTraps.test("UnwrapNone")
 }
 
 OptionalTraps.test("UnwrapNone/Ounchecked")
-  .xfail(.Custom(
+  .xfail(.custom(
     { !_isFastAssertConfiguration() },
     reason: "unwrapping nil should trap unless we are in -Ounchecked mode"))
   .code {
   var a: AnyObject? = returnNil()
-  expectEqual(0, unsafeBitCast(a!, Int.self))
+  expectEqual(0, unsafeBitCast(a!, to: Int.self))
 }
 
 runAllTests()

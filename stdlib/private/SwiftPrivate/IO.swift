@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -16,7 +16,7 @@ public struct _FDInputStream {
   public let fd: CInt
   public var isClosed: Bool = false
   public var isEOF: Bool = false
-  internal var _buffer = [UInt8](count: 256, repeatedValue: 0)
+  internal var _buffer = [UInt8](repeating: 0, count: 256)
   internal var _bufferUsed: Int = 0
 
   public init(fd: CInt) {
@@ -25,10 +25,10 @@ public struct _FDInputStream {
 
   public mutating func getline() -> String? {
     if let newlineIndex =
-      _buffer[0..<_bufferUsed].indexOf(UInt8(UnicodeScalar("\n").value)) {
+      _buffer[0..<_bufferUsed].index(of: UInt8(UnicodeScalar("\n").value)) {
       let result = String._fromWellFormedCodeUnitSequence(
         UTF8.self, input: _buffer[0..<newlineIndex])
-      _buffer.removeRange(0...newlineIndex)
+      _buffer.removeSubrange(0...newlineIndex)
       _bufferUsed -= newlineIndex + 1
       return result
     }
@@ -49,13 +49,13 @@ public struct _FDInputStream {
       _buffer.reserveCapacity(minFree - bufferFree)
       while bufferFree < minFree {
         _buffer.append(0)
-        ++bufferFree
+        bufferFree += 1
       }
     }
     let readResult: __swift_ssize_t = _buffer.withUnsafeMutableBufferPointer {
       (_buffer) in
       let fd = self.fd
-      let addr = _buffer.baseAddress + self._bufferUsed
+      let addr = _buffer.baseAddress! + self._bufferUsed
       let size = bufferFree
       return _swift_stdlib_read(fd, addr, size)
     }
@@ -81,17 +81,17 @@ public struct _FDInputStream {
   }
 }
 
-public struct _Stderr : OutputStreamType {
+public struct _Stderr : OutputStream {
   public init() {}
 
-  public mutating func write(string: String) {
+  public mutating func write(_ string: String) {
     for c in string.utf8 {
       _swift_stdlib_putc_stderr(CInt(c))
     }
   }
 }
 
-public struct _FDOutputStream : OutputStreamType {
+public struct _FDOutputStream : OutputStream {
   public let fd: CInt
   public var isClosed: Bool = false
 
@@ -99,7 +99,7 @@ public struct _FDOutputStream : OutputStreamType {
     self.fd = fd
   }
 
-  public mutating func write(string: String) {
+  public mutating func write(_ string: String) {
     let utf8 = string.nulTerminatedUTF8
     utf8.withUnsafeBufferPointer {
       (utf8) -> Void in
@@ -107,7 +107,7 @@ public struct _FDOutputStream : OutputStreamType {
       let bufferSize = utf8.count - 1
       while writtenBytes != bufferSize {
         let result = _swift_stdlib_write(
-          self.fd, UnsafePointer(utf8.baseAddress + Int(writtenBytes)),
+          self.fd, UnsafePointer(utf8.baseAddress! + Int(writtenBytes)),
           bufferSize - writtenBytes)
         if result < 0 {
           fatalError("write() returned an error")
@@ -128,4 +128,3 @@ public struct _FDOutputStream : OutputStreamType {
     isClosed = true
   }
 }
-

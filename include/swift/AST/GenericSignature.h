@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -21,6 +21,7 @@
 #include "swift/AST/Substitution.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
 
@@ -87,7 +88,11 @@ public:
 /// Describes the generic signature of a particular declaration, including
 /// both the generic type parameters and the requirements placed on those
 /// generic parameters.
-class GenericSignature : public llvm::FoldingSetNode {
+class GenericSignature final : public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<GenericSignature, GenericTypeParamType *,
+                                  Requirement> {
+  friend TrailingObjects;
+
   unsigned NumGenericParams;
   unsigned NumRequirements;
 
@@ -95,17 +100,21 @@ class GenericSignature : public llvm::FoldingSetNode {
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;
 
-  /// Retrieve a mutable version of the generic parameters.
-  MutableArrayRef<GenericTypeParamType *> getGenericParamsBuffer() {
-    return { reinterpret_cast<GenericTypeParamType **>(this + 1),
-             NumGenericParams };
+  size_t numTrailingObjects(OverloadToken<GenericTypeParamType *>) const {
+    return NumGenericParams;
+  }
+  size_t numTrailingObjects(OverloadToken<Requirement>) const {
+    return NumRequirements;
   }
 
-  /// Retrieve a mutable verison of the requirements.
+  /// Retrieve a mutable version of the generic parameters.
+  MutableArrayRef<GenericTypeParamType *> getGenericParamsBuffer() {
+    return {getTrailingObjects<GenericTypeParamType *>(), NumGenericParams};
+  }
+
+  /// Retrieve a mutable version of the requirements.
   MutableArrayRef<Requirement> getRequirementsBuffer() {
-    void *genericParams = getGenericParamsBuffer().end();
-    return { reinterpret_cast<Requirement *>(genericParams),
-      NumRequirements };
+    return {getTrailingObjects<Requirement>(), NumRequirements};
   }
 
   GenericSignature(ArrayRef<GenericTypeParamType *> params,
@@ -135,8 +144,7 @@ public:
 
   /// Retrieve the generic parameters.
   ArrayRef<GenericTypeParamType *> getGenericParams() const {
-    return { reinterpret_cast<GenericTypeParamType * const *>(this + 1),
-             NumGenericParams };
+    return const_cast<GenericSignature *>(this)->getGenericParamsBuffer();
   }
 
   /// Retrieve the innermost generic parameters.
@@ -147,9 +155,7 @@ public:
 
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const {
-    const void *genericParams = getGenericParams().end();
-    return { reinterpret_cast<const Requirement *>(genericParams),
-             NumRequirements };
+    return const_cast<GenericSignature *>(this)->getRequirementsBuffer();
   }
 
   // Only allow allocation by doing a placement new.
@@ -202,12 +208,29 @@ public:
   /// Determine the superclass bound on the given dependent type.
   Type getSuperclassBound(Type type, ModuleDecl &mod);
 
+  using ConformsToArray = SmallVector<ProtocolDecl *, 2>;
   /// Determine the set of protocols to which the given dependent type
   /// must conform.
-  SmallVector<ProtocolDecl *, 2> getConformsTo(Type type, ModuleDecl &mod);
+  ConformsToArray getConformsTo(Type type, ModuleDecl &mod);
 
   /// Determine whether the given dependent type is equal to a concrete type.
   bool isConcreteType(Type type, ModuleDecl &mod);
+
+  /// Return the concrete type that the given dependent type is constrained to,
+  /// or the null Type if it is not the subject of a concrete same-type
+  /// constraint.
+  Type getConcreteType(Type type, ModuleDecl &mod);
+
+  /// Return the preferred representative of the given type parameter within
+  /// this generic signature.  This may yield a concrete type or a
+  /// different type parameter.
+  Type getRepresentative(Type type, ModuleDecl &mod);
+
+  /// Return whether two type parameters represent the same type under this
+  /// generic signature.
+  ///
+  /// The type parameters must be known to not be concrete within the context.
+  bool areSameTypeParameterInContext(Type type1, Type type2, ModuleDecl &mod);
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,

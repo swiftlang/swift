@@ -28,7 +28,7 @@ extension vU1024: IntegerLiteralConvertible, CustomStringConvertible, Equatable 
       (intermediate, digit) = quorem(intermediate, 10)
       digits.append(Character(UnicodeScalar(Int(digit) + 48)))
     } while intermediate != 0
-    return String(digits.reverse())
+    return String(digits.reversed())
   }
 }
 
@@ -49,7 +49,7 @@ func *(x: vU1024, y: vU1024) -> vU1024 {
   return result
 }
 
-func quorem(x: vU1024, _ y: vU1024) -> (vU1024, vU1024) {
+func quorem(_ x: vU1024, _ y: vU1024) -> (vU1024, vU1024) {
   var x = x
   var y = y
   var quo = vU1024()
@@ -64,7 +64,7 @@ public func ==(x: vU1024, y: vU1024) -> Bool {
   return memcmp(&x, &y, sizeof(vU1024.self)) == 0
 }
 
-func factorial(x: Int) -> vU1024 {
+func factorial(_ x: Int) -> vU1024 {
   var result: vU1024 = 1
 
   for i in 1...x {

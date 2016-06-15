@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 
 /// For a given p-value, returns the critical chi-square value for
 /// a distribution with 1 degree of freedom.
-func _chiSquaredUniform1DFCritical(pValue: Double) -> Double {
+func _chiSquaredUniform1DFCritical(_ pValue: Double) -> Double {
   if abs(pValue - 0.05) < 0.00001 { return 0.00393214 }
   if abs(pValue - 0.02) < 0.00001 { return 0.000628450 }
   if abs(pValue - 0.01) < 0.00001 { return 0.000157088 }
@@ -27,10 +27,10 @@ func _chiSquaredUniform1DFCritical(pValue: Double) -> Double {
 /// Perform chi-squared test for a discrete uniform distribution with
 /// 2 outcomes.
 public func chiSquaredUniform2(
-  trials: Int, _ observedACount: Int, _ pValue: Double
+  _ trials: Int, _ observedACount: Int, _ pValue: Double
 ) -> Bool {
 
-  func square(x: Double) -> Double {
+  func square(_ x: Double) -> Double {
     return x * x
   }
 
@@ -47,5 +47,3 @@ public func chiSquaredUniform2(
   }
   return true
 }
-
-

@@ -20,7 +20,7 @@ func f_closure_returns_void() {
   }
 }
 
-// Do not warn when the indentation is differnt.
+// Do not warn when the indentation is different.
 func reachable_returns_void() {
   return 
     f_returns_void() // no-warning

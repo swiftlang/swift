@@ -77,7 +77,7 @@ Boxes
 ~~~~~
 
 These are used for heap-allocating mutable values captured in closures, for
-indirect enum cases, and for ErrorType existential values. They have an
+indirect enum cases, and for ErrorProtocol existential values. They have an
 identifying isa pointer and reference count, but the isa pointer is shared by
 all boxes and thus does not describe the heap layout of the box.
 
@@ -348,7 +348,7 @@ each isa pointer.
     ...
   }
 
-  func getSymbolicTypeOfObject(isa: void*) -> SymbolicTypeReference
+  func getSymbolicTypeOfObject(_ isa: void*) -> SymbolicTypeReference
 
 Next, we define an "instantiation" operation, which takes a completely
 substituted symbolic type reference, and returns a list of concrete field types
@@ -384,7 +384,7 @@ tools.
     let layout: FieldLayout
   }
 
-  func instantiateSymbolicType(ref: SymbolicTypeReference) -> [FieldTypeDescriptor]
+  func instantiateSymbolicType(_ ref: SymbolicTypeReference) -> [FieldTypeDescriptor]
 
 Field type metadata can have circular references — for example, consider two
 classes which contain optionals of each other. In order to calculate field

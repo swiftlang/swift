@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
-func acceptInt(inout _ : Int) {}
-func acceptDouble(inout _ : Double) {}
+func acceptInt(_ : inout Int) {}
+func acceptDouble(_ : inout Double) {}
 
 var i1 = 1
 acceptInt(&i1)
@@ -9,17 +9,17 @@ var i2 = 1 + 2.0 + 1
 acceptDouble(&i2)
 
 
-func ternary<T>(cond: Bool,
-                @autoclosure _ ifTrue: () -> T,
-                @autoclosure _ ifFalse: () -> T) -> T {}
-ternary(false, 1, 2.5)
-ternary(false, 2.5, 1)
+func ternary<T>(_ cond: Bool,
+                _ ifTrue: @autoclosure () -> T,
+                _ ifFalse: @autoclosure () -> T) -> T {}
+_ = ternary(false, 1, 2.5)
+_ = ternary(false, 2.5, 1)
 
 // <rdar://problem/18447543>
-ternary(false, 1, 2 as Int32)
-ternary(false, 1, 2 as Float)
+_ = ternary(false, 1, 2 as Int32)
+_ = ternary(false, 1, 2 as Float)
 
-func genericFloatingLiteral<T : FloatLiteralConvertible>(x: T) {
+func genericFloatingLiteral<T : FloatLiteralConvertible>(_ x: T) {
   var _ : T = 2.5
 }
 
@@ -35,7 +35,7 @@ var ch = UInt32(65).asChar()
 extension Int {
   func call0() {}
   typealias Signature = (a: String, b: String)
-  func call(x: Signature) {}
+  func call(_ x: Signature) {}
 }
 
 3.call((a: "foo", b: "bar"))

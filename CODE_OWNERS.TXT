@@ -1,12 +1,11 @@
 This file is a list of the people responsible for ensuring that patches for a
-particular part of Swift are reviewed, either by themself or by someone else.
+particular part of Swift are reviewed, either by themselves or by someone else.
 They are also the gatekeepers for their part of Swift, with the final word on
 what goes in or not.
 
 The list is sorted by surname and formatted to allow easy grepping and
 beautification by scripts.  The fields are: name (N), email (E), web-address
-(W), PGP key ID and fingerprint (P), description (D), and snail-mail address
-(S).
+(W), description (D).
 
 N: David Abrahams
 E: dabrahams@apple.com
@@ -28,6 +27,10 @@ N: Argyrios Kyrzidis
 E: kyrtzidis@apple.com
 D: IDE, SourceKit, swift-ide-test
 
+N: Luke Larson
+E: llarson@apple.com
+D: Swift Benchmark Suite
+
 N: Chris Lattner
 E: clattner@apple.com
 D: Everything in Swift not covered by someone else
@@ -46,7 +49,7 @@ D: ClangImporter, Serialization, (Objective-)C printer, Driver
 
 N: Nadav Rotem
 E: nrotem@apple.com
-D: SILAnalysis, SILPasses
+D: SILOptimizer
 
 N: Anna Zaks
 E: ganna@apple.com

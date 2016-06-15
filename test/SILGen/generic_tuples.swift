@@ -1,14 +1,12 @@
 // RUN: %target-swift-frontend -emit-silgen -parse-as-library %s | FileCheck %s
 
 
-func dup<T>(x: T) -> (T, T) { return (x,x) }
+func dup<T>(_ x: T) -> (T, T) { return (x,x) }
 // CHECK-LABEL:      sil hidden @_TF14generic_tuples3dup
-// CHECK:      ([[RESULT:%.*]] : $*(T, T), [[XVAR:%.*]] : $*T):
-// CHECK-NEXT: debug_value_addr [[XVAR]] : $*T  // let x
-// CHECK-NEXT: [[T0:%.*]] = tuple_element_addr [[RESULT]] : {{.*}}, 0
-// CHECK-NEXT: [[T1:%.*]] = tuple_element_addr [[RESULT]] : {{.*}}, 1
-// CHECK-NEXT: copy_addr [[XVAR]] to [initialization] [[T0]]
-// CHECK-NEXT: copy_addr [take] [[XVAR]] to [initialization] [[T1]]
+// CHECK:      ([[RESULT_0:%.*]] : $*T, [[RESULT_1:%.*]] : $*T, [[XVAR:%.*]] : $*T):
+// CHECK-NEXT: debug_value_addr [[XVAR]] : $*T, let, name "x"
+// CHECK-NEXT: copy_addr [[XVAR]] to [initialization] [[RESULT_0]]
+// CHECK-NEXT: copy_addr [take] [[XVAR]] to [initialization] [[RESULT_1]]
 // CHECK-NEXT: [[T0:%.*]] = tuple ()
 // CHECK-NEXT: return [[T0]]
 
@@ -18,6 +16,6 @@ func dup<T>(x: T) -> (T, T) { return (x,x) }
 
 struct Blub {}
 // CHECK-LABEL: sil hidden @_TF14generic_tuples3foo
-func foo<T>(x: T) {}
+func foo<T>(_ x: T) {}
 // CHECK-LABEL: sil hidden @_TF14generic_tuples3bar
-func bar(x: (Blub, Blub)) { foo(x) }
+func bar(_ x: (Blub, Blub)) { foo(x) }

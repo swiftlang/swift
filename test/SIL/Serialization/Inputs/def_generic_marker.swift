@@ -1,23 +1,23 @@
 public protocol mmGeneratorType {
-  typealias Element
+  associatedtype Element
 }
 
 public protocol mmSequenceType {
-  typealias Generator : mmGeneratorType
+  associatedtype Generator : mmGeneratorType
 }
 
 public protocol mmCollectionType : mmSequenceType {
   mutating func extend<
     S : mmSequenceType
     where S.Generator.Element == Self.Generator.Element
-  > (seq: S)
+  > (_ seq: S)
 }
 
 public func test<
   EC1 : mmCollectionType,
   EC2 : mmCollectionType
   where EC1.Generator.Element == EC2.Generator.Element
-> (lhs: EC1, _ rhs: EC2) -> EC1 {
+> (_ lhs: EC1, _ rhs: EC2) -> EC1 {
   var lhs = lhs
   lhs.extend(rhs)
   return lhs

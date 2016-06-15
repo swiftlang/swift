@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -18,12 +18,9 @@
 #define SWIFT_AST_IDENTIFIER_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/StringRef.h"
-#include <cstring>
+#include "llvm/Support/TrailingObjects.h"
 
 namespace llvm {
   class raw_ostream;
@@ -31,6 +28,7 @@ namespace llvm {
 
 namespace swift {
   class ASTContext;
+  class ParameterList;
 
 /// DeclRefKind - The kind of reference to an identifier.
 enum class DeclRefKind {
@@ -65,10 +63,11 @@ public:
   StringRef str() const { return Pointer; }
   
   unsigned getLength() const {
+    assert(Pointer != nullptr && "Tried getting length of empty identifier");
     return ::strlen(Pointer);
   }
   
-  bool empty() const { return Pointer == 0; }
+  bool empty() const { return Pointer == nullptr; }
   
   /// isOperator - Return true if this identifier is an operator, false if it is
   /// a normal identifier.
@@ -109,9 +108,6 @@ public:
   /// isOperatorContinuationCodePoint - Return true if the specified code point
   /// is a valid operator code point.
   static bool isOperatorContinuationCodePoint(uint32_t C) {
-    // '.' is a special case. It can only appear in '..'.
-    if (C == '.')
-      return false;
     if (isOperatorStartCodePoint(C))
       return true;
 
@@ -124,11 +120,17 @@ public:
         || (C >= 0xE0100 && C <= 0xE01EF);
   }
 
+  static bool isEditorPlaceholder(StringRef name) {
+    return name.startswith("<#");
+  }
+
   bool isEditorPlaceholder() const {
-    return !empty() && Pointer[0] == '<' && Pointer[1] == '#';
+    return !empty() && isEditorPlaceholder(str());
   }
   
-  void *getAsOpaquePointer() const { return (void *)Pointer; }
+  const void *getAsOpaquePointer() const {
+      return static_cast<const void *>(Pointer);
+  }
   
   static Identifier getFromOpaquePointer(void *P) {
     return Identifier((const char*)P);
@@ -141,7 +143,7 @@ public:
   int compare(Identifier other) const;
 
   bool operator==(Identifier RHS) const { return Pointer == RHS.Pointer; }
-  bool operator!=(Identifier RHS) const { return Pointer != RHS.Pointer; }
+  bool operator!=(Identifier RHS) const { return !(*this==RHS); }
 
   bool operator<(Identifier RHS) const { return Pointer < RHS.Pointer; }
   
@@ -206,8 +208,12 @@ namespace swift {
 class DeclName {
   friend class ASTContext;
 
-  /// Represents a compound
-  struct alignas(Identifier*) CompoundDeclName : llvm::FoldingSetNode {
+  /// Represents a compound declaration name.
+  struct alignas(Identifier) CompoundDeclName final : llvm::FoldingSetNode,
+      private llvm::TrailingObjects<CompoundDeclName, Identifier> {
+    friend TrailingObjects;
+    friend class DeclName;
+
     Identifier BaseName;
     size_t NumArgs;
     
@@ -218,10 +224,10 @@ class DeclName {
     }
     
     ArrayRef<Identifier> getArgumentNames() const {
-      return {reinterpret_cast<const Identifier*>(this + 1), NumArgs};
+      return {getTrailingObjects<Identifier>(), NumArgs};
     }
     MutableArrayRef<Identifier> getArgumentNames() {
-      return {reinterpret_cast<Identifier*>(this + 1), NumArgs};
+      return {getTrailingObjects<Identifier>(), NumArgs};
     }
       
     /// Uniquing for the ASTContext.
@@ -246,6 +252,9 @@ class DeclName {
     : SimpleOrCompound(decltype(SimpleOrCompound)::getFromOpaqueValue(Opaque))
   {}
 
+  void initialize(ASTContext &C, Identifier baseName,
+                  ArrayRef<Identifier> argumentNames);
+  
 public:
   /// Build a null name.
   DeclName() : SimpleOrCompound(IdentifierAndCompound()) {}
@@ -256,9 +265,15 @@ public:
   
   /// Build a compound value name given a base name and a set of argument names.
   DeclName(ASTContext &C, Identifier baseName,
-           ArrayRef<Identifier> argumentNames);
+           ArrayRef<Identifier> argumentNames) {
+    initialize(C, baseName, argumentNames);
+  }
+
+  /// Build a compound value name given a base name and a set of argument names
+  /// extracted from a parameter list.
+  DeclName(ASTContext &C, Identifier baseName, ParameterList *paramList);
   
-  /// Retrive the 'base' name, i.e., the name that follows the introducer,
+  /// Retrieve the 'base' name, i.e., the name that follows the introducer,
   /// such as the 'foo' in 'func foo(x:Int, y:Int)' or the 'bar' in
   /// 'var bar: Int'.
   Identifier getBaseName() const {
@@ -352,7 +367,7 @@ public:
   }
 
   friend bool operator!=(DeclName lhs, DeclName rhs) {
-    return lhs.getOpaqueValue() != rhs.getOpaqueValue();
+    return !(lhs == rhs);
   }
 
   friend bool operator<(DeclName lhs, DeclName rhs) {
@@ -373,6 +388,20 @@ public:
 
   void *getOpaqueValue() const { return SimpleOrCompound.getOpaqueValue(); }
   static DeclName getFromOpaqueValue(void *p) { return DeclName(p); }
+
+  /// Get a string representation of the name,
+  ///
+  /// \param scratch Scratch space to use.
+  StringRef getString(llvm::SmallVectorImpl<char> &scratch,
+                      bool skipEmptyArgumentNames = false) const;
+
+  /// Print the representation of this declaration name to the given
+  /// stream.
+  ///
+  /// \param skipEmptyArgumentNames When true, don't print the argument labels
+  /// if they are all empty.
+  llvm::raw_ostream &print(llvm::raw_ostream &os,
+                           bool skipEmptyArgumentNames = false) const;
 
   /// Print a "pretty" representation of this declaration name to the given
   /// stream.
@@ -458,7 +487,7 @@ public:
   }
 
   friend bool operator!=(ObjCSelector lhs, ObjCSelector rhs) {
-    return lhs.getOpaqueValue() != rhs.getOpaqueValue();
+    return !(lhs == rhs);
   }
 
   friend bool operator<(ObjCSelector lhs, ObjCSelector rhs) {

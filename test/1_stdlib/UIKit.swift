@@ -1,67 +1,98 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: OS=ios
 
 import UIKit
+import StdlibUnittest
 
-func printOrientation(o: UIDeviceOrientation) {
-  print("\(o.isPortrait) \(UIDeviceOrientationIsPortrait(o)), ", terminator: "")
-  print("\(o.isLandscape) \(UIDeviceOrientationIsLandscape(o)), ", terminator: "")
-  print("\(o.isFlat), ", terminator: "")
-  print("\(o.isValidInterfaceOrientation) \(UIDeviceOrientationIsValidInterfaceOrientation(o))")
+let UIKitTests = TestSuite("UIKit")
+
+private func printDevice(_ o: UIDeviceOrientation) -> String {
+  var s = "\(o.isPortrait) \(UIDeviceOrientationIsPortrait(o)), "
+  s += "\(o.isLandscape) \(UIDeviceOrientationIsLandscape(o)), "
+  s += "\(o.isFlat), \(o.isValidInterfaceOrientation) "
+  s += "\(UIDeviceOrientationIsValidInterfaceOrientation(o))"
+  return s
 }
 
-print("Device orientations")
-printOrientation(UIDeviceOrientation.Unknown)
-printOrientation(UIDeviceOrientation.Portrait)
-printOrientation(UIDeviceOrientation.PortraitUpsideDown)
-printOrientation(UIDeviceOrientation.LandscapeLeft)
-printOrientation(UIDeviceOrientation.LandscapeRight)
-printOrientation(UIDeviceOrientation.FaceUp)
-printOrientation(UIDeviceOrientation.FaceDown)
-// CHECK:      Device orientations
-// CHECK-NEXT: false false, false false, false, false false
-// CHECK-NEXT: true true, false false, false, true true
-// CHECK-NEXT: true true, false false, false, true true
-// CHECK-NEXT: false false, true true, false, true true
-// CHECK-NEXT: false false, true true, false, true true
-// CHECK-NEXT: false false, false false, true, false false
-// CHECK-NEXT: false false, false false, true, false false
-
-
-func printOrientation(o: UIInterfaceOrientation) {
-  print("\(o.isPortrait) \(UIInterfaceOrientationIsPortrait(o)), ", terminator: "")
-  print("\(o.isLandscape) \(UIInterfaceOrientationIsLandscape(o))")
+private func printInterface(_ o: UIInterfaceOrientation) -> String {
+  return "\(o.isPortrait) \(UIInterfaceOrientationIsPortrait(o)), " +
+    "\(o.isLandscape) \(UIInterfaceOrientationIsLandscape(o))"
 }
 
-print("Interface orientations")
-printOrientation(UIInterfaceOrientation.Unknown)
-printOrientation(UIInterfaceOrientation.Portrait)
-printOrientation(UIInterfaceOrientation.PortraitUpsideDown)
-printOrientation(UIInterfaceOrientation.LandscapeLeft)
-printOrientation(UIInterfaceOrientation.LandscapeRight)
-// CHECK:      Interface orientations
-// CHECK-NEXT: false false, false false
-// CHECK-NEXT: true true, false false
-// CHECK-NEXT: true true, false false
-// CHECK-NEXT: false false, true true
-// CHECK-NEXT: false false, true true
+UIKitTests.test("UIDeviceOrientation") {
+  expectEqual("false false, false false, false, false false",
+    printDevice(.unknown))
 
-var inset1 = UIEdgeInsets(top: 1.0, left: 2.0, bottom: 3.0, right: 4.0)
-var inset2 = UIEdgeInsets(top: 1.0, left: 2.0, bottom: 3.1, right: 4.0)
-print("inset1 == inset1: \(inset1 == inset1)")
-print("inset1 != inset1: \(inset1 != inset1)")
-print("inset1 == inset2: \(inset1 == inset2)")
-// CHECK: inset1 == inset1: true
-// CHECK: inset1 != inset1: false
-// CHECK: inset1 == inset2: false
+  expectEqual("true true, false false, false, true true",
+    printDevice(.portrait))
 
-var offset1 = UIOffset(horizontal: 1.0, vertical: 2.0)
-var offset2 = UIOffset(horizontal: 1.0, vertical: 3.0)
-print("offset1 == offset1: \(offset1 == offset1)")
-print("offset1 != offset1: \(offset1 != offset1)")
-print("offset1 == offset2: \(offset1 == offset2)")
-// CHECK: offset1 == offset1: true
-// CHECK: offset1 != offset1: false
-// CHECK: offset1 == offset2: false
+  expectEqual("true true, false false, false, true true",
+    printDevice(.portraitUpsideDown))
 
+  expectEqual("false false, true true, false, true true",
+    printDevice(.landscapeLeft))
+
+  expectEqual("false false, true true, false, true true",
+    printDevice(.landscapeRight))
+
+  expectEqual("false false, false false, true, false false",
+    printDevice(.faceUp))
+
+  expectEqual("false false, false false, true, false false",
+    printDevice(.faceDown))
+}
+
+UIKitTests.test("UIInterfaceOrientation") {
+  expectEqual("false false, false false",
+    printInterface(.unknown))
+
+  expectEqual("true true, false false",
+    printInterface(.portrait))
+
+  expectEqual("true true, false false",
+    printInterface(.portraitUpsideDown))
+
+  expectEqual("false false, true true",
+    printInterface(.landscapeLeft))
+
+  expectEqual("false false, true true",
+    printInterface(.landscapeRight))
+}
+
+UIKitTests.test("UIEdgeInsets") {
+  let insets = [
+    UIEdgeInsets(top: 1.0, left: 2.0, bottom: 3.0, right: 4.0),
+    UIEdgeInsets(top: 1.0, left: 2.0, bottom: 3.1, right: 4.0),
+    UIEdgeInsets.zero
+  ]
+  checkEquatable(insets, oracle: { $0 == $1 })
+}
+
+UIKitTests.test("UIOffset") {
+  let offsets = [
+    UIOffset(horizontal: 1.0, vertical: 2.0),
+    UIOffset(horizontal: 1.0, vertical: 3.0),
+    UIOffset.zero
+  ]
+  checkEquatable(offsets, oracle: { $0 == $1 })
+}
+
+class TestChildView : UIView, CustomPlaygroundQuickLookable {
+  convenience init() {
+    self.init(frame: CGRect(x: 0, y: 0, width: 10, height: 10))
+  }
+  var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text("child")
+  }
+}
+
+UIKitTests.test("CustomPlaygroundQuickLookable") {
+  switch PlaygroundQuickLook(reflecting: TestChildView()) {
+  case .text("child"): break
+  default: expectUnreachable(
+    "TestChildView custom quicklookable should have been invoked")
+  }
+}
+
+runAllTests()

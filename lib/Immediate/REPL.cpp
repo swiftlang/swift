@@ -1,8 +1,8 @@
-//===-- REPL.cpp - the integrated REPL ------------------------------------===//
+//===--- REPL.cpp - the integrated REPL -----------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -24,7 +24,7 @@
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SILPasses/Passes.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -33,7 +33,7 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__FreeBSD__)
 // FIXME: Support REPL on non-Apple platforms. Ubuntu 14.10's editline does not
 // include the wide character entry points needed by the REPL yet.
 #include <histedit.h>
@@ -130,6 +130,7 @@ public:
 
 using Convert = ConvertForWcharSize<sizeof(wchar_t)>;
   
+#if defined(__APPLE__) || defined(__FreeBSD__)
 static void convertFromUTF8(llvm::StringRef utf8,
                             llvm::SmallVectorImpl<wchar_t> &out) {
   size_t reserve = out.size() + utf8.size();
@@ -157,8 +158,11 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
   (void)res;
   out.set_size(utf8_begin - out.begin());
 }
+#endif
 
 } // end anonymous namespace
+
+#if defined(__APPLE__) || defined(__FreeBSD__)
 
 static bool appendToREPLFile(SourceFile &SF,
                              PersistentParserState &PersistentState,
@@ -182,8 +186,6 @@ static bool appendToREPLFile(SourceFile &SF,
   } while (!Done);
   return FoundAnySideEffects;
 }
-
-#if defined(__APPLE__)
 
 /// An arbitrary, otherwise-unused char value that editline interprets as
 /// entering/leaving "literal mode", meaning it passes prompt characters through
@@ -869,11 +871,7 @@ private:
     // Make a copy of it to be able to correct produce DumpModule.
     std::unique_ptr<llvm::Module> SaveLineModule(CloneModule(LineModule.get()));
     
-    if (!linkLLVMModules(Module, LineModule.get()
-                         // TODO: reactivate the linker mode if it is
-                         // supported in llvm again. Otherwise remove the
-                         // commented code completely.
-                         /*, llvm::Linker::PreserveSource */)) {
+    if (!linkLLVMModules(Module, std::move(LineModule))) {
       return false;
     }
 
@@ -883,11 +881,7 @@ private:
 
     stripPreviouslyGenerated(*NewModule);
 
-    if (!linkLLVMModules(&DumpModule, SaveLineModule.get()
-                         // TODO: reactivate the linker mode if it is
-                         // supported in llvm again. Otherwise remove the
-                         // commented code completely.
-                         /*, llvm::Linker::DestroySource */)) {
+    if (!linkLLVMModules(&DumpModule, std::move(SaveLineModule))) {
       return false;
     }
     llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
@@ -948,8 +942,7 @@ public:
     }
     tryLoadLibraries(CI.getLinkLibraries(), Ctx.SearchPathOpts, CI.getDiags());
 
-    llvm::EngineBuilder builder(
-        std::move(std::unique_ptr<llvm::Module>(Module)));
+    llvm::EngineBuilder builder{std::unique_ptr<llvm::Module>{Module}};
     std::string ErrorMsg;
     llvm::TargetOptions TargetOpt;
     std::string CPU;
@@ -991,7 +984,8 @@ public:
     if (llvm::sys::Process::StandardInIsUserInput())
       llvm::outs() <<
           "***  You are running Swift's integrated REPL,  ***\n"
-          "***  intended for testing purposes only.       ***\n"
+          "***  intended for compiler and stdlib          ***\n"
+          "***  development and testing purposes only.    ***\n"
           "***  The full REPL is built as part of LLDB.   ***\n"
           "***  Type ':help' for assistance.              ***\n";
   }
@@ -1190,6 +1184,7 @@ void swift::runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   // Disable the REPL on other platforms; our current implementation is tied
   // to histedit.h.
   llvm::report_fatal_error("Compiler-internal integrated REPL unimplemented "
-                           "for this platform");
+                           "for this platform; use the LLDB-enhanced REPL "
+                           "instead.");
 }
 #endif

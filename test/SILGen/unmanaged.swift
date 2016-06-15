@@ -6,14 +6,14 @@ struct Holder {
   unowned(unsafe) var value: C
 }
 _ = Holder(value: C())
-// CHECK-LABEL:sil hidden @_TFV9unmanaged6HolderC{{.*}} : $@convention(thin) (@owned C, @thin Holder.Type) -> Holder
+// CHECK-LABEL:sil hidden @_TFV9unmanaged6HolderC{{.*}} : $@convention(method) (@owned C, @thin Holder.Type) -> Holder
 // CHECK: bb0([[T0:%.*]] : $C,
 // CHECK-NEXT:   [[T1:%.*]] = ref_to_unmanaged [[T0]] : $C to $@sil_unmanaged C
 // CHECK-NEXT:   strong_release [[T0]] : $C
 // CHECK-NEXT:   [[T2:%.*]] = struct $Holder ([[T1]] : $@sil_unmanaged C)
 // CHECK-NEXT:   return [[T2]] : $Holder
 
-func set(inout holder holder: Holder) {
+func set(holder holder: inout Holder) {
   holder.value = C()
 }
 // CHECK-LABEL:sil hidden @_TF9unmanaged3setFT6holderRVS_6Holder_T_ : $@convention(thin) (@inout Holder) -> ()
@@ -27,12 +27,12 @@ func set(inout holder holder: Holder) {
 // CHECK-NEXT:   tuple ()
 // CHECK-NEXT:   return
 
-func get(inout holder holder: Holder) -> C {
+func get(holder holder: inout Holder) -> C {
   return holder.value
 }
 // CHECK-LABEL:sil hidden @_TF9unmanaged3getFT6holderRVS_6Holder_CS_1C : $@convention(thin) (@inout Holder) -> @owned C
 // CHECK: bb0([[ADDR:%.*]] : $*Holder):
-// CHECK-NEXT:   debug_value_addr %0 : $*Holder // var holder, argno: 1 
+// CHECK-NEXT:   debug_value_addr %0 : $*Holder, var, name "holder", argno 1 
 // CHECK-NEXT:   [[T0:%.*]] = struct_element_addr [[ADDR]] : $*Holder, #Holder.value
 // CHECK-NEXT:   [[T1:%.*]] = load [[T0]] : $*@sil_unmanaged C
 // CHECK-NEXT:   [[T2:%.*]] = unmanaged_to_ref [[T1]]

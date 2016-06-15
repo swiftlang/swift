@@ -1,6 +1,9 @@
-// RUN: %target-build-swift -Xfrontend %clang-importer-sdk %s -emit-ir
-// REQUIRES: executable_test
+// RUN: rm -rf %t && mkdir %t
+// RUN: %build-clang-importer-objc-overlays
 
+// RUN: %target-swift-frontend %clang-importer-sdk-nosource -I %t %s -emit-ir
+// REQUIRES: executable_test
+// REQUIRES: OS=macosx
 // REQUIRES: objc_interop
 
 // Test that we don't crash when producing IR.

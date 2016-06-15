@@ -1,9 +1,9 @@
 // RUN: %target-parse-verify-swift
 
 class HasFunc {
-  func HasFunc(_: HasFunc) { // expected-error {{use of undeclared type 'HasFunc'}}
+  func HasFunc(_: HasFunc) {
   }
-  func HasFunc() -> HasFunc { // expected-error {{use of undeclared type 'HasFunc'}}
+  func HasFunc() -> HasFunc {
     return HasFunc()
   }
   func SomethingElse(_: SomethingElse) { // expected-error {{use of undeclared type 'SomethingElse'}}
@@ -24,17 +24,17 @@ class HasGenericFunc {
 }
 
 class HasProp {
-  var HasProp: HasProp { // expected-error {{'HasProp' used within its own type}} expected-error 2 {{use of undeclared type 'HasProp'}}
-    return HasProp()
+  var HasProp: HasProp {
+    return HasProp() // expected-error {{cannot call value of non-function type 'HasProp'}}
   }
-  var SomethingElse: SomethingElse? { // expected-error {{'SomethingElse' used within its own type}} expected-error 2 {{use of undeclared type 'SomethingElse'}}
+  var SomethingElse: SomethingElse? { // expected-error 2 {{use of undeclared type 'SomethingElse'}}
     return nil
   }
 }
 
 protocol SomeProtocol {}
 protocol ReferenceSomeProtocol {
-  var SomeProtocol: SomeProtocol { get }  // expected-error {{'SomeProtocol' used within its own type}} expected-error 2 {{use of undeclared type 'SomeProtocol'}}
+  var SomeProtocol: SomeProtocol { get } 
 }
 
 func TopLevelFunc(x: TopLevelFunc) -> TopLevelFunc { return x } // expected-error {{use of undeclared type 'TopLevelFunc'}}'
@@ -44,14 +44,14 @@ var TopLevelVar: TopLevelVar? { return nil } // expected-error 2 {{use of undecl
 
 
 protocol AProtocol {
-  typealias e : e  // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
+  associatedtype e : e  // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
 }
 
 
 
 // <rdar://problem/15604574> Protocol conformance checking needs to be delayed
 protocol P15604574 {
-  typealias FooResult
+  associatedtype FooResult
   func foo() -> FooResult
 }
 

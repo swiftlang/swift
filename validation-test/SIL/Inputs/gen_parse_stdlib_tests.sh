@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 process_count=17
-process_id_max=$(($process_count - 1))
+process_id_max=$((process_count - 1))
 
 for id in $(seq 0 $process_id_max); do
 
@@ -14,6 +14,8 @@ for id in $(seq 0 $process_id_max); do
 // RUN: rm -f %t.*
 // RUN: %target-sil-opt -enable-sil-verify-all -sil-disable-ast-dump %platform-module-dir/Swift.swiftmodule -module-name=Swift -o %t.sil
 // RUN: %target-sil-opt -enable-sil-verify-all %t.sil -ast-verifier-process-count=$process_count -ast-verifier-process-id=$id > /dev/null
+// REQUIRES: long_test
+// REQUIRES: nonexecutable_test
 __EOF__
 
 done

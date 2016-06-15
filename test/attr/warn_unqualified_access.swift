@@ -53,7 +53,7 @@ class Sub : Base {
   }
 }
 
-func test(sub: Sub) {
+func test(_ sub: Sub) {
   sub.a()
   sub.b()
   sub.c()
@@ -68,7 +68,7 @@ class Recovery {
   @warn_unqualified_access
   func topLevel() {} // expected-note * {{declared here}}
   @warn_unqualified_access
-  func overloaded(x: Float) {} // expected-note * {{declared here}}
+  func overloaded(_ x: Float) {} // expected-note * {{declared here}}
 
   func test() {
     topLevel() // expected-warning {{use of 'topLevel' treated as a reference to instance method in class 'Recovery'}}

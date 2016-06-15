@@ -1,6 +1,14 @@
 ---
 Name: ObjectiveC
 Classes:
+- Name: NSArray
+  SwiftBridge: 'Swift.Array'
+- Name: NSDictionary
+  SwiftBridge: 'Swift.Dictionary'
+- Name: NSSet
+  SwiftBridge: 'Swift.Set'
+- Name: NSString
+  SwiftBridge: 'Swift.String'
 - Name: List
   Methods:
   - Selector: init
@@ -12,6 +20,7 @@ Classes:
     - O
     NullabilityOfRet: S
 - Name: NSObject
+  SwiftName: NSObject
   Methods:
   - Selector: alloc
     MethodKind: Class
@@ -23,7 +32,7 @@ Classes:
     NullabilityOfRet: N
   - Selector: class
     MethodKind: Class
-    Availability: none
+    Availability: nonswift
     AvailabilityMsg: use 'self' instead
   - Selector: 'conformsToProtocol:'
     MethodKind: Class
@@ -35,7 +44,7 @@ Classes:
     NullabilityOfRet: N
   - Selector: dealloc
     MethodKind: Instance
-    Availability: none
+    Availability: nonswift
     AvailabilityMsg: use 'deinit' to define a de-initializer
   - Selector: debugDescription
     MethodKind: Class
@@ -50,14 +59,14 @@ Classes:
     NullabilityOfRet: O
   - Selector: 'forwardInvocation:'
     MethodKind: Instance
-    Availability: none
+    Availability: nonswift
   - Selector: init
     MethodKind: Instance
     NullabilityOfRet: N
     DesignatedInit: true
   - Selector: 'instanceMethodSignatureForSelector:'
     MethodKind: Class
-    Availability: none
+    Availability: nonswift
   - Selector: 'isSubclassOfClass:'
     MethodKind: Class
     Nullability:
@@ -65,7 +74,7 @@ Classes:
     NullabilityOfRet: S
   - Selector: 'methodSignatureForSelector:'
     MethodKind: Instance
-    Availability: none
+    Availability: nonswift
   - Selector: mutableCopy
     MethodKind: Instance
     NullabilityOfRet: N
@@ -87,10 +96,11 @@ Classes:
     NullabilityOfRet: S
 Protocols:
 - Name: NSObject
+  SwiftName: NSObjectProtocol
   Methods:
   - Selector: class
     MethodKind: Instance
-    Availability: none
+    Availability: nonswift
     AvailabilityMsg: use 'dynamicType' instead
   - Selector: 'conformsToProtocol:'
     MethodKind: Instance
@@ -122,3 +132,7 @@ Protocols:
     Nullability: N
   - Name: superclass
     Nullability: O
+Tags:
+- Name: _NSZone
+  SwiftName: _NSZone
+

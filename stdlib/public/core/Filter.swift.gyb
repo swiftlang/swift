@@ -1,0 +1,376 @@
+//===--- Filter.swift.gyb -------------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal,
+    sliceTypeName
+)
+}%
+
+/// An iterator over the elements traversed by some base iterator that also
+/// satisfy a given predicate.
+///
+/// - Note: This is the associated `Iterator` of `LazyFilterSequence`
+/// and `LazyFilterCollection`.
+public struct LazyFilterIterator<
+  Base : IteratorProtocol
+> : IteratorProtocol, Sequence {
+  /// Advances to the next element and returns it, or `nil` if no next element
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
+  ///
+  /// - Precondition: `next()` has not been applied to a copy of `self`
+  ///   since the copy was made.
+  public mutating func next() -> Base.Element? {
+    while let n = _base.next() {
+      if _predicate(n) {
+        return n
+      }
+    }
+    return nil
+  }
+
+  /// Creates an instance that produces the elements `x` of `base`
+  /// for which `predicate(x) == true`.
+  internal init(
+    _base: Base,
+    whereElementsSatisfy predicate: (Base.Element) -> Bool
+  ) {
+    self._base = _base
+    self._predicate = predicate
+  }
+
+  /// The underlying iterator whose elements are being filtered.
+  public var base: Base { return _base }
+
+  internal var _base: Base
+  
+  /// The predicate used to determine which elements produced by
+  /// `base` are also produced by `self`.
+  internal let _predicate: (Base.Element) -> Bool
+}
+
+/// A sequence whose elements consist of the elements of some base
+/// sequence that also satisfy a given predicate.
+///
+/// - Note: `s.lazy.filter { ... }`, for an arbitrary sequence `s`,
+///   is a `LazyFilterSequence`.
+public struct LazyFilterSequence<Base : Sequence>
+  : LazySequenceProtocol {
+  
+  /// Returns an iterator over the elements of this sequence.
+  ///
+  /// - Complexity: O(1).
+  public func makeIterator() -> LazyFilterIterator<Base.Iterator> {
+    return LazyFilterIterator(
+      _base: base.makeIterator(), whereElementsSatisfy: _include)
+  }
+
+  /// Creates an instance consisting of the elements `x` of `base` for
+  /// which `predicate(x) == true`.
+  public // @testable
+  init(
+    _base base: Base,
+    whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
+  ) {
+    self.base = base
+    self._include = predicate
+  }
+
+  /// The underlying sequence whose elements are being filtered
+  public let base: Base
+
+  /// The predicate used to determine which elements of `base` are
+  /// also elements of `self`.
+  internal let _include: (Base.Iterator.Element) -> Bool
+}
+
+/// The `Index` used for subscripting a `LazyFilterCollection`.
+///
+/// The positions of a `LazyFilterIndex` correspond to those positions
+/// `p` in its underlying collection `c` such that `c[p]`
+/// satisfies the predicate with which the `LazyFilterIndex` was
+/// initialized.
+/// 
+/// - Note: The performance of advancing a `LazyFilterIndex`
+///   depends on how sparsely the filtering predicate is satisfied,
+///   and may not offer the usual performance given by models of
+///   `Collection`.
+public struct LazyFilterIndex<Base : Collection> : Comparable {
+
+  /// The position corresponding to `self` in the underlying collection.
+  public let base: Base.Index
+}
+
+public func == <Base : Collection>(
+  lhs: LazyFilterIndex<Base>,
+  rhs: LazyFilterIndex<Base>
+) -> Bool {
+  return lhs.base == rhs.base
+}
+
+public func != <Base : Collection>(
+  lhs: LazyFilterIndex<Base>,
+  rhs: LazyFilterIndex<Base>
+) -> Bool {
+  return lhs.base != rhs.base
+}
+
+public func < <Base : Collection>(
+  lhs: LazyFilterIndex<Base>,
+  rhs: LazyFilterIndex<Base>
+) -> Bool {
+  return lhs.base < rhs.base
+}
+
+public func <= <Base : Collection>(
+  lhs: LazyFilterIndex<Base>,
+  rhs: LazyFilterIndex<Base>
+) -> Bool {
+  return lhs.base <= rhs.base
+}
+
+public func >= <Base : Collection>(
+  lhs: LazyFilterIndex<Base>,
+  rhs: LazyFilterIndex<Base>
+) -> Bool {
+  return lhs.base >= rhs.base
+}
+
+public func > <Base : Collection>(
+  lhs: LazyFilterIndex<Base>,
+  rhs: LazyFilterIndex<Base>
+) -> Bool {
+  return lhs.base > rhs.base
+}
+
+// FIXME(ABI)(compiler limitation): `LazyFilter*Collection` types should be
+// collapsed into one `LazyFilterCollection` using conditional conformances.
+// Maybe even combined with `LazyFilterSequence`.
+
+% for Traversal in ['Forward', 'Bidirectional']:
+%   Self = "LazyFilter" + collectionForTraversal(Traversal)
+%   Slice = sliceTypeName(traversal=Traversal, mutable=False, rangeReplaceable=False)
+
+/// A lazy `Collection` wrapper that includes the elements of an
+/// underlying collection that satisfy a predicate.
+///
+/// - Note: The performance of accessing `startIndex`, `first`, any methods
+///   that depend on `startIndex`, or of advancing a `LazyFilterIndex` depends
+///   on how sparsely the filtering predicate is satisfied, and may not offer
+///   the usual performance given by `Collection`. Be aware, therefore, that 
+///   general operations on `LazyFilterCollection` instances may not have the
+///   documented complexity.
+public struct ${Self}<
+  Base : ${collectionForTraversal(Traversal)}
+> : LazyCollectionProtocol, ${collectionForTraversal(Traversal)} {
+
+  /// A type that represents a valid position in the collection.
+  ///
+  /// Valid indices consist of the position of every element and a
+  /// "past the end" position that's not valid for use as a subscript.
+  public typealias Index = LazyFilterIndex<Base>
+
+  public typealias IndexDistance = Base.IndexDistance
+
+  /// Construct an instance containing the elements of `base` that
+  /// satisfy `predicate`.
+  public // @testable
+  init(
+    _base: Base,
+    whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
+  ) {
+    self._base = _base
+    self._predicate = predicate
+  }
+
+  /// The position of the first element in a non-empty collection.
+  ///
+  /// In an empty collection, `startIndex == endIndex`.
+  ///
+  /// - Complexity: O(N), where N is the ratio between unfiltered and
+  ///   filtered collection counts.
+  public var startIndex: Index {
+    var index = _base.startIndex
+    while index != _base.endIndex && !_predicate(_base[index]) {
+      _base.formIndex(after: &index)
+    }
+    return LazyFilterIndex(base: index)
+  }
+
+  /// The collection's "past the end" position---that is, the position one
+  /// greater than the last valid subscript argument.
+  ///
+  /// `endIndex` is always reachable from `startIndex` by zero or more
+  /// applications of `index(after:)`.
+  public var endIndex: Index {
+    return LazyFilterIndex(base: _base.endIndex)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  public func index(after i: Index) -> Index {
+    var i = i
+    formIndex(after: &i)
+    return i
+  }
+
+  public func formIndex(after i: inout Index) {
+    // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
+    var index = i.base
+    _precondition(index != _base.endIndex, "can't advance past endIndex")
+    repeat {
+      _base.formIndex(after: &index)
+    } while index != _base.endIndex && !_predicate(_base[index])
+    i = LazyFilterIndex(base: index)
+  }
+
+%   if Traversal == 'Bidirectional':
+  public func index(before i: Index) -> Index {
+    var i = i
+    formIndex(before: &i)
+    return i
+  }
+
+  public func formIndex(before i: inout Index) {
+    // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
+    var index = i.base
+    _precondition(index != _base.startIndex, "can't retreat before startIndex")
+    repeat {
+      _base.formIndex(before: &index)
+    } while !_predicate(_base[index])
+    i = LazyFilterIndex(base: index)
+  }
+%   end
+
+  /// Access the element at `position`.
+  ///
+  /// - Precondition: `position` is a valid position in `self` and
+  /// `position != endIndex`.
+  public subscript(position: Index) -> Base.Iterator.Element {
+    return _base[position.base]
+  }
+
+  public subscript(bounds: Range<Index>) -> ${Slice}<${Self}<Base>> {
+    return ${Slice}(base: self, bounds: bounds)
+  }
+
+  // FIXME(ABI)(compiler limitation): we actually want to add:
+  //
+  //   typealias SubSequence = ${Self}<Base.SubSequence>
+  //
+  // so that all slicing optimizations of the base collection can kick in.
+  //
+  // We can't do that right now though, because that would force a lot of
+  // constraints on `Base.SubSequence`, limiting the possible contexts where
+  // the `.lazy.filter` API can be used.
+
+  /// Returns an iterator over the elements of this sequence.
+  ///
+  /// - Complexity: O(1).
+  public func makeIterator() -> LazyFilterIterator<Base.Iterator> {
+    return LazyFilterIterator(
+      _base: _base.makeIterator(), whereElementsSatisfy: _predicate)
+  }
+
+  var _base: Base
+  let _predicate: (Base.Iterator.Element) -> Bool
+}
+
+% end
+
+extension LazySequenceProtocol {
+  /// Returns the elements of `self` that satisfy `predicate`.
+  ///
+  /// - Note: The elements of the result are computed on-demand, as
+  ///   the result is used. No buffering storage is allocated and each
+  ///   traversal step invokes `predicate` on one or more underlying
+  ///   elements.
+  public func filter(
+    _ predicate: (Elements.Iterator.Element) -> Bool
+  ) -> LazyFilterSequence<Self.Elements> {
+    return LazyFilterSequence(
+      _base: self.elements, whereElementsSatisfy: predicate)
+  }
+}
+
+% for Traversal in ['Forward', 'Bidirectional']:
+
+extension LazyCollectionProtocol
+  where
+  Self : ${collectionForTraversal(Traversal)},
+  Elements : ${collectionForTraversal(Traversal)}
+{
+  /// Returns the elements of `self` that satisfy `predicate`.
+  ///
+  /// - Note: The elements of the result are computed on-demand, as
+  ///   the result is used. No buffering storage is allocated and each
+  ///   traversal step invokes `predicate` on one or more underlying
+  ///   elements.
+  public func filter(
+    _ predicate: (Elements.Iterator.Element) -> Bool
+  ) -> LazyFilter${collectionForTraversal(Traversal)}<Self.Elements> {
+    return LazyFilter${collectionForTraversal(Traversal)}(
+      _base: self.elements, whereElementsSatisfy: predicate)
+  }
+}
+
+% end
+
+@available(*, unavailable, renamed: "LazyFilterIterator")
+public struct LazyFilterGenerator<Base : IteratorProtocol> {}
+
+extension LazyFilterIterator {
+  @available(*, unavailable, message: "use '.lazy.filter' on the sequence")
+  public init(
+    _ base: Base,
+    whereElementsSatisfy predicate: (Base.Element) -> Bool
+  ) {
+    Builtin.unreachable()
+  }
+}
+
+extension LazyFilterSequence {
+  @available(*, unavailable, message: "use '.lazy.filter' on the sequence")
+  public init(
+    _ base: Base,
+    whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
+  ) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "makeIterator")
+  public func generate() -> LazyFilterIterator<Base.Iterator> {
+    Builtin.unreachable()
+  }
+}
+
+extension LazyFilterCollection {
+  @available(*, unavailable, message: "use '.lazy.filter' on the collection")
+  public init(
+    _ base: Base,
+    whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
+  ) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "makeIterator")
+  public func generate() -> LazyFilterIterator<Base.Iterator> {
+    Builtin.unreachable()
+  }
+}
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

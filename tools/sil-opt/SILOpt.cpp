@@ -1,8 +1,8 @@
-//===-- SILOpt.cpp - SIL Optimization Driver ------------------------------===//
+//===--- SILOpt.cpp - SIL Optimization Driver -----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,9 +23,9 @@
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/SILAnalysis/Analysis.h"
-#include "swift/SILPasses/Passes.h"
-#include "swift/SILPasses/PassManager.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Serialization/SerializationOptions.h"
@@ -37,6 +37,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
+#include <cstdio>
 using namespace swift;
 
 namespace {
@@ -65,6 +66,12 @@ ModuleName("module-name", llvm::cl::desc("The name of the module if processing"
                                          " a module. Necessary for processing "
                                          "stdin."));
 
+static llvm::cl::opt<bool>
+EnableResilience("enable-resilience",
+                 llvm::cl::desc("Compile the module to export resilient "
+                                "interfaces for all public declarations by "
+                                "default"));
+
 static llvm::cl::opt<std::string>
 ResourceDir("resource-dir",
     llvm::cl::desc("The directory that holds the compiler resource files"));
@@ -90,8 +97,8 @@ static llvm::cl::list<PassKind>
 Passes(llvm::cl::desc("Passes:"),
        llvm::cl::values(
 #define PASS(ID, NAME, DESCRIPTION) clEnumValN(PassKind::ID, NAME, DESCRIPTION),
-#include "swift/SILPasses/Passes.def"
-			clEnumValEnd));
+#include "swift/SILOptimizer/PassManager/Passes.def"
+       clEnumValEnd));
 
 static llvm::cl::opt<bool>
 PrintStats("print-stats", llvm::cl::desc("Print various statistics"));
@@ -198,6 +205,7 @@ int main(int argc, char **argv) {
     Invocation.setTargetTriple(Target);
   if (!ResourceDir.empty())
     Invocation.setRuntimeResourcePath(ResourceDir);
+  Invocation.getFrontendOptions().EnableResilience = EnableResilience;
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;

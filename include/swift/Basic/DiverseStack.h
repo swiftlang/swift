@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,23 +17,24 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IRGEN_DIVERSESTACK_H
-#define SWIFT_IRGEN_DIVERSESTACK_H
+#ifndef SWIFT_BASIC_DIVERSESTACK_H
+#define SWIFT_BASIC_DIVERSESTACK_H
 
+#include "swift/Basic/Malloc.h"
+#include "llvm/Support/PointerLikeTypeTraits.h"
 #include <cassert>
 #include <cstring>
 #include <utility>
-#include "swift/Basic/Malloc.h"
 
 namespace swift {
 
 template <class T> class DiverseStackImpl;
 
-/// DiverseStack - A stack of heterogenously-typed objects.
+/// DiverseStack - A stack of heterogeneously-typed objects.
 ///
 /// \tparam T - A common base class of the objects on the stack; must
 ///   provide an allocated_size() const method.
-/// \tparam InlineCapacity - the amount of inline storage to provide, in bytes
+/// \tparam InlineCapacity - the amount of inline storage to provide, in bytes.
 template <class T, unsigned InlineCapacity>
 class DiverseStack : public DiverseStackImpl<T> {
   char InlineStorage[InlineCapacity];
@@ -105,7 +106,7 @@ public:
       return a.Depth == b.Depth;
     }
     friend bool operator!=(stable_iterator a, stable_iterator b) {
-      return a.Depth != b.Depth;
+      return !operator==(a, b);
     }
 
     static stable_iterator invalid() {
@@ -114,6 +115,57 @@ public:
     bool isValid() const {
       return Depth != (std::size_t) -1;
     }
+
+    /// A helper class that wraps a stable_iterator as something that
+    /// pretends to be a non-null pointer.
+    ///
+    /// This allows stable_iterators to be placed in TinyPtrVector.
+    ///
+    /// A wrapper is needed because we don't want to give stable_iterator
+    /// a null inhabitant, an operator bool, conversions from nullptr_t, or
+    /// any similar features that TinyPtrVector reasonably requires of its
+    /// element types.
+    class AsPointer {
+      void *EncodedValue;
+      explicit AsPointer(void *encodedValue) : EncodedValue(encodedValue) {}
+    public:
+      enum { NumLowBitsAvailable = 3 };
+
+      /// Allow a null AsPointer to be created with either 'nullptr' or
+      /// 'AsPointer()'.
+      /*implicit*/ AsPointer(std::nullptr_t _ = nullptr)
+        : EncodedValue(nullptr) {}
+
+      /// Allow an AsPointer to be tested as a boolean value.
+      explicit operator bool() const { return EncodedValue != nullptr; }
+
+      /// Allow an AsPointer to be compared for equality with a void*.
+      friend bool operator==(AsPointer lhs, void *rhs) {
+        return lhs.EncodedValue == rhs;
+      }
+
+      /// Allow an implicit conversion from stable_iterator.
+      /*implicit*/ AsPointer(stable_iterator it) {
+        assert(it.isValid() && "can't encode invalid stable_iterator");
+        auto encodedDepth = (it.Depth + 1) << NumLowBitsAvailable;
+        EncodedValue = reinterpret_cast<void*>(encodedDepth);
+        assert(EncodedValue && "encoded pointer was null");
+      }
+
+      /// Allow an implicit conversion to stable_iterator.
+      operator stable_iterator() const {
+        assert(EncodedValue && "can't decode null pointer");
+        auto encodedDepth = reinterpret_cast<std::size_t>(EncodedValue);
+        auto depth = (encodedDepth >> NumLowBitsAvailable) - 1;
+        auto it = stable_iterator(depth);
+        assert(it.isValid() && "decoded stable_iterator was invalid");
+        return it;
+      }
+
+      void *getAsVoidPointer() const { return EncodedValue; }
+      static AsPointer getFromVoidPointer(void *ptr) { return AsPointer(ptr); }
+    };
+    AsPointer asPointer() const { return *this; }
   };
   stable_iterator stable_begin() const {
     return stable_iterator(End - Begin);
@@ -204,7 +256,7 @@ public:
       return *this;
     }
     iterator operator++(int _) {
-      iterator copy = *this;
+      auto copy = *this;
       operator++();
       return copy;
     }
@@ -217,7 +269,7 @@ public:
     }
 
     friend bool operator==(iterator a, iterator b) { return a.Ptr == b.Ptr; }
-    friend bool operator!=(iterator a, iterator b) { return a.Ptr != b.Ptr; }
+    friend bool operator!=(iterator a, iterator b) { return !operator==(a, b); }
   };
 
   using DiverseStackBase::checkIterator;
@@ -252,7 +304,7 @@ public:
       return *this;
     }
     const_iterator operator++(int _) {
-      const_iterator copy = *this;
+      auto copy = *this;
       operator++();
       return copy;
     }
@@ -268,7 +320,7 @@ public:
       return a.Ptr == b.Ptr;
     }
     friend bool operator!=(const_iterator a, const_iterator b) {
-      return a.Ptr != b.Ptr;
+      return !operator==(a, b);
     }
   };
   const_iterator begin() const { checkValid(); return const_iterator(Begin); }
@@ -308,4 +360,24 @@ public:
 
 } // end namespace swift
 
-#endif
+/// Allow stable_iterators to be put in things like TinyPtrVectors.
+namespace llvm {
+  template <>
+  class PointerLikeTypeTraits<
+                      swift::DiverseStackBase::stable_iterator::AsPointer> {
+    using AsPointer = swift::DiverseStackBase::stable_iterator::AsPointer;
+  public:
+    static inline void *getAsVoidPointer(AsPointer ptr) {
+      return ptr.getAsVoidPointer();
+    }
+    static inline AsPointer getFromVoidPointer(void *ptr) {
+      return AsPointer::getFromVoidPointer(ptr);
+    }
+
+    enum {
+      NumLowBitsAvailable = AsPointer::NumLowBitsAvailable
+    };
+  };
+}
+
+#endif // SWIFT_BASIC_DIVERSESTACK_H

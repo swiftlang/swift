@@ -1,26 +1,26 @@
 // RUN: %target-parse-verify-swift
 
 // Basic support for Bool
-func simpleIf(b: Bool) {
+func simpleIf(_ b: Bool) {
   if b { }
 }
 
 // Support for non-Bool logic values
-struct OtherLogicValue : BooleanType {
+struct OtherLogicValue : Boolean {
   var boolValue: Bool { return true }
 }
 
-func otherIf(b : OtherLogicValue) {
+func otherIf(_ b : OtherLogicValue) {
   if b { }
 }
 
 // Support for arbitrary logic values in generics
-func doIf<T : BooleanType>(t: T) {
+func doIf<T : Boolean>(_ t: T) {
   if t { }
 }
 doIf(true)
 
-// Using BooleanType-ness to resolve overloading.
+// Using Boolean-ness to resolve overloading.
 func getValue() -> OtherLogicValue {}
 func getValue() -> Int {}
 

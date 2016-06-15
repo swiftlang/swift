@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -67,7 +67,8 @@ public:
 
   /// As a convenience, build a metadata object with internal linkage
   /// consisting solely of the standard heap metadata.
-  llvm::Constant *getPrivateMetadata(IRGenModule &IGM) const;
+  llvm::Constant *getPrivateMetadata(IRGenModule &IGM,
+                                     llvm::Constant *captureDescriptor) const;
 };
 
 class HeapNonFixedOffsets : public NonFixedOffsetsImpl {
@@ -115,8 +116,12 @@ void emitDeallocatePartialClassInstance(IRGenFunction &IGF,
                                         llvm::Value *alignMask);
 
 /// Allocate a boxed value.
+///
+/// The interface type is required for emitting reflection metadata.
 OwnedAddress
-emitAllocateBox(IRGenFunction &IGF, CanSILBoxType boxType,
+emitAllocateBox(IRGenFunction &IGF,
+                CanSILBoxType boxType,
+                CanSILBoxType boxInterfaceType,
                 const llvm::Twine &name);
 
 /// Deallocate a box whose value is uninitialized.

@@ -15,11 +15,11 @@ import Foundation
   func foo() {}
 
   // CHECK-DAG: - "bar"
-  func bar(x: Int, y: Int) {}
+  func bar(_ x: Int, y: Int) {}
   
   // FIXME: We don't really need this twice, but de-duplicating is effort.
   // CHECK-DAG: - "bar"
-  func bar(str: String) {}
+  func bar(_ str: String) {}
     
   // CHECK-DAG: - "prop"
   var prop: String?
@@ -35,7 +35,7 @@ func getAnyObject() -> AnyObject? { return nil }
 
 // CHECK-LABEL: depends-dynamic-lookup:
 
-func testDynamicLookup(obj: AnyObject) {
+func testDynamicLookup(_ obj: AnyObject) {
   // CHECK-DAG: - !private "foo"
   obj.foo()
   // CHECK-DAG: - !private "bar"
@@ -50,10 +50,11 @@ func testDynamicLookup(obj: AnyObject) {
   // CHECK-DAG: - !private "description"
   _ = obj.description
   // CHECK-DAG: - !private "method"
-  _ = obj.method(5, withDouble: 5.0)
+  _ = obj.method(5, with: 5.0 as Double)
   
   // CHECK-DAG: - !private "subscript"
-  _ = obj[2]
+  _ = obj[2] as AnyObject
+  _ = obj[2] as AnyObject!
 }
 
 // CHECK-DAG: - "counter"

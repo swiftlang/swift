@@ -1,8 +1,8 @@
-//===-- ImmediateImpl.h - Support functions for immediate mode -*- C++ -*--===//
+//===--- ImmediateImpl.h - Support functions for immediate mode -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -38,7 +38,8 @@ bool loadSwiftRuntime(StringRef runtimeLibPath);
 bool tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
                       SearchPathOptions SearchPathOpts,
                       DiagnosticEngine &Diags);
-bool linkLLVMModules(llvm::Module *Module, llvm::Module *SubModule);
+bool linkLLVMModules(llvm::Module *Module,
+                     std::unique_ptr<llvm::Module> SubModule);
 bool IRGenImportedModules(
     CompilerInstance &CI,
     llvm::Module &Module,

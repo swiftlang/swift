@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -73,6 +73,19 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
   LoadResult result = LoadResult::UpToDate;
   SmallString<64> scratch;
 
+  // After an entry, we know more about the node as a whole.
+  // Update the "result" variable above.
+  // This is a macro rather than a lambda because it contains a return.
+#define UPDATE_RESULT(update) switch (update) {\
+    case LoadResult::HadError: \
+      return LoadResult::HadError; \
+    case LoadResult::UpToDate: \
+      break; \
+    case LoadResult::AffectsDownstream: \
+      result = LoadResult::AffectsDownstream; \
+      break; \
+    } \
+
   // FIXME: LLVM's YAML support does incremental parsing in such a way that
   // for-range loops break.
   for (auto i = topLevelMap->begin(), e = topLevelMap->end(); i != e; ++i) {
@@ -83,7 +96,6 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
     if (!key)
       return LoadResult::HadError;
     StringRef keyString = key->getValue(scratch);
-    LoadResult resultUpdate;
 
     if (keyString == "interface-hash") {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
@@ -91,7 +103,7 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
         return LoadResult::HadError;
 
       StringRef valueString = value->getValue(scratch);
-      resultUpdate = interfaceHashCallback(valueString);
+      UPDATE_RESULT(interfaceHashCallback(valueString));
 
     } else {
       enum class DependencyDirection : bool {
@@ -172,8 +184,8 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
           appended.push_back('\0');
           appended += member->getValue(scratch);
 
-          resultUpdate = callback(appended.str(), dirAndKind.first,
-                                  isCascading);
+          UPDATE_RESULT(callback(appended.str(), dirAndKind.first,
+                                 isCascading));
         }
       } else {
         for (const yaml::Node &rawEntry : *entries) {
@@ -184,21 +196,10 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
           bool isDepends = dirAndKind.second == DependencyDirection::Depends;
           auto &callback = isDepends ? dependsCallback : providesCallback;
 
-          resultUpdate = callback(entry->getValue(scratch), dirAndKind.first,
-                                  entry->getRawTag() != "!private");
+          UPDATE_RESULT(callback(entry->getValue(scratch), dirAndKind.first,
+                                 entry->getRawTag() != "!private"));
         }
       }
-    }
-
-    // After processing this entry, we now know more about the node as a whole.
-    switch (resultUpdate) {
-    case LoadResult::HadError:
-      return LoadResult::HadError;
-    case LoadResult::UpToDate:
-      break;
-    case LoadResult::AffectsDownstream:
-      result = LoadResult::AffectsDownstream;
-      break;
     }
   }
 

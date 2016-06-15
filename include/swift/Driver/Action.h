@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -38,6 +38,7 @@ public:
   enum ActionClass {
     Input = 0,
     CompileJob,
+    InterpretJob,
     BackendJob,
     MergeModuleJob,
     ModuleWrapJob,
@@ -53,40 +54,27 @@ public:
   static const char *getClassName(ActionClass AC);
 
 private:
-  ActionClass Kind;
-  types::ID Type;
-
-  ActionList Inputs;
-
   unsigned OwnsInputs : 1;
+  unsigned Kind : 4;
+  unsigned Type : 27;
 
 protected:
   Action(ActionClass Kind, types::ID Type)
-    : Kind(Kind), Type(Type), OwnsInputs(true) {}
-  Action(ActionClass Kind, ArrayRef<Action *> Inputs, types::ID Type)
-    : Kind(Kind), Type(Type), Inputs(Inputs.begin(), Inputs.end()),
-      OwnsInputs(true) {}
-
-public:
-  virtual ~Action();
-
-  const char *getClassName() const { return Action::getClassName(getKind()); }
+    : OwnsInputs(true), Kind(Kind), Type(Type) {
+    assert(Kind == getKind() && "not enough bits");
+    assert(Type == getType() && "not enough bits");
+  }
 
   bool getOwnsInputs() const { return OwnsInputs; }
   void setOwnsInputs(bool Value) { OwnsInputs = Value; }
 
-  ActionClass getKind() const { return Kind; }
-  types::ID getType() const { return Type; }
+public:
+  virtual ~Action() = default;
 
-  ArrayRef<Action *> getInputs() const { return Inputs; }
-  void addInput(Action *Input) { Inputs.push_back(Input); }
+  const char *getClassName() const { return Action::getClassName(getKind()); }
 
-  size_type size() const { return Inputs.size(); }
-
-  iterator begin() { return Inputs.begin(); }
-  iterator end() { return Inputs.end(); }
-  const_iterator begin() const { return Inputs.begin(); }
-  const_iterator end() const { return Inputs.end(); }
+  ActionClass getKind() const { return static_cast<ActionClass>(Kind); }
+  types::ID getType() const { return static_cast<types::ID>(Type); }
 };
 
 class InputAction : public Action {
@@ -104,21 +92,37 @@ public:
 };
 
 class JobAction : public Action {
+  ActionList Inputs;
   virtual void anchor();
 protected:
   JobAction(ActionClass Kind, ArrayRef<Action *> Inputs, types::ID Type)
-      : Action(Kind, Inputs, Type) {}
+      : Action(Kind, Type), Inputs(Inputs.begin(), Inputs.end()) {}
 
 public:
-  static bool classof(const Action *A) {
-    return (A->getKind() >= ActionClass::JobFirst &&
-            A->getKind() <= ActionClass::JobLast);
-  }
-  
+  ~JobAction() override;
+
+  bool getOwnsInputs() const { return Action::getOwnsInputs(); }
+  void setOwnsInputs(bool Value) { Action::setOwnsInputs(Value); }
+
+  ArrayRef<Action *> getInputs() const { return Inputs; }
+  void addInput(Action *Input) { Inputs.push_back(Input); }
+
+  size_type size() const { return Inputs.size(); }
+
+  iterator begin() { return Inputs.begin(); }
+  iterator end() { return Inputs.end(); }
+  const_iterator begin() const { return Inputs.begin(); }
+  const_iterator end() const { return Inputs.end(); }
+
   // Returns the index of the Input action's output file which is used as
   // (single) input to this action. Most actions produce only a single output
   // file, so we return 0 by default.
   virtual int getInputIndex() const { return 0; }
+
+  static bool classof(const Action *A) {
+    return (A->getKind() >= ActionClass::JobFirst &&
+            A->getKind() <= ActionClass::JobLast);
+  }
 };
 
 class CompileJobAction : public JobAction {
@@ -161,6 +165,19 @@ public:
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::CompileJob;
+  }
+};
+
+class InterpretJobAction : public JobAction {
+private:
+  virtual void anchor();
+
+public:
+  explicit InterpretJobAction()
+      : JobAction(Action::InterpretJob, llvm::None, types::TY_Nothing) {}
+
+  static bool classof(const Action *A) {
+    return A->getKind() == Action::InterpretJob;
   }
 };
 

@@ -6,7 +6,7 @@ struct BigStruct { var a,b,c,d,e,f,g,h:Int }
 // FIXME: missing symbol for Object destructor?
 //class SomeClass : Object { }
 
-func id<T>(x: T) -> T {
+func id<T>(_ x: T) -> T {
   return x
 }
 
@@ -15,7 +15,7 @@ var bigStruct = id(BigStruct(a: 1, b: 2,c: 3, d: 4, e: 5, f: 6, g: 7, h: 8))
 //var someClass = SomeClass()
 //var someClass2 = id(someClass)
 
-func print(bs: BigStruct) {
+func print(_ bs: BigStruct) {
   // FIXME: typechecker is too slow to handle this as an interpolated literal
   print("BigStruct(", terminator: "")
   print(bs.a, terminator: "")
@@ -58,18 +58,18 @@ struct S1 : P1 {}
 struct S2 : P2 {}
 struct S3 : P3 {}
 
-func foo1<T : P1>(x: T) { print("P1") }
-func foo1<T : P2>(x: T) { print("P2") }
-func foo1<T : P3>(x: T) { print("P3") }
+func foo1<T : P1>(_ x: T) { print("P1") }
+func foo1<T : P2>(_ x: T) { print("P2") }
+func foo1<T : P3>(_ x: T) { print("P3") }
 
-func foo2<T : P1>(x: T) { print("P1") }
-func foo2<T : P2>(x: T) { print("P2") }
+func foo2<T : P1>(_ x: T) { print("P1") }
+func foo2<T : P2>(_ x: T) { print("P2") }
 
-func foo3<T : P1>(x: T) { print("P1") }
-func foo3<T : P3>(x: T) { print("P3") }
+func foo3<T : P1>(_ x: T) { print("P1") }
+func foo3<T : P3>(_ x: T) { print("P3") }
 
-func foo4<T : P3, U : P1>(x: T, _ y: U) { print("P3, P1") }
-func foo4<T : P3, U : P3>(x: T, _ y: U) { print("P3, P3") }
+func foo4<T : P3, U : P1>(_ x: T, _ y: U) { print("P3, P1") }
+func foo4<T : P3, U : P3>(_ x: T, _ y: U) { print("P3, P3") }
 
 func checkOverloadResolution() {
   print("overload resolution:")
@@ -93,7 +93,7 @@ func checkOverloadResolution() {
 }
 checkOverloadResolution()
 
-class Base  {
+class Base {
     var v = 0
     required init() {}
     func map() {
@@ -102,13 +102,13 @@ class Base  {
 }
 
 class D1 : Base {
-    required  init() {}
+    required init() {}
     override func map() {
         v = 2
     }
 }
 
-func parse<T:Base>()->T {
+func parse<T:Base>() -> T {
     let inst = T()
     inst.map()
     return inst
@@ -119,3 +119,26 @@ var m : D1 = parse()
 print(m.v)
 // CHECK: 2
 
+// rdar://problem/21770225 - infinite recursion with metadata
+// instantiation when associated type contains Self
+
+struct MySlice<T : MyIndexableType> : MySequenceType {}
+struct MyMutableSlice<T : MyMutableCollectionType> : MySequenceType {}
+
+protocol MySequenceType {}
+protocol MyIndexableType {}
+
+protocol MyCollectionType : MySequenceType, MyIndexableType {
+  associatedtype SubSequence = MySlice<Self>
+}
+protocol MyMutableCollectionType : MyCollectionType {
+  associatedtype SubSequence = MyMutableSlice<Self>
+}
+
+struct S : MyMutableCollectionType {}
+
+// CHECK: MyMutableSlice<S>()
+print(S.SubSequence())
+
+// CHECK: MyMutableSlice<S>
+print(S.SubSequence.self)

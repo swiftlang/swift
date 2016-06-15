@@ -54,7 +54,7 @@ let f: Toaster.Type.Type = Dryer.Type.self
 let g: Toaster.Type.Type = HairDryer.Type.self // expected-error {{cannot convert value of type 'HairDryer.Type.Type' to specified type 'Toaster.Type.Type'}}
 let h: WashingMachine.Type.Type = Dryer.Type.self // expected-error {{cannot convert value of type 'Dryer.Type.Type' to specified type 'WashingMachine.Type.Type'}}
 
-func generic<T : WashingMachine>(t: T.Type) {
+func generic<T : WashingMachine>(_ t: T.Type) {
   let _: Toaster.Type.Type = t.dynamicType
 }
 
@@ -68,20 +68,20 @@ extension P2 {
   init() { self.init(x: 5) }
 }
 
-func testP2(pt: P2.Type) {
-  pt.init().elements
+func testP2(_ pt: P2.Type) {
+  pt.init().elements // expected-warning {{expression of type '[P2]' is unused}}
 }
 
 // rdar://problem/21597711
 protocol P3 {
-  func withP3(fn: (P3) -> ())
+  func withP3(_ fn: (P3) -> ())
 }
 
 class Something {
-  func takeP3(p: P3) { }
+  func takeP3(_ p: P3) { }
 }
 
 
-func testP3(p: P3, something: Something) {
+func testP3(_ p: P3, something: Something) {
   p.withP3(Something.takeP3(something))
 }

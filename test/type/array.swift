@@ -2,21 +2,21 @@
 
 // Array types.
 class Base1 {
-  func f0(x: [Int]) { }
-  func f0a(x: [Int]?) { }
-  func f1(x: [[Int]]) { }
-  func f1a(x: [[Int]]?) { }
-  func f2(x: [[Int] -> [Int]]) { }
-  func f2a(x: [[Int]? -> [Int]?]?) { }
+  func f0(_ x: [Int]) { }
+  func f0a(_ x: [Int]?) { }
+  func f1(_ x: [[Int]]) { }
+  func f1a(_ x: [[Int]]?) { }
+  func f2(_ x: [([Int]) -> [Int]]) { }
+  func f2a(_ x: [([Int]?) -> [Int]?]?) { }
 }
 
 class Derived1 : Base1 {
-  override func f0(x: Array<Int>) { }
-  override func f0a(x: Optional<Array<Int>>) { }
-  override func f1(x: Array<Array<Int>>) { }
-  override func f1a(x: Optional<Array<Array<Int>>>) { }
-  override func f2(x: Array<Array<Int> -> Array<Int>>) { }
-  override func f2a(x: Optional<Array<Optional<Array<Int>> -> Optional<Array<Int>>>>) { }
+  override func f0(_ x: Array<Int>) { }
+  override func f0a(_ x: Optional<Array<Int>>) { }
+  override func f1(_ x: Array<Array<Int>>) { }
+  override func f1a(_ x: Optional<Array<Array<Int>>>) { }
+  override func f2(_ x: Array<(Array<Int>) -> Array<Int>>) { }
+  override func f2a(_ x: Optional<Array<(Optional<Array<Int>>) -> Optional<Array<Int>>>>) { }
 }
 
 
@@ -28,8 +28,8 @@ func testGenericSpec() {
 }
 
 // Array types for construction.
-func constructArray(n: Int) {
-  var ones = [Int](count: n, repeatedValue: 1)
+func constructArray(_ n: Int) {
+  var ones = [Int](repeating: 1, count: n)
   ones[5] = 0
 
   var matrix = [[Float]]()
@@ -41,6 +41,4 @@ func constructArray(n: Int) {
 // Fix-Its from the old syntax to the new.
 
 typealias FixIt0 = Int[] // expected-error{{array types are now written with the brackets around the element type}}{{20-20=[}}{{23-24=}}
-typealias FixIt1 = Int[][] // expected-error{{array types are now written with the brackets around the element type}}{{20-20=[}}{{25-26=}}
-// expected-error@-1{{array types are now written with the brackets around the element type}}{{20-20=[}}{{23-24=}}
 

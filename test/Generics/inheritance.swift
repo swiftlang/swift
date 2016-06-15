@@ -10,9 +10,9 @@ class B : A {
 
 class Other { }
 
-func acceptA(a: A) { }
+func acceptA(_ a: A) { }
 
-func f0<T : A>(obji: T, _ ai: A, _ bi: B) {
+func f0<T : A>(_ obji: T, _ ai: A, _ bi: B) {
   var obj = obji, a = ai, b = bi
   // Method access
   obj.foo()
@@ -36,15 +36,11 @@ func f0<T : A>(obji: T, _ ai: A, _ bi: B) {
   b = obj as! B
 }
 
-func call_f0(a: A, b: B, other: Other) {
+func call_f0(_ a: A, b: B, other: Other) {
   f0(a, a, b)
   f0(b, a, b)
   f0(other, a, b) // expected-error{{cannot convert value of type 'Other' to expected argument type 'A'}}
 }
-
-// Declaration errors
-func f1<T : A where T : Other>(_: T) { } // expected-error{{generic parameter 'T' cannot be a subclass of both 'A' and 'Other'}}
-func f2<T : A where T : B>(_: T) { }
 
 class X<T> {
   func f() -> T {}

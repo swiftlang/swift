@@ -20,7 +20,12 @@
 // RUN: %target-swift-frontend -emit-ir -parse-stdlib -module-name someModule -module-link-name module %S/../Inputs/empty.swift -autolink-force-load | FileCheck --check-prefix=FORCE-LOAD %s
 // RUN: %target-swift-frontend -emit-ir -parse-stdlib -module-name someModule -module-link-name 0module %S/../Inputs/empty.swift -autolink-force-load | FileCheck --check-prefix=FORCE-LOAD-HEX %s
 
+// Linux uses a different autolinking mechanism, based on
+// swift-autolink-extract. This file tests the Darwin mechanism.
 // UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=linux-gnueabihf
+// UNSUPPORTED: OS=freebsd
+// UNSUPPORTED: OS=linux-androideabi
 
 import someModule
 

@@ -5,17 +5,17 @@
 // specialized version fo myDictionaryBridge.
 // <rdar://problem/17821040>
 
-// A miminized version of _dictionaryBridgeToObjectiveC in the stdlib 
+// A minimized version of _dictionaryBridgeToObjectiveC in the stdlib 
 public func myDictionaryBridge<
     SrcType, DestType
 >(
-    source: Dictionary<SrcType, Int>, _ keyBridgesDirectly : Bool
+    _ source: Dictionary<SrcType, Int>, _ keyBridgesDirectly : Bool
 ) -> DestType? {
 
   for (key, value) in source {
     if keyBridgesDirectly {
-      var bridgedKey = unsafeBitCast(key, DestType.self)
-	  return bridgedKey
+      var bridgedKey = unsafeBitCast(key, to: DestType.self)
+      return bridgedKey
     }
   }
   return nil

@@ -6,7 +6,7 @@
 
 func f0<T>(x: Int, y: Int, t: T) { }
 func f1<T : Any>(x: Int, y: Int, t: T) { }
-func f2<T : protocol<GeneratorType,Any>>(x: Int, y: Int, t: T) { }
+func f2<T : protocol<IteratorProtocol,Any>>(x: Int, y: Int, t: T) { }
 func f3<T : () -> ()>(x: Int, y: Int, t: T) { } // expected-error{{expected a type name or protocol composition restricting 'T'}}
 func f4<T>(x: T, y: T) { }
 
@@ -35,3 +35,7 @@ public class A<X> {
   public func f10(x:Int) {}
   public func f11<T, U>(x:X, y:T) {} //expected-error{{generic parameter 'U' is not used in function signature}}
 }
+
+protocol P { associatedtype A }
+
+func f12<T : P>(x: T) -> T.A<Int> {} //expected-error{{cannot specialize non-generic type 'T.A'}}{{29-34=}}

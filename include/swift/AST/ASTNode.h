@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -18,7 +18,6 @@
 #define SWIFT_AST_AST_NODE_H
 
 #include "llvm/ADT/PointerUnion.h"
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/TypeAlignments.h"
 
 namespace swift {
@@ -27,6 +26,7 @@ namespace swift {
   class Decl;
   class SourceLoc;
   class SourceRange;
+  class ASTWalker;
   
   struct ASTNode : public llvm::PointerUnion3<Expr*, Stmt*, Decl*> {
     // Inherit the constructors from PointerUnion.

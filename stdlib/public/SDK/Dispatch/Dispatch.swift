@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -12,189 +12,197 @@
 
 @_exported import Dispatch
 
-/// The type of blocks submitted to dispatch queues, which take no arguments
-/// and have no return value.
-///
-/// The dispatch_block_t typealias is different from usual closures in that it
-/// uses @convention(block). This is to avoid unnecessary bridging between
-/// C blocks and Swift closures, which interferes with Grand Central Dispatch
-/// APIs that depend on the referential identity of a block.
-public typealias dispatch_block_t = @convention(block) () -> Void
+/// dispatch_assert
 
-//===----------------------------------------------------------------------===//
-// Macros
-// FIXME: rdar://16851050 update API so these import better
-//===----------------------------------------------------------------------===//
-
-// dispatch/io.h
-public var DISPATCH_IO_STREAM: dispatch_io_type_t {
-  return 0
-}
-public var DISPATCH_IO_RANDOM: dispatch_io_type_t {
-  return 1
+@available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+public enum DispatchPredicate {
+	case onQueue(DispatchQueue)
+	case onQueueAsBarrier(DispatchQueue)
+	case notOnQueue(DispatchQueue)
 }
 
-public var DISPATCH_IO_STOP: dispatch_io_close_flags_t {
-  return 1
-}
-public var DISPATCH_IO_STRICT_INTERVAL: dispatch_io_interval_flags_t {
-  return 1
-}
-
-// dispatch/queue.h
-public var DISPATCH_QUEUE_SERIAL: dispatch_queue_attr_t! {
-  return nil
-}
-public var DISPATCH_CURRENT_QUEUE_LABEL: dispatch_queue_t! {
-  return nil
-}
-public var DISPATCH_TARGET_QUEUE_DEFAULT: dispatch_queue_t! {
-  return nil
-}
-public var DISPATCH_QUEUE_PRIORITY_HIGH: dispatch_queue_priority_t {
-  return 2
-}
-public var DISPATCH_QUEUE_PRIORITY_DEFAULT: dispatch_queue_priority_t {
-  return 0
-}
-public var DISPATCH_QUEUE_PRIORITY_LOW: dispatch_queue_priority_t {
-  return -2
-}
-public var DISPATCH_QUEUE_PRIORITY_BACKGROUND: dispatch_queue_priority_t {
-  return -32768
+@available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+public func _dispatchPreconditionTest(_ condition: DispatchPredicate) -> Bool {
+	switch condition {
+	case .onQueue(let q):
+		__dispatch_assert_queue(q)
+	case .onQueueAsBarrier(let q):
+		__dispatch_assert_queue_barrier(q)
+	case .notOnQueue(let q):
+		__dispatch_assert_queue_not(q)
+	}
+	return true
 }
 
-@warn_unused_result
-public func dispatch_get_global_queue(identifier: qos_class_t,
-                                      _ flags: UInt) -> dispatch_queue_t {
-  return dispatch_get_global_queue(Int(identifier.rawValue), flags);
+@_transparent
+@available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+public func dispatchPrecondition(condition: @autoclosure () -> DispatchPredicate) {
+	// precondition is able to determine release-vs-debug asserts where the overlay
+	// cannot, so formulating this into a call that we can call with precondition()
+	precondition(_dispatchPreconditionTest(condition()), "dispatchPrecondition failure")
 }
 
-public var DISPATCH_QUEUE_CONCURRENT : dispatch_queue_attr_t {
-  return _swift_dispatch_queue_concurrent()
+/// qos_class_t
+
+public struct DispatchQoS : Equatable {
+	public let qosClass: QoSClass
+	public let relativePriority: Int
+
+	@available(OSX 10.10, iOS 8.0, *)
+	public static let background = DispatchQoS(qosClass: .background, relativePriority: 0)
+
+	@available(OSX 10.10, iOS 8.0, *)
+	public static let utility = DispatchQoS(qosClass: .utility, relativePriority: 0)
+
+	@available(OSX 10.10, iOS 8.0, *)
+	public static let `default` = DispatchQoS(qosClass: .default, relativePriority: 0)
+
+	@available(OSX, introduced: 10.10, deprecated: 10.10, renamed: "DispatchQoS.default")
+	@available(iOS, introduced: 8.0, deprecated: 8.0, renamed: "DispatchQoS.default")
+	@available(*, deprecated, renamed: "DispatchQoS.default")
+	public static let defaultQoS = DispatchQoS.default
+
+	@available(OSX 10.10, iOS 8.0, *)
+	public static let userInitiated = DispatchQoS(qosClass: .userInitiated, relativePriority: 0)
+
+	@available(OSX 10.10, iOS 8.0, *)
+	public static let userInteractive = DispatchQoS(qosClass: .userInteractive, relativePriority: 0)
+
+	public static let unspecified = DispatchQoS(qosClass: .unspecified, relativePriority: 0)
+
+	public enum QoSClass {
+		@available(OSX 10.10, iOS 8.0, *)
+		case background
+
+		@available(OSX 10.10, iOS 8.0, *)
+		case utility
+
+		@available(OSX 10.10, iOS 8.0, *)
+		case `default`
+
+		@available(OSX, introduced: 10.10, deprecated: 10.10, renamed: "QoSClass.default")
+		@available(iOS, introduced: 8.0, deprecated: 8.0, renamed: "QoSClass.default")
+		@available(*, deprecated, renamed: "QoSClass.default")
+		static let defaultQoS = QoSClass.default
+
+		@available(OSX 10.10, iOS 8.0, *)
+		case userInitiated
+
+		@available(OSX 10.10, iOS 8.0, *)
+		case userInteractive
+
+		case unspecified
+
+		@available(OSX 10.10, iOS 8.0, *)
+		internal init?(qosClass: qos_class_t) {
+			switch qosClass {
+			case QOS_CLASS_BACKGROUND: self = .background
+			case QOS_CLASS_UTILITY: self = .utility
+			case QOS_CLASS_DEFAULT: self = .default
+			case QOS_CLASS_USER_INITIATED: self = .userInitiated
+			case QOS_CLASS_USER_INTERACTIVE: self = .userInteractive
+			case QOS_CLASS_UNSPECIFIED: self = .unspecified
+			default: return nil
+			}
+		}
+
+		@available(OSX 10.10, iOS 8.0, *)
+		internal var rawValue: qos_class_t {
+			switch self {
+			case .background: return QOS_CLASS_BACKGROUND
+			case .utility: return QOS_CLASS_UTILITY
+			case .default: return QOS_CLASS_DEFAULT
+			case .userInitiated: return QOS_CLASS_USER_INITIATED
+			case .userInteractive: return QOS_CLASS_USER_INTERACTIVE
+			case .unspecified: return QOS_CLASS_UNSPECIFIED
+			}
+		}
+	}
+
+	public init(qosClass: QoSClass, relativePriority: Int) {
+		self.qosClass = qosClass
+		self.relativePriority = relativePriority
+	}
 }
 
-@warn_unused_result
-@_silgen_name("_swift_dispatch_queue_concurrent")
-internal func _swift_dispatch_queue_concurrent() -> dispatch_queue_attr_t
-
-// dispatch/data.h
-public var dispatch_data_empty : dispatch_data_t {
-  return _swift_dispatch_data_empty()
+public func ==(a: DispatchQoS, b: DispatchQoS) -> Bool {
+	return a.qosClass == b.qosClass && a.relativePriority == b.relativePriority
 }
 
-@warn_unused_result
-@_silgen_name("_swift_dispatch_data_empty")
-internal func _swift_dispatch_data_empty() -> dispatch_data_t
+/// 
 
-// dispatch/source.h
-// FIXME: DISPATCH_SOURCE_TYPE_*
-public var DISPATCH_MACH_SEND_DEAD: dispatch_source_mach_send_flags_t {
-  return 1
-}
-public var DISPATCH_MEMORYPRESSURE_NORMAL: dispatch_source_memorypressure_flags_t {
-  return 1
-}
-public var DISPATCH_MEMORYPRESSURE_WARN: dispatch_source_memorypressure_flags_t {
-  return 2
-}
-public var DISPATCH_MEMORYPRESSURE_CRITICAL: dispatch_source_memorypressure_flags_t {
-  return 4
-}
-public var DISPATCH_PROC_EXIT: dispatch_source_proc_flags_t {
-  return 0x80000000
-}
-public var DISPATCH_PROC_FORK: dispatch_source_proc_flags_t { return 0x40000000 }
-public var DISPATCH_PROC_EXEC: dispatch_source_proc_flags_t { return 0x20000000 }
-public var DISPATCH_PROC_SIGNAL: dispatch_source_proc_flags_t { return 0x08000000 }
-public var DISPATCH_VNODE_DELETE: dispatch_source_vnode_flags_t { return 0x1 }
-public var DISPATCH_VNODE_WRITE:  dispatch_source_vnode_flags_t { return 0x2 }
-public var DISPATCH_VNODE_EXTEND: dispatch_source_vnode_flags_t { return 0x4 }
-public var DISPATCH_VNODE_ATTRIB: dispatch_source_vnode_flags_t { return 0x8 }
-public var DISPATCH_VNODE_LINK:   dispatch_source_vnode_flags_t { return 0x10 }
-public var DISPATCH_VNODE_RENAME: dispatch_source_vnode_flags_t { return 0x20 }
-public var DISPATCH_VNODE_REVOKE: dispatch_source_vnode_flags_t { return 0x40 }
-public var DISPATCH_TIMER_STRICT: dispatch_source_timer_flags_t { return 1 }
-
-public var DISPATCH_SOURCE_TYPE_DATA_ADD: dispatch_source_type_t {
-  return _swift_dispatch_source_type_data_add()
-}
-public var DISPATCH_SOURCE_TYPE_DATA_OR: dispatch_source_type_t {
-  return _swift_dispatch_source_type_data_or()
-}
-public var DISPATCH_SOURCE_TYPE_MACH_SEND: dispatch_source_type_t {
-  return _swift_dispatch_source_type_mach_send()
-}
-public var DISPATCH_SOURCE_TYPE_MACH_RECV: dispatch_source_type_t {
-  return _swift_dispatch_source_type_mach_recv()
-}
-public var DISPATCH_SOURCE_TYPE_MEMORYPRESSURE: dispatch_source_type_t {
-  return _swift_dispatch_source_type_memorypressure()
-}
-public var DISPATCH_SOURCE_TYPE_READ: dispatch_source_type_t {
-  return _swift_dispatch_source_type_read()
-}
-public var DISPATCH_SOURCE_TYPE_PROC: dispatch_source_type_t {
-  return _swift_dispatch_source_type_proc()
-}
-public var DISPATCH_SOURCE_TYPE_SIGNAL: dispatch_source_type_t {
-  return _swift_dispatch_source_type_signal()
-}
-public var DISPATCH_SOURCE_TYPE_TIMER: dispatch_source_type_t {
-  return _swift_dispatch_source_type_timer()
-}
-public var DISPATCH_SOURCE_TYPE_VNODE: dispatch_source_type_t {
-  return _swift_dispatch_source_type_vnode()
-}
-public var DISPATCH_SOURCE_TYPE_WRITE: dispatch_source_type_t {
-  return _swift_dispatch_source_type_write()
+public enum DispatchTimeoutResult {
+	case Success
+	case TimedOut
 }
 
-@warn_unused_result
-@_silgen_name("_swift_dispatch_source_type_DATA_ADD")
-internal func _swift_dispatch_source_type_data_add() -> dispatch_source_type_t
+/// dispatch_group
 
-@warn_unused_result
-@_silgen_name("_swift_dispatch_source_type_DATA_OR")
-internal func _swift_dispatch_source_type_data_or() -> dispatch_source_type_t
+public extension DispatchGroup {
+	public func notify(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], queue: DispatchQueue, execute work: @convention(block) () -> ()) {
+		if #available(OSX 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
+			let item = DispatchWorkItem(qos: qos, flags: flags, block: work)
+			__dispatch_group_notify(self, queue, item._block)
+		} else {
+			__dispatch_group_notify(self, queue, work)
+		}
+	}
 
-@warn_unused_result
-@_silgen_name("_swift_dispatch_source_type_MACH_SEND")
-internal func _swift_dispatch_source_type_mach_send() -> dispatch_source_type_t
+	@available(OSX 10.10, iOS 8.0, *)
+	public func notify(queue: DispatchQueue, work: DispatchWorkItem) {
+		__dispatch_group_notify(self, queue, work._block)
+	}
 
-@warn_unused_result
-@_silgen_name("_swift_dispatch_source_type_MACH_RECV")
-internal func _swift_dispatch_source_type_mach_recv() -> dispatch_source_type_t
+	public func wait() {
+		_ = __dispatch_group_wait(self, DispatchTime.distantFuture.rawValue)
+	}
 
-@warn_unused_result
-@_silgen_name("_swift_dispatch_source_type_MEMORYPRESSURE")
-internal func _swift_dispatch_source_type_memorypressure()
-  -> dispatch_source_type_t
+	public func wait(timeout: DispatchTime) -> DispatchTimeoutResult {
+		return __dispatch_group_wait(self, timeout.rawValue) == 0 ? .Success : .TimedOut
+	}
 
-@warn_unused_result
-@_silgen_name("_swift_dispatch_source_type_PROC")
-internal func _swift_dispatch_source_type_proc() -> dispatch_source_type_t
+	public func wait(wallTimeout timeout: DispatchWallTime) -> DispatchTimeoutResult {
+		return __dispatch_group_wait(self, timeout.rawValue) == 0 ? .Success : .TimedOut
+	}
+}
 
-@warn_unused_result
-@_silgen_name("_swift_dispatch_source_type_READ")
-internal func _swift_dispatch_source_type_read() -> dispatch_source_type_t
+public extension DispatchGroup {
+	@available(*, deprecated, renamed: "DispatchGroup.wait(self:wallTimeout:)")
+	public func wait(walltime timeout: DispatchWallTime) -> Int {
+		switch wait(wallTimeout: timeout) {
+		case .Success: return 0
+		case .TimedOut: return Int(KERN_OPERATION_TIMED_OUT)
+		}
+	}
+}
 
-@warn_unused_result
-@_silgen_name("_swift_dispatch_source_type_SIGNAL")
-internal func _swift_dispatch_source_type_signal() -> dispatch_source_type_t
+/// dispatch_semaphore
 
-@warn_unused_result
-@_silgen_name("_swift_dispatch_source_type_TIMER")
-internal func _swift_dispatch_source_type_timer() -> dispatch_source_type_t
+public extension DispatchSemaphore {
+	@discardableResult
+	public func signal() -> Int {
+		return __dispatch_semaphore_signal(self)
+	}
 
-@warn_unused_result
-@_silgen_name("_swift_dispatch_source_type_VNODE")
-internal func _swift_dispatch_source_type_vnode() -> dispatch_source_type_t
+	public func wait() {
+		_ = __dispatch_semaphore_wait(self, DispatchTime.distantFuture.rawValue)
+	}
 
-@warn_unused_result
-@_silgen_name("_swift_dispatch_source_type_WRITE")
-internal func _swift_dispatch_source_type_write() -> dispatch_source_type_t
+	public func wait(timeout: DispatchTime) -> DispatchTimeoutResult {
+		return __dispatch_semaphore_wait(self, timeout.rawValue) == 0 ? .Success : .TimedOut
+	}
 
-// dispatch/time.h
-// DISPATCH_TIME_NOW: ok
-// DISPATCH_TIME_FOREVER: ok
+	public func wait(wallTimeout: DispatchWallTime) -> DispatchTimeoutResult {
+		return __dispatch_semaphore_wait(self, wallTimeout.rawValue) == 0 ? .Success : .TimedOut
+	}
+}
+
+public extension DispatchSemaphore {
+	@available(*, deprecated, renamed: "DispatchSemaphore.wait(self:wallTimeout:)")
+	public func wait(walltime timeout: DispatchWalltime) -> Int {
+		switch wait(wallTimeout: timeout) {
+		case .Success: return 0
+		case .TimedOut: return Int(KERN_OPERATION_TIMED_OUT)
+		}
+	}
+}

@@ -1,12 +1,12 @@
 // RUN: %target-swift-frontend -emit-silgen -parse-stdlib %s
 
 protocol P {
-  typealias Assoc
+  associatedtype Assoc
 }
 
 protocol Q {
-  typealias Assoc1
-  typealias Assoc2
+  associatedtype Assoc1
+  associatedtype Assoc2
 }
 
 struct G<T> {}
@@ -50,11 +50,11 @@ struct Foo<V> {
 // member of a dependent member that substitutes to a type parameter.
 // <rdar://problem/16257259>
 protocol Fooable {
-  typealias Foo
+  associatedtype Foo
 }
 
 protocol Barrable {
-  typealias Bar: Fooable
+  associatedtype Bar: Fooable
 
   func bar(_: Bar) -> Bar.Foo
 }
@@ -65,3 +65,19 @@ struct FooBar<T: Fooable>: Barrable {
   func bar(_ x: T) -> T.Foo { }
 }
 
+
+// Test that associated types can be constrained to concrete types
+
+func concreteJungle<T where T : Fooable, T.Foo == C>() -> T.Foo {
+  return C()
+}
+
+func concreteJungle<T where T : Fooable, T.Foo == C>(t: T.Foo) -> C {
+  let c: C = t
+  return c
+}
+
+func concreteJungle<T where T : Fooable, T.Foo == C>(f: (T.Foo) -> C) -> T.Foo {
+  let ff: (C) -> T.Foo = f
+  return ff(C())
+}

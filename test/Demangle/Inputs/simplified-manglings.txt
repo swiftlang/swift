@@ -93,8 +93,8 @@ _TWPC3foo3barS_8barrables ---> protocol witness table for bar
 _TWaC3foo3barS_8barrableS_ ---> protocol witness table accessor for bar
 _TWlC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table accessor for type bar and conformance bar
 _TWLC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table cache variable for type bar and conformance bar
-_TWDC3foo3barS_8barrableS_ ---> dependent protocol witness table generator for bar
-_TWdC3foo3barS_8barrableS_ ---> dependent protocol witness table template for bar
+_TWGC3foo3barS_8barrableS_ ---> generic protocol witness table for bar
+_TWIC3foo3barS_8barrableS_ ---> instantiation function for generic protocol witness table for bar
 _TFSCg5greenVSC5Color ---> green.getter
 _TIF1t1fFT1iSi1sSS_T_A_ ---> (f(i : Int, s : String) -> ()).(default argument 0)
 _TIF1t1fFT1iSi1sSS_T_A0_ ---> (f(i : Int, s : String) -> ()).(default argument 1)
@@ -165,8 +165,9 @@ _TF8manglingX30Proprostnemluvesky_uybCEdmaEBaFT_T_ ---> Pročprostěnemluvíčes
 _TF8manglingXoi7p_qcaDcFTSiSi_Si ---> «+» infix(Int, Int) -> Int
 _TF8manglingoi2qqFTSiSi_T_ ---> ?? infix(Int, Int) -> ()
 _TFE11ext_structAV11def_structA1A4testfT_T_ ---> A.test() -> ()
-_TF13devirt_accessP5_DISC15getPrivateClassFT_CS_P5_DISC12PrivateClass ---> (getPrivateClass in _DISC)() -> (PrivateClass in _DISC)
-_TF4mainP5_mainX3wxaFT_T_ ---> (λ in _main)() -> ()
+_TF13devirt_accessP5_DISC15getPrivateClassFT_CS_P5_DISC12PrivateClass ---> getPrivateClass() -> PrivateClass
+_TF4mainP5_mainX3wxaFT_T_ ---> λ() -> ()
+_TF4mainP5_main3abcFT_aS_P5_DISC3xyz ---> abc() -> xyz
 _TtPMP_ ---> protocol<>.Type
 _TFCs13_NSSwiftArray29canStoreElementsOfDynamicTypefPMP_Sb ---> _NSSwiftArray.canStoreElementsOfDynamicType(protocol<>.Type) -> Bool
 _TFCs13_NSSwiftArrayg17staticElementTypePMP_ ---> _NSSwiftArray.staticElementType.getter
@@ -176,6 +177,7 @@ _TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiS
 _TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TTSg5Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized specialized take_closure((Int, Int) -> ()) -> ()
 _TTSg5Si___TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized specialized take_closure((Int, Int) -> ()) -> ()
 _TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_dT__XFo_iSi_dT__ ---> specialized thunk
+_TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_DT__XFo_iSi_DT__ ---> specialized thunk
 _TTSf1cpi0_cpfl0_cpse0v4u123_cpg53globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8_cpfr36_TFtest_capture_propagation2_closure___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized take_closure((Int, Int) -> ()) -> ()
 _TTSf0gs___TFVs11_StringCore15_invariantCheckfT_T_ ---> specialized _StringCore._invariantCheck() -> ()
 _TTSf2g___TTSf2s_d___TFVs11_StringCoreCfVs13_StringBufferS_ ---> specialized specialized _StringCore.init(_StringBuffer) -> _StringCore
@@ -192,5 +194,6 @@ _TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_F
 _TFC3red11BaseClassEHcfzT1aSi_S0_ ---> BaseClassEH.init(a : Int) throws -> BaseClassEH
 _TFe27mangling_generic_extensionsR_S_8RunciblerVS_3Foog1aSi ---> Foo<A where ...>.a.getter
 _TFe27mangling_generic_extensionsR_S_8RunciblerVS_3Foog1bx ---> Foo<A where ...>.b.getter
-_TTRXFo_iT__iT_zoPs9ErrorType__XFo__dT_zoPS___ ---> thunk
+_TTRXFo_iT__iT_zoPs13ErrorProtocol__XFo__dT_zoPS___ ---> thunk
 _TFE1a ---> _TFE1a
+_TFC4testP33_83378C430F65473055F1BD53F3ADCDB71C5doFoofT_T_ ---> C.doFoo() -> ()

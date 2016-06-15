@@ -1,0 +1,428 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# ===--- Benchmark_Driver ------------------------------------------------===//
+#
+#  This source file is part of the Swift.org open source project
+#
+#  Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+#  Licensed under Apache License v2.0 with Runtime Library Exception
+#
+#  See http://swift.org/LICENSE.txt for license information
+#  See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# ===---------------------------------------------------------------------===//
+
+import argparse
+import datetime
+import glob
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+import urllib
+import urllib2
+
+DRIVER_DIR = os.path.dirname(os.path.realpath(__file__))
+
+
+def parse_results(res, optset):
+    # Parse lines like this
+    # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),PEAK_MEMORY(B)
+    score_re = re.compile(r"(\d+),[ \t]*(\w+)," +
+                          ",".join([r"[ \t]*([\d.]+)"] * 7))
+    # The Totals line would be parsed like this.
+    total_re = re.compile(r"()(Totals)," +
+                          ",".join([r"[ \t]*([\d.]+)"] * 7))
+    key_group = 2
+    val_group = 4
+    mem_group = 9
+
+    tests = []
+    for line in res.split():
+        m = score_re.match(line)
+        if not m:
+            m = total_re.match(line)
+            if not m:
+                continue
+        testresult = int(m.group(val_group))
+        testname = m.group(key_group)
+        test = {}
+        test['Data'] = [testresult]
+        test['Info'] = {}
+        test['Name'] = "nts.swift/" + optset + "." + testname + ".exec"
+        tests.append(test)
+        if testname != 'Totals':
+            mem_testresult = int(m.group(mem_group))
+            mem_test = {}
+            mem_test['Data'] = [mem_testresult]
+            mem_test['Info'] = {}
+            mem_test['Name'] = "nts.swift/mem_maxrss." + \
+                optset + "." + testname + ".mem"
+            tests.append(mem_test)
+    return tests
+
+
+def submit_to_lnt(data, url):
+    print("\nSubmitting results to LNT server...")
+    json_report = {'input_data': json.dumps(data), 'commit': '1'}
+    data = urllib.urlencode(json_report)
+    response_str = urllib2.urlopen(urllib2.Request(url, data))
+    response = json.loads(response_str.read())
+    if 'success' in response:
+        print("Server response:\tSuccess")
+    else:
+        print("Server response:\tError")
+        print("Error:\t", response['error'])
+        sys.exit(1)
+
+
+def instrument_test(driver_path, test, num_samples):
+    """Run a test and instrument its peak memory use"""
+    test_outputs = []
+    for _ in range(num_samples):
+        test_output_raw = subprocess.check_output(
+            ['time', '-lp', driver_path, test],
+            stderr=subprocess.STDOUT
+        )
+        peak_memory = re.match('\s*(\d+)\s*maximum resident set size',
+                               test_output_raw.split('\n')[-15]).group(1)
+        test_outputs.append(test_output_raw.split()[1].split(',') +
+                            [peak_memory])
+
+    # Average sample results
+    num_samples_index = 2
+    min_index = 3
+    max_index = 4
+    avg_start_index = 5
+
+    # TODO: Correctly take stdev
+    avg_test_output = test_outputs[0]
+    avg_test_output[avg_start_index:] = map(int,
+                                            avg_test_output[avg_start_index:])
+    for test_output in test_outputs[1:]:
+        for i in range(avg_start_index, len(test_output)):
+            avg_test_output[i] += int(test_output[i])
+    for i in range(avg_start_index, len(avg_test_output)):
+        avg_test_output[i] = int(round(avg_test_output[i] /
+                                       float(len(test_outputs))))
+    avg_test_output[num_samples_index] = num_samples
+    avg_test_output[min_index] = min(
+        test_outputs, key=lambda x: int(x[min_index]))[min_index]
+    avg_test_output[max_index] = max(
+        test_outputs, key=lambda x: int(x[max_index]))[max_index]
+    avg_test_output = map(str, avg_test_output)
+
+    return avg_test_output
+
+
+def get_tests(driver_path):
+    """Return a list of available performance tests"""
+    return subprocess.check_output([driver_path, '--list']).split()[2:]
+
+
+def get_current_git_branch(git_repo_path):
+    """Return the selected branch for the repo `git_repo_path`"""
+    return subprocess.check_output(
+        ['git', '-C', git_repo_path, 'rev-parse',
+         '--abbrev-ref', 'HEAD'], stderr=subprocess.STDOUT).strip()
+
+
+def log_results(log_directory, driver, formatted_output, swift_repo=None):
+    """Log `formatted_output` to a branch specific directory in
+    `log_directory`
+    """
+    try:
+        branch = get_current_git_branch(swift_repo)
+    except (OSError, subprocess.CalledProcessError):
+        branch = None
+    timestamp = time.strftime("%Y%m%d%H%M%S", time.localtime())
+    if branch:
+        output_directory = os.path.join(log_directory, branch)
+    else:
+        output_directory = log_directory
+    driver_name = os.path.basename(driver)
+    try:
+        os.makedirs(output_directory)
+    except OSError:
+        pass
+    log_file = os.path.join(output_directory,
+                            driver_name + '-' + timestamp + '.log')
+    print('Logging results to: %s' % log_file)
+    with open(log_file, 'w') as f:
+        f.write(formatted_output)
+
+
+def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
+                   log_directory=None, swift_repo=None):
+    """Run perf tests individually and return results in a format that's
+    compatible with `parse_results`. If `benchmarks` is not empty,
+    only run tests included in it.
+    """
+    (total_tests, total_min, total_max, total_mean) = (0, 0, 0, 0)
+    output = []
+    headings = ['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)', 'MEAN(μs)',
+                'SD(μs)', 'MEDIAN(μs)', 'MAX_RSS(B)']
+    line_format = '{:>3} {:<25} {:>7} {:>7} {:>7} {:>8} {:>6} {:>10} {:>10}'
+    if verbose and log_directory:
+        print(line_format.format(*headings))
+    for test in get_tests(driver):
+        if benchmarks and test not in benchmarks:
+            continue
+        test_output = instrument_test(driver, test, num_samples)
+        if test_output[0] == 'Totals':
+            continue
+        if verbose:
+            if log_directory:
+                print(line_format.format(*test_output))
+            else:
+                print(','.join(test_output))
+        output.append(test_output)
+        (samples, _min, _max, mean) = map(int, test_output[2:6])
+        total_tests += 1
+        total_min += _min
+        total_max += _max
+        total_mean += mean
+    if not output:
+        return
+    formatted_output = '\n'.join([','.join(l) for l in output])
+    totals = map(str, ['Totals', total_tests, total_min, total_max,
+                       total_mean, '0', '0', '0'])
+    totals_output = '\n\n' + ','.join(totals)
+    if verbose:
+        if log_directory:
+            print(line_format.format(*([''] + totals)))
+        else:
+            print(totals_output[1:])
+    formatted_output += totals_output
+    if log_directory:
+        log_results(log_directory, driver, formatted_output, swift_repo)
+    return formatted_output
+
+
+def submit(args):
+    print("SVN revision:\t", args.revision)
+    print("Machine name:\t", args.machine)
+    print("Iterations:\t", args.iterations)
+    print("Optimizations:\t", ','.join(args.optimization))
+    print("LNT host:\t", args.lnt_host)
+    starttime = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    print("Start time:\t", starttime)
+    data = {}
+    data['Tests'] = []
+    data['Machine'] = {'Info': {'name': args.machine}, 'Name': args.machine}
+    print("\nRunning benchmarks...")
+    for optset in args.optimization:
+        print("Opt level:\t", optset)
+        file = os.path.join(args.tests, "Benchmark_" + optset)
+        try:
+            res = run_benchmarks(
+                file, benchmarks=args.benchmark,
+                num_samples=args.iterations)
+            data['Tests'].extend(parse_results(res, optset))
+        except subprocess.CalledProcessError as e:
+            print("Execution failed.. Test results are empty.")
+            print("Process output:\n", e.output)
+
+    endtime = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    data['Run'] = {'End Time': endtime,
+                   'Info': {'inferred_run_order': str(args.revision),
+                            'run_order': str(args.revision),
+                            'tag': 'nts',
+                            'test_suite_revision': 'None'},
+                   'Start Time': starttime}
+    print("End time:\t", endtime)
+
+    submit_to_lnt(data, args.lnt_host)
+    return 0
+
+
+def run(args):
+    optset = args.optimization
+    file = os.path.join(args.tests, "Benchmark_" + optset)
+    run_benchmarks(
+        file, benchmarks=args.benchmarks,
+        num_samples=args.iterations, verbose=True,
+        log_directory=args.output_dir,
+        swift_repo=args.swift_repo)
+    return 0
+
+
+def format_name(log_path):
+    """Return the filename and directory for a log file"""
+    return '/'.join(log_path.split('/')[-2:])
+
+
+def compare_logs(compare_script, new_log, old_log, log_dir, opt):
+    """Return diff of log files at paths `new_log` and `old_log`"""
+    print('Comparing %s %s ...' % (format_name(old_log), format_name(new_log)))
+    subprocess.call([compare_script, '--old-file', old_log,
+                    '--new-file', new_log, '--format', 'markdown',
+                     '--output', os.path.join(log_dir, 'latest_compare_{0}.md'
+                                              .format(opt))])
+
+
+def compare(args):
+    log_dir = args.log_dir
+    swift_repo = args.swift_repo
+    compare_script = args.compare_script
+    current_branch = get_current_git_branch(swift_repo)
+    current_branch_dir = os.path.join(log_dir, current_branch)
+    master_branch_dir = os.path.join(log_dir, 'master')
+
+    if current_branch != 'master' and not os.path.isdir(master_branch_dir):
+        print('Unable to find benchmark logs for master branch. Set a ' +
+              'baseline benchmark log by passing --benchmark to ' +
+              'build-script while on master branch.')
+        return 1
+
+    recent_logs = {}
+    for branch_dir in [current_branch_dir, master_branch_dir]:
+        for opt in ['O', 'Onone']:
+            recent_logs[os.path.basename(branch_dir) + '_' + opt] = sorted(
+                glob.glob(os.path.join(
+                    branch_dir, 'Benchmark_' + opt + '-*.log')),
+                key=os.path.getctime, reverse=True)
+
+    if current_branch == 'master':
+        if len(recent_logs['master_O']) > 1 and \
+           len(recent_logs['master_Onone']) > 1:
+            compare_logs(compare_script,
+                         recent_logs['master_O'][0],
+                         recent_logs['master_O'][1],
+                         log_dir, 'O')
+            compare_logs(compare_script,
+                         recent_logs['master_Onone'][0],
+                         recent_logs['master_Onone'][1],
+                         log_dir, 'Onone')
+        else:
+            print('master/master comparison skipped: no previous master logs')
+    else:
+        # TODO: Check for outdated master branch log
+        if len(recent_logs[current_branch + '_O']) == 0 or \
+           len(recent_logs[current_branch + '_Onone']) == 0:
+            print('branch sanity failure: missing branch logs')
+            return 1
+
+        if len(recent_logs[current_branch + '_O']) == 1 or \
+           len(recent_logs[current_branch + '_Onone']) == 1:
+            print('branch/branch comparison skipped: no previous branch logs')
+        else:
+            compare_logs(compare_script,
+                         recent_logs[current_branch + '_O'][0],
+                         recent_logs[current_branch + '_O'][1],
+                         log_dir, 'O')
+            compare_logs(compare_script,
+                         recent_logs[current_branch + '_Onone'][0],
+                         recent_logs[current_branch + '_Onone'][1],
+                         log_dir, 'Onone')
+
+        if len(recent_logs['master_O']) == 0 or \
+           len(recent_logs['master_Onone']) == 0:
+            print('branch/master failure: no master logs')
+            return 1
+        else:
+            compare_logs(compare_script,
+                         recent_logs[current_branch + '_O'][0],
+                         recent_logs['master_O'][0],
+                         log_dir, 'O')
+            compare_logs(compare_script,
+                         recent_logs[current_branch + '_Onone'][0],
+                         recent_logs['master_Onone'][0],
+                         log_dir, 'Onone')
+
+        # TODO: Fail on large regressions
+
+    return 0
+
+
+def positive_int(value):
+    ivalue = int(value)
+    if not (ivalue > 0):
+        raise ValueError
+    return ivalue
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Swift benchmarks driver')
+    subparsers = parser.add_subparsers()
+
+    submit_parser = subparsers.add_parser(
+        'submit',
+        help='run benchmarks and submit results to LNT')
+    submit_parser.add_argument(
+        '-t', '--tests',
+        help='directory containing Benchmark_O{,none,unchecked} ' +
+        '(default: DRIVER_DIR)',
+        default=DRIVER_DIR)
+    submit_parser.add_argument(
+        '-m', '--machine', required=True,
+        help='LNT machine name')
+    submit_parser.add_argument(
+        '-r', '--revision', required=True,
+        help='SVN revision of compiler to identify the LNT run', type=int)
+    submit_parser.add_argument(
+        '-l', '--lnt_host', required=True,
+        help='LNT host to submit results to')
+    submit_parser.add_argument(
+        '-i', '--iterations',
+        help='number of times to run each test (default: 10)',
+        type=positive_int, default=10)
+    submit_parser.add_argument(
+        '-o', '--optimization', nargs='+',
+        help='optimization levels to use (default: O Onone Ounchecked)',
+        default=['O', 'Onone', 'Ounchecked'])
+    submit_parser.add_argument(
+        'benchmark',
+        help='benchmark to run (default: all)', nargs='*')
+    submit_parser.set_defaults(func=submit)
+
+    run_parser = subparsers.add_parser(
+        'run',
+        help='run benchmarks and output results to stdout')
+    run_parser.add_argument(
+        '-t', '--tests',
+        help='directory containing Benchmark_O{,none,unchecked} ' +
+        '(default: DRIVER_DIR)',
+        default=DRIVER_DIR)
+    run_parser.add_argument(
+        '-i', '--iterations',
+        help='number of times to run each test (default: 1)',
+        type=positive_int, default=1)
+    run_parser.add_argument(
+        '-o', '--optimization',
+        help='optimization level to use (default: O)', default='O')
+    run_parser.add_argument(
+        '--output-dir',
+        help='log results to directory (default: no logging)')
+    run_parser.add_argument(
+        '--swift-repo',
+        help='absolute path to Swift source repo for branch comparison')
+    run_parser.add_argument(
+        'benchmarks',
+        help='benchmark to run (default: all)', nargs='*')
+    run_parser.set_defaults(func=run)
+
+    compare_parser = subparsers.add_parser(
+        'compare',
+        help='compare benchmark results')
+    compare_parser.add_argument(
+        '--log-dir', required=True,
+        help='directory containing benchmark logs')
+    compare_parser.add_argument(
+        '--swift-repo', required=True,
+        help='absolute path to Swift source repo')
+    compare_parser.add_argument(
+        '--compare-script', required=True,
+        help='absolute path to compare script')
+    compare_parser.set_defaults(func=compare)
+
+    args = parser.parse_args()
+    if args.func != compare and isinstance(args.optimization, list):
+        args.optimization = sorted(list(set(args.optimization)))
+    return args.func(args)
+
+if __name__ == '__main__':
+    exit(main())

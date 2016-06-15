@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -parse -verify %s
-enum MSV : ErrorType {
+enum MSV : ErrorProtocol {
   case Foo, Bar, Baz
 
   var domain: String { return "" }
@@ -13,7 +13,7 @@ func d() {}
 func e() {}
 func thrower() throws {}
 
-func opaque_error() -> ErrorType { return MSV.Foo }
+func opaque_error() -> ErrorProtocol { return MSV.Foo }
 
 func one() {
   throw MSV.Foo // expected-error {{error is not handled because the enclosing function is not declared 'throws'}}
@@ -102,7 +102,7 @@ protocol ThrowingProto {
   static func bar() throws
 }
 
-func testExistential(p : ThrowingProto) throws {
+func testExistential(_ p : ThrowingProto) throws {
   try p.foo()
   try p.dynamicType.bar()
 }
@@ -112,24 +112,24 @@ func testGeneric<P : ThrowingProto>(p : P) throws {
 }
 
 // Don't warn about the "useless" try in these cases.
-func nine_helper(x: Int, y: Int) throws {}
+func nine_helper(_ x: Int, y: Int) throws {}
 func nine() throws {
   try nine_helper(y: 0) // expected-error {{missing argument for parameter #1 in call}}
 }
-func ten_helper(x: Int) {}
-func ten_helper(x: Int, y: Int) throws {}
+func ten_helper(_ x: Int) {}
+func ten_helper(_ x: Int, y: Int) throws {}
 func ten() throws {
   try ten_helper(y: 0) // expected-error {{extraneous argument label 'y:' in call}} {{18-21=}}
 }
 
 // rdar://21074857
-func eleven_helper(fn: () -> ()) {}
+func eleven_helper(_ fn: () -> ()) {}
 func eleven_one() {
   eleven_helper {
     do {
       try thrower()
     // FIXME: suppress the double-emission of the 'always true' warning
-    } catch let e as ErrorType { // expected-warning {{immutable value 'e' was never used}} {{17-18=_}} expected-warning 2 {{'as' test is always true}}
+    } catch let e as ErrorProtocol { // expected-warning {{immutable value 'e' was never used}} {{17-18=_}} expected-warning 2 {{'as' test is always true}}
     }
   }
 }
@@ -143,7 +143,7 @@ func eleven_two() {
 }
 
 enum Twelve { case Payload(Int) }
-func twelve_helper(fn: (Int, Int) -> ()) {}
+func twelve_helper(_ fn: (Int, Int) -> ()) {}
 func twelve() {
   twelve_helper { (a, b) in // expected-error {{invalid conversion from throwing function of type '(_, _) throws -> ()' to non-throwing function type '(Int, Int) -> ()'}}
     do {
@@ -153,12 +153,12 @@ func twelve() {
   }
 }
 
-struct Thirteen : ErrorType, Equatable {}
+struct Thirteen : ErrorProtocol, Equatable {}
 func ==(a: Thirteen, b: Thirteen) -> Bool { return true }
 
-func thirteen_helper(fn: (Thirteen) -> ()) {}
+func thirteen_helper(_ fn: (Thirteen) -> ()) {}
 func thirteen() {
-  thirteen_helper { (a) in // expected-error {{invalid conversion from throwing function of type '_ throws -> ()' to non-throwing function type '(Thirteen) -> ()'}}
+  thirteen_helper { (a) in // expected-error {{invalid conversion from throwing function of type '(_) throws -> ()' to non-throwing function type '(Thirteen) -> ()'}}
     do {
       try thrower()
     } catch a {

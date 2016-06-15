@@ -1,9 +1,8 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// XFAIL: interpret
-
 import StdlibUnittest
+
 
 // Check that the generic parameter is called 'Instance'.
 protocol TestProtocol1 {}
@@ -16,17 +15,6 @@ extension Unmanaged where Instance : TestProtocol1 {
 
 var UnmanagedTests = TestSuite("Unmanaged")
 
-UnmanagedTests.test("fromOpaque()/trap")
-  .skip(.Custom(
-    { !_isDebugAssertConfiguration() },
-    reason: "fromOpaque() does a _debugPrecondition() for null pointers"))
-  .code {
-  let null = getPointer(COpaquePointer())
-  expectCrashLater()
-  let unmanaged = Unmanaged<AnyObject>.fromOpaque(null)
-  _blackHole(unmanaged)
-}
-
 class FooClass {}
 
 UnmanagedTests.test("unsafeBitCast(Unmanaged, Int)") {
@@ -35,9 +23,52 @@ UnmanagedTests.test("unsafeBitCast(Unmanaged, Int)") {
     0,
     unsafeBitCast(
       Unmanaged.passUnretained(ref) as Unmanaged<AnyObject>,
-      Int.self))
+      to: Int.self))
+  _fixLifetime(ref)
+}
+
+class Foobar {
+  func foo() -> Int { return 1 }
+}
+
+UnmanagedTests.test("_withUnsafeGuaranteedRef") {
+  var ref = Foobar()
+  var unmanaged = Unmanaged.passUnretained(ref)
+  withExtendedLifetime(ref) {
+    unmanaged._withUnsafeGuaranteedRef {
+      expectTrue(ref === $0)
+    }
+    unmanaged._withUnsafeGuaranteedRef {
+      expectEqual(1, $0.foo())
+    }
+  }
+}
+
+UnmanagedTests.test("_withUnsafeGuaranteedRef/return") {
+  var ref = Foobar()
+  var unmanaged = Unmanaged.passUnretained(ref)
+  withExtendedLifetime(ref) {
+    expectEqual(1, unmanaged._withUnsafeGuaranteedRef {
+      return $0.foo()
+    })
+  }
+}
+
+UnmanagedTests.test("Opaque") {
+  var ref = Foobar()
+  let opaquePtr = Unmanaged.passUnretained(ref).toOpaque()
+  
+  let unknownPtr = Int(bitPattern: opaquePtr)
+  let voidPtr = UnsafePointer<Void>(bitPattern: unknownPtr)
+  expectNotEmpty(voidPtr, "toOpaque must not return null pointer")
+  
+  let unmanaged = Unmanaged<Foobar>.fromOpaque(voidPtr!)
+  expectEqual(
+    ref === unmanaged.takeUnretainedValue(),
+    true,
+    "fromOpaque must return the same reference")
+  
   _fixLifetime(ref)
 }
 
 runAllTests()
-

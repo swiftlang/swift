@@ -1,8 +1,8 @@
-//===--- GenEnum.h - Swift IR Generation For 'enum' Types -------* C++ *-===//
+//===--- GenEnum.h - Swift IR Generation For 'enum' Types -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,13 +23,23 @@ namespace llvm {
   class Value;
 }
 
+namespace clang {
+namespace CodeGen {
+namespace swiftcall {
+  class SwiftAggLowering;
+}
+}
+}
+
 namespace swift {
   class EnumElementDecl;
   
 namespace irgen {
   class EnumPayload;
+  class EnumPayloadSchema;
   class IRGenFunction;
   class TypeConverter;
+  using clang::CodeGen::swiftcall::SwiftAggLowering;
 
 /// \brief Emit the dispatch branch(es) for an address-only enum.
 void emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,
@@ -83,6 +93,12 @@ void emitStoreEnumTagToAddress(IRGenFunction &IGF,
 APInt
 interleaveSpareBits(IRGenModule &IGM, const SpareBitVector &spareBits,
                     unsigned bits, unsigned spareValue, unsigned occupiedValue);
+
+/// A version of the above where the tag value is dynamic.
+EnumPayload interleaveSpareBits(IRGenFunction &IGF,
+                                const EnumPayloadSchema &schema,
+                                const SpareBitVector &spareBitVector,
+                                llvm::Value *value);
 
 /// Gather spare bits into the low bits of a smaller integer value.
 llvm::Value *emitGatherSpareBits(IRGenFunction &IGF,
@@ -170,8 +186,8 @@ public:
     return cast<llvm::StructType>(getTypeInfo().getStorageType());
   }
   
-  IsPOD_t isPOD(ResilienceScope scope) const {
-    return getTypeInfo().isPOD(scope);
+  IsPOD_t isPOD(ResilienceExpansion expansion) const {
+    return getTypeInfo().isPOD(expansion);
   }
   
   /// \group Query enum layout
@@ -193,7 +209,12 @@ public:
     return ElementsWithNoPayload;
   }
 
+  /// Return a tag index in the range [0..NumElements].
   unsigned getTagIndex(EnumElementDecl *Case) const;
+
+  /// Return a tag index in the range
+  /// [-ElementsWithPayload..ElementsWithNoPayload-1].
+  int getResilientTagIndex(EnumElementDecl *Case) const;
 
   /// Map the given element to the appropriate index in the
   /// discriminator type.
@@ -223,7 +244,7 @@ public:
   /// \group Indirect enum operations
   
   /// Return the enum case tag for the given value. Payload cases come first,
-  /// followed by non-payload cases.
+  /// followed by non-payload cases. Used for the getEnumTag value witness.
   virtual llvm::Value *emitGetEnumTag(IRGenFunction &IGF,
                                       SILType T,
                                       Address enumAddr) const = 0;
@@ -242,11 +263,20 @@ public:
                         Address enumAddr,
                         EnumElementDecl *elt) const = 0;
   
+  /// Overlay a dynamic case tag onto a data value in memory. Used when
+  /// generating the destructiveInjectEnumTag value witness.
+  virtual void emitStoreTag(IRGenFunction &IGF,
+                            SILType T,
+                            Address enumAddr,
+                            llvm::Value *tag) const = 0;
+  
   /// Clears tag bits from within the payload of an enum in memory and
   /// projects the address of the data for a case. Does not check
   /// the referenced enum value.
   /// Performs the block argument binding for a SIL
   /// 'switch_enum_addr' instruction.
+  /// Also used when generating the destructiveProjectEnumData value
+  /// witness.
   Address destructiveProjectDataForLoad(IRGenFunction &IGF,
                                         SILType T,
                                         Address enumAddr,
@@ -321,9 +351,11 @@ public:
   
   /// \group Delegated TypeInfo operations
   
+  virtual void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                                Size offset) const = 0;
   virtual void getSchema(ExplosionSchema &schema) const = 0;
   virtual void destroy(IRGenFunction &IGF, Address addr, SILType T) const = 0;
-  
+
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                                     Address dest, SILType T) const;
   
@@ -377,8 +409,9 @@ public:
   virtual void reexplode(IRGenFunction &IGF, Explosion &src,
                          Explosion &dest) const = 0;
   virtual void copy(IRGenFunction &IGF, Explosion &src,
-                    Explosion &dest) const = 0;
-  virtual void consume(IRGenFunction &IGF, Explosion &src) const = 0;
+                    Explosion &dest, Atomicity atomicity) const = 0;
+  virtual void consume(IRGenFunction &IGF, Explosion &src,
+                       Atomicity atomicity) const = 0;
   virtual void fixLifetime(IRGenFunction &IGF, Explosion &src) const = 0;
   virtual void packIntoEnumPayload(IRGenFunction &IGF,
                                    EnumPayload &payload,
@@ -391,6 +424,7 @@ public:
                                      unsigned offset) const = 0;
   
   virtual bool needsPayloadSizeInMetadata() const = 0;
+  virtual unsigned getPayloadSizeForMetadata() const;
   
   virtual llvm::Value *loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                                          Address addr) const;

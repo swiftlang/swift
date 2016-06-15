@@ -7,13 +7,17 @@ set(sourcekitdAPI_sources
   TokenAnnotationsArray.cpp
 )
 
+set(sourcekitdAPI_Darwin_sources
+  sourcekitdAPI-XPC.cpp)
+set(LLVM_OPTIONAL_SOURCES ${sourcekitdAPI_Darwin_sources})
 if(APPLE)
-  list(APPEND sourcekitdAPI_sources
-    sourcekitdAPI-XPC.cpp
-  )
+  list(APPEND sourcekitdAPI_sources ${sourcekitdAPI_Darwin_sources})
 endif()
 
 add_sourcekit_library(sourcekitdAPI
   ${sourcekitdAPI_sources}
-  DEPENDS SourceKitSupport
+  DEPENDS
+      SourceKitSupport SourceKitSwiftLang
+      # Clang dependencies, required by SourceKitSwiftLang
+      clangFormat clangToolingCore clangDriver
 )

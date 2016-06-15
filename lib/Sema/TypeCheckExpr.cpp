@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -18,9 +18,9 @@
 #include "TypeChecker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/APInt.h"
@@ -105,8 +105,7 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
   // sugar on it.  If so, propagate the sugar to the curried result function
   // type.
   if (isa<ConstructorRefCallExpr>(E) && isa<TypeExpr>(E->getArg())) {
-    auto resultSugar =
-      E->getArg()->getType()->castTo<MetatypeType>()->getInstanceType();
+    auto resultSugar = cast<TypeExpr>(E->getArg())->getInstanceType();
 
     // The result of this apply is "(args) -> T" where T is the type being
     // constructed.  Apply the sugar onto it.
@@ -142,7 +141,9 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                      Associativity::Right,
                      /*assignment*/ false);
 
-  } else if (auto *assign = dyn_cast<AssignExpr>(E)) {
+  }
+
+  if (auto *assign = dyn_cast<AssignExpr>(E)) {
     // Assignment has fixed precedence.
     assert(!assign->isFolded() && "already folded assign expr in sequence?!");
     (void)assign;
@@ -150,7 +151,9 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                      Associativity::Right,
                      /*assignment*/ true);
 
-  } else if (auto *as = dyn_cast<ExplicitCastExpr>(E)) {
+  }
+
+  if (auto *as = dyn_cast<ExplicitCastExpr>(E)) {
     // 'as' and 'is' casts have fixed precedence.
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     (void)as;
@@ -158,7 +161,9 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                      Associativity::None,
                      /*assignment*/ false);
 
-  } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+  }
+
+  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     SourceFile *SF = DC->getParentSourceFile();
     Identifier name = DRE->getDecl()->getName();
     bool isCascading = DC->isCascadingContextForLookup(true);
@@ -166,7 +171,9 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                                                         E->getLoc()))
       return op->getInfixData();
 
-  } else if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
+  }
+
+  if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
     SourceFile *SF = DC->getParentSourceFile();
     Identifier name = OO->getDecls()[0]->getName();
     bool isCascading = DC->isCascadingContextForLookup(true);
@@ -174,8 +181,18 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
                                                         E->getLoc()))
       return op->getInfixData();
   }
-  
-  TC.diagnose(E->getLoc(), diag::unknown_binop);
+
+  if (isa<ArrowExpr>(E)) {
+    return InfixData(IntrinsicPrecedences::ArrowExpr,
+                     Associativity::Right,
+                     /*assignment*/ false);
+  }
+
+  // If E is already an ErrorExpr, then we've diagnosed it as invalid already,
+  // otherwise emit an error.
+  if (!isa<ErrorExpr>(E))
+    TC.diagnose(E->getLoc(), diag::unknown_binop);
+
   // Recover with an infinite-precedence left-associative operator.
   return InfixData((unsigned char)~0U, Associativity::Left,
                    /*assignment*/ false);
@@ -294,6 +311,14 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     as->setSubExpr(LHS);    
     return makeResultExpr(as);
   }
+
+  if (auto *arrow = dyn_cast<ArrowExpr>(Op)) {
+    // Resolve the '->' expression.
+    assert(!arrow->isFolded() && "already folded '->' expr in sequence?!");
+    arrow->setArgsExpr(LHS);
+    arrow->setResultExpr(RHS);
+    return makeResultExpr(arrow);
+  }
   
   // Build the argument to the operation.
   Expr *ArgElts[] = { LHS, RHS };
@@ -302,7 +327,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
                                      SourceLoc(), 
                                      ArgElts2, { }, { }, SourceLoc(),
                                      /*hasTrailingClosure=*/false,
-                                     LHS->isImplicit() && RHS->isImplicit());
+                                     /*Implicit=*/true);
 
   
   
@@ -550,14 +575,14 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
 }
 
 Expr *TypeChecker::buildCheckedRefExpr(ValueDecl *value, DeclContext *UseDC,
-                                       SourceLoc loc, bool Implicit) {
+                                       DeclNameLoc loc, bool Implicit) {
   auto type = getUnopenedTypeOfReference(value, Type(), UseDC);
   AccessSemantics semantics = value->getAccessSemanticsFromContext(UseDC);
   return new (Context) DeclRefExpr(value, loc, Implicit, semantics, type);
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
-                                DeclContext *UseDC, SourceLoc NameLoc,
+                                DeclContext *UseDC, DeclNameLoc NameLoc,
                                 bool Implicit, bool isSpecialized) {
   assert(!Decls.empty() && "Must have at least one declaration");
 
@@ -721,14 +746,14 @@ namespace {
     llvm::SmallPtrSet<ValueDecl *, 2> Diagnosed;
     /// The AbstractClosureExpr or AbstractFunctionDecl being analyzed.
     AnyFunctionRef AFR;
-    bool &capturesTypes;
+    SourceLoc &TypeCapturingLoc;
   public:
     FindCapturedVars(TypeChecker &tc,
                      SmallVectorImpl<CapturedValue> &captureList,
-                     bool &capturesTypes,
+                     SourceLoc &typeCapturingLoc,
                      AnyFunctionRef AFR)
         : TC(tc), captureList(captureList), AFR(AFR),
-          capturesTypes(capturesTypes) {
+          TypeCapturingLoc(typeCapturingLoc) {
       if (auto AFD = AFR.getAbstractFunctionDecl())
         CaptureLoc = AFD->getLoc();
       else {
@@ -747,23 +772,41 @@ namespace {
     /// FIXME: SILGen doesn't currently allow local generic functions to
     /// capture generic parameters from an outer context. Once it does, we
     /// will need to distinguish outer and inner type parameters here.
-    void checkType(Type type) {
+    void checkType(Type type, SourceLoc loc) {
       // Nothing to do if the type is concrete.
       if (!type || !type->hasArchetype())
         return;
 
-      // Easy case.
-      if (!type->hasOpenedExistential()) {
-        capturesTypes = true;
-        return;
-      }
-
-      // This type contains both an archetype and an open existential. Walk the
-      // type to see if we have any archetypes that are *not* open existentials.
-      if (type.findIf([](Type t) -> bool {
-            return (t->is<ArchetypeType>() && !t->isOpenedExistential());
-          }))
-        capturesTypes = true;
+      // Walk the type to see if we have any archetypes that are *not* open
+      // existentials and that aren't type-erased.
+      class CapturesTypeWalker final : public TypeWalker {
+        SourceLoc &TypeCapturingLoc;
+        SourceLoc CurLoc;
+        
+      public:
+        CapturesTypeWalker(SourceLoc &capturingLoc, SourceLoc curLoc)
+          : TypeCapturingLoc(capturingLoc), CurLoc(curLoc) {}
+        
+        Action walkToTypePre(Type t) override {
+          if (t->is<ArchetypeType>() && !t->isOpenedExistential()) {
+            if (TypeCapturingLoc.isInvalid())
+              TypeCapturingLoc = CurLoc;
+            return Action::Stop;
+          }
+          
+          // ObjC generic type parameters don't have a runtime representation,
+          // so they don't count as captures.
+          if (auto bgt = t->getAs<BoundGenericClassType>()) {
+            if (bgt->getDecl()->hasClangNode()) {
+              return Action::SkipChildren;
+            }
+          }
+          
+          return Action::Continue;
+        }
+      };
+      
+      type.walk(CapturesTypeWalker(TypeCapturingLoc, loc));
     }
 
     /// Add the specified capture to the closure's capture list, diagnosing it
@@ -786,9 +829,17 @@ namespace {
         captureList[entryNumber-1] = capture;
       }
 
+      // Visit the type of the capture, if it isn't a class reference, since
+      // we'd need the metadata to do so.
+      if (VD->hasType()
+          && (!AFR.isObjC()
+              || !VD->getType()->hasRetainablePointerRepresentation()))
+        checkType(VD->getType(), VD->getLoc());
+
       // If VD is a noescape decl, then the closure we're computing this for
       // must also be noescape.
-      if (VD->getAttrs().hasAttribute<NoEscapeAttr>() &&
+      if (VD->hasType() && VD->getType()->is<AnyFunctionType>() &&
+          VD->getType()->castTo<AnyFunctionType>()->isNoEscape() &&
           !capture.isNoEscape() &&
           // Don't repeatedly diagnose the same thing.
           Diagnosed.insert(VD).second) {
@@ -799,8 +850,7 @@ namespace {
         TC.diagnose(Loc, isDecl ? diag::decl_closure_noescape_use :
                     diag::closure_noescape_use, VD->getName());
 
-        if (VD->getAttrs().hasAttribute<AutoClosureAttr>() &&
-            VD->getAttrs().getAttribute<NoEscapeAttr>()->isImplicit())
+        if (VD->getType()->castTo<AnyFunctionType>()->isAutoClosure())
           TC.diagnose(VD->getLoc(), diag::noescape_autoclosure,
                       VD->getName());
       }
@@ -836,9 +886,7 @@ namespace {
 
               TC.diagnose(NTD->getLoc(), diag::type_declared_here);
 
-              TC.diagnose(D->getLoc(), diag::decl_declared_here,
-                          D->getName());
-
+              TC.diagnose(D, diag::decl_declared_here, D->getFullName());
               return { false, DRE };
             }
           }
@@ -890,7 +938,7 @@ namespace {
           }
           // Recursively check the transitive captures.
           capturePath.push_back(func);
-          defer([&]{ capturePath.pop_back(); });
+          defer { capturePath.pop_back(); };
           for (auto capture : func->getCaptureInfo().getCaptures())
             if (!validateForwardCapture(capture.getDecl()))
               return false;
@@ -916,14 +964,30 @@ namespace {
               prevDecl = path;
             }
           }
-          TC.diagnose(capturedDecl->getLoc(), diag::decl_declared_here,
-                      capturedDecl->getName());
+          TC.diagnose(capturedDecl, diag::decl_declared_here,
+                      capturedDecl->getFullName());
         }
         return false;
       };
       
       if (!validateForwardCapture(DRE->getDecl()))
         return { false, DRE };
+
+      bool isInOut = D->hasType() && D->getInterfaceType()->is<InOutType>();
+      bool isNested = false;
+      if (auto f = AFR.getAbstractFunctionDecl())
+        isNested = f->getDeclContext()->isLocalContext();
+
+      if (isInOut && !AFR.isKnownNoEscape() && !isNested) {
+        if (D->getNameStr() == "self") {
+          TC.diagnose(DRE->getLoc(),
+            diag::closure_implicit_capture_mutating_self);
+        } else {
+          TC.diagnose(DRE->getLoc(),
+            diag::closure_implicit_capture_without_noescape);
+        }
+        return { false, DRE };
+      }
 
       // We're going to capture this, compute flags for the capture.
       unsigned Flags = 0;
@@ -968,25 +1032,151 @@ namespace {
       }
 
       if (innerClosure.getCaptureInfo().hasGenericParamCaptures())
-        capturesTypes = true;
+        TypeCapturingLoc = innerClosure.getLoc();
     }
 
     bool walkToDeclPre(Decl *D) override {
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
         propagateCaptures(AFD, AFD->getLoc());
-        for (auto *paramPattern : AFD->getBodyParamPatterns())
-          paramPattern->walk(*this);
+        
+        // Can default parameter initializers capture state?  That seems like
+        // a really bad idea.
+        for (auto *paramList : AFD->getParameterLists())
+          for (auto param : *paramList) {
+            if (auto E = param->getDefaultValue())
+              E->getExpr()->walk(*this);
+          }
         return false;
       }
 
       return true;
     }
+    
+    bool usesTypeMetadataOfFormalType(Expr *E) {
+      // For non-ObjC closures, assume the type metadata is always used.
+      if (!AFR.isObjC())
+        return true;
+      
+      if (!E->getType() || E->getType()->is<ErrorType>())
+        return false;
+    
+      // We can use Objective-C generics in limited ways without reifying
+      // their type metadata, meaning we don't need to capture their generic
+      // params.
+      
+      // Look through one layer of optionality when considering the class-
+      
+      // Referring to a class-constrained generic or metatype
+      // doesn't require its type metadata.
+      if (auto declRef = dyn_cast<DeclRefExpr>(E))
+        return (!declRef->getDecl()->isObjC()
+                && !E->getType()->hasRetainablePointerRepresentation()
+                && !E->getType()->is<AnyMetatypeType>());
+      
+      // Loading classes or metatypes doesn't require their metadata.
+      if (isa<LoadExpr>(E))
+        return (!E->getType()->hasRetainablePointerRepresentation()
+                && !E->getType()->is<AnyMetatypeType>());
+      
+      // Accessing @objc members doesn't require type metadata.
+      if (auto memberRef = dyn_cast<MemberRefExpr>(E))
+        return !memberRef->getMember().getDecl()->hasClangNode();
+      
+      if (auto applyExpr = dyn_cast<ApplyExpr>(E)) {
+        if (auto methodApply = dyn_cast<ApplyExpr>(applyExpr->getFn())) {
+          if (auto callee = dyn_cast<DeclRefExpr>(methodApply->getFn())) {
+            return !callee->getDecl()->isObjC();
+          }
+        }
+        if (auto callee = dyn_cast<DeclRefExpr>(applyExpr->getFn())) {
+          return !callee->getDecl()->isObjC();
+        }
+      }
+      
+      if (auto subscriptExpr = dyn_cast<SubscriptExpr>(E)) {
+        return (subscriptExpr->hasDecl() &&
+                !subscriptExpr->getDecl().getDecl()->isObjC());
+      }
+      
+      // Getting the dynamic type of a class doesn't require type metadata.
+      if (isa<DynamicTypeExpr>(E))
+        return (!E->getType()->castTo<AnyMetatypeType>()->getInstanceType()
+                    ->hasRetainablePointerRepresentation());
+      
+      // Building a fixed-size tuple doesn't require type metadata.
+      // Approximate this for the purposes of being able to invoke @objc methods
+      // by considering tuples of ObjC-representable types to not use metadata.
+      if (auto tuple = dyn_cast<TupleExpr>(E)) {
+        for (auto elt : tuple->getType()->castTo<TupleType>()->getElements()) {
+          if (!elt.getType()->isRepresentableIn(ForeignLanguage::ObjectiveC,
+                                                AFR.getAsDeclContext()))
+            return true;
+        }
+        return false;
+      }
+      
+      // Coercion by itself is a no-op.
+      if (isa<CoerceExpr>(E))
+        return false;
+      
+      // Upcasting doesn't require type metadata.
+      if (isa<DerivedToBaseExpr>(E))
+        return false;
+      if (isa<ArchetypeToSuperExpr>(E))
+        return false;
+      if (isa<CovariantReturnConversionExpr>(E))
+        return false;
+      if (isa<MetatypeConversionExpr>(E))
+        return false;
+      
+      // Identity expressions are no-ops.
+      if (isa<IdentityExpr>(E))
+        return false;
+      
+      // Discarding an assignment is a no-op.
+      if (isa<DiscardAssignmentExpr>(E))
+        return false;
+      
+      // Opening an @objc existential or metatype is a no-op.
+      if (auto open = dyn_cast<OpenExistentialExpr>(E))
+        return (!open->getSubExpr()->getType()->isObjCExistentialType()
+                && !open->getSubExpr()->getType()->is<AnyMetatypeType>());
+      
+      // Erasure to an ObjC existential or between metatypes doesn't require
+      // type metadata.
+      if (auto erasure = dyn_cast<ErasureExpr>(E)) {
+        if (E->getType()->isObjCExistentialType()
+            || E->getType()->is<AnyMetatypeType>())
+          return false;
+        // Erasure to a Swift protocol always captures the type metadata from
+        // its subexpression.
+        checkType(erasure->getSubExpr()->getType(),
+                  erasure->getSubExpr()->getLoc());
+        return true;
+      }
+      
+      // Converting an @objc metatype to AnyObject doesn't require type
+      // metadata.
+      if (isa<ClassMetatypeToObjectExpr>(E)
+          || isa<ExistentialMetatypeToObjectExpr>(E))
+        return false;
+      
+      return true;
+    }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      checkType(E->getType());
+      if (usesTypeMetadataOfFormalType(E)) {
+        checkType(E->getType(), E->getLoc());
+      }
+
+      // Some kinds of expression don't really evaluate their subexpression,
+      // so we don't need to traverse.
+      if (isa<ObjCSelectorExpr>(E)) {
+        return { false, E };
+      }
 
       if (auto *ECE = dyn_cast<ExplicitCastExpr>(E)) {
-        checkType(ECE->getCastTypeLoc().getType());
+        checkType(ECE->getCastTypeLoc().getType(), ECE->getLoc());
         return { true, E };
       }
 
@@ -1001,7 +1191,7 @@ namespace {
         return { false, superE };
       }
 
-      // Don't recurse into child closures. They should already have a capture
+      // Don't recur into child closures. They should already have a capture
       // list computed; we just propagate it, filtering out stuff that they
       // capture from us.
       if (auto *SubCE = dyn_cast<AbstractClosureExpr>(E)) {
@@ -1037,12 +1227,35 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
     return;
 
   SmallVector<CapturedValue, 4> Captures;
-  bool GenericParamCaptures = false;
-  FindCapturedVars finder(*this, Captures, GenericParamCaptures, AFR);
+  SourceLoc GenericParamCaptureLoc;
+  FindCapturedVars finder(*this, Captures, GenericParamCaptureLoc, AFR);
   AFR.getBody()->walk(finder);
 
-  if (AFR.hasType())
-    finder.checkType(AFR.getType());
+  unsigned inoutCount = 0;
+  for (auto C: Captures) {
+    if (auto type = C.getDecl()->getInterfaceType())
+      if (isa<InOutType>(type.getPointer()))
+        inoutCount++;
+  }
+
+  if (inoutCount > 0) {
+    if (auto e = AFR.getAbstractFunctionDecl()) {
+      for (auto returnOccurrence: getEscapingFunctionAsReturnValue(e)) {
+        diagnose(returnOccurrence->getReturnLoc(),
+          diag::nested_function_escaping_inout_capture);
+      }
+      auto occurrences = getEscapingFunctionAsArgument(e);
+      for (auto occurrence: occurrences) {
+        diagnose(occurrence->getLoc(),
+          diag::nested_function_with_implicit_capture_argument,
+          inoutCount > 1);
+      }
+    }
+  }
+
+  if (AFR.hasType() && !AFR.isObjC()) {
+    finder.checkType(AFR.getType(), AFR.getLoc());
+  }
 
   // If this is an init(), explicitly walk the initializer values for members of
   // the type.  They will be implicitly emitted by SILGen into the generated
@@ -1064,37 +1277,32 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
     }
   }
 
-  // We don't distinguish inner from outer generic parameters yet, but also
-  // nested generics are not really supported by the rest of the compiler.
-  // There are three cases where getGenericSignatureOfContext() returns a
-  // non-null value:
-  //
-  // 1) Top-level generic functions
-  // 2) Methods with a generic signature either on the type or the method
-  // 3) Local generic functions
-  //
-  // But *not*
-  //
-  // 4) Closure or non-generic local function inside a generic context
-  //
-  // In case 1) and 2), usages of generic type parameters are never formally
-  // "captures". In case 3), the only way a generic type parameter can be
-  // captured is if the local generic function is itself nested inside a generic
-  // context. However, SILGen does not currently support this anyway.
-  //
-  // So we only set GenericParamCaptures in case 4), to avoid confusing SILGen.
-  // Eventually, the computation in checkType() will be more exact and this
-  // conditional should be removed.
-  if (!(AFR.getAbstractFunctionDecl() &&
-        AFR.getAbstractFunctionDecl()->hasType() &&
-        AFR.getAbstractFunctionDecl()->getGenericSignatureOfContext())) {
-    AFR.getCaptureInfo().setGenericParamCaptures(GenericParamCaptures);
+  auto *AFD = AFR.getAbstractFunctionDecl();
+  if (AFD) {
+    if (AFD->getGenericParams())
+      AFR.getCaptureInfo().setGenericParamCaptures(true);
   }
+
+  if (GenericParamCaptureLoc.isValid())
+    AFR.getCaptureInfo().setGenericParamCaptures(true);
 
   if (Captures.empty())
     AFR.getCaptureInfo().setCaptures(None);
   else
     AFR.getCaptureInfo().setCaptures(Context.AllocateCopy(Captures));
+
+  // Extensions of generic ObjC functions can't use generic parameters from
+  // their context.
+  if (AFD && GenericParamCaptureLoc.isValid()) {
+    if (auto Clas = AFD->getParent()->getAsClassOrClassExtensionContext()) {
+      if (Clas->isGenericContext() && Clas->hasClangNode()) {
+        diagnose(AFD->getLoc(),
+                 diag::objc_generic_extension_using_type_parameter);
+        diagnose(GenericParamCaptureLoc,
+                 diag::objc_generic_extension_using_type_parameter_here);
+      }
+    }
+  }
 
   // Diagnose if we have local captures and there were C pointers formed to
   // this function before we computed captures.

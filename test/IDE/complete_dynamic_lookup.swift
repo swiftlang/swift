@@ -108,7 +108,6 @@ protocol Bar { func bar() }
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule[swift_ide_test]:      .nested1_Property1[#Int?#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .nested2_ObjcInstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule[swift_ide_test]:      .nested2_Property[#Int?#]{{; name=.+$}}
-// DL_INSTANCE_NO_DOT-DAG-NOT:.objectAtIndexedSubscript
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .returnsObjcClass!({#(i): Int#})[#TopLevelObjcClass#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .topLevelClass_ObjcInstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule[swift_ide_test]:      .topLevelClass_ObjcProperty1[#Int?#]{{; name=.+$}}
@@ -127,6 +126,7 @@ protocol Bar { func bar() }
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[baz_clang_module]:      [{#Int32#}][#AnyObject!?#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[baz_clang_module]:      [{#AnyObject!#}][#AnyObject!?#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT: End completions
+// GLOBAL_NEGATIVE-NOT:.objectAtIndexedSubscript
 
 // DL_INSTANCE_DOT: Begin completions
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule[bar_swift_module]: bar_ImportedObjcClass_InstanceFunc1!()[#Void#]{{; name=.+$}}
@@ -139,6 +139,7 @@ protocol Bar { func bar() }
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule[swift_ide_test]:      base1_Property2[#Base?#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: baz_Class_InstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule[baz_clang_module]:    baz_Class_Property1[#Baz_Class!?#]{{; name=.+$}}
+// DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule[baz_clang_module]:    baz_Class_Property2[#Baz_Class!?#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: baz_Protocol_InstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_Nested1_ObjcInstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule[foo_swift_module]:    foo_Nested1_Property1[#Int?#]{{; name=.+$}}
@@ -249,7 +250,7 @@ protocol Bar { func bar() }
 // Blocked by: rdar://15136550 Properties in protocols not implemented
 
 @objc class TopLevelObjcClass {
-  func returnsObjcClass(i: Int) -> TopLevelObjcClass {}
+  func returnsObjcClass(_ i: Int) -> TopLevelObjcClass {}
 
   func topLevelObjcClass_InstanceFunc1() {}
   class func topLevelObjcClass_ClassFunc1() {}
@@ -369,9 +370,9 @@ struct GenericContainerForNestedClass2<T> {
 @objc class Base1 {
   func base1_InstanceFunc1() {}
 
-  func base1_InstanceFunc2(a: Derived) {}
+  func base1_InstanceFunc2(_ a: Derived) {}
 
-  func base1_InstanceFunc3(a: Derived) {}
+  func base1_InstanceFunc3(_ a: Derived) {}
 
   func base1_InstanceFunc4() -> Base {}
 
@@ -383,9 +384,9 @@ struct GenericContainerForNestedClass2<T> {
 @objc class Derived1 : Base1 {
   func base1_InstanceFunc1() {}
 
-  func base1_InstanceFunc2(a: Derived) {}
+  func base1_InstanceFunc2(_ a: Derived) {}
 
-  func base1_InstanceFunc3(a: Base) {}
+  func base1_InstanceFunc3(_ a: Base) {}
 
   func base1_InstanceFunc4() -> Derived {}
 
@@ -408,11 +409,11 @@ func returnsAnyObject() -> AnyObject {
   return TopLevelClass()
 }
 
-func testAnyObject1(dl: AnyObject) {
+func testAnyObject1(_ dl: AnyObject) {
   dl#^DL_FUNC_PARAM_NO_DOT_1^#
 }
 
-func testAnyObject2(dl: AnyObject) {
+func testAnyObject2(_ dl: AnyObject) {
   dl.#^DL_FUNC_PARAM_DOT_1^#
 }
 
@@ -434,11 +435,11 @@ func testAnyObject6() {
   returnsAnyObject().#^DL_RETURN_VAL_DOT_1^#
 }
 
-func testAnyObject7(dl: AnyObject) {
+func testAnyObject7(_ dl: AnyObject) {
   dl.returnsObjcClass!(42)#^DL_CALL_RETURN_VAL_NO_DOT_1^#
 }
 
-func testAnyObject8(dl: AnyObject) {
+func testAnyObject8(_ dl: AnyObject) {
   dl.returnsObjcClass!(42).#^DL_CALL_RETURN_VAL_DOT_1^#
 }
 
@@ -452,30 +453,30 @@ func testAnyObject10() {
   // dl.returnsObjcClass?(42).#^DL_CALL_RETURN_OPTIONAL_DOT_1^#
 }
 
-func testAnyObject11(dl: AnyObject) {
+func testAnyObject11(_ dl: AnyObject) {
   dl.returnsObjcClass#^DL_FUNC_NAME_1^#
 }
-// FIXME: it wolud be nice if we produced a call pattern here.
+// FIXME: it would be nice if we produced a call pattern here.
 // DL_FUNC_NAME_1:     Begin completions
-// DL_FUNC_NAME_1-DAG: Decl[InstanceMethod]/CurrNominal:   .map({#(f):
-// DL_FUNC_NAME_1-DAG: Decl[InstanceMethod]/CurrNominal:   .flatMap({#(f):
+// DL_FUNC_NAME_1-DAG: Decl[InstanceVar]/CurrNominal:      .description[#String#]{{; name=.+$}}
+// DL_FUNC_NAME_1:     End completions
 
-func testAnyObject11_(dl: AnyObject) {
+func testAnyObject11_(_ dl: AnyObject) {
   dl.returnsObjcClass!(#^DL_FUNC_NAME_PAREN_1^#
 }
 // DL_FUNC_NAME_PAREN_1: Begin completions
 // DL_FUNC_NAME_PAREN_1-DAG: Pattern/ExprSpecific: ['(']{#Int#})[#TopLevelObjcClass#]{{; name=.+$}}
 // DL_FUNC_NAME_PAREN_1: End completions
 
-func testAnyObject12(dl: AnyObject) {
+func testAnyObject12(_ dl: AnyObject) {
   dl.returnsObjcClass.#^DL_FUNC_NAME_DOT_1^#
 }
-// FIXME: it wolud be nice if we produced a call pattern here.
+// FIXME: it would be nice if we produced a call pattern here.
 // DL_FUNC_NAME_DOT_1:     Begin completions
-// DL_FUNC_NAME_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   map({#(f):
-// DL_FUNC_NAME_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   flatMap({#(f):
+// DL_FUNC_NAME_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      description[#String#]{{; name=.+$}}
+// DL_FUNC_NAME_DOT_1:     End completions
 
-func testAnyObject13(dl: AnyObject) {
+func testAnyObject13(_ dl: AnyObject) {
   dl.returnsObjcClass!#^DL_FUNC_NAME_BANG_1^#
 }
 // DL_FUNC_NAME_BANG_1: Begin completions
@@ -487,10 +488,10 @@ func testAnyObject14() {
   // dl.returnsObjcClass?#^DL_FUNC_QUESTION_1^#
 }
 
-func testAnyObjectClassMethods1(dl: AnyObject) {
+func testAnyObjectClassMethods1(_ dl: AnyObject) {
   dl.dynamicType#^DL_CLASS_NO_DOT_1^#
 }
 
-func testAnyObjectClassMethods2(dl: AnyObject) {
+func testAnyObjectClassMethods2(_ dl: AnyObject) {
   dl.dynamicType.#^DL_CLASS_DOT_1^#
 }

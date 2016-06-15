@@ -8,19 +8,19 @@ import Swift
 
 // ==== Tests =====
 
-func hex(x: UInt64) -> String { return String(x, radix:16) }
+func hex(_ x: UInt64) -> String { return String(x, radix:16) }
 
-func hexAddrVal<T>(x: T) -> String {
-  return "@0x" + hex(UInt64(unsafeBitCast(x, UInt.self)))
+func hexAddrVal<T>(_ x: T) -> String {
+  return "@0x" + hex(UInt64(unsafeBitCast(x, to: UInt.self)))
 }
 
-func hexAddr(x: AnyObject?) -> String {
+func hexAddr(_ x: AnyObject?) -> String {
   if let owner = x {
     if let y = owner as? _StringBuffer._Storage.Storage {
-      return ".Native\(hexAddrVal(y))"
+      return ".native\(hexAddrVal(y))"
     }
     if let y = owner as? NSString {
-      return ".Cocoa\(hexAddrVal(y))"
+      return ".cocoa\(hexAddrVal(y))"
     }
     else {
       return "?Uknown?\(hexAddrVal(owner))"
@@ -29,11 +29,11 @@ func hexAddr(x: AnyObject?) -> String {
   return "null"
 }
 
-func repr(x: NSString) -> String {
+func repr(_ x: NSString) -> String {
   return "\(NSStringFromClass(object_getClass(x)))\(hexAddrVal(x)) = \"\(x)\""
 }
 
-func repr(x: _StringCore) -> String {
+func repr(_ x: _StringCore) -> String {
   if x.hasContiguousStorage {
     if let b = x.nativeBuffer {
     var offset = x.elementWidth == 2
@@ -51,7 +51,7 @@ func repr(x: _StringCore) -> String {
   return "?????"
 }
 
-func repr(x: String) -> String {
+func repr(_ x: String) -> String {
   return "String(\(repr(x._core))) = \"\(x)\""
 }
 
@@ -80,9 +80,9 @@ func nonASCII() {
   // Cocoa stores non-ASCII in a UTF-16 buffer
   // Code units in each character: 2 1 1 1 2 2 2
   // Offset of each character:     0 2 3 4 5 7 9 11
-  var nsUTF16 = NSString(UTF8String: "🏂☃❅❆❄︎⛄️❄️")!
+  var nsUTF16 = NSString(utf8String: "🏂☃❅❆❄︎⛄️❄️")!
   // CHECK-NEXT: has UTF-16: true
-  print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsUTF16, CFString.self)) != nil)")
+  print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsUTF16, to: CFString.self)) != nil)")
 
   // CHECK: --- UTF-16 basic round-tripping ---
   print("--- UTF-16 basic round-tripping ---")
@@ -91,7 +91,7 @@ func nonASCII() {
   // CHECK-NEXT: __NSCFString@[[utf16address:[x0-9a-f]+]] = "🏂☃❅❆❄︎⛄️❄️"
   print("  \(repr(nsUTF16))")
 
-  // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], count: 11))
+  // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 11))
   var newNSUTF16 = nsUTF16 as String
   print("  \(repr(newNSUTF16))")
 
@@ -103,9 +103,9 @@ func nonASCII() {
   print("--- UTF-16 slicing ---")
 
   // Slicing the String does not allocate
-  // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], count: 6))
-  let i2 = newNSUTF16.startIndex.advancedBy(2)
-  let i8 = newNSUTF16.startIndex.advancedBy(6)
+  // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 6))
+  let i2 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 2)
+  let i8 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 6)
   print("  \(repr(newNSUTF16[i2..<i8]))")
 
   // Representing a slice as an NSString requires a new object
@@ -115,7 +115,7 @@ func nonASCII() {
   print("  \(repr(nsSliceUTF16))")
 
   // Check that we can recover the original buffer
-  // CHECK-NEXT: String(Contiguous(owner: .Cocoa@[[utf16address]], count: 6))
+  // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 6))
   print("  \(repr(nsSliceUTF16 as String))")
 }
 nonASCII()
@@ -126,9 +126,9 @@ func ascii() {
   // Cocoa stores ASCII in a buffer of bytes.  This is an important case
   // because it doesn't provide a contiguous array of UTF-16, so we'll be
   // treating it as an opaque NSString.
-  var nsASCII = NSString(UTF8String: "foobar")!
+  var nsASCII = NSString(utf8String: "foobar")!
   // CHECK-NEXT: has UTF-16: false
-  print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsASCII, CFString.self)) != nil)")
+  print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsASCII, to: CFString.self)) != nil)")
 
   // CHECK: --- ASCII basic round-tripping ---
   print("--- ASCII basic round-tripping ---")
@@ -147,8 +147,8 @@ func ascii() {
   // CHECK: --- ASCII slicing ---
   print("--- ASCII slicing ---")
 
-  let i3 = newNSASCII.startIndex.advancedBy(3)
-  let i6 = newNSASCII.startIndex.advancedBy(6)
+  let i3 = newNSASCII.index(newNSASCII.startIndex, offsetBy: 3)
+  let i6 = newNSASCII.index(newNSASCII.startIndex, offsetBy: 6)
   
   // Slicing the String
   print("  \(repr(newNSASCII[i3..<i6]))")

@@ -13,7 +13,7 @@ extension Float32 : Barable {
 }
 
 func f0(_: Barable) {}
-func f1(x: protocol<Fooable, Barable>) {}
+func f1(_ x: protocol<Fooable, Barable>) {}
 func f2(_: Float) {}
 let nilFunc: Optional<(Barable) -> ()> = nil
 
@@ -32,9 +32,9 @@ var i : Int
 var f : Float
 var b : Barable
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Conversion to and among existential types
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 f0(i)
 f0(f)
@@ -44,9 +44,9 @@ f1(i)
 f1(f) // expected-error{{argument type 'Float' does not conform to expected type 'protocol<Barable, Fooable>'}}
 f1(b) // expected-error{{argument type 'Barable' does not conform to expected type 'protocol<Barable, Fooable>'}}
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Subtyping
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 g(f0) // okay (subtype)
 g(f1) // okay (exact match)
 
@@ -67,7 +67,7 @@ func getAnyObject() -> AnyObject? {
   return SomeArbitraryClass()
 }
 
-func castToClass(object: Any) -> SomeArbitraryClass? {
+func castToClass(_ object: Any) -> SomeArbitraryClass? {
   return object as? SomeArbitraryClass
 }
 
@@ -93,16 +93,26 @@ let _: () -> Int = {
   return ""
 }
 
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 // Dynamic self
-//===--------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 protocol Clonable {
   func maybeClone() -> Self?
-  func badMaybeClone() -> Self??
+  func doubleMaybeClone() -> Self??
+  func subdivideClone() -> (Self, Self)
+  func metatypeOfClone() -> Self.Type
+  func badClonerFn() -> ((Self) -> Self)
+  func veryBadClonerFn() -> ((inout Self) -> ())
+  func goodClonerFn() -> (() -> Self)
 }
 
-func testClonable(v : Clonable) {
+func testClonable(_ v : Clonable) { // expected-error {{protocol 'Clonable' can only be used as a generic constraint because it has Self or associated type requirements}}
   let v2 = v.maybeClone()
+  let v3 = v.doubleMaybeClone()
+  let v4 = v.subdivideClone()
+  let v5 = v.metatypeOfClone()
+  let v6 = v.goodClonerFn()
 
-  let v3 = v.badMaybeClone() // expected-error {{member 'badMaybeClone' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
+  let v7 = v.badClonerFn() // expected-error {{member 'badClonerFn' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
+  let v8 = v.veryBadClonerFn() // expected-error {{member 'veryBadClonerFn' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
 }

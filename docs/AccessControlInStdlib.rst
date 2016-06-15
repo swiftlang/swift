@@ -6,7 +6,7 @@ Scope and introduction
 This document defines the policy for applying access control modifiers and
 related naming conventions for the Swift standard library and overlays.
 
-In this document, “stdlib” refers to the core standard library and
+In this document, "stdlib" refers to the core standard library and
 overlays for system frameworks written in Swift.
 
 Swift has three levels of access control --- private, internal
@@ -49,7 +49,7 @@ To document the reason for marking symbols public, we use comments:
 * symbols that are SPIs for the module X::
 
     public // SPI(X)
-    public _foo() { ... }
+    func _foo() { ... }
 
 `internal`
 ==========
@@ -60,7 +60,7 @@ explicitly everywhere in the stdlib to avoid confusion.
 
 .. Note:: No declaration should omit an access
 
-To create a “single point of truth” about whether a name is intended
+To create a "single point of truth" about whether a name is intended
 for user consumption, the following names should all use the `leading
 underscore rule`_:
 
@@ -77,7 +77,7 @@ underscore rule`_:
 `private`
 =========
 
-The `private` modifier can not be used in the stdlib at least until
+The `private` modifier cannot be used in the stdlib at least until
 rdar://17631278 is fixed.
 
 Leading Underscore Rule
@@ -87,7 +87,7 @@ Variables, functions and typealiases should have names that start with an
 underscore::
 
   var _value: Int
-  func _bridgeSomethingToAnything(something: AnyObject) -> AnyObject
+  func _bridgeSomethingToAnything(_ something: AnyObject) -> AnyObject
   typealias _InternalTypealias = HeapBuffer<Int, Int>
 
 To apply the rule to an initializer, one of its label arguments *or*

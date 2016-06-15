@@ -1,24 +1,15 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/ArrayTraps.swift
-// RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Debug
-// RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Release -O
+// RUN: %gyb %s -o %t/ArrayTraps.swift
+// RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Debug
+// RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Release -O
 //
-// RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Debug
-// RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Release
+// RUN: %line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Debug
+// RUN: %line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Release
 // REQUIRES: executable_test
-
-// XFAIL: linux
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 %{
 # We test for bounds-checking traps for both reading and writing
@@ -41,7 +32,7 @@ var ${ArrayTy}Traps = TestSuite("${ArrayTy}Traps")
 %   for io in ['read', 'write']:
 
 ${ArrayTy}Traps.test("bounds1/${io}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -50,7 +41,7 @@ ${ArrayTy}Traps.test("bounds1/${io}")
 }
 
 ${ArrayTy}Traps.test("bounds2/${io}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -59,7 +50,7 @@ ${ArrayTy}Traps.test("bounds2/${io}")
 }
 
 ${ArrayTy}Traps.test("bounds3/${io}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -68,7 +59,7 @@ ${ArrayTy}Traps.test("bounds3/${io}")
 }
 
 ${ArrayTy}Traps.test("sliceBounds0/${io}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -77,7 +68,7 @@ ${ArrayTy}Traps.test("sliceBounds0/${io}")
 }
 
 ${ArrayTy}Traps.test("sliceBounds1/${io}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -86,7 +77,7 @@ ${ArrayTy}Traps.test("sliceBounds1/${io}")
 }
 
 ${ArrayTy}Traps.test("sliceBounds2/${io}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -95,7 +86,7 @@ ${ArrayTy}Traps.test("sliceBounds2/${io}")
 }
 
 ${ArrayTy}Traps.test("sliceBounds3/${io}")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -112,93 +103,32 @@ ${ArrayTy}Traps.test("PopFromEmpty") {
 }
 
 %   for index in -1, 2:
-${ArrayTy}Traps.test("${'insert(_:atIndex:)/%s' % index}")
-  .skip(.Custom(
+${ArrayTy}Traps.test("${'insert(_:at:)/%s' % index}")
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var a: ${ArrayTy}<Int> = [42]
   expectCrashLater()
-  a.insert(3, atIndex: ${index})
+  a.insert(3, at: ${index})
 }
 %   end
 
 %   for index in -1, 1, 2:
-${ArrayTy}Traps.test("${'removeAtIndex(_:)/%s' % index}")
-  .skip(.Custom(
+${ArrayTy}Traps.test("${'remove(at:)/%s' % index}")
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var a: ${ArrayTy}<Int> = [42]
   expectCrashLater()
-  a.removeAtIndex(${index})
+  a.remove(at: ${index})
 }
 %   end
 % end
 
-class Base { }
-class Derived : Base { }
-class Derived2 : Derived { }
-
-ArrayTraps.test("downcast1")
-  .skip(.Custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .code {
-  let ba: [Base] = [ Derived(), Base() ]
-  let da = ba as! [Derived]
-  let d0 = da[0]
-  expectCrashLater()
-  da[1]
-}
-
-import Foundation
-
-ArrayTraps.test("downcast2")
-  .skip(.Custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .code {
-  let a: [AnyObject] = [ "String", 1 ]
-  let sa = a as! [NSString]
-  let s0 = sa[0]
-  expectCrashLater()
-  sa[1]
-}
-
-ArrayTraps.test("downcast3")
-  .skip(.Custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .code {
-  let ba: [Base] = [ Derived2(), Derived(), Base() ]
-  let d2a = ba as! [Derived2]
-  let d2a0 = d2a[0]
-  let d1a = d2a as [Derived]
-  let d1a0 = d1a[0]
-  let d1a1 = d1a[1]
-  expectCrashLater()
-  d1a[2]
-}
-
-@objc protocol ObjCProto { }
-class ObjCBase : NSObject, ObjCProto { }
-class ObjCDerived : ObjCBase { }
-
-ArrayTraps.test("downcast4")
-  .skip(.Custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .code {
-  let ba: [ObjCProto] = [ ObjCDerived(), ObjCBase() ]
-  let da = ba as! [ObjCDerived]
-  let d0 = da[0]
-  expectCrashLater()
-  da[1]
-}
-
 ArrayTraps.test("unsafeLength")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
@@ -211,114 +141,6 @@ ArrayTraps.test("unsafeLength")
   a.withUnsafeBufferPointer {
     UnsafeBufferPointer(start: $0.baseAddress, count: -1)
   }
-}
-
-ArrayTraps.test("bounds_with_downcast")
-  .skip(.Custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "fatal error: Index out of range" : "")
-  .code {
-  let ba: [Base] = [ Derived(), Base() ]
-  let da = ba as! [Derived]
-  expectCrashLater()
-  let x = da[2]
-}
-
-var ArraySemanticOptzns = TestSuite("ArraySemanticOptzns")
-
-class BaseClass {
-}
-
-class ElementClass : BaseClass {
-  var val: String
-  init(_ x: String) {
-    val = x
-  }
-}
-
-class ViolateInoutSafeySwitchToObjcBuffer {
-  final var anArray: [ElementClass] = []
-
-  let nsArray = NSArray(
-    objects: ElementClass("a"), ElementClass("b"), ElementClass("c"))
-
-  @inline(never)
-  func accessArrayViaInoutVolation() {
-    anArray = _convertNSArrayToArray(nsArray)
-  }
-
-  @inline(never)
-  func runLoop(inout A: [ElementClass]) {
-    // Simulate what happens if we hoist array properties out of a loop and the
-    // loop calls a function that violates inout safety and overrides the array.
-    let isNativeTypeChecked = A._hoistableIsNativeTypeChecked()
-    for i in 0..<A.count {
-      A._checkSubscript(i, wasNativeTypeChecked: isNativeTypeChecked)
-      _ = A._getElement(i, wasNativeTypeChecked: isNativeTypeChecked)
-      accessArrayViaInoutVolation()
-    }
-  }
-
-  @inline(never)
-  func inoutViolation() {
-    anArray = [ ElementClass("1"), ElementClass("2"), ElementClass("3") ]
-    runLoop(&anArray)
-  }
-}
-
-ArraySemanticOptzns.test("inout_rule_violated_isNativeBuffer")
-  .skip(.Custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))  
-  .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "fatal error: inout rules were violated: the array was overwritten" : "")
-  .code {
-  let v = ViolateInoutSafeySwitchToObjcBuffer()
-  expectCrashLater()
-  v.inoutViolation()
-}
-
-class ViolateInoutSafeyNeedElementTypeCheck {
-  final var anArray : [ElementClass] = []
-
-  @inline(never)
-  func accessArrayViaInoutVolation() {
-    // Overwrite the array with one that needs an element type check.
-    let ba: [BaseClass] = [ BaseClass(), BaseClass() ]
-    anArray = ba as! [ElementClass]
-  }
-
-  @inline(never)
-  func runLoop(inout A : [ElementClass]) {
-    // Simulate what happens if we hoist array properties out of a loop and the
-    // loop calls a function that violates inout safety and overrides the array.
-    let isNativeTypeChecked = A._hoistableIsNativeTypeChecked()
-    for i in 0..<A.count {
-      A._checkSubscript(i, wasNativeTypeChecked: isNativeTypeChecked)
-      _ = A._getElement(i, wasNativeTypeChecked: isNativeTypeChecked)
-      accessArrayViaInoutVolation()
-    }
-  }
-
-  @inline(never)
-  func inoutViolation() {
-    anArray = [ ElementClass("1"), ElementClass("2"), ElementClass("3")]
-    runLoop(&anArray)
-  }
-}
-
-ArraySemanticOptzns.test("inout_rule_violated_needsElementTypeCheck")
-  .skip(.Custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))  
-  .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "fatal error: inout rules were violated: the array was overwritten" : "")
-  .code {
-  let v = ViolateInoutSafeyNeedElementTypeCheck()
-  expectCrashLater()
-  v.inoutViolation()
 }
 
 runAllTests()

@@ -4,7 +4,6 @@
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
-// REQUIRES: objc_interop
 
 import Foundation
 
@@ -57,17 +56,17 @@ import Foundation
 // CHECK:       ]
 
 @objc protocol P {
-  func requiredInstanceMethod(o: NSNumber) -> NSNumber
-  optional func optionalInstanceMethod(o: NSObject) -> NSObject
-  static func requiredClassMethod(o: NSString) -> NSString
-  optional static func optionalClassMethod(o: NSMutableString)
+  func requiredInstanceMethod(_ o: NSNumber) -> NSNumber
+  @objc optional func optionalInstanceMethod(_ o: NSObject) -> NSObject
+  static func requiredClassMethod(_ o: NSString) -> NSString
+  @objc optional static func optionalClassMethod(_ o: NSMutableString)
   var requiredInstanceProperty: NSMutableArray { get set }
   var requiredROInstanceProperty: NSMutableArray { get }
 
-  func requiredInstanceMethod2(o: NSNumber) -> NSNumber
-  optional func optionalInstanceMethod2(o: NSObject) -> NSObject
-  static func requiredClassMethod2(o: NSString) -> NSString
-  optional static func optionalClassMethod2(o: NSMutableString)
+  func requiredInstanceMethod2(_ o: NSNumber) -> NSNumber
+  @objc optional func optionalInstanceMethod2(_ o: NSObject) -> NSObject
+  static func requiredClassMethod2(_ o: NSString) -> NSString
+  @objc optional static func optionalClassMethod2(_ o: NSMutableString)
   var requiredInstanceProperty2: NSMutableArray { get set }
   var requiredROInstanceProperty2: NSMutableArray { get }
 

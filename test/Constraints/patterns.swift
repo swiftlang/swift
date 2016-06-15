@@ -19,7 +19,7 @@ case (0..<10, _, _),
 }
 
 switch (1, 2) {
-case (let a, a): // expected-error {{use of unresolved identifier 'a'}}
+case (var a, a): // expected-error {{use of unresolved identifier 'a'}}
   ()
 }
 
@@ -27,17 +27,17 @@ case (let a, a): // expected-error {{use of unresolved identifier 'a'}}
 
 protocol P { func p() }
 
-class B : P {
-  init() {}
+class B : P { 
+  init() {} 
   func p() {}
   func b() {}
 }
 class D : B {
-  override init() { super.init() }
+  override init() { super.init() } 
   func d() {}
 }
 class E {
-  init() {}
+  init() {} 
   func e() {}
 }
 
@@ -165,16 +165,60 @@ case x ?? 42: break // match value
 default: break
 }
 
-// FIXME: rdar://problem/23378003
-// These will eventually become errors.
-for (var x) in 0...100 {} // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=}}
-for var x in 0...100 {}  // expected-error {{Use of 'var' binding here is not allowed}} {{5-9=}}
-
-for (let x) in 0...100 {} // expected-error {{'let' pattern is already in an immutable context}}
+for (var x) in 0...100 {}
+for var x in 0...100 {}  // rdar://20167543
+for (let x) in 0...100 {} // expected-error {{'let' pattern cannot appear nested in an already immutable context}}
 
 var (let y) = 42  // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
 let (var z) = 42  // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
 
 
+// Crash when re-typechecking EnumElementPattern.
+// FIXME: This should actually type-check -- the diagnostics are bogus. But
+// at least we don't crash anymore.
 
+protocol PP {
+  associatedtype E
+}
 
+struct A<T> : PP {
+  typealias E = T
+}
+
+extension PP {
+  func map<T>(_ f: (Self.E) -> T) -> T {}
+}
+
+enum EE {
+  case A
+  case B
+}
+
+func good(_ a: A<EE>) -> Int {
+  return a.map {
+    switch $0 {
+    case .A:
+      return 1
+    default:
+      return 2
+    }
+  }
+}
+
+func bad(_ a: A<EE>) {
+  a.map { // expected-error {{generic parameter 'T' could not be inferred}}
+    let _: EE = $0
+    return 1
+  }
+}
+
+func ugly(_ a: A<EE>) {
+  a.map { // expected-error {{generic parameter 'T' could not be inferred}}
+    switch $0 {
+    case .A:
+      return 1
+    default:
+      return 2
+    }
+  }
+}

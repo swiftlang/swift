@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,32 +17,30 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A generator that never produces an element.
+/// An iterator that never produces an element.
 ///
 /// - SeeAlso: `EmptyCollection<Element>`.
-public struct EmptyGenerator<Element> : GeneratorType, SequenceType {
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
+public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
   /// Construct an instance.
   public init() {}
 
-  /// Return `nil`, indicating that there are no more elements.
+  /// Returns `nil`, indicating that there are no more elements.
   public mutating func next() -> Element? {
     return nil
   }
 }
 
 /// A collection whose element type is `Element` but that is always empty.
-public struct EmptyCollection<Element> : CollectionType {
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
-
+public struct EmptyCollection<Element> :
+  RandomAccessCollection, MutableCollection, Equatable
+{
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Int
+  public typealias IndexDistance = Int
+  public typealias SubSequence = EmptyCollection<Element>
 
   /// Construct an instance.
   public init() {}
@@ -57,23 +55,108 @@ public struct EmptyCollection<Element> : CollectionType {
     return 0
   }
 
-  /// Returns an empty *generator*.
+  /// Always traps.
+  ///
+  /// EmptyCollection does not have any element indices, so it is not
+  /// possible to advance indices.
+  public func index(after i: Index) -> Index {
+    _preconditionFailure("EmptyCollection can't advance indices")
+  }
+
+  /// Always traps.
+  ///
+  /// EmptyCollection does not have any element indices, so it is not
+  /// possible to advance indices.
+  public func index(before i: Index) -> Index {
+    _preconditionFailure("EmptyCollection can't advance indices")
+  }
+
+  /// Returns an empty iterator.
   ///
   /// - Complexity: O(1).
-  public func generate() -> EmptyGenerator<Element> {
-    return EmptyGenerator()
+  public func makeIterator() -> EmptyIterator<Element> {
+    return EmptyIterator()
   }
 
   /// Access the element at `position`.
   ///
   /// Should never be called, since this collection is always empty.
   public subscript(position: Index) -> Element {
-    _preconditionFailure("Index out of range")
+    get {
+      _preconditionFailure("Index out of range")
+    }
+    set {
+      _preconditionFailure("Index out of range")
+    }
   }
 
-  /// Return the number of elements (always zero).
+  public subscript(bounds: Range<Index>) -> EmptyCollection<Element> {
+    get {
+      _precondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
+        "Index out of range")
+      return self
+    }
+    set {
+      _precondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
+        "Index out of range")
+    }
+  }
+
+  /// The number of elements (always zero).
   public var count: Int {
     return 0
   }
+
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    _precondition(i == startIndex && n == 0, "Index out of range")
+    return i
+  }
+
+  public func index(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    _precondition(i == startIndex && limit == startIndex,
+      "Index out of range")
+    return n == 0 ? i : nil
+  }
+
+  /// The distance between two indexes (always zero).
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    _precondition(start == 0, "From must be startIndex (or endIndex)")
+    _precondition(end == 0, "To must be endIndex (or startIndex)")
+    return 0
+  }
+
+  public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
+    _precondition(index == 0, "out of bounds")
+    _precondition(bounds == Range(indices),
+      "invalid bounds for an empty collection")
+  }
+
+  public func _failEarlyRangeCheck(
+    _ range: Range<Index>, bounds: Range<Index>
+  ) {
+    _precondition(range == Range(indices),
+      "invalid range for an empty collection")
+    _precondition(bounds == Range(indices),
+      "invalid bounds for an empty collection")
+  }
+
+  public typealias Indices = CountableRange<Int>
 }
 
+public func == <Element>(
+  lhs: EmptyCollection<Element>, rhs: EmptyCollection<Element>
+) -> Bool {
+  return true
+}
+
+@available(*, unavailable, renamed: "EmptyIterator")
+public struct EmptyGenerator<Element> {}
+
+extension EmptyIterator {
+  @available(*, unavailable, renamed: "makeIterator")
+  public func generate() -> EmptyIterator<Element> {
+    Builtin.unreachable()
+  }
+}

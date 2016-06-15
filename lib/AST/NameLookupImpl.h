@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -15,6 +15,7 @@
 
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ParameterList.h"
 
 namespace swift {
 namespace namelookup {
@@ -89,14 +90,19 @@ public:
       return;
     }
   }
+  
+  void checkParameterList(const ParameterList *params) {
+    for (auto param : *params) {
+      checkValueDecl(param, DeclVisibilityKind::FunctionParameter);
+    }
+  }
 
-  void checkGenericParams(GenericParamList *Params,
-                          DeclVisibilityKind Reason) {
+  void checkGenericParams(GenericParamList *Params) {
     if (!Params)
       return;
 
     for (auto P : *Params)
-      checkValueDecl(P, Reason);
+      checkValueDecl(P, DeclVisibilityKind::GenericParameter);
   }
 
   void checkSourceFile(const SourceFile &SF) {
@@ -182,7 +188,8 @@ private:
     if (!isReferencePointInRange(S->getSourceRange()))
       return;
     visit(S->getBody());
-    checkPattern(S->getPattern(), DeclVisibilityKind::LocalVariable);
+    if (!isReferencePointInRange(S->getSequence()->getSourceRange()))
+      checkPattern(S->getPattern(), DeclVisibilityKind::LocalVariable);
   }
 
   void visitBraceStmt(BraceStmt *S, bool isTopLevelCode = false) {
@@ -217,12 +224,23 @@ private:
   void visitCaseStmt(CaseStmt *S) {
     if (!isReferencePointInRange(S->getSourceRange()))
       return;
-    for (const auto &CLI : S->getCaseLabelItems()) {
-      auto *P = CLI.getPattern();
-      if (!isReferencePointInRange(P->getSourceRange()))
-        checkPattern(P, DeclVisibilityKind::LocalVariable);
+    // Pattern names aren't visible in the patterns themselves,
+    // just in the body or in where guards.
+    auto body = S->getBody();
+    bool inPatterns = isReferencePointInRange(S->getLabelItemsRange());
+    auto items = S->getCaseLabelItems();
+    if (inPatterns) {
+      for (const auto &CLI : items) {
+        auto guard = CLI.getGuardExpr();
+        if (guard && isReferencePointInRange(guard->getSourceRange())) {
+          inPatterns = false;
+          break;
+        }
+      }
     }
-    visit(S->getBody());
+    if (!inPatterns && items.size() > 0)
+      checkPattern(items[0].getPattern(), DeclVisibilityKind::LocalVariable);
+    visit(body);
   }
 
   void visitDoCatchStmt(DoCatchStmt *S) {

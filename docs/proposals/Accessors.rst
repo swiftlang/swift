@@ -87,7 +87,7 @@ objects::
   point = point1
   point0.x = x
   point = point0
-  
+
 Note that ``point.y`` is left unchanged.
 
 Local analysis
@@ -157,7 +157,7 @@ through unexpected aliases::
 Note that, in either solution, you've introduced extra full-value
 loads.  This may be quite expensive, and it's not guaranteed to be
 semantically equivalent.
-  
+
 Performance
 ~~~~~~~~~~~
 
@@ -168,7 +168,7 @@ Unnecessary subobject accesses
 
 The first is that they may load or store more than is necessary.
 
-As an obvious example, imagine a variable of type ``(Int,Int)``; even
+As an obvious example, imagine a variable of type ``(Int, Int)``; even
 if my code only accesses the first element of the tuple, full-value
 accesses force me to read or write the second element as well.  That
 means that, even if I'm purely overwriting the first element, I
@@ -177,7 +177,7 @@ value to use for the second element when performing the full-value
 store.
 
 Additionally, while unnecessarily loading the second element of an
-``(Int,Int)`` pair might seem trivial, consider that the tuple could
+``(Int, Int)`` pair might seem trivial, consider that the tuple could
 actually have twenty elements, or that the second element might be
 non-trivial to copy (e.g. if it's a retainable pointer).
 
@@ -434,7 +434,7 @@ completing the operation.  This can present the opportunity for
 corruption if the interleaved code modifies the original value.
 Consider the following code::
 
-  func operate(inout value: Int, count: Int) { ... }
+  func operate(value: inout Int, count: Int) { ... }
 
   var array: [Int] = [1,2,3,4]
   operate(&array[0], { array = []; return 0 }())
@@ -453,8 +453,8 @@ Nor can this be fixed with a purely local analysis; consider::
 
   class C { var array: [Int] }
   let global_C = C()
-  
-  func assign(inout value: Int) {
+
+  func assign(value: inout Int) {
     C.array = []
     value = 0
   }
@@ -549,6 +549,140 @@ Notably, it breaks swapping two array elements::
   release(newArrayBuffer_j)
   release(newArrayBuffer_i)
 
+get- and setForMutation
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Some collections need finer-grained control over the entire mutation
+process. For instance, to support divide-and-conquer algorithms using
+slices, sliceable collections must "pin" and "unpin" their buffers
+while a slice is being mutated to grant permission for the slice
+to mutate the collection in-place while sharing ownership. This
+flexibility can be exposed by a pair of accessors that are called
+before and after a mutation. The "get" stage produces both the
+value to mutate and a state value (whose type must be declared) to
+forward to the "set" stage. A pinning accessor can then look something
+like this::
+
+  extension Array {
+    subscript(range: Range<Int>) -> Slice<Element> {
+      // `getForMutation` must declare its return value, a pair of both
+      // the value to mutate and a state value that is passed to
+      // `setForMutation`.
+      getForMutation() -> (Slice<Element>, PinToken) {
+        let slice = _makeSlice(range)
+        let pinToken = _pin()
+        return (slice, pinToken)
+      }
+      
+      // `setForMutation` receives two arguments--the result of the
+      // mutation to write back, and the state value returned by
+      // `getForMutation`.
+      setForMutation(slice, pinToken) {
+        _unpin(pinToken)
+        _writeSlice(slice, backToRange: range)
+      }
+    }
+  }
+
+``getForMutation`` and ``setForMutation`` must appear as a pair;
+neither one is valid on its own. A ``get`` and ``set`` accessor
+should also still be provided for simple read and write operations.
+When the compiler has visibility that storage is implemented in
+terms of ``getForMutation`` and ``setForMutation``, it lowers a mutable
+projection using those accessors as follows::
+
+  // A mutation like this (assume `reverse` is a mutating method):
+  array[0...99].reverse()
+  // Decomposes to:
+  let index = 0...99
+  (var slice, let state) = array.`subscript.getForMutation`(index)
+  slice.reverse()
+  array.`subscript.setForMutation`(index, slice, state)
+
+To support the conservative access pattern,
+a `materializeForSet` accessor can be generated from `getForMutation`
+and `setForMutation` in an obvious fashion: perform `getForMutation`
+and store the state result in its scratch space, and return a
+callback that loads the state and hands it off to `setForMutation`.
+
+The beacon of hope for a user-friendly future: Inversion of control
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Addressors and ``{get,set}ForMutation`` expose important optimizations
+to the standard library, but are undeniably fiddly and unsafe constructs
+to expose to users. A more natural model would be to
+recognize that a compound mutation is a composition of nested scopes, and
+express it in the language that way. A strawman model might look something
+like this::
+
+  var foo: T {
+    get { return getValue() }
+    set { setValue(newValue) }
+    
+    // Perform a full in-out mutation. The `next` continuation is of
+    // type `(inout T) -> ()` and must be called exactly once
+    // with the value to hand off to the nested mutation operation.
+    mutate(next) {
+      var value = getValue()
+      next(&value)
+      setValue(value)
+    }
+  }
+
+This presents a natural model for expressing the lifetime extension concerns
+of addressors, and the state maintenance necessary for pinning ``getForMutation``
+accessors::
+
+  // An addressing mutator
+  mutate(next) {
+    withUnsafePointer(&resource) {
+      next(&$0.memory)
+    }
+  }
+  
+  // A pinning mutator
+  mutate(next) {
+    var slice = makeSlice()
+    let token = pin()
+    next(&slice)
+    unpin(token)
+    writeBackSlice(slice)
+  }
+ 
+For various semantic and implementation efficiency reasons, we don't want to
+literally implement every access as a nesting of closures like this. Doing so
+would allow for semantic surprises (a mutate() operation never invoking its
+continuation, or doing so multiple times would be disastrous), and would
+interfere with the ability for `inout` and `mutating` functions to throw or
+otherwise nonlocally exit. However, we could present this model using
+*inversion of control*, similar to Python generators or async-await.
+A `mutate` operation could `yield` the `inout` reference to its inner value,
+and the compiler could enforce that a `yield` occurs exactly once on every
+control flow path::
+
+  // An addressing, yielding mutator
+  mutate {
+    withUnsafePointer(&resource) {
+      yield &$0.memory
+    }
+  }
+
+  // A pinning mutator
+  mutate {
+    var slice = makeSlice()
+    let token = pin()
+    yield &slice
+    unpin(token)
+    writeBackSlice(slice)
+  }
+  
+This obviously requires more implementation infrastructure than we currently
+have, and raises language and library design issues (in particular,
+lifetime-extending combinators like ``withUnsafePointer`` would need either
+a ``reyields`` kind of decoration, or to become macros), but represents a
+promising path toward exposing the full power of the accessor model to
+users in an elegant way.
+
 Acceptability
 -------------
 
@@ -606,7 +740,7 @@ General solutions
 ~~~~~~~~~~~~~~~~~
 
 A language generally has six tools for dealing with code it considers
-undesireable.  Some of this terminology is taken from existing
+undesirable.  Some of this terminology is taken from existing
 standards, others not.
 
 * The language may nonetheless take steps to ensure that the code
@@ -704,9 +838,9 @@ that was technically copied beforehand.  For example::
   var oldArray : [Int] = []
 
   // This function copies array before modifying it, but because that
-  // copy is of an value undergoing modification, the copy will use
+  // copy is of a value undergoing modification, the copy will use
   // the same buffer and therefore observe updates to the element.
-  func foo(inout element: Int) {
+  func foo(element: inout Int) {
     oldArray = array
     element = 4
   }
@@ -781,7 +915,7 @@ depend on how the l-value is used:
 
   Example::
 
-    func swap<T>(inout lhs: T, inout rhs: T) {}
+    func swap<T>(lhs: inout T, rhs: inout T) {}
 
     // object is a variable of class type
     swap(&leftObject.array, &rightObject.array)
@@ -856,7 +990,7 @@ depend on how the l-value is used:
   that ``left`` contains a value::
 
     // begin FA for ? operand left (DSN={})
-    // instataneous FA reading right (DSN={})
+    // instantaneous FA reading right (DSN={})
     // begin FA for inout argument left?.member (DSN={lhs})
     // evaluation of +=
     // end FA for inout argument left?.member
@@ -916,7 +1050,7 @@ I'm almost ready to state the core rule about formal accesses, but
 first I need to build up a few more definitions.
 
 An *abstract storage location* (ASL) is:
-  
+
 * a global variable declaration;
 
 * an ``inout`` parameter declaration, along with a reference
@@ -1027,7 +1161,7 @@ summary of the rule being proposed.
 
 If storage is passed to an ``inout`` argument, then any other
 simultaneous attempt to read or write to that storage, including to
-the storage containing it, will have have unspecified behavior.  Reads
+the storage containing it, will have unspecified behavior.  Reads
 from it may see partially-updated values, or even values which will
 change as modifications are made to the original storage; and writes
 may be clobbered or simply disappear.
@@ -1106,8 +1240,8 @@ the other FA's DSN set and (2) not from a non-overlapping subobject.
 Are these conditions true?
 
 Recall that an addressor is invoked for an l-value of the form::
-  
-  base.memory
+
+  base.pointee
 
 or::
 
@@ -1296,7 +1430,7 @@ Code generation patterns
 The signatures and access patterns for addressors will need to change
 in order to ensure memory-safety.
 
-``mutableAddress`` currentlys returns an ``UnsafeMutablePointer``; it
+``mutableAddress`` currently returns an ``UnsafeMutablePointer``; it
 will need to return ``(Builtin.NativeObject?, UnsafeMutablePointer)``.
 The owner pointer must be a native object; we cannot efficiently
 support either uniqueness checking or the NSM bit on non-Swift

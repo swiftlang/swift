@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -67,13 +67,6 @@ SingleRawComment::SingleRawComment(StringRef RawText, unsigned StartColumn)
     : RawText(RawText), Kind(static_cast<unsigned>(getCommentKind(RawText))),
       StartColumn(StartColumn), StartLine(0), EndLine(0) {}
 
-static bool canHaveComment(const Decl *D) {
-  return !D->hasClangNode() &&
-         (isa<ValueDecl>(D) || isa<ExtensionDecl>(D)) &&
-         !isa<ParamDecl>(D) &&
-         (!isa<AbstractTypeParamDecl>(D) || isa<AssociatedTypeDecl>(D));
-}
-
 static void addCommentToList(SmallVectorImpl<SingleRawComment> &Comments,
                              const SingleRawComment &SRC) {
   // TODO: consider producing warnings when we decide not to merge comments.
@@ -131,7 +124,7 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
 }
 
 RawComment Decl::getRawComment() const {
-  if (!canHaveComment(this))
+  if (!this->canHaveComment())
     return RawComment();
 
   // Check the cache in ASTContext.
@@ -149,8 +142,8 @@ RawComment Decl::getRawComment() const {
   // Ask the parent module.
   if (auto *Unit =
           dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
-    if (Optional<BriefAndRawComment> C = Unit->getCommentForDecl(this)) {
-      llvm::markup::MarkupContext MC;
+    if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
+      swift::markup::MarkupContext MC;
       Context.setBriefComment(this, C->Brief);
       Context.setRawComment(this, C->Raw);
       return C->Raw;
@@ -161,14 +154,63 @@ RawComment Decl::getRawComment() const {
   return RawComment();
 }
 
+static const Decl* getGroupDecl(const Decl *D) {
+  auto GroupD = D;
+
+  // Extensions always exist in the same group with the nominal.
+  if (auto ED = dyn_cast_or_null<ExtensionDecl>(D->getDeclContext()->
+                                                getInnermostTypeContext())) {
+    if (auto ExtTy = ED->getExtendedType())
+      GroupD = ExtTy->getAnyNominal();
+  }
+  return GroupD;
+}
+
+Optional<StringRef> Decl::getGroupName() const {
+  if (hasClangNode())
+    return None;
+  if (auto GroupD = getGroupDecl(this)) {
+    // We can only get group information from deserialized module files.
+    if (auto *Unit =
+        dyn_cast<FileUnit>(GroupD->getDeclContext()->getModuleScopeContext())) {
+      return Unit->getGroupNameForDecl(GroupD);
+    }
+  }
+  return None;
+}
+
+Optional<StringRef> Decl::getSourceFileName() const {
+  if (hasClangNode())
+    return None;
+  if (auto GroupD = getGroupDecl(this)) {
+    // We can only get group information from deserialized module files.
+    if (auto *Unit =
+        dyn_cast<FileUnit>(GroupD->getDeclContext()->getModuleScopeContext())) {
+      return Unit->getSourceFileNameForDecl(GroupD);
+    }
+  }
+  return None;
+}
+
+Optional<unsigned> Decl::getSourceOrder() const {
+  if (hasClangNode())
+    return None;
+  // We can only get source orders from deserialized module files.
+  if (auto *Unit =
+      dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
+    return Unit->getSourceOrderForDecl(this);
+  }
+  return None;
+}
+
 static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
                                      const Decl *D) {
   PrettyStackTraceDecl StackTrace("extracting brief comment for", D);
 
-  if (!canHaveComment(D))
+  if (!D->canHaveComment())
     return StringRef();
 
-  llvm::markup::MarkupContext MC;
+  swift::markup::MarkupContext MC;
   auto DC = getDocComment(MC, D);
   if (!DC.hasValue())
     return StringRef();
@@ -179,7 +221,7 @@ static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
 
   SmallString<256> BriefStr("");
   llvm::raw_svector_ostream OS(BriefStr);
-  llvm::markup::printInlinesUnder(Brief.getValue(), OS);
+  swift::markup::printInlinesUnder(Brief.getValue(), OS);
   if (OS.str().empty())
     return StringRef();
 
@@ -187,7 +229,7 @@ static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
 }
 
 StringRef Decl::getBriefComment() const {
-  if (!canHaveComment(this))
+  if (!this->canHaveComment())
     return StringRef();
 
   auto &Context = getASTContext();

@@ -1,9 +1,16 @@
 // RUN: %target-swift-frontend -dump-ast %s 2>&1 | FileCheck %s
 // RUN: %target-swift-frontend -emit-ir %s > /dev/null
 
+// RUN: %target-swift-frontend -dump-ast -DVAR %s 2>&1 | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -DVAR %s > /dev/null
+
 // CHECK: (top_level_code_decl
 // CHECK: (guard_stmt
+#if VAR
+guard var x = Optional(0) else { fatalError() }
+#else
 guard let x = Optional(0) else { fatalError() }
+#endif
 
 // CHECK: (top_level_code_decl
 _ = 0 // intervening code
@@ -36,3 +43,7 @@ let closureCapture: () -> Void = { [x] in
 defer {
   _ = x
 }
+
+#if VAR
+x = 5
+#endif

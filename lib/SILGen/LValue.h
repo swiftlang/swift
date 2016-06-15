@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -53,7 +53,7 @@ struct LValueTypeData {
   /// On physical path components, projection yields an address of
   /// this type.  On logical path components, materialize yields an
   /// address of this type, set expects a value of this type, and
-  /// get yields a vlaue of this type.
+  /// get yields a value of this type.
   SILType TypeOfRValue;
 
   LValueTypeData() = default;
@@ -233,8 +233,8 @@ public:
   /// Get the property.
   ///
   /// \param base - always an address, but possibly an r-value
-  virtual ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                           ManagedValue base, SGFContext c) && = 0;
+  virtual RValue get(SILGenFunction &gen, SILLocation loc,
+                     ManagedValue base, SGFContext c) && = 0;
 
   /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
   /// the same dynamic PathComponent type as the receiver) to see if they are
@@ -258,8 +258,9 @@ public:
   ///
   /// \param base - always an address, but possibly an r-value
   virtual void writeback(SILGenFunction &gen, SILLocation loc,
-                         ManagedValue base, ManagedValue temporary,
-                         ArrayRef<SILValue> otherInfo, bool isFinal);
+                         ManagedValue base,
+                         MaterializedLValue materialized,
+                         bool isFinal);
 };
 
 inline LogicalPathComponent &PathComponent::asLogical() {
@@ -293,21 +294,21 @@ public:
     // no useful writeback diagnostics at this point
   }
 
-  ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                   ManagedValue base, SGFContext c) && override;
+  RValue get(SILGenFunction &gen, SILLocation loc,
+             ManagedValue base, SGFContext c) && override;
 
   void set(SILGenFunction &gen, SILLocation loc,
            RValue &&value, ManagedValue base) && override;
 
   /// Transform from the original pattern.
-  virtual ManagedValue translate(SILGenFunction &gen, SILLocation loc,
-                                 ManagedValue value,
-                                 SGFContext ctx = SGFContext()) && = 0;
+  virtual RValue translate(SILGenFunction &gen, SILLocation loc,
+                           RValue &&value,
+                           SGFContext ctx = SGFContext()) && = 0;
 
   /// Transform into the original pattern.
-  virtual ManagedValue untranslate(SILGenFunction &gen, SILLocation loc,
-                                   ManagedValue value,
-                                   SGFContext ctx = SGFContext()) && = 0;
+  virtual RValue untranslate(SILGenFunction &gen, SILLocation loc,
+                             RValue &&value,
+                             SGFContext ctx = SGFContext()) && = 0;
   
 };
 
@@ -334,13 +335,12 @@ public:
   LValue &operator=(const LValue &) = delete;
   LValue &operator=(LValue &&) = default;
 
+  static LValue forValue(ManagedValue value,
+                         CanType substFormalType);
+
   static LValue forAddress(ManagedValue address,
                            AbstractionPattern origFormalType,
                            CanType substFormalType);
-
-  /// Form a class-reference l-value.  Only suitable as the base of
-  /// very specific member components.
-  static LValue forClassReference(ManagedValue reference);
 
   bool isValid() const { return !Path.empty(); }
 

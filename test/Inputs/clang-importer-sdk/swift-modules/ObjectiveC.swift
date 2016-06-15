@@ -1,9 +1,9 @@
 @_exported import ObjectiveC // Clang module
 
-// The iOS/arm64 target uses _Bool for Objective C's BOOL.  We include
+// The iOS/arm64 target uses _Bool for Objective-C's BOOL.  We include
 // x86_64 here as well because the iOS simulator also uses _Bool.
 #if ((os(iOS) || os(tvOS)) && (arch(arm64) || arch(x86_64))) || os(watchOS)
-public struct ObjCBool : BooleanType {
+public struct ObjCBool : Boolean {
   private var value : Bool
 
   public init(_ value: Bool) {
@@ -18,7 +18,7 @@ public struct ObjCBool : BooleanType {
 
 #else
 
-public struct ObjCBool : BooleanType {
+public struct ObjCBool : Boolean {
   private var value : UInt8
 
   public init(_ value: Bool) {
@@ -44,7 +44,11 @@ extension ObjCBool : BooleanLiteralConvertible {
 }
 
 public struct Selector : StringLiteralConvertible {
-  private var ptr : COpaquePointer
+  private var ptr : OpaquePointer
+
+  public init(_ value: String) {
+    self.init(stringLiteral: value)
+  }
 
   public init(unicodeScalarLiteral value: String) {
     self.init(stringLiteral: value)
@@ -59,20 +63,15 @@ public struct Selector : StringLiteralConvertible {
   }
 }
 
-public struct NSZone: NilLiteralConvertible {
-  public var pointer : COpaquePointer
-
-  @_transparent public
-  init(nilLiteral: ()) {
-    pointer = COpaquePointer()
-  }
+public struct NSZone {
+  public var pointer : OpaquePointer
 }
 
-internal func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
+internal func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool {
   return ObjCBool(x)
 }
 
-internal func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
+internal func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
   return Bool(x)
 }
 

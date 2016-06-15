@@ -6,16 +6,15 @@ protocol ConcatToAnything {
   func +++ <T>(lhs: Self, other: T)
 }
 
-func min<T : Comparable>(x: T, y: T) -> T {
+func min<T : Comparable>(_ x: T, y: T) -> T {
   if y < x { return y }
   return x
 }
 
-func weirdConcat<T : ConcatToAnything, U>(t: T, u: U) {
+func weirdConcat<T : ConcatToAnything, U>(_ t: T, u: U) {
   t +++ u
   t +++ 1
-  u +++ t // expected-error{{binary operator '+++' cannot be applied to operands of type 'U' and 'T'}}
-  // expected-note @-1 {{expected an argument list of type '(Self, T)'}}
+  u +++ t // expected-error{{argument type 'U' does not conform to expected type 'ConcatToAnything'}}
 }
 
 // Make sure that the protocol operators don't get in the way.
@@ -29,24 +28,24 @@ extension UnicodeScalar {
 }
 
 protocol P {
-  static func foo(arg: Self) -> Self
+  static func foo(_ arg: Self) -> Self
 }
 struct S : P {
-  static func foo(arg: S) -> S {
+  static func foo(_ arg: S) -> S {
     return arg
   }
 }
 
-func foo<T : P>(arg: T) -> T {
+func foo<T : P>(_ arg: T) -> T {
   return T.foo(arg)
 }
 
 // Associated types and metatypes
 protocol SomeProtocol {
-  typealias SomeAssociated
+  associatedtype SomeAssociated
 }
 
-func generic_metatypes<T : SomeProtocol>(x: T)
+func generic_metatypes<T : SomeProtocol>(_ x: T)
   -> (T.Type, T.SomeAssociated.Type)
 {
   return (x.dynamicType, x.dynamicType.SomeAssociated.self)
@@ -55,13 +54,13 @@ func generic_metatypes<T : SomeProtocol>(x: T)
 // Inferring a variable's type from a call to a generic.
 struct Pair<T, U> { }
 
-func pair<T, U>(x: T, _ y: U) -> Pair<T, U> { }
+func pair<T, U>(_ x: T, _ y: U) -> Pair<T, U> { }
 
 var i : Int, f : Float
 var p = pair(i, f)
 
 // Conformance constraints on static variables.
-func f1<S1 : SequenceType>(s1: S1) {}
+func f1<S1 : Sequence>(_ s1: S1) {}
 var x : Array<Int> = [1]
 f1(x)
 
@@ -77,13 +76,13 @@ class Foo<T> : X {
 class Y<U> : Foo<Int> {
 }
 
-func genericAndNongenericBases(x: Foo<Int>, y: Y<()>) {
+func genericAndNongenericBases(_ x: Foo<Int>, y: Y<()>) {
   x.f()
   y.f()
   y.g()
 }
 
-func genericAndNongenericBasesTypeParameter<T : Y<()>>(t: T) {
+func genericAndNongenericBasesTypeParameter<T : Y<()>>(_ t: T) {
   t.f()
   t.g()
 }
@@ -91,17 +90,17 @@ func genericAndNongenericBasesTypeParameter<T : Y<()>>(t: T) {
 protocol P1 {}
 protocol P2 {}
 
-func foo<T : P1>(t: T) -> P2 {
+func foo<T : P1>(_ t: T) -> P2 {
   return t // expected-error{{return expression of type 'T' does not conform to 'P2'}}
 }
 
-func foo2(p1: P1) -> P2 {
+func foo2(_ p1: P1) -> P2 {
   return p1 // expected-error{{return expression of type 'P1' does not conform to 'P2'}}
 }
 
 // <rdar://problem/14005696>
 protocol BinaryMethodWorkaround {
-  typealias MySelf
+  associatedtype MySelf
 }
 
 protocol Squigglable : BinaryMethodWorkaround {
@@ -118,23 +117,39 @@ extension UInt8 : Squigglable {
 }
 
 var rdar14005696 : UInt8
-rdar14005696 ~~~ 5
+_ = rdar14005696 ~~~ 5
 
 // <rdar://problem/15168483>
-func f1<
-  S: CollectionType 
-  where S.Index: BidirectionalIndexType
->(seq: S) {
-  let x = (seq.indices).lazy.reverse()
-  PermutationGenerator(elements: seq, indices: x) // expected-warning{{unused}}
-  PermutationGenerator(elements: seq, indices: seq.indices.reverse()) // expected-warning{{unused}}
+public struct SomeIterator<
+  C: Collection, Indices: Sequence
+  where
+  C.Index == Indices.Iterator.Element
+> : IteratorProtocol, Sequence {
+  var seq : C
+  var indices : Indices.Iterator
+
+  public typealias Element = C.Iterator.Element
+
+  public mutating func next() -> Element? {
+    fatalError()
+  }
+
+  public init(elements: C, indices: Indices) {
+    fatalError()
+  }
+}
+func f1<T>(seq: Array<T>) {
+  let x = (seq.indices).lazy.reversed()
+  SomeIterator(elements: seq, indices: x) // expected-warning{{unused}}
+  SomeIterator(elements: seq, indices: seq.indices.reversed()) // expected-warning{{unused}}
 }
 
-// <rdar://problem/16078944>
-func count16078944<C: CollectionType>(x: C) -> Int { return 0 }
 
-func test16078944 <T: ForwardIndexType>(lhs: T, args: T) -> Int {
-    return count16078944(lhs..<args) // don't crash
+// <rdar://problem/16078944>
+func count16078944<T>(_ x: Range<T>) -> Int { return 0 }
+
+func test16078944 <T: Comparable>(lhs: T, args: T) -> Int {
+  return count16078944(lhs..<args) // don't crash
 }
 
 
@@ -142,32 +157,72 @@ func test16078944 <T: ForwardIndexType>(lhs: T, args: T) -> Int {
 class r22409190ManagedBuffer<Value, Element> {
   final var value: Value { get {} set {}}
   func withUnsafeMutablePointerToElements<R>(
-    body: (UnsafeMutablePointer<Element>)->R) -> R {
+    _ body: (UnsafeMutablePointer<Element>) -> R) -> R {
   }
 }
 class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
   deinit {
-    self.withUnsafeMutablePointerToElements { elems->Void in
-      elems.destroy(self.value)  // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
+    self.withUnsafeMutablePointerToElements { elems -> Void in
+      elems.deinitialize(count: self.value)  // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
     }
   }
 }
 
 // <rdar://problem/22459135> error: 'print' is unavailable: Please wrap your tuple argument in parentheses: 'print((...))'
 func r22459135() {
-  func h<S: SequenceType where S.Generator.Element: IntegerType>
-    (sequence: S) -> S.Generator.Element {
+  func h<S : Sequence where S.Iterator.Element : Integer>
+    (_ sequence: S) -> S.Iterator.Element {
     return 0
   }
 
-  func g(x: Any) {}
-  func f(x: Int) {
+  func g(_ x: Any) {}
+  func f(_ x: Int) {
     g(h([3]))
   }
 
-  func f2<TargetType: AnyObject>(target: TargetType, handler: TargetType -> ()) {
-    let _: AnyObject -> () = { internalTarget in
+  func f2<TargetType: AnyObject>(_ target: TargetType, handler: (TargetType) -> ()) {
+    let _: (AnyObject) -> () = { internalTarget in
       handler(internalTarget as! TargetType)
     }
   }
 }
+
+
+// <rdar://problem/19710848> QoI: Friendlier error message for "[] as Set"
+// <rdar://problem/22326930> QoI: "argument for generic parameter 'Element' could not be inferred" lacks context
+_ = [] as Set  // expected-error {{generic parameter 'Element' could not be inferred in cast to 'Set<_>}}
+
+
+//<rdar://problem/22509125> QoI: Error when unable to infer generic archetype lacks greatness
+func r22509125<T>(_ a : T?) { // expected-note {{in call to function 'r22509125'}}
+  r22509125(nil) // expected-error {{generic parameter 'T' could not be inferred}}
+}
+
+
+// <rdar://problem/24267414> QoI: error: cannot convert value of type 'Int' to specified type 'Int'
+struct R24267414<T> {  // expected-note {{'T' declared as parameter to type 'R24267414'}}
+  static func foo() -> Int {}
+}
+var _ : Int = R24267414.foo() // expected-error {{generic parameter 'T' could not be inferred}}
+
+
+// https://bugs.swift.org/browse/SR-599
+func SR599<T: Integer>() -> T.Type { return T.self }  // expected-note {{in call to function 'SR599'}}
+_ = SR599()         // expected-error {{generic parameter 'T' could not be inferred}}
+
+
+
+
+// <rdar://problem/19215114> QoI: Poor diagnostic when we are unable to infer type
+protocol Q19215114 {}
+protocol P19215114 {}
+
+// expected-note @+1 {{in call to function 'body9215114'}}
+func body9215114<T: P19215114, U: Q19215114>(_ t: T) -> (u: U) -> () {}
+
+func test9215114<T: P19215114, U: Q19215114>(_ t: T) -> (U) -> () {
+  //Should complain about not being able to infer type of U.
+  let f = body9215114(t)  // expected-error {{generic parameter 'T' could not be inferred}}
+  return f
+}
+

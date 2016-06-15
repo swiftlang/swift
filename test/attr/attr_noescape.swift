@@ -2,15 +2,15 @@
 
 @noescape var fn : () -> Int = { 4 }  // expected-error {{@noescape may only be used on 'parameter' declarations}} {{1-11=}}
 
-func doesEscape(fn : () -> Int) {}
+func doesEscape(_ fn : () -> Int) {}
 
-func takesGenericClosure<T>(a : Int, @noescape _ fn : () -> T) {}
+func takesGenericClosure<T>(_ a : Int, _ fn : @noescape () -> T) {}
 
 
-func takesNoEscapeClosure(@noescape fn : () -> Int) {
+func takesNoEscapeClosure(_ fn : @noescape () -> Int) {
   takesNoEscapeClosure { 4 }  // ok
 
-  fn()  // ok
+  _ = fn()  // ok
 
   var x = fn  // expected-error {{@noescape parameter 'fn' may only be called}}
 
@@ -22,7 +22,7 @@ func takesNoEscapeClosure(@noescape fn : () -> Int) {
 
   // This is not ok, because it escapes the 'fn' closure.
   func nested_function() {
-    fn()   // expected-error {{declaration closing over @noescape parameter 'fn' may allow it to escape}}
+    _ = fn()   // expected-error {{declaration closing over @noescape parameter 'fn' may allow it to escape}}
   }
 
   takesNoEscapeClosure(fn)  // ok
@@ -44,6 +44,7 @@ class SomeClass {
     takesNoEscapeClosure { x }
   }
 
+  @discardableResult
   func foo() -> Int {
     foo()
 
@@ -105,6 +106,7 @@ class SomeClass {
     }
 
     struct Outer {
+      @discardableResult
       func bar() -> Int {
         bar()
 
@@ -126,6 +128,7 @@ class SomeClass {
 
     func structOuter() {
       struct Inner {
+        @discardableResult
         func bar() -> Int {
           bar() // no-warning
 
@@ -153,58 +156,58 @@ class SomeClass {
 
 // Implicit conversions (in this case to @convention(block)) are ok.
 @_silgen_name("whatever")
-func takeNoEscapeAsObjCBlock(@noescape _: @convention(block) () -> Void)
-func takeNoEscapeTest2(@noescape fn : () -> ()) {
+func takeNoEscapeAsObjCBlock(_: @noescape @convention(block) () -> Void)
+func takeNoEscapeTest2(_ fn : @noescape () -> ()) {
   takeNoEscapeAsObjCBlock(fn)
 }
 
 // Autoclosure implies noescape, but produce nice diagnostics so people know
 // why noescape problems happen.
-func testAutoclosure(@autoclosure a : () -> Int) { // expected-note{{parameter 'a' is implicitly @noescape because it was declared @autoclosure}}
+func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter 'a' is implicitly @noescape because it was declared @autoclosure}}
   doesEscape { a() }  // expected-error {{closure use of @noescape parameter 'a' may allow it to escape}}
 }
 
 
 // <rdar://problem/19470858> QoI: @autoclosure implies @noescape, so you shouldn't be allowed to specify both
-func redundant(@noescape  // expected-error {{@noescape is implied by @autoclosure and should not be redundantly specified}} {{16-25=}}
-               @autoclosure fn : () -> Int) {
+func redundant(_ fn : @noescape  // expected-error @+1 {{@noescape is implied by @autoclosure and should not be redundantly specified}}
+               @autoclosure () -> Int) {
 }
 
 
 protocol P1 {
-  typealias Element
+  associatedtype Element
 }
 protocol P2 : P1 {
-  typealias Element
+  associatedtype Element
 }
 
-func overloadedEach<O: P1, T>(source: O, _ transform: O.Element -> (), _: T) {}
+func overloadedEach<O: P1, T>(_ source: O, _ transform: (O.Element) -> (), _: T) {}
 
-func overloadedEach<P: P2, T>(source: P, _ transform: P.Element -> (), _: T) {}
+func overloadedEach<P: P2, T>(_ source: P, _ transform: (P.Element) -> (), _: T) {}
 
 struct S : P2 {
   typealias Element = Int
-  func each(@noescape transform: Int -> ()) {
-    overloadedEach(self,  // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, @noescape Int -> (), Int)'}}
+  func each(_ transform: @noescape (Int) -> ()) {
+    overloadedEach(self,  // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, @noescape (Int) -> (), Int)'}}
                    transform, 1)
-    // expected-note @-2 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, O.Element -> (), T), (P, P.Element -> (), T)}}
+    // expected-note @-2 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, (O.Element) -> (), T), (P, (P.Element) -> (), T)}}
   }
 }
 
 
 
 // rdar://19763676 - False positive in @noescape analysis triggered by parameter label
-func r19763676Callee(@noescape f: (param: Int) -> Int) {}
+func r19763676Callee(_ f: @noescape (param: Int) -> Int) {}
 
-func r19763676Caller(@noescape g: (Int) -> Int) {
+func r19763676Caller(_ g: @noescape (Int) -> Int) {
   r19763676Callee({ _ in g(1) })
 }
 
 
 // <rdar://problem/19763732> False positive in @noescape analysis triggered by default arguments
-func calleeWithDefaultParameters(@noescape f: () -> (), x : Int = 1) {}  // expected-warning {{closure parameter prior to parameters with default arguments will not be treated as a trailing closure}}
+func calleeWithDefaultParameters(_ f: @noescape () -> (), x : Int = 1) {}  // expected-warning {{closure parameter prior to parameters with default arguments will not be treated as a trailing closure}}
 
-func callerOfDefaultParams(@noescape g: () -> ()) {
+func callerOfDefaultParams(_ g: @noescape () -> ()) {
   calleeWithDefaultParameters(g)
 }
 
@@ -223,10 +226,80 @@ class NoEscapeImmediatelyApplied {
 
 
 // Reduced example from XCTest overlay, involves a TupleShuffleExpr
-public func XCTAssertTrue(@autoclosure expression: () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertTrue(_ expression: @autoclosure () -> Boolean, _ message: String = "", file: StaticString = #file, line: UInt = #line) -> Void {
 }
-public func XCTAssert( @autoclosure expression: () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
+public func XCTAssert(_ expression: @autoclosure () -> Boolean, _ message: String = "", file: StaticString = #file, line: UInt = #line)  -> Void {
   XCTAssertTrue(expression, message, file: file, line: line);
 }
 
 
+
+/// SR-770 - Currying and `noescape`/`rethrows` don't work together anymore
+func curriedFlatMap<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] {
+  return { f in
+    x.flatMap(f)
+  }
+}
+
+func curriedFlatMap2<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] {
+  return { (f : @noescape (A) -> [B]) in
+    x.flatMap(f)
+  }
+}
+
+func bad(_ a : (Int)-> Int) -> Int { return 42 }
+func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int {
+  return { f in
+    bad(f)  // expected-error {{invalid conversion from non-escaping function of type '@noescape (Int) -> Int' to potentially escaping function type '(Int) -> Int'}}
+  }
+}
+
+
+// SR-824 - @noescape for Type Aliased Closures
+//
+typealias CompletionHandlerNE = @noescape (success: Bool) -> ()
+typealias CompletionHandler = (success: Bool) -> ()
+var escape : CompletionHandlerNE
+func doThing1(_ completion: @noescape (success: Bool) -> ()) {
+  // expected-error @+2 {{@noescape value 'escape' may only be called}}
+  // expected-error @+1 {{@noescape parameter 'completion' may only be called}}
+  escape = completion // expected-error {{declaration closing over @noescape parameter 'escape' may allow it to escape}}
+}
+func doThing2(_ completion: CompletionHandlerNE) {
+  // expected-error @+2 {{@noescape value 'escape' may only be called}}
+  // expected-error @+1 {{@noescape parameter 'completion' may only be called}}
+  escape = completion // expected-error {{declaration closing over @noescape parameter 'escape' may allow it to escape}}
+}
+
+// <rdar://problem/19997680> @noescape doesn't work on parameters of function type
+func apply<T, U>(_ f: @noescape (T) -> U, g: @noescape (@noescape (T) -> U) -> U) -> U {
+  return g(f)
+}
+
+// <rdar://problem/19997577> @noescape cannot be applied to locals, leading to duplication of code
+enum r19997577Type {
+  case Unit
+  case Function(() -> r19997577Type, () -> r19997577Type)
+  case Sum(() -> r19997577Type, () -> r19997577Type)
+
+  func reduce<Result>(_ initial: Result, _ combine: @noescape (Result, r19997577Type) -> Result) -> Result {
+    let binary: @noescape (r19997577Type, r19997577Type) -> Result = { combine(combine(combine(initial, self), $0), $1) }
+    switch self {
+    case .Unit:
+      return combine(initial, self)
+    case let .Function(t1, t2):
+      return binary(t1(), t2())
+    case let .Sum(t1, t2):
+      return binary(t1(), t2())
+    }
+  }
+}
+
+// type attribute and decl attribute
+func noescapeD(@noescape f: () -> Bool) {} // expected-warning {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}} {{16-25=}} {{29-29=@noescape }}
+func noescapeT(f: @noescape () -> Bool) {} // ok
+func autoclosureD(@autoclosure f: () -> Bool) {} // expected-warning {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{19-31=}} {{35-35=@autoclosure }}
+func autoclosureT(f: @autoclosure () -> Bool) {}  // ok
+
+func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {}
+func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-warning {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{29-41=}} {{45-45=@autoclosure }}

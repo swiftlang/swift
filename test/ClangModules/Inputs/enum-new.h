@@ -47,6 +47,6 @@ MoreColor getMoreColor();
 
 
 typedef CF_OPTIONS(unsigned, ColorOptions) {
-  Pastel, Swift
+  None = 0x0, Pastel = 0x1, Swift = 0x2
 };
 ColorOptions getColorOptions();

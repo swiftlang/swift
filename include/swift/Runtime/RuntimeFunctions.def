@@ -1,0 +1,1154 @@
+//===--- RuntimeFunctions.def - Runtime Functions Database ------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines x-macros used for metaprogramming with the set of
+// runtime functions.
+//
+//===----------------------------------------------------------------------===//
+
+/// FUNCTION(Id, Name, ReturnTys, ArgTys, CC, Attrs)
+///   Makes available as "Id" the following runtime function:
+///     ReturnTy Name(ArgTys...);
+///   ReturnTys is a call to RETURNS, which takes a non-empty list
+///     of expressions meant to be looked up in IRGenModule.
+///   ArgTys is either NO_ARGS or a call to ARGS, which takes a non-empty
+///     list of expressions meant to be looked up in IRGenModule.
+///   Attrs is a parenthesized list of attributes.
+///
+///   By default, passes Id to FUNCTION_ID.  Therefore, the valid uses of
+///   this database define either:
+///     FUNCTION_ID
+///   or all of the following:
+///     FUNCTION
+///     RETURNS
+///     ARGS
+///     NO_ARGS
+///     ATTRS
+///     NO_ATTRS
+#ifndef FUNCTION
+#define FUNCTION(Id, Name, CC, ReturnTys, ArgTys, Attrs) FUNCTION_ID(Id)
+#endif
+
+/// This is a special version for runtime functions which have a global
+/// symbol containing a reference of the implementation of this runtime
+/// entry.
+///  SymbolName is the name of the global symbol
+///  Impl is the name of the function implementing this entry point.
+#ifndef FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL
+#define FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(Id, Name, SymbolName, Impl, CC,  \
+                                             ReturnTys, ArgTys, Attrs)        \
+  FUNCTION_ID(Id)
+#endif
+
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocBox, swift_allocBox,
+         _swift_allocBox, _swift_allocBox_, DefaultCC,
+         RETURNS(RefCountedPtrTy, OpaquePtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(DeallocBox, swift_deallocBox, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(ProjectBox, swift_projectBox, DefaultCC,
+         RETURNS(OpaquePtrTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// RefCounted *swift_allocObject(Metadata *type, size_t size, size_t alignMask);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocObject, swift_allocObject,
+         _swift_allocObject, _swift_allocObject_, RegisterPreservingCC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy),
+         ATTRS(NoUnwind))
+
+// HeapObject *swift_initStackObject(HeapMetadata const *metadata,
+//                                   HeapObject *object);
+FUNCTION(InitStackObject, swift_initStackObject, DefaultCC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(TypeMetadataPtrTy, RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_verifyEndOfLifetime(HeapObject *object);
+FUNCTION(VerifyEndOfLifetime, swift_verifyEndOfLifetime, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_deallocObject(HeapObject *obj, size_t size, size_t alignMask);
+FUNCTION(DeallocObject, swift_deallocObject, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, SizeTy, SizeTy),
+         ATTRS(NoUnwind))
+
+// void swift_deallocClassInstance(HeapObject *obj, size_t size, size_t alignMask);
+FUNCTION(DeallocClassInstance, swift_deallocClassInstance, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, SizeTy, SizeTy),
+         ATTRS(NoUnwind))
+
+// void swift_deallocPartialClassInstance(HeapObject *obj, HeapMetadata *type, size_t size, size_t alignMask);
+FUNCTION(DeallocPartialClassInstance, swift_deallocPartialClassInstance, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, TypeMetadataPtrTy, SizeTy, SizeTy),
+         ATTRS(NoUnwind))
+
+// void *swift_slowAlloc(size_t size, size_t alignMask);
+FUNCTION(SlowAlloc, swift_slowAlloc, RegisterPreservingCC,
+         RETURNS(Int8PtrTy),
+         ARGS(SizeTy, SizeTy),
+         ATTRS(NoUnwind))
+
+// void swift_slowDealloc(void *ptr, size_t size, size_t alignMask);
+FUNCTION(SlowDealloc, swift_slowDealloc, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, SizeTy, SizeTy),
+         ATTRS(NoUnwind))
+
+// void swift_willThrow(error *ptr);
+FUNCTION(WillThrow, swift_willThrow, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(ErrorPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_errorInMain(error *ptr);
+FUNCTION(ErrorInMain, swift_errorInMain, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(ErrorPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unexpectedError(error *ptr);
+FUNCTION(UnexpectedError, swift_unexpectedError, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(ErrorPtrTy),
+         ATTRS(NoUnwind, NoReturn))
+
+// void *swift_copyPOD(void *dest, void *src, Metadata *self);
+FUNCTION(CopyPOD, swift_copyPOD, DefaultCC,
+         RETURNS(OpaquePtrTy),
+         ARGS(OpaquePtrTy, OpaquePtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_retain(void *ptr);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeStrongRetain, swift_retain,
+         _swift_retain,  _swift_retain_, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_release(void *ptr);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeStrongRelease, swift_release,
+         _swift_release, _swift_release_, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_retain_n(void *ptr, int32_t n);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeStrongRetainN, swift_retain_n,
+         _swift_retain_n, _swift_retain_n_, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_release_n(void *ptr, int32_t n);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeStrongReleaseN, swift_release_n,
+         _swift_release_n, _swift_release_n_, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_setDeallocating(void *ptr);
+FUNCTION(NativeSetDeallocating, swift_setDeallocating,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_retain_n(void *ptr, int32_t n);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongRetainN, swift_nonatomic_retain_n,
+         _swift_nonatomic_retain_n, _swift_nonatomic_retain_n_, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_release_n(void *ptr, int32_t n);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongReleaseN, swift_nonatomic_release_n,
+         _swift_nonatomic_release_n, _swift_nonatomic_release_n_, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_unknownRetain_n(void *ptr, int32_t n);
+FUNCTION(UnknownRetainN, swift_unknownRetain_n,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_unknownRelease_n(void *ptr, int32_t n);
+FUNCTION(UnknownReleaseN, swift_unknownRelease_n,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_unknownRetain_n(void *ptr, int32_t n);
+FUNCTION(NonAtomicUnknownRetainN, swift_nonatomic_unknownRetain_n,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_unknownRelease_n(void *ptr, int32_t n);
+FUNCTION(NonAtomicUnknownReleaseN, swift_nonatomic_unknownRelease_n,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_bridgeObjectRetain_n(void *ptr, int32_t n);
+FUNCTION(BridgeObjectRetainN, swift_bridgeObjectRetain_n,
+         DefaultCC,
+         RETURNS(BridgeObjectPtrTy),
+         ARGS(BridgeObjectPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_bridgeObjectRelease_n(void *ptr, int32_t n);
+FUNCTION(BridgeObjectReleaseN, swift_bridgeObjectRelease_n,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(BridgeObjectPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_bridgeObjectRetain_n(void *ptr, int32_t n);
+FUNCTION(NonAtomicBridgeObjectRetainN, swift_nonatomic_bridgeObjectRetain_n,
+         DefaultCC,
+         RETURNS(BridgeObjectPtrTy),
+         ARGS(BridgeObjectPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_bridgeObjectRelease_n(void *ptr, int32_t n);
+FUNCTION(NonAtomicBridgeObjectReleaseN, swift_nonatomic_bridgeObjectRelease_n,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(BridgeObjectPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_retain(void *ptr);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongRetain, swift_nonatomic_retain,
+         _swift_nonatomic_retain, _swift_nonatomic_retain_, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void *swift_tryPin(void *ptr);
+FUNCTION(NativeTryPin, swift_tryPin, RegisterPreservingCC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_release(void *ptr);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeNonAtomicStrongRelease, swift_nonatomic_release,
+         _swift_nonatomic_release, _swift_nonatomic_release_, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void *swift_tryRetain(void *ptr);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(NativeTryRetain, swift_tryRetain,
+         _swift_tryRetain, _swift_tryRetain_, RegisterPreservingCC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unpin(void *ptr);
+FUNCTION(NativeUnpin, swift_unpin, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// bool swift_isDeallocating(void *ptr);
+FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(IsDeallocating, swift_isDeallocating,
+         _swift_isDeallocating, _swift_isDeallocating_, DefaultCC,
+         RETURNS(Int1Ty),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind, ZExt))
+
+// void *swift_nonatomic_tryPin(void *ptr);
+FUNCTION(NonAtomicNativeTryPin, swift_nonatomic_tryPin, RegisterPreservingCC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_unpin(void *ptr);
+FUNCTION(NonAtomicNativeUnpin, swift_nonatomic_unpin, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownRetain(void *ptr);
+FUNCTION(UnknownRetain, swift_unknownRetain, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownRelease(void *ptr);
+FUNCTION(UnknownRelease, swift_unknownRelease, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_unknownRetain(void *ptr);
+FUNCTION(NonAtomicUnknownRetain, swift_nonatomic_unknownRetain, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownRelease(void *ptr);
+FUNCTION(NonAtomicUnknownRelease, swift_nonatomic_unknownRelease, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void *swift_bridgeObjectRetain(void *ptr);
+FUNCTION(BridgeObjectStrongRetain, swift_bridgeObjectRetain, DefaultCC,
+         RETURNS(BridgeObjectPtrTy),
+         ARGS(BridgeObjectPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_bridgeRelease(void *ptr);
+FUNCTION(BridgeObjectStrongRelease, swift_bridgeObjectRelease, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(BridgeObjectPtrTy),
+         ATTRS(NoUnwind))
+
+// void *swift_nonatomic_bridgeObjectRetain(void *ptr);
+FUNCTION(NonAtomicBridgeObjectStrongRetain, swift_nonatomic_bridgeObjectRetain, DefaultCC,
+         RETURNS(BridgeObjectPtrTy),
+         ARGS(BridgeObjectPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_bridgeRelease(void *ptr);
+FUNCTION(NonAtomicBridgeObjectStrongRelease, swift_nonatomic_bridgeObjectRelease, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(BridgeObjectPtrTy),
+         ATTRS(NoUnwind))
+
+
+// error *swift_errorRetain(error *ptr);
+FUNCTION(ErrorStrongRetain, swift_errorRetain, DefaultCC,
+         RETURNS(ErrorPtrTy),
+         ARGS(ErrorPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_errorRelease(void *ptr);
+FUNCTION(ErrorStrongRelease, swift_errorRelease, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(ErrorPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unownedRetain(void *ptr);
+FUNCTION(NativeUnownedRetain, swift_unownedRetain, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unownedRelease(void *ptr);
+FUNCTION(NativeUnownedRelease, swift_unownedRelease, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unownedRetain_n(void *ptr, int32_t n);
+FUNCTION(UnownedRetainN, swift_unownedRetain_n,
+         RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_unownedRelease_n(void *ptr, int32_t n);
+FUNCTION(UnownedReleaseN, swift_unownedRelease_n,
+         RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_unownedRetainStrong(void *ptr);
+FUNCTION(NativeStrongRetainUnowned, swift_unownedRetainStrong, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unownedRetainStrongAndRelease(void *ptr);
+FUNCTION(NativeStrongRetainAndUnownedRelease,
+         swift_unownedRetainStrongAndRelease, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_weakDestroy(WeakReference *object);
+FUNCTION(NativeWeakDestroy, swift_weakDestroy, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_weakInit(WeakReference *object, void *value);
+FUNCTION(NativeWeakInit, swift_weakInit, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_weakAssign(WeakReference *object, void *value);
+FUNCTION(NativeWeakAssign, swift_weakAssign, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void *swift_weakLoadStrong(WeakReference *object);
+FUNCTION(NativeWeakLoadStrong, swift_weakLoadStrong,DefaultCC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void *swift_weakTakeStrong(WeakReference *object);
+FUNCTION(NativeWeakTakeStrong, swift_weakTakeStrong,DefaultCC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_weakCopyInit(WeakReference *dest, WeakReference *src);
+FUNCTION(NativeWeakCopyInit, swift_weakCopyInit, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_weakTakeInit(WeakReference *dest, WeakReference *src);
+FUNCTION(NativeWeakTakeInit, swift_weakTakeInit, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_weakCopyAssign(WeakReference *dest, WeakReference *src);
+FUNCTION(NativeWeakCopyAssign, swift_weakCopyAssign, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_weakTakeAssign(WeakReference *dest, WeakReference *src);
+FUNCTION(NativeWeakTakeAssign, swift_weakTakeAssign, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownWeakDestroy(WeakReference *object);
+FUNCTION(UnknownWeakDestroy, swift_unknownWeakDestroy, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownWeakInit(WeakReference *object, void *value);
+FUNCTION(UnknownWeakInit, swift_unknownWeakInit, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownWeakAssign(WeakReference *object, void *value);
+FUNCTION(UnknownWeakAssign, swift_unknownWeakAssign, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void *swift_unknownWeakLoad(WeakReference *object);
+FUNCTION(UnknownWeakLoadStrong, swift_unknownWeakLoadStrong,DefaultCC,
+         RETURNS(UnknownRefCountedPtrTy),
+         ARGS(WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void *swift_unknownWeakTake(WeakReference *object);
+FUNCTION(UnknownWeakTakeStrong, swift_unknownWeakTakeStrong,DefaultCC,
+         RETURNS(UnknownRefCountedPtrTy),
+         ARGS(WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownWeakCopyInit(WeakReference *dest, WeakReference *src);
+FUNCTION(UnknownWeakCopyInit, swift_unknownWeakCopyInit, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownWeakTakeInit(WeakReference *dest, WeakReference *src);
+FUNCTION(UnknownWeakTakeInit, swift_unknownWeakTakeInit, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownWeakCopyAssign(WeakReference *dest, WeakReference *src);
+FUNCTION(UnknownWeakCopyAssign, swift_unknownWeakCopyAssign, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownWeakTakeAssign(WeakReference *dest, WeakReference *src);
+FUNCTION(UnknownWeakTakeAssign, swift_unknownWeakTakeAssign, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedDestroy(UnownedReference *object);
+FUNCTION(UnknownUnownedDestroy, swift_unknownUnownedDestroy, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(UnownedReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedInit(UnownedReference *object, void *value);
+FUNCTION(UnknownUnownedInit, swift_unknownUnownedInit, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(UnownedReferencePtrTy, UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedAssign(UnownedReference *object, void *value);
+FUNCTION(UnknownUnownedAssign, swift_unknownUnownedAssign, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(UnownedReferencePtrTy, UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void *swift_unknownUnownedLoad(UnownedReference *object);
+FUNCTION(UnknownUnownedLoadStrong, swift_unknownUnownedLoadStrong, DefaultCC,
+         RETURNS(UnknownRefCountedPtrTy),
+         ARGS(UnownedReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void *swift_unknownUnownedTake(UnownedReference *object);
+FUNCTION(UnknownUnownedTakeStrong, swift_unknownUnownedTakeStrong, DefaultCC,
+         RETURNS(UnknownRefCountedPtrTy),
+         ARGS(UnownedReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedCopyInit(UnownedReference *dest, UnownedReference *src);
+FUNCTION(UnknownUnownedCopyInit, swift_unknownUnownedCopyInit, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(UnownedReferencePtrTy, UnownedReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedTakeInit(UnownedReference *dest, UnownedReference *src);
+FUNCTION(UnknownUnownedTakeInit, swift_unknownUnownedTakeInit, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(UnownedReferencePtrTy, UnownedReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedCopyAssign(UnownedReference *dest, UnownedReference *src);
+FUNCTION(UnknownUnownedCopyAssign, swift_unknownUnownedCopyAssign, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(UnownedReferencePtrTy, UnownedReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownUnownedTakeAssign(UnownedReference *dest, UnownedReference *src);
+FUNCTION(UnknownUnownedTakeAssign, swift_unknownUnownedTakeAssign, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(UnownedReferencePtrTy, UnownedReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// bool swift_isUniquelyReferencedNonObjC(const void *);
+FUNCTION(IsUniquelyReferencedNonObjC, swift_isUniquelyReferencedNonObjC,
+         DefaultCC,
+         RETURNS(Int1Ty),
+         ARGS(UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind, ZExt))
+
+// bool swift_isUniquelyReferencedNonObjC_nonNull(const void *);
+FUNCTION(IsUniquelyReferencedNonObjC_nonNull,
+         swift_isUniquelyReferencedNonObjC_nonNull,
+         DefaultCC,
+         RETURNS(Int1Ty),
+         ARGS(UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind, ZExt))
+
+// bool swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(const void *);
+FUNCTION(IsUniquelyReferencedOrPinnedNonObjC_nonNull,
+         swift_isUniquelyReferencedOrPinnedNonObjC_nonNull,
+         DefaultCC,
+         RETURNS(Int1Ty),
+         ARGS(UnknownRefCountedPtrTy),
+         ATTRS(NoUnwind, ZExt))
+
+// bool swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
+//   uintptr_t bits);
+FUNCTION(IsUniquelyReferencedNonObjC_nonNull_bridgeObject,
+         swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject,
+         DefaultCC,
+         RETURNS(Int1Ty),
+         ARGS(BridgeObjectPtrTy),
+         ATTRS(NoUnwind, ZExt))
+
+// bool swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(
+//   uintptr_t bits);
+FUNCTION(IsUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject,
+         swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject,
+         DefaultCC,
+         RETURNS(Int1Ty),
+         ARGS(BridgeObjectPtrTy),
+         ATTRS(NoUnwind, ZExt))
+
+// bool swift_isUniquelyReferenced_native(const struct HeapObject *);
+FUNCTION(IsUniquelyReferenced_native, swift_isUniquelyReferenced_native,
+         DefaultCC,
+         RETURNS(Int1Ty),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind, ZExt))
+
+// bool swift_isUniquelyReferencedOrPinned_native(const struct HeapObject *);
+FUNCTION(IsUniquelyReferencedOrPinned_native,
+         swift_isUniquelyReferencedOrPinned_native,
+         RegisterPreservingCC,
+         RETURNS(Int1Ty),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind, ZExt))
+
+// bool swift_isUniquelyReferenced_nonNull_native(const struct HeapObject *);
+FUNCTION(IsUniquelyReferenced_nonNull_native,
+         swift_isUniquelyReferenced_nonNull_native,
+         RegisterPreservingCC,
+         RETURNS(Int1Ty),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind, ZExt))
+
+// bool swift_isUniquelyReferencedOrPinned_nonNull_native(
+//   const struct HeapObject *);
+FUNCTION(IsUniquelyReferencedOrPinned_nonNull_native,
+         swift_isUniquelyReferencedOrPinned_nonNull_native,
+         RegisterPreservingCC,
+         RETURNS(Int1Ty),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind, ZExt))
+
+// Metadata *swift_getFunctionTypeMetadata(const void **args);
+FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy->getPointerTo(0)),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getFunctionTypeMetadata1(unsigned long flags, const void *arg0, const Metadata *resultMetadata);
+FUNCTION(GetFunctionMetadata1, swift_getFunctionTypeMetadata1, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy, Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getFunctionTypeMetadata2(unsigned long flags, const void *arg0, const void *arg1, const Metadata *resultMetadata);
+FUNCTION(GetFunctionMetadata2, swift_getFunctionTypeMetadata2, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy, Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getFunctionTypeMetadata3(unsigned long flags, const void *arg0, const void *arg1, const void *arg2, const Metadata *resultMetadata);
+FUNCTION(GetFunctionMetadata3, swift_getFunctionTypeMetadata3, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getForeignTypeMetadata(Metadata *nonUnique);
+FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
+
+// Metadata *swift_getGenericMetadata(GenericMetadata *pattern,
+//                                    const void *arguments);
+FUNCTION(GetGenericMetadata, swift_getGenericMetadata, RegisterPreservingCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPatternPtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// Metadata *swift_allocateGenericClassMetadata(GenericMetadata *pattern,
+//                                              const void * const *arguments,
+//                                              objc_class *superclass);
+FUNCTION(AllocateGenericClassMetadata, swift_allocateGenericClassMetadata,
+         DefaultCC, RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPatternPtrTy, Int8PtrPtrTy, ObjCClassPtrTy),
+         ATTRS(NoUnwind))
+
+// Metadata *swift_allocateGenericValueMetadata(GenericMetadata *pattern,
+//                                              const void * const *arguments);
+FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
+         DefaultCC, RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPatternPtrTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind))
+
+// const ProtocolWitnessTable *
+// swift_getGenericWitnessTable(GenericProtocolWitnessTable *genericTable,
+//                              const Metadata *type,
+//                              void * const *instantiationArgs);
+FUNCTION(GetGenericWitnessTable, swift_getGenericWitnessTable, RegisterPreservingCC,
+         RETURNS(WitnessTablePtrTy),
+         ARGS(getGenericWitnessTableCacheTy()->getPointerTo(),
+              TypeMetadataPtrTy,
+              Int8PtrPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// Metadata *swift_getMetatypeMetadata(Metadata *instanceTy);
+FUNCTION(GetMetatypeMetadata, swift_getMetatypeMetadata, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getExistentialMetatypeMetadata(Metadata *instanceTy);
+FUNCTION(GetExistentialMetatypeMetadata,
+         swift_getExistentialMetatypeMetadata, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getObjCClassMetadata(objc_class *theClass);
+FUNCTION(GetObjCClassMetadata, swift_getObjCClassMetadata, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(ObjCClassPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getTupleTypeMetadata(size_t numElements,
+//                                      Metadata * const *elts,
+//                                      const char *labels,
+//                                      value_witness_table_t *proposed);
+FUNCTION(GetTupleMetadata, swift_getTupleTypeMetadata, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy, TypeMetadataPtrTy->getPointerTo(0),
+              Int8PtrTy, WitnessTablePtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// Metadata *swift_getTupleTypeMetadata2(Metadata *elt0, Metadata *elt1,
+//                                       const char *labels,
+//                                       value_witness_table_t *proposed);
+FUNCTION(GetTupleMetadata2, swift_getTupleTypeMetadata2, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy,
+              Int8PtrTy, WitnessTablePtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// Metadata *swift_getTupleTypeMetadata3(Metadata *elt0, Metadata *elt1,
+//                                       Metadata *elt2, const char *labels,
+//                                       value_witness_table_t *proposed);
+FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
+              Int8PtrTy, WitnessTablePtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// Metadata *swift_getExistentialTypeMetadata(size_t numProtocols,
+//                              const protocol_descriptor_t * const *protocols);
+FUNCTION(GetExistentialMetadata,
+         swift_getExistentialTypeMetadata, RegisterPreservingCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy,
+              ProtocolDescriptorPtrTy->getPointerTo()),
+         ATTRS(NoUnwind, ReadOnly))
+
+// struct FieldInfo { size_t Size; size_t AlignMask; };
+// Metadata *swift_initClassMetadata_UniversalStrategy(Metadata *self,
+//                                                     size_t numFields,
+//                                                     const FieldInfo *fields,
+//                                                     size_t *fieldOffsets);
+FUNCTION(InitClassMetadataUniversal,
+         swift_initClassMetadata_UniversalStrategy, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy,
+              SizeTy->getPointerTo(),
+              SizeTy->getPointerTo()),
+         ATTRS(NoUnwind))
+
+// void swift_initStructMetadata_UniversalStrategy(size_t numFields,
+//                                              TypeLayout * const *fieldTypes,
+//                                              size_t *fieldOffsets,
+//                                              value_witness_table_t *vwtable);
+FUNCTION(InitStructMetadataUniversal,
+         swift_initStructMetadata_UniversalStrategy, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(SizeTy, Int8PtrPtrTy->getPointerTo(),
+              SizeTy->getPointerTo(), WitnessTablePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_initEnumValueWitnessTableSinglePayload(value_witness_table_t *vwt,
+//                                                   TypeLayout *payload,
+//                                                   unsigned num_empty_cases);
+FUNCTION(InitEnumValueWitnessTableSinglePayload,
+         swift_initEnumValueWitnessTableSinglePayload,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WitnessTablePtrTy, Int8PtrPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_initEnumMetadataMultiPayload(value_witness_table_t *vwt,
+//                                         Metadata *enumType,
+//                                         size_t numPayloads,
+//                                         TypeLayout * const *payloadTypes);
+FUNCTION(InitEnumMetadataMultiPayload,
+         swift_initEnumMetadataMultiPayload,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(WitnessTablePtrTy, TypeMetadataPtrTy, SizeTy,
+              Int8PtrPtrTy->getPointerTo(0)),
+         ATTRS(NoUnwind))
+
+// int swift_getEnumCaseSinglePayload(opaque_t *obj, Metadata *payload,
+//                                    unsigned num_empty_cases);
+FUNCTION(GetEnumCaseSinglePayload,
+         swift_getEnumCaseSinglePayload,
+         RegisterPreservingCC,
+         RETURNS(Int32Ty),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty),
+         ATTRS(NoUnwind, ReadOnly))
+
+// int swift_getEnumCaseMultiPayload(opaque_t *obj, Metadata *enumTy);
+FUNCTION(GetEnumCaseMultiPayload,
+         swift_getEnumCaseMultiPayload,
+         DefaultCC,
+         RETURNS(Int32Ty),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// void swift_storeEnumTagSinglePayload(opaque_t *obj, Metadata *payload,
+//                                      int case_index,
+//                                      unsigned num_empty_cases);
+FUNCTION(StoreEnumTagSinglePayload,
+         swift_storeEnumTagSinglePayload,
+         RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_storeEnumTagMultiPayload(opaque_t *obj, Metadata *enumTy,
+//                                     int case_index);
+FUNCTION(StoreEnumTagMultiPayload,
+         swift_storeEnumTagMultiPayload,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// Class object_getClass(id object);
+//
+// This is readonly instead of readnone because isa-rewriting can have
+// a noticeable effect.
+FUNCTION(GetObjectClass, object_getClass, C_CC,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(ObjCPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// Class objc_lookUpClass(const char *name);
+FUNCTION(LookUpClass, objc_lookUpClass, C_CC,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getObjectType(id object);
+//
+// Since this is intended to look through dynamic subclasses, it's
+// invariant across reasonable isa-rewriting schemes and therefore can
+// be readnone.
+FUNCTION(GetObjectType, swift_getObjectType, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(ObjCPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getDynamicType(opaque_t *obj, Metadata *self);
+FUNCTION(GetDynamicType, swift_getDynamicType, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// void *swift_dynamicCastClass(void*, void*);
+FUNCTION(DynamicCastClass, swift_dynamicCastClass, RegisterPreservingCC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// void *swift_dynamicCastClassUnconditional(void*, void*);
+FUNCTION(DynamicCastClassUnconditional, swift_dynamicCastClassUnconditional,
+         DefaultCC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// void *swift_dynamicCastObjCClass(void*, void*);
+FUNCTION(DynamicCastObjCClass, swift_dynamicCastObjCClass, DefaultCC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// void *swift_dynamicCastObjCClassUnconditional(void*, void*);
+FUNCTION(DynamicCastObjCClassUnconditional,
+         swift_dynamicCastObjCClassUnconditional, DefaultCC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// void *swift_dynamicCastUnknownClass(void*, void*);
+FUNCTION(DynamicCastUnknownClass, swift_dynamicCastUnknownClass, DefaultCC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// void *swift_dynamicCastUnknownClassUnconditional(void*, void*);
+FUNCTION(DynamicCastUnknownClassUnconditional,
+         swift_dynamicCastUnknownClassUnconditional, DefaultCC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// type *swift_dynamicCastMetatype(type*, type*);
+FUNCTION(DynamicCastMetatype, swift_dynamicCastMetatype, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// type *swift_dynamicCastMetatypeUnconditional(type*, type*);
+FUNCTION(DynamicCastMetatypeUnconditional,
+         swift_dynamicCastMetatypeUnconditional, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// objc_class *swift_dynamicCastObjCClassMetatype(objc_class*, objc_class*);
+FUNCTION(DynamicCastObjCClassMetatype, swift_dynamicCastObjCClassMetatype,
+         DefaultCC,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(ObjCClassPtrTy, ObjCClassPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// objc_class *swift_dynamicCastObjCClassMetatypeUnconditional(objc_class*, objc_class*);
+FUNCTION(DynamicCastObjCClassMetatypeUnconditional,
+         swift_dynamicCastObjCClassMetatypeUnconditional, DefaultCC,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(ObjCClassPtrTy, ObjCClassPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// bool swift_dynamicCast(opaque*, opaque*, type*, type*, size_t);
+FUNCTION(DynamicCast, swift_dynamicCast, RegisterPreservingCC,
+         RETURNS(Int1Ty),
+         ARGS(OpaquePtrTy, OpaquePtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
+              SizeTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// type* swift_dynamicCastTypeToObjCProtocolUnconditional(type* object,
+//                                               size_t numProtocols,
+//                                               Protocol * const *protocols);
+FUNCTION(DynamicCastTypeToObjCProtocolUnconditional,
+         swift_dynamicCastTypeToObjCProtocolUnconditional, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind))
+
+// type* swift_dynamicCastTypeToObjCProtocolConditional(type* object,
+//                                             size_t numProtocols,
+//                                             Protocol * const *protocols);
+FUNCTION(DynamicCastTypeToObjCProtocolConditional,
+         swift_dynamicCastTypeToObjCProtocolConditional, DefaultCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind))
+
+// id swift_dynamicCastObjCProtocolUnconditional(id object,
+//                                               size_t numProtocols,
+//                                               Protocol * const *protocols);
+FUNCTION(DynamicCastObjCProtocolUnconditional,
+         swift_dynamicCastObjCProtocolUnconditional, DefaultCC,
+         RETURNS(ObjCPtrTy),
+         ARGS(ObjCPtrTy, SizeTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind))
+
+// id swift_dynamicCastObjCProtocolConditional(id object,
+//                                             size_t numProtocols,
+//                                             Protocol * const *protocols);
+FUNCTION(DynamicCastObjCProtocolConditional,
+         swift_dynamicCastObjCProtocolConditional, DefaultCC,
+         RETURNS(ObjCPtrTy),
+         ARGS(ObjCPtrTy, SizeTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind))
+
+// id swift_dynamicCastMetatypeToObjectUnconditional(type *type);
+FUNCTION(DynamicCastMetatypeToObjectUnconditional,
+         swift_dynamicCastMetatypeToObjectUnconditional, DefaultCC,
+         RETURNS(ObjCPtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// id swift_dynamicCastMetatypeToObjectConditional(type *type);
+FUNCTION(DynamicCastMetatypeToObjectConditional,
+         swift_dynamicCastMetatypeToObjectConditional, DefaultCC,
+         RETURNS(ObjCPtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// witness_table* swift_conformsToProtocol(type*, protocol*);
+FUNCTION(ConformsToProtocol,
+         swift_conformsToProtocol, DefaultCC,
+         RETURNS(WitnessTablePtrTy),
+         ARGS(TypeMetadataPtrTy, ProtocolDescriptorPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// bool swift_isClassType(type*);
+FUNCTION(IsClassType,
+         swift_isClassType, DefaultCC,
+         RETURNS(Int1Ty),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// bool swift_isOptionalType(type*);
+FUNCTION(IsOptionalType,
+         swift_isOptionalType, DefaultCC,
+         RETURNS(Int1Ty),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// void swift_once(swift_once_t *predicate,
+//                 void (*function_code)(RefCounted*));
+FUNCTION(Once, swift_once, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(OnceTy->getPointerTo(), Int8PtrTy),
+         ATTRS())
+
+// void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
+//                                         const ProtocolConformanceRecord *end)
+FUNCTION(RegisterProtocolConformances,
+         swift_registerProtocolConformances, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(ProtocolConformanceRecordPtrTy, ProtocolConformanceRecordPtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(RegisterTypeMetadataRecords,
+         swift_registerTypeMetadataRecords, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataRecordPtrTy, TypeMetadataRecordPtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(ObjCRetain, objc_retain, C_CC,
+         RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
+FUNCTION(ObjCRelease, objc_release, C_CC,
+         RETURNS(VoidTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
+FUNCTION(ObjCAutorelease, objc_autorelease, C_CC,
+         RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
+FUNCTION(ObjCRetainAutoreleasedReturnValue,
+         objc_retainAutoreleasedReturnValue, C_CC,
+         RETURNS(Int8PtrTy), ARGS(Int8PtrTy), ATTRS(NoUnwind))
+FUNCTION(ObjCAutoreleaseReturnValue, objc_autoreleaseReturnValue, C_CC,
+         RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
+FUNCTION(ObjCMsgSend, objc_msgSend, C_CC,
+         RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
+FUNCTION(ObjCMsgSendStret, objc_msgSend_stret, C_CC,
+         RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
+FUNCTION(ObjCMsgSendSuper, objc_msgSendSuper, C_CC,
+         RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
+FUNCTION(ObjCMsgSendSuperStret, objc_msgSendSuper_stret, C_CC,
+         RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
+FUNCTION(ObjCMsgSendSuper2, objc_msgSendSuper2, C_CC,
+         RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
+FUNCTION(ObjCMsgSendSuperStret2, objc_msgSendSuper2_stret, C_CC,
+         RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
+FUNCTION(ObjCSelRegisterName, sel_registerName, C_CC,
+         RETURNS(ObjCSELTy), ARGS(Int8PtrTy), ATTRS(NoUnwind, ReadNone))
+FUNCTION(ClassReplaceMethod, class_replaceMethod, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(ObjCClassPtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(ClassAddProtocol, class_addProtocol, C_CC,
+         RETURNS(VoidTy),
+         ARGS(ObjCClassPtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(ObjCGetClass, objc_getClass, C_CC,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(ObjCGetMetaClass, objc_getMetaClass, C_CC,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(ObjCClassGetName, class_getName, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(ObjCClassPtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(GetObjCProtocol, objc_getProtocol, C_CC,
+         RETURNS(ProtocolDescriptorPtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(AllocateObjCProtocol, objc_allocateProtocol, C_CC,
+         RETURNS(ProtocolDescriptorPtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(RegisterObjCProtocol, objc_registerProtocol, C_CC,
+         RETURNS(VoidTy),
+         ARGS(ProtocolDescriptorPtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(ProtocolAddMethodDescription, protocol_addMethodDescription, C_CC,
+         RETURNS(VoidTy),
+         ARGS(ProtocolDescriptorPtrTy, Int8PtrTy, Int8PtrTy,
+              ObjCBoolTy, ObjCBoolTy),
+         ATTRS(NoUnwind))
+FUNCTION(ProtocolAddProtocol, protocol_addProtocol, C_CC,
+         RETURNS(VoidTy),
+         ARGS(ProtocolDescriptorPtrTy, ProtocolDescriptorPtrTy),
+         ATTRS(NoUnwind))
+
+// void *_Block_copy(void *block);
+FUNCTION(BlockCopy, _Block_copy, C_CC,
+         RETURNS(ObjCBlockPtrTy),
+         ARGS(ObjCBlockPtrTy),
+         NO_ATTRS)
+// void _Block_release(void *block);
+FUNCTION(BlockRelease, _Block_release, C_CC,
+         RETURNS(VoidTy),
+         ARGS(ObjCBlockPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_deletedMethodError();
+FUNCTION(DeletedMethodError, swift_deletedMethodError, C_CC,
+        RETURNS(VoidTy),
+        ARGS(),
+        ATTRS(NoUnwind))
+
+FUNCTION(AllocError, swift_allocError, C_CC,
+         RETURNS(ErrorPtrTy, OpaquePtrTy),
+         ARGS(TypeMetadataPtrTy, WitnessTablePtrTy, OpaquePtrTy, Int1Ty),
+         ATTRS(NoUnwind))
+FUNCTION(DeallocError, swift_deallocError, C_CC,
+         RETURNS(VoidTy),
+         ARGS(ErrorPtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(GetErrorValue, swift_getErrorValue, C_CC,
+         RETURNS(VoidTy),
+         ARGS(ErrorPtrTy, Int8PtrPtrTy, OpenedErrorTriplePtrTy),
+         ATTRS(NoUnwind))
+
+#if SWIFT_OBJC_INTEROP || !defined(SWIFT_RUNTIME_GENERATE_GLOBAL_SYMBOLS)
+
+// Put here all definitions of runtime functions which are:
+// - only available when SWIFT_OBJC_INTEROP is enabled
+// - need a global function pointer referring to their implementation,
+//   e.g. those defined FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL or using
+//   the RegisterPreservingCC calling convention.
+
+FUNCTION(GetInitializedObjCClass, swift_getInitializedObjCClass, RegisterPreservingCC,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(ObjCClassPtrTy),
+         ATTRS(NoUnwind))
+
+#endif
+
+#undef RETURNS
+#undef ARGS
+#undef ATTRS
+#undef NO_ARGS
+#undef NO_ATTRS
+#undef FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL
+#undef FUNCTION
+#undef FUNCTION_NAME

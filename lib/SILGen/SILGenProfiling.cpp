@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -17,26 +17,60 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/GlobalValue.h"
 #include "llvm/ProfileData/CoverageMapping.h"
 #include "llvm/ProfileData/CoverageMappingWriter.h"
+#include "llvm/ProfileData/InstrProf.h"
 
 #include <forward_list>
 
 using namespace swift;
 using namespace Lowering;
 
+static bool isUnmappedDecl(Decl *D) {
+  if (isa<ConstructorDecl>(D) || isa<DestructorDecl>(D))
+    return false;
+
+  return D->isImplicit() || isa<EnumCaseDecl>(D);
+}
+
+/// Walk the non-static initializers in \p PBD.
+static void walkForProfiling(PatternBindingDecl *PBD, ASTWalker &Walker) {
+  if (PBD && !PBD->isStatic())
+    for (auto E : PBD->getPatternList())
+      if (E.getInit())
+        E.getInit()->walk(Walker);
+}
+
+/// Walk the AST of \c Root and related nodes that are relevant for profiling.
+static void walkForProfiling(AbstractFunctionDecl *Root, ASTWalker &Walker) {
+  Root->walk(Walker);
+
+  // We treat class initializers as part of the constructor for profiling.
+  if (auto *CD = dyn_cast<ConstructorDecl>(Root)) {
+    Type DT = CD->getDeclContext()->getDeclaredTypeInContext();
+    auto *NominalType = DT->getNominalOrBoundGenericNominal();
+    for (auto *Member : NominalType->getMembers()) {
+      // Find pattern binding declarations that have initializers.
+      if (auto *PBD = dyn_cast<PatternBindingDecl>(Member))
+        walkForProfiling(PBD, Walker);
+    }
+  }
+}
+
 ProfilerRAII::ProfilerRAII(SILGenModule &SGM, AbstractFunctionDecl *D)
-    : SGM(SGM) {
+    : SGM(SGM), PreviousProfiler(std::move(SGM.Profiler)) {
   const auto &Opts = SGM.M.getOptions();
-  if (!Opts.GenerateProfile)
+  if (!Opts.GenerateProfile || isUnmappedDecl(D))
     return;
   SGM.Profiler =
       llvm::make_unique<SILGenProfiling>(SGM, Opts.EmitProfileCoverageMapping);
   SGM.Profiler->assignRegionCounters(D);
 }
 
-ProfilerRAII::~ProfilerRAII() { SGM.Profiler = nullptr; }
+ProfilerRAII::~ProfilerRAII() { SGM.Profiler = std::move(PreviousProfiler); }
 
 namespace {
 
@@ -52,6 +86,8 @@ struct MapRegionCounters : public ASTWalker {
       : NextCounter(0), CounterMap(CounterMap) {}
 
   bool walkToDeclPre(Decl *D) override {
+    if (isUnmappedDecl(D))
+      return false;
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
       CounterMap[AFD->getBody()] = NextCounter++;
     return true;
@@ -70,6 +106,7 @@ struct MapRegionCounters : public ASTWalker {
       CounterMap[FS->getBody()] = NextCounter++;
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
       CounterMap[FES->getBody()] = NextCounter++;
+      walkForProfiling(FES->getIterator(), *this);
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
       CounterMap[SS] = NextCounter++;
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
@@ -229,6 +266,9 @@ private:
   /// \brief A stack of currently live regions.
   std::vector<SourceMappingRegion> RegionStack;
 
+  /// \brief A stack of active repeat-while loops.
+  std::vector<RepeatWhileStmt *> RepeatWhileStack;
+
   CounterExpr *ExitCounter;
 
   /// \brief Return true if \c Node has an associated counter.
@@ -269,6 +309,16 @@ private:
       Counter = CounterExpr::Ref(Expr);
     else
       Counter = CounterExpr::Add(createCounter(std::move(Counter)), Expr);
+  }
+
+  /// \brief Subtract \c Expr from \c Node's counter.
+  void subtractFromCounter(ASTNode Node, CounterExpr &Expr) {
+    CounterExpr &Counter = getCounter(Node);
+    assert(!Counter.isZero() && "Cannot create a negative counter");
+    if (const CounterExpr *ReferencedCounter = Counter.getReferencedNode())
+      Counter = CounterExpr::Sub(*ReferencedCounter, Expr);
+    else
+      Counter = CounterExpr::Sub(createCounter(std::move(Counter)), Expr);
   }
 
   /// \brief Return the current region's counter.
@@ -395,12 +445,11 @@ public:
   /// \brief Generate the coverage counter mapping regions from collected
   /// source regions.
   SILCoverageMap *
-  emitSourceRegions(SILModule &M, StringRef Name, uint64_t Hash,
-                    llvm::DenseMap<ASTNode, unsigned> &CounterIndices) {
+  emitSourceRegions(SILModule &M, StringRef Name, bool External, uint64_t Hash,
+                    llvm::DenseMap<ASTNode, unsigned> &CounterIndices,
+                    StringRef Filename) {
     if (SourceRegions.empty())
       return nullptr;
-    StringRef Filename = SM.getIdentifierForBuffer(
-        SM.findBufferContainingLoc(SourceRegions.front().getStartLoc()));
 
     llvm::coverage::CounterExpressionBuilder Builder;
     std::vector<SILCoverageMap::MappedRegion> Regions;
@@ -415,12 +464,12 @@ public:
       Regions.emplace_back(Start.first, Start.second, End.first, End.second,
                            Region.getCounter().expand(Builder, CounterIndices));
     }
-    return SILCoverageMap::create(M, Filename, Name, Hash, Regions,
+    return SILCoverageMap::create(M, Filename, Name, External, Hash, Regions,
                                   Builder.getExpressions());
   }
 
   bool walkToDeclPre(Decl *D) override {
-    if (D->isImplicit())
+    if (isUnmappedDecl(D))
       return false;
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
       assignCounter(AFD->getBody());
@@ -457,6 +506,7 @@ public:
       assignCounter(RWS, CounterExpr::Zero());
       CounterExpr &BodyCounter = assignCounter(RWS->getBody());
       assignCounter(RWS->getCond(), CounterExpr::Ref(BodyCounter));
+      RepeatWhileStack.push_back(RWS);
 
     } else if (auto *FS = dyn_cast<ForStmt>(S)) {
       assignCounter(FS, CounterExpr::Zero());
@@ -469,6 +519,7 @@ public:
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
       assignCounter(FES, CounterExpr::Zero());
       assignCounter(FES->getBody());
+      walkForProfiling(FES->getIterator(), *this);
 
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
       assignCounter(SS);
@@ -505,6 +556,11 @@ public:
       if (auto *E = getConditionNode(WS->getCond()))
         addToCounter(E, getExitCounter());
 
+    } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
+      assert(RepeatWhileStack.back() == RWS && "Malformed repeat-while stack");
+      (void) RWS;
+      RepeatWhileStack.pop_back();
+
     } else if (auto *FS = dyn_cast<ForStmt>(S)) {
       // Both the condition and the increment are reached through the backedge.
       if (Expr *E = FS->getCond().getPtrOrNull())
@@ -514,7 +570,8 @@ public:
 
     } else if (auto *CS = dyn_cast<ContinueStmt>(S)) {
       // Continues create extra backedges, add them to the appropriate counters.
-      addToCounter(CS->getTarget(), getCurrentCounter());
+      if (!isa<RepeatWhileStmt>(CS->getTarget()))
+        addToCounter(CS->getTarget(), getCurrentCounter());
       if (auto *WS = dyn_cast<WhileStmt>(CS->getTarget())) {
         if (auto *E = getConditionNode(WS->getCond()))
           addToCounter(E, getCurrentCounter());
@@ -525,8 +582,11 @@ public:
 
     } else if (auto *BS = dyn_cast<BreakStmt>(S)) {
       // When we break from a loop, we need to adjust the exit count.
-      if (!isa<SwitchStmt>(BS->getTarget()))
+      if (auto *RWS = dyn_cast<RepeatWhileStmt>(BS->getTarget())) {
+        subtractFromCounter(RWS->getCond(), getCurrentCounter());
+      } else if (!isa<SwitchStmt>(BS->getTarget())) {
         addToCounter(BS->getTarget(), getCurrentCounter());
+      }
       terminateRegion(S);
 
     } else if (auto *FS = dyn_cast<FallthroughStmt>(S)) {
@@ -543,6 +603,10 @@ public:
       replaceCount(CounterExpr::Ref(getCounter(S)), getEndLoc(S));
 
     } else if (isa<ReturnStmt>(S) || isa<FailStmt>(S) || isa<ThrowStmt>(S)) {
+      // When we return, we may need to adjust some loop condition counts.
+      for (auto *RWS : RepeatWhileStack)
+        subtractFromCounter(RWS->getCond(), getCurrentCounter());
+
       terminateRegion(S);
     }
     return S;
@@ -564,8 +628,11 @@ public:
       assignCounter(E);
     } else if (auto *IE = dyn_cast<IfExpr>(E)) {
       CounterExpr &ThenCounter = assignCounter(IE->getThenExpr());
-      assignCounter(IE->getElseExpr(),
-                    CounterExpr::Sub(getCurrentCounter(), ThenCounter));
+      if (Parent.isNull())
+        assignCounter(IE->getElseExpr());
+      else
+        assignCounter(IE->getElseExpr(),
+                      CounterExpr::Sub(getCurrentCounter(), ThenCounter));
     }
 
     if (hasCounter(E))
@@ -584,29 +651,26 @@ public:
 
 } // end anonymous namespace
 
-/// Walk the AST of \c Root and related nodes that are relevant for profiling.
-static void walkForProfiling(AbstractFunctionDecl *Root, ASTWalker &Walker) {
-  Root->walk(Walker);
+static llvm::GlobalValue::LinkageTypes
+getEquivalentPGOLinkage(FormalLinkage Linkage) {
+  switch (Linkage) {
+  case FormalLinkage::PublicUnique:
+  case FormalLinkage::PublicNonUnique:
+    return llvm::GlobalValue::ExternalLinkage;
 
-  // We treat class initializers as part of the constructor for profiling.
-  if (auto *CD = dyn_cast<ConstructorDecl>(Root)) {
-    Type DT = CD->getDeclContext()->getDeclaredTypeInContext();
-    auto *NominalType = DT->getNominalOrBoundGenericNominal();
-    for (auto *Member : NominalType->getMembers()) {
-      // Find pattern binding declarations that have initializers.
-      if (auto *PBD = dyn_cast<PatternBindingDecl>(Member))
-        if (!PBD->isStatic())
-          for (auto E : PBD->getPatternList())
-            if (E.getInit())
-              E.getInit()->walk(Walker);
-    }
+  case FormalLinkage::HiddenUnique:
+  case FormalLinkage::HiddenNonUnique:
+  case FormalLinkage::Private:
+    return llvm::GlobalValue::PrivateLinkage;
   }
 }
 
 void SILGenProfiling::assignRegionCounters(AbstractFunctionDecl *Root) {
-  SmallString<128> NameBuffer;
-  SILDeclRef(Root).mangle(NameBuffer);
-  CurrentFuncName = NameBuffer.str();
+  CurrentFuncName = SILDeclRef(Root).mangle();
+  CurrentFuncLinkage = getDeclLinkage(Root);
+
+  if (auto *ParentFile = Root->getParentSourceFile())
+    CurrentFileName = ParentFile->getFilename();
 
   MapRegionCounters Mapper(RegionCounterMap);
   walkForProfiling(Root, Mapper);
@@ -618,8 +682,10 @@ void SILGenProfiling::assignRegionCounters(AbstractFunctionDecl *Root) {
   if (EmitCoverageMapping) {
     CoverageMapping Coverage(SGM.M.getASTContext().SourceMgr);
     walkForProfiling(Root, Coverage);
-    Coverage.emitSourceRegions(SGM.M, CurrentFuncName, FunctionHash,
-                               RegionCounterMap);
+    Coverage.emitSourceRegions(SGM.M, CurrentFuncName,
+                               !llvm::GlobalValue::isLocalLinkage(
+                                   getEquivalentPGOLinkage(CurrentFuncLinkage)),
+                               FunctionHash, RegionCounterMap, CurrentFileName);
   }
 }
 
@@ -644,16 +710,18 @@ void SILGenProfiling::emitCounterIncrement(SILGenBuilder &Builder,ASTNode Node){
   auto Int32Ty = SGM.Types.getLoweredType(BuiltinIntegerType::get(32, C));
   auto Int64Ty = SGM.Types.getLoweredType(BuiltinIntegerType::get(64, C));
 
+  std::string PGOFuncName = llvm::getPGOFuncName(
+      CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
+      CurrentFileName);
+
   SILLocation Loc = getLocation(Node);
   SILValue Args[] = {
-      // TODO: In C++ we give this string linkage that matches the functions, so
-      // that it's uniqued appropriately across TUs.
-      Builder.createStringLiteral(Loc, StringRef(CurrentFuncName),
+      // The intrinsic must refer to the function profiling name var, which is
+      // inaccessible during SILGen. Rely on irgen to rewrite the function name.
+      Builder.createStringLiteral(Loc, StringRef(PGOFuncName),
                                   StringLiteralInst::Encoding::UTF8),
       Builder.createIntegerLiteral(Loc, Int64Ty, FunctionHash),
       Builder.createIntegerLiteral(Loc, Int32Ty, NumRegionCounters),
-      // TODO: Should we take care to emit only one copy of each of the above
-      // three literals per function?
       Builder.createIntegerLiteral(Loc, Int32Ty, CounterIt->second)};
   Builder.createBuiltin(Loc, C.getIdentifier("int_instrprof_increment"),
                         SGM.Types.getEmptyTupleType(), {}, Args);

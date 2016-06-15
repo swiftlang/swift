@@ -9,14 +9,18 @@ handle_gyb_sources(
     "")
 
 add_swift_library(swiftClangImporter
+  CFTypeInfo.cpp
   ClangDiagnosticConsumer.cpp
   ClangImporter.cpp
+  IAMInference.cpp
   ImportDecl.cpp
+  ImportEnumInfo.cpp
   ImportMacro.cpp
   ImportType.cpp
   SwiftLookupTable.cpp
   LINK_LIBRARIES
     swiftAST
+    swiftParse
 )
 
 

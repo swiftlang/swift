@@ -1,8 +1,8 @@
-//===--- RuntimeStubs.h ---------------------------------------------------===//
+//===--- RuntimeStubs.h -----------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -21,7 +21,21 @@
 
 #include "LibcShims.h"
 
-__swift_ssize_t swift_stdlib_readLine_stdin(char **LinePtr);
+#ifdef __cplusplus
+namespace swift { extern "C" {
+#endif
+
+SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_ssize_t
+swift_stdlib_readLine_stdin(char * _Nullable * _Nonnull LinePtr);
+
+SWIFT_END_NULLABILITY_ANNOTATIONS
+
+#ifdef __cplusplus
+}} // extern "C", namespace swift
+#endif
 
 #endif // SWIFT_STDLIB_SHIMS_RUNTIMESTUBS_H_
 

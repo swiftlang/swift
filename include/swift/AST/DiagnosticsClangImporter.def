@@ -1,8 +1,8 @@
-//===- DiagnosticsClangImporter.def - Diagnostics Text ----------*- C++ -*-===//
+//===--- DiagnosticsClangImporter.def - Diagnostics Text --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,41 +22,59 @@
 #endif
 
 #ifndef ERROR
-#  define ERROR(ID,Category,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Category,Options,Text,Signature)
+#  define ERROR(ID,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Options,Text,Signature)
 #endif
 
 #ifndef WARNING
-#  define WARNING(ID,Category,Options,Text,Signature) \
-  DIAG(WARNING,ID,Category,Options,Text,Signature)
+#  define WARNING(ID,Options,Text,Signature) \
+  DIAG(WARNING,ID,Options,Text,Signature)
 #endif
 
 #ifndef NOTE
-#  define NOTE(ID,Category,Options,Text,Signature) \
-  DIAG(NOTE,ID,Category,Options,Text,Signature)
+#  define NOTE(ID,Options,Text,Signature) \
+  DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
-WARNING(warning_from_clang,none,none,
+WARNING(warning_from_clang,none,
   "%0", (StringRef))
-ERROR(error_from_clang,none,none,
+ERROR(error_from_clang,none,
   "%0", (StringRef))
-NOTE(note_from_clang,none,none,
+NOTE(note_from_clang,none,
   "%0", (StringRef))
 
-ERROR(clang_cannot_build_module,none,Fatal,
+ERROR(clang_cannot_build_module,Fatal,
   "could not build Objective-C module '%0'", (StringRef))
 
-ERROR(bridging_header_missing,none,Fatal,
+ERROR(bridging_header_missing,Fatal,
   "bridging header '%0' does not exist", (StringRef))
-ERROR(bridging_header_error,none,Fatal,
+ERROR(bridging_header_error,Fatal,
   "failed to import bridging header '%0'", (StringRef))
-WARNING(could_not_rewrite_bridging_header,none,none,
+WARNING(could_not_rewrite_bridging_header,none,
   "failed to serialize bridging header; "
   "target may not be debuggable outside of its original project", ())
 
-WARNING(invalid_swift_name_method,none,none,
+WARNING(invalid_swift_name_method,none,
   "too %select{few|many}0 parameters in swift_name attribute (expected %1; "
   "got %2)", (bool, unsigned, unsigned))
+
+NOTE(note_while_importing, none, "while importing '%0'", (StringRef))
+ERROR(swift_name_protocol_static, none, "swift_name cannot be used to define "
+                                         "%select{static member|init}0 on "
+                                         "protocol",
+      (bool))
+ERROR(swift_name_no_prototype, none,
+      "swift_name cannot be used on a non-prototyped function declaration", ())
+
+WARNING(inconsistent_swift_name,none,
+        "inconsistent Swift name for Objective-C %select{method|property}0 "
+        "'%1' in '%2' (%3 in '%4' vs. %5 in '%6')",
+        (bool, StringRef, StringRef, DeclName, StringRef, DeclName,
+         StringRef))
+
+WARNING(unresolvable_clang_decl,none,
+        "imported declaration '%0' could not be mapped to '%1'",
+        (StringRef, StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

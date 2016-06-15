@@ -2,10 +2,10 @@
 
 import Swift
 
-// CHECK-64: @_TWVO13indirect_enum5TreeA = constant {{.*}} i8* inttoptr ([[WORD:i64]] 8 to i8*), i8* inttoptr (i64 2162695 to i8*), i8* inttoptr (i64 8 to i8*)
-// CHECK-32: @_TWVO13indirect_enum5TreeA = constant {{.*}} i8* inttoptr ([[WORD:i32]] 4 to i8*), i8* inttoptr (i32 2162691 to i8*), i8* inttoptr (i32 4 to i8*)
+// CHECK-64: @_TWVO13indirect_enum5TreeA = hidden constant {{.*}} i8* inttoptr ([[WORD:i64]] 8 to i8*), i8* inttoptr (i64 2162695 to i8*), i8* inttoptr (i64 8 to i8*)
+// CHECK-32: @_TWVO13indirect_enum5TreeA = hidden constant {{.*}} i8* inttoptr ([[WORD:i32]] 4 to i8*), i8* inttoptr (i32 2162691 to i8*), i8* inttoptr (i32 4 to i8*)
 
-// CHECK-LABEL: define private %swift.type** @get_field_types_TreeA
+// CHECK-LABEL: define{{( protected)?}} private %swift.type** @get_field_types_TreeA
 // -- Leaf(T)
 // CHECK:         [[BITS:%.*]] = ptrtoint %swift.type* %T to [[WORD]]
 // CHECK:         [[INDIRECT_FLAG:%.*]] = or [[WORD]] [[BITS]], 1
@@ -19,7 +19,7 @@ indirect enum TreeA<T> {
   case Branch(left: TreeA<T>, right: TreeA<T>)
 }
 
-// CHECK-LABEL: define private %swift.type** @get_field_types_TreeB
+// CHECK-LABEL: define{{( protected)?}} private %swift.type** @get_field_types_TreeB
 // -- Leaf(T)
 // CHECK-NOT:     ptrtoint %swift.type* %T
 // -- Branch(TreeA, TreeA)
@@ -32,7 +32,7 @@ enum TreeB<T> {
   indirect case Branch(left: TreeB<T>, right: TreeB<T>)
 }
 
-// CHECK-LABEL: define private %swift.type** @get_field_types_Foo
+// CHECK-LABEL: define{{( protected)?}} private %swift.type** @get_field_types_Foo
 // -- Foo(Int)
 // CHECK-64:         (i64 or (i64 ptrtoint (%swift.type* @_TMSi {{.*}}), [[WORD]] 1)
 // CHECK-32:         (i32 or (i32 ptrtoint (%swift.type* @_TMSi {{.*}}), [[WORD]] 1)

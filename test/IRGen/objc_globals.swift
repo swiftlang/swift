@@ -7,13 +7,12 @@ import gadget
 import Foundation
 
 @inline(never)
-func blackHole<T>(t: T) { }
+func blackHole<T>(_ t: T) { }
 
 // CHECK-LABEL: @"OBJC_CLASS_$_NSNumber" = external global %objc_class
+// CHECK: @"OBJC_CLASS_$_NSString" = external global {{%.*}}, align
 // CHECK: @"OBJC_CLASSLIST_REFERENCES_$_{{.*}}" = private global %struct._class_t* bitcast (%objc_class* @"OBJC_CLASS_$_NSNumber" to %struct._class_t*), section "__DATA, __objc_classrefs, regular, no_dead_strip"
-
-// CHECK-LABEL: @"OBJC_CLASS_$_NSString" = external global %struct._class_t
-// CHECK: @"OBJC_CLASSLIST_REFERENCES_$_{{.*}}" = private global %struct._class_t* @"OBJC_CLASS_$_NSString", section "__DATA, __objc_classrefs, regular, no_dead_strip"
+// CHECK: @"OBJC_CLASSLIST_REFERENCES_$_{{.*}}" = private global %struct._class_t* bitcast (%objc_class* @"OBJC_CLASS_$_NSString" to %struct._class_t*), section "__DATA, __objc_classrefs, regular, no_dead_strip"
 
 public func testLiterals() {
   blackHole(gadget.giveMeASelector())
@@ -33,16 +32,16 @@ public func fooLazy() {
 // CHECK:         load i8*, i8** @OBJC_SELECTOR_REFERENCES_
 // CHECK:         ret
 
-// CHECK-LABEL: define internal i8* @giveMeAMetaclass()
+// CHECK-LABEL: define internal {{.*}}* @giveMeANumber()
 // CHECK:         [[CLASS:%.*]] = load %struct._class_t*, %struct._class_t**
-// CHECK:         [[SELECTOR:%.*]] = load i8*, i8** @OBJC_SELECTOR_REFERENCES_
+// CHECK:         [[SELECTOR:%.*]] = load i8*, i8** @OBJC_SELECTOR_REFERENCES_.{{.*}}
 // CHECK:         bitcast %struct._class_t* [[CLASS]] to i8*
 // CHECK:         call {{.*}} @objc_msgSend
 // CHECK:         ret
 
-// CHECK-LABEL: define internal {{.*}}* @giveMeANumber()
+// CHECK-LABEL: define internal i8* @giveMeAMetaclass()
 // CHECK:         [[CLASS:%.*]] = load %struct._class_t*, %struct._class_t**
-// CHECK:         [[SELECTOR:%.*]] = load i8*, i8** @OBJC_SELECTOR_REFERENCES_.{{.*}}
+// CHECK:         [[SELECTOR:%.*]] = load i8*, i8** @OBJC_SELECTOR_REFERENCES_
 // CHECK:         bitcast %struct._class_t* [[CLASS]] to i8*
 // CHECK:         call {{.*}} @objc_msgSend
 // CHECK:         ret

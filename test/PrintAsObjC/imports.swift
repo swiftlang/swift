@@ -25,16 +25,16 @@ import ctypes.bits
 import Foundation
 
 import Base
-import Base.ImplicitSub;
-import Base.ImplicitSub.ImSub;
-import Base.ImplicitSub.ExSub;
-import Base.ExplicitSub;
-import Base.ExplicitSub.ImSub;
-import Base.ExplicitSub.ExSub;
+import Base.ImplicitSub
+import Base.ImplicitSub.ImSub
+import Base.ImplicitSub.ExSub
+import Base.ExplicitSub
+import Base.ExplicitSub.ImSub
+import Base.ExplicitSub.ExSub
 
 @objc class Test {
   let word: DWORD = 0
-  let number: NSTimeInterval = 0.0
+  let number: TimeInterval = 0.0
 
   let baseI: BaseI = 0
   let baseII: BaseII = 0

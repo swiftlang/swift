@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -27,7 +27,7 @@ void swift::printSILLocationDescription(llvm::raw_ostream &out,
                                         ASTContext &Context) {
   if (loc.isNull()) {
     out << "<<invalid location>>";
-  } else if (!loc.hasASTLocation()) {
+  } else if (loc.isSILFile()) {
     printSourceLocDescription(out, loc.getSourceLoc(), Context);
   } else if (auto decl = loc.getAsASTNode<Decl>()) {
     printDeclDescription(out, decl, Context);
@@ -35,8 +35,7 @@ void swift::printSILLocationDescription(llvm::raw_ostream &out,
     printExprDescription(out, expr, Context);
   } else if (auto stmt = loc.getAsASTNode<Stmt>()) {
     printStmtDescription(out, stmt, Context);
-  } else {
-    auto pattern = loc.castToASTNode<Pattern>();
+  } else if (auto pattern = loc.castToASTNode<Pattern>()) {
     printPatternDescription(out, pattern, Context);
   }
 }

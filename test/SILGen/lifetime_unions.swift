@@ -69,9 +69,9 @@ func destroyUnionRValues() {
   // C/HECK:   [[GET_ADDRESS_ONLY_UNION:%.*]] = function_ref @_TF15lifetime_unions19getAddressOnlyUnionU__FMQ_GOS_16AddressOnlyUnionQ__ : $@convention(thin) <T> T.Type -> AddressOnlyUnion<T>
   // C/HECK:   [[GET_ADDRESS_ONLY_UNION_SPEC:%.*]] = specialize [[GET_ADDRESS_ONLY_UNION]] : $@convention(thin) <T> T.Type -> AddressOnlyUnion<T>, $@thin Int64.Type -> AddressOnlyUnion<Int64>, T = Int
   // C/HECK:   [[ADDRESS_ONLY_UNION_ADDR:%.*]] = alloc_stack $AddressOnlyUnion<Int64>
-  // C/HECK:   apply [[GET_ADDRESS_ONLY_UNION_SPEC]]([[ADDRESS_ONLY_UNION_ADDR]]#1, {{%.*}}) : $@thin Int64.Type -> AddressOnlyUnion<Int64>
-  // C/HECK:   destroy_addr [[ADDRESS_ONLY_UNION_ADDR]]#1 : $*AddressOnlyUnion<Int64>
-  // C/HECK:   dealloc_stack [[ADDRESS_ONLY_UNION_ADDR]]#0 : $*@local_storage AddressOnlyUnion<Int64>
+  // C/HECK:   apply [[GET_ADDRESS_ONLY_UNION_SPEC]]([[ADDRESS_ONLY_UNION_ADDR]], {{%.*}}) : $@thin Int64.Type -> AddressOnlyUnion<Int64>
+  // C/HECK:   destroy_addr [[ADDRESS_ONLY_UNION_ADDR]] : $*AddressOnlyUnion<Int64>
+  // C/HECK:   dealloc_stack [[ADDRESS_ONLY_UNION_ADDR]] : $*AddressOnlyUnion<Int64>
   getAddressOnlyUnion(Int)
    */
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -10,41 +10,78 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension LazySequenceType {
+extension LazySequenceProtocol {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///
   ///     self.map(transform).flatten()
   ///
   /// - Complexity: O(1)
-  @warn_unused_result
-  public func flatMap<Intermediate: SequenceType>(
-    transform: (Elements.Generator.Element)->Intermediate
+  public func flatMap<SegmentOfResult : Sequence>(
+    _ transform: (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazySequence<
-    FlattenSequence<LazyMapSequence<Elements, Intermediate>>> {
+    FlattenSequence<LazyMapSequence<Elements, SegmentOfResult>>> {
     return self.map(transform).flatten()
+  }
+  
+  /// Returns a `LazyMapSequence` containing the concatenated non-nil
+  /// results of mapping transform over this `Sequence`.
+  ///
+  /// Use this method to receive only nonoptional values when your
+  /// transformation produces an optional value.
+  ///
+  /// - Parameter transform: A closure that accepts an element of this
+  /// sequence as its argument and returns an optional value.
+  public func flatMap<ElementOfResult>(
+    _ transform: (Elements.Iterator.Element) -> ElementOfResult?
+  ) -> LazyMapSequence<
+    LazyFilterSequence<
+      LazyMapSequence<Elements, ElementOfResult?>>,
+    ElementOfResult
+  > {
+    return self.map(transform).filter { $0 != nil }.map { $0! }
   }
 }
 
-extension LazyCollectionType {
+extension LazyCollectionProtocol {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///
   ///     self.map(transform).flatten()
   ///
   /// - Complexity: O(1)
-  @warn_unused_result
-  public func flatMap<Intermediate: CollectionType>(
-    transform: (Elements.Generator.Element)->Intermediate
+  public func flatMap<SegmentOfResult : Collection>(
+    _ transform: (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazyCollection<
     FlattenCollection<
-      LazyMapCollection<Elements, Intermediate>>
+      LazyMapCollection<Elements, SegmentOfResult>>
   > {
     return self.map(transform).flatten()
   }
+  
+  /// Returns a `LazyMapCollection` containing the concatenated non-nil
+  /// results of mapping transform over this collection.
+  ///
+  /// Use this method to receive only nonoptional values when your
+  /// transformation produces an optional value.
+  ///
+  /// - Parameter transform: A closure that accepts an element of this
+  /// collection as its argument and returns an optional value.
+  public func flatMap<ElementOfResult>(
+    _ transform: (Elements.Iterator.Element) -> ElementOfResult?
+  ) -> LazyMapCollection<
+    LazyFilterCollection<
+      LazyMapCollection<Elements, ElementOfResult?>>,
+    ElementOfResult
+  > {
+    return self.map(transform).filter { $0 != nil }.map { $0! }
+  }
 }
 
-extension LazyCollectionType where Elements.Index : BidirectionalIndexType
+extension LazyCollectionProtocol
+  where
+  Self : BidirectionalCollection,
+  Elements : BidirectionalCollection
 {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
@@ -52,16 +89,30 @@ extension LazyCollectionType where Elements.Index : BidirectionalIndexType
   ///     self.map(transform).flatten()
   ///
   /// - Complexity: O(1)
-  @warn_unused_result
-  public func flatMap<
-    Intermediate: CollectionType
-    where Intermediate.Index : BidirectionalIndexType
-  >(
-    transform: (Elements.Generator.Element)->Intermediate
+  public func flatMap<SegmentOfResult : Collection>(
+    _ transform: (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazyCollection<
     FlattenBidirectionalCollection<
-      LazyMapCollection<Elements, Intermediate>
-  >> {
+      LazyMapBidirectionalCollection<Elements, SegmentOfResult>>>
+    where SegmentOfResult : BidirectionalCollection {
     return self.map(transform).flatten()
+  }
+  
+  /// Returns a `LazyMapBidirectionalCollection` containing the concatenated non-nil
+  /// results of mapping transform over this collection.
+  ///
+  /// Use this method to receive only nonoptional values when your
+  /// transformation produces an optional value.
+  ///
+  /// - Parameter transform: A closure that accepts an element of this
+  /// collection as its argument and returns an optional value.
+  public func flatMap<ElementOfResult>(
+    _ transform: (Elements.Iterator.Element) -> ElementOfResult?
+  ) -> LazyMapBidirectionalCollection<
+    LazyFilterBidirectionalCollection<
+      LazyMapBidirectionalCollection<Elements, ElementOfResult?>>,
+    ElementOfResult
+  > {
+    return self.map(transform).filter { $0 != nil }.map { $0! }
   }
 }

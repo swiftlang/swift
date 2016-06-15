@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -27,7 +27,7 @@ TEST(FunctionNameDemangleTests, CorrectlyDemangles) {
   EXPECT_STREQ(DemangledName, OutputBuffer);
   EXPECT_EQ(Result, strlen(DemangledName));
 
-  // Make sure the SynthesizeSugarOnTypes option is functioning
+  // Make sure the SynthesizeSugarOnTypes option is functioning.
   const char *FunctionNameWithSugar = "_TF4main3fooFT3argGSqGSaSi___T_";
   const char *DemangledNameWithSugar = "main.foo (arg : [Swift.Int]?) -> ()";
 

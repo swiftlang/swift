@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -14,8 +14,9 @@
 // camelCase names.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_BASIC_STRINGEXTRAS_HPP
-#define SWIFT_BASIC_STRINGEXTRAS_HPP
+
+#ifndef SWIFT_BASIC_STRINGEXTRAS_H
+#define SWIFT_BASIC_STRINGEXTRAS_H
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
@@ -28,6 +29,14 @@
 #include <string>
 
 namespace swift {
+  /// Determine whether the given string can be an argument label.
+  ///
+  /// \seealso Token::canBeArgumentLabel()
+  bool canBeArgumentLabel(StringRef identifier);
+
+  /// Determine whether the given string can be the name of a member.
+  bool canBeMemberName(StringRef identifier);
+
   /// Describes the kind of preposition a word is.
   enum PrepositionKind {
     PK_None = 0,
@@ -44,7 +53,6 @@ namespace swift {
     Unknown,
     Preposition,
     Verb,
-    AuxiliaryVerb,
     Gerund,
   };
 
@@ -177,6 +185,16 @@ namespace swift {
       unsigned getPosition() const {
         return Position;
       }
+
+      /// Retrieve the string up until this iterator
+      StringRef getPriorStr() const {
+        return String.slice(0, Position);
+      }
+
+      /// Retrieve the rest of the string (including this position)
+      StringRef getRestOfStr() const {
+        return String.slice(Position, String.size());
+      }
     };
 
     /// Find the first camelCase word in the given string.
@@ -237,6 +255,26 @@ namespace swift {
     /// unchanged.
     StringRef toLowercaseWord(StringRef string, StringScratchSpace &scratch);
 
+    /// Lowercase the first word within the given camelCase string.
+    ///
+    /// \param string The string to lowercase.
+    /// \param scratch Scratch buffer used to form the resulting string.
+    ///
+    /// \returns the string with the first word lowercased, including
+    /// initialisms.
+    StringRef toLowercaseInitialisms(StringRef string,
+                                     StringScratchSpace &scratch);
+
+    /// Lowercase the first word within the given camelCase string.
+    ///
+    /// \param string The string to lowercase.
+    /// \param scratch Scratch buffer used to form the resulting string.
+    ///
+    /// \returns the string with the first word lowercased, including
+    /// initialisms.
+    StringRef toLowercaseInitialisms(StringRef string,
+                                     SmallVectorImpl<char> &scratch);
+
     /// Sentence-case the given camelCase string by turning the first
     /// letter into an uppercase letter.
     ///
@@ -281,6 +319,10 @@ enum class NameRole {
   /// The base name of a function or method.
   BaseName,
 
+  /// The base name of a method where the omission type name is the
+  /// 'self' type.
+  BaseNameSelf,
+
   /// The first parameter of a function or method.
   FirstParameter,
 
@@ -301,6 +343,9 @@ enum class OmissionTypeFlags {
 
   /// Whether this parameter is of some Boolean type.
   Boolean = 0x02,
+
+  /// Whether this parameter is of some function/block type.
+  Function = 0x04,
 };
 
 /// Options that described omitted types.
@@ -350,6 +395,11 @@ struct OmissionTypeName {
   /// Whether this type is a Boolean type.
   bool isBoolean() const {
     return Options.contains(OmissionTypeFlags::Boolean);
+  }
+
+  /// Whether this type is a function/block type.
+  bool isFunction() const {
+    return Options.contains(OmissionTypeFlags::Function);
   }
 
   /// Determine whether the type name is empty.
@@ -431,6 +481,7 @@ bool omitNeedlessWords(StringRef &baseName,
                        bool isProperty,
                        const InheritedNameSet *allPropertyNames,
                        StringScratchSpace &scratch);
-}
 
-#endif // LLVM_SWIFT_BASIC_STRINGEXTRAS_HPP
+} // end namespace swift
+
+#endif // SWIFT_BASIC_STRINGEXTRAS_H

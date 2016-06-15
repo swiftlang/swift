@@ -8,24 +8,23 @@
 // Basic type checking
 //===----------------------------------------------------------------------===//
 protocol EqualComparable {
-  func isEqual(other: Self) -> Bool
+  func isEqual(_ other: Self) -> Bool
 }
 
-func doCompare<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) -> Bool {
+func doCompare<T : EqualComparable, U : EqualComparable>(_ t1: T, t2: T, u: U) -> Bool {
   var b1 = t1.isEqual(t2)
   if b1 {
-    return true;
+    return true
   }
 
-  return t1.isEqual(u) // expected-error {{cannot invoke 'isEqual' with an argument list of type '(U)'}}
-  // expected-note @-1 {{expected an argument list of type '(T)'}}
+  return t1.isEqual(u) // expected-error {{cannot invoke 'isEqual' with an argument list of type '(U)'}} expected-note {{expected an argument list of type '(T)'}}
 }
 
 protocol MethodLessComparable {
-  func isLess(other: Self) -> Bool
+  func isLess(_ other: Self) -> Bool
 }
 
-func min<T : MethodLessComparable>(x: T, y: T) -> T {
+func min<T : MethodLessComparable>(_ x: T, y: T) -> T {
   if (y.isLess(x)) { return y }
   return x
 }
@@ -34,7 +33,7 @@ func min<T : MethodLessComparable>(x: T, y: T) -> T {
 // Interaction with existential types
 //===----------------------------------------------------------------------===//
 
-func existential<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) {
+func existential<T : EqualComparable, U : EqualComparable>(_ t1: T, t2: T, u: U) {
   var eqComp : EqualComparable = t1 // expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
   eqComp = u
   if t1.isEqual(eqComp) {} // expected-error{{cannot invoke 'isEqual' with an argument list of type '(EqualComparable)'}}
@@ -43,10 +42,10 @@ func existential<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) {
 }
 
 protocol OtherEqualComparable {
-  func isEqual(other: Self) -> Bool
+  func isEqual(_ other: Self) -> Bool
 }
 
-func otherExistential<T : EqualComparable>(t1: T) {
+func otherExistential<T : EqualComparable>(_ t1: T) {
   var otherEqComp : OtherEqualComparable = t1 // expected-error{{value of type 'T' does not conform to specified type 'OtherEqualComparable'}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}}
   otherEqComp = t1 // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in assignment}}
   _ = otherEqComp
@@ -59,11 +58,11 @@ func otherExistential<T : EqualComparable>(t1: T) {
 }
 
 protocol Runcible {
-  func runce<A>(x: A)
-  func spoon(x: Self)
+  func runce<A>(_ x: A)
+  func spoon(_ x: Self)
 }
 
-func testRuncible(x: Runcible) { // expected-error{{protocol 'Runcible' can only be used as a generic constraint}}
+func testRuncible(_ x: Runcible) { // expected-error{{protocol 'Runcible' can only be used as a generic constraint}}
   x.runce(5)
 }
 
@@ -72,8 +71,8 @@ func testRuncible(x: Runcible) { // expected-error{{protocol 'Runcible' can only
 //===----------------------------------------------------------------------===//
 
 protocol Overload {
-  typealias A
-  typealias B
+  associatedtype A
+  associatedtype B
   func getA() -> A
   func getB() -> B
   func f1(_: A) -> A
@@ -87,15 +86,15 @@ protocol Overload {
   var prop : Self { get }
 }
 
-func testOverload<Ovl : Overload, OtherOvl : Overload>(ovl: Ovl, ovl2: Ovl,
+func testOverload<Ovl : Overload, OtherOvl : Overload>(_ ovl: Ovl, ovl2: Ovl,
                                                        other: OtherOvl) {
   var a = ovl.getA()
   var b = ovl.getB()
 
   // Overloading based on arguments
-  ovl.f1(a)
+  _ = ovl.f1(a)
   a = ovl.f1(a)
-  ovl.f1(b)
+  _ = ovl.f1(b)
   b = ovl.f1(b)
 
   // Overloading based on return type
@@ -128,8 +127,8 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(ovl: Ovl, ovl2: Ovl,
 // Subscripting
 //===----------------------------------------------------------------------===//
 protocol Subscriptable {
-  typealias Index
-  typealias Value
+  associatedtype Index
+  associatedtype Value
 
   func getIndex() -> Index
   func getValue() -> Value
@@ -138,14 +137,14 @@ protocol Subscriptable {
 }
 
 protocol IntSubscriptable {
-  typealias ElementType
+  associatedtype ElementType
 
   func getElement() -> ElementType
 
   subscript (index : Int) -> ElementType { get  }
 }
 
-func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(t: T) {
+func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(_ t: T) {
   var index = t.getIndex()
   var value = t.getValue()
   var element = t.getElement()
@@ -155,24 +154,24 @@ func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(t: T) {
   element = t[17]
   t[42] = element // expected-error{{cannot assign through subscript: subscript is get-only}}
 
-  t[value] = 17 // expected-error{{cannot subscript a value of type 'T' with an index of type 'T.Value'}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Self.Index), (Int)}}
+  // Suggests the Int form because we prefer concrete matches to generic matches in diagnosis.
+  t[value] = 17 // expected-error{{cannot convert value of type 'T.Value' to expected argument type 'Int'}}
 }
 
 //===----------------------------------------------------------------------===//
 // Static functions
 //===----------------------------------------------------------------------===//
 protocol StaticEq {
-  static func isEqual(x: Self, y: Self) -> Bool
+  static func isEqual(_ x: Self, y: Self) -> Bool
 }
 
-func staticEqCheck<T : StaticEq, U : StaticEq>(t: T, u: U) {
+func staticEqCheck<T : StaticEq, U : StaticEq>(_ t: T, u: U) {
   if t.isEqual(t, t) { return } // expected-error{{static member 'isEqual' cannot be used on instance of type 'T'}}
 
   if T.isEqual(t, y: t) { return }
   if U.isEqual(u, y: u) { return }
-  T.isEqual(t, y: u) // expected-error{{cannot invoke 'isEqual' with an argument list of type '(T, y: U)'}}
-  // expected-note @-1 {{expected an argument list of type '(T, y: T)'}}
+
+  T.isEqual(t, y: u) // expected-error{{cannot invoke 'isEqual' with an argument list of type '(T, y: U)'}} expected-note {{expected an argument list of type '(T, y: T)'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -182,7 +181,7 @@ protocol Ordered {
   func <(lhs: Self, rhs: Self) -> Bool
 }
 
-func testOrdered<T : Ordered>(x: T, y: Int) {
+func testOrdered<T : Ordered>(_ x: T, y: Int) {
   if y < 100 || 500 < y { return }
   if x < x { return }
 }
@@ -190,67 +189,66 @@ func testOrdered<T : Ordered>(x: T, y: Int) {
 //===----------------------------------------------------------------------===//
 // Requires clauses
 //===----------------------------------------------------------------------===//
-func conformanceViaRequires<T 
-       where T : EqualComparable, T : MethodLessComparable
-     >(t1: T, t2: T) -> Bool {
+func conformanceViaRequires<T>(_ t1: T, t2: T) -> Bool
+    where T : EqualComparable, T : MethodLessComparable {
   let b1 = t1.isEqual(t2)
   if b1 || t1.isLess(t2) {
-    return true;
+    return true
   }
 }
 
 protocol GeneratesAnElement {
-  typealias Element : EqualComparable
-  func generate() -> Element
+  associatedtype Element : EqualComparable
+  func makeIterator() -> Element
 }
 
 protocol AcceptsAnElement {
-  typealias Element : MethodLessComparable
-  func accept(e : Element)
+  associatedtype Element : MethodLessComparable
+  func accept(_ e : Element)
 }
 
-func impliedSameType<T : GeneratesAnElement where T : AcceptsAnElement>(t: T) {
-  t.accept(t.generate())
-  let e = t.generate(), e2 = t.generate()
+func impliedSameType<T : GeneratesAnElement>(_ t: T)
+    where T : AcceptsAnElement {
+  t.accept(t.makeIterator())
+  let e = t.makeIterator(), e2 = t.makeIterator()
   if e.isEqual(e2) || e.isLess(e2) {
     return
   }
 }
 
 protocol GeneratesAssoc1 {
-  typealias Assoc1 : EqualComparable
+  associatedtype Assoc1 : EqualComparable
   func get() -> Assoc1
 }
 
 protocol GeneratesAssoc2 {
-  typealias Assoc2 : MethodLessComparable
+  associatedtype Assoc2 : MethodLessComparable
   func get() -> Assoc2
 }
 
-func simpleSameType
-       <T : GeneratesAssoc1, U : GeneratesAssoc2 where T.Assoc1 == U.Assoc2>
-       (t: T, u: U) -> Bool
-{
+func simpleSameType<T : GeneratesAssoc1, U : GeneratesAssoc2>
+  (_ t: T, u: U) -> Bool
+   where T.Assoc1 == U.Assoc2 {
   return t.get().isEqual(u.get()) || u.get().isLess(t.get())
 }
 
 protocol GeneratesMetaAssoc1 {
-  typealias MetaAssoc1 : GeneratesAnElement
+  associatedtype MetaAssoc1 : GeneratesAnElement
   func get() -> MetaAssoc1
 }
 
 protocol GeneratesMetaAssoc2 {
-  typealias MetaAssoc2 : AcceptsAnElement
+  associatedtype MetaAssoc2 : AcceptsAnElement
   func get() -> MetaAssoc2
 }
 
 func recursiveSameType
-       <T : GeneratesMetaAssoc1, U : GeneratesMetaAssoc2, V : GeneratesAssoc1
-        where T.MetaAssoc1 == V.Assoc1, V.Assoc1 == U.MetaAssoc2>
-       (t: T, u: U)
+       <T : GeneratesMetaAssoc1, U : GeneratesMetaAssoc2, V : GeneratesAssoc1>
+       (_ t: T, u: U)
+  where T.MetaAssoc1 == V.Assoc1, V.Assoc1 == U.MetaAssoc2
 {
-  t.get().accept(t.get().generate())
-  let e = t.get().generate(), e2 = t.get().generate()
+  t.get().accept(t.get().makeIterator())
+  let e = t.get().makeIterator(), e2 = t.get().makeIterator()
   if e.isEqual(e2) || e.isLess(e2) {
     return
   }
@@ -258,20 +256,17 @@ func recursiveSameType
 
 // <rdar://problem/13985164>
 protocol P1 {
-  typealias Element
+  associatedtype Element
 }
 
 protocol P2 {
-  typealias AssocP1 : P1
+  associatedtype AssocP1 : P1
   func getAssocP1() -> AssocP1
 }
 
-func beginsWith2<
-     E0: P1, E1: P1
-     where 
-       E0.Element == E1.Element, 
-       E0.Element : EqualComparable
-     >(e0: E0, _ e1: E1) -> Bool
+func beginsWith2<E0: P1, E1: P1>(_ e0: E0, _ e1: E1) -> Bool
+where E0.Element == E1.Element,
+      E0.Element : EqualComparable
 {
 }
 
@@ -280,7 +275,7 @@ func beginsWith3<
      where 
        S0.AssocP1.Element == S1.AssocP1.Element, 
        S1.AssocP1.Element : EqualComparable
-     >(seq1: S0, _ seq2: S1) -> Bool
+     >(_ seq1: S0, _ seq2: S1) -> Bool
 {
   return beginsWith2(seq1.getAssocP1(), seq2.getAssocP1())
 }

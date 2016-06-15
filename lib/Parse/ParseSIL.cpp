@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -33,14 +33,21 @@ using namespace swift;
 namespace swift {
   class SILParserTUState {
   public:
-    SILParserTUState() {}
+    SILParserTUState(SILModule &M) : M(M) {}
     ~SILParserTUState();
+
+    SILModule &M;
     
     /// This is all of the forward referenced functions with
     /// the location for where the reference is.
     llvm::DenseMap<Identifier,
                    std::pair<SILFunction*, SourceLoc>> ForwardRefFns;
-    
+    /// A list of all functions forward-declared by a sil_scope.
+    std::vector<SILFunction *> PotentialZombieFns;
+
+    /// A map from textual .sil scope number to SILDebugScopes.
+    llvm::DenseMap<unsigned, SILDebugScope *> ScopeSlots;
+
     /// Did we parse a sil_stage for this module?
     bool DidParseSILStage = false;
     
@@ -49,7 +56,7 @@ namespace swift {
 }
 
 SILParserState::SILParserState(SILModule *M) : M(M) {
-  S = M ? new SILParserTUState() : nullptr;
+  S = M ? new SILParserTUState(*M) : nullptr;
 }
 
 SILParserState::~SILParserState() {
@@ -59,8 +66,16 @@ SILParserState::~SILParserState() {
 SILParserTUState::~SILParserTUState() {
   if (!ForwardRefFns.empty())
     for (auto Entry : ForwardRefFns)
-      Diags->diagnose(Entry.second.second, diag::sil_use_of_undefined_value,
-                      Entry.first.str());
+      if (Entry.second.second.isValid())
+        Diags->diagnose(Entry.second.second, diag::sil_use_of_undefined_value,
+                        Entry.first.str());
+
+  // Turn any debug-info-only function declarations into zombies.
+  for (auto *Fn : PotentialZombieFns)
+    if (Fn->isExternalDeclaration()) {
+      Fn->setInlined();
+      M.eraseFunction(Fn);
+    }
 }
 
 
@@ -71,8 +86,11 @@ SILParserTUState::~SILParserTUState() {
 namespace {
   struct ParsedSubstitution {
     SourceLoc loc;
-    Identifier name;
     Type replacement;
+  };
+
+  struct ParsedSpecAttr {
+    SmallVector<ParsedSubstitution, 4> subs;
   };
 
   class SILParser {
@@ -92,13 +110,9 @@ namespace {
 
     /// Data structures used to perform name lookup for local values.
     llvm::StringMap<ValueBase*> LocalValues;
-    llvm::StringMap<std::vector<SILValue>> ForwardMRVLocalValues;
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
     bool performTypeLocChecking(TypeLoc &T, bool IsSIL = true);
-    bool parseApplySubstitutions(
-                   SmallVectorImpl<ParsedSubstitution> &parsed);
-    bool handleGenericParams(TypeLoc &T, ArchetypeBuilder *builder);
     bool parseSpecConformanceSubstitutions(
                    SmallVectorImpl<ParsedSubstitution> &parsed);
     ProtocolConformance *parseProtocolConformanceHelper(ProtocolDecl *&proto,
@@ -115,7 +129,8 @@ namespace {
     /// up and return an appropriate SIL function.
     SILFunction *getGlobalNameForReference(Identifier Name,
                                            CanSILFunctionType Ty,
-                                           SourceLoc Loc);
+                                           SourceLoc Loc,
+                                           bool IgnoreFwdRef = false);
     /// getGlobalNameForDefinition - Given a definition of a global name, look
     /// it up and return an appropriate SIL function.
     SILFunction *getGlobalNameForDefinition(Identifier Name,
@@ -134,10 +149,8 @@ namespace {
     struct UnresolvedValueName {
       StringRef Name;
       SourceLoc NameLoc;
-      unsigned ResultVal;
 
       bool isUndef() const { return Name == "undef"; }
-      bool isMRV() const { return ResultVal != ~0U; }
     };
 
     /// getLocalValue - Get a reference to a local value with the specified name
@@ -149,8 +162,8 @@ namespace {
     /// method is used to register it and update our symbol table.
     void setLocalValue(ValueBase *Value, StringRef Name, SourceLoc NameLoc);
 
-    SILDebugLocation *getDebugLoc(SILBuilder & B, SILLocation Loc) {
-      return B.getOrCreateDebugLocation(Loc, F->getDebugScope());
+    SILDebugLocation getDebugLoc(SILBuilder & B, SILLocation Loc) {
+      return SILDebugLocation(Loc, F->getDebugScope());
     }
 
   public:
@@ -247,10 +260,15 @@ namespace {
     }
     bool parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
                         StringRef &OpcodeName);
+    bool parseSILDebugVar(SILDebugVariable &Var);
 
     /// \brief Parses the basic block arguments as part of branch instruction.
     bool parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args, SILBuilder &B);
 
+    bool parseSILLocation(SILLocation &L);
+    bool parseScopeRef(SILDebugScope *&DS);
+    bool parseSILDebugLocation(SILLocation &L, SILBuilder &B,
+                               bool parsedComma = false);
     bool parseSILInstruction(SILBasicBlock *BB);
     bool parseCallInstruction(SILLocation InstLoc,
                               ValueKind Opcode, SILBuilder &B,
@@ -262,13 +280,15 @@ namespace {
     
     bool isStartOfSILInstruction();
 
+    bool parseApplySubstitutions(
+                   SmallVectorImpl<ParsedSubstitution> &parsed);
+
     ProtocolConformance *parseProtocolConformance(ProtocolDecl *&proto,
-                             GenericParamList *&generics,
-                             ArchetypeBuilder &builder, bool localScope);
-    ProtocolConformance *parseProtocolConformance(ArchetypeBuilder &builder) {
+                             GenericParamList *&generics, bool localScope);
+    ProtocolConformance *parseProtocolConformance() {
       ProtocolDecl *dummy;
       GenericParamList *gp;
-      return parseProtocolConformance(dummy, gp, builder, true);
+      return parseProtocolConformance(dummy, gp, true);
     }
 
     Optional<llvm::coverage::Counter>
@@ -336,7 +356,7 @@ bool SILParser::parseVerbatim(StringRef name) {
 bool SILParser::diagnoseProblems() {
   // Check for any uses of basic blocks that were not defined.
   if (!UndefinedBlocks.empty()) {
-    // FIXME: These are going to come out in nondeterminstic order.
+    // FIXME: These are going to come out in nondeterministic order.
     for (auto Entry : UndefinedBlocks)
       P.diagnose(Entry.second.first, diag::sil_undefined_basicblock_use,
                  Entry.second.second);
@@ -345,7 +365,7 @@ bool SILParser::diagnoseProblems() {
   }
   
   if (!ForwardRefLocalValues.empty()) {
-    // FIXME: These are going to come out in nondeterminstic order.
+    // FIXME: These are going to come out in nondeterministic order.
     for (auto &Entry : ForwardRefLocalValues)
       P.diagnose(Entry.second, diag::sil_use_of_undefined_value,
                  Entry.first());
@@ -371,10 +391,11 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
       P.diagnose(Loc, diag::sil_value_use_type_mismatch, Name.str(),
                  Fn->getLoweredFunctionType(), Ty);
       P.diagnose(It->second.second, diag::sil_prior_reference);
-      auto loc = SILFileLocation(Loc);
-      Fn = SILFunction::create(SILMod, SILLinkage::Private, "", Ty,
-                               nullptr, loc, IsNotBare, IsNotTransparent, IsNotFragile);
-      Fn->setDebugScope(new (SILMod) SILDebugScope(loc, *Fn));
+      auto loc = RegularLocation(Loc);
+      Fn =
+          SILMod.createFunction(SILLinkage::Private, "", Ty, nullptr, loc,
+                                IsNotBare, IsNotTransparent, IsNotFragile);
+      Fn->setDebugScope(new (SILMod) SILDebugScope(loc, Fn));
     }
     
     assert(Fn->isExternalDeclaration() && "Forward defns cannot have bodies!");
@@ -387,23 +408,23 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
     return Fn;
   }
   
-  auto loc = SILFileLocation(Loc);
+  auto loc = RegularLocation(Loc);
   // If we don't have a forward reference, make sure the function hasn't been
   // defined already.
   if (SILMod.lookUpFunction(Name.str()) != nullptr) {
     P.diagnose(Loc, diag::sil_value_redefinition, Name.str());
-    auto fn = SILFunction::create(SILMod, SILLinkage::Private, "", Ty,
-                                  nullptr, loc, IsNotBare, IsNotTransparent,
-                                  IsNotFragile);
-    fn->setDebugScope(new (SILMod) SILDebugScope(loc, *fn));
+    auto *fn =
+        SILMod.createFunction(SILLinkage::Private, "", Ty, nullptr, loc,
+                              IsNotBare, IsNotTransparent, IsNotFragile);
+    fn->setDebugScope(new (SILMod) SILDebugScope(loc, fn));
     return fn;
   }
 
   // Otherwise, this definition is the first use of this name.
-  auto fn = SILFunction::create(SILMod, SILLinkage::Private, Name.str(),
-                                Ty, nullptr, loc, IsNotBare, IsNotTransparent,
-                                IsNotFragile);
-  fn->setDebugScope(new (SILMod) SILDebugScope(loc, *fn));
+  auto *fn = SILMod.createFunction(SILLinkage::Private, Name.str(), Ty,
+                                   nullptr, loc, IsNotBare,
+                                   IsNotTransparent, IsNotFragile);
+  fn->setDebugScope(new (SILMod) SILDebugScope(loc, fn));
   return fn;
 }
 
@@ -413,8 +434,9 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
 /// up and return an appropriate SIL function.
 SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
                                                   CanSILFunctionType Ty,
-                                                  SourceLoc Loc) {
-  auto loc = SILFileLocation(Loc);
+                                                  SourceLoc Loc,
+                                                  bool IgnoreFwdRef) {
+  auto loc = RegularLocation(Loc);
   
   // Check to see if we have a function by this name already.
   if (SILFunction *FnRef = SILMod.lookUpFunction(Name.str())) {
@@ -422,21 +444,21 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
     if (FnRef->getLoweredFunctionType() != Ty) {
       P.diagnose(Loc, diag::sil_value_use_type_mismatch,
                  Name.str(), FnRef->getLoweredFunctionType(), Ty);
-      FnRef = SILFunction::create(SILMod, SILLinkage::Private, "", Ty, nullptr,
-                                  loc, IsNotBare, IsNotTransparent,
-                                  IsNotFragile);
-      FnRef->setDebugScope(new (SILMod) SILDebugScope(loc, *FnRef));
+      FnRef =
+          SILMod.createFunction(SILLinkage::Private, "", Ty, nullptr, loc,
+                                IsNotBare, IsNotTransparent, IsNotFragile);
+      FnRef->setDebugScope(new (SILMod) SILDebugScope(loc, FnRef));
     }
     return FnRef;
   }
   
   // If we didn't find a function, create a new one - it must be a forward
   // reference.
-  auto Fn = SILFunction::create(SILMod, SILLinkage::Private,
-                                Name.str(), Ty, nullptr, loc, IsNotBare,
-                                IsNotTransparent, IsNotFragile);
-  Fn->setDebugScope(new (SILMod) SILDebugScope(loc, *Fn));
-  TUState.ForwardRefFns[Name] = { Fn, Loc };
+  auto *Fn = SILMod.createFunction(SILLinkage::Private, Name.str(), Ty,
+                                   nullptr, loc, IsNotBare,
+                                   IsNotTransparent, IsNotFragile);
+  Fn->setDebugScope(new (SILMod) SILDebugScope(loc, Fn));
+  TUState.ForwardRefFns[Name] = { Fn, IgnoreFwdRef ? SourceLoc() : Loc };
   TUState.Diags = &P.Diags;
   return Fn;
 }
@@ -504,20 +526,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
 
   if (Entry) {
     // If this value is already defined, check it to make sure types match.
-    SILType EntryTy;
-
-    // If this is a reference to something with multiple results, get the right
-    // one.
-    if (Name.isMRV()) {
-      if (Name.ResultVal >= Entry->getTypes().size()) {
-        HadError = true;
-        P.diagnose(Name.NameLoc, diag::invalid_sil_value_name_result_number);
-        // Make sure to return something of the requested type.
-        return new (SILMod) GlobalAddrInst(getDebugLoc(B, Loc), Type);
-      }
-    }
-
-    EntryTy = Entry->getType(Name.isMRV() ? Name.ResultVal : 0);
+    SILType EntryTy = Entry->getType();
 
     if (EntryTy != Type) {
       HadError = true;
@@ -527,27 +536,15 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
       return new (SILMod) GlobalAddrInst(getDebugLoc(B, Loc), Type);
     }
 
-    return SILValue(Entry, Name.isMRV() ? Name.ResultVal : 0);
+    return SILValue(Entry);
   }
   
   // Otherwise, this is a forward reference.  Create a dummy node to represent
   // it until we see a real definition.
   ForwardRefLocalValues[Name.Name] = Name.NameLoc;
 
-  if (!Name.isMRV()) {
-    Entry = new (SILMod) GlobalAddrInst(getDebugLoc(B, Loc), Type);
-    return Entry;
-  }
-
-  // If we have multiple results, track them through ForwardMRVLocalValues.
-  std::vector<SILValue> &Placeholders = ForwardMRVLocalValues[Name.Name];
-  if (Placeholders.size() <= Name.ResultVal)
-    Placeholders.resize(Name.ResultVal+1);
-
-  if (!Placeholders[Name.ResultVal])
-    Placeholders[Name.ResultVal] =
-      new (SILMod) GlobalAddrInst(getDebugLoc(B, Loc), Type);
-  return Placeholders[Name.ResultVal];
+  Entry = new (SILMod) GlobalAddrInst(getDebugLoc(B, Loc), Type);
+  return Entry;
 }
 
 /// setLocalValue - When an instruction or block argument is defined, this
@@ -566,15 +563,14 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
     }
 
     // If the forward reference was of the wrong type, diagnose this now.
-    if (Entry->getTypes() != Value->getTypes()) {
-      // FIXME: report correct entry
+    if (Entry->getType() != Value->getType()) {
       P.diagnose(NameLoc, diag::sil_value_def_type_mismatch, Name,
-                 Entry->getType(0).getSwiftRValueType(),
-                 Value->getType(0).getSwiftRValueType());
+                 Entry->getType().getSwiftRValueType(),
+                 Value->getType().getSwiftRValueType());
       HadError = true;
     } else {
       // Forward references only live here if they have a single result.
-      SILValue(Entry).replaceAllUsesWith(SILValue(Value));
+      Entry->replaceAllUsesWith(Value);
     }
     Entry = Value;
     return;
@@ -582,45 +578,6 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
 
   // Otherwise, just store it in our map.
   Entry = Value;
-
-  // If Entry has multiple values, it may be forward referenced.
-  if (Entry->getTypes().size() > 1) {
-    auto It = ForwardMRVLocalValues.find(Name);
-    if (It != ForwardMRVLocalValues.end()) {
-      // Take the information about the forward ref out of the maps.
-      std::vector<SILValue> Entries(std::move(It->second));
-      SourceLoc Loc = ForwardRefLocalValues[Name];
-
-      // Remove the entries from the maps.
-      ForwardRefLocalValues.erase(Name);
-      ForwardMRVLocalValues.erase(It);
-
-      // Verify that any forward-referenced values line up.
-      if (Entries.size() > Value->getTypes().size()) {
-        P.diagnose(Loc, diag::sil_value_def_type_mismatch, Name,
-                   Entry->getType(0).getSwiftRValueType(),
-                   Value->getType(0).getSwiftRValueType());
-        HadError = true;
-        return;
-      }
-
-      // Validate that any forward-referenced elements have the right type, and
-      // RAUW them.
-      for (unsigned i = 0, e = Entries.size(); i != e; ++i) {
-        if (!Entries[i]) continue;
-
-        if (Entries[i]->getType(0) != Value->getType(i)) {
-          P.diagnose(Loc, diag::sil_value_def_type_mismatch, Name,
-                     Entry->getType(0).getSwiftRValueType(),
-                     Value->getType(i).getSwiftRValueType());
-          HadError = true;
-          return;
-        }
-
-        Entries[i].replaceAllUsesWith(SILValue(Value, i));
-      }
-    }
-  }
 }
 
 
@@ -709,10 +666,10 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
 
 static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
                                  IsThunk_t *isThunk, bool *isGlobalInit,
-                                 Inline_t *inlineStrategy,
-                                 bool *isLet,
-                                 std::string *Semantics, EffectsKind *MRK,
-                                 Parser &P) {
+                                 Inline_t *inlineStrategy, bool *isLet,
+                                 SmallVectorImpl<std::string> *Semantics,
+                                 SmallVectorImpl<ParsedSpecAttr> *SpecAttrs,
+                                 EffectsKind *MRK, Parser &P) {
   while (P.consumeIf(tok::l_square)) {
     if (isLet && P.Tok.is(tok::kw_let)) {
       *isLet = true;
@@ -752,8 +709,25 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
   
       // Drop the double quotes.
       StringRef rawString = P.Tok.getText().drop_front().drop_back();
-      *Semantics = rawString;
+      Semantics->push_back(rawString);
       P.consumeToken(tok::string_literal);
+
+      P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+      continue;
+    }
+    else if (SpecAttrs && P.Tok.getText() == "_specialize") {
+      P.consumeToken(tok::identifier);
+
+      /// Parse a specialized attributed, building a parsed substitution list
+      /// and pushing a new ParsedSpecAttr on the SpecAttrs list. Conformances
+      /// cannot be generated until the function declaration is fully parsed so
+      /// that the function's generic signature can be consulted.
+      SILParser SpecAttrState(P);
+      ParsedSpecAttr SpecAttr;
+      if (SpecAttrState.parseApplySubstitutions(SpecAttr.subs))
+        return true;
+
+      SpecAttrs->emplace_back(SpecAttr);
 
       P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
@@ -795,7 +769,7 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name,
                                SourceLoc Loc,
                                SmallVectorImpl<ValueDecl *> &Lookup,
                                bool ExpectMultipleResults) {
-  unsigned options = NL_QualifiedDefault;
+  NLOptions options = NL_QualifiedDefault;
   // FIXME: a bit of a hack.
   if (Name == P.Context.Id_deinit || Name == P.Context.Id_init)
     options = options & ~NL_VisitSupertypes;
@@ -806,19 +780,6 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name,
     return nullptr;
   }
   return Lookup[0];
-}
-
-bool SILParser::handleGenericParams(TypeLoc &T, ArchetypeBuilder *builder) {
-  if (T.wasValidated() || !T.getType().isNull())
-     return false;
-
-  if (auto fnType = dyn_cast<FunctionTypeRepr>(T.getTypeRepr()))
-    if (auto gp = fnType->getGenericParams()) {
-      SmallVector<ArchetypeBuilder *, 1> builders(1, builder);
-      SmallVector<GenericParamList *, 1> gps(1, gp);
-      handleSILGenericParams(P.Context, gps, &P.SF, builders);
-    }
-  return false;
 }
 
 bool SILParser::parseASTType(CanType &result) {
@@ -857,32 +818,15 @@ bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
     if (auto generics = fnType->getGenericParams()) {
       GenericParams = generics;
 
-      // Collect the nested GenericParamLists and pass it to
-      // handleSILGenericParams.
-      SmallVector<GenericParamList *, 4> nestedLists;
-      SmallVector<ArchetypeBuilder *, 4> builders;
-      for (; generics; generics = generics->getOuterParameters()) {
-        nestedLists.push_back(generics);
-        auto *builder = new ArchetypeBuilder(*P.SF.getParentModule(), P.Diags);
-        generics->setBuilder(builder);
-        builders.push_back(builder);
-      }
-      handleSILGenericParams(P.Context, nestedLists, &P.SF, builders);
+      auto *genericSig = handleSILGenericParams(P.Context, generics, &P.SF);
+      fnType->setGenericSignature(genericSig);
     }
   }
   
   // Apply attributes to the type.
   TypeLoc Ty = P.applyAttributeToType(TyR.get(), attrs);
 
-  // We need the builders to be live here for generating GenericSignature.
-  bool retCode = performTypeLocChecking(Ty);
-  for (auto generics = GenericParams; generics;
-       generics = generics->getOuterParameters())
-    if (auto *builder = generics->getBuilder()) {
-      delete builder;
-      generics->setBuilder(nullptr);
-    }
-  if (retCode)
+  if (performTypeLocChecking(Ty))
     return true;
 
   Result = SILType::getPrimitiveType(Ty.getType()->getCanonicalType(),
@@ -915,16 +859,6 @@ bool SILParser::parseSILType(SILType &Result, GenericParamList *&GenericParams,
     // Use a random location.
     attrs.setAttr(TAK_convention, P.PreviousLoc);
     attrs.convention = "thin";
-  }
-
-  // Handle @local_storage, which changes the SIL value category.
-  if (attrs.has(TAK_local_storage)) {
-    // Require '*' on local_storage values.
-    if (category != SILValueCategory::Address)
-      P.diagnose(attrs.getLoc(TAK_local_storage),
-                 diag::sil_local_storage_non_address);
-    category = SILValueCategory::LocalStorage;
-    attrs.clearAttribute(TAK_local_storage);
   }
   return parseSILTypeWithoutQualifiers(Result, category, attrs, GenericParams,
                                        IsFuncDecl);
@@ -1104,7 +1038,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
 /// parseValueName - Parse a value name without a type available yet.
 ///
 ///     sil-value-name:
-///       sil-local-name ('#' integer_literal)?
+///       sil-local-name
 ///       'undef'
 ///
 bool SILParser::parseValueName(UnresolvedValueName &Result) {
@@ -1112,7 +1046,6 @@ bool SILParser::parseValueName(UnresolvedValueName &Result) {
 
   if (P.Tok.is(tok::kw_undef)) {
     Result.NameLoc = P.consumeToken(tok::kw_undef);
-    Result.ResultVal = ~1U;
     return false;
   }
 
@@ -1120,21 +1053,6 @@ bool SILParser::parseValueName(UnresolvedValueName &Result) {
   if (P.parseToken(tok::sil_local_name, Result.NameLoc,
                    diag::expected_sil_value_name))
     return true;
-
-  // If the result value specifier is present, parse it.
-  if (P.consumeIf(tok::pound)) {
-    unsigned Value = 0;
-    if (P.Tok.isNot(tok::integer_literal) ||
-        P.Tok.getText().getAsInteger(10, Value)) {
-      P.diagnose(P.Tok, diag::expected_sil_value_name_result_number);
-      return true;
-    }
-
-    P.consumeToken(tok::integer_literal);
-    Result.ResultVal = Value;
-  } else {
-    Result.ResultVal = ~0U;
-  }
 
   return false;
 }
@@ -1168,7 +1086,7 @@ bool SILParser::parseTypedValueRef(SILValue &Result, SourceLoc &Loc,
       parseSILType(Ty))
     return true;
   
-  Result = getLocalValue(Name, Ty, SILFileLocation(Loc), B);
+  Result = getLocalValue(Name, Ty, RegularLocation(Loc), B);
   return false;
 }
 
@@ -1193,7 +1111,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("witness_method", ValueKind::WitnessMethodInst)
     .Case("apply", ValueKind::ApplyInst)
     .Case("assign", ValueKind::AssignInst)
-    .Case("autorelease_return", ValueKind::AutoreleaseReturnInst)
     .Case("autorelease_value", ValueKind::AutoreleaseValueInst)
     .Case("br", ValueKind::BranchInst)
     .Case("builtin", ValueKind::BuiltinInst)
@@ -1237,9 +1154,12 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("is_unique_or_pinned", ValueKind::IsUniqueOrPinnedInst)
     .Case("function_ref", ValueKind::FunctionRefInst)
     .Case("load", ValueKind::LoadInst)
+    .Case("load_unowned", ValueKind::LoadUnownedInst)
     .Case("load_weak", ValueKind::LoadWeakInst)
     .Case("mark_dependence", ValueKind::MarkDependenceInst)
     .Case("mark_uninitialized", ValueKind::MarkUninitializedInst)
+    .Case("mark_uninitialized_behavior",
+          ValueKind::MarkUninitializedBehaviorInst)
     .Case("mark_function_escape", ValueKind::MarkFunctionEscapeInst)
     .Case("metatype", ValueKind::MetatypeInst)
     .Case("objc_existential_metatype_to_object",
@@ -1256,6 +1176,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("pointer_to_thin_function", ValueKind::PointerToThinFunctionInst)
     .Case("project_block_storage", ValueKind::ProjectBlockStorageInst)
     .Case("project_box", ValueKind::ProjectBoxInst)
+    .Case("project_existential_box", ValueKind::ProjectExistentialBoxInst)
     .Case("project_value_buffer", ValueKind::ProjectValueBufferInst)
     .Case("existential_metatype", ValueKind::ExistentialMetatypeInst)
     .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
@@ -1265,18 +1186,20 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("ref_to_unmanaged", ValueKind::RefToUnmanagedInst)
     .Case("ref_to_unowned", ValueKind::RefToUnownedInst)
     .Case("retain_value", ValueKind::RetainValueInst)
+    .Case("alloc_global", ValueKind::AllocGlobalInst)
     .Case("global_addr", ValueKind::GlobalAddrInst)
     .Case("strong_pin", ValueKind::StrongPinInst)
     .Case("strong_release", ValueKind::StrongReleaseInst)
     .Case("strong_retain", ValueKind::StrongRetainInst)
-    .Case("strong_retain_autoreleased", ValueKind::StrongRetainAutoreleasedInst)
     .Case("strong_retain_unowned", ValueKind::StrongRetainUnownedInst)
     .Case("strong_unpin", ValueKind::StrongUnpinInst)
     .Case("return", ValueKind::ReturnInst)
     .Case("select_enum", ValueKind::SelectEnumInst)
     .Case("select_enum_addr", ValueKind::SelectEnumAddrInst)
     .Case("select_value", ValueKind::SelectValueInst)
+    .Case("set_deallocating", ValueKind::SetDeallocatingInst)
     .Case("store", ValueKind::StoreInst)
+    .Case("store_unowned", ValueKind::StoreUnownedInst)
     .Case("store_weak", ValueKind::StoreWeakInst)
     .Case("string_literal", ValueKind::StringLiteralInst)
     .Case("struct", ValueKind::StructInst)
@@ -1321,6 +1244,47 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   return true;
 }
 
+static bool peekSILDebugLocation(Parser &P) {
+  auto T = P.peekToken().getText();
+  return P.Tok.is(tok::comma) && (T == "loc" || T == "scope");
+}
+
+bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
+  while (P.Tok.is(tok::comma) && !peekSILDebugLocation(P)) {
+    P.consumeToken();
+    StringRef Key = P.Tok.getText();
+    if (Key == "name") {
+      P.consumeToken();
+      if (P.Tok.getKind() != tok::string_literal) {
+        P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
+        return true;
+      }
+      // Drop the double quotes.
+      StringRef Val = P.Tok.getText().drop_front().drop_back();
+      Var.Name = Val;
+    } else if (Key == "argno") {
+      P.consumeToken();
+      if (P.Tok.getKind() != tok::integer_literal) {
+        P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
+        return true;
+      }
+      if (P.Tok.getText().getAsInteger(0, Var.ArgNo))
+        return true;
+    } else if (Key == "let") {
+      Var.Constant = true;
+    } else if (Key == "var") {
+      Var.Constant = false; 
+    } else if (Key == "loc") {
+      Var.Constant = false; 
+    } else {
+      P.diagnose(P.Tok, diag::sil_dbg_unknown_key, Key);
+      return true;
+    }
+    P.consumeToken();
+  }
+  return false;
+}
+
 bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args,
                                        SILBuilder &B) {
   if (P.Tok.is(tok::l_paren)) {
@@ -1356,10 +1320,6 @@ bool SILParser::parseApplySubstitutions(
   // Parse a list of Substitutions.
   do {
     SourceLoc Loc = P.Tok.getLoc();
-    Substitution Sub;
-    SILType Replace;
-    Identifier ArcheId;
-    TypeAttributes emptyAttrs;
 
     // Parse substitution as AST type.
     ParserResult<TypeRepr> TyR = P.parseType();
@@ -1368,7 +1328,7 @@ bool SILParser::parseApplySubstitutions(
     TypeLoc Ty = TyR.get();
     if (performTypeLocChecking(Ty, false))
       return true;
-    parsed.push_back({Loc, ArcheId, Ty.getType()});
+    parsed.push_back({Loc, Ty.getType()});
   } while (P.consumeIf(tok::comma));
   
   // Consume the closing '>'.
@@ -1387,64 +1347,66 @@ getConformanceOfReplacement(Parser &P, Type subReplacement,
                             ProtocolDecl *proto) {
   auto conformance = P.SF.getParentModule()->lookupConformance(
                        subReplacement, proto, nullptr);
-  return conformance.getPointer();
+  if (conformance && conformance->isConcrete())
+    return conformance->getConcrete();
+  return nullptr;
 }
 
-/// Return true if B is derived from A.
-static bool isDerivedFrom(ArchetypeType *A, ArchetypeType *B) {
-  if (A == B)
-    return true;
-  auto *p = B;
-  while ((p = p->getParent())) {
-    if (p == A)
+static bool isImpliedBy(ProtocolDecl *proto, ArrayRef<ProtocolDecl*> derived) {
+  for (auto derivedProto : derived) {
+    if (derivedProto == proto || derivedProto->inheritsFrom(proto))
       return true;
   }
+  return false;
+}
+
+static bool allowAbstractConformance(Parser &P, Type subReplacement,
+                                     ProtocolDecl *proto) {
+  if (!subReplacement->hasDependentProtocolConformances())
+    return false;
+
+  // AnyObject is implicitly conformed to by anything with a class bound.
+  if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject) &&
+      subReplacement->isAnyClassReferenceType()) {
+    return true;
+  }
+
+  if (auto archetype = subReplacement->getAs<ArchetypeType>()) {
+    return isImpliedBy(proto, archetype->getConformsTo());
+  }
+
+  SmallVector<ProtocolDecl *, 4> existentialProtos;
+  if (subReplacement->isExistentialType(existentialProtos)) {
+    return isImpliedBy(proto, existentialProtos);
+  }
+
   return false;
 }
 
 /// Collect conformances by looking up the conformance from replacement
 /// type and protocol decl in GenericParamList.
 static bool getConformancesForSubstitution(Parser &P,
-              GenericParamList *gp, ArchetypeType *subArchetype,
-              Type subReplacement, SourceLoc loc,
-              SmallVectorImpl<ProtocolConformance*> &conformances) {
-  for (auto params = gp; params; params = params->getOuterParameters()) {
-    for (auto param : *params) {
-      if (param->getInherited().empty())
-        continue;
-
-      auto *pArch = param->getArchetype();
-      if (!pArch || !isDerivedFrom(pArch, subArchetype))
-        continue;
-
-      // If subArchetype is C.Index and we have C inherits from P, we
-      // need to find the protocol conformance to P.Index. For now, we
-      // check if the replacement type conforms to subArchetype->getConformsTo.
-      for (auto *proto : subArchetype->getConformsTo())
-        if (auto *pConform =
-            getConformanceOfReplacement(P, subReplacement, proto))
-          conformances.push_back(pConform);
+              ArchetypeType *subArchetype, Type subReplacement, SourceLoc loc,
+              SmallVectorImpl<ProtocolConformanceRef> &conformances) {
+  for (auto proto : subArchetype->getConformsTo()) {
+    // Try looking up a concrete conformance.
+    if (auto conformance =
+          getConformanceOfReplacement(P, subReplacement, proto)) {
+      conformances.push_back(ProtocolConformanceRef(conformance));
+      continue;
     }
 
-    for (const auto &req : params->getRequirements()) {
-      if (req.getKind() != RequirementKind::Conformance)
-        continue;
-
-      if (req.getSubject().getPointer() != subArchetype)
-        continue;
-
-      if (auto *protoTy = req.getConstraint()->getAs<ProtocolType>())
-        if (auto *pConform =
-            getConformanceOfReplacement(P, subReplacement, protoTy->getDecl()))
-          conformances.push_back(pConform);
+    // If the replacement type has dependent conformances, we might be
+    // able to use an abstract conformance.
+    if (allowAbstractConformance(P, subReplacement, proto)) {
+      conformances.push_back(ProtocolConformanceRef(proto));
+      continue;
     }
-  }
 
-  if (subArchetype && !subReplacement->hasDependentProtocolConformances() &&
-      conformances.size() != subArchetype->getConformsTo().size()) {
     P.diagnose(loc, diag::sil_substitution_mismatch);
     return true;
   }
+
   return false;
 }
 
@@ -1464,13 +1426,13 @@ bool getApplySubstitutionsFromParsed(
     auto parsed = parses.front();
     parses = parses.slice(1);
 
-    SmallVector<ProtocolConformance*, 2> conformances;
-    if (getConformancesForSubstitution(SP.P, gp, subArchetype,
+    SmallVector<ProtocolConformanceRef, 2> conformances;
+    if (getConformancesForSubstitution(SP.P, subArchetype,
                                        parsed.replacement,
                                        parsed.loc, conformances))
       return true;
 
-    subs.push_back({subArchetype, parsed.replacement,
+    subs.push_back({parsed.replacement,
                     SP.P.Context.AllocateCopy(conformances)});
   }
   if (!parses.empty()) {
@@ -1480,101 +1442,7 @@ bool getApplySubstitutionsFromParsed(
   return false;
 }
 
-// FIXME: we work around canoicalization of PolymorphicFunctionType
-// by generating GenericSignature and transforming the input, output
-// types.
-static GenericSignature *canonicalPolymorphicFunctionType(
-                           PolymorphicFunctionType *Ty,
-                           ASTContext &Context,
-                           CanType &inTy, CanType &outTy) {
-  GenericSignature *genericSig = nullptr;
-  llvm::DenseMap<ArchetypeType*, Type> archetypeMap;
-  genericSig
-    = Ty->getGenericParams().getAsCanonicalGenericSignature(archetypeMap,
-                                                            Context);
-  
-  auto getArchetypesAsDependentTypes = [&](Type t) -> Type {
-    if (!t) return t;
-    if (auto arch = t->getAs<ArchetypeType>()) {
-      // As a kludge, we allow Self archetypes of protocol_methods to be
-      // unapplied.
-      if (arch->getSelfProtocol() && !archetypeMap.count(arch))
-        return arch;
-      return arch->getAsDependentType(archetypeMap);
-    }
-    return t;
-  };
-  
-  inTy = Ty->getInput()
-    .transform(getArchetypesAsDependentTypes)
-    ->getCanonicalType();
-  outTy = Ty->getResult()
-    .transform(getArchetypesAsDependentTypes)
-    ->getCanonicalType();
-  return genericSig;
-}
-
-static bool checkPolymorphicFunctionType(PolymorphicFunctionType *Ty,
-                                         PolymorphicFunctionType *Ty2,
-                                         ASTContext &Context, unsigned depth) {
-  bool InputIsPoly = isa<PolymorphicFunctionType>(Ty->getInput().getPointer());
-  bool OutputIsPoly =
-    isa<PolymorphicFunctionType>(Ty->getResult().getPointer());
-  bool Input2IsPoly =
-    isa<PolymorphicFunctionType>(Ty2->getInput().getPointer());
-  bool Output2IsPoly =
-    isa<PolymorphicFunctionType>(Ty2->getResult().getPointer());
-
-  if ((InputIsPoly && !Input2IsPoly) || (!InputIsPoly && Input2IsPoly) ||
-      (OutputIsPoly && !Output2IsPoly) || (!OutputIsPoly && Output2IsPoly))
-    return false;
-
-  // FIXME: We currently have issues canonicalizing PolymorphicFunctionType
-  // whose input type or result type is also a PolymorphicFunctionType. We also
-  // have issues when PolymorphicFunctionType is part of a FunctionType.
-  // rdar://18021608
-  if (InputIsPoly || OutputIsPoly || depth)
-    return true;
-
-  // Try to canonicalize PolymorphicFunctionType and compare.
-  CanType inTy, outTy, inTy2, outTy2;
-  auto sig = canonicalPolymorphicFunctionType(Ty, Context, inTy, outTy);
-  auto sig2 = canonicalPolymorphicFunctionType(Ty2, Context, inTy2, outTy2);
-  return sig == sig2 && inTy == inTy2 && outTy == outTy2;
-}
-
-static bool checkFunctionType(FunctionType *Ty, FunctionType *Ty2,
-                              ASTContext &Context);
-
-static bool checkASTType(CanType Ty, CanType Ty2, ASTContext &Context,
-                         unsigned depth) {
-  if (Ty == Ty2)
-    return true;
-  if (auto *InputTy = dyn_cast<FunctionType>(Ty.getPointer())) {
-    auto *Input2Ty = dyn_cast<FunctionType>(Ty2.getPointer());
-    if (!Input2Ty)
-      return false;
-    return checkFunctionType(InputTy, Input2Ty, Context);
-  }
-  if (auto *InputPoly = dyn_cast<PolymorphicFunctionType>(Ty.getPointer())) {
-    auto *Input2Poly = dyn_cast<PolymorphicFunctionType>(Ty2.getPointer());
-    if (!Input2Poly)
-      return false;
-    return checkPolymorphicFunctionType(InputPoly, Input2Poly, Context, depth);
-  }
-  return false;
-}
-
-static bool checkFunctionType(FunctionType *Ty, FunctionType *Ty2,
-                              ASTContext &Context) {
-  return Ty == Ty2 ||
-         (checkASTType(Ty->getInput()->getCanonicalType(),
-                       Ty2->getInput()->getCanonicalType(), Context, 1) &&
-          checkASTType(Ty->getResult()->getCanonicalType(),
-                       Ty2->getResult()->getCanonicalType(), Context, 1));
-}
-
-static ArrayRef<ProtocolConformance *>
+static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(Parser &P,
                                CanType conformingType, CanType protocolType) {
   SmallVector<ProtocolDecl *, 2> protocols;
@@ -1584,19 +1452,93 @@ collectExistentialConformances(Parser &P,
   if (protocols.empty())
     return {};
   
-  MutableArrayRef<ProtocolConformance *> conformances =
-    P.Context.Allocate<ProtocolConformance*>(protocols.size());
+  MutableArrayRef<ProtocolConformanceRef> conformances =
+    P.Context.AllocateUninitialized<ProtocolConformanceRef>(protocols.size());
   
   for (unsigned i : indices(protocols)) {
-    conformances[i]
-      = getConformanceOfReplacement(P, conformingType, protocols[i]);
+    auto proto = protocols[i];
+    auto conformance = getConformanceOfReplacement(P, conformingType, proto);
+    conformances[i] = ProtocolConformanceRef(proto, conformance);
   }
   
   return conformances;
 }
 
-///   sil-instruction:
-///     (sil_local_name '=')? identifier ...
+/// sil-loc ::= 'loc' string-literal ':' [0-9]+ ':' [0-9]+
+bool SILParser::parseSILLocation(SILLocation &Loc) {
+  SILLocation::DebugLoc L;
+  if (parseVerbatim("loc"))
+    return true;
+
+  if (P.Tok.getKind() != tok::string_literal) {
+    P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
+    return true;
+  }
+  // Drop the double quotes.
+  StringRef File = P.Tok.getText().drop_front().drop_back();
+  L.Filename = P.Context.getIdentifier(File).str().data();
+  P.consumeToken(tok::string_literal);
+  if (P.parseToken(tok::colon, diag::expected_colon_in_sil_location))
+    return true;
+  if (parseInteger(L.Line, diag::sil_invalid_line_in_sil_location))
+    return true;
+  if (P.parseToken(tok::colon, diag::expected_colon_in_sil_location))
+    return true;
+  if (parseInteger(L.Column, diag::sil_invalid_column_in_sil_location))
+    return true;
+
+  Loc.setDebugInfoLoc(L);
+  return false;
+}
+
+bool SILParser::parseScopeRef(SILDebugScope *&DS) {
+  unsigned Slot;
+  SourceLoc SlotLoc = P.Tok.getLoc();
+  if (parseInteger(Slot, diag::sil_invalid_scope_slot))
+    return true;
+
+  DS = TUState.ScopeSlots[Slot];
+  if (!DS) {
+    P.diagnose(SlotLoc, diag::sil_scope_undeclared, Slot);
+    return true;
+  }
+  return false;
+}
+
+///  (',' sil-loc)? (',' sil-scope-ref)?
+bool SILParser::parseSILDebugLocation(SILLocation &L, SILBuilder &B,
+                                      bool parsedComma) {
+  // Parse the debug information, if any.
+  if (P.Tok.is(tok::comma)) {
+    P.consumeToken();
+    parsedComma = true;
+  }
+  if (!parsedComma)
+    return false;
+
+  bool requireScope = false;
+  if (P.Tok.getText() == "loc") {
+    if (parseSILLocation(L))
+      return true;
+
+    if (P.Tok.is(tok::comma)) {
+      P.consumeToken();
+      requireScope = true;
+    }
+  }
+  if (P.Tok.getText() == "scope" || requireScope) {
+    parseVerbatim("scope");
+    SILDebugScope *DS = nullptr;
+    if (parseScopeRef(DS))
+      return true;
+    if (DS)
+      B.setCurrentDebugScope(DS);
+  }
+  return false;
+}
+
+/// sil-instruction-def ::= (sil-value-name '=')? sil-instruction
+///                         (',' sil-scope-ref)? (',' sil-loc)?
 bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   // We require SIL instructions to be at the start of a line to assist
   // recovery.
@@ -1629,7 +1571,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   SmallVector<SILValue, 4> OpList;
   SILValue Val;
 
-  SILLocation InstLoc = SILFileLocation(OpcodeLoc);
+  SILLocation InstLoc = RegularLocation(OpcodeLoc);
 
   auto parseCastConsumptionKind = [&](Identifier name, SourceLoc loc,
                                       CastConsumptionKind &out) -> bool {
@@ -1658,7 +1600,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::AllocBoxInst: {
     SILType Ty;
     if (parseSILType(Ty)) return true;
-    ResultVal = B.createAllocBox(InstLoc, Ty);
+    SILDebugVariable VarInfo;
+    if (parseSILDebugVar(VarInfo))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createAllocBox(InstLoc, Ty, VarInfo);
     break;
   }
   case ValueKind::ApplyInst:
@@ -1698,9 +1645,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       value = -value; 
     if (value.getBitWidth() != intTy->getGreatestWidth())
       value = value.zextOrTrunc(intTy->getGreatestWidth());
-    
-    ResultVal = B.createIntegerLiteral(InstLoc, Ty, value);
+
     P.consumeToken(tok::integer_literal);
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createIntegerLiteral(InstLoc, Ty, value);
     break;
   }
   case ValueKind::FloatLiteralInst: {
@@ -1730,7 +1679,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       bits = bits.zextOrTrunc(floatTy->getBitWidth());
     
     APFloat value(floatTy->getAPFloatSemantics(), bits);
-    
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
     ResultVal = B.createFloatLiteral(InstLoc, Ty, value);
     P.consumeToken(tok::integer_literal);
     break;
@@ -1746,6 +1696,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       encoding = StringLiteralInst::Encoding::UTF8;
     } else if (P.Tok.getText() == "utf16") {
       encoding = StringLiteralInst::Encoding::UTF16;
+    } else if (P.Tok.getText() == "objc_selector") {
+      encoding = StringLiteralInst::Encoding::ObjCSelector;
     } else {
       P.diagnose(P.Tok, diag::sil_string_invalid_encoding, P.Tok.getText());
       return true;
@@ -1763,8 +1715,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     // Ask the lexer to interpret the entire string as a literal segment.
     SmallVector<char, 128> stringBuffer;
     StringRef string = P.L->getEncodedStringSegment(rawString, stringBuffer);
-    ResultVal = B.createStringLiteral(InstLoc, string, encoding);
     P.consumeToken(tok::string_literal);
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createStringLiteral(InstLoc, string, encoding);
     break;
   }
 
@@ -1772,7 +1726,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILType Ty;
     if (parseSILType(Ty) ||
         parseVerbatim("in") ||
-        parseTypedValueRef(Val, B))
+        parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createAllocValueBuffer(InstLoc, Ty, Val);
     break;
@@ -1781,7 +1736,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILType Ty;
     if (parseSILType(Ty) ||
         parseVerbatim("in") ||
-        parseTypedValueRef(Val, B))
+        parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createProjectValueBuffer(InstLoc, Ty, Val);
     break;
@@ -1790,16 +1746,29 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILType Ty;
     if (parseSILType(Ty) ||
         parseVerbatim("in") ||
-        parseTypedValueRef(Val, B))
+        parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createDeallocValueBuffer(InstLoc, Ty, Val);
     break;
   }
 
   case ValueKind::ProjectBoxInst: {
-    if (parseTypedValueRef(Val, B))
+    if (parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createProjectBox(InstLoc, Val);
+    break;
+  }
+      
+  case ValueKind::ProjectExistentialBoxInst: {
+    SILType Ty;
+    if (parseSILType(Ty) ||
+        parseVerbatim("in") ||
+        parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createProjectExistentialBox(InstLoc, Ty, Val);
     break;
   }
       
@@ -1877,6 +1846,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseSILType(ResultTy))
       return true;
     
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
     ResultVal = B.createBuiltin(InstLoc, Id, ResultTy, subs, Args);
     break;
   }
@@ -1898,6 +1869,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
       return true;
     }
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
 
     switch (Opcode) {
     case ValueKind::OpenExistentialAddrInst:
@@ -1924,46 +1898,96 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 #define UNARY_INSTRUCTION(ID) \
   case ValueKind::ID##Inst:                   \
     if (parseTypedValueRef(Val, B)) return true; \
+    if (parseSILDebugLocation(InstLoc, B)) return true; \
     ResultVal = B.create##ID(InstLoc, Val);   \
     break;
-  UNARY_INSTRUCTION(FixLifetime)
-  UNARY_INSTRUCTION(CopyBlock)
-  UNARY_INSTRUCTION(StrongPin)
-  UNARY_INSTRUCTION(StrongRetain)
-  UNARY_INSTRUCTION(StrongRelease)
-  UNARY_INSTRUCTION(StrongRetainAutoreleased)
-  UNARY_INSTRUCTION(StrongUnpin)
-  UNARY_INSTRUCTION(AutoreleaseReturn)
-  UNARY_INSTRUCTION(StrongRetainUnowned)
-  UNARY_INSTRUCTION(UnownedRetain)
-  UNARY_INSTRUCTION(UnownedRelease)
-  UNARY_INSTRUCTION(IsUnique)
-  UNARY_INSTRUCTION(IsUniqueOrPinned)
-  UNARY_INSTRUCTION(DestroyAddr)
-  UNARY_INSTRUCTION(AutoreleaseValue)
-  UNARY_INSTRUCTION(ReleaseValue)
-  UNARY_INSTRUCTION(RetainValue)
-  UNARY_INSTRUCTION(Load)
-  UNARY_INSTRUCTION(CondFail)
-  UNARY_INSTRUCTION(DebugValue)
-  UNARY_INSTRUCTION(DebugValueAddr)
+
+#define REFCOUNTING_INSTRUCTION(ID)                                            \
+  case ValueKind::ID##Inst: {                                                  \
+    Atomicity atomicity = Atomicity::Atomic;                                   \
+    StringRef Optional;                                                        \
+    if (parseSILOptional(Optional, *this)) {                                   \
+      if (Optional == "nonatomic") {                                           \
+        atomicity = Atomicity::NonAtomic;                                      \
+      } else {                                                                 \
+        return true;                                                           \
+      }                                                                        \
+    }                                                                          \
+    if (parseTypedValueRef(Val, B))                                            \
+      return true;                                                             \
+    if (parseSILDebugLocation(InstLoc, B))                                     \
+      return true;                                                             \
+    ResultVal = B.create##ID(InstLoc, Val, atomicity);                         \
+  } break;
+
+    UNARY_INSTRUCTION(FixLifetime)
+    UNARY_INSTRUCTION(CopyBlock)
+    UNARY_INSTRUCTION(IsUnique)
+    UNARY_INSTRUCTION(IsUniqueOrPinned)
+    UNARY_INSTRUCTION(DestroyAddr)
+    UNARY_INSTRUCTION(Load)
+    UNARY_INSTRUCTION(CondFail)
+    REFCOUNTING_INSTRUCTION(StrongPin)
+    REFCOUNTING_INSTRUCTION(StrongRetain)
+    REFCOUNTING_INSTRUCTION(StrongRelease)
+    REFCOUNTING_INSTRUCTION(StrongUnpin)
+    REFCOUNTING_INSTRUCTION(StrongRetainUnowned)
+    REFCOUNTING_INSTRUCTION(UnownedRetain)
+    REFCOUNTING_INSTRUCTION(UnownedRelease)
+    REFCOUNTING_INSTRUCTION(AutoreleaseValue)
+    REFCOUNTING_INSTRUCTION(SetDeallocating)
+    REFCOUNTING_INSTRUCTION(ReleaseValue)
+    REFCOUNTING_INSTRUCTION(RetainValue)
 #undef UNARY_INSTRUCTION
+#undef REFCOUNTING_INSTRUCTION
 
-  case ValueKind::LoadWeakInst: {
-    bool isTake = false;
-    if (parseSILOptional(isTake, *this, "take") ||
-        parseTypedValueRef(Val, B))
-      return true;
+ case ValueKind::DebugValueInst:
+ case ValueKind::DebugValueAddrInst: {
+   SILDebugVariable VarInfo;
+   if (parseTypedValueRef(Val, B) ||
+       parseSILDebugVar(VarInfo) ||
+       parseSILDebugLocation(InstLoc, B))
+     return true;
+   if (Opcode == ValueKind::DebugValueInst)
+     ResultVal = B.createDebugValue(InstLoc, Val, VarInfo);
+   else
+     ResultVal = B.createDebugValueAddr(InstLoc, Val, VarInfo);
+   break;
+ }
 
-    ResultVal = B.createLoadWeak(InstLoc, Val, IsTake_t(isTake));
-    break;
+ case ValueKind::LoadUnownedInst:
+ case ValueKind::LoadWeakInst: {
+   bool isTake = false;
+   SourceLoc addrLoc;
+   if (parseSILOptional(isTake, *this, "take") ||
+       parseTypedValueRef(Val, addrLoc, B) ||
+       parseSILDebugLocation(InstLoc, B))
+     return true;
+
+   if (Opcode == ValueKind::LoadUnownedInst) {
+     if (!Val->getType().is<UnownedStorageType>()) {
+       P.diagnose(addrLoc, diag::sil_operand_not_unowned_address, "source",
+                  OpcodeName);
+     }
+     ResultVal = B.createLoadUnowned(InstLoc, Val, IsTake_t(isTake));
+
+   } else {
+     if (!Val->getType().is<WeakStorageType>()) {
+       P.diagnose(addrLoc, diag::sil_operand_not_weak_address, "source",
+                  OpcodeName);
+     }
+     ResultVal = B.createLoadWeak(InstLoc, Val, IsTake_t(isTake));
+   }
+
+   break;
   }
 
   case ValueKind::MarkDependenceInst: {
     SILValue Base;
     if (parseTypedValueRef(Val, B) ||
         parseVerbatim("on") ||
-        parseTypedValueRef(Base, B))
+        parseTypedValueRef(Base, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
     ResultVal = B.createMarkDependence(InstLoc, Val, Base);
@@ -2000,7 +2024,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseTypedValueRef(Val, B) ||
         parseSILIdentifier(ToToken, ToLoc,
                            diag::expected_tok_in_sil_instr, "to") ||
-        parseSILType(Ty))
+        parseSILType(Ty) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
     if (ToToken.str() != "to") {
@@ -2087,7 +2112,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILValue BitsVal;
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseTypedValueRef(BitsVal, B))
+        parseTypedValueRef(BitsVal, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createRefToBridgeObject(InstLoc, Val, BitsVal);
     break;
@@ -2127,11 +2153,15 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
 
     if (Opcode == ValueKind::UncheckedRefCastAddrInst) {
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
       ResultVal = B.createUncheckedRefCastAddr(InstLoc,
                                                sourceAddr, sourceType,
                                                destAddr, targetType);
       break;
     } else if (Opcode == ValueKind::UnconditionalCheckedCastAddrInst) {
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
       ResultVal = B.createUnconditionalCheckedCastAddr(InstLoc,
                                                        consumptionKind,
                                                        sourceAddr, sourceType,
@@ -2142,12 +2172,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     // The conditional cast still needs its branch destinations.
     Identifier successBBName, failureBBName;
     SourceLoc successBBLoc, failureBBLoc;
-    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
-        || parseSILIdentifier(successBBName, successBBLoc,
-                              diag::expected_sil_block_name)
-        || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
-        || parseSILIdentifier(failureBBName, failureBBLoc,
-                              diag::expected_sil_block_name))
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILIdentifier(successBBName, successBBLoc,
+                           diag::expected_sil_block_name) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILIdentifier(failureBBName, failureBBLoc,
+                           diag::expected_sil_block_name) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
     ResultVal = B.createCheckedCastAddrBranch(InstLoc, consumptionKind,
@@ -2163,8 +2194,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::CheckedCastBranchInst: {
     SILType ty;
     SILValue destVal;
-    Identifier kindToken, toToken;
-    SourceLoc kindLoc, toLoc;
+    Identifier toToken;
+    SourceLoc toLoc;
 
     bool isExact = false;
     if (Opcode == ValueKind::CheckedCastBranchInst &&
@@ -2178,18 +2209,21 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     
     // An unconditional cast instruction is finished here.
     if (Opcode == ValueKind::UnconditionalCheckedCastInst) {
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
       ResultVal = B.createUnconditionalCheckedCast(InstLoc, Val, ty);
       break;
     }    
     // The conditional cast still needs its branch destinations.
     Identifier successBBName, failureBBName;
     SourceLoc successBBLoc, failureBBLoc;
-    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
-        || parseSILIdentifier(successBBName, successBBLoc,
-                              diag::expected_sil_block_name)
-        || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
-        || parseSILIdentifier(failureBBName, failureBBLoc,
-                              diag::expected_sil_block_name))
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILIdentifier(successBBName, successBBLoc,
+                           diag::expected_sil_block_name) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILIdentifier(failureBBName, failureBBLoc,
+                           diag::expected_sil_block_name) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
     ResultVal = B.createCheckedCastBranch(InstLoc, isExact, Val, ty,
@@ -2231,23 +2265,97 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
 
-    if (parseTypedValueRef(Val, B)) return true;
+    if (parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
     ResultVal = B.createMarkUninitialized(InstLoc, Val, Kind);
     break;
   }
+  
+  case ValueKind::MarkUninitializedBehaviorInst: {
+    UnresolvedValueName InitStorageFuncName, StorageName,
+                        SetterFuncName, SelfName;
+    SmallVector<ParsedSubstitution, 4> ParsedInitStorageSubs,
+                                       ParsedSetterSubs;
+    GenericParamList *InitStorageParams, *SetterParams;
+    SILType InitStorageTy, SetterTy;
+    
+    // mark_uninitialized_behavior %init<Subs>(%storage) : $T -> U,
+    //                             %set<Subs>(%self) : $V -> W
+    if (parseValueName(InitStorageFuncName)
+        || parseApplySubstitutions(ParsedInitStorageSubs)
+        || P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "(")
+        || parseValueName(StorageName)
+        || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")")
+        || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || parseSILType(InitStorageTy, InitStorageParams)
+        || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
+        || parseValueName(SetterFuncName)
+        || parseApplySubstitutions(ParsedSetterSubs)
+        || P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "(")
+        || parseValueName(SelfName)
+        || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")")
+        || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || parseSILType(SetterTy, SetterParams))
+      return true;
+    
+    // Resolve the types of the operands.
+    SILValue InitStorageFunc = getLocalValue(InitStorageFuncName,
+                                             InitStorageTy, InstLoc, B);
+    SILValue SetterFunc = getLocalValue(SetterFuncName, SetterTy, InstLoc, B);
+    
+    SmallVector<Substitution, 4> InitStorageSubs, SetterSubs;
+    if (getApplySubstitutionsFromParsed(*this, InitStorageParams,
+                                        ParsedInitStorageSubs, InitStorageSubs)
+        || getApplySubstitutionsFromParsed(*this, SetterParams,
+                                           ParsedSetterSubs, SetterSubs))
+      return true;
+    
+    auto SubstInitStorageTy = InitStorageTy.castTo<SILFunctionType>()
+      ->substGenericArgs(B.getModule(), B.getModule().getSwiftModule(),
+                         InitStorageSubs);
+    auto SubstSetterTy = SetterTy.castTo<SILFunctionType>()
+      ->substGenericArgs(B.getModule(), B.getModule().getSwiftModule(),
+                         SetterSubs);
+    
+    // Derive the storage type from the initStorage method.
+    auto StorageTy = SILType::getPrimitiveAddressType(
+                               SubstInitStorageTy->getSingleResult().getType());
+    auto Storage = getLocalValue(StorageName, StorageTy, InstLoc, B);
+    
+    auto SelfTy = SubstSetterTy->getSelfParameter().getSILType();
+    auto Self = getLocalValue(SelfName, SelfTy, InstLoc, B);
+    
+    auto PropTy = SubstInitStorageTy->getParameters()[0].getSILType()
+      .getAddressType();
+    
+    ResultVal = B.createMarkUninitializedBehavior(InstLoc,
+                                                  InitStorageFunc,
+                                                  InitStorageSubs,
+                                                  Storage,
+                                                  SetterFunc,
+                                                  SetterSubs,
+                                                  Self,
+                                                  PropTy);
+    break;
+  }
+  
   case ValueKind::MarkFunctionEscapeInst: {
     SmallVector<SILValue, 4> OpList;
     do {
       if (parseTypedValueRef(Val, B)) return true;
       OpList.push_back(Val);
-    } while (P.consumeIf(tok::comma));
+    } while (!peekSILDebugLocation(P) && P.consumeIf(tok::comma));
 
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
     ResultVal = B.createMarkFunctionEscape(InstLoc, OpList);
     break;
   }
 
   case ValueKind::AssignInst:
   case ValueKind::StoreInst:
+  case ValueKind::StoreUnownedInst:
   case ValueKind::StoreWeakInst: {
     UnresolvedValueName from;
 
@@ -2258,9 +2366,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseValueName(from) ||
         parseSILIdentifier(toToken, toLoc,
                            diag::expected_tok_in_sil_instr, "to") ||
-        (Opcode == ValueKind::StoreWeakInst &&
+        ((Opcode == ValueKind::StoreWeakInst ||
+          Opcode == ValueKind::StoreUnownedInst) &&
          parseSILOptional(isInit, *this, "initialization")) ||
-        parseTypedValueRef(addrVal, addrLoc, B))
+        parseTypedValueRef(addrVal, addrLoc, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
     if (toToken.str() != "to") {
@@ -2268,14 +2378,28 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
 
-    if (!addrVal.getType().isAddress()) {
+    if (!addrVal->getType().isAddress()) {
       P.diagnose(addrLoc, diag::sil_operand_not_address,
                  "destination", OpcodeName);
       return true;
     }
 
+    if (Opcode == ValueKind::StoreUnownedInst) {
+      auto refType = addrVal->getType().getAs<UnownedStorageType>();
+      if (!refType) {
+        P.diagnose(addrLoc, diag::sil_operand_not_unowned_address,
+                   "destination", OpcodeName);
+        return true;
+      }
+      auto valueTy = SILType::getPrimitiveObjectType(refType.getReferentType());
+      ResultVal = B.createStoreUnowned(InstLoc,
+                                       getLocalValue(from, valueTy, InstLoc, B),
+                                       addrVal, IsInitialization_t(isInit));
+      break;
+    }
+
     if (Opcode == ValueKind::StoreWeakInst) {
-      auto refType = addrVal.getType().getAs<WeakStorageType>();
+      auto refType = addrVal->getType().getAs<WeakStorageType>();
       if (!refType) {
         P.diagnose(addrLoc, diag::sil_operand_not_weak_address,
                    "destination", OpcodeName);
@@ -2288,7 +2412,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     }
 
-    SILType ValType = addrVal.getType().getObjectType();
+    SILType ValType = addrVal->getType().getObjectType();
 
     if (Opcode == ValueKind::StoreInst) {
       ResultVal = B.createStore(InstLoc,
@@ -2322,13 +2446,21 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILType Ty;
     if (parseSILType(Ty))
       return true;
-    
-    if (Opcode == ValueKind::AllocStackInst)
-      ResultVal = B.createAllocStack(InstLoc, Ty);
-    else if (Opcode == ValueKind::AllocRefInst)
+
+    if (Opcode == ValueKind::AllocStackInst) {
+      SILDebugVariable VarInfo;
+      if (parseSILDebugVar(VarInfo) ||
+          parseSILDebugLocation(InstLoc, B))
+        return true;
+      ResultVal = B.createAllocStack(InstLoc, Ty, VarInfo);
+    } else if (Opcode == ValueKind::AllocRefInst) {
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
       ResultVal = B.createAllocRef(InstLoc, Ty, IsObjC, OnStack);
-    else {
+    } else {
       assert(Opcode == ValueKind::MetatypeInst);
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
       ResultVal = B.createMetatype(InstLoc, Ty);
     }
     break;
@@ -2339,7 +2471,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseSILOptional(isObjC, *this, "objc") ||
         parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILType(Ty))
+        parseSILType(Ty) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
     ResultVal = B.createAllocRefDynamic(InstLoc, Val, Ty, isObjC);
@@ -2347,7 +2480,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   }
 
   case ValueKind::DeallocStackInst:
-    if (parseTypedValueRef(Val, B))
+    if (parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createDeallocStack(InstLoc, Val);
     break;
@@ -2356,7 +2490,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseSILOptional(OnStack, *this, "stack"))
       return true;
 
-    if (parseTypedValueRef(Val, B))
+    if (parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createDeallocRef(InstLoc, Val, OnStack);
     break;
@@ -2365,14 +2500,16 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILValue Metatype, Instance;
     if (parseTypedValueRef(Instance, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseTypedValueRef(Metatype, B))
+        parseTypedValueRef(Metatype, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
     ResultVal = B.createDeallocPartialRef(InstLoc, Instance, Metatype);
     break;
   }
   case ValueKind::DeallocBoxInst:
-    if (parseTypedValueRef(Val, B))
+    if (parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
     ResultVal = B.createDeallocBox(InstLoc, Val);
@@ -2382,7 +2519,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILType Ty;
     if (parseSILType(Ty) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseTypedValueRef(Val, B))
+        parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     switch (Opcode) {
     default: llvm_unreachable("Out of sync with parent switch");
@@ -2403,7 +2541,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseTypedValueRef(Val, B)
         || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
         || P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$")
-        || parseASTType(ConcreteTy))
+        || parseASTType(ConcreteTy)
+        || parseSILDebugLocation(InstLoc, B))
       return true;
     
     ResultVal = B.createDeallocExistentialBox(InstLoc, ConcreteTy, Val);
@@ -2427,14 +2566,16 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         do {
           if (parseTypedValueRef(Val, B)) return true;
           OpList.push_back(Val);
-          TypeElts.push_back(Val.getType().getSwiftRValueType());
+          TypeElts.push_back(Val->getType().getSwiftRValueType());
         } while (P.consumeIf(tok::comma));
       }
       HadError |= P.parseToken(tok::r_paren,
                                diag::expected_tok_in_sil_instr,")");
-      
+
       auto Ty = TupleType::get(TypeElts, P.Context);
       auto Ty2 = SILType::getPrimitiveObjectType(Ty->getCanonicalType());
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
       ResultVal = B.createTuple(InstLoc, Ty2, OpList);
       break;
     }
@@ -2462,10 +2603,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         Type EltTy = TT->getElement(TypeElts.size()).getType();
         if (parseValueRef(Val,
                  SILType::getPrimitiveObjectType(EltTy->getCanonicalType()),
-                          SILFileLocation(P.Tok.getLoc()), B))
+                          RegularLocation(P.Tok.getLoc()), B))
           return true;
         OpList.push_back(Val);
-        TypeElts.push_back(Val.getType().getSwiftRValueType());
+        TypeElts.push_back(Val->getType().getSwiftRValueType());
       } while (P.consumeIf(tok::comma));
     }
     HadError |= P.parseToken(tok::r_paren,
@@ -2477,6 +2618,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
 
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
     ResultVal = B.createTuple(InstLoc, Ty, OpList);
     break;
   }
@@ -2489,12 +2632,14 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseSILDeclRef(Elt))
       return true;
     
-    if (P.Tok.is(tok::comma)) {
+    if (P.Tok.is(tok::comma) && !peekSILDebugLocation(P)) {
       P.consumeToken(tok::comma);
       if (parseTypedValueRef(Operand, B))
         return true;
     }
     
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
     ResultVal = B.createEnum(InstLoc, Operand,
                               cast<EnumElementDecl>(Elt.getDecl()), Ty);
     break;
@@ -2506,11 +2651,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILDeclRef EltRef;
     if (parseTypedValueRef(Operand, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILDeclRef(EltRef))
+        parseSILDeclRef(EltRef) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     
     EnumElementDecl *Elt = cast<EnumElementDecl>(EltRef.getDecl());
-    auto ResultTy = Operand.getType().getEnumElementType(Elt, SILMod);
+    auto ResultTy = Operand->getType().getEnumElementType(Elt, SILMod);
     
     switch (Opcode) {
     case swift::ValueKind::InitEnumDataAddrInst:
@@ -2533,7 +2679,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILDeclRef EltRef;
     if (parseTypedValueRef(Operand, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILDeclRef(EltRef))
+        parseSILDeclRef(EltRef) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     
     EnumElementDecl *Elt = cast<EnumElementDecl>(EltRef.getDecl());
@@ -2542,14 +2689,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   }
   case ValueKind::TupleElementAddrInst:
   case ValueKind::TupleExtractInst: {
-    Identifier ElemId;
     SourceLoc NameLoc;
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
       return true;
 
     unsigned Field = 0;
-    TupleType *TT = Val.getType().getAs<TupleType>();
+    TupleType *TT = Val->getType().getAs<TupleType>();
     if (P.Tok.isNot(tok::integer_literal) ||
         P.Tok.getText().getAsInteger(10, Field) ||
         Field >= TT->getNumElements()) {
@@ -2557,7 +2703,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     P.consumeToken(tok::integer_literal);
-
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
     auto ResultTy = TT->getElement(Field).getType()->getCanonicalType();
     if (Opcode == ValueKind::TupleElementAddrInst)
       ResultVal = B.createTupleElementAddr(InstLoc, Val, Field,
@@ -2568,12 +2715,16 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::ReturnInst: {
-    if (parseTypedValueRef(Val, B)) return true;
+    if (parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
     ResultVal = B.createReturn(InstLoc, Val);
     break;
   }
   case ValueKind::ThrowInst: {
-    if (parseTypedValueRef(Val, B)) return true;
+    if (parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
     ResultVal = B.createThrow(InstLoc, Val);
     break;
   }
@@ -2585,6 +2736,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
     SmallVector<SILValue, 6> Args;
     if (parseSILBBArgsAtBranch(Args, B))
+      return true;
+
+    if (parseSILDebugLocation(InstLoc, B))
       return true;
 
     // Note, the basic block here could be a reference to an undefined
@@ -2605,7 +2759,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILIdentifier(BBName2, NameLoc2,
                            diag::expected_sil_block_name) ||
-        parseSILBBArgsAtBranch(Args2, B))
+        parseSILBBArgsAtBranch(Args2, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
     auto I1Ty =
@@ -2619,6 +2774,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::UnreachableInst:
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
     ResultVal = B.createUnreachable(InstLoc);
     break;
     
@@ -2648,12 +2805,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     TypeLoc Ty = TyR.get();
 
     // The type can be polymorphic.
-    ArchetypeBuilder builder(*P.SF.getParentModule(), P.Diags);
     if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get())) {
       if (auto generics = fnType->getGenericParams()) {
-        generics->setBuilder(&builder);
-        TypeLoc TyLoc = TyR.get();
-        handleGenericParams(TyLoc, &builder);
+        assert(!Ty.wasValidated() && Ty.getType().isNull());
+
+        auto *genericSig = handleSILGenericParams(P.Context, generics, &P.SF);
+        fnType->setGenericSignature(genericSig);
       }
     }
 
@@ -2661,20 +2818,20 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
 
     if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILType(MethodTy, TyLoc)
-       )
+        parseSILType(MethodTy, TyLoc) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
-
+    
     // Pick the ValueDecl that has the right type.
     ValueDecl *TheDecl = nullptr;
     auto declTy = Ty.getType()->getCanonicalType();
     auto unlabeledDecl =
       declTy->getUnlabeledType(P.Context)->getCanonicalType();
     for (unsigned I = 0, E = values.size(); I < E; I++) {
-      auto lookupTy = values[I]->getType()->getCanonicalType();
+      auto lookupTy = values[I]->getInterfaceType();
       auto unlabeledLookup =
         lookupTy->getUnlabeledType(P.Context)->getCanonicalType();
-      if (checkASTType(unlabeledLookup, unlabeledDecl, P.Context, 0)) {
+      if (unlabeledDecl == unlabeledLookup) {
         TheDecl = values[I];
         // Update SILDeclRef to point to the right Decl.
         Member.loc = TheDecl;
@@ -2729,7 +2886,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         return true;
     }
     if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
-        parseSILType(MethodTy, TyLoc))
+        parseSILType(MethodTy, TyLoc) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
     // If LookupTy is a non-archetype, look up its conformance.
@@ -2739,15 +2897,15 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       P.diagnose(TyLoc, diag::sil_witness_method_not_protocol);
       return true;
     }
-    ProtocolConformance *Conformance = nullptr;
+    ProtocolConformanceRef Conformance(proto);
     if (!isa<ArchetypeType>(LookupTy)) {
       auto lookup = P.SF.getParentModule()->lookupConformance(
                                                       LookupTy, proto, nullptr);
-      if (lookup.getInt() != ConformanceKind::Conforms) {
+      if (!lookup) {
         P.diagnose(TyLoc, diag::sil_witness_method_type_does_not_conform);
         return true;
       }
-      Conformance = lookup.getPointer();
+      Conformance = ProtocolConformanceRef(*lookup);
     }
     
     ResultVal = B.createWitnessMethod(InstLoc, LookupTy, Conformance, Member,
@@ -2764,7 +2922,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseSILIdentifier(ToToken, ToLoc,
                            diag::expected_tok_in_sil_instr, "to") ||
         parseSILOptional(IsInit, *this, "initialization") ||
-        parseTypedValueRef(DestLVal, DestLoc, B))
+        parseTypedValueRef(DestLVal, DestLoc, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
     if (ToToken.str() != "to") {
@@ -2772,12 +2931,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
 
-    if (!DestLVal.getType().isAddress()) {
+    if (!DestLVal->getType().isAddress()) {
       P.diagnose(DestLoc, diag::sil_invalid_instr_operands);
       return true;
     }
 
-    SILValue SrcLVal = getLocalValue(SrcLName, DestLVal.getType(), InstLoc, B);
+    SILValue SrcLVal = getLocalValue(SrcLName, DestLVal->getType(), InstLoc, B);
     ResultVal = B.createCopyAddr(InstLoc, SrcLVal, DestLVal,
                                  IsTake_t(IsTake),
                                  IsInitialization_t(IsInit));
@@ -2797,7 +2956,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       } while (P.consumeIf(tok::comma));
     }
     if (P.parseToken(tok::r_paren,
-                     diag::expected_tok_in_sil_instr,")"))
+                     diag::expected_tok_in_sil_instr,")") ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
     ResultVal = B.createStruct(InstLoc, StructTy, OpList);
@@ -2809,7 +2969,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SourceLoc NameLoc = P.Tok.getLoc();
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILDottedPath(FieldV))
+        parseSILDottedPath(FieldV) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     if (!FieldV || !isa<VarDecl>(FieldV)) {
       P.diagnose(NameLoc, diag::sil_struct_inst_wrong_field);
@@ -2819,7 +2980,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
     // FIXME: substitution means this type should be explicit to improve
     // performance.
-    auto ResultTy = Val.getType().getFieldType(Field, SILMod);
+    auto ResultTy = Val->getType().getFieldType(Field, SILMod);
     if (Opcode == ValueKind::StructElementAddrInst)
       ResultVal = B.createStructElementAddr(InstLoc, Val, Field,
                                             ResultTy.getAddressType());
@@ -2833,20 +2994,22 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SourceLoc NameLoc;
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILDottedPath(FieldV))
+        parseSILDottedPath(FieldV) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     if (!FieldV || !isa<VarDecl>(FieldV)) {
       P.diagnose(NameLoc, diag::sil_ref_inst_wrong_field);
       return true;
     }
     VarDecl *Field = cast<VarDecl>(FieldV);
-    auto ResultTy = Val.getType().getFieldType(Field, SILMod);
+    auto ResultTy = Val->getType().getFieldType(Field, SILMod);
     ResultVal = B.createRefElementAddr(InstLoc, Val, Field, ResultTy);
     break;
   }
   case ValueKind::IsNonnullInst: {
     SourceLoc Loc;
-    if (parseTypedValueRef(Val, Loc, B))
+    if (parseTypedValueRef(Val, Loc, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createIsNonnull(InstLoc, Val);
     break;
@@ -2855,7 +3018,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILValue IndexVal;
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseTypedValueRef(IndexVal, B))
+        parseTypedValueRef(IndexVal, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createIndexAddr(InstLoc, Val, IndexVal);
     break;
@@ -2864,7 +3028,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILValue IndexVal;
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseTypedValueRef(IndexVal, B))
+        parseTypedValueRef(IndexVal, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createIndexRawPointer(InstLoc, Val, IndexVal);
     break;
@@ -2875,7 +3040,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (P.parseToken(tok::pound, diag::expected_sil_constant) ||
         parseSILIdentifier(ProtocolName, diag::expected_sil_constant) ||
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
-        parseSILType(Ty))
+        parseSILType(Ty) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     // Find the decl for the protocol name.
     ValueDecl *VD;
@@ -2890,6 +3056,24 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createObjCProtocol(InstLoc, cast<ProtocolDecl>(VD), Ty);
     break;
   }
+  case ValueKind::AllocGlobalInst: {
+    Identifier GlobalName;
+    SourceLoc IdLoc;
+    if (P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
+        parseSILIdentifier(GlobalName, IdLoc, diag::expected_sil_value_name) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    // Go through list of global variables in the SILModule.
+    SILGlobalVariable *global = SILMod.lookUpGlobalVariable(GlobalName.str());
+    if (!global) {
+      P.diagnose(IdLoc, diag::sil_global_variable_not_found, GlobalName);
+      return true;
+    }
+
+    ResultVal = B.createAllocGlobal(InstLoc, global);
+    break;
+  }
   case ValueKind::GlobalAddrInst: {
     Identifier GlobalName;
     SourceLoc IdLoc;
@@ -2897,7 +3081,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
         parseSILIdentifier(GlobalName, IdLoc, diag::expected_sil_value_name) ||
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
-        parseSILType(Ty))
+        parseSILType(Ty) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
     // Go through list of global variables in the SILModule.
@@ -2958,7 +3143,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     // Parse the type of the result operands.
     SILType ResultType;
     if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
-        || parseSILType(ResultType))
+        || parseSILType(ResultType) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     
     // Resolve the results.
@@ -2987,7 +3173,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
     SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 4> CaseBBs;
     SILBasicBlock *DefaultBB = nullptr;
-    while (P.consumeIf(tok::comma)) {
+    while (!peekSILDebugLocation(P) && P.consumeIf(tok::comma)) {
       Identifier BBName;
       SourceLoc BBLoc;
       // Parse 'default' sil-identifier.
@@ -3013,6 +3199,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "case or default");
       return true;
     }
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
     if (Opcode == ValueKind::SwitchEnumInst)
       ResultVal = B.createSwitchEnum(InstLoc, Val, DefaultBB, CaseBBs);
     else
@@ -3025,10 +3213,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
     SmallVector<std::pair<SILValue, SILBasicBlock *>, 4> CaseBBs;
     SILBasicBlock *DefaultBB = nullptr;
-    while (P.consumeIf(tok::comma)) {
+    while (!peekSILDebugLocation(P) && P.consumeIf(tok::comma)) {
       Identifier BBName;
       SourceLoc BBLoc;
       SILValue CaseVal;
+      
       // Parse 'default' sil-identifier.
       if (P.consumeIf(tok::kw_default)) {
         parseSILIdentifier(BBName, BBLoc, diag::expected_sil_block_name);
@@ -3038,14 +3227,15 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
       // Parse 'case' value-ref ':' sil-identifier.
       if (P.consumeIf(tok::kw_case)) {
-        if (parseValueRef(CaseVal, Val.getType(),
-                          SILFileLocation(P.Tok.getLoc()), B)) {
+        if (parseValueRef(CaseVal, Val->getType(),
+                          RegularLocation(P.Tok.getLoc()), B)) {
           // TODO: Issue a proper error message here
           P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "reference to a value");
           return true;
         }
-        auto intTy = Val.getType().getAs<BuiltinIntegerType>();
-        auto functionTy = Val.getType().getAs<SILFunctionType>();
+
+        auto intTy = Val->getType().getAs<BuiltinIntegerType>();
+        auto functionTy = Val->getType().getAs<SILFunctionType>();
         if (!intTy && !functionTy) {
           P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
           return true;
@@ -3053,32 +3243,36 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
         if (intTy) {
           // If it is a switch on an integer type, check that all case values
-          // are integer literals.
-          auto *IL = dyn_cast<IntegerLiteralInst>(CaseVal);
-          if (!IL) {
-            P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
-            return true;
-          }
-          APInt CaseValue = IL->getValue();
+          // are integer literals or undef.
+          if (!isa<SILUndef>(CaseVal)) {
+            auto *IL = dyn_cast<IntegerLiteralInst>(CaseVal);
+            if (!IL) {
+              P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
+              return true;
+            }
+            APInt CaseValue = IL->getValue();
 
-          if (CaseValue.getBitWidth() != intTy->getGreatestWidth())
-            CaseVal = B.createIntegerLiteral(
-                IL->getLoc(), Val.getType(),
-                CaseValue.zextOrTrunc(intTy->getGreatestWidth()));
+            if (CaseValue.getBitWidth() != intTy->getGreatestWidth())
+              CaseVal = B.createIntegerLiteral(
+                  IL->getLoc(), Val->getType(),
+                  CaseValue.zextOrTrunc(intTy->getGreatestWidth()));
+          }
         }
 
         if (functionTy) {
           // If it is a switch on a function type, check that all case values
-          // are function references.
-          auto *FR = dyn_cast<FunctionRefInst>(CaseVal);
-          if (!FR) {
-            if (auto *CF = dyn_cast<ConvertFunctionInst>(CaseVal)) {
-              FR = dyn_cast<FunctionRefInst>(CF->getOperand());
+          // are function references or undef.
+          if (!isa<SILUndef>(CaseVal)) {
+            auto *FR = dyn_cast<FunctionRefInst>(CaseVal);
+            if (!FR) {
+              if (auto *CF = dyn_cast<ConvertFunctionInst>(CaseVal)) {
+                FR = dyn_cast<FunctionRefInst>(CF->getOperand());
+              }
             }
-          }
-          if (!FR) {
-            P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
-            return true;
+            if (!FR) {
+              P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
+              return true;
+            }
           }
         }
 
@@ -3091,6 +3285,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "case or default");
       return true;
     }
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
     ResultVal = B.createSwitchValue(InstLoc, Val, DefaultBB, CaseBBs);
     break;
   }
@@ -3137,7 +3333,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     // Parse the type of the result operands.
     SILType ResultType;
     if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
-        parseSILType(ResultType))
+        parseSILType(ResultType) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
     // Resolve the results.
@@ -3145,7 +3342,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILValue DefaultValue;
     if (DefaultResultName)
       DefaultValue = getLocalValue(*DefaultResultName, ResultType, InstLoc, B);
-    SILType ValType = Val.getType();
+    SILType ValType = Val->getType();
     for (auto &caseName : CaseValueAndResultNames)
       CaseValues.push_back(std::make_pair(
           getLocalValue(caseName.first, ValType, InstLoc, B),
@@ -3156,7 +3353,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::DeinitExistentialAddrInst: {
-    if (parseTypedValueRef(Val, B))
+    if (parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createDeinitExistentialAddr(InstLoc, Val);
     break;
@@ -3166,12 +3364,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
-        parseASTType(Ty))
+        parseASTType(Ty) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     
     // Lower the type at the abstraction level of the existential.
     auto archetype
-      = ArchetypeType::getOpened(Val.getType().getSwiftRValueType())
+      = ArchetypeType::getOpened(Val->getType().getSwiftRValueType())
         ->getCanonicalType();
     
     SILType LoweredTy = SILMod.Types.getLoweredType(
@@ -3179,9 +3378,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       .getAddressType();
     
     // Collect conformances for the type.
-    ArrayRef<ProtocolConformance *> conformances
+    ArrayRef<ProtocolConformanceRef> conformances
       = collectExistentialConformances(P, Ty,
-                                       Val.getType().getSwiftRValueType());
+                                       Val->getType().getSwiftRValueType());
     
     ResultVal = B.createInitExistentialAddr(InstLoc, Val, Ty, LoweredTy,
                                         conformances);
@@ -3194,25 +3393,17 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseSILType(ExistentialTy) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
-        parseASTType(ConcreteFormalTy))
+        parseASTType(ConcreteFormalTy) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     
-    // Lower the type at the abstraction level of the existential.
-    auto archetype
-      = ArchetypeType::getOpened(ExistentialTy.getSwiftRValueType())
-        ->getCanonicalType();
-    
-    SILType LoweredTy = SILMod.Types.getLoweredType(
-                      Lowering::AbstractionPattern(archetype), ConcreteFormalTy)
-      .getAddressType();
-    
     // Collect conformances for the type.
-    ArrayRef<ProtocolConformance *> conformances
+    ArrayRef<ProtocolConformanceRef> conformances
       = collectExistentialConformances(P, ConcreteFormalTy,
                                        ExistentialTy.getSwiftRValueType());
     
     ResultVal = B.createAllocExistentialBox(InstLoc, ExistentialTy,
-                                    ConcreteFormalTy, LoweredTy, conformances);
+                                            ConcreteFormalTy, conformances);
     
     break;
   }
@@ -3224,10 +3415,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
         parseASTType(FormalConcreteTy) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILType(ExistentialTy))
+        parseSILType(ExistentialTy) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     
-    ArrayRef<ProtocolConformance *> conformances
+    ArrayRef<ProtocolConformanceRef> conformances
       = collectExistentialConformances(P, FormalConcreteTy,
                             ExistentialTy.getSwiftRValueType());
 
@@ -3242,12 +3434,24 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILType ExistentialTy;
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILType(ExistentialTy))
+        parseSILType(ExistentialTy) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
+
+    auto baseExType = ExistentialTy.getSwiftRValueType();
+    auto formalConcreteType = Val->getType().getSwiftRValueType();
+    while (auto instExType = dyn_cast<ExistentialMetatypeType>(baseExType)) {
+      baseExType = instExType.getInstanceType();
+      formalConcreteType =
+        cast<MetatypeType>(formalConcreteType).getInstanceType();
+    }
+
+    ArrayRef<ProtocolConformanceRef> conformances
+      = collectExistentialConformances(P, formalConcreteType,
+                            ExistentialTy.getSwiftRValueType());
     
-    // FIXME: We should be parsing conformances here.
     ResultVal = B.createInitExistentialMetatype(InstLoc, Val, ExistentialTy,
-                                           ArrayRef<ProtocolConformance*>());
+                                                conformances);
     break;
   }
   case ValueKind::DynamicMethodBranchInst: {
@@ -3261,7 +3465,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseSILIdentifier(BBName, NameLoc, diag::expected_sil_block_name) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILIdentifier(BBName2, NameLoc2,
-                           diag::expected_sil_block_name))
+                           diag::expected_sil_block_name) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
     ResultVal = B.createDynamicMethodBranch(InstLoc, Val, Member,
@@ -3271,7 +3476,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::ProjectBlockStorageInst: {
-    if (parseTypedValueRef(Val, B))
+    if (parseTypedValueRef(Val, B) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     
     ResultVal = B.createProjectBlockStorage(InstLoc, Val);
@@ -3281,19 +3487,27 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     Identifier invoke, type;
     SourceLoc invokeLoc, typeLoc;
     
-    SILValue invokeVal, invokeValLoc;
+    UnresolvedValueName invokeName;
+    SILType invokeTy;
+    GenericParamList *invokeGenericParams;
     
     SILType blockType;
+    SmallVector<ParsedSubstitution, 4> parsedSubs;
+
     
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILIdentifier(invoke, invokeLoc,
                            diag::expected_tok_in_sil_instr, "invoke") ||
-        parseTypedValueRef(invokeVal, B) ||
+        parseValueName(invokeName) ||
+        parseApplySubstitutions(parsedSubs) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(invokeTy, invokeGenericParams) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILIdentifier(type, typeLoc,
                            diag::expected_tok_in_sil_instr, "type") ||
-        parseSILType(blockType))
+        parseSILType(blockType) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
     
     if (invoke.str() != "invoke") {
@@ -3305,12 +3519,25 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     
+    auto invokeVal = getLocalValue(invokeName, invokeTy, InstLoc, B);
+    
+    SmallVector<Substitution, 4> subs;
+    if (!parsedSubs.empty()) {
+      if (!invokeGenericParams) {
+        P.diagnose(typeLoc, diag::sil_substitutions_on_non_polymorphic_type);
+        return true;
+      }
+      if (getApplySubstitutionsFromParsed(*this, invokeGenericParams,
+                                          parsedSubs, subs))
+        return true;
+    }
+    
     ResultVal = B.createInitBlockStorageHeader(InstLoc, Val, invokeVal,
-                                               blockType);
+                                               blockType, subs);
     break;
   }
   }
-  
+
   // Store the named value if we had a name.
   if (ResultNameLoc.isValid())
     setLocalValue(ResultVal, ResultName, ResultNameLoc);
@@ -3370,7 +3597,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
   SILValue FnVal = getLocalValue(FnName, Ty, InstLoc, B);
 
-  SILType FnTy = FnVal.getType();
+  SILType FnTy = FnVal->getType();
   CanSILFunctionType substFTI = FTI;
   if (!subs.empty()) {
     auto silFnTy = FnTy.castTo<SILFunctionType>();
@@ -3380,12 +3607,12 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     FnTy = SILType::getPrimitiveObjectType(substFTI);
   }
   
-  auto ArgTys = substFTI->getParameterSILTypes();
-
   switch (Opcode) {
   default: llvm_unreachable("Unexpected case");
   case ValueKind::ApplyInst : {
-    if (ArgTys.size() != ArgNames.size()) {
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    if (substFTI->getNumSILArguments() != ArgNames.size()) {
       P.diagnose(TypeLoc, diag::expected_sil_type_kind,
                  "to have the same number of arg names as arg types");
       return true;
@@ -3393,16 +3620,20 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     
     unsigned ArgNo = 0;
     SmallVector<SILValue, 4> Args;
-    for (auto &ArgName : ArgNames)
-      Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++], InstLoc, B));
+    for (auto &ArgName : ArgNames) {
+      SILType expectedTy = substFTI->getSILArgumentType(ArgNo++);
+      Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
+    }
     
     ResultVal = B.createApply(InstLoc, FnVal, FnTy,
-                              substFTI->getResult().getSILType(),
+                              substFTI->getSILResult(),
                               subs, Args, IsNonThrowingApply);
     break;
   }
   case ValueKind::PartialApplyInst: {
-    if (ArgTys.size() < ArgNames.size()) {
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    if (substFTI->getParameters().size() < ArgNames.size()) {
       P.diagnose(TypeLoc, diag::expected_sil_type_kind,
                  "have the right argument types");
       return true;
@@ -3411,9 +3642,11 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     // Compute the result type of the partial_apply, based on which arguments
     // are getting applied.
     SmallVector<SILValue, 4> Args;
-    unsigned ArgNo = ArgTys.size() - ArgNames.size();
-    for (auto &ArgName : ArgNames)
-      Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++], InstLoc, B));
+    unsigned ArgNo = substFTI->getNumSILArguments() - ArgNames.size();
+    for (auto &ArgName : ArgNames) {
+      SILType expectedTy = substFTI->getSILArgumentType(ArgNo++);
+      Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
+    }
 
     SILType closureTy =
       SILBuilder::getPartialApplyResultType(Ty, ArgNames.size(), SILMod, subs);
@@ -3425,17 +3658,18 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   case ValueKind::TryApplyInst: {
     Identifier normalBBName, errorBBName;
     SourceLoc normalBBLoc, errorBBLoc;
-    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
-        || parseVerbatim("normal")
-        || parseSILIdentifier(normalBBName, normalBBLoc,
-                              diag::expected_sil_block_name)
-        || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
-        || parseVerbatim("error")
-        || parseSILIdentifier(errorBBName, errorBBLoc,
-                              diag::expected_sil_block_name))
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseVerbatim("normal") ||
+        parseSILIdentifier(normalBBName, normalBBLoc,
+                           diag::expected_sil_block_name) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseVerbatim("error") ||
+        parseSILIdentifier(errorBBName, errorBBLoc,
+                           diag::expected_sil_block_name) ||
+        parseSILDebugLocation(InstLoc, B))
       return true;
 
-    if (ArgTys.size() != ArgNames.size()) {
+    if (substFTI->getNumSILArguments() != ArgNames.size()) {
       P.diagnose(TypeLoc, diag::expected_sil_type_kind,
                  "to have the same number of arg names as arg types");
       return true;
@@ -3443,8 +3677,10 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     
     unsigned argNo = 0;
     SmallVector<SILValue, 4> args;
-    for (auto &argName : ArgNames)
-      args.push_back(getLocalValue(argName, ArgTys[argNo++], InstLoc, B));
+    for (auto &argName : ArgNames) {
+      SILType expectedTy = substFTI->getSILArgumentType(argNo++);
+      args.push_back(getLocalValue(argName, expectedTy, InstLoc, B));
+    }
 
     SILBasicBlock *normalBB = getBBForReference(normalBBName, normalBBLoc);
     SILBasicBlock *errorBB = getBBForReference(errorBBName, errorBBLoc);
@@ -3463,7 +3699,8 @@ bool SILParser::parseSILFunctionRef(SILLocation InstLoc,
   SourceLoc Loc = P.Tok.getLoc();
   if (parseGlobalName(Name) ||
       P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
-      parseSILType(Ty))
+      parseSILType(Ty) ||
+      parseSILDebugLocation(InstLoc, B))
     return true;
 
   auto FnTy = Ty.getAs<SILFunctionType>();
@@ -3574,11 +3811,13 @@ bool Parser::parseDeclSIL() {
   IsThunk_t isThunk = IsNotThunk;
   bool isGlobalInit = false;
   Inline_t inlineStrategy = InlineDefault;
-  std::string Semantics;
+  SmallVector<std::string, 1> Semantics;
+  SmallVector<ParsedSpecAttr, 4> SpecAttrs;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, *this) ||
       parseDeclSILOptional(&isTransparent, &isFragile, &isThunk, &isGlobalInit,
-                           &inlineStrategy, nullptr, &Semantics, &MRK, *this) ||
+                           &inlineStrategy, nullptr, &Semantics, &SpecAttrs,
+                           &MRK, *this) ||
       parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
@@ -3605,9 +3844,9 @@ bool Parser::parseDeclSIL() {
     FunctionState.F->setGlobalInit(isGlobalInit);
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setEffectsKind(MRK);
-    if (!Semantics.empty())
-      FunctionState.F->setSemanticsAttr(Semantics);
-
+    for (auto &Attr : Semantics) {
+      FunctionState.F->addSemanticsAttr(Attr);
+    }
     // Now that we have a SILFunction parse the body, if present.
 
     bool isDefinition = false;
@@ -3619,6 +3858,17 @@ bool Parser::parseDeclSIL() {
       // to parse this from the TypeRepr when SILFunctionType loses its context
       // params.
       FunctionState.F->setContextGenericParams(ContextParams);
+
+      // Resolve specialization attributes after setting ContextParams.
+      for (auto &Attr : SpecAttrs) {
+        SmallVector<Substitution, 4> Subs;
+        if (getApplySubstitutionsFromParsed(FunctionState, ContextParams,
+                                            Attr.subs, Subs)) {
+          return true;
+        }
+        FunctionState.F->addSpecializeAttr(
+          SILSpecializeAttr::create(FunctionState.F->getModule(), Subs));
+      }
       
       // Parse the basic block list.
       do {
@@ -3637,7 +3887,7 @@ bool Parser::parseDeclSIL() {
   if (FunctionState.diagnoseProblems())
     return true;
 
-  // If SIL prsing succeeded, verify the generated SIL.
+  // If SIL parsing succeeded, verify the generated SIL.
   if (!FunctionState.P.Diags.hadAnyError())
     FunctionState.F->verify();
 
@@ -3698,7 +3948,7 @@ bool Parser::parseSILGlobal() {
   Scope S(this, ScopeKind::TopLevel);
   if (parseSILLinkage(GlobalLinkage, *this) ||
       parseDeclSILOptional(nullptr, &isFragile, nullptr, nullptr,
-                           nullptr, &isLet, nullptr, nullptr, *this) ||
+                           nullptr, &isLet, nullptr, nullptr, nullptr, *this) ||
       parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
@@ -3716,7 +3966,7 @@ bool Parser::parseSILGlobal() {
   auto *GV = SILGlobalVariable::create(*SIL->M, GlobalLinkage.getValue(),
                                        (IsFragile_t)isFragile,
                                        GlobalName.str(),GlobalType,
-                                       SILFileLocation(NameLoc));
+                                       RegularLocation(NameLoc));
 
   GV->setLet(isLet);
   // Parse static initializer if exists.
@@ -3840,8 +4090,8 @@ static AssociatedTypeDecl *parseAssociatedTypeDecl(Parser &P, SILParser &SP,
   if (SP.parseSILIdentifier(DeclName, DeclLoc, diag::expected_sil_value_name))
     return nullptr;
   // We can return multiple decls, for now, we use the first lookup result.
-  // One example is two decls when searching for Generator of SequenceType:
-  // one from SequenceType, the other from _Sequence_Type.
+  // One example is two decls when searching for Generator of Sequence:
+  // one from Sequence, the other from _Sequence_Type.
   SmallVector<ValueDecl *, 4> values;
   auto VD = lookupMember(P, proto->getType(), DeclName, DeclLoc,
                          values, true/*ExpectMultipleResults*/);
@@ -3884,17 +4134,15 @@ static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
                                        P.Context);
   auto lookup = P.SF.getParentModule()->lookupConformance(
                          lookupTy, proto, nullptr);
-  if (!lookup.getPointer()) {
+  if (!lookup) {
     P.diagnose(KeywordLoc, diag::sil_witness_protocol_conformance_not_found);
     return nullptr;
   }
-  NormalProtocolConformance *theConformance =
-      dyn_cast<NormalProtocolConformance>(lookup.getPointer());
-  if (!theConformance) {
+  if (!lookup->isConcrete()) {
     P.diagnose(KeywordLoc, diag::sil_witness_protocol_conformance_not_found);
     return nullptr;
   }
-  return theConformance;
+  return lookup->getConcrete()->getRootNormalConformance();
 }
 
 /// Parse the substitution list for a specialized conformance.
@@ -3909,25 +4157,6 @@ bool SILParser::parseSpecConformanceSubstitutions(
   // Parse a list of Substitutions: Archetype = Replacement.
   do {
     SourceLoc Loc = P.Tok.getLoc();
-    Substitution Sub;
-    Identifier ArcheId;
-    std::string ArcheStr;
-    bool FirstToken = true;
-
-    // It is possible to have Base.Element as the Archetype name.
-    do {
-      Identifier TmpId;
-      if (parseSILIdentifier(TmpId, diag::expected_sil_type))
-        return true;
-      if (!FirstToken)
-        ArcheStr += ".";
-      ArcheStr += TmpId.str();
-      FirstToken = false;
-    } while (P.consumeIf(tok::period));
-    ArcheId = P.Context.getIdentifier(ArcheStr);
-
-    if (P.parseToken(tok::equal, diag::expected_tok_in_sil_instr, "="))
-      return true;
 
     // Parse substitution as AST type.
     ParserResult<TypeRepr> TyR = P.parseType();
@@ -3936,7 +4165,7 @@ bool SILParser::parseSpecConformanceSubstitutions(
     TypeLoc Ty = TyR.get();
     if (performTypeLocChecking(Ty, false))
       return true;
-    parsed.push_back({Loc, ArcheId, Ty.getType()});
+    parsed.push_back({Loc, Ty.getType()});
   } while (P.consumeIf(tok::comma));
 
   // Consume the closing '>'.
@@ -3948,53 +4177,18 @@ bool SILParser::parseSpecConformanceSubstitutions(
   return false;
 }
 
-/// Reconstruct AST substitutions from parsed substitutions using archetypes
-/// from a BoundGenericType.
-static bool getSpecConformanceSubstitutionsFromParsed(
-                             Parser &P,
-                             GenericParamList *gp,
-                             ArrayRef<ParsedSubstitution> parses,
-                             SmallVectorImpl<Substitution> &subs) {
-  for (auto &parsed : parses) {
-    ArchetypeType *subArchetype = nullptr;
-    Type subReplacement;
-    // Find the corresponding ArchetypeType.
-    for (auto archetype : gp->getAllNestedArchetypes())
-      if (archetype->getFullName() == parsed.name.str()) {
-        subArchetype = archetype;
-        break;
-      }
-    if (!subArchetype) {
-      P.diagnose(parsed.loc, diag::sil_witness_archetype_not_found);
-      return true;
-    }
-    subReplacement = parsed.replacement;
-    SmallVector<ProtocolConformance*, 2> conformances;
-    if (getConformancesForSubstitution(P, gp, subArchetype, subReplacement,
-                                       parsed.loc, conformances))
-      return true;
-
-    subs.push_back({subArchetype, subReplacement,
-                    P.Context.AllocateCopy(conformances)});
-  }
-  return false;
-}
-
 ProtocolConformance *SILParser::parseProtocolConformance(
            ProtocolDecl *&proto, GenericParamList *&generics,
-           ArchetypeBuilder &builder, bool localScope) {
+           bool localScope) {
   // Parse generic params for the protocol conformance. We need to make sure
   // they have the right scope.
   Optional<Scope> GenericsScope;
   if (localScope)
     GenericsScope.emplace(&P, ScopeKind::Generics);
 
-  generics = P.maybeParseGenericParams();
+  generics = P.maybeParseGenericParams().getPtrOrNull();
   if (generics) {
-    generics->setBuilder(&builder);
-    SmallVector<ArchetypeBuilder *, 1> builders(1, &builder);
-    SmallVector<GenericParamList *, 1> gps(1, generics);
-    handleSILGenericParams(P.Context, gps, &P.SF, builders);
+    handleSILGenericParams(P.Context, generics, &P.SF);
   }
 
   ProtocolConformance *retVal = parseProtocolConformanceHelper(proto,
@@ -4002,8 +4196,6 @@ ProtocolConformance *SILParser::parseProtocolConformance(
 
   if (localScope) {
     GenericsScope.reset();
-    if (generics)
-      generics->setBuilder(nullptr);
   }
   return retVal;
 }
@@ -4043,17 +4235,15 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
     if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
       return nullptr;
     ProtocolDecl *dummy;
-    ArchetypeBuilder genericBuilder(*P.SF.getParentModule(), P.Diags);
     GenericParamList *gp;
-    auto genericConform = parseProtocolConformance(dummy, gp,
-                                                   genericBuilder, localScope);
+    auto genericConform = parseProtocolConformance(dummy, gp, localScope);
     if (!genericConform)
       return nullptr;
     if (P.parseToken(tok::r_paren, diag::expected_sil_witness_rparen))
       return nullptr;
 
     SmallVector<Substitution, 4> subs;
-    if (getSpecConformanceSubstitutionsFromParsed(P, gp, parsedSubs, subs))
+    if (getApplySubstitutionsFromParsed(*this, gp, parsedSubs, subs))
       return nullptr;
 
     auto result = P.Context.getSpecializedConformance(
@@ -4066,8 +4256,7 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
 
     if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
       return nullptr;
-    ArchetypeBuilder baseBuilder(*P.SF.getParentModule(), P.Diags);
-    auto baseConform = parseProtocolConformance(baseBuilder);
+    auto baseConform = parseProtocolConformance();
     if (!baseConform)
       return nullptr;
     if (P.parseToken(tok::r_paren, diag::expected_sil_witness_rparen))
@@ -4102,7 +4291,7 @@ bool Parser::parseSILWitnessTable() {
   
   bool isFragile = false;
   if (parseDeclSILOptional(nullptr, &isFragile, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, *this))
+                           nullptr, nullptr, nullptr, nullptr, nullptr, *this))
     return true;
 
   Scope S(this, ScopeKind::TopLevel);
@@ -4114,8 +4303,7 @@ bool Parser::parseSILWitnessTable() {
   // Parse the protocol conformance.
   ProtocolDecl *proto;
   GenericParamList *dummy;
-  ArchetypeBuilder builder(*SF.getParentModule(), Diags);
-  auto conf = WitnessState.parseProtocolConformance(proto, dummy, builder,
+  auto conf = WitnessState.parseProtocolConformance(proto, dummy,
                                                     false/*localScope*/);
 
   NormalProtocolConformance *theConformance = conf ?
@@ -4123,7 +4311,7 @@ bool Parser::parseSILWitnessTable() {
 
   SILWitnessTable *wt = nullptr;
   if (theConformance) {
-    wt = SIL->M->lookUpWitnessTable(theConformance, false).first;
+    wt = SIL->M->lookUpWitnessTable(theConformance, false);
     assert((!wt || wt->isDeclaration()) &&
            "Attempting to create duplicate witness table.");
   }
@@ -4167,9 +4355,7 @@ bool Parser::parseSILWitnessTable() {
           return true;
         if (parseToken(tok::colon, diag::expected_sil_witness_colon))
           return true;
-        ArchetypeBuilder builder(*SF.getParentModule(), Diags);
-        ProtocolConformance *conform = WitnessState.parseProtocolConformance(
-                                           builder);
+        ProtocolConformance *conform = WitnessState.parseProtocolConformance();
         if (!conform) // Ignore this witness entry for now.
           continue;
 
@@ -4195,18 +4381,18 @@ bool Parser::parseSILWitnessTable() {
             parseToken(tok::colon, diag::expected_sil_witness_colon))
           return true;
 
-        ProtocolConformance *conform = nullptr;
+        ProtocolConformanceRef conformance(proto);
         if (Tok.getText() != "dependent") {
-          ArchetypeBuilder builder(*SF.getParentModule(), Diags);
-          conform = WitnessState.parseProtocolConformance(builder);
-          if (!conform) // Ignore this witness entry for now.
+          auto concrete = WitnessState.parseProtocolConformance();
+          if (!concrete) // Ignore this witness entry for now.
             continue;
+          conformance = ProtocolConformanceRef(concrete);
         } else {
           consumeToken();
         }
 
         witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-          assoc, proto, conform
+          assoc, proto, ProtocolConformanceRef(conformance)
         });
         continue;
       }
@@ -4277,6 +4463,92 @@ bool Parser::parseSILWitnessTable() {
   if (!wt)
     wt = SILWitnessTable::create(*SIL->M, *Linkage, theConformance);
   wt->convertToDefinition(witnessEntries, isFragile);
+  BodyScope.reset();
+  return false;
+}
+
+/// decl-sil-default-witness ::= 'sil_default_witness_table' 
+///                              sil-linkage identifier
+///                              decl-sil-default-witness-body
+/// decl-sil-default-witness-body:
+///   '{' sil-default-witness-entry* '}'
+/// sil-default-witness-entry:
+///   'method' SILDeclRef ':' @SILFunctionName
+///   'no_default'
+bool Parser::parseSILDefaultWitnessTable() {
+  consumeToken(tok::kw_sil_default_witness_table);
+  SILParser WitnessState(*this);
+  
+  // Parse the linkage.
+  Optional<SILLinkage> Linkage;
+  parseSILLinkage(Linkage, *this);
+  
+  Scope S(this, ScopeKind::TopLevel);
+  // We should use WitnessTableBody. This ensures that the generic params
+  // are visible.
+  Optional<Scope> BodyScope;
+  BodyScope.emplace(this, ScopeKind::FunctionBody);
+
+  // Parse the protocol.
+  ProtocolDecl *protocol = parseProtocolDecl(*this, WitnessState);
+
+  // Parse the body.
+  SourceLoc LBraceLoc = Tok.getLoc();
+  consumeToken(tok::l_brace);
+
+  // We need to turn on InSILBody to parse SILDeclRef.
+  Lexer::SILBodyRAII Tmp(*L);
+
+  // Parse the entry list.
+  std::vector<SILDefaultWitnessTable::Entry> witnessEntries;
+  if (Tok.isNot(tok::r_brace)) {
+    do {
+      Identifier EntryKeyword;
+      SourceLoc KeywordLoc;
+      if (parseIdentifier(EntryKeyword, KeywordLoc,
+            diag::expected_tok_in_sil_instr, "method, no_default"))
+        return true;
+
+      if (EntryKeyword.str() == "no_default") {
+        witnessEntries.push_back(SILDefaultWitnessTable::Entry());
+        continue;
+      }
+
+      if (EntryKeyword.str() != "method") {
+        diagnose(KeywordLoc, diag::expected_tok_in_sil_instr, "method");
+        return true;
+      }
+
+      SILDeclRef Ref;
+      Identifier FuncName;
+      SourceLoc FuncLoc;
+      if (WitnessState.parseSILDeclRef(Ref) ||
+          parseToken(tok::colon, diag::expected_sil_witness_colon))
+        return true;
+      
+      if (parseToken(tok::at_sign, diag::expected_sil_function_name) ||
+          WitnessState.parseSILIdentifier(FuncName, FuncLoc,
+                                      diag::expected_sil_value_name))
+        return true;
+
+      SILFunction *Func = SIL->M->lookUpFunction(FuncName.str());
+      if (!Func) {
+        diagnose(FuncLoc, diag::sil_witness_func_not_found, FuncName);
+        return true;
+      }
+      witnessEntries.push_back(SILDefaultWitnessTable::Entry{ Ref, Func });
+    } while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof));
+  }
+
+  SourceLoc RBraceLoc;
+  parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
+                     LBraceLoc);
+  
+  // Default to public linkage.
+  if (!Linkage)
+    Linkage = SILLinkage::Public;
+
+  SILDefaultWitnessTable::create(*SIL->M, *Linkage, protocol, witnessEntries);
   BodyScope.reset();
   return false;
 }
@@ -4415,7 +4687,87 @@ bool Parser::parseSILCoverageMap() {
                      LBraceLoc);
 
   if (!BodyHasError)
-    SILCoverageMap::create(*SIL->M, Filename.str(), FuncName.str(), Hash,
-                           Regions, Builder.getExpressions());
+    SILCoverageMap::create(*SIL->M, Filename.str(), FuncName.str(),
+                           Func->isPossiblyUsedExternally(), Hash, Regions,
+                           Builder.getExpressions());
+  return false;
+}
+
+/// sil-scope-ref ::= 'scope' [0-9]+
+/// sil-scope ::= 'sil_scope' [0-9]+ '{'
+///                 debug-loc
+///                 'parent' scope-parent
+///                 ('inlined_at' sil-scope-ref)?
+///               '}'
+/// scope-parent ::= sil-function-name ':' sil-type
+/// scope-parent ::= sil-scope-ref
+/// debug-loc ::= 'loc' string-literal ':' [0-9]+ ':' [0-9]+
+bool Parser::parseSILScope() {
+  consumeToken(tok::kw_sil_scope);
+  SILParser ScopeState(*this);
+
+  SourceLoc SlotLoc = Tok.getLoc();
+  unsigned Slot;
+  if (ScopeState.parseInteger(Slot, diag::sil_invalid_scope_slot))
+    return true;
+
+  SourceLoc LBraceLoc = Tok.getLoc();
+  consumeToken(tok::l_brace);
+
+  StringRef Key = Tok.getText();
+  RegularLocation Loc{SILLocation::DebugLoc()};
+  if (Key == "loc")
+    if (ScopeState.parseSILLocation(Loc))
+      return true;
+  ScopeState.parseVerbatim("parent");
+  Identifier FnName;
+  SILDebugScope *Parent = nullptr;
+  SILFunction *ParentFn = nullptr;
+  if (Tok.is(tok::integer_literal)) {
+    /// scope-parent ::= sil-scope-ref
+    if (ScopeState.parseScopeRef(Parent))
+      return true;
+  } else {
+    /// scope-parent ::= sil-function-name
+    SILType Ty;
+    SourceLoc FnLoc = Tok.getLoc();
+    // We need to turn on InSILBody to parse the function reference.
+    Lexer::SILBodyRAII Tmp(*L);
+    GenericParamList *Ignored;
+    Scope S(this, ScopeKind::TopLevel);
+    Scope Body(this, ScopeKind::FunctionBody);
+    if ((ScopeState.parseGlobalName(FnName)) ||
+        parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
+        ScopeState.parseSILType(Ty, Ignored, true))
+      return true;
+
+    // The function doesn't exist yet. Create a zombie forward declaration.
+    auto FnTy = Ty.getAs<SILFunctionType>();
+    if (!FnTy || !Ty.isObject()) {
+      diagnose(FnLoc, diag::expected_sil_function_type);
+      return true;
+    }
+    ParentFn = ScopeState.getGlobalNameForReference(FnName, FnTy, FnLoc, true);
+    ScopeState.TUState.PotentialZombieFns.push_back(ParentFn);
+  }
+
+  SILDebugScope *InlinedAt = nullptr;
+  if (Tok.getText() == "inlined_at") {
+    consumeToken();
+    if (ScopeState.parseScopeRef(InlinedAt))
+      return true;
+  }
+
+  SourceLoc RBraceLoc;
+  parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
+                     LBraceLoc);
+
+  auto &Scope = SIL->S->ScopeSlots[Slot];
+  if (Scope) {
+    diagnose(SlotLoc, diag::sil_scope_redefined, Slot);
+    return true;
+  }
+
+  Scope = new (*SIL->M) SILDebugScope(Loc, ParentFn, Parent, InlinedAt);
   return false;
 }

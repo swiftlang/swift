@@ -1,0 +1,38 @@
+// RUN: %target-swift-frontend -emit-ir -verify -I %S/../IDE/Inputs/custom-modules %s
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import ImportAsMember
+
+sil @IAMStruct1CreateSimple : $@convention(c) () -> Struct1
+sil @IAMStruct1Rotate : $@convention(c) (@in Struct1, Double) -> Struct1
+sil @IAMStruct1SetAltitude : $@convention(c) (@inout Struct1, Double) -> ()
+sil @mutateSomeState : $@convention(c) <τ_0_0 where τ_0_0 : IAMProto> (τ_0_0) -> ()
+
+sil @invoke_methods : $@convention(thin) (Double) -> () {
+entry(%z : $Double):
+  %a = function_ref @IAMStruct1CreateSimple : $@convention(c) () -> Struct1
+  %b = apply %a() : $@convention(c) () -> Struct1
+  %c = alloc_stack $Struct1
+  store %b to %c : $*Struct1
+  %d = function_ref @IAMStruct1Rotate : $@convention(c) (@in Struct1, Double) -> Struct1
+  %e = apply %d(%c, %z) : $@convention(c) (@in Struct1, Double) -> Struct1
+  %f = function_ref @IAMStruct1SetAltitude : $@convention(c) (@inout Struct1, Double) -> ()
+  apply %f(%c, %z) : $@convention(c) (@inout Struct1, Double) -> ()
+  dealloc_stack %c : $*Struct1
+  return undef : $()
+}
+
+// CHECK-LABEL: define void @invoke_protocol_methods(%objc_object*)
+sil @invoke_protocol_methods : $@convention(thin) (IAMProto) -> () {
+entry(%z : $IAMProto):
+  %a = open_existential_ref %z : $IAMProto to $@opened("01234567-89AB-CDEF-0123-000000000000") IAMProto
+  %b = function_ref @mutateSomeState : $@convention(c) <τ_0_0 where τ_0_0 : IAMProto> (τ_0_0) -> ()
+  // CHECK: [[CAST:%.*]] = bitcast %objc_object* %0 to i8*
+  // CHECK: call void @mutateSomeState(i8* [[CAST]])
+  apply %b<@opened("01234567-89AB-CDEF-0123-000000000000") IAMProto>(%a) : $@convention(c) <τ_0_0 where τ_0_0 : IAMProto> (τ_0_0) -> ()
+  return undef : $()
+}

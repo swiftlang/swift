@@ -30,7 +30,7 @@ enum GoodEnum {
 }
 
 protocol GoodProtocol1 : diag_values_of_module_type_foo.SomeProtocol {
-  typealias GoodTypealias1 : diag_values_of_module_type_foo.SomeProtocol
+  associatedtype GoodTypealias1 : diag_values_of_module_type_foo.SomeProtocol
 }
 
 typealias GoodTypealias1 = Swift.Int
@@ -52,7 +52,7 @@ func goodTest1() {
   _ = diag_values_of_module_type_foo.SomeClass.staticVar1
   _ = diag_values_of_module_type_foo.SomeStruct()
   _ = diag_values_of_module_type_foo.SomeEnum.Foo
-  // Can not default-construct a protocol.
+  // Cannot default-construct a protocol.
   // _ = diag_values_of_module_type_foo.SomeExistential()
   _ = diag_values_of_module_type_foo.SomeTypealias()
 
@@ -95,13 +95,13 @@ func badTest2() {
   _ = x
 }
 func badTest3() {
-  var x = Swift. // expected-error {{postfix '.' is reserved}} expected-error {{expected member name following '.'}}
+  var _ = Swift. // expected-error {{expected member name following '.'}} expected-error {{expected module member name after module name}}
 }
 func badTest4() {
-  Swift // expected-error {{expected module member name after module name}}
+  _ = Swift // expected-error {{expected module member name after module name}}
 }
 func badTest5() {
-  Swift. // expected-error {{postfix '.' is reserved}} expected-error {{expected member name following '.'}}
+  _ = Swift. // expected-error {{expected module member name after module name}} expected-error {{expected member name following '.'}}
 }
 func badTest6() {
   _ = { () -> Int in

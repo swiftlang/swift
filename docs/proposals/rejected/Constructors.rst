@@ -461,11 +461,11 @@ zero-argument selector with no trailing colon, e.g.,::
 
 maps to the selector ``initToMemory``.
 
-This mapping is reversible: given a selector in the “init” family,
-i.e., where the first word is “init”, we split the selector into its
+This mapping is reversible: given a selector in the "init" family,
+i.e., where the first word is "init", we split the selector into its
 various pieces at the colons:
 
-* For the first piece, we remove the “init” and then lowercase the
+* For the first piece, we remove the "init" and then lowercase the
   next character *unless* the second character is also uppercase. This
   becomes the name of the first parameter to the constructor. If this
   string is non-empty and the selector is a zero-argument selector
@@ -494,7 +494,7 @@ designated initializers in Objective-C. Clang can then be extended to
 perform similar checking to what we're describing for Swift:
 designated initializers delegate or chain to the superclass
 constructor, secondary constructors always delegate, and subclassing
-rrequires one to override the designated initializers. The impact can
+requires one to override the designated initializers. The impact can
 be softened somewhat using warnings or other heuristics, to be
 (separately) determined.
 
@@ -508,7 +508,7 @@ is being substituted for another object.
 
 In both cases, we are left with a partially-constructed object that
 then needs to be destroyed, even though its instance variables may not
-yet havee been initialized. This is also a problem for Objective-C,
+yet have been initialized. This is also a problem for Objective-C,
 which makes returning anything other than the original ''self''
 brittle. 
 
@@ -533,7 +533,7 @@ Alternatives
 ------------
 
 This proposal is complicated, in part because it's trying to balance
-the safety goals of Swift against the convience of Objective-C's
+the safety goals of Swift against the convenience of Objective-C's
 two-phase initialization.
 
 Separate Swift Constructors from Objective-C Initializers

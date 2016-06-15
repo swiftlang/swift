@@ -6,11 +6,11 @@
 prefix operator !! {}
 infix operator &&& {}
 
-prefix func !!<T : BooleanType>(x: T) -> Bool {
+prefix func !!<T : Boolean>(x: T) -> Bool {
   return x.boolValue
 }
 
-func &&&(x: BooleanType, @autoclosure y: () -> BooleanType) -> Bool {
+func &&&(x: Boolean, y: @autoclosure () -> Boolean) -> Bool {
   return x.boolValue ? y().boolValue : false
 }
 

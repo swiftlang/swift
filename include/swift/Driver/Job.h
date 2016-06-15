@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -14,6 +14,7 @@
 #define SWIFT_DRIVER_JOB_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Driver/Action.h"
 #include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
 #include "llvm/Option/Option.h"
@@ -30,9 +31,8 @@
 namespace swift {
 namespace driver {
 
-class Action;
-class InputAction;
 class Job;
+class JobAction;
 
 class CommandOutput {
   types::ID PrimaryOutputType;
@@ -87,10 +87,12 @@ public:
     NewlyAdded
   };
 
+  using EnvironmentVector = std::vector<std::pair<const char *, const char *>>;
+
 private:
   /// The action which caused the creation of this Job, and the conditions
   /// under which it must be run.
-  llvm::PointerIntPair<const Action *, 2, Condition> SourceAndCondition;
+  llvm::PointerIntPair<const JobAction *, 2, Condition> SourceAndCondition;
 
   /// The list of other Jobs which are inputs to this Job.
   SmallVector<const Job *, 4> Inputs;
@@ -103,25 +105,42 @@ private:
 
   /// The list of program arguments (not including the implicit first argument,
   /// which will be the Executable).
+  ///
+  /// These argument strings must be kept alive as long as the Job is alive.
   llvm::opt::ArgStringList Arguments;
+
+  /// Additional variables to set in the process environment when running.
+  ///
+  /// These strings must be kept alive as long as the Job is alive.
+  EnvironmentVector ExtraEnvironment;
+
+  /// Whether the job wants a list of input or output files created.
+  FilelistInfo FilelistFileInfo;
 
   /// The modification time of the main input file, if any.
   llvm::sys::TimeValue InputModTime = llvm::sys::TimeValue::MaxTime();
 
 public:
-  Job(const Action &Source,
+  Job(const JobAction &Source,
       SmallVectorImpl<const Job *> &&Inputs,
       std::unique_ptr<CommandOutput> Output,
       const char *Executable,
-      llvm::opt::ArgStringList Arguments)
+      llvm::opt::ArgStringList Arguments,
+      EnvironmentVector ExtraEnvironment = {},
+      FilelistInfo Info = {})
       : SourceAndCondition(&Source, Condition::Always),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
-        Executable(Executable), Arguments(std::move(Arguments)) {}
+        Executable(Executable), Arguments(std::move(Arguments)),
+        ExtraEnvironment(std::move(ExtraEnvironment)),
+        FilelistFileInfo(std::move(Info)) {}
 
-  const Action &getSource() const { return *SourceAndCondition.getPointer(); }
+  const JobAction &getSource() const {
+    return *SourceAndCondition.getPointer();
+  }
 
   const char *getExecutable() const { return Executable; }
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }
+  FilelistInfo getFilelistInfo() const { return FilelistFileInfo; }
 
   ArrayRef<const Job *> getInputs() const { return Inputs; }
   const CommandOutput &getOutput() const { return *Output; }
@@ -141,9 +160,20 @@ public:
     return InputModTime;
   }
 
+  ArrayRef<std::pair<const char *, const char *>> getExtraEnvironment() const {
+    return ExtraEnvironment;
+  }
+
   /// Print the command line for this Job to the given \p stream,
   /// terminating output with the given \p terminator.
   void printCommandLine(raw_ostream &Stream, StringRef Terminator = "\n") const;
+
+  /// Print the command line for this Job to the given \p stream,
+  /// and include any extra environment variables that will be set.
+  ///
+  /// \sa printCommandLine
+  void printCommandLineAndEnvironment(raw_ostream &Stream,
+                                      StringRef Terminator = "\n") const;
 
   void dump() const LLVM_ATTRIBUTE_USED;
 

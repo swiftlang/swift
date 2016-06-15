@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -49,7 +49,7 @@ public:
 
   /// Construct a successful parser result.
   explicit ParserResult(T *Result) : PtrAndBits(Result) {
-    assert(Result && "a successful parser result can not be null");
+    assert(Result && "a successful parser result cannot be null");
   }
 
   /// Convert from a different but compatible parser result.
@@ -125,8 +125,8 @@ static inline ParserResult<T> makeParserCodeCompletionResult(T *Result =
 /// \brief Same as \c ParserResult, but just the status bits without the AST
 /// node.
 ///
-/// Useful when the AST node is returned by some other means (for example, a in
-/// vector out parameter).
+/// Useful when the AST node is returned by some other means (for example, in
+/// a vector out parameter).
 ///
 /// If you want to use 'bool' as a result type in the Parser, consider using
 /// ParserStatus instead.
@@ -217,11 +217,12 @@ template <typename T> ParserResult<T>::ParserResult(ParserStatus Status) {
     setHasCodeCompletion();
 }
 
-enum class ConfigExprKind {
+enum class ConditionalCompilationExprKind {
   Unknown,
   Error,
   OS,
   Arch,
+  LanguageVersion,
   CompilerVersion,
   Binary,
   Paren,
@@ -230,17 +231,20 @@ enum class ConfigExprKind {
   Integer
 };
 
-class ConfigParserState {
+class ConditionalCompilationExprState {
 
-  unsigned ConditionActive : 1;
-  ConfigExprKind Kind;
+  uint8_t ConditionActive : 1;
+  uint8_t Kind : 7;
 public:
-  friend class ConfigParserState;
+  ConditionalCompilationExprState() : ConditionActive(false) {
+    setKind(ConditionalCompilationExprKind::Unknown);
+  }
 
-  ConfigParserState() : ConditionActive(false), Kind(ConfigExprKind::Unknown) {}
-
-  ConfigParserState(bool ConditionActive, ConfigExprKind Kind)
-    : ConditionActive(ConditionActive), Kind(Kind) {}
+  ConditionalCompilationExprState(bool ConditionActive,
+                                  ConditionalCompilationExprKind Kind)
+    : ConditionActive(ConditionActive) {
+    setKind(Kind);
+  }
 
   bool isConditionActive() const {
     return ConditionActive;
@@ -250,30 +254,36 @@ public:
     ConditionActive = A;
   }
 
-  ConfigExprKind getKind() const {
-    return Kind;
+  ConditionalCompilationExprKind getKind() const {
+    return static_cast<ConditionalCompilationExprKind>(Kind);
   }
 
-  void setKind(ConfigExprKind K) {
-    Kind = K;
+  void setKind(ConditionalCompilationExprKind K) {
+    Kind = static_cast<uint8_t>(K);
+    assert(getKind() == K);
   }
 
   bool shouldParse() const {
-    if (Kind == ConfigExprKind::Error)
+    if (getKind() == ConditionalCompilationExprKind::Error)
       return true;
-    return ConditionActive || (Kind != ConfigExprKind::CompilerVersion);
+    return ConditionActive ||
+      (getKind() != ConditionalCompilationExprKind::CompilerVersion &&
+       getKind() != ConditionalCompilationExprKind::LanguageVersion);
   }
 
-  static ConfigParserState error() {
-    return ConfigParserState(false, ConfigExprKind::Error);
+  static ConditionalCompilationExprState error() {
+    return {false, ConditionalCompilationExprKind::Error};
   }
 };
 
-ConfigParserState operator&&(const ConfigParserState lhs,
-                              const ConfigParserState rhs);
-ConfigParserState operator||(const ConfigParserState lhs,
-                              const ConfigParserState rhs);
-ConfigParserState operator!(const ConfigParserState Result);
+ConditionalCompilationExprState
+operator&&(const ConditionalCompilationExprState lhs,
+           const ConditionalCompilationExprState rhs);
+ConditionalCompilationExprState
+operator||(const ConditionalCompilationExprState lhs,
+           const ConditionalCompilationExprState rhs);
+ConditionalCompilationExprState
+operator!(const ConditionalCompilationExprState Result);
 
 } // namespace swift
 

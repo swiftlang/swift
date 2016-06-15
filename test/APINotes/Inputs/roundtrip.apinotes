@@ -1,0 +1,79 @@
+---
+Name:            AppKit
+Availability:    available
+AvailabilityMsg: ''
+Classes:         
+  - Name:            NSCell
+    Availability:    available
+    AvailabilityMsg: ''
+    Methods:         
+      - Selector:        init
+        MethodKind:      Instance
+        NullabilityOfRet: U
+        Availability:    available
+        AvailabilityMsg: ''
+        DesignatedInit:  true
+      - Selector:        'initImageCell:'
+        MethodKind:      Instance
+        Nullability:     [ N ]
+        NullabilityOfRet: U
+        Availability:    available
+        AvailabilityMsg: ''
+        DesignatedInit:  true
+      - Selector:        'initTextCell:'
+        MethodKind:      Instance
+        Nullability:     [ N ]
+        NullabilityOfRet: U
+        Availability:    available
+        AvailabilityMsg: ''
+        DesignatedInit:  true
+      - Selector:        'initWithCoder:'
+        MethodKind:      Instance
+        Nullability:     [ N ]
+        NullabilityOfRet: U
+        Availability:    available
+        AvailabilityMsg: ''
+        DesignatedInit:  true
+        Required:        true
+  - Name:            NSView
+    AuditedForNullability: true
+    Availability:    available
+    AvailabilityMsg: ''
+    Methods:         
+      - Selector:        'addSubview:'
+        MethodKind:      Instance
+        Nullability:     [ N ]
+        NullabilityOfRet: N
+        Availability:    available
+        AvailabilityMsg: ''
+      - Selector:        'addSubview:positioned:relativeTo:'
+        MethodKind:      Instance
+        Nullability:     [ N, N, O ]
+        NullabilityOfRet: N
+        Availability:    available
+        AvailabilityMsg: ''
+      - Selector:        'beginDraggingSessionWithItems:event:source:'
+        MethodKind:      Instance
+        Nullability:     [ U, U, N ]
+        NullabilityOfRet: N
+        Availability:    available
+        AvailabilityMsg: ''
+    Properties:      
+      - Name:            enclosingScrollView
+        Nullability:     O
+        Availability:    available
+        AvailabilityMsg: ''
+      - Name:            makeBackingLayer
+        Nullability:     N
+        Availability:    available
+        AvailabilityMsg: ''
+Functions:       
+  - Name:            NSAvailableWindowDepths
+    NullabilityOfRet: N
+    Availability:    available
+    AvailabilityMsg: ''
+Globals:         
+  - Name:            NSCalibratedWhiteColorSpace
+    Nullability:     N
+    Availability:    available
+    AvailabilityMsg: ''

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,7 +22,7 @@ template class llvm::DominatorTreeBase<SILBasicBlock>;
 template class llvm::DominatorBase<SILBasicBlock>;
 template class llvm::DomTreeNodeBase<SILBasicBlock>;
 
-/// Compute the immmediate-dominators map.
+/// Compute the immediate-dominators map.
 DominanceInfo::DominanceInfo(SILFunction *F)
     : DominatorTreeBase(/*isPostDom*/ false) {
       assert(!F->isExternalDeclaration() &&
@@ -40,10 +40,13 @@ bool DominanceInfo::properlyDominates(SILInstruction *a, SILInstruction *b) {
 
   // Otherwise, they're in the same block, and we just need to check
   // whether B comes after A.  This is a non-strict computation.
-  SILInstruction *f = &*aBlock->begin();
-  while (b != f) {
-    b = b->getPrevNode();
-    if (a == b) return true;
+  auto aIter = a->getIterator();
+  auto bIter = b->getIterator();
+  auto fIter = aBlock->begin();
+  while (bIter != fIter) {
+    --bIter;
+    if (aIter == bIter)
+      return true;
   }
 
   return false;
@@ -55,7 +58,7 @@ void DominanceInfo::verify() const {
   DominanceInfo OtherDT(F);
 
   // And compare.
-  if (errorOccuredOnComparison(OtherDT)) {
+  if (errorOccurredOnComparison(OtherDT)) {
     llvm::errs() << "DominatorTree is not up to date!\nComputed:\n";
     print(llvm::errs());
     llvm::errs() << "\nActual:\n";
@@ -64,11 +67,11 @@ void DominanceInfo::verify() const {
   }
 }
 
-/// Compute the immmediate-post-dominators map.
+/// Compute the immediate-post-dominators map.
 PostDominanceInfo::PostDominanceInfo(SILFunction *F)
   : DominatorTreeBase(/*isPostDom*/ true) {
   assert(!F->isExternalDeclaration() &&
-         "Can not construct a post dominator tree for a declaration");
+         "Cannot construct a post dominator tree for a declaration");
   recalculate(*F);
 }
 
@@ -102,7 +105,7 @@ void PostDominanceInfo::verify() const {
   PostDominanceInfo OtherDT(F);
 
   // And compare.
-  if (errorOccuredOnComparison(OtherDT)) {
+  if (errorOccurredOnComparison(OtherDT)) {
     llvm::errs() << "PostDominatorTree is not up to date!\nComputed:\n";
     print(llvm::errs());
     llvm::errs() << "\nActual:\n";

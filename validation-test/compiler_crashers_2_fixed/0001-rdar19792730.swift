@@ -3,20 +3,20 @@
 // rdar://problem/19792730
 
 public func foo<
-    Expected : SequenceType,
-    Actual : SequenceType,
-    T : Comparable
-    where
-      Expected.Generator.Element == Actual.Generator.Element,
-      Expected.Generator.Element == T
+  Expected : Sequence,
+  Actual : Sequence,
+  T : Comparable
+  where
+  Expected.Iterator.Element == Actual.Iterator.Element,
+  Expected.Iterator.Element == T
 >(expected: Expected, actual: Actual) {}
 
 public func foo<
-    Expected : SequenceType,
-    Actual : SequenceType,
-    T : Comparable
-    where
-      Expected.Generator.Element == Actual.Generator.Element,
-      Expected.Generator.Element == (T, T)
+  Expected : Sequence,
+  Actual : Sequence,
+  T : Comparable
+  where
+  Expected.Iterator.Element == Actual.Iterator.Element,
+  Expected.Iterator.Element == (T, T)
 >(expected: Expected, actual: Actual) {}
 

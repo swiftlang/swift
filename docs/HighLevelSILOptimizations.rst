@@ -13,7 +13,7 @@ Abstract
 This document describes the high-level abstraction of built-in Swift
 data structures in SIL that is used by the optimizer. You need to read
 this document if you wish to understand the early stages of the Swift
-optimizer or if you are working on one of the containers in the 
+optimizer or if you are working on one of the containers in the
 standard library.
 
 
@@ -33,22 +33,22 @@ Any Swift developer could identify the redundancy in the code sample above.
 Storing two values into the same key in the dictionary is inefficient.
 However, optimizing compilers are unaware of the special semantics that the
 Swift dictionary has and can't perform this optimization. Traditional
-compilers would start optimizing this code by inlining the subscript 
+compilers would start optimizing this code by inlining the subscript
 function call and try to analyze the sequence of load/store instructions.
 This approach is not very effective because the compiler has to be very
-conservative when optimizing general code with pointers. 
+conservative when optimizing general code with pointers.
 
 On the other hand, compilers for high-level languages usually have special
 bytecode instructions that allow them to perform high-level optimizations.
 However, unlike high-level languages such as JavaScript or Python, Swift
 containers are implemented in Swift itself. Moreover, it is beneficial to
 be able to inline code from the container into the user program and optimize
-them together, especially for code that uses Generics. 
+them together, especially for code that uses Generics.
 
 In order to perform both high-level optimizations, that are common in
 high-level languages, and low-level optimizations we annotate parts of the
 standard library and describe the semantics of a domain-specific high-level
-operations on data types in the Swift standard library. 
+operations on data types in the Swift standard library.
 
 Annotation of code in the standard library
 ------------------------------------------
@@ -78,25 +78,25 @@ operations in the semantic model. One for checking the bounds and
 another one for accessing the elements. With this abstraction the
 optimizer can remove the ``checkSubscript`` instruction and keep the
 getElement instruction::
- 
+
   @public subscript(index: Int) -> Element {
      get {
       checkSubscript(index)
       return getElement(index)
      }
 
-  @_semantics("array.check_subscript") func checkSubscript(index: Int) {
+  @_semantics("array.check_subscript") func checkSubscript(_ index: Int) {
     ...
   }
-	
-  @_semantics("array.get_element") func getElement(index: Int) -> Element {
+
+  @_semantics("array.get_element") func getElement(_ index: Int) -> Element {
     return _buffer[index]
   }
 
 
 Swift optimizations
 -------------------
-The swift optimizer can access the information that is provided by the
+The Swift optimizer can access the information that is provided by the
 ``@_semantics`` attribute to perform high-level optimizations. In the early
 stages of the optimization pipeline the optimizer does not inline functions
 with special semantics in order to allow the early high-level optimization
@@ -131,8 +131,9 @@ Array
 
 The following semantic tags describe Array operations. The operations
 are first described in terms of the Array "state". Relations between the
-operations are formally defined below. 'Array' referes to the standard library
-Array<T>, ContigousArray<T>, and ArraySlice<T> data-structures.
+operations are formally defined below. 'Array' refers to the standard library
+Array<Element>, ContiguousArray<Element>, and ArraySlice<Element>
+data-structures.
 
 We consider the array state to consist of a set of disjoint elements
 and a storage descriptor that encapsulates nonelement data such as the
@@ -156,7 +157,7 @@ array.init
   may act as a guard to other potentially mutating operations, such as
   ``get_element_address``.
 
-array.uninitialized(count: Builtin.Word) -> (Array<T>, Builtin.RawPointer)
+array.uninitialized(count: Builtin.Word) -> (Array<Element>, Builtin.RawPointer)
 
   Creates an array with the specified number of elements. It initializes
   the storage descriptor but not the array elements. The returned tuple
@@ -166,9 +167,9 @@ array.uninitialized(count: Builtin.Word) -> (Array<T>, Builtin.RawPointer)
 array.props.isCocoa/needsElementTypeCheck -> Bool
   Reads storage descriptors properties (isCocoa, needsElementTypeCheck).
   This is not control dependent or guarded. The optimizer has
-  semantic knowledge of the state transfer those properties can not make:
-  An array that is not ``isCocoa`` can not transfer to ``isCocoa``.
-  An array that is not ``needsElementTypeCheck`` can not transfer to
+  semantic knowledge of the state transfer those properties cannot make:
+  An array that is not ``isCocoa`` cannot transfer to ``isCocoa``.
+  An array that is not ``needsElementTypeCheck`` cannot transfer to
   ``needsElementTypeCheck``.
 
 array.get_element(index: Int) -> Element
@@ -236,7 +237,7 @@ array.mutate_unknown
 To complete the semantics understood by the optimizer, we define these relations:
 
 interferes-with
-  
+
   Given idempotent ``OpA``, the sequence "``OpA, OpB, OpA``" is
   semantically equivalent to the sequence "``OpA, OpB``" *iff* ``OpB``
   does not interfere with ``OpA``.
@@ -248,7 +249,7 @@ interferes-with
 guards
 
   If ``OpA`` guards ``OpB``, then the sequence of operations
-  ``OpA,OpB`` must be preserved on any control flow path on which the
+  ``OpA, OpB`` must be preserved on any control flow path on which the
   sequence originally appears.
 
 An operation can only interfere-with or guard another if they may operate on the same Array.
@@ -262,7 +263,7 @@ check_subscript  guards          get_element, get_element_address
 make_mutable     interferes-with props.isCocoa/needsElementTypeCheck
 get_elt_addr     interferes-with get_element, get_element_address,
                                  props.isCocoa/needsElementTypeCheck
-mutate_unknown   itereferes-with get_element, check_subscript, get_count,
+mutate_unknown   interferes-with get_element, check_subscript, get_count,
                                  get_capacity, get_element_address,
                                  props.isCocoa/needsElementTypeCheck
 ================ =============== ==========================================
@@ -282,18 +283,18 @@ String
 ~~~~~~
 
 string.concat(lhs: String, rhs: String) -> String
-  
+
   Performs concatenation of two strings. Operands are not mutated.
   This operation can be optimized away in case of both operands
   being string literals. In this case, it can be replaced by
   a string literal representing a concatenation of both operands.
   
-string.makeUTF8(start: RawPointer, byteSize: Word, isASCII: Int1) -> String
+string.makeUTF8(start: RawPointer, utf8CodeUnitCount: Word, isASCII: Int1) -> String
   
   Converts a built-in UTF8-encoded string literal into a string.
-  
-string.makeUTF16(start: RawPointer, numberOfCodeUnits: Word) -> String
-  
+
+string.makeUTF16(start: RawPointer, utf16CodeUnitCount: Word) -> String
+
   Converts a built-in UTF16-encoded string literal into a string.
 
 Dictionary
@@ -323,7 +324,7 @@ readnone
 
 readonly
 
-  function has no side effects, but is dependent on the global 
+  function has no side effects, but is dependent on the global
   state of the program. Calls to readonly functions can be
   eliminated, but cannot be reordered or folded in a way that would
   move calls to the readnone function across side effects.
@@ -335,13 +336,13 @@ readwrite
 Optimize semantics attribute
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The optimize attribute adds function-sepcific directives to the optimizer.
+The optimize attribute adds function-specific directives to the optimizer.
 
 The optimize attribute supports the following tags:
 
 sil.never
 
-   The sil optimizer should not optimize this funciton.
+   The sil optimizer should not optimize this function.
 
   Example:
   @_semantics("optimize.sil.never")
@@ -358,4 +359,3 @@ The availability attribute supports the following tags:
 availability.osversion(major: Builtin.Word, minor: Builtin.Word, patch: Builtin.Word) -> Builtin.Int1
 
   Returns true if the OS version matches the parameters.
-

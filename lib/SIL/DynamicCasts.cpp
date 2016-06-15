@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -163,24 +163,22 @@ bool swift::isObjectiveCBridgeable(Module *M, CanType Ty) {
     // Find the conformance of the value type to _BridgedToObjectiveC.
     // Check whether the type conforms to _BridgedToObjectiveC.
     auto conformance = M->lookupConformance(Ty, bridgedProto, nullptr);
-
-    return (conformance.getInt() != ConformanceKind::DoesNotConform);
+    return conformance.hasValue();
   }
   return false;
 }
 
 /// Check if a given type conforms to _Error protocol.
-bool swift::isErrorType(Module *M, CanType Ty) {
-  // Retrieve the ErrorType protocol.
+bool swift::isErrorProtocol(Module *M, CanType Ty) {
+  // Retrieve the ErrorProtocol protocol.
   auto errorTypeProto =
-      M->getASTContext().getProtocol(KnownProtocolKind::ErrorType);
+      M->getASTContext().getProtocol(KnownProtocolKind::ErrorProtocol);
 
   if (errorTypeProto) {
     // Find the conformance of the value type to _BridgedToObjectiveC.
     // Check whether the type conforms to _BridgedToObjectiveC.
     auto conformance = M->lookupConformance(Ty, errorTypeProto, nullptr);
-
-    return (conformance.getInt() != ConformanceKind::DoesNotConform);
+    return conformance.hasValue();
   }
   return false;
 }
@@ -369,9 +367,42 @@ swift::classifyDynamicCast(Module *M,
   auto targetClass = target.getClassOrBoundGenericClass();
   if (sourceClass) {
     if (targetClass) {
-      if (target->isSuperclassOf(source, nullptr))
+      // Imported Objective-C generics don't check the generic parameters, which
+      // are lost at runtime.
+      if (sourceClass->usesObjCGenericsModel()) {
+      
+        if (sourceClass == targetClass)
+          return DynamicCastFeasibility::WillSucceed;
+        
+        if (targetClass->usesObjCGenericsModel()) {
+          // If both classes are ObjC generics, the cast may succeed if the
+          // classes are related, irrespective of their generic parameters.
+          auto isDeclSuperclass = [&](ClassDecl *proposedSuper,
+                                      ClassDecl *proposedSub) -> bool {
+            do {
+              if (proposedSuper == proposedSub)
+                return true;
+            } while ((proposedSub = proposedSub->getSuperclassDecl()));
+            
+            return false;
+          };
+          
+          if (isDeclSuperclass(sourceClass, targetClass))
+            return DynamicCastFeasibility::MaySucceed;
+          
+          if (isDeclSuperclass(targetClass, sourceClass)) {
+            return DynamicCastFeasibility::WillSucceed;
+          }          
+          return DynamicCastFeasibility::WillFail;
+        }
+      }
+
+
+      if (target->isExactSuperclassOf(source, nullptr))
         return DynamicCastFeasibility::WillSucceed;
-      if (source->isSuperclassOf(target, nullptr))
+      if (target->isBindableToSuperclassOf(source, nullptr))
+        return DynamicCastFeasibility::MaySucceed;
+      if (source->isBindableToSuperclassOf(target, nullptr))
         return DynamicCastFeasibility::MaySucceed;
 
       // FIXME: bridged types, e.g. CF <-> NS (but not for metatypes).
@@ -400,7 +431,7 @@ swift::classifyDynamicCast(Module *M,
 
   // FIXME: tuple conversions?
 
-  // FIXME: Be more careful with briding conversions from
+  // FIXME: Be more careful with bridging conversions from
   // NSArray, NSDictionary and NSSet as they may fail?
 
   // Check if there might be a bridging conversion.
@@ -436,7 +467,7 @@ swift::classifyDynamicCast(Module *M,
   }
 
   // Check if it is a cast between bridged error types.
-  if (isErrorType(M, source) && isErrorType(M, target)) {
+  if (isErrorProtocol(M, source) && isErrorProtocol(M, target)) {
     // TODO: Cast to NSError succeeds always.
     return DynamicCastFeasibility::MaySucceed;
   }
@@ -459,7 +490,7 @@ namespace {
     CanType FormalType;
     CastConsumptionKind Consumption;
 
-    bool isAddress() const { return Value.getType().isAddress(); }
+    bool isAddress() const { return Value->getType().isAddress(); }
     IsTake_t shouldTake() const {
       return shouldTakeOnSuccess(Consumption);
     }
@@ -482,13 +513,13 @@ namespace {
     }
     Source asScalarSource(SILValue value) const {
       assert(!isAddress());
-      assert(!value.getType().isAddress());
+      assert(!value->getType().isAddress());
       return { value, FormalType, CastConsumptionKind::TakeAlways };
     }
 
     Target() = default;
     Target(SILValue address, CanType formalType)
-      : Address(address), LoweredType(address.getType()),
+      : Address(address), LoweredType(address->getType()),
         FormalType(formalType) {
       assert(LoweredType.isAddress());
     }
@@ -529,7 +560,7 @@ namespace {
     }
 
     Source putOwnedScalar(SILValue scalar, Target target) {
-      assert(scalar.getType() == target.LoweredType.getObjectType());
+      assert(scalar->getType() == target.LoweredType.getObjectType());
       if (!target.isAddress())
         return target.asScalarSource(scalar);
 
@@ -542,7 +573,7 @@ namespace {
     Source emitSameType(Source source, Target target) {
       assert(source.FormalType == target.FormalType);
 
-      auto &srcTL = getTypeLowering(source.Value.getType());
+      auto &srcTL = getTypeLowering(source.Value->getType());
 
       // The destination always wants a +1 value, so make the source
       // +1 if it's a scalar.
@@ -591,8 +622,8 @@ namespace {
       // FIXME: Upcasts between existential metatypes are not handled yet.
       // We should generate for it:
       // %openedSrcMetatype = open_existential srcMetatype
-      // init_existental dstMetatype, %openedSrcMetatype
-      auto &srcTL = getTypeLowering(source.Value.getType());
+      // init_existential dstMetatype, %openedSrcMetatype
+      auto &srcTL = getTypeLowering(source.Value->getType());
       SILValue value;
       if (source.isAddress()) {
         value = srcTL.emitLoadOfCopy(B, Loc, source.Value, source.shouldTake());
@@ -642,7 +673,7 @@ namespace {
         auto sourceSomeDecl = Ctx.getOptionalSomeDecl(sourceOptKind);
 
         SILType loweredSourceObjectType =
-          source.Value.getType().getEnumElementType(sourceSomeDecl, M);
+          source.Value->getType().getEnumElementType(sourceSomeDecl, M);
 
         // Form the target for the optional object.
         EmitSomeState state;
@@ -657,8 +688,8 @@ namespace {
           SILValue sourceAddr = source.Value;
           if (!source.shouldTake()) {
             sourceTemp = B.createAllocStack(Loc,
-                                       sourceAddr.getType().getObjectType());
-            sourceAddr = sourceTemp->getAddressResult();
+                                       sourceAddr->getType().getObjectType());
+            sourceAddr = sourceTemp;
             B.createCopyAddr(Loc, source.Value, sourceAddr, IsNotTake,
                              IsInitialization);
           }
@@ -677,7 +708,7 @@ namespace {
 
         // Deallocate the source temporary if we needed one.
         if (sourceTemp) {
-          B.createDeallocStack(Loc, sourceTemp->getContainerResult());
+          B.createDeallocStack(Loc, sourceTemp);
         }
 
         Source result = emitSome(resultObject, target, state);
@@ -743,7 +774,7 @@ namespace {
         B.createInjectEnumAddr(Loc, target.Address, state.SomeDecl);
         return target.asAddressSource();
       } else {
-        auto &srcTL = getTypeLowering(source.Value.getType());
+        auto &srcTL = getTypeLowering(source.Value->getType());
         auto sourceObject = getOwnedScalar(source, srcTL);
         auto source = B.createEnum(Loc, sourceObject, state.SomeDecl,
                                    target.LoweredType);
@@ -799,7 +830,7 @@ swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, Module *M,
   Target target(loweredTargetType, targetType);
   Source result = CastEmitter(B, M, loc).emitTopLevel(source, target);
   assert(!result.isAddress());
-  assert(result.Value.getType() == loweredTargetType);
+  assert(result.Value->getType() == loweredTargetType);
   assert(result.Consumption == CastConsumptionKind::TakeAlways);
   return result.Value;
 }
@@ -815,8 +846,8 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
   assert(classifyDynamicCast(M, sourceType, targetType)
            == DynamicCastFeasibility::WillSucceed);
 
-  assert(src.getType().isAddress());
-  assert(dest.getType().isAddress());
+  assert(src->getType().isAddress());
+  assert(dest->getType().isAddress());
 
   // Casts between the same types can be always handled here.
   // Casts from non-existentials into existentials and
@@ -824,11 +855,11 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
   // Casts between a value type and a class cannot be optimized.
   // Therefore generate a simple unconditional_checked_cast_aadr.
 
-  if (src.getType() != dest.getType())
-  if (src.getType().isAnyExistentialType() !=
-      dest.getType().isAnyExistentialType() ||
-      !(src.getType().getClassOrBoundGenericClass() &&
-       dest.getType().getClassOrBoundGenericClass())) {
+  if (src->getType() != dest->getType())
+  if (src->getType().isAnyExistentialType() !=
+      dest->getType().isAnyExistentialType() ||
+      !(src->getType().getClassOrBoundGenericClass() &&
+       dest->getType().getClassOrBoundGenericClass())) {
     // If there is an existing cast with the same arguments,
     // indicate we cannot improve it.
     if (existingCast) {
@@ -873,7 +904,7 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
     objectType = type;
 
   // Casting to NSError needs to go through the indirect-cast case,
-  // since it may conform to ErrorType and require ErrorType-to-NSError
+  // since it may conform to ErrorProtocol and require ErrorProtocol-to-NSError
   // bridging, unless we can statically see that the source type inherits
   // NSError.
   
@@ -884,6 +915,11 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
     auto super = archetype->getSuperclass();
     if (super.isNull())
       return false;
+
+    // Only ever permit this if the source type is a reference type.
+    if (!objectType.isAnyClassReferenceType())
+      return false;
+
     // A base class constraint that isn't NSError rules out the archetype being
     // bound to NSError.
     if (auto nserror = M.Types.getNSErrorType())
@@ -893,10 +929,10 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
   }
   
   if (targetType == M.Types.getNSErrorType()) {
-    // If we statically know the target is an NSError subclass, then the cast
+    // If we statically know the source is an NSError subclass, then the cast
     // can go through the scalar path (and it's trivially true so can be
     // killed).
-    return targetType->isSuperclassOf(objectType, nullptr);
+    return targetType->isExactSuperclassOf(objectType, nullptr);
   }
   
   // Three supported cases:
@@ -904,7 +940,7 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
   // - metatype to object
   // - object to object
   if ((objectType.isAnyClassReferenceType() || isa<AnyMetatypeType>(objectType))
-      && targetType->isAnyClassReferenceType())
+      && targetType.isAnyClassReferenceType())
     return true;
 
   if (isa<AnyMetatypeType>(objectType) && isa<AnyMetatypeType>(targetType))
@@ -939,14 +975,14 @@ emitIndirectConditionalCastWithScalar(SILBuilder &B, Module *M,
   // We always need a different success block.
   SILBasicBlock *scalarSuccBB = B.splitBlockForFallthrough();
 
-  auto &srcTL = B.getModule().Types.getTypeLowering(src.getType());
+  auto &srcTL = B.getModule().Types.getTypeLowering(src->getType());
 
   // Always take; this works under an assumption that retaining the
   // result is equivalent to retaining the source.  That means that
   // these casts would not be appropriate for bridging-like conversions.
   SILValue srcValue = srcTL.emitLoadOfCopy(B, loc, src, IsTake);
 
-  SILType targetValueType = dest.getType().getObjectType();
+  SILType targetValueType = dest->getType().getObjectType();
   B.createCheckedCastBranch(loc, /*exact*/ false, srcValue, targetValueType,
                             scalarSuccBB, scalarFailBB);
 

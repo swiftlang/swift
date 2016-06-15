@@ -30,8 +30,8 @@ class Phoûx : NSObject, Fooable {
 // CHECK-LABEL: _TFC14objc_witnessesX8Phox_xra3foo
 // CHECK:      bb0([[IN_ADDR:%.*]] : 
 // CHECK:         [[STACK_SLOT:%.*]] = alloc_stack $Phoûx
-// CHECK:         copy_addr [[IN_ADDR]] to [initialization] [[STACK_SLOT]]#1
-// CHECK:         [[VALUE:%.*]] = load [[STACK_SLOT]]#1
+// CHECK:         copy_addr [[IN_ADDR]] to [initialization] [[STACK_SLOT]]
+// CHECK:         [[VALUE:%.*]] = load [[STACK_SLOT]]
 // CHECK:         class_method [[VALUE]] : $Phoûx, #Phoûx.foo!1
 
 protocol Bells {
@@ -44,18 +44,11 @@ extension Gizmo : Bells {
 // CHECK: sil hidden [transparent] [thunk] @_TTWCSo5Gizmo14objc_witnesses5BellsS0_FS1_C
 // CHECK: bb0([[SELF:%[0-9]+]] : $*Gizmo, [[I:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick Gizmo.Type):
 
-// CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFCSo5GizmoC{{.*}} : $@convention(thin) (Int, @thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
-// CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[I]], [[META]]) : $@convention(thin) (Int, @thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
-// CHECK:   [[IUO_RESULT_TEMP:%[0-9]+]] = alloc_stack $ImplicitlyUnwrappedOptional<Gizmo>
-// CHECK:   store [[IUO_RESULT]] to [[IUO_RESULT_TEMP]]#1 : $*ImplicitlyUnwrappedOptional<Gizmo>
-
-// CHECK:   [[UNWRAP_FUNC:%[0-9]+]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
-// CHECK:   [[UNWRAPPED_RESULT_TEMP:%[0-9]+]] = alloc_stack $Gizmo
-// CHECK:   apply [[UNWRAP_FUNC]]<Gizmo>([[UNWRAPPED_RESULT_TEMP]]#1, [[IUO_RESULT_TEMP]]#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in ImplicitlyUnwrappedOptional<τ_0_0>) -> ()
-// CHECK:   [[UNWRAPPED_RESULT:%[0-9]+]] = load [[UNWRAPPED_RESULT_TEMP]]#1 : $*Gizmo
+// CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFCSo5GizmoC{{.*}} : $@convention(method) (Int, @thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
+// CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[I]], [[META]]) : $@convention(method) (Int, @thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
+// CHECK:   switch_enum [[IUO_RESULT]]
+// CHECK:   [[UNWRAPPED_RESULT:%[0-9]+]] = unchecked_enum_data [[IUO_RESULT]]
 // CHECK:   store [[UNWRAPPED_RESULT]] to [[SELF]] : $*Gizmo
-// CHECK:   dealloc_stack [[UNWRAPPED_RESULT_TEMP]]#0 : $*@local_storage Gizmo
-// CHECK:   dealloc_stack [[IUO_RESULT_TEMP]]#0 : $*@local_storage ImplicitlyUnwrappedOptional<Gizmo>
 
 // Test extension of a native @objc class to conform to a protocol with a
 // subscript requirement. rdar://problem/20371661
@@ -66,6 +59,35 @@ protocol Subscriptable {
 
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWCSo7NSArray14objc_witnesses13SubscriptableS0_FS1_g9subscriptFSiPs9AnyObject_ : $@convention(witness_method) (Int, @in_guaranteed NSArray) -> @owned AnyObject {
 // CHECK:         function_ref @_TTOFCSo7NSArrayg9subscriptFSiPs9AnyObject_ : $@convention(method) (Int, @guaranteed NSArray) -> @owned AnyObject
-// CHECK-LABEL: sil shared @_TTOFCSo7NSArrayg9subscriptFSiPs9AnyObject_ : $@convention(method) (Int, @guaranteed NSArray) -> @owned AnyObject {
+// CHECK-LABEL: sil shared [thunk] @_TTOFCSo7NSArrayg9subscriptFSiPs9AnyObject_ : $@convention(method) (Int, @guaranteed NSArray) -> @owned AnyObject {
 // CHECK:         class_method [volatile] %1 : $NSArray, #NSArray.subscript!getter.1.foreign
 extension NSArray: Subscriptable {}
+
+// witness is a dynamic thunk:
+
+protocol Orbital {
+  var quantumNumber: Int { get set }
+}
+
+class Electron : Orbital {
+  dynamic var quantumNumber: Int = 0
+}
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC14objc_witnesses8ElectronS_7OrbitalS_FS1_g13quantumNumberSi
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TTDFC14objc_witnesses8Electrong13quantumNumberSi
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC14objc_witnesses8ElectronS_7OrbitalS_FS1_s13quantumNumberSi
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TTDFC14objc_witnesses8Electrons13quantumNumberSi
+
+// witness is a dynamic thunk and is public:
+
+public protocol Lepton {
+  var spin: Float { get }
+}
+
+public class Positron : Lepton {
+  public dynamic var spin: Float = 0.5
+}
+
+// CHECK-LABEL: sil [transparent] [fragile] [thunk] @_TTWC14objc_witnesses8PositronS_6LeptonS_FS1_g4spinSf
+// CHECK-LABEL: sil shared [transparent] [fragile] [thunk] @_TTDFC14objc_witnesses8Positrong4spinSf

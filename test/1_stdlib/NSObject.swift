@@ -10,7 +10,7 @@ import Foundation
 // NSObject ==
 //===----------------------------------------------------------------------===//
 
-func printEquality<T : Equatable>(lhs: T, _ rhs: T, _ lhsName: String, _ rhsName: String) {
+func printEquality<T : Equatable>(_ lhs: T, _ rhs: T, _ lhsName: String, _ rhsName: String) {
   if lhs == lhs {
     print("\(lhsName) == \(lhsName)")
   }
@@ -25,7 +25,7 @@ func printEquality<T : Equatable>(lhs: T, _ rhs: T, _ lhsName: String, _ rhsName
   }
 }
 
-func printIdentity(lhs: AnyObject, _ rhs: AnyObject, _ lhsName: String, _ rhsName: String) {
+func printIdentity(_ lhs: AnyObject, _ rhs: AnyObject, _ lhsName: String, _ rhsName: String) {
   if lhs === lhs {
     print("\(lhsName) === \(lhsName)")
   }
@@ -43,7 +43,7 @@ func printIdentity(lhs: AnyObject, _ rhs: AnyObject, _ lhsName: String, _ rhsNam
 
 print("NoisyEqual ==")
 class NoisyEqual : NSObject {
-  override func isEqual(rhs: AnyObject?) -> Bool {
+  override func isEqual(_ rhs: AnyObject?) -> Bool {
     print("wow much equal")
     return super.isEqual(rhs)
   }
@@ -98,7 +98,7 @@ let s2 = NSMutableString.init(string:"hazcam")
 printIdentity(s1, s2, "s1", "s2")
 printEquality(s1, s2, "s1", "s2")
 print("mutate")
-s2.appendString("navcam")
+s2.append("navcam")
 printIdentity(s1, s2, "s1", "s2")
 printEquality(s1, s2, "s1", "s2")
 print("done NSMutableString ==")
@@ -119,7 +119,7 @@ print("done NSMutableString ==")
 // NSObject hashValue
 //===----------------------------------------------------------------------===//
 
-func printHashValue<T : Hashable>(x: T, _ name: String) {
+func printHashValue<T : Hashable>(_ x: T, _ name: String) {
   print("\(name) hashes to \(x.hashValue)")
 }
 
@@ -127,7 +127,7 @@ func printHashValue<T : Hashable>(x: T, _ name: String) {
 print("NSMutableString hashValue")
 print("\(s1.hashValue)")
 print("\(s1.hash)")
-s1.appendString("pancam")
+s1.append("pancam")
 print("\(s1.hashValue)")
 print("\(s1.hash)")
 print("done NSMutableString hashValue")
@@ -164,7 +164,7 @@ class ValueLike : NSObject {
     super.init()
   }
 
-  override func isEqual(rhs: AnyObject?) -> Bool {
+  override func isEqual(_ rhs: AnyObject?) -> Bool {
     if let rhs2 = rhs as? ValueLike {
       return x == rhs2.x
     }
@@ -227,12 +227,12 @@ class GenericNativeSwift<T> {}
 
 var native: AnyObject = NativeSwift()
 
-if native.respondsToSelector(".cxx_construct") {
+if native.responds(to: ".cxx_construct") {
   print("SwiftObject has nontrivial constructor")
 } else {
   print("no nontrivial constructor") // CHECK-NEXT: no nontrivial constructor
 }
-if native.respondsToSelector(".cxx_destruct") {
+if native.responds(to: ".cxx_destruct") {
   print("SwiftObject has nontrivial destructor")
 } else {
   print("no nontrivial destructor") // CHECK-NEXT: no nontrivial destructor
@@ -240,12 +240,12 @@ if native.respondsToSelector(".cxx_destruct") {
 
 native = GenericNativeSwift<Int>()
 
-if native.respondsToSelector(".cxx_construct") {
+if native.responds(to: ".cxx_construct") {
   print("SwiftObject has nontrivial constructor")
 } else {
   print("no nontrivial constructor") // CHECK-NEXT: no nontrivial constructor
 }
-if native.respondsToSelector(".cxx_destruct") {
+if native.responds(to: ".cxx_destruct") {
   print("SwiftObject has nontrivial destructor")
 } else {
   print("no nontrivial destructor") // CHECK-NEXT: no nontrivial destructor

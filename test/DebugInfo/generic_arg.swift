@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 import StdlibUnittest
-func foo<T>(x: T) -> () {
+func foo<T>(_ x: T) -> () {
   // CHECK: define {{.*}} @_TF11generic_arg3foourFxT_
   // CHECK: %[[T:.*]] = alloca %swift.type*
   // CHECK: %[[X:.*]] = alloca %swift.opaque*
@@ -14,7 +14,8 @@ func foo<T>(x: T) -> () {
   // CHECK-SAME:                       flags: DIFlagArtificial)
   // CHECK: ![[EMPTY]] = !DIExpression()
   // CHECK: ![[X1]] = !DILocalVariable(name: "x", arg: 1,
-  // CHECK-SAME:          line: 3, type: !"_TtQq_F11generic_arg3foourFxT_")
+  // CHECK-SAME:          line: 3, type: ![[TY:.*]])
+  // CHECK: ![[TY]] = !DICompositeType({{.*}}identifier: "_TtQq_F11generic_arg3foourFxT_")
   _blackHole(x)
 }
 

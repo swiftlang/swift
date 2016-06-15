@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -50,13 +50,6 @@ infix operator «+» {}
 // CHECK-LABEL: sil hidden @_TZF8manglingXoi7p_qcaDcFTSiSi_Si
 func «+»(a: Int, b: Int) -> Int { return a + b }
 
-// Curried function entry points mangle in terms of their original types, not
-// their uncurried private SIL types.
-// CHECK-LABEL: sil hidden @_TF8mangling7curriedfT1aSi_FT1bSS_T_ : $@convention(thin) (@owned String, Int) -> ()
-// CHECK-LABEL: sil shared @_TF8mangling7curriedFT1aSi_FT1bSS_T_ : $@convention(thin) (Int) -> @owned @callee_owned (@owned String) -> ()
-func curried(a a: Int)(b: String) {}
-_ = curried(a: 1)
-
 protocol Foo {}
 protocol Bar {}
 
@@ -94,15 +87,17 @@ func uses_objc_class_and_protocol(o o: NSObject, p: NSAnsing) {}
 func uses_clang_struct(r r: NSRect) {}
 
 // CHECK-LABEL: sil hidden @_TF8mangling14uses_optionalsFT1xGSqSi__GSqSc_
-func uses_optionals(x x: Int?) -> UnicodeScalar? { return Optional() }
+func uses_optionals(x x: Int?) -> UnicodeScalar? { return nil }
 
 enum GenericUnion<T> {
-  // CHECK-LABEL: sil hidden [transparent] @_TFO8mangling12GenericUnion3FoourfMGS0_x_FSiGS0_x_
+  // CHECK-LABEL: sil shared [transparent] @_TFO8mangling12GenericUnion3FoourfMGS0_x_FSiGS0_x_
   case Foo(Int)
-  // CHECK-LABEL: sil hidden [transparent] @_TFO8mangling12GenericUnion3BarurFMGS0_x_GS0_x_
-  case Bar
 }
- 
+
+func instantiateGenericUnionConstructor<T>(_ t: T) {
+  _ = GenericUnion<T>.Foo
+}
+
 struct HasVarInit {
   static var state = true && false
 }
@@ -113,7 +108,7 @@ struct HasVarInit {
 // function type.
 
 // CHECK-LABEL: sil hidden @_TF8mangling19autoClosureOverloadFT1fKT_Si_T_ : $@convention(thin) (@owned @callee_owned () -> Int) -> () {
-func autoClosureOverload(@autoclosure f f: () -> Int) {}
+func autoClosureOverload(f f: @autoclosure () -> Int) {}
 // CHECK-LABEL: sil hidden @_TF8mangling19autoClosureOverloadFT1fFT_Si_T_ : $@convention(thin) (@owned @callee_owned () -> Int) -> () {
 func autoClosureOverload(f f: () -> Int) {}
 
@@ -131,7 +126,7 @@ func autoClosureOverloadCalls() {
 protocol AssocReqt {}
 
 protocol HasAssocType {
-  typealias Assoc
+  associatedtype Assoc
 }
 
 // CHECK-LABEL: sil hidden @_TF8mangling4fooAuRxS_12HasAssocTyperFxT_ : $@convention(thin) <T where T : HasAssocType> (@in T) -> ()
@@ -162,25 +157,25 @@ func curry1() {
 
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling3barFzT_Si : $@convention(thin) () -> (Int, @error ErrorType)
+// CHECK-LABEL: sil hidden @_TF8mangling3barFzT_Si : $@convention(thin) () -> (Int, @error ErrorProtocol)
 func bar() throws -> Int { return 0 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling12curry1ThrowsFzT_T_ : $@convention(thin) () -> @error ErrorType
+// CHECK-LABEL: sil hidden @_TF8mangling12curry1ThrowsFzT_T_ : $@convention(thin) () -> @error ErrorProtocol
 func curry1Throws() throws {
 
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling12curry2ThrowsFzT_FT_T_ : $@convention(thin) () -> (@owned @callee_owned () -> (), @error ErrorType)
+// CHECK-LABEL: sil hidden @_TF8mangling12curry2ThrowsFzT_FT_T_ : $@convention(thin) () -> (@owned @callee_owned () -> (), @error ErrorProtocol)
 func curry2Throws() throws -> () -> () {
   return curry1
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling6curry3FT_FzT_T_ : $@convention(thin) () -> @owned @callee_owned () -> @error ErrorType
+// CHECK-LABEL: sil hidden @_TF8mangling6curry3FT_FzT_T_ : $@convention(thin) () -> @owned @callee_owned () -> @error ErrorProtocol
 func curry3() -> () throws -> () {
   return curry1Throws
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling12curry3ThrowsFzT_FzT_T_ : $@convention(thin) () -> (@owned @callee_owned () -> @error ErrorType, @error ErrorType)
+// CHECK-LABEL: sil hidden @_TF8mangling12curry3ThrowsFzT_FzT_T_ : $@convention(thin) () -> (@owned @callee_owned () -> @error ErrorProtocol, @error ErrorProtocol)
 func curry3Throws() throws -> () throws -> () {
   return curry1Throws
 }

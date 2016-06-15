@@ -27,9 +27,10 @@ func class_bound_generic<T : ClassBound>(x: T) -> T {
   var x = x
   // CHECK: bb0([[X:%.*]] : $T):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $T
-  // CHECK:   store [[X]] to [[X_ADDR]]
+  // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
+  // CHECK:   store [[X]] to [[PB]]
   return x
-  // CHECK:   [[X1:%.*]] = load [[X_ADDR]]
+  // CHECK:   [[X1:%.*]] = load [[PB]]
   // CHECK:   retain [[X1]]
   // CHECK:   return [[X1]]
 }
@@ -39,9 +40,10 @@ func class_bound_generic_2<T : protocol<ClassBound, NotClassBound>>(x: T) -> T {
   var x = x
   // CHECK: bb0([[X:%.*]] : $T):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $T
-  // CHECK:   store [[X]] to [[X_ADDR]]
+  // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
+  // CHECK:   store [[X]] to [[PB]]
   return x
-  // CHECK:   [[X1:%.*]] = load [[X_ADDR]]
+  // CHECK:   [[X1:%.*]] = load [[PB]]
   // CHECK:   retain [[X1]]
   // CHECK:   return [[X1]]
 }
@@ -51,9 +53,10 @@ func class_bound_protocol(x: ClassBound) -> ClassBound {
   var x = x
   // CHECK: bb0([[X:%.*]] : $ClassBound):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $ClassBound
-  // CHECK:   store [[X]] to [[X_ADDR]]
+  // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
+  // CHECK:   store [[X]] to [[PB]]
   return x
-  // CHECK:   [[X1:%.*]] = load [[X_ADDR]]
+  // CHECK:   [[X1:%.*]] = load [[PB]]
   // CHECK:   retain [[X1]]
   // CHECK:   return [[X1]]
 }
@@ -64,9 +67,10 @@ func class_bound_protocol_composition(x: protocol<ClassBound, NotClassBound>)
   var x = x
   // CHECK: bb0([[X:%.*]] : $protocol<ClassBound, NotClassBound>):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $protocol<ClassBound, NotClassBound>
-  // CHECK:   store [[X]] to [[X_ADDR]]
+  // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
+  // CHECK:   store [[X]] to [[PB]]
   return x
-  // CHECK:   [[X1:%.*]] = load [[X_ADDR]]
+  // CHECK:   [[X1:%.*]] = load [[PB]]
   // CHECK:   retain [[X1]]
   // CHECK:   return [[X1]]
 }
@@ -88,11 +92,10 @@ func class_bound_existential_upcast(x: protocol<ClassBound,ClassBound2>)
 }
 
 // CHECK-LABEL: sil hidden @_TF21class_bound_protocols41class_bound_to_unbound_existential_upcast
-func class_bound_to_unbound_existential_upcast(x: protocol<ClassBound,NotClassBound>) -> NotClassBound {
-  var x = x
+func class_bound_to_unbound_existential_upcast
+(x: protocol<ClassBound,NotClassBound>) -> NotClassBound {
   return x
-  // CHECK: [[X:%.*]] = load {{%.*}} : $*protocol<ClassBound, NotClassBound>
-  // CHECK: [[X_OPENED:%.*]] = open_existential_ref [[X]] : $protocol<ClassBound, NotClassBound> to [[OPENED_TYPE:\$@opened(.*) protocol<ClassBound, NotClassBound>]]
+  // CHECK: [[X_OPENED:%.*]] = open_existential_ref %1 : $protocol<ClassBound, NotClassBound> to [[OPENED_TYPE:\$@opened(.*) protocol<ClassBound, NotClassBound>]]
   // CHECK: [[PAYLOAD_ADDR:%.*]] = init_existential_addr %0 : $*NotClassBound, [[OPENED_TYPE]]
   // CHECK: store [[X_OPENED]] to [[PAYLOAD_ADDR]]
 }

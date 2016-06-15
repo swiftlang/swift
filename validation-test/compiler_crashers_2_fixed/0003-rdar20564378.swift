@@ -1,27 +1,27 @@
 // RUN: not %target-swift-frontend %s -parse
 
-public protocol Q_SequenceDefaultsType {
+public protocol Q_SequenceDefaults {
   typealias Element
-  typealias Generator : GeneratorType
-  func generate() -> Generator
+  typealias Iterator : IteratorProtocol
+  func makeIterator() -> Iterator
 }
 
-extension Q_SequenceDefaultsType {
-  public final func underestimateCount() -> Int { return 0 }
+extension Q_SequenceDefaults {
+  public final var underestimatedCount: Int { return 0 }
   public final func preprocessingPass<R>(body: (Self)->R) -> R? {
     return nil
   }
 
   /// Create a ContiguousArray containing the elements of `self`,
   /// in the same order.
-  public final func copyToContiguousArray() -> ContiguousArray<Generator.Element> {
-    let initialCapacity = underestimateCount()
+  public final func copyToContiguousArray() -> ContiguousArray<Iterator.Element> {
+    let initialCapacity = underestimatedCount
 
-    var result = _ContiguousArrayBuffer<Generator.Element>(
+    var result = _ContiguousArrayBuffer<Iterator.Element>(
       count: initialCapacity, minimumCapacity: 0)
 
-    var g = self.generate()
-    while let x = g.next() {
+    var iter = self.makeIterator()
+    while let x = iter.next() {
       result += CollectionOfOne(x)
     }
     return ContiguousArray(result)
@@ -30,42 +30,39 @@ extension Q_SequenceDefaultsType {
   /// Initialize the storage at baseAddress with the contents of this
   /// sequence.
   public final func initializeRawMemory(
-    baseAddress: UnsafeMutablePointer<Generator.Element>
+    baseAddress: UnsafeMutablePointer<Iterator.Element>
   ) {
     var p = baseAddress
-    var g = self.generate()
-    while let element = g.next() {
-      p.initialize(element)
-      ++p
+    var iter = self.makeIterator()
+    while let element = iter.next() {
+      p.initialize(with: element)
+      p += 1
     }
   }
 
-  public final static func _constrainElement(Generator.Element) {}
+  public final static func _constrainElement(Iterator.Element) {}
 }
 
 /// A type that can be iterated with a `for`\ ...\ `in` loop.
 ///
-/// `SequenceType` makes no requirement on conforming types regarding
+/// `Sequence` makes no requirement on conforming types regarding
 /// whether they will be destructively "consumed" by iteration.  To
 /// ensure non-destructive iteration, constrain your *sequence* to
-/// `CollectionType`.
-public protocol Q_SequenceType : Q_SequenceDefaultsType {
+/// `Collection`.
+public protocol Q_Sequence : Q_SequenceDefaults {
   /// A type that provides the *sequence*\ 's iteration interface and
   /// encapsulates its iteration state.
-  typealias Generator : GeneratorType
+  typealias Iterator : IteratorProtocol
 
-  /// Return a *generator* over the elements of this *sequence*.
-  ///
-  /// Complexity: O(1)
-  func generate() -> Generator
+  func makeIterator() -> Iterator
 
   /// Return a value less than or equal to the number of elements in
   /// self, **nondestructively**.
   ///
   /// Complexity: O(N)
-  func underestimateCount() -> Int
+  var underestimatedCount: Int
 
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke the function
+  /// If `self` is multi-pass (i.e., a `Collection`), invoke the function
   /// on `self` and return its result.  Otherwise, return `nil`.
   func preprocessingPass<R>(body: (Self)->R) -> R?
 
@@ -82,27 +79,27 @@ public protocol Q_SequenceType : Q_SequenceDefaultsType {
   static func _constrainElement(Element)
 }
 
-public extension GeneratorType {
-  typealias Generator = Self
+public extension IteratorProtocol {
+  typealias Iterator = Self
   
-  public final func generate() -> Generator {
+  public final func makeIterator() -> Iterator {
     return self
   }
 }
 
-public protocol Q_CollectionDefaultsType : Q_SequenceType {
-  typealias Index : ForwardIndexType
+public protocol Q_CollectionDefaults : Q_Sequence {
+  typealias Index : ForwardIndex
   subscript(position: Index) -> Element {get}
   var startIndex: Index {get}
   var endIndex: Index {get}
 }
 
-extension Q_CollectionDefaultsType {
+extension Q_CollectionDefaults {
   public final func count() -> Index.Distance {
     return distance(startIndex, endIndex)
   }
   
-  public final func underestimateCount() -> Int {
+  public final var underestimatedCount: Int {
     let n = count().toIntMax()
     return n > IntMax(Int.max) ? Int.max : Int(n)
   }
@@ -112,14 +109,14 @@ extension Q_CollectionDefaultsType {
   }
 
   /*
-  typealias Generator = Q_IndexingGenerator<Self>
-  public final func generate() -> Q_IndexingGenerator<Self> {
-    return Q_IndexingGenerator(pos: self.startIndex, elements: self)
+  typealias Iterator = Q_IndexingIterator<Self>
+  public final func makeIterator() -> Q_IndexingIterator<Self> {
+    return Q_IndexingIterator(pos: self.startIndex, elements: self)
   }
   */
 }
 
-public struct Q_IndexingGenerator<C: Q_CollectionDefaultsType> : GeneratorType {
+public struct Q_IndexingIterator<C: Q_CollectionDefaults> : IteratorProtocol {
   public typealias Element = C.Element
   var pos: C.Index
   let elements: C
@@ -129,28 +126,28 @@ public struct Q_IndexingGenerator<C: Q_CollectionDefaultsType> : GeneratorType {
       return nil
     }
     let ret = elements[pos]
-    ++pos
+    pos += 1
     return ret
   }
 }
 
-public protocol Q_CollectionType : Q_CollectionDefaultsType {
+public protocol Q_Collection : Q_CollectionDefaults {
   func count() -> Index.Distance
   subscript(position: Index) -> Element {get}
 }
 
-extension Array : Q_CollectionType {
+extension Array : Q_Collection {
   public func copyToContiguousArray() -> ContiguousArray<Element> {
     return ContiguousArray(self~>_copyToNativeArrayBuffer())
   }
 }
 
-struct Boo : Q_CollectionType {
+struct Boo : Q_Collection {
   let startIndex: Int = 0
   let endIndex: Int = 10
 
-  func generate() -> Q_IndexingGenerator<Boo> {
-    return Q_IndexingGenerator(pos: self.startIndex, elements: self)
+  func makeIterator() -> Q_IndexingIterator<Boo> {
+    return Q_IndexingIterator(pos: self.startIndex, elements: self)
   }
   
   subscript(i: Int) -> String {

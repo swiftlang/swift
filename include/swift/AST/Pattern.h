@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -20,17 +20,16 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/Expr.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/OptionSet.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
   class ASTContext;
-  class ExprHandle;
 
 /// PatternKind - The classification of different kinds of
 /// value-matching pattern.
@@ -90,6 +89,8 @@ public:
   /// to the user of the compiler in any way.
   static StringRef getKindName(PatternKind K);
 
+  /// A pattern is implicit if it is compiler-generated and there
+  /// exists no source code for it.
   bool isImplicit() const { return PatternBits.isImplicit; }
   void setImplicit() { PatternBits.isImplicit = true; }
 
@@ -119,11 +120,6 @@ public:
   /// Returns the name directly bound by this pattern, or the null
   /// identifier if the pattern does not bind a name directly.
   Identifier getBoundName() const;
-
-  /// Returns the name directly bound by this pattern within the body of
-  /// a function, or the null identifier if the pattern does not bind a name
-  /// directly.
-  Identifier getBodyName() const;
 
   /// If this pattern binds a single variable without any
   /// destructuring or conditionalizing, return that variable.
@@ -169,54 +165,15 @@ public:
       VD->setParentPatternStmt(S);
     });
   }
-  
-  /// Return the number of "top-level" variables in the given pattern,
-  /// which looks into one level of tuple pattern to determine the #
-  /// of variables. If the pattern is not a tuple, the result is one.
-  unsigned numTopLevelVariables() const;
 
-  /// \brief Build an implicit 'self' parameter for the specified DeclContext.
-  static Pattern *buildImplicitSelfParameter(SourceLoc Loc,
-                                             TypeLoc TyLoc,
-                                             DeclContext *CurDeclContext);
+  /// Does this binding declare something that requires storage?
+  bool hasStorage() const;
 
-  /// \brief Build an implicit let parameter pattern for the specified
-  /// DeclContext.
-  static Pattern *buildImplicitLetParameter(SourceLoc loc, StringRef name,
-                                            TypeLoc TyLoc,
-                                            DeclContext *CurDeclContext);
-
-  /// Flags used to indicate how pattern cloning should operate.
-  enum CloneFlags {
-    /// The cloned pattern should be implicit.
-    Implicit = 0x01,
-    /// The cloned pattern is for an inherited constructor; mark default
-    /// arguments as inherited, and mark unnamed arguments as named.
-    Inherited = 0x02,
-    /// Whether the named patterns produced from a cloned 'any' pattern is
-    /// are 'var'.
-    IsVar = 0x04
-  };
-
-  Pattern *clone(ASTContext &context,
-                 OptionSet<CloneFlags> options = None) const;
-
-  /// Given that this is a function-parameter pattern, clone it in a
-  /// way that permits makeForwardingReference to be called on the
-  /// result.
-  Pattern *cloneForwardable(ASTContext &context, DeclContext *DC,
-                            OptionSet<CloneFlags> options = None) const;
-
-  /// Form an un-typechecked reference to the variables bound by this
-  /// pattern in a manner which perfectly forwards the values.  Not
-  /// all patterns can be forwarded.
-  Expr *buildForwardingRefExpr(ASTContext &context) const;
-  
   static bool classof(const Pattern *P) { return true; }
   
   //*** Allocation Routines ************************************************/
 
-  void *operator new(size_t bytes, ASTContext &C);
+  void *operator new(size_t bytes, const ASTContext &C);
 
   // Make placement new and vanilla new/delete illegal for Patterns.
   void *operator new(size_t bytes) = delete;
@@ -271,23 +228,14 @@ public:
 class TuplePatternElt {
   Identifier Label;
   SourceLoc LabelLoc;
-  llvm::PointerIntPair<Pattern *, 1, bool> ThePatternAndEllipsis;
-  SourceLoc EllipsisLoc;
-  ExprHandle *Init;
-  DefaultArgumentKind DefArgKind;
+  Pattern *ThePattern;
 
 public:
   TuplePatternElt() = default;
-  explicit TuplePatternElt(Pattern *P)
-    : ThePatternAndEllipsis(P, false), Init(nullptr), DefArgKind(DefaultArgumentKind::None) {}
+  explicit TuplePatternElt(Pattern *P) : ThePattern(P) {}
 
-  TuplePatternElt(Identifier Label, SourceLoc LabelLoc,
-                  Pattern *p, bool hasEllipsis,
-                  SourceLoc ellipsisLoc = SourceLoc(),
-                  ExprHandle *init = nullptr,
-                  DefaultArgumentKind defArgKind = DefaultArgumentKind::None)
-    : Label(Label), LabelLoc(LabelLoc), ThePatternAndEllipsis(p, hasEllipsis),
-      EllipsisLoc(ellipsisLoc), Init(init), DefArgKind(defArgKind) {}
+  TuplePatternElt(Identifier Label, SourceLoc LabelLoc, Pattern *p)
+    : Label(Label), LabelLoc(LabelLoc), ThePattern(p) {}
 
   Identifier getLabel() const { return Label; }
   SourceLoc getLabelLoc() const { return LabelLoc; }
@@ -296,33 +244,20 @@ public:
     LabelLoc = Loc;
   }
 
-  Pattern *getPattern() { return ThePatternAndEllipsis.getPointer(); }
+  Pattern *getPattern() { return ThePattern; }
   const Pattern *getPattern() const {
-    return ThePatternAndEllipsis.getPointer();
+    return ThePattern;
   }
   
-  void setPattern(Pattern *p) { ThePatternAndEllipsis.setPointer(p); }
-
-  bool hasEllipsis() const { return ThePatternAndEllipsis.getInt(); }
-  SourceLoc getEllipsisLoc() const { return EllipsisLoc; }
-
-  ExprHandle *getInit() const { return Init; }
-
-  DefaultArgumentKind getDefaultArgKind() const { return DefArgKind; }
-  void setDefaultArgKind(DefaultArgumentKind DAK) { DefArgKind = DAK; }
+  void setPattern(Pattern *p) { ThePattern = p; }
 };
 
 /// A pattern consisting of a tuple of patterns.
-class TuplePattern : public Pattern {
+class TuplePattern final : public Pattern,
+    private llvm::TrailingObjects<TuplePattern, TuplePatternElt> {
+  friend TrailingObjects;
   SourceLoc LPLoc, RPLoc;
   // TuplePatternBits.NumElements
-
-  TuplePatternElt *getElementsBuffer() {
-    return reinterpret_cast<TuplePatternElt *>(this+1);
-  }
-  const TuplePatternElt *getElementsBuffer() const {
-    return reinterpret_cast<const TuplePatternElt *>(this + 1);
-  }
 
   TuplePattern(SourceLoc lp, unsigned numElements, SourceLoc rp,
                bool implicit)
@@ -349,14 +284,10 @@ public:
   }
 
   MutableArrayRef<TuplePatternElt> getElements() {
-    return getNumElements() == 0 ? MutableArrayRef<TuplePatternElt>() :
-                                   MutableArrayRef<TuplePatternElt>(getElementsBuffer(),
-                                                                    getNumElements());
+    return {getTrailingObjects<TuplePatternElt>(), getNumElements()};
   }
   ArrayRef<TuplePatternElt> getElements() const {
-    return getNumElements() == 0 ? ArrayRef<TuplePatternElt>() :
-                                   ArrayRef<TuplePatternElt>(getElementsBuffer(),
-                                                             getNumElements());
+    return {getTrailingObjects<TuplePatternElt>(), getNumElements()};
   }
 
   const TuplePatternElt &getElement(unsigned i) const {return getElements()[i];}
@@ -365,9 +296,6 @@ public:
   SourceLoc getLParenLoc() const { return LPLoc; }
   SourceLoc getRParenLoc() const { return RPLoc; }
   SourceRange getSourceRange() const;
-
-  bool hasAnyEllipsis() const;
-  SourceLoc getAnyEllipsisLoc() const;
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Tuple;
@@ -387,7 +315,6 @@ public:
 
   VarDecl *getDecl() const { return Var; }
   Identifier getBoundName() const;
-  Identifier getBodyName() const;
   StringRef getNameStr() const { return Var->getNameStr(); }
 
   SourceLoc getLoc() const { return Var->getLoc(); }
@@ -525,14 +452,9 @@ public:
   }
 };
 
-  
-/// A pattern that matches a nominal type and destructures elements out of it.
-/// The match succeeds if the loaded property values all match their associated
-/// subpatterns.
-class NominalTypePattern : public Pattern {
-public:
+namespace detail {
   /// A nominal type subpattern record.
-  class Element {
+  class NominalTypePatternElement {
     /// The location of the property name.
     SourceLoc PropertyLoc;
     /// The location of the colon.
@@ -544,9 +466,8 @@ public:
     /// The subpattern.
     Pattern *SubPattern;
   public:
-    Element(SourceLoc PropLoc, Identifier PropName, VarDecl *Prop,
-            SourceLoc ColonLoc,
-            Pattern *SubP)
+    NominalTypePatternElement(SourceLoc PropLoc, Identifier PropName,
+                              VarDecl *Prop, SourceLoc ColonLoc, Pattern *SubP)
       : PropertyLoc(PropLoc), ColonLoc(ColonLoc),
         PropertyName(PropName), Property(Prop),
         SubPattern(SubP)
@@ -564,20 +485,26 @@ public:
     Pattern *getSubPattern() { return SubPattern; }
     void setSubPattern(Pattern *p) { SubPattern = p; }
   };
+} // end namespace detail
   
+/// A pattern that matches a nominal type and destructures elements out of it.
+/// The match succeeds if the loaded property values all match their associated
+/// subpatterns.
+class NominalTypePattern final : public Pattern,
+    private llvm::TrailingObjects<NominalTypePattern,
+                                  detail::NominalTypePatternElement> {
+  friend TrailingObjects;
+
+public:
+  /// A nominal type subpattern record.
+  using Element = detail::NominalTypePatternElement;
+
 private:
   TypeLoc CastType;
   SourceLoc LParenLoc, RParenLoc;
   
   unsigned NumElements;
-  
-  Element *getElementStorage() {
-    return reinterpret_cast<Element *>(this + 1);
-  }
-  const Element *getElementStorage() const {
-    return reinterpret_cast<const Element *>(this + 1);
-  }
-  
+
   NominalTypePattern(TypeLoc CastTy, SourceLoc LParenLoc,
                      ArrayRef<Element> Elements,
                      SourceLoc RParenLoc,
@@ -588,10 +515,8 @@ private:
   {
     if (implicit.hasValue() ? *implicit : !CastTy.hasLocation())
       setImplicit();
-    static_assert(IsTriviallyCopyable<Element>::value,
-                  "assuming Element is trivially copyable");
-    memcpy(getElementStorage(), Elements.begin(),
-           Elements.size() * sizeof(Element));
+    std::uninitialized_copy(Elements.begin(), Elements.end(),
+                            getTrailingObjects<Element>());
   }
   
 public:
@@ -605,10 +530,10 @@ public:
   TypeLoc getCastTypeLoc() const { return CastType; }
   
   ArrayRef<Element> getElements() const {
-    return {getElementStorage(), NumElements};
+    return {getTrailingObjects<Element>(), NumElements};
   }
   MutableArrayRef<Element> getMutableElements() {
-    return {getElementStorage(), NumElements};
+    return {getTrailingObjects<Element>(), NumElements};
   }
   
   SourceLoc getLoc() const { return CastType.getSourceRange().Start; }
@@ -641,7 +566,7 @@ public:
     : Pattern(PatternKind::EnumElement),
       ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
       ElementDecl(Element), SubPattern(SubPattern) {
-    if (Implicit.hasValue() ? *Implicit : !ParentType.hasLocation())
+    if (Implicit.hasValue() && *Implicit)
       setImplicit();
   }
 
@@ -653,6 +578,10 @@ public:
   
   Pattern *getSubPattern() {
     return SubPattern;
+  }
+
+  bool isParentTypeImplicit() {
+    return !ParentType.hasLocation();
   }
   
   void setSubPattern(Pattern *p) { SubPattern = p; }
@@ -674,6 +603,7 @@ public:
   }
   SourceRange getSourceRange() const { return {getStartLoc(), getEndLoc()}; }
   
+  TypeLoc &getParentType() { return ParentType; }
   TypeLoc getParentType() const { return ParentType; }
   
   static bool classof(const Pattern *P) {

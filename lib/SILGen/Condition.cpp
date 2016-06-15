@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -173,7 +173,7 @@ SGFContext ConditionalValue::enterBranch(SILBasicBlock *bb) {
   // conditionals.
   if (tl.isAddressOnly()) {
     assert(!currentInitialization && "already have an initialization?!");
-    currentInitialization = gen.useBufferAsTemporary(loc, result, tl);
+    currentInitialization = gen.useBufferAsTemporary(result, tl);
     return SGFContext(currentInitialization.get());
   }
 
@@ -188,8 +188,8 @@ void ConditionalValue::exitBranch(RValue &&condResult) {
     // Transfer the result into our buffer if it wasn't emitted in-place
     // already.
     assert(currentInitialization && "no current initialization?!");
-    std::move(condResult).forwardInto(gen, currentInitialization.release(),
-                                      loc);
+    std::move(condResult).forwardInto(gen, loc,
+                                      currentInitialization.release());
     scope.reset();
     gen.B.createBranch(loc, contBB);
   } else {

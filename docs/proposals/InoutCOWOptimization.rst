@@ -7,7 +7,7 @@
 :Authors: Dave Abrahams, Joe Groff
           
 :Summary: Our writeback model interacts with Copy-On-Write (COW) to
-          cause some surprising ineffiencies, such as O(N) performance
+          cause some surprising inefficiencies, such as O(N) performance
           for ``x[0][0] = 1``. We propose a modified COW optimization
           that recovers O(1) performance for these cases and supports
           the efficient use of slices in algorithm implementation.
@@ -25,8 +25,8 @@ The problem is caused as follows:
 
     x[0].mutate()
 
-  we “``subscript get``” ``x[0]`` into a temporary, mutate the
-  temporary, and “``subscript set``” it back into ``x[0]``.
+  we "``subscript get``" ``x[0]`` into a temporary, mutate the
+  temporary, and "``subscript set``" it back into ``x[0]``.
 
 * When the element itself is a COW type, that temporary implies a
   retain count of at least 2 on the element's buffer.
@@ -51,8 +51,8 @@ could be written as follows:
   protocol Sliceable {
     ...
     @mutating
-    func quickSort(compare: (StreamType.Element, StreamType.Element)->Bool) {
-      let (start,end) = (startIndex, endIndex)
+    func quickSort(_ compare: (StreamType.Element, StreamType.Element) -> Bool) {
+      let (start, end) = (startIndex, endIndex)
       if start != end && start.succ() != end {
         let pivot = self[start]
         let mid = partition({compare($0, pivot)})
@@ -118,7 +118,7 @@ for the following reasons:
   unspecified::
 
     var arr = [1,2,3]
-    func mutate(x: inout Int[]) -> Int[] {
+    func mutate(_ x: inout Int[]) -> Int[] {
       x = [3...4]
       return arr[0...2]
     }

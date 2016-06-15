@@ -12,13 +12,9 @@ func basicTests() -> Int {
   return y
 }
 
-// expected-error@+2 {{Use of 'var' binding here is not allowed}} {{41-45=}}
-// expected-error@+1 {{Use of 'var' binding here is not allowed}} {{54-58=}}
-func mutableParameter(a : Int, h : Int, var i : Int, var j: Int, 
-       var g : Int) -> Int { // expected-error {{Use of 'var' binding here is not allowed}} {{8-12=}}
-  // expected-error@+1 {{left side of mutating operator isn't mutable: 'g' is a 'let' constant}}
-  g += 1
-  // expected-error@+1 {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
+func mutableParameter(_ a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // expected-error {{parameters may not have the 'var' specifier}}
+  i += 1
+  var j = j
   swap(&i, &j)
   return i+g
 }
@@ -40,7 +36,7 @@ func testStruct() {
   c.f()
 }
 
-func takeClosure(fn : () -> ()) {}
+func takeClosure(_ fn : () -> ()) {}
 
 class TestClass {
 
@@ -80,7 +76,7 @@ func property() -> Int {
 }
 
 
-func testInOut(inout x : Int) {  // Ok.
+func testInOut(_ x : inout Int) {  // Ok.
 }
 
 struct TestStruct {
@@ -102,11 +98,13 @@ func testSubscript() -> [Int] {
 }
 
 
-func testTuple(var x : Int) -> Int { // expected-error {{Use of 'var' binding here is not allowed}} {{16-19=}}
+func testTuple(_ x : Int) -> Int {
+  var x = x
   var y : Int  // Ok, stored by a tuple
   
-  // expected-error@+1 {{cannot assign to value: 'x' is a 'let' constant}}
   (x, y) = (1,2)
+  _ = x
+  _ = y
   return y
 }
   
@@ -130,7 +128,7 @@ func test() {
 
 func test4() {
   // expected-warning @+1 {{variable 'dest' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
-  var dest = UnsafeMutablePointer<Int>(bitPattern: 0)
+  var dest = UnsafeMutablePointer<Int>(bitPattern: 0)!
 
   dest[0] = 0
 }
@@ -140,7 +138,7 @@ func testTuple() {
   tup.x = 1
 
   // <rdar://problem/20927707> QoI: 'variable was never mutated' noisy when only part of a destructured tuple is mutated
-  var (tupA, tupB) = (1,2)  // don't warn about tupB being changable to a 'let'.
+  var (tupA, tupB) = (1,2)  // don't warn about tupB being changeable to a 'let'.
   tupA += tupB
 
 }
@@ -166,9 +164,10 @@ protocol Fooable {
   mutating func mutFoo()
   func immutFoo()
 }
-func testOpenExistential(var x: Fooable, // expected-error {{Use of 'var' binding here is not allowed}} {{26-29=}}
+func testOpenExistential(_ x: Fooable,
                          y: Fooable) {
-  // expected-error@+1 {{cannot use mutating member on immutable value}}
+  var x = x
+  let y = y
   x.mutFoo()
   y.immutFoo()
 }
@@ -176,53 +175,30 @@ func testOpenExistential(var x: Fooable, // expected-error {{Use of 'var' bindin
 
 func couldThrow() throws {}
 
-func testFixitsInStatementsWithPatterns(a : Int?) {
-  if var b = a,    // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=let}}
-      var b2 = a {  // expected-error {{Use of 'var' binding here is not allowed}} {{7-10=let}}
-    b = 1
-    b2 = 1
+func testFixitsInStatementsWithPatterns(_ a : Int?) {
+  if var b = a,    // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{6-9=let}}
+      var b2 = a {   // expected-warning {{variable 'b2' was never mutated; consider changing to 'let' constant}} {{7-10=let}}
     _ = b
     _ = b2
   }
-
-  var g = [1,2,3].generate()
-  while var x = g.next() { // expected-error {{Use of 'var' binding here is not allowed}} {{9-12=let}}
-    x = 0
-    _ = x
-  }
-
-  guard var y = Optional.Some(1) else { // expected-error {{Use of 'var' binding here is not allowed}} {{9-12=let}}
-    return
-  }
-  y = 0
-  _ = y
-
-  for var b in [42] {   // expected-error {{Use of 'var' binding here is not allowed}} {{7-11=}}
-    b = 42
-    _ = b
-  }
-
-  for let b in [42] {   // expected-error {{'let' pattern is already in an immutable context}} {{7-11=}}
+  
+  for var b in [42] {   // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{7-10=let}}
     _ = b
   }
 
   do {
     try couldThrow()
-  } catch var err {  // expected-error {{Use of 'var' binding here is not allowed}} {{11-14=let}}
-    // expected-warning@-1 {{variable 'err' was never mutated; consider changing to 'let' constant}}
+  } catch var err {  // expected-warning {{variable 'err' was never mutated; consider changing to 'let' constant}} {{11-14=let}}
     _ = err
   }
 
   switch a {
-    case var b: // expected-error {{Use of 'var' binding here is not allowed}} {{10-13=let}}
-      // expected-warning@-1 {{was never mutated; consider changing to 'let' constant}}
-      _ = b
+    case var b: _ = b  // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{10-13=let}}
   }
 }
 
-
 // <rdar://22774938> QoI: "never used" in an "if let" should rewrite expression to use != nil
-func test(a : Int?, b : Any) {
+func test(_ a : Int?, b : Any) {
   if true == true, let x = a {   // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{24-25=_}}
   }
   if let x = a, y = a {  // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{10-11=_}}
@@ -240,7 +216,19 @@ func test(a : Int?, b : Any) {
   if let x = b as? Int {  // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{6-14=}} {{16-19=is}}
   }
 
-  
+  // SR-1112
+
+  let xxx: Int? = 0
+
+  if let yyy = xxx { } // expected-warning{{with boolean test}} {{6-16=}} {{19-19= != nil}}
+
+  var zzz: Int? = 0
+  zzz = 1
+
+  if let yyy = zzz { } // expected-warning{{with boolean test}} {{6-16=}} {{19-19= != nil}}
+
+  if let yyy = zzz ?? xxx { } // expected-warning{{with boolean test}} {{6-16=(}} {{26-26=) != nil}}
+
 }
 
 

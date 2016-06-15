@@ -375,6 +375,11 @@
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_1 | FileCheck %s -check-prefix=GENERIC_TYPEALIAS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPEALIAS_2 > %t.gentypealias.txt
+// RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.gentypealias.txt
+// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.gentypealias.txt
+
 //===--- Helper types that are used in this test
 
 struct FooStruct {
@@ -643,7 +648,7 @@ func resyncParser1() {}
 //===---
 
 protocol AssocType1 {
-  typealias AssocType = #^TYPE_IN_ASSOC_TYPE_1^#
+  associatedtype AssocType = #^TYPE_IN_ASSOC_TYPE_1^#
 }
 
 //===---
@@ -651,7 +656,7 @@ protocol AssocType1 {
 //===---
 
 protocol AssocType1 {
-  typealias AssocType : #^TYPE_IN_ASSOC_TYPE_INHERITANCE_1^#
+  associatedtype AssocType : #^TYPE_IN_ASSOC_TYPE_INHERITANCE_1^#
 }
 
 //===---
@@ -1001,4 +1006,19 @@ func testTypeIdentifierIrrelevant1() {
 
 func testAsCast1(a: Int) {
   a as #^INSIDE_AS_CAST_1^#
+}
+
+//===---
+//===--- Test that we can complete generic typealiases.
+//===---
+
+func testGenericTypealias1() {
+  typealias MyPair<T> = (T, T)
+  let x: #^GENERIC_TYPEALIAS_1^#
+}
+// FIXME: should we use the alias name in the annotation?
+// GENERIC_TYPEALIAS_1: Decl[TypeAlias]/Local: MyPair[#(T, T)#];
+func testGenericTypealias2() {
+  typealias MyPair<T> = (T, T)
+  let x: MyPair<#^GENERIC_TYPEALIAS_2^#>
 }

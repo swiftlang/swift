@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func my_print<T>(t: T) {}
+func my_print<T>(_ t: T) {}
 
 class 你好 {
   class שלום {
@@ -17,7 +17,7 @@ class 你好 {
 你好.שלום.வணக்கம்.Γειά.привет()
 
 // Identifiers cannot start with combining chars.
-_ = .́duh() // expected-error {{an identifier cannot begin with this character}} // expected-error{{expected identifier after '.' expression}}
+_ = .́duh() // expected-error {{use of unresolved operator '.́'}} // expected-error{{use of unresolved identifier 'duh'}}
 
 // Combining characters can be used within identifiers.
 func s̈pin̈al_tap̈() {}

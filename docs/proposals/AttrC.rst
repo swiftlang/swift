@@ -4,7 +4,7 @@ Eventually, we would like to write Swift modules which define pure-C entry
 points for top-level functions, and be able to export more data types to
 C code.
 
-This will be imporant for the Linux port, but also perhaps for system
+This will be important for the Linux port, but also perhaps for system
 frameworks that want to transition to Swift.
 
 The radars tracking this work are:
@@ -59,14 +59,14 @@ and "non-POD". POD types include:
 
 On Linux, we can't have reference counted pointers here at all, and
 NSArray, etc do not exist, so only POD types are bridgeable. We must
-ensure that we produce ther right diagnostic and not crash when the
+ensure that we produce the right diagnostic and not crash when the
 user references NSArray, etc on Linux.
 
 On Darwin, we can allow passing reference counted pointers directly
 as function parameters. They are still not allowed as fields in ``@c``
 structs, though.
 
-The convention for arguments and results an be the same as CoreFoundation
+The convention for arguments and results can be the same as CoreFoundation
 functions imported from C. The code in ``CFunctionConventions`` in
 SILFunctionType.cpp looks relevant.
 

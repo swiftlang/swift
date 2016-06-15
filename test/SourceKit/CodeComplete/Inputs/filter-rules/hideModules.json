@@ -1,0 +1,12 @@
+[
+  {
+    key.kind: source.codecompletion.module,
+    key.hide: 1,
+    key.names: ["Foo"]
+  },
+  {
+    key.kind: source.codecompletion.identifier,
+    key.hide: 0,
+    key.names: ["FooStruct2"]
+  }
+]

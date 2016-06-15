@@ -1,4 +1,4 @@
-// XFAIL: linux
+// XFAIL: freebsd, linux
 
 // Test LLDB detection, first in a clean environment, then in one that looks
 // like the Xcode installation environment. We use hard links to make sure

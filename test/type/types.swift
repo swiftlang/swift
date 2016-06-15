@@ -7,19 +7,19 @@ func test() {
   var z : y   // expected-error {{'y' is not a type}}
 }
 
-var b : Int -> Int = {$0}
+var b : (Int) -> Int = { $0 }
 
 var c2 : (field : Int)  // expected-error {{cannot create a single-element tuple with an element label}}{{11-19=}}
 
-var d2 : () -> Int = { 4}
+var d2 : () -> Int = { 4 }
 
-var d3 : () -> Float = {4 }
+var d3 : () -> Float = { 4 }
 
 var d4 : () -> Int = { d2 }  // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}} {{26-26=()}}
 
 var e0 : [Int]
 e0[] // expected-error {{cannot subscript a value of type '[Int]' with an index of type '()'}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Int), (Range<Int>), (Range<Self.Index>), (Self.Index)}}
+  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Int), (Range<Int>),}}
 
 var f0 : [Float]
 var f1 : [(Int,Int)]
@@ -37,15 +37,15 @@ var h3b : [Int?]?
 var h4 : ([Int])?
 var h5 : ([([[Int??]])?])?
 var h7 : (Int,Int)?
-var h8 : (Int -> Int)?
-var h9 : Int? -> Int?
+var h8 : ((Int) -> Int)?
+var h9 : (Int?) -> Int?
 var h10 : Int?.Type?.Type
 
 var i = Int?(42)
 
 var bad_io : (Int) -> (inout Int, Int)  // expected-error {{'inout' is only valid in parameter lists}}
 
-func bad_io2(a: (inout Int, Int)) {}    // expected-error {{'inout' is only valid in parameter lists}}
+func bad_io2(_ a: (inout Int, Int)) {}    // expected-error {{'inout' is only valid in parameter lists}}
 
 // <rdar://problem/15588967> Array type sugar default construction syntax doesn't work
 func test_array_construct<T>(_: T) {
@@ -55,8 +55,12 @@ func test_array_construct<T>(_: T) {
   _ = [UnsafeMutablePointer<Int?>]()  // Nesting.
   _ = [([UnsafeMutablePointer<Int>])]()
   _ = [(String, Float)]()
+}
 
-  
+extension Optional {
+  init() {
+    self = .none
+  }
 }
 
 // <rdar://problem/15295763> default constructing an optional fails to typecheck
@@ -79,9 +83,9 @@ var y3b : Gen<[Int?]?>
 var y4 : Gen<([Int])?>
 var y5 : Gen<([([[Int??]])?])?>
 var y7 : Gen<(Int,Int)?>
-var y8 : Gen<(Int -> Int)?>
-var y8a : Gen<[[Int]? -> Int]>
-var y9 : Gen<Int? -> Int?>
+var y8 : Gen<((Int) -> Int)?>
+var y8a : Gen<[([Int]?) -> Int]>
+var y9 : Gen<(Int?) -> Int?>
 var y10 : Gen<Int?.Type?.Type>
 var y11 : Gen<Gen<Int>?>
 var y12 : Gen<Gen<Int>?>?
@@ -100,9 +104,9 @@ var z3b = Gen<[Int?]?>()
 var z4 = Gen<([Int])?>()
 var z5 = Gen<([([[Int??]])?])?>()
 var z7 = Gen<(Int,Int)?>()
-var z8 = Gen<(Int -> Int)?>()
-var z8a = Gen<[[Int]? -> Int]>()
-var z9 = Gen<Int? -> Int?>()
+var z8 = Gen<((Int) -> Int)?>()
+var z8a = Gen<[([Int]?) -> Int]>()
+var z9 = Gen<(Int?) -> Int?>()
 var z10 = Gen<Int?.Type?.Type>()
 var z11 = Gen<Gen<Int>?>()
 var z12 = Gen<Gen<Int>?>?()
@@ -140,14 +144,19 @@ let tupleTypeWithNames = (age:Int, count:Int)(4, 5)
 let dictWithTuple = [String: (age:Int, count:Int)]()
 
 // <rdar://problem/21684837> typeexpr not being formed for postfix !
-let bb2 = [Int!](count: 2, repeatedValue: nil)
+let bb2 = [Int!](repeating: nil, count: 2)
 
 // <rdar://problem/21560309> inout allowed on function return type
-func r21560309<U>(body: (inout _: Int) -> inout U) {}  // expected-error {{'inout' is only valid in parameter lists}}
+func r21560309<U>(_ body: (_: inout Int) -> inout U) {}  // expected-error {{'inout' is only valid in parameter lists}}
 r21560309 { x in x }
 
 // <rdar://problem/21949448> Accepts-invalid: 'inout' shouldn't be allowed on stored properties
 class r21949448 {
   var myArray: inout [Int] = []   // expected-error {{'inout' is only valid in parameter lists}}
 }
+
+// SE-0066 - Standardize function type argument syntax to require parentheses
+let _ : Int -> Float // expected-warning {{single argument function types require parentheses}} {{9-9=(}} {{12-12=)}}
+
+
 

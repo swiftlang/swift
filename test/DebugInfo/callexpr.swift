@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend %s -g -emit-ir -o - | FileCheck %s
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
-func foo(a : Int64, _ b : Int64) -> Int64 {
+func foo(_ a : Int64, _ b : Int64) -> Int64 {
   return a+b
 }
 

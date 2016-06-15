@@ -1,0 +1,106 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-combine %s | FileCheck %s
+
+import Swift
+
+class AClass {
+  deinit
+  init()
+}
+
+struct S {}
+
+@objc class NSCloud {}
+
+// CHECK-LABEL: sil @dont_fold_unconditional_checked_cast_to_existentials
+// CHECK: unconditional_checked_cast %1 : $NSCloud to $AnyObject
+sil @dont_fold_unconditional_checked_cast_to_existentials : $@convention(thin) () -> AnyObject {
+entry:
+  %0 = alloc_stack $NSCloud
+  %1 = load %0 : $*NSCloud
+  %2 = unconditional_checked_cast %1 : $NSCloud to $AnyObject
+  dealloc_stack %0 : $*NSCloud
+  return %2 : $AnyObject
+}
+
+// CHECK-LABEL: sil @dont_fold_unconditional_checked_cast_from_existentials
+// CHECK: unconditional_checked_cast %0 : $AnyObject to $NSCloud
+sil @dont_fold_unconditional_checked_cast_from_existentials : $@convention(thin) (AnyObject) -> NSCloud {
+entry (%0 : $AnyObject):
+  %1 = unconditional_checked_cast %0 : $AnyObject to $NSCloud
+  return %1 : $NSCloud
+}
+
+// CHECK-LABEL: sil @function_cast_nothrow_to_nothrow
+// CHECK:         load
+// CHECK:         store
+sil @function_cast_nothrow_to_nothrow : $@convention(thin) <T> () -> () {
+entry:
+  %a = unconditional_checked_cast_addr take_on_success () -> ()        in undef : $*(@in ()) -> @out ()                 to () -> ()        in undef : $*(@in ()) -> @out ()
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @function_cast_nothrow_to_nothrow_substitutable
+// CHECK:         unconditional_checked_cast_addr
+sil @function_cast_nothrow_to_nothrow_substitutable : $@convention(thin) <T> () -> () {
+entry:
+  %a = unconditional_checked_cast_addr take_on_success () -> ()        in undef : $*(@in ()) -> @out ()                 to (T) -> T        in undef : $*(@in T) -> @out T
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @function_cast_nothrow_substitutable_to_nothrow
+// CHECK:         unconditional_checked_cast_addr
+sil @function_cast_nothrow_substitutable_to_nothrow : $@convention(thin) <T> () -> () {
+entry:
+  %a = unconditional_checked_cast_addr take_on_success (T) -> T        in undef : $*(@in T) -> @out T                 to () -> ()        in undef : $*(@in ()) -> @out ()
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @function_cast_throw_to_nothrow
+// CHECK:         builtin "int_trap"
+sil @function_cast_throw_to_nothrow : $@convention(thin) <T> () -> () {
+  %b = unconditional_checked_cast_addr take_on_success () throws -> () in undef : $*(@in ()) -> (@out (), @error ErrorProtocol) to () -> ()        in undef : $*(@in ()) -> @out ()
+  return undef : $()
+}
+
+// TODO: Do a function_conversion?
+// CHECK-LABEL: sil @function_cast_nothrow_to_throw
+// CHECK:         unconditional_checked_cast_addr
+sil @function_cast_nothrow_to_throw : $@convention(thin) <T> () -> () {
+  %c = unconditional_checked_cast_addr take_on_success () -> ()        in undef : $*(@in ()) -> @out ()                 to () throws -> () in undef : $*(@in ()) -> (@out (), @error ErrorProtocol)
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @function_cast_throw_to_throw
+// CHECK:         load
+// CHECK:         store
+sil @function_cast_throw_to_throw : $@convention(thin) <T> () -> () {
+  %d = unconditional_checked_cast_addr take_on_success () throws -> () in undef : $*(@in ()) -> (@out (), @error ErrorProtocol) to () throws -> () in undef : $*(@in ()) -> (@out (), @error ErrorProtocol)
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @function_ref_cast_promote
+// CHECK: [[LD:%.*]] = load %1 : $*AnyObject
+// CHECK-NEXT: unchecked_ref_cast [[LD]] : $AnyObject to $AClass
+// CHECK-NEXT: store %{{.*}} to %0 : $*AClass
+sil @function_ref_cast_promote : $@convention(thin) (@in AnyObject) -> @out AClass {
+bb0(%0 : $*AClass, %1 : $*AnyObject):
+  unchecked_ref_cast_addr AnyObject in %1 : $*AnyObject to AClass in %0 : $*AClass
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// Do not promote a ref cast for invalid types. It's a runtime error.
+// CHECK-LABEL: sil @function_ref_cast_struct
+// CHECK: unchecked_ref_cast_addr
+sil @function_ref_cast_struct : $@convention(thin) () -> @owned AnyObject {
+bb0:
+  %0 = struct $S ()
+  %1 = alloc_stack $S
+  store %0 to %1 : $*S
+  %4 = alloc_stack $AnyObject
+  unchecked_ref_cast_addr S in %1 : $*S to AnyObject in %4 : $*AnyObject
+  %6 = load %4 : $*AnyObject
+  dealloc_stack %4 : $*AnyObject
+  dealloc_stack %1 : $*S
+  return %6 : $AnyObject
+}

@@ -3,12 +3,12 @@
 // RUN: FileCheck --check-prefix=CHECK-SCOPES %s < %t.ll
 // RUN: %target-swift-frontend -emit-sil -emit-verbose-sil -primary-file %s -o - | FileCheck %s --check-prefix=SIL-CHECK
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
-func classifyPoint2(p: (Double, Double)) {
-    func return_same (input : Double) -> Double {
-        var input = input
-        return input;
+func classifyPoint2(_ p: (Double, Double)) {
+    func return_same (_ input : Double) -> Double
+    {
+        return input; // return_same gets called in both where statements
     }
 
 switch p {
@@ -25,13 +25,13 @@ switch p {
       // Verify that the branch has a location >= the cleanup.
       // SIL-CHECK-NEXT:  br{{.*}}line:[[@LINE-3]]:17:cleanup
       // CHECK-SCOPES: call {{.*}}markUsed
-      // CHECK-SCOPES: call void @llvm.dbg.declare({{.*}}metadata ![[X1:[0-9]+]]
+      // CHECK-SCOPES: call void @llvm.dbg.value({{.*}}metadata ![[X1:[0-9]+]]
       // CHECK-SCOPES-SAME:                        !dbg ![[X1LOC:[0-9]+]]
-      // CHECK-SCOPES: call void @llvm.dbg.declare
-      // CHECK-SCOPES: call void @llvm.dbg.declare({{.*}}metadata ![[X2:[0-9]+]]
+      // CHECK-SCOPES: call void @llvm.dbg.value
+      // CHECK-SCOPES: call void @llvm.dbg.value({{.*}}metadata ![[X2:[0-9]+]]
       // CHECK-SCOPES-SAME:                        !dbg ![[X2LOC:[0-9]+]]
-      // CHECK-SCOPES: call void @llvm.dbg.declare
-      // CHECK-SCOPES: call void @llvm.dbg.declare({{.*}}metadata ![[X3:[0-9]+]]
+      // CHECK-SCOPES: call void @llvm.dbg.value
+      // CHECK-SCOPES: call void @llvm.dbg.value({{.*}}metadata ![[X3:[0-9]+]]
       // CHECK-SCOPES-SAME:                        !dbg ![[X3LOC:[0-9]+]]
       // CHECK-SCOPES: !DILocalVariable(name: "x",
     case (let x, let y) where x == -y:

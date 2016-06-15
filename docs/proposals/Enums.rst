@@ -81,7 +81,7 @@ C::
 
   enum Foo { case A, B, C, D }
   
-  func use(x:Foo) {
+  func use(_ x:Foo) {
     switch x {
     case .A:
     case .B:
@@ -95,7 +95,7 @@ together::
 
   enum Foo { case A, B, C, D, Other(String) }
   
-  func use(x:Foo) {
+  func use(_ x:Foo) {
     switch x {
     case .A:
     case .B:
@@ -212,7 +212,7 @@ structs, including nested types, methods, constructors, and properties::
       this = .Int(0)
     }
 
-    func min(x:IntOrInfinity) -> IntOrInfinity {
+    func min(_ x:IntOrInfinity) -> IntOrInfinity {
       switch (self, x) {
       case (.NegInfinity, _):
       case (_, .NegInfinity):
@@ -281,7 +281,7 @@ circumstances:
   StringLiteralConvertible.
 - None of the cases of the enum may have non-void payloads.
 
-If an enum declares an raw type, then its cases may declare raw
+If an enum declares a raw type, then its cases may declare raw
 values. raw values must be integer, float, character, or string
 literals, and must be unique within the enum. If the raw type is
 IntegerLiteralConvertible, then the raw values default to
@@ -330,7 +330,7 @@ methods. The NSChangeDictionaryKey definition behaves as if defined::
       }
     }
 
-    static func fromRaw(s:String) -> NSChangeDictionaryKey? {
+    static func fromRaw(_ s:String) -> NSChangeDictionaryKey? {
       switch s {
       case "NSKeyValueChangeKindKey":
         return .NSKeyValueChangeKindKey

@@ -1,8 +1,8 @@
-//===--- HeapObject.h -----------------------------------------------------===//
+//===--- HeapObject.h -------------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -19,9 +19,14 @@
 #include "swift/Basic/type_traits.h"
 
 namespace swift {
-#endif 
 
-struct HeapMetadata;
+struct InProcess;
+
+template <typename Target> struct TargetHeapMetadata;
+using HeapMetadata = TargetHeapMetadata<InProcess>;
+#else
+typedef struct HeapMetadata HeapMetadata;
+#endif
 
 // The members of the HeapObject header that are not shared by a
 // standard Objective-C instance
@@ -32,7 +37,7 @@ struct HeapMetadata;
 /// The Swift heap-object header.
 struct HeapObject {
   /// This is always a valid pointer to a metadata object.
-  struct HeapMetadata const *metadata;
+  HeapMetadata const *metadata;
 
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
   // FIXME: allocate two words of metadata on 32-bit platforms
@@ -55,7 +60,7 @@ static_assert(swift::IsTriviallyConstructible<HeapObject>::value,
 static_assert(std::is_trivially_destructible<HeapObject>::value,
               "HeapObject must be trivially destructible");
 
-}
-#endif 
+} // end namespace swift
+#endif
 
 #endif

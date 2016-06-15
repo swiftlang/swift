@@ -1,8 +1,8 @@
-//===--- CodeCompletion.h - --------------------------------------*- C++ -*-==//
+//===--- CodeCompletion.h - -------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -15,12 +15,15 @@
 
 #include "SourceKit/Core/LLVM.h"
 #include "swift/IDE/CodeCompletion.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 
 namespace SourceKit {
 namespace CodeCompletion {
 
 using CodeCompletionDeclKind = swift::ide::CodeCompletionDeclKind;
+using CodeCompletionKeywordKind = swift::ide::CodeCompletionKeywordKind;
+using CodeCompletionLiteralKind = swift::ide::CodeCompletionLiteralKind;
 using SemanticContextKind = swift::ide::SemanticContextKind;
 using CodeCompletionString = swift::ide::CodeCompletionString;
 using SwiftResult = swift::ide::CodeCompletionResult;
@@ -120,6 +123,8 @@ class CompletionBuilder {
   CompletionSink &sink;
   SwiftResult &current;
   bool modified = false;
+  bool isNotRecommended;
+  Completion::NotRecommendedReason notRecommendedReason;
   SemanticContextKind semanticContext;
   CodeCompletionString *completionString;
   llvm::SmallVector<char, 64> originalName;
@@ -140,6 +145,13 @@ public:
   void setModuleImportDepth(Optional<uint8_t> value) {
     assert(!value || *value <= Completion::maxModuleImportDepth);
     moduleImportDepth = value;
+  }
+
+  void setNotRecommended(Completion::NotRecommendedReason Reason) {
+    modified = true;
+    notRecommendedReason = Reason;
+    if (Reason != Completion::NoReason)
+      isNotRecommended = true;
   }
 
   void setSemanticContext(SemanticContextKind kind) {
@@ -204,6 +216,28 @@ public:
 
   unsigned getNextOffset() const;
   bool walk(Walker &walker) const override;
+};
+
+struct FilterRules {
+  bool hideAll = false;
+
+  bool hideAllValueLiterals = false;
+  llvm::SmallDenseMap<CodeCompletionLiteralKind, bool, 8> hideValueLiteral;
+
+  bool hideAllKeywords = false;
+  llvm::DenseMap<CodeCompletionKeywordKind, bool> hideKeyword;
+
+  bool hideCustomCompletions = false;
+  // FIXME: hide individual custom completions
+
+  llvm::StringMap<bool> hideModule;
+  llvm::StringMap<bool> hideByName;
+
+  bool hideCompletion(Completion *completion) const;
+  bool hideCompletion(SwiftResult *completion,
+                      StringRef name,
+                      void *customKind = nullptr) const;
+  bool hideName(StringRef name) const;
 };
 
 } // end namespace CodeCompletion

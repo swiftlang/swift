@@ -3,7 +3,7 @@
 import c_layout
 
 @inline(never)
-func blackHole<T>(t: T) { }
+func blackHole<T>(_ t: T) { }
 
 // CHECK: @staticFloat = internal global float 1.700000e+01, align 4
 // CHECK: define internal void @doubleTrouble() [[CLANG_FUNC_ATTR:#[0-9]+]] {
@@ -19,7 +19,7 @@ public func testStaticGlobal() {
 public func testCaptureGlobal() {
   var f: Float = 0
   var i: CInt = 0
-  var s: UnsafePointer<CChar> = nil
+  var s: UnsafePointer<CChar>! = nil
   // CHECK-LABEL: define linkonce_odr hidden void @_TFF9c_globals17testCaptureGlobalFT_T_U_FT_T_{{.*}} {
   blackHole({ () -> Void in
     // CHECK: @staticFloat
@@ -31,5 +31,5 @@ public func testCaptureGlobal() {
   }) // CHECK: {{^}$}}
 }
 
-// CHECK: attributes [[SWIFT_FUNC_ATTR]] = { "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"
-// CHECK: attributes [[CLANG_FUNC_ATTR]] = { inlinehint nounwind {{(ssp )?}}{{(uwtable )?}}"no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"
+// CHECK-DAG: attributes [[CLANG_FUNC_ATTR]] = { inlinehint nounwind {{.*}}"no-frame-pointer-elim"="true"{{.*}}
+// CHECK-DAG: attributes [[SWIFT_FUNC_ATTR]] = { "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"

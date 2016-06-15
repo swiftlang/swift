@@ -1,8 +1,8 @@
-//===--- Demangle.h - Interface to Swift symbol demangling -------*- C++ -*-==//
+//===--- Demangle.h - Interface to Swift symbol demangling ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -44,6 +44,7 @@ struct DemangleOptions {
   bool ShortenThunk = false;
   bool ShortenValueWitness = false;
   bool ShortenArchetype = false;
+  bool ShowPrivateDiscriminators = true;
 
   DemangleOptions() {}
 
@@ -62,6 +63,7 @@ struct DemangleOptions {
     Opt.ShortenThunk = true;
     Opt.ShortenValueWitness = true;
     Opt.ShortenArchetype = true;
+    Opt.ShowPrivateDiscriminators = false;
     return Opt;
   };
 };
@@ -78,7 +80,8 @@ enum class FunctionSigSpecializationParamKind : unsigned {
   ConstantPropFloat = 3,
   ConstantPropString = 4,
   ClosureProp = 5,
-  InOutToValue = 6,
+  BoxToValue = 6,
+  BoxToStack = 7,
 
   // Option Set Flags use bits 6-31. This gives us 26 bits to use for option
   // flags.
@@ -89,7 +92,7 @@ enum class FunctionSigSpecializationParamKind : unsigned {
 
 /// The pass that caused the specialization to occur. We use this to make sure
 /// that two passes that generate similar changes do not yield the same
-/// mangling. This currently can not happen, so this is just a safety measure
+/// mangling. This currently cannot happen, so this is just a safety measure
 /// that creates separate name spaces.
 enum class SpecializationPass : uint8_t {
   AllocBoxToStack,
@@ -101,7 +104,7 @@ enum class SpecializationPass : uint8_t {
 };
 
 static inline char encodeSpecializationPass(SpecializationPass Pass) {
-  return char(uint8_t(Pass)) + 48;
+  return char(uint8_t(Pass)) + '0';
 }
 
 enum class ValueWitnessKind {
@@ -125,7 +128,7 @@ enum class ValueWitnessKind {
   StoreExtraInhabitant,
   GetExtraInhabitantIndex,
   GetEnumTag,
-  DestructiveProjectEnumData
+  DestructiveProjectEnumData,
 };
 
 enum class Directness {
@@ -318,7 +321,7 @@ enum class OperatorKind {
   NotOperator,
   Prefix,
   Postfix,
-  Infix
+  Infix,
 };
 
 /// \brief Mangle an identifier using Swift's mangling rules.
@@ -331,7 +334,7 @@ void mangleIdentifier(const char *data, size_t length,
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
 
-/// \brief Transform the node structure in a string.
+/// \brief Transform the node structure to a string.
 ///
 /// Typical usage:
 /// \code
@@ -369,8 +372,7 @@ struct NodeFactory {
   /// A class for printing to a std::string.
 class DemanglerPrinter {
 public:
-  DemanglerPrinter(std::string &out) : Stream(out) {}
-  DemanglerPrinter(std::string &&out) : Stream(out) {}
+  DemanglerPrinter() = default;
 
   DemanglerPrinter &operator<<(llvm::StringRef Value) & {
     Stream.append(Value.data(), Value.size());
@@ -404,7 +406,7 @@ public:
   std::string &&str() && { return std::move(Stream); }
   
 private:
-  std::string &Stream;
+  std::string Stream;
 };
 
 /// Is a character considered a digit by the demangling grammar?
@@ -418,5 +420,4 @@ static inline bool isDigit(int c) {
 } // end namespace Demangle
 } // end namespace swift
 
-#endif
-
+#endif // SWIFT_BASIC_DEMANGLE_H

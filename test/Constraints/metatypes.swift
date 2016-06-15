@@ -13,3 +13,6 @@ struct S {}
 
 let test5 : S.Type = S.self
 let test6 : AnyClass = S.self // expected-error {{cannot convert value of type 'S.Type' to specified type 'AnyClass' (aka 'AnyObject.Type')}}
+
+func acceptMeta<T>(_ meta: T.Type) { }
+acceptMeta(A) // expected-warning{{missing '.self' for reference to metatype of type 'A'}}{{13-13=.self}}

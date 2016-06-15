@@ -24,9 +24,65 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_CLOSURE_1 | FileCheck %s -check-prefix=TOP_LEVEL_CLOSURE_1
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_1 > %t.toplevel.txt
-// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.txt
-// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_1 > %t.toplevel.1.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.1.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.1.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.1.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_2 > %t.toplevel.2.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.2.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.2.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.2.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_3 > %t.toplevel.3.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.3.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.3.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.3.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_4 > %t.toplevel.4.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.4.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.4.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.4.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_5 > %t.toplevel.5.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.5.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.5.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.5.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_5 > %t.toplevel.5.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.5.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.5.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.5.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_6 > %t.toplevel.6.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.6.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.6.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.6.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_EXPR_TYPE_1 > %t.toplevel-expr.1.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel-expr.1.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel-expr.1.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel-expr.1.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_EXPR_TYPE_2 > %t.toplevel-expr.2.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel-expr.2.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel-expr.2.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel-expr.2.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_EXPR_TYPE_3 > %t.toplevel-expr.3.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel-expr.3.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel-expr.3.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel-expr.3.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_EXPR_TYPE_4 > %t.toplevel-expr.4.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel-expr.4.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel-expr.4.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel-expr.4.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_EXPR_TYPE_2 > %t.toplevel-expr.2.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel-expr.2.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel-expr.2.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel-expr.2.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_1 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_2 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
@@ -62,6 +118,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_GUARD_1 | FileCheck %s -check-prefix=TOP_LEVEL_GUARD
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_GUARD_2 | FileCheck %s -check-prefix=TOP_LEVEL_GUARD
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERP_1 | FileCheck %s -check-prefix=STRING_INTERP
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERP_2 | FileCheck %s -check-prefix=STRING_INTERP
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERP_3 | FileCheck %s -check-prefix=STRING_INTERP
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERP_4 | FileCheck %s -check-prefix=STRING_INTERP
+
 // Test code completion in top-level code.
 //
 // This test is not meant to test that we can correctly form all kinds of
@@ -70,16 +131,16 @@
 struct FooStruct {
   var instanceVar = 0
 
-  func instanceFunc(a: Int) {}
+  func instanceFunc(_ a: Int) {}
   // Add more stuff as needed.
 }
 
 var fooObject : FooStruct
 
 func fooFunc1() {}
-func fooFunc2(a: Int, _ b: Double) {}
+func fooFunc2(_ a: Int, _ b: Double) {}
 
-func erroneous1(x: Undeclared) {}
+func erroneous1(_ x: Undeclared) {}
 
 //===--- Test code completions of expressions that can be typechecked.
 
@@ -92,6 +153,7 @@ fooObject#^TYPE_CHECKED_EXPR_1^#
 // TYPE_CHECKED_EXPR_1: Begin completions
 // TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
+// TYPE_CHECKED_EXPR_1-NEXT: BuiltinOperator/None:                     = {#FooStruct#}[#Void#];
 // TYPE_CHECKED_EXPR_1-NEXT: End completions
 
 func resyncParser2() {}
@@ -103,6 +165,7 @@ fooObject#^TYPE_CHECKED_EXPR_2^#
 // TYPE_CHECKED_EXPR_2: Begin completions
 // TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
+// TYPE_CHECKED_EXPR_2-NEXT: BuiltinOperator/None:                     = {#FooStruct#}[#Void#];
 // TYPE_CHECKED_EXPR_2-NEXT: End completions
 
 func resyncParser3() {}
@@ -111,6 +174,7 @@ fooObject#^TYPE_CHECKED_EXPR_3^#.bar
 // TYPE_CHECKED_EXPR_3: Begin completions
 // TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
+// TYPE_CHECKED_EXPR_3-NEXT: BuiltinOperator/None:                     = {#FooStruct#}[#Void#];
 // TYPE_CHECKED_EXPR_3-NEXT: End completions
 
 func resyncParser4() {}
@@ -215,6 +279,37 @@ var topLevelVarType1 : #^TOP_LEVEL_VAR_TYPE_1^#
 // TOP_LEVEL_VAR_TYPE_1: Begin completions
 // TOP_LEVEL_VAR_TYPE_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_TYPE_1: End completions
+// TOP_LEVEL_VAR_TYPE_NEGATIVE_1-NOT: Decl[GlobalVar
+// TOP_LEVEL_VAR_TYPE_NEGATIVE_1-NOT: Decl[FreeFunc
+func resyncParserA1_1() {}
+
+var topLevelVarType2 : [#^TOP_LEVEL_VAR_TYPE_2^#]
+
+func resyncParserA1_2() {}
+
+var topLevelVarType3 : [#^TOP_LEVEL_VAR_TYPE_3^#: Int]
+
+func resyncParserA1_3() {}
+
+var topLevelVarType4 : [Int: #^TOP_LEVEL_VAR_TYPE_4^#]
+
+func resyncParserA1_4() {}
+
+if let topLevelVarType5 : [#^TOP_LEVEL_VAR_TYPE_5^#] {}
+
+func resyncParserA1_5() {}
+
+guard let topLevelVarType6 : [#^TOP_LEVEL_VAR_TYPE_6^#] else {}
+
+func resyncParserA1_6() {}
+
+_ = ("a" as #^TOP_LEVEL_EXPR_TYPE_1^#)
+func resyncParserA1_7() {}
+_ = ("a" as! #^TOP_LEVEL_EXPR_TYPE_2^#)
+func resyncParserA1_8() {}
+_ = ("a" as? #^TOP_LEVEL_EXPR_TYPE_3^#)
+func resyncParserA1_9() {}
+_ = ("a" is #^TOP_LEVEL_EXPR_TYPE_4^#)
 
 func resyncParserA2() {}
 
@@ -330,7 +425,19 @@ func interstitial() {}
 // TOP_LEVEL_GUARD: Decl[LocalVar]/Local: guardedName[#Int#]; name=guardedName
 
 func resyncParserB14() {}
-  
+
+
+"\(#^STRING_INTERP_1^#)"
+"\(1) \(#^STRING_INTERP_2^#) \(2)"
+var stringInterp = "\(#^STRING_INTERP_3^#)"
+_ = "" + "\(#^STRING_INTERP_4^#)" + ""
+// STRING_INTERP: Begin completions
+// STRING_INTERP-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#];
+// STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule: fooFunc1()[#Void#];
+// STRING_INTERP-DAG: Decl[GlobalVar]/Local: fooObject[#FooStruct#];
+// STRING_INTERP: End completions
+func resyncParserC1() {}
+
 
 //
 //===--- DON'T ADD ANY TESTS AFTER THIS LINE.

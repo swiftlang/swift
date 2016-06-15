@@ -23,7 +23,7 @@ class Model : NSObject {
     }
   }
 
-  func print(message: String) {
+  func print(_ message: String) {
     print(message + ": \(value)")
   }
 }

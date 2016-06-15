@@ -29,14 +29,14 @@ below.
 */
 
 protocol NewHashable /*: Equatable*/ {
-  func combineIntoHash<Hasher : HasherType>(inout hasher: Hasher)
+  func combineIntoHash<H : Hasher>(_ hasher: inout H)
 }
 
 struct UserTypeA : NewHashable {
   var a1: Int
   var a2: Float
 
-  func combineIntoHash<Hasher : HasherType>(inout hasher: Hasher) {
+  func combineIntoHash<H : Hasher>(_ hasher: inout H) {
     hasher.combine(a1)
     hasher.combine(a2)
   }
@@ -47,7 +47,7 @@ struct UserTypeB : NewHashable {
   var b2: UserTypeA // User-defined hashable type
   var b3: [Int]
 
-  func combineIntoHash<Hasher : HasherType>(inout hasher: Hasher) {
+  func combineIntoHash<H : Hasher>(_ hasher: inout H) {
     hasher.combine(b1)
     hasher.combine(b2)
     hasher.combineSequence(b3)
@@ -58,7 +58,7 @@ class UserClassA : NSObject {
   var a1: Int = 0
 
   // error: declarations from extensions cannot be overridden yet
-  //func combineIntoHash<Hasher : HasherType>(inout hasher: Hasher) {
+  //func combineIntoHash<H : Hasher>(_ hasher: inout H) {
   //  hasher.combine(a1)
   //}
 
@@ -72,22 +72,22 @@ class UserClassA : NSObject {
 
 /// A hasher object computes a hash value.
 ///
-/// Requirement: two hasher objects compute the same hash value when
+/// Precondition: two hasher objects compute the same hash value when
 /// the same sequence of `combine(...)` calls with equal arguments is
 /// performed on both of them.
-protocol HasherType {
+protocol Hasher {
   //
   // Primary APIs
   //
 
-  mutating func combine(value: Int)
-  mutating func combine(value: Float)
+  mutating func combine(_ value: Int)
+  mutating func combine(_ value: Float)
   // ... overloads for other primitive types...
 
-  mutating func squeezeHashValue<I : SignedIntegerType>(
-    resultRange: Range<I>) -> I
-  mutating func squeezeHashValue<I : UnsignedIntegerType>(
-    resultRange: Range<I>) -> I
+  mutating func squeezeHashValue<I : SignedInteger>(
+    _ resultRange: Range<I>) -> I
+  mutating func squeezeHashValue<I : UnsignedInteger>(
+    _ resultRange: Range<I>) -> I
 
   //
   // Convenience APIs; would be completely implemented by default
@@ -97,15 +97,16 @@ protocol HasherType {
   // This handles arrays, UnsafeBufferPointer, user-defined
   // collections.
   mutating func combineSequence<
-    S : SequenceType
-  where
-    S.Generator.Element : NewHashable>(s: S)
+    S : Sequence
+    where
+    S.Iterator.Element : NewHashable
+  >(_ s: S)
 
-  mutating func combine<H : NewHashable>(value: H)
+  mutating func combine<H : NewHashable>(_ value: H)
 }
 
 /// A hasher for in-process, non-persistent hashtables.
-struct InProcessHashtableHasher : HasherType {
+struct InProcessHashtableHasher : Hasher {
   // Only for exposition.
   var _state: Int
 
@@ -114,36 +115,37 @@ struct InProcessHashtableHasher : HasherType {
     _state = 0
   }
 
-  mutating func combine(value: Int) {
+  mutating func combine(_ value: Int) {
     // Only for exposition.
     _state = _state ^ value
   }
 
-  mutating func combine(value: Float) {
+  mutating func combine(_ value: Float) {
     // Only for exposition.
-    _state = _state ^ Int(value._toBitPattern())
+    _state = _state ^ Int(value.bitPattern)
   }
 
   mutating func combineSequence<
-    S : SequenceType
-  where
-    S.Generator.Element : NewHashable>(s: S) {
+    S : Sequence
+    where
+    S.Iterator.Element : NewHashable
+  >(_ s: S) {
     for v in s {
       v.combineIntoHash(&self)
     }
   }
 
-  mutating func combine<H : NewHashable>(value: H) {
+  mutating func combine<H : NewHashable>(_ value: H) {
     value.combineIntoHash(&self)
   }
 
-  mutating func squeezeHashValue<I : SignedIntegerType>(
-    resultRange: Range<I>) -> I {
+  mutating func squeezeHashValue<I : SignedInteger>(
+    _ resultRange: Range<I>) -> I {
     // ... finalize hash value computation first...
     return I(IntMax(_state)) // Should actually clamp the value
   }
-  mutating func squeezeHashValue<I : UnsignedIntegerType>(
-    resultRange: Range<I>) -> I {
+  mutating func squeezeHashValue<I : UnsignedInteger>(
+    _ resultRange: Range<I>) -> I {
     // ... finalize hash value computation first...
     return I(UIntMax(_state)) // Should actually clamp the value
   }
@@ -152,10 +154,10 @@ struct InProcessHashtableHasher : HasherType {
 /// A hasher with 128-bit output and a well-defined algorithm stable
 /// *across platforms*; useful for on-disk or distributed hash tables.
 /// Not a cryptographic hash.
-// struct StableFingerprint128Hasher : HasherType {}
+// struct StableFingerprint128Hasher : Hasher {}
 
 extension Int : NewHashable {
-  func combineIntoHash<Hasher : HasherType>(inout hasher: Hasher) {
+  func combineIntoHash<H : Hasher>(_ hasher: inout H) {
     hasher.combine(self)
   }
 }
@@ -167,7 +169,7 @@ extension Int : NewHashable {
 import Foundation
 
 extension NSObject : NewHashable {
-  func combineIntoHash<Hasher : HasherType>(inout hasher: Hasher) {
+  func combineIntoHash<H : Hasher>(_ hasher: inout H) {
     hasher.combine(self.hash)
   }
 }

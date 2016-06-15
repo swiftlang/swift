@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -208,7 +208,7 @@ public:
     }
   }
 
-  /// \brief Retrieve the declaraton that corresponds to this overload choice.
+  /// \brief Retrieve the declaration that corresponds to this overload choice.
   ValueDecl *getDecl() const {
     assert(isDecl() && "Not a declaration");
     return reinterpret_cast<ValueDecl *>(DeclOrKind & ~(uintptr_t)0x03);

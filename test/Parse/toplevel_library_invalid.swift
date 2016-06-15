@@ -1,11 +1,13 @@
 // RUN: %target-parse-verify-swift -parse-as-library
 
-let x = 42
-x + x; // expected-error {{expressions are not allowed at the top level}}
-x + x; // expected-error {{expressions are not allowed at the top level}}
+let x = 42 // expected-note{{did you mean 'x'?}}
+x + x; // expected-error {{expressions are not allowed at the top level}} expected-warning {{result of operator '+' is unused}}
+x + x; // expected-error {{expressions are not allowed at the top level}} expected-warning {{result of operator '+' is unused}}
 // Make sure we don't crash on closures at the top level
 ({ }) // expected-error {{expressions are not allowed at the top level}} expected-error{{expression resolves to an unused function}}
 ({ 5 }()) // expected-error {{expressions are not allowed at the top level}}
+// expected-warning @-1 {{result of call is unused}}
+
 
 // FIXME: Too many errors for this.
 for i // expected-error 2 {{expected ';' in 'for' statement}} 

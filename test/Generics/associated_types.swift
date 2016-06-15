@@ -2,20 +2,20 @@
 
 // Deduction of associated types.
 protocol Fooable {
-  typealias AssocType
-  func foo(x : AssocType)
+  associatedtype AssocType
+  func foo(_ x : AssocType)
 }
 
 struct X : Fooable {
-  func foo(x: Float) {}
+  func foo(_ x: Float) {}
 }
 
 struct Y<T> : Fooable {
-  func foo(x: T) {}
+  func foo(_ x: T) {}
 }
 
 struct Z : Fooable {
-  func foo(x: Float) {}
+  func foo(_ x: Float) {}
 
   func blah() {
     var a : AssocType // expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}} {{9-10=_}}
@@ -39,7 +39,7 @@ var d : Double
 d = yd
 
 protocol P1 {
-  typealias Assoc1
+  associatedtype Assoc1
   func foo() -> Assoc1
 }
 
@@ -50,7 +50,7 @@ struct S1 : P1 {
 prefix operator % {}
 
 protocol P2 {
-  typealias Assoc2
+  associatedtype Assoc2
   prefix func %(target: Self) -> Assoc2
 }
 
@@ -63,16 +63,16 @@ extension S1 : P2 {
 
 // <rdar://problem/14418181>
 protocol P3 {
-  typealias Assoc3
+  associatedtype Assoc3
   func foo() -> Assoc3
 }
 
 protocol P4 : P3 {
-  typealias Assoc4
+  associatedtype Assoc4
   func bar() -> Assoc4
 }
 
-func takeP4<T : P4>(x: T) { }
+func takeP4<T : P4>(_ x: T) { }
 
 struct S4<T> : P3, P4 {
   func foo() -> Int {}
@@ -89,11 +89,11 @@ protocol P5 { }
 struct S7a {}
 
 protocol P6 {
-  func foo<Target: P5>(inout target: Target)
+  func foo<Target: P5>(_ target: inout Target)
 }
 
 protocol P7 : P6 {
-  typealias Assoc : P6
+  associatedtype Assoc : P6
   func ~> (x: Self, _: S7a) -> Assoc
 }
 
@@ -101,31 +101,32 @@ func ~> <T:P6>(x: T, _: S7a) -> S7b { return S7b() }
 
 struct S7b : P7 {
   typealias Assoc = S7b
-  func foo<Target: P5>(inout target: Target) {}
+  func foo<Target: P5>(_ target: inout Target) {}
 }
 
 // <rdar://problem/14685674>
-struct zip<A: GeneratorType, B: GeneratorType> : GeneratorType, SequenceType {
-     func next() -> (A.Element, B.Element)? { }
+struct zip<A : IteratorProtocol, B : IteratorProtocol>
+  : IteratorProtocol, Sequence {
 
-     typealias Generator = zip
-     func generate() -> zip { }
-     
+  func next() -> (A.Element, B.Element)? { }
+
+  typealias Generator = zip
+  func makeIterator() -> zip { }
 }
 
 protocol P8 { }
 
 protocol P9 {
-  typealias A1 : P8
+  associatedtype A1 : P8
 }
 
 protocol P10 {
-  typealias A1b : P8
-  typealias A2 : P9
+  associatedtype A1b : P8
+  associatedtype A2 : P9
 
   func f()
-  func g(a: A1b)
-  func h(a: A2)
+  func g(_ a: A1b)
+  func h(_ a: A2)
 }
 
 struct X8 : P8 { }
@@ -136,18 +137,44 @@ struct Y9 : P9 {
 
 struct Z10 : P10 {
   func f() { }
-  func g(a: X8) { }
-  func h(a: Y9) { }
+  func g(_ a: X8) { }
+  func h(_ a: Y9) { }
 }
 
 
 struct W : Fooable {
-  func foo(x: String) {}
+  func foo(_ x: String) {}
 }
 struct V<T> : Fooable {
-  func foo(x: T) {}
+  func foo(_ x: T) {}
 }
 
-// FIXME: <rdar://problem/16123805> Inferred associated types can't be used in expression contexts
+// FIXME: <rdar://problem/16123805> associated Inferred types can't be used in expression contexts
 var w = W.AssocType()
 var v = V<String>.AssocType()
+
+//
+// SR-427
+protocol A {
+  func c()
+}
+
+protocol B : A {
+  associatedtype e : A = C<Self> // expected-note {{default type 'C<C<a>>' for associated type 'e' (from protocol 'B') does not conform to 'A'}}
+}
+
+extension B {
+  func c() {
+  }
+}
+
+struct C<a : B> : B { // expected-error {{type 'C<a>' does not conform to protocol 'B'}}
+}
+
+// SR-511
+protocol sr511 {
+  typealias Foo // expected-warning {{use of 'typealias' to declare associated types is deprecated; use 'associatedtype' instead}} 
+}
+
+associatedtype Foo = Int // expected-error {{associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement}}
+

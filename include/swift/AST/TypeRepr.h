@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -21,6 +21,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
@@ -45,16 +46,22 @@ class alignas(8) TypeRepr {
   void operator=(const TypeRepr&) = delete;
 
   /// \brief The subclass of TypeRepr that this is.
-  unsigned Kind : 7;
+  unsigned Kind : 6;
 
   /// Whether this type representation is known to contain an invalid
   /// type.
   unsigned Invalid : 1;
 
+  /// Whether this type representation had a warning emitted related to it.
+  /// This is a hack related to how we resolve type exprs multiple times in
+  /// generic contexts.
+  unsigned Warned : 1;
+
   SourceLoc getLocImpl() const { return getStartLoc(); }
 
 protected:
-  TypeRepr(TypeReprKind K) : Kind(static_cast<unsigned>(K)), Invalid(false) {}
+  TypeRepr(TypeReprKind K)
+    : Kind(static_cast<unsigned>(K)), Invalid(false), Warned(false) {}
 
 public:
   TypeReprKind getKind() const { return static_cast<TypeReprKind>(Kind); }
@@ -65,6 +72,11 @@ public:
   /// Note that this type representation describes an invalid type.
   void setInvalid() { Invalid = true; }
 
+  /// If a warning is produced about this type repr, keep track of that so we
+  /// don't emit another one upon further reanalysis.
+  bool isWarnedAbout() const { return Warned; }
+  void setWarned() { Warned = true; }
+  
   /// Get the representative location for pointing at this type.
   SourceLoc getLoc() const;
 
@@ -85,7 +97,7 @@ public:
 
   //*** Allocation Routines ************************************************/
 
-  void *operator new(size_t bytes, ASTContext &C,
+  void *operator new(size_t bytes, const ASTContext &C,
                      unsigned Alignment = alignof(TypeRepr));
 
   // Make placement new and vanilla new/delete illegal for TypeReprs.
@@ -98,7 +110,7 @@ public:
   void dump() const;
 
   /// Clone the given type representation.
-  TypeRepr *clone(ASTContext &ctx) const;
+  TypeRepr *clone(const ASTContext &ctx) const;
 
   /// Visit the top-level types in the given type representation,
   /// which includes the types referenced by \c IdentTypeReprs either
@@ -150,6 +162,7 @@ public:
   }
 
   const TypeAttributes &getAttrs() const { return Attrs; }
+  void setAttrs(const TypeAttributes &attrs) { Attrs = attrs; }
   TypeRepr *getTypeRepr() const { return Ty; }
 
   void printAttrs(llvm::raw_ostream &OS) const;
@@ -351,21 +364,33 @@ inline IdentTypeRepr::ComponentRange IdentTypeRepr::getComponentRange() {
 ///   Foo -> Bar
 /// \endcode
 class FunctionTypeRepr : public TypeRepr {
-  GenericParamList *Generics;
+  // These two are only used in SIL mode, which is the only time
+  // we can have polymorphic function values.
+  GenericParamList *GenericParams;
+  GenericSignature *GenericSig;
+
   TypeRepr *ArgsTy;
   TypeRepr *RetTy;
   SourceLoc ArrowLoc;
   SourceLoc ThrowsLoc;
 
 public:
-  FunctionTypeRepr(GenericParamList *generics, TypeRepr *argsTy,
+  FunctionTypeRepr(GenericParamList *genericParams, TypeRepr *argsTy,
                    SourceLoc throwsLoc, SourceLoc arrowLoc, TypeRepr *retTy)
     : TypeRepr(TypeReprKind::Function),
-      Generics(generics), ArgsTy(argsTy), RetTy(retTy),
+      GenericParams(genericParams), GenericSig(nullptr),
+      ArgsTy(argsTy), RetTy(retTy),
       ArrowLoc(arrowLoc), ThrowsLoc(throwsLoc) {
   }
 
-  GenericParamList *getGenericParams() const { return Generics; }
+  GenericParamList *getGenericParams() const { return GenericParams; }
+  GenericSignature *getGenericSignature() const { return GenericSig; }
+
+  void setGenericSignature(GenericSignature *genericSig) {
+    assert(GenericSig == nullptr);
+    GenericSig = genericSig;
+  }
+
   TypeRepr *getArgsTypeRepr() const { return ArgsTy; }
   TypeRepr *getResultTypeRepr() const { return RetTy; }
   bool throws() const { return ThrowsLoc.isValid(); }
@@ -392,23 +417,15 @@ private:
 ///   [Foo]
 /// \endcode
 class ArrayTypeRepr : public TypeRepr {
-  // FIXME: Tail allocation. Use bits to determine whether Base/Size are
-  // availble.
   TypeRepr *Base;
-  llvm::PointerIntPair<ExprHandle *, 1, bool> SizeAndOldSyntax;
   SourceRange Brackets;
 
 public:
-  ArrayTypeRepr(TypeRepr *Base, ExprHandle *Size, SourceRange Brackets,
-                bool OldSyntax)
-    : TypeRepr(TypeReprKind::Array), Base(Base),
-      SizeAndOldSyntax(Size, OldSyntax), Brackets(Brackets) { }
+  ArrayTypeRepr(TypeRepr *Base, SourceRange Brackets)
+    : TypeRepr(TypeReprKind::Array), Base(Base), Brackets(Brackets) { }
 
   TypeRepr *getBase() const { return Base; }
-  ExprHandle *getSize() const { return SizeAndOldSyntax.getPointer(); }
   SourceRange getBrackets() const { return Brackets; }
-
-  bool usesOldSyntax() const { return SizeAndOldSyntax.getInt(); }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Array;
@@ -416,20 +433,8 @@ public:
   static bool classof(const ArrayTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const {
-    if (usesOldSyntax())
-      return Base->getStartLoc();
-
-    return Brackets.Start;
-  }
-  SourceLoc getEndLocImpl() const {
-    // This test is necessary because the type Int[4][2] is represented as
-    // ArrayTypeRepr(ArrayTypeRepr(Int, 2), 4), so the range needs to cover both
-    // sets of brackets.
-    if (usesOldSyntax() && isa<ArrayTypeRepr>(Base))
-      return Base->getEndLoc();
-    return Brackets.End;
-  }
+  SourceLoc getStartLocImpl() const { return Brackets.Start; }
+  SourceLoc getEndLocImpl() const { return Brackets.End; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -781,10 +786,8 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::ProtocolComposition:
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:
-    return true;
-
   case TypeReprKind::Array:
-    return !cast<ArrayTypeRepr>(this)->usesOldSyntax();
+    return true;
   }
   llvm_unreachable("bad TypeRepr kind");
 }

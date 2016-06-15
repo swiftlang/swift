@@ -148,7 +148,7 @@ grammar for function types and implicit ``()`` result types, e.g.::
 
   // Takes a 'callback' function that can throw.
   // 'fred' itself can also throw.
-  func fred(callback: (UInt8) throws -> ()) throws {
+  func fred(_ callback: (UInt8) throws -> ()) throws {
 
   // These are distinct types.
   let a : () -> () -> ()
@@ -159,7 +159,7 @@ grammar for function types and implicit ``()`` result types, e.g.::
 For curried functions, ``throws`` only applies to the innermost
 function.  This function has type ``(Int) -> (Int) throws -> Int``::
 
-  func jerry(i: Int)(j: Int) throws -> Int {
+  func jerry(_ i: Int)(j: Int) throws -> Int {
 
 ``throws`` is tracked as part of the type system: a function value
 must also declare whether it can throw.  Functions that cannot throw
@@ -167,7 +167,7 @@ are a subtype of functions that can, so you can use a function that
 can't throw anywhere you could use a function that can::
 
   func rachel() -> Int { return 12 }
-  func donna(generator: () throws -> Int) -> Int { ... }
+  func donna(_ generator: () throws -> Int) -> Int { ... }
 
   donna(rachel)
 
@@ -190,8 +190,8 @@ override a throwing method or satisfy a throwing protocol requirement.
 It is valuable to be able to overload higher-order functions based on
 whether an argument function throws, so this is allowed::
 
-  func foo(callback: () throws -> Bool) {
-  func foo(callback: () -> Bool) {
+  func foo(_ callback: () throws -> Bool) {
+  func foo(_ callback: () -> Bool) {
 
 ``rethrows``
 ~~~~~~~~~~~~
@@ -200,7 +200,7 @@ Functions which take a throwing function argument (including as an
 autoclosure) can be marked as ``rethrows``::
 
   extension Array {
-    func map<U>(fn: ElementType throws -> U) rethrows -> [U]
+    func map<U>(_ fn: ElementType throws -> U) rethrows -> [U]
   }
 
 It is an error if a function declared ``rethrows`` does not include a
@@ -256,8 +256,8 @@ Throwing an error
 -----------------
 
 The ``throw`` statement begins the propagation of an error.  It always
-take an argument, which can be any value that conforms to the
-``ErrorType`` protocol (described below).
+takes an argument, which can be any value that conforms to the
+``ErrorProtocol`` protocol (described below).
 
 ::
 
@@ -311,15 +311,15 @@ be marked ``throws``).
 
 We expect to refine the ``catch`` syntax with usage experience.
 
-``ErrorType``
--------------
+``ErrorProtocol``
+-----------------
 
-The Swift standard library will provide ``ErrorType``, a protocol with
+The Swift standard library will provide ``ErrorProtocol``, a protocol with
 a very small interface (which is not described in this proposal).  The
 standard pattern should be to define the conformance of an ``enum`` to
 the type::
 
-  enum HomeworkError : ErrorType {
+  enum HomeworkError : ErrorProtocol {
     case Overworked
     case Impossible
     case EatenByCat(Cat)
@@ -332,13 +332,13 @@ within that namespace, and optional values to attach to each option.
 Note that this corresponds very cleanly to the ``NSError`` model of an
 error domain, an error code, and optional user data.  We expect to
 import system error domains as enums that follow this approach and
-implement ``ErrorType``.  ``NSError`` and ``CFError`` themselves will also
-conform to ``ErrorType``.
+implement ``ErrorProtocol``.  ``NSError`` and ``CFError`` themselves will also
+conform to ``ErrorProtocol``.
 
 The physical representation (still being nailed down) will make it
-efficient to embed an ``NSError`` as an ``ErrorType`` and vice-versa.  It
+efficient to embed an ``NSError`` as an ``ErrorProtocol`` and vice-versa.  It
 should be possible to turn an arbitrary Swift ``enum`` that conforms to
-``ErrorType`` into an ``NSError`` by using the qualified type name as the
+``ErrorProtocol`` into an ``NSError`` by using the qualified type name as the
 domain key, the enumerator as the error code, and turning the payload
 into user data.
 
@@ -507,7 +507,7 @@ like this one from ``NSAttributedString``::
 
 would be imported as::
 
-  func dataFromRange(range: NSRange,
+  func dataFromRange(_ range: NSRange,
                      documentAttributes dict: NSDictionary) throws -> NSData
 
 There are a number of cases to consider, but we expect that most can
@@ -578,7 +578,7 @@ of failability.
 
 One limitation of this approach is that we need to be able to reconstruct
 the selector to use when an overload of a method is introduced.  For this
-reason, the import is likely to be limited to methods where  the error
+reason, the import is likely to be limited to methods where the error
 parameter is the last one and the corresponding selector
 chunk is either ``error:`` or the first chunk (see below).  Empirically,
 this seems to do the right thing for all but two sets of APIs in the
@@ -637,7 +637,7 @@ can be done in a fairly simple way: a function can declare that it
 throws if any of a set of named arguments do.  As an example (using
 strawman syntax)::
 
-  func map<T,U>(array: [T], fn: T -> U) throwsIf(fn) -> [U] {
+  func map<T, U>(_ array: [T], fn: T -> U) throwsIf(fn) -> [U] {
     ...
   }
 
@@ -680,7 +680,7 @@ can be overloaded on whether its argument closure throws; the
 overload that takes a throwing closures would itself throw.
 
 There is one minor usability problem here, though.  If the closure
-contains throwing expressions, those expression must be explicitly
+contains throwing expressions, those expressions must be explicitly
 marked within the closure with ``try``.  However, from the compiler's
 perspective, the call to ``autoreleasepool`` is also a call that
 can throw, and so it must also be marked with ``try``::
@@ -726,7 +726,7 @@ more likely, we'd need to wrap them all in an overlay.
 
 In both cases, it is possible to pull these into the Swift error
 handling model, but because this is likely to require massive SDK
-annotations it is considered out of scope for iOS 9/OSX 10.11 & Swift 2.0.
+annotations it is considered out of scope for iOS 9/OS X 10.11 & Swift 2.0.
 
 Unexpected and universal errors
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

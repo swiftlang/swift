@@ -8,11 +8,11 @@ import Foundation
 
 class SwiftClass { }
 
-func genericCast<T>(x: AnyObject, _: T.Type) -> T? {
+func genericCast<T>(_ x: AnyObject, _: T.Type) -> T? {
   return x as? T
 }
 
-func genericCastUnconditional<T>(x: AnyObject, _: T.Type) -> T {
+func genericCastUnconditional<T>(_ x: AnyObject, _: T.Type) -> T {
   return x as! T
 }
 

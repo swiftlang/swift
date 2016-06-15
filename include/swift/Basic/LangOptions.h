@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_LANGOPTIONS_H
-#define SWIFT_LANGOPTIONS_H
+#ifndef SWIFT_BASIC_LANGOPTIONS_H
+#define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Basic/LLVM.h"
 #include "clang/Basic/VersionTuple.h"
@@ -40,10 +40,6 @@ namespace swift {
     ///
     /// Language features
     ///
-
-    /// \brief If true, all types are treated as resilient unless declared
-    /// @_fixed_layout.
-    bool EnableResilience = false;
 
     /// \brief Disable API availability checking.
     bool DisableAvailabilityChecking = false;
@@ -73,12 +69,6 @@ namespace swift {
     /// \brief Enable features useful for running playgrounds.
     // FIXME: This should probably be limited to the particular SourceFile.
     bool Playground = false;
-
-    /// Whether to delay adding enum protocol conformances during code
-    /// completion. This isn't completely correct with multiple files but is
-    /// currently necessary to get reasonable performance.
-    // FIXME: remove this when rdar://20047340 is fixed.
-    bool EnableCodeCompletionDelayedEnumConformanceHack = false;
 
     /// \brief Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;
@@ -130,7 +120,7 @@ namespace swift {
     /// This is for testing purposes.
     std::string DebugForbidTypecheckPrefix;
 
-    /// Number of paralellel processes performing AST verification.
+    /// Number of parallel processes performing AST verification.
     unsigned ASTVerifierProcessCount = 1U;
 
     /// ID of the current process for the purposes of AST verification.
@@ -147,14 +137,33 @@ namespace swift {
     /// \brief Enable experimental "switch" pattern-matching features.
     bool EnableExperimentalPatterns = false;
 
+    /// \brief Enable experimental property behavior feature.
+    bool EnableExperimentalPropertyBehaviors = false;
+
+    /// \brief Enable experimental nested generic types feature.
+    bool EnableExperimentalNestedGenericTypes = false;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
-    
-    /// Don't mangle the Self type as part of declaration manglings.
-    bool DisableSelfTypeMangling = true;
-    
-    /// Sets the target we are building for and updates configuration options
+
+    /// Whether to use the import as member inference system
+    ///
+    /// When importing a global, try to infer whether we can import it as a
+    /// member of some type instead. This includes inits, computed properties,
+    /// and methods.
+    bool InferImportAsMember = false;
+
+    /// Whether we are stripping the "NS" prefix from Foundation et al.
+    bool StripNSPrefix = true;
+
+    /// Enable the Swift 3 migration via Fix-Its.
+    bool Swift3Migration = false;
+
+    /// Enable typealiases in protocols.
+    bool EnableProtocolTypealiases = false;
+
+    /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
     /// \returns A pair - the first element is true if the OS was invalid.
@@ -173,7 +182,10 @@ namespace swift {
         Target.getiOSVersion(major, minor, revision);
       } else if (Target.isWatchOS()) {
         Target.getOSVersion(major, minor, revision);
-      } else if (Target.isOSLinux() || Target.getTriple().empty()) {
+      } else if (Target.isOSLinux() || Target.isOSFreeBSD() ||
+                 Target.isAndroid() || Target.isOSWindows() ||
+                 Target.getTriple().empty())
+      {
         major = minor = revision = 0;
       } else {
         llvm_unreachable("Unsupported target OS");
@@ -181,63 +193,61 @@ namespace swift {
       return clang::VersionTuple(major, minor, revision);
     }
 
-    /// Implicit target configuration options.  There are currently three
-    ///   supported target configuration values:
-    ///     os - The active os target (OSX or IOS)
-    ///     arch - The active arch target (X64, I386, ARM, ARM64)
-    ///     _runtime - Runtime support (_ObjC or _Native)
-    void addTargetConfigOption(StringRef Name, StringRef Value) {
+    /// Sets an implicit platform condition.
+    ///
+    /// There are currently three supported platform conditions:
+    /// - os: The active os target (OSX or iOS)
+    /// - arch: The active arch target (x86_64, i386, arm, arm64)
+    /// - _runtime: Runtime support (_ObjC or _Native)
+    void addPlatformConditionValue(StringRef Name, StringRef Value) {
       assert(!Name.empty() && !Value.empty());
-      TargetConfigOptions.push_back(std::make_pair(Name, Value));
+      PlatformConditionValues.emplace_back(Name, Value);
     }
 
-    /// Removes all configuration options added with addTargetConfigOption.
-    void clearAllTargetConfigOptions() {
-      TargetConfigOptions.clear();
+    /// Removes all values added with addPlatformConditionValue.
+    void clearAllPlatformConditionValues() {
+      PlatformConditionValues.clear();
     }
     
-    /// Returns the value for the given target configuration or an empty string.
-    StringRef getTargetConfigOption(StringRef Name) const;
-    
-    /// Explicit build configuration options, initialized via the '-D'
+    /// Returns the value for the given platform condition or an empty string.
+    StringRef getPlatformConditionValue(StringRef Name) const;
+
+    /// Explicit conditional compilation flags, initialized via the '-D'
     /// compiler flag.
-    void addBuildConfigOption(StringRef Name) {
+    void addCustomConditionalCompilationFlag(StringRef Name) {
       assert(!Name.empty());
-      BuildConfigOptions.push_back(Name);
+      CustomConditionalCompilationFlags.push_back(Name);
     }
 
-    /// Determines if a given build configuration has been defined.
-    bool hasBuildConfigOption(StringRef Name) const;
+    /// Determines if a given conditional compilation flag has been set.
+    bool isCustomConditionalCompilationFlagSet(StringRef Name) const;
 
     ArrayRef<std::pair<std::string, std::string>>
-        getTargetConfigOptions() const {
-      return TargetConfigOptions;
+    getPlatformConditionValues() const {
+      return PlatformConditionValues;
     }
 
-    ArrayRef<std::string> getBuildConfigOptions() const {
-      return BuildConfigOptions;
+    ArrayRef<std::string> getCustomConditionalCompilationFlags() const {
+      return CustomConditionalCompilationFlags;
     }
 
-    /// The constant list of supported os build configuration arguments.
-    static const std::vector<std::string> SupportedOSBuildConfigArguments;
-
-    /// Returns true if the os build configuration argument represents
+    /// Returns true if the 'os' platform condition argument represents
     /// a supported target operating system.
-    static bool isOSBuildConfigSupported(StringRef OSName);
+    static bool isPlatformConditionOSSupported(StringRef OSName);
 
-    /// The constant list of supported arch build configuration arguments.
-    static const std::vector<std::string> SupportedArchBuildConfigArguments;
-
-    /// Returns true if the arch build configuration argument represents
+    /// Returns true if the 'arch' platform condition argument represents
     /// a supported target architecture.
-    static bool isArchBuildConfigSupported(StringRef ArchName);
+    static bool isPlatformConditionArchSupported(StringRef ArchName);
+
+    /// Returns true if the 'endian' platform condition argument represents
+    /// a supported target endianness.
+    static bool isPlatformConditionEndiannessSupported(StringRef endianness);
 
   private:
-    llvm::SmallVector<std::pair<std::string, std::string>, 2>
-        TargetConfigOptions; 
-    llvm::SmallVector<std::string, 2> BuildConfigOptions;
+    llvm::SmallVector<std::pair<std::string, std::string>, 3>
+        PlatformConditionValues;
+    llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
   };
-}
+} // end namespace swift
 
-#endif // LLVM_SWIFT_LANGOPTIONS_H
-
+#endif // SWIFT_BASIC_LANGOPTIONS_H

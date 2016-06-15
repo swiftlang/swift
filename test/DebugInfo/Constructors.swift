@@ -6,7 +6,7 @@ struct Foo {
   // CHECK-NOT:           scopeLine: 0
   // CHECK-SAME:          isDefinition: true
   init(x: Int64) {}
-  func bar(x: Int64) {}
+  func bar(_ x: Int64) {}
 }
 
 var f = Foo(x: 1)

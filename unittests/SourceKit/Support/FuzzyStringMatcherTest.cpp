@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -276,8 +276,8 @@ TEST(FuzzyStringMatcher, NormalizeSingleCharacterScore) {
 TEST(FuzzyStringMatcher, NormalizeScore) {
   FuzzyStringMatcher m("AB");
   m.normalize = true;
-  EXPECT_EQ(1.0, m.scoreCandidate("AB"));
-  EXPECT_EQ(0.0, m.scoreCandidate("BB"));
+  EXPECT_DOUBLE_EQ(1.0, m.scoreCandidate("AB"));
+  EXPECT_DOUBLE_EQ(0.0, m.scoreCandidate("BB"));
   EXPECT_GT(1.0, m.scoreCandidate("ab"));
   EXPECT_LT(0.0, m.scoreCandidate("ab"));
   EXPECT_GT(1.0, m.scoreCandidate("ABB"));
@@ -291,8 +291,8 @@ TEST(FuzzyStringMatcher, NormalizeScore) {
 
   FuzzyStringMatcher n("abc");
   n.normalize = true;
-  EXPECT_EQ(1.0, n.scoreCandidate("abc"));
-  EXPECT_EQ(1.0, n.scoreCandidate("ABC"));
+  EXPECT_DOUBLE_EQ(1.0, n.scoreCandidate("abc"));
+  EXPECT_DOUBLE_EQ(1.0, n.scoreCandidate("ABC"));
 }
 
 TEST(FuzzyStringMatcher, TokenizingCharacters) {

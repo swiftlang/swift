@@ -1,8 +1,8 @@
-//===-- KnownDecl.def - Compiler declaration metaprogramming ----*- C++ -*-===//
+//===--- KnownDecls.def - Compiler declaration metaprogramming --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -57,15 +57,15 @@ FUNC_DECL(ForceBridgeFromObjectiveC,
           "_forceBridgeFromObjectiveC")
 FUNC_DECL(ConditionallyBridgeFromObjectiveC,
           "_conditionallyBridgeFromObjectiveC")
-FUNC_DECL(BridgeErrorTypeToNSError,
-          "_bridgeErrorTypeToNSError")
+FUNC_DECL(BridgeErrorProtocolToNSError,
+          "_bridgeErrorProtocolToNSError")
 
 FUNC_DECL(ForceBridgeFromObjectiveCBridgeable,
           "_forceBridgeFromObjectiveC_bridgeable")
 FUNC_DECL(ConditionallyBridgeFromObjectiveCBridgeable,
           "_conditionallyBridgeFromObjectiveC_bridgeable")
 
-FUNC_DECL(DidEnterMain, "_didEnterMain")
+FUNC_DECL(DidEnterMain, "_stdlib_didEnterMain")
 FUNC_DECL(DiagnoseUnexpectedNilOptional, "_diagnoseUnexpectedNilOptional")
 
 #undef FUNC_DECL

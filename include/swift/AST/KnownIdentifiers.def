@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines macros used for macro-metaprogramming with compiler-known
-// identifers.
+// identifiers.
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,10 +24,12 @@
 
 IDENTIFIER(alloc)
 IDENTIFIER(allocWithZone)
+IDENTIFIER(allZeros)
 IDENTIFIER(atIndexedSubscript)
 IDENTIFIER_(bridgeToObjectiveC)
 IDENTIFIER_WITH_NAME(code_, "_code")
-IDENTIFIER(CVarArgType)
+IDENTIFIER(CGFloat)
+IDENTIFIER(CVarArg)
 IDENTIFIER(Darwin)
 IDENTIFIER(dealloc)
 IDENTIFIER(deinit)
@@ -36,33 +38,40 @@ IDENTIFIER(error)
 IDENTIFIER(forKeyedSubscript)
 IDENTIFIER(Foundation)
 IDENTIFIER(fromRaw)
-IDENTIFIER(generate)
-IDENTIFIER(Generator)
 IDENTIFIER(hashValue)
 IDENTIFIER(init)
+IDENTIFIER(initStorage)
+IDENTIFIER(initialValue)
+IDENTIFIER(makeIterator)
+IDENTIFIER(Iterator)
 IDENTIFIER(load)
 IDENTIFIER(next)
-IDENTIFIER(NSError)
-IDENTIFIER_(NSErrorDomain)
-IDENTIFIER(NSObject)
+IDENTIFIER(none)
+IDENTIFIER_(nsErrorDomain)
 IDENTIFIER(objectAtIndexedSubscript)
 IDENTIFIER(objectForKeyedSubscript)
 IDENTIFIER(ObjectiveC)
+IDENTIFIER_(ObjectiveCType)
 IDENTIFIER_(OptionalNilComparisonType)
+IDENTIFIER(parameter)
 IDENTIFIER(Protocol)
 IDENTIFIER(rawValue)
 IDENTIFIER(RawValue)
+IDENTIFIER(Selector)
 IDENTIFIER(self)
 IDENTIFIER(Self)
 IDENTIFIER(setObject)
 IDENTIFIER(simd)
-IDENTIFIER(Some)
+IDENTIFIER(some)
+IDENTIFIER(storage)
 IDENTIFIER(subscript)
 IDENTIFIER(SwiftObject)
 IDENTIFIER(toRaw)
 IDENTIFIER(Type)
+IDENTIFIER(Value)
 IDENTIFIER(value)
 IDENTIFIER_WITH_NAME(value_, "_value")
+IDENTIFIER(with)
 
 // Operators
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")
@@ -100,6 +109,7 @@ IDENTIFIER(stringInterpolationSegment)
 IDENTIFIER(arrayLiteral)
 IDENTIFIER(dictionaryLiteral)
 IDENTIFIER_(getBuiltinLogicValue)
+IDENTIFIER(className)
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

@@ -18,17 +18,17 @@ class ValueObserver: NSObject {
 	init(value: ObservedValue) {
 		observedValue = value
 		super.init()
-		observedValue.addObserver(self, forKeyPath: "amount", options: .New, context: &observeContext)
+		observedValue.addObserver(self, forKeyPath: "amount", options: .new, context: &observeContext)
 	}
 
 	deinit {
 		observedValue.removeObserver(self, forKeyPath: "amount")
 	}
 	
-	override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
+	override func observeValue(forKeyPath keyPath: String?, of object: AnyObject?, change: [NSKeyValueChangeKey : AnyObject]?, context: UnsafeMutablePointer<Void>?) {
 		if context == &observeContext {
       if let change_ = change {
-        if let amount = change_[NSKeyValueChangeNewKey as String] as? Int {
+        if let amount = change_[.newKey] as? Int {
           print("Observed value updated to \(amount)")
         }
       }
@@ -40,7 +40,7 @@ let value = ObservedValue()
 value.amount = 42
 let observer = ValueObserver(value: value)
 // CHECK: updated to 43
-value.amount++
+value.amount += 1
 // CHECK: amount: 43
 dump(value)
 

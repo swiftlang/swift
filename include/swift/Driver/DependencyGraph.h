@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -94,7 +94,7 @@ private:
   static_assert(std::is_move_constructible<ProvidesEntryTy>::value, "");
 
   /// The "outgoing" edge map. This lists all outgoing (kind, string) edges
-  /// representing satisified dependencies from a particular node.
+  /// representing satisfied dependencies from a particular node.
   ///
   /// For multiple outgoing edges with the same string, the kinds are combined
   /// into one field.

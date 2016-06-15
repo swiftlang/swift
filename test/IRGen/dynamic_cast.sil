@@ -19,113 +19,113 @@ struct S {
 
 // CHECK: [[INT:%Si]] = type <{ [[LLVM_PTRSIZE_INT:i(32|64)]] }>
 
-// CHECK-LABEL: define void @testUnconditional0(
+// CHECK-LABEL: define{{( protected)?}} void @testUnconditional0(
 sil @testUnconditional0 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
   // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_TMaP12dynamic_cast1P_()
-  // CHECK: call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 7)
+  // CHECK: call i1 @rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 7)
   %1 = alloc_stack $S
-  unconditional_checked_cast_addr take_always P in %0 : $*P to S in %1#1 : $*S
-  destroy_addr %1#1 : $*S
-  dealloc_stack %1#0 : $*@local_storage S
+  unconditional_checked_cast_addr take_always P in %0 : $*P to S in %1 : $*S
+  destroy_addr %1 : $*S
+  dealloc_stack %1 : $*S
   %2 = tuple ()
   return %2 : $()
 }
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMaP12dynamic_cast1P_()
-// CHECK:       call %swift.type* @swift_getExistentialTypeMetadata(
+// CHECK:       call %swift.type* @rt_swift_getExistentialTypeMetadata(
 
-// CHECK-LABEL: define void @testUnconditional1(
+// CHECK-LABEL: define{{( protected)?}} void @testUnconditional1(
 sil @testUnconditional1 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
   // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_TMaP12dynamic_cast1P_()
-  // CHECK: call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 3)
+  // CHECK: call i1 @rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 3)
   %1 = alloc_stack $S
-  unconditional_checked_cast_addr take_on_success P in %0 : $*P to S in %1#1 : $*S
-  destroy_addr %1#1 : $*S
-  dealloc_stack %1#0 : $*@local_storage S
+  unconditional_checked_cast_addr take_on_success P in %0 : $*P to S in %1 : $*S
+  destroy_addr %1 : $*S
+  dealloc_stack %1 : $*S
   %2 = tuple ()
   return %2 : $()
 }
 
-// CHECK-LABEL: define void @testUnconditional2(
+// CHECK-LABEL: define{{( protected)?}} void @testUnconditional2(
 sil @testUnconditional2 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
   // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_TMaP12dynamic_cast1P_()
-  // CHECK: call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 1)
+  // CHECK: call i1 @rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 1)
   %1 = alloc_stack $S
-  unconditional_checked_cast_addr copy_on_success P in %0 : $*P to S in %1#1 : $*S
-  destroy_addr %1#1 : $*S
-  dealloc_stack %1#0 : $*@local_storage S
+  unconditional_checked_cast_addr copy_on_success P in %0 : $*P to S in %1 : $*S
+  destroy_addr %1 : $*S
+  dealloc_stack %1 : $*S
   %2 = tuple ()
   return %2 : $()
 }
 
-// CHECK-LABEL: define void @testConditional0(
+// CHECK-LABEL: define{{( protected)?}} void @testConditional0(
 sil @testConditional0 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
   // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_TMaP12dynamic_cast1P_()
-  // CHECK: [[T4:%.*]] = call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 6)
+  // CHECK: [[T4:%.*]] = call i1 @rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 6)
   // CHECK: br i1 [[T4]], 
   %1 = alloc_stack $S
-  checked_cast_addr_br take_always P in %0 : $*P to S in %1#1 : $*S, bb1, bb2
+  checked_cast_addr_br take_always P in %0 : $*P to S in %1 : $*S, bb1, bb2
 bb1:
   br bb2
 bb2:
-  destroy_addr %1#1 : $*S
-  dealloc_stack %1#0 : $*@local_storage S
+  destroy_addr %1 : $*S
+  dealloc_stack %1 : $*S
   %2 = tuple ()
   return %2 : $()
 }
 
-// CHECK-LABEL: define void @testConditional1(
+// CHECK-LABEL: define{{( protected)?}} void @testConditional1(
 sil @testConditional1 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
   // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_TMaP12dynamic_cast1P_()
-  // CHECK: [[T4:%.*]] = call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 2)
+  // CHECK: [[T4:%.*]] = call i1 @rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 2)
   // CHECK: br i1 [[T4]], 
   %1 = alloc_stack $S
-  checked_cast_addr_br take_on_success P in %0 : $*P to S in %1#1 : $*S, bb1, bb2
+  checked_cast_addr_br take_on_success P in %0 : $*P to S in %1 : $*S, bb1, bb2
 bb1:
   br bb2
 bb2:
-  destroy_addr %1#1 : $*S
-  dealloc_stack %1#0 : $*@local_storage S
+  destroy_addr %1 : $*S
+  dealloc_stack %1 : $*S
   %2 = tuple ()
   return %2 : $()
 }
 
-// CHECK-LABEL: define void @testConditional2(
+// CHECK-LABEL: define{{( protected)?}} void @testConditional2(
 sil @testConditional2 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
   // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_TMaP12dynamic_cast1P_()
-  // CHECK: [[T4:%.*]] = call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 0)
+  // CHECK: [[T4:%.*]] = call i1 @rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 0)
   // CHECK: br i1 [[T4]], 
   %1 = alloc_stack $S
-  checked_cast_addr_br copy_on_success P in %0 : $*P to S in %1#1 : $*S, bb1, bb2
+  checked_cast_addr_br copy_on_success P in %0 : $*P to S in %1 : $*S, bb1, bb2
 bb1:
   br bb2
 bb2:
-  destroy_addr %1#1 : $*S
-  dealloc_stack %1#0 : $*@local_storage S
+  destroy_addr %1 : $*S
+  dealloc_stack %1 : $*S
   %2 = tuple ()
   return %2 : $()
 }

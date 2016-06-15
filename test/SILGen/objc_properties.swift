@@ -17,7 +17,7 @@ class A {
   // Regular methods go through the @objc property accessors.
   // CHECK-LABEL: sil hidden @_TFC15objc_properties1A6method
   // CHECK: class_method {{.*}} #A.prop
-  func method(x: Int) {
+  func method(_ x: Int) {
     prop = x
     method(prop)
   }
@@ -58,26 +58,26 @@ class A {
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_properties11testPropGet
-func testPropGet(a: A) -> Int {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!getter.1.foreign : A -> () -> Int , $@convention(objc_method) (A) -> Int
+func testPropGet(_ a: A) -> Int {
+  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!getter.1.foreign : (A) -> () -> Int , $@convention(objc_method) (A) -> Int
   return a.prop
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_properties11testPropSet
-func testPropSet(a: A, i: Int) {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!setter.1.foreign : A -> (Int) -> () , $@convention(objc_method) (Int, A) -> ()
+func testPropSet(_ a: A, i: Int) {
+  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.prop!setter.1.foreign : (A) -> (Int) -> () , $@convention(objc_method) (Int, A) -> ()
   a.prop = i
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_properties19testComputedPropGet
-func testComputedPropGet(a: A) -> Int {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!getter.1.foreign : A -> () -> Int , $@convention(objc_method) (A) -> Int
+func testComputedPropGet(_ a: A) -> Int {
+  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!getter.1.foreign : (A) -> () -> Int , $@convention(objc_method) (A) -> Int
   return a.computedProp
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_properties19testComputedPropSet
-func testComputedPropSet(a: A, i: Int) {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!setter.1.foreign : A -> (Int) -> () , $@convention(objc_method) (Int, A) -> ()
+func testComputedPropSet(_ a: A, i: Int) {
+  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.computedProp!setter.1.foreign : (A) -> (Int) -> () , $@convention(objc_method) (Int, A) -> ()
   a.computedProp = i
 }
 
@@ -86,12 +86,12 @@ class B : A {
   @objc override var computedProp: Int {
     // CHECK-LABEL: sil hidden @_TFC15objc_properties1Bg12computedPropSi : $@convention(method) (@guaranteed B) -> Int
     get {
-      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!getter.1.foreign : A -> () -> Int , $@convention(objc_method) (A) -> Int
+      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!getter.1.foreign : (A) -> () -> Int , $@convention(objc_method) (A) -> Int
       return super.computedProp
     }
     // CHECK-LABEL: sil hidden @_TFC15objc_properties1Bs12computedPropSi : $@convention(method) (Int, @guaranteed B) -> ()
     set(value) {
-      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!setter.1.foreign : A -> (Int) -> () , $@convention(objc_method) (Int, A) -> ()
+      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!setter.1.foreign : (A) -> (Int) -> () , $@convention(objc_method) (Int, A) -> ()
       super.computedProp = value
     }
   }
@@ -102,7 +102,7 @@ class B : A {
 class TestNSCopying {
   // CHECK-LABEL: sil hidden [transparent] @_TFC15objc_properties13TestNSCopyings8propertyCSo8NSString : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
   // CHECK: bb0(%0 : $NSString, %1 : $TestNSCopying):
-  // CHECK:  class_method [volatile] %0 : $NSString, #NSString.copyWithZone!1.foreign
+  // CHECK:  class_method [volatile] %0 : $NSString, #NSString.copy!1.foreign
   @NSCopying var property : NSString
 
   @NSCopying var optionalProperty : NSString?
@@ -118,7 +118,7 @@ class TestNSCopying {
 // <rdar://problem/16663515> IBOutlet not adjusting getter/setter when making a property implicit unchecked optional
 @objc
 class TestComputedOutlet : NSObject {
-  var _disclosedView : TestComputedOutlet! = .None
+  var _disclosedView : TestComputedOutlet! = .none
 
   @IBOutlet var disclosedView : TestComputedOutlet! {
   get { return _disclosedView }
@@ -131,22 +131,22 @@ class TestComputedOutlet : NSObject {
 }
 
 class Singleton : NSObject {
-  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong14sharedInstanceS0_ : $@convention(thin) (@thick Singleton.Type) -> @owned Singleton
+  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong14sharedInstanceS0_ : $@convention(method) (@thick Singleton.Type) -> @owned Singleton
   // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletong14sharedInstanceS0_ : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased Singleton {
   static let sharedInstance = Singleton()
 
-  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong1iSi : $@convention(thin) (@thick Singleton.Type) -> Int
+  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong1iSi : $@convention(method) (@thick Singleton.Type) -> Int
   // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletong1iSi : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Int
   static let i = 2
 
-  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong1jSS : $@convention(thin) (@thick Singleton.Type) -> @owned String
+  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong1jSS : $@convention(method) (@thick Singleton.Type) -> @owned String
   // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletong1jSS : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased NSString
-  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletons1jSS : $@convention(thin) (@owned String, @thick Singleton.Type) -> ()
+  // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletons1jSS : $@convention(method) (@owned String, @thick Singleton.Type) -> ()
   // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletons1jSS : $@convention(objc_method) (NSString, @objc_metatype Singleton.Type) -> ()
   static var j = "Hello"
 
   // CHECK-DAG: sil hidden [thunk] @_TToZFC15objc_properties9Singletong1kSd : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Double
-  // CHECK-DAG: sil hidden @_TZFC15objc_properties9Singletong1kSd : $@convention(thin) (@thick Singleton.Type) -> Double
+  // CHECK-DAG: sil hidden @_TZFC15objc_properties9Singletong1kSd : $@convention(method) (@thick Singleton.Type) -> Double
   static var k: Double {
     return 7.7
   }

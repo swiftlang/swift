@@ -1,20 +1,23 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen %s | FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-clang-importer-objc-overlays
+
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-silgen %s | FileCheck %s
 
 // REQUIRES: objc_interop
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @_TF10objc_error24NSErrorErrorType_erasureFCSo7NSErrorPs9ErrorType_
-// CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $NSError : $NSError, $ErrorType
+// CHECK-LABEL: sil hidden @_TF10objc_error28NSErrorErrorProtocol_erasureFCSo7NSErrorPs13ErrorProtocol_
+// CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $NSError : $NSError, $ErrorProtocol
 // CHECK:         return [[ERROR_TYPE]]
-func NSErrorErrorType_erasure(x: NSError) -> ErrorType {
+func NSErrorErrorProtocol_erasure(_ x: NSError) -> ErrorProtocol {
   return x
 }
 
-// CHECK-LABEL: sil hidden @_TF10objc_error34NSErrorErrorType_archetype_erasure
-// CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $T : $T, $ErrorType
+// CHECK-LABEL: sil hidden @_TF10objc_error38NSErrorErrorProtocol_archetype_erasure
+// CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $T : $T, $ErrorProtocol
 // CHECK:         return [[ERROR_TYPE]]
-func NSErrorErrorType_archetype_erasure<T : NSError>(t: T) -> ErrorType {
+func NSErrorErrorProtocol_archetype_erasure<T : NSError>(_ t: T) -> ErrorProtocol {
   return t
 }
 
@@ -23,7 +26,7 @@ func NSErrorErrorType_archetype_erasure<T : NSError>(t: T) -> ErrorType {
 func test_doesnt_throw() {
   do {
     throw NSError(domain: "", code: 1, userInfo: [:])
-  } catch is ErrorType {  // expected-warning {{'is' test is always true}}
+  } catch is ErrorProtocol {  // expected-warning {{'is' test is always true}}
   }
 
   do {
@@ -33,7 +36,7 @@ func test_doesnt_throw() {
   }
 }
 
-class ErrorClass: ErrorType {
+class ErrorClass: ErrorProtocol {
   let _domain = ""
   let _code = 0
 }
@@ -45,13 +48,13 @@ class ErrorClass: ErrorType {
 func test_cast_to_nserror() {
   let e = ErrorClass()
 
-  // CHECK: function_ref @swift_bridgeErrorTypeToNSError
+  // CHECK: function_ref @swift_bridgeErrorProtocolToNSError
   let nsCoerced = e as NSError
 
   // CHECK: unconditional_checked_cast_addr {{.*}} AnyObject in {{%.*}} : $*AnyObject to NSError in {{%.*}} : $*NSError
   let nsForcedCast = (e as AnyObject) as! NSError
 
-  // CHECK: checked_cast_addr_br {{.*}} ErrorType in {{%.*}} : $*ErrorType to NSError in {{%.*}} : $*NSError, bb3, bb4
+  // CHECK: checked_cast_addr_br {{.*}} ErrorProtocol in {{%.*}} : $*ErrorProtocol to NSError in {{%.*}} : $*NSError, bb3, bb4
   do {
     throw e
   } catch _ as NSError {

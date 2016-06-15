@@ -3,66 +3,70 @@
 import Builtin
 
 sil @consume : $@convention(thin) <T> (@in T) -> ()
-sil @produce : $@convention(thin) <T> (@out T) -> ()
+sil @produce : $@convention(thin) <T> () -> @out T
 
-// CHECK-LABEL: define void @join_alloc_stack_copy_addr
+// CHECK-LABEL: define{{( protected)?}} void @join_alloc_stack_copy_addr
 sil @join_alloc_stack_copy_addr : $@convention(thin) <T> (@in T) -> () {
 entry(%x : $*T):
   // CHECK: [[BUFFER:%.*]] = alloca [[BUFFER_TYPE:\[.* x i8\]]]
+  // CHECK: [[BUFFERLIFE:%.*]] = bitcast [[BUFFER_TYPE]]* [[BUFFER]]
+  // CHECK: llvm.lifetime.start(i64 [[BUFFER_SIZE:12|24]], i8* [[BUFFERLIFE]])
   %a = alloc_stack $T
   // CHECK: [[ADDR:%.*]] = call %swift.opaque* %initializeBufferWithCopy([[BUFFER_TYPE]]* [[BUFFER]], %swift.opaque* %0, %swift.type* %T)
-  copy_addr %x to [initialization] %a#1 : $*T
+  copy_addr %x to [initialization] %a : $*T
   // CHECK: call void @consume(%swift.opaque* noalias nocapture [[ADDR]], %swift.type* %T)
   %u = function_ref @consume : $@convention(thin) <T> (@in T) -> ()
-  %z = apply %u<T>(%a#1) : $@convention(thin) <T> (@in T) -> ()
-  dealloc_stack %a#0 : $*@local_storage T
+  %z = apply %u<T>(%a) : $@convention(thin) <T> (@in T) -> ()
+  // CHECK: [[BUFFERLIFE:%.*]] = bitcast [[BUFFER_TYPE]]* [[BUFFER]]
+  // CHECK: llvm.lifetime.end(i64 [[BUFFER_SIZE]], i8* [[BUFFERLIFE]])
+  dealloc_stack %a : $*T
   return undef : $()
 }
 
 protocol P {}
 
-// CHECK-LABEL: define void @join_init_existential_copy_addr(%P27fixed_size_buffer_peepholes1P_* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.P)
+// CHECK-LABEL: define{{( protected)?}} void @join_init_existential_copy_addr(%P27fixed_size_buffer_peepholes1P_* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.P)
 // CHECK:         [[BUFFER:%.*]] = getelementptr inbounds %P27fixed_size_buffer_peepholes1P_, %P27fixed_size_buffer_peepholes1P_* %0, i32 0, i32 0
 // CHECK:         call %swift.opaque* %initializeBufferWithTake([[BUFFER_TYPE]]* [[BUFFER]], %swift.opaque* %1
-sil @join_init_existential_copy_addr : $@convention(thin) <T: P> (@out P, @in T) -> () {
+sil @join_init_existential_copy_addr : $@convention(thin) <T: P> (@in T) -> @out P {
 entry(%p : $*P, %x: $*T):
   %y = init_existential_addr %p : $*P, $T
   copy_addr [take] %x to [initialization] %y : $*T
   return undef : $()
 }
 
-// CHECK-LABEL: define void @dont_join_alloc_stack_copy_addr_if_intervening_use
+// CHECK-LABEL: define{{( protected)?}} void @dont_join_alloc_stack_copy_addr_if_intervening_use
 sil @dont_join_alloc_stack_copy_addr_if_intervening_use : $@convention(thin) <T> (@in T) -> () {
 entry(%x : $*T):
   // CHECK: [[BUFFER:%.*]] = alloca [[BUFFER_TYPE:\[.* x i8\]]]
   // CHECK: [[ADDR:%.*]] = call %swift.opaque* %allocateBuffer([[BUFFER_TYPE]]* [[BUFFER]], %swift.type* %T)
   %a = alloc_stack $T
-  %p = function_ref @produce : $@convention(thin) <T> (@out T) -> ()
-  %y = apply %p<T>(%a#1) : $@convention(thin) <T> (@out T) -> ()
-  destroy_addr %a#1 : $*T
+  %p = function_ref @produce : $@convention(thin) <T> () -> @out T
+  %y = apply %p<T>(%a) : $@convention(thin) <T> () -> @out T
+  destroy_addr %a : $*T
 
   // CHECK: call %swift.opaque* %initializeWithCopy(%swift.opaque* [[ADDR]],
-  copy_addr %x to [initialization] %a#1 : $*T
+  copy_addr %x to [initialization] %a : $*T
   %u = function_ref @consume : $@convention(thin) <T> (@in T) -> ()
-  %z = apply %u<T>(%a#1) : $@convention(thin) <T> (@in T) -> ()
-  dealloc_stack %a#0 : $*@local_storage T
+  %z = apply %u<T>(%a) : $@convention(thin) <T> (@in T) -> ()
+  dealloc_stack %a : $*T
   return undef : $()
 }
 
-// CHECK-LABEL: define void @dont_join_alloc_stack_copy_addr_if_no_copy_addr
+// CHECK-LABEL: define{{( protected)?}} void @dont_join_alloc_stack_copy_addr_if_no_copy_addr
 sil @dont_join_alloc_stack_copy_addr_if_no_copy_addr : $@convention(thin) <T> (@in T) -> () {
 entry(%x : $*T):
   // CHECK: [[BUFFER:%.*]] = alloca [[BUFFER_TYPE:\[.* x i8\]]]
   // CHECK: [[ADDR:%.*]] = call %swift.opaque* %allocateBuffer([[BUFFER_TYPE]]* [[BUFFER]], %swift.type* %T)
   %a = alloc_stack $T
-  %p = function_ref @produce : $@convention(thin) <T> (@out T) -> ()
-  %y = apply %p<T>(%a#1) : $@convention(thin) <T> (@out T) -> ()
-  destroy_addr %a#1 : $*T
-  dealloc_stack %a#0 : $*@local_storage T
+  %p = function_ref @produce : $@convention(thin) <T> () -> @out T
+  %y = apply %p<T>(%a) : $@convention(thin) <T> () -> @out T
+  destroy_addr %a : $*T
+  dealloc_stack %a : $*T
   return undef : $()
 }
 
-// CHECK-LABEL: define void @dont_join_alloc_stack_if_copy_addr_in_different_bb
+// CHECK-LABEL: define{{( protected)?}} void @dont_join_alloc_stack_if_copy_addr_in_different_bb
 sil @dont_join_alloc_stack_if_copy_addr_in_different_bb : $@convention(thin) <T> (@in T) -> () {
 entry(%x : $*T):
   // CHECK: [[BUFFER:%.*]] = alloca [[BUFFER_TYPE:\[.* x i8\]]]
@@ -72,11 +76,11 @@ entry(%x : $*T):
 
 next:
   // CHECK: call %swift.opaque* %initializeWithCopy(%swift.opaque* [[ADDR]],
-  copy_addr %x to [initialization] %a#1 : $*T
+  copy_addr %x to [initialization] %a : $*T
   // CHECK: call void @consume(%swift.opaque* noalias nocapture [[ADDR]], %swift.type* %T)
   %u = function_ref @consume : $@convention(thin) <T> (@in T) -> ()
-  %z = apply %u<T>(%a#1) : $@convention(thin) <T> (@in T) -> ()
-  dealloc_stack %a#0 : $*@local_storage T
+  %z = apply %u<T>(%a) : $@convention(thin) <T> (@in T) -> ()
+  dealloc_stack %a : $*T
   return undef : $()
 }
 

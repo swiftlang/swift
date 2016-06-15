@@ -11,7 +11,7 @@ extension A {
   }
 }
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 // CHECK-LABEL: sil hidden @_TFE11ext_structAV11def_structA1A4testfT_T_
 var ao = A()

@@ -5,8 +5,8 @@
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
 
+// CHECK: %swift.refcounted = type
 // CHECK: [[HOOZIT:%C17objc_class_export6Hoozit]] = type <{ [[REF:%swift.refcounted]] }>
-// CHECK: [[REF]] = type
 // CHECK: [[FOO:%C17objc_class_export3Foo]] = type <{ [[REF]], %Si }>
 // CHECK: [[INT:%Si]] = type <{ i64 }>
 // CHECK: [[NSRECT:%VSC6NSRect]] = type <{ %VSC7NSPoint, %VSC6NSSize }>
@@ -15,7 +15,7 @@
 // CHECK: [[NSSIZE:%VSC6NSSize]] = type <{ %Sd, %Sd }>
 // CHECK: [[OBJC:%objc_object]] = type opaque
 
-// CHECK: @"OBJC_METACLASS_$__TtC17objc_class_export3Foo" = global %objc_class {
+// CHECK: @"OBJC_METACLASS_$__TtC17objc_class_export3Foo" = hidden global %objc_class {
 // CHECK:   %objc_class* @"OBJC_METACLASS_$_SwiftObject",
 // CHECK:   %objc_class* @"OBJC_METACLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
@@ -49,7 +49,7 @@
 // CHECK:   i8* null,
 // CHECK:   _PROPERTIES__TtC17objc_class_export3Foo
 // CHECK: }, section "__DATA, __objc_const", align 8
-// CHECK: @_TMfC17objc_class_export3Foo = internal global {{.*i64}} } {
+// CHECK: @_TMfC17objc_class_export3Foo = internal global <{{.*i64}} }> <{
 // CHECK:   void ([[FOO]]*)* @_TFC17objc_class_export3FooD,
 // CHECK:   i8** @_TWVBO,
 // CHECK:   i64 ptrtoint (%objc_class* @"OBJC_METACLASS_$__TtC17objc_class_export3Foo" to i64),
@@ -59,10 +59,10 @@
 // CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC17objc_class_export3Foo to i64), i64 1),
 // CHECK:   [[FOO]]* (%swift.type*)* @_TZFC17objc_class_export3Foo6createfT_S0_,
 // CHECK:   void (%VSC6NSRect*, [[FOO]]*)* @_TFC17objc_class_export3Foo10drawInRectfT5dirtyVSC6NSRect_T_
-// CHECK: }, section "__DATA,__objc_data, regular"
+// CHECK: }>, section "__DATA,__objc_data, regular"
 // -- TODO: The OBJC_CLASS symbol should reflect the qualified runtime name of
 //    Foo.
-// CHECK: @_TMC17objc_class_export3Foo = alias %swift.type, bitcast (i64* getelementptr inbounds ({{.*}} @_TMfC17objc_class_export3Foo, i32 0, i32 2) to %swift.type*)
+// CHECK: @_TMC17objc_class_export3Foo = hidden alias %swift.type, bitcast (i64* getelementptr inbounds ({{.*}} @_TMfC17objc_class_export3Foo, i32 0, i32 2) to %swift.type*)
 // CHECK: @"OBJC_CLASS_$__TtC17objc_class_export3Foo" = alias %swift.type, %swift.type* @_TMC17objc_class_export3Foo
 
 import gizmo
@@ -96,7 +96,7 @@ struct BigStructWithNativeObjects {
   // CHECK:   call void @_TFC17objc_class_export3Foo6boundsfT_VSC6NSRect([[NSRECT]]* noalias nocapture sret {{.*}}, [[FOO]]* [[CAST]])
 
   func convertRectToBacking(r r: NSRect) -> NSRect {
-    return r;
+    return r
   }
   // CHECK: define internal void @_TToFC17objc_class_export3Foo20convertRectToBackingfT1rVSC6NSRect_S1_([[NSRECT]]* noalias nocapture sret, [[OPAQUE5:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE5]]* %1 to [[FOO]]*

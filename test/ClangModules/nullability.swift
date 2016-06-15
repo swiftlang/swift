@@ -4,18 +4,18 @@
 
 import CoreCooling
 
-func testSomeClass(sc: SomeClass, osc: SomeClass?) {
+func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
   var ao1: AnyObject = sc.methodA(osc)
-  if sc.methodA(osc) == nil { } // expected-error{{value of type 'AnyObject' can never be nil, comparison isn't allowed}}
+  if sc.methodA(osc) == nil { } // expected-error{{type 'AnyObject' is not optional, value can never be nil}}
 
   var ao2: AnyObject = sc.methodB(nil)
-  if sc.methodA(osc) == nil { } // expected-error{{value of type 'AnyObject' can never be nil, comparison isn't allowed}}
+  if sc.methodA(osc) == nil { } // expected-error{{type 'AnyObject' is not optional, value can never be nil}}
 
   var ao3: AnyObject = sc.property // expected-error{{value of optional type 'AnyObject?' not unwrapped; did you mean to use '!' or '?'?}} {{35-35=!}}
   var ao3_ok: AnyObject? = sc.property // okay
 
   var ao4: AnyObject = sc.methodD()
-  if sc.methodD() == nil { } // expected-error{{value of type 'AnyObject' can never be nil, comparison isn't allowed}}
+  if sc.methodD() == nil { } // expected-error{{type 'AnyObject' is not optional, value can never be nil}}
 
   sc.methodE(sc)
   sc.methodE(osc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
@@ -31,7 +31,7 @@ func testSomeClass(sc: SomeClass, osc: SomeClass?) {
   let ci: CInt = 1
   var sc2 = SomeClass(int: ci)
   var sc2a: SomeClass = sc2
-  if sc2 == nil { } // expected-error{{value of type 'SomeClass' can never be nil, comparison isn't allowed}}
+  if sc2 == nil { } // expected-error{{type 'SomeClass' is not optional, value can never be nil}}
 
   var sc3 = SomeClass(double: 1.5)
   if sc3 == nil { } // okay
@@ -39,11 +39,11 @@ func testSomeClass(sc: SomeClass, osc: SomeClass?) {
 
   var sc4 = sc.returnMe()
   var sc4a: SomeClass = sc4
-  if sc4 == nil { } // expected-error{{value of type 'SomeClass' can never be nil, comparison isn't allowed}}
+  if sc4 == nil { } // expected-error{{type 'SomeClass' is not optional, value can never be nil}}
 }
 
 // Nullability with CF types.
-func testCF(fridge: CCRefrigerator) {
+func testCF(_ fridge: CCRefrigerator) {
   CCRefrigeratorOpenDoSomething(fridge) // okay
   CCRefrigeratorOpenDoSomething(nil) // expected-error{{nil is not compatible with expected argument type 'CCRefrigerator'}}
 

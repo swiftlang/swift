@@ -4,18 +4,18 @@
 // <rdar://problem/15609900>
 
 // CHECK: 10
-// CHECK: None
+// CHECK: none
 // CHECK: 20
-// CHECK: None
+// CHECK: none
 // CHECK: 30
 // CHECK: hello world
 func main() {
-	var arrOpt : [Int?] = [10,.None,20,.None,30]
+	var arrOpt : [Int?] = [10,.none,20,.none,30]
 	for item in arrOpt {
 		switch item {
-			case .None:
-			print("None")
-			case .Some(let v):
+			case .none:
+			print("none")
+			case .some(var v):
 			print(v)
 		}
 	}

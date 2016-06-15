@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -82,6 +82,74 @@ int canPromote(CallInst *CI, unsigned &align, int maxSize) {
   align = AlignMaskConst->getValue().getZExtValue() + 1;
 
   return size;
+}
+
+/// Remove redundant runtime calls for stack allocated buffers.
+/// If a buffer is allocated on the stack it's not needed to explicitly set
+/// the RC_DEALLOCATING_FLAG flag (except there is code which may depend on it).
+/// Also the a call to swift_deallocClassInstance (which stems from an inlined
+/// deallocator) is not needed.
+///
+///   %0 = alloca
+///     ...
+///   call @swift_setDeallocating(%0) // not needed
+///     // code which does not depend on the RC_DEALLOCATING_FLAG flag.
+///   call @swift_deallocClassInstance(%0) // not needed
+///   call @llvm.lifetime.end(%0)
+///
+static void removeRedundantRTCalls(CallInst *DeallocCall) {
+  BasicBlock::iterator Iter(DeallocCall);
+  BasicBlock::iterator Begin = DeallocCall->getParent()->begin();
+  Value *Buffer = DeallocCall->getArgOperand(0);
+  CallInst *RedundantDealloc = nullptr;
+  CallInst *RedundantSetFlag = nullptr;
+  SmallVector<Instruction *, 2> ToDelete;
+  while (Iter != Begin) {
+    --Iter;
+    Instruction *I = &*Iter;
+    if (auto *CI = dyn_cast<CallInst>(I)) {
+
+      // Check if we have a runtime function with the buffer as argument.
+      if (CI->getNumArgOperands() < 1)
+        break;
+      if (CI->getArgOperand(0)->stripPointerCasts() != Buffer)
+        break;
+      auto *Callee = dyn_cast<Constant>(CI->getCalledValue());
+      if (!Callee)
+        break;
+
+      // The callee function my be a bitcast constant expression.
+      if (auto *U = dyn_cast<ConstantExpr>(Callee)) {
+        if (U->getOpcode() == Instruction::BitCast)
+          Callee = U->getOperand(0);
+      }
+      auto *RTFunc = dyn_cast<Function>(Callee);
+      if (!RTFunc)
+        break;
+
+      if (RTFunc->getName() == "swift_setDeallocating") {
+        assert(RedundantDealloc && "dealloc call must follow setDeallocating");
+        assert(!RedundantSetFlag && "multiple setDeallocating calls");
+        RedundantSetFlag = CI;
+        continue;
+      }
+      if (RTFunc->getName() == "swift_deallocClassInstance") {
+        assert(!RedundantSetFlag && "dealloc call must follow setDeallocating");
+        assert(!RedundantDealloc && "multiple deallocClassInstance calls");
+        RedundantDealloc = CI;
+        continue;
+      }
+      break;
+    }
+    // Bail if we have an instruction which may read the RC_DEALLOCATING_FLAG
+    // flag.
+    if (I->mayReadFromMemory())
+      break;
+  }
+  if (RedundantDealloc)
+    RedundantDealloc->eraseFromParent();
+  if (RedundantSetFlag)
+    RedundantSetFlag->eraseFromParent();
 }
 
 bool SwiftStackPromotion::runOnFunction(Function &F) {
@@ -179,6 +247,9 @@ bool SwiftStackPromotion::runOnFunction(Function &F) {
     CallInst *Alloc = dyn_cast<CallInst>(CI->getArgOperand(0));
     assert(Alloc && "alloc buffer obfuscated");
     if (PromotedAllocs.count(Alloc)) {
+
+      removeRedundantRTCalls(CI);
+
       IRBuilder<> B(CI);
       // This has two purposes:
       // 1. Tell LLVM the lifetime of the allocated stack memory.

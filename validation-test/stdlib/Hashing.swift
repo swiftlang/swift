@@ -5,6 +5,7 @@ import Swift
 import SwiftPrivate
 import StdlibUnittest
 
+
 var HashingTestSuite = TestSuite("Hashing")
 
 HashingTestSuite.test("_mixUInt32/GoldenValues") {
@@ -52,7 +53,7 @@ HashingTestSuite.test("_mixUInt64/GoldenValues") {
 HashingTestSuite.test("_mixUInt/GoldenValues") {
 #if arch(i386) || arch(arm)
   expectEqual(0x11b8_82c9, _mixUInt(0x0))
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   expectEqual(0xb2b2_4f68_8dc4_164d, _mixUInt(0x0))
 #else
   fatalError("unimplemented")
@@ -62,7 +63,7 @@ HashingTestSuite.test("_mixUInt/GoldenValues") {
 HashingTestSuite.test("_mixInt/GoldenValues") {
 #if arch(i386) || arch(arm)
   expectEqual(Int(bitPattern: 0x11b8_82c9), _mixInt(0x0))
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   expectEqual(Int(bitPattern: 0xb2b2_4f68_8dc4_164d), _mixInt(0x0))
 #else
   fatalError("unimplemented")
@@ -71,16 +72,16 @@ HashingTestSuite.test("_mixInt/GoldenValues") {
 
 HashingTestSuite.test("_squeezeHashValue/Int") {
   // Check that the function can return values that cover the whole range.
-  func checkRange(r: Range<Int>) {
+  func checkRange(_ r: Range<Int>) {
     var results = [Int : Void]()
-    for _ in 0..<(10 * (r.endIndex - r.startIndex)) {
+    for _ in 0..<(14 * (r.upperBound - r.lowerBound)) {
       let v = _squeezeHashValue(randInt(), r)
       expectTrue(r ~= v)
       if results[v] == nil {
         results[v] = Void()
       }
     }
-    expectEqual(results.count, r.endIndex - r.startIndex)
+    expectEqual(r.upperBound - r.lowerBound, results.count)
   }
   checkRange(Int.min..<(Int.min+10))
   checkRange(0..<4)
@@ -92,7 +93,7 @@ HashingTestSuite.test("_squeezeHashValue/Int") {
 #if arch(i386) || arch(arm)
   expectEqual(-0x6e477d37, _squeezeHashValue(0, Int.min..<(Int.max - 1)))
   expectEqual(0x38a3ea26, _squeezeHashValue(2, Int.min..<(Int.max - 1)))
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   expectEqual(0x32b24f688dc4164d, _squeezeHashValue(0, Int.min..<(Int.max - 1)))
   expectEqual(-0x6d1cc14f97aa822, _squeezeHashValue(1, Int.min..<(Int.max - 1)))
 #else
@@ -102,9 +103,9 @@ HashingTestSuite.test("_squeezeHashValue/Int") {
 
 HashingTestSuite.test("_squeezeHashValue/UInt") {
   // Check that the function can return values that cover the whole range.
-  func checkRange(r: Range<UInt>) {
+  func checkRange(_ r: Range<UInt>) {
     var results = [UInt : Void]()
-    let cardinality = r.endIndex - r.startIndex
+    let cardinality = r.upperBound - r.lowerBound
     for _ in 0..<(10*cardinality) {
       let v = _squeezeHashValue(randInt(), r)
       expectTrue(r ~= v)
@@ -112,7 +113,7 @@ HashingTestSuite.test("_squeezeHashValue/UInt") {
         results[v] = Void()
       }
     }
-    expectEqual(results.count, Int(cardinality))
+    expectEqual(Int(cardinality), results.count)
   }
   checkRange(0..<4)
   checkRange(0..<8)
@@ -121,10 +122,29 @@ HashingTestSuite.test("_squeezeHashValue/UInt") {
   checkRange((UInt.max-10)..<(UInt.max-1))
 }
 
+HashingTestSuite.test("String/hashValue/topBitsSet") {
+#if _runtime(_ObjC)
+#if arch(x86_64) || arch(arm64)
+  // Make sure that we don't accidentally throw away bits by storing the result
+  // of NSString.hash into an int in the runtime.
+
+  // This is the bit pattern that we xor to NSString's hash value.
+  let hashOffset = UInt(bitPattern: 0x429b_1266_0000_0000)
+  let hash = "efghijkl".hashValue
+  // When we are not equal to the top bit of the xor'ed hashOffset pattern
+  // there where some bits set.
+  let topHashBits = UInt(bitPattern: hash) & 0xffff_ffff_0000_0000
+  expectTrue(hash > 0)
+  expectTrue(topHashBits != hashOffset)
+#endif
+#endif
+}
+
 HashingTestSuite.test("overridePerExecutionHashSeed/overflow") {
   // Test that we don't use checked arithmetic on the seed.
   _HashingDetail.fixedSeedOverride = UInt64.max
   expectEqual(0x4344_dc3a_239c_3e81, _mixUInt64(0xffff_ffff_ffff_ffff))
+  _HashingDetail.fixedSeedOverride = 0
 }
 
 runAllTests()

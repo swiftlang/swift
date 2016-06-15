@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -enable-experimental-patterns -emit-silgen %s | FileCheck %s
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>
@@ -316,17 +316,17 @@ struct Z : P { func p() {} }
 // CHECK-LABEL: sil hidden  @_TF6switch10test_isa_1FT1pPS_1P__T_
 func test_isa_1(p p: P) {
   // CHECK: [[PTMPBUF:%[0-9]+]] = alloc_stack $P
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[PTMPBUF]]#1 : $*P
+  // CHECK-NEXT: copy_addr %0 to [initialization] [[PTMPBUF]] : $*P
   switch p {
     // CHECK: [[TMPBUF:%[0-9]+]] = alloc_stack $X
-  // CHECK:   checked_cast_addr_br copy_on_success P in [[P:%.*]] : $*P to X in [[TMPBUF]]#1 : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br copy_on_success P in [[P:%.*]] : $*P to X in [[TMPBUF]] : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
   case is X:
   // CHECK: [[IS_X]]:
-  // CHECK-NEXT: load [[TMPBUF]]#1
-  // CHECK-NEXT: dealloc_stack [[TMPBUF]]#0
-  // CHECK-NEXT: destroy_addr [[PTMPBUF]]#1
-  // CHECK-NEXT: dealloc_stack [[PTMPBUF]]#0
+  // CHECK-NEXT: load [[TMPBUF]]
+  // CHECK-NEXT: dealloc_stack [[TMPBUF]]
+  // CHECK-NEXT: destroy_addr [[PTMPBUF]]
+  // CHECK-NEXT: dealloc_stack [[PTMPBUF]]
     a()
     // CHECK:   function_ref @_TF6switch1aFT_T_
     // CHECK:   br [[CONT:bb[0-9]+]]
@@ -600,7 +600,7 @@ func test_union_1(u u: MaybePair) {
     b()
 
   // CHECK: [[IS_RIGHT]]([[STR:%.*]] : $String):
-  case let .Right:
+  case var .Right:
   // CHECK:   release_value [[STR]] : $String
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
@@ -841,9 +841,9 @@ enum Generic<T, U> {
 // Check that switching over a generic instance generates verified SIL.
 func test_union_generic_instance(u u: Generic<Int, String>) {
   switch u {
-  case .Foo(let x):
+  case .Foo(var x):
     a()
-  case .Bar(let y):
+  case .Bar(var y):
     b()
   }
   c()
@@ -861,21 +861,21 @@ func test_switch_two_unions(x x: Foo, y: Foo) {
 
   switch (x, y) {
   // CHECK: [[IS_CASE1]]:
-  case (_,     Foo.A):
+  case (_, Foo.A):
   // CHECK:   function_ref @_TF6switch1aFT_T_
     a()
 
   // CHECK: [[IS_NOT_CASE1]]:
   // CHECK:   switch_enum [[X]] : $Foo, case #Foo.B!enumelt: [[IS_CASE2:bb[0-9]+]], default [[IS_NOT_CASE2:bb[0-9]+]]
   // CHECK: [[IS_CASE2]]:
-  case (Foo.B, _    ):
+  case (Foo.B, _):
   // CHECK:   function_ref @_TF6switch1bFT_T_
     b()
 
   // CHECK: [[IS_NOT_CASE2]]:
   // CHECK:   switch_enum [[Y]] : $Foo, case #Foo.B!enumelt: [[IS_CASE3:bb[0-9]+]], default [[UNREACHABLE:bb[0-9]+]]
   // CHECK: [[IS_CASE3]]:
-  case (_,     Foo.B):
+  case (_, Foo.B):
   // CHECK:   function_ref @_TF6switch1cFT_T_
     c()
 
@@ -939,20 +939,20 @@ func ~=(a: P, b: P) -> Bool { return true }
 // CHECK-LABEL: sil hidden @_TF6switch22test_struct_pattern_aoFT1sVS_19StructPatternTestAO1pPS_1P__T_
 func test_struct_pattern_ao(s s: StructPatternTestAO, p: P) {
   // CHECK:   [[S:%.*]] = alloc_stack $StructPatternTestAO
-  // CHECK:   copy_addr %0 to [initialization] [[S]]#1
-  // CHECK:   [[T0:%.*]] = struct_element_addr [[S]]#1 : $*StructPatternTestAO, #StructPatternTestAO.x
+  // CHECK:   copy_addr %0 to [initialization] [[S]]
+  // CHECK:   [[T0:%.*]] = struct_element_addr [[S]] : $*StructPatternTestAO, #StructPatternTestAO.x
   // CHECK:   [[X:%.*]] = load [[T0]]
-  // CHECK:   [[T0:%.*]] = struct_element_addr [[S]]#1 : $*StructPatternTestAO, #StructPatternTestAO.y
+  // CHECK:   [[T0:%.*]] = struct_element_addr [[S]] : $*StructPatternTestAO, #StructPatternTestAO.y
   // CHECK:   [[Y:%.*]] = alloc_stack $P
-  // CHECK:   copy_addr [[T0]] to [initialization] [[Y]]#1
+  // CHECK:   copy_addr [[T0]] to [initialization] [[Y]]
   
   switch s {
   // CHECK:   cond_br {{%.*}}, [[IS_CASE1:bb[0-9]+]], [[IS_NOT_CASE1:bb[0-9]+]]
   // CHECK: [[IS_CASE1]]:
-  // CHECK:   destroy_addr [[Y]]#1
-  // CHECK:   dealloc_stack [[Y]]#0
-  // CHECK:   destroy_addr [[S]]#1
-  // CHECK:   dealloc_stack [[S]]#0
+  // CHECK:   destroy_addr [[Y]]
+  // CHECK:   dealloc_stack [[Y]]
+  // CHECK:   destroy_addr [[S]]
+  // CHECK:   dealloc_stack [[S]]
   case StructPatternTestAO(x: 0):
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
@@ -960,30 +960,30 @@ func test_struct_pattern_ao(s s: StructPatternTestAO, p: P) {
 
   // CHECK: [[IS_NOT_CASE1]]:
   // CHECK:   [[TEMP:%.*]] = alloc_stack $P
-  // CHECK:   copy_addr [[Y]]#1 to [initialization] [[TEMP]]#1
+  // CHECK:   copy_addr [[Y]] to [initialization] [[TEMP]]
   // CHECK:   cond_br {{%.*}}, [[IS_CASE2:bb[0-9]+]], [[IS_NOT_CASE2:bb[0-9]+]]
 
   // CHECK: [[IS_CASE2]]:
   case StructPatternTestAO(y: p):
-  // CHECK:   destroy_addr [[TEMP]]#1
-  // CHECK:   dealloc_stack [[TEMP]]#0
-  // CHECK:   destroy_addr [[Y]]#1
-  // CHECK:   dealloc_stack [[Y]]#0
-  // CHECK:   destroy_addr [[S]]#1
-  // CHECK:   dealloc_stack [[S]]#0
+  // CHECK:   destroy_addr [[TEMP]]
+  // CHECK:   dealloc_stack [[TEMP]]
+  // CHECK:   destroy_addr [[Y]]
+  // CHECK:   dealloc_stack [[Y]]
+  // CHECK:   destroy_addr [[S]]
+  // CHECK:   dealloc_stack [[S]]
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
 
   // CHECK: [[IS_NOT_CASE2]]:
-  // CHECK:   destroy_addr [[TEMP]]#1
-  // CHECK:   dealloc_stack [[TEMP]]#0
+  // CHECK:   destroy_addr [[TEMP]]
+  // CHECK:   dealloc_stack [[TEMP]]
   // CHECK:   br [[IS_CASE3:bb[0-9]+]]
   // CHECK: [[IS_CASE3]]:
-  // CHECK:   destroy_addr [[Y]]#1
-  // CHECK:   dealloc_stack [[Y]]#0
-  // CHECK:   destroy_addr [[S]]#1
-  // CHECK:   dealloc_stack [[S]]#0
+  // CHECK:   destroy_addr [[Y]]
+  // CHECK:   dealloc_stack [[Y]]
+  // CHECK:   destroy_addr [[S]]
+  // CHECK:   dealloc_stack [[S]]
   case StructPatternTestAO(x: _):
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
@@ -1187,7 +1187,7 @@ enum ABC { case A, B, C }
 // CHECK:         function_ref @_TF6switch1dFT_T_
 // CHECK:       [[X_NOT_C]]:
 // CHECK:         function_ref @_TF6switch1eFT_T_
-func testTupleWildcards(x: ABC, _ y: ABC) {
+func testTupleWildcards(_ x: ABC, _ y: ABC) {
   switch (x, y) {
   case (.A, _):
     a()
@@ -1207,7 +1207,7 @@ enum LabeledScalarPayload {
 }
 
 // CHECK-LABEL: sil hidden @_TF6switch24testLabeledScalarPayloadFOS_20LabeledScalarPayloadP_
-func testLabeledScalarPayload(lsp: LabeledScalarPayload) -> Any {
+func testLabeledScalarPayload(_ lsp: LabeledScalarPayload) -> Any {
   // CHECK: switch_enum {{%.*}}, case #LabeledScalarPayload.Payload!enumelt.1: bb1
   switch lsp {
   // CHECK: bb1([[TUPLE:%.*]] : $(name: Int)):
@@ -1221,8 +1221,8 @@ func testLabeledScalarPayload(lsp: LabeledScalarPayload) -> Any {
 
 // There should be no unreachable generated.
 // CHECK-LABEL: sil hidden @_TF6switch19testOptionalPatternFGSqSi_T_
-func testOptionalPattern(value : Int?) {
-  // CHECK: switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: [[NILBB:bb[0-9]+]]
+func testOptionalPattern(_ value : Int?) {
+  // CHECK: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
   switch value {
   case 1?: a()
   case 2?: b()
@@ -1232,21 +1232,21 @@ func testOptionalPattern(value : Int?) {
 }
 
 
-// x? and .None should both be considered "similar" and thus handled in the same
+// x? and .none should both be considered "similar" and thus handled in the same
 // switch on the enum kind.  There should be no unreachable generated.
 // CHECK-LABEL: sil hidden @_TF6switch19testOptionalEnumMixFGSqSi_Si
-func testOptionalEnumMix(a : Int?) -> Int {
-  // CHECK: debug_value %0 : $Optional<Int>  // let a
-  // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.None!enumelt: [[NILBB:bb[0-9]+]]
+func testOptionalEnumMix(_ a : Int?) -> Int {
+  // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
+  // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
   switch a {
   case let x?:
     return 0
 
   // CHECK: [[SOMEBB]](%3 : $Int):
-  // CHECK-NEXT: debug_value %3 : $Int  // let x
+  // CHECK-NEXT: debug_value %3 : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.Int2048, 0
 
-  case .None:
+  case .none:
     return 42
 
   // CHECK: [[NILBB]]:
@@ -1257,15 +1257,15 @@ func testOptionalEnumMix(a : Int?) -> Int {
 // x? and nil should both be considered "similar" and thus handled in the same
 // switch on the enum kind.  There should be no unreachable generated.
 // CHECK-LABEL: sil hidden @_TF6switch26testOptionalEnumMixWithNilFGSqSi_Si
-func testOptionalEnumMixWithNil(a : Int?) -> Int {
-  // CHECK: debug_value %0 : $Optional<Int>  // let a
-  // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.None!enumelt: [[NILBB:bb[0-9]+]]
+func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
+  // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
+  // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
   switch a {
   case let x?:
     return 0
 
   // CHECK: [[SOMEBB]](%3 : $Int):
-  // CHECK-NEXT: debug_value %3 : $Int  // let x
+  // CHECK-NEXT: debug_value %3 : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.Int2048, 0
 
   case nil:

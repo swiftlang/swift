@@ -1,10 +1,47 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_1 | FileCheck %s -check-prefix=KW_DECL_STMT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_1 > %t.top1
+// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.top1
+// RUN: FileCheck %s -check-prefix=KW_NO_RETURN < %t.top1
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_1 | FileCheck %s -check-prefix=KW_DECL_STMT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_2 | FileCheck %s -check-prefix=KW_DECL_STMT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_3 | FileCheck %s -check-prefix=KW_DECL_STMT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_4 | FileCheck %s -check-prefix=KW_DECL_STMT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_5 | FileCheck %s -check-prefix=KW_DECL_STMT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_2 > %t.top2
+// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.top2
+// RUN: FileCheck %s -check-prefix=KW_NO_RETURN < %t.top2
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_1 > %t.func1
+// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.func1
+// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.func1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_2 > %t.func2
+// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.func2
+// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.func2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_3 > %t.func3
+// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.func3
+// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.func3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_4 > %t.func4
+// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.func4
+// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.func4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_5 > %t.func5
+// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.func5
+// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.func5
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_1 > %t.clos1
+// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos1
+// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.clos1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_2 > %t.clos2
+// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos2
+// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.clos2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_3 > %t.clos3
+// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos3
+// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.clos3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_4 > %t.clos4
+// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos4
+// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.clos4
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_SUBSCRIPT_1 > %t.subs
+// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.subs
+// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.subs
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_INIT_1 > %t.init
+// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.init
+// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.init
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_1 | FileCheck %s -check-prefix=KW_DECL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_2 | FileCheck %s -check-prefix=KW_DECL
@@ -40,6 +77,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_6 > %t.expr6
 // RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr6
 // RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr6
+
+// KW_RETURN: Keyword[return]/None: return{{; name=.+$}}
+// KW_NO_RETURN-NOT: Keyword[return]
 
 // KW_DECL: Begin completions
 // KW_DECL-DAG: Keyword[class]/None: class{{; name=.+$}}
@@ -121,7 +161,6 @@
 // KW_DECL_STMT-DAG: Keyword[for]/None: for{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[in]/None: in{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[while]/None: while{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[return]/None: return{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[break]/None: break{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[continue]/None: continue{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[fallthrough]/None: fallthrough{{; name=.+$}}
@@ -137,10 +176,10 @@
 // KW_DECL_STMT-DAG: Keyword[try]/None: try{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[try]/None: try!{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[try]/None: try?{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[__FUNCTION__]/None: __FUNCTION__[#String#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[__FILE__]/None: __FILE__[#String#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[__LINE__]/None: __LINE__[#Int#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[__COLUMN__]/None: __COLUMN__[#Int#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#function]/None: #function[#String#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#file]/None: #file[#String#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#line]/None: #line[#Int#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#column]/None: #column[#Int#]{{; name=.+$}}
 //
 // Literals
 //
@@ -157,10 +196,10 @@
 // KW_EXPR-DAG: Keyword[try]/None: try{{; name=.+$}}
 // KW_EXPR-DAG: Keyword[try]/None: try!{{; name=.+$}}
 // KW_EXPR-DAG: Keyword[try]/None: try?{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[__FUNCTION__]/None: __FUNCTION__[#String#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[__FILE__]/None: __FILE__[#String#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[__LINE__]/None: __LINE__[#Int#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[__COLUMN__]/None: __COLUMN__[#Int#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#function]/None: #function[#String#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#file]/None: #file[#String#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#line]/None: #line[#Int#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#column]/None: #column[#Int#]{{; name=.+$}}
 //
 // let and var
 //
@@ -194,6 +233,10 @@
 
 #^TOP_LEVEL_1^#
 
+for _ in 1...10 {
+  #^TOP_LEVEL_2^#
+}
+
 func testInFuncBody1() {
   #^IN_FUNC_BODY_1^#
 }
@@ -224,6 +267,25 @@ class InClassFunc {
   }
 }
 
+func testInClosure1() {
+  { #^IN_CLOSURE_1^# }
+}
+func testInClosure2() {
+  { #^IN_CLOSURE_2^#
+}
+struct InVarClosureInit {
+  let x = { #^IN_CLOSURE_3^# }()
+}
+
+{ #^IN_CLOSURE_4^# }
+
+struct InSubscript {
+  subscript(x: Int) -> Int { #^IN_SUBSCRIPT_1^# }
+}
+
+struct InInit {
+  init?() { #^IN_INIT_1^# }
+}
 
 struct InStruct {
   #^IN_NOMINAL_DECL_1^#

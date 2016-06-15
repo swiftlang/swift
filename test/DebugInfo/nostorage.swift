@@ -1,28 +1,40 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o %t
+// RUN: cat %t | FileCheck %s --check-prefix=CHECK1
+// RUN: cat %t | FileCheck %s --check-prefix=CHECK2
+// RUN: cat %t | FileCheck %s --check-prefix=CHECK3
 
-func markUsed<T>(t: T) {}
+func used<T>(_ t: T) {}
 
-class AClass {
-  func f () -> Int64 { return 1 }
+public class Foo {
+    func foo() {
+      { [weak self] in
+      // CHECK1: call void @llvm.dbg.value(metadata i{{.*}} 0,
+      // CHECK1-SAME:                      metadata ![[TYPE:.*]], metadata
+      // CHECK1: ![[TYPE]] = !DILocalVariable(name: "type",
+      // CHECK1-SAME:                         line: [[@LINE+4]],
+      // CHECK1-SAME:                         type: ![[FOO:[0-9]+]]
+      // CHECK1: ![[FOO]] = !DICompositeType(tag: DW_TAG_structure_type,
+      // CHECK1-SAME:                        line: [[@LINE+1]], align: 8, flags:
+            let type = self.dynamicType
+            used(type)
+        }()
+    }
 }
 
-class AnotherClass : AClass {
-  override func f() -> Int64 { return 2 }
-}
+struct AStruct {}
 
-struct AStruct {
-  func f() -> Int64 { return 3 }
-}
-
-// CHECK: define hidden void @_TF9nostorage3appFT_T_()
-func app() {
-  var ac: AClass = AnotherClass()
+// CHECK2: define{{.*}}app
+public func app() {
   // No members? No storage! Emitted as a constant 0, because.
-  // CHECK: call void @llvm.dbg.value(metadata {{.*}}, i64 0, metadata ![[AT:.*]], metadata !{{[0-9]+}}), !dbg
-  // CHECK: ![[AT]] = !DILocalVariable(name: "at",
-  // CHECK-SAME:                       line: [[@LINE+1]]
+  // CHECK2: call void @llvm.dbg.value(metadata i{{.*}} 0,
+  // CHECK2-SAME:                      metadata ![[AT:.*]], metadata
+  // CHECK2: ![[AT]] = !DILocalVariable(name: "at",{{.*}}line: [[@LINE+1]]
   var at = AStruct()
-  markUsed("\(ac.f()) \(at.f())")
+  
+  used(at)
 }
 
-app()
+public enum empty { case exists }
+public let globalvar = empty.exists
+// CHECK3: !DIGlobalVariable(name: "globalvar", {{.*}}line: [[@LINE-1]],
+// CHECK3-SAME:          isLocal: false, isDefinition: true, variable: i64 0)

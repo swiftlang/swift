@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -685,6 +685,179 @@ unsigned ConstraintGraph::computeConnectedComponents(
   components.erase(components.begin() + outIndex, components.end());
 
   return numComponents;
+}
+
+
+/// For a given constraint kind, decide if we should attempt to eliminate its
+/// edge in the graph.
+static bool shouldContractEdge(ConstraintKind kind) {
+  switch (kind) {
+    case ConstraintKind::Bind:
+    case ConstraintKind::BindParam:
+    case ConstraintKind::Equal:
+    case ConstraintKind::BindOverload:
+
+    // We currently only allow subtype contractions for the purpose of 
+    // parameter binding constraints.
+    // TODO: We do this because of how inout parameter bindings are handled
+    // for implicit closure parameters. We should consider adjusting our
+    // current approach to unlock more opportunities for subtype contractions.
+    case ConstraintKind::Subtype:
+      return true;
+
+    default:
+      return false;
+  }
+}
+
+/// We use this function to determine if a subtype constraint is set
+/// between two (possibly sugared) type variables, one of which is wrapped
+/// in an inout type.
+static bool isStrictInoutSubtypeConstraint(Constraint *constraint) {
+  if (constraint->getKind() != ConstraintKind::Subtype)
+    return false;
+
+  auto t1 = constraint->getFirstType()->getDesugaredType();
+
+  if (auto tt = t1->getAs<TupleType>()) {
+    if (tt->getNumElements() != 1)
+      return false;
+
+    t1 = tt->getElementType(0).getPointer();
+  }
+
+  auto iot = t1->getAs<InOutType>();
+
+  if (!iot)
+    return false;
+
+  return iot->getObjectType()->getAs<TypeVariableType>() == nullptr;
+}
+
+bool ConstraintGraph::contractEdges() {
+  llvm::SetVector<std::pair<TypeVariableType *,
+                            TypeVariableType *>> contractions;
+
+  auto tyvars = getTypeVariables();
+  auto didContractEdges = false;
+
+  for (auto tyvar : tyvars) {
+    SmallVector<Constraint *, 4> constraints;
+    gatherConstraints(tyvar, constraints);
+
+    for (auto constraint : constraints) {
+      auto kind = constraint->getKind();
+      // Contract binding edges between type variables.
+      if (shouldContractEdge(kind)) {
+        auto t1 = constraint->getFirstType()->getDesugaredType();
+        auto t2 = constraint->getSecondType()->getDesugaredType();
+
+        if (kind == ConstraintKind::Subtype) {
+          if (auto iot1 = t1->getAs<InOutType>()) {
+            t1 = iot1->getObjectType().getPointer();
+          } else {
+            continue;
+          }
+        }
+
+        auto tyvar1 = t1->getAs<TypeVariableType>();
+        auto tyvar2 = t2->getAs<TypeVariableType>();
+
+        if (!(tyvar1 && tyvar2))
+          continue;
+
+        auto isParamBindingConstraint = kind == ConstraintKind::BindParam;
+
+        // We need to take special care not to directly contract parameter
+        // binding constraints if there is an inout subtype constraint on the
+        // type variable. The constraint solver depends on multiple constraints
+        // being present in this case, so it can generate the appropriate lvalue
+        // wrapper for the argument type.
+        if (isParamBindingConstraint) {
+          auto node = tyvar1->getImpl().getGraphNode();
+          auto hasDependentConstraint = false;
+
+          for (auto t1Constraint : node->getConstraints()) {
+            if (isStrictInoutSubtypeConstraint(t1Constraint)) {
+              hasDependentConstraint = true;
+              break;
+            }
+          }
+
+          if (hasDependentConstraint)
+            continue;
+        }
+
+        auto rep1 = CS.getRepresentative(tyvar1);
+        auto rep2 = CS.getRepresentative(tyvar2);
+
+        if (((rep1->getImpl().canBindToLValue() ==
+              rep2->getImpl().canBindToLValue()) ||
+              // Allow l-value contractions when binding parameter types.
+              isParamBindingConstraint)) {
+          if (CS.TC.getLangOpts().DebugConstraintSolver) {
+            auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+            if (CS.solverState)
+              log.indent(CS.solverState->depth * 2);
+
+            log << "Contracting constraint ";
+            constraint->print(log, &CS.getASTContext().SourceMgr);
+            log << "\n";
+          }
+
+          // Merge the edges and remove the constraint.
+          removeEdge(constraint);
+          if (rep1 != rep2)
+            CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
+          didContractEdges = true;
+        }
+      }
+    }
+  }
+
+  return didContractEdges;
+}
+
+void ConstraintGraph::removeEdge(Constraint *constraint) {
+
+  for (auto &active : CS.ActiveConstraints) {
+    if (&active == constraint) {
+      CS.ActiveConstraints.erase(constraint);
+      break;
+    }
+  }
+
+  for (auto &inactive : CS.InactiveConstraints) {
+    if (&inactive == constraint) {
+      CS.InactiveConstraints.erase(constraint);
+      break;
+    }
+  }
+
+  size_t index = 0;
+  for (auto generated : CS.solverState->generatedConstraints) {
+    if (generated == constraint) {
+      unsigned last = CS.solverState->generatedConstraints.size()-1;
+      auto lastConstraint = CS.solverState->generatedConstraints[last];
+      if (lastConstraint == generated) {
+        CS.solverState->generatedConstraints.pop_back();
+        break;
+      } else {
+        CS.solverState->generatedConstraints[index] = lastConstraint;
+        CS.solverState->generatedConstraints[last] = constraint;
+        CS.solverState->generatedConstraints.pop_back();
+        break;
+      }
+    }
+    index++;
+  }
+
+  removeConstraint(constraint);
+}
+
+void ConstraintGraph::optimize() {
+  // Merge equivalence classes until a fixed point is reached.
+  while (contractEdges()) {}
 }
 
 #pragma mark Debugging output

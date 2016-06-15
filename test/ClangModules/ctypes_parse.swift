@@ -4,7 +4,7 @@ import ctypes
 
 func checkRawRepresentable<T: RawRepresentable>(_: T) {}
 func checkEquatable<T: Equatable>(_: T) -> Bool {}
-func checkEquatablePattern(c: Color) {
+func checkEquatablePattern(_ c: Color) {
   switch c {
     case red: return
     case green: return
@@ -17,7 +17,7 @@ func testColor() {
   c = blue
   _ = c.rawValue
   checkRawRepresentable(c)
-  checkEquatable(c)
+  _ = checkEquatable(c)
   checkEquatablePattern(c)
 }
 
@@ -32,7 +32,7 @@ func testAnonEnum() {
   a = AnonConst2
 #if arch(i386) || arch(arm)
   _ = a as CUnsignedLongLong
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   _ = a as CUnsignedLong
 #else
   __portMe()
@@ -76,14 +76,14 @@ func testUnnamedStructs() {
 // FIXME: Import pointers to opaque types as unique types.
 
 func testPointers() {
-  _ = nil as HWND
+  _ = HWND(bitPattern: 0)
 }
 
 // Ensure that imported structs can be extended, even if typedef'ed on the C
 // side.
 
-func sqrt(x: Float) -> Float {}
-func atan2(x: Float, _ y: Float) -> Float {}
+func sqrt(_ x: Float) -> Float {}
+func atan2(_ x: Float, _ y: Float) -> Float {}
 
 extension Point {
   func asPolar() -> (rho: Float, theta: Float) {
@@ -193,18 +193,18 @@ func testFunctionPointers() {
   let fp = getFunctionPointer()
   useFunctionPointer(fp)
 
-  _ = fp as (@convention(c) (CInt) -> CInt)
+  _ = fp as (@convention(c) (CInt) -> CInt)?
 
   let wrapper: FunctionPointerWrapper = FunctionPointerWrapper(a: nil, b: nil)
   _ = FunctionPointerWrapper(a: fp, b: fp)
   useFunctionPointer(wrapper.a)
   _ = wrapper.b as (@convention(c) (CInt) -> CInt)
 
-  var anotherFP: @convention(c) (CInt, CLong, UnsafeMutablePointer<Void>) -> Void
+  var anotherFP: @convention(c) (CInt, CLong, UnsafeMutablePointer<Void>?) -> Void
     = getFunctionPointer2()
 
   useFunctionPointer2(anotherFP)
-  anotherFP = fp // expected-error {{cannot assign value of type 'fptr!' to type '@convention(c) (CInt, CLong, UnsafeMutablePointer<Void>) -> Void'}}
+  anotherFP = fp // expected-error {{cannot assign value of type 'fptr?' to type '@convention(c) (CInt, CLong, UnsafeMutablePointer<Void>?) -> Void'}}
 }
 
 func testStructDefaultInit() {

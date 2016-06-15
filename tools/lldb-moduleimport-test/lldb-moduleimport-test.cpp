@@ -1,8 +1,8 @@
-//===-- lldb-moduleimport-test.cpp - LLDB moduleimport tester -------------===//
+//===--- lldb-moduleimport-test.cpp - LLDB moduleimport tester ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -48,6 +48,8 @@ static void printValidationInfo(llvm::StringRef data) {
   if (info.status != swift::serialization::Status::Valid)
     return;
 
+  if (!info.shortVersion.empty())
+    llvm::outs() << "- Swift Version: " << info.shortVersion << "\n";
   llvm::outs() << "- Target: " << info.targetTriple << "\n";
   if (!extendedInfo.getSDKPath().empty())
     llvm::outs() << "- SDK path: " << extendedInfo.getSDKPath() << "\n";

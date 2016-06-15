@@ -19,7 +19,7 @@ class MyClass {
   var value: TheEnum = .A
 }
 
-func foo<T: Equatable>(x: T) {}
+func foo<T: Equatable>(_ x: T) {}
 func bar() {
   foo(EquatableEnum.A)
 }
@@ -31,14 +31,14 @@ func bar() {
 
 
 // <rdar://problem/17251682>
-struct StructWithInheritedConformances: SequenceType {
-  struct EmptyGenerator: GeneratorType {
+struct StructWithInheritedConformances: Sequence {
+  struct EmptyIterator : IteratorProtocol {
     mutating func next() -> Int? {
       return nil
     }
   }
 
-  func generate() -> EmptyGenerator {
-    return EmptyGenerator()
+  func makeIterator() -> EmptyIterator {
+    return EmptyIterator()
   }
 }

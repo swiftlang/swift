@@ -34,6 +34,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_29 | FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_30 | FileCheck %s -check-prefix=UNRESOLVED_2
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_AVAIL_1 | FileCheck %s -check-prefix=ENUM_AVAIL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OPTIONS_AVAIL_1 | FileCheck %s -check-prefix=OPTIONS_AVAIL_1
+
 enum SomeEnum1 {
   case South
   case North
@@ -49,10 +52,10 @@ enum SomeEnum3 {
 }
 
 struct NotOptions1 {
-  static let NotSet = 1;
+  static let NotSet = 1
 }
 
-struct SomeOptions1 : OptionSetType {
+struct SomeOptions1 : OptionSet {
   let rawValue : Int
   static let Option1 = SomeOptions1(rawValue: 1 << 1)
   static let Option2 = SomeOptions1(rawValue: 1 << 2)
@@ -61,11 +64,24 @@ struct SomeOptions1 : OptionSetType {
   static let NotOption = 1
 }
 
-struct SomeOptions2 : OptionSetType {
+struct SomeOptions2 : OptionSet {
   let rawValue : Int
   static let Option4 = SomeOptions2(rawValue: 1 << 1)
   static let Option5 = SomeOptions2(rawValue: 1 << 2)
   static let Option6 = SomeOptions2(rawValue: 1 << 3)
+}
+
+enum EnumAvail1 {
+  case aaa
+  @available(*, unavailable) case AAA
+  @available(*, deprecated) case BBB
+}
+
+struct OptionsAvail1 : OptionSet {
+  let rawValue: Int
+  static let aaa = OptionsAvail1(rawValue: 1 << 0)
+  @available(*, unavailable) static let AAA = OptionsAvail1(rawValue: 1 << 0)
+  @available(*, deprecated) static let BBB = OptionsAvail1(rawValue: 1 << 1)
 }
 
 func OptionSetTaker1(Op : SomeOptions1) {}
@@ -118,7 +134,6 @@ class C2 {
 // UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal: Option1[#SomeOptions1#]; name=Option1
 // UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal: Option2[#SomeOptions1#]; name=Option2
 // UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal: Option3[#SomeOptions1#]; name=Option3
-// UNRESOLVED_1-NOT:  SomeOptions2
 // UNRESOLVED_1-NOT:  Not
 }
 
@@ -135,7 +150,6 @@ class C3 {
 // UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal: Option4[#SomeOptions2#]; name=Option4
 // UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal: Option5[#SomeOptions2#]; name=Option5
 // UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal: Option6[#SomeOptions2#]; name=Option6
-// UNRESOLVED_2-NOT:  SomeOptions1
 // UNRESOLVED_2-NOT:  Not
 }
 
@@ -154,7 +168,6 @@ class C4 {
 // UNRESOLVED_3: Begin completions
 // UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#]; name=North
 // UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#]; name=South
-// UNRESOLVED_3-NOT: SomeEnum2
 // UNRESOLVED_3-NOT: SomeOptions1
 // UNRESOLVED_3-NOT: SomeOptions2
 
@@ -178,7 +191,7 @@ OptionSetTaker6(.Option4, .#^UNRESOLVED_17^#,)
 var a = {() in
   OptionSetTaker5([.#^UNRESOLVED_18^#], .Option4, .South, .West)
 }
-var Containner = OptionTakerContainer1()
+var Container = OptionTakerContainer1()
 Container.OptionSetTaker1(.#^UNRESOLVED_19^#
 Container.EnumTaker1(.#^UNRESOLVED_20^#
 
@@ -220,6 +233,12 @@ extension C7 {
 var cInst1 = C7()
 cInst1.extendedf1(.#^UNRESOLVED_26^#
 
+      
+// This #if works around:
+// <rdar://problem/26057202> Crash in code completion on invalid input
+#if false
+#endif
+      
 func f() -> SomeEnum1 {
   return .#^UNRESOLVED_27^#
 }
@@ -229,3 +248,23 @@ let TopLevelVar1 = OptionSetTaker7([.#^UNRESOLVED_28^#], Op2: [.Option4])
 let TopLevelVar2 = OptionSetTaker1([.#^UNRESOLVED_29^#])
 
 let TopLevelVar3 = OptionSetTaker7([.Option1], Op2: [.#^UNRESOLVED_30^#])
+
+func testAvail1(x: EnumAvail1) {
+  testAvail1(.#^ENUM_AVAIL_1^#)
+}
+// ENUM_AVAIL_1: Begin completions, 2 items
+// ENUM_AVAIL_1-NOT: AAA
+// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific:     aaa[#EnumAvail1#];
+// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific/NotRecommended: BBB[#EnumAvail1#];
+// ENUM_AVAIL_1-NOT: AAA
+// ENUM_AVAIL_1: End completions
+
+func testAvail2(x: OptionsAvail1) {
+  testAvail2(.#^OPTIONS_AVAIL_1^#)
+}
+// OPTIONS_AVAIL_1: Begin completions, 2 items
+// ENUM_AVAIL_1-NOT: AAA
+// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal:        aaa[#OptionsAvail1#];
+// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal/NotRecommended: BBB[#OptionsAvail1#];
+// ENUM_AVAIL_1-NOT: AAA
+// OPTIONS_AVAIL_1: End completions

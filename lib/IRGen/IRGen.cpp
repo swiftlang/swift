@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,6 +23,8 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/Timer.h"
+#include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/LLVMPasses/PassesFwd.h"
 #include "swift/LLVMPasses/Passes.h"
@@ -46,6 +48,7 @@
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Mutex.h"
+#include "llvm/Support/MD5.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Target/TargetMachine.h"
@@ -54,6 +57,7 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/ObjCARC.h"
+#include "llvm/Object/ObjectFile.h"
 #include "IRGenModule.h"
 
 #include <thread>
@@ -61,6 +65,16 @@
 using namespace swift;
 using namespace irgen;
 using namespace llvm;
+
+namespace {
+// We need this to access IRGenOptions from extension functions
+class PassManagerBuilderWrapper : public PassManagerBuilder {
+public:
+  const IRGenOptions &IRGOpts;
+  PassManagerBuilderWrapper(const IRGenOptions &IRGOpts)
+      : PassManagerBuilder(), IRGOpts(IRGOpts) {}
+};
+}
 
 static void addSwiftARCOptPass(const PassManagerBuilder &Builder,
                                PassManagerBase &PM) {
@@ -80,16 +94,30 @@ static void addSwiftStackPromotionPass(const PassManagerBuilder &Builder,
     PM.add(createSwiftStackPromotionPass());
 }
 
-// FIXME: Copied from clang/lib/CodeGen/CGObjCMac.cpp. 
-// These should be moved to a single definition shared by clang and swift.
-enum ImageInfoFlags {
-  eImageInfo_FixAndContinue      = (1 << 0),
-  eImageInfo_GarbageCollected    = (1 << 1),
-  eImageInfo_GCOnly              = (1 << 2),
-  eImageInfo_OptimizedByDyld     = (1 << 3),
-  eImageInfo_CorrectedSynthesize = (1 << 4),
-  eImageInfo_ImageIsSimulated    = (1 << 5)
-};
+static void addSwiftMergeFunctionsPass(const PassManagerBuilder &Builder,
+                                       PassManagerBase &PM) {
+  if (Builder.OptLevel > 0)
+    PM.add(createSwiftMergeFunctionsPass());
+}
+
+static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
+                                      legacy::PassManagerBase &PM) {
+  PM.add(createAddressSanitizerFunctionPass());
+  PM.add(createAddressSanitizerModulePass());
+}
+
+static void addThreadSanitizerPass(const PassManagerBuilder &Builder,
+                                   legacy::PassManagerBase &PM) {
+  PM.add(createThreadSanitizerPass());
+}
+
+static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
+                                     legacy::PassManagerBase &PM) {
+  const PassManagerBuilderWrapper &BuilderWrapper =
+      static_cast<const PassManagerBuilderWrapper &>(Builder);
+  PM.add(createSanitizerCoverageModulePass(
+      BuilderWrapper.IRGOpts.SanitizeCoverage));
+}
 
 std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
 swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
@@ -116,14 +144,17 @@ void setModuleFlags(IRGenModule &IGM) {
 
 void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
                                      llvm::TargetMachine *TargetMachine) {
+  SharedTimer timer("LLVM optimization");
+
   // Set up a pipeline.
-  PassManagerBuilder PMBuilder;
+  PassManagerBuilderWrapper PMBuilder(Opts);
 
   if (Opts.Optimize && !Opts.DisableLLVMOptzns) {
     PMBuilder.OptLevel = 3;
     PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
     PMBuilder.SLPVectorize = true;
     PMBuilder.LoopVectorize = true;
+    PMBuilder.MergeFunctions = true;
   } else {
     PMBuilder.OptLevel = 0;
     if (!Opts.DisableLLVMOptzns)
@@ -142,7 +173,32 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
                            addSwiftContractPass);
   }
+
+  if (Opts.Sanitize == SanitizerKind::Address) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addAddressSanitizerPasses);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addAddressSanitizerPasses);
+  }
   
+  if (Opts.Sanitize == SanitizerKind::Thread) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addThreadSanitizerPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addThreadSanitizerPass);
+  }
+
+  if (Opts.SanitizeCoverage.CoverageType !=
+      llvm::SanitizerCoverageOptions::SCK_None) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addSanitizerCoveragePass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addSanitizerCoveragePass);
+  }
+
+  PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                         addSwiftMergeFunctionsPass);
+
   // Configure the function passes.
   legacy::FunctionPassManager FunctionPasses(Module);
   FunctionPasses.add(createTargetTransformInfoWrapperPass(
@@ -193,17 +249,138 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
   if (Opts.Verify)
     ModulePasses.add(createVerifierPass());
 
+  if (Opts.PrintInlineTree)
+    ModulePasses.add(createInlineTreePrinterPass());
+
   // Do it.
   ModulePasses.run(*Module);
+}
+
+/// An output stream which calculates the MD5 hash of the streamed data.
+class MD5Stream : public llvm::raw_ostream {
+private:
+
+  uint64_t Pos = 0;
+  llvm::MD5 Hash;
+
+  void write_impl(const char *Ptr, size_t Size) override {
+    Hash.update(ArrayRef<uint8_t>((uint8_t *)Ptr, Size));
+    Pos += Size;
+  }
+
+  uint64_t current_pos() const override { return Pos; }
+
+public:
+
+  void final(MD5::MD5Result &Result) {
+    flush();
+    Hash.final(Result);
+  }
+};
+
+/// Computes the MD5 hash of the llvm \p Module including the compiler version
+/// and options which influence the compilation.
+static void getHashOfModule(MD5::MD5Result &Result, IRGenOptions &Opts,
+                            llvm::Module *Module,
+                            llvm::TargetMachine *TargetMachine) {
+  // Calculate the hash of the whole llvm module.
+  MD5Stream HashStream;
+  llvm::WriteBitcodeToFile(Module, HashStream);
+
+  // Update the hash with the compiler version. We want to recompile if the
+  // llvm pipeline of the compiler changed.
+  HashStream << version::getSwiftFullVersion();
+
+  // Add all options which influence the llvm compilation but are not yet
+  // reflected in the llvm module itself.
+  HashStream << Opts.getLLVMCodeGenOptionsHash();
+
+  HashStream.final(Result);
+}
+
+/// Returns false if the hash of the current module \p HashData matches the
+/// hash which is stored in an existing output object file.
+static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
+                           llvm::GlobalVariable *HashGlobal,
+                           llvm::sys::Mutex *DiagMutex) {
+  if (OutputFilename.empty())
+    return true;
+
+  auto BinaryOwner = object::createBinary(OutputFilename);
+  if (!BinaryOwner)
+    return true;
+  auto *ObjectFile = dyn_cast<object::ObjectFile>(BinaryOwner->getBinary());
+  if (!ObjectFile)
+    return true;
+
+  const char *HashSectionName = HashGlobal->getSection();
+  // Strip the segment name. For mach-o the GlobalVariable's section name format
+  // is <segment>,<section>.
+  if (const char *Comma = ::strchr(HashSectionName, ','))
+    HashSectionName = Comma + 1;
+
+  // Search for the section which holds the hash.
+  for (auto &Section : ObjectFile->sections()) {
+    StringRef SectionName;
+    Section.getName(SectionName);
+    if (SectionName == HashSectionName) {
+      StringRef SectionData;
+      Section.getContents(SectionData);
+      ArrayRef<uint8_t> PrevHashData((uint8_t *)SectionData.data(),
+                                     SectionData.size());
+      DEBUG(if (PrevHashData.size() == sizeof(MD5::MD5Result)) {
+        if (DiagMutex) DiagMutex->lock();
+        SmallString<32> HashStr;
+        MD5::stringifyResult(*(MD5::MD5Result *)PrevHashData.data(), HashStr);
+        llvm::dbgs() << OutputFilename << ": prev MD5=" << HashStr <<
+          (HashData == PrevHashData ? " skipping\n" : " recompiling\n");
+        if (DiagMutex) DiagMutex->unlock();
+      });
+      if (HashData == PrevHashData)
+        return false;
+
+      return true;
+    }
+  }
+  return true;
 }
 
 /// Run the LLVM passes. In multi-threaded compilation this will be done for
 /// multiple LLVM modules in parallel.
 static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
                         llvm::sys::Mutex *DiagMutex,
+                        llvm::GlobalVariable *HashGlobal,
                         llvm::Module *Module,
                         llvm::TargetMachine *TargetMachine,
                         StringRef OutputFilename) {
+  if (Opts.UseIncrementalLLVMCodeGen && HashGlobal) {
+    // Check if we can skip the llvm part of the compilation if we have an
+    // existing object file which was generated from the same llvm IR.
+    MD5::MD5Result Result;
+    getHashOfModule(Result, Opts, Module, TargetMachine);
+
+    DEBUG(
+      if (DiagMutex) DiagMutex->lock();
+      SmallString<32> ResultStr;
+      MD5::stringifyResult(Result, ResultStr);
+      llvm::dbgs() << OutputFilename << ": MD5=" << ResultStr << '\n';
+      if (DiagMutex) DiagMutex->unlock();
+    );
+
+    ArrayRef<uint8_t> HashData(Result, sizeof(MD5::MD5Result));
+    if (Opts.OutputKind == IRGenOutputKind::ObjectFile &&
+        !Opts.PrintInlineTree &&
+        !needsRecompile(OutputFilename, HashData, HashGlobal, DiagMutex)) {
+      // The llvm IR did not change. We don't need to re-create the object file.
+      return false;
+    }
+
+    // Store the hash in the global variable so that it is written into the
+    // object file.
+    auto *HashConstant = ConstantDataArray::get(Module->getContext(), HashData);
+    HashGlobal->setInitializer(HashConstant);
+  }
+
   llvm::SmallString<0> Buffer;
   std::unique_ptr<raw_pwrite_stream> RawOS;
   if (!OutputFilename.empty()) {
@@ -277,12 +454,15 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
   }
   }
 
-  EmitPasses.run(*Module);
+  {
+    SharedTimer timer("LLVM output");
+    EmitPasses.run(*Module);
+  }
   return false;
 }
 
-static llvm::TargetMachine *createTargetMachine(IRGenOptions &Opts,
-                                                ASTContext &Ctx) {
+std::unique_ptr<llvm::TargetMachine>
+static createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
   const llvm::Triple &Triple = Ctx.LangOpts.Target;
   std::string Error;
   const Target *Target = TargetRegistry::lookupTarget(Triple.str(), Error);
@@ -318,7 +498,15 @@ static llvm::TargetMachine *createTargetMachine(IRGenOptions &Opts,
                        Triple.str(), "no LLVM target machine");
     return nullptr;
   }
-  return TargetMachine;
+  return std::unique_ptr<llvm::TargetMachine>(TargetMachine);
+}
+
+IRGenerator::IRGenerator(IRGenOptions &options, SILModule &module)
+  : Opts(options), SIL(module), QueueIndex(0) {
+}
+
+std::unique_ptr<llvm::TargetMachine> IRGenerator::createTargetMachine() {
+  return ::createTargetMachine(Opts, SIL.getASTContext());
 }
 
 // With -embed-bitcode, save a copy of the llvm IR as data in the
@@ -393,106 +581,109 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   auto &Ctx = M->getASTContext();
   assert(!Ctx.hadError());
 
-  llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, Ctx);
-  if (!TargetMachine)
-    return nullptr;
+  IRGenerator irgen(Opts, *SILMod);
 
-  const llvm::DataLayout DataLayout = TargetMachine->createDataLayout();
+  auto targetMachine = irgen.createTargetMachine();
+  if (!targetMachine) return nullptr;
 
   // Create the IR emitter.
-  IRGenModuleDispatcher dispatcher;
-  const llvm::Triple &Triple = Ctx.LangOpts.Target;
-  IRGenModule IGM(dispatcher, nullptr, Ctx, LLVMContext, Opts, ModuleName,
-                  DataLayout, Triple,
-                  TargetMachine, SILMod, Opts.getSingleOutputFilename());
+  IRGenModule IGM(irgen, std::move(targetMachine), nullptr,
+                  LLVMContext, ModuleName, Opts.getSingleOutputFilename());
 
   initLLVMModule(IGM);
   
-  // Emit the module contents.
-  dispatcher.emitGlobalTopLevel();
+  {
+    SharedTimer timer("IRGen");
+    // Emit the module contents.
+    irgen.emitGlobalTopLevel();
 
-  if (SF) {
-    IGM.emitSourceFile(*SF, StartElem);
-  } else {
-    assert(StartElem == 0 && "no explicit source file provided");
-    for (auto *File : M->getFiles()) {
-      if (auto *nextSF = dyn_cast<SourceFile>(File)) {
-        if (nextSF->ASTStage >= SourceFile::TypeChecked)
-          IGM.emitSourceFile(*nextSF, 0);
-      } else {
-        File->collectLinkLibraries([&IGM](LinkLibrary LinkLib) {
-          IGM.addLinkLibrary(LinkLib);
-        });
+    if (SF) {
+      IGM.emitSourceFile(*SF, StartElem);
+    } else {
+      assert(StartElem == 0 && "no explicit source file provided");
+      for (auto *File : M->getFiles()) {
+        if (auto *nextSF = dyn_cast<SourceFile>(File)) {
+          if (nextSF->ASTStage >= SourceFile::TypeChecked)
+            IGM.emitSourceFile(*nextSF, 0);
+        } else {
+          File->collectLinkLibraries([&IGM](LinkLibrary LinkLib) {
+            IGM.addLinkLibrary(LinkLib);
+          });
+        }
       }
     }
-  }
 
-  // Register our info with the runtime if needed.
-  if (Opts.UseJIT) {
-    IGM.emitRuntimeRegistration();
-  } else {
-    // Emit protocol conformances into a section we can recognize at runtime.
-    // In JIT mode these are manually registered above.
-    IGM.emitProtocolConformances();
-  }
+    // Register our info with the runtime if needed.
+    if (Opts.UseJIT) {
+      IGM.emitRuntimeRegistration();
+    } else {
+      // Emit protocol conformances into a section we can recognize at runtime.
+      // In JIT mode these are manually registered above.
+      IGM.emitProtocolConformances();
+      IGM.emitTypeMetadataRecords();
+      IGM.emitBuiltinReflectionMetadata();
+    }
 
-  // Okay, emit any definitions that we suddenly need.
-  dispatcher.emitLazyDefinitions();
+    // Okay, emit any definitions that we suddenly need.
+    irgen.emitLazyDefinitions();
 
-  // Emit symbols for eliminated dead methods.
-  IGM.emitVTableStubs();
+    // Emit symbols for eliminated dead methods.
+    IGM.emitVTableStubs();
 
-  // Verify type layout if we were asked to.
-  if (!Opts.VerifyTypeLayoutNames.empty())
-    IGM.emitTypeVerifier();
+    // Verify type layout if we were asked to.
+    if (!Opts.VerifyTypeLayoutNames.empty())
+      IGM.emitTypeVerifier();
 
-  std::for_each(Opts.LinkLibraries.begin(), Opts.LinkLibraries.end(),
-                [&](LinkLibrary linkLib) {
-    IGM.addLinkLibrary(linkLib);
-  });
-
-  // Hack to handle thunks eagerly synthesized by the Clang importer.
-  swift::Module *prev = nullptr;
-  for (auto external : Ctx.ExternalDefinitions) {
-    swift::Module *next = external->getModuleContext();
-    if (next == prev)
-      continue;
-    prev = next;
-
-    if (next->getName() == M->getName())
-      continue;
-
-    next->collectLinkLibraries([&](LinkLibrary linkLib) {
+    std::for_each(Opts.LinkLibraries.begin(), Opts.LinkLibraries.end(),
+                  [&](LinkLibrary linkLib) {
       IGM.addLinkLibrary(linkLib);
     });
+
+    // Hack to handle thunks eagerly synthesized by the Clang importer.
+    swift::Module *prev = nullptr;
+    for (auto external : Ctx.ExternalDefinitions) {
+      swift::Module *next = external->getModuleContext();
+      if (next == prev)
+        continue;
+      prev = next;
+
+      if (next->getName() == M->getName())
+        continue;
+
+      next->collectLinkLibraries([&](LinkLibrary linkLib) {
+        IGM.addLinkLibrary(linkLib);
+      });
+    }
+
+    if (!IGM.finalize())
+      return nullptr;
+
+    setModuleFlags(IGM);
   }
-
-  IGM.finalize();
-
-  setModuleFlags(IGM);
 
   // Bail out if there are any errors.
   if (Ctx.hadError()) return nullptr;
 
   embedBitcode(IGM.getModule(), Opts);
-  if (performLLVM(IGM.Opts, IGM.Context.Diags, nullptr, IGM.getModule(),
-                  IGM.TargetMachine, IGM.OutputFilename))
+
+  if (performLLVM(Opts, IGM.Context.Diags, nullptr, IGM.ModuleHash,
+                  IGM.getModule(), IGM.TargetMachine.get(), IGM.OutputFilename))
     return nullptr;
   return std::unique_ptr<llvm::Module>(IGM.releaseModule());
 }
 
-static void ThreadEntryPoint(IRGenModuleDispatcher *dispatcher,
+static void ThreadEntryPoint(IRGenerator *irgen,
                              llvm::sys::Mutex *DiagMutex, int ThreadIdx) {
-  while (IRGenModule *IGM = dispatcher->fetchFromQueue()) {
+  while (IRGenModule *IGM = irgen->fetchFromQueue()) {
     DEBUG(
       DiagMutex->lock();
       dbgs() << "thread " << ThreadIdx << ": fetched " << IGM->OutputFilename <<
           "\n";
       DiagMutex->unlock();
     );
-    embedBitcode(IGM->getModule(), IGM->Opts);
-    performLLVM(IGM->Opts, IGM->Context.Diags, DiagMutex, IGM->getModule(),
-                IGM->TargetMachine, IGM->OutputFilename);
+    embedBitcode(IGM->getModule(), irgen->Opts);
+    performLLVM(irgen->Opts, IGM->Context.Diags, DiagMutex, IGM->ModuleHash,
+                IGM->getModule(), IGM->TargetMachine.get(), IGM->OutputFilename);
     if (IGM->Context.Diags.hadAnyError())
       return;
   }
@@ -510,11 +701,26 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
                                         SILModule *SILMod,
                                         StringRef ModuleName, int numThreads) {
 
-  IRGenModuleDispatcher dispatcher;
+  IRGenerator irgen(Opts, *SILMod);
+
+  // Enter a cleanup to delete all the IGMs and their associated LLVMContexts
+  // that have been associated with the IRGenerator.
+  struct IGMDeleter {
+    IRGenerator &IRGen;
+    IGMDeleter(IRGenerator &irgen) : IRGen(irgen) {}
+    ~IGMDeleter() {
+      for (auto it = IRGen.begin(); it != IRGen.end(); ++it) {
+        IRGenModule *IGM = it->second;
+        LLVMContext *Context = &IGM->LLVMContext;
+        delete IGM;
+        delete Context;
+      }
+    }
+  } _igmDeleter(irgen);
   
   auto OutputIter = Opts.OutputFilenames.begin();
   bool IGMcreated = false;
-  
+
   auto &Ctx = M->getASTContext();
   // Create an IRGenModule for each source file.
   for (auto *File : M->getFiles()) {
@@ -522,14 +728,6 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     if (!nextSF || nextSF->ASTStage < SourceFile::TypeChecked)
       continue;
     
-    // Create a target machine.
-    llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, Ctx);
-    
-    const llvm::DataLayout DataLayout = TargetMachine->createDataLayout();
-    
-    LLVMContext *Context = new LLVMContext();
-    const llvm::Triple &Triple = Ctx.LangOpts.Target;
-
     // There must be an output filename for each source file.
     // We ignore additional output filenames.
     if (OutputIter == Opts.OutputFilenames.end()) {
@@ -537,11 +735,18 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
       Ctx.Diags.diagnose(SourceLoc(), diag::too_few_output_filenames);
       return;
     }
+
+    auto targetMachine = irgen.createTargetMachine();
+    if (!targetMachine) continue;
+
+    // This (and the IGM itself) will get deleted by the IGMDeleter
+    // as long as the IGM is registered with the IRGenerator. 
+    auto Context = new LLVMContext();
   
     // Create the IR emitter.
-    IRGenModule *IGM = new IRGenModule(dispatcher, nextSF, Ctx, *Context,
-                                       Opts, ModuleName, DataLayout, Triple,
-                                       TargetMachine, SILMod, *OutputIter++);
+    IRGenModule *IGM = new IRGenModule(irgen, std::move(targetMachine),
+                                       nextSF, *Context,
+                                       ModuleName, *OutputIter++);
     IGMcreated = true;
 
     initLLVMModule(*IGM);
@@ -554,26 +759,25 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   }
 
   // Emit the module contents.
-  dispatcher.emitGlobalTopLevel();
+  irgen.emitGlobalTopLevel();
   
   for (auto *File : M->getFiles()) {
     if (SourceFile *SF = dyn_cast<SourceFile>(File)) {
-      IRGenModule *IGM = dispatcher.getGenModule(SF);
+      IRGenModule *IGM = irgen.getGenModule(SF);
       IGM->emitSourceFile(*SF, 0);
     } else {
-      File->collectLinkLibraries([&dispatcher](LinkLibrary LinkLib) {
-        dispatcher.getPrimaryIGM()->addLinkLibrary(LinkLib);
+      File->collectLinkLibraries([&](LinkLibrary LinkLib) {
+        irgen.getPrimaryIGM()->addLinkLibrary(LinkLib);
       });
     }
   }
   
-  IRGenModule *PrimaryGM = dispatcher.getPrimaryIGM();
+  IRGenModule *PrimaryGM = irgen.getPrimaryIGM();
 
-  // Emit protocol conformances.
-  dispatcher.emitProtocolConformances();
+  irgen.emitProtocolConformances();
 
   // Okay, emit any definitions that we suddenly need.
-  dispatcher.emitLazyDefinitions();
+  irgen.emitLazyDefinitions();
   
  // Emit symbols for eliminated dead methods.
   PrimaryGM->emitVTableStubs();
@@ -605,7 +809,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   
   llvm::StringSet<> referencedGlobals;
 
-  for (auto it = dispatcher.begin(); it != dispatcher.end(); ++it) {
+  for (auto it = irgen.begin(); it != irgen.end(); ++it) {
     IRGenModule *IGM = it->second;
     llvm::Module *M = IGM->getModule();
     auto collectReference = [&](llvm::GlobalObject &G) {
@@ -623,7 +827,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     }
   }
 
-  for (auto it = dispatcher.begin(); it != dispatcher.end(); ++it) {
+  for (auto it = irgen.begin(); it != irgen.end(); ++it) {
     IRGenModule *IGM = it->second;
     llvm::Module *M = IGM->getModule();
     
@@ -645,7 +849,9 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
       updateLinkage(F);
     }
 
-    IGM->finalize();
+    if (!IGM->finalize())
+      return;
+
     setModuleFlags(*IGM);
   }
 
@@ -655,25 +861,17 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   std::vector<std::thread> Threads;
   llvm::sys::Mutex DiagMutex;
 
-  // Start all the threads an do the LLVM compilation.
+  // Start all the threads and do the LLVM compilation.
   for (int ThreadIdx = 1; ThreadIdx < numThreads; ++ThreadIdx) {
-    Threads.push_back(std::thread(ThreadEntryPoint, &dispatcher, &DiagMutex,
+    Threads.push_back(std::thread(ThreadEntryPoint, &irgen, &DiagMutex,
                                   ThreadIdx));
   }
 
-  ThreadEntryPoint(&dispatcher, &DiagMutex, 0);
+  ThreadEntryPoint(&irgen, &DiagMutex, 0);
 
   // Wait for all threads.
   for (std::thread &Thread : Threads) {
     Thread.join();
-  }
-
-  // Cleanup.
-  for (auto it = dispatcher.begin(); it != dispatcher.end(); ++it) {
-    IRGenModule *IGM = it->second;
-    LLVMContext *Context = &IGM->LLVMContext;
-    delete IGM;
-    delete Context;
   }
 }
 
@@ -702,56 +900,58 @@ performIRGeneration(IRGenOptions &Opts, SourceFile &SF, SILModule *SILMod,
 void
 swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
                                    StringRef OutputPath) {
-  LLVMContext *VMContext = new LLVMContext();
+  LLVMContext VMContext;
 
   auto &Ctx = SILMod.getASTContext();
   assert(!Ctx.hadError());
 
   IRGenOptions Opts;
   Opts.OutputKind = IRGenOutputKind::ObjectFile;
-  llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, Ctx);
-  if (!TargetMachine)
-    return;
+  IRGenerator irgen(Opts, SILMod);
 
-  const auto DataLayout = TargetMachine->createDataLayout();
+  auto targetMachine = irgen.createTargetMachine();
+  if (!targetMachine) return;
 
-  const llvm::Triple &Triple = Ctx.LangOpts.Target;
-  IRGenModuleDispatcher dispatcher;
-  IRGenModule IGM(dispatcher, nullptr, Ctx, *VMContext, Opts, OutputPath,
-                  DataLayout, Triple,
-                  TargetMachine, &SILMod, Opts.getSingleOutputFilename());
+  IRGenModule IGM(irgen, std::move(targetMachine), nullptr, VMContext,
+                  OutputPath, Opts.getSingleOutputFilename());
   initLLVMModule(IGM);
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
   auto *Data =
-      llvm::ConstantDataArray::getString(*VMContext, Buffer, /*AddNull=*/false);
+      llvm::ConstantDataArray::getString(VMContext, Buffer, /*AddNull=*/false);
   auto &M = *IGM.getModule();
   auto *ASTSym = new llvm::GlobalVariable(M, Ty, /*constant*/ true,
                                           llvm::GlobalVariable::InternalLinkage,
                                           Data, "__Swift_AST");
   std::string Section;
-  if (Triple.isOSBinFormatMachO())
-    Section = std::string(MachOASTSegmentName) + "," + MachOASTSectionName;
-  else if (Triple.isOSBinFormatCOFF())
+  switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("unknown object format");
+  case llvm::Triple::COFF:
     Section = COFFASTSectionName;
-  else
+    break;
+  case llvm::Triple::ELF:
     Section = ELFASTSectionName;
-
+    break;
+  case llvm::Triple::MachO:
+    Section = std::string(MachOASTSegmentName) + "," + MachOASTSectionName;
+    break;
+  }
   ASTSym->setSection(Section);
   ASTSym->setAlignment(8);
-  ::performLLVM(Opts, Ctx.Diags, nullptr, IGM.getModule(), TargetMachine,
-                OutputPath);
+  ::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, IGM.getModule(),
+                IGM.TargetMachine.get(), OutputPath);
 }
 
 bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
                         llvm::Module *Module) {
   // Build TargetMachine.
-  llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, Ctx);
+  auto TargetMachine = createTargetMachine(Opts, Ctx);
   if (!TargetMachine)
     return true;
 
   embedBitcode(Module, Opts);
-  if (::performLLVM(Opts, Ctx.Diags, nullptr, Module, TargetMachine,
-                    Opts.getSingleOutputFilename()))
+  if (::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, Module,
+                    TargetMachine.get(), Opts.getSingleOutputFilename()))
     return true;
   return false;
 }

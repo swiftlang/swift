@@ -1,8 +1,8 @@
-//===- DiagnosticList.cpp - Diagnostic Definitions ------------------------===//
+//===--- DiagnosticList.cpp - Diagnostic Definitions ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -18,7 +18,7 @@
 using namespace swift;
 
 enum class swift::DiagID : uint32_t {
-#define DIAG(KIND,ID,Category,Options,Text,Signature) ID,
+#define DIAG(KIND,ID,Options,Text,Signature) ID,
 #include "swift/AST/DiagnosticsAll.def"
 };
 
@@ -26,7 +26,7 @@ enum class swift::DiagID : uint32_t {
 // diagnostic IDs.
 namespace swift {
   namespace diag {
-#define DIAG(KIND,ID,Category,Options,Text,Signature) \
+#define DIAG(KIND,ID,Options,Text,Signature) \
     detail::DiagWithArguments<void Signature>::type ID = { DiagID::ID };
 #include "swift/AST/DiagnosticsAll.def"
   }

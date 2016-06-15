@@ -1,0 +1,19 @@
+---
+Name: XCTest
+Classes:
+- Name: XCTestSuiteRun
+  Methods:
+  - Selector: 'addTestRun:'
+    MethodKind: Instance
+    SwiftName: 'addTestRun(_:)'
+- Name: XCUIElementQuery
+  Methods:
+  - Selector: 'matchingPredicate:'
+    MethodKind: Instance
+    SwiftName: 'matching(_:)'
+  - Selector: 'matchingType:identifier:'
+    MethodKind: Instance
+    SwiftName: 'matching(_:identifier:)'
+  - Selector: 'matchingIdentifier:'
+    MethodKind: Instance
+    SwiftName: 'matching(identifier:)'

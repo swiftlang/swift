@@ -1,5 +1,6 @@
 
 public class MyClass {
+
     public func pub_method()
 }
 
@@ -24,32 +25,32 @@ public func pub_function()
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 28,
+    key.offset: 29,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 35,
+    key.offset: 36,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 40,
+    key.offset: 41,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 56,
+    key.offset: 57,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 63,
+    key.offset: 64,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 68,
+    key.offset: 69,
     key.length: 12
   }
 ]
@@ -60,20 +61,20 @@ public func pub_function()
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "MyClass",
     key.offset: 8,
-    key.length: 46,
+    key.length: 47,
     key.runtime_name: "_TtC4main7MyClass",
     key.nameoffset: 14,
     key.namelength: 7,
     key.bodyoffset: 23,
-    key.bodylength: 30,
+    key.bodylength: 31,
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "pub_method()",
-        key.offset: 35,
+        key.offset: 36,
         key.length: 17,
-        key.nameoffset: 40,
+        key.nameoffset: 41,
         key.namelength: 12
       }
     ]
@@ -82,9 +83,9 @@ public func pub_function()
     key.kind: source.lang.swift.decl.function.free,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "pub_function()",
-    key.offset: 63,
+    key.offset: 64,
     key.length: 19,
-    key.nameoffset: 68,
+    key.nameoffset: 69,
     key.namelength: 14
   }
 ]

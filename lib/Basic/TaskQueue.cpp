@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -23,7 +23,7 @@ using namespace swift;
 using namespace swift::sys;
 
 // Include the correct TaskQueue implementation.
-#if LLVM_ON_UNIX
+#if LLVM_ON_UNIX && !defined(__CYGWIN__)
 #include "Unix/TaskQueue.inc"
 #else
 #include "Default/TaskQueue.inc"

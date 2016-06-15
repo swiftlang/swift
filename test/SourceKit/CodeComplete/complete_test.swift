@@ -14,19 +14,19 @@
 // RUN: %sourcekitd-test -req=complete.open -pos=49:5  %s -- %s > %t.sourcekitd-test
 // RUN: diff %t.complete-test %t.sourcekitd-test
 
+struct MyInt {
+  func advancedFeatures(x: Int) {}
+  func advancedFeatures(x: Int, y: Int) {}
+  var bigPower: Int = 0
+  func descriptiveIntention(x: Int) {}
+}
+
 func foo() {
-  let x = 1
+  let x = MyInt()
   x.#^INT_DOT^#
-  // INT_DOT: {{^}}advancedBy(n:
-  // INT_DOT: {{^}}bigEndian{{$}}
-  // INT_DOT: {{^}}byteSwapped{{$}}
-  // INT_DOT: {{^}}description{{$}}
-  // INT_DOT: {{^}}distanceTo(other: Int){{$}}
-  // INT_DOT: {{^}}hashValue{{$}}
-  // INT_DOT: {{^}}littleEndian{{$}}
-  // INT_DOT: {{^}}predecessor(){{$}}
-  // INT_DOT: {{^}}successor(){{$}}
-  // INT_DOT: {{^}}toIntMax(){{$}}
+  // INT_DOT: {{^}}advancedFeatures(x:
+  // INT_DOT: {{^}}bigPower{{$}}
+  // INT_DOT: {{^}}descriptiveIntention(x: Int){{$}}
 }
 
 func bar() {
@@ -48,3 +48,5 @@ struct ForDiff {
 func diff(x: ForDiff) {
   x.#^DIFF^#
 }
+
+// XFAIL: broken_std_regex

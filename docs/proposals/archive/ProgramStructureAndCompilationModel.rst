@@ -35,7 +35,7 @@ to the business and management reality of the world:
 
 **Ownership Domain / Top Level Component**: corresponds to a product that is
 shipped as a unit (Mac OS/X, iWork, Xcode), is a collection of frameworks/dylibs
-and resources. Only acyclic dependences between different domains is
+and resources. Only acyclic dependencies between different domains is
 allowed. There is some correlation in concept here to "umbrella headers" or
 "dyld shared cache" though it isn't exact.
 
@@ -47,7 +47,7 @@ dylib + optional resources. All contributing source files and resources live in
 one directory (with optional subdirs), and have a single "project file". Can
 contribute to multiple namespaces. The division of a domain into components is
 an implementation detail, not something externally visible as API. Can have
-cyclic dependences between other components. Components roughly correspond to
+cyclic dependencies between other components. Components roughly correspond to
 "xcode project" or "B&I project" granularity at Apple. Can rebuild a "debug
 version" of a subcomponent and drop it into an app without rebuilding the entire
 world.
@@ -57,7 +57,7 @@ world.
 In the trivial hello world example, the source file gets implicitly dropped into
 a default component (since it doesn't have a component declaration). The default
 component has settings that corresponds to an executable. As the app grows and
-wants to start using sub- libraries, the author would have to know about
+wants to start using sub-libraries, the author would have to know about
 components. This ensures a simple model for new people, because they don't need
 to know anything about components until they want to define a library and stable
 APIs.
@@ -104,7 +104,7 @@ Components are explicitly declared, and these declarations can include:
 
 * the version of the component (which are used for "availability macros" etc)
 
-* an explicit list of dependences on other top-level components (whose
+* an explicit list of dependencies on other top-level components (whose
   dependence graph is required to be acyclic) optionally with specific versions:
   "I depend on swift standard libs 1.4 or later"
 
@@ -132,7 +132,7 @@ Components can optionally be broken into a set of "**Subcomponents**", which are
 organizational units within a top-level component. Subcomponents exist to
 support extremely large components that have multiple different teams
 contributing to a single large product. Subcomponents are purely an
-implementation detail of top- level components and have no runtime,
+implementation detail of top-level components and have no runtime,
 naming/namespace, or other externally visible artifacts that persist once the
 entire domain is built. If version 1.0 of a domain is shipped, version 1.1 can
 completely reshuffle the internal subcomponent organization without affecting
@@ -255,10 +255,10 @@ components (similar to clang -F or -L) etc. We'll also support a "clean" command
 that nukes buildcache/ and products/.
 
 The BuildCache directory holds object files, dependence information and other
-stuff needed for incremental [re]builds within the component The generated
-manifest file is used both the compiler when a clients lib/app import mylib (it
+stuff needed for incremental [re]builds within the component. The generated
+manifest file is used by the compiler when a client lib/app import mylib (it
 contains type information for all the stuff exported from mylib) but also at
-runtime by the runtime library (e.g.  for reflection). It needs to be a
+runtime by the runtime library (e.g. for reflection). It needs to be a
 fast-to-read but extensible format.
 
 What the build system does, how it works
@@ -275,7 +275,7 @@ diagnosed here.
 
 If this directory is a subcomponent (as opposed to a top-level component), the
 subcomponent declaration has already been read. If this subcomponent depends on
-any other components that are not up-to- date, those are recursively
+any other components that are not up-to-date, those are recursively
 rebuilt. Explicit subcomponent dependencies are acyclic and cycles are diagnosed
 here. Now all depended-on top-level components and subcomponents are built.
 
@@ -283,7 +283,7 @@ Now the compiler parses each swift file into an AST. We'll keep the swift
 grammar carefully factored to keep types and values distinct, so it is possible
 to parse (but not fully typecheck) the files without first reading "all the
 headers they depend on". This is important because we want to allow arbitrary
-type and value cyclic dependences between files in a component. As each file is
+type and value cyclic dependencies between files in a component. As each file is
 parsed, the compiler resolves as many intra-file references as it can, and ends
 up with a list of (namespace qualified) types and values that are imported by
 the file that are not satisfied by other components. This is the list of things
@@ -306,12 +306,12 @@ declared cyclic dependencies match the given and actual prototype. 2) resources
 are copied or processed into the product directory. 3) the explicit dependence
 graph is verified, extraneous edges are warned about, missing edges are errors.
 
-In terms of implementation, this should be relatively straight- forward, and is
+In terms of implementation, this should be relatively straight-forward, and is
 carefully layered to be memory efficient (e.g. only processing an SCC at a time
 instead of an entire component) as well as highly parallel for multicore
 machines. For incremental builds, we will have a huge win because the
 fine-grained dependence information between .o files is tracked and we know
-exactly what dependences to rebuild if anything changes. The build cache will
+exactly what dependencies to rebuild if anything changes. The build cache will
 accelerate most of this, which will eventually be a hybrid on-disk/in-memory
 data structure.
 
@@ -330,7 +330,7 @@ client builds against the component to type check the client and ensure that its
 references are resolved.
 
 Because we have the version number as well as the full interface to the
-component available in a consumable format is that we can build a SDK generation
+component available in a consumable format is that we can build an SDK generation
 tool. This tool would take manifest files for a set of releases (e.g. iOS 4.0,
 4.0.1, 4.0.2, 4.1, 4.1.1, 4.2) and build a single SDK manifest which would have
 a mapping from symbol+type -> version list that indicates what the versions a

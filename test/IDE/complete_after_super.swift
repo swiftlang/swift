@@ -127,7 +127,7 @@ class SuperBaseA {
   // Don't declare constructors.
 
   func baseFunc0() {}
-  func baseFunc1(a: Int) {}
+  func baseFunc1(_ a: Int) {}
 
   subscript(i: Int) -> Double {
     get {
@@ -138,7 +138,7 @@ class SuperBaseA {
     }
   }
 
-  // expected-error@+1 {{class stored properties not yet supported}}
+  // expected-error@+1 {{class stored properties not supported}}
   class var baseStaticVar: Int = 0
 
   class var baseStaticProp: Int {
@@ -169,7 +169,7 @@ extension SuperBaseA {
 
   func baseExtFunc0() {}
 
-  // expected-error@+1 {{class stored properties not yet supported}}
+  // expected-error@+1 {{class stored properties not supported}}
   class var baseExtStaticVar: Int = 0
 
   class func baseExtStaticFunc0() {}
@@ -293,7 +293,7 @@ class SuperBaseB {
   init(int: Int) {}
 
   func baseFunc0() {}
-  func baseFunc1(a: Int) {}
+  func baseFunc1(_ a: Int) {}
 
   subscript(i: Int) -> Double {
     get {
@@ -304,7 +304,7 @@ class SuperBaseB {
     }
   }
 
-  // expected-error@+1 {{class stored properties not yet supported}}
+  // expected-error@+1 {{class stored properties not supported}}
   class var baseStaticVar: Int = 0
 
   class var baseStaticProp: Int {
@@ -335,7 +335,7 @@ extension SuperBaseB {
 
   func baseExtFunc0() {}
 
-  // expected-error@+1 {{class stored properties not yet supported}}
+  // expected-error@+1 {{class stored properties not supported}}
   class var baseExtStaticVar: Int = 0
 
   class var baseExtStaticProp: Int {
@@ -412,7 +412,7 @@ class SemanticContextBase1 {
   init() {}
   init(a: Int) {}
   func instanceFunc1() {}
-  func instanceFunc1(a: Int) {}
+  func instanceFunc1(_ a: Int) {}
 }
 
 class SemanticContextDerived1 : SemanticContextBase1 {
@@ -445,7 +445,7 @@ class SemanticContextDerived1 : SemanticContextBase1 {
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: End completions
   }
-  func instanceFunc1(a: Int) {
+  func instanceFunc1(_ a: Int) {
     super.#^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5: Begin completions
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1()[#Void#]{{; name=.+$}}

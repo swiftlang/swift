@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 func f0(_: Float) -> Float {}
 func f0(_: Int) -> Int {}
@@ -18,9 +18,9 @@ var x : X
 var i : Int
 var f : Float
 
-f0(i)
-f0(1.0)
-f0(1)
+_ = f0(i)
+_ = f0(1.0)
+_ = f0(1)
 f1(f0(1))
 f1(identity(1))
 
@@ -28,8 +28,8 @@ f0(x) // expected-error{{cannot invoke 'f0' with an argument list of type '(X)'}
 // expected-note @-1 {{overloads for 'f0' exist with these partially matching parameter lists: (Float), (Int)}}
 
 _ = f + 1
-f2(i)
-f2((i, f))
+_ = f2(i)
+_ = f2((i, f))
 
 class A { 
   init() {} 
@@ -41,8 +41,8 @@ class C : B {
   override init() { super.init() } 
 }
 
-func bar(b: B) -> Int {} // #1
-func bar(a: A) -> Float {} // #2
+func bar(_ b: B) -> Int {} // #1
+func bar(_ a: A) -> Float {} // #2
 
 var barResult = bar(C()) // selects #1, which is more specialized
 i = barResult // make sure we got #1
@@ -73,7 +73,7 @@ struct X2d {
     return 7
   }
 
-  func foo(x : X2c) -> Int {
+  func foo(_ x : X2c) -> Int {
     return self[x]
   }
 }
@@ -81,13 +81,13 @@ struct X2d {
 // Invalid declarations
 // FIXME: Suppress the diagnostic for the call below, because the invalid
 // declaration would have matched.
-func f3(x: Intthingy) -> Int { } // expected-error{{use of undeclared type 'Intthingy'}}
+func f3(_ x: Intthingy) -> Int { } // expected-error{{use of undeclared type 'Intthingy'}}
 
-func f3(x: Float) -> Float { }
+func f3(_ x: Float) -> Float { }
 f3(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Float'}}
 
-func f4(i: Wonka) { } // expected-error{{use of undeclared type 'Wonka'}}
-func f4(j: Wibble) { } // expected-error{{use of undeclared type 'Wibble'}}
+func f4(_ i: Wonka) { } // expected-error{{use of undeclared type 'Wonka'}}
+func f4(_ j: Wibble) { } // expected-error{{use of undeclared type 'Wibble'}}
 f4(5)
 
 func f1() {
@@ -96,8 +96,8 @@ func f1() {
 }
 
 // We don't provide return-type sensitivity unless there is context.
-func f5(i: Int) -> A { return A() } // expected-note{{candidate}}
-func f5(i: Int) -> B { return B() } // expected-note{{candidate}}
+func f5(_ i: Int) -> A { return A() } // expected-note{{candidate}}
+func f5(_ i: Int) -> B { return B() } // expected-note{{candidate}}
 
 f5(5) // expected-error{{ambiguous use of 'f5'}}
 
@@ -113,23 +113,51 @@ struct HasX1aProperty {
 
 // rdar://problem/16554496
 @available(*, unavailable)
-func availTest(x: Int) {}
-func availTest(x: Any) { markUsed("this one") }
-func doAvailTest(x: Int) {
+func availTest(_ x: Int) {}
+func availTest(_ x: Any) { markUsed("this one") }
+func doAvailTest(_ x: Int) {
   availTest(x)
 }
 
 // rdar://problem/20886179
-func test20886179(handlers: [(Int) -> Void], buttonIndex: Int) {
+func test20886179(_ handlers: [(Int) -> Void], buttonIndex: Int) {
     handlers[buttonIndex](buttonIndex)
 }
 
 // The problem here is that the call has a contextual result type incompatible
 // with *all* overload set candidates.  This is not an ambiguity.
-func overloaded_identity(a : Int) -> Int {}
-func overloaded_identity(b : Float) -> Float {}
+func overloaded_identity(_ a : Int) -> Int {}
+func overloaded_identity(_ b : Float) -> Float {}
 
 func test_contextual_result() {
   return overloaded_identity()  // expected-error {{no 'overloaded_identity' candidates produce the expected contextual result type '()'}}
   // expected-note @-1 {{overloads for 'overloaded_identity' exist with these result types: Int, Float}}
 }
+
+// rdar://problem/24128153
+struct X0 {
+  init(_ i: Any.Type) { }
+  init?(_ i: Any.Type, _ names: String...) { }
+}
+
+let x0 = X0(Int.self)
+let x0check: X0 = x0 // okay: chooses first initializer
+
+struct X1 {
+  init?(_ i: Any.Type) { }
+  init(_ i: Any.Type, _ names: String...) { }
+}
+
+let x1 = X1(Int.self)
+let x1check: X1 = x1 // expected-error{{value of optional type 'X1?' not unwrapped; did you mean to use '!' or '?'?}}
+
+
+struct X2 {
+  init?(_ i: Any.Type) { }
+  init(_ i: Any.Type, a: Int = 0) { }
+  init(_ i: Any.Type, a: Int = 0, b: Int = 0) { }
+  init(_ i: Any.Type, a: Int = 0, c: Int = 0) { }
+}
+
+let x2 = X2(Int.self)
+let x2check: X2 = x2 // expected-error{{value of optional type 'X2?' not unwrapped; did you mean to use '!' or '?'?}}

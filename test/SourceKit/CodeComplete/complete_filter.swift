@@ -11,6 +11,7 @@ func foo() {
   x.#^FOO,,a,aa,ab,abc,abcd^#
 }
 
+// XFAIL: broken_std_regex
 // RUN: %sourcekitd-test -req=complete.open -pos=11:5 %s -- %s > %t.all
 // FileCheck -check-prefix=CHECK-ALL %s < %t.all
 // CHECK-ALL: key.name: "aaa
@@ -88,7 +89,7 @@ func foo() {
 struct A {}
 func over() {}
 func overload() {}
-func overload(x: A) {}
+func overload(_ x: A) {}
 
 func test() {
   #^OVER,over,overload,overloadp^#
@@ -106,3 +107,20 @@ func test() {
 // GROUP-NEXT: ]
 // GROUP-LABEL: Results for filterText: overloadp [
 // GROUP-NEXT: ]
+
+struct UnnamedArgs {
+  func dontMatchAgainst(_ unnamed: Int, arguments: Int, _ unnamed2:Int) {}
+  func test() {
+    self.#^UNNAMED_ARGS_0,dont,arguments,unnamed^#
+  }
+}
+
+// RUN: %complete-test -tok=UNNAMED_ARGS_0 %s | FileCheck %s -check-prefix=UNNAMED_ARGS_0
+// UNNAMED_ARGS_0: Results for filterText: dont [
+// UNNAMED_ARGS_0-NEXT:   dontMatchAgainst(unnamed: Int, arguments: Int, unnamed2: Int)
+// UNNAMED_ARGS_0-NEXT: ]
+// UNNAMED_ARGS_0-NEXT: Results for filterText: arguments [
+// UNNAMED_ARGS_0-NEXT:   dontMatchAgainst(unnamed: Int, arguments: Int, unnamed2: Int)
+// UNNAMED_ARGS_0-NEXT: ]
+// UNNAMED_ARGS_0-NEXT: Results for filterText: unnamed [
+// UNNAMED_ARGS_0-NEXT: ]

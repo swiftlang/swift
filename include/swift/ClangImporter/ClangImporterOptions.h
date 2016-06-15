@@ -1,8 +1,8 @@
-//===-- ClangImporterOptions.h ---------------------------------*- C++ -*--===//
+//===--- ClangImporterOptions.h ---------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -53,10 +53,6 @@ public:
   /// generation.
   bool DetailedPreprocessingRecord = false;
 
-  /// If true, matched getter-like and setter-like methods will be imported as
-  /// properties.
-  bool InferImplicitProperties = false;
-
   /// If true, Clang diagnostics will be dumped to stderr using Clang's
   /// diagnostic printer as well as being passed to Swift's diagnostic engine.
   bool DumpClangDiagnostics = false;
@@ -65,18 +61,18 @@ public:
   /// instead of dropped altogether when possible.
   bool ImportForwardDeclarations = false;
 
-  /// If true, remove words from imported names that are redundant
-  /// with the type information of the corresponding parameter or
-  /// property.
-  bool OmitNeedlessWords = false;
+  /// Whether to use the import as member inference system
+  ///
+  /// When importing a global, try to infer whether we can import it as a
+  /// member of some type instead. This includes inits, computed properties,
+  /// and methods.
+  bool InferImportAsMember = false;
 
-  // If true, infer default arguments for nullable pointers (nil) and
-  // option sets ([]).
-  bool InferDefaultArguments = false;
+  /// If true ignore the swift bridged attribute.
+  bool DisableSwiftBridgeAttr = false;
 
-  /// If true, we should use the Swift name lookup tables rather than
-  /// Clang's name lookup facilities.
-  bool UseSwiftLookupTables = false;
+  /// Whether we should honor the swift_newtype attribute.
+  bool HonorSwiftNewtypeAttr = true;
 };
 
 } // end namespace swift

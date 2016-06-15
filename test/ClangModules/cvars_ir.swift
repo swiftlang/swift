@@ -5,7 +5,7 @@
 import cvars
 
 // Check that the mangling is correct.
-// CHECK: @PI = external global [[FLOAT:%.*]]
+// CHECK: @PI = external global float, align 4
 
 func getPI() -> Float {
   return PI

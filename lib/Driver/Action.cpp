@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -18,8 +18,8 @@
 using namespace swift::driver;
 using namespace llvm::opt;
 
-Action::~Action() {
-  if (OwnsInputs) {
+JobAction::~JobAction() {
+  if (getOwnsInputs()) {
     llvm::DeleteContainerPointers(Inputs);
   }
 }
@@ -28,6 +28,7 @@ const char *Action::getClassName(ActionClass AC) {
   switch (AC) {
     case Input: return "input";
     case CompileJob: return "compile";
+    case InterpretJob: return "interpret";
     case BackendJob: return "backend";
     case MergeModuleJob: return "merge-module";
     case ModuleWrapJob: return "modulewrap";
@@ -45,6 +46,8 @@ void InputAction::anchor() {}
 void JobAction::anchor() {}
 
 void CompileJobAction::anchor() {}
+
+void InterpretJobAction::anchor() {}
 
 void BackendJobAction::anchor() {}
 

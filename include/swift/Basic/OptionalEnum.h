@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -55,7 +55,7 @@ namespace swift {
         I rawValue,
         typename std::enable_if<std::is_integral<I>::value>::type * = {})
       : Storage(rawValue) {
-      assert(rawValue == (uintptr_t)(intptr_t)*this);
+      assert((uintptr_t)rawValue == (uintptr_t)(intptr_t)*this);
     }
 
     void reset() {
@@ -83,6 +83,6 @@ namespace swift {
       return (intptr_t)Storage;
     }
   };
-}
+} // end namespace swift
   
-#endif
+#endif // SWIFT_BASIC_OPTIONALENUM_H

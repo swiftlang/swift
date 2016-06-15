@@ -1,8 +1,8 @@
-//===- Utils.h - Misc utilities -------------------------------------------===//
+//===--- Utils.h - Misc utilities -------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -16,7 +16,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/IDE/SourceEntityWalker.h"
+#include "swift/AST/SourceEntityWalker.h"
 #include "llvm/ADT/StringRef.h"
 #include <memory>
 #include <string>
@@ -54,7 +54,7 @@ struct SourceCompleteResult {
   // The text to use as the indent string when auto indenting the next line.
   // This will contain the exactly what the client typed (any whitespaces and
   // tabs) and can be used to indent subsequent lines. It does not include
-  // the current indent level, IDE clients should insert the currect indentation
+  // the current indent level, IDE clients should insert the correct indentation
   // with spaces or tabs to account for the current indent level. The indent
   // prefix will contain the leading space characters of the line that
   // contained the '{', '(' or '[' character that was unbalanced.
@@ -71,7 +71,8 @@ struct SourceCompleteResult {
       IndentLevel(0) {}
 };
 
-SourceCompleteResult isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf);
+SourceCompleteResult
+isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf);
 SourceCompleteResult isSourceInputComplete(StringRef Text);
 
 bool initInvocationByClangArguments(ArrayRef<const char *> ArgList,
@@ -99,8 +100,8 @@ struct PlaceholderOccurrence {
   StringRef IdentifierReplacement;
 };
 
-/// Replaces Xcode editor placeholders (<#such as this#>) with dollar identifiers
-/// and returns a new memory buffer.
+/// Replaces Xcode editor placeholders (<#such as this#>) with dollar
+/// identifiers and returns a new memory buffer.
 ///
 /// The replacement identifier will be the same size as the placeholder so that
 /// the new buffer will have the same size as the input buffer.
@@ -112,9 +113,10 @@ std::unique_ptr<llvm::MemoryBuffer>
   replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
                       bool *HadPlaceholder = nullptr);
 
-void getLocationInfo(const ValueDecl *VD,
-                     llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
-                     StringRef &Filename);
+void getLocationInfo(
+    const ValueDecl *VD,
+    llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
+    StringRef &Filename);
 
 void getLocationInfoForClangNode(ClangNode ClangNode,
                                  ClangImporter *Importer,
@@ -122,6 +124,16 @@ void getLocationInfoForClangNode(ClangNode ClangNode,
                                  StringRef &Filename);
 
 Optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
+
+Decl *getDeclFromUSR(ASTContext &context, StringRef USR, std::string &error);
+Decl *getDeclFromMangledSymbolName(ASTContext &context, StringRef mangledName,
+                                   std::string &error);
+
+Type getTypeFromMangledTypename(ASTContext &Ctx, StringRef mangledName,
+                                std::string &error);
+
+Type getTypeFromMangledSymbolname(ASTContext &Ctx, StringRef mangledName,
+                                  std::string &error);
 
 class XMLEscapingPrinter : public StreamPrinter {
   public:
@@ -179,7 +191,6 @@ private:
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override;
 };
-
 } // namespace ide
 
 class ArchetypeTransformer {

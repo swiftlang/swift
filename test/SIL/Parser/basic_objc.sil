@@ -32,3 +32,11 @@ entry(%a : $@objc_metatype SomeClass.Type, %b : $@objc_metatype SomeClassProtoco
   return %z : $(AnyObject, AnyObject)
 }
 
+sil @requires_any_object : $@convention(thin) <T: AnyObject> (@owned T) -> ()
+
+sil @foo : $@convention(thin) (@owned ObjCProto) -> () {
+entry(%a : $ObjCProto):
+  %f = function_ref @requires_any_object : $@convention(thin) <T: AnyObject> (@owned T) -> ()
+  %0 = apply %f<ObjCProto>(%a) : $@convention(thin) <T: AnyObject> (@owned T) -> ()
+  return %0 : $()
+}

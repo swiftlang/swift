@@ -1,13 +1,13 @@
 // RUN: %target-parse-verify-swift
 
-struct MyLogicValue : BooleanType {
+struct MyLogicValue : Boolean {
   var boolValue: Bool {
     return true
   }
 }
 
-func useInt(x: Int) {}
-func useDouble(x: Double) {}
+func useInt(_ x: Int) {}
+func useDouble(_ x: Double) {}
 
 class B {
   init() {} 
@@ -19,9 +19,9 @@ class D2 : B {
   override init() { super.init() } 
 }
 
-func useB(x: B) {}
-func useD1(x: D1) {}
-func useD2(x: D2) {}
+func useB(_ x: B) {}
+func useD1(_ x: D1) {}
+func useD2(_ x: D2) {}
 
 var a = true ? 1 : 0 // should infer Int
 var b : Double = true ? 1 : 0 // should infer Double
@@ -34,7 +34,7 @@ useDouble(c)
 useDouble(d)
 
 var z = true ? a : b // expected-error{{result values in '? :' expression have mismatching types 'Int' and 'Double'}}
-var _ = a ? b : b // expected-error{{type 'Int' does not conform to protocol 'BooleanType'}}
+var _ = a ? b : b // expected-error{{type 'Int' does not conform to protocol 'Boolean'}}
 
 
 
@@ -57,8 +57,8 @@ useD1(i) // expected-error{{cannot convert value of type 'B' to expected argumen
 useD2(i) // expected-error{{cannot convert value of type 'B' to expected argument type 'D2'}}
 
 var x = MyLogicValue() ? 1 : 0
-var y = 22 ? 1 : 0 // expected-error{{type 'Int' does not conform to protocol 'BooleanType'}}
+var y = 22 ? 1 : 0 // expected-error{{type 'Int' does not conform to protocol 'Boolean'}}
 
-_ = x ? x : x // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
+_ = x ? x : x // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
 _ = true ? x : 1.2 // expected-error {{result values in '? :' expression have mismatching types 'Int' and 'Double'}}
 

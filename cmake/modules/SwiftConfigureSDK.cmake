@@ -109,12 +109,12 @@ macro(configure_sdk_darwin
 endmacro()
 
 macro(configure_sdk_unix
-    prefix name lib_subdir triple_name arch triple)
+    prefix name lib_subdir triple_name arch triple sdkpath)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
   set(SWIFT_SDK_${prefix}_NAME "${name}")
-  set(SWIFT_SDK_${prefix}_PATH "/")
+  set(SWIFT_SDK_${prefix}_PATH "${sdkpath}")
   set(SWIFT_SDK_${prefix}_VERSION "don't use")
   set(SWIFT_SDK_${prefix}_BUILD_NUMBER "don't use")
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "don't use")

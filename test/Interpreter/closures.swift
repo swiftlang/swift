@@ -1,15 +1,15 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
-func localFunc(x: Int) -> Int {
-  func addToX(y: Int) -> Int {
+func localFunc(_ x: Int) -> Int {
+  func addToX(_ y: Int) -> Int {
     return x + y
   }
   return addToX(1)
 }
 
-func localFunc2(x: Int) -> (y: Int) -> Int {
-  func addToX(y: Int) -> Int {
+func localFunc2(_ x: Int) -> (y: Int) -> Int {
+  func addToX(_ y: Int) -> Int {
     return x + y
   }
   return addToX
@@ -35,11 +35,11 @@ func test() {
 test()
 
 // <rdar://problem/19776288>
-func map<T>(fn: T->()) {
+func map<T>(_ fn: (T) -> ()) {
     print("Void overload")
 }
 
-func map<T,U>(fn: T->U) {
+func map<T,U>(_ fn: (T) -> U) {
     print("Non-void overload")
 }
 

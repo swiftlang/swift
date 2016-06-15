@@ -1,8 +1,8 @@
-//===--- NumericParsing.swift.gyb ----------------------------------------===//
+//===--- NumericParsing.swift.gyb -----------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -11,25 +11,27 @@
 //===----------------------------------------------------------------------===//
 // -*- swift -*-
 // RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb -DCMAKE_SIZEOF_VOID_P=%target-ptrsize %s -o %t/NumericParsing.swift
-// RUN: %S/../../utils/line-directive %t/NumericParsing.swift -- %target-build-swift %t/NumericParsing.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/NumericParsing.swift -- %target-run %t/a.out
+// RUN: %gyb -DCMAKE_SIZEOF_VOID_P=%target-ptrsize %s -o %t/NumericParsing.swift
+// RUN: %line-directive %t/NumericParsing.swift -- %target-build-swift %t/NumericParsing.swift -o %t/a.out
+// RUN: %line-directive %t/NumericParsing.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 %{
-from SwiftIntTypes import *
+from SwiftIntTypes import all_integer_types
 
 word_bits = int(CMAKE_SIZEOF_VOID_P)
   
 def maskOfWidth(n):
   return (1 << n) - 1
 
-def inRadix(radix, n, zero = '0'):
+def inRadix(radix, n, zero='0'):
   """
 Represent the int n in the given radix.  
 Note: the third parameter, zero, is not for user consumption.
   """
-  if n < 0: return '-' + inRadix(radix, -n, '')
-  elif n == 0: return zero
+  if n < 0:
+    return '-' + inRadix(radix, -n, '')
+  elif n == 0:
+    return zero
   else:
     r = n % radix
     digit = chr((ord('0') + r) if r < 10 else (ord('a') + r - 10))
@@ -43,9 +45,10 @@ radices_to_test = [2, 8, 10, 16, max_radix]
 
 # How many values to test in each radix?  A nice prime number of course.
 number_of_values = 23
-}% 
+}%
 
 import StdlibUnittest
+
 
 var tests = TestSuite("NumericParsing")
 
@@ -83,6 +86,10 @@ tests.test("${Self}/success") {
   expectEqual(nil, ${Self}("${maxValue + 1}"))
   expectEqual(nil, ${Self}("${minValue - 1}"))
   expectEqual(nil, ${Self}("\u{1D7FF}"))  // MATHEMATICAL MONOSPACE DIGIT NINE
+
+  // Cases that should fail to parse
+  expectEqual(nil, ${Self}("--0")) // Zero w/ repeated plus
+  expectEqual(nil, ${Self}("-+5")) // Non-zero with -+
 
   // Do more exhaustive testing
   % for radix in radices_to_test:
@@ -122,9 +129,12 @@ tests.test("${Self}/radixTooHigh") {
 
 tests.test("${Self}/Basics") {
 % if Self != 'Float80': # Inf/NaN are not defined for Float80
+  expectEqual(.infinity, ${Self}("inf"))
   expectEqual(.infinity, ${Self}("Inf"))
+  expectEqual(-(.infinity), ${Self}("-inf"))
   expectEqual(-(.infinity), ${Self}("-Inf"))
-  expectEqual(String(${Self}.NaN), String(${Self}("NaN")!))
+  expectEqual(String(${Self}.nan), String(${Self}("nan")!))
+  expectEqual(String(${Self}.nan), String(${Self}("NaN")!))
 % end
   
   expectEqual(-0.0, ${Self}("-0"))
@@ -136,7 +146,7 @@ tests.test("${Self}/Basics") {
   // Check that we can round-trip the string representation of 2^100,
   // which requires an exponent to express...
   let large =
-    Repeat(count: 10, repeatedValue: 1024 as ${Self}).reduce(1, combine: *)
+    repeatElement(1024 as ${Self}, count: 10).reduce(1, combine: *)
   let largeText = String(large)
   expectEqual(largeText, String(${Self}(largeText)!))
   

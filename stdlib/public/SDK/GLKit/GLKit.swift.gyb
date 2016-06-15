@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -32,7 +32,7 @@ vectorElementNames = [
 
 // Do dirty pointer manipulations to index an opaque struct like an array.
 @inline(__always)
-public func _indexHomogeneousValue<TTT, T>(aggregate: UnsafePointer<TTT>,
+public func _indexHomogeneousValue<TTT, T>(_ aggregate: UnsafePointer<TTT>,
                                            _ index: Int) -> T {
   return UnsafePointer<T>(aggregate)[index]
 }
@@ -59,7 +59,7 @@ def defineSubscript(Type, limit):
 extension GLKMatrix${size} {
   public typealias _Tuple = (${ ', '.join(['Float'] * (size * size)) })
   public var _tuple: _Tuple {
-    @inline(__always) get { return unsafeBitCast(self, _Tuple.self) }
+    @inline(__always) get { return unsafeBitCast(self, to: _Tuple.self) }
   }
   % for i in xrange(0, size):
   %   for j in xrange(0, size):
@@ -75,7 +75,7 @@ extension GLKMatrix${size} {
 extension GLKVector${size} {
   public typealias _Tuple = (${ ', '.join(['Float'] * size) })
   public var _tuple: _Tuple {
-    @inline(__always) get { return unsafeBitCast(self, _Tuple.self) }
+    @inline(__always) get { return unsafeBitCast(self, to: _Tuple.self) }
   }
 
   % for (names, minSize) in vectorElementNames:
@@ -94,7 +94,7 @@ extension GLKVector${size} {
 extension GLKQuaternion {
   public typealias _Tuple = (Float, Float, Float, Float)
   public var _tuple: _Tuple {
-    @inline(__always) get { return unsafeBitCast(self, _Tuple.self) }
+    @inline(__always) get { return unsafeBitCast(self, to: _Tuple.self) }
   }
   
   public var v: GLKVector3 {

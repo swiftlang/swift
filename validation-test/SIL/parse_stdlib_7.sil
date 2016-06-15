@@ -6,3 +6,5 @@
 // RUN: rm -f %t.*
 // RUN: %target-sil-opt -enable-sil-verify-all -sil-disable-ast-dump %platform-module-dir/Swift.swiftmodule -module-name=Swift -o %t.sil
 // RUN: %target-sil-opt -enable-sil-verify-all %t.sil -ast-verifier-process-count=17 -ast-verifier-process-id=7 > /dev/null
+// REQUIRES: long_test
+// REQUIRES: nonexecutable_test

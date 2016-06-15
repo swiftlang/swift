@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -39,8 +39,8 @@ struct _HashingDetail {
     }
   }
 
+  @_versioned
   @_transparent
-  @warn_unused_result
   static func getExecutionSeed() -> UInt64 {
     // FIXME: This needs to be a per-execution seed. This is just a placeholder
     // implementation.
@@ -48,9 +48,9 @@ struct _HashingDetail {
     return _HashingDetail.fixedSeedOverride == 0 ? seed : fixedSeedOverride
   }
 
+  @_versioned
   @_transparent
-  @warn_unused_result
-  static func hash16Bytes(low: UInt64, _ high: UInt64) -> UInt64 {
+  static func hash16Bytes(_ low: UInt64, _ high: UInt64) -> UInt64 {
     // Murmur-inspired hashing.
     let mul: UInt64 = 0x9ddfea08eb382d69
     var a: UInt64 = (low ^ high) &* mul
@@ -68,13 +68,12 @@ struct _HashingDetail {
 
 //
 // _mix*() functions all have type (T) -> T.  These functions don't compress
-// their inputs and just exhibit avalance effect.
+// their inputs and just exhibit avalanche effect.
 //
 
 @_transparent
-@warn_unused_result
 public // @testable
-func _mixUInt32(value: UInt32) -> UInt32 {
+func _mixUInt32(_ value: UInt32) -> UInt32 {
   // Zero-extend to 64 bits, hash, select 32 bits from the hash.
   //
   // NOTE: this differs from LLVM's implementation, which selects the lower
@@ -86,16 +85,14 @@ func _mixUInt32(value: UInt32) -> UInt32 {
 }
 
 @_transparent
-@warn_unused_result
 public // @testable
-func _mixInt32(value: Int32) -> Int32 {
+func _mixInt32(_ value: Int32) -> Int32 {
   return Int32(bitPattern: _mixUInt32(UInt32(bitPattern: value)))
 }
 
 @_transparent
-@warn_unused_result
 public // @testable
-func _mixUInt64(value: UInt64) -> UInt64 {
+func _mixUInt64(_ value: UInt64) -> UInt64 {
   // Similar to hash_4to8_bytes but using a seed instead of length.
   let seed: UInt64 = _HashingDetail.getExecutionSeed()
   let low: UInt64 = value & 0xffff_ffff
@@ -104,30 +101,27 @@ func _mixUInt64(value: UInt64) -> UInt64 {
 }
 
 @_transparent
-@warn_unused_result
 public // @testable
-func _mixInt64(value: Int64) -> Int64 {
+func _mixInt64(_ value: Int64) -> Int64 {
   return Int64(bitPattern: _mixUInt64(UInt64(bitPattern: value)))
 }
 
 @_transparent
-@warn_unused_result
 public // @testable
-func _mixUInt(value: UInt) -> UInt {
+func _mixUInt(_ value: UInt) -> UInt {
 #if arch(i386) || arch(arm)
   return UInt(_mixUInt32(UInt32(value)))
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   return UInt(_mixUInt64(UInt64(value)))
 #endif
 }
 
 @_transparent
-@warn_unused_result
 public // @testable
-func _mixInt(value: Int) -> Int {
+func _mixInt(_ value: Int) -> Int {
 #if arch(i386) || arch(arm)
   return Int(_mixInt32(Int32(value)))
-#elseif arch(x86_64) || arch(arm64)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   return Int(_mixInt64(Int64(value)))
 #endif
 }
@@ -149,14 +143,13 @@ func _mixInt(value: Int) -> Int {
 /// hash value does not change anything fundamentally: collisions are still
 /// possible, and it does not prevent malicious users from constructing data
 /// sets that will exhibit pathological collisions.
-@warn_unused_result
 public // @testable
-func _squeezeHashValue(hashValue: Int, _ resultRange: Range<Int>) -> Int {
+func _squeezeHashValue(_ hashValue: Int, _ resultRange: Range<Int>) -> Int {
   // Length of a Range<Int> does not fit into an Int, but fits into an UInt.
   // An efficient way to compute the length is to rely on two's complement
   // arithmetic.
   let resultCardinality =
-    UInt(bitPattern: resultRange.endIndex &- resultRange.startIndex)
+    UInt(bitPattern: resultRange.upperBound &- resultRange.lowerBound)
 
   // Calculate the result as `UInt` to handle the case when
   // `resultCardinality >= Int.max`.
@@ -166,20 +159,18 @@ func _squeezeHashValue(hashValue: Int, _ resultRange: Range<Int>) -> Int {
   // We perform the unchecked arithmetic on `UInt` (instead of doing
   // straightforward computations on `Int`) in order to handle the following
   // tricky case: `startIndex` is negative, and `resultCardinality >= Int.max`.
-  // We can not convert the latter to `Int`.
+  // We cannot convert the latter to `Int`.
   return
     Int(bitPattern:
-      UInt(bitPattern: resultRange.startIndex) &+ unsignedResult)
+      UInt(bitPattern: resultRange.lowerBound) &+ unsignedResult)
 }
 
-@warn_unused_result
 public // @testable
-func _squeezeHashValue(hashValue: Int, _ resultRange: Range<UInt>) -> UInt {
+func _squeezeHashValue(_ hashValue: Int, _ resultRange: Range<UInt>) -> UInt {
   let mixedHashValue = UInt(bitPattern: _mixInt(hashValue))
-  let resultCardinality: UInt = resultRange.endIndex - resultRange.startIndex
+  let resultCardinality: UInt = resultRange.upperBound - resultRange.lowerBound
   if _isPowerOf2(resultCardinality) {
     return mixedHashValue & (resultCardinality - 1)
   }
-  return resultRange.startIndex + (mixedHashValue % resultCardinality)
+  return resultRange.lowerBound + (mixedHashValue % resultCardinality)
 }
-

@@ -16,7 +16,7 @@ enum EMult { case X(Int64), Y(Int64) }
 @_alignment(4)
 struct CommonLayout { var x,y,z,w: Int8 }
 
-// CHECK:       @_TMPV11type_layout14TypeLayoutTest = global {{.*}} @create_generic_metadata_TypeLayoutTest
+// CHECK:       @_TMPV11type_layout14TypeLayoutTest = hidden global {{.*}} @create_generic_metadata_TypeLayoutTest
 // CHECK:       define private %swift.type* @create_generic_metadata_TypeLayoutTest
 struct TypeLayoutTest<T> {
   // -- dynamic layout, projected from metadata
@@ -52,7 +52,7 @@ struct TypeLayoutTest<T> {
   // CHECK:       store i8** [[T_LAYOUT]]
   var i: GSing<T>
   // -- Multi-element generic struct, need to derive from metadata
-  // CHECK:       [[METADATA:%.*]] = call %swift.type* @swift_getGenericMetadata1
+  // CHECK:       [[METADATA:%.*]] = call %swift.type* @_TMaV11type_layout5GMult
   // CHECK:       [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
   // CHECK:       [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], {{i32|i64}} -1
   // CHECK:       [[VALUE_WITNESSES:%.*]] = load i8**, i8*** [[T1]]

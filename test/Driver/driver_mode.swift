@@ -11,4 +11,4 @@
 // CHECK-SWIFTC-elf: 3: link, {1, 2}, image
 
 // CHECK-SWIFT: 0: input, "{{.*}}driver_mode.swift", swift
-// CHECK-SWIFT: 1: compile, {0}, none
+// CHECK-SWIFT: 1: interpret, {0}, none

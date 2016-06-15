@@ -88,7 +88,7 @@ Subsequent Parameters
 
   .. parsed-literal::
 
-    x.replaceRange(r, **with:** someElements)
+    x.replaceSubrange(r, **with:** someElements)
 
     p.initializeFrom(q, **count:** n)
   
@@ -102,7 +102,7 @@ Subsequent Parameters
 Other Differences
 -----------------
     
-* We don't use namespace prefixes such as “`NS`”, relying instead on
+* We don't use namespace prefixes such as "`NS`", relying instead on
   the language's own facilities.
 
 * Names of types, protocols and enum cases are `UpperCamelCase`.
@@ -156,7 +156,7 @@ library, but are compatible with the Cocoa guidelines.
     }
 
 * Even unlabelled parameter names should be meaningful as they'll be
-  referred to in comments and visible in “generated headers”
+  referred to in comments and visible in "generated headers"
   (cmd-click in Xcode):
 
   .. parsed-literal::
@@ -167,7 +167,7 @@ library, but are compatible with the Cocoa guidelines.
     /// mutable contiguous storage.
     ///
     /// Complexity: O(\`count\`)
-    mutating func reserveCapacity(**minimumCapacity**: Int)
+    mutating func reserveCapacity(_ **minimumCapacity**: Int)
     
 * Type parameter names of generic types describe the role of the 
   parameter, e.g.
@@ -183,7 +183,7 @@ Acceptable Short or Non-Descriptive Names
 
   .. parsed-literal::
 
-    func swap<**T**>(inout lhs: T, inout rhs: T)
+    func swap<**T**>(lhs: inout T, rhs: inout T)
 
 * `lhs` and `rhs` are acceptable names for binary operator or
   symmetric binary function parameters:
@@ -192,20 +192,20 @@ Acceptable Short or Non-Descriptive Names
 
     func + (**lhs**: Int, **rhs**: Int) -> Int
 
-    func swap<T>(inout **lhs**: T, inout **rhs**: T)
+    func swap<T>(**lhs**: inout T, **rhs**: inout T)
 
 * `body` is an acceptable name for a trailing closure argument when
   the resulting construct is supposed to act like a language extension
   and is likely to have side-effects::
 
-    func map<U>(transformation: T->U) -> [U] // not this one
+    func map<U>(_ transformation: T->U) -> [U] // not this one
 
-    func forEach<S: SequenceType>(body: (S.Generator.Element)->())
+    func forEach<S: SequenceType>(_ body: (S.Iterator.Element) -> ())
 
 Prefixes and Suffixes
 ---------------------
 
-* `Any` is used as a prefix to denote “type erasure,”
+* `Any` is used as a prefix to denote "type erasure,"
   e.g. `AnySequence<T>` wraps any sequence with element type `T`,
   conforms to `SequenceType` itself, and forwards all operations to the
   wrapped sequence.  When handling the wrapper, the specific type of 
@@ -221,8 +221,8 @@ Prefixes and Suffixes
   .. parsed-literal::
 
     extension Set {
-      func union(other: Set) -> Set
-      mutating func union\ **InPlace**\ (other: Set)
+      func union(_ other: Set) -> Set
+      mutating func union\ **InPlace**\ (_ other: Set)
     }
 
 * `with` is used as a prefix to denote a function that executes a

@@ -1,8 +1,8 @@
-//===-------------- LoopInfo.h - SIL Loop Analysis -----*- C++ -*----------===//
+//===--- LoopInfo.h - SIL Loop Analysis -------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -45,6 +45,10 @@ public:
   iterator_range<iterator> getSubLoopRange() const {
     return make_range(begin(), end());
   }
+
+  /// Check whether it is safe to duplicate this instruction when duplicating
+  /// this loop by unrolling or versioning.
+  bool canDuplicate(SILInstruction *Inst) const;
 
 private:
   friend class llvm::LoopInfoBase<SILBasicBlock, SILLoop>;

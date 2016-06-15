@@ -3,7 +3,7 @@ struct LazyContainer {
 }
 
 @inline(never)
-func useLazyContainer(container: LazyContainer) {}
+func useLazyContainer(_ container: LazyContainer) {}
 
 
 class LazyContainerClass {

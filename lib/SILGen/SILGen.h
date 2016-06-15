@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -119,11 +119,16 @@ public:
   Optional<SILDeclRef> ObjCBoolToBoolFn;
   Optional<SILDeclRef> BoolToDarwinBooleanFn;
   Optional<SILDeclRef> DarwinBooleanToBoolFn;
-  Optional<SILDeclRef> NSErrorToErrorTypeFn;
-  Optional<SILDeclRef> ErrorTypeToNSErrorFn;
+  Optional<SILDeclRef> NSErrorToErrorProtocolFn;
+  Optional<SILDeclRef> ErrorProtocolToNSErrorFn;
 
   Optional<ProtocolDecl*> PointerProtocol;
-  
+
+  Optional<ProtocolDecl*> ObjectiveCBridgeable;
+  Optional<FuncDecl*> BridgeToObjectiveCRequirement;
+  Optional<FuncDecl*> UnconditionallyBridgeFromObjectiveCRequirement;
+  Optional<AssociatedTypeDecl*> BridgedObjectiveCType;
+
 public:
   SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile);
   ~SILGenModule();
@@ -215,6 +220,8 @@ public:
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
 
+  void emitPropertyBehavior(VarDecl *vd);
+
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
   
   /// Generate code for a source file of the module.
@@ -227,7 +234,7 @@ public:
   void emitFunction(FuncDecl *fd);
   
   /// \brief Generates code for the given closure expression and adds the
-  /// SILFunction to the current SILModule under the nane SILDeclRef(ce).
+  /// SILFunction to the current SILModule under the name SILDeclRef(ce).
   SILFunction *emitClosure(AbstractClosureExpr *ce);
   /// Generates code for the given ConstructorDecl and adds
   /// the SILFunction to the current SILModule under the name SILDeclRef(decl).
@@ -247,7 +254,7 @@ public:
   
   /// Emits the default argument generator for the given function.
   void emitDefaultArgGenerators(SILDeclRef::Loc decl,
-                                ArrayRef<Pattern*> patterns);
+                                ArrayRef<ParameterList*> paramLists);
 
   /// Emits the curry thunk between two uncurry levels of a function.
   void emitCurryThunk(ValueDecl *fd,
@@ -298,6 +305,9 @@ public:
                                    IsFreeFunctionWitness_t isFree,
                                    ArrayRef<Substitution> witnessSubs);
 
+  /// Emit the default witness table for a resilient protocol.
+  void emitDefaultWitnessTable(ProtocolDecl *protocol);
+
   /// Emit the lazy initializer function for a global pattern binding
   /// declaration.
   SILFunction *emitLazyGlobalInitializer(StringRef funcName,
@@ -323,13 +333,6 @@ public:
   /// True if the given constructor requires an entry point for ObjC method
   /// dispatch.
   bool requiresObjCMethodEntryPoint(ConstructorDecl *constructor);
-  
-  /// True if calling the given method or property should use ObjC dispatch.
-  bool requiresObjCDispatch(ValueDecl *vd);
-  
-  /// True if super-calling the given method from a subclass should use ObjC
-  /// dispatch.
-  bool requiresObjCSuperDispatch(ValueDecl *vd);
 
   /// Emit a global initialization.
   void emitGlobalInitialization(PatternBindingDecl *initializer, unsigned elt);
@@ -347,9 +350,28 @@ public:
   SILDeclRef getObjCBoolToBoolFn();
   SILDeclRef getBoolToDarwinBooleanFn();
   SILDeclRef getDarwinBooleanToBoolFn();
-  SILDeclRef getNSErrorToErrorTypeFn();
-  SILDeclRef getErrorTypeToNSErrorFn();
+  SILDeclRef getNSErrorToErrorProtocolFn();
+  SILDeclRef getErrorProtocolToNSErrorFn();
   
+  /// Retrieve the _ObjectiveCBridgeable protocol definition.
+  ProtocolDecl *getObjectiveCBridgeable(SILLocation loc);
+
+  /// Retrieve the _ObjectiveCBridgeable._bridgeToObjectiveC requirement.
+  FuncDecl *getBridgeToObjectiveCRequirement(SILLocation loc);
+
+  /// Retrieve the
+  /// _ObjectiveCBridgeable._unconditionallyBridgeFromObjectiveC
+  /// requirement.
+  FuncDecl *getUnconditionallyBridgeFromObjectiveCRequirement(SILLocation loc);
+
+  /// Retrieve the _ObjectiveCBridgeable._ObjectiveCType requirement.
+  AssociatedTypeDecl *getBridgedObjectiveCTypeRequirement(SILLocation loc);
+
+  /// Find the conformance of the given Swift type to the
+  /// _ObjectiveCBridgeable protocol.
+  ProtocolConformance *getConformanceToObjectiveCBridgeable(SILLocation loc,
+                                                            Type type);
+
   /// Report a diagnostic.
   template<typename...T, typename...U>
   InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,
@@ -370,10 +392,21 @@ public:
 
   /// Mark a protocol conformance as used, so we know we need to emit it if
   /// it's in our TU.
-  void useConformance(ProtocolConformance *conformance);
+  void useConformance(ProtocolConformanceRef conformance);
 
   /// Mark protocol conformances from the given set of substitutions as used.
   void useConformancesFromSubstitutions(ArrayRef<Substitution> subs);
+
+  /// Substitute the `Self` type from a protocol conformance into a protocol
+  /// requirement's type to get the type of the witness.
+  CanAnyFunctionType
+  substSelfTypeIntoProtocolRequirementType(CanGenericFunctionType reqtTy,
+                                           ProtocolConformance *conformance);
+
+  /// Emit a `mark_function_escape` instruction for top-level code when a
+  /// function or closure at top level refers to script globals.
+  void emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
+                                                const CaptureInfo &captureInfo);
 
 private:
   /// Emit the deallocator for a class that uses the objc allocator.

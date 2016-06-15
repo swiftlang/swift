@@ -1,9 +1,9 @@
 # Doxyfile 1.4.4
 
 # This file describes the settings to be used by the documentation system
-# doxygen (www.doxygen.org) for a project
+# doxygen (www.doxygen.org) for a project.
 #
-# All text after a hash (#) is considered a comment and will be ignored
+# All text after a hash (#) is considered a comment and will be ignored.
 # The format is:
 #       TAG = value [value, ...]
 # For lists items can also be appended using:
@@ -385,7 +385,7 @@ SHOW_DIRECTORIES       = YES
 # version control system). Doxygen will invoke the program by executing (via 
 # popen()) the command <command> <input-file>, where <command> is the value of 
 # the FILE_VERSION_FILTER tag, and <input-file> is the name of an input file 
-# provided by doxygen. Whatever the progam writes to standard output 
+# provided by doxygen. Whatever the program writes to standard output 
 # is used as the file version. See the manual for examples.
 
 #FILE_VERSION_FILTER    = 
@@ -418,7 +418,7 @@ WARN_IF_UNDOCUMENTED   = NO
 
 WARN_IF_DOC_ERROR      = YES
 
-# This WARN_NO_PARAMDOC option can be abled to get warnings for 
+# This WARN_NO_PARAMDOC option can be enabled to get warnings for 
 # functions that are documented, but have no documentation for their parameters 
 # or return value. If set to NO (the default) doxygen will only warn about 
 # wrong or incomplete parameter documentation, but not about the absence of 
@@ -1063,7 +1063,7 @@ PERL_PATH              =
 #---------------------------------------------------------------------------
 
 # If the CLASS_DIAGRAMS tag is set to YES (the default) Doxygen will 
-# generate a inheritance diagram (in HTML, RTF and LaTeX) for classes with base 
+# generate an inheritance diagram (in HTML, RTF and LaTeX) for classes with base 
 # or super classes. Setting the tag to NO turns the diagrams off. Note that 
 # this option is superseded by the HAVE_DOT option below. This is only a 
 # fallback. It is recommended to install and use dot, since it yields more 
@@ -1239,7 +1239,7 @@ SEARCHENGINE           = @enable_searchengine@
 # using Javascript. Doxygen will generate the search PHP script and index
 # file to put on the web server. The advantage of the server
 # based approach is that it scales better to large projects and allows
-# full text search. The disadvances is that it is more difficult to setup
+# full text search. The disadvantage is that it is more difficult to setup
 # and does not have live searching capabilities.
 
 SERVER_BASED_SEARCH    = @enable_server_based_search@

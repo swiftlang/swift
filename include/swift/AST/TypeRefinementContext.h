@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -153,35 +153,35 @@ private:
 
   SourceRange SrcRange;
 
-  VersionRange PotentialVersions;
+  AvailabilityContext AvailabilityInfo;
 
   std::vector<TypeRefinementContext *> Children;
 
   TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
                         TypeRefinementContext *Parent, SourceRange SrcRange,
-                        const VersionRange &Versions);
+                        const AvailabilityContext &Info);
 
 public:
   
   /// Create the root refinement context for the given SourceFile.
   static TypeRefinementContext *createRoot(SourceFile *SF,
-                                           const VersionRange &Versions);
+                                           const AvailabilityContext &Info);
 
   /// Create a refinement context for the given declaration.
   static TypeRefinementContext *createForDecl(ASTContext &Ctx, Decl *D,
                                               TypeRefinementContext *Parent,
-                                              const VersionRange &Versions,
+                                              const AvailabilityContext &Info,
                                               SourceRange SrcRange);
   
   /// Create a refinement context for the Then branch of the given IfStmt.
   static TypeRefinementContext *
   createForIfStmtThen(ASTContext &Ctx, IfStmt *S, TypeRefinementContext *Parent,
-                      const VersionRange &Versions);
+                      const AvailabilityContext &Info);
 
   /// Create a refinement context for the Else branch of the given IfStmt.
   static TypeRefinementContext *
   createForIfStmtElse(ASTContext &Ctx, IfStmt *S, TypeRefinementContext *Parent,
-                      const VersionRange &Versions);
+                      const AvailabilityContext &Info);
 
   /// Create a refinement context for the true-branch control flow to
   /// further StmtConditionElements following a #available() query in
@@ -190,26 +190,26 @@ public:
   createForConditionFollowingQuery(ASTContext &Ctx, PoundAvailableInfo *PAI,
                                    const StmtConditionElement &LastElement,
                                    TypeRefinementContext *Parent,
-                                   const VersionRange &Versions);
+                                   const AvailabilityContext &Info);
 
   /// Create a refinement context for the fallthrough of a GuardStmt.
   static TypeRefinementContext *
   createForGuardStmtFallthrough(ASTContext &Ctx, GuardStmt *RS,
                                   BraceStmt *ContainingBraceStmt,
                                   TypeRefinementContext *Parent,
-                                  const VersionRange &Versions);
+                                  const AvailabilityContext &Info);
 
   /// Create a refinement context for the else branch of a GuardStmt.
   static TypeRefinementContext *
   createForGuardStmtElse(ASTContext &Ctx, GuardStmt *RS,
                          TypeRefinementContext *Parent,
-                         const VersionRange &Versions);
+                         const AvailabilityContext &Info);
 
   /// Create a refinement context for the body of a WhileStmt.
   static TypeRefinementContext *
   createForWhileStmtBody(ASTContext &Ctx, WhileStmt *WS,
                          TypeRefinementContext *Parent,
-                          const VersionRange &Versions);
+                         const AvailabilityContext &Info);
 
   /// Returns the reason this context was introduced.
   Reason getReason() const;
@@ -229,9 +229,11 @@ public:
   /// Returns the source range on which this context refines types.
   SourceRange getSourceRange() const { return SrcRange; }
 
-  /// Returns a version range representing the range of operating system
-  /// versions on which the code contained in this context may run.
-  const VersionRange &getPotentialVersions() const { return PotentialVersions; }
+  /// Returns the information on what can be assumed present at run time when
+  /// running code contained in this context.
+  const AvailabilityContext &getAvailabilityInfo() const {
+    return AvailabilityInfo;
+  }
 
   /// Adds a child refinement context.
   void addChild(TypeRefinementContext *Child) {

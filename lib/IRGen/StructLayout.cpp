@@ -1,8 +1,8 @@
-//===--- StructLayout.cpp - Layout of structures -------------------------===//
+//===--- StructLayout.cpp - Layout of structures --------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -109,7 +109,7 @@ StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
   // If the struct is not @_fixed_layout, it will have a dynamic
   // layout outside of its resilience domain.
   if (astTy && astTy->getAnyNominal())
-    if (IGM.isResilient(astTy->getAnyNominal(), ResilienceScope::Universal))
+    if (IGM.isResilient(astTy->getAnyNominal(), ResilienceExpansion::Minimal))
       IsKnownAlwaysFixedSize = IsNotFixedSize;
 
   assert(typeToFill == nullptr || Ty == typeToFill);
@@ -208,12 +208,12 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
   // is Type; StructIndex and ByteOffset need to be laid out.
   for (auto &elt : elts) {
     auto &eltTI = elt.getType();
-    IsKnownPOD &= eltTI.isPOD(ResilienceScope::Component);
-    IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceScope::Component);
-    IsKnownAlwaysFixedSize &= eltTI.isFixedSize(ResilienceScope::Universal);
+    IsKnownPOD &= eltTI.isPOD(ResilienceExpansion::Maximal);
+    IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceExpansion::Maximal);
+    IsKnownAlwaysFixedSize &= eltTI.isFixedSize(ResilienceExpansion::Minimal);
     
     // If the element type is empty, it adds nothing.
-    if (eltTI.isKnownEmpty()) {
+    if (eltTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
       addEmptyElement(elt);
     } else {
       // Anything else we do at least potentially adds storage requirements.
@@ -307,7 +307,8 @@ void StructLayoutBuilder::addNonFixedSizeElement(ElementLayout &elt) {
 
 /// Add an empty element to the aggregate.
 void StructLayoutBuilder::addEmptyElement(ElementLayout &elt) {
-  elt.completeEmpty(elt.getType().isPOD(ResilienceScope::Component));
+  elt.completeEmpty(elt.getType().isPOD(ResilienceExpansion::Maximal),
+                    CurSize);
 }
 
 /// Add an element at the fixed offset of the current end of the
@@ -316,7 +317,7 @@ void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
   assert(isFixedLayout());
   auto &eltTI = cast<FixedTypeInfo>(elt.getType());
 
-  elt.completeFixed(elt.getType().isPOD(ResilienceScope::Component),
+  elt.completeFixed(elt.getType().isPOD(ResilienceExpansion::Maximal),
                     CurSize, StructFields.size());
   StructFields.push_back(elt.getType().getStorageType());
   
@@ -327,7 +328,7 @@ void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
 /// Add an element at a non-fixed offset to the aggregate.
 void StructLayoutBuilder::addElementAtNonFixedOffset(ElementLayout &elt) {
   assert(!isFixedLayout());
-  elt.completeNonFixed(elt.getType().isPOD(ResilienceScope::Component),
+  elt.completeNonFixed(elt.getType().isPOD(ResilienceExpansion::Maximal),
                        NextNonFixedOffsetIndex);
   CurSpareBits.clear();
 }
@@ -337,7 +338,7 @@ void StructLayoutBuilder::addNonFixedSizeElementAtOffsetZero(ElementLayout &elt)
   assert(isFixedLayout());
   assert(!isa<FixedTypeInfo>(elt.getType()));
   assert(CurSize.isZero());
-  elt.completeInitialNonFixedSize(elt.getType().isPOD(ResilienceScope::Component));
+  elt.completeInitialNonFixedSize(elt.getType().isPOD(ResilienceExpansion::Maximal));
   CurSpareBits.clear();
 }
 

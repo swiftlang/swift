@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -24,6 +24,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Malloc.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -34,7 +35,6 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Allocator.h"
 #include <functional>
 #include <memory>
@@ -55,7 +55,9 @@ namespace swift {
   class DeclContext;
   class DefaultArgumentInitializer;
   class ExtensionDecl;
+  class ForeignRepresentationInfo;
   class FuncDecl;
+  class InFlightDiagnostic;
   class LazyResolver;
   class PatternBindingDecl;
   class PatternBindingInitializer;
@@ -100,6 +102,26 @@ enum class AllocationArena {
   ConstraintSolver
 };
 
+/// Lists the set of "known" Foundation entities that are used in the
+/// compiler.
+///
+/// While the names of Foundation types aren't likely to change in
+/// Objective-C, their mapping into Swift can. Therefore, when
+/// referring to names of Foundation entities in Swift, use this enum
+/// and \c ASTContext::getSwiftName or \c ASTContext::getSwiftId.
+enum class KnownFoundationEntity {
+#define FOUNDATION_ENTITY(Name) Name,
+#include "swift/AST/KnownFoundationEntities.def"
+};
+
+/// Retrieve the Foundation entity kind for the given Objective-C
+/// entity name.
+Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
+
+/// Determine with the non-prefixed name of the given known Foundation
+/// entity conflicts with the Swift standard library.
+bool nameConflictsWithStandardLibrary(KnownFoundationEntity entity);
+
 /// Callback function used when referring to a type member of a given
 /// type variable.
 typedef std::function<Type(TypeVariableType *, AssociatedTypeDecl *)>
@@ -140,14 +162,6 @@ public:
 /// declaration.
 typedef llvm::PointerUnion<NominalTypeDecl *, ExtensionDecl *>
   TypeOrExtensionDecl;
-
-/// An entry in the protocol conformance map.
-///
-/// The pointer is the actual conformance providing the witnesses used to
-/// provide conformance. The Boolean indicates whether the type explicitly
-/// conforms to the protocol. A non-null conformance with a false Bool occurs
-/// when error recovery has suggested implicit conformance.
-typedef llvm::PointerIntPair<ProtocolConformance *, 1, bool> ConformanceEntry;
 
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
@@ -202,11 +216,6 @@ public:
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
 
-  // FIXME: Once DenseMap learns about move semantics, use std::unique_ptr
-  // and remove the explicit delete loop in the destructor.
-  typedef llvm::DenseMap<std::pair<CanType, ProtocolDecl *>, 
-                         ConformanceEntry> ConformsToMap;
-  
   /// \brief The list of external definitions imported by this context.
   llvm::SetVector<Decl *> ExternalDefinitions;
 
@@ -281,7 +290,7 @@ public:
   template <typename T>
   typename std::remove_reference<T>::type *AllocateObjectCopy(T &&t,
               AllocationArena arena = AllocationArena::Permanent) const {
-    // This function can not be named AllocateCopy because it would always win
+    // This function cannot be named AllocateCopy because it would always win
     // overload resolution over the AllocateCopy(ArrayRef<T>).
     using TNoRef = typename std::remove_reference<T>::type;
     TNoRef *res = (TNoRef *) Allocate(sizeof(TNoRef), alignof(TNoRef), arena);
@@ -352,8 +361,8 @@ public:
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
 
-  /// Retrieve the declaration of Swift.ErrorType.
-  NominalTypeDecl *getExceptionTypeDecl() const;
+  /// Retrieve the declaration of Swift.ErrorProtocol.
+  NominalTypeDecl *getErrorProtocolDecl() const;
   CanType getExceptionType() const;
   
   /// Retrieve the declaration of Swift.Bool.
@@ -380,8 +389,8 @@ public:
   /// Retrieve the declaration of Swift.Set<T>.
   NominalTypeDecl *getSetDecl() const;
 
-  /// Retrieve the declaration of Swift.SequenceType<T>.
-  NominalTypeDecl *getSequenceTypeDecl() const;
+  /// Retrieve the declaration of Swift.Sequence<T>.
+  NominalTypeDecl *getSequenceDecl() const;
 
   /// Retrieve the declaration of Swift.Dictionary<K, V>.
   NominalTypeDecl *getDictionaryDecl() const;
@@ -410,8 +419,11 @@ public:
   EnumElementDecl *getOptionalSomeDecl(OptionalTypeKind kind) const;
   EnumElementDecl *getOptionalNoneDecl(OptionalTypeKind kind) const;
 
-  /// Retrieve the declaration of Swift.OptionSetType.
-  NominalTypeDecl *getOptionSetTypeDecl() const;
+  /// Retrieve the declaration of Swift.OptionSet.
+  NominalTypeDecl *getOptionSetDecl() const;
+  
+  /// Retrieve the declaration of Swift.COpaquePointer.
+  NominalTypeDecl *getOpaquePointerDecl() const;
   
   /// Retrieve the declaration of Swift.UnsafeMutablePointer<T>.
   NominalTypeDecl *getUnsafeMutablePointerDecl() const;
@@ -425,8 +437,8 @@ public:
   /// Retrieve the declaration of Swift.Unmanaged<T>.
   NominalTypeDecl *getUnmanagedDecl() const;
 
-  /// Retrieve the declaration of the "memory" property of a pointer type.
-  VarDecl *getPointerMemoryPropertyDecl(PointerTypeKind ptrKind) const;
+  /// Retrieve the declaration of the "pointee" property of a pointer type.
+  VarDecl *getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const;
 
   /// Retrieve the declaration of Swift.Void.
   TypeAliasDecl *getVoidDecl() const;
@@ -441,15 +453,6 @@ public:
 #define FUNC_DECL(Name, Id) \
   FuncDecl *get##Name(LazyResolver *resolver) const;
 #include "swift/AST/KnownDecls.def"
-
-  /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValueAsBool.
-  FuncDecl *getDoesOptionalHaveValueAsBoolDecl(LazyResolver *resolver,
-                                               OptionalTypeKind kind) const;
-
-  /// Retrieve the declaration of
-  /// Swift._get{,ImplicitlyUnwrapped}OptionalValue.
-  FuncDecl *getGetOptionalValueDecl(LazyResolver *resolver,
-                                    OptionalTypeKind kind) const;
 
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.
@@ -481,10 +484,13 @@ public:
   /// Retrieve the declaration of Swift._unimplemented_initializer.
   FuncDecl *getUnimplementedInitializerDecl(LazyResolver *resolver) const;
 
+  /// Retrieve the declaration of Swift._undefined.
+  FuncDecl *getUndefinedDecl(LazyResolver *resolver) const;
+
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl(LazyResolver *resolver) const;
   
-  /// \brief Look for the declaration with the given name within the
+  /// Look for the declaration with the given name within the
   /// swift module.
   void lookupInSwiftModule(StringRef name,
                            SmallVectorImpl<ValueDecl *> &results) const;
@@ -492,14 +498,27 @@ public:
   /// Retrieve a specific, known protocol.
   ProtocolDecl *getProtocol(KnownProtocolKind kind) const;
   
+  /// Determine whether the given nominal type is one of the standard
+  /// library types that is known a priori to be bridged to a
+  /// Foundation.
+  bool isStandardLibraryTypeBridgedInFoundation(NominalTypeDecl *nominal) const;
+
   /// Get the Objective-C type that a Swift type bridges to, if any.
   Optional<Type> getBridgedToObjC(const DeclContext *dc,
                                   Type type,
                                   LazyResolver *resolver) const;
 
-  /// \brief Notify all of the mutation listeners that the given declaration
-  /// was just added.
-  void addedExternalDecl(Decl *decl);
+  /// Determine whether the given Swift type is representable in a
+  /// given foreign language.
+  ForeignRepresentationInfo
+  getForeignRepresentationInfo(NominalTypeDecl *nominal,
+                               ForeignLanguage language,
+                               const DeclContext *dc);
+
+  /// Add a declaration to a list of declarations that need to be emitted
+  /// as part of the current module or source file, but are otherwise not
+  /// nested within it.
+  void addExternalDecl(Decl *decl);
 
   /// Add a cleanup function to be called when the ASTContext is deallocated.
   void addCleanup(std::function<void(void)> cleanup);
@@ -587,7 +606,7 @@ public:
   /// one.
   void loadExtensions(NominalTypeDecl *nominal, unsigned previousGeneration);
 
-  /// \brief Load the methods within the given class that that produce
+  /// \brief Load the methods within the given class that produce
   /// Objective-C class or instance methods with the given selector.
   ///
   /// \param classDecl The class in which we are searching for @objc methods.
@@ -601,7 +620,7 @@ public:
   ///
   /// \param previousGeneration The previous generation with which this
   /// callback was invoked. The list of methods will already contain all of
-  /// the results from generations up and and including \c previousGeneration.
+  /// the results from generations up and including \c previousGeneration.
   ///
   /// \param methods The list of @objc methods in this class that have this
   /// selector and are instance/class methods as requested. This list will be
@@ -674,6 +693,15 @@ public:
                  DeclContext *dc,
                  ProtocolConformanceState state);
 
+  /// Produce a new normal conformance for a property behavior.
+  NormalProtocolConformance *
+  getBehaviorConformance(Type conformingType,
+                         Type conformingInterfaceType,
+                         ProtocolDecl *protocol,
+                         SourceLoc loc,
+                         AbstractStorageDecl *storage,
+                         ProtocolConformanceState state);
+
   /// A callback used to produce a diagnostic for an ill-formed protocol
   /// conformance that was type-checked before we're actually walking the
   /// conformance itself, along with a bit indicating whether this diagnostic
@@ -727,7 +755,7 @@ public:
   
   /// \brief Retrieve the substitutions for a bound generic type, if known.
   Optional<ArrayRef<Substitution>>
-  getSubstitutions(BoundGenericType *Bound, DeclContext *gpContext) const;
+  getSubstitutions(TypeBase *type, DeclContext *gpContext) const;
 
   /// Record a conformance loader and its context data for the given
   /// declaration.
@@ -777,6 +805,16 @@ public:
   /// protocols that conflict with methods.
   bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
 
+  /// Retrieve the Swift name for the given Foundation entity, where
+  /// "NS" prefix stripping will apply under omit-needless-words.
+  StringRef getSwiftName(KnownFoundationEntity kind);
+
+  /// Retrieve the Swift identifier for the given Foundation entity, where
+  /// "NS" prefix stripping will apply under omit-needless-words.
+  Identifier getSwiftId(KnownFoundationEntity kind) {
+    return getIdentifier(getSwiftName(kind));
+  }
+
   /// Try to dump the context of the given archetype.
   void dumpArchetypeContext(ArchetypeType *archetype,
                             unsigned indent = 0) const;
@@ -788,7 +826,7 @@ public:
 
   /// Collect visible clang modules from the ClangModuleLoader. These modules are
   /// not necessarily loaded.
-  void getVisibleTopLevelClangeModules(SmallVectorImpl<clang::Module*> &Modules) const;
+  void getVisibleTopLevelClangModules(SmallVectorImpl<clang::Module*> &Modules) const;
 
   /// Retrieve or create the stored archetype builder for the given
   /// canonical generic signature and module.
@@ -818,10 +856,10 @@ private:
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);
 
-  friend class BoundGenericType;
+  friend class TypeBase;
 
   /// \brief Set the substitutions for the given bound generic type.
-  void setSubstitutions(BoundGenericType *Bound,
+  void setSubstitutions(TypeBase *type,
                         DeclContext *gpContext,
                         ArrayRef<Substitution> Subs) const;
 
@@ -851,7 +889,26 @@ private:
 /// DiagnosticsSema.def.
 std::pair<unsigned, DeclName> getObjCMethodDiagInfo(
                                 AbstractFunctionDecl *method);
-  
+
+/// Attach Fix-Its to the given diagnostic that updates the name of the
+/// given declaration to the desired target name.
+///
+/// \returns false if the name could not be fixed.
+bool fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
+                        DeclName targetName);
+
+/// Fix the Objective-C name of the given declaration to match the provided
+/// Objective-C selector.
+///
+/// \param ignoreImpliedName When true, ignore the implied name of the
+/// given declaration, because it no longer applies.
+///
+/// For properties, the selector should be a zero-parameter selector of the
+/// given property's name.
+bool fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
+                            Optional<ObjCSelector> targetNameOpt,
+                            bool ignoreImpliedName = false);
+
 } // end namespace swift
 
 #endif

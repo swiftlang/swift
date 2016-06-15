@@ -21,9 +21,9 @@ Scope
 Goals
 .....
 
-* The REPL and LLDB (“debuggers”) share formatting logic
-* All types are “debug-printable” automatically
-* Making a type “printable for humans” is super-easy
+* The REPL and LLDB ("debuggers") share formatting logic
+* All types are "debug-printable" automatically
+* Making a type "printable for humans" is super-easy
 * ``toString()``-ability is a consequence of printability.
 * Customizing a type's printed representations is super-easy
 * Format variations such as numeric radix are explicit and readable
@@ -43,11 +43,11 @@ Non-Goals
   that feature.  Therefore, localization and dynamic format strings
   should be designed together, and *under this proposal* the only
   format strings are string literals containing interpolations
-  (“``\(...)``”). Cocoa programmers can still use Cocoa localization
+  ("``\(...)``"). Cocoa programmers can still use Cocoa localization
   APIs for localization jobs.
 
   In Swift, only the most common cases need to be very terse.
-  Anything “fancy” can afford to be a bit more verbose. If and when
+  Anything "fancy" can afford to be a bit more verbose. If and when
   we address localization and design a full-featured dynamic string
   formatter, it may make sense to incorporate features of ``printf``
   into the design.
@@ -68,7 +68,7 @@ printed with ``print(x)``, and can be converted to ``String`` with
 
 The simple extension story for beginners is as follows: 
 
-  “To make your type ``CustomStringConvertible``, simply declare conformance to
+  "To make your type ``CustomStringConvertible``, simply declare conformance to
   ``CustomStringConvertible``::
 
     extension Person : CustomStringConvertible {}
@@ -93,14 +93,14 @@ Formatting Variants
 (e.g. number types) *additionally* support a ``format(…)`` method
 parameterized according to that type's axes of variability::
 
-  print( offset )
-  print( offset.format() ) // equivalent to previous line
-  print( offset.format(radix: 16, width: 5, precision: 3) )
+  print(offset)
+  print(offset.format()) // equivalent to previous line
+  print(offset.format(radix: 16, width: 5, precision: 3))
 
 Although ``format(…)`` is intended to provide the most general
 interface, specialized formatting interfaces are also possible::
 
-  print( offset.hex() )
+  print(offset.hex())
 
 
 Design Details
@@ -115,13 +115,13 @@ into which we can stream text: [#character1]_
 ::
 
   protocol OutputStream {
-    func append(text: String)
+    func append(_ text: String)
   }
 
 Every ``String`` can be used as an ``OutputStream`` directly::
 
   extension String : OutputStream {
-    func append(text: String)
+    func append(_ text: String)
   }
 
 Debug Printing
@@ -129,8 +129,7 @@ Debug Printing
 
 Via compiler magic, *everything* conforms to the ``CustomDebugStringConvertible``
 protocol. To change the debug representation for a type, you don't
-need to declare conformance: simply give the type a ``debugFormat()``
-::
+need to declare conformance: simply give the type a ``debugFormat()``::
 
   /// \brief A thing that can be printed in the REPL and the Debugger
   protocol CustomDebugStringConvertible {
@@ -153,9 +152,9 @@ directly to the ``OutputStream`` for efficiency reasons,
    Producing a representation that can be consumed by the REPL
    and LLDB to produce an equivalent object is strongly encouraged
    where possible!  For example, ``String.debugFormat()`` produces
-   a representation starting and ending with “``"``”, where special
+   a representation starting and ending with "``"``", where special
    characters are escaped, etc. A ``struct Point { var x, y: Int }``
-   might be represented as “``Point(x: 3, y: 5)``”.
+   might be represented as "``Point(x: 3, y: 5)``".
 
 (Non-Debug) Printing
 ....................
@@ -199,10 +198,10 @@ Because it's not always efficient to construct a ``String``
 representation before writing an object to a stream, we provide a
 ``Streamable`` protocol, for types that can write themselves into an
 ``OutputStream``. Every ``Streamable`` is also a ``CustomStringConvertible``,
-naturally ::
+naturally::
 
   protocol Streamable : CustomStringConvertible {
-    func writeTo<T: OutputStream>(target: [inout] T)
+    func writeTo<T: OutputStream>(_ target: [inout] T)
 
     // You'll never want to reimplement this
     func format() -> PrintRepresentation {
@@ -225,7 +224,7 @@ adds surrounding quotes and escapes special characters::
   struct EscapedStringRepresentation : Streamable {
     var _value: String
 
-    func writeTo<T: OutputStream>(target: [inout] T) {
+    func writeTo<T: OutputStream>(_ target: [inout] T) {
       target.append("\"")
       for c in _value {
         target.append(c.escape())
@@ -238,7 +237,7 @@ Besides modeling ``OutputStream``, ``String`` also conforms to
 ``Streamable``::
 
   extension String : Streamable {
-    func writeTo<T: OutputStream>(target: [inout] T) {
+    func writeTo<T: OutputStream>(_ target: [inout] T) {
       target.append(self) // Append yourself to the stream
     }
 
@@ -266,7 +265,7 @@ complicated ``format(…)`` might be written::
     constructor(x: Int)
     func toInt() -> Int
 
-    func format(radix: Int = 10, fill: String = " ", width: Int = 0) 
+    func format(_ radix: Int = 10, fill: String = " ", width: Int = 0) 
       -> RadixFormat<This> {
 
       return RadixFormat(this, radix: radix, fill: fill, width: width)
@@ -276,13 +275,13 @@ complicated ``format(…)`` might be written::
   struct RadixFormat<T: CustomStringConvertibleInteger> : Streamable {
     var value: T, radix = 10, fill = " ", width = 0
 
-    func writeTo<S: OutputStream>(target: [inout] S) {
+    func writeTo<S: OutputStream>(_ target: [inout] S) {
       _writeSigned(value, &target)
     }
 
     // Write the given positive value to stream
     func _writePositive<T:CustomStringConvertibleInteger, S: OutputStream>( 
-      value: T, stream: [inout] S
+      _ value: T, stream: [inout] S
     ) -> Int {
       if value == 0 { return 0 }
       var radix: T = T.fromInt(self.radix)
@@ -295,7 +294,7 @@ complicated ``format(…)`` might be written::
     }
 
     func _writeSigned<T:CustomStringConvertibleInteger, S: OutputStream>(
-      value: T, target: [inout] S
+      _ value: T, target: [inout] S
     ) {
       var width = 0
       var result = ""
@@ -343,19 +342,19 @@ adapter that transforms its input to upper case before writing it to
 an underlying stream::
 
   struct UpperStream<UnderlyingStream:OutputStream> : OutputStream {
-    func append(x: String) { base.append( x.toUpper() ) }
+    func append(_ x: String) { base.append(x.toUpper()) }
     var base: UnderlyingStream
   }
 
 However, upcasing is a trivial example: many such transformations—such
 as ``trim()`` or regex replacement—are stateful, which implies some
-way of indicating “end of input” so that buffered state can be
+way of indicating "end of input" so that buffered state can be
 processed and written to the underlying stream:
 
 .. parsed-literal::
 
   struct TrimStream<UnderlyingStream:OutputStream> : OutputStream {
-    func append(x: String) { ... }
+    func append(_ x: String) { ... }
     **func close() { ... }**
     var base: UnderlyingStream
     var bufferedWhitespace: String
@@ -373,7 +372,7 @@ For every conceivable ``OutputStream`` adaptor there's a corresponding
   struct UpperStreamable<UnderlyingStreamable:Streamable> {
     var base: UnderlyingStreamable
 
-    func writeTo<T: OutputStream>(target: [inout] T) {
+    func writeTo<T: OutputStream>(_ target: [inout] T) {
       var adaptedStream = UpperStream(target)
       self.base.writeTo(&adaptedStream)
       target = adaptedStream.base
@@ -393,7 +392,7 @@ and, finally, we'd be able to write:
 
 .. parsed-literal::
 
-  print( n.format(radix:16)\ **.toUpper()** )
+  print(n.format(radix:16)\ **.toUpper()**)
 
 The complexity of this back-and-forth adapter dance is daunting, and
 might well be better handled in the language once we have some formal
@@ -403,7 +402,7 @@ more sense to build the important transformations directly into
 
 .. parsed-literal::
 
-  print( n.format(radix:16, **case:.upper** ) )
+  print(n.format(radix:16, **case:.upper**))
 
 Possible Simplifications
 ------------------------
@@ -423,16 +422,16 @@ If we were willing to say that only ``class``\ es can conform to
 ``OutputStream``\ s are passed around. Then, we'd simply need a
 ``class StringStream`` for creating ``String`` representations. It
 would also make ``OutputStream`` adapters a *bit* simpler to use
-because you'd never need to “write back” explicitly onto the target
+because you'd never need to "write back" explicitly onto the target
 stream. However, stateful ``OutputStream`` adapters would still need a
 ``close()`` method, which makes a perfect place to return a copy of
-the underlying stream, which can then be “written back.”  :
+the underlying stream, which can then be "written back":
 
 .. parsed-literal::
 
   struct AdaptedStreamable<T:Streamable> {
     ...
-    func writeTo<Target: OutputStream>(target: [inout] Target) {
+    func writeTo<Target: OutputStream>(_ target: [inout] Target) {
       // create the stream that transforms the representation
       var adaptedTarget = adapt(target, adapter);
       // write the Base object to the target stream

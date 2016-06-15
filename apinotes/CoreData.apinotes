@@ -1,0 +1,159 @@
+---
+Name: CoreData
+Classes:
+- Name: NSAtomicStore
+  Methods:
+  - Selector: 'objectIDForEntity:referenceObject:'
+    SwiftName: objectID(for:withReferenceObject:)
+    MethodKind: Instance
+- Name: NSEntityDescription
+  Methods:
+  - Selector: 'entityForName:inManagedObjectContext:'
+    SwiftName: entity(forEntityName:in:)
+    MethodKind: Class
+  - Selector: 'insertNewObjectForEntityForName:inManagedObjectContext:'
+    SwiftName: insertNewObject(forEntityName:into:)
+    MethodKind: Class
+  - Selector: 'relationshipsWithDestinationEntity:'
+    SwiftName: relationships(forDestination:)
+    MethodKind: Instance
+  - Selector: 'isKindOfEntity:'
+    SwiftName: isKindOf(entity:)
+    MethodKind: Instance
+- Name: NSEntityMigrationPolicy
+  Methods:
+  - Selector: 'beginEntityMapping:manager:error:'
+    SwiftName: begin(_:with:)
+    MethodKind: Instance
+  - Selector: 'createDestinationInstancesForSourceInstance:entityMapping:manager:error:'
+    SwiftName: createDestinationInstances(forSource:in:manager:)
+    MethodKind: Instance
+  - Selector: 'endInstanceCreationForEntityMapping:manager:error:'
+    SwiftName: endInstanceCreation(forMapping:manager:)
+    MethodKind: Instance
+  - Selector: 'createRelationshipsForDestinationInstance:entityMapping:manager:error:'
+    SwiftName: createRelationships(forDestination:in:manager:)
+    MethodKind: Instance
+  - Selector: 'endRelationshipCreationForEntityMapping:manager:error:'
+    SwiftName: endRelationshipCreation(forMapping:manager:)
+    MethodKind: Instance
+  - Selector: 'performCustomValidationForEntityMapping:manager:error:'
+    SwiftName: performCustomValidation(forMapping:manager:)
+    MethodKind: Instance
+- Name: NSIncrementalStore
+  Methods:
+  - Selector: 'newObjectIDForEntity:referenceObject:'
+    SwiftName: newObjectID(for:referenceObject:)
+    MethodKind: Instance
+- Name: NSManagedObjectContext
+  Methods:
+  - Selector: 'performBlockAndWait:'
+    SwiftName: performAndWait(_:)
+    MethodKind: Instance
+  - Selector: 'objectRegisteredForID:'
+    SwiftName: registeredObject(for:)
+    MethodKind: Instance
+  - Selector: 'executeFetchRequest:error:'
+    SwiftName: fetch(_:)
+    MethodKind: Instance
+  - Selector: 'refreshObject:mergeChanges:'
+    SwiftName: refresh(_:mergeChanges:)
+    MethodKind: Instance
+- Name: NSManagedObjectModel
+  Methods:
+  - Selector: 'entitiesForConfiguration:'
+    SwiftName: entities(forConfigurationName:)
+    MethodKind: Instance
+  - Selector: 'setEntities:forConfiguration:'
+    SwiftName: setEntities(_:forConfigurationName:)
+    MethodKind: Instance
+  - Selector: 'isConfiguration:compatibleWithStoreMetadata:'
+    SwiftName: isConfiguration(withName:compatibleWithStoreMetadata:)
+    MethodKind: Instance
+- Name: NSConstraintConflict
+  Methods:
+  - Selector: 'initWithConstraint:databaseObject:databaseSnapshot:conflictingObjects:conflictingSnapshots:'
+    SwiftName: 'init(constraint:database:databaseSnapshot:conflicting:conflictingSnapshots:)'
+    MethodKind: Instance
+- Name: NSMergePolicy
+  Methods:
+  - Selector: 'resolveConflicts:error:'
+    SwiftName: resolve(mergeConflicts:)
+    MethodKind: Instance
+  - Selector: 'resolveOptimisticLockingVersionConflicts:error:'
+    SwiftName: 'resolve(optimisticLockingConflicts:)'
+    MethodKind: Instance
+  - Selector: 'resolveConstraintConflicts:error:'
+    SwiftName: resolve(constraintConflicts:)
+    MethodKind: Instance
+- Name: NSMigrationManager
+  Methods:
+  - Selector: 'migrateStoreFromURL:type:options:withMappingModel:toDestinationURL:destinationType:destinationOptions:error:'
+    SwiftName: migrateStore(from:sourceType:options:with:toDestinationURL:destinationType:destinationOptions:)
+    MethodKind: Instance
+  - Selector: 'associateSourceInstance:withDestinationInstance:forEntityMapping:'
+    SwiftName: associate(sourceInstance:withDestinationInstance:for:)
+    MethodKind: Instance
+  - Selector: 'destinationInstancesForEntityMappingNamed:sourceInstances:'
+    SwiftName: destinationInstances(forEntityMappingName:sourceInstances:)
+    MethodKind: Instance
+  - Selector: 'sourceInstancesForEntityMappingNamed:destinationInstances:'
+    SwiftName: sourceInstances(forEntityMappingName:destinationInstances:)
+    MethodKind: Instance
+- Name: NSPersistentStore
+  Methods:
+  - Selector: 'setMetadata:forPersistentStoreWithURL:error:'
+    SwiftName: setMetadata(_:forPersistentStoreAt:)
+    MethodKind: Class
+  - Selector: 'initWithPersistentStoreCoordinator:configurationName:URL:options:'
+    SwiftName: init(persistentStoreCoordinator:configurationName:at:options:)
+    MethodKind: Instance
+- Name: NSPersistentStoreCoordinator
+  Methods:
+  - Selector: 'addPersistentStoreWithType:configuration:URL:options:error:'
+    SwiftName: addPersistentStore(ofType:configurationName:at:options:)
+    MethodKind: Instance
+  - Selector: 'removePersistentStore:error:'
+    SwiftName: remove(_:)
+    MethodKind: Instance
+  - Selector: 'metadataForPersistentStoreOfType:URL:options:error:'
+    SwiftName: metadataForPersistentStore(ofType:at:options:)
+    MethodKind: Class
+  - Selector: 'setMetadata:forPersistentStoreOfType:URL:options:error:'
+    SwiftName: setMetadata(_:forPersistentStoreOfType:at:options:)
+    MethodKind: Class
+  - Selector: 'metadataForPersistentStoreOfType:URL:error:'
+    SwiftName: 'metadataForPersistentStore(ofType:at:)'
+    MethodKind: Class
+  - Selector: 'setMetadata:forPersistentStoreOfType:URL:error:'
+    SwiftName: 'setMetadata(_:forPersistentStoreOfType:at:)'
+    MethodKind: Class
+  - Selector: 'elementsDerivedFromExternalRecordURL:'
+    SwiftName: elementsDerived(fromExternalRecordAt:)
+    MethodKind: Class
+  - Selector: 'importStoreWithIdentifier:fromExternalRecordsDirectory:toURL:options:withType:error:'
+    SwiftName: importStore(withIdentifier:fromExternalRecordsDirectoryAt:to:options:ofType:)
+    MethodKind: Instance
+  - Selector: 'destroyPersistentStoreAtURL:withType:options:error:'
+    SwiftName: 'destroyPersistentStore(at:ofType:options:)'
+    MethodKind: Instance
+  - Selector: 'replacePersistentStoreAtURL:destinationOptions:withPersistentStoreFromURL:sourceOptions:storeType:error:'
+    SwiftName: 'replacePersistentStore(at:destinationOptions:withPersistentStoreFrom:sourceOptions:ofType:)'
+    MethodKind: Instance
+  - Selector: 'performBlockAndWait:'
+    SwiftName: 'performAndWait(_:)'
+    MethodKind: Instance
+- Name: NSSaveChangesRequest
+  Methods:
+  - Selector: 'initWithInsertedObjects:updatedObjects:deletedObjects:lockedObjects:'
+    SwiftName: init(inserted:updated:deleted:locked:)
+    MethodKind: Instance
+Protocols:
+- Name: NSFetchedResultsControllerDelegate
+  Methods:
+  - Selector: 'controller:didChangeSection:atIndex:forChangeType:'
+    SwiftName: controller(_:didChange:atSectionIndex:for:)
+    MethodKind: Instance
+Enumerators:
+- Name: NSManagedObjectResultType
+  SwiftName: managedObjectResultType

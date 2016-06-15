@@ -1,0 +1,120 @@
+//===--- CheckSequenceInstance.swift.gyb ----------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
+}%
+
+import StdlibUnittest
+
+// Generate two overloads: one for Array (which will get
+// picked up when the caller passes a literal), and another that
+// accepts any appropriate Collection type.
+% for genericParam, Element, Expected in zip(
+%   ('Expected: Collection', 'Element'),
+%   ('Expected.Iterator.Element', 'Element'),
+%   ('Expected', 'Array<Element>')):
+
+public func checkIterator<
+  ${genericParam}, I : IteratorProtocol
+>(
+  _ expected: ${Expected},
+  _ iterator: I,
+  ${TRACE},
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  sameValue: (${Element}, ${Element}) -> Bool
+) where I.Element == ${Element} {
+  // Copying a `IteratorProtocol` is allowed.
+  var mutableGen = iterator
+  var actual: [${Element}] = []
+  while let e = mutableGen.next() {
+    actual.append(e)
+  }
+  expectEqualSequence(
+    expected, actual, ${trace}, sameValue: sameValue)
+
+  // Having returned `.None` once, a `IteratorProtocol` should not generate
+  // more elements.
+  for _ in 0..<10 {
+    expectEmpty(mutableGen.next(), ${trace})
+  }
+}
+
+public func checkIterator<
+  ${genericParam}, I : IteratorProtocol
+>(
+  _ expected: ${Expected},
+  _ iterator: I,
+  ${TRACE},
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all
+) where I.Element == ${Element}, ${Element} : Equatable {
+  checkIterator(
+    expected, iterator, ${trace},
+    resiliencyChecks: resiliencyChecks, showFrame: false
+  ) { $0 == $1 }
+}
+
+public func checkSequence<
+  ${genericParam}, S : Sequence
+>(
+  _ expected: ${Expected},
+  _ sequence: S,
+  ${TRACE},
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  sameValue: (${Element}, ${Element}) -> Bool
+) where S.Iterator.Element == ${Element} {
+  let expectedCount: Int = numericCast(expected.count)
+  checkIterator(
+    expected, sequence.makeIterator(), ${trace},
+    resiliencyChecks: resiliencyChecks,
+    sameValue: sameValue)
+
+  expectGE(
+    expectedCount, sequence.underestimatedCount, ${trace})
+
+  // Check that _copyContents does the right thing if we can do so
+  // without destroying the sequence.
+  _ = sequence._preprocessingPass { () -> Void in
+    var count = 0
+    for _ in sequence { count += 1 }
+    let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: count)
+    let end = sequence._copyContents(initializing: buf)
+    expectTrue(end == buf + count, "_copyContents returned the wrong value")
+    var j = expected.startIndex
+    for i in 0..<(end - buf) {
+      expectTrue(sameValue(expected[j], buf[i]))
+      j = expected.index(after: j)
+    }
+    buf.deinitialize(count: end - buf)
+    buf.deallocateCapacity(count)
+  }
+}
+
+public func checkSequence<
+  ${genericParam}, S : Sequence
+>(
+  _ expected: ${Expected},
+  _ sequence: S,
+  ${TRACE},
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all
+) where
+  S.Iterator.Element == ${Element},
+  S.Iterator.Element : Equatable {
+
+  checkSequence(
+    expected, sequence, ${trace},
+    resiliencyChecks: resiliencyChecks, showFrame: false
+  ) { $0 == $1 }
+}
+
+% end
+

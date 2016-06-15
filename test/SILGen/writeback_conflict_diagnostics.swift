@@ -2,7 +2,7 @@
 
 
 struct MutatorStruct {
-  mutating func f(inout x : MutatorStruct) {}
+  mutating func f(_ x : inout MutatorStruct) {}
 }
 
 var global_property : MutatorStruct { get {} set {} }
@@ -67,7 +67,7 @@ func testComputedStructWithProperty() {
 
 var global_array : [[Int]]
 
-func testMultiArray(i : Int, j : Int, array : [[Int]]) {
+func testMultiArray(_ i : Int, j : Int, array : [[Int]]) {
   var array = array
   swap(&array[i][j],
        &array[i][i])
@@ -94,7 +94,7 @@ struct ArrayWithoutAddressors<T> {
 var global_array_without_addressors: ArrayWithoutAddressors<ArrayWithoutAddressors<Int>>
 
 func testMultiArrayWithoutAddressors(
-  i: Int, j: Int, array: ArrayWithoutAddressors<ArrayWithoutAddressors<Int>>
+  _ i: Int, j: Int, array: ArrayWithoutAddressors<ArrayWithoutAddressors<Int>>
 ) {
   var array = array
   swap(&array[i][j],  // expected-note  {{concurrent writeback occurred here}}

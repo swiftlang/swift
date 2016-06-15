@@ -22,9 +22,9 @@ struct OtherFileSecretTypeWrapper {
   }
 }
 
-struct OtherFileIntArray : SequenceType {
+struct OtherFileIntArray : Sequence {
   var array: [Int] = []
-  func generate() -> Array<Int>.Generator { return array.generate() }
+  func makeIterator() -> Array<Int>.Iterator { return array.makeIterator() }
 }
 func getOtherFileIntArray() -> OtherFileIntArray { return OtherFileIntArray() }
 
@@ -130,3 +130,12 @@ protocol PrivateProto3 {}
 struct OtherFileElementType {}
 
 struct OtherFileTypeToBeExtended {}
+
+struct TypeReferencedOnlyBySubscript {}
+struct TypeReferencedOnlyByPrivateSubscript {}
+
+protocol ProtoReferencedOnlyInGeneric {}
+protocol ProtoReferencedOnlyInPrivateGeneric {}
+
+struct TypeReferencedOnlyByPrivateVar {}
+struct TypeReferencedOnlyByPrivateClassVar {}

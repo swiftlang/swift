@@ -1,8 +1,8 @@
-//===-- driver.cpp - Swift Compiler Driver --------------------------------===//
+//===--- driver.cpp - Swift Compiler Driver -------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -24,6 +24,7 @@
 #include "swift/Driver/Job.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/FrontendTool/FrontendTool.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Errno.h"
@@ -48,9 +49,6 @@ std::string getExecutablePath(const char *FirstArg) {
   void *P = (void *)(intptr_t)getExecutablePath;
   return llvm::sys::fs::getMainExecutable(FirstArg, P);
 }
-
-extern int frontend_main(ArrayRef<const char *> Args, const char *Argv0,
-                         void *MainAddr);
 
 /// Run 'swift-autolink-extract'.
 extern int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
@@ -104,6 +102,8 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
   return true;
 }
 
+extern int apinotes_main(ArrayRef<const char *> Args);
+
 int main(int argc_, const char **argv_) {
   INITIALIZE_LLVM(argc_, argv_);
 
@@ -153,14 +153,18 @@ int main(int argc_, const char **argv_) {
   if (argv.size() > 1){
     StringRef FirstArg(argv[1]);
     if (FirstArg == "-frontend") {
-      return frontend_main(llvm::makeArrayRef(argv.data()+2,
-                                              argv.data()+argv.size()),
-                           argv[0], (void *)(intptr_t)getExecutablePath);
+      return performFrontend(llvm::makeArrayRef(argv.data()+2,
+                                                argv.data()+argv.size()),
+                             argv[0], (void *)(intptr_t)getExecutablePath);
     }
     if (FirstArg == "-modulewrap") {
       return modulewrap_main(llvm::makeArrayRef(argv.data()+2,
                                                 argv.data()+argv.size()),
                              argv[0], (void *)(intptr_t)getExecutablePath);
+    }
+    if (FirstArg == "-apinotes") {
+      return apinotes_main(llvm::makeArrayRef(argv.data()+1,
+                                              argv.data()+argv.size()));
     }
   }
 

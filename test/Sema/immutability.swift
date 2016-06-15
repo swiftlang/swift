@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 let bad_property_1: Int {    // expected-error {{'let' declarations cannot be computed properties}}
   get {
@@ -23,7 +23,7 @@ func foreach_variable() {
   }
 }
 
-func takeClosure(fn : (Int)->Int) {}
+func takeClosure(_ fn : (Int) -> Int) {}
 
 func passClosure() {
   takeClosure { a in
@@ -32,7 +32,7 @@ func passClosure() {
   }
   
   takeClosure {
-    $0 = 42     // expected-error{{cannot assign to value: '$0' is a 'let' constant}}
+    $0 = 42     // expected-error{{cannot assign to value: '$0' is immutable}}
     return 42
   }
   
@@ -45,7 +45,7 @@ func passClosure() {
 
 
 class FooClass {
-  class let type_let = 5 // expected-error {{class stored properties not yet supported in classes}}
+  class let type_let = 5 // expected-error {{class stored properties not supported in classes}}
 
 
   init() {
@@ -220,12 +220,13 @@ func test_mutability() {
 }
 
 
-func test_arguments(a : Int,
-                    var b : Int, // expected-error {{Use of 'var' binding here is not allowed}} {{21-25=}}
-                    let c : Int) { // expected-warning {{'let' keyword is unnecessary; function parameters are immutable by default}} {{21-25=}}
+func test_arguments(_ a : Int,
+                    b : Int,
+                    let c : Int) { // expected-error {{'let' as a parameter attribute is not allowed}} {{21-25=}}
+  var b = b
   a = 1  // expected-error {{cannot assign to value: 'a' is a 'let' constant}}
-  var b = 2  // ok.
-  c = 3  // expected-error {{cannot assign to value: 'c' is a 'let' constant}}
+  b = 2  // ok.
+  _ = b
 }
 
 
@@ -302,6 +303,17 @@ func test_properties() {
  lvalue.weird_property = 1    // ok
 }
 
+protocol OpaqueBase {}
+extension OpaqueBase {
+  var x: Int { get { return 0 } set { } } // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
+}
+
+protocol OpaqueRefinement : class, OpaqueBase {
+  var x: Int { get set } // expected-note {{protocol requires property 'x' with type 'Int'}}
+}
+
+class SetterMutatingConflict : OpaqueRefinement {} // expected-error {{type 'SetterMutatingConflict' does not conform to protocol 'OpaqueRefinement'}}
+
 struct DuplicateMutating {
   mutating mutating func f() {} // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}
 }
@@ -310,28 +322,38 @@ protocol SubscriptNoGetter {
   subscript (i: Int) -> Int { get }
 }
 
-func testSubscriptNoGetter(iis: SubscriptNoGetter) {
+func testSubscriptNoGetter(let iis: SubscriptNoGetter) { // expected-error {{'let' as a parameter attribute is not allowed}}{{28-31=}}
   var _: Int = iis[17]
 }
 
-func testSelectorStyleArguments1(x: Int, bar y: Int) {
+func testSelectorStyleArguments1(_ x: Int, bar y: Int) {
   var x = x
   var y = y
-  ++x; ++y
+  x += 1
+  y += 1
+  _ = x
+  _ = y
 }
 
-func testSelectorStyleArguments2(x: Int,
-                                 bar y: Int) {
+func testSelectorStyleArguments2(let x: Int, // expected-error {{'let' as a parameter attribute is not allowed}}{{34-37=}}
+                                 let bar y: Int) { // expected-error {{'let' as a parameter attribute is not allowed}}{{34-38=}}
+                                 
+  
+}
+func testSelectorStyleArguments3(_ x: Int, bar y: Int) {
   ++x  // expected-error {{cannot pass immutable value to mutating operator: 'x' is a 'let' constant}}
   ++y  // expected-error {{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
 }
 
 func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-30=}}
+// expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}{{20-25=}}{{34-34=inout }}
+}
+func invalid_var(var x: Int) { // expected-error {{parameters may not have the 'var' specifier}}{{18-21=}} {{1-1=    var x = x\n}}
+  
 }
 
 
-
-func updateInt(inout x : Int) {}
+func updateInt(_ x : inout Int) {}
 
 // rdar://15785677 - allow 'let' declarations in structs/classes be initialized in init()
 class LetClassMembers {
@@ -427,15 +449,11 @@ struct StructWithDelegatingInit {
   init() { self.init(x: 0); self.x = 22 } // expected-error {{cannot assign to property: 'x' is a 'let' constant}}
 }
 
-
-
-func test_recovery_missing_name_1(: Int) {} // expected-error {{expected ',' separator}} {{35-35=,}} expected-error {{expected parameter type following ':'}}
-
-func test_recovery_missing_name_2(: Int) {} // expected-error {{expected ',' separator}} {{35-35=,}} expected-error {{expected parameter type following ':'}}
-
+func test_recovery_missing_name_2(let: Int) {} // expected-error {{'let' as a parameter attribute is not allowed}}{{35-38=}} 
+// expected-error @-1 2{{expected ',' separator}} {{38-38=,}} expected-error @-1 2 {{expected parameter name followed by ':'}}
 
 // <rdar://problem/16792027> compiler infinite loops on a really really mutating function
-struct F {
+struct F { // expected-note 2 {{in declaration of 'F'}}
   mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}} expected-note 2 {{modifier already specified here}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{29-29=;}} expected-error 2 {{expected declaration}}
   }
   
@@ -487,7 +505,7 @@ struct TestSubscriptMutability {
   }
 }
 
-func f(a : TestSubscriptMutability) {
+func f(_ a : TestSubscriptMutability) {
   a.var_arr = []  // expected-error {{cannot assign to property: 'a' is a 'let' constant}}
 }
 
@@ -528,3 +546,20 @@ func testBindOptional() {
   a?.mutatingfunc()
 }
 
+struct HasTestStruct2 {
+  var t = TestStruct2()
+}
+
+func testConditional(b : Bool) {
+  var x = TestStruct2()
+  var y = TestStruct2()
+  var z = HasTestStruct2()
+
+  (b ? x : y).mutatingfunc() // expected-error {{cannot use mutating member on immutable value: result of conditional operator '? :' is never mutable}}
+
+  (b ? (b ? x : y) : y).mutatingfunc() // expected-error {{cannot use mutating member on immutable value: result of conditional operator '? :' is never mutable}}
+
+  (b ? x : (b ? x : y)).mutatingfunc() // expected-error {{cannot use mutating member on immutable value: result of conditional operator '? :' is never mutable}}
+
+  (b ? x : z.t).mutatingfunc() // expected-error {{cannot use mutating member on immutable value: result of conditional operator '? :' is never mutable}}
+}

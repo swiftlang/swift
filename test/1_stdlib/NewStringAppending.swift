@@ -6,23 +6,23 @@
 // like OpaqueString anyway, so we can just disable the failing
 // configuration
 //
-// Memory allocator specifics also vary across platorms.
+// Memory allocator specifics also vary across platforms.
 // REQUIRES: CPU=x86_64, OS=macosx
 
 import Foundation
 import Swift
 
-func hexAddrVal<T>(x: T) -> String {
-  return "@0x" + String(UInt64(unsafeBitCast(x, Int.self)), radix: 16)
+func hexAddrVal<T>(_ x: T) -> String {
+  return "@0x" + String(UInt64(unsafeBitCast(x, to: Int.self)), radix: 16)
 }
 
-func hexAddr(x: AnyObject?) -> String {
+func hexAddr(_ x: AnyObject?) -> String {
   if let owner = x {
     if let y = owner as? _StringBuffer._Storage.Storage {
-      return ".Native\(hexAddrVal(y))"
+      return ".native\(hexAddrVal(y))"
     }
     if let y = owner as? NSString {
-      return ".Cocoa\(hexAddrVal(y))"
+      return ".cocoa\(hexAddrVal(y))"
     }
     else {
       return "?Uknown?\(hexAddrVal(owner))"
@@ -31,11 +31,11 @@ func hexAddr(x: AnyObject?) -> String {
   return "nil"
 }
 
-func repr(x: NSString) -> String {
+func repr(_ x: NSString) -> String {
   return "\(NSStringFromClass(object_getClass(x)))\(hexAddr(x)) = \"\(x)\""
 }
 
-func repr(x: _StringCore) -> String {
+func repr(_ x: _StringCore) -> String {
   if x.hasContiguousStorage {
     if let b = x.nativeBuffer {
     var offset = x.elementWidth == 2
@@ -53,7 +53,7 @@ func repr(x: _StringCore) -> String {
   return "?????"
 }
 
-func repr(x: String) -> String {
+func repr(_ x: String) -> String {
   return "String(\(repr(x._core))) = \"\(x)\""
 }
 
@@ -69,22 +69,22 @@ var s = "⓪" // start non-empty
 // explicitly request initial capacity.
 s.reserveCapacity(8)
 
-// CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer0:[x0-9a-f]+]][0...2], capacity = 8)) = "⓪1"
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer0:[x0-9a-f]+]][0...2], capacity = 8)) = "⓪1"
 s += "1"
 print("\(repr(s))")
 
-// CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer1:[x0-9a-f]+]][0...8], capacity = 8)) = "⓪1234567"
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer1:[x0-9a-f]+]][0...8], capacity = 8)) = "⓪1234567"
 s += "234567"
 print("\(repr(s))")
 
 // -- expect a reallocation here
 
-// CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer2:[x0-9a-f]+]][0...9], capacity = 16)) = "⓪12345678"
-// CHECK-NOT: .Native@[[buffer1]]
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer2:[x0-9a-f]+]][0...9], capacity = 16)) = "⓪12345678"
+// CHECK-NOT: .native@[[buffer1]]
 s += "8"
 print("\(repr(s))")
 
-// CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer2]][0...16], capacity = 16)) = "⓪123456789012345"
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer2]][0...16], capacity = 16)) = "⓪123456789012345"
 s += "9012345"
 print("\(repr(s))")
 
@@ -98,15 +98,15 @@ print("\(repr(s))")
 // more capacity.  It might be better to always grow to a multiple of
 // the current capacity when the capacity is exceeded.
 
-// CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer3:[x0-9a-f]+]][0...48], capacity = 48))
-// CHECK-NOT: .Native@[[buffer2]]
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer3:[x0-9a-f]+]][0...48], capacity = 48))
+// CHECK-NOT: .native@[[buffer2]]
 s += s + s
 print("\(repr(s))")
 
 // -- expect a reallocation here
 
-// CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer4:[x0-9a-f]+]][0...49], capacity = 96))
-// CHECK-NOT: .Native@[[buffer3]]
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer4:[x0-9a-f]+]][0...49], capacity = 96))
+// CHECK-NOT: .native@[[buffer3]]
 s += "C"
 print("\(repr(s))")
 
@@ -114,24 +114,24 @@ print("\(repr(s))")
 /// impede the use of available capacity
 var s1 = s
 
-// CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer4]][0...50], capacity = 96))
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer4]][0...50], capacity = 96))
 s += "F"
 print("\(repr(s))")
 
-// CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer4]][0...49], capacity = 96))
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer4]][0...49], capacity = 96))
 print("\(repr(s1))")
 
 /// The use of later buffer capacity by another string forces
 /// reallocation
 
 // CHECK-NEXT: String{{.*}} = {{.*}}X"
-// CHECK-NOT: .Native@[[buffer4]]
+// CHECK-NOT: .native@[[buffer4]]
 s1 += "X"
 print("\(repr(s1))")
 
 /// Appending to an empty string re-uses the RHS
 
-// CHECK-NEXT: .Native@[[buffer4]]
+// CHECK-NEXT: .native@[[buffer4]]
 var s2 = String()
 s2 += s
 print("\(repr(s2))")

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -25,12 +25,15 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/SIL/SILPrintContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -44,8 +47,6 @@ namespace swift {
   class AnyFunctionType;
   class ASTContext;
   class FuncDecl;
-  class SILExternalSource;
-  class SILTypeList;
   class SILUndef;
   class SourceFile;
   class SerializedSILLoader;
@@ -80,12 +81,14 @@ public:
   using GlobalListType = llvm::ilist<SILGlobalVariable>;
   using VTableListType = llvm::ilist<SILVTable>;
   using WitnessTableListType = llvm::ilist<SILWitnessTable>;
+  using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
   using CoverageMapListType = llvm::ilist<SILCoverageMap>;
   using LinkingMode = SILOptions::LinkingMode;
 
 private:
   friend class SILBasicBlock;
   friend class SILCoverageMap;
+  friend class SILDefaultWitnessTable;
   friend class SILFunction;
   friend class SILGlobalVariable;
   friend class SILType;
@@ -98,7 +101,6 @@ private:
 
   /// Allocator that manages the memory of all the pieces of the SILModule.
   mutable llvm::BumpPtrAllocator BPA;
-  void *TypeListUniquing;
 
   /// The swift Module associated with this SILModule.
   ModuleDecl *TheSwiftModule;
@@ -112,6 +114,7 @@ private:
   /// Lookup table for SIL functions. This needs to be declared before \p
   /// functions so that the destructor of \p functions is called first.
   llvm::StringMap<SILFunction *> FunctionTable;
+  llvm::StringMap<SILFunction *> ZombieFunctionTable;
 
   /// The list of SILFunctions in the module.
   FunctionListType functions;
@@ -124,20 +127,27 @@ private:
   llvm::BumpPtrAllocator zombieFunctionNames;
   
   /// Lookup table for SIL vtables from class decls.
-  llvm::DenseMap<const ClassDecl *, SILVTable *> VTableLookupTable;
+  llvm::DenseMap<const ClassDecl *, SILVTable *> VTableMap;
 
   /// The list of SILVTables in the module.
   VTableListType vtables;
 
   /// Lookup table for SIL witness tables from conformances.
   llvm::DenseMap<const NormalProtocolConformance *, SILWitnessTable *>
-  WitnessTableLookupCache;
+  WitnessTableMap;
 
   /// The list of SILWitnessTables in the module.
   WitnessTableListType witnessTables;
 
+  /// Lookup table for SIL default witness tables from protocols.
+  llvm::DenseMap<const ProtocolDecl *, SILDefaultWitnessTable *>
+  DefaultWitnessTableMap;
+
+  /// The list of SILDefaultWitnessTables in the module.
+  DefaultWitnessTableListType defaultWitnessTables;
+
   /// Lookup table for SIL Global Variables.
-  llvm::StringMap<SILGlobalVariable *> GlobalVariableTable;
+  llvm::StringMap<SILGlobalVariable *> GlobalVariableMap;
 
   /// The list of SILGlobalVariables in the module.
   GlobalListType silGlobals;
@@ -165,18 +175,19 @@ private:
   /// This is lazily initialized the first time we attempt to
   /// deserialize. Previously this was created when the SILModule was
   /// constructed. In certain cases this was before all Modules had been loaded
-  /// causeing us to not
+  /// causing us to not
   std::unique_ptr<SerializedSILLoader> SILLoader;
   
   /// True if this SILModule really contains the whole module, i.e.
   /// optimizations can assume that they see the whole module.
   bool wholeModule;
 
-  /// The external SIL source to use when linking this module.
-  SILExternalSource *ExternalSource = nullptr;
-
   /// The options passed into this SILModule.
   SILOptions &Options;
+
+  /// A list of clients that need to be notified when an instruction
+  /// invalidation message is sent.
+  llvm::SetVector<DeleteNotificationHandler*> NotificationHandlers;
 
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
@@ -193,8 +204,15 @@ private:
 public:
   ~SILModule();
 
-  /// \brief Get a uniqued pointer to a SIL type list.
-  SILTypeList *getSILTypeList(ArrayRef<SILType> Types) const;
+  /// Add a delete notification handler \p Handler to the module context.
+  void registerDeleteNotificationHandler(DeleteNotificationHandler* Handler);
+
+  /// Remove the delete notification handler \p Handler from the module context.
+  void removeDeleteNotificationHandler(DeleteNotificationHandler* Handler);
+
+  /// Send the invalidation message that \p V is being deleted to all
+  /// registered handlers. The order of handlers is deterministic but arbitrary.
+  void notifyDeleteHandlers(ValueBase *V);
 
   /// \brief This converts Swift types to SILTypes.
   mutable Lowering::TypeConverter Types;
@@ -209,6 +227,14 @@ public:
 
   /// Erase a function from the module.
   void eraseFunction(SILFunction *F);
+
+  /// Invalidate a function in SILLoader cache.
+  void invalidateFunctionInSILCache(SILFunction *F);
+
+  /// Specialization can cause a function that was erased before by dead function
+  /// elimination to become alive again. If this happens we need to remove it
+  /// from the list of zombies.
+  void removeFromZombieList(StringRef Name);
 
   /// Erase a global SIL variable from the module.
   void eraseGlobalVariable(SILGlobalVariable *G);
@@ -312,6 +338,21 @@ public:
     return {witnessTables.begin(), witnessTables.end()};
   }
 
+  using default_witness_table_iterator = DefaultWitnessTableListType::iterator;
+  using default_witness_table_const_iterator = DefaultWitnessTableListType::const_iterator;
+  DefaultWitnessTableListType &getDefaultWitnessTableList() { return defaultWitnessTables; }
+  const DefaultWitnessTableListType &getDefaultWitnessTableList() const { return defaultWitnessTables; }
+  default_witness_table_iterator default_witness_table_begin() { return defaultWitnessTables.begin(); }
+  default_witness_table_iterator default_witness_table_end() { return defaultWitnessTables.end(); }
+  default_witness_table_const_iterator default_witness_table_begin() const { return defaultWitnessTables.begin(); }
+  default_witness_table_const_iterator default_witness_table_end() const { return defaultWitnessTables.end(); }
+  iterator_range<default_witness_table_iterator> getDefaultWitnessTables() {
+    return {defaultWitnessTables.begin(), defaultWitnessTables.end()};
+  }
+  iterator_range<default_witness_table_const_iterator> getDefaultWitnessTables() const {
+    return {defaultWitnessTables.begin(), defaultWitnessTables.end()};
+  }
+
   using sil_global_iterator = GlobalListType::iterator;
   using sil_global_const_iterator = GlobalListType::const_iterator;
   GlobalListType &getSILGlobalList() { return silGlobals; }
@@ -354,7 +395,7 @@ public:
   ///
   /// \return null if this module has no such global variable
  SILGlobalVariable *lookUpGlobalVariable(StringRef name) const {
-    return GlobalVariableTable.lookup(name);
+    return GlobalVariableMap.lookup(name);
   }
 
   /// Look for a function by name.
@@ -374,24 +415,28 @@ public:
   ///
   /// \return false if the linking failed.
   bool linkFunction(SILFunction *Fun,
-                    LinkingMode LinkAll=LinkingMode::LinkNormal,
-                    std::function<void(SILFunction *)> Callback =nullptr);
+                    LinkingMode LinkAll = LinkingMode::LinkNormal);
 
   /// Attempt to link a function by declaration. Returns true if linking
   /// succeeded, false otherwise.
   ///
   /// \return false if the linking failed.
   bool linkFunction(SILDeclRef Decl,
-                    LinkingMode LinkAll=LinkingMode::LinkNormal,
-                    std::function<void(SILFunction *)> Callback =nullptr);
+                    LinkingMode LinkAll = LinkingMode::LinkNormal);
 
   /// Attempt to link a function by mangled name. Returns true if linking
   /// succeeded, false otherwise.
   ///
   /// \return false if the linking failed.
   bool linkFunction(StringRef Name,
-                    LinkingMode LinkAll=LinkingMode::LinkNormal,
-                    std::function<void(SILFunction *)> Callback =nullptr);
+                    LinkingMode LinkAll = LinkingMode::LinkNormal);
+
+  /// Check if a given function exists in the module,
+  /// i.e. it can be linked by linkFunction.
+  ///
+  /// \return null if this module has no such function. Otherwise
+  /// the declaration of a function.
+  SILFunction *hasFunction(StringRef Name, SILLinkage Linkage);
 
   /// Link in all Witness Tables in the module.
   void linkAllWitnessTables();
@@ -410,7 +455,7 @@ public:
                                          IsThunk_t isThunk);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
-  /// exist..
+  /// exist.
   SILFunction *getOrCreateFunction(SILLocation loc,
                                    StringRef name,
                                    SILLinkage linkage,
@@ -423,10 +468,26 @@ public:
                                            SILFunction::NotRelevant);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
-  /// exist..
+  /// exist.
   SILFunction *getOrCreateFunction(SILLocation loc,
                                    SILDeclRef constant,
                                    ForDefinition_t forDefinition);
+
+  /// \brief Create a function declaration.
+  ///
+  /// This signature is a direct copy of the signature of SILFunction::create()
+  /// in order to simplify refactoring all SILFunction creation use-sites to use
+  /// SILModule. Eventually the uses should probably be refactored.
+  SILFunction *createFunction(
+      SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
+      GenericParamList *contextGenericParams, Optional<SILLocation> loc,
+      IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+      IsFragile_t isFragile, IsThunk_t isThunk = IsNotThunk,
+      SILFunction::ClassVisibility_t classVisibility = SILFunction::NotRelevant,
+      Inline_t inlineStrategy = InlineDefault,
+      EffectsKind EK = EffectsKind::Unspecified,
+      SILFunction *InsertBefore = nullptr,
+      const SILDebugScope *DebugScope = nullptr, DeclContext *DC = nullptr);
 
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced
@@ -434,18 +495,31 @@ public:
   ///
   /// \arg C The protocol conformance mapped key to use to lookup the witness
   ///        table.
-  /// \arg deserializeLazily If we can not find the witness table should we
+  /// \arg deserializeLazily If we cannot find the witness table should we
   ///                        attempt to lazily deserialize it.
-  std::pair<SILWitnessTable *, ArrayRef<Substitution>>
+  SILWitnessTable *
+  lookUpWitnessTable(ProtocolConformanceRef C, bool deserializeLazily=true);
+  SILWitnessTable *
   lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily=true);
 
-  /// Attempt to lookup \p Member in the witness table for C.
+  /// Attempt to lookup \p Member in the witness table for \p C.
   std::tuple<SILFunction *, SILWitnessTable *, ArrayRef<Substitution>>
-  lookUpFunctionInWitnessTable(const ProtocolConformance *C, SILDeclRef Member);
+  lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
+                               SILDeclRef Requirement);
+
+  /// Look up the SILDefaultWitnessTable representing the default witnesses
+  /// of a resilient protocol, if any.
+  SILDefaultWitnessTable *lookUpDefaultWitnessTable(const ProtocolDecl *Protocol,
+                                                    bool deserializeLazily=true);
+
+  /// Attempt to lookup \p Member in the default witness table for \p Protocol.
+  std::pair<SILFunction *, SILDefaultWitnessTable *>
+  lookUpFunctionInDefaultWitnessTable(const ProtocolDecl *Protocol,
+                                      SILDeclRef Requirement,
+                                      bool deserializeLazily=true);
 
   /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.
-  SILVTable *lookUpVTable(const ClassDecl *C,
-                          std::function<void(SILFunction *)> Callback = nullptr);
+  SILVTable *lookUpVTable(const ClassDecl *C);
 
   /// Attempt to lookup the function corresponding to \p Member in the class
   /// hierarchy of \p Class.
@@ -456,6 +530,12 @@ public:
   SILWitnessTable *
   createWitnessTableDeclaration(ProtocolConformance *C, SILLinkage linkage);
 
+  // Given a protocol, attempt to create a default witness table declaration
+  // for it.
+  SILDefaultWitnessTable *
+  createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol,
+                                       SILLinkage Linkage);
+
   /// \brief Return the stage of processing this module is at.
   SILStage getStage() const { return Stage; }
 
@@ -463,12 +543,6 @@ public:
   void setStage(SILStage s) {
     assert(s >= Stage && "regressing stage?!");
     Stage = s;
-  }
-
-  SILExternalSource *getExternalSource() const { return ExternalSource; }
-  void setExternalSource(SILExternalSource *S) {
-    assert(!ExternalSource && "External source already set");
-    ExternalSource = S;
   }
 
   /// \brief Run the SIL verifier to make sure that all Functions follow
@@ -496,15 +570,28 @@ public:
   /// \param PrintASTDecls If set to true print AST decls.
   void print(raw_ostream &OS, bool Verbose = false,
              ModuleDecl *M = nullptr, bool ShouldSort = false,
+             bool PrintASTDecls = true) const {
+    SILPrintContext PrintCtx(OS, Verbose, ShouldSort);
+    print(PrintCtx, M, PrintASTDecls);
+  }
+
+  /// Pretty-print the module with the context \p PrintCtx.
+  ///
+  /// \param M If present, the types and declarations from this module will be
+  ///        printed. The module would usually contain the types and Decls that
+  ///        the SIL module depends on.
+  /// \param PrintASTDecls If set to true print AST decls.
+  void print(SILPrintContext &PrintCtx, ModuleDecl *M = nullptr,
              bool PrintASTDecls = true) const;
 
   /// Allocate memory using the module's internal allocator.
-  void *allocate(unsigned Size, unsigned Align) const {
-    if (getASTContext().LangOpts.UseMalloc)
-      return AlignedAlloc(Size, Align);
+  void *allocate(unsigned Size, unsigned Align) const;
 
-    return BPA.Allocate(Size, Align);
-  }
+  /// Allocate memory for an instruction using the module's internal allocator.
+  void *allocateInst(unsigned Size, unsigned Align) const;
+
+  /// Deallocate memory of an instruction.
+  void deallocateInst(SILInstruction *I);
 
   /// \brief Looks up the llvm intrinsic ID and type for the builtin function.
   ///

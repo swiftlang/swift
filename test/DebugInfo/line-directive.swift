@@ -1,14 +1,14 @@
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 func f() {
   if 1==1 {
-#line 42 "abc.swift"
+#sourceLocation(file: "abc.swift", line: 42)
     markUsed("Hello World")
-#line
+#sourceLocation()
   }
   markUsed("Test")
-#line 142 "abc.swift"
+#sourceLocation(file: "abc.swift", line: 142)
   markUsed("abc again")
-#line 142 "def.swift"
+#sourceLocation(file: "def.swift", line:  142)
   markUsed("jump directly to def")
 }
 

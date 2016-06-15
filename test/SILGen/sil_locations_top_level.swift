@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -emit-verbose-sil %s | FileCheck %s
 
 // Test top-level/module locations.
 class TopLevelObjectTy {
@@ -16,7 +16,7 @@ class TopLevelObjectTyWithoutDestructor {
 var topLevelObject2:TopLevelObjectTyWithoutDestructor
 
 // CHECK-LABEL: sil @main
-// CHECK: integer_literal ${{.*}}, 0  {{.*}} top_level
+// CHECK: integer_literal ${{.*}}, 0, {{.*}} top_level
 // CHECK: return    {{.*}} top_level
 
 // Check default constructor

@@ -22,7 +22,7 @@ func parseError3(x: Int) {
 
 func parseError4(x: Int) {
   switch x {
-  case let z where // expected-error {{expected expression for 'where' guard of 'case'}} expected-error {{expected ':' after 'case'}}
+  case var z where // expected-error {{expected expression for 'where' guard of 'case'}} expected-error {{expected ':' after 'case'}}
   }
 }
 
@@ -62,9 +62,9 @@ case 10,
 case _ where x % 2 == 0,
      20:
   x = 1
-case let y where y % 2 == 0:
+case var y where y % 2 == 0:
   x = y + 1
-case _ where 0: // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
+case _ where 0: // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
   x = 0
 default:
   x = 1
@@ -197,39 +197,41 @@ default:
 var t = (1, 2)
 
 switch t {
+case (var a, 2), (1, _): // expected-error {{'a' must be bound in every pattern}}
+  ()
 
-case (let a, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{17-17= break}}
+case (_, 2), (var a, _): // expected-error {{'a' must be bound in every pattern}}
+  ()
+
+case (var a, 2), (1, var b): // expected-error {{'a' must be bound in every pattern}} expected-error {{'b' must be bound in every pattern}}
+  ()
+
+case (var a, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{17-17= break}}
 case (1, _):
   ()
 
 case (_, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{13-13= break}}
-case (1, let a):
+case (1, var a):
   ()
 
-case (let a, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{17-17= break}}
-case (1, let b):
+case (var a, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{17-17= break}}
+case (1, var b):
   ()
 
 case (1, let b): // let bindings
   ()
 
-// var bindings are not allowed in cases.
-// FIXME: rdar://problem/23378003
-// This will eventually be an error.
-case (1, var b): // expected-error {{Use of 'var' binding here is not allowed}} {{10-13=let}}
-  ()
-case (var a, 2): // expected-error {{Use of 'var' binding here is not allowed}} {{7-10=let}}
-  ()
-
-case (let a, 2), (1, let b): // expected-error {{'case' labels with multiple patterns cannot declare variables}}
-  ()
-case (let a, 2), (1, _): // expected-error {{'case' labels with multiple patterns cannot declare variables}}
-  ()
-case (_, 2), (let a, _): // expected-error {{'case' labels with multiple patterns cannot declare variables}}
+case (_, 2), (let a, _): // expected-error {{'a' must be bound in every pattern}}
   ()
 
 // OK
 case (_, 2), (1, _):
+  ()
+  
+case (_, var a), (_, var a):
+  ()
+  
+case (var a, var b), (var b, var a):
   ()
 
 case (_, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{13-13= break}}
@@ -237,11 +239,19 @@ case (1, _):
   ()
 }
 
+func patternVarUsedInAnotherPattern(x: Int) {
+  switch x {
+  case let a, // expected-error {{'a' must be bound in every pattern}}
+       a:
+    break
+  }
+}
+
 // Fallthroughs can't transfer control into a case label with bindings.
 switch t {
 case (1, 2):
   fallthrough // expected-error {{'fallthrough' cannot transfer control to a case label that declares variables}}
-case (let a, let b):
+case (var a, var b):
   t = (b, a)
 }
 
@@ -261,3 +271,11 @@ func enumElementSyntaxOnTuple() {
   }
 }
 
+// sr-176
+enum Whatever { case Thing }
+func f0(values: [Whatever]) { // expected-note {{did you mean 'values'?}}
+    switch value { // expected-error {{use of unresolved identifier 'value'}}
+    case .Thing: // Ok. Don't emit diagnostics about enum case not found in type <<error type>>.
+        break
+    }
+}

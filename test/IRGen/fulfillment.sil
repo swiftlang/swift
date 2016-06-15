@@ -25,6 +25,8 @@ bb0(%0 : $@thick A<T>.Type):
   return %2 : $()
 }
 
+sil hidden_external @use_all : $@convention(thin) <T, U where T : P, U : P> () -> ()
+
 // CHECK-LABEL: define hidden void @class_pointer(%C11fulfillment1B*, i8** %T.P)
 // CHECK:      [[T0:%.*]] = bitcast %C11fulfillment1B* %0 to %swift.type**
 // CHECK-NEXT: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
@@ -39,11 +41,13 @@ bb0(%0 : $@thick A<T>.Type):
 // CHECK-NEXT:  %U.P = load i8**, i8*** [[T1]], align 8
 sil hidden @class_pointer : $@convention(thin) <T, U where T : P, U : P> (@guaranteed B<T, U>) -> () {
 bb0(%0 : $B<T, U>):
+  %f = function_ref @use_all : $@convention(thin) <T, U where T : P, U : P> () -> ()
+  apply %f<T, U>() : $@convention(thin) <T, U where T : P, U : P> () -> ()
   %3 = tuple ()
   return %3 : $()
 }
 
-// CHECK-LABEL: define hidden void @test_23121786(%C11fulfillment1A*, %C11fulfillment1A*)
+// CHECK-LABEL: define hidden void @test_23121786(%C11fulfillment1A*, %C11fulfillment1A{{.*}}*)
 sil hidden @test_23121786 : $@convention(thin) <T> (@owned A<A<T>>, @owned A<T>) -> () {
 bb0(%0 : $A<A<T>>, %1 : $A<T>):
   %2 = tuple ()

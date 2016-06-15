@@ -7,7 +7,7 @@ struct A<T> {
   // Can't from this one
   init(x:Int, y:Int) { }
 
-  static func bort(x: T) -> T { return x }
+  static func bort(_ x: T) -> T { return x }
 }
 
 var a = A(x: 0)
@@ -29,7 +29,7 @@ var d1 : C<String> = d
 var x : Int = A.bort(0)
 var y : String = A.bort("zero")
 
-func foo(a: A<String>) { }
+func foo(_ a: A<String>) { }
 // Deduce A<String> from context
 foo(A(x: 0, y: 0))
 

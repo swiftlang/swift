@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -19,31 +19,31 @@
 #include "swift/Markup/AST.h"
 #include "llvm/ADT/Optional.h"
 
-using namespace llvm;
+using namespace swift;
 using namespace markup;
 
 Document::Document(ArrayRef<MarkupASTNode*> Children)
-    : MarkupASTNode(ASTNodeKind::Document),
-      NumChildren(Children.size()) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+    : MarkupASTNode(ASTNodeKind::Document), NumChildren(Children.size()) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Document *Document::create(MarkupContext &MC,
-                           ArrayRef<llvm::markup::MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Document) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Document));
+                           ArrayRef<swift::markup::MarkupASTNode *> Children) {
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Document));
   return new (Mem) Document(Children);
 }
 
 BlockQuote::BlockQuote(ArrayRef<MarkupASTNode*> Children)
-    : MarkupASTNode(ASTNodeKind::BlockQuote),
-      NumChildren(Children.size()) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+    : MarkupASTNode(ASTNodeKind::BlockQuote), NumChildren(Children.size()) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 BlockQuote *BlockQuote::create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(BlockQuote) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(BlockQuote));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(BlockQuote));
   return new (Mem) BlockQuote(Children);
 }
 
@@ -62,66 +62,66 @@ Code *Code::create(MarkupContext &MC, StringRef LiteralContent) {
   return new (Mem) Code(LiteralContent);
 }
 
-CodeBlock *CodeBlock::create(MarkupContext &MC, StringRef LiteralContent) {
+CodeBlock *CodeBlock::create(MarkupContext &MC, StringRef LiteralContent,
+                             StringRef Language) {
   void *Mem = MC.allocate(sizeof(CodeBlock), alignof(CodeBlock));
-  return new (Mem) CodeBlock(LiteralContent);
+  return new (Mem) CodeBlock(LiteralContent, Language);
 }
 
 List::List(ArrayRef<MarkupASTNode *> Children, bool IsOrdered)
-    : MarkupASTNode(ASTNodeKind::List),
-      NumChildren(Children.size()),
+    : MarkupASTNode(ASTNodeKind::List), NumChildren(Children.size()),
       Ordered(IsOrdered) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 List *List::create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children,
                    bool IsOrdered) {
-  void *Mem = MC.allocate(sizeof(List) + sizeof(MarkupASTNode)
-      * Children.size(), alignof(List));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(List));
   return new (Mem) List(Children, IsOrdered);
 }
 
 Item::Item(ArrayRef<MarkupASTNode*> Children)
-    : MarkupASTNode(ASTNodeKind::Item),
-      NumChildren(Children.size()) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+    : MarkupASTNode(ASTNodeKind::Item), NumChildren(Children.size()) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Item *Item::create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Item) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Item));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Item));
   return new (Mem) Item(Children);
 }
 
 Link::Link(StringRef Destination, ArrayRef<MarkupASTNode *> Children)
-    : InlineContent(ASTNodeKind::Link),
-      NumChildren(Children.size()),
+    : InlineContent(ASTNodeKind::Link), NumChildren(Children.size()),
       Destination(Destination) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Link *Link::create(MarkupContext &MC, StringRef Destination,
                    ArrayRef<MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Link) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Link));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Link));
   StringRef DestinationCopy = MC.allocateCopy(Destination);
   return new (Mem) Link(DestinationCopy, Children);
 }
 
 Image::Image(StringRef Destination, Optional<StringRef> Title,
              ArrayRef<MarkupASTNode *> Children)
-    : InlineContent(ASTNodeKind::Image),
-      NumChildren(Children.size()),
-      Destination(Destination),
-      Title(Title) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+    : InlineContent(ASTNodeKind::Image), NumChildren(Children.size()),
+      Destination(Destination), Title(Title) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Image *Image::create(MarkupContext &MC, StringRef Destination,
                      Optional<StringRef> Title,
                      ArrayRef<MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Image) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Image));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Image));
   StringRef DestinationCopy = MC.allocateCopy(Destination);
   Optional<StringRef> TitleCopy;
   if (Title)
@@ -130,30 +130,30 @@ Image *Image::create(MarkupContext &MC, StringRef Destination,
 }
 
 Header::Header(unsigned Level, ArrayRef<MarkupASTNode *> Children)
-    : MarkupASTNode(ASTNodeKind::Header),
-      NumChildren(Children.size()),
+    : MarkupASTNode(ASTNodeKind::Header), NumChildren(Children.size()),
       Level(Level) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Header *Header::create(MarkupContext &MC, unsigned Level,
                        ArrayRef<MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Header) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Header));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Header));
   return new (Mem) Header(Level, Children);
 }
 
 Paragraph::Paragraph(ArrayRef<MarkupASTNode *> Children)
     : MarkupASTNode(ASTNodeKind::Paragraph),
       NumChildren(Children.size()) {
-      std::uninitialized_copy(Children.begin(), Children.end(),
-                              getChildrenBuffer());
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Paragraph *Paragraph::create(MarkupContext &MC,
-                             ArrayRef<llvm::markup::MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Paragraph) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Paragraph));
+                             ArrayRef<swift::markup::MarkupASTNode *> Children) {
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Paragraph));
   return new (Mem) Paragraph(Children);
 }
 
@@ -179,52 +179,56 @@ LineBreak *LineBreak::create(MarkupContext &MC) {
 
 Emphasis::Emphasis(ArrayRef<MarkupASTNode *> Children)
     : InlineContent(ASTNodeKind::Emphasis), NumChildren(Children.size()) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Emphasis *Emphasis::create(MarkupContext &MC,
-                           ArrayRef<llvm::markup::MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Emphasis) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Emphasis));
+                           ArrayRef<swift::markup::MarkupASTNode *> Children) {
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Emphasis));
   return new (Mem) Emphasis(Children);
 }
 
 Strong::Strong(ArrayRef<MarkupASTNode *> Children)
     : InlineContent(ASTNodeKind::Strong), NumChildren(Children.size()) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 Strong *Strong::create(MarkupContext &MC,
-                       ArrayRef<llvm::markup::MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(Strong) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(Strong));
+                       ArrayRef<swift::markup::MarkupASTNode *> Children) {
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(Strong));
   return new (Mem) Strong(Children);
 }
 
 ParamField::ParamField(StringRef Name, ArrayRef<MarkupASTNode *> Children)
-    : PrivateExtension(ASTNodeKind::ParamField),
-      Name(Name), NumChildren(Children.size()) {
-  std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
+    : PrivateExtension(ASTNodeKind::ParamField), NumChildren(Children.size()),
+      Name(Name),
+      Parts(None) {
+  std::uninitialized_copy(Children.begin(), Children.end(),
+                          getTrailingObjects<MarkupASTNode *>());
 }
 
 ParamField *ParamField::create(MarkupContext &MC, StringRef Name,
                                ArrayRef<MarkupASTNode *> Children) {
-  void *Mem = MC.allocate(sizeof(ParamField) + Children.size()
-      * sizeof(MarkupASTNode *), alignof(ParamField));
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()),
+                          alignof(ParamField));
   return new (Mem) ParamField(Name, Children);
 }
 
 #define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) \
 Id *Id::create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children) { \
-  void *Mem = MC.allocate(sizeof(Id) + Children.size() \
-      * sizeof(MarkupASTNode *), alignof(Id)); \
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()), \
+                          alignof(Id)); \
   return new (Mem) Id(Children); \
 } \
 \
 Id::Id(ArrayRef<MarkupASTNode *> Children) \
     : PrivateExtension(ASTNodeKind::Id), NumChildren(Children.size()) { \
-      std::uninitialized_copy(Children.begin(), Children.end(), \
-                          getChildrenBuffer()); \
+  std::uninitialized_copy(Children.begin(), Children.end(), \
+                          getTrailingObjects<MarkupASTNode *>()); \
 }
 #include "swift/Markup/SimpleFields.def"
 
@@ -250,41 +254,41 @@ return cast<Id>(this)->getChildren();
   }
 }
 
-void llvm::markup::printInlinesUnder(const MarkupASTNode *Node,
+void swift::markup::printInlinesUnder(const MarkupASTNode *Node,
                                      llvm::raw_ostream &OS,
                                      bool PrintDecorators) {
   auto printChildren = [](const ArrayRef<const MarkupASTNode *> Children,
                           llvm::raw_ostream &OS) {
     for (auto Child = Children.begin(); Child != Children.end(); Child++)
-      llvm::markup::printInlinesUnder(*Child, OS);
+      swift::markup::printInlinesUnder(*Child, OS);
   };
 
   switch (Node->getKind()) {
-  case llvm::markup::ASTNodeKind::HTML: {
+  case swift::markup::ASTNodeKind::HTML: {
     auto H = cast<HTML>(Node);
     OS << H->getLiteralContent();
     break;
   }
-  case llvm::markup::ASTNodeKind::InlineHTML: {
+  case swift::markup::ASTNodeKind::InlineHTML: {
     auto IH = cast<InlineHTML>(Node);
     OS << IH->getLiteralContent();
     break;
   }
-  case llvm::markup::ASTNodeKind::HRule:
+  case swift::markup::ASTNodeKind::HRule:
     OS << '\n';
     break;
-  case llvm::markup::ASTNodeKind::Text: {
+  case swift::markup::ASTNodeKind::Text: {
     auto T = cast<Text>(Node);
     OS << T->getLiteralContent();
     break;
   }
-  case llvm::markup::ASTNodeKind::SoftBreak:
+  case swift::markup::ASTNodeKind::SoftBreak:
     OS << ' ';
     break;
-  case llvm::markup::ASTNodeKind::LineBreak:
+  case swift::markup::ASTNodeKind::LineBreak:
     OS << '\n';
     break;
-  case llvm::markup::ASTNodeKind::Code: {
+  case swift::markup::ASTNodeKind::Code: {
     auto C = cast<Code>(Node);
     if (PrintDecorators)
       OS << '`';
@@ -296,7 +300,7 @@ void llvm::markup::printInlinesUnder(const MarkupASTNode *Node,
 
     break;
   }
-  case llvm::markup::ASTNodeKind::CodeBlock: {
+  case swift::markup::ASTNodeKind::CodeBlock: {
     auto CB = cast<CodeBlock>(Node);
     if (PrintDecorators) OS << "``";
 
@@ -306,14 +310,14 @@ void llvm::markup::printInlinesUnder(const MarkupASTNode *Node,
 
     break;
   }
-  case llvm::markup::ASTNodeKind::Emphasis: {
+  case swift::markup::ASTNodeKind::Emphasis: {
     auto E = cast<Emphasis>(Node);
     if (PrintDecorators) OS << '*';
     printChildren(E->getChildren(), OS);
     if (PrintDecorators) OS << '*';
     break;
   }
-  case llvm::markup::ASTNodeKind::Strong: {
+  case swift::markup::ASTNodeKind::Strong: {
     auto S = cast<Strong>(Node);
     if (PrintDecorators) OS << "**";
     printChildren(S->getChildren(), OS);
@@ -326,10 +330,10 @@ void llvm::markup::printInlinesUnder(const MarkupASTNode *Node,
   OS.flush();
 }
 
-llvm::markup::MarkupASTNode *llvm::markup::createSimpleField(
+swift::markup::MarkupASTNode *swift::markup::createSimpleField(
     MarkupContext &MC,
     StringRef Tag,
-    ArrayRef<llvm::markup::MarkupASTNode *> Children) {
+    ArrayRef<swift::markup::MarkupASTNode *> Children) {
   if (false) {
 
   }
@@ -341,7 +345,7 @@ llvm::markup::MarkupASTNode *llvm::markup::createSimpleField(
   llvm_unreachable("Given tag not for any simple markup field");
 }
 
-bool llvm::markup::isAFieldTag(StringRef Tag) {
+bool swift::markup::isAFieldTag(StringRef Tag) {
   if (false) {
 
   }
@@ -353,15 +357,15 @@ bool llvm::markup::isAFieldTag(StringRef Tag) {
   return false;
 }
 
-void llvm::markup::dump(const MarkupASTNode *Node, llvm::raw_ostream &OS,
+void swift::markup::dump(const MarkupASTNode *Node, llvm::raw_ostream &OS,
                         unsigned indent) {
   auto dumpChildren = [](const ArrayRef<const MarkupASTNode *> Children,
                          llvm::raw_ostream &OS, unsigned indent) {
-    OS << "\n";
+    OS << '\n';
     for (auto Child = Children.begin(); Child != Children.end(); Child++) {
-      llvm::markup::dump(*Child, OS, indent + 1);
+      swift::markup::dump(*Child, OS, indent + 1);
       if (Child != Children.end() - 1)
-        OS << "\n";
+        OS << '\n';
     }
   };
 
@@ -390,114 +394,117 @@ void llvm::markup::dump(const MarkupASTNode *Node, llvm::raw_ostream &OS,
   };
 
   for (unsigned i = 0; i < indent; ++i) {
-    OS << " ";
+    OS << ' ';
   }
 
-  OS << "(";
+  OS << '(';
   switch (Node->getKind()) {
-  case llvm::markup::ASTNodeKind::Document: {
+  case swift::markup::ASTNodeKind::Document: {
     OS << "Document: Children=" << Node->getChildren().size();
     dumpChildren(Node->getChildren(), OS, indent + 1);
     break;
   }
-  case llvm::markup::ASTNodeKind::BlockQuote: {
+  case swift::markup::ASTNodeKind::BlockQuote: {
     OS << "BlockQuote: Children=" << Node->getChildren().size();
     dumpChildren(Node->getChildren(), OS, indent + 1);
     break;
   }
-  case llvm::markup::ASTNodeKind::List: {
+  case swift::markup::ASTNodeKind::List: {
     auto L = cast<List>(Node);
     OS << "List: " << (L->isOrdered() ? "Ordered " : "Unordered ");
     OS << "Items=" << Node->getChildren().size();
     dumpChildren(Node->getChildren(), OS, indent + 1);
     break;
   }
-  case llvm::markup::ASTNodeKind::Item: {
+  case swift::markup::ASTNodeKind::Item: {
     OS << "Item: Children=" << Node->getChildren().size();
     dumpChildren(Node->getChildren(), OS, indent + 1);
     break;
   }
-  case llvm::markup::ASTNodeKind::HTML: {
+  case swift::markup::ASTNodeKind::HTML: {
     auto H = cast<HTML>(Node);
     OS << "HTML: Content=";
     simpleEscapingPrint(H->getLiteralContent(), OS);
     break;
   }
-  case llvm::markup::ASTNodeKind::InlineHTML: {
+  case swift::markup::ASTNodeKind::InlineHTML: {
     auto IH = cast<InlineHTML>(Node);
     OS << "InlineHTML: Content=";
     simpleEscapingPrint(IH->getLiteralContent(), OS);
     break;
   }
-  case llvm::markup::ASTNodeKind::Paragraph: {
+  case swift::markup::ASTNodeKind::Paragraph: {
     OS << "Paragraph: Children=" << Node->getChildren().size();
     dumpChildren(Node->getChildren(), OS, indent + 1);
     break;
   }
-  case llvm::markup::ASTNodeKind::Header: {
+  case swift::markup::ASTNodeKind::Header: {
     auto H = cast<Header>(Node);
     OS << "Header: Level=" << H->getLevel();
     dumpChildren(Node->getChildren(), OS, indent + 1);
     break;
   }
-  case llvm::markup::ASTNodeKind::HRule: {
+  case swift::markup::ASTNodeKind::HRule: {
     OS << "HRule";
     break;
   }
-  case llvm::markup::ASTNodeKind::Text: {
+  case swift::markup::ASTNodeKind::Text: {
     auto T = cast<Text>(Node);
     OS << "Text: Content=";
     simpleEscapingPrint(T->getLiteralContent(), OS);
     break;
   }
-  case llvm::markup::ASTNodeKind::SoftBreak: {
+  case swift::markup::ASTNodeKind::SoftBreak: {
     OS << "SoftBreak";
     break;
   }
-  case llvm::markup::ASTNodeKind::LineBreak: {
+  case swift::markup::ASTNodeKind::LineBreak: {
     OS << "LineBreak";
     break;
   }
-  case llvm::markup::ASTNodeKind::CodeBlock: {
+  case swift::markup::ASTNodeKind::CodeBlock: {
     auto CB = cast<CodeBlock>(Node);
-    OS << "CodeBlock: Content=";
+    OS << "CodeBlock: ";
+    OS << "Language=";
+    simpleEscapingPrint(CB->getLanguage(), OS);
+    OS << " Content=";
     simpleEscapingPrint(CB->getLiteralContent(), OS);
     break;
   }
-  case llvm::markup::ASTNodeKind::Code: {
+  case swift::markup::ASTNodeKind::Code: {
     auto C = cast<Code>(Node);
     OS << "Code: Content=\"";
     simpleEscapingPrint(C->getLiteralContent(), OS);
     OS << "\"";
     break;
   }
-  case llvm::markup::ASTNodeKind::Strong: {
+  case swift::markup::ASTNodeKind::Strong: {
     OS << "Strong: Children=" << Node->getChildren().size();
     dumpChildren(Node->getChildren(), OS, indent + 1);
     break;
   }
-  case llvm::markup::ASTNodeKind::Emphasis: {
+  case swift::markup::ASTNodeKind::Emphasis: {
     OS << "Emphasis: Children=" << Node->getChildren().size();
     dumpChildren(Node->getChildren(), OS, indent + 1);
     break;
   }
-  case llvm::markup::ASTNodeKind::Link: {
+  case swift::markup::ASTNodeKind::Link: {
     auto L = cast<Link>(Node);
     OS << "Link: Destination=";
     simpleEscapingPrint(L->getDestination(), OS);
-    OS << " " << "Children=" << L->getChildren().size();
+    OS << ' ' << "Children=" << L->getChildren().size();
     dumpChildren(Node->getChildren(), OS, indent + 1);
     break;
   }
-  case llvm::markup::ASTNodeKind::Image: {
+  case swift::markup::ASTNodeKind::Image: {
     auto I = cast<Image>(Node);
     OS << "Image: Destination=";
     simpleEscapingPrint(I->getDestination(), OS);
-    OS << " " << "Children=" << I->getChildren().size();
+    OS << ' ' << "Children=" << I->getChildren().size();
     dumpChildren(Node->getChildren(), OS, indent + 1);
     break;
   }
-  case llvm::markup::ASTNodeKind::ParamField: {
+  case swift::markup::ASTNodeKind::ParamField: {
     auto PF = cast<ParamField>(Node);
     OS << "ParamField: Name=";
     simpleEscapingPrint(PF->getName(), OS);
@@ -507,7 +514,7 @@ void llvm::markup::dump(const MarkupASTNode *Node, llvm::raw_ostream &OS,
   }
 
 #define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) \
-  case llvm::markup::ASTNodeKind::Id: { \
+  case swift::markup::ASTNodeKind::Id: { \
     auto Field = cast<Id>(Node); \
     OS << #Id << ": Children=" << Field->getChildren().size(); \
     dumpChildren(Node->getChildren(), OS, indent + 1); \
@@ -518,5 +525,5 @@ void llvm::markup::dump(const MarkupASTNode *Node, llvm::raw_ostream &OS,
   default:
     llvm_unreachable("Can't dump Markup AST Node: unknown node kind");
   }
-  OS << ")";
+  OS << ')';
 }

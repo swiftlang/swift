@@ -8,7 +8,7 @@ class C: NSObject {}
 @objc protocol Q {}
 protocol NonObjC: class {}
 
-// CHECK: @_TMPV34type_layout_reference_storage_objc26ReferenceStorageTypeLayout = global {{.*}} @create_generic_metadata_ReferenceStorageTypeLayout
+// CHECK: @_TMPV34type_layout_reference_storage_objc26ReferenceStorageTypeLayout = hidden global {{.*}} @create_generic_metadata_ReferenceStorageTypeLayout
 // CHECK: define private %swift.type* @create_generic_metadata_ReferenceStorageTypeLayout
 struct ReferenceStorageTypeLayout<T> {
   var z: T

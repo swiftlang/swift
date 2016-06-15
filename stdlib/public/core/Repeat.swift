@@ -1,8 +1,8 @@
-//===--- Repeat.swift - A CollectionType that repeats a value N times -----===//
+//===--- Repeat.swift - A Collection that repeats a value N times ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -11,10 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 /// A collection whose elements are all identical `Element`s.
-public struct Repeat<Element> : CollectionType {
+public struct Repeated<Element> : RandomAccessCollection {
 
-  @available(*, unavailable, renamed="Element")
-  public typealias T = Element
+  public typealias Indices = CountableRange<Int>
 
   /// A type that represents a valid position in the collection.
   /// 
@@ -24,7 +23,8 @@ public struct Repeat<Element> : CollectionType {
 
   /// Construct an instance that contains `count` elements having the
   /// value `repeatedValue`.
-  public init(count: Int, repeatedValue: Element) {
+  internal init(_repeating repeatedValue: Element, count: Int) {
+    _precondition(count >= 0, "Repetition count should be non-negative")
     self.count = count
     self.repeatedValue = repeatedValue
   }
@@ -43,7 +43,7 @@ public struct Repeat<Element> : CollectionType {
 
   /// Access the element at `position`.
   ///
-  /// - Requires: `position` is a valid position in `self` and
+  /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public subscript(position: Int) -> Element {
     _precondition(position >= 0 && position < count, "Index out of range")
@@ -51,9 +51,23 @@ public struct Repeat<Element> : CollectionType {
   }
 
   /// The number of elements in this collection.
-  public var count: Int
+  public let count: Int
 
   /// The value of every element in this collection.
   public let repeatedValue: Element
 }
 
+/// Return a collection containing `n` repetitions of `elementInstance`.
+public func repeatElement<T>(_ element: T, count n: Int) -> Repeated<T> {
+  return Repeated(_repeating: element, count: n)
+}
+
+@available(*, unavailable, renamed: "Repeated")
+public struct Repeat<Element> {}
+
+extension Repeated {
+  @available(*, unavailable, renamed: "repeatElement")
+  public init(count: Int, repeatedValue: Element) {
+    Builtin.unreachable()
+  }
+}

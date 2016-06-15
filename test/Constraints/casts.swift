@@ -27,7 +27,7 @@ var b_is_d:Bool = B() is D
 // FIXME: Poor diagnostic below.
 var bad_d_is_b:Bool = D() is B // expected-warning{{always true}}
 
-func base_class_archetype_casts<T : B>(t: T) {
+func base_class_archetype_casts<T : B>(_ t: T) {
   var _ : B = t
   _ = B() as! T
   var _ : T = B() // expected-error{{cannot convert value of type 'B' to specified type 'T'}}
@@ -65,7 +65,7 @@ struct S12 : P1, P2 {
   func p2() {}
 }
 
-func protocol_archetype_casts<T : P1>(t: T, p1: P1, p2: P2, p12: protocol<P1, P2>) {
+func protocol_archetype_casts<T : P1>(_ t: T, p1: P1, p2: P2, p12: protocol<P1, P2>) {
   // Coercions.
   var _ : P1 = t
   var _ : P2 = t // expected-error{{value of type 'T' does not conform to specified type 'P2'}}
@@ -102,7 +102,7 @@ func protocol_archetype_casts<T : P1>(t: T, p1: P1, p2: P2, p12: protocol<P1, P2
   var _:Bool = t is S2
 }
 
-func protocol_concrete_casts(p1: P1, p2: P2, p12: protocol<P1, P2>) {
+func protocol_concrete_casts(_ p1: P1, p2: P2, p12: protocol<P1, P2>) {
   // Checked unconditional casts.
   _ = p1 as! S1
   _ = p1 as! C1
@@ -134,7 +134,7 @@ func protocol_concrete_casts(p1: P1, p2: P2, p12: protocol<P1, P2>) {
   var _:Bool = p12 is S3
 }
 
-func conditional_cast(b: B) -> D? {
+func conditional_cast(_ b: B) -> D? {
   return b as? D
 }
 
@@ -145,7 +145,7 @@ protocol NonObjCProto : class {}
 @objc class ObjCClass {}
 class NonObjCClass {}
 
-func objc_protocol_casts(op1: ObjCProto1, opn: NonObjCProto) {
+func objc_protocol_casts(_ op1: ObjCProto1, opn: NonObjCProto) {
   _ = ObjCClass() as! ObjCProto1
   _ = ObjCClass() as! ObjCProto2
   _ = ObjCClass() as! protocol<ObjCProto1, ObjCProto2>
@@ -160,7 +160,7 @@ func objc_protocol_casts(op1: ObjCProto1, opn: NonObjCProto) {
   _ = NonObjCClass() as! ObjCProto1
 }
 
-func dynamic_lookup_cast(dl: AnyObject) {
+func dynamic_lookup_cast(_ dl: AnyObject) {
   _ = dl as! ObjCProto1
   _ = dl as! ObjCProto2
   _ = dl as! protocol<ObjCProto1, ObjCProto2>
@@ -169,7 +169,7 @@ func dynamic_lookup_cast(dl: AnyObject) {
 // Cast to subclass with generic parameter inference
 class C2<T> : B { }
 class C3<T> : C2<[T]> { 
-  func f(x: T) { }
+  func f(_ x: T) { }
 }
 var c2i : C2<[Int]> = C3()
 var c3iOpt = c2i as? C3
@@ -180,10 +180,10 @@ var c2f2: C2<[Float]>? = b as! C3
 
 
 // <rdar://problem/15633178>
-var f: Float -> Float = { $0 as Float }
-var f2: B -> Bool = { $0 is D }
+var f: (Float) -> Float = { $0 as Float }
+var f2: (B) -> Bool = { $0 is D }
 
-func metatype_casts<T, U>(b: B.Type, t:T.Type, u: U.Type) {
+func metatype_casts<T, U>(_ b: B.Type, t:T.Type, u: U.Type) {
   _ = b is D.Type
   _ = T.self is U.Type
   _ = T.self.dynamicType is U.Type.Type
@@ -193,7 +193,7 @@ func metatype_casts<T, U>(b: B.Type, t:T.Type, u: U.Type) {
 }
 
 // <rdar://problem/17017851>
-func forcedDowncastToOptional(b: B) {
+func forcedDowncastToOptional(_ b: B) {
   var dOpt: D? = b as! D // expected-warning{{treating a forced downcast to 'D' as optional will never produce 'nil'}}
   // expected-note@-1{{use 'as?' to perform a conditional downcast to 'D'}}{{22-23=?}}
   // expected-note@-2{{add parentheses around the cast to silence this warning}}{{18-18=(}}{{25-25=)}}

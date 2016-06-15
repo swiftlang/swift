@@ -1,0 +1,63 @@
+#!/usr/bin/env python
+
+# ===--- Benchmark_GuardMalloc.in ----------------------------------------===//
+#
+#  This source file is part of the Swift.org open source project
+#
+#  Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+#  Licensed under Apache License v2.0 with Runtime Library Exception
+#
+#  See http://swift.org/LICENSE.txt for license information
+#  See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# ===---------------------------------------------------------------------===//
+
+import os
+import subprocess
+import sys
+
+sys.path.append("@PATH_TO_DRIVER_LIBRARY@")
+
+import perf_test_driver  # noqa (E402 module level import not at top of file)
+
+# Regexes for the XFAIL_LIST. Matches against '([Onone|O|Ounchecked],TestName)'
+XFAIL_LIST = [
+]
+
+
+class GuardMallocResult(perf_test_driver.Result):
+
+    def __init__(self, name, status):
+        perf_test_driver.Result.__init__(self, name, status, "", XFAIL_LIST)
+
+
+class GuardMallocBenchmarkDriver(perf_test_driver.BenchmarkDriver):
+
+    def __init__(self, binary, xfail_list):
+        perf_test_driver.BenchmarkDriver.__init__(
+            self, binary, xfail_list,
+            enable_parallel=True)
+        self.new_env = os.environ.copy()
+        self.new_env['DYLD_INSERT_LIBRARIES'] = '/usr/lib/libgmalloc.dylib'
+
+    def prepare_input(self, name):
+        return {'env': self.new_env}
+
+    def process_input(self, data):
+        test_name = '({},{})'.format(data['opt'], data['test_name'])
+        print("Running {}...".format(test_name))
+        sys.stdout.flush()
+        status = subprocess.call(
+            [data['path'], data['test_name'], '--num-iters=2'],
+            env=data['env'], stderr=open('/dev/null', 'w'),
+            stdout=open('/dev/null', 'w'))
+        return GuardMallocResult(test_name, status)
+
+SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))
+
+if __name__ == "__main__":
+    g = GuardMallocBenchmarkDriver(SWIFT_BIN_DIR, XFAIL_LIST)
+    if g.run():
+        sys.exit(0)
+    else:
+        sys.exit(-1)

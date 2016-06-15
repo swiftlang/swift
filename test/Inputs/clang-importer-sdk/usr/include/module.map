@@ -107,3 +107,8 @@ module c_simd {
   header "simd.h"
   export *
 }
+
+module objc_generics {
+  header "objc_generics.h"
+  export *
+}

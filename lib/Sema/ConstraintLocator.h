@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -22,7 +22,6 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Fixnum.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -51,7 +50,7 @@ namespace constraints {
 /// to indicate constraints on its argument or result type.
 class ConstraintLocator : public llvm::FoldingSetNode {
 public:
-  /// \brief Describes the kind of a a particular path element, e.g.,
+  /// \brief Describes the kind of a particular path element, e.g.,
   /// "tuple element", "call result", "base of member lookup", etc.
   enum PathElementKind : unsigned char {
     /// \brief The argument of function application.
@@ -105,7 +104,7 @@ public:
     /// \brief The instance of a metatype type.
     InstanceType,
     /// \brief The generic type of a sequence.
-    SequenceGeneratorType,
+    SequenceIteratorProtocol,
     /// \brief The element type of a generator.
     GeneratorElementType,
     /// \brief The element of an array type.
@@ -114,9 +113,12 @@ public:
     ScalarToTuple,
     /// \brief The load of an lvalue.
     Load,
+    /// The requirement that we're matching during protocol conformance
+    /// checking.
+    Requirement,
     /// The candidate witness during protocol conformance checking.
     Witness,
-    /// This is refering to a type produced by opening a generic type at the
+    /// This is referring to a type produced by opening a generic type at the
     /// base of the locator.
     OpenedGeneric,
   };
@@ -142,11 +144,12 @@ public:
     case ClosureResult:
     case ParentType:
     case InstanceType:
-    case SequenceGeneratorType:
+    case SequenceIteratorProtocol:
     case GeneratorElementType:
     case ArrayElementType:
     case ScalarToTuple:
     case Load:
+    case Requirement:
     case Witness:
     case OpenedGeneric:
       return 0;
@@ -182,7 +185,7 @@ public:
     case ApplyArgument:
     case ApplyFunction:
     case ApplyArgToParam:
-    case SequenceGeneratorType:
+    case SequenceIteratorProtocol:
     case GeneratorElementType:
     case ArrayElementType:
     case ClosureResult:
@@ -211,6 +214,7 @@ public:
     case InterpolationArgument:
     case NamedTupleElement:
     case TupleElement:
+    case Requirement:
     case Witness:
       return IsNotSimple;
     }
@@ -226,13 +230,10 @@ public:
     /// \brief Describes the kind of data stored here.
     enum StoredKind : unsigned char {
       StoredArchetype,
-      StoredAssociatedType,
+      StoredRequirement,
       StoredWitness,
       StoredKindAndValue
     };
-
-    /// \brief The type of storage used for a kind and numeric value.
-    typedef llvm::Fixnum<62> KindAndValueStorage;
 
     /// \brief The actual storage for the path element, which involves both a
     /// kind and (potentially) a value.
@@ -251,15 +252,13 @@ public:
     uint64_t storedKind : 2;
 
     /// \brief Encode a path element kind and a value into the storage format.
-    static KindAndValueStorage encodeStorage(PathElementKind kind,
-                                             unsigned value) {
-      unsigned result = (value << 8) | (unsigned)kind;
-      return result;
+    static uint64_t encodeStorage(PathElementKind kind, unsigned value) {
+      return ((uint64_t)value << 8) | kind;
     }
 
     /// \brief Decode a storage value into path element kind and value.
     static std::pair<PathElementKind, unsigned>
-    decodeStorage(KindAndValueStorage storage) {
+    decodeStorage(uint64_t storage) {
       return { (PathElementKind)((unsigned)storage & 0xFF), storage >> 8 };
     }
 
@@ -299,15 +298,17 @@ public:
 
     PathElement(PathElementKind kind, ValueDecl *decl)
       : storage((reinterpret_cast<uintptr_t>(decl) >> 2)),
-        storedKind(StoredWitness)
+        storedKind(kind == Witness ? StoredWitness : StoredRequirement)
     {
-      assert(kind == Witness && "Not a witness element");
-      assert(getWitness() == decl);
+      assert((kind == Witness || kind == Requirement) &&
+             "Not a witness element");
+      assert(((kind == Requirement && getRequirement() == decl) ||
+              (kind == Witness && getWitness() == decl)));
     }
 
     PathElement(AssociatedTypeDecl *decl)
       : storage((reinterpret_cast<uintptr_t>(decl) >> 2)),
-        storedKind(StoredAssociatedType)
+        storedKind(StoredRequirement)
     {
       assert(getAssociatedType() == decl);
     }
@@ -348,8 +349,9 @@ public:
       case StoredArchetype:
         return Archetype;
 
-      case StoredAssociatedType:
-        return AssociatedType;
+      case StoredRequirement:
+        return isa<AssociatedTypeDecl>(getRequirement()) ? AssociatedType
+                                                         : Requirement;
 
       case StoredWitness:
         return Witness;
@@ -396,7 +398,14 @@ public:
       return reinterpret_cast<ArchetypeType *>(storage << 2);
     }
 
-      /// Retrieve the declaration for an associated type path element.
+    /// Retrieve the declaration for a requirement path element.
+    ValueDecl *getRequirement() const {
+      assert((static_cast<StoredKind>(storedKind) == StoredRequirement) &&
+             "Is not a requirement");
+      return reinterpret_cast<ValueDecl *>(storage << 2);
+    }
+
+    /// Retrieve the declaration for an associated type path element.
     AssociatedTypeDecl *getAssociatedType() const {
       assert(getKind() == AssociatedType && "Is not an associated type");
       return reinterpret_cast<AssociatedTypeDecl *>(storage << 2);
@@ -449,17 +458,6 @@ public:
     Profile(id, anchor, getPath());
   }
   
-  /// \brief Determine whether or not constraint failures associated with this
-  /// locator should be discarded.
-  bool shouldDiscardFailures() {
-    return discardFailures;
-  }
-  
-  /// \brief Toggle option to discard constraint failures.
-  void setDiscardFailures(bool shouldDiscard = true) {
-    discardFailures = shouldDiscard;
-  }
-
   /// \brief Produce a debugging dump of this locator.
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(SourceManager *SM) LLVM_ATTRIBUTE_USED,
@@ -474,8 +472,7 @@ private:
   /// \brief Initialize a constraint locator with an anchor and a path.
   ConstraintLocator(Expr *anchor, ArrayRef<PathElement> path,
                     unsigned flags)
-    : anchor(anchor), numPathElements(path.size()), summaryFlags(flags),
-      discardFailures(false)
+    : anchor(anchor), numPathElements(path.size()), summaryFlags(flags)
   {
     // FIXME: Alignment.
     std::copy(path.begin(), path.end(),
@@ -510,11 +507,6 @@ private:
   /// \brief A set of flags summarizing interesting properties of the path.
   unsigned summaryFlags : 7;
   
-  /// \brief Determines whether or not we should record constraint application
-  /// failures associated with this locator. This information cannot be
-  /// inferred from the path itself, so it is not stored as a summary flag.
-  unsigned discardFailures: 1;
-
   friend class ConstraintSystem;
 };
 
@@ -613,6 +605,25 @@ public:
 
   /// Attempt to simplify this locator to a single expression.
   Expr *trySimplifyToExpr() const;
+
+  /// Retrieve the last element in the path, if there is one.
+  Optional<LocatorPathElt> last() const {
+    // If we stored a path element here, grab it.
+    if (element) return *element;
+
+    // Otherwise, look in the previous builder if there is one.
+    if (auto prevBuilder = previous.dyn_cast<ConstraintLocatorBuilder *>())
+      return prevBuilder->last();
+
+    // Next, check the constraint locator itself.
+    if (auto locator = previous.dyn_cast<ConstraintLocator *>()) {
+      auto path = locator->getPath();
+      if (path.empty()) return None;
+      return path.back();
+    }
+
+    return None;
+  }
 };
 
 } } // end namespace swift::constraints

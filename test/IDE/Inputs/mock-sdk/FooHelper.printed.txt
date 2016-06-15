@@ -1,6 +1,6 @@
 import FooHelper.FooHelperExplicit
 @_exported import FooHelper.FooHelperSub
 
-func fooHelperFunc1(a: Int32) -> Int32
+func fooHelperFunc1(_ a: Int32) -> Int32
 var FooHelperUnnamedEnumeratorA1: Int { get }
 var FooHelperUnnamedEnumeratorA2: Int { get }

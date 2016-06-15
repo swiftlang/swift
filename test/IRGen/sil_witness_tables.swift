@@ -12,7 +12,7 @@ import sil_witness_tables_external_conformance
 protocol A {}
 
 protocol P {
-  typealias Assoc: A
+  associatedtype Assoc: A
 
   static func staticMethod()
   func instanceMethod()
@@ -36,17 +36,16 @@ struct Conformer: Q, QQ {
   func qMethod() {}
 }
 
-// CHECK: [[EXTERNAL_CONFORMER_EXTERNAL_P_WITNESS_TABLE:@_TWPV39sil_witness_tables_external_conformance17ExternalConformerS_9ExternalPS_]] = external global i8*
+// CHECK: [[EXTERNAL_CONFORMER_EXTERNAL_P_WITNESS_TABLE:@_TWPV39sil_witness_tables_external_conformance17ExternalConformerS_9ExternalPS_]] = external global i8*, align 8
 // CHECK: [[CONFORMER_Q_WITNESS_TABLE:@_TWPV18sil_witness_tables9ConformerS_1QS_]] = hidden constant [2 x i8*] [
 // CHECK:   i8* bitcast ([4 x i8*]* [[CONFORMER_P_WITNESS_TABLE:@_TWPV18sil_witness_tables9ConformerS_1PS_]] to i8*),
-// CHECK:   i8* bitcast (void (%V18sil_witness_tables9Conformer*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1QS_FS1_7qMethod{{.*}} to i8*)
+// CHECK:   i8* bitcast (void (%V18sil_witness_tables9Conformer*, %swift.type*, i8**)* @_TTWV18sil_witness_tables9ConformerS_1QS_FS1_7qMethod{{.*}} to i8*)
 // CHECK: ]
 // CHECK: [[CONFORMER_P_WITNESS_TABLE]] = hidden constant [4 x i8*] [
-// -- FIXME: associated type and witness table
-// CHECK:   i8* null,
-// CHECK:   i8* null,
-// CHECK:   i8* bitcast (void (%swift.type*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1PS_ZFS1_12staticMethod{{.*}} to i8*),
-// CHECK:   i8* bitcast (void (%V18sil_witness_tables9Conformer*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1PS_FS1_14instanceMethod{{.*}} to i8*)
+// CHECK:   i8* bitcast (%swift.type* ()* @_TMaV18sil_witness_tables14AssocConformer to i8*),
+// CHECK:   i8* bitcast (i8** ()* @_TWaV18sil_witness_tables14AssocConformerS_1AS_ to i8*)
+// CHECK:   i8* bitcast (void (%swift.type*, %swift.type*, i8**)* @_TTWV18sil_witness_tables9ConformerS_1PS_ZFS1_12staticMethod{{.*}} to i8*),
+// CHECK:   i8* bitcast (void (%V18sil_witness_tables9Conformer*, %swift.type*, i8**)* @_TTWV18sil_witness_tables9ConformerS_1PS_FS1_14instanceMethod{{.*}} to i8*)
 // CHECK: ]
 // CHECK: [[CONFORMER2_P_WITNESS_TABLE:@_TWPV18sil_witness_tables10Conformer2S_1PS_]] = hidden constant [4 x i8*]
 
@@ -71,3 +70,11 @@ func erasure(c c: Conformer) -> QQ {
 func externalErasure(c c: ExternalConformer) -> ExternalP {
   return c
 }
+
+// FIXME: why do these have different linkages?
+
+// CHECK-LABEL: define hidden %swift.type* @_TMaV18sil_witness_tables14AssocConformer()
+// CHECK:         ret %swift.type* bitcast (i64* getelementptr inbounds {{.*}} @_TMfV18sil_witness_tables14AssocConformer, i32 0, i32 1) to %swift.type*)
+
+// CHECK-LABEL: define hidden i8** @_TWaV18sil_witness_tables9ConformerS_1PS_()
+// CHECK:         ret i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @_TWPV18sil_witness_tables9ConformerS_1PS_, i32 0, i32 0)

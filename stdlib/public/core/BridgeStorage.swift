@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -20,6 +20,7 @@
 //===----------------------------------------------------------------------===//
 import SwiftShims
 
+@_fixed_layout
 public // @testable
 struct _BridgeStorage<
   NativeClass: AnyObject, ObjCClass: AnyObject
@@ -67,14 +68,12 @@ struct _BridgeStorage<
   }
   
   @inline(__always)
-  @warn_unused_result
   public // @testable
   mutating func isUniquelyReferencedNative() -> Bool {
     return _isUnique(&rawValue)
   }
 
   @inline(__always)
-  @warn_unused_result
   public // @testable
   mutating func isUniquelyReferencedOrPinnedNative() -> Bool {
     return _isUniqueOrPinned(&rawValue)
@@ -89,9 +88,8 @@ struct _BridgeStorage<
   }
   
   @inline(__always)
-  @warn_unused_result
   public // @testable
-  func isNativeWithClearedSpareBits(bits: Int) -> Bool {
+  func isNativeWithClearedSpareBits(_ bits: Int) -> Bool {
     return (_bitPattern(rawValue) &
             (_objCTaggedPointerBits | _objectPointerIsObjCBit |
              (UInt(bits)) << _objectPointerLowSpareBitShift)) == 0
@@ -122,7 +120,6 @@ struct _BridgeStorage<
   }
   
   @inline(__always)
-  @warn_unused_result
   public // @testable
   mutating func isUniquelyReferenced_native_noSpareBits() -> Bool {
     _sanityCheck(isNative)
@@ -130,7 +127,6 @@ struct _BridgeStorage<
   }
 
   @inline(__always)
-  @warn_unused_result
   public // @testable
   mutating func isUniquelyReferencedOrPinned_native_noSpareBits() -> Bool {
     _sanityCheck(isNative)

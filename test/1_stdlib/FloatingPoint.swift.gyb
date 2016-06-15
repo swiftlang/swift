@@ -1,9 +1,11 @@
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/FloatingPoint.swift
-// RUN: %S/../../utils/line-directive %t/FloatingPoint.swift -- %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %t/FloatingPoint.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
+// RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/FloatingPoint.swift
+// RUN: %line-directive %t/FloatingPoint.swift -- %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %t/FloatingPoint.swift -o %t/a.out
+// RUN: %line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
-// XFAIL: interpret
+%{
+from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
+}%
 
 import Swift
 import StdlibUnittest
@@ -20,7 +22,7 @@ struct Float80Bits : Equatable, CustomStringConvertible {
   }
 
   var description: String {
-    return "(\(String(signAndExponent, radix: 16)) \(String(significand, radix: 16))))"
+    return "(\(String(signAndExponent, radix: 16)) \(String(significand, radix: 16)))"
   }
 }
 
@@ -31,7 +33,7 @@ func == (lhs: Float80Bits, rhs: Float80Bits) -> Bool {
 }
 
 extension Float80 {
-  func _toBitPattern() -> Float80Bits {
+  var bitPattern: Float80Bits {
     let bits = Builtin.bitcast_FPIEEE80_Int80(self._value)
     let sixtyFour = Builtin.zextOrBitCast_Int64_Int80((64 as Int64)._value)
     return Float80Bits(
@@ -40,17 +42,40 @@ extension Float80 {
       UInt64(Builtin.truncOrBitCast_Int80_Int64(bits)))
   }
 
-  static func _fromBitPattern(bits: Float80Bits) -> Float80 {
+  init(bitPattern: Float80Bits) {
     var result = Builtin.shl_Int80(
-      Builtin.zextOrBitCast_Int16_Int80(bits.signAndExponent._value),
+      Builtin.zextOrBitCast_Int16_Int80(bitPattern.signAndExponent._value),
       Builtin.zextOrBitCast_Int64_Int80((64 as Int64)._value))
     result = Builtin.or_Int80(
-      result, Builtin.zextOrBitCast_Int64_Int80(bits.significand._value))
-    return Float80(_bits: Builtin.bitcast_Int80_FPIEEE80(result))
+      result, Builtin.zextOrBitCast_Int64_Int80(bitPattern.significand._value))
+    self = Float80(_bits: Builtin.bitcast_Int80_FPIEEE80(result))
   }
 }
 
 #endif
+
+% for (FloatTy, BitPatternTy) in [
+%   ('Float', 'UInt32'),
+%   ('Double', 'UInt64'),
+%   ('Float80', 'Float80Bits')
+% ]:
+%   if FloatTy == 'Float80':
+#if arch(i386) || arch(x86_64)
+%   end
+func expectBitwiseEqual(
+  _ expected: ${FloatTy}, _ actual: ${FloatTy}, ${TRACE}
+) {
+  expectEqual(expected.bitPattern, actual.bitPattern, ${trace})
+}
+func expectBitwiseEqual(
+  bitPattern expected: ${BitPatternTy}, _ actual: ${FloatTy}, ${TRACE}
+) {
+  expectBitwiseEqual(${FloatTy}(bitPattern: expected), actual, ${trace})
+}
+%   if FloatTy == 'Float80':
+#endif
+%   end
+% end
 
 var FloatingPoint = TestSuite("FloatingPoint")
 
@@ -64,6 +89,33 @@ func negativeOne<T: IntegerLiteralConvertible>() -> T {
 FloatingPoint.test("Float/IntegerLiteralConvertible") {
   expectEqual(positiveOne(),  1.0 as Float)
   expectEqual(negativeOne(), -1.0 as Float)
+}
+
+FloatingPoint.test("Float/FloatLiteralConvertible") {
+  let x: Float = -0.0
+  expectBitwiseEqual(bitPattern: 0x8000_0000, x)
+}
+
+FloatingPoint.test("Float/staticProperties") {
+  typealias Ty = Float
+  // From the FloatingPoint protocol.
+  expectEqual(2, Ty.radix)
+  expectBitwiseEqual(bitPattern: 0x7fc0_0000, Ty.nan)
+  expectBitwiseEqual(bitPattern: 0x7fa0_0000, Ty.signalingNaN)
+  expectBitwiseEqual(bitPattern: 0x7f80_0000, Ty.infinity)
+  expectBitwiseEqual(0x1.ffff_fe__p127, Ty.greatestFiniteMagnitude)
+  expectBitwiseEqual(0x1.921f_b6__p1, Ty.pi)
+  expectBitwiseEqual(0x1.0p-23, Ty.ulpOfOne)
+  expectBitwiseEqual(0x1.0p-126, Ty.leastNormalMagnitude)
+#if arch(arm)
+  expectBitwiseEqual(0x1.0p-126, Ty.leastNonzeroMagnitude)
+#else
+  expectBitwiseEqual(0x1.0p-149, Ty.leastNonzeroMagnitude)
+#endif
+
+  // From the BinaryFloatingPoint protocol.
+  expectEqual(8, Ty.exponentBitCount)
+  expectEqual(23, Ty.significandBitCount)
 }
 
 // Tests the float and int conversions work correctly. Each case is special.
@@ -116,6 +168,33 @@ FloatingPoint.test("Double/IntegerLiteralConvertible") {
   expectEqual(negativeOne(), -1.0 as Double)
 }
 
+FloatingPoint.test("Double/FloatLiteralConvertible") {
+  let x: Double = -0.0
+  expectBitwiseEqual(bitPattern: 0x8000_0000_0000_0000, x)
+}
+
+FloatingPoint.test("Double/staticProperties") {
+  typealias Ty = Double
+  // From the FloatingPoint protocol.
+  expectEqual(2, Ty.radix)
+  expectBitwiseEqual(bitPattern: 0x7ff8_0000_0000_0000, Ty.nan)
+  expectBitwiseEqual(bitPattern: 0x7ff4_0000_0000_0000, Ty.signalingNaN)
+  expectBitwiseEqual(bitPattern: 0x7ff0_0000_0000_0000, Ty.infinity)
+  expectBitwiseEqual(0x1.ffff_ffff_ffff_f__p1023, Ty.greatestFiniteMagnitude)
+  expectBitwiseEqual(0x1.921f_b544_42d1_8__p1, Ty.pi)
+  expectBitwiseEqual(0x1.0p-52, Ty.ulpOfOne)
+  expectBitwiseEqual(0x1.0p-1022, Ty.leastNormalMagnitude)
+#if arch(arm)
+  expectBitwiseEqual(0x1.0p-1022, Ty.leastNonzeroMagnitude)
+#else
+  expectBitwiseEqual(0x1.0p-1074, Ty.leastNonzeroMagnitude)
+#endif
+
+  // From the BinaryFloatingPoint protocol.
+  expectEqual(11, Ty.exponentBitCount)
+  expectEqual(52, Ty.significandBitCount)
+}
+
 FloatingPoint.test("Double/UInt8") {
   expectEqual(UInt8.min, UInt8(Double(UInt8.min)))
   expectEqual(UInt8.max, UInt8(Double(UInt8.max)))
@@ -161,15 +240,81 @@ FloatingPoint.test("Double/Int64") {
 FloatingPoint.test("Float/HashValueZero") {
   let zero: Float = getFloat32(0.0)
   let negativeZero: Float = getFloat32(-0.0)
-  expectNotEqual(zero._toBitPattern(), negativeZero._toBitPattern())
+  expectNotEqual(zero.bitPattern, negativeZero.bitPattern)
   expectEqual(zero.hashValue, negativeZero.hashValue)
 }
 
 FloatingPoint.test("Double/HashValueZero") {
   let zero: Double = getFloat64(0.0)
   let negativeZero: Double = getFloat64(-0.0)
-  expectNotEqual(zero._toBitPattern(), negativeZero._toBitPattern())
+  expectNotEqual(zero.bitPattern, negativeZero.bitPattern)
   expectEqual(zero.hashValue, negativeZero.hashValue)
+}
+
+#if arch(arm)
+% for FloatSelf in ['Float32', 'Float64']:
+func testSubNormalFlush(_ f: ${FloatSelf}) {
+  if !f.isSubnormal {
+    return
+  }
+  switch f.sign {
+  case .plus:
+    expectBitwiseEqual(.leastNonzeroMagnitude, f.nextUp)
+    expectBitwiseEqual(0.0, f.nextDown)
+  case .minus:
+    expectBitwiseEqual(-0.0, f.nextUp)
+    expectBitwiseEqual(-.leastNonzeroMagnitude, f.nextDown)
+  }
+}
+% end
+#endif
+
+let floatNextUpDownTests: [(Float, Float)] = [
+  (.nan, .nan),
+  (.greatestFiniteMagnitude, .infinity),
+  (0x1.ffff_fe__p-1, 1.0), (1.0, 0x1.0000_02__p+0),
+  (0.0, .leastNonzeroMagnitude),
+  (0x1.efff_fe__p-1, 0x1.fp-1), (0x1.fp-1, 0x1.f000_02__p-1),
+]
+
+FloatingPoint.test("Float.nextUp, .nextDown")
+  .forEach(in: floatNextUpDownTests) {
+  (prev, succ) in
+#if arch(arm)
+  if prev.isSubnormal || succ.isSubnormal {
+    testSubNormalFlush(prev)
+    testSubNormalFlush(succ)
+    return
+  }
+#endif
+  expectBitwiseEqual(succ, prev.nextUp)
+  expectBitwiseEqual(prev, succ.nextDown)
+  expectBitwiseEqual(-succ, (-prev).nextDown)
+  expectBitwiseEqual(-prev, (-succ).nextUp)
+}
+
+let doubleNextUpDownTests: [(Double, Double)] = [
+  (.nan, .nan),
+  (.greatestFiniteMagnitude, .infinity),
+  (0x1.ffff_ffff_ffff_fp-1, 1.0), (1.0, 0x1.0000_0000_0000_1p+0),
+  (0.0, .leastNonzeroMagnitude),
+  (0x1.efff_ffff_ffff_fp-1, 0x1.fp-1), (0x1.fp-1, 0x1.f000_0000_0000_1p-1),
+]
+
+FloatingPoint.test("Double.nextUp, .nextDown")
+  .forEach(in: doubleNextUpDownTests) {
+  (prev, succ) in
+#if arch(arm)
+  if prev.isSubnormal || succ.isSubnormal {
+    testSubNormalFlush(prev)
+    testSubNormalFlush(succ)
+    return
+  }
+#endif
+  expectBitwiseEqual(succ, prev.nextUp)
+  expectBitwiseEqual(prev, succ.nextDown)
+  expectBitwiseEqual(-succ, (-prev).nextDown)
+  expectBitwiseEqual(-prev, (-succ).nextUp)
 }
 
 #if arch(i386) || arch(x86_64)
@@ -179,46 +324,67 @@ FloatingPoint.test("Float80/IntegerLiteralConvertible") {
   expectEqual(negativeOne(), -1.0 as Float80)
 }
 
+FloatingPoint.test("Float80/FloatLiteralConvertible") {
+  let x: Float80 = -0.0
+  expectBitwiseEqual(bitPattern: Float80Bits(0x8000, 0), x)
+}
+
+FloatingPoint.test("Float80/staticProperties") {
+  typealias Ty = Double
+  // From the FloatingPoint protocol.
+  expectEqual(2, Ty.radix)
+  expectBitwiseEqual(bitPattern: 0x7ff8_0000_0000_0000, Ty.nan)
+  expectBitwiseEqual(bitPattern: 0x7ff4_0000_0000_0000, Ty.signalingNaN)
+  expectBitwiseEqual(bitPattern: 0x7ff0_0000_0000_0000, Ty.infinity)
+  expectBitwiseEqual(0x1.ffff_ffff_ffff_f__p1023, Ty.greatestFiniteMagnitude)
+  expectBitwiseEqual(0x1.921f_b544_42d1_8__p1, Ty.pi)
+  expectBitwiseEqual(0x1.0p-52, Ty.ulpOfOne)
+  expectBitwiseEqual(0x1.0p-1022, Ty.leastNormalMagnitude)
+  expectBitwiseEqual(0x1.0p-1074, Ty.leastNonzeroMagnitude)
+
+  // From the BinaryFloatingPoint protocol.
+  expectEqual(11, Ty.exponentBitCount)
+  expectEqual(52, Ty.significandBitCount)
+}
+
 FloatingPoint.test("Float80/HashValueZero") {
   let zero: Float80 = getFloat80(0.0)
   let negativeZero: Float80 = getFloat80(-0.0)
-  expectNotEqual(zero._toBitPattern(), negativeZero._toBitPattern())
+  expectNotEqual(zero.bitPattern, negativeZero.bitPattern)
   expectEqual(zero.hashValue, negativeZero.hashValue)
+}
+
+let float80NextUpDownTests: [(Float80, Float80)] = [
+  (.nan, .nan),
+  (.greatestFiniteMagnitude, .infinity),
+  (0x1.ffff_ffff_ffff_fffep-1, 1.0), (1.0, 0x1.0000_0000_0000_0002p+0),
+  (0.0, .leastNonzeroMagnitude),
+  (0x1.efff_ffff_ffff_fffep-1, 0x1.fp-1),
+  (0x1.fp-1, 0x1.f000_0000_0000_0002p-1),
+]
+
+FloatingPoint.test("Float80.nextUp, .nextDown")
+  .forEach(in: float80NextUpDownTests) {
+  (prev, succ) in
+
+  expectBitwiseEqual(succ, prev.nextUp)
+  expectBitwiseEqual(prev, succ.nextDown)
+  expectBitwiseEqual(-succ, (-prev).nextDown)
+  expectBitwiseEqual(-prev, (-succ).nextUp)
 }
 
 #endif
 
-func getPositiveSubnormal_Float32() -> Float32 {
-  var result: Float32 = 1.0
-  for _ in 0..<127 {
-    result /= 2.0 as Float32
-  }
-  expectTrue(result.isSubnormal)
-  return result
-}
-
-func getPositiveSubnormal_Float64() -> Float64 {
-  var result: Float64 = 1.0
-  for _ in 0..<1023 {
-    result /= 2.0 as Float64
-  }
-  expectTrue(result.isSubnormal)
-  return result
-}
-
-// FIXME: Float80
-// <rdar://problem/17958458> Int(Float80.quietNaN) is garbage
-
 % for FloatSelf in ['Float32', 'Float64']:
 
 func checkFloatingPointComparison_${FloatSelf}(
-  expected: ExpectedComparisonResult,
+  _ expected: ExpectedComparisonResult,
   _ lhs: ${FloatSelf}, _ rhs: ${FloatSelf},
   //===--- TRACE boilerplate ----------------------------------------------===//
-  // @autoclosure _ message: ()->String = "",
+  // @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
-  file: String = __FILE__, line: UInt = __LINE__
+  file: String = #file, line: UInt = #line
 ) {
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
   let message = { "expected: lhs=\(lhs) \(expected) rhs=\(rhs)" }
@@ -239,25 +405,39 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
   let interestingValues: [${FloatSelf}] = [
     // Interesting floating point values, sorted.
     -${FloatSelf}.infinity,
+    -${FloatSelf}.greatestFiniteMagnitude,
     -1.0,
+    -${FloatSelf}.ulpOfOne,
+    -${FloatSelf}.leastNormalMagnitude,
     -0.0,
     0.0,
+    ${FloatSelf}.leastNormalMagnitude,
+    ${FloatSelf}.ulpOfOne,
     1.0,
+    ${FloatSelf}.greatestFiniteMagnitude,
     ${FloatSelf}.infinity,
-    ${FloatSelf}.quietNaN,
+    ${FloatSelf}.nan,
   ]
 #else
   let interestingValues: [${FloatSelf}] = [
     // Interesting floating point values, sorted.
     -${FloatSelf}.infinity,
+    -${FloatSelf}.greatestFiniteMagnitude,
     -1.0,
-    -getPositiveSubnormal_${FloatSelf}(),
+    -${FloatSelf}.ulpOfOne,
+    -${FloatSelf}.leastNormalMagnitude,
+    -${FloatSelf}.leastNormalMagnitude/2,
+    -${FloatSelf}.leastNonzeroMagnitude,
     -0.0,
     0.0,
-    getPositiveSubnormal_${FloatSelf}(),
+    ${FloatSelf}.leastNonzeroMagnitude,
+    ${FloatSelf}.leastNormalMagnitude/2,
+    ${FloatSelf}.leastNormalMagnitude,
+    ${FloatSelf}.ulpOfOne,
     1.0,
+    ${FloatSelf}.greatestFiniteMagnitude,
     ${FloatSelf}.infinity,
-    ${FloatSelf}.quietNaN,
+    ${FloatSelf}.nan,
   ]
 #endif
 
@@ -268,7 +448,7 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
       if lhs.isZero && rhs.isZero {
         // Special case: 0.0 and -0.0 compare equal.
         checkFloatingPointComparison_${FloatSelf}(
-          ExpectedComparisonResult.EQ, lhs, rhs)
+          ExpectedComparisonResult.eq, lhs, rhs)
       } else if lhs.isNaN || rhs.isNaN {
         // Special case: NaN is unordered wrt other values.
         // - equality comparison with NaN returns false,
@@ -284,10 +464,10 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
         // The sane case.
         checkFloatingPointComparison_${FloatSelf}(
           lhsIdx < rhsIdx ?
-            ExpectedComparisonResult.LT :
+            ExpectedComparisonResult.lt :
             (lhsIdx == rhsIdx ?
-              ExpectedComparisonResult.EQ :
-              ExpectedComparisonResult.GT),
+              ExpectedComparisonResult.eq :
+              ExpectedComparisonResult.gt),
           lhs, rhs)
       }
     }
@@ -312,332 +492,534 @@ FloatingPoint.test("${Self}/Strideable") {
 #endif
 % end
 
-// FIXME: implement Float80 tests after Float80 is implemented.
-// <rdar://problem/20005438> Float80 does not conform to FloatingPointType
-
 FloatingPoint.test("Float32/Literals") {
-  if true {
+  do {
     let f: Float32 = 0.0
-    expectEqual(0x0000_0000, f._toBitPattern())
+    expectEqual(0x0000_0000, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float32 = -0.0
-    expectEqual(0x8000_0000, f._toBitPattern())
+    expectEqual(0x8000_0000, f.bitPattern)
   }
 
-  if true {
+  do {
     let f: Float32 = 1.0
-    expectEqual(0x3f80_0000, f._toBitPattern())
+    expectEqual(0x3f80_0000, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float32 = -1.0
-    expectEqual(0xbf80_0000, f._toBitPattern())
+    expectEqual(0xbf80_0000, f.bitPattern)
   }
 
-  if true {
+  do {
     let f: Float32 = 0.999999
-    expectEqual(0x3f7fffef, f._toBitPattern())
+    expectEqual(0x3f7fffef, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float32 = 0.9999999
-    expectEqual(0x3f7ffffe, f._toBitPattern())
+    expectEqual(0x3f7ffffe, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float32 = 0.99999999
-    expectEqual(0x3f80_0000, f._toBitPattern())
+    expectEqual(0x3f80_0000, f.bitPattern)
   }
 
   // Infinity.
   // FIXME: this should be a compile-time error, not silent overflow.
-  if true {
+  do {
     let f: Float32 = 1.0e999
-    expectEqual(0x7f80_0000, f._toBitPattern())
+    expectEqual(0x7f80_0000, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float32 = -1.0e999
-    expectEqual(0xff80_0000, f._toBitPattern())
+    expectEqual(0xff80_0000, f.bitPattern)
   }
 
   // Smallest subnormal.
-  if true {
+  do {
     let f: Float32 = 1.4e-45
-    expectEqual(0x0000_0001, f._toBitPattern())
+    expectEqual(0x0000_0001, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float32 = -1.4e-45
-    expectEqual(0x8000_0001, f._toBitPattern())
+    expectEqual(0x8000_0001, f.bitPattern)
   }
 
   // Rounded to zero.
-  if true {
+  do {
     let f: Float32 = 0.7e-45
-    expectEqual(0x0000_0000, f._toBitPattern())
+    expectEqual(0x0000_0000, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float32 = -0.7e-45
-    expectEqual(0x8000_0000, f._toBitPattern())
+    expectEqual(0x8000_0000, f.bitPattern)
   }
 
   // Second largest normal.
-  if true {
+  do {
     let f: Float32 = 3.4028232e+38
-    expectEqual(0x7f7f_fffe, f._toBitPattern())
+    expectEqual(0x7f7f_fffe, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float32 = -3.4028232e+38
-    expectEqual(0xff7f_fffe, f._toBitPattern())
+    expectEqual(0xff7f_fffe, f.bitPattern)
   }
 
   // Largest normal.
-  if true {
+  do {
     let f: Float32 = 3.4028234e+38
-    expectEqual(0x7f7f_ffff, f._toBitPattern())
+    expectEqual(0x7f7f_ffff, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float32 = 340282340000000000000000000000000000000.0
-    expectEqual(0x7f7f_ffff, f._toBitPattern())
+    expectEqual(0x7f7f_ffff, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float32 = 340282340000000000000000000000000000000
-    expectEqual(0x7f7f_ffff, f._toBitPattern())
+    expectEqual(0x7f7f_ffff, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float32 = -3.4028234e+38
-    expectEqual(0xff7f_ffff, f._toBitPattern())
+    expectEqual(0xff7f_ffff, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float32 = -340282340000000000000000000000000000000.0
-    expectEqual(0xff7f_ffff, f._toBitPattern())
+    expectEqual(0xff7f_ffff, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float32 = -340282340000000000000000000000000000000
-    expectEqual(0xff7f_ffff, f._toBitPattern())
+    expectEqual(0xff7f_ffff, f.bitPattern)
   }
 
   // Smallest decimal that is rounded to infinity.
   // FIXME: this should be a compile-time error, not silent overflow.
-  if true {
+  do {
     let f: Float32 = 3.4028236e+38
-    expectEqual(0x7f80_0000, f._toBitPattern())
+    expectEqual(0x7f80_0000, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float32 = -3.4028236e+38
-    expectEqual(0xff80_0000, f._toBitPattern())
+    expectEqual(0xff80_0000, f.bitPattern)
   }
 }
 
 FloatingPoint.test("Float64/Literals") {
-  if true {
+  do {
     let f: Float64 = 0.0
-    expectEqual(0x0000_0000_0000_0000, f._toBitPattern())
+    expectEqual(0x0000_0000_0000_0000, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float64 = -0.0
-    expectEqual(0x8000_0000_0000_0000, f._toBitPattern())
+    expectEqual(0x8000_0000_0000_0000, f.bitPattern)
   }
 
-  if true {
+  do {
     let f: Float64 = 1.0
-    expectEqual(0x3ff0_0000_0000_0000, f._toBitPattern())
+    expectEqual(0x3ff0_0000_0000_0000, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float64 = -1.0
-    expectEqual(0xbff0_0000_0000_0000, f._toBitPattern())
+    expectEqual(0xbff0_0000_0000_0000, f.bitPattern)
   }
 
-  if true {
+  do {
     let f: Float64 = 0.999999999999999
-    expectEqual(0x3fef_ffff_ffff_fff7, f._toBitPattern())
+    expectEqual(0x3fef_ffff_ffff_fff7, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float64 = 0.9999999999999999
-    expectEqual(0x3fef_ffff_ffff_ffff, f._toBitPattern())
+    expectEqual(0x3fef_ffff_ffff_ffff, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float64 = 0.99999999999999999
-    expectEqual(0x3ff0_0000_0000_0000, f._toBitPattern())
+    expectEqual(0x3ff0_0000_0000_0000, f.bitPattern)
   }
 
   // Infinity.
   // FIXME: this should be a compile-time error, not silent overflow.
-  if true {
+  do {
     let f: Float64 = 1.0e999
-    expectEqual(0x7ff0_0000_0000_0000, f._toBitPattern())
+    expectEqual(0x7ff0_0000_0000_0000, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float64 = -1.0e999
-    expectEqual(0xfff0_0000_0000_0000, f._toBitPattern())
+    expectEqual(0xfff0_0000_0000_0000, f.bitPattern)
   }
 
   // Smallest subnormal.
-  if true {
+  do {
     let f: Float64 = 4.0e-324
-    expectEqual(0x0000_0000_0000_0001, f._toBitPattern())
+    expectEqual(0x0000_0000_0000_0001, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float64 = -4.0e-324
-    expectEqual(0x8000_0000_0000_0001, f._toBitPattern())
+    expectEqual(0x8000_0000_0000_0001, f.bitPattern)
   }
 
   // Rounded to zero.
-  if true {
+  do {
     let f: Float64 = 2.4e-324
-    expectEqual(0x0000_0000_0000_0000, f._toBitPattern())
+    expectEqual(0x0000_0000_0000_0000, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float64 = -2.4e-324
-    expectEqual(0x8000_0000_0000_0000, f._toBitPattern())
+    expectEqual(0x8000_0000_0000_0000, f.bitPattern)
   }
 
   // Second largest normal.
-  if true {
+  do {
     let f: Float64 = 1.79769313486231551e+308
-    expectEqual(0x7fef_ffff_ffff_fffe, f._toBitPattern())
+    expectEqual(0x7fef_ffff_ffff_fffe, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float64 = -1.79769313486231551e+308
-    expectEqual(0xffef_ffff_ffff_fffe, f._toBitPattern())
+    expectEqual(0xffef_ffff_ffff_fffe, f.bitPattern)
   }
 
   // Largest normal.
-  if true {
+  do {
     let f: Float64 = 1.7976931348623157e+308
-    expectEqual(0x7fef_ffff_ffff_ffff, f._toBitPattern())
+    expectEqual(0x7fef_ffff_ffff_ffff, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float64 = 179769313486231570000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.0
-    expectEqual(0x7fef_ffff_ffff_ffff, f._toBitPattern())
+    expectEqual(0x7fef_ffff_ffff_ffff, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float64 = 179769313486231570000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-    expectEqual(0x7fef_ffff_ffff_ffff, f._toBitPattern())
+    expectEqual(0x7fef_ffff_ffff_ffff, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float64 = -1.7976931348623157e+308
-    expectEqual(0xffef_ffff_ffff_ffff, f._toBitPattern())
+    expectEqual(0xffef_ffff_ffff_ffff, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float64 = -179769313486231570000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.0
-    expectEqual(0xffef_ffff_ffff_ffff, f._toBitPattern())
+    expectEqual(0xffef_ffff_ffff_ffff, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float64 = -179769313486231570000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-    expectEqual(0xffef_ffff_ffff_ffff, f._toBitPattern())
+    expectEqual(0xffef_ffff_ffff_ffff, f.bitPattern)
   }
 
   // Smallest decimal that is rounded to infinity.
   // FIXME: this should be a compile-time error, not silent overflow.
-  if true {
+  do {
     let f: Float64 = 1.7976931348623159e+308
-    expectEqual(0x7ff0_0000_0000_0000, f._toBitPattern())
+    expectEqual(0x7ff0_0000_0000_0000, f.bitPattern)
   }
-  if true {
+  do {
     let f: Float64 = -1.7976931348623159e+308
-    expectEqual(0xfff0_0000_0000_0000, f._toBitPattern())
+    expectEqual(0xfff0_0000_0000_0000, f.bitPattern)
   }
 }
 
 #if arch(i386) || arch(x86_64)
 
 FloatingPoint.test("Float80/Literals") {
-  if true {
+  do {
     let f: Float80 = 0.0
-    expectEqual(Float80Bits(0x0000, 0x0000_0000_0000_0000), f._toBitPattern())
+    expectEqual(Float80Bits(0x0000, 0x0000_0000_0000_0000), f.bitPattern)
   }
-  if true {
+  do {
     let f: Float80 = -0.0
-    expectEqual(Float80Bits(0x8000, 0x0000_0000_0000_0000), f._toBitPattern())
+    expectEqual(Float80Bits(0x8000, 0x0000_0000_0000_0000), f.bitPattern)
   }
 
-  if true {
+  do {
     let f: Float80 = 1.0
-    expectEqual(Float80Bits(0x3fff, 0x8000_0000_0000_0000), f._toBitPattern())
+    expectEqual(Float80Bits(0x3fff, 0x8000_0000_0000_0000), f.bitPattern)
   }
-  if true {
+  do {
     let f: Float80 = -1.0
-    expectEqual(Float80Bits(0xbfff, 0x8000_0000_0000_0000), f._toBitPattern())
+    expectEqual(Float80Bits(0xbfff, 0x8000_0000_0000_0000), f.bitPattern)
   }
 
-  if true {
+  do {
     let f: Float80 = 0.999999999999999999
-    expectEqual(Float80Bits(0x3ffe, 0xffff_ffff_ffff_ffee), f._toBitPattern())
+    expectEqual(Float80Bits(0x3ffe, 0xffff_ffff_ffff_ffee), f.bitPattern)
   }
-  if true {
+  do {
     let f: Float80 = 0.9999999999999999999
-    expectEqual(Float80Bits(0x3ffe, 0xffff_ffff_ffff_fffe), f._toBitPattern())
+    expectEqual(Float80Bits(0x3ffe, 0xffff_ffff_ffff_fffe), f.bitPattern)
   }
-  if true {
+  do {
     let f: Float80 = 0.99999999999999999995
-    expectEqual(Float80Bits(0x3ffe, 0xffff_ffff_ffff_ffff), f._toBitPattern())
+    expectEqual(Float80Bits(0x3ffe, 0xffff_ffff_ffff_ffff), f.bitPattern)
   }
-  if true {
+  do {
     let f: Float80 = 0.99999999999999999999
-    expectEqual(Float80Bits(0x3fff, 0x8000_0000_0000_0000), f._toBitPattern())
+    expectEqual(Float80Bits(0x3fff, 0x8000_0000_0000_0000), f.bitPattern)
   }
 
   // Infinity.
   // FIXME: this should be a compile-time error, not silent overflow.
-  if true {
+  do {
     let f: Float80 = 1.0e19999
-    expectEqual(Float80Bits(0x7fff, 0x8000_0000_0000_0000), f._toBitPattern())
+    expectEqual(Float80Bits(0x7fff, 0x8000_0000_0000_0000), f.bitPattern)
   }
-  if true {
+  do {
     let f: Float80 = -1.0e19999
-    expectEqual(Float80Bits(0xffff, 0x8000_0000_0000_0000), f._toBitPattern())
+    expectEqual(Float80Bits(0xffff, 0x8000_0000_0000_0000), f.bitPattern)
   }
 
   // Smallest subnormal.
-  if true {
+  do {
     // 3.645199531882474602528e-4951
     let f: Float80 = 3.6e-4951
-    expectEqual(Float80Bits(0x0000, 0x0000_0000_0000_0001), f._toBitPattern())
+    expectEqual(Float80Bits(0x0000, 0x0000_0000_0000_0001), f.bitPattern)
   }
-  if true {
+  do {
     let f: Float80 = -3.6e-4951
-    expectEqual(Float80Bits(0x8000, 0x0000_0000_0000_0001), f._toBitPattern())
+    expectEqual(Float80Bits(0x8000, 0x0000_0000_0000_0001), f.bitPattern)
   }
 
   // Rounded to zero.
-  if true {
+  do {
     let f: Float80 = 1.8e-4951
-    expectEqual(Float80Bits(0x0000, 0x0000_0000_0000_0000), f._toBitPattern())
+    expectEqual(Float80Bits(0x0000, 0x0000_0000_0000_0000), f.bitPattern)
   }
-  if true {
+  do {
     let f: Float80 = -1.8e-4951
-    expectEqual(Float80Bits(0x8000, 0x0000_0000_0000_0000), f._toBitPattern())
+    expectEqual(Float80Bits(0x8000, 0x0000_0000_0000_0000), f.bitPattern)
   }
 
   // Largest normal.
-  if true {
+  do {
     let f: Float80 = 1.189731495357231765e+4932
-    expectEqual(Float80Bits(0x7ffe, 0xffff_ffff_ffff_ffff), f._toBitPattern())
+    expectEqual(Float80Bits(0x7ffe, 0xffff_ffff_ffff_ffff), f.bitPattern)
   }
-  if true {
+  do {
     let f: Float80 = 1189731495357231765000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.0
-    expectEqual(Float80Bits(0x7ffe, 0xffff_ffff_ffff_ffff), f._toBitPattern())
+    expectEqual(Float80Bits(0x7ffe, 0xffff_ffff_ffff_ffff), f.bitPattern)
   }
-  if true {
+  do {
     let f: Float80 = -1.189731495357231765e+4932
-    expectEqual(Float80Bits(0xfffe, 0xffff_ffff_ffff_ffff), f._toBitPattern())
+    expectEqual(Float80Bits(0xfffe, 0xffff_ffff_ffff_ffff), f.bitPattern)
   }
-  if true {
+  do {
     let f: Float80 = -1189731495357231765000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.0
-    expectEqual(Float80Bits(0xfffe, 0xffff_ffff_ffff_ffff), f._toBitPattern())
+    expectEqual(Float80Bits(0xfffe, 0xffff_ffff_ffff_ffff), f.bitPattern)
   }
 
   // Smallest decimal that is rounded to infinity.
   // FIXME: this should be a compile-time error, not silent overflow.
-  if true {
+  do {
     let f: Float80 = 1.18973149535723176515e+4932
-    expectEqual(Float80Bits(0x7fff, 0x8000_0000_0000_0000), f._toBitPattern())
+    expectEqual(Float80Bits(0x7fff, 0x8000_0000_0000_0000), f.bitPattern)
   }
-  if true {
+  do {
     let f: Float80 = -1.18973149535723176515e+4932
-    expectEqual(Float80Bits(0xffff, 0x8000_0000_0000_0000), f._toBitPattern())
+    expectEqual(Float80Bits(0xffff, 0x8000_0000_0000_0000), f.bitPattern)
   }
 }
 
 #endif
+
+FloatingPoint.test("Float32/quietNaN") {
+  do {
+    let f: Float32 = .nan
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+    expectEqual(0x7fc0_0000, f.bitPattern)
+  }
+  do {
+    // Empty payload
+    let f: Float32 = Float32(bitPattern: 0x7fc0_0000)
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+  }
+  do {
+    // Full payload
+    let f: Float32 = Float32(bitPattern: 0x7fff_ffff)
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+  }
+  do {
+    // Highest payload `init(nan:signaling:)` can handle
+    let f: Float32 = Float32(nan: 0x1f_ffff, signaling: false)
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+    expectEqual(0x7fdf_ffff, f.bitPattern)
+  }
+  do {
+    // Payload overflow
+    expectCrashLater()
+    _ = Float32(nan: 0x20_0000, signaling: false)
+  }
+}
+
+FloatingPoint.test("Float64/quietNaN") {
+  do {
+    let f: Float64 = .nan
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+    expectEqual(0x7ff8_0000_0000_0000, f.bitPattern)
+  }
+  do {
+    // Empty payload
+    let f: Float64 = Float64(bitPattern: 0x7ff8_0000_0000_0000)
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+  }
+  do {
+    // Full payload
+    let f: Float64 = Float64(bitPattern: 0x7fff_ffff_ffff_ffff)
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+  }
+  do {
+    // Highest payload `init(nan:signaling:)` can handle
+    let f: Float64 = Float64(nan: 0x3_ffff_ffff_ffff, signaling: false)
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+    expectEqual(0x7ffb_ffff_ffff_ffff, f.bitPattern)
+  }
+  do {
+    // Payload overflow
+    expectCrashLater()
+    _ = Float64(nan: 0x4_0000_0000_0000, signaling: false)
+  }
+}
+
+#if arch(i386) || arch(x86_64)
+
+FloatingPoint.test("Float80/quietNaN") {
+  do {
+    let f: Float80 = .nan
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+    expectEqual(Float80Bits(0x7fff, 0xc000_0000_0000_0000), f.bitPattern)
+  }
+  do {
+    // Empty payload
+    let f: Float80 = Float80(bitPattern: Float80Bits(0x7fff, 0xc000_0000_0000_0000))
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+  }
+  do {
+    // Full payload
+    let f: Float80 = Float80(bitPattern: Float80Bits(0x7fff, 0xffff_ffff_ffff_ffff))
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+  }
+  do {
+    // Highest payload `init(nan:signaling:)` can handle
+    let f: Float80 = Float80(nan: 0x1fff_ffff_ffff_ffff, signaling: false)
+    expectTrue(f.isNaN && !f.isSignalingNaN)
+    expectEqual(Float80Bits(0x7fff, 0xdfff_ffff_ffff_ffff), f.bitPattern)
+  }
+  do {
+    // Payload overflow
+    expectCrashLater()
+    _ = Float80(nan: 0x2000_0000_0000_0000, signaling: false)
+  }
+}
+
+#endif
+
+#if !arch(i386)
+
+FloatingPoint.test("Float32/signalingNaN") {
+  do {
+    let f: Float32 = .signalingNaN
+    expectTrue(f.isNaN && f.isSignalingNaN)
+    expectEqual(0x7fa0_0000, f.bitPattern)
+  }
+  do {
+    // Empty payload
+    let f: Float32 = Float32(bitPattern: 0x7fa0_0000)
+    expectTrue(f.isNaN && f.isSignalingNaN)
+  }
+  do {
+    // Full payload
+    let f: Float32 = Float32(bitPattern: 0x7fbf_ffff)
+    expectTrue(f.isNaN && f.isSignalingNaN)
+  }
+  do {
+    // Highest payload `init(nan:signaling:)` can handle
+    let f: Float32 = Float32(nan: 0x1f_ffff, signaling: true)
+    expectTrue(f.isNaN && f.isSignalingNaN)
+    expectEqual(0x7fbf_ffff, f.bitPattern)
+  }
+  do {
+    // payload overflow
+    expectCrashLater()
+    _ = Float32(nan: 0x20_0000, signaling: true)
+  }
+}
+
+FloatingPoint.test("Float64/signalingNaN") {
+  do {
+    let f: Float64 = .signalingNaN
+    expectTrue(f.isNaN && f.isSignalingNaN)
+    expectEqual(0x7ff4_0000_0000_0000, f.bitPattern)
+  }
+  do {
+    // Empty payload
+    let f: Float64 = Float64(bitPattern: 0x7ff4_0000_0000_0000)
+    expectTrue(f.isNaN && f.isSignalingNaN)
+  }
+  do {
+    // Full payload
+    let f: Float64 = Float64(bitPattern: 0x7ff7_ffff_ffff_ffff)
+    expectTrue(f.isNaN && f.isSignalingNaN)
+  }
+  do {
+    // Highest payload `init(nan:signaling:)` can handle
+    let f: Float64 = Float64(nan: 0x3_ffff_ffff_ffff, signaling: true)
+    expectTrue(f.isNaN && f.isSignalingNaN)
+    expectEqual(0x7ff7_ffff_ffff_ffff, f.bitPattern)
+  }
+  do {
+    // payload overflow
+    expectCrashLater()
+    _ = Float64(nan: 0x4_0000_0000_0000, signaling: true)
+  }
+}
+
+#endif
+
+#if arch(i386) || arch(x86_64)
+
+FloatingPoint.test("Float80/signalingNaN") {
+  do {
+    let f: Float80 = .signalingNaN
+    expectTrue(f.isNaN && f.isSignalingNaN)
+    expectEqual(Float80Bits(0x7fff, 0xa000_0000_0000_0000), f.bitPattern)
+  }
+  do {
+    // Empty payload
+    let f: Float80 = Float80(bitPattern: Float80Bits(0x7fff, 0xa000_0000_0000_0000))
+    expectTrue(f.isNaN && f.isSignalingNaN)
+  }
+  do {
+    // Full payload
+    let f: Float80 = Float80(bitPattern: Float80Bits(0x7fff, 0xbfff_ffff_ffff_ffff))
+    expectTrue(f.isNaN && f.isSignalingNaN)
+  }
+  do {
+    // Highest payload `init(nan:signaling:)` can handle
+    let f: Float80 = Float80(nan: 0x1fff_ffff_ffff_ffff, signaling: true)
+    expectTrue(f.isNaN && f.isSignalingNaN)
+    expectEqual(Float80Bits(0x7fff, 0xbfff_ffff_ffff_ffff), f.bitPattern)
+  }
+  do {
+    // payload overflow
+    expectCrashLater()
+    _ = Float80(nan: 0x2000_0000_0000_0000, signaling: true)
+  }
+}
+
+#endif
+
+var FloatingPointClassification = TestSuite("NumericParsing")
+
+FloatingPointClassification.test("FloatingPointClassification/Equatable") {
+  let values: [FloatingPointClassification] = [
+    .signalingNaN,
+    .quietNaN,
+    .negativeInfinity,
+    .negativeNormal,
+    .negativeSubnormal,
+    .negativeZero,
+    .positiveZero,
+    .positiveSubnormal,
+    .positiveNormal,
+    .positiveInfinity
+  ]
+  // Values should be equal iff indices equal
+  checkEquatable(values, oracle: { $0 == $1 }) 
+}
 
 runAllTests()
 

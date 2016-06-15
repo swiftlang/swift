@@ -1,5 +1,8 @@
 // RUN: %target-parse-verify-swift
 
+// REQUIRES: objc_interop
+import Foundation
+
 struct S0 {
   init!(int: Int) { }
   init! (uint: UInt) { }
@@ -26,7 +29,7 @@ class DuplicateDecls {
 }
 
 // Construct via a failable initializer.
-func testConstruction(i: Int, s: String) {
+func testConstruction(_ i: Int, s: String) {
   let s0Opt = S0(string: s)
   assert(s0Opt != nil)
   var _: S0 = s0Opt // expected-error{{value of optional type 'S0?' not unwrapped; did you mean to use '!' or '?'?}} {{20-20=!}}

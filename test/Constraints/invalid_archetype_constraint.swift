@@ -3,7 +3,7 @@
 protocol Empty {}
 
 protocol P {
-  typealias Element
+  associatedtype Element
   init()
 }
 
@@ -19,6 +19,6 @@ struct A2<T> : P {
   typealias Element = T
 }
 
-func toA<S: Empty, AT:P where AT.Element == S.Generator.Element>(s: S) -> AT { // expected-error{{'Generator' is not a member type of 'S'}}
+func toA<S: Empty, AT:P where AT.Element == S.Generator.Element>(_ s: S) -> AT { // expected-error{{'Generator' is not a member type of 'S'}}
   return AT()
 }

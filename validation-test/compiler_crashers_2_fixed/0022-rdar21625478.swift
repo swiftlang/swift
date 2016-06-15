@@ -2,6 +2,131 @@
 
 import StdlibUnittest
 
+public struct MyRange<Bound : ForwardIndex> {
+  var startIndex: Bound
+  var endIndex: Bound
+}
+
+public protocol ForwardIndex : Equatable {
+  associatedtype Distance : SignedNumber
+  func successor() -> Self
+}
+
+public protocol MySequence {
+  associatedtype Iterator : IteratorProtocol
+  associatedtype SubSequence = Void
+
+  func makeIterator() -> Iterator
+  var underestimatedCount: Int { get }
+
+  func map<T>(
+    @noescape _ transform: (Iterator.Element) -> T
+  ) -> [T]
+
+  func filter(
+    @noescape _ includeElement: (Iterator.Element) -> Bool
+  ) -> [Iterator.Element]
+
+  func _customContainsEquatableElement(
+    _ element: Iterator.Element
+  ) -> Bool?
+
+  func _preprocessingPass<R>(
+    @noescape _ preprocess: (Self) -> R
+  ) -> R?
+
+  func _copyToNativeArrayBuffer()
+    -> _ContiguousArrayBuffer<Iterator.Element>
+
+  func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Iterator.Element>
+  ) -> UnsafeMutablePointer<Iterator.Element>
+}
+extension MySequence {
+  var underestimatedCount: Int {
+    return 0
+  }
+
+  public func map<T>(
+    @noescape _ transform: (Iterator.Element) -> T
+  ) -> [T] {
+    return []
+  }
+
+  public func filter(
+    @noescape _ includeElement: (Iterator.Element) -> Bool
+  ) -> [Iterator.Element] {
+    return []
+  }
+
+  public func _customContainsEquatableElement(
+    _ element: Iterator.Element
+  ) -> Bool? {
+    return nil
+  }
+
+  public func _preprocessingPass<R>(
+    @noescape _ preprocess: (Self) -> R
+  ) -> R? {
+    return nil
+  }
+
+  public func _copyToNativeArrayBuffer()
+    -> _ContiguousArrayBuffer<Iterator.Element> {
+    fatalError()
+  }
+
+  public func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Iterator.Element>
+  ) -> UnsafeMutablePointer<Iterator.Element> {
+    fatalError()
+  }
+}
+
+public protocol MyIndexable : MySequence {
+  associatedtype Index : ForwardIndex
+
+  var startIndex: Index { get }
+  var endIndex: Index { get }
+
+  associatedtype _Element
+  subscript(_: Index) -> _Element { get }
+}
+
+public protocol MyCollection : MyIndexable {
+  associatedtype Iterator : IteratorProtocol = IndexingIterator<Self>
+  associatedtype SubSequence : MySequence
+
+  subscript(_: Index) -> Iterator.Element { get }
+  subscript(_: MyRange<Index>) -> SubSequence { get }
+
+  var first: Iterator.Element? { get }
+  var isEmpty: Bool { get }
+  var count: Index.Distance { get }
+
+  func _customIndexOfEquatableElement(_ element: Iterator.Element) -> Index??
+}
+extension MyCollection {
+  public var isEmpty: Bool {
+    return startIndex == endIndex
+  }
+  public func _preprocessingPass<R>(
+    @noescape _ preprocess: (Self) -> R
+  ) -> R? {
+    return preprocess(self)
+  }
+  public var count: Index.Distance { return 0 }
+  public func _customIndexOfEquatableElement(_ element: Iterator.Element) -> Index?? {
+    return nil
+  }
+}
+
+public struct IndexingIterator<I : MyIndexable> : IteratorProtocol {
+  public func next() -> I._Element? {
+    return nil
+  }
+}
+
 protocol Resettable : AnyObject {
   func reset()
 }
@@ -29,11 +154,11 @@ public class TypeIndexed<Value> : Resettable {
   internal var defaultValue: Value
 }
 
-//===--- LoggingWrappers.swift ---------------------------------------===//
+//===--- LoggingWrappers.swift --------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -41,14 +166,14 @@ public class TypeIndexed<Value> : Resettable {
 //
 //===----------------------------------------------------------------------===//
 
-public protocol WrapperType {
-  typealias Base
+public protocol Wrapper {
+  associatedtype Base
   init(_: Base)
   var base: Base {get set}
 }
 
-public protocol LoggingType : WrapperType {
-  typealias Log : AnyObject
+public protocol LoggingType : Wrapper {
+  associatedtype Log : AnyObject
 }
 
 extension LoggingType {
@@ -61,26 +186,26 @@ extension LoggingType {
   }
 }
 
-public class GeneratorLog {
-  public static func dispatchTester<G: GeneratorType>(
-    g: G
-  ) -> LoggingGenerator<LoggingGenerator<G>> {
-    return LoggingGenerator(LoggingGenerator(g))
+public class IteratorLog {
+  public static func dispatchTester<G : IteratorProtocol>(
+    _ g: G
+  ) -> LoggingIterator<LoggingIterator<G>> {
+    return LoggingIterator(LoggingIterator(g))
   }
   public static var next = TypeIndexed(0)
 }
 
-public struct LoggingGenerator<Base: GeneratorType>
-  : GeneratorType, LoggingType {
+public struct LoggingIterator<Base: IteratorProtocol>
+  : IteratorProtocol, LoggingType {
 
-  public typealias Log = GeneratorLog
+  public typealias Log = IteratorLog
   
   public init(_ base: Base) {
     self.base = base
   }
   
   public mutating func next() -> Base.Element? {
-    ++Log.next[selfType]
+    Log.next[selfType] += 1
     return base.next()
   }
   
@@ -88,89 +213,92 @@ public struct LoggingGenerator<Base: GeneratorType>
 }
 
 public class SequenceLog {
-  public static func dispatchTester<S: SequenceType>(
-    s: S
+  public static func dispatchTester<S: MySequence>(
+    _ s: S
   ) -> LoggingSequence<LoggingSequence<S>> {
     return LoggingSequence(LoggingSequence(s))
   }
-  public static var generate = TypeIndexed(0)
-  public static var underestimateCount = TypeIndexed(0)
+  public static var iterator = TypeIndexed(0)
+  public static var underestimatedCount = TypeIndexed(0)
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
   public static var _preprocessingPass = TypeIndexed(0)
   public static var _copyToNativeArrayBuffer = TypeIndexed(0)
-  public static var _initializeTo = TypeIndexed(0)
+  public static var _copyContents = TypeIndexed(0)
 }
 
-public protocol LoggingSequenceType  : SequenceType, LoggingType {
-  typealias Base : SequenceType
-  typealias Log : AnyObject = SequenceLog
-  typealias Generator : GeneratorType = LoggingGenerator<Base.Generator>
+public protocol LoggingSequenceType : MySequence, LoggingType {
+  associatedtype Base : MySequence
+  associatedtype Log : AnyObject = SequenceLog
+  associatedtype Iterator : IteratorProtocol = LoggingIterator<Base.Iterator>
+}
+
+extension LoggingSequenceType {
+  public var underestimatedCount: Int {
+    SequenceLog.underestimatedCount[selfType] += 1
+    return base.underestimatedCount
+  }
 }
 
 extension LoggingSequenceType
-  where Log == SequenceLog, Generator == LoggingGenerator<Base.Generator> {
-  public func generate() -> LoggingGenerator<Base.Generator> {
-    ++Log.generate[selfType]
-    return LoggingGenerator(base.generate())
-  }
-
-  public func underestimateCount() -> Int {
-    ++Log.underestimateCount[selfType]
-    return base.underestimateCount()
+  where Log == SequenceLog, Iterator == LoggingIterator<Base.Iterator> {
+  public func makeIterator() -> LoggingIterator<Base.Iterator> {
+    Log.iterator[selfType] += 1
+    return LoggingIterator(base.makeIterator())
   }
 
   public func map<T>(
-    @noescape transform: (Base.Generator.Element) -> T
+    @noescape _ transform: (Base.Iterator.Element) -> T
   ) -> [T] {
-    ++Log.map[selfType]
+    Log.map[selfType] += 1
     return base.map(transform)
   }
 
   public func filter(
-    @noescape includeElement: (Base.Generator.Element) -> Bool
-  ) -> [Base.Generator.Element] {
-    ++Log.filter[selfType]
+    @noescape _ includeElement: (Base.Iterator.Element) -> Bool
+  ) -> [Base.Iterator.Element] {
+    Log.filter[selfType] += 1
     return base.filter(includeElement)
   }
   
   public func _customContainsEquatableElement(
-    element: Base.Generator.Element
+    _ element: Base.Iterator.Element
   ) -> Bool? {
-    ++Log._customContainsEquatableElement[selfType]
+    Log._customContainsEquatableElement[selfType] += 1
     return base._customContainsEquatableElement(element)
   }
   
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
+  /// If `self` is multi-pass (i.e., a `Collection`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
-    preprocess: (Self)->R
+    @noescape _ preprocess: (Self) -> R
   ) -> R? {
-    ++Log._preprocessingPass[selfType]
+    Log._preprocessingPass[selfType] += 1
     return base._preprocessingPass { _ in preprocess(self) }
   }
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
   public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Generator.Element> {
-    ++Log._copyToNativeArrayBuffer[selfType]
+    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
+    Log._copyToNativeArrayBuffer[selfType] += 1
     return base._copyToNativeArrayBuffer()
   }
 
   /// Copy a Sequence into an array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>)
-    -> UnsafeMutablePointer<Base.Generator.Element> {
-    ++Log._initializeTo[selfType]
-    return base._initializeTo(ptr)
+  public func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
+  ) -> UnsafeMutablePointer<Base.Iterator.Element> {
+    Log._copyContents[selfType] += 1
+    return base._copyContents(initializing: ptr)
   }
 }
 
 public struct LoggingSequence<
-  Base_: SequenceType
-> : LoggingSequenceType, SequenceType {
+  Base_: MySequence
+> : LoggingSequenceType, MySequence {
   public typealias Log = SequenceLog
   public typealias Base = Base_
 
@@ -182,8 +310,8 @@ public struct LoggingSequence<
 }
 
 public class CollectionLog : SequenceLog {
-  public class func dispatchTester<C: CollectionType>(
-    c: C
+  public class func dispatchTester<C: MyCollection>(
+    _ c: C
   ) -> LoggingCollection<LoggingCollection<C>> {
     return LoggingCollection(LoggingCollection(c))
   }
@@ -197,61 +325,61 @@ public class CollectionLog : SequenceLog {
   static var first = TypeIndexed(0)
 }
 
-public protocol LoggingCollectionType : LoggingSequenceType, CollectionType {
-  typealias Base : CollectionType
-  typealias Index : ForwardIndexType = Base.Index
+public protocol LoggingCollectionType : LoggingSequenceType, MyCollection {
+  associatedtype Base : MyCollection
+  associatedtype Index : ForwardIndex = Base.Index
 }
 
 extension LoggingCollectionType
 where Index == Base.Index {
   public var startIndex: Base.Index {
-    ++CollectionLog.startIndex[selfType]
+    CollectionLog.startIndex[selfType] += 1
     return base.startIndex
   }
   
   public var endIndex: Base.Index {
-    ++CollectionLog.endIndex[selfType]
+    CollectionLog.endIndex[selfType] += 1
     return base.endIndex
   }
-  public subscript(position: Base.Index) -> Base.Generator.Element {
-    ++CollectionLog.subscriptIndex[selfType]
+  public subscript(position: Base.Index) -> Base.Iterator.Element {
+    CollectionLog.subscriptIndex[selfType] += 1
     return base[position]
   }
   
-  public subscript(_prext_bounds: Range<Base.Index>) -> Base.SubSequence {
-    ++CollectionLog.subscriptRange[selfType]
+  public subscript(_prext_bounds: MyRange<Base.Index>) -> Base.SubSequence {
+    CollectionLog.subscriptRange[selfType] += 1
     return base[_prext_bounds]
   }    
 
   public var isEmpty: Bool {
-    ++CollectionLog.isEmpty[selfType]
+    CollectionLog.isEmpty[selfType] += 1
     return base.isEmpty
   }
 
   public var count: Base.Index.Distance {
-    ++CollectionLog.count[selfType]
+    CollectionLog.count[selfType] += 1
     return base.count
   }
   
-  public func _customIndexOfEquatableElement(element: Base.Generator.Element) -> Base.Index?? {
-    ++CollectionLog._customIndexOfEquatableElement[selfType]
+  public func _customIndexOfEquatableElement(_ element: Base.Iterator.Element) -> Base.Index?? {
+    CollectionLog._customIndexOfEquatableElement[selfType] += 1
     return base._customIndexOfEquatableElement(element)
   }
 
-  public var first: Base.Generator.Element? {
-    ++CollectionLog.first[selfType]
+  public var first: Base.Iterator.Element? {
+    CollectionLog.first[selfType] += 1
     return base.first
   }
 }
 
-public struct LoggingCollection<Base_: CollectionType> : LoggingCollectionType {
-  public typealias Generator = LoggingGenerator<Base.Generator>
+public struct LoggingCollection<Base_ : MyCollection> : LoggingCollectionType {
+  public typealias Iterator = LoggingIterator<Base.Iterator>
   public typealias Log = CollectionLog
   public typealias Base = Base_
   public typealias SubSequence = Base.SubSequence
 
-  public func generate() -> Generator {
-    return Generator(base.generate())
+  public func makeIterator() -> Iterator {
+    return Iterator(base.makeIterator())
   }
   public init(_ base: Base_) {
     self.base = base
@@ -261,13 +389,13 @@ public struct LoggingCollection<Base_: CollectionType> : LoggingCollectionType {
 }
 
 public func expectCustomizable<
-  T : WrapperType where
+  T : Wrapper where
   T : LoggingType,
-  T.Base : WrapperType, T.Base : LoggingType,
+  T.Base : Wrapper, T.Base : LoggingType,
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
   stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UInt = __LINE__,
+  file: String = #file, line: UInt = #line,
   collectMoreInfo: (()->String)? = nil
 ) {
   expectNotEqual(
@@ -280,13 +408,13 @@ public func expectCustomizable<
 }
 
 public func expectNotCustomizable<
-  T : WrapperType where
+  T : Wrapper where
   T : LoggingType,
-  T.Base : WrapperType, T.Base : LoggingType,
+  T.Base : Wrapper, T.Base : LoggingType,
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
   stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UInt = __LINE__,
+  file: String = #file, line: UInt = #line,
   collectMoreInfo: (()->String)? = nil
 ) {
   expectNotEqual(

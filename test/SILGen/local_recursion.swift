@@ -2,8 +2,8 @@
 
 // CHECK-LABEL: sil hidden @_TF15local_recursion15local_recursionFTSi1ySi_T_ : $@convention(thin) (Int, Int) -> () {
 // CHECK:       bb0([[X:%0]] : $Int, [[Y:%1]] : $Int):
-func local_recursion(x: Int, y: Int) {
-  func self_recursive(a: Int) {
+func local_recursion(_ x: Int, y: Int) {
+  func self_recursive(_ a: Int) {
     self_recursive(x + a)
   }
 
@@ -18,10 +18,10 @@ func local_recursion(x: Int, y: Int) {
   // CHECK: apply [[CLOSURE]]([[Y]])
   sr(y)
 
-  func mutually_recursive_1(a: Int) {
+  func mutually_recursive_1(_ a: Int) {
     mutually_recursive_2(x + a)
   }
-  func mutually_recursive_2(b: Int) {
+  func mutually_recursive_2(_ b: Int) {
     mutually_recursive_1(y + b)
   }
 
@@ -29,10 +29,13 @@ func local_recursion(x: Int, y: Int) {
   // CHECK: apply [[MUTUALLY_RECURSIVE_REF]]([[X]], [[Y]], [[X]])
   mutually_recursive_1(x)
 
-  func transitive_capture_1(a: Int) -> Int {
+  // CHECK: [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_1]]
+  _ = mutually_recursive_1
+
+  func transitive_capture_1(_ a: Int) -> Int {
     return x + a
   }
-  func transitive_capture_2(b: Int) -> Int {
+  func transitive_capture_2(_ b: Int) -> Int {
     return transitive_capture_1(y + b)
   }
 
@@ -56,7 +59,7 @@ func local_recursion(x: Int, y: Int) {
   // CHECK: [[CLOSURE_REF:%.*]] = function_ref @_TFF15local_recursion15local_recursionFTSi1ySi_T_U0_FSiT_
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[CLOSURE_REF]]([[X]], [[Y]])
   // CHECK: apply [[CLOSURE]]([[X]])
-  let f: Int -> () = {
+  let f: (Int) -> () = {
     self_recursive($0)
     transitive_capture_2($0)
   }
@@ -86,31 +89,41 @@ func local_recursion(x: Int, y: Int) {
 // CHECK:   [[TRANS_CAPTURE_1_REF:%.*]] = function_ref [[TRANS_CAPTURE_1]]
 // CHECK:   apply [[TRANS_CAPTURE_1_REF]]({{.*}}, [[X]])
 
-func plus<T>(x: T, _ y: T) -> T { return x }
-func toggle<T, U>(x: T, _ y: U) -> U { return y }
+func plus<T>(_ x: T, _ y: T) -> T { return x }
+func toggle<T, U>(_ x: T, _ y: U) -> U { return y }
 
-func generic_local_recursion<T, U>(x: T, y: U) {
-  func self_recursive(a: T) {
+func generic_local_recursion<T, U>(_ x: T, y: U) {
+  func self_recursive(_ a: T) {
     self_recursive(plus(x, a))
   }
 
   self_recursive(x)
+  _ = self_recursive
 
-  func transitive_capture_1(a: T) -> U {
+  func transitive_capture_1(_ a: T) -> U {
     return toggle(a, y)
   }
-  func transitive_capture_2(b: U) -> U {
+  func transitive_capture_2(_ b: U) -> U {
     return transitive_capture_1(toggle(b, x))
   }
 
   transitive_capture_2(y)
+  _ = transitive_capture_2
 
   func no_captures() {}
 
   no_captures()
+  _ = no_captures
+
+  func transitive_no_captures() {
+    no_captures()
+  }
+
+  transitive_no_captures()
+  _ = transitive_no_captures
 }
 
-func local_properties(x: Int, y: Int) -> Int {
+func local_properties(_ x: Int, y: Int) -> Int {
   var self_recursive: Int {
     return x + self_recursive
   }

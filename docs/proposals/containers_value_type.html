@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="utf-8" />
-	<title>Swift containers and value types</title>
+  <meta charset="utf-8" />
+  <title>Swift containers and value types</title>
 </head>
 <body>
 
@@ -65,7 +65,7 @@ simpler (default) syntax is by value:
 </p>
 
 <blockquote><pre>
-func foo(c : Character, i : Int)  <font color="#C80000">// define foo</font>
+func foo(_ c : Character, i : Int)  <font color="#C80000">// define foo</font>
 
 // ...
 
@@ -79,7 +79,7 @@ individual parameter:
 </p>
 
 <blockquote><pre>
-func foo(c : Character, i : [inout] Int)  <font color="#C80000">// define foo</font>
+func foo(_ c : Character, i : [inout] Int)  <font color="#C80000">// define foo</font>
 
 // ...
 
@@ -118,7 +118,7 @@ to modify its last argument:
 </p>
 
 <blockquote><pre>
-func foo(c : Character, i : <b>[inout]</b> Int)
+func foo(_ c : Character, i : <b>[inout]</b> Int)
 </pre></blockquote>
 
 <p>
@@ -135,7 +135,7 @@ reference:
 </p>
 
 <blockquote><pre>
-func foo(c : Character, i : Int)
+func foo(_ c : Character, i : Int)
 </pre></blockquote>
 
 <p>
@@ -212,7 +212,7 @@ will compile this code:
 </p>
 
 <blockquote><pre>
-func foo(v : Array, i : Int)  <font color="#C80000">// define foo</font>
+func foo(_ v : Array, i : Int)  <font color="#C80000">// define foo</font>
 
 func doWork() {
   <font color="#C80000">// ...</font>
@@ -231,7 +231,7 @@ rely on a high quality and strictly followed naming conventions such as
 those used in Cocoa.  Now there is absolutely nothing wrong with high
 quality, strictly followed naming conventions. But they aren't checked
 by the compiler.  Having the compiler be able to confirm: yes, this
-argument can be modified / no, that argument can not be modified; is a
+argument can be modified / no, that argument cannot be modified; is a
 <i>tremendous</i> productivity booster.
 </p>
 
@@ -347,7 +347,7 @@ the programmer ensure that both the client and function both agree that
 <code>archives</code> is an in-out argument.  And <i>just as importantly</i>,
 that <code>archivePath</code> is <b>not</b> to be modified within
 <code>_checkPathForArchiveAndAddToArray</code>.  However if
-<code>archivePath</code> is a mutable object with reference semantics, we loose
+<code>archivePath</code> is a mutable object with reference semantics, we lose
 that ability to locally reason about this code, even in Swift.
 </p>
 
@@ -386,7 +386,7 @@ passed, semantically, <i>by-value</i>.
 </p>
 
 <blockquote><pre>
-func _backgroundSortNewFilteredMessages(messages : Array) -&gt; _FilteredListInfo {
+func _backgroundSortNewFilteredMessages(_ messages : Array) -&gt; _FilteredListInfo {
     // ...
     res.filteredMessages = messages;  <font color="#C80000">// copy here!</font>
     // ...
@@ -482,7 +482,7 @@ use of '<code>&amp;</code>' at the call site.  Thus the programmer can
 more easily spot the few cases where this is desired.
 </p>
 <ul>
-<li>Swift can not provide such protection for types with reference semantics.</li>
+<li>Swift cannot provide such protection for types with reference semantics.</li>
 </ul>
 </li>
 

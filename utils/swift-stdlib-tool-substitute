@@ -4,7 +4,7 @@
 #
 ## This source file is part of the Swift.org open source project
 ##
-## Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+## Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 ## Licensed under Apache License v2.0 with Runtime Library Exception
 ##
 ## See http://swift.org/LICENSE.txt for license information
@@ -20,7 +20,7 @@
 self_path=$0
 
 tool="$DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-stdlib-tool"
-if [[ ! -fx "$tool" ]]; then
+if [ ! -f "$tool" -o ! -x "$tool" ]; then
     echo "$self_path: error: couldn't find swift-stdlib-tool at $tool"
     exit 1
 fi
@@ -35,17 +35,17 @@ argv=("$@")
 have_source_libraries=NO
 platform=""
 set -- "$@"
-while [[ $# > 0 ]]; do
+while [[ $# -gt 0 ]]; do
     case "$1" in
         --source-libraries)
             shift
-            if [[ $# > 0 ]]; then
+            if [[ $# -gt 0 ]]; then
                 have_source_libraries=YES
             fi
             ;;
         --platform)
             shift
-            if [[ $# > 0 ]]; then
+            if [[ $# -gt 0 ]]; then
                 platform="$1"
             fi
             ;;
@@ -63,10 +63,10 @@ elif [[ "$platform" = "" ]]; then
     exit 1
 else
     # Construct a new --source-libraries argument.
-    bindir=`dirname "$self_path"`
-    usrdir=`dirname "$bindir"`
+    bindir=$(dirname "$self_path")
+    usrdir=$(dirname "$bindir")
     source_libraries="$usrdir/lib/swift/$platform"
-    if [[ ! -dx "$source_libraries" ]]; then
+    if [ ! -d "$source_libraries" -o ! -x "$source_libraries" ]; then
         echo "$self_path: error: platform path inaccessible: $source_libraries"
         exit 1
     fi

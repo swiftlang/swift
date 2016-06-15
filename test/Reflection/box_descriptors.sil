@@ -1,0 +1,39 @@
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %target-build-swift %s -emit-module -emit-library -module-name capture_descriptors -o %t/capture_descriptors.%target-dylib-extension
+// RUN: %target-swift-reflection-dump -binary-filename %t/capture_descriptors.%target-dylib-extension | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// CHECK:      CAPTURE DESCRIPTORS:
+// CHECK-NEXT: ====================
+
+class C<T> {}
+
+sil_vtable C {}
+
+sil @make_some_boxes : $@convention(thin) <T> () -> (@box Int, @box (Int, Int), @box C<T>) {
+  %a = alloc_box $Int
+  %b = alloc_box $(Int, Int)
+  %c = alloc_box $C<T>
+  %result = tuple (%a : $@box Int, %b : $@box (Int, Int), %c : $@box C<T>)
+  return %result : $(@box Int, @box (Int, Int), @box C<T>)
+}
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (struct Swift.Int)
+// CHECK-NEXT: - Metadata sources:
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (tuple
+// CHECK-NEXT:   (struct Swift.Int)
+// CHECK-NEXT:   (struct Swift.Int))
+// CHECK-NEXT: - Metadata sources:
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (bound_generic_class capture_descriptors.C
+// CHECK-NEXT:   (generic_type_parameter depth=0 index=0))
+// CHECK-NEXT: - Metadata sources:

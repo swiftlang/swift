@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -14,7 +14,7 @@
 ///
 /// This is a simple reimplementation of opt that includes support for Swift-
 /// specific LLVM passes. It is meant to make it easier to handle issues related
-/// to transitioning to the new LLVM pass manager (which lacks the dynamicism of
+/// to transitioning to the new LLVM pass manager (which lacks the dynamism of
 /// the old pass manager) and also problems during the code base transition to
 /// that pass manager. Additionally it will enable a user to exactly simulate
 /// Swift's LLVM pass pipeline by using the same pass pipeline building
@@ -59,7 +59,6 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/SystemUtils.h"
-#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -235,6 +234,8 @@ int main(int argc, char **argv) {
   initializeSwiftARCOptPass(Registry);
   initializeSwiftARCContractPass(Registry);
   initializeSwiftStackPromotionPass(Registry);
+  initializeInlineTreePrinterPass(Registry);
+  initializeSwiftMergeFunctionsPass(Registry);
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift LLVM optimizer\n");
 

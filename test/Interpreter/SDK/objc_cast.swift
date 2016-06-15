@@ -7,21 +7,21 @@ import Foundation
 
 @objc protocol SwiftObjCProto {}
 
-class SwiftSuperPort : NSPort { }
+class SwiftSuperPort : Port { }
 
 class SwiftSubPort : SwiftSuperPort { }
 
 class SwiftSuper { }
 class SwiftSub : SwiftSuper { }
 
-extension NSPort : SwiftObjCProto {}
+extension Port : SwiftObjCProto {}
 
 var obj : AnyObject
 
-func genericCast<T>(x: AnyObject, _: T.Type) -> T? {
+func genericCast<T>(_ x: AnyObject, _: T.Type) -> T? {
   return x as? T
 }
-func genericCastObjCBound<T: NSObject>(x: AnyObject, _: T.Type) -> T? {
+func genericCastObjCBound<T: NSObject>(_ x: AnyObject, _: T.Type) -> T? {
   return x as? T
 }
 
@@ -30,11 +30,11 @@ func genericCastObjCBound<T: NSObject>(x: AnyObject, _: T.Type) -> T? {
 obj = SwiftSubPort()
 _ = obj as! SwiftSubPort
 _ = obj as! SwiftSuperPort
-_ = (obj as? NSPort)
+_ = (obj as? Port)
 _ = (obj as? NSObject)!
 if (obj as? SwiftSubPort) == nil    { abort() }
 if (obj as? SwiftSuperPort) ==  nil { abort() }
-if (obj as? NSPort) == nil          { abort() }
+if (obj as? Port) == nil            { abort() }
 if (obj as? NSObject) == nil        { abort() }
 if (obj as? NSArray) != nil         { abort() }
 if (obj as? SwiftSub) != nil        { abort() }
@@ -42,11 +42,11 @@ if (obj as? SwiftSuper) != nil      { abort() }
 
 obj = SwiftSuperPort()
 _ = obj as! SwiftSuperPort
-_ = obj as! NSPort
+_ = obj as! Port
 _ = obj as! NSObject
 if (obj as? SwiftSubPort) != nil   { abort() }
 if (obj as? SwiftSuperPort) == nil { abort() }
-if (obj as? NSPort) == nil         { abort() }
+if (obj as? Port) == nil           { abort() }
 if (obj as? NSObject) == nil       { abort() }
 if (obj as? NSArray) != nil        { abort() }
 if (obj as? SwiftSub) != nil       { abort() }
@@ -54,34 +54,34 @@ if (obj as? SwiftSuper) != nil     { abort() }
 
 // Test instance of Objective-C class that has Swift subclass
 
-obj = NSPort()
-_ = obj as! NSPort
+obj = Port()
+_ = obj as! Port
 _ = obj as! NSObject
 if (obj as? SwiftSubPort) != nil    { abort() }
 if (obj as? SwiftSuperPort) !=  nil { abort() }
-if (obj as? NSPort) == nil          { abort() }
+if (obj as? Port) == nil            { abort() }
 if (obj as? NSObject) == nil        { abort() }
 if (obj as? NSArray) != nil         { abort() }
 if (obj as? SwiftSub) != nil        { abort() }
 if (obj as? SwiftSuper) != nil      { abort() }
 if (obj as? SwiftObjCProto) == nil  { abort() }
 
-obj = NSPort()
-_ = genericCast(obj, NSPort.self)!
+obj = Port()
+_ = genericCast(obj, Port.self)!
 _ = genericCast(obj, NSObject.self)!
 if genericCast(obj, SwiftSubPort.self) != nil   { abort() }
 if genericCast(obj, SwiftSuperPort.self) != nil { abort() }
-if genericCast(obj, NSPort.self) == nil         { abort() }
+if genericCast(obj, Port.self) == nil           { abort() }
 if genericCast(obj, NSObject.self) == nil       { abort() }
 if genericCast(obj, NSArray.self) != nil        { abort() }
 if genericCast(obj, SwiftSub.self) != nil       { abort() }
 if genericCast(obj, SwiftSuper.self) != nil     { abort() }
 
-_ = genericCastObjCBound(obj, NSPort.self)!
+_ = genericCastObjCBound(obj, Port.self)!
 _ = genericCastObjCBound(obj, NSObject.self)!
 if genericCastObjCBound(obj, SwiftSubPort.self) != nil   { abort() }
 if genericCastObjCBound(obj, SwiftSuperPort.self) != nil { abort() }
-if genericCastObjCBound(obj, NSPort.self) == nil         { abort() }
+if genericCastObjCBound(obj, Port.self) == nil           { abort() }
 if genericCastObjCBound(obj, NSObject.self) == nil       { abort() }
 if genericCastObjCBound(obj, NSArray.self) != nil        { abort() }
 
@@ -89,7 +89,7 @@ obj = NSObject()
 _ = obj as! NSObject
 if  (obj as? SwiftSubPort) != nil   { abort() }
 if  (obj as? SwiftSuperPort) != nil { abort() }
-if  (obj as? NSPort) != nil         { abort() }
+if  (obj as? Port) != nil           { abort() }
 if  (obj as? NSObject) == nil       { abort() }
 if  (obj as? NSCopying) != nil      { abort() }
 if  (obj as? NSArray) != nil        { abort() }
@@ -99,7 +99,7 @@ if  (obj as? SwiftObjCProto) != nil { abort() }
 
 // Test instance of a tagged pointer type
 
-obj = NSNumber(int: 1234567)
+obj = NSNumber(value: 1234567)
 _ = obj as! NSNumber
 _ = obj as! NSValue
 _ = obj as! NSObject
@@ -341,7 +341,7 @@ if let strArr = obj as? [NSString] {
 
 // CHECK-NEXT: Object-to-bridged-array cast failed due to bridge mismatch
 if let strArr = obj as? [Int] {
-  print("Object-to-bridged-array cast should not have succedded")
+  print("Object-to-bridged-array cast should not have succeeded")
 } else {
   print("Object-to-bridged-array cast failed due to bridge mismatch")
 }
@@ -376,7 +376,7 @@ if let strArr = objOpt as? [NSString] {
 
 // CHECK: Object-to-bridged-array cast failed due to bridge mismatch
 if let intArr = objOpt as? [Int] {
-  print("Object-to-bridged-array cast should not have succedded")
+  print("Object-to-bridged-array cast should not have succeeded")
 } else {
   print("Object-to-bridged-array cast failed due to bridge mismatch")
 }
@@ -412,7 +412,7 @@ if let strArr = objImplicitOpt as? [NSString] {
 
 // CHECK: Object-to-bridged-array cast failed due to bridge mismatch
 if let intArr = objImplicitOpt as? [Int] {
-  print("Object-to-bridged-array cast should not have succedded")
+  print("Object-to-bridged-array cast should not have succeeded")
 } else {
   print("Object-to-bridged-array cast failed due to bridge mismatch")
 }
@@ -426,16 +426,18 @@ if let strArr = objImplicitOpt as? [String] {
 }
 
 // Casting an array of numbers to different numbers.
-// CHECK: Numbers-as-doubles cast produces [3.14159, 2.71828, 0.0]
-obj = ([3.14159, 2.71828, 0] as [Double]) as AnyObject
+// CHECK: Numbers-as-doubles cast produces [3.9375, 2.71828, 0.0]
+obj = ([3.9375, 2.71828, 0] as [Double]) as AnyObject
 if let doubleArr = obj as? [Double] {
+  print(sizeof(Double.self))
   print("Numbers-as-doubles cast produces \(doubleArr)")
 } else {
   print("Numbers-as-doubles failed")
 }
 
-// CHECK: Numbers-as-floats cast produces [3.14159{{.*}}, 2.71828{{.*}}, 0.0]
+// CHECK: Numbers-as-floats cast produces [3.9375, 2.71828{{.*}}, 0.0]
 if let floatArr = obj as? [Float] {
+  print(sizeof(Float.self))
   print("Numbers-as-floats cast produces \(floatArr)")
 } else {
   print("Numbers-as-floats failed")
@@ -576,7 +578,7 @@ if let array = obj as? Dictionary<String, [Dictionary<String, String>]> {
 }
 
 // Helper function that downcasts 
-func downcastToStringArrayOptOpt(obj: AnyObject??!!) {
+func downcastToStringArrayOptOpt(_ obj: AnyObject???!) {
   if let strArrOptOpt = obj as? [String]?? {
     if let strArrOpt = strArrOptOpt {
       if let strArr = strArrOpt {
@@ -593,15 +595,15 @@ func downcastToStringArrayOptOpt(obj: AnyObject??!!) {
 }
 
 // CHECK: {{^}}some(some(some(["a", "b", "c"]))){{$}}
-var objOptOpt: AnyObject?? = .Some(.Some(["a", "b", "c"]))
+var objOptOpt: AnyObject?? = .some(.some(["a", "b", "c"]))
 downcastToStringArrayOptOpt(objOptOpt)
 
 // CHECK: {{^}}none{{$}}
-objOptOpt = .Some(.Some([1 : "hello", 2 : "swift", 3 : "world"]))
+objOptOpt = .some(.some([1 : "hello", 2 : "swift", 3 : "world"]))
 downcastToStringArrayOptOpt(objOptOpt)
 
 // CHECK: {{^}}none{{$}}
-objOptOpt = .Some(.Some([1, 2, 3]))
+objOptOpt = .some(.some([1, 2, 3]))
 downcastToStringArrayOptOpt(objOptOpt)
 
 print("ok")  // CHECK: ok

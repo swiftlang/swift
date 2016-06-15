@@ -3,26 +3,27 @@
 // REQUIRES: objc_interop
 
 import CoreCooling
+import CFAndObjC
 
-func assertUnmanaged<T: AnyObject>(t: Unmanaged<T>) {}
-func assertManaged<T: AnyObject>(t: T) {}
+func assertUnmanaged<T: AnyObject>(_ t: Unmanaged<T>) {}
+func assertManaged<T: AnyObject>(_ t: T) {}
 
-func test0(fridge: CCRefrigeratorRef) {
+func test0(_ fridge: CCRefrigerator) {
   assertManaged(fridge)
 }
 
-func test1(power: Unmanaged<CCPowerSupplyRef>) {
+func test1(_ power: Unmanaged<CCPowerSupply>) {
   assertUnmanaged(power)
-  let fridge = CCRefrigeratorCreate(power) // expected-error {{cannot convert value of type 'Unmanaged<CCPowerSupplyRef>' (aka 'Unmanaged<CCPowerSupply>') to expected argument type 'CCPowerSupply!'}}
+  let fridge = CCRefrigeratorCreate(power) // expected-error {{cannot convert value of type 'Unmanaged<CCPowerSupply>' to expected argument type 'CCPowerSupply!'}}
   assertUnmanaged(fridge)
 }
 
 func test2() {
-  let fridge = CCRefrigeratorCreate(kCCPowerStandard)
+  let fridge = CCRefrigeratorCreate(kCCPowerStandard)!
   assertUnmanaged(fridge)
 }
 
-func test3(fridge: CCRefrigerator) {
+func test3(_ fridge: CCRefrigerator) {
   assertManaged(fridge)
 }
 
@@ -30,7 +31,7 @@ func test4() {
   // FIXME: this should not require a type annotation
   let power: CCPowerSupply = kCCPowerStandard
   assertManaged(power)
-  let fridge = CCRefrigeratorCreate(power)
+  let fridge = CCRefrigeratorCreate(power)!
   assertUnmanaged(fridge)
 }
 
@@ -46,11 +47,11 @@ func test6() {
 }
 
 func test7() {
-  let value = CFBottom()
+  let value = CFBottom()!
   assertUnmanaged(value)
 }
 
-func test8(f: CCRefrigerator) {
+func test8(_ f: CCRefrigerator) {
   _ = f as CFTypeRef
   _ = f as AnyObject
 }
@@ -66,35 +67,35 @@ func test9() {
   CCRefrigeratorClose(fridge)
 }
 
-func testProperty(k: Kitchen) {
+func testProperty(_ k: Kitchen) {
   k.fridge = CCRefrigeratorCreate(kCCPowerStandard).takeRetainedValue()
   CCRefrigeratorOpen(k.fridge)
   CCRefrigeratorClose(k.fridge)
 }
 
-func testTollFree0(mduct: MutableDuct) {
+func testTollFree0(_ mduct: MutableDuct) {
   _ = mduct as CCMutableDuct
 
   let duct = mduct as Duct
   _ = duct as CCDuct
 }
 
-func testTollFree1(ccmduct: CCMutableDuct) {
+func testTollFree1(_ ccmduct: CCMutableDuct) {
   _ = ccmduct as MutableDuct
 
   let ccduct: CCDuct = ccmduct
   _ = ccduct as Duct
 }
 
-func testChainedAliases(fridge: CCRefrigerator) {
-  _ = fridge as CCRefrigeratorRef
+func testChainedAliases(_ fridge: CCRefrigerator) {
+  _ = fridge as CCRefrigerator
 
   _ = fridge as CCFridge
-  _ = fridge as CCFridgeRef
+  _ = fridge as CCFridgeRef // expected-error{{'CCFridgeRef' has been renamed to 'CCFridge'}} {{17-28=CCFridge}}
 }
 
-func testBannedImported(object: CCOpaqueTypeRef) {
-  CCRetain(object) // expected-error {{'CCRetain' is unavailable: Core Foundation objects are automatically memory managed}}
+func testBannedImported(_ object: CCOpaqueTypeRef) {
+  CCRetain(object) // expected-error {{'CCRetain' is unavailable: Core Foundation objects are automatically memory managed}} expected-warning {{result of call to 'CCRetain' is unused}}
   CCRelease(object) // expected-error {{'CCRelease' is unavailable: Core Foundation objects are automatically memory managed}}
 }
 
@@ -111,11 +112,40 @@ func testOutParametersGood() {
 
 func testOutParametersBad() {
   let fridge: CCRefrigerator?
-  CCRefrigeratorCreateIndirect(fridge) // expected-error {{cannot convert value of type 'CCRefrigerator?' to expected argument type 'UnsafeMutablePointer<CCRefrigerator?>' (aka 'UnsafeMutablePointer<Optional<CCRefrigerator>>')}} 
+  CCRefrigeratorCreateIndirect(fridge) // expected-error {{cannot convert value of type 'CCRefrigerator?' to expected argument type 'UnsafeMutablePointer<CCRefrigerator?>?'}}
 
   let power: CCPowerSupply?
   CCRefrigeratorGetPowerSupplyIndirect(0, power) // expected-error {{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator!'}}
 
   let item: CCItem?
   CCRefrigeratorGetItemUnaudited(0, 0, item) // expected-error {{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator!'}}
+}
+
+func nameCollisions() {
+  var objc: MyProblematicObject?
+  var cf: MyProblematicObjectRef?
+  cf = objc // expected-error {{cannot assign value of type 'MyProblematicObject?' to type 'MyProblematicObjectRef?'}}
+  objc = cf // expected-error {{cannot assign value of type 'MyProblematicObjectRef?' to type 'MyProblematicObject?'}}
+
+  var cfAlias: MyProblematicAliasRef?
+  cfAlias = cf // okay
+  cf = cfAlias // okay
+
+  var otherAlias: MyProblematicAlias?
+  otherAlias = cfAlias // expected-error {{cannot assign value of type 'MyProblematicAliasRef?' to type 'MyProblematicAlias?'}}
+  cfAlias = otherAlias // expected-error {{cannot assign value of type 'MyProblematicAlias?' to type 'MyProblematicAliasRef?'}}
+
+  func isOptionalFloat(_: inout Optional<Float>) {}
+  isOptionalFloat(&otherAlias) // okay
+
+  var np: NotAProblem?
+  var np2: NotAProblemRef? // expected-error{{'NotAProblemRef' has been renamed to 'NotAProblem'}} {{12-26=NotAProblem}}
+
+  np = np2
+  np2 = np
+}
+
+func testNonConstVoid() {
+  let value: Unmanaged<CFNonConstVoidRef> = CFNonConstBottom()!
+  assertUnmanaged(value)
 }

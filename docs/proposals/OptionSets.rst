@@ -99,15 +99,15 @@ protocol::
   protocol OptionSet : Equatable {
     // Set intersection
     @infix func &(_:Self, _:Self) -> Self
-    @infix func &=(@inout _:Self, _:Self)
+    @infix func &=(_: inout Self, _:Self)
 
     // Set union
     @infix func |(_:Self, _:Self) -> Self
-    @infix func |=(@inout _:Self, _:Self)
+    @infix func |=(_: inout Self, _:Self)
 
     // Set xor
     @infix func ^(_:Self, _:Self) -> Self
-    @infix func ^=(@inout _:Self, _:Self)
+    @infix func ^=(_: inout Self, _:Self)
 
     // Set negation
     @prefix func ~(_:Self) -> Self

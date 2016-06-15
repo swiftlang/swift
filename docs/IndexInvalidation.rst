@@ -128,7 +128,7 @@ Consequences:
   any indices.  Indices are composites of offsets, so replacing the value does
   not change the shape of the data structure and preserves offsets.
 
-- A value type mutable linked list can not conform to
+- A value type mutable linked list cannot conform to
   ``MutableCollectionType``.  An index for a linked list has to be implemented
   as a pointer to the list node to provide O(1) element access.  Mutating an
   element of a non-uniquely referenced linked list will create a copy of the

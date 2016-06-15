@@ -14,7 +14,7 @@ func bar() throws -> Int { return 0 }
 var x = try foo() + bar()
 x = try foo() + bar()
 x += try foo() + bar()
-x += try foo() %%%% bar() // expected-error {{'try' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}}
+x += try foo() %%%% bar() // expected-error {{'try' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}} // expected-warning {{result of operator '%%%%' is unused}}
 x += try foo() %%% bar()
 x = foo() + try bar() // expected-error {{'try' cannot appear to the right of a non-assignment operator}} // expected-error {{call can throw but is not marked with 'try'}}
 
@@ -24,7 +24,7 @@ var z = true ? try foo() : try bar() %%% 0 // expected-error {{'try' following c
 var a = try! foo() + bar()
 a = try! foo() + bar()
 a += try! foo() + bar()
-a += try! foo() %%%% bar() // expected-error {{'try!' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}}
+a += try! foo() %%%% bar() // expected-error {{'try!' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}} // expected-warning {{result of operator '%%%%' is unused}}
 a += try! foo() %%% bar()
 a = foo() + try! bar() // expected-error {{'try!' cannot appear to the right of a non-assignment operator}} // expected-error {{call can throw but is not marked with 'try'}}
 
@@ -32,7 +32,7 @@ var b = true ? try! foo() : try! bar() + 0
 var c = true ? try! foo() : try! bar() %%% 0 // expected-error {{'try!' following conditional operator does not cover everything to its right}}
 
 infix operator ?+= { associativity right precedence 90 assignment }
-func ?+=(inout lhs: Int?, rhs: Int?) {
+func ?+=(lhs: inout Int?, rhs: Int?) {
   lhs = lhs! + rhs!
 }
 
@@ -40,7 +40,7 @@ var i = try? foo() + bar()
 let _: Double = i // expected-error {{cannot convert value of type 'Int?' to specified type 'Double'}}
 i = try? foo() + bar()
 i ?+= try? foo() + bar()
-i ?+= try? foo() %%%% bar() // expected-error {{'try?' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}}
+i ?+= try? foo() %%%% bar() // expected-error {{'try?' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}} // expected-warning {{result of operator '%%%%' is unused}}
 i ?+= try? foo() %%% bar()
 _ = foo() < try? bar() // expected-error {{'try?' cannot appear to the right of a non-assignment operator}} // expected-error {{call can throw but is not marked with 'try'}}
 _ = (try? foo()) < bar() // expected-error {{call can throw but is not marked with 'try'}}
@@ -68,7 +68,7 @@ func test() throws -> Int {
   ; // Reset parser.
 
   try throw foo() // expected-error {{'try' must be placed on the thrown expression}} {{3-7=}} {{13-13=try }}
-  // expected-error@-1 {{thrown expression type 'Int' does not conform to 'ErrorType'}}
+  // expected-error@-1 {{thrown expression type 'Int' does not conform to 'ErrorProtocol'}}
   try return foo() // expected-error {{'try' must be placed on the returned expression}} {{3-7=}} {{14-14=try }}
 }
 
@@ -83,7 +83,7 @@ let _ = (try? "foo"*"bar") ?? 0
 
 
 // <rdar://problem/21414023> Assertion failure when compiling function that takes throwing functions and rethrows
-func rethrowsDispatchError(handleError: ((ErrorType) throws -> ()), body: () throws -> ()) rethrows {
+func rethrowsDispatchError(handleError: ((ErrorProtocol) throws -> ()), body: () throws -> ()) rethrows {
   do {
     body()   // expected-error {{call can throw but is not marked with 'try'}}
   } catch {
@@ -92,15 +92,15 @@ func rethrowsDispatchError(handleError: ((ErrorType) throws -> ()), body: () thr
 
 // <rdar://problem/21432429> Calling rethrows from rethrows crashes Swift compiler
 struct r21432429 {
-  func x(f: () throws ->()) rethrows {}
-  func y(f: () throws ->()) rethrows {
+  func x(_ f: () throws -> ()) rethrows {}
+  func y(_ f: () throws -> ()) rethrows {
     x(f)  // expected-error {{call can throw but is not marked with 'try'}} expected-note {{call is to 'rethrows' function, but argument function can throw}}
   }
 }
 
 // <rdar://problem/21427855> Swift 2: Omitting try from call to throwing closure in rethrowing function crashes compiler
-func callThrowingClosureWithoutTry(closure: Int throws -> Int) rethrows {
-  closure(0)  // expected-error {{call can throw but is not marked with 'try'}}
+func callThrowingClosureWithoutTry(closure: (Int) throws -> Int) rethrows {
+  closure(0)  // expected-error {{call can throw but is not marked with 'try'}} expected-warning {{result of call is unused}}
 }
 
 func producesOptional() throws -> Int? { return nil }
