@@ -64,7 +64,7 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
     /**
     Returns the interval between the date object and 00:00:00 UTC on 1 January 2001.
     
-    This property’s value is negative if the date object is earlier than the system’s absolute reference date (00:00:00 UTC on 1 January 2001).
+    This property's value is negative if the date object is earlier than the system's absolute reference date (00:00:00 UTC on 1 January 2001).
     */
     public var timeIntervalSinceReferenceDate: TimeInterval {
         return _time
@@ -88,7 +88,7 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
     /**
     The time interval between the date and the current date and time.
 
-    If the date is earlier than the current date and time, the this property’s value is negative.
+    If the date is earlier than the current date and time, the this property's value is negative.
 
     - SeeAlso: `timeIntervalSince(_:)`
     - SeeAlso: `timeIntervalSince1970`
@@ -101,7 +101,7 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
     /**
     The interval between the date object and 00:00:00 UTC on 1 January 1970.
 
-    This property’s value is negative if the date object is earlier than 00:00:00 UTC on 1 January 1970.
+    This property's value is negative if the date object is earlier than 00:00:00 UTC on 1 January 1970.
 
     - SeeAlso: `timeIntervalSince(_:)`
     - SeeAlso: `timeIntervalSinceNow`
