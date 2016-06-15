@@ -1,3 +1,4 @@
+// XFAIL: broken_std_regex
 // RUN: %complete-test %s -group=none -fuzz -structure -tok=S1_DOT | FileCheck %s -check-prefix=S1_DOT
 // RUN: %complete-test %s -group=none -add-inner-results -fuzz -structure -tok=S1_POSTFIX | FileCheck %s -check-prefix=S1_POSTFIX
 // RUN: %complete-test %s -group=none -add-inner-results -fuzz -structure -tok=S1_POSTFIX_INIT | FileCheck %s -check-prefix=S1_INIT

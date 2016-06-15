@@ -48,3 +48,5 @@ struct ForDiff {
 func diff(x: ForDiff) {
   x.#^DIFF^#
 }
+
+// XFAIL: broken_std_regex

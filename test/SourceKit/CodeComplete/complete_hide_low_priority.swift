@@ -1,3 +1,4 @@
+// XFAIL: broken_std_regex
 // RUN: %complete-test -hide-low-priority=1 -tok=TOP_LEVEL_0 %s -- -I %S/Inputs > %t.on
 // RUN: %complete-test -hide-low-priority=0 -tok=TOP_LEVEL_0 %s -- -I %S/Inputs > %t.off
 

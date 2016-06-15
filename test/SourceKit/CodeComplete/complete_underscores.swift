@@ -32,6 +32,7 @@ enum Norf {
 func test001() {
   #^TOP_LEVEL_0,,_^#
 }
+// XFAIL: broken_std_regex
 // RUN: %complete-test %s -hide-none -tok=TOP_LEVEL_0  -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=TOP_LEVEL_0
 // TOP_LEVEL_0-LABEL: Results for filterText: [
 // TOP_LEVEL_0-DAG: Foo
