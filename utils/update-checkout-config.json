@@ -15,7 +15,7 @@
         "swift-corelibs-libdispatch": { "name": "apple/swift-corelibs-libdispatch" },
         "swift-integration-tests": { "name": "apple/swift-integration-tests" }
     },
-    "branch-names": ["master-branches", "next-branches", "swift-3.0-preview-1-branches"],
+    "branch-names": ["master-branches", "next-branches", "swift-3.0-preview-1-branches", "swift-3.0-preview-2-branches"],
     "default-branch-alias": "master",
     "master-branches": {
         "aliases": ["master", "stable"],
