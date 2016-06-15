@@ -7,7 +7,7 @@
 
 // CHECK: [[SGIZMO:%C19objc_attr_NSManaged10SwiftGizmo]] = type
 
-// CHECK: [[X:@[0-9+]]] = private unnamed_addr constant [2 x i8] c"x\00"
+// CHECK: [[X:@.*]] = private unnamed_addr constant [2 x i8] c"x\00"
 
 import Builtin
 import Swift

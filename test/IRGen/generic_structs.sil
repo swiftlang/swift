@@ -7,9 +7,8 @@ import Builtin
 // -- Generic structs with dynamic layout contain the vwtable pattern as part
 //    of the metadata pattern, and no independent vwtable symbol
 // CHECK-NOT: @_TWVV15generic_structs13SingleDynamic
-//    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private constant [34 x i8] c"V15generic_structs13SingleDynamic\00"
-// CHECK: [[SINGLEDYNAMIC_FIELDS:@.*]] = private constant [3 x i8] c"x\00\00"
+// CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private unnamed_addr constant [34 x i8] c"V15generic_structs13SingleDynamic\00"
+// CHECK: [[SINGLEDYNAMIC_FIELDS:@.*]] = private unnamed_addr constant [3 x i8] c"x\00\00"
 // CHECK: @_TMnV15generic_structs13SingleDynamic = hidden constant <{ {{.*}} i32 }> <{
 // --       name
 // CHECK:   [34 x i8]* [[SINGLEDYNAMIC_NAME]]
@@ -48,9 +47,8 @@ import Builtin
 // CHECK-NOT: @_TWVV15generic_structs13SingleDynamic
 
 // -- Nominal type descriptor for generic struct with protocol requirements
-//    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private constant [44 x i8] c"V15generic_structs23DynamicWithRequirements\00"
-// CHECK: [[DYNAMICWITHREQUIREMENTS_FIELDS:@.*]] = private constant [5 x i8] c"x\00y\00\00"
+// CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private unnamed_addr constant [44 x i8] c"V15generic_structs23DynamicWithRequirements\00"
+// CHECK: [[DYNAMICWITHREQUIREMENTS_FIELDS:@.*]] = private unnamed_addr constant [5 x i8] c"x\00y\00\00"
 // CHECK: @_TMnV15generic_structs23DynamicWithRequirements = hidden constant <{ {{.*}} i32 }> <{
 // --       name
 // CHECK-SAME: [44 x i8]* [[DYNAMICWITHREQUIREMENTS_NAME]]

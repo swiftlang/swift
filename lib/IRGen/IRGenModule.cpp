@@ -610,19 +610,17 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
 
 std::pair<llvm::GlobalVariable *, llvm::Constant *>
 IRGenModule::createStringConstant(StringRef Str,
-  bool willBeRelativelyAddressed, StringRef sectionName) {
+                                  StringRef sectionName) {
   // If not, create it.  This implicitly adds a trailing null.
   auto init = llvm::ConstantDataArray::getString(LLVMContext, Str);
   auto global = new llvm::GlobalVariable(Module, init->getType(), true,
                                          llvm::GlobalValue::PrivateLinkage,
                                          init);
-  // FIXME: ld64 crashes resolving relative references to coalesceable symbols.
-  // rdar://problem/22674524
-  // If we intend to relatively address this string, don't mark it with
-  // unnamed_addr to prevent it from going into the cstrings section and getting
-  // coalesced.
-  if (!willBeRelativelyAddressed)
-    global->setUnnamedAddr(true);
+  global->setUnnamedAddr(true);
+  // FIXME: Force the symbol to have a linker-local name rather than an
+  // assembler-local name, because the AArch64 backend can't cope with
+  // relative references to private symbols. rdar://problem/26830295
+  global->setName("\01l_str");
 
   if (!sectionName.empty())
     global->setSection(sectionName);

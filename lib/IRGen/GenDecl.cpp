@@ -2841,23 +2841,14 @@ Address IRGenFunction::createFixedSizeBufferAlloca(const llvm::Twine &name) {
 ///
 /// \returns an i8* with a null terminator; note that embedded nulls
 ///   are okay
-///
-/// FIXME: willBeRelativelyAddressed is only needed to work around an ld64 bug
-/// resolving relative references to coalesceable symbols.
-/// It should be removed when fixed. rdar://problem/22674524
-llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
-                                               bool willBeRelativelyAddressed) {
+llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data) {
   // Check whether this string already exists.
   auto &entry = GlobalStrings[data];
   if (entry.second) {
-    // FIXME: Clear unnamed_addr if the global will be relative referenced
-    // to work around an ld64 bug. rdar://problem/22674524
-    if (willBeRelativelyAddressed)
-      entry.first->setUnnamedAddr(false);
     return entry.second;
   }
 
-  entry = createStringConstant(data, willBeRelativelyAddressed);
+  entry = createStringConstant(data);
   return entry.second;
 }
 

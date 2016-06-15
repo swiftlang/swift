@@ -752,8 +752,7 @@ llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
   if (entry.second)
     return entry.second;
 
-  entry = createStringConstant(Name, /*willBeRelativelyAddressed*/ true,
-                               getReflectionStringsSectionName());
+  entry = createStringConstant(Name, getReflectionStringsSectionName());
   return entry.second;
 }
 
@@ -762,8 +761,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef Str) {
   if (entry.second)
     return entry.second;
 
-  entry = createStringConstant(Str, /*willBeRelativelyAddressed*/ true,
-                               getReflectionTypeRefSectionName());
+  entry = createStringConstant(Str, getReflectionTypeRefSectionName());
   return entry.second;
 }
 
