@@ -136,7 +136,7 @@ extension TestSuite {
       return makeCollectionOfComparable(elements.map(wrapValueIntoComparable))
     }
 
-    testNamePrefix += String(C.Type)
+    testNamePrefix += String(C.Type.self)
 
 //===----------------------------------------------------------------------===//
 // subscript(_: Index)
@@ -657,7 +657,7 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
       return makeCollection(elements.map(wrapValue))
     }
 
-    testNamePrefix += String(C.Type)
+    testNamePrefix += String(C.Type.self)
 
 //===----------------------------------------------------------------------===//
 // subscript(_: Index)
@@ -783,7 +783,7 @@ self.test("\(testNamePrefix).reverse()") {
       return makeCollectionOfComparable(elements.map(wrapValueIntoComparable))
     }
 
-    testNamePrefix += String(C.Type)
+    testNamePrefix += String(C.Type.self)
 
 //===----------------------------------------------------------------------===//
 // sort()

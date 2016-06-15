@@ -298,7 +298,7 @@ final internal class _VaListBuilder {
     // differs from ABI alignment on some architectures.
 #if arch(arm) && !os(iOS)
     if let arg = arg as? _CVarArgAligned {
-      let alignmentInWords = arg._cVarArgAlignment / sizeof(Int)
+      let alignmentInWords = arg._cVarArgAlignment / sizeof(Int.self)
       let misalignmentInWords = count % alignmentInWords
       if misalignmentInWords != 0 {
         let paddingInWords = alignmentInWords - misalignmentInWords
