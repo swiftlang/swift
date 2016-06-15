@@ -704,7 +704,7 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     }
 }
 
-/// Iterate two index sets on the boundaries of their ranges. This is where all of the interesting stuff happens for exclusive or, intersect, etc.
+/// Iterate two index sets on the boundaries of their ranges. This is where all of the interesting stuff happens for exclusive or, intersect, etc.
 private struct IndexSetBoundaryIterator : IteratorProtocol {
     private typealias Element = IndexSet.Element
     
