@@ -276,6 +276,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<ClassType> ClassTypes;
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
+    llvm::FoldingSet<ProtocolType> ProtocolTypes;
 
     llvm::DenseMap<std::pair<TypeBase *, DeclContext *>,
                    ArrayRef<Substitution>>
@@ -3358,17 +3359,38 @@ ImplicitlyUnwrappedOptionalType *ImplicitlyUnwrappedOptionalType::get(Type base)
 }
 
 ProtocolType *ProtocolType::get(ProtocolDecl *D, const ASTContext &C) {
-  if (auto declaredTy = D->getDeclaredType())
-    return declaredTy->castTo<ProtocolType>();
+  // Protocol types can never be nested inside other types, but we should
+  // model this anyway to fix some compiler crashes when computing
+  // substitutions on invalid code.
+  Type Parent;
 
-  auto protoTy = new (C, AllocationArena::Permanent) ProtocolType(D, C);
-  D->setDeclaredType(protoTy);
+  llvm::FoldingSetNodeID id;
+  ProtocolType::Profile(id, D, Parent);
+
+  RecursiveTypeProperties properties;
+  if (Parent) properties |= Parent->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  void *insertPos = 0;
+  if (auto protoTy
+        = C.Impl.getArena(arena).ProtocolTypes.FindNodeOrInsertPos(id, insertPos))
+    return protoTy;
+
+  auto protoTy = new (C, arena) ProtocolType(D, C);
+  C.Impl.getArena(arena).ProtocolTypes.InsertNode(protoTy, insertPos);
+
   return protoTy;
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)
   : NominalType(TypeKind::Protocol, &Ctx, TheDecl, /*Parent=*/Type(),
                 RecursiveTypeProperties()) { }
+
+void ProtocolType::Profile(llvm::FoldingSetNodeID &ID, ProtocolDecl *D,
+                           Type Parent) {
+  ID.AddPointer(D);
+  ID.AddPointer(Parent.getPointer());
+}
 
 LValueType *LValueType::get(Type objectTy) {
   assert(!objectTy->is<ErrorType>() &&
