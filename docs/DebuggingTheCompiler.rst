@@ -217,7 +217,7 @@ we know to ignore swift_getGenericMetadata 84 times, i.e.::
 LLDB Scripts
 ````````````
 
-LLDB has powerful capabilities of scripting in python among other languages. An
+LLDB has powerful capabilities of scripting in Python among other languages. An
 often overlooked, but very useful technique is the -s command to lldb. This
 essentially acts as a pseudo-stdin of commands that lldb will read commands
 from. Each time lldb hits a stopping point (i.e. a breakpoint or a
