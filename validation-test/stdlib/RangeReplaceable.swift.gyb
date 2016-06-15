@@ -109,6 +109,26 @@ RangeReplaceableTestSuite.test("replaceSubrange/countableClosedRange") {
   }
 }
 
+% withRangeTypes = ["countableRange", "countableClosedRange"]
+% for rangeType in withRangeTypes:
+RangeReplaceableTestSuite.test("removeSubrange/${rangeType}") {
+%   if rangeType is "countableClosedRange":
+  for test in removeRangeTests.filter({ !$0.rangeSelection.isEmpty }) {
+%   else:
+  for test in removeRangeTests {
+%   end
+    var c = 
+      MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex(elements: test.collection)
+    let rangeToRemove = test.rangeSelection.${rangeType}(in: c)
+    c.removeSubrange(rangeToRemove)
+    expectEqualSequence(
+      test.expected,
+      c.map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+% end
+
 RangeReplaceableTestSuite.test("reserveCapacity/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester(Array<Int>())
   tester.reserveCapacity(10)
