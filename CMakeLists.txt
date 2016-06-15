@@ -48,17 +48,39 @@ option(SWIFT_BUILD_TOOLS
     "Build the Swift compiler and other tools"
     TRUE)
 
-option(SWIFT_BUILD_STDLIB
-    "Build the Swift standard library (independent of the SDK headers)"
-    TRUE)
-
-option(SWIFT_BUILD_SDK_OVERLAY
-    "Build Swift SDK overlay"
+option(SWIFT_BUILD_DYNAMIC_STDLIB
+    "Build dynamic variants of the Swift standard library"
     TRUE)
 
 option(SWIFT_BUILD_STATIC_STDLIB
-    "Build static variants of the Swift standard library and SDK overlay"
+    "Build static variants of the Swift standard library"
     FALSE)
+
+option(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY
+    "Build dynamic variants of the Swift SDK overlay"
+    TRUE)
+
+option(SWIFT_BUILD_STATIC_SDK_OVERLAY
+    "Build static variants of the Swift SDK overlay"
+    FALSE)
+
+# In many cases, the CMake build system needs to determine whether to include
+# a directory, or perform other actions, based on whether the stdlib or SDK is
+# being built at all -- statically or dynamically. Please note that these
+# flags are not related to the deprecated build-script-impl arguments
+# 'build-swift-stdlib' and 'build-swift-sdk-overlay'. These are not flags that
+# the build script should be able to set.
+if(SWIFT_BUILD_DYNAMIC_STDLIB OR SWIFT_BUILD_STATIC_STDLIB)
+  set(SWIFT_BUILD_STDLIB TRUE)
+else()
+  set(SWIFT_BUILD_STDLIB FALSE)
+endif()
+
+if(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY OR SWIFT_BUILD_STATIC_SDK_OVERLAY)
+  set(SWIFT_BUILD_SDK_OVERLAY TRUE)
+else()
+  set(SWIFT_BUILD_SDK_OVERLAY FALSE)
+endif()
 
 option(SWIFT_BUILD_PERF_TESTSUITE
     "Create targets for swift performance benchmarks."
@@ -798,7 +820,7 @@ endif()
 add_subdirectory(utils)
 add_subdirectory(stdlib)
 
-if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
+if(SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_INCLUDE_TESTS)
   add_subdirectory(tools/swift-reflection-test)
 endif()
 
