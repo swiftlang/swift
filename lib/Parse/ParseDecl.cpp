@@ -4200,7 +4200,10 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     }
     
     // Parse a behavior block if present.
-    if (consumeIf(tok::kw___behavior)) {
+    if (Context.LangOpts.EnableExperimentalPropertyBehaviors
+        && Tok.is(tok::identifier)
+        && Tok.getRawText().equals("__behavior")) {
+      consumeToken(tok::identifier);
       auto type = parseType(diag::expected_behavior_name,
                             /*handle completion*/ true);
       if (type.isParseError())
