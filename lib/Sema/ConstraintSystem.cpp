@@ -904,6 +904,73 @@ void ConstraintSystem::openGeneric(
               replacements);
 }
 
+/// Bind type variables for archetypes that are determined from
+/// context.
+///
+/// For example, if we are opening a generic function type
+/// nested inside another function, we must bind the outer
+/// generic parameters to context archetypes, because the
+/// nested function can "capture" these outer generic parameters.
+///
+/// Another case where this comes up is if a generic type is
+/// nested inside a function. We don't support codegen for this
+/// yet, but again we need to bind any outer generic parameters
+/// to context archetypes, because they're not free.
+///
+/// A final case we have to handle, even though it is invalid, is
+/// when a type is nested inside another protocol. We bind the
+/// protocol type variable for the protocol Self to its archetype
+/// in protocol context. This of course makes no sense, but we
+/// can't leave the type variable dangling, because then we crash
+/// later.
+///
+/// If we ever do want to allow nominal types to be nested inside
+/// protocols, the key is to set their declared type to a
+/// NominalType whose parent is the 'Self' generic parameter, and
+/// not the ProtocolType. Then, within a conforming type context,
+/// we can 'reparent' the NominalType to that concrete type, and
+/// resolve references to associated types inside that NominalType
+/// relative to this concrete 'Self' type.
+///
+/// Also, of course IRGen would have to know to store the 'Self'
+/// metadata as an extra hidden generic parameter in the metadata
+/// of such a type, etc.
+static void bindArchetypesFromContext(
+    ConstraintSystem &cs,
+    DeclContext *outerDC,
+    ConstraintLocator *locatorPtr,
+    const llvm::DenseMap<CanType, TypeVariableType *> &replacements) {
+
+  bool inTypeContext = true;
+  for (const auto *parentDC = outerDC;
+       !parentDC->isModuleScopeContext();
+       parentDC = parentDC->getParent()) {
+    if (!parentDC->isTypeContext())
+      inTypeContext = false;
+
+    if ((!inTypeContext && parentDC->isInnermostContextGeneric()) ||
+        (parentDC->getAsProtocolOrProtocolExtensionContext() &&
+         parentDC != outerDC)) {
+      for (auto gpDecl : *parentDC->getGenericParamsOfContext()) {
+        auto gp = gpDecl->getDeclaredType();
+        auto *archetype = ArchetypeBuilder::mapTypeIntoContext(parentDC, gp)
+            ->castTo<ArchetypeType>();
+        auto found = replacements.find(gp->getCanonicalType());
+
+        // When opening up an UnboundGenericType, we only pass in the
+        // innermost generic parameters as 'params' above -- outer
+        // parameters are not opened, so we must skip them here.
+        if (found != replacements.end()) {
+          auto typeVar = found->second;
+          cs.addConstraint(ConstraintKind::Bind, typeVar, archetype,
+                           locatorPtr);
+        }
+      }
+    }
+  }
+
+}
+
 void ConstraintSystem::openGeneric(
        DeclContext *innerDC,
        DeclContext *outerDC,
@@ -913,8 +980,6 @@ void ConstraintSystem::openGeneric(
        ConstraintLocatorBuilder locator,
        llvm::DenseMap<CanType, TypeVariableType *> &replacements) {
   auto locatorPtr = getConstraintLocator(locator);
-
-  unsigned minOpeningDepth = outerDC->getGenericTypeContextDepth();
 
   // Create the type variables for the generic parameters.
   for (auto gp : params) {
@@ -926,12 +991,8 @@ void ConstraintSystem::openGeneric(
                                       TVO_PrefersSubtypeBinding |
                                       TVO_MustBeMaterializable);
     replacements[gp->getCanonicalType()] = typeVar;
-
-    if (gp->getDepth() < minOpeningDepth)
-      addConstraint(ConstraintKind::Bind, typeVar, archetype, locatorPtr);
   }
 
-  
   GetTypeVariable getTypeVariable{*this, locator};
   ReplaceDependentTypes replaceDependentTypes(*this, locator, replacements,
                                               getTypeVariable);
@@ -941,6 +1002,7 @@ void ConstraintSystem::openGeneric(
   locatorPtr = getConstraintLocator(
                      locator.withPathElement(ConstraintLocator::OpenedGeneric));
 
+  bindArchetypesFromContext(*this, outerDC, locatorPtr, replacements);
 
   // Add the requirements as constraints.
   for (auto req : requirements) {

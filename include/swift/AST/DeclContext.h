@@ -368,11 +368,6 @@ public:
   /// Determine whether the innermost context is generic.
   bool isInnermostContextGeneric() const;
 
-  /// Determine the maximum depth of the current generic type context's generic
-  /// parameters. If the current context is not a generic type context, returns
-  /// the maximum depth of any generic parameter in this context.
-  unsigned getGenericTypeContextDepth() const;
-
   /// Get the most optimal resilience expansion for code in this context.
   /// If the body is able to be inlined into functions in other resilience
   /// domains, this ensures that only sufficiently-conservative access patterns
