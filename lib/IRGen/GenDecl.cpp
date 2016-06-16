@@ -1216,7 +1216,8 @@ bool LinkEntity::isFragile(IRGenModule &IGM) const {
 static std::pair<llvm::GlobalValue::LinkageTypes,
                  llvm::GlobalValue::VisibilityTypes>
 getIRLinkage(IRGenModule &IGM,
-             SILLinkage linkage, bool isFragile, ForDefinition_t isDefinition,
+             SILLinkage linkage, bool isFragile, bool isSILOnly,
+             ForDefinition_t isDefinition,
              bool isWeakImported) {
   
 #define RESULT(LINKAGE, VISIBILITY)        \
@@ -1260,6 +1261,22 @@ llvm::GlobalValue::VISIBILITY##Visibility }
   
   switch (linkage) {
   case SILLinkage::Public:
+    // Don't code-gen transparent functions. Internal linkage
+    // will enable llvm to delete transparent functions except
+    // they are referenced from somewhere (i.e. the function pointer
+    // is taken).
+    if (isSILOnly &&
+        // In case we are generating multiple LLVM modules, we still have to
+        // use ExternalLinkage so that modules can cross-reference transparent
+        // functions.
+        !IGM.IRGen.hasMultipleIGMs() &&
+        
+        // TODO: In non-whole-module-opt the generated swiftmodules are "linked"
+        // and this strips all serialized transparent functions. So we have to
+        // code-gen transparent functions in non-whole-module-opt.
+        IGM.getSILModule().isWholeModule()) {
+      return RESULT(Internal, Default);
+    }
     return {llvm::GlobalValue::ExternalLinkage, PublicDefinitionVisibility};
   case SILLinkage::Shared:
   case SILLinkage::SharedExternal: return RESULT(LinkOnceODR, Hidden);
@@ -1273,6 +1290,10 @@ llvm::GlobalValue::VISIBILITY##Visibility }
     return RESULT(Internal, Default);
   case SILLinkage::PublicExternal:
     if (isDefinition) {
+      if (isSILOnly) {
+        // Transparent function are not available externally.
+        return RESULT(LinkOnceODR, Hidden);
+      }
       return RESULT(AvailableExternally, Default);
     }
 
@@ -1303,6 +1324,7 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
                    IGM,
                    entity.getLinkage(IGM, ForDefinition),
                    entity.isFragile(IGM),
+                   entity.isSILOnly(),
                    ForDefinition,
                    entity.isWeakImported(IGM.getSwiftModule()));
   global->setLinkage(linkage.first);
@@ -1329,6 +1351,7 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
   std::tie(result.Linkage, result.Visibility) =
     getIRLinkage(IGM, entity.getLinkage(IGM, isDefinition),
                  entity.isFragile(IGM),
+                 entity.isSILOnly(),
                  isDefinition,
                  entity.isWeakImported(IGM.getSwiftModule()));
 
