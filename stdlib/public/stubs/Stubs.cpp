@@ -21,6 +21,7 @@
 #endif
 
 #if defined(_MSC_VER)
+#define WIN32_LEAN_AND_MEAN
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
 #define NOMINMAX
 #include <windows.h>
