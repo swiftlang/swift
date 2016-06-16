@@ -138,7 +138,7 @@ func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
 #if _runtime(_ObjC)
 func isNativeNSSet(_ s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(s.dynamicType) as NSString
-  return className.range(of: "NativeSetStorage").length > 0
+  return className.range(of: "NativeSetBridgingStorage").length > 0
 }
 
 func isCocoaNSSet(_ s: NSSet) -> Bool {
@@ -832,7 +832,7 @@ SetTestSuite.test("COW.Fast.UnionInPlaceSmallSetDoesNotReallocate") {
 SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWFastSet()
-    let originalCapacity = s._variantStorage.asNative.capacity
+    let originalCapacity = s._variantStorage.asNative._capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(1010))
 
@@ -840,7 +840,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     // We cannot expectTrue that identity changed, since the new buffer of
     // smaller size can be allocated at the same address as the old one.
     var identity1 = s._rawIdentifier()
-    expectTrue(s._variantStorage.asNative.capacity < originalCapacity)
+    expectTrue(s._variantStorage.asNative._capacity < originalCapacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(1010))
 
@@ -853,19 +853,19 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWFastSet()
     var identity1 = s._rawIdentifier()
-    let originalCapacity = s._variantStorage.asNative.capacity
+    let originalCapacity = s._variantStorage.asNative._capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(1010))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, s._rawIdentifier())
-    expectEqual(originalCapacity, s._variantStorage.asNative.capacity)
+    expectEqual(originalCapacity, s._variantStorage.asNative._capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(1010))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, s._rawIdentifier())
-    expectEqual(originalCapacity, s._variantStorage.asNative.capacity)
+    expectEqual(originalCapacity, s._variantStorage.asNative._capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(1010))
   }
@@ -894,7 +894,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var s1 = getCOWFastSet()
     var identity1 = s1._rawIdentifier()
-    let originalCapacity = s1._variantStorage.asNative.capacity
+    let originalCapacity = s1._variantStorage.asNative._capacity
     expectEqual(3, s1.count)
     expectTrue(s1.contains(1010))
 
@@ -905,7 +905,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     expectNotEqual(identity1, identity2)
     expectEqual(3, s1.count)
     expectTrue(s1.contains(1010))
-    expectEqual(originalCapacity, s2._variantStorage.asNative.capacity)
+    expectEqual(originalCapacity, s2._variantStorage.asNative._capacity)
     expectEqual(0, s2.count)
     expectFalse(s2.contains(1010))
 
@@ -918,7 +918,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWSlowSet()
-    let originalCapacity = s._variantStorage.asNative.capacity
+    let originalCapacity = s._variantStorage.asNative._capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(TestKeyTy(1010)))
 
@@ -926,7 +926,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     // We cannot expectTrue that identity changed, since the new buffer of
     // smaller size can be allocated at the same address as the old one.
     var identity1 = s._rawIdentifier()
-    expectTrue(s._variantStorage.asNative.capacity < originalCapacity)
+    expectTrue(s._variantStorage.asNative._capacity < originalCapacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(TestKeyTy(1010)))
 
@@ -939,19 +939,19 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWSlowSet()
     var identity1 = s._rawIdentifier()
-    let originalCapacity = s._variantStorage.asNative.capacity
+    let originalCapacity = s._variantStorage.asNative._capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(TestKeyTy(1010)))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, s._rawIdentifier())
-    expectEqual(originalCapacity, s._variantStorage.asNative.capacity)
+    expectEqual(originalCapacity, s._variantStorage.asNative._capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(TestKeyTy(1010)))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, s._rawIdentifier())
-    expectEqual(originalCapacity, s._variantStorage.asNative.capacity)
+    expectEqual(originalCapacity, s._variantStorage.asNative._capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(TestKeyTy(1010)))
   }
@@ -980,7 +980,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var s1 = getCOWSlowSet()
     var identity1 = s1._rawIdentifier()
-    let originalCapacity = s1._variantStorage.asNative.capacity
+    let originalCapacity = s1._variantStorage.asNative._capacity
     expectEqual(3, s1.count)
     expectTrue(s1.contains(TestKeyTy(1010)))
 
@@ -991,7 +991,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     expectNotEqual(identity1, identity2)
     expectEqual(3, s1.count)
     expectTrue(s1.contains(TestKeyTy(1010)))
-    expectEqual(originalCapacity, s2._variantStorage.asNative.capacity)
+    expectEqual(originalCapacity, s2._variantStorage.asNative._capacity)
     expectEqual(0, s2.count)
     expectFalse(s2.contains(TestKeyTy(1010)))
 
