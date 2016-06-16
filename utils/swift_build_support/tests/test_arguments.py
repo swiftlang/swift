@@ -210,3 +210,11 @@ class ArgumentsActionTestCase(unittest.TestCase):
         self.assertEqual(args.test_default_default, True)
         self.assertEqual(args.test_default_true, True)
         self.assertEqual(args.test_default_false, True)
+
+        args, unknown_args = parser.parse_known_args(
+            ['--test-default-default',
+             '--test-default-true',
+             '--test-default-false'])
+        self.assertEqual(args.test_default_default, True)
+        self.assertEqual(args.test_default_true, True)
+        self.assertEqual(args.test_default_false, True)
