@@ -656,7 +656,7 @@ extension MutableCollection
   Self : RandomAccessCollection,
   Self.Iterator.Element : Comparable {
 
-  @available(*, unavailable, renamed: "sort")
+  @available(*, unavailable, renamed: "sort()")
   public mutating func sortInPlace() {
     Builtin.unreachable()
   }

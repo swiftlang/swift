@@ -350,7 +350,7 @@ extension LazyFilterSequence {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
     Builtin.unreachable()
   }
@@ -365,7 +365,7 @@ extension LazyFilterCollection {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> LazyFilterIterator<Base.Iterator> {
     Builtin.unreachable()
   }

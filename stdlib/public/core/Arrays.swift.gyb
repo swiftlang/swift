@@ -2156,7 +2156,7 @@ extension ${Self} {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "replaceSubrange")
+  @available(*, unavailable, renamed: "replaceSubrange(_:with:)")
   public mutating func replaceRange<C>(
     _ subRange: Range<Int>,
     with newElements: C

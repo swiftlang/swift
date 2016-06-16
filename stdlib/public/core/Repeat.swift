@@ -66,7 +66,7 @@ public func repeatElement<T>(_ element: T, count n: Int) -> Repeated<T> {
 public struct Repeat<Element> {}
 
 extension Repeated {
-  @available(*, unavailable, renamed: "repeatElement")
+  @available(*, unavailable, message: "Please use repeatElement(_:count:) function instead")
   public init(count: Int, repeatedValue: Element) {
     Builtin.unreachable()
   }

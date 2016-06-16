@@ -168,9 +168,9 @@ public func print<T>(_: T, _: inout OutputStream) {}
 @available(*, unavailable, message: "Please use the 'to' label for the target stream: 'debugPrint((...), to: &...))'")
 public func debugPrint<T>(_: T, _: inout OutputStream) {}
 
-@available(*, unavailable, message: "Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'toStream' label for the target stream: 'print((...), terminator: \"\", toStream: &...)'")
+@available(*, unavailable, message: "Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'to' label for the target stream: 'print((...), terminator: \"\", to: &...)'")
 public func print<T>(_: T, _: inout OutputStream, appendNewline: Bool = true) {}
-@available(*, unavailable, message: "Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'toStream' label for the target stream: 'debugPrint((...), terminator: \"\", toStream: &...)'")
+@available(*, unavailable, message: "Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'to' label for the target stream: 'debugPrint((...), terminator: \"\", to: &...)'")
 public func debugPrint<T>(
   _: T, _: inout OutputStream, appendNewline: Bool = true
 ) {}

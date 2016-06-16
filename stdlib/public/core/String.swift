@@ -976,7 +976,7 @@ extension String {
 }
 
 extension String {
-  @available(*, unavailable, renamed: "append")
+  @available(*, unavailable, renamed: "append(_:)")
   public mutating func appendContentsOf(_ other: String) {
     Builtin.unreachable()
   }

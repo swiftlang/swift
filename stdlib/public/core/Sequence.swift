@@ -1223,17 +1223,17 @@ public typealias SequenceType = Sequence
 
 extension Sequence {
   @available(*, unavailable, renamed: "makeIterator()")
-  func generate() -> Iterator {
+  public func generate() -> Iterator {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, message: "it became a property 'underestimatedCount'")
-  func underestimateCount() -> Int {
+  public func underestimateCount() -> Int {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, message: "call 'split(_:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
-  func split(_ maxSplit: Int, allowEmptySlices: Bool,
+  @available(*, unavailable, message: "call 'split(maxSplits:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
+  public func split(_ maxSplit: Int, allowEmptySlices: Bool,
     isSeparator: @noescape (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     Builtin.unreachable()
@@ -1241,7 +1241,7 @@ extension Sequence {
 }
 
 extension Sequence where Iterator.Element : Equatable {
-  @available(*, unavailable, message: "call 'split(separator:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
+  @available(*, unavailable, message: "call 'split(separator:maxSplits:omittingEmptySubsequences:)' and invert the 'allowEmptySlices' argument")
   public func split(
     _ separator: Iterator.Element,
     maxSplit: Int = Int.max,
