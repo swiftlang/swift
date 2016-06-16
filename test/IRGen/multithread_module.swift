@@ -45,6 +45,9 @@ func callPrivInc(_ x: Int) -> Int {
 	return privateInc(x)
 }
 
+// Check if we use the correct linkage for a transparent function
+public var transparentfuncptr = transparentfunc
+
 protocol MyProto {
 	func protofunc() -> Int
 }

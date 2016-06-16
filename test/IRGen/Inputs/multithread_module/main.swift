@@ -19,6 +19,10 @@ private struct MyStruct : MyProto {
 	}
 }
 
+@_transparent public func transparentfunc(_ x: Int) -> Int {
+	return x + 3
+}
+
 public var g1 = 234
 
 let i = testit(27)
