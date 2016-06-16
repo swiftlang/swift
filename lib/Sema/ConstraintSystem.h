@@ -694,6 +694,10 @@ public:
   /// \brief Retrieve the fixed type for the given type variable.
   Type getFixedType(TypeVariableType *typeVar) const;
 
+  /// Try to resolve the given locator to a declaration within this
+  /// solution.
+  ConcreteDeclRef resolveLocatorToDecl(ConstraintLocator *locator) const;
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");

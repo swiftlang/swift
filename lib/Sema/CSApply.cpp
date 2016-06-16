@@ -3800,9 +3800,62 @@ resolveLocatorToDecl(ConstraintSystem &cs, ConstraintLocator *locator,
     }
   }
 
+  if (isa<UnresolvedDotExpr>(anchor)) {
+    // Unresolved member: find the resolved overload.
+    auto anchorLocator = cs.getConstraintLocator(anchor,
+                                                 ConstraintLocator::Member);
+    if (auto selected = findOvlChoice(anchorLocator)) {
+      if (selected->choice.isDecl())
+        return getConcreteDeclRef(selected->choice.getDecl(),
+                                  selected->openedType,
+                                  anchorLocator);
+    }
+  }
+
   return ConcreteDeclRef();
 }
 
+ConcreteDeclRef Solution::resolveLocatorToDecl(
+                  ConstraintLocator *locator) const {
+  auto &cs = getConstraintSystem();
+
+  // Simplify the locator.
+  SourceRange range;
+  locator = simplifyLocator(cs, locator, range);
+
+  // If we didn't map down to a specific expression, we can't handle a default
+  // argument.
+  if (!locator->getAnchor() || !locator->getPath().empty())
+    return nullptr;
+
+  if (auto resolved
+        = ::resolveLocatorToDecl(cs, locator,
+            [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
+              auto known = overloadChoices.find(locator);
+              if (known == overloadChoices.end()) {
+                return None;
+              }
+
+              return known->second;
+            },
+            [&](ValueDecl *decl, Type openedType, ConstraintLocator *locator)
+                  -> ConcreteDeclRef {
+              if (decl->getInnermostDeclContext()->isGenericContext()) {
+                SmallVector<Substitution, 4> subs;
+                computeSubstitutions(
+                  decl->getType(),
+                  decl->getInnermostDeclContext(),
+                  openedType, locator, subs);
+                return ConcreteDeclRef(cs.getASTContext(), decl, subs);
+              }
+              
+              return decl;
+            })) {
+    return resolved;
+  }
+
+  return ConcreteDeclRef();
+}
 
 /// \brief Given a constraint locator, find the declaration reference
 /// to the callee, it is a call to a declaration.
@@ -3843,42 +3896,7 @@ findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
     locator = cs.getConstraintLocator(locator->getAnchor(), newPath, newFlags);
   }
 
-  // Simplify the locator.
-  SourceRange range;
-  locator = simplifyLocator(cs, locator, range);
-
-  // If we didn't map down to a specific expression, we can't handle a default
-  // argument.
-  if (!locator->getAnchor() || !locator->getPath().empty())
-    return nullptr;
-
-  if (auto resolved
-        = resolveLocatorToDecl(cs, locator,
-            [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
-              auto known = solution.overloadChoices.find(locator);
-              if (known == solution.overloadChoices.end()) {
-                return None;
-              }
-
-              return known->second;
-            },
-            [&](ValueDecl *decl, Type openedType, ConstraintLocator *locator)
-                  -> ConcreteDeclRef {
-              if (decl->getInnermostDeclContext()->isGenericContext()) {
-                SmallVector<Substitution, 4> subs;
-                solution.computeSubstitutions(
-                  decl->getType(),
-                  decl->getInnermostDeclContext(),
-                  openedType, locator, subs);
-                return ConcreteDeclRef(cs.getASTContext(), decl, subs);
-              }
-              
-              return decl;
-            })) {
-    return resolved;
-  }
-
-  return nullptr;
+  return solution.resolveLocatorToDecl(locator);
 }
 
 static bool

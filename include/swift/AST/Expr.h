@@ -494,7 +494,11 @@ public:
   ///   has an access kind
   void propagateLValueAccessKind(AccessKind accessKind,
                                  bool allowOverwrite = false);
-  
+
+  /// Retrieves the declaration that is being referenced by this
+  /// expression, if any.
+  ConcreteDeclRef getReferencedDecl() const;
+
   /// Determine whether this expression is 'super', possibly converted to
   /// a base class.
   bool isSuperExpr() const;

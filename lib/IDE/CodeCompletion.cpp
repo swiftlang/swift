@@ -1309,7 +1309,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     return typeCheckCompletionDecl(DelayedParsedDecl);
   }
 
-  Optional<Type> getTypeOfParsedExpr() {
+  Optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
     assert(ParsedExpr && "should have an expression");
 
     // Figure out the kind of type-check we'll be performing.
@@ -1324,16 +1324,19 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     // typecheck again. rdar://21466394
     if (CheckKind == CompletionTypeCheckKind::Normal &&
         ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>())
-      return ParsedExpr->getType();
+      return std::make_pair(ParsedExpr->getType(),
+                            ParsedExpr->getReferencedDecl());
 
+    ConcreteDeclRef ReferencedDecl = nullptr;
     Expr *ModifiedExpr = ParsedExpr;
     if (auto T = getTypeOfCompletionContextExpr(P.Context, CurDeclContext,
-                                                CheckKind, ModifiedExpr)) {
+                                                CheckKind, ModifiedExpr,
+                                                ReferencedDecl)) {
       // FIXME: even though we don't apply the solution, the type checker may
       // modify the original expression. We should understand what effect that
       // may have on code completion.
       ParsedExpr = ModifiedExpr;
-      return T;
+      return std::make_pair(*T, ReferencedDecl);
     }
     return None;
   }
@@ -2058,16 +2061,17 @@ public:
     addPatternFromTypeImpl(Builder, T, Identifier(), true, /*isVarArg*/false);
   }
 
-  static bool hasInterestingDefaultValues(const AnyFunctionType *AFT) {
-    if (auto *TT = dyn_cast<TupleType>(AFT->getInput().getPointer())) {
-      for (const TupleTypeElt &EltT : TT->getElements()) {
-        switch (EltT.getDefaultArgKind()) {
-        case DefaultArgumentKind::Normal:
-        case DefaultArgumentKind::Inherited: // FIXME: include this?
-          return true;
-        default:
-          break;
-        }
+  static bool hasInterestingDefaultValues(const AbstractFunctionDecl *func) {
+    if (!func) return false;
+
+    bool isMemberOfType = func->getDeclContext()->isTypeContext();
+    for (auto param : *func->getParameterList(isMemberOfType ? 1 : 0)) {
+      switch (param->getDefaultArgumentKind()) {
+      case DefaultArgumentKind::Normal:
+      case DefaultArgumentKind::Inherited: // FIXME: include this?
+        return true;
+      default:
+        break;
       }
     }
     return false;
@@ -2080,8 +2084,25 @@ public:
                                    bool includeDefaultArgs = true) {
 
     const ParameterList *BodyParams = nullptr;
-    if (AFD)
+    if (AFD) {
       BodyParams = AFD->getParameterList(AFD->getImplicitSelfDecl() ? 1 : 0);
+
+      // FIXME: Hack because we don't know which parameter list we're
+      // actually working with.
+      unsigned expectedNumParams;
+      if (auto *TT = dyn_cast<TupleType>(AFT->getInput().getPointer()))
+        expectedNumParams = TT->getNumElements();
+      else
+        expectedNumParams = 1;
+
+      if (expectedNumParams != BodyParams->size()) {
+        // Adjust to the "self" list if that is present, otherwise give up.
+        if (expectedNumParams == 1 && AFD->getImplicitSelfDecl())
+          BodyParams = AFD->getParameterList(0);
+        else
+          BodyParams = nullptr;
+      }
+    }
 
     bool modifiedBuilder = false;
 
@@ -2091,8 +2112,10 @@ public:
       bool NeedComma = false;
       // Iterate over the tuple type fields, corresponding to each parameter.
       for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
-        const auto &TupleElt = TT->getElement(i);
-        switch (TupleElt.getDefaultArgKind()) {
+        auto defArg = DefaultArgumentKind::None;
+        if (BodyParams && i < BodyParams->size())
+          defArg = BodyParams->get(i)->getDefaultArgumentKind();
+        switch (defArg) {
         case DefaultArgumentKind::None:
           break;
 
@@ -2115,6 +2138,8 @@ public:
           // these parameters.
           continue;
         }
+
+        const auto &TupleElt = TT->getElement(i);
         auto ParamType = TupleElt.isVararg() ? TupleElt.getVarargBaseTy()
                                              : TupleElt.getType();
         auto Name = TupleElt.getName();
@@ -2247,7 +2272,7 @@ public:
       addTypeAnnotation(Builder, AFT->getResult());
     };
 
-    if (hasInterestingDefaultValues(AFT))
+    if (hasInterestingDefaultValues(AFD))
       addPattern(/*includeDefaultArgs*/ false);
     addPattern();
   }
@@ -2359,7 +2384,7 @@ public:
     };
 
     if (!FunctionType->is<ErrorType>() &&
-        hasInterestingDefaultValues(FunctionType->castTo<AnyFunctionType>())) {
+        hasInterestingDefaultValues(FD)) {
       addMethodImpl(/*includeDefaultArgs*/ false);
     }
     addMethodImpl();
@@ -2442,7 +2467,7 @@ public:
                                             ConstructorType->getResult());
     };
 
-    if (ConstructorType && hasInterestingDefaultValues(ConstructorType))
+    if (ConstructorType && hasInterestingDefaultValues(CD))
       addConstructorImpl(/*includeDefaultArgs*/ false);
     addConstructorImpl();
   }
@@ -3107,12 +3132,13 @@ public:
                                DeclNameLoc(expr->getSourceRange().End));
     PostfixUnaryExpr opExpr(&UDRE, expr);
     Expr *tempExpr = &opExpr;
-
+    ConcreteDeclRef referencedDecl;
     if (auto T = getTypeOfCompletionContextExpr(
             CurrDeclContext->getASTContext(),
             const_cast<DeclContext *>(CurrDeclContext),
             CompletionTypeCheckKind::Normal,
-            tempExpr))
+            tempExpr,
+            referencedDecl))
       addPostfixOperatorCompletion(op, *T);
   }
 
@@ -4820,15 +4846,19 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     CurDeclContext = AFD;
 
   Optional<Type> ExprType;
+  ConcreteDeclRef ReferencedDecl = nullptr;
   if (ParsedExpr) {
-    ExprType = getTypeOfParsedExpr();
+    if (auto typechecked = typeCheckParsedExpr()) {
+      ExprType = typechecked->first;
+      ReferencedDecl = typechecked->second;
+      ParsedExpr->setType(*ExprType);
+    }
+
     if (!ExprType && Kind != CompletionKind::PostfixExprParen &&
         Kind != CompletionKind::CallArg &&
         Kind != CompletionKind::KeyPathExpr &&
         Kind != CompletionKind::KeyPathExprDot)
       return;
-    if (ExprType)
-      ParsedExpr->setType(*ExprType);
   }
 
   if (!ParsedTypeLoc.isNull() && !typecheckParsedType())
@@ -4888,7 +4918,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (TypeAnalyzer.Analyze(PossibleTypes)) {
       Lookup.setExpectedTypes(PossibleTypes);
     }
-    Lookup.getValueExprCompletions(ExprType);
+    Lookup.getValueExprCompletions(ExprType, ReferencedDecl.getDecl());
     break;
   }
 
@@ -4911,7 +4941,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.setHaveLeadingSpace(HasSpace);
     if (isDynamicLookup(*ExprType))
       Lookup.setIsDynamicLookup();
-    Lookup.getValueExprCompletions(*ExprType);
+    Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
     Lookup.getOperatorCompletions(ParsedExpr, leadingSequenceExprs);
     break;
   }
@@ -4930,7 +4960,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (ExprType) {
       if (ShouldCompleteCallPatternAfterParen) {
         Lookup.setHaveRParen(HasRParen);
-        Lookup.getValueExprCompletions(*ExprType);
+        Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
       } else {
         // Add argument labels, then fallthrough to get values.
         Lookup.addArgNameCompletionResults(PossibleNames);
@@ -4948,14 +4978,14 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::SuperExpr: {
     Lookup.setIsSuperRefExpr();
-    Lookup.getValueExprCompletions(*ExprType);
+    Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
     break;
   }
 
   case CompletionKind::SuperExprDot: {
     Lookup.setIsSuperRefExpr();
     Lookup.setHaveDot(SourceLoc());
-    Lookup.getValueExprCompletions(*ExprType);
+    Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
     break;
   }
 
@@ -4971,7 +5001,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       if (isDynamicLookup(*ExprType))
         Lookup.setIsDynamicLookup();
 
-      Lookup.getValueExprCompletions(*ExprType);
+      Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
     } else {
       SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
       Lookup.getValueCompletionsInDeclContext(Loc, KeyPathFilter,
