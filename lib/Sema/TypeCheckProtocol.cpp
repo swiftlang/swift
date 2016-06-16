@@ -1807,15 +1807,21 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
   SmallVector<ProtocolConformanceRef, 4> conformances;
 
   bool isError = replacement->is<ErrorType>();
-  for (auto proto : archetype->getConformsTo()) {
-    ProtocolConformance *conformance = nullptr;
-    bool conforms = tc.conformsToProtocol(replacement, proto, dc, None,
-                                          &conformance);
-    assert((conforms || isError) &&
-           "Conformance should already have been verified");
-    (void)isError;
-    (void)conforms;
-    conformances.push_back(ProtocolConformanceRef(proto, conformance));
+  assert((archetype != nullptr || isError) &&
+         "Should have built archetypes already");
+
+  // FIXME: Turn the nullptr check into an assertion
+  if (archetype != nullptr) {
+    for (auto proto : archetype->getConformsTo()) {
+      ProtocolConformance *conformance = nullptr;
+      bool conforms = tc.conformsToProtocol(replacement, proto, dc, None,
+                                            &conformance);
+      assert((conforms || isError) &&
+             "Conformance should already have been verified");
+      (void)isError;
+      (void)conforms;
+      conformances.push_back(ProtocolConformanceRef(proto, conformance));
+    }
   }
 
   return Substitution{
