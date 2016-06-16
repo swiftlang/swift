@@ -1469,9 +1469,11 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
 Optional<Type> TypeChecker::
 getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
+                                   ConcreteDeclRef &referencedDecl,
                                  FreeTypeVariableBinding allowFreeTypeVariables,
                                    ExprTypeCheckListener *listener) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
+  referencedDecl = nullptr;
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
@@ -1504,6 +1506,11 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   assert(exprType && !exprType->is<ErrorType>() && "erroneous solution?");
   assert(!exprType->hasTypeVariable() &&
          "free type variable with FreeTypeVariableBinding::GenericParameters?");
+
+  // Dig the declaration out of the solution.
+  auto semanticExpr = expr->getSemanticsProvidingExpr();
+  auto topLocator = cs.getConstraintLocator(semanticExpr);
+  referencedDecl = solution.resolveLocatorToDecl(topLocator);
 
   // Recover the original type if needed.
   recoverOriginalType();

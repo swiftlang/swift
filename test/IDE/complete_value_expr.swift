@@ -1814,8 +1814,7 @@ func testThrows002() {
   globalFuncRethrows#^THROWS2^#
 
 // THROWS2: Begin completions
-// FIXME: <rdar://problem/21010193> Fix throws => rethrows in call patterns
-// THROWS2: Pattern/ExprSpecific:               ({#() throws -> ()##() throws -> ()#})[' throws'][#Void#]; name=(() throws -> ()) throws
+// THROWS2: Pattern/ExprSpecific:               ({#(x): () throws -> ()##() throws -> ()#})[' rethrows'][#Void#]; name=(x: () throws -> ()) rethrows
 // THROWS2: End completions
 }
 func testThrows003(_ x: HasThrowingMembers) {
@@ -1834,8 +1833,7 @@ func testThrows004(_ x: HasThrowingMembers) {
 func testThrows005(_ x: HasThrowingMembers) {
   x.memberRethrows#^MEMBER_THROWS3^#
 // MEMBER_THROWS3: Begin completions
-// FIXME: <rdar://problem/21010193> Fix throws => rethrows in call patterns
-// MEMBER_THROWS3: Pattern/ExprSpecific:               ({#() throws -> ()##() throws -> ()#})[' throws'][#Void#]; name=(() throws -> ()) throws
+// MEMBER_THROWS3: Pattern/ExprSpecific: ({#(x): () throws -> ()##() throws -> ()#})[' rethrows'][#Void#]; name=(x: () throws -> ()) rethrows
 // MEMBER_THROWS3: End completions
 }
 func testThrows006() {
