@@ -808,7 +808,8 @@ def main_preset():
         "-n", "--dry-run",
         help="print the commands that would be executed, but do not execute "
              "them",
-        action=arguments.action.optional_bool)
+        action="store_true",
+        default=False)
     parser.add_argument(
         "--preset-file",
         help="load presets from the specified file",
@@ -1063,7 +1064,8 @@ details of the setups of other systems or automated environments.""")
         "-n", "--dry-run",
         help="print the commands that would be executed, but do not execute "
              "them",
-        action=arguments.action.optional_bool)
+        action="store_true",
+        default=False)
 
     targets_group = parser.add_argument_group(
         title="Host and cross-compilation targets")
@@ -1099,17 +1101,17 @@ details of the setups of other systems or automated environments.""")
     projects_group.add_argument(
         "-l", "--lldb",
         help="build LLDB",
-        action=arguments.action.optional_bool,
+        action="store_true",
         dest="build_lldb")
     projects_group.add_argument(
         "-b", "--llbuild",
         help="build llbuild",
-        action=arguments.action.optional_bool,
+        action="store_true",
         dest="build_llbuild")
     projects_group.add_argument(
         "-p", "--swiftpm",
         help="build swiftpm",
-        action=arguments.action.optional_bool,
+        action="store_true",
         dest="build_swiftpm")
     projects_group.add_argument(
         "--xctest",
@@ -1136,7 +1138,7 @@ details of the setups of other systems or automated environments.""")
     extra_actions_group.add_argument(
         "-c", "--clean",
         help="do a clean build",
-        action=arguments.action.optional_bool)
+        action="store_true")
     extra_actions_group.add_argument(
         "--export-compile-commands",
         help="generate compilation databases in addition to building",
@@ -1354,7 +1356,7 @@ details of the setups of other systems or automated environments.""")
     run_tests_group.add_argument(
         "-B", "--benchmark",
         help="run the Swift Benchmark Suite after building",
-        action=arguments.action.optional_bool)
+        action="store_true")
     run_tests_group.add_argument(
         "--skip-test-osx",
         help="skip testing Swift stdlibs for Mac OS X",
@@ -1386,7 +1388,7 @@ details of the setups of other systems or automated environments.""")
     run_build_group.add_argument(
         "-S", "--skip-build",
         help="generate build directory only without building",
-        action=arguments.action.optional_bool)
+        action="store_true")
     run_build_group.add_argument(
         "--skip-build-linux",
         help="skip building Swift stdlibs for Linux",
@@ -1513,7 +1515,7 @@ details of the setups of other systems or automated environments.""")
         "-i", "--ios",
         help="also build for iOS, but disallow tests that require an iOS "
              "device",
-        action=arguments.action.optional_bool)
+        action="store_true")
     parser.add_argument(
         "--skip-ios",
         help="set to skip everything iOS-related",
