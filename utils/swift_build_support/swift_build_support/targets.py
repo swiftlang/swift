@@ -175,7 +175,7 @@ class StdlibDeploymentTarget(object):
 
         elif system == 'FreeBSD':
             if machine == 'amd64':
-                return StdlibDeploymentTarget.FreeBSD.amd64
+                return StdlibDeploymentTarget.FreeBSD.x86_64
 
         elif system == 'CYGWIN_NT-10.0':
             if machine == 'x86_64':
