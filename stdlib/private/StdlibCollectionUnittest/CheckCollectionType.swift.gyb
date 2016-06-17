@@ -1765,7 +1765,7 @@ extension TestSuite {
           }
         } else {
           expectCrashLater()
-          c.formIndex(&new, offsetBy: numericCast(test.distance), limitedBy: limit)
+          _ = c.formIndex(&new, offsetBy: numericCast(test.distance), limitedBy: limit)
         }
       }
     }
