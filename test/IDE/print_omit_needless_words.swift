@@ -47,32 +47,32 @@
 
 // Note: Pointer-to-struct name matching; preposition splitting.
 //
-// CHECK-FOUNDATION: func copy(with: Zone? = nil) -> AnyObject!
+// CHECK-FOUNDATION: func copy(with: NSZone? = nil) -> AnyObject!
 
 // Note: Objective-C type parameter names.
-// CHECK-FOUNDATION: func object(forKey: Copying) -> AnyObject?
-// CHECK-FOUNDATION: func removeObject(forKey: Copying)
+// CHECK-FOUNDATION: func object(forKey: NSCopying) -> AnyObject?
+// CHECK-FOUNDATION: func removeObject(forKey: NSCopying)
 
 // Note: Don't drop the name of the first parameter in an initializer entirely.
 // CHECK-FOUNDATION: init(array: [AnyObject])
 
 // Note: struct name matching; don't drop "With".
-// CHECK-FOUNDATION: class func withRange(_: NSRange) -> Value
+// CHECK-FOUNDATION: class func withRange(_: NSRange) -> NSValue
 
 // Note: built-in types.
-// CHECK-FOUNDATION: func add(_: Double) -> Number
+// CHECK-FOUNDATION: func add(_: Double) -> NSNumber
 
 // Note: built-in types.
-// CHECK-FOUNDATION: func add(_: Bool) -> Number
+// CHECK-FOUNDATION: func add(_: Bool) -> NSNumber
 
 // Note: builtin-types.
-// CHECK-FOUNDATION: func add(_: UInt16) -> Number
+// CHECK-FOUNDATION: func add(_: UInt16) -> NSNumber
 
 // Note: builtin-types.
-// CHECK-FOUNDATION: func add(_: Int32) -> Number
+// CHECK-FOUNDATION: func add(_: Int32) -> NSNumber
 
 // Note: Typedefs with a "_t" suffix".
-// CHECK-FOUNDATION: func subtract(_: Int32) -> Number
+// CHECK-FOUNDATION: func subtract(_: Int32) -> NSNumber
 
 // Note: Respect the getter name for BOOL properties.
 // CHECK-FOUNDATION: var isMakingHoney: Bool
@@ -84,14 +84,14 @@
 // CHECK-FOUNDATION: class func withString(_: String!) -> Self!
 
 // Note: lowercasing enum constants.
-// CHECK-FOUNDATION: enum ByteCountFormatterCountStyle : Int {
+// CHECK-FOUNDATION: enum CountStyle : Int {
 // CHECK-FOUNDATION: case file
 // CHECK-FOUNDATION-NEXT: case memory
 // CHECK-FOUNDATION-NEXT: case decimal
 // CHECK-FOUNDATION-NEXT: case binary
 
 // Note: Make sure NSURL works in various places
-// CHECK-FOUNDATION: open(_: URL!, completionHandler: ((Bool) -> Void)!)
+// CHECK-FOUNDATION: open(_: NSURL!, completionHandler: ((Bool) -> Void)!)
 
 // Note: property name stripping property type.
 // CHECK-FOUNDATION: var uppercased: String
@@ -117,16 +117,16 @@
 // CHECK-FOUNDATION: func withString(_: String) -> String
 
 // Note: Noun phrase puts preposition inside.
-// CHECK-FOUNDATION: func url(withAddedString: String) -> URL?
+// CHECK-FOUNDATION: func url(withAddedString: String) -> NSURL?
 
 // Note: CalendarUnits is not a set of "Options".
-// CHECK-FOUNDATION: class func forCalendarUnits(_: CalendarUnit) -> String!
+// CHECK-FOUNDATION: class func forCalendarUnits(_: Calendar.Unit) -> String!
 
 // Note: <property type>By<gerund> --> <gerund>.
-// CHECK-FOUNDATION: var deletingLastPathComponent: URL? { get }
+// CHECK-FOUNDATION: var deletingLastPathComponent: NSURL? { get }
 
 // Note: <property type><preposition> --> <preposition>.
-// CHECK-FOUNDATION: var withHTTPS: URL { get }
+// CHECK-FOUNDATION: var withHTTPS: NSURL { get }
 
 // Note: lowercasing option set values
 // CHECK-FOUNDATION: struct EnumerationOptions
@@ -141,10 +141,10 @@
 // CHECK-FOUNDATION: func enumerateObjectsRandomly(_: ((AnyObject?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)? = nil)
 
 // Note: id<Proto> treated as "Proto".
-// CHECK-FOUNDATION: func doSomething(with: Copying)
+// CHECK-FOUNDATION: func doSomething(with: NSCopying)
 
 // Note: NSObject<Proto> treated as "Proto".
-// CHECK-FOUNDATION: func doSomethingElse(with: protocol<Copying, ObjectProtocol>)
+// CHECK-FOUNDATION: func doSomethingElse(with: protocol<NSCopying, NSObjectProtocol>)
 
 // Note: Function type -> "Function".
 // CHECK-FOUNDATION: func sort(_: @convention(c) (AnyObject, AnyObject) -> Int)
@@ -161,7 +161,7 @@
 // CHECK-FOUNDATION: func normalizingXMLPreservingComments(_: Bool)
 
 // Collection element types.
-// CHECK-FOUNDATION: func adding(_: AnyObject) -> Set<Object>
+// CHECK-FOUNDATION: func adding(_: AnyObject) -> Set<NSObject>
 
 // Boolean properties follow the getter.
 // CHECK-FOUNDATION: var empty: Bool { get }
@@ -188,7 +188,7 @@
 // CHECK-FOUNDATION: let NSHTTPRequestKey: String
 
 // Lowercasing initialisms with plurals.
-// CHECK-FOUNDATION: var urlsInText: [URL] { get }
+// CHECK-FOUNDATION: var urlsInText: [NSURL] { get }
 
 // Don't strip prefixes from macro names.
 // CHECK-FOUNDATION: var NSTimeIntervalSince1970: Double { get }
@@ -216,8 +216,8 @@
 // CHECK-APPKIT: func draw(in: NSView?)
 
 // Note: NSDictionary default arguments for "options"
-// CHECK-APPKIT: func drawAnywhere(in: NSView?, options: [Object : AnyObject] = [:])
-// CHECK-APPKIT: func drawAnywhere(options: [Object : AnyObject] = [:])
+// CHECK-APPKIT: func drawAnywhere(in: NSView?, options: [NSObject : AnyObject] = [:])
+// CHECK-APPKIT: func drawAnywhere(options: [NSObject : AnyObject] = [:])
 
 // Note: no lowercasing of initialisms when there might be a prefix.
 // CHECK-CORECOOLING: func CFBottom() ->
@@ -261,19 +261,19 @@
 // CHECK-APPKIT: func removeGestureRecognizer(_: NSGestureRecognizer)
 // CHECK-APPKIT: func favoriteView(for: NSGestureRecognizer) -> NSView?
 // CHECK-APPKIT: func addLayoutConstraints(_: Set<NSLayoutConstraint>)
-// CHECK-APPKIT: func add(_: Rect)
-// CHECK-APPKIT: class func conjureRect(_: Rect)
+// CHECK-APPKIT: func add(_: NSRect)
+// CHECK-APPKIT: class func conjureRect(_: NSRect)
 
-// CHECK-OMIT-NEEDLESS-WORDS: func jump(to: URL)
+// CHECK-OMIT-NEEDLESS-WORDS: func jump(to: NSURL)
 // CHECK-OMIT-NEEDLESS-WORDS: func objectIs(compatibleWith: AnyObject) -> Bool
 // CHECK-OMIT-NEEDLESS-WORDS: func insetBy(x: Int, y: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func setIndirectlyToValue(_: AnyObject)
 // CHECK-OMIT-NEEDLESS-WORDS: func jumpToTop(_: AnyObject)
 // CHECK-OMIT-NEEDLESS-WORDS: func removeWithNoRemorse(_: AnyObject)
-// CHECK-OMIT-NEEDLESS-WORDS: func bookmark(with: [URL])
-// CHECK-OMIT-NEEDLESS-WORDS: func save(to: URL, forSaveOperation: Int)
+// CHECK-OMIT-NEEDLESS-WORDS: func bookmark(with: [NSURL])
+// CHECK-OMIT-NEEDLESS-WORDS: func save(to: NSURL, forSaveOperation: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func index(withItemNamed: String)
-// CHECK-OMIT-NEEDLESS-WORDS: func methodAndReturnError(_: AutoreleasingUnsafeMutablePointer<Error?>!)
+// CHECK-OMIT-NEEDLESS-WORDS: func methodAndReturnError(_: AutoreleasingUnsafeMutablePointer<NSError?>!)
 
 // CHECK-OMIT-NEEDLESS-WORDS: func type(of: String)
 // CHECK-OMIT-NEEDLESS-WORDS: func type(ofNamedString: String)
@@ -294,10 +294,10 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func slobbering(_: String) -> OmitNeedlessWords
 
 // Elements of C array types
-// CHECK-OMIT-NEEDLESS-WORDS: func drawPolygon(with: UnsafePointer<Point>!, count: Int)
+// CHECK-OMIT-NEEDLESS-WORDS: func drawPolygon(with: UnsafePointer<NSPoint>!, count: Int)
 
 // Typedef ending in "Array".
-// CHECK-OMIT-NEEDLESS-WORDS: func drawFilledPolygon(with: PointArray!, count: Int)
+// CHECK-OMIT-NEEDLESS-WORDS: func drawFilledPolygon(with: NSPointArray!, count: Int)
 
 // Non-parameterized Objective-C class ending in "Array".
 // CHECK-OMIT-NEEDLESS-WORDS: func draw(_: SEGreebieArray)

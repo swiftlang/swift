@@ -19,6 +19,12 @@ func bytesFromNSData(_ data: NSData) -> [UInt8] {
     count: data.length))
 }
 
+func floatsFromNSData(_ data: NSData) -> [Float] {
+  return Array(UnsafeBufferPointer(
+    start: UnsafePointer<Float>(data.bytes),
+    count: data.length / sizeof(Float)))
+}
+
 if #available(iOS 8.0, *) {
   SceneKitTests.test("SCNGeometryElement.init(indices:primitiveType:)/Int") {
     let element = SCNGeometryElement(
@@ -37,7 +43,7 @@ if #available(iOS 8.0, *) {
         5,0,0,0,
         6,0,0,0,
       ],
-      bytesFromNSData(element.data))
+      bytesFromNSData(element.data as NSData))
     expectEqual(4, element.bytesPerIndex)
   #elseif arch(x86_64) || arch(arm64)
     expectEqual(
@@ -49,7 +55,7 @@ if #available(iOS 8.0, *) {
         5,0,0,0, 0,0,0,0,
         6,0,0,0, 0,0,0,0,
       ],
-      bytesFromNSData(element.data))
+      bytesFromNSData(element.data as NSData))
     expectEqual(8, element.bytesPerIndex)
   #else
     _portThisCode()
@@ -72,7 +78,7 @@ if #available(iOS 8.0, *) {
         5, 0,
         6, 0
       ],
-      bytesFromNSData(element.data))
+      bytesFromNSData(element.data as NSData))
     expectEqual(2, element.bytesPerIndex)
   }
 
@@ -85,7 +91,7 @@ if #available(iOS 8.0, *) {
     expectEqual(2, element.primitiveCount)
     expectEqual(
       [ 1, 2, UInt8.max, UInt8.max/2, 5, 6 ],
-      bytesFromNSData(element.data))
+      bytesFromNSData(element.data as NSData))
     expectEqual(1, element.bytesPerIndex)
   }
 
@@ -98,7 +104,7 @@ if #available(iOS 8.0, *) {
     expectEqual(4, element.primitiveCount)
     expectEqual(
       [ 1, 2, 3, 4, 5, 6 ],
-      bytesFromNSData(element.data))
+      bytesFromNSData(element.data as NSData))
     expectEqual(1, element.bytesPerIndex)
   }
 
@@ -111,7 +117,7 @@ if #available(iOS 8.0, *) {
     expectEqual(3, element.primitiveCount)
     expectEqual(
       [ 1, 2, 3, 4, 5, 6 ],
-      bytesFromNSData(element.data))
+      bytesFromNSData(element.data as NSData))
     expectEqual(1, element.bytesPerIndex)
   }
 
@@ -124,8 +130,49 @@ if #available(iOS 8.0, *) {
     expectEqual(6, element.primitiveCount)
     expectEqual(
       [ 1, 2, 3, 4, 5, 6 ],
-      bytesFromNSData(element.data))
+      bytesFromNSData(element.data as NSData))
     expectEqual(1, element.bytesPerIndex)
+  }
+
+  SceneKitTests.test("SCNGeometrySource.init(vertices:)") {
+    let source = SCNGeometrySource(vertices: [SCNVector3(1, 2, 3),
+                                              SCNVector3(4, 5, 6)])
+
+    expectEqual(source.semantic, SCNGeometrySourceSemanticVertex)
+    expectEqual(source.vectorCount, 2)
+    expectEqual(source.componentsPerVector, 3)
+
+    expectEqual(source.bytesPerComponent, sizeof(Float))
+    let positions = floatsFromNSData(source.data as NSData)
+    expectEqual(positions[2], 3)
+    expectEqual(positions[4], 5)
+  }
+
+  SceneKitTests.test("SCNGeometrySource.init(normals:)") {
+    let source = SCNGeometrySource(normals: [SCNVector3(1, 2, 3),
+                                             SCNVector3(4, 5, 6)])
+
+    expectEqual(source.semantic, SCNGeometrySourceSemanticNormal)
+    expectEqual(source.vectorCount, 2)
+    expectEqual(source.componentsPerVector, 3)
+
+    expectEqual(source.bytesPerComponent, sizeof(Float))
+    let normals = floatsFromNSData(source.data as NSData)
+    expectEqual(normals[2], 3)
+    expectEqual(normals[4], 5)
+  }
+
+  SceneKitTests.test("SCNGeometrySource.init(textureCoordinates:)") {
+    let source = SCNGeometrySource(textureCoordinates: [CGPoint(x: 1, y: 2),
+                                                        CGPoint(x: 4, y: 5)])
+
+    expectEqual(source.semantic, SCNGeometrySourceSemanticTexcoord)
+    expectEqual(source.vectorCount, 2)
+    expectEqual(source.componentsPerVector, 2)
+
+    let uvs = floatsFromNSData(source.data as NSData)
+    expectEqual(uvs[1], 2)
+    expectEqual(uvs[3], 5)
   }
 
   SceneKitTests.test("SCNSceneSource.entryWithIdentifier(uid:withClass:)")
@@ -299,9 +346,9 @@ if #available(iOS 8.0, *) {
       "</COLLADA>"
 
     let sceneData = sceneDescription.data(
-      using: NSUTF8StringEncoding,
+      using: .utf8,
       allowLossyConversion: true)!
-    let sceneSource = SCNSceneSource(data: sceneData, options: nil)!
+    let sceneSource = SCNSceneSource(data: sceneData as Data, options: nil)!
 
     do {
       var unarchivedPlaneGeometry =
@@ -337,6 +384,45 @@ if #available(iOS 8.0, *) {
       expectType(Optional<SCNNode>.self, &unarchivedBoxNode)
 
       expectEmpty(unarchivedBoxNode_nil)
+    }
+  }
+
+  if #available(OSX 10.10, *) {
+    SceneKitTests.test("SCNBoundingVolume.boundingBox/getter") {
+      let box = SCNBox(width: 42, height: 0.5, length: 1337, chamferRadius: 0)
+      let boundingBox = box.boundingBox
+
+      expectEqual(boundingBox.max.x, 21)
+      expectEqual(boundingBox.max.x, -boundingBox.min.x)
+      expectEqual(boundingBox.max.y, 0.25)
+      expectEqual(boundingBox.max.y, -boundingBox.min.y)
+      expectEqual(boundingBox.max.z, 668.5)
+      expectEqual(boundingBox.max.z, -boundingBox.min.z)
+    }
+
+    SceneKitTests.test("SCNBoundingVolume.boundingBox/setter") {
+      let max = SCNVector3(42, 0.414, 1337)
+      let min = SCNVector3(-42, -0.414, -1337)
+      let box = SCNBox(width: 1, height: 2, length: 3, chamferRadius: 0)
+      let boxNode = SCNNode(geometry: box)
+
+      boxNode.boundingBox = (min, max)
+      let nodeBoundingBox = boxNode.boundingBox
+
+      expectEqual(nodeBoundingBox.max.x, max.x)
+      expectEqual(nodeBoundingBox.min.x, -max.x)
+      expectEqual(nodeBoundingBox.max.y, max.y)
+      expectEqual(nodeBoundingBox.min.y, -max.y)
+      expectEqual(nodeBoundingBox.max.z, max.z)
+      expectEqual(nodeBoundingBox.min.z, -max.z)
+    }
+
+    SceneKitTests.test("SCNBoundingVolume.boundingSphere/getter") {
+      let box = SCNBox(width: 2 * 2, height: 3 * 2, length: 6 * 2, chamferRadius: 0)
+      let boundingSphere = box.boundingSphere
+
+      // 2^2 + 3^2 + 6^2 = 7^2
+      expectEqual(boundingSphere.radius, 7.0)
     }
   }
 }

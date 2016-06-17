@@ -19,6 +19,6 @@ public class HasObjCClasses {
   let rect = CGRect(x: 0, y: 1, width: 2, height: 3)
 }
 
-public func closureHasObjCClasses(b: NSBundle, c: NSCoding) -> () -> () {
+public func closureHasObjCClasses(b: Bundle, c: NSCoding) -> () -> () {
   return { _ = b; _ = c }
 }

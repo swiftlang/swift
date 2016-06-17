@@ -1034,18 +1034,28 @@ DictionaryTestSuite.test("deleteChainCollision2") {
 }
 
 func uniformRandom(_ max: Int) -> Int {
-  // FIXME: this is not uniform.
-  return random() % max
+  return Int(arc4random_uniform(UInt32(max)))
 }
 
 func pickRandom<T>(_ a: [T]) -> T {
   return a[uniformRandom(a.count)]
 }
 
-DictionaryTestSuite.test("deleteChainCollisionRandomized") {
-  let timeNow = CUnsignedInt(time(nil))
-  print("time is \(timeNow)")
-  srandom(timeNow)
+func product<C1 : Collection, C2 : Collection>(
+  _ c1: C1, _ c2: C2
+) -> [(C1.Iterator.Element, C2.Iterator.Element)] {
+  var result: [(C1.Iterator.Element, C2.Iterator.Element)] = []
+  for e1 in c1 {
+    for e2 in c2 {
+      result.append((e1, e2))
+    }
+  }
+  return result
+}
+
+DictionaryTestSuite.test("deleteChainCollisionRandomized")
+  .forEach(in: product(1...8, 0...5)) {
+  (collisionChains, chainOverlap) in
 
   func check(_ d: Dictionary<TestKeyTy, TestValueTy>) {
     var keys = Array(d.keys)
@@ -1059,13 +1069,6 @@ DictionaryTestSuite.test("deleteChainCollisionRandomized") {
       assert(d[k] != nil)
     }
   }
-
-  var collisionChainsChoices = Array(1...8)
-  var chainOverlapChoices = Array(0...5)
-
-  var collisionChains = pickRandom(collisionChainsChoices)
-  var chainOverlap = pickRandom(chainOverlapChoices)
-  print("chose parameters: collisionChains=\(collisionChains) chainLength=\(chainOverlap)")
 
   let chainLength = 7
 
@@ -1266,8 +1269,10 @@ class ParallelArrayDictionary : NSDictionary {
   }
 
   override func countByEnumerating(
-      with state: UnsafeMutablePointer<NSFastEnumerationState>,
-      objects: AutoreleasingUnsafeMutablePointer<AnyObject>, count: Int) -> Int {
+    with state: UnsafeMutablePointer<NSFastEnumerationState>,
+    objects: AutoreleasingUnsafeMutablePointer<AnyObject?>,
+    count: Int
+  ) -> Int {
     var theState = state.pointee
     if theState.state == 0 {
       theState.state = 1
@@ -3846,18 +3851,19 @@ DictionaryTestSuite.test("getObjects:andKeys:") {
     start: UnsafeMutablePointer<NSNumber>(allocatingCapacity: 2), count: 2)
   var values = UnsafeMutableBufferPointer(
     start: UnsafeMutablePointer<NSString>(allocatingCapacity: 2), count: 2)
-  var kp = AutoreleasingUnsafeMutablePointer<AnyObject>(keys.baseAddress!)
-  var vp = AutoreleasingUnsafeMutablePointer<AnyObject>(values.baseAddress!)
+  var kp = AutoreleasingUnsafeMutablePointer<AnyObject?>(keys.baseAddress!)
+  var vp = AutoreleasingUnsafeMutablePointer<AnyObject?>(values.baseAddress!)
+  var null: AutoreleasingUnsafeMutablePointer<AnyObject?>? = nil
 
-  d.getObjects(nil, andKeys: nil) // don't segfault
+  d.available_getObjects(null, andKeys: null) // don't segfault
 
-  d.getObjects(nil, andKeys: kp)
+  d.available_getObjects(null, andKeys: kp)
   expectEqual([2, 1] as [NSNumber], Array(keys))
 
-  d.getObjects(vp, andKeys: nil)
+  d.available_getObjects(vp, andKeys: null)
   expectEqual(["two", "one"] as [NSString], Array(values))
 
-  d.getObjects(vp, andKeys: kp)
+  d.available_getObjects(vp, andKeys: kp)
   expectEqual([2, 1] as [NSNumber], Array(keys))
   expectEqual(["two", "one"] as [NSString], Array(values))
 }

@@ -263,6 +263,7 @@ SIMPLE_DECL_ATTR(_versioned, Versioned,
 SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,
                  OnFunc | OnConstructor | LongAttribute, 65)
 
+SIMPLE_DECL_ATTR(GKInspectable, GKInspectable, OnVar, 66)
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

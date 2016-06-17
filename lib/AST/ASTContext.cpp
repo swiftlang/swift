@@ -2526,17 +2526,17 @@ bool swift::nameConflictsWithStandardLibrary(KnownFoundationEntity entity) {
   case KnownFoundationEntity::NSRange:
   case KnownFoundationEntity::NSSet:
   case KnownFoundationEntity::NSString:
-    return true;
-
   case KnownFoundationEntity::NSCopying:
   case KnownFoundationEntity::NSError:
   case KnownFoundationEntity::NSErrorPointer:
   case KnownFoundationEntity::NSNumber:
   case KnownFoundationEntity::NSObject:
-  case KnownFoundationEntity::NSStringEncoding:
   case KnownFoundationEntity::NSUInteger:
   case KnownFoundationEntity::NSURL:
   case KnownFoundationEntity::NSZone:
+    return true;
+
+  case KnownFoundationEntity::NSStringEncoding:
     return false;
   }
 }

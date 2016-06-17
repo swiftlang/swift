@@ -79,7 +79,7 @@ protocol CustomNameType2 {}
 // CHECK-NEXT: @end
 // NEGATIVE-NOT: @protocol NSCoding
 class MyObject : NSObject, NSCoding {
-  required init(coder aCoder: NSCoder) {
+  required init(coder acoder: NSCoder) {
     super.init()
   }
 }

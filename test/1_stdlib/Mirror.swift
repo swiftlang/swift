@@ -425,7 +425,7 @@ mirrors.test("class/ObjCUncustomizedSuper/Synthesized/Explicit") {
 }
 
 mirrors.test("class/ObjCCustomizedSuper/Synthesized") {
-  class A : NSDateFormatter, CustomReflectable {
+  class A : DateFormatter, CustomReflectable {
     var a: Int = 1
     var customMirror: Mirror {
       return Mirror(self, children: ["aye": a])
@@ -450,9 +450,9 @@ mirrors.test("class/ObjCCustomizedSuper/Synthesized") {
     expectTrue(a.subjectType == A.self)
     expectEqual("a", a.children.first!.label)
     if let d = expectNotEmpty(a.superclassMirror) {
-      expectTrue(d.subjectType == NSDateFormatter.self)
+      expectTrue(d.subjectType == DateFormatter.self)
       if let f = expectNotEmpty(d.superclassMirror) {
-        expectTrue(f.subjectType == NSFormatter.self)
+        expectTrue(f.subjectType == Formatter.self)
         if let o = expectNotEmpty(f.superclassMirror) {
           expectTrue(o.subjectType == NSObject.self)
           expectEmpty(o.superclassMirror)

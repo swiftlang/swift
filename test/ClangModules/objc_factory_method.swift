@@ -93,7 +93,7 @@ func testNonsplittableFactoryMethod() {
 
 func testFactoryMethodBlacklist() {
   _ = NCWidgetController.widgetController()
-  _ = NSProcessInfo.processInfo()
+  _ = ProcessInfo.processInfo()
 }
 
 func test17261609() {
@@ -102,12 +102,12 @@ func test17261609() {
 }
 
 func testURL() {
-  let url = NSURL(string: "http://www.llvm.org")
+  let url = NSURL(string: "http://www.llvm.org")!
   _ = NSURL.withString("http://www.llvm.org") // expected-error{{'withString' is unavailable: use object construction 'NSURL(string:)'}}
 
   NSURLRequest(string: "http://www.llvm.org") // expected-warning{{unused}}
-  NSURLRequest(url: url) // expected-warning{{unused}}
+  NSURLRequest(url: url as URL) // expected-warning{{unused}}
 
   _ = NSURLRequest.withString("http://www.llvm.org") // expected-error{{'withString' is unavailable: use object construction 'NSURLRequest(string:)'}}
-  _ = NSURLRequest.withURL(url) // expected-error{{'withURL' is unavailable: use object construction 'NSURLRequest(url:)'}}
+  _ = NSURLRequest.withURL(url as URL) // expected-error{{'withURL' is unavailable: use object construction 'NSURLRequest(url:)'}}
 }

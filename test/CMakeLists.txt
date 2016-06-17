@@ -231,6 +231,7 @@ if(PYTHONINTERP_FOUND)
         list(APPEND LIT_ARGS "--xunit-xml-output=${swift_test_results_dir}/lit-tests.xml")
 
         set(command_upload_stdlib)
+        set(command_upload_swift_reflection_test)
         if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS")
           # These are supported testing SDKs.
         endif()
@@ -274,6 +275,7 @@ if(PYTHONINTERP_FOUND)
           if(want_this_combination)
             add_custom_target("check-swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}"
                 ${command_upload_stdlib}
+                ${command_upload_swift_reflection_test}
                 ${command_clean_test_results_dir}
                 ${command_profdata_merge_start}
                 COMMAND ${PYTHON_EXECUTABLE} "${LIT}" ${LIT_ARGS} ${directories}

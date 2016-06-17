@@ -6,24 +6,24 @@ import Foundation
 
 func expectType<T>(_: T.Type, _ x: inout T) {}
 
-func test_NSCoder_decodeObject(_ coder: NSCoder) {
+func test_Coder_decodeObject(_ coder: NSCoder) {
   var r = coder.decodeObject()
   expectType(Optional<AnyObject>.self, &r)
 }
 
 @available(iOS, introduced: 9.0)
 @available(OSX, introduced: 10.11)
-func test_NSCoder_decodeTopLevelObject(_ coder: NSCoder) throws {
+func test_Coder_decodeTopLevelObject(_ coder: NSCoder) throws {
   var r = try coder.decodeTopLevelObject()
   expectType(Optional<AnyObject>.self, &r)
 }
 
-func test_NSCoder_decodeObjectForKey(_ coder: NSCoder, key: String) {
+func test_Coder_decodeObjectForKey(_ coder: NSCoder, key: String) {
   var r = coder.decodeObject(forKey: key)
   expectType(Optional<AnyObject>.self, &r)
 }
 
-func test_NSCoder_decodeObjectOfClasses_forKey(
+func test_Coder_decodeObjectOfClasses_forKey(
   _ coder: NSCoder, classes: NSSet?, key: String
 ) {
   var r = coder.decodeObjectOfClasses(classes, forKey: key)
@@ -32,7 +32,7 @@ func test_NSCoder_decodeObjectOfClasses_forKey(
 
 @available(iOS, introduced: 9.0)
 @available(OSX, introduced: 10.11)
-func test_NSCoder_decodeTopLevelObjectOfClasses_forKey_error(
+func test_Coder_decodeTopLevelObjectOfClasses_forKey_error(
   _ coder: NSCoder, classes: NSSet?, key: String
 ) throws {
   var r = try coder.decodeTopLevelObjectOfClasses(classes, forKey: key)
@@ -41,7 +41,7 @@ func test_NSCoder_decodeTopLevelObjectOfClasses_forKey_error(
 
 
 func test_NSKeyedUnarchiver_unarchiveObjectWithData(_ data: NSData) {
-  var r = NSKeyedUnarchiver.unarchiveObject(with: data)
+  var r = NSKeyedUnarchiver.unarchiveObject(with: data as Data)
   expectType(Optional<AnyObject>.self, &r)
 }
 

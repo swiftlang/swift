@@ -6,10 +6,10 @@ import Foundation
 import user_objc
 
 // Ignore deprecated constants in prefix stripping, even if they aren't deprecated /yet/.
-let calendarUnits: NSCalendarUnit = [.era, .year, .calendar]
-let calendarUnits2: NSCalendarUnit = [.NSMonthCalendarUnit, .NSYearCalendarUnit] // expected-error 2 {{unavailable}}
+let calendarUnits: Calendar.Unit = [.era, .year, .calendar]
+let calendarUnits2: Calendar.Unit = [.NSMonthCalendarUnit, .NSYearCalendarUnit] // expected-error 2 {{unavailable}}
   // ...unless they're all deprecated.
-let calendarUnitsDep: NSCalendarUnitDeprecated = [.eraCalendarUnitDeprecated, .yearCalendarUnitDeprecated] // expected-error 2 {{unavailable}}
+let calendarUnitsDep: CalendarUnitDeprecated = [.eraCalendarUnitDeprecated, .yearCalendarUnitDeprecated] // expected-error 2 {{unavailable}}
 
 // rdar://problem/21081557
 func pokeRawValue(_ random: SomeRandomEnum) {

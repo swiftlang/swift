@@ -355,19 +355,52 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       "-D_ISO646_H_", "-D__ISO646_H",
 
       // Request new APIs from Foundation.
-      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=5",
+      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=6",
 
       // Request new APIs from SceneKit.
-      "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=1",
-
-      // Request new APIs from SpriteKit.
-      "-DSWIFT_SDK_OVERLAY2_SPRITEKIT_EPOCH=1",
+      "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=2",
 
       // Request new APIs from CoreImage.
-      "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=1",
+      "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=2",
 
       // Request new APIs from libdispatch.
-      "-DSWIFT_SDK_OVERLAY_DISPATCH_EPOCH=0",
+      "-DSWIFT_SDK_OVERLAY_DISPATCH_EPOCH=2",
+
+      // Request new APIs from Pthreads.
+      "-DSWIFT_SDK_OVERLAY_PTHREAD_EPOCH=1",
+
+      // Request new APIs from CoreGraphics.
+      "-DSWIFT_SDK_OVERLAY_COREGRAPHICS_EPOCH=0",
+
+      // WORKAROUND: Define macro constants unconditionally omitted
+      // from Dispatch headers.
+      "-DDISPATCH_IO_STREAM=0",
+      "-DDISPATCH_IO_RANDOM=1",
+      "-DDISPATCH_IO_STOP=0x1",
+      "-DDISPATCH_IO_STRICT_INTERVAL=0x1",
+      "-DDISPATCH_QUEUE_PRIORITY_HIGH=2",
+      "-DDISPATCH_QUEUE_PRIORITY_DEFAULT=0",
+      "-DDISPATCH_QUEUE_PRIORITY_LOW=(-2)",
+      "-DDISPATCH_QUEUE_PRIORITY_BACKGROUND=INT16_MIN",
+      "-DDISPATCH_MACH_SEND_DEAD=0x1",
+      "-DDISPATCH_MEMORYPRESSURE_NORMAL=0x01",
+      "-DDISPATCH_MEMORYPRESSURE_WARN=0x02",
+      "-DDISPATCH_MEMORYPRESSURE_CRITICAL=0x04",
+      "-DDISPATCH_PROC_EXIT=0x80000000",
+      "-DDISPATCH_PROC_FORK=0x40000000",
+      "-DDISPATCH_PROC_EXEC=0x20000000",
+      "-DDISPATCH_PROC_SIGNAL=0x08000000",
+      "-DDISPATCH_VNODE_DELETE=0x1",
+      "-DDISPATCH_VNODE_WRITE=0x2",
+      "-DDISPATCH_VNODE_EXTEND=0x4",
+      "-DDISPATCH_VNODE_ATTRIB=0x8",
+      "-DDISPATCH_VNODE_LINK=0x10",
+      "-DDISPATCH_VNODE_RENAME=0x20",
+      "-DDISPATCH_VNODE_REVOKE=0x40",
+      "-DDISPATCH_VNODE_FUNLOCK=0x100",
+      "-DDISPATCH_TIMER_STRICT=0x1",
+      "-DDISPATCH_TIME_NOW=(0ull)",
+      "-DDISPATCH_TIME_FOREVER=(~0ull)",
     });
 
     // Get the version of this compiler and pass it to
@@ -2352,6 +2385,12 @@ auto ClangImporter::Implementation::importFullName(
   if (isa<clang::ObjCCategoryDecl>(D))
     return result;
 
+  // Dig out the definition, if there is one.
+  if (auto def = getDefinitionForClangTypeDecl(D)) {
+    if (*def)
+      D = static_cast<const clang::NamedDecl *>(*def);
+  }
+
   // Compute the effective context.
   auto dc = const_cast<clang::DeclContext *>(D->getDeclContext());
 
@@ -3294,7 +3333,8 @@ ClangImporter::Implementation::shouldSuppressGenericParamsImport(
   while (decl) {
     StringRef name = decl->getName();
     if (name == "NSArray" || name == "NSDictionary" || name == "NSSet" ||
-        name == "NSOrderedSet" || name == "NSEnumerator") {
+        name == "NSOrderedSet" || name == "NSEnumerator" ||
+        name == "NSMeasurement") {
       return true;
     }
     decl = decl->getSuperClass();

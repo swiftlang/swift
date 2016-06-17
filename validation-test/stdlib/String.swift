@@ -1142,10 +1142,10 @@ StringTests.test("indexConversion")
   .skip(.nativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
-  let re : NSRegularExpression
+  let re : RegularExpression
   do {
-    re = try NSRegularExpression(
-      pattern: "([^ ]+)er", options: NSRegularExpressionOptions())
+    re = try RegularExpression(
+      pattern: "([^ ]+)er", options: RegularExpression.Options())
   } catch { fatalError("couldn't build regexp: \(error)") }
 
   let s = "go further into the larder to barter."
@@ -1153,7 +1153,7 @@ StringTests.test("indexConversion")
   var matches: [String] = []
   
   re.enumerateMatches(
-    in: s, options: NSMatchingOptions(), range: NSRange(0..<s.utf16.count)
+    in: s, options: RegularExpression.MatchingOptions(), range: NSRange(0..<s.utf16.count)
   ) {
     result, flags, stop
   in

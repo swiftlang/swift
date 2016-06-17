@@ -8,36 +8,36 @@ import Foundation
 import user_objc
 
 // NS_ENUM
-var mince = NSRuncingMode.mince
-var quince = NSRuncingMode.quince
+var mince = RuncingMode.mince
+var quince = RuncingMode.quince
 
-var rawMince: UInt = NSRuncingMode.mince.rawValue
-var rawFoo: CInt = NSUnderlyingType.foo.rawValue
+var rawMince: UInt = RuncingMode.mince.rawValue
+var rawFoo: CInt = UnderlyingType.foo.rawValue
 var rawNegativeOne: CUnsignedInt
-  = NSUnsignedUnderlyingTypeNegativeValue.negativeOne.rawValue
+  = UnsignedUnderlyingTypeNegativeValue.negativeOne.rawValue
 
-var rawWordBreakA: Int = NSPrefixWordBreak.banjo.rawValue
-var rawWordBreakB: Int = NSPrefixWordBreak.bandana.rawValue
+var rawWordBreakA: Int = PrefixWordBreak.banjo.rawValue
+var rawWordBreakB: Int = PrefixWordBreak.bandana.rawValue
 
-var rawWordBreak2A: Int = NSPrefixWordBreak2.breakBarBas.rawValue
-var rawWordBreak2B: Int = NSPrefixWordBreak2.breakBareBass.rawValue
+var rawWordBreak2A: Int = PrefixWordBreak2.breakBarBas.rawValue
+var rawWordBreak2B: Int = PrefixWordBreak2.breakBareBass.rawValue
 
-var rawWordBreak3A: Int = NSPrefixWordBreak3.break1Bob.rawValue
-var rawWordBreak3B: Int = NSPrefixWordBreak3.break1Ben.rawValue
+var rawWordBreak3A: Int = PrefixWordBreak3.break1Bob.rawValue
+var rawWordBreak3B: Int = PrefixWordBreak3.break1Ben.rawValue
 
-var singleConstant = NSSingleConstantEnum.value
+var singleConstant = SingleConstantEnum.value
 
 var myCoolWaterMelon = MyCoolEnum.waterMelon
 
-var hashMince: Int = NSRuncingMode.mince.hashValue
-if NSRuncingMode.mince != .quince { }
+var hashMince: Int = RuncingMode.mince.hashValue
+if RuncingMode.mince != .quince { }
 
-var numberBehavior: NSNumberFormatterBehavior = .behaviorDefault
+var numberBehavior: NumberFormatter.Behavior = .behaviorDefault
 numberBehavior = .behavior10_4
-var postingStyle: NSPostingStyle = .postWhenIdle
+var postingStyle: NotificationQueue.PostingStyle = .postWhenIdle
 postingStyle = .postASAP
 
-func handler(_ formatter: NSByteCountFormatter) {
+func handler(_ formatter: ByteCountFormatter) {
 	// Ensure that the Equality protocol is properly added to an
 	// imported ObjC enum type before the type is referenced by name
     if (formatter.countStyle == .file) {}
@@ -57,10 +57,10 @@ let objcABI: objc_abi = .v2
 let underscoreSuffix: ALL_CAPS_ENUM = .ENUM_CASE_ONE
 let underscoreSuffix2: ALL_CAPS_ENUM2 = .CASE_TWO
 
-var alias1 = NSAliasesEnum.bySameValue
-var alias2 = NSAliasesEnum.byEquivalentValue
-var alias3 = NSAliasesEnum.byName
-var aliasOriginal = NSAliasesEnum.original
+var alias1 = AliasesEnum.bySameValue
+var alias2 = AliasesEnum.byEquivalentValue
+var alias3 = AliasesEnum.byName
+var aliasOriginal = AliasesEnum.original
 
 switch aliasOriginal {
 case .original:
@@ -89,13 +89,13 @@ default:
 }
 
 switch aliasOriginal {
-case NSAliasesEnum.bySameValue:
+case AliasesEnum.bySameValue:
   break
-case NSAliasesEnum.differentValue:
+case AliasesEnum.differentValue:
   break
 }
 
-extension NSAliasesEnum {
+extension AliasesEnum {
   func test() {
     switch aliasOriginal {
     case bySameValue:
@@ -107,49 +107,49 @@ extension NSAliasesEnum {
 }
 
 // Test NS_SWIFT_NAME:
-_ = NSXMLNodeKind.DTDKind == .invalidKind
+_ = XMLNode.Kind.DTDKind == .invalid
 
-_ = NSPrefixWordBreakCustom.problemCase == .deprecatedGoodCase // expected-warning {{deprecated}}
+_ = PrefixWordBreakCustom.problemCase == .deprecatedGoodCase // expected-warning {{deprecated}}
 
-_ = NSPrefixWordBreak2Custom.problemCase == .goodCase
-_ = NSPrefixWordBreak2Custom.problemCase == .PrefixWordBreak2DeprecatedBadCase // expected-warning {{deprecated}}
-_ = NSPrefixWordBreak2Custom.problemCase == .deprecatedGoodCase // expected-warning {{deprecated}}
+_ = PrefixWordBreak2Custom.problemCase == .goodCase
+_ = PrefixWordBreak2Custom.problemCase == .PrefixWordBreak2DeprecatedBadCase // expected-warning {{deprecated}}
+_ = PrefixWordBreak2Custom.problemCase == .deprecatedGoodCase // expected-warning {{deprecated}}
 
-_ = NSPrefixWordBreakReversedCustom.problemCase == .deprecatedGoodCase // expected-warning {{deprecated}}
+_ = PrefixWordBreakReversedCustom.problemCase == .deprecatedGoodCase // expected-warning {{deprecated}}
 
-_ = NSPrefixWordBreakReorderedCustom.problemCase == .goodCase
-_ = NSPrefixWordBreakReorderedCustom.problemCase == .PrefixWordBreakReorderedDeprecatedBadCase // expected-warning {{deprecated}}
-_ = NSPrefixWordBreakReorderedCustom.problemCase == .deprecatedGoodCase // expected-warning {{deprecated}}
+_ = PrefixWordBreakReorderedCustom.problemCase == .goodCase
+_ = PrefixWordBreakReorderedCustom.problemCase == .PrefixWordBreakReorderedDeprecatedBadCase // expected-warning {{deprecated}}
+_ = PrefixWordBreakReorderedCustom.problemCase == .deprecatedGoodCase // expected-warning {{deprecated}}
 
-_ = NSPrefixWordBreakReordered2Custom.problemCase == .goodCase
-_ = NSPrefixWordBreakReordered2Custom.problemCase == .PrefixWordBreakReordered2DeprecatedBadCase // expected-warning {{deprecated}}
-_ = NSPrefixWordBreakReordered2Custom.problemCase == .deprecatedGoodCase // expected-warning {{deprecated}}
+_ = PrefixWordBreakReordered2Custom.problemCase == .goodCase
+_ = PrefixWordBreakReordered2Custom.problemCase == .PrefixWordBreakReordered2DeprecatedBadCase // expected-warning {{deprecated}}
+_ = PrefixWordBreakReordered2Custom.problemCase == .deprecatedGoodCase // expected-warning {{deprecated}}
 
-_ = NSSwiftNameAllTheThings.Foo == .Bar
-_ = NSSwiftNameBad.`class`
+_ = SwiftNameAllTheThings.Foo == .Bar
+_ = SwiftNameBad.`class`
 
 
 #if !IRGEN
-var qualifiedName = NSRuncingMode.mince
-var topLevelCaseName = NSRuncingMince // expected-error{{}}
+var qualifiedName = RuncingMode.mince
+var topLevelCaseName = RuncingMince // expected-error{{}}
 #endif
 
 // NS_OPTIONS
-var withMince: NSRuncingOptions = .enableMince
-var withQuince: NSRuncingOptions = .enableQuince
+var withMince: RuncingOptions = .enableMince
+var withQuince: RuncingOptions = .enableQuince
 
 // When there is a single enum constant, compare it against the type name to
 // derive the namespaced name.
-var singleValue: NSSingleOptions = .value
+var singleValue: SingleOptions = .value
 
 // Check OptionSet conformance.
-var minceAndQuince: NSRuncingOptions = NSRuncingOptions.enableMince.intersection(NSRuncingOptions.enableQuince)
-var minceOrQuince: NSRuncingOptions = [.enableMince, .enableQuince]
+var minceAndQuince: RuncingOptions = RuncingOptions.enableMince.intersection(RuncingOptions.enableQuince)
+var minceOrQuince: RuncingOptions = [.enableMince, .enableQuince]
 minceOrQuince.formIntersection(minceAndQuince)
 minceOrQuince.formUnion(minceAndQuince)
 
 var minceValue: UInt = minceAndQuince.rawValue
-var minceFromMask: NSRuncingOptions = []
+var minceFromMask: RuncingOptions = []
 
 // Strip leading 'k' in "kConstant".
 let calendarUnit: CFCalendarUnit = [.year, .weekday]
@@ -162,12 +162,12 @@ let bluetoothProps: CBCharacteristicProperties = [.write, .writeWithoutResponse]
 let buzzFilter: AlertBuzzes = [.funk, .sosumi]
 
 // Match multi-capital acronym.
-let bitmapFormat: NSBitmapFormat = [.NSAlphaFirstBitmapFormat, .NS32BitBigEndianBitmapFormat];
-let bitmapFormatR: NSBitmapFormatReversed = [.NSAlphaFirstBitmapFormatR, .NS32BitBigEndianBitmapFormatR];
-let bitmapFormat2: NSBitmapFormat2  = [.NSU16a  , .NSU32a]
-let bitmapFormat3: NSBitmapFormat3  = [.NSU16b  , .NSS32b]
-let bitmapFormat4: NSUBitmapFormat4 = [.NSU16c  , .NSU32c]
-let bitmapFormat5: NSABitmapFormat5 = [.NSAA16d , .NSAB32d]
+let bitmapFormat: BitmapFormat = [.NSAlphaFirstBitmapFormat, .NS32BitBigEndianBitmapFormat];
+let bitmapFormatR: BitmapFormatReversed = [.NSAlphaFirstBitmapFormatR, .NS32BitBigEndianBitmapFormatR];
+let bitmapFormat2: BitmapFormat2  = [.NSU16a  , .NSU32a]
+let bitmapFormat3: BitmapFormat3  = [.NSU16b  , .NSS32b]
+let bitmapFormat4: UBitmapFormat4 = [.NSU16c  , .NSU32c]
+let bitmapFormat5: ABitmapFormat5 = [.NSAA16d , .NSAB32d]
 
 // Drop trailing underscores when possible.
 let timeFlags: CMTimeFlags = [.valid , .hasBeenRounded]
@@ -178,4 +178,4 @@ let audioComponentFlags2: FakeAudioComponentFlags = [.loadOutOfProcess]
 
 let objcFlags: objc_flags = [.taggedPointer, .swiftRefcount]
 
-let optionsWithSwiftName: NSOptionsAlsoGetSwiftName = .Case
+let optionsWithSwiftName: OptionsAlsoGetSwiftName = .Case

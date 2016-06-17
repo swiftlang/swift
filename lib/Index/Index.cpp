@@ -1052,6 +1052,7 @@ void index::indexSourceFile(SourceFile *SF, StringRef hash,
   unsigned bufferID = SF->getBufferID().getValue();
   IndexSwiftASTWalker walker(consumer, SF->getASTContext(), bufferID);
   walker.visitModule(*SF->getParentModule(), hash);
+  consumer.finish();
 }
 
 void index::indexModule(ModuleDecl *module, StringRef hash,
@@ -1060,4 +1061,5 @@ void index::indexModule(ModuleDecl *module, StringRef hash,
   IndexSwiftASTWalker walker(consumer, module->getASTContext(),
                              /*bufferID*/ -1);
   walker.visitModule(*module, hash);
+  consumer.finish();
 }

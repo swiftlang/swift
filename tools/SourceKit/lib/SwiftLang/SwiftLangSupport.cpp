@@ -640,6 +640,11 @@ std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttribute
       AttrUIDs.push_back(Attr_IBInspectable);
       continue;
     }
+    case DAK_GKInspectable: {
+      static UIdent Attr_GKInspectable("source.decl.attribute.gkinspectable");
+      AttrUIDs.push_back(Attr_GKInspectable);
+      continue;
+    }
     case DAK_ObjC: {
       static UIdent Attr_Objc("source.decl.attribute.objc");
       static UIdent Attr_ObjcNamed("source.decl.attribute.objc.name");

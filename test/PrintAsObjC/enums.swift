@@ -26,7 +26,7 @@ import Foundation
   @objc func takeAndReturnEnum(_ foo: FooComments) -> NegativeValues {
     return .Zung
   }
-  @objc func acceptPlainEnum(_: NSMalformedEnumMissingTypedef) {}
+  @objc func acceptPlainEnum(_: MalformedEnumMissingTypedef) {}
   @objc func takeAndReturnRenamedEnum(_ foo: EnumNamed) -> EnumNamed {
     return .A
   }

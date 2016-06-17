@@ -33,12 +33,17 @@ class IBDesignableClassExtensionTy {}
 extension IBDesignableClassExtensionTy {}
 
 class Inspect {
-  @IBInspectable var value : Int = 0
+  @IBInspectable var value : Int = 0 // okay
+  @GKInspectable var value2: Int = 0 // okay
+
   @IBInspectable func foo() {} // expected-error {{@IBInspectable may only be used on 'var' declarations}} {{3-18=}}
+  @GKInspectable func foo2() {} // expected-error {{@GKInspectable may only be used on 'var' declarations}} {{3-18=}}
 
   @IBInspectable class var cval: Int { return 0 } // expected-error {{only instance properties can be declared @IBInspectable}} {{3-18=}}
+  @GKInspectable class var cval2: Int { return 0 } // expected-error {{only instance properties can be declared @GKInspectable}} {{3-18=}}
 }
 @IBInspectable var ibinspectable_global : Int // expected-error {{only instance properties can be declared @IBInspectable}} {{1-16=}}
+@GKInspectable var gkinspectable_global : Int // expected-error {{only instance properties can be declared @GKInspectable}} {{1-16=}}
 
 
 func foo(x: @convention(block) Int) {} // expected-error {{@convention attribute only applies to function types}}

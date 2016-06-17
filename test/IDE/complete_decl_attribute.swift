@@ -90,7 +90,7 @@ struct S{}
 
 @#^KEYWORD_LAST^#
 
-// KEYWORD_LAST:                  Begin completions, 21 items
+// KEYWORD_LAST:                  Begin completions, 22 items
 // KEYWORD_LAST-NEXT:             Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       swift3_migration[#Declaration Attribute#]; name=swift3_migration{{$}}
@@ -112,4 +112,5 @@ struct S{}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       warn_unused_result[#Declaration Attribute#]; name=warn_unused_result
 // KEYWORD_LAST-NEXT:             Keyword/None:                       warn_unqualified_access[#Declaration Attribute#]; name=warn_unqualified_access
 // KEYWORD_LAST-NEXT:             Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
+// KEYWORD_LAST-NEXT:             Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable{{$}}
 // KEYWORD_LAST-NEXT:             End completions

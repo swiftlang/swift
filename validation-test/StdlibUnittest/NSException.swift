@@ -11,7 +11,7 @@ _setTestSuiteFailedCallback() { print("abort()") }
 
 
 func raiseNSException() {
-  NSException(name: "Trogdor", reason: "Burnination", userInfo: nil).raise()
+  NSException(name: NSExceptionName(rawValue: "Trogdor"), reason: "Burnination", userInfo: nil).raise()
 }
 
 var TestSuiteCrashes = TestSuite("NSExceptionCrashes")

@@ -563,6 +563,9 @@ class d0170_TestAvailability {
 
   @IBInspectable var inspectableProp: Int = 0
 // PASS_EXPLODE_PATTERN-NEXT: {{^}}  @IBInspectable @objc var inspectableProp: Int{{$}}
+
+  @GKInspectable var inspectableProp2: Int = 0
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @GKInspectable @objc var inspectableProp2: Int{{$}}
 }
 
 struct d0190_LetVarDecls {

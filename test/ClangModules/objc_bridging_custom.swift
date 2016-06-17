@@ -21,8 +21,8 @@ class Base : NSObject {
     return nil
   }
   class func testInout(_: inout Refrigerator) {} // expected-note {{potential overridden class method 'testInout' here}}
-  func testUnmigrated(a: NSRuncingMode, b: Refrigerator, c: NSCoding) {} // expected-note {{potential overridden instance method 'testUnmigrated(a:b:c:)' here}}
-  func testPartialMigrated(a: NSRuncingMode, b: Refrigerator) {} // expected-note {{potential overridden instance method 'testPartialMigrated(a:b:)' here}}
+  func testUnmigrated(a: RuncingMode, b: Refrigerator, c: NSCoding) {} // expected-note {{potential overridden instance method 'testUnmigrated(a:b:c:)' here}}
+  func testPartialMigrated(a: RuncingMode, b: Refrigerator) {} // expected-note {{potential overridden instance method 'testPartialMigrated(a:b:)' here}}
 
   subscript(a a: Refrigerator, b b: Refrigerator) -> Refrigerator? { // expected-note {{potential overridden subscript 'subscript(a:b:)' here}} {{none}}
     return nil
@@ -55,7 +55,7 @@ class Sub : Base {
 
   override func testUnmigrated(a: NSObject, b: NSObject, c: NSObject) {} // expected-error {{method does not override any method from its superclass}} {{none}}
 
-  // expected-note@+1 {{type does not match superclass instance method with type '(a: NSRuncingMode, b: Refrigerator) -> ()'}} {{53-68=Refrigerator}}
+  // expected-note@+1 {{type does not match superclass instance method with type '(a: RuncingMode, b: Refrigerator) -> ()'}} {{53-68=Refrigerator}}
   override func testPartialMigrated(a: NSObject, b: APPRefrigerator) {} // expected-error {{method does not override any method from its superclass}} {{none}}
 
   // expected-note@+1 {{type does not match superclass subscript with type '(a: Refrigerator, b: Refrigerator) -> Refrigerator?'}} {{27-42=Refrigerator}} {{49-65=Refrigerator?}} {{70-85=Refrigerator}}
@@ -90,8 +90,8 @@ protocol TestProto {
   func test(a: Refrigerator, b: Refrigerator) -> Refrigerator? // expected-note {{protocol requires}} {{none}}
   func testGeneric(a: ManufacturerInfo<NSString>, b: ManufacturerInfo<NSString>) -> ManufacturerInfo<NSString>? // expected-note {{protocol requires}} {{none}}
   static func testInout(_: inout Refrigerator) // expected-note {{protocol requires}} {{none}}
-  func testUnmigrated(a: NSRuncingMode, b: Refrigerator, c: NSCoding) // expected-note {{protocol requires}} {{none}}
-  func testPartialMigrated(a: NSRuncingMode, b: Refrigerator) // expected-note {{protocol requires}} {{none}}
+  func testUnmigrated(a: RuncingMode, b: Refrigerator, c: NSCoding) // expected-note {{protocol requires}} {{none}}
+  func testPartialMigrated(a: RuncingMode, b: Refrigerator) // expected-note {{protocol requires}} {{none}}
 
   subscript(a a: Refrigerator, b b: Refrigerator) -> Refrigerator? { get } // expected-note {{protocol requires}} {{none}}
   subscript(generic a: ManufacturerInfo<NSString>, b b: ManufacturerInfo<NSString>) -> ManufacturerInfo<NSString>? { get } // expected-note {{protocol requires}} {{none}}
@@ -152,8 +152,8 @@ class TestProtoImpl : NSObject, TestProto { // expected-error {{type 'TestProtoI
 @objc protocol TestObjCProto {
   @objc optional func test(a: Refrigerator, b: Refrigerator) -> Refrigerator? // expected-note {{here}} {{none}}
   @objc optional func testGeneric(a: ManufacturerInfo<NSString>, b: ManufacturerInfo<NSString>) -> ManufacturerInfo<NSString>? // expected-note {{here}} {{none}}
-  @objc optional func testUnmigrated(a: NSRuncingMode, b: Refrigerator, c: NSCoding) // expected-note {{here}} {{none}}
-  @objc optional func testPartialMigrated(a: NSRuncingMode, b: Refrigerator) // expected-note {{here}} {{none}}
+  @objc optional func testUnmigrated(a: RuncingMode, b: Refrigerator, c: NSCoding) // expected-note {{here}} {{none}}
+  @objc optional func testPartialMigrated(a: RuncingMode, b: Refrigerator) // expected-note {{here}} {{none}}
 
   @objc optional subscript(a a: Refrigerator) -> Refrigerator? { get } // expected-note {{here}} {{none}}
   @objc optional subscript(generic a: ManufacturerInfo<NSString>) -> ManufacturerInfo<NSString>? { get } // expected-note {{here}} {{none}}

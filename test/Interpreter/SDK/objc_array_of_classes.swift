@@ -5,18 +5,18 @@
 import Foundation
 import StdlibUnittest
 
-var NSURLSessionConfigurationUsage = TestSuite("NSURLSessionConfigurationUsage")
+var URLSessionConfigurationUsage = TestSuite("URLSessionConfigurationUsage")
 
-// NSURLSessionConfiguration.protocolClasses is a prominent example of an
+// URLSessionConfiguration.protocolClasses is a prominent example of an
 // NSArray<Class> * in Foundation. Make sure it works.
-NSURLSessionConfigurationUsage.test("protocolClasses") {
-  if let protocols = NSURLSessionConfiguration
+URLSessionConfigurationUsage.test("protocolClasses") {
+  if let protocols = URLSessionConfiguration
     .`default`()
     .protocolClasses {
 
     for proto in protocols {
-      // The protocol classes should all be subclasses of NSURLProtocol.
-      _ = proto as! NSURLProtocol.Type
+      // The protocol classes should all be subclasses of URLProtocol.
+      _ = proto as! URLProtocol.Type
     }
   }
 }

@@ -15,7 +15,8 @@ class Foo : Bar {
 class Foo2 {}
 
 class Foo3 {
-    @IBInspectable var testInspectable : Int
+    @IBInspectable var testIBInspectable : Int
+    @GKInspectable var testGKInspectable : Int
 }
 
 protocol MyProt {}
@@ -31,13 +32,13 @@ extension OuterCls {
 class GenCls<T1, T2> {}
 
 class TestParamAndCall {
-    func testParams(arg1: Int, name: String) {
+    func testParams(_ arg1: Int, name: String) {
         if (arg1) {
             testParams(0, name:"testing")
         }
     }
 
-    func testParamAndArg(arg1: Int, param par: Int) {
+    func testParamAndArg(_ arg1: Int, param par: Int) {
     }
 }
 
@@ -45,7 +46,7 @@ class TestParamAndCall {
 
 class TestMarkers {
     // TODO: Something.
-    func test(arg1: Bool) -> Int {
+    func test(_ arg1: Bool) -> Int {
         // FIXME: Blah.
         if (arg1) {
             // FIXME: Blah.
@@ -55,7 +56,7 @@ class TestMarkers {
     }
 }
 
-func test2(arg1: Bool) {
+func test2(_ arg1: Bool) {
     if (arg1) {
         // http://whatever FIXME: http://whatever/fixme.
     }

@@ -228,6 +228,32 @@ extension NSRange : _ObjectiveCBridgeable {
   }
 }
 
+public struct URL : _ObjectiveCBridgeable {
+  public init() { }
+
+  public init?(string: String) { return nil }
+
+  public static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
+  public func _bridgeToObjectiveC() -> NSURL {
+    return NSURL()
+  }
+  public static func _forceBridgeFromObjectiveC(_ x: NSURL,
+                                                result: inout URL?) {
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ x: NSURL,
+    result: inout URL?
+  ) -> Bool {
+    return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(_ x: NSURL?) -> URL {
+    return URL()
+ }
+}
+
 extension NSError : ErrorProtocol {
   public var _domain: String { return domain }
   public var _code: Int { return code }

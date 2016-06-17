@@ -51,18 +51,18 @@ public func err() {
 // LOC-CHECK: define {{.*}}4date
 public func date() {
   // LOC-CHECK: call {{.*}} @_TFSSCfT21_builtinStringLiteralBp17utf8CodeUnitCountBw7isASCIIBi1__SS{{.*}}, !dbg ![[L1:.*]]
-  let d1 = NSDateFormatter()
+  let d1 = DateFormatter()
   // LOC-CHECK: br{{.*}}, !dbg ![[L2:.*]]
   d1.dateFormat = "dd. mm. yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L2]]
   // LOC-CHECK: call {{.*}} @_TFSSCfT21_builtinStringLiteralBp17utf8CodeUnitCountBw7isASCIIBi1__SS{{.*}}, !dbg ![[L3:.*]]
-  let d2 = NSDateFormatter()
+  let d2 = DateFormatter()
   // LOC-CHECK: br{{.*}}, !dbg ![[L4:.*]]
   d2.dateFormat = "mm dd yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L4]]
 }
 
 // Make sure we build some witness tables for enums.
-func useOptions(_ opt: NSURLBookmarkCreationOptions)
-       -> NSURLBookmarkCreationOptions {
+func useOptions(_ opt: URL.BookmarkCreationOptions)
+       -> URL.BookmarkCreationOptions {
   return [opt, opt]
 }
 

@@ -152,7 +152,7 @@ namespace swift {
     bool InferImportAsMember = false;
 
     /// Whether we are stripping the "NS" prefix from Foundation et al.
-    bool StripNSPrefix = false;
+    bool StripNSPrefix = true;
 
     /// Enable the Swift 3 migration via Fix-Its.
     bool Swift3Migration = false;
