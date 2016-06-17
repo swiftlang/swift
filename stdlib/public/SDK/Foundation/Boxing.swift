@@ -116,7 +116,7 @@ extension _SwiftNativeFoundationType {
     }
     
     func mutableCopy(with zone : NSZone) -> AnyObject {
-        return _mapUnmanaged { ($0 as AnyObject).mutableCopy(with: zone) }
+        return _mapUnmanaged { $0.mutableCopy() }
     }
     
     var hashValue: Int {

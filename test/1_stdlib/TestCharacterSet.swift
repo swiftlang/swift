@@ -74,7 +74,17 @@ class TestCharacterSet : TestCharacterSetSuper {
         expectTrue(secondCharacterSet.contains(capitalC), "Character set must not contain our letter")
         expectTrue(thirdCharacterSet.contains(capitalC), "Character set must contain our letter")
     }
+
+    func testMutability_mutableCopyCrash() {
+        let cs = CharacterSet(charactersIn: "ABC")
+        (cs as NSCharacterSet).mutableCopy() // this should not crash
+    }
     
+    func testMutability_SR_1782() {
+        var nonAlphanumeric = CharacterSet.alphanumerics.inverted
+        nonAlphanumeric.remove(charactersIn: " ") // this should not crash
+    }
+
     func testRanges() {
         // Simple range check
         let asciiUppercase = CharacterSet(charactersIn: UnicodeScalar(0x41)...UnicodeScalar(0x5A))
@@ -140,6 +150,8 @@ class TestCharacterSet : TestCharacterSetSuper {
 var CharacterSetTests = TestSuite("TestCharacterSet")
 CharacterSetTests.test("testBasicConstruction") { TestCharacterSet().testBasicConstruction() }
 CharacterSetTests.test("testMutability_copyOnWrite") { TestCharacterSet().testMutability_copyOnWrite() }
+CharacterSetTests.test("testMutability_mutableCopyCrash") { TestCharacterSet().testMutability_mutableCopyCrash() }
+CharacterSetTests.test("testMutability_SR_1782") { TestCharacterSet().testMutability_SR_1782() }
 CharacterSetTests.test("testRanges") { TestCharacterSet().testRanges() }
 CharacterSetTests.test("testInsertAndRemove") { TestCharacterSet().testInsertAndRemove() }
 CharacterSetTests.test("testBasics") { TestCharacterSet().testBasics() }

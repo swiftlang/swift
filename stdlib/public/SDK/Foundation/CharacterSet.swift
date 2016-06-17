@@ -49,6 +49,16 @@ internal final class _SwiftNSCharacterSet : _SwiftNativeNSCharacterSet, _SwiftNa
     deinit {
         releaseWrappedObject()
     }
+
+    @objc(copyWithZone:)
+    func copy(with zone: NSZone? = nil) -> AnyObject {
+        return _mapUnmanaged { $0.copy(with: zone) }
+    }
+
+    @objc(mutableCopyWithZone:)
+    func mutableCopy(with zone: NSZone? = nil) -> AnyObject {
+        return _mapUnmanaged { $0.mutableCopy(with: zone) }
+    }
 }
 
 /**
