@@ -38,75 +38,6 @@ public struct ClosedRangeIndex<Bound> : Comparable
 
   /// Creates a position `p` for which `r[p] == x`.
   internal init(_ x: Bound) { _value = .inRange(x) }
-
-  internal func _successor(upperBound limit: Bound) -> ClosedRangeIndex {
-    switch _value {
-    case .inRange(let x): return x == limit
-      ? ClosedRangeIndex() : ClosedRangeIndex(x.advanced(by: 1))
-    case .pastEnd: _preconditionFailure("Incrementing past end index")
-    }
-  }
-  
-  internal func _predecessor(
-    lowerBound: Bound, upperBound limit: Bound
-  ) -> ClosedRangeIndex {
-    switch _value {
-    case .inRange(let x):
-      _precondition(x > lowerBound, "Incrementing past start index")
-      return ClosedRangeIndex(x.advanced(by: -1))
-    case .pastEnd: 
-      _precondition(limit >= lowerBound, "Incrementing past start index")
-      return ClosedRangeIndex(limit)
-    }
-  }
-  
-  internal func _advanced(
-    by n: Bound.Stride, lowerBound: Bound, upperBound limit: Bound
-  ) -> ClosedRangeIndex {
-    switch _value {
-    case .inRange(let x):
-      let d = x.distance(to: limit)
-      if n <= d {
-        let newPosition = x.advanced(by: n)
-        _precondition(newPosition >= lowerBound,
-          "Advancing past start index")
-        return ClosedRangeIndex(newPosition)
-      }
-      if d - -1 == n { return ClosedRangeIndex() }
-      _preconditionFailure("Advancing past end index")
-    case .pastEnd:
-      if n == 0 {
-        return self
-      } else if n > 0 {
-        _preconditionFailure("Advancing past end index")
-      } else {
-        return ClosedRangeIndex(limit)._advanced(
-          by: (n + 1),
-          lowerBound: lowerBound,
-          upperBound: limit
-        )
-      }
-    }
-  }
-
-  internal func _distance(
-    to: ClosedRangeIndex<Bound>, upperBound limit: Bound
-  ) -> Bound.Stride {
-    switch (_value, to._value) {
-    case let (.inRange(left), .inRange(right)):
-      // in range <--> in range
-      return left.distance(to: right)
-    case let (.inRange(left), .pastEnd):
-      // in range --> end
-      return 1 + left.distance(to: limit)
-    case let (.pastEnd, .inRange(right)):
-      // in range <-- end
-      return limit.distance(to: right) - 1
-    case (.pastEnd, .pastEnd):
-      // end <--> end
-      return 0
-    }
-  }
   
   internal var _value: _ClosedRangeIndexRepresentation<Bound>
   internal var _dereferenced : Bound {
@@ -258,19 +189,65 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
   }
 
   public func index(after i: Index) -> Index {
-    return i._successor(upperBound: upperBound)
+    switch i._value {
+    case .inRange(let x):
+      return x == upperBound
+        ? ClosedRangeIndex() 
+        : ClosedRangeIndex(x.advanced(by: 1))
+    case .pastEnd: 
+      _preconditionFailure("Incrementing past end index")
+    }
   }
 
   public func index(before i: Index) -> Index {
-    return i._predecessor(lowerBound: lowerBound, upperBound: upperBound)
+    switch i._value {
+    case .inRange(let x):
+      _precondition(x > lowerBound, "Incrementing past start index")
+      return ClosedRangeIndex(x.advanced(by: -1))
+    case .pastEnd: 
+      _precondition(upperBound >= lowerBound, "Incrementing past start index")
+      return ClosedRangeIndex(upperBound)
+    }
   }
 
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    return i._advanced(by: n, lowerBound: lowerBound, upperBound: upperBound)
+    switch i._value {
+    case .inRange(let x):
+      let d = x.distance(to: upperBound)
+      if n <= d {
+        let newPosition = x.advanced(by: n)
+        _precondition(newPosition >= lowerBound,
+          "Advancing past start index")
+        return ClosedRangeIndex(newPosition)
+      }
+      if d - -1 == n { return ClosedRangeIndex() }
+      _preconditionFailure("Advancing past end index")
+    case .pastEnd:
+      if n == 0 {
+        return i
+      } else if n > 0 {
+        _preconditionFailure("Advancing past end index")
+      } else {
+        return index(ClosedRangeIndex(upperBound), offsetBy: (n + 1))
+      }
+    }
   }
 
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    return start._distance(to: end, upperBound: upperBound)
+    switch (start._value, end._value) {
+    case let (.inRange(left), .inRange(right)):
+      // in range <--> in range
+      return left.distance(to: right)
+    case let (.inRange(left), .pastEnd):
+      // in range --> end
+      return 1 + left.distance(to: upperBound)
+    case let (.pastEnd, .inRange(right)):
+      // in range <-- end
+      return upperBound.distance(to: right) - 1
+    case (.pastEnd, .pastEnd):
+      // end <--> end
+      return 0
+    }
   }
 
   /// Accesses the element at specified position.
