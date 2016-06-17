@@ -1246,24 +1246,6 @@ static bool allowsBridgingFromObjC(TypeChecker &tc, DeclContext *dc,
   return true;
 }
 
-/// Given that 'tupleTy' is the argument type of a function that's being
-/// invoked with a single unlabeled argument, return the type of the parameter
-/// that matches that argument, or the null type if such a match is impossible.
-static Type getTupleElementTypeForSingleArgument(TupleType *tupleTy) {
-  Type result;
-  for (auto &param : tupleTy->getElements()) {
-    bool mustClaimArg = !param.isVararg() &&
-                        param.getDefaultArgKind() == DefaultArgumentKind::None;
-    bool canClaimArg = !param.hasName();
-    if (!result && canClaimArg) {
-      result = param.isVararg() ? param.getVarargBaseTy() : param.getType();
-    } else if (mustClaimArg) {
-      return Type();
-    }
-  }
-  return result;
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                              unsigned flags,
@@ -1415,34 +1397,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       return SolutionKind::Unsolved;
     }
 
-    // We need to be careful about mapping 'raw' argument type variables to
-    // parameter tuples containing default args, or varargs in the first
-    // position. If we naively bind the type variable to the parameter tuple,
-    // we'll later end up looking to whatever expression created the type
-    // variable to find the declarations for default arguments. This can
-    // obviously be problematic if the expression in question is not an
-    // application. (For example, We don't want to introspect an 'if' expression
-    // to see if it has default arguments.) Instead, we should bind the type
-    // variable to the first element type of the tuple.
     case TypeMatchKind::ArgumentTupleConversion:
-      if (typeVar1 &&
-          !typeVar1->getImpl().literalConformanceProto &&
-          (flags & TMF_GenerateConstraints) &&
-          isa<ParenType>(type1.getPointer())) {
-        
-        if (auto tupleTy = type2->getAs<TupleType>()) {
-          if (auto tupleEltTy = getTupleElementTypeForSingleArgument(tupleTy)) {
-            addConstraint(getConstraintKind(kind),
-                          typeVar1,
-                          tupleEltTy,
-                          getConstraintLocator(locator));
-            return SolutionKind::Solved;
-          }
-        }
-
-      }
-      SWIFT_FALLTHROUGH;
-
     case TypeMatchKind::Conversion:
       if (typeVar1 && typeVar2) {
         auto rep1 = getRepresentative(typeVar1);
@@ -1489,7 +1444,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // different from normal conversions.
   if (kind == TypeMatchKind::ArgumentTupleConversion ||
       kind == TypeMatchKind::OperatorArgumentTupleConversion) {
-    if (concrete) {
+    if (!typeVar2) {
       return ::matchCallArguments(*this, kind, type1, type2, locator);
     }
 

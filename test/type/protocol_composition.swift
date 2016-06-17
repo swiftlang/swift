@@ -116,7 +116,7 @@ func testConversion() {
   var _ : () -> protocol<FooProtocol, SuperREPLPrintable> = return_superPrintable
 
   // FIXME: closures make ABI conversions explicit. rdar://problem/19517003
-  var _ : () -> protocol<FooProtocol, REPLPrintable> = { return_superPrintable($0) }
+  var _ : () -> protocol<FooProtocol, REPLPrintable> = { return_superPrintable() }
 }
 
 // Test the parser's splitting of >= into > and =.
