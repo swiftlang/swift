@@ -1693,6 +1693,8 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
   if (var->getGetter() || var->isBeingTypeChecked())
     return;
 
+  auto *dc = var->getDeclContext();
+
   assert(!var->hasAccessorFunctions());
 
   // Introduce accessors for a property with behaviors.
@@ -1707,7 +1709,6 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     var->setIsBeingTypeChecked();
 
     auto behavior = var->getMutableBehavior();
-    auto dc = var->getDeclContext();
     NormalProtocolConformance *conformance = nullptr;
     VarDecl *valueProp = nullptr;
 
@@ -1753,9 +1754,9 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       behavior->ValueDecl = valueProp;
       var->setIsBeingTypeChecked(false);
 
-      addMemberToContextIfNeeded(getter, var->getDeclContext());
+      addMemberToContextIfNeeded(getter, dc);
       if (setter)
-        addMemberToContextIfNeeded(setter, var->getDeclContext());
+        addMemberToContextIfNeeded(setter, dc);
     };
 
     // Try to resolve the behavior to a protocol.
@@ -1845,7 +1846,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
 
     auto *getter = createGetterPrototype(var, TC);
     // lazy getters are mutating on an enclosing value type.
-    if (!var->getDeclContext()->getAsClassOrClassExtensionContext())
+    if (!dc->getAsClassOrClassExtensionContext())
       getter->setMutating();
     getter->setAccessibility(var->getFormalAccess());
 
@@ -1858,22 +1859,20 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     TC.validateDecl(getter);
     TC.validateDecl(setter);
 
-    addMemberToContextIfNeeded(getter, var->getDeclContext());
-    addMemberToContextIfNeeded(setter, var->getDeclContext());
+    addMemberToContextIfNeeded(getter, dc);
+    addMemberToContextIfNeeded(setter, dc);
     return;
   }
 
   // Local variables don't otherwise get accessors.
-  if (var->getDeclContext()->isLocalContext())
+  if (dc->isLocalContext())
     return;
 
   // Implicit properties don't get accessors.
   if (var->isImplicit())
     return;
 
-  auto nominal = var->getDeclContext()
-                    ->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (!nominal) {
+  if (!dc->isTypeContext()) {
     // Fixed-layout global variables don't get accessors.
     if (var->hasFixedLayout())
       return;
@@ -1881,7 +1880,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
   // In a protocol context, variables written as just "var x : Int" or
   // "let x : Int" are errors and recovered by building a computed property
   // with just a getter. Diagnose this and create the getter decl now.
-  } else if (isa<ProtocolDecl>(var->getDeclContext())) {
+  } else if (isa<ProtocolDecl>(dc)) {
     if (var->hasStorage()) {
       if (var->isLet())
         TC.diagnose(var->getLoc(),
@@ -1896,7 +1895,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     return;
 
   // NSManaged properties on classes require special handling.
-  } else if (isa<ClassDecl>(nominal)) {
+  } else if (dc->getAsClassOrClassExtensionContext()) {
     if (var->getAttrs().hasAttribute<NSManagedAttr>()) {
       var->setIsBeingTypeChecked();
       convertNSManagedStoredVarToComputed(var, TC);
@@ -1905,13 +1904,13 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     }
 
   // Stored properties imported from Clang don't get accessors.
-  } else if (isa<StructDecl>(nominal)) {
-    if (nominal->hasClangNode())
+  } else if (auto *structDecl = dyn_cast<StructDecl>(dc)) {
+    if (structDecl->hasClangNode())
       return;
   }
 
   // Stored properties in SIL mode don't get accessors.
-  if (auto sourceFile = var->getDeclContext()->getParentSourceFile())
+  if (auto sourceFile = dc->getParentSourceFile())
     if (sourceFile->Kind == SourceFileKind::SIL)
       return;
 

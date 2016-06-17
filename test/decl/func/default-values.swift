@@ -40,8 +40,8 @@ Ctor(f:12.5) // expected-warning{{unused}}
 
 // Default arguments for nested constructors/functions.
 struct Outer<T> {
-  struct Inner { // expected-error{{type 'Inner' nested in generic type}}
-    struct VeryInner {// expected-error{{type 'VeryInner' nested in generic type}}
+  struct Inner { // expected-error{{type 'Inner' cannot be nested in generic type 'Outer'}}
+    struct VeryInner {// expected-error{{type 'VeryInner' cannot be nested in generic type 'Inner'}}
       init (i : Int = 17, f : Float = 1.5) { }
       static func f(i: Int = 17, f: Float = 1.5) { }
       func g(i: Int = 17, f: Float = 1.5) { }

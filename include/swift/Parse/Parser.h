@@ -655,16 +655,15 @@ public:
     PD_Default              = 0,
     PD_AllowTopLevel        = 1 << 1,
     PD_HasContainerType     = 1 << 2,
-    PD_DisallowNominalTypes = 1 << 3,
-    PD_DisallowInit         = 1 << 4,
-    PD_AllowDestructor      = 1 << 5,
-    PD_AllowEnumElement     = 1 << 6,
-    PD_InProtocol           = 1 << 7,
-    PD_InClass              = 1 << 8,
-    PD_InExtension          = 1 << 9,
-    PD_InStruct             = 1 << 10,
-    PD_InEnum               = 1 << 11,
-    PD_InLoop               = 1 << 12
+    PD_DisallowInit         = 1 << 3,
+    PD_AllowDestructor      = 1 << 4,
+    PD_AllowEnumElement     = 1 << 5,
+    PD_InProtocol           = 1 << 6,
+    PD_InClass              = 1 << 7,
+    PD_InExtension          = 1 << 8,
+    PD_InStruct             = 1 << 9,
+    PD_InEnum               = 1 << 10,
+    PD_InLoop               = 1 << 11
   };
 
   /// Options that control the parsing of declarations.

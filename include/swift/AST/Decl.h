@@ -2847,12 +2847,15 @@ public:
     return SearchedForFailableInits;
   }
 
-  /// getDeclaredType - Retrieve the type declared by this entity.
-  Type getDeclaredType() const { return DeclaredTy; }
-
-  /// Compute the type (and declared type) of this nominal type.
+  /// Compute the type of this nominal type.
   void computeType();
 
+  /// getDeclaredType - Retrieve the type declared by this entity, without
+  /// any generic parameters bound if this is a generic type.
+  Type getDeclaredType() const;
+
+  /// getDeclaredType - Retrieve the type declared by this entity, with
+  /// context archetypes bound if this is a generic type.
   Type getDeclaredTypeInContext() const;
 
   /// Get the "interface" type of the given nominal type, which is the
@@ -3437,7 +3440,8 @@ public:
   bool inheritsFrom(const ProtocolDecl *Super) const;
   
   ProtocolType *getDeclaredType() const {
-    return reinterpret_cast<ProtocolType *>(DeclaredTy.getPointer());
+    return reinterpret_cast<ProtocolType *>(
+      NominalTypeDecl::getDeclaredType().getPointer());
   }
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }

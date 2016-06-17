@@ -5,5 +5,6 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-extension a{protocol i{func>}}func j>f
+// RUN: not %target-swift-frontend %s -parse
+// REQUIRES: asserts
+{<f}class B<a{protocol a{enum S<A{extension{protocol a{func<

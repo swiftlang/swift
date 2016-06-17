@@ -1350,6 +1350,12 @@ bool DeclContext::lookupQualified(Type type,
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
         continue;
 
+      if (typeResolver && !decl->isBeingTypeChecked()) {
+        typeResolver->resolveDeclSignature(decl);
+        if (!decl->hasType())
+          continue;
+      }
+
       // If the declaration has an override, name lookup will also have
       // found the overridden method. Skip this declaration, because we
       // prefer the overridden method.

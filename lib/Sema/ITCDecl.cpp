@@ -303,7 +303,7 @@ bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
 
   // Nominal types.
   auto nominal = cast<NominalTypeDecl>(typeDecl);
-  return !nominal->getDeclaredType().isNull();
+  return nominal->hasType();
 }
 
 void IterativeTypeChecker::processResolveTypeDecl(

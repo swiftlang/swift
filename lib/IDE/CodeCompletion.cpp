@@ -1233,7 +1233,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     auto *DC = CurDeclContext->getInnermostTypeContext();
     if (!DC)
       return;
-    Type DT = DC->getDeclaredTypeInContext();
+    Type DT = DC->getDeclaredTypeOfContext();
     if (DT.isNull() || DT->is<ErrorType>())
       return;
     OwnedResolver TypeResolver(createLazyResolver(CurDeclContext->getASTContext()));
@@ -4120,9 +4120,7 @@ public:
     if (hasFuncIntroducer || hasVarIntroducer || isKeywordSpecified("override"))
       return;
 
-    assert(CurrTy);
-    NominalTypeDecl *NTD = dyn_cast_or_null<NominalTypeDecl>(CurrTy->
-                                                              getAnyNominal());
+    NominalTypeDecl *NTD = CurrTy->getAnyNominal();
 
     for (auto Conformance : NTD->getAllConformances()) {
       auto Proto = Conformance->getProtocol();
@@ -4147,7 +4145,8 @@ public:
     if (!CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext())
       return;
 
-    if (Type CurrTy = CurrDeclContext->getDeclaredTypeInContext()) {
+    Type CurrTy = CurrDeclContext->getDeclaredTypeInContext();
+    if (CurrTy && !CurrTy->is<ErrorType>()) {
       lookupVisibleMemberDecls(*this, CurrTy, CurrDeclContext,
                                TypeResolver.get(),
                                /*includeInstanceMembers=*/false);

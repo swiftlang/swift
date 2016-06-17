@@ -3654,6 +3654,10 @@ void ConformanceChecker::checkConformance() {
     if (isa<TypeAliasDecl>(requirement))
       continue;
 
+    // Nominal types nested inside protocols are not requirements.
+    if (isa<NominalTypeDecl>(requirement))
+      continue;
+
     /// Local function to finalize the witness.
     auto finalizeWitness = [&] {
       // Find the witness.

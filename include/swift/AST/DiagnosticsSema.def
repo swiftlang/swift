@@ -1053,14 +1053,26 @@ ERROR(pattern_binds_no_variables,none,
 
 // Generic types
 ERROR(unsupported_generic_nested_in_type,none,
-      "generic type %0 nested in type %1 is not allowed",
-      (Identifier, Type))
-ERROR(unsupported_type_nested_in_generic_type,none,
-      "type %0 nested in generic type %1 is not allowed",
-      (Identifier, Type))
-ERROR(unsupported_type_nested_in_generic_function,none,
-      "type %0 nested in generic function %1 is not allowed",
+      "generic type %0 cannot be nested in type %1",
       (Identifier, Identifier))
+ERROR(unsupported_type_nested_in_generic_type,none,
+      "type %0 cannot be nested in generic type %1",
+      (Identifier, Identifier))
+ERROR(unsupported_type_nested_in_generic_extension,none,
+      "type %0 cannot be nested in extension of generic type %1",
+      (Identifier, Identifier))
+ERROR(unsupported_type_nested_in_generic_function,none,
+      "type %0 cannot be nested in generic function %1",
+      (Identifier, Identifier))
+ERROR(unsupported_type_nested_in_protocol,none,
+      "type %0 cannot be nested in protocol %1",
+      (Identifier, Identifier))
+ERROR(unsupported_type_nested_in_protocol_extension,none,
+      "type %0 cannot be nested in protocol extension of %1",
+      (Identifier, Identifier))
+ERROR(unsupported_nested_protocol,none,
+      "protocol %0 cannot be nested inside another declaration",
+      (Identifier))
 
 // Type aliases
 ERROR(circular_type_alias,none,
@@ -1111,8 +1123,6 @@ ERROR(extension_constrained_inheritance,none,
       "inheritance clause", (Type))
 ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause", (Type))
-ERROR(extension_protocol_type_definition,none,
-      "type %0 cannot be defined within a protocol extension", (DeclName))
 ERROR(extension_protocol_via_typealias,none,
       "protocol %0 in the module being compiled cannot be extended via a "
       "typealias", (Type))

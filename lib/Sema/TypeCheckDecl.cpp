@@ -312,7 +312,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
     validateExtension(ext);
 
-    if (ext->checkedInheritanceClause())
+    if (ext->isInvalid() ||
+        ext->checkedInheritanceClause())
       return;
 
     // This breaks infinite recursion, which will be diagnosed separately.
@@ -3401,21 +3402,56 @@ public:
   }
 
   bool checkUnsupportedNestedGeneric(NominalTypeDecl *NTD) {
+    // We don't support protocols outside the top level of a file.
+    if (isa<ProtocolDecl>(NTD) &&
+        !NTD->getParent()->isModuleScopeContext()) {
+      TC.diagnose(NTD->getLoc(),
+                  diag::unsupported_nested_protocol,
+                  NTD->getName());
+      return true;
+    }
+
     // We don't support nested types in generics yet.
     if (NTD->isGenericContext()) {
       auto DC = NTD->getDeclContext();
+      if (auto proto = DC->getAsProtocolOrProtocolExtensionContext()) {
+        if (DC->getAsProtocolExtensionContext()) {
+          TC.diagnose(NTD->getLoc(),
+                      diag::unsupported_type_nested_in_protocol_extension,
+                      NTD->getName(),
+                      proto->getName());
+        } else {
+          TC.diagnose(NTD->getLoc(),
+                      diag::unsupported_type_nested_in_protocol,
+                      NTD->getName(),
+                      proto->getName());
+        }
+        return true;
+      }
+
       if (!TC.Context.LangOpts.EnableExperimentalNestedGenericTypes) {
-        if (DC->isTypeContext()) {
+        if (auto parent = dyn_cast<NominalTypeDecl>(DC)) {
           if (NTD->getGenericParams())
             TC.diagnose(NTD->getLoc(), diag::unsupported_generic_nested_in_type,
-                  NTD->getName(),
-                  DC->getDeclaredTypeOfContext());
+                        NTD->getName(),
+                        parent->getName());
           else
             TC.diagnose(NTD->getLoc(),
                         diag::unsupported_type_nested_in_generic_type,
                         NTD->getName(),
-                        DC->getDeclaredTypeOfContext());
+                        parent->getName());
           return true;
+        } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
+          auto *parent = ED->getAsNominalTypeOrNominalTypeExtensionContext();
+          if (parent == nullptr) {
+            /* Invalid extension -- diagnosed elsewhere */
+            return true;
+          }
+
+          TC.diagnose(NTD->getLoc(),
+                      diag::unsupported_type_nested_in_generic_extension,
+                      NTD->getName(),
+                      parent->getName());
         }
       }
 
@@ -3434,20 +3470,6 @@ public:
   }
 
   void visitEnumDecl(EnumDecl *ED) {
-    // This enum declaration is technically a parse error, so do not type
-    // check.
-    if (isa<ProtocolDecl>(ED->getParent()))
-      return;
-
-    // Types cannot be defined in a protocol extension.
-    if (ED->getDeclContext()->getAsProtocolExtensionContext()) {
-      if (!ED->isInvalid())
-        TC.diagnose(ED->getLoc(), diag::extension_protocol_type_definition,
-                    ED->getFullName());
-      ED->setInvalid();
-      return;
-    }
-
     TC.checkDeclAttributesEarly(ED);
     TC.computeAccessibility(ED);
 
@@ -3507,20 +3529,6 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
-    // This struct declaration is technically a parse error, so do not type
-    // check.
-    if (isa<ProtocolDecl>(SD->getParent()))
-      return;
-
-    // Types cannot be defined in a protocol extension.
-    if (SD->getDeclContext()->getAsProtocolExtensionContext()) {
-      if (!SD->isInvalid())
-        TC.diagnose(SD->getLoc(), diag::extension_protocol_type_definition,
-                    SD->getFullName());
-      SD->setInvalid();
-      return;
-    }
-
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessibility(SD);
 
@@ -3652,20 +3660,6 @@ public:
 
 
   void visitClassDecl(ClassDecl *CD) {
-    // This class declaration is technically a parse error, so do not type
-    // check.
-    if (isa<ProtocolDecl>(CD->getParent()))
-      return;
-
-    // Types cannot be defined in a protocol extension.
-    if (CD->getDeclContext()->getAsProtocolExtensionContext()) {
-      if (!CD->isInvalid())
-        TC.diagnose(CD->getLoc(), diag::extension_protocol_type_definition,
-                    CD->getFullName());
-      CD->setInvalid();
-      return;
-    }
-
     TC.checkDeclAttributesEarly(CD);
     TC.computeAccessibility(CD);
 
@@ -3741,13 +3735,11 @@ public:
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
-    // This protocol declaration is technically a parse error, so do not type
-    // check.
-    if (isa<ProtocolDecl>(PD->getParent()))
-      return;
-
     TC.checkDeclAttributesEarly(PD);
     TC.computeAccessibility(PD);
+
+    if (!IsSecondPass)
+      checkUnsupportedNestedGeneric(PD);
 
     if (IsSecondPass) {
       checkAccessibility(TC, PD);
@@ -4078,8 +4070,11 @@ public:
     }
 
     // 'Self' is only a dynamic self on class methods.
-    auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
-    assert(nominal && "Non-nominal container for method type?");
+    auto declaredType = dc->getDeclaredTypeOfContext();
+    if (declaredType->is<ErrorType>())
+      return false;
+
+    auto nominal = declaredType->getAnyNominal();
     if (!isa<ClassDecl>(nominal) && !isa<ProtocolDecl>(nominal)) {
       int which;
       if (isa<StructDecl>(nominal))
@@ -5695,36 +5690,27 @@ public:
   void visitExtensionDecl(ExtensionDecl *ED) {
     TC.validateExtension(ED);
 
-    if (ED->isInvalid()) {
-      // Mark children as invalid.
-      // FIXME: This is awful.
-      for (auto member : ED->getMembers()) {
-        member->setInvalid();
-        if (ValueDecl *VD = dyn_cast<ValueDecl>(member))
-          VD->overwriteType(ErrorType::get(TC.Context));
-      }
-      return;
-    }
-
     TC.checkDeclAttributesEarly(ED);
 
     if (!IsSecondPass) {
-      CanType ExtendedTy = ED->getExtendedType()->getCanonicalType();
-
-      if (!isa<NominalType>(ExtendedTy) &&
-          !isa<BoundGenericType>(ExtendedTy) &&
-          !isa<ErrorType>(ExtendedTy)) {
-        // FIXME: Redundant diagnostic test here?
-        TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
-                    ExtendedTy);
-        // FIXME: It would be nice to point out where we found the named type
-        // declaration, if any.
-        ED->setInvalid();
+      if (auto extendedTy = ED->getExtendedType()) {
+        if (!extendedTy->is<NominalType>() &&
+            !extendedTy->is<BoundGenericType>() &&
+            !extendedTy->is<ErrorType>()) {
+          // FIXME: Redundant diagnostic test here?
+          TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
+                      extendedTy);
+          // FIXME: It would be nice to point out where we found the named type
+          // declaration, if any.
+          ED->setInvalid();
+        }
       }
 
       TC.checkInheritanceClause(ED);
-      if (auto nominal = ExtendedTy->getAnyNominal()) {
-        TC.validateDecl(nominal);
+      if (auto extendedTy = ED->getExtendedType()) {
+        if (auto nominal = extendedTy->getAnyNominal()) {
+          TC.validateDecl(nominal);
+        }
       }
 
       validateAttributes(TC, ED);
@@ -5741,14 +5727,13 @@ public:
       TC.checkConformancesInContext(ED, ED);
     }
 
-    if (!ED->isInvalid()) {
-      for (Decl *Member : ED->getMembers())
-        visit(Member);
-      for (Decl *Global : ED->getDerivedGlobalDecls())
-        visit(Global);
-    }
+    for (Decl *Member : ED->getMembers())
+      visit(Member);
+    for (Decl *Global : ED->getDerivedGlobalDecls())
+      visit(Global);
 
-    TC.checkDeclAttributes(ED);
+    if (!ED->isInvalid())
+      TC.checkDeclAttributes(ED);
  }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
@@ -6461,8 +6446,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       return;
     proto->computeType();
 
-    auto gp = proto->getGenericParams();
-
     // Resolve the inheritance clauses for each of the associated
     // types.
     for (auto member : proto->getMembers()) {
@@ -6472,6 +6455,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     }
 
     // Validate the generic type signature, which is just <Self : P>.
+    auto gp = proto->getGenericParams();
+
     validateGenericTypeSignature(proto);
 
     assert(gp->getOuterParameters() ==
@@ -6493,11 +6478,12 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         archetype = selfArchetype->getNestedType(assocType->getName())
           .getAsArchetype();
         if (!archetype)
-          return;
-
-        assocType->setArchetype(archetype);
-        if (!assocType->hasType())
-          assocType->computeType();
+          assocType->overwriteType(ErrorType::get(D->getASTContext()));
+        else {
+          assocType->setArchetype(archetype);
+          if (!assocType->hasType())
+            assocType->computeType();
+        }
       }
     }
 

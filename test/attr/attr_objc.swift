@@ -324,22 +324,22 @@ class ConcreteContext3 {
 
 func genericContext1<T>(_: T) {
   @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{3-9=}}
-  class subject_inGenericContext {} // expected-error{{type 'subject_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
+  class subject_inGenericContext {} // expected-error{{type 'subject_inGenericContext' cannot be nested in generic function 'genericContext1'}}
 
   @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{3-9=}}
-  class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{type 'subject_inGenericContext2' nested in generic function 'genericContext1' is not allowed}}
+  class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{type 'subject_inGenericContext2' cannot be nested in generic function 'genericContext1'}}
 
-  class subject_constructor_inGenericContext { // expected-error{{type 'subject_constructor_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
+  class subject_constructor_inGenericContext { // expected-error{{type 'subject_constructor_inGenericContext' cannot be nested in generic function 'genericContext1'}}
     @objc
     init() {} // no-error
   }
 
-  class subject_var_inGenericContext { // expected-error{{type 'subject_var_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
+  class subject_var_inGenericContext { // expected-error{{type 'subject_var_inGenericContext' cannot be nested in generic function 'genericContext1'}}
     @objc
     var subject_instanceVar: Int = 0 // no-error
   }
 
-  class subject_func_inGenericContext { // expected-error{{type 'subject_func_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
+  class subject_func_inGenericContext { // expected-error{{type 'subject_func_inGenericContext' cannot be nested in generic function 'genericContext1'}}
     @objc
     func f() {} // no-error
   }
